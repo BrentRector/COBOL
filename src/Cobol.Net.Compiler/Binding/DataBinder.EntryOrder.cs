@@ -25,8 +25,9 @@ using Core = CobolParserCore;
 /// later pass see source order. An item later in a record that is still being described is bound the same way at the
 /// granularity of its own entry (<see cref="BindLaterEntriesOfOpenRecord"/>, kb/Work PB1941): the entry, its
 /// subordinates and each group entry between it and its nearest bound ancestor bind now, and the walk attaches them
-/// where they stand. Measuring an item whose own description is open — the description that referenced the constant —
-/// is the SR4 cycle; an item subordinate to that open entry is <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>.</para>
+/// where they stand — an entry SUBORDINATE to the entry whose OCCURS bound demanded the constant included, since that
+/// entry's item exists before its table bounds bind (<see cref="BindTableBounds"/>). Measuring an item whose own
+/// description is open — the description that referenced the constant — is the SR4 cycle.</para>
 /// </summary>
 public sealed partial class DataBinder
 {
@@ -46,7 +47,12 @@ public sealed partial class DataBinder
     /// <summary>One entry whose description is being bound right now: the entry, its walk's level stack and the level
     /// the entry nests at. The stack items of a LOWER level are its ancestors — open groups whose subordinates are
     /// still being described; the stack items at or above it are complete siblings and their subordinates.</summary>
-    private sealed record OpenDescription(Core.DataDescriptionEntryContext Entry, Stack<DataItem> Stack, int Level);
+    private sealed record OpenDescription(Core.DataDescriptionEntryContext Entry, Stack<DataItem> Stack, int Level)
+    {
+        /// <summary>The entry's own item, once it exists while its description is still open: while its table bounds
+        /// bind (<see cref="BindTableBounds"/>).</summary>
+        public DataItem? Item { get; set; }
+    }
 
     /// <summary>The descriptions being bound right now, outermost first (an out-of-order record bind nests).</summary>
     private readonly List<OpenDescription> _openDescriptions = [];
@@ -118,10 +124,36 @@ public sealed partial class DataBinder
     private bool IsBeingDescribed(string name) =>
         _openDescriptions.Any(d => CobolNames.Same(d.Entry.dataName()?.GetText(), name));
 
-    /// <summary>Is <paramref name="item"/>'s description still open — an ancestor of an entry being bound, so a group
-    /// whose subordinates are still being described?</summary>
+    /// <summary>Is <paramref name="item"/>'s description still open — the item of the entry being bound, or an ancestor
+    /// of it, so a group whose subordinates are still being described?</summary>
     private bool IsDescriptionOpen(DataItem item) =>
-        _openDescriptions.Any(d => item.Level < d.Level && d.Stack.Contains(item));
+        _openDescriptions.Any(d => ReferenceEquals(d.Item, item) || (item.Level < d.Level && d.Stack.Contains(item)));
+
+    /// <summary>The OCCURS clause of each entry whose item exists and whose table bounds are not yet bound
+    /// (<see cref="DataItem.TableBoundsPending"/>).</summary>
+    private readonly Dictionary<DataItem, Core.OccursClauseContext> _pendingTableBounds = new(ReferenceEqualityComparer.Instance);
+
+    /// <summary>⛔ AN ENTRY'S TABLE BOUNDS BIND AFTER ITS ITEM EXISTS (kb/Work PB1941). <c>05 A3 OCCURS K3. 10 W3 PIC
+    /// X(4).</c> with <c>01 K3 CONSTANT AS LENGTH OF W3 (1).</c>: A3's OCCURS bound demands K3, and K3 measures W3, an
+    /// entry subordinate to A3. §13.10.3 SR4 ("The length of data-name-1 or data-name-2 shall not be dependent,
+    /// directly or indirectly, upon the value of constant-name-1") is not violated — an element's length does not
+    /// depend on the occurrence count — so W3 binds ahead of the walk (<see cref="BindLaterEntriesOfOpenRecord"/>)
+    /// under A3's item, which therefore exists, linked into its record and known as a table
+    /// (<see cref="DataItem.TableBoundsPending"/>), before the bounds are evaluated. A3's description stays open
+    /// meanwhile (<see cref="IsDescriptionOpen"/>): a constant that measures A3 or an ancestor is the SR4 cycle.
+    /// <para>Each bound is an integer literal or an integer constant-name (§13.10.3 SR2), read by
+    /// <see cref="IntegerOperandValue"/>. The table is allocated at its MAXIMUM occurrence count — the last fixed
+    /// bound (integer-2 of a Format 2 table, the sole bound of a fixed one) — per §8.5.1.8; the minimum, DEPENDING,
+    /// KEY and dynamic-capacity surface is the <see cref="OccursSpec"/>.</para></summary>
+    private void BindTableBounds(DataItem item, OpenDescription description)
+    {
+        if (!_pendingTableBounds.Remove(item, out var occ)) return;
+        description.Item = item;
+        string where = $"data item '{item.CobolName ?? "FILLER"}'";
+        int? occurs = occ.integerOperand() is { Length: > 0 } bounds && IntegerOperandValue(bounds[^1], where) is { } n
+            ? n : null;
+        item.BindTableBounds(occurs, OdoBindOccursSpec(occ, where, occurs));
+    }
 
     /// <summary>Bind, now and out of source order, every record that declares <paramref name="name"/> and whose bind has
     /// not begun; true when one was bound. The roots are parked for the section walk to place
@@ -161,9 +193,11 @@ public sealed partial class DataBinder
     /// ancestor screens see the real chain, and the walk ATTACHES it when it reaches the entry
     /// (<see cref="TakePreboundEntry"/>), so the parent's members keep source order. A description that does depend
     /// on the constant meets the constant's own cycle check while it binds here — the SR4 violation, reported as such.</para>
-    /// <para>An entry subordinate to the entry whose description is being bound right now has no bound ancestor to
-    /// link to (that entry's item does not exist yet) and is left for
-    /// <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>.</para></summary>
+    /// <para>An entry subordinate to the entry whose description is being bound right now links to that entry's item,
+    /// which exists while the entry's table bounds bind (<see cref="BindTableBounds"/>) — the one place an entry with
+    /// subordinates may demand a constant. Before the item exists only the elementary-only clauses read a constant
+    /// (PICTURE, VALUE, DYNAMIC LENGTH), so there an entry with a subordinate has no ancestor to link to and its own
+    /// clause rule reports the source.</para></summary>
     /// <returns>True when at least one entry was bound.</returns>
     private bool BindLaterEntriesOfOpenRecord(string name)
     {
@@ -259,7 +293,8 @@ public sealed partial class DataBinder
 
     /// <summary>Where one report group description entry stands: its RD's entry list, its index there and the
     /// report-name. A report entry is no <see cref="DataItem"/> that <see cref="ReferenceResolver.FindItem"/> sees, so
-    /// a constant's length phrase finds it here.</summary>
+    /// a constant's length phrase finds it here, and its description is read from here
+    /// (<see cref="DescribeReportItem"/>) by the report walk and the length phrase alike.</summary>
     private sealed record ReportEntryLocation(Core.ReportGroupEntryContext[] Entries, int Index, string ReportName)
     {
         public Core.ReportGroupEntryContext Entry => Entries[Index];
@@ -292,13 +327,6 @@ public sealed partial class DataBinder
 
     /// <summary>Every named report group description entry of this unit, by name.</summary>
     private readonly Dictionary<string, List<ReportEntryLocation>> _reportEntryLocations = new(CobolNames.Comparer);
-
-    /// <summary>The report group description entries the report binder has reached.</summary>
-    private readonly HashSet<Core.ReportGroupEntryContext> _reportEntriesBound = [];
-
-    /// <summary>Each elementary report item's printable <see cref="DataItem"/> (its first repetition's — every
-    /// repetition shares the one description), by its entry.</summary>
-    private readonly Dictionary<Core.ReportGroupEntryContext, DataItem> _reportEntryItems = [];
 
     private void DeclareReportEntries(Core.ReportDescriptionEntryContext rd)
     {

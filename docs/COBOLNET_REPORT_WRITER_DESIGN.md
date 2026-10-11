@@ -651,7 +651,12 @@ entry, asking the data arm's own `ScreenImmediateMemberLevel` — COBOLNET2771, 
 record (kb/Work PB1246, PB1954). A constant's
 `LENGTH OF` / `BYTE-LENGTH OF` may name a report entry: `DeclareReportEntries` records every named entry before
 binding, `ReportLengthOperand` refuses a report group (§13.10.3 SR11 — elementary report items only, kb/Work PB1226)
-and measures an elementary one as its printable item; and `ScreenReportDescriptionHasGroup` reports an RD with no group entry, COBOLNET2708,
+and measures an elementary one by its DESCRIPTION — PICTURE, USAGE (its own or the one an enclosing entry writes,
+§13.18.60.4 GR1), SIGN, JUSTIFIED, BLANK WHEN ZERO and the VALUE literals, decoded once per entry from the written
+entries by `DescribeReportItem` and analyzed by `ReportPrintablePicture`, the two functions the report walk builds the
+printable item from (`DataBinder.ReportItemDescription.cs`, kb/Work PB1941) — so the item measures the same wherever
+the constant is evaluated: in the FILE SECTION, in an earlier group, earlier in its own group, or in the OCCURS
+clause of an entry it is subordinate to; and `ScreenReportDescriptionHasGroup` reports an RD with no group entry, COBOLNET2708,
 §13.8.4); the report group entry's name slot is the data description entry's `dataName` (FILLER included,
 §13.18.20.3 SR3), read through `CstExtensions.NameOrNull`; and `reportPageClause` carries the page-width operand
 (`integer-2 {COLS | COLUMNS}`, `ReportModel.PageWidth`, default 999 by §13.18.39.4 GR5 → `CobolReport`'s page

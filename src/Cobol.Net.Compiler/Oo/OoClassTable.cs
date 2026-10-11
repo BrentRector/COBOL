@@ -33,6 +33,16 @@ public sealed class OoClassTable
     /// (<see cref="_ifaceByName"/> is checked against <see cref="_byName"/> at Build — a collision is 0840).</summary>
     public IReadOnlyList<OoInterfaceSymbol> Interfaces => _interfaces;
     private readonly List<OoInterfaceSymbol> _interfaces = [];
+
+    /// <summary>The PARAMETERIZED class and interface definitions (§9.3.12 / §9.3.13), in source order: kept OUT of
+    /// <see cref="Classes"/> / <see cref="Interfaces"/> and out of every name lookup — each is a skeleton, its
+    /// expansions are the classes (<see cref="OoExpansion"/>) — but each is still a class or interface definition, so
+    /// the binder binds it as itself, for its own rules, and emits nothing from it (kb/Work PB2051; OO deep-dive D12).</summary>
+    public IReadOnlyList<OoClassSymbol> ParameterizedClasses => _parameterizedClasses;
+    private readonly List<OoClassSymbol> _parameterizedClasses = [];
+    /// <summary>The interface twin of <see cref="ParameterizedClasses"/>.</summary>
+    public IReadOnlyList<OoInterfaceSymbol> ParameterizedInterfaces => _parameterizedInterfaces;
+    private readonly List<OoInterfaceSymbol> _parameterizedInterfaces = [];
     private readonly Dictionary<string, OoInterfaceSymbol> _ifaceByName = new(CobolNames.Comparer);
 
     /// <summary>The interface named <paramref name="name"/>, or null (case-insensitive, §8.3.2.2).</summary>
@@ -175,7 +185,9 @@ public sealed class OoClassTable
     public static OoClassTable Build(IReadOnlyList<Core.ClassDefinitionContext> classes, EditionContext edition,
         IReadOnlyList<Core.InterfaceDefinitionContext>? interfaces = null,
         IReadOnlySet<string>? parameterizedNames = null,
-        IReadOnlyList<Core.ClassDefinitionContext>? parameterizedClasses = null)
+        IReadOnlyList<Core.ClassDefinitionContext>? parameterizedClasses = null,
+        IReadOnlyList<Core.InterfaceDefinitionContext>? parameterizedInterfaces = null,
+        IReadOnlySet<string>? expandedNames = null)
     {
         var table = new OoClassTable { _parameterized = parameterizedNames ?? EmptyNames };
         var usedCsNames = new HashSet<string>(StringComparer.Ordinal);
@@ -204,12 +216,8 @@ public sealed class OoClassTable
             using var atInterface = edition.At(ictx.interfaceName(0));   // PB975 — every pass-1 report is positioned
             // COBOL-2002 introduction gate: VersionConformancePass ParseArm.VisitInterfaceDefinition (rearch 14g.3,
             // recognition — fires per parse node, so a duplicate/colliding definition dropped below still names its edition).
-            string icsName = DataItem.WordIdentifier(iname);
-            var isym = new OoInterfaceSymbol(iname, icsName, ictx)
-            {
-                ExternalizedName = Externalized(ictx.externalizedNamePhrase(), iname,
-                    "INTERFACE-ID", "ISO §11.6.3 SR1"),
-            };
+            var isym = NewInterfaceSymbol(ictx);
+            string icsName = isym.CsName;
             if (table._ifaceByName.ContainsKey(iname) || table._byName.ContainsKey(iname)
                 || !usedCsNames.Add(icsName))
             {
@@ -221,9 +229,38 @@ public sealed class OoClassTable
             table._ifaceByName.Add(iname, isym);
             table._interfaces.Add(isym);
             // The END INTERFACE and END METHOD names are §10.7.3 SR6 / SR5, asked by Validation.EndMarkerPass.
+            AddPrototypes(isym);
+        }
+        // The PARAMETERIZED interface definitions (kb/Work PB2051): out of the table and every lookup, but interface
+        // definitions all the same — their INTERFACE-ID and prototype rules are asked here, their formals bound later.
+        // A definition some expansion re-binds is asked through that expansion only (one fact, one diagnostic:
+        // OoExpansion.Result.ExpandedNames).
+        foreach (var ictx in parameterizedInterfaces ?? [])
+        {
+            if (expandedNames?.Contains(ictx.interfaceName(0).GetText()) == true) continue;
+            using var atInterface = edition.At(ictx.interfaceName(0));
+            var isym = NewInterfaceSymbol(ictx);
+            AddPrototypes(isym);
+            table._parameterizedInterfaces.Add(isym);
+        }
 
-            // PROTOTYPES (§10.6.2 SR4): a header + optional LINKAGE-only data division, NO procedure body,
-            // NO OVERRIDE/FINAL attributes (§11.7 SR2/SR8 — the OVERRIDE/FINAL wave's forward obligation).
+        // One interface definition's symbol (the table's and the parameterized ones); §11.6.3 SR1 screens the AS literal.
+        OoInterfaceSymbol NewInterfaceSymbol(Core.InterfaceDefinitionContext ictx)
+        {
+            string iname = ictx.interfaceName(0).GetText();
+            return new OoInterfaceSymbol(iname, DataItem.WordIdentifier(iname), ictx)
+            {
+                ExternalizedName = Externalized(ictx.externalizedNamePhrase(), iname,
+                    "INTERFACE-ID", "ISO §11.6.3 SR1"),
+            };
+        }
+
+        // PROTOTYPES (§10.6.2 SR4): a header + optional LINKAGE-only data division, NO procedure body,
+        // NO OVERRIDE/FINAL attributes (§11.7 SR2/SR8 — the OVERRIDE/FINAL wave's forward obligation).
+        void AddPrototypes(OoInterfaceSymbol isym)
+        {
+            var ictx = isym.Ctx;
+            string iname = isym.Name;
             foreach (var m in ictx.methodDefinition())
             {
                 string pname = (m.methodName().Length > 0 ? m.methodName(0)?.GetText() : null)
@@ -265,8 +302,10 @@ public sealed class OoClassTable
                         $"interface '{iname}': duplicate method prototype '{pname}' (v1 unique-name rule, D9)");
             }
         }
-        // Interface INHERITS resolution + cycle check (§11.6.3 SR2/SR3/SR6).
-        foreach (var isym in table._interfaces)
+        // Interface INHERITS resolution + cycle check (§11.6.3 SR2/SR3/SR6). The INHERITS clause of a PARAMETERIZED
+        // interface is asked too (kb/Work PB2051): nothing resolves to a skeleton, so it cannot close a cycle, and a
+        // base written as one of its parameter-names resolves as a formal, which each expansion's own clause answers.
+        foreach (var isym in table._interfaces.Concat(table._parameterizedInterfaces))
         {
             // §11.6.3 SR6: "A given interface-name shall not appear more than once in an INHERITS clause" — the rule is
             // about the WRITTEN NAME (two spellings are one name under the Annex C fold, §8.1.3.2 GR3 b)/GR4 b)), not the interface it resolves to:
@@ -320,7 +359,7 @@ public sealed class OoClassTable
         // prototype of the same roster key (the v1 method resolution signature is the method-name, kb/Work PB1519) is a
         // violation. Asked after the INHERITS graph resolved (it needs the closure) and before any formal binds (the
         // key needs none); a cyclic graph is reported above and the closure walk terminates over it.
-        foreach (var isym in table._interfaces)
+        foreach (var isym in table._interfaces.Concat(table._parameterizedInterfaces))
             foreach (var own in isym.Prototypes)
                 foreach (var inherited in isym.InheritedClosure())
                     if (inherited.FindOwnPrototype(own.ExternalizedName) is not null)
@@ -340,17 +379,8 @@ public sealed class OoClassTable
             using var atClass = edition.At(id.className(0));
             // COBOL-2002 introduction gate: VersionConformancePass ParseArm.VisitClassDefinition (rearch 14g.3,
             // recognition — fires per parse node, so a duplicate/colliding definition dropped below still names its edition).
-            string csName = DataItem.WordIdentifier(name);   // MUST match PicInfo.ClrType's mapping
-            var bases = id.className().Skip(1).Select(c => c.GetText()).ToList();
-            var sym = new OoClassSymbol(name, csName, ctx)
-            {
-                // §11.3.3 SR1 alone omits the zero-length exclusion (verified on the printed page).
-                ExternalizedName = Externalized(id.externalizedNamePhrase(), name,
-                    "CLASS-ID", "ISO §11.3.3 SR1", rejectZeroLength: false),
-                Bases = bases,
-                BaseName = bases.Count >= 1 ? bases[0] : null,
-                IsFinal = id.FINAL() is not null,
-            };
+            var sym = NewClassSymbol(ctx);
+            string csName = sym.CsName;
             ScreenInheritsNames(id, name, edition);
             usedCsNames.Add(csName + NamingConvention.FactorySuffix);   // belt-and-braces (a `__` name cannot collide with COBOL-derived names)
             if (table._ifaceByName.ContainsKey(name))
@@ -367,7 +397,34 @@ public sealed class OoClassTable
             }
             table._classes.Add(sym);
             // The END CLASS and END METHOD names are §10.7.3 SR4 / SR5, asked by Validation.EndMarkerPass.
+            AddMethods(sym);
+        }
 
+        // One class definition's symbol: its names, its CLASS-ID attributes (§11.3.3 SR1 screens the AS literal), its
+        // INHERITS operands as written. Shared by the table's classes and the parameterized definitions (kb/Work PB2051),
+        // so a CLASS-ID rule asked here is asked of every class definition the source holds.
+        OoClassSymbol NewClassSymbol(Core.ClassDefinitionContext ctx)
+        {
+            var id = ctx.classIdParagraph();
+            string name = id.className(0).GetText();
+            string csName = DataItem.WordIdentifier(name);   // MUST match PicInfo.ClrType's mapping
+            var bases = id.className().Skip(1).Select(c => c.GetText()).ToList();
+            return new OoClassSymbol(name, csName, ctx)
+            {
+                // §11.3.3 SR1 alone omits the zero-length exclusion (verified on the printed page).
+                ExternalizedName = Externalized(id.externalizedNamePhrase(), name,
+                    "CLASS-ID", "ISO §11.3.3 SR1", rejectZeroLength: false),
+                Bases = bases,
+                BaseName = bases.Count >= 1 ? bases[0] : null,
+                IsFinal = id.FINAL() is not null,
+            };
+        }
+
+        // The instance and factory method rosters of one class definition (the table's and the parameterized ones).
+        void AddMethods(OoClassSymbol sym)
+        {
+            var ctx = sym.Ctx;
+            string name = sym.Name, csName = sym.CsName;
             foreach (var m in ctx.objectParagraph()?.methodDefinition() ?? [])
             {
                 using var atMethod = edition.At(m);
@@ -498,6 +555,15 @@ public sealed class OoClassTable
         {
             var id = skeleton.classIdParagraph();
             string name = id.className(0).GetText();
+            // The definition binds as itself (PB2051) only when nothing expands it; an expanded one is asked through
+            // its expansions, which re-bind every line of it (one fact, one diagnostic: OoExpansion.Result.ExpandedNames).
+            if (expandedNames?.Contains(name) != true)
+                using (edition.At(id.className(0)))
+                {
+                    var sym = NewClassSymbol(skeleton);
+                    AddMethods(sym);
+                    table._parameterizedClasses.Add(sym);
+                }
             ScreenInheritsNames(id, name, edition);
             if (id.className().Length < 2) continue;
             var baseCtx = id.className(1);
@@ -527,8 +593,10 @@ public sealed class OoClassTable
         // §11.4.3 SR1 (FACTORY) are the SAME sentence — "Interface-name-1 shall be the name of an interface
         // specified in the REPOSITORY paragraph of the containing class definition" — and both now resolve
         // through the §8.4.6.4 funnel. Until kb/Work PB365 this comment said the REPOSITORY requirement was
-        // "staged as a documented follow-up"; a staged rule is an accepted illegal program, so it is enforced.
-        foreach (var sym in table._classes)
+        // "staged as a documented follow-up"; a staged rule is an accepted illegal program, so it is enforced. A
+        // PARAMETERIZED class's IMPLEMENTS clauses are asked too (kb/Work PB2051); a parameter-name there resolves as a
+        // formal, and conformance to whatever it names is each expansion's (§9.3.8.2.4).
+        foreach (var sym in table._classes.Concat(table._parameterizedClasses))
         {
             CaptureImplements(sym.Ctx.objectParagraph()?.implementsClause(), sym.Implements,
                 "OBJECT", "ISO §11.8.3 SR1");

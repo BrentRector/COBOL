@@ -1097,10 +1097,10 @@ public sealed partial class DataBinder
     /// and refused every legal NATIONAL report item at every edition under a §13.15 citation that says nothing
     /// of the kind; the nearest real text, §13.18.14.4 GR3, is about the column/character correspondence.</para>
     /// </summary>
-    private void ScreenReportUsage(Usage usage, ReportModel model, string? entryName, string? written)
+    private void ScreenReportUsage(Usage usage, string reportName, string? entryName, string? written)
     {
         if (usage is Usage.Display or Usage.National) return;
-        Edition.Error(DiagnosticCatalog.ReportUsageNotDisplayOrNational, $"RD '{model.Name}' entry "
+        Edition.Error(DiagnosticCatalog.ReportUsageNotDisplayOrNational, $"RD '{reportName}' entry "
             + $"'{entryName ?? "FILLER"}'{(written is null ? "" : $" ({written})")}: usage {usage} is not "
             + "admitted here — only the DISPLAY or NATIONAL phrase may be specified in any USAGE clause "
             + "associated with a report group item (ISO §13.18.60.3 SR7)");
@@ -2340,7 +2340,7 @@ public sealed partial class DataBinder
         /// clause is specified or implied at a group level, it applies only to each elementary item in the
         /// group"), so a printable item inherits the usage written on a group entry above it instead of the
         /// clause being discarded (kb/Work PB541).</para>
-        public readonly List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> Chain = [];
+        public readonly List<(int Level, Core.ConditionContext? Cond, int Reps, string? Name)> Chain = [];
         /// <summary>Stack frames whose conditions the CURRENT line already carries.</summary>
         public int LineChainDepth;
         /// <summary>The repeating entries enclosing the entry being bound, outermost first (§13.18.38 Format 3).</summary>
@@ -2466,7 +2466,7 @@ public sealed partial class DataBinder
                 for (int rep = 0; rep < occurs.Max; rep++)
                 {
                     frame.Ordinal = rep;
-                    BindReportEntry(ge, entries[i], model, st, occurs, rep);
+                    BindReportEntry(new ReportEntryLocation(entries, i, model.Name), entries[i], model, st, occurs, rep);
                     BindReportEntries(entries, i + 1, subtreeEnd, model, st);
                 }
                 if (counters.Count > 0) st.Varying.RemoveAt(st.Varying.Count - 1);
@@ -2475,7 +2475,7 @@ public sealed partial class DataBinder
                 continue;
             }
             if (counters.Count > 0) st.Varying.Add((ge, counters, null));
-            BindReportEntry(ge, ge, model, st);
+            BindReportEntry(new ReportEntryLocation(entries, i, model.Name), ge, model, st);
             if (counters.Count > 0) st.Varying.RemoveAt(st.Varying.Count - 1);
         }
     }
@@ -2801,12 +2801,12 @@ public sealed partial class DataBinder
     /// <param name="ordinal">This repetition's zero-based ordinal within <paramref name="ownOccurs"/> — what
     /// selects the LINE operand of a multiple LINE clause (§13.18.35.4 GR9).</param>
     private void BindReportEntry(
-        Core.ReportGroupEntryContext ge, Core.ReportGroupEntryContext anchorKey, ReportModel model,
+        ReportEntryLocation at, Core.ReportGroupEntryContext anchorKey, ReportModel model,
         ReportGroupBuild st, ReportOccursSpec? ownOccurs = null, int ordinal = 0)
     {
         {
+            var ge = at.Entry;
             using var _ = Edition.At(ge);
-            _reportEntriesBound.Add(ge);   // a constant's length phrase may now measure it (§13.10.3 SR11, kb/Work PB1226)
             int.TryParse(ge.levelNumber().GetText(), out int level);
             string? entryName = ge.dataName().NameOrNull();
             if (level == 1)
@@ -2824,21 +2824,23 @@ public sealed partial class DataBinder
             }
             var chain = st.Chain;
             while (chain.Count > 0 && chain[^1].Level >= level) chain.RemoveAt(chain.Count - 1);
-            // ISO §13.18.60.4 GR1 — the usage written on an enclosing report group entry "applies only to each
-            // elementary item in the group", so the innermost surviving frame carries the usage this entry
-            // inherits when it writes no USAGE clause of its own (kb/Work PB541).
-            string? inheritedUsage = chain.Count > 0 ? chain[^1].Usage : null;
 
-            // Clause capture for THIS entry (clauses may appear in any order within the entry — RW104A).
-            string? picText = null, usageText = null;
+            // The clauses that DESCRIBE the entry's item — PICTURE, USAGE (its own, and the one §13.18.60.4 GR1 hands
+            // down from an enclosing entry), SIGN, JUSTIFIED, BLANK WHEN ZERO and the VALUE literals — decoded once per
+            // entry by the reader a constant's length phrase also asks (DataBinder.ReportItemDescription.cs, kb/Work
+            // PB1941). The rest of the entry's clauses are the walk's, captured below (clauses may appear in any order
+            // within the entry — RW104A).
+            var described = DescribeReportItem(at);
+            string? picText = described.PicText, usageText = described.UsageText;
+            string? inheritedUsage = described.InheritedUsage;
             // The VALUE clause's operand list (§13.18.63.2 format 4) and the count WRITTEN — the SR35 check
             // reads the written count so a rejected operand cannot make an illegal clause look legal.
-            var valueRaws = new List<string>();
+            var valueRaws = new List<string>(described.ValueRaws);
             int valueOpsWritten = 0;
-            List<EditingPhraseSpec>? reportEditing = null;   // PICTURE EDITING phrases (§13.18.40.2)
-            LocaleEditSpec? reportLocale = null;             // PICTURE format 2 — the LOCALE phrase (PB113 / PB64 T6)
-            SignSpec? ownSign = null;
-            bool justified = false, blankWhenZero = false, groupIndicate = false;
+            List<EditingPhraseSpec>? reportEditing = described.Editing;   // PICTURE EDITING phrases (§13.18.40.2)
+            LocaleEditSpec? reportLocale = described.Locale;   // PICTURE format 2 — the LOCALE phrase (PB113 / PB64 T6)
+            SignSpec? ownSign = described.OwnSign;
+            bool justified = described.Justified, blankWhenZero = described.BlankWhenZero, groupIndicate = false;
             // A repetition VEHICLE that was REFUSED (an OCCURS clause a §13.18.38.3 syntax rule rejected):
             // the entry's §13.15.4 GR3 repetition count is then not knowable, so the operand-count screen
             // below stands down rather than emitting a second diagnostic about it (kb/Work PB506).
@@ -2958,55 +2960,12 @@ public sealed partial class DataBinder
                     // The counters are made by the walk (VaryingCountersOf), once per entry per enclosing occurrence,
                     // and reach this entry's printable item through ReportGroupBuild.Varying (§13.18.64.3 SR2).
                 }
-                else if (clause.pictureClause()?.PIC_STRING() is { } pic)
+                else if (clause.pictureClause() is not null || clause.usageClause() is not null
+                         || clause.signClause() is not null || clause.justifiedClause() is not null
+                         || clause.blankWhenZeroClause() is not null)
                 {
-                    picText = pic.GetText();
-                    // §13.15.4 GR2 imports the PICTURE clause, and §13.10.3 SR2 lets an integer constant-name
-                    // specify repetition in a picture character-string: expanded before the analyzer reads it,
-                    // exactly as BindEntry does for a data description entry (kb/Work PB1226's sibling sweep).
-                    if (UnitHasConstants)
-                        picText = ExpandPicConstants(picText, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'");
-                    reportEditing = BuildEditingSpecs(clause.pictureClause(),
-                        $"report group entry '{entryName ?? "FILLER"}'");
-                    // PICTURE format 2 in a REPORT GROUP entry (§13.15.4 GR2 imports the PICTURE clause's own
-                    // rules, so format 2 is LEGAL here; kb/Work PB113 — this arm used to ignore the phrase and
-                    // analyze the picture as format 1: a silent wrong answer). One analyzer, three callers. ⛔ Do
-                    // NOT pair it with a SIGN check: §13.15.3 carries no twin of §13.16.3 SR19 — the pair is legal here.
-                    if (clause.pictureClause()!.pictureLocalePhrase() is { } rlp)
-                    {
-                        var localeName = rlp.cobolWord();   // locale-name-1; LOCALE is the formatWord (kb/Work PB764)
-                        var locale = LocaleRef.Current;
-                        if (localeName is not null)
-                        {
-                            var sym = ResolveLocaleName(localeName.GetText(),
-                                $"RD '{model.Name}' entry '{entryName ?? "FILLER"}' PICTURE … LOCALE {localeName.GetText()}",
-                                "ISO §13.18.40.3 SR37 — locale-name-1 shall be specified in the LOCALE clause in the SPECIAL-NAMES paragraph");
-                            if (sym is not null) locale = new LocaleRef(sym);
-                        }
-                        int size = Math.Max(1, IntegerOperandValue(rlp.integerOperand(),
-                            $"RD '{model.Name}' entry '{entryName ?? "FILLER"}' PICTURE … LOCALE SIZE") ?? RecoveredIntegerOperand);
-                        reportLocale = new LocaleEditSpec(locale, size, "");
-                    }
+                    // The item's description — decoded once per entry by DescribeReportItem, above.
                 }
-                else if (clause.usageClause() is { } usage)
-                {
-                    usageText = UsageKeyword(usage);
-                    // ⛔ §13.18.60.3 SR7 IS ABOUT THE CLAUSE, NOT ABOUT THE PRINTABLE LEAF (kb/Work PB541):
-                    // "Only the DISPLAY or NATIONAL phrase may be specified in any USAGE clause associated with
-                    // a report group item." A USAGE clause on a GROUP entry is associated with the report group
-                    // items under it (GR1), so it is screened HERE, where every entry's clause passes — before
-                    // this, a group entry's `USAGE COMP` was captured and then silently discarded, and the only
-                    // usage screen in the compiler was a staged-loud on the leaf's analyzed picture.
-                    ScreenReportUsage(PictureAnalyzer.ParseUsage(usageText, Edition,
-                            $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'"),
-                        model, entryName, usageText);
-                }
-                else if (clause.signClause() is { } sign)
-                    ownSign = new SignSpec(sign.LEADING() is not null, sign.SEPARATE() is not null);
-                else if (clause.justifiedClause() is not null)
-                    justified = true;
-                else if (clause.blankWhenZeroClause() is not null)
-                    blankWhenZero = true;
                 else if (clause.occursClause() is not null)
                 {
                     // The repeating entry itself (ISO §13.18.38 Format 3) is read by ReportOccursOf BEFORE this
@@ -3017,15 +2976,11 @@ public sealed partial class DataBinder
                 }
                 else if (clause.valueClause() is { } value)
                 {
-                    // Format 4 (report-section), ISO §13.18.63.2 — `{literal-1}…`, an operand LIST; the same ONE
-                    // literal-position reader as Format 1 per operand, so a non-literal operand is reported here
-                    // too (kb/Work PB732: an undefined word used to be written into the report as its own
-                    // spelling, exit 0) and the operands are never glued (kb/Work PB506).
+                    // Format 4 (report-section), ISO §13.18.63.2 — `{literal-1}…`: its literals are the description's
+                    // (DescribeReportItem); the connective and the WRITTEN count are the walk's.
                     CheckValueConnective(value, pairedConnective: true,
                         $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'");
                     valueOpsWritten += value.valueItem().FirstOrDefault()?.valueClauseOperand().Length ?? 0;
-                    if (ExtractValueOperandList(value, $"RD '{model.Name}' entry '{entryName ?? "FILLER"}'") is { } raws)
-                        valueRaws.AddRange(raws);
                 }
             }
 
@@ -3072,7 +3027,7 @@ public sealed partial class DataBinder
                 st.Line = opened;
                 group.Lines.Add(opened);
                 // The line's PRESENT WHEN chain: every ancestor condition + this entry's own (§13.18.41.4 GR2b).
-                foreach (var (_, c, _, _, _) in chain) if (c is not null) opened.PresentWhenCtxs.Add(c);
+                foreach (var (_, c, _, _) in chain) if (c is not null) opened.PresentWhenCtxs.Add(c);
                 if (ownCond is not null) opened.PresentWhenCtxs.Add(ownCond);
                 // §13.18.38.4 GR13 on the VERTICAL axis: a repetition the DEPENDING count excludes has no line.
                 opened.RepetitionGuards.AddRange(st.GuardsHere());
@@ -3099,7 +3054,7 @@ public sealed partial class DataBinder
                     if (perReplay > 1) coordinates[^1] = c;
                     var sum = BindSumClause(sumClause, family, family.IdAt(coordinates), entryName, group, model,
                         columns.Count > 0);
-                    foreach (var (_, cond, _, _, _) in chain) if (cond is not null) sum.PresentWhenCtxs.Add(cond);
+                    foreach (var (_, cond, _, _) in chain) if (cond is not null) sum.PresentWhenCtxs.Add(cond);
                     if (ownCond is not null) sum.PresentWhenCtxs.Add(ownCond);
                     sum.RepetitionGuards.AddRange(st.GuardsHere());
                     sums.Add(sum);
@@ -3137,7 +3092,7 @@ public sealed partial class DataBinder
                     // and ScreenReportEntryClausePresence has refused the COLUMN entry (§13.15.3 SR9) — said once,
                     // at the written entry, never here per replay. (The converse is not what this test means: a
                     // line opened by an EARLIER entry says nothing about this entry's ancestry, kb/Work PB1224.)
-                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
+                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), entryName));
                     return;
                 }
                 // ⛔ NO OPERAND, NO PRINTABLE ITEM (kb/Work PB853). An entry with a COLUMN clause and no SOURCE,
@@ -3147,41 +3102,15 @@ public sealed partial class DataBinder
                 // compiler inventing source the programmer did not write — which printed `000` under PIC 999.
                 if (sumClause is null && sourceOps.Count == 0 && valueRaws.Count == 0)
                 {
-                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
+                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), entryName));
                     return;
                 }
                 // The printable item (§13.18.14): a SYNTHETIC DataItem carrying the PICTURE so the emitter's ONE
                 // MOVE conversion path renders the §13.18.53.4 GR1 implicit MOVE. A printable item is a
                 // USAGE-DISPLAY elementary item; its numeric face stores its character IMAGE (StoreAsImage).
                 string itemWhere = $"RD '{model.Name}' printable item '{entryName ?? "FILLER"}'";
-                Usage itemUsage = PictureAnalyzer.ParseUsage(usageText ?? inheritedUsage, Edition, itemWhere);
-                var pic = picText is not null
-                    ? PictureAnalyzer.Analyze(picText, itemUsage, Edition,
-                        itemWhere, ownSign, currencies: CurrencySigns, blankWhenZero: blankWhenZero, editing: reportEditing,
-                        localeFormat2: reportLocale, decimalPointIsComma: DecimalPointIsComma)
-                    // ⛔ ISO §13.15.3 SR14 — THE REPORT GROUP ENTRY'S OWN VALUE-IMPLIED PICTURE, word for word the
-                    // §13.16.3 SR9 rule this compiler synthesizes for a data description entry: "The PICTURE clause
-                    // may be omitted for an elementary item when an alphanumeric, boolean or national literal that
-                    // is not a zero-length literal is specified in the VALUE clause.  A PICTURE clause is implied as
-                    // follows: a) If the literal is alphanumeric, 'PICTURE X(length)' b) If the literal is boolean,
-                    // 'PICTURE 1(length)' c) If the literal is national, 'PICTURE N(length)' where length is the
-                    // length of the literal as specified in 8.3.3, Literals."
-                    // ONE classifier for both formats (DataBinder.ImpliedPicture.cs) — the two-arm shape is this
-                    // repo's most reproducible defect, and this WAS that shape: `02 COLUMN 1 VALUE "HELLO".` is
-                    // legal source the report binder REJECTED, while its data-division twin now compiles.
-                    // The CONTEXT §8.3.3.6.4 GR1/GR4 ask about is this entry's own usage — a report group entry
-                    // is not subject to §13.18.60.4 GR1 inheritance from a data-division group, and §13.18.60.3
-                    // SR7 admits only DISPLAY or NATIONAL here anyway, so GR4's boolean context cannot arise.
-                    // ⛔ THE SINGULAR "the literal": SR14 fixes `length` from THE literal, so the implied
-                    // PICTURE exists only for a clause that supplies exactly ONE operand. A multi-operand
-                    // format-4 VALUE clause (§13.18.63.2, kb/Work PB506) implies none — the standard names no
-                    // rule for which of several literals fixes the ONE description all the repetitions share,
-                    // and taking the first would silently truncate every longer one. Such an entry reaches the
-                    // SR12 diagnostic below, never a guess (DETERMINATION, kb/Work PB504 × PB506).
-                    : valueRaws is [{ } reportValue]
-                        && Sr9ImpliedFor(reportValue, itemUsage) is { } implied
-                    ? ImpliedReportPicture(implied, itemUsage, usageText is not null, ownSign, itemWhere)
-                    : null;
+                // The one analysis a constant's length phrase measures the item by, too (kb/Work PB1941).
+                var pic = ReportPrintablePicture(described, model.Name, entryName);
                 ScreenReportEntryPicture(ge, pic, picText, itemWhere, summed: sumClause is not null);   // once per written entry
                 if (pic is null)
                 {
@@ -3193,7 +3122,7 @@ public sealed partial class DataBinder
                             + "has a VALUE clause but no PICTURE clause, and none is implied: the PICTURE clause may be "
                             + "omitted only when an alphanumeric, boolean or national literal that is not a zero-length "
                             + "literal is specified in the VALUE clause (ISO §13.15.3 SR14)");
-                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
+                    chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), entryName));
                     return;
                 }
                 // §13.18.60.3 SR7 over a usage NO clause ever stated — one IMPLIED by the picture
@@ -3204,7 +3133,7 @@ public sealed partial class DataBinder
                 // gate this replaced admitted DISPLAY alone and refused the NATIONAL half of the rule under a
                 // §13.15 citation that does not say it (kb/Work PB541).
                 if (usageText is null && inheritedUsage is null)
-                    ScreenReportUsage(pic.Usage, model, entryName, picText is null ? null : $"PICTURE {picText}");
+                    ScreenReportUsage(pic.Usage, model.Name, entryName, picText is null ? null : $"PICTURE {picText}");
                 // §13.18.52.3 SR1's report bullet — "a numeric report group description entry whose picture
                 // character-string contains the symbol 'S'" — and SR2, through the ONE elementary-subject test the
                 // data description entry reads (kb/Work PB537: this arm had no screen at all).
@@ -3279,9 +3208,6 @@ public sealed partial class DataBinder
                     BlankWhenZero = blankWhenZero,
                 };
                 item.Uid = _uidCounter++;
-                // The elementary report item a constant's LENGTH OF / BYTE-LENGTH OF measures (§13.10.3 SR11, kb/Work
-                // PB1226): the first repetition's item — every repetition of the entry shares its description.
-                _reportEntryItems.TryAdd(ge, item);
                 if (pic is { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display })
                     MarkImageForced(item);      // the collected image fact — compose wants the printable CHARACTER image
                 // THE OPERAND LIST (§13.18.63.2 format 4 / §13.18.53.2 — both clauses write `{ operand } …`).
@@ -3327,7 +3253,7 @@ public sealed partial class DataBinder
                 }
             }
 
-            chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), usageText ?? inheritedUsage, entryName));
+            chain.Add((level, ownCond, EntryRepetitions(columns, ownOccurs), entryName));
         }
     }
 
@@ -3620,7 +3546,7 @@ public sealed partial class DataBinder
     /// the number of repetitions of any number of successive repeating entries at higher levels" straight off
     /// the scope stack.</summary>
     private static List<int> RepetitionChain(List<ReportColumnSpec> columns, ReportOccursSpec? occurs,
-        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> chain)
+        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Name)> chain)
     {
         var reps = new List<int>(chain.Count + 1) { EntryRepetitions(columns, occurs) };
         for (int i = chain.Count - 1; i >= 0; i--) reps.Add(chain[i].Reps);
@@ -3788,7 +3714,7 @@ public sealed partial class DataBinder
     /// (<see cref="DataItem.SubscriptLevels"/>) are the ordinary ones.</para>
     /// </summary>
     private ReportSumFamily SumFamilyOf(Core.ReportGroupEntryContext ge, string? entryName, string? picText,
-        int columnCount, List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> chain,
+        int columnCount, List<(int Level, Core.ConditionContext? Cond, int Reps, string? Name)> chain,
         ReportModel model, ReportGroupBuild st)
     {
         if (st.SumFamilies.TryGetValue(ge, out var known)) return known;
@@ -3873,7 +3799,7 @@ public sealed partial class DataBinder
     /// <see cref="SumFamilyOf"/>: the same repetition geometry, so a rolled total maps an addend's occurrences onto a
     /// counter's by one arithmetic (§13.18.54.4 GR8).</summary>
     private ReportSourceFamily SourceFamilyOf(Core.ReportGroupEntryContext ge, string? entryName, int columnCount,
-        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Usage, string? Name)> chain,
+        List<(int Level, Core.ConditionContext? Cond, int Reps, string? Name)> chain,
         ReportModel model, ReportGroupBuild st)
     {
         if (st.SourceFamilies.TryGetValue(ge, out var known)) return known;
@@ -3913,7 +3839,7 @@ public sealed partial class DataBinder
             {
                 Family = family, Coordinates = coordinates, Source = operands[ordinal % operands.Count],
             };
-            foreach (var (_, cond, _, _, _) in st.Chain) if (cond is not null) occurrence.PresentWhenCtxs.Add(cond);
+            foreach (var (_, cond, _, _) in st.Chain) if (cond is not null) occurrence.PresentWhenCtxs.Add(cond);
             if (ownCond is not null) occurrence.PresentWhenCtxs.Add(ownCond);
             occurrence.RepetitionGuards.AddRange(st.GuardsHere());
             occurrence.Varyings.AddRange(varyings);

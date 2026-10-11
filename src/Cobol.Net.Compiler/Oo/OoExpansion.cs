@@ -49,20 +49,28 @@ using CobolNet.Runtime;
 /// <para><b>The definition itself emits nothing.</b> It is a skeleton, and §12.3.8.4 GR1 ("If object-class-name-1
 /// is a class described with the USING phrase, object-class-name-1 may be specified only in the REPOSITORY
 /// paragraph") leaves it no other use. It is kept out of the class table and recorded as parameterized, so
-/// <see cref="OoNameResolution.Resolve"/> can name GR1 when some other position writes it.</para>
+/// <see cref="OoNameResolution.Resolve"/> can name GR1 when some other position writes it. It is still a class or
+/// interface definition, so it BINDS as itself for its own rules — its data, environment and method headers, with each
+/// formal resolving as a formal (kb/Work PB2051; <c>OoDriver.BindParameterized</c>).</para>
 /// </summary>
 internal static class OoExpansion
 {
     /// <summary>The group's definitions after expansion: the written NON-parameterized definitions in source order,
     /// then one synthesized definition per distinct expansion (in first-specifier order), plus the names of the
-    /// parameterized definitions (class and interface names share one namespace, §8.3.2.2) and the parameterized CLASS
-    /// definitions themselves — kept out of the class table, but still class definitions whose CLASS-ID paragraph the
-    /// §11.3.3 syntax rules govern (kb/Work PB1505; <c>OoClassTable.Build</c> screens them).</summary>
+    /// parameterized definitions (class and interface names share one namespace, §8.3.2.2) and the parameterized
+    /// definitions themselves — kept out of the class table, but still class and interface definitions that every
+    /// rule of their own text governs (kb/Work PB1505, PB2051): <c>OoClassTable.Build</c> screens their headers and the
+    /// binder binds each as itself (<c>OoDriver.BindParameterized</c>), emitting nothing — and the names of the
+    /// definitions that some expansion re-binds (<see cref="Result.ExpandedNames"/>): those are checked through their
+    /// expansions, never also as themselves, because one fact is one diagnostic and a report naming the definition
+    /// would sit beside each expansion's report of the same line (train 1053 review).</summary>
     public sealed record Result(
         IReadOnlyList<Core.ClassDefinitionContext> Classes,
         IReadOnlyList<Core.InterfaceDefinitionContext> Interfaces,
         IReadOnlySet<string> ParameterizedNames,
-        IReadOnlyList<Core.ClassDefinitionContext> ParameterizedClasses);
+        IReadOnlyList<Core.ClassDefinitionContext> ParameterizedClasses,
+        IReadOnlyList<Core.InterfaceDefinitionContext> ParameterizedInterfaces,
+        IReadOnlySet<string> ExpandedNames);
 
     /// <summary>One parameterized definition: its context, its formals in USING order, and the kind each formal's
     /// REPOSITORY specifier declares it as (null when undeclared — already COBOLNET2239).</summary>
@@ -96,7 +104,7 @@ internal static class OoExpansion
         var entries = new List<Core.RepositoryEntryContext>();
         CollectExpandsEntries(tree, entries);
         if (skeletons.Count == 0 && entries.Count == 0)
-            return new Result(classes, interfaces, new HashSet<string>(), []);   // the overwhelmingly common path
+            return new Result(classes, interfaces, new HashSet<string>(), [], [], new HashSet<string>());   // the overwhelmingly common path
         // §12.3.8.3 SR3 — an EXPANDS phrase inside a parameterized definition is reported once, on the definition
         // (AddSkeleton), and is otherwise inert: it creates nothing.
         entries.RemoveAll(e => EnclosingSkeleton(e) is not null);
@@ -151,21 +159,29 @@ internal static class OoExpansion
 
         var outClasses = new List<Core.ClassDefinitionContext>(plainClasses);
         var outInterfaces = new List<Core.InterfaceDefinitionContext>(plainInterfaces);
+        var expandedNames = new HashSet<string>(CobolNames.Comparer);
         foreach (var x in order)
         {
             var tokens = SubstitutedTokens(x);
             if (x.Of.IsInterface)
             {
                 if (FragmentParse.ParseTokens(tokens, edition.Edition, words, p => p.interfaceDefinition()) is { } ictx)
+                {
                     outInterfaces.Add(ictx);
+                    expandedNames.Add(x.Of.Name);
+                }
                 else ReparseFailed(x);
             }
             else if (FragmentParse.ParseTokens(tokens, edition.Edition, words, p => p.classDefinition()) is { } cctx)
+            {
                 outClasses.Add(cctx);
+                expandedNames.Add(x.Of.Name);
+            }
             else ReparseFailed(x);
         }
         return new Result(outClasses, outInterfaces, new HashSet<string>(skeletons.Keys, CobolNames.Comparer),
-            [.. classes.Where(c => c.classIdParagraph().ooParameterName().Length > 0)]);
+            [.. classes.Where(c => c.classIdParagraph().ooParameterName().Length > 0)],
+            [.. interfaces.Where(i => i.ooParameterName().Length > 0)], expandedNames);
 
         void AddSkeleton(ParserRuleContext ctx, string name, bool isInterface, Core.OoParameterNameContext[] formals,
             Core.EnvironmentDivisionContext? env, string header, string sr8, string sr9)
@@ -196,7 +212,9 @@ internal static class OoExpansion
             }
             // §12.3.8.3 SR12 / SR13 (kb/Work PB1744): a parameter-name is a user-defined word (§8.3.2.2) in the scope
             // of this definition's REPOSITORY paragraph, so one its FUNCTION … INTRINSIC specifier identifies is
-            // refused — through the one declaration funnel, since no binder ever binds this skeleton.
+            // refused — through the one declaration funnel, in a scope of its own: the binder that binds the definition
+            // as itself (OoDriver.BindParameterized, kb/Work PB2051) declares the formal's class-specifier as an
+            // object-class-name, and one word is only one type of user-defined word in a scope (§8.3.2.2).
             new DataBinder(edition) { CobolWords = words }
                 .DeclareParameterNames(OoRepositoryScope.RepositoryEntries(env), formals);
             // §11.3.4 GR6 / §11.6.4 GR4: a parameter-name may be specified "only where an object-class-name or an

@@ -42,6 +42,9 @@ internal static class RaisingPhrase
             var word = t.cobolWord();
             string up = CobolNames.UpperFold(word.GetText());
             bool factory = t.FACTORY() is not null;
+            // Every report below names THIS element, so it is positioned at it — a method prototype's header has no
+            // enclosing position of its own, and its refusals printed with none.
+            using var atTarget = edition.At(t);
 
             // exception-name-1 (SR7). Direct TryGet, not the EcNameResolution funnel: an unresolved word here may
             // legally be a class-name or an interface-name (SR8/SR9), so the funnel's unknown-name error does
@@ -63,12 +66,19 @@ internal static class RaisingPhrase
             // object-class-name-1 (SR8) or interface-name-1 (SR9) — both "specified in the REPOSITORY paragraph",
             // i.e. the §8.4.6.4 scope of THIS source element, asked through the funnel's non-diagnosing half.
             var found = OoNameResolution.Lookup(table, word, up, OoNameResolution.Want.Either);
+            // A parameter-name of the parameterized definition bound as itself (§11.3.4 GR6 / §11.6.4 GR4 admit it
+            // wherever a class-name or interface-name is; kb/Work PB2051): legal here, and each expansion names the
+            // actual. Its kind is its REPOSITORY specifier's, so FACTORY OF an interface formal is still SR8's refusal.
+            // An INTERFACE formal under FACTORY OF falls through to the interface arm's refusal below.
+            if (found.IsFormal
+                && (!factory || OoNameResolution.Lookup(table, word, up, OoNameResolution.Want.Class).IsFormal))
+                continue;
             if (found.Class is not null)
             {
                 targets.Add(new RaisingTarget(RaisingTargetKind.ObjectClass, up, factory));
                 continue;
             }
-            if (found.Interface is not null)
+            if (found.Interface is not null || found.IsFormal)
             {
                 // The interface-name-1 alternative of §14.2.1 carries no FACTORY phrase: `[ FACTORY OF ]` is
                 // printed on the object-class-name-1 line only.

@@ -252,9 +252,13 @@ subordinate run, and each group entry between it and its nearest already-bound a
 parent at once (so qualification, the OCCURS depth and the ancestor screens see the real chain) but joined to the
 parent's members only when the walk reaches it (`TakePreboundEntry` → the walk's one `AttachToHierarchy` tail), so
 member order stays source order; a group bound alone is completed — its remaining subordinates bound under it — before
-anything measures it (`CompletePreboundGroup`). An operand SUBORDINATE to the very entry whose description references
-the constant has no bound ancestor to link to (that entry's item does not exist yet) and stays recognized-not-implemented
-COBOLNET0899 `constant-length-operand-bound-later`.
+anything measures it (`CompletePreboundGroup`). An operand SUBORDINATE to the very entry whose OCCURS bound references
+the constant links to that entry's item: a data description entry's item is created, attached and recorded BEFORE its
+table bounds are evaluated (`BindTableBounds`; `DataItem.TableBoundsPending` keeps it a table meanwhile, so the operand's
+subscripts are screened against the real dimensions), with the entry's description still open, so measuring the entry
+itself or an ancestor stays the SR4 cycle. Before the item exists only a PICTURE, VALUE or DYNAMIC LENGTH clause reads a
+constant, none of which may describe a group (§13.18.40.3 SR1, §13.18.63.3 SR13), so an operand under such an entry is
+that clause's refusal plus COBOLNET1547.
 
 **⛔ A LENGTH PHRASE MEASURES THE COMPLETED DESCRIPTION** (kb/Work PB2465). §13.10.4 GR5/GR6 take the value "as
 specified in" the BYTE-LENGTH / LENGTH intrinsic, which measures the item as described — and four clauses that decide

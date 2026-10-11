@@ -107,6 +107,11 @@ internal sealed class BinderDriver
         // OVERRIDE / FINAL over COMPLETE rosters — a PROPERTY clause's accessors exist only once its class's data has
         // bound (ISO §13.18.42.4 GR1/GR2; kb/Work PB1274), and every signature comparison below reads the marking.
         table.ResolveOverrides(edition);
+        // The PARAMETERIZED definitions nothing expands bind as themselves, for their own rules, after every emitted
+        // class (their uid bands follow) and outside every later pass: nothing emits a skeleton (kb/Work PB2051; OO
+        // deep-dive D12). An expanded one is bound through its expansions only (OoExpansion.Result.ExpandedNames).
+        foreach (var iface in table.ParameterizedInterfaces) oo.BindParameterized(iface);
+        foreach (var cls in table.ParameterizedClasses) oo.BindParameterized(cls);
         // §14.9.23.4 GR7 c)'s METHOD-side half, folded once now that every method symbol exists — at the method's
         // PROCEDURE DIVISION HEADER, the program twin's query point (TurnState.EnabledAtHeader; kb/Work PB1381).
         // See OoMethodSymbol.OoUniversalCheckingHere for why this is bind-time.
@@ -404,7 +409,7 @@ internal sealed class BinderDriver
         // REPOSITORY EXPANDS phrase creates one, and from here on an expansion is an ordinary definition.
         var expanded = OoExpansion.Expand(tree, classDefs, ifaceDefs, edition, words);
         var table = OoClassTable.Build(expanded.Classes, edition, expanded.Interfaces, expanded.ParameterizedNames,
-            expanded.ParameterizedClasses);
+            expanded.ParameterizedClasses, expanded.ParameterizedInterfaces, expanded.ExpandedNames);
         var classes = table.Classes.Select(sym => new OoClassUnit { Symbol = sym }).ToList();
         return (all, classes, table);
 

@@ -247,6 +247,60 @@ public sealed class ParameterizedClassTests
         Assert.Single(errors, e => e.Contains("PCNOSUCH", StringComparison.Ordinal));
     }
 
+    /// <summary>A definition some expansion re-binds is asked through that expansion only, never also as itself
+    /// (kb/Work PB2051, train 1053 review): a report that names the class or interface — a duplicate METHOD-ID
+    /// (COBOLNET0822), a duplicate prototype (COBOLNET0840), an OBJECT LINKAGE SECTION (COBOLNET1519) — would
+    /// otherwise sit twice at one position, once naming the expansion and once the definition that emits nothing.
+    /// An UNEXPANDED definition is still asked as itself (the pb2051 negatives).</summary>
+    [Fact]
+    public void ExpandedDefinition_HeaderAndDataDefects_ReportedOnce()
+    {
+        var errors = ErrorsOf("""
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PCEB1.
+            END CLASS PCEB1.
+            IDENTIFICATION DIVISION.
+            INTERFACE-ID. PCEISK USING ELT.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS ELT.
+            PROCEDURE DIVISION.
+            METHOD-ID. PUT.
+            PROCEDURE DIVISION.
+            END METHOD PUT.
+            METHOD-ID. PUT.
+            PROCEDURE DIVISION.
+            END METHOD PUT.
+            END INTERFACE PCEISK.
+            IDENTIFICATION DIVISION.
+            CLASS-ID. PCECSK USING ELT.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            REPOSITORY.
+                CLASS ELT.
+            OBJECT.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 ITEM USAGE OBJECT REFERENCE ELT.
+            PROCEDURE DIVISION.
+            METHOD-ID. M1.
+            PROCEDURE DIVISION.
+            END METHOD M1.
+            METHOD-ID. M1.
+            PROCEDURE DIVISION.
+            END METHOD M1.
+            END OBJECT.
+            END CLASS PCECSK.
+            """ + Driver("CLASS PCEB1 CLASS PCECSK INTERFACE PCEISK "
+                + "CLASS PCEX EXPANDS PCECSK USING PCEB1 INTERFACE PCEY EXPANDS PCEISK USING PCEB1"));
+        Assert.Single(errors, e => e.Contains("COBOLNET0822", StringComparison.Ordinal));
+        Assert.Single(errors, e => e.Contains("COBOLNET0840", StringComparison.Ordinal));
+        Assert.Single(errors, e => e.Contains("COBOLNET1519", StringComparison.Ordinal));
+        Assert.DoesNotContain(errors, e => e.Contains("'PCECSK'", StringComparison.Ordinal)
+            || e.Contains("'PCEISK'", StringComparison.Ordinal));
+    }
+
     /// <summary>Below the introducing edition the parameterized definition and the EXPANDS specifier draw the
     /// OO introduction diagnostic, not a parse error about a missing period (the pre-PB759 COBOL0307).</summary>
     [Fact]

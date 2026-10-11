@@ -156,24 +156,29 @@ public sealed partial class DataBinder
         // ancestor walk starts from.
         var resolved = Compiler.Oo.OoNameResolution.Resolve(OoClasses, Edition, site, name,
             Compiler.Oo.OoNameResolution.Want.Either, where, "COBOLNET0813", resolveRule);
-        bool isInterface = resolved.Interface is not null;
+        // A PARAMETER-NAME of the parameterized definition being bound as itself (kb/Work PB2051): it names whatever
+        // each expansion passes, so here the least-constrained description stands for it — the universal object
+        // reference, which every conformance rule admits; each expansion binds the actual's own description and asks
+        // them all (§9.3.8.2.4, §12.3.8.4 GR5). Nothing emits from this description.
+        // A formal's kind is its own REPOSITORY specifier's, so an interface formal is still the bare-name alternative.
+        bool isInterface = resolved.Interface is not null
+            || resolved.IsFormal && !Compiler.Oo.OoNameResolution.Lookup(OoClasses, site, name,
+                Compiler.Oo.OoNameResolution.Want.Class).IsFormal;
+        if (isInterface && (factory || only))
+            // The general format's interface-name-1 alternative is the BARE name: FACTORY OF and ONLY belong to
+            // the object-class-name-1 alternative alone, and GR22 c) states the interface reading with no
+            // subordinate rules at all ("the object referenced by this data item shall implement interface-1").
+            Edition.Error(interfacePhrase, $"{where} names the interface '{name}' with "
+                + (factory && only ? "the FACTORY OF and ONLY phrases" : factory ? "the FACTORY OF phrase" : "the ONLY phrase")
+                + " — those phrases belong to the object-class-name-1 alternative of the general format; the "
+                + $"interface-name-1 alternative carries neither ({interfaceRule})");
+        if (resolved.IsFormal) return ObjectRefDescriptor.Universal;
         if (!resolved.Ok)
             // The funnel has already reported WHICH of the two failures this is (defined in the group but out
             // of scope vs. defined nowhere). Keep the name so every later diagnostic about this item still
             // says what the programmer wrote.
             return ObjectRefDescriptor.ObjectClass(name, factory, only);
-        if (isInterface)
-        {
-            // The general format's interface-name-1 alternative is the BARE name: FACTORY OF and ONLY belong to
-            // the object-class-name-1 alternative alone, and GR22 c) states the interface reading with no
-            // subordinate rules at all ("the object referenced by this data item shall implement interface-1").
-            if (factory || only)
-                Edition.Error(interfacePhrase, $"{where} names the interface '{name}' with "
-                    + (factory && only ? "the FACTORY OF and ONLY phrases" : factory ? "the FACTORY OF phrase" : "the ONLY phrase")
-                    + " — those phrases belong to the object-class-name-1 alternative of the general format; the "
-                    + $"interface-name-1 alternative carries neither ({interfaceRule})");
-            return ObjectRefDescriptor.Interface(resolved.Interface!.Name);
-        }
+        if (isInterface) return ObjectRefDescriptor.Interface(resolved.Interface!.Name);
         // ⛔ The descriptor carries the RESOLVED definition's name, not the word written: a REPOSITORY specifier's
         // `AS literal-1` makes the local word (BOXY) name the class whose externalized name is the literal
         // (§12.3.8.4 GR2, kb/Work PB974), and every downstream reader of the descriptor looks the class up by

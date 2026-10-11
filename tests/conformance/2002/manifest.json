@@ -814,7 +814,10 @@
   "pb2739_copy_after_directive_line",
   "pb2618_no_get_part_store_every_execution",
   "pb2618_string_into_property_keeps_unreferenced",
-  "pb2695_wide_item_subscript_and_odo_count"
+  "pb2695_wide_item_subscript_and_odo_count",
+  "pb1941_constant_length_inside_open_entry",
+  "pb1941_constant_length_report_ahead",
+  "pb2051_parameterized_definition_binds_itself"
   ],
   "pending": []
 }

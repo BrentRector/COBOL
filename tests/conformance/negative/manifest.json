@@ -2586,7 +2586,11 @@
   "pb2292-class-id-class-condition-keyword",
   "pb2748-reopen-sharing-below-2002",
   "pb2751-sharing-clause-below-2002",
-  "pb2690-fixed-group-vlg-element-tables-below-2014"
+  "pb2690-fixed-group-vlg-element-tables-below-2014",
+  "pb1941-constant-length-cycle-open-entry",
+  "pb1941-constant-length-report-cycle",
+  "pb2051-parameterized-class-body-unexpanded",
+  "pb2051-parameterized-interface-body-unexpanded"
  ],
  "pending": []
 }

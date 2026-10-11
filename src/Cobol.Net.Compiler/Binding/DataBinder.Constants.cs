@@ -764,7 +764,7 @@ public sealed partial class DataBinder
             ?? (ComposePendingSubjectsAhead() ? resolver.FindItem(baseName, qualifiers) : null);
         DataItem? item = FindComposed();
         if (item is null && ReportEntryCandidates(baseName, qualifiers) is { Count: > 0 } reportEntries)
-            return ReportLengthOperand(reportEntries, baseName, phrase, written, where, demanded, out waits);
+            return ReportLengthOperand(reportEntries, baseName, phrase, written, where);
         // Any word of the reference may be described later: the data-name, or a qualifier whose TYPE or SAME AS clause
         // supplies a data-name its type declaration already declared (`M OF V` with `01 V TYPE T.` after the constant).
         string[] words = [baseName, .. qualifiers];
@@ -790,12 +790,18 @@ public sealed partial class DataBinder
                 + "shall not be dependent, directly or indirectly, upon the value of constant-name-1)");
             return null;
         }
+        // Still described later: its entry is subordinate to an entry that has no item to measure it under (kb/Work
+        // PB1941). The entry being described has one while its OCCURS bounds bind (BindTableBounds); before that, only a
+        // PICTURE, VALUE or DYNAMIC LENGTH clause reads a constant, and none of them may describe a group (§13.18.40.3
+        // SR1, §13.18.63.3 SR13, §13.18.19.3 SR1) — or the ancestor's own entry was refused. That entry's diagnostic
+        // names the rule; this one says why the constant has no value.
         if (laterWord is not null)
         {
-            Edition.Error(DiagnosticCatalog.ConstantLengthOperandBoundLater, $"{where}: {phrase} '{written}' — "
-                + $"'{laterWord}' is described later, subordinate to the entry whose description references "
-                + $"'{constantName}'; measuring an item subordinate to that open entry out of source order is "
-                + "recognized but not yet implemented");
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — '{laterWord}' is "
+                + $"subordinate to an entry that describes no item to measure it under: the entry whose PICTURE, VALUE or "
+                + $"DYNAMIC LENGTH clause references '{constantName}' describes an elementary item (ISO §13.18.40.3 SR1: "
+                + "the PICTURE clause may be specified only at the elementary level; §13.18.63.3 SR13), or the entry was "
+                + "refused, so the length of the operand is not computable (ISO §13.10.4 GR5/GR6)");
             return null;
         }
         if (item is null)
@@ -812,14 +818,13 @@ public sealed partial class DataBinder
     /// group (an entry with subordinates) is refused by that rule, and an elementary report item is measured as its
     /// printable item's description (§15.50 / §15.14 over its PICTURE). A report entry is not a <see cref="DataItem"/>
     /// <see cref="ReferenceResolver.FindItem"/> sees; <see cref="ReportEntryCandidates"/> resolves it, and more than
-    /// one candidate is §8.4.2.2.3 SR1's ambiguity. The report binder reaches the REPORT SECTION's groups in source
-    /// order, so an entry reached in order before the item waits, and one whose value is needed sooner is
-    /// <see cref="DiagnosticCatalog.ConstantLengthOperandBoundLater"/>.</summary>
+    /// one candidate is §8.4.2.2.3 SR1's ambiguity. The item's description is read from its entry
+    /// (<see cref="DescribeReportItem"/>, kb/Work PB1941), never from the report walk, so it is measured the same
+    /// wherever the constant is evaluated — before the REPORT SECTION binds, or in a group, or an entry, that the walk
+    /// has not finished.</summary>
     private DataItem? ReportLengthOperand(
-        List<ReportEntryLocation> candidates, string baseName, string phrase,
-        string written, string where, bool demanded, out bool waits)
+        List<ReportEntryLocation> candidates, string baseName, string phrase, string written, string where)
     {
-        waits = false;
         if (candidates is not [var entry])
         {
             Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: {phrase} '{written}' — '{baseName}' names "
@@ -835,20 +840,30 @@ public sealed partial class DataBinder
                 + "§13.10.3 SR11)");
             return null;
         }
-        if (_reportEntryItems.TryGetValue(entry.Entry, out var item)) return item;
-        if (!_reportEntriesBound.Contains(entry.Entry))
+        var described = DescribeReportItem(entry);
+        PicInfo? pic;
+        using (Edition.At(entry.Entry)) pic = ReportPrintablePicture(described, entry.ReportName, baseName);
+        if (pic is null)
         {
-            if (!demanded) { waits = true; return null; }
-            Edition.Error(DiagnosticCatalog.ConstantLengthOperandBoundLater, $"{where}: {phrase} '{written}' — the "
-                + $"elementary report item '{baseName}' of report '{entry.ReportName}' is described in a report group "
-                + "the REPORT SECTION has not reached where the constant is referenced; measuring it out of source order "
-                + "is recognized but not yet implemented");
+            // No PICTURE written and none implied (§13.15.3 SR12/SR14 — reported at the entry by the report walk).
+            Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the length of '{written}' is not computable — "
+                + "the elementary report item has no PICTURE clause and none is implied, so it describes no data (ISO "
+                + "§13.10.4 GR5/GR6)");
             return null;
         }
-        // Bound, yet no printable item: its own entry was refused (§13.15.3 SR10/SR12 — reported there).
-        Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the length of '{written}' is not computable — the "
-            + "elementary report item describes no printable item (ISO §13.10.4 GR5/GR6)");
-        return null;
+        // The item as the printable item is SIZED (§13.18.14) — what §15.50 LENGTH and §15.14 BYTE-LENGTH measure: its
+        // PICTURE and its SIGN clause (a SEPARATE sign is a character position). JUSTIFIED and BLANK WHEN ZERO place
+        // and blank characters but occupy none, so this item is not a copy of the description and carries neither;
+        // the walk's printable item is built from the same DescribeReportItem / ReportPrintablePicture pair.
+        return new DataItem
+        {
+            Level = ReportEntryLevel(entry.Entry),
+            CobolName = baseName,
+            CsName = DataItem.WordIdentifier(baseName),
+            DeclaredAt = Edition.Cursor,
+            Pic = pic,
+            OwnSign = described.OwnSign,
+        };
     }
 
     // ── The data-division substitution chokepoints (§13.10.3 SR2) ────────────────────────────────────────────

@@ -252,23 +252,11 @@ public static class DiagnosticCatalog
         + "implemented.", "ISO §13.18.33.4 GR3 / §12.4.6.4.4 GR2",
         RecognizedNotImplemented);
 
-    // ── COBOLNET0899 — a constant's LENGTH OF / BYTE-LENGTH OF operand described later, whose description cannot be
-    //    bound ahead of the reference that needs the constant (kb/Work PB1231, PB1226)
-    /// <summary>A constant entry's length phrase may name a data item described after it (§13.10.3 SR4 forbids only a
-    /// length that depends on the constant). The binder serves that by binding the operand's RECORD out of source
-    /// order when the value is first needed, or, inside a record whose earlier entries are being bound, the operand's
-    /// own entry and subordinates (kb/Work PB1941). Two shapes it cannot bind ahead are recognized-not-implemented
-    /// debt, never a misreported undefined name: an operand SUBORDINATE to the very entry whose description
-    /// references the constant (<c>05 A OCCURS K. 10 W PIC X(7).</c> with <c>01 K CONSTANT AS LENGTH OF W.</c> — A's
-    /// item does not exist yet to link W to), and an elementary report item of a report group the report binder has
-    /// not reached (§13.10.3 SR11's operand).</summary>
-    public static readonly DiagnosticDescriptor ConstantLengthOperandBoundLater = new(
-        NotImplemented, "constant-length-operand-bound-later", EditionSeverity.Error,
-        "A constant entry's LENGTH OF / BYTE-LENGTH OF operand is described later, and the constant is referenced "
-        + "before that description can be bound (subordinate to the entry whose description references the constant, "
-        + "or in a report group the REPORT SECTION has not reached): measuring it out of source order is recognized "
-        + "but not yet implemented.",
-        "ISO §13.10.3 SR4 / §13.10.4 GR5-GR6", RecognizedNotImplemented);
+    // ⛔ The 0899-staged ConstantLengthOperandBoundLater is GONE (kb/Work PB1941). Its two shapes are bound: an operand
+    // SUBORDINATE to the entry whose OCCURS bound references the constant links to that entry's item, which exists
+    // before its table bounds bind (DataBinder.EntryOrder.cs#BindTableBounds), and an elementary report item is measured
+    // from its entry's description, never from the report walk (DataBinder.ReportItemDescription.cs). What is left
+    // under a group's PICTURE, VALUE or DYNAMIC LENGTH clause is that clause's own refusal plus ConstantEntryRule.
 
     // ⛔ The two 0899-staged constant-entry legs are GONE. ConstantFromCompilationVariable (kb/Work PB1368): the
     // >>DEFINE table now reaches the binder as a timeline (DirectiveResults.CompilationVariables), and an undefined

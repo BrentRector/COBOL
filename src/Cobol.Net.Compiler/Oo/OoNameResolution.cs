@@ -45,8 +45,14 @@ public static class OoNameResolution
 
     /// <summary>A resolution outcome. <see cref="Class"/> and <see cref="Interface"/> are mutually exclusive:
     /// classes and interfaces share ONE name namespace (<see cref="OoClassTable"/> rejects a collision as
-    /// COBOLNET0840), so at most one can be set.</summary>
-    public readonly record struct Result(OoClassSymbol? Class, OoInterfaceSymbol? Interface)
+    /// COBOLNET0840), so at most one can be set.
+    /// <para><see cref="IsFormal"/> is the third outcome, and sets neither: the name is a PARAMETER-NAME of the
+    /// parameterized definition the reference is written in (§11.3.4 GR6 / §11.6.4 GR4 — "may be specified within
+    /// this class definition only where an object-class-name or an interface-name is permitted"). It names whatever
+    /// class or interface each expansion passes (§12.3.8.4 GR5 / GR8), so the definition itself knows no symbol for
+    /// it — only that the reference is legal (kb/Work PB2051). It is not <see cref="Ok"/>: a site that needs the
+    /// symbol has nothing to read, and asks <see cref="IsFormal"/> first when the definition is bound as itself.</para></summary>
+    public readonly record struct Result(OoClassSymbol? Class, OoInterfaceSymbol? Interface, bool IsFormal = false)
     {
         public bool Ok => Class is not null || Interface is not null;
     }
@@ -64,7 +70,7 @@ public static class OoNameResolution
         Want want, string where, string code, string ruleCitation)
     {
         var found = Lookup(table, site, name, want);
-        if (found.Ok) return found;
+        if (found.Ok || found.IsFormal) return found;
 
         // A PARAMETERIZED definition is a skeleton, not a class or interface, so it is never in the table and a
         // reference to it can never resolve (kb/Work PB759). Say which rule, rather than "not defined": the
@@ -115,6 +121,14 @@ public static class OoNameResolution
     {
         if (table is null) return default;
         var scope = table.RepositoryScopeFor(site);
+        // A parameter-name of the enclosing parameterized definition, in a position of the kind its own REPOSITORY
+        // specifier declares (§11.3.3 SR8 / §11.6.3 SR4 make that declaration mandatory, and OoExpansion reports its
+        // absence). Asked FIRST: inside the definition the word names the formal even when some class of the group is
+        // spelled the same, since every expansion replaces it (§12.3.8.4 GR5 / GR8; kb/Work PB2051).
+        if (scope.IsFormal(name)
+            && (want is Want.Class or Want.Either && scope.DeclaresClass(name)
+                || want is Want.Interface or Want.Either && scope.DeclaresInterface(name)))
+            return new Result(null, null, IsFormal: true);
         // A specifier with `AS literal-n` names the definition whose EXTERNALIZED name is the literal (§12.3.8.4 GR2,
         // kb/Work PB974); without it the declared word names the definition of that name.
         if (want is Want.Class or Want.Either && scope.ClassTarget(name, out var clsExt)
@@ -137,21 +151,30 @@ public sealed class OoRepositoryScope
 {
     /// <summary>The scope of a reference outside every source element that can declare one. It admits nothing:
     /// §8.4.6.4 offers no third source for a visible name.</summary>
-    public static readonly OoRepositoryScope Empty = new([], []);
+    public static readonly OoRepositoryScope Empty = new([], [], []);
 
     // Declared name → the EXTERNALIZED name the specifier's `AS literal-n` gives, or null when it wrote none (the
     // containing definition's own name, too): null resolves by the declared word (kb/Work PB974).
     private readonly Dictionary<string, string?> _classes;
     private readonly Dictionary<string, string?> _interfaces;
+    // The parameter-names of a containing PARAMETERIZED class or interface definition (its USING clause).
+    private readonly HashSet<string> _formals;
 
-    private OoRepositoryScope(Dictionary<string, string?> classes, Dictionary<string, string?> interfaces)
+    private OoRepositoryScope(Dictionary<string, string?> classes, Dictionary<string, string?> interfaces,
+        HashSet<string> formals)
     {
         _classes = classes;
         _interfaces = interfaces;
+        _formals = formals;
     }
 
     public bool DeclaresClass(string name) => _classes.ContainsKey(name);
     public bool DeclaresInterface(string name) => _interfaces.ContainsKey(name);
+
+    /// <summary>Whether <paramref name="name"/> is a parameter-name of the parameterized class or interface
+    /// definition this scope lies in (§11.3.2 / §11.6.2 `USING parameter-name-1`). Only the written skeleton has
+    /// one: an expansion's re-parsed text has its USING clause dropped and every formal replaced (kb/Work PB759).</summary>
+    public bool IsFormal(string name) => _formals.Contains(name);
 
     /// <summary>Whether <paramref name="name"/> is a class-name in this scope, and the externalized name its
     /// specifier's AS phrase gave it (null: resolve by the declared word).</summary>
@@ -168,6 +191,7 @@ public sealed class OoRepositoryScope
     {
         var classes = new Dictionary<string, string?>(CobolNames.Comparer);
         var interfaces = new Dictionary<string, string?>(CobolNames.Comparer);
+        var formals = new HashSet<string>(CobolNames.Comparer);
         for (RuleContext? c = site; c is not null; c = c.Parent)
         {
             switch (c)
@@ -178,9 +202,11 @@ public sealed class OoRepositoryScope
                     // §12.3.8.3 SR5/SR8: a specifier naming the containing definition "is ignored" — its own name
                     // resolves to it, whatever an inner entry wrote.
                     if (cd.classIdParagraph()?.className().FirstOrDefault() is { } cn) classes[cn.GetText()] = null;
+                    foreach (var p in cd.classIdParagraph()?.ooParameterName() ?? []) formals.Add(p.GetText());
                     break;
                 case Core.InterfaceDefinitionContext idf:
                     if (idf.interfaceName().FirstOrDefault() is { } inm) interfaces[inm.GetText()] = null;
+                    foreach (var p in idf.ooParameterName()) formals.Add(p.GetText());
                     break;
             }
             // The environment division of THIS context, when it directly carries one. Only a source-element
@@ -189,7 +215,7 @@ public sealed class OoRepositoryScope
                 if (c.GetChild(i) is Core.EnvironmentDivisionContext env)
                     Collect(env, classes, interfaces);
         }
-        return classes.Count == 0 && interfaces.Count == 0 ? Empty : new OoRepositoryScope(classes, interfaces);
+        return classes.Count == 0 && interfaces.Count == 0 ? Empty : new OoRepositoryScope(classes, interfaces, formals);
     }
 
     private static void Collect(Core.EnvironmentDivisionContext env, Dictionary<string, string?> classes,

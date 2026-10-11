@@ -1006,20 +1006,26 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             try
             {
                 bound = BindEntry(entry, section);
+                if (bound is { } placed)
+                {
+                    _entryItems[entry] = placed;
+                    if (placed.Level is 1 or 77) placed.RootSection = section;   // DataItem.Section — a subordinate reads its root's
+                    // The root of a run bound AHEAD of its record's walk (kb/Work PB1941) links to the parent the walk
+                    // will attach it to — so qualification, the OCCURS depth and every ancestor screen below see its
+                    // real chain — and joins that parent's members only when the walk reaches it (TakePreboundEntry).
+                    if (aheadOfWalkParent is not null && stack.Count == 0) placed.Parent = aheadOfWalkParent;
+                    else AttachToHierarchy(placed);
+                    // The entry's table bounds, now that its item exists and is linked, its description still open
+                    // (kb/Work PB1941): a bound's constant may measure an entry subordinate to this one.
+                    BindTableBounds(placed, description);
+                    placed.Uid = _uidCounter++;
+                }
             }
             finally
             {
                 _openDescriptions.Remove(description);
             }
             if (bound is not { } item) { lastDescribed = null; continue; }
-            _entryItems[entry] = item;
-            item.Uid = _uidCounter++;
-            if (item.Level is 1 or 77) item.RootSection = section;   // DataItem.Section — a subordinate reads its root's
-            // The root of a run bound AHEAD of its record's walk (kb/Work PB1941) links to the parent the walk will
-            // attach it to — so qualification, the OCCURS depth and every ancestor screen below see its real chain —
-            // and joins that parent's members only when the walk reaches it (TakePreboundEntry, above).
-            if (aheadOfWalkParent is not null && stack.Count == 0) item.Parent = aheadOfWalkParent;
-            else AttachToHierarchy(item);
             // CONSTANT RECORD placement (P10 Step 15). §13.18.15.3 SR1: the clause may be specified only in the
             // local-storage or working-storage sections. (The same-entry SR13/SR3/SR6 conflicts are checked in
             // BindEntry, where the flags are local — the IsBased discipline.)
@@ -3377,9 +3383,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>Declare a PARAMETERIZED class or interface definition's parameter-names (§11.3.2 / §11.6.2
     /// <c>USING parameter-name-1</c>) through the one funnel, <see cref="DeclareUserWord"/>, within the scope of that
-    /// definition's own REPOSITORY paragraph (kb/Work PB1744). The definition is a skeleton that no binder binds:
-    /// <c>OoExpansion</c> replaces every formal by its actual before the class table exists, so an expansion's binder
-    /// sees only the actual. The formal's own spelling was therefore never asked §12.3.8.3 SR12 ("Intrinsic-function-
+    /// definition's own REPOSITORY paragraph (kb/Work PB1744). <c>OoExpansion</c> replaces every formal by its actual
+    /// before the class table exists, so an expansion's binder sees only the actual, and the binder that binds the
+    /// definition as itself (<c>OoDriver.BindParameterized</c>, kb/Work PB2051) declares its REPOSITORY entries but not
+    /// the USING clause's words. The formal's own spelling was therefore never asked §12.3.8.3 SR12 ("Intrinsic-function-
     /// name-1 shall not be specified as a user-defined word within the scope of this REPOSITORY paragraph") or SR13
     /// (ALL), and <c>CLASS-ID. C USING SQRT.</c> under <c>FUNCTION ALL INTRINSIC</c> compiled. Only the INTRINSIC
     /// specifiers are recorded here: the class- and interface-specifiers that declare the formals are those formals
@@ -5103,8 +5110,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // adjudicated into an ObjectRefDescriptor below (OoBindObjectRefDescriptor), where the class table and
         // the entry's section are both in hand. kb/Work PB389.
         Core.ObjectReferenceUsageContext? objectRefUsage = null;
-        int? occurs = null;
-        OccursSpec? occursSpec = null;
+        Core.OccursClauseContext? occursClause = null;   // its bounds bind after the item (BindTableBounds)
         var indexNames = new List<string>();
         SignSpec? ownSign = null;
         bool justified = false, blankWhenZero = false, synchronized = false;
@@ -5373,15 +5379,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     ownSign = new SignSpec(sign.LEADING() is not null, sign.SEPARATE() is not null);
                 else if (clause.Context.occursClause() is { } occ)
                 {
-                    // Allocate at the table's MAXIMUM occurrence count — the last fixed bound (integer-2 for a
-                    // Format-2 `n TO m` table, the sole bound for a fixed table) — per ISO §8.5.1.8 (physical
-                    // capacity fixed at compile time). Each bound is an integer literal or an integer
-                    // constant-name (§13.10.3 SR2) — IntegerOperandValue resolves both (DataBinder.Constants.cs).
-                    // The min/DEPENDING/KEY surface is captured in the OccursSpec.
-                    string occWhere = $"data item '{cobolName ?? "FILLER"}'";
-                    if (occ.integerOperand() is { Length: > 0 } bnds && IntegerOperandValue(bnds[^1], occWhere) is { } n)
-                        occurs = n;
-                    occursSpec = OdoBindOccursSpec(occ, occWhere, occurs);
+                    // The bounds are evaluated once the entry's item exists and is linked (BindTableBounds, kb/Work
+                    // PB1941): a bound may be a constant-name measuring an entry subordinate to this one.
+                    occursClause = occ;
                     if (occ.INDEXED() is not null)
                         foreach (var idxName in clause.IndexNames)
                             indexNames.Add(idxName);
@@ -5905,8 +5905,6 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             OwnNoSign = noSign && entryUsage is Usage.Packed,
             RawValue = rawValue,
             TableValues = tableValues,
-            Occurs = occurs,
-            OccursSpec = occursSpec,
             RedefinesTargetName = redefinesTargetName,
             GroupUsage = pic is null ? groupUsage : GroupUsage.None,   // §13.18.29 (D20/PB79); never on an elementary item
             DeclaredAt = Edition.Cursor,   // the entry cursor (kb/Work PB82) — where post-build passes report
@@ -5925,6 +5923,11 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             SameAsName = sameAsName,
         };
         if (sameAsName is not null) item.SameAsQualifiers.AddRange(sameAsQuals);
+        if (occursClause is not null)
+        {
+            item.DeferTableBounds();
+            _pendingTableBounds[item] = occursClause;
+        }
         // §13.18.52.3 SR1/SR2 speak about the entry that WROTE the SIGN clause — screened post-forest by
         // CheckSignClauses (DataBinder.SignClause.cs), where group-ness and the inherited usage are known.
         if (ownSign is not null) _signClauseWritten.Add(item);

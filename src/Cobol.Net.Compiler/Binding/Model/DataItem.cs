@@ -439,10 +439,12 @@ public sealed class DataItem
     /// <summary>The ALLOCATED occurrence count — the table's physical capacity — or <see langword="null"/> if the
     /// item is not a table. For a fixed (Format 1) table this is the OCCURS count; for an occurs-depending (Format 2)
     /// table it is the MAXIMUM, integer-2 (ISO §8.5.1.8 — "the physical capacity is fixed at compile time; the
-    /// logical capacity may vary"). The variable current count lives in <see cref="OccursSpec"/>.</summary>
+    /// logical capacity may vary"). The variable current count lives in <see cref="OccursSpec"/>. A data description
+    /// entry's table gets it once its item exists (<see cref="BindTableBounds"/>, kb/Work PB1941).</summary>
     [DescriptionCopy(DescriptionCopyKind.MemberOnly,
         "ISO §13.18.49.3 SR5 forbids OCCURS on data-name-1 and §13.16.3 SR12/SR14 make a SUBJECT's own OCCURS the array-of-description form; a cloned SUBORDINATE's OCCURS is part of the type (§13.18.58.4 GR1)")]
-    public int? Occurs { get; init; }
+    public int? Occurs { get => _occurs; init => _occurs = value; }
+    private int? _occurs;
 
     /// <summary>The structured OCCURS DEPENDING ON / KEY description (ISO §13.18.38 Format 2 + GR3), or
     /// <see langword="null"/> for a non-table or a plain keyless fixed table (which <see cref="Occurs"/> alone
@@ -450,7 +452,32 @@ public sealed class DataItem
     /// ASCENDING/DESCENDING KEY data-names.</summary>
     [DescriptionCopy(DescriptionCopyKind.MemberOnly,
         "the same clause's structured form — CLONED, never shared: Depending / CapacityRegister resolve per-clone")]
-    public OccursSpec? OccursSpec { get; init; }
+    public OccursSpec? OccursSpec { get => _occursSpec; init => _occursSpec = value; }
+    private OccursSpec? _occursSpec;
+
+    /// <summary>True while this item's OCCURS clause is written but its bounds are not yet evaluated: the item of a
+    /// data description entry exists, linked into its record, BEFORE its table bounds are, because a bound may be a
+    /// constant-name whose LENGTH OF operand is subordinate to this very entry (kb/Work PB1941; ISO §13.10.3 SR4 —
+    /// "The length of data-name-1 or data-name-2 shall not be dependent, directly or indirectly, upon the value of
+    /// constant-name-1" — is not violated, since an element's length does not depend on the occurrence count). The
+    /// operand bound ahead then sees this item as the table it is (<see cref="IsTable"/>), so its subscripts are
+    /// screened against the real dimensions. Only the binder sets it, and <see cref="BindTableBounds"/> clears it, so
+    /// it is false on every item after binding.</summary>
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "binder-transient: false once the entry's bounds are bound, before any copy is made")]
+    public bool TableBoundsPending { get; private set; }
+
+    /// <summary>The OCCURS clause of this item's own entry, written but not yet evaluated (<see cref="TableBoundsPending"/>).</summary>
+    public void DeferTableBounds() => TableBoundsPending = true;
+
+    /// <summary>The bounds of the table <see cref="DeferTableBounds"/> left pending, evaluated: the allocated count and
+    /// the structured description together (kb/Work PB1941). Every other item gets both from its initializer.</summary>
+    public void BindTableBounds(int? occurs, OccursSpec? spec)
+    {
+        _occurs = occurs;
+        _occursSpec = spec;
+        TableBoundsPending = false;
+    }
 
     /// <summary>True for a Format-4 DYNAMIC-capacity table (ISO §13.18.38, data-model D9): capacity varies at run
     /// time; storage is the out-of-line <c>CobolDynTable&lt;T&gt;</c>, and <see cref="Occurs"/> (the fixed physical
@@ -460,7 +487,7 @@ public sealed class DataItem
     /// <summary>True for ANY table — fixed (<see cref="Occurs"/>) OR dynamic (D9). Use at table-RECOGNITION sites
     /// (subscript arity, SEARCH detection); keep <c>Occurs is not null</c> at fixed-capacity-ARITHMETIC sites
     /// (static image width, fixed-array init) where a dynamic table must NOT be treated as a fixed run.</summary>
-    public bool IsTable => Occurs is not null || IsDynamicTable;
+    public bool IsTable => Occurs is not null || IsDynamicTable || TableBoundsPending;
 
     /// <summary>⛔ §8.4.2.3.3 SR2'S ADMISSION TEST, AND NOT <see cref="IsTable"/> (kb/Work PB877). SR2: "If a
     /// subscript is specified, the data description entry describing qualified-data-name-1 or the conditional

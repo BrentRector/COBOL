@@ -556,7 +556,7 @@ class (`DataItem.PointerRestrictionIdentity`), and `PrototypeSignatures.Restrict
 are therefore one type on both lanes; the class identity is group-local until the external repository
 (`DESIGN-external-repository.md`) supplies a record's identity.
 
-### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that binds and emits nothing.
+### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that emits nothing and binds only for its own rules.
 
 **Rationale.** §12.3.8.4 GR5 states the semantics as a construction: "The class object-class-name-1 is created
 from the parameterized class object-class-name-2 by replacing each specification of the formal parameter by the
@@ -591,6 +591,25 @@ to the REPOSITORY paragraph. (4) An actual whose kind differs from its formal's 
 an `INTERFACE T` formal, or the reverse) is COBOLNET2240: the GR5 substitution would write a specifier naming the
 wrong kind. (5) A defect in a skeleton line that no formal touches is found once per expansion and reported ONCE
 (`EditionContext` records each distinct diagnostic line once — one fact, one report).
+
+(6) The definition is still a class or interface DEFINITION, so every rule of its own text governs it whether or
+not anything expands it (kb/Work PB2051). An EXPANDED definition is asked through its expansions, which re-bind
+every line of it with the actuals substituted; one that nothing expands is asked as itself, and only then
+(`OoExpansion.Result.ExpandedNames`): a report naming the definition beside each expansion's report of the same
+line would state one fact twice (train 1053 review). For an unexpanded definition `OoClassTable.Build` builds a symbol
+through the same `NewClassSymbol` / `NewInterfaceSymbol` and roster collection the table's classes use, kept in
+`ParameterizedClasses` / `ParameterizedInterfaces` and out of every name lookup, and asks it the header rules every
+definition is asked (CLASS-ID / INTERFACE-ID / METHOD-ID AS literal, duplicate METHOD-ID, the INHERITS and IMPLEMENTS
+REPOSITORY rules). `OoDriver.BindParameterized` then binds its environment and data divisions and its method
+headers as itself, after every emitted class, and drops the result. A parameter-name resolves through the one
+funnel as a FORMAL (`OoNameResolution.Result.IsFormal`, from the scope's own USING clause, asked before any group
+class of the same spelling), and a reference typed by a formal takes the universal description: what it names is
+known only in an expansion, where §9.3.8.2.4 asks every conformance question "as if the actual parameter classes or
+interfaces were substituted". The PROCEDURE statements of the definition bind only in its expansions: a statement
+through a formal-typed reference (a literal INVOKE argument, `SUPER` over a formal base, a formal as INVOKE's
+class-name) obeys rules that differ between the universal description and the typed one an expansion binds, so
+binding them here needs a description kind of its own (a FORMAL object-reference kind beside universal, class,
+interface and ACTIVE-CLASS) — the open half, outside this decision's current text.
 
 **Diagnostics.** COBOLNET2239 — the definition's own rules (§11.3.3 SR8/SR9, §11.6.3 SR4/SR7, §11.3.4 GR6 /
 §11.6.4 GR4, §12.3.8.3 SR3), reported on the skeleton whether or not anything expands it. COBOLNET2240 — the
