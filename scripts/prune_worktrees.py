@@ -22,10 +22,18 @@ who acts next:
                    `w<wave><letter>`), the train whose lander holds the landing lease carries it (its manifest,
                    landing_train_members), or it was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
                    Nobody touches it.
-  WAITING TO LAND  not on main, and its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py
-                   REPORT_NAME, under coord.reports_dir()) says `Status: DONE`: a land unit's train takes it. A train
-                   carries at most TRAIN_MAX of them, the most harmful first (`--train`, kb/Work PB2981); the rest wait
-                   for the land unit after it.
+                   A branch with no report whose tip is contained in a fix-lane branch that is IN FLIGHT or waiting
+                   (a same-file predecessor, a branch a review finisher merged) is IN FLIGHT too: it lands through
+                   that branch, and reads LANDED once it has.
+  WAITING FOR REVIEW  not on main, and its newest fix-lane report says `Status: DONE`, but its header carries no
+                   `Review: CLEAN` stamp at the branch's tip (plan_wave.REVIEW, written by review_findings.py stamp): ONE
+                   read-only cobol-reviewer reviews it (the `review` skill's branch form, kb/Work PB3027). The landing
+                   step never reviews and never fixes a finding. A stamp at an older head is unreviewed work.
+  WAITING TO LAND  not on main, its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py
+                   REPORT_NAME, under coord.reports_dir()) says `Status: DONE`, and its header's review stamp is CLEAN
+                   at the branch's tip: a land unit's train takes it. A train carries at most TRAIN_MAX of them, the
+                   most harmful first (`--train`, kb/Work PB2981); the rest wait for the land unit after it. (A stamp
+                   that says FINDINGS is a DECISION row: the next wave's finisher answers them, plan_wave.py.)
   LANDED           its work is on main by content (MERGED or LANDED below) and its worktree holds nothing uncommitted:
                    `--apply` deletes it.
   DECISION         everything else: a person or the operator decides — land it (via a finisher when SPLIT), or ABANDON it
@@ -78,11 +86,13 @@ import sys
 import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / 'scripts' / 'orchestrator'))
 import coord  # noqa: E402  (the coordination directory, the live-process probe)
+if TYPE_CHECKING:
+    from plan_wave import Review  # noqa: E402  (imported lazily at run time: plan_wave imports this module back)
 
 DECL = re.compile(r'^\+\s*(?:(?:public|internal|private|protected|static|sealed|abstract|partial|override|readonly|async|virtual|unsafe|new)\s+)*'
                   r'(?:class|record|struct|enum|interface)\s+(?:struct\s+)?(\w+)')
@@ -90,7 +100,7 @@ METH = re.compile(r'^\+\s*(?:(?:public|internal|private|protected|static|sealed|
                   r'[\w<>\[\],.?()\s]+?\s+(\w+)\s*\(')
 TEST = re.compile(r'^\+\s*public (?:async )?(?:void|Task)\s+(\w+)\s*\(')
 LANDED_CONTENT = ('MERGED', 'LANDED')
-STATES = ('IN FLIGHT', 'WAITING TO LAND', 'LANDED', 'DECISION')
+STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'LANDED', 'DECISION')
 LOCK_PID = re.compile(r'\(pid (\d+)\)')
 SETTINGS = ':!.claude/settings.local.json'   # always dirty in an agent's worktree, never work (2026-10-03)
 
@@ -293,6 +303,7 @@ class Row:
     state: str = ''
     why: str = ''
     how: str = ''                   # a LANDED row whose own merge would change main: how its work got there (carried)
+    tip: str = ''                   # the branch's tip sha (a review stamp covers exactly one head)
 
 
 @dataclasses.dataclass
@@ -303,6 +314,7 @@ class Report:
     lead_terminal: bool             # the lead note is landed or retired: the work reached main some other way
     age_min: float                  # minutes since the report was written
     header: str = dataclasses.field(default='', repr=False)
+    review: Review | None = None    # the header's branch-review stamp (plan_wave.parse_review, kb/Work PB3027)
 
 
 REPORT_SLACK_MIN = 10   # an agent writes its report right after its last STATUS.md rewrite; older than that = resumed since
@@ -334,7 +346,18 @@ def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours:
         if rep.age_min > stale_hours * 60:
             return 'DECISION', (f'{rep.name}: DONE {rep.age_min / 60:.0f} h ago and never landed (over {stale_hours:g} h): '
                                 f'land it or record why not; ' + evidence(row))
-        return 'WAITING TO LAND', f'{rep.name}: Status DONE; a land unit takes it (`--train` names the next train)'
+        rv = rep.review
+        if rv and rv.verdict == 'CLEAN' and rv.covers(row.tip):
+            return 'WAITING TO LAND', (f'{rep.name}: Status DONE, Review CLEAN at {rv.sha[:12]} ({rv.reviewer}); a land '
+                                       f'unit takes it (`--train` names the next train)')
+        if rv and rv.verdict == 'FINDINGS' and rv.covers(row.tip):
+            return 'DECISION', (f'{rep.name}: DONE, but its branch review found {rv.findings} finding(s) ({rv.file}): '
+                                f'a finisher answers them, and the next wave plans it (plan_wave.py, kb/Work PB3027); '
+                                + evidence(row))
+        unreviewed = ('no review stamp' if rv is None else
+                      f'Review {rv.verdict} at {rv.sha[:12]}, but the branch is at {row.tip[:12] or "?"}')
+        return 'WAITING FOR REVIEW', (f'{rep.name}: Status DONE, {unreviewed}: one cobol-reviewer reviews it (the review '
+                                      f'skill\'s branch form, kb/Work PB3027)')
     if fresh:
         return 'IN FLIGHT', touched
     return 'DECISION', evidence(row)
@@ -373,7 +396,8 @@ def report_index(reports_dir: pathlib.Path | None, terminal: Callable[[str], boo
     for r in plan_wave.load_reports(reports_dir):
         lines = r.path.read_text(encoding='utf-8', errors='replace').splitlines()
         head = next((i for i, l in enumerate(lines) if i > 0 and l.startswith('## ')), len(lines))
-        out.append(Report(r.path.name, r.status, r.lead, terminal(r.lead), age_minutes(r.path), '\n'.join(lines[:head])))
+        out.append(Report(r.path.name, r.status, r.lead, terminal(r.lead), age_minutes(r.path), '\n'.join(lines[:head]),
+                          r.review))
     return out
 
 
@@ -445,7 +469,8 @@ def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset
             stamps += [gitdir / 'logs' / 'HEAD', pathlib.Path(t.path) / 'STATUS.md']
             dirty = uncommitted(t.path)
         return Row(b, kind, absent, lost, ahead, t.path if t else None, t.lock if t else None, dirty,
-                   age_minutes(*stamps), last, newest_report(list(reports), b, t.path if t else None), how=how)
+                   age_minutes(*stamps), last, newest_report(list(reports), b, t.path if t else None), how=how,
+                   tip=git('rev-parse', '--verify', '--quiet', f'refs/heads/{b}', cwd=repo).stdout.strip())
 
     def measure_detached(t: Tree) -> Row:
         gitdir = pathlib.Path(git('rev-parse', '--absolute-git-dir', cwd=t.path).stdout.strip() or t.path)
@@ -460,12 +485,34 @@ def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset
     for r in rows:
         r.state, r.why = lifecycle(r, in_flight_slugs=set(slugs), min_age=min_age, stale_hours=stale_hours, live=live,
                                    in_train=in_train)
+    contained(rows, repo)
     return rows
+
+
+CARRIER_STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND')
+
+
+def contained(rows: list[Row], repo=REPO) -> None:
+    """A branch that lands THROUGH another one is IN FLIGHT, not a decision and not a second landing: its tip is an
+    ancestor of the tip of a fix-lane branch (one a report names) that is IN FLIGHT or waiting. That is a same-file
+    predecessor (MANDATORY-PRACTICES O2: it lands through its successor) and a branch a review finisher merged
+    (kb/Work PB3027: the finisher's report names only its own branch). Once the carrier lands, the content test reads
+    it LANDED and --apply deletes it. Two names for one commit carry nothing."""
+    carriers = [c for c in rows if c.report and c.tip and c.state in CARRIER_STATES]
+    for r in rows:
+        if not r.tip or r.dirty or r.content in LANDED_CONTENT or r.state not in ('DECISION', *CARRIER_STATES[1:]) \
+                or (r.state == 'DECISION' and r.report is not None):
+            continue
+        c = next((c for c in carriers if c.tip != r.tip
+                  and git('merge-base', '--is-ancestor', r.tip, c.tip, cwd=repo).returncode == 0), None)
+        if c:
+            r.state, r.why = 'IN FLIGHT', f'contained in {c.name} ({c.state}): its work lands through that branch; ' + evidence(r)
 
 
 def verdict(rows: list[Row]) -> str:
     n = {s: sum(1 for r in rows if r.state == s) for s in STATES}
-    return (f'=== BRANCH LIFECYCLE: {len(rows)} · {n["IN FLIGHT"]} in flight · {n["WAITING TO LAND"]} waiting to land · '
+    return (f'=== BRANCH LIFECYCLE: {len(rows)} · {n["IN FLIGHT"]} in flight · {n["WAITING FOR REVIEW"]} waiting for '
+            f'review · {n["WAITING TO LAND"]} waiting to land · '
             f'{n["LANDED"]} landed (--apply deletes) · {n["DECISION"]} need a DECISION'
             + (' (owner rule 2026-10-08, kb/Work PB2600: land it or abandon it in its kb/Work note, then delete) ===' if n['DECISION'] else ' ==='))
 
@@ -676,9 +723,20 @@ def self_test() -> int:
         # DECISION), a DONE report the branch moved past by an hour (resumed since: not waiting), a ledger slug, a fresh one
         for b, f in (('orphan', 'src/C.cs'), ('done-branch', 'src/D.cs'), ('split-branch', 'src/E.cs'),
                      ('w9999a-ledger', 'src/F.cs'), ('fresh', 'src/G.cs'), ('superseded', 'src/H.cs'),
-                     ('stale-done', 'src/I.cs'), ('resumed', 'src/J.cs')):
+                     ('stale-done', 'src/I.cs'), ('resumed', 'src/J.cs'),
+                     # THE BRANCH REVIEW (kb/Work PB3027): DONE with no stamp, a FINDINGS stamp at its tip, a CLEAN
+                     # stamp at a head the branch has since moved past; `pred` carries no report and lands through
+                     # `succ`, which was cut from it and is DONE and reviewed CLEAN
+                     ('unreviewed', 'src/N.cs'), ('review-findings', 'src/O.cs'), ('reviewed-moved', 'src/S.cs'),
+                     ('pred', 'src/T.cs')):
             g('switch', '-q', '-c', b, 'main')
             commit(f, f'class {b.replace("-", "_").title()}X {{}}\n', b)
+        reviewed_at = g('rev-parse', 'reviewed-moved').stdout.strip()
+        g('switch', '-q', 'reviewed-moved')
+        commit('src/S.cs', 'class ReviewedMovedX { int AfterTheReview; }\n', 'a commit after the review')
+        g('switch', '-q', '-c', 'succ', 'pred')
+        commit('src/V.cs', 'class SuccessorX {}\n', 'succ')
+        tips = {b: g('rev-parse', b).stdout.strip() for b in ('done-branch', 'review-findings', 'succ')}
         # modified-only: an unlanded change to an EXISTING file that declares no new name (train 1039b review: the
         # name test called it LANDED, and --apply would have deleted it)
         g('switch', '-q', '-c', 'modified-only', 'main')
@@ -762,7 +820,14 @@ def self_test() -> int:
         for name, text, h in (
                 # the attended shape (kb/Work PB2602): Status, Worktree (a Windows path), Branch, HEAD, Base
                 ('w9998a-PB1-report.md', 'Status: DONE\nWorktree: E:\\x\\.claude\\worktrees\\done-wt\n'
-                                         'Branch: `done-branch`\nHEAD: abcdef1\nBase: 1234567\n', 10),
+                                         'Branch: `done-branch`\nHEAD: abcdef1\nBase: 1234567\n'
+                                         f'**Review:** CLEAN w9998a-review-r1 {tips["done-branch"]}\n', 10),
+                ('w9998k-PB12-report.md', 'Status: DONE\nBranch: unreviewed\n', 10),
+                ('w9998l-PB13-report.md', 'Status: DONE\nBranch: review-findings\n**Review:** FINDINGS 2 '
+                                          f'w9998l-review-r1 {tips["review-findings"]} E:/s/review-w9998-l.jsonl\n', 10),
+                ('w9998m-PB14-report.md', 'Status: DONE\nBranch: reviewed-moved\n'
+                                          f'**Review:** CLEAN w9998m-review-r1 {reviewed_at[:12]}\n', 10),
+                ('w9998n-PB15-report.md', f'Status: DONE\nBranch: succ\n**Review:** CLEAN w9998n-r1 {tips["succ"]}\n', 10),
                 ('w9998b-PB2-report.md', 'SPLIT\nBranch: split-branch\n', 10),
                 ('w9998c-PB3-report-v2.md', 'Status: DONE\nBranch: orphan\n', 10),        # suffixed: invisible
                 ('w9998d-PB4-report.md', '**Status:** DONE · **branch:** `superseded`\n', 10),
@@ -795,7 +860,9 @@ def self_test() -> int:
                 'dirty-merged': 'DECISION', 'agent-live': 'IN FLIGHT', 'agent-dead': 'LANDED', '(detached) pin': 'DECISION',
                 'modified-only': 'DECISION', 'unreadable': 'DECISION',
                 'carried': 'LANDED', 'carried-moved': 'DECISION', 'add-del': 'DECISION', 'picked': 'LANDED',
-                'picked-lost': 'DECISION', 'unlanded-train': 'DECISION', 'ejected': 'DECISION'}
+                'picked-lost': 'DECISION', 'unlanded-train': 'DECISION', 'ejected': 'DECISION',
+                'unreviewed': 'WAITING FOR REVIEW', 'review-findings': 'DECISION', 'reviewed-moved': 'WAITING FOR REVIEW',
+                'pred': 'IN FLIGHT', 'succ': 'WAITING TO LAND'}
         for name, state in want.items():
             got = rows.get(name)
             check(got is not None and got.state == state, f'{name}: want {state}, got {got.state if got else "no row"} ({got.why if got else ""})')
@@ -806,6 +873,11 @@ def self_test() -> int:
         check('already landed' in rows['superseded'].why, 'a DONE report whose lead note landed is superseded')
         check('never landed' in rows['stale-done'].why, 'a DONE report over --stale-hours is a DECISION, said so')
         check('uncommitted' in rows['dirty-merged'].why, 'a dirty landed worktree is a DECISION, with the reason')
+        check('no review stamp' in rows['unreviewed'].why, 'a DONE branch with no review stamp waits for its reviewer')
+        check('but the branch is at' in rows['reviewed-moved'].why, 'a stamp at an older head is unreviewed work, said so')
+        check('2 finding(s)' in rows['review-findings'].why and 'finisher' in rows['review-findings'].why,
+              'a FINDINGS stamp is a finisher DECISION, with the findings file')
+        check('contained in succ' in rows['pred'].why, f'a predecessor lands through its successor: {rows["pred"].why}')
         check(set(rows) == set(want), f'every branch and detached worktree has a row: {sorted(set(rows) ^ set(want))}')
         check(rows['modified-only'].content == 'CHECK', 'a branch that only modifies an existing file is not LANDED')
         check(rows['unreadable'].dirty > 0, 'a worktree whose status git cannot produce counts as dirty')
@@ -847,7 +919,8 @@ def self_test() -> int:
         check([r.name for r in train] == ['b3', 'b5', 'b2', 'b6', 'b1', 'b7'] and [r.name for r in held] == ['b0', 'b4'],
               f'the next train is the {TRAIN_MAX} most harmful waiting rows, compiler before process, oldest first: '
               f'{[r.name for r in train]}, held {[r.name for r in held]}')
-        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 23 · 3 in flight · 1 waiting to land · 5 landed'),
+        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 28 · 4 in flight · 2 waiting for review · '
+                                                      '2 waiting to land · 5 landed'),
               f'verdict line: {verdict(list(rows.values()))}')
         # the pure rule: a lock with no pid is honoured; a ledger slug matches only at a word boundary
         r0 = dataclasses.replace(rows['orphan'], lock='')

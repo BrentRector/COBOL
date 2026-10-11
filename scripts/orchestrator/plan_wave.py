@@ -16,7 +16,8 @@ cost the orchestrator a hand-written groups.json; this computes it.
    launched yet (held_by_dispatch, kb/Work PB2806). An aborted dispatch is released with --release.
 2. FINISHERS FIRST: an open note whose newest report says SPLIT or NOT STARTED (its branch landed, gone, or still
    unlanded: the finisher then cherry-picks the branch's commits, because a `land` unit lands only DONE branches;
-   kb/Work PB2575), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
+   kb/Work PB2575), a DONE report whose branch review stamped FINDINGS (kb/Work PB3027: the finisher answers each
+   finding), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
    name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
    branch.
 3. CLUSTERS from fix_clusters.py --json (the public submodule's view of kb/Work), minus the notes above, ranked by
@@ -89,6 +90,13 @@ STATUS_WORD = re.compile(r"^\**(?:Status:\**)?\s*\**\s*(?P<s>DONE|SPLIT|DISCHARG
 BRANCH = re.compile(r"\b(worktree-[A-Za-z0-9_][A-Za-z0-9_.\-]*[A-Za-z0-9_])")
 WORKTREE = re.compile(r"([A-Za-z]:\\[^\s`*]*?\\worktrees\\[A-Za-z0-9_.\-]+)")
 HEAD = re.compile(r"\bHEAD\b[:*`\s]*([0-9a-f]{7,40})\b|\bhead ([0-9a-f]{7,40})\b")
+# THE BRANCH REVIEW'S STAMP (kb/Work PB3027; DESIGN-test-build-ci.md section 3.17.2 step 2). The read-only reviewer of a
+# DONE branch writes ONE line into its report's header, through `review_findings.py stamp` and never by hand:
+#   **Review:** CLEAN <reviewer> <head sha>                              the branch at that head may land
+#   **Review:** FINDINGS <n> <reviewer> <head sha> <findings file>        a finisher answers them first
+# A header with no parsable stamp, or one naming another head than the branch's tip, is not reviewed.
+REVIEW = re.compile(r"^\**Review:\**\s*(?P<verdict>CLEAN|FINDINGS)\s+(?:(?P<n>\d+)\s+)?(?P<reviewer>[^\s`*]+)\s+"
+                    r"(?P<sha>[0-9a-f]{7,40})\b(?:\s+(?P<file>\S+))?", re.M)
 FINISH_STATUSES = {"SPLIT", "NOT STARTED"}
 LANDED_CLASSES = {"MERGED", "LANDED", "ABSENT"}
 
@@ -105,6 +113,30 @@ class Note:
     harm: int = 0
 
 
+@dataclasses.dataclass(frozen=True)
+class Review:
+    verdict: str             # CLEAN | FINDINGS
+    findings: int
+    reviewer: str
+    sha: str                 # the head the reviewer reviewed
+    file: str | None         # the findings file (FINDINGS only)
+
+    def covers(self, tip: str | None) -> bool:
+        """The stamp is about exactly this head: a commit made after the review is unreviewed work."""
+        return bool(tip) and (tip.startswith(self.sha) or self.sha.startswith(tip))
+
+
+def parse_review(header: str) -> Review | None:
+    """The review stamp in a report's header (REVIEW), or None. The one reader: this planner (a FINDINGS stamp makes
+    a finisher) and prune_worktrees.py (a DONE branch is WAITING TO LAND only under a CLEAN stamp at its tip)."""
+    m = REVIEW.search(header)
+    if not m or (m.group("verdict") == "FINDINGS" and not (m.group("n") and m.group("file"))):
+        return None
+    findings = m.group("verdict") == "FINDINGS"
+    return Review(m.group("verdict"), int(m.group("n")) if findings else 0, m.group("reviewer"), m.group("sha"),
+                  m.group("file") if findings else None)
+
+
 @dataclasses.dataclass
 class Report:
     path: pathlib.Path
@@ -117,6 +149,7 @@ class Report:
     branch: str | None
     worktree: str | None
     head: str | None
+    review: Review | None = None
 
 
 def harm_weights() -> dict[str, int]:
@@ -159,7 +192,7 @@ def parse_report(p: pathlib.Path) -> Report | None:
     ids = list(dict.fromkeys(PB.findall(text) + [m.group("lead")]))
     return Report(p, int(m.group("wave")), f"w{m.group('wave')}{m.group('letter')}", m.group("lead"), status, ids,
                   bool(re.search(r"(?i)not\s+started", text)), b.group(1) if b else None, w.group(1) if w else None,
-                  (h.group(1) or h.group(2)) if h else None)
+                  (h.group(1) or h.group(2)) if h else None, parse_review(text))
 
 
 def load_reports(reports_dir: pathlib.Path | None) -> list[Report]:
@@ -553,6 +586,15 @@ def branch_resume(branch: str, nid_list: list[str]) -> str:
 def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: list[str]) -> str:
     if rep is None:
         return "FINISH-FIRST: " + branch_resume(branch or "?", nid_list)
+    if rep.status == "DONE" and rep.review and rep.review.verdict == "FINDINGS":
+        return (f"FINISH-FIRST: the branch review of {rep.slug} ({rep.lead}) found {rep.review.findings} finding(s) at "
+                f"head {rep.review.sha}: the records of kind `finding` in {rep.review.file} "
+                f"(`python scripts/orchestrator/review_findings.py show {rep.review.file}`). Its branch {rep.branch} "
+                f"(worktree {rep.worktree or 'removed'}) is {cls}: `git merge {rep.branch}` into your branch, read "
+                f"{rep.path} and its \"For the next implementer\" section, then answer EVERY finding by its id: fix it at "
+                f"its root (a regression test or golden with it) or answer `no_change_needed` with the reason, one line "
+                f"each in your report's `## Review findings` section; re-gate; your branch is reviewed again when it "
+                f"returns DONE (kb/Work PB3027).")
     where = (f"Its branch {rep.branch} (worktree {rep.worktree or 'removed'}, head {rep.head or '?'}) is {cls}: "
              + ("cherry-pick its unlanded commits onto current main (never merge the branch) and re-gate before new work."
                 if cls in ("UNLANDED", "CHECK") else
@@ -600,7 +642,10 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         # branches (units/land.md), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
         # finisher cherry-picks the branch's commits (finisher_pred's UNLANDED arm). A DONE report that names a
         # note NOT started still lands first: its finished work is the land unit's.
-        if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started):
+        # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the land unit never fixes
+        # a review finding, so its finisher answers them (finisher_pred's review arm).
+        if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or \
+                (cls not in LANDED_CLASSES and r.status == "DONE" and r.review and r.review.verdict == "FINDINGS"):
             finisher_by_rep.setdefault(r.path, []).append(nid)
         elif cls not in LANDED_CLASSES:
             awaiting.setdefault(r.branch or str(r.path), []).append(nid)
