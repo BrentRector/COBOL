@@ -33,7 +33,8 @@ BRIEFS = {
                                       r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
                              r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched gating, PB2515\)'],  # I9; PB2515
-    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
+    'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main',
+                              r'YOU DO NOT REVIEW', r'Review:\*\* CLEAN',  # PB3027 (L9): the branch was reviewed; the lander checks the stamp
                               r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
                               r'landing_oracle',  # PB2885 (L11): push-main refuses a stale baseline (exit 7)
                               r'train_apply\.py',  # PB2885 (L1): the clusters come in by one command
@@ -75,13 +76,18 @@ BRIEFS = {
                                      # PB1732 (I8): CI's Linux legs run under WSL before the report
                                      r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
                                      r'LSP DIAGNOSTICS',  # P13: act on the language server's diagnostics
+                                     r'BRANCH REVIEW \(MANDATORY-PRACTICES I10',  # PB3027: reviewed on the branch
                                      r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
     # O2: the standard fix-lane dispatch — rolling pool, same-file successors, the graceful STOP, and the explicit
     # final StructuredOutput reminder (three agents in waves 65-67 ended without it and stranded finished branches).
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
     'wf_rolling_wave.js': [r'args\.stop_file', r'args\.global_stop', r"agentType: 'cobol-implementer'", r"agentType: 'cobol-lander'", r'StructuredOutput',
                            r'g\.after', r'held\[', r'push-main\.sh', r'status_delta\.py', r'withCeiling\(',
-                           r"status: 'NO-RESULT', error", r'landing lease'],  # PB2537: the train lander takes the lease
+                           r"status: 'NO-RESULT', error", r'landing lease',  # PB2537: the train lander takes the lease
+                           # PB3027 (I10): a DONE branch is reviewed on the branch by one read-only reviewer, findings go
+                           # to a review finisher, and only a branch reviewed CLEAN reaches a train
+                           r"agentType: 'cobol-reviewer'", r'review_findings\.py', r"r\.review === 'CLEAN'",
+                           r'REVIEW FINISHER', r'REVIEW_FIX_ROUNDS'],
     # O8: every fleet workflow runs with the stall watchdog beside it (PB1704).
     'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py',  # O8; PB1732; I9, O9, O10
                                r'STOP-<scope>',  # P3, PB2483: the scoped stop
@@ -90,7 +96,8 @@ BRIEFS = {
                                # PB2600 (O10: the owner's branch rule; nothing archived, abandon by a recorded
                                # decision); PB2602 (O11: one landing queue); PB2601 (L13: the push-main hand-off)
                                r'NO BRANCH IS LEFT UNDECIDED', r'--abandon', r'ONE LANDING QUEUE', r'coord\.py loop-state',
-                               r'READY-TO-PUSH <worktree> <sha>'],
+                               r'READY-TO-PUSH <worktree> <sha>',
+                               r'I10', r'review_findings\.py', r'WAITING FOR REVIEW'],  # PB3027: review on the branch
 }
 # The group slug is w<wave><letter>, optionally followed by a successor ordinal (w68v2 = the second same-file
 # cluster after group V), so the report path stays wave-and-group prefixed.

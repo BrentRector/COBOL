@@ -3,6 +3,9 @@
 **Status:** DONE | SPLIT | PAUSED · **turns:** N of cap · **worktree:** `<path>` · **branch:** `<branch>` · **base:** `<sha>` · **HEAD:** `<sha>`
 **diffstat:** `git diff --stat <base>..HEAD` last line · **codes used:** COBOLNET#### (unused ones returned: ####)
 
+(The branch reviewer adds `**Review:** CLEAN <reviewer> <head>` under the Status line through `review_findings.py stamp`
+when it has reviewed your DONE branch — MANDATORY-PRACTICES I10, kb/Work PB3027. Never write that line yourself.)
+
 ## Reproduced?
 Two to four lines: the probe program(s) by path, the BEFORE output, the AFTER output, on this worktree's own build.
 State plainly anything in the note that did NOT hold on today's tree.
@@ -35,6 +38,10 @@ red on the way named and attributed in one line.
 
 ## Self-review
 One line per lens — architecture · full code · performance · duplication — naming what was found and fixed, or "nothing".
+
+## Review findings (a REVIEW FINISHER's report only, I10)
+One line per finding id from `review_findings.py show <file>`: `R<k>-<n>` · fixed (the commit, and the regression test
+or golden) | no_change_needed (the reason the reviewer can check).
 
 ## Overlap for the lander
 Files a sibling worktree also edits, and the keep-both rule for each.

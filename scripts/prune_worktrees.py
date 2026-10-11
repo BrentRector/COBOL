@@ -637,7 +637,7 @@ def main(argv=None):
     ap.add_argument('--stale-hours', type=float, default=24,
                     help='a DONE report older than this that never landed needs a DECISION (default 24)')
     ap.add_argument('--reports', type=pathlib.Path, help='the fix-lane reports directory (default coord.reports_dir())')
-    ap.add_argument('--brief', action='store_true', help='the verdict line and the WAITING TO LAND and DECISION rows only')
+    ap.add_argument('--brief', action='store_true', help='the verdict line and the WAITING FOR REVIEW, WAITING TO LAND and DECISION rows only')
     ap.add_argument('--train', action='store_true',
                     help=f'the next train: at most {TRAIN_MAX} WAITING TO LAND rows, the most harmful first (kb/Work PB2981)')
     ap.add_argument('--json', action='store_true', help='the survey as JSON: every row with its state and evidence')

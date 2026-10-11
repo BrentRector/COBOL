@@ -84,3 +84,6 @@ run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <t
 Turn cap 220 — at the cap, checkpoint, write NEXT, return SPLIT.
 
 Report ≤ 60 lines, following `templates/implementer-report-template.md`, one section per note.
+BRANCH REVIEW (MANDATORY-PRACTICES I10, kb/Work PB3027): when you return DONE, one read-only cobol-reviewer reviews your
+branch and stamps your report `**Review:** CLEAN|FINDINGS …` through `review_findings.py`; never write that line
+yourself. A finding comes back to a review finisher, who answers each by its id in the report's `## Review findings`.
