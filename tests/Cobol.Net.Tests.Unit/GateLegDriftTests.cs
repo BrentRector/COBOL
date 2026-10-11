@@ -121,7 +121,7 @@ public sealed class GateLegDriftTests
                      "scope leg1: a red in leg 1 is LEG 1 ONLY: RED",
                      "scope leg1 with no plan: the one leg IS the whole population",
                      "malformed shared gate settings: the gate is NOT RUN",
-                     "a red audit (a stale drift-rules index) STOPS the gate before the build",
+                     "a red audit (a tracked rendered view) STOPS the gate before the build",
                      "the audits and the corpus fetch run BEFORE the gate slot is taken",
                      "shared gate settings that turn malformed while the gate queues: NOT RUN",
                      "every gate that ran a leg publishes its measured durations to the shared timings store",

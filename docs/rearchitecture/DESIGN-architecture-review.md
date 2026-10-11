@@ -328,7 +328,8 @@ Per §5.5: language-version and SDK upgrade first, then one analyzer rule per wa
 ### R5 — Close
 - The full battery, the GnuCOBOL differential and the NIST run.
 - The performance re-measure against the R0 baseline (a regression is a finding).
-- Docs: `COBOLNET_DESIGN.md`, `DOC_INDEX.md`, `DRIFT_RULES.md` and this document's status.
+- Docs: `COBOLNET_DESIGN.md`, `DOC_INDEX.md` and this document's status (the drift-rule index is a rendered view,
+  `scripts/rendered_views.py`, never committed).
 - The architecture drift tests stay in the suite, so the structure stays true after the review.
 
 ## 4. The behavior-neutrality contract (every R3 and R4 wave)

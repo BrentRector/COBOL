@@ -278,9 +278,9 @@ jobs:
       - name: Evidence supersession — a frozen record's claim the tree now contradicts (audit_evidence_supersession.py --check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/audit_evidence_supersession.py --check
-      - name: Drift-rule index — docs/DRIFT_RULES.md regenerated from every *DriftTests summary (drift_rules.py --check)
+      - name: Rendered views — none tracked, every in-tree one gitignored, every generator renders (rendered_views.py --check, kb/Work PB3026)
         if: ${{ !cancelled() }}
-        run: python3 scripts/spec/drift_rules.py --check
+        run: python3 scripts/rendered_views.py --check
       - name: Witness loss — inventory evidence dropped since the base of this push (audit_witness_loss.py --check)
         if: ${{ !cancelled() }}
         shell: bash

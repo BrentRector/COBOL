@@ -123,7 +123,7 @@ AUDITS = (
     ("CITATIONS", ["scripts/spec/audit_code_citations.py", "--check"]),
     ("DOC CITATIONS", ["scripts/spec/audit_doc_citations.py", "--check"]),
     ("EVIDENCE SUPERSESSION", ["scripts/spec/audit_evidence_supersession.py", "--check"]),
-    ("DRIFT RULES INDEX", ["scripts/spec/drift_rules.py", "--check"]),
+    ("RENDERED VIEWS", ["scripts/rendered_views.py", "--check"]),
     ("WITNESS LOSS", ["scripts/spec/audit_witness_loss.py", "--check"]),
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
@@ -845,7 +845,7 @@ class FakeHost(Host):
         self.audited = True
         self.events.append("audits")
         say("PLANTED-AUDIT-OUTPUT")
-        return ["DRIFT RULES INDEX RED"] if "audit" in self.plant else []
+        return ["RENDERED VIEWS RED"] if "audit" in self.plant else []
 
     def built_self_tests(self, spawn):
         self.events.append("post-build self-tests")
@@ -1049,9 +1049,9 @@ def self_test() -> int:
             o.verdict == "NOT RUN" and o.exit_code == 2 and "malformed settings.json" in o.line, o.line)
 
         o, h = gate("audit", plant={"audit"})
-        arm("a red audit (a stale drift-rules index) STOPS the gate before the build: RED, the audit "
+        arm("a red audit (a tracked rendered view) STOPS the gate before the build: RED, the audit "
             "named, no leg ran",
-            o.verdict == "RED" and o.exit_code == 1 and "DRIFT RULES INDEX RED" in o.line and "NO LEG RAN" in o.line
+            o.verdict == "RED" and o.exit_code == 1 and "RENDERED VIEWS RED" in o.line and "NO LEG RAN" in o.line
             and h.audited and not h.built and not o.runs and not o.legs_invoked and sink[-1] == o.line, o.line)
         arm("the audits and the corpus fetch run BEFORE the gate slot is taken, and a red audit never queues for one "
             "(kb/Work PB2524)",

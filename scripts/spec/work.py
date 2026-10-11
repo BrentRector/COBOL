@@ -765,6 +765,16 @@ def is_build_output(path: str) -> bool:
     return bool(_GENERATED_DIR.search(path))
 
 
+def is_view_output(path: str) -> bool:
+    """A registered rendered view's output (scripts/rendered_views.py VIEWS, the one registry)."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    try:
+        import rendered_views  # noqa: PLC0415
+    finally:
+        sys.path.pop(0)
+    return rendered_views.is_view_output(path)
+
+
 def named_paths(body: str) -> list[tuple[str, bool]]:
     """(path, is new) for every repository path a note names, in code spans or bare in prose (a path followed by
     "(new" is a file the wave creates); placeholders (`<sha>`) and globs are not paths."""
@@ -776,9 +786,11 @@ def named_missing_paths(body: str, repo: pathlib.Path = REPO, tracked: frozenset
     """The repository paths a note names that the committed tree does not have: a wave's file set is computed from
     what its note names, so a wrong path is a hole in the partition (PB2118 Draft 8, J2: PB2296 named
     `Binding/BinderContext.cs`, which is `Binding/Procedure/`; Draft 9: a bare path was never checked). A build
-    output is not missing; `build_output_problems` holds the note to its source instead."""
+    output is not missing, and neither is a RENDERED VIEW (kb/Work PB3026: gitignored, rendered on demand, so the committed
+    tree never has it); `build_output_problems` holds the note to its source instead."""
     tracked = tracked_paths(repo) if tracked is None else tracked
-    return sorted({p for p, new in named_paths(body) if not new and not is_build_output(p) and p not in tracked})
+    return sorted({p for p, new in named_paths(body)
+                   if not new and not is_build_output(p) and not is_view_output(p) and p not in tracked})
 
 
 def build_output_problems(body: str) -> list[str]:

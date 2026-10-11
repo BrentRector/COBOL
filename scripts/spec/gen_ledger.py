@@ -32,7 +32,7 @@ account in the coordination directory, and this script prints it after a render 
 
     python scripts/spec/gen_ledger.py                       # write the default --out, <coord>/ledger.html
     python scripts/spec/gen_ledger.py --out ledger.html     # write somewhere else
-    python scripts/spec/gen_ledger.py --check               # non-zero if --out is stale (mirrors
+    python scripts/spec/gen_ledger.py --check               # non-zero if the page cannot be rendered (mirrors
                                                             # gen_conformance_notes.py --check); this and a
                                                             # write both refuse when ledger_plan.problems()
                                                             # finds the lanes unreadable
@@ -1324,8 +1324,8 @@ def main() -> int:
     ap.add_argument("--out", type=pathlib.Path, default=DEFAULT_OUT,
                     help=f"HTML to write (default {DEFAULT_OUT})")
     ap.add_argument("--check", action="store_true",
-                    help="do not write; exit non-zero if --out differs from what the repo would render now, or if "
-                         "the plan does not read cleanly off the register (ledger_plan.problems)")
+                    help="render in memory, write nothing; exit non-zero if the page cannot be rendered or the plan "
+                         "does not read cleanly off the register (ledger_plan.problems)")
     ap.add_argument("--self-test", action="store_true",
                     help="the loud flags, UNMEASURED, the trend append and the register at a commit, on planted inputs")
     ap.add_argument("--backfill-register", action="store_true",
@@ -1358,24 +1358,13 @@ def main() -> int:
     pts, is_new = tr["points"], tr["is_new"]
 
     if a.check:
-        if not a.out.exists():
-            # ⛔ ABSENT IS NOT STALE — the gen_conformance_notes.py contract, and for the same reason: the
-            # rendered page is a gitignored build output, so on a fresh clone and in CI it legitimately does
-            # not exist. Reporting that as a failure would be a manufactured red
-            # (feedback_verdict_evidence_invariant).
-            print(f"· {a.out} does not exist (gitignored build output) — nothing to check.")
-            return 0
-        page_ok = a.out.read_text(encoding="utf-8") == text
-        if page_ok and not is_new:
-            print(f"✓ {a.out.name} matches the repo exactly ({len(text):,} bytes), and the trend file holds its points")
-            return 0
-        print("⛔ THE CONFORMANCE LEDGER IS STALE — " + ("it describes a tree the repo has moved past." if not page_ok
-              else f"the page matches, but {TREND.relative_to(REPO)} lacks the point(s) the page draws."))
-        if is_new:
-            print(f"      the trend series is missing the current point "
-                  f"(GAP {pts[-1]['gap']}, {pts[-1].get('compiler_open')} compiler notes at {pts[-1]['sha']})")
-        print("   Run: python scripts/spec/gen_ledger.py    then publish --out to the artifact's URL")
-        return 1
+        # A RENDERED VIEW (kb/Work PB3026; scripts/rendered_views.py) is not compared with a copy on disk: it lives in
+        # the coordination directory, outside the tree, and a landing that moves a row would make every such comparison
+        # red (the very reason it is not committed). What is checked is what can go wrong in the SOURCES: the plan
+        # reads off the register (above), and the whole page renders from the repo as it stands. The trend file is
+        # not checked for a missing point either: a render appends it, and that is the loop's refresh, never a fix PR's.
+        print(f"the ledger renders from the repo ({len(text):,} bytes)")
+        return 0
 
     if is_new:
         write_trend(pts)

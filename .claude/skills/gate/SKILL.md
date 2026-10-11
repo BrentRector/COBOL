@@ -38,7 +38,7 @@ pwsh scripts/build-local.ps1 -Priority BelowNormal *> <log>
 
 The driver, `scripts/run_gate_legs.py` (DESIGN-test-build-ci.md §3.14; kb/Work PB1721), holds the worktree's GATE
 LOCK (a second gate in the same worktree is refused), runs the audits (FAIL-FAST, before the slot and the build: a red
-audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 — run `python scripts/spec/drift_rules.py`
+audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 — run `python scripts/rendered_views.py --check`
 and the citation audits yourself before gating to avoid the round trip; one audit, `SELF-TESTS`, is every script
 self-test under `scripts/`, discovered and run in parallel by `scripts/self_tests.py`, kb/Work PB2563 — run
 `python scripts/self_tests.py` yourself after editing a script; every gate passes `--reuse`, so a self-test

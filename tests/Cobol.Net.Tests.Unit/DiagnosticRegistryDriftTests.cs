@@ -12,9 +12,10 @@ namespace CobolNet.Tests.Unit;
 /// <c>ReservedWordsDriftTests</c>): the first-class <see cref="DiagnosticCatalog"/> is THE source, so
 /// (a) every descriptor's stable <see cref="DiagnosticDescriptor.Id"/> is unique, (b) no compiler emit site
 /// still uses a BARE split-code string literal where a descriptor now exists (the <c>COBOLNET0899</c> catch-all
-/// and the reused <c>COBOLNET1533</c>), and (c) <c>docs/DIAGNOSTICS.md</c> is regenerated-and-in-sync with the
-/// catalogue. Editing the catalogue without regenerating the doc is a CI failure, never a silent stale doc.
-/// Regenerate: <c>pwsh scripts/gen-diagnostics-doc.ps1</c> (or run this test with
+/// and the reused <c>COBOLNET1533</c>), and (c) <c>docs/DIAGNOSTICS.md</c> is a RENDERED VIEW of the catalogue
+/// (kb/Work PB3026, <c>scripts/rendered_views.py</c>): gitignored and never committed, because two pull requests that each
+/// add a diagnostic would both rewrite it. This test is that view's render check: the catalogue must render one row per
+/// descriptor. Render it: <c>pwsh scripts/gen-diagnostics-doc.ps1</c> (or run this test with
 /// <c>COBOLNET_WRITE_DIAGNOSTICS_DOC=1</c>).
 /// </summary>
 [Trait("Sweep", "tree")]
@@ -109,21 +110,22 @@ public sealed class DiagnosticRegistryDriftTests
     }
 
     [Fact]
-    public void DiagnosticsDoc_IsInSync_WithTheCatalogue()
+    public void DiagnosticsDoc_RendersTheWholeCatalogue()
     {
-        string path = TestRepo.Docs("DIAGNOSTICS.md");
-        string expected = RenderMarkdown();
+        string rendered = RenderMarkdown();
 
         if (Environment.GetEnvironmentVariable("COBOLNET_WRITE_DIAGNOSTICS_DOC") == "1")
         {
-            File.WriteAllText(path, expected);
+            File.WriteAllText(TestRepo.Docs("DIAGNOSTICS.md"), rendered);
             return;
         }
 
-        Assert.True(File.Exists(path), $"{path} is missing — run: pwsh scripts/gen-diagnostics-doc.ps1");
-        string actual = Normalize(File.ReadAllText(path));
-        Assert.True(actual == Normalize(expected),
-            "docs/DIAGNOSTICS.md is out of sync with DiagnosticCatalog — regenerate: pwsh scripts/gen-diagnostics-doc.ps1");
+        // The view is not compared with a copy on disk (a copy is not promised to be current, and is gitignored):
+        // what can go wrong is the renderer, so each descriptor must come out as exactly one table row.
+        string[] rows = rendered.Split('\n').Where(l => l.StartsWith("| ", StringComparison.Ordinal)).Skip(2).ToArray();
+        Assert.Equal(DiagnosticCatalog.All.Count, rows.Length);
+        Assert.All(DiagnosticCatalog.All, d =>
+            Assert.Contains(rows, r => r.Contains($"| {Cell(d.Id)} |", StringComparison.Ordinal)));
     }
 
     /// <summary>Render the catalogue as the canonical <c>docs/DIAGNOSTICS.md</c> content.</summary>
@@ -131,9 +133,9 @@ public sealed class DiagnosticRegistryDriftTests
     {
         var sb = new StringBuilder();
         sb.Append("# WiseOwl COBOL diagnostics\n\n");
-        sb.Append("> **Generated** from `src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs` — do not edit by hand.\n");
-        sb.Append("> Regenerate: `pwsh scripts/gen-diagnostics-doc.ps1` (or run `DiagnosticRegistryDriftTests` with\n");
-        sb.Append("> `COBOLNET_WRITE_DIAGNOSTICS_DOC=1`). `DiagnosticRegistryDriftTests` fails CI if this file drifts.\n\n");
+        sb.Append("> **Rendered view** of `src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs` — gitignored, never committed or edited.\n");
+        sb.Append("> Render: `pwsh scripts/gen-diagnostics-doc.ps1` (or run `DiagnosticRegistryDriftTests` with\n");
+        sb.Append("> `COBOLNET_WRITE_DIAGNOSTICS_DOC=1`).\n\n");
         sb.Append("This catalogue is the first-class registry that replaced bare `COBOLNETnnnn` string literals\n");
         sb.Append("(rearch PHASE 02, P2.10). A **Code** may repeat across rows — the emitted number is byte-stable, the\n");
         sb.Append("stable **Id** is the identity. The `recognized-not-implemented` suppress key groups every\n");
@@ -149,6 +151,4 @@ public sealed class DiagnosticRegistryDriftTests
 
     /// <summary>Escape a markdown table cell (pipes + collapse any stray newlines).</summary>
     private static string Cell(string s) => s.Replace("|", "\\|").Replace("\r", "").Replace("\n", " ");
-
-    private static string Normalize(string s) => s.Replace("\r\n", "\n").TrimEnd('\n') + "\n";
 }

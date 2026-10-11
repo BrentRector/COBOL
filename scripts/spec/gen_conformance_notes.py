@@ -11,20 +11,15 @@ aggregates and points at the inventory for the full list. Deliberately NOT an ex
 3,790 table rows spread over 11 notes would recreate the same problem in a different shape, and the tracker's own
 rule for enumerating drift-prone items applies here too.
 
-`kb/Conformance/` is a GITIGNORED build output, so it is never committed. Regenerate freely.
+`kb/Conformance/` is a RENDERED VIEW (kb/Work PB3026; scripts/rendered_views.py): gitignored, never committed, rendered
+on demand. It went stale once because it was a file someone had to remember to regenerate (2026-08-04: five of twelve
+clause notes wrong, §15 saying **533 GAP where the live number was 481**, the dashboard under-reporting real progress
+by 52 rows while still read as current). The fix is not a staleness check on a copy: nothing is promised about a copy,
+so the session probe RENDERS the view at every session start, and `--check` only proves the inventory still produces
+one (the verdict-evidence invariant, DESIGN-test-build-ci.md §3.10: a view that is absent is not stale).
 
-⛔ AND IT WENT STALE, WHICH IS WHY `--check` EXISTS (2026-08-04). Nothing ran this script, so the notes drifted
-from the inventory they claim to summarise: five of twelve clause notes were wrong, and §15's said **533 GAP
-where the live number was 481** — the dashboard under-reported real progress by 52 rows. A generated view that
-nobody regenerates is worse than no view, because it is read as current. Two things now prevent it:
-  * `build_inventory.py` regenerates this view in the same run that writes the inventory, so the two cannot
-    diverge without someone bypassing both;
-  * `--check` rebuilds in memory and diffs against what is on disk, so a gate can FAIL on staleness. It exits 0
-    when the directory is absent — that is CI, where a gitignored build output legitimately does not exist, and
-    "missing" must not be reported as "stale" (the verdict-evidence invariant, DESIGN-test-build-ci.md §3.10).
-
-    python scripts/spec/gen_conformance_notes.py            # write
-    python scripts/spec/gen_conformance_notes.py --check    # non-zero if the notes on disk are stale
+    python scripts/spec/gen_conformance_notes.py --out kb/Conformance   # render (replaces the directory)
+    python scripts/spec/gen_conformance_notes.py --check                # non-zero when the inventory renders no view
 """
 from __future__ import annotations
 
@@ -37,7 +32,6 @@ from collections import Counter, defaultdict
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 INVENTORY = REPO / "tests" / "version-matrix" / "traceability-inventory.json"
-OUT = REPO / "kb" / "Conformance"
 
 KIND_LABEL = {
     "SR": "syntax rules", "GR": "general rules", "AR": "argument rules",
@@ -84,7 +78,7 @@ def build_notes(rows: list[dict]) -> dict[str, str]:
             "---", "",
             f"# §{clause} — {len(items)} items, {g} GAP", "",
             "> ⚙ **Generated** from `tests/version-matrix/traceability-inventory.json`. Do not edit — record",
-            "> verdicts in the inventory and re-run `scripts/spec/gen_conformance_notes.py`.", "",
+            "> verdicts in the inventory and re-render with `python scripts/rendered_views.py conformance-burn-down`.", "",
             "| kind | items |", "|---|---:|",
         ]
         for kk, n in sorted(k.items()):
@@ -143,8 +137,10 @@ def build_notes(rows: list[dict]) -> dict[str, str]:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--out", type=pathlib.Path, metavar="DIR",
+                    help="render the view into DIR (replaced wholesale); the registry's path is kb/Conformance/")
     ap.add_argument("--check", action="store_true",
-                    help="do not write; exit non-zero if the notes on disk differ from the inventory")
+                    help="render in memory and exit non-zero when the inventory no longer produces a view")
     args = ap.parse_args()
     try:
         sys.stdout.reconfigure(encoding="utf-8")
@@ -157,45 +153,31 @@ def main() -> int:
     notes = build_notes(rows)
 
     if args.check:
-        if not OUT.exists():
-            # ⛔ ABSENT IS NOT STALE. kb/Conformance/ is a gitignored build output, so on a fresh clone or in CI
-            # it legitimately does not exist; reporting that as a failure would be a manufactured red.
-            print(f"· {OUT.relative_to(REPO)} does not exist (gitignored build output) — nothing to check.")
-            return 0
-        on_disk = {p.name: p.read_text(encoding="utf-8") for p in OUT.glob("*.md")}
-        stale = sorted(set(notes) - set(on_disk)) or []
-        removed = sorted(set(on_disk) - set(notes))
-        changed = sorted(n for n in set(notes) & set(on_disk) if notes[n] != on_disk[n])
-        if not (stale or removed or changed):
-            print(f"✓ {len(notes)} conformance notes match the inventory exactly")
-            return 0
-        print("⛔ THE GENERATED CONFORMANCE VIEW IS STALE — it summarises an inventory that has since moved.")
-        for n in stale:
-            print(f"      + {n} missing on disk")
-        for n in removed:
-            print(f"      - {n} on disk but no longer generated")
-        for n in changed:
-            print(f"      ~ {n} differs")
-        print("   Run: python scripts/spec/gen_conformance_notes.py")
-        return 1
-
-    return main_write()
+        # A rendered view is never compared with a copy on disk (kb/Work PB3026): the copy is not promised to be
+        # current, and "absent" and "stale" are both just "not rendered yet". What can go wrong, and is checked, is
+        # that the inventory stops producing a view: a row without a field `build_notes` reads raises above, and an
+        # inventory with no rows renders a dashboard of zeros, which is no view of the standard (train 1063 review).
+        if not rows:
+            print(f"the inventory has no rows: {INVENTORY}")
+            return 1
+        print(f"the inventory renders {len(notes)} conformance notes")
+        return 0
+    if args.out is None:
+        ap.error("one of --out DIR or --check is required")
+    return write_view(rows, notes, args.out)
 
 
-def main_write() -> int:
-    """Write the view. A SEPARATE entry point from :func:`main` because ``build_inventory.py`` calls it in-process
-    and must not have its own argv re-parsed by this module's ArgumentParser."""
-    rows = json.loads(INVENTORY.read_text(encoding="utf-8"))
-    notes = build_notes(rows)
-    if OUT.exists():
-        shutil.rmtree(OUT)
-    OUT.mkdir(parents=True)
+def write_view(rows: list[dict], notes: dict[str, str], out: pathlib.Path) -> int:
+    """Write the view into ``out``, replacing what was there (the view is wholly derived, so nothing in it is kept)."""
+    if out.exists():
+        shutil.rmtree(out)
+    out.mkdir(parents=True)
     for name, text in notes.items():
-        (OUT / name).write_text(text, encoding="utf-8")
+        (out / name).write_text(text, encoding="utf-8")
 
     total = len(rows)
     gaps = sum(1 for r in rows if r["state"] == "GAP")
-    print(f"wrote {len(notes)} notes into {OUT.relative_to(REPO)}")
+    print(f"wrote {len(notes)} notes into {out}")
     print(f"  {total} items · {gaps} GAP · {len(notes) - 1} clause notes + 1 dashboard")
     return 0
 

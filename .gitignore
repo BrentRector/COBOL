@@ -115,9 +115,17 @@ tests/external/gnucobol-differential-report.json
 kb/Reference/
 # Generated grammar railroad diagrams (regenerated from *.g4 by scripts/gen-grammar-diagrams.ps1).
 kb/Grammar/
-# Generated conformance view over the traceability inventory (scripts/spec/gen_conformance_notes.py).
-# The inventory JSON is the SSOT and IS tracked; these 3,200+ notes are its Dataview-queryable projection.
+# RENDERED VIEWS (kb/Work PB3026; scripts/rendered_views.py is the ONE registry; DESIGN-test-build-ci.md section 3.17.4):
+# the tree holds SOURCES, derived indexes are rendered on demand and never committed, because two queued pull requests
+# that each regenerate one collide, and a copy nobody regenerates goes stale. `RenderedViewsDriftTests` and CI's
+# `audits` job fail when a registered output is tracked or missing from this list.
+# The conformance burn-down over the traceability inventory (scripts/spec/gen_conformance_notes.py). The inventory
+# JSON is the SSOT and IS tracked; these notes are its Dataview-queryable projection.
 kb/Conformance/
+# The drift-rule index (scripts/spec/drift_rules.py --out): query the rules with `drift_rules.py <path>` instead.
+docs/DRIFT_RULES.md
+# The diagnostics table (scripts/gen-diagnostics-doc.ps1), rendered from DiagnosticCatalog.cs.
+docs/DIAGNOSTICS.md
 # Generated status page for the owner's "WiseOwl COBOL Conformance Ledger" artifact (scripts/spec/gen_ledger.py).
 # A build output for the same reason kb/Conformance/ is: every input it reads IS tracked, so the page can be
 # re-derived at will — and committing it would make `--check` red after every landing that moves a row, which

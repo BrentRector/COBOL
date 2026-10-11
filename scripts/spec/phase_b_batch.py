@@ -559,13 +559,17 @@ def doc_citing(path: pathlib.Path, pat: re.Pattern) -> dict:
 
 
 def diagnostics_citing(pat: re.Pattern) -> dict:
-    """DIAGNOSTICS.md is a generated table — split the row so the agent gets a code and an id, not a wall.
+    """DIAGNOSTICS.md is a rendered table — split the row so the agent gets a code and an id, not a wall.
 
     ⚠ A row that does not split into the expected columns is emitted RAW rather than skipped. The file is
     generated and its shape can change; a parser that silently returned nothing on a new shape would read as
     "this clause has no diagnostic", which is the one answer it must never invent.
     """
     rel = DIAGNOSTICS_DOC.relative_to(REPO).as_posix()
+    if not DIAGNOSTICS_DOC.exists():
+        # The table is a RENDERED VIEW (kb/Work PB3026), absent until someone renders it. An empty read here would
+        # say "no clause has a diagnostic", the one answer this function must never invent (verdict-evidence invariant).
+        sys.exit(f"{rel} is not rendered — run: pwsh scripts/gen-diagnostics-doc.ps1")
     entries = []
     dropped = 0
     for i, line in enumerate(doc_lines(DIAGNOSTICS_DOC), 1):

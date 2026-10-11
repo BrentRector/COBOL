@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import importlib
 import json
 import re
 import sys
@@ -143,22 +142,9 @@ def main() -> int:
     print(f"\nwrote {INVENTORY.relative_to(REPO)}  ({INVENTORY.stat().st_size / 1_048_576:.1f} MB)")
     print("session-probe will now report the live GAP count.")
 
-    # ⛔ REGENERATE THE VAULT VIEW IN THE SAME RUN THAT MOVES THE INVENTORY (2026-08-04). kb/Conformance/ is a
-    # generated burn-down over exactly this file, and because nothing ever re-ran its generator it drifted: five
-    # of twelve clause notes were wrong and §15's claimed 533 GAP where the live number was 481 — the dashboard
-    # UNDER-REPORTED real progress by 52 rows and was still read as current. A view regenerated only when someone
-    # remembers is a hand-maintained artifact wearing a generator's clothes. Wiring it here means the two cannot
-    # diverge without bypassing both; `gen_conformance_notes.py --check` is the gate that proves they have not.
-    # ⚠ NON-FATAL BY DESIGN: the inventory is the SSOT and must be written even if the vault view cannot be —
-    # failing the inventory write because a derived note failed would invert their importance.
-    try:
-        import gen_conformance_notes
-        importlib.reload(gen_conformance_notes)
-        rc = gen_conformance_notes.main_write()
-        print(f"regenerated the kb/Conformance burn-down view (rc={rc})")
-    except Exception as exc:  # noqa: BLE001 - a derived view must never block the SSOT
-        print(f"⚠ could not regenerate kb/Conformance: {exc}\n"
-              f"  run: python scripts/spec/gen_conformance_notes.py")
+    # kb/Conformance/ is a RENDERED VIEW over this file (kb/Work PB3026, scripts/rendered_views.py): the session probe
+    # renders it at every session start and `rendered_views.py conformance-burn-down` renders it on demand, so this
+    # writer no longer knows the view exists (one mechanism per job).
     return 0
 
 

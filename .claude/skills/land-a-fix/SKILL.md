@@ -35,7 +35,7 @@ large, surface the effort as a bare question — do not pre-decide the deferral.
 
 ## 3. Fix the root cause, then sweep
 
-**Before you edit a file, ask which drift rules govern it:** `python scripts/spec/drift_rules.py <path> …` (generated from every `*DriftTests` summary; index at `docs/DRIFT_RULES.md`). Read the SPECIFIC rules it prints and honor them in the change — a drift test is a structural rule the gate will enforce anyway, and learning it from a red gate costs a cycle.
+**Before you edit a file, ask which drift rules govern it:** `python scripts/spec/drift_rules.py <path> …` (derived from every `*DriftTests` summary; the full index is a rendered view, `python scripts/spec/drift_rules.py --out <path>`, never committed). Read the SPECIFIC rules it prints and honor them in the change — a drift test is a structural rule the gate will enforce anyway, and learning it from a red gate costs a cycle.
 
 No workaround, no shim, no relabeling a defect a "quirk". Never edit valid COBOL to dodge a compiler bug — if the
 source is valid, the compiler is broken.

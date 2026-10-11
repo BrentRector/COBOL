@@ -55,12 +55,6 @@ if (Test-Path 'tests/version-matrix/traceability-inventory.json') {
         $needTest = @($adjudicated | Where-Object { $_.verdict -eq 'CONFORMS' -and $_.state -eq 'GAP' }).Count
         if ($needTest -gt 0) { Write-Host "       $needTest CONFORMS still test-needed (each is one spec-derived golden from OK)" }
     }
-    # ⛔ IS THE VAULT'S BURN-DOWN VIEW STILL TELLING THE TRUTH? kb/Conformance/ is a GENERATED summary of the very
-    # file read above, and because nothing re-ran its generator it silently drifted: five of twelve clause notes
-    # were wrong and §15's claimed 533 GAP where the live number was 481 — it UNDER-reported real progress and was
-    # still read as current. build_inventory.py now regenerates it, so this only fires when the inventory was
-    # edited another way. Absent is NOT stale: it is a gitignored build output and legitimately missing on a fresh
-    # clone, which the checker reports as OK rather than as a red.
     # ⛔ THE WORK LIST, PRINTED, FROM THE ONE REGISTER. Deriving "what should I fix next" from a 2,400-line
     # prose queue is what led to picking PB39 (rule-id cosmetics, zero wrong answers) over PB24 (FUNCTION LENGTH
     # silently wrong) — both are [MAJOR], so severity could not separate them. kb/Work/ replaced FIVE overlapping
@@ -72,11 +66,14 @@ if (Test-Path 'tests/version-matrix/traceability-inventory.json') {
             Write-Host "work   : the kb/Work register has malformed items - run: python scripts/spec/work.py check"
         }
     }
-    if (Test-Path 'kb/Conformance') {
-        $viewCheck = & python scripts/spec/gen_conformance_notes.py --check 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "vault  : ⛔ kb/Conformance burn-down is STALE — run: python scripts/spec/gen_conformance_notes.py"
-        }
+    # ⛔ THE VAULT'S BURN-DOWN IS A RENDERED VIEW (kb/Work PB3026; scripts/rendered_views.py): kb/Conformance/ is
+    # gitignored and was once STALE for days because it was a file someone had to remember to regenerate (five of
+    # twelve clause notes wrong, §15 claiming 533 GAP where the live number was 481). A copy cannot be stale if it is
+    # RENDERED here, from the inventory read above, at every session start; the render is cheap and the directory is
+    # gitignored, so the checkout stays clean.
+    & python scripts/rendered_views.py conformance-burn-down *>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "vault  : the kb/Conformance burn-down did not render - run: python scripts/rendered_views.py conformance-burn-down"
     }
 } else {
     Write-Host "invent : not built yet (P14 Step 0)"

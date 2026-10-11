@@ -18,7 +18,7 @@ What remains:
 1. `python scripts/spec/work.py check` — the register is well-formed (kind/status/id, no duplicates, and the
    `closes_rows` back-link's SHAPE). `python scripts/spec/work.py parity` checks that the register's two
    frontmatter readers — Python and `tests/_shared/WorkRegister.cs` — still read one file format the same way.
-2. `python scripts/spec/gen_conformance_notes.py --check` — the derived burn-down still matches the inventory.
+2. `python scripts/rendered_views.py --check` — every rendered view (the burn-down, the drift-rule index, the diagnostics table) still renders, none is tracked.
 3. `constructs.json` — still its own authority for CI and the drift tests; unchanged.
 4. Plan §0 — narrative and owner decisions ONLY. It no longer carries a worklist; `Fix next` does.
 
