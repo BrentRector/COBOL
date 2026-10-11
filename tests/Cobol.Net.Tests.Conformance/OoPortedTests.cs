@@ -164,7 +164,7 @@ public sealed class OoPortedTests
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        REPOSITORY.
-           CLASS CLBP9.
+           CLASS CLBP9
            CLASS CLSP9.
        DATA DIVISION.
        WORKING-STORAGE SECTION.

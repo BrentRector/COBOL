@@ -5,7 +5,7 @@
       *> END-SORT is in no ISO word list (§8.9) and is a user-defined word (§8.3.2.1, kb/Work PB1689),
       *> which the GIVING phrase's file-name list takes as file-name-3 (§14.9.40.2). Not a declined ISO
       *> facility (§4.2.7) - there is no facility - so the answer is the ordinary undefined-name error.
-      *> Control: conformance/2023/pb1689_vendor_channel_clause_still_parses is this program without
+      *> Control: conformance/2023/pb1689_sort_giving_ended_by_next_statement is this program without
       *> END-SORT, and prints SORTED.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. P758NEGS.

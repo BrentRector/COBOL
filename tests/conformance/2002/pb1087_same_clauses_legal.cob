@@ -20,10 +20,10 @@
            SELECT S2 ASSIGN TO "pb1087oks2.dat".
            SELECT R1 ASSIGN TO "pb1087okr.dat".
        I-O-CONTROL.
-           SAME AREA FOR F1 F2.
-           SAME RECORD AREA FOR F1 F2 F3 S1.
-           SAME SORT AREA FOR S1 F1 F2.
-           SAME SORT-MERGE AREA FOR S2 F1 F2 F3.
+           SAME AREA FOR F1 F2
+           SAME RECORD AREA FOR F1 F2 F3 S1
+           SAME SORT AREA FOR S1 F1 F2
+           SAME SORT-MERGE AREA FOR S2 F1 F2 F3
            SAME AREA FOR R1 F4.
        DATA DIVISION.
        FILE SECTION.

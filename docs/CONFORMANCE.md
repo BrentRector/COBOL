@@ -1213,7 +1213,7 @@ of an unsupported facility.
   (`cobc/reserved.c`, no context test). CHANNEL, END-INVOKE, END-MERGE, END-METHOD, END-SORT, GENERIC, PACKED and
   REMARKS were on this list until 2026-09-29 and are NOT reserved: ISO §8.9 does not reserve them, GnuCOBOL 3.2
   has no entry (REMARKS: a context test normal code never meets), so they are user-defined words and the vendor
-  constructs they spell are recognized by position (owner: follow ISO) — except END-INVOKE, END-SORT and
+  constructs they spell are recognized by position (owner: follow ISO) — except CHANNEL, whose vendor SPECIAL-NAMES entry `CHANNEL integer IS mnemonic-name` (and its `RESERVE integer [CHANNELS]` twin) no ISO format prints and nothing implements, so it is refused as a syntax error and CHANNEL is a user word everywhere (kb/Work PB2727), and END-INVOKE, END-SORT and
   END-MERGE, which spell NO construct at all: Table 12 (§14.5.1) gives INVOKE, SORT and MERGE no explicit scope
   terminator (`cite.py --check 14.5.1 "Statement names are identified in Table 12"` → OK; §14.9.23.2's INVOKE format
   ends at `[ RETURNING identifier-4 ]`), so `INVOKE … END-INVOKE`, `SORT … END-SORT` and `MERGE … END-MERGE` are

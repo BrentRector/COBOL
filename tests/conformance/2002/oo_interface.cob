@@ -3,8 +3,8 @@
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        REPOSITORY.
-           CLASS ICAT.
-           CLASS IDOG.
+           CLASS ICAT
+           CLASS IDOG
            INTERFACE ISPKR.
        DATA DIVISION.
        WORKING-STORAGE SECTION.

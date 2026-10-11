@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
-using CobolNet.Common;
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
@@ -36,43 +35,95 @@ using Core = CobolParserCore;
 /// takes the collating sequence of the context — so every caller names its <see cref="LiteralEnvironment"/>
 /// (the id paragraphs, screened before any table exists, pass <see cref="LiteralEnvironment.Unscoped"/>;
 /// kb/Work PB1406).</para>
+///
+/// <para>The operand may be a CONSTANT-NAME (kb/Work PB2588): §13.10.3 SR2 — "constant-name-1 may be used anywhere
+/// that a format specifies a literal of the class and category of constant-name-1" — and §13.10.4 GR1 — "as if
+/// literal-1 or the text represented by compilation-variable-name-1 were written where constant-name-1 is written".
+/// The caller hands the screen the constant reading of its own phase (<see cref="ConstantReading"/>: the data bind's
+/// <c>DataBinder.ReadConstant</c>, or <see cref="PreBindConstants.Read"/> before it), and the constant's literal is
+/// then held to the SAME rules as a written one — its class (alphanumeric or national), the zero-length exclusion and
+/// the formation rule — so a constant-name is never a second path with rules of its own.</para>
 /// </summary>
 internal static class ExternalizedName
 {
-    /// <summary>Screen one AS-phrase literal against its clause's syntax rule and return the externalized name it
+    /// <summary>The operand as written — the literal, or the constant-name — for a message's source-shaped prefix.</summary>
+    public static string Written(Core.ExternalizedNamePhraseContext phrase) =>
+        phrase.literal()?.GetText() ?? phrase.cobolWord().GetText();
+
+    /// <summary>The value an AS phrase gives, WITHOUT diagnosing — for a reader that must know the externalized name
+    /// but is not the phrase's screen (OoRepositoryScope, kb/Work PB974). Null for any operand <see cref="Screen"/>
+    /// would reject, so both agree on which names exist.</summary>
+    public static string? Peek(Core.ExternalizedNamePhraseContext phrase, Func<string, ConstantReading> constants) =>
+        Screen(phrase, constants, new EditionContext(2023), DiagnosticCatalog.ExternalizedNameLiteral, "", "", "",
+            LiteralEnvironment.Unscoped, rejectZeroLength: true);
+
+    /// <summary>Screen one AS phrase's operand against its clause's syntax rule and return the externalized name it
     /// FORMS (see <see cref="Form"/>), or null (having reported) on violation.</summary>
-    /// <param name="lit">The phrase's <c>literal</c> child.</param>
+    /// <param name="phrase">The <c>externalizedNamePhrase</c>.</param>
+    /// <param name="constants">What a constant-name operand stands for in the caller's phase.</param>
     /// <param name="edition">The diagnostic sink; the caller has already positioned it.</param>
     /// <param name="code">The reporting descriptor — the OWNING clause's, never a shared one, so a message
     /// still names the paragraph the rule belongs to.</param>
     /// <param name="where">The source-shaped prefix of every message, e.g. <c>PROGRAM-ID 'X' AS "Y"</c>.</param>
     /// <param name="tag">The literal's name in its own clause — "literal-1" everywhere but the REPOSITORY
-    /// program-specifier, where §12.3.8.2 numbers it literal-3.</param>
+    /// specifiers, where §12.3.8.2 numbers them literal-1 … literal-5.</param>
     /// <param name="rule">The citation appended to every message, e.g. <c>ISO §11.10.3 SR1</c>.</param>
     /// <param name="env">The literal environment a concatenation-expression literal folds in.</param>
     /// <param name="rejectZeroLength">False ONLY for §11.3.3 SR1 (CLASS-ID), which omits the exclusion.</param>
-    /// <summary>The value an AS-phrase literal gives, WITHOUT diagnosing — for a reader that must know the
-    /// externalized name but is not the phrase's screen (OoRepositoryScope, kb/Work PB974). Null for any literal
-    /// <see cref="Screen"/> would reject, so both agree on which names exist.</summary>
-    public static string? Peek(Core.LiteralContext lit) =>
-        Screen(lit, new EditionContext(2023), DiagnosticCatalog.ExternalizedNameLiteral, "", "", "",
-            LiteralEnvironment.Unscoped, rejectZeroLength: true);
-
     public static string? Screen(
-        Core.LiteralContext lit, EditionContext edition, DiagnosticDescriptor code,
-        string where, string tag, string rule, LiteralEnvironment env, bool rejectZeroLength = true)
+        Core.ExternalizedNamePhraseContext phrase, Func<string, ConstantReading> constants, EditionContext edition,
+        DiagnosticDescriptor code, string where, string tag, string rule, LiteralEnvironment env,
+        bool rejectZeroLength = true)
     {
         void Reject(string why) => edition.Error(code, $"{where}: {why}");
 
+        ConcatFolder.Folded? operand;
+        if (phrase.cobolWord() is { } word)
+        {
+            var reading = constants(word.GetText());
+            switch (reading.Kind)
+            {
+                case ConstantReadingKind.NotAConstant:
+                    Reject($"{ConstantReading.NotAConstantMessage(tag, word.GetText())} ({rule})");
+                    return null;
+                case ConstantReadingKind.Refused:
+                    return null;   // the constant entry reported its own fault
+            }
+            if (reading.Value.Category is not (PicCategory.Alphanumeric or PicCategory.National))
+            {
+                Reject($"{tag} is the constant-name '{word.GetText()}', which stands for a "
+                       + $"{reading.Value.Category.ToString().ToLowerInvariant()} literal; {rule} admits an "
+                       + "alphanumeric or national literal (ISO §13.10.3 SR2 admits a constant-name only where a "
+                       + "literal of its class and category is specified)");
+                return null;
+            }
+            operand = reading.Value;
+        }
+        else operand = LiteralOperand(phrase.literal(), edition, Reject, where, tag, rule, env);
+        if (operand is not { } value) return null;
+        if (rejectZeroLength && value.Value.Length == 0)
+        {
+            Reject($"{tag} shall not be a zero-length literal ({rule})");
+            return null;
+        }
+        return Form(value.Value, edition, where, tag, rejectZeroLength);
+    }
+
+    /// <summary>A WRITTEN literal operand's class, category and value, or null (having reported) when the clause's
+    /// rule refuses it: a numeric, figurative, boolean or NULL operand, or a concatenation that folds to any class but
+    /// alphanumeric or national.</summary>
+    private static ConcatFolder.Folded? LiteralOperand(Core.LiteralContext lit, EditionContext edition,
+        Action<string> reject, string where, string tag, string rule, LiteralEnvironment env)
+    {
         if (lit.nonNumericLiteral() is not { } nn)
         {
-            Reject($"{tag} shall be an alphanumeric or national literal — a numeric literal is not an "
+            reject($"{tag} shall be an alphanumeric or national literal — a numeric literal is not an "
                    + $"externalized name ({rule})");
             return null;
         }
         if (nn.figurativeConstant() is not null)
         {
-            Reject($"{tag} shall not be a figurative constant ({rule})");
+            reject($"{tag} shall not be a figurative constant ({rule})");
             return null;
         }
         // The predefined NULL is an identifier, not a literal (kb/Work PB1427) — the ONE §8.4.3.10.3 SR1 refusal, not
@@ -83,36 +134,26 @@ internal static class ExternalizedName
                 + $"({rule}),");
             return null;
         }
-        string value;
         if (nn.concatenationExpression() is { } ce)
         {
             var folded = ConcatFolder.Fold(ce, edition, env);
             if (folded.Category is not (PicCategory.Alphanumeric or PicCategory.National))
             {
-                Reject($"{tag} folds to a {folded.Category.ToString().ToLowerInvariant()} literal; {rule} "
+                reject($"{tag} folds to a {folded.Category.ToString().ToLowerInvariant()} literal; {rule} "
                        + "admits an alphanumeric or national literal");
                 return null;
             }
-            value = folded.Value;
+            return folded;
         }
-        else if (nn.STRINGLIT() is { } s) value = CobolLiteral.Decode(s.GetText());
-        else if (nn.HEXLIT() is { } x) value = CobolLiteral.DecodeHex(x.GetText());
-        else if (nn.NATLIT() is { } nat) value = CobolLiteral.Decode(nat.GetText());
-        else if (nn.BOOLLIT() is not null)
+        // One literal token, decoded by the ONE decoder a constant entry's literal-1 also takes.
+        var token = DataBinder.LiteralTokenValue(nn, where);
+        if (token.Category == PicCategory.Boolean)
         {
-            Reject($"{tag} shall be an alphanumeric or national literal — a boolean literal is not an "
+            reject($"{tag} shall be an alphanumeric or national literal — a boolean literal is not an "
                    + $"externalized name ({rule})");
             return null;
         }
-        else
-            throw new InvalidOperationException($"{where}: nonNumericLiteral alternative '{nn.GetText()}' has no "
-                + "externalized-name decoding — the grammar rule grew an arm this screen does not read");
-        if (rejectZeroLength && value.Length == 0)
-        {
-            Reject($"{tag} shall not be a zero-length literal ({rule})");
-            return null;
-        }
-        return Form(value, edition, where, tag, rejectZeroLength);
+        return token;
     }
 
     /// <summary>§8.3.2.2 2)'s FORMATION half — "the content of the literal specified in that AS phrase is a name

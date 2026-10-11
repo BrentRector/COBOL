@@ -1,4 +1,11 @@
 #nullable enable
+CobolNet.Runtime.Collation.LocaleCollationException
+CobolNet.Runtime.Collation.LocaleCollationException.DataSource.get -> string!
+CobolNet.Runtime.Collation.LocaleCollationException.Line.get -> int?
+CobolNet.Runtime.Collation.LocaleCollationException.LocaleCollationException(string! dataSource, int? line, string! reason, System.Exception? inner = null) -> void
+CobolNet.Runtime.Collation.LocaleCollationException.Reason.get -> string!
+CobolNet.Runtime.Collation.ResolvedLocaleCollation.Failure.get -> CobolNet.Runtime.Collation.LocaleCollationException?
+CobolNet.Runtime.Collation.ResolvedLocaleCollation.Failure.init -> void
 CobolNet.Runtime.ConfigEntry.FamilyMember.get -> System.Func<string!, bool>?
 CobolNet.Runtime.ConfigEntry.FamilyMember.init -> void
 CobolNet.Runtime.ProgramTable.RunModule(System.Action! ensureRegistered, string? mainPath) -> void

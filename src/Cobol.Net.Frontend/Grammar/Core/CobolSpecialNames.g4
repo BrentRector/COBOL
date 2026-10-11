@@ -14,42 +14,44 @@ options {
 specialNamesParagraph
     // §12.3.7.2 prints `SPECIAL-NAMES. [clauses] .` and §12.3.7.3 SR31 lets ONE of the two separator periods go
     // when no clause is written (kb/Work PB1090) — the full empty spelling `SPECIAL-NAMES. .` is the second alternative,
-    // as the SOURCE-COMPUTER / OBJECT-COMPUTER siblings write theirs. A non-empty paragraph's closing period is its
-    // last entry's own DOT?.
-    : SPECIAL_NAMES DOT (specialNameEntry+ | DOT)?
+    // as the SOURCE-COMPUTER / OBJECT-COMPUTER siblings write theirs. ⛔ A non-empty paragraph has ONE closing period,
+    // after its last clause. The `DOT?` after every entry is a PUNCTUATION SUPERSET written HERE, on the paragraph
+    // (not inside specialNameEntry), so the periods are this rule's own children: ClosedFormatPass reads them through
+    // ParagraphPeriods and refuses a period after an inner entry (COBOLNET3407) or a missing closing one
+    // (COBOLNET3408) BY NAME (kb/Work PB2727) — `SPECIAL-NAMES. CLASS HEXD IS "0" THRU "9". DECIMAL-POINT IS COMMA.`
+    // compiled clean, a period-per-entry spelling §12.3.7.2 does not print.
+    : SPECIAL_NAMES DOT ((specialNameEntry DOT?)+ | DOT)?
     ;
 
 specialNameEntry
-    : currencySignClause DOT?
-    | decimalPointClause DOT?
-    | classDefinitionClause DOT?
-    | symbolicCharactersClause DOT?
-    | alphabetClause DOT?
+    : currencySignClause
+    | decimalPointClause
+    | classDefinitionClause
+    | symbolicCharactersClause
+    | alphabetClause
     // CRT STATUS / CURSOR (§12.3.7; Annex A.4.2 item 25 — the DECLINED screen module, refused by name at bind
     // with COBOLNET1560). ⚠ RESERVATION-GATED. §8.9 reserves CRT and CURSOR from 2002 ONLY, so at COBOL-85 they
     // are ordinary user words and `SPECIAL-NAMES. CURSOR IS FOO.` is a legal '85 implementor-switch entry that
     // must keep parsing as one — the localeClause precedent exactly. Without the gate the '85 program drew a
     // screen-facility refusal for a switch entry that has nothing to do with screens (kb/Work PB301).
-    | {reservedHere("CRT")}?    crtStatusClause DOT?
-    | {reservedHere("CURSOR")}? cursorClause DOT?
-    | channelClause DOT?
-    | reserveClause DOT?
+    | {reservedHere("CRT")}?    crtStatusClause
+    | {reservedHere("CURSOR")}? cursorClause
     // MUST precede implementorSwitchEntry: `LOCALE FR IS "fr_FR"` otherwise matches `cobolWord (IS cobolWord)?`
     // as far as the bare word LOCALE, then re-enters as `FR IS "fr_FR"` and dies on the LITERAL with
     // COBOL0308 "a data-name is expected here, not a literal" — a parse error pointing at the wrong token, for a
     // clause the standard defines (fix-queue PB25).
-    | localeClause DOT?
+    | localeClause
     // MUST precede implementorSwitchEntry, for the LOCALE clause's reason: at COBOL-85 §8.9 leaves ORDER
     // user-definable, so `cobolWord`'s gated alternative still admits it and `ORDER TABLE OT1 IS "…"` would
     // otherwise match `cobolWord (IS cobolWord)?` as far as the bare word ORDER, and the entry loop re-enters on
     // TABLE — a keyword token no cobolWord admits — dying on a token the user never wrote a clause around
     // (kb/Work PB101). ORDER became a lexer token at kb/Work PB704, which retired the clause's text predicate but
     // NOT this ordering requirement.
-    | orderTableClause DOT?
+    | orderTableClause
     // DYNAMIC is reserved at every edition, so it heads no switch entry — but it is listed ahead of
     // implementorSwitchEntry anyway, the LOCALE / ORDER TABLE posture for a clause with a keyword anchor.
-    | dynamicLengthStructureClause DOT?
-    | implementorSwitchEntry DOT?
+    | dynamicLengthStructureClause
+    | implementorSwitchEntry
     // ⛔ THE §12.3.7.2 GENERAL FORMAT IS CLOSED (kb/Work PB829; RENDERED from the printed page — PDF p320 /
     // folio 290): alphabet-name-clause · CLASS · CRT STATUS · CURRENCY SIGN · CURSOR · DECIMAL-POINT ·
     // dynamic-length-structure-clause · LOCALE · the switch-name/feature-name/device-name entry ·
@@ -59,8 +61,11 @@ specialNameEntry
     // mnemonic-name-3` and never reaches here — what the standard refuses there is §12.3.7.3 SR8 (the name is
     // not one the implementor specifies), a SEMANTIC rule refused by name at bind (COBOLNET2241, kb/Work PB862).
     // This alternative catches what NO arm of the format admits: a lone word (kb/Work PB716), a run carrying a
-    // literal, or three or more words.
-    | unrecognizedClause DOT?   // ⛔ LAST — refused BY NAME by ClosedFormatPass (COBOLNET1970)
+    // literal, or three or more words. The vendor `CHANNEL integer IS mnemonic-name` and `RESERVE integer
+    // [CHANNELS]` entries, which no ISO format prints and nothing implements, match no arm at all, this one
+    // included (its word run stops at IS, and RESERVE is a reserved word that never starts it), so they are a
+    // syntax error, COBOL0001, rather than arms no binder reads (kb/Work PB2727; they compiled clean and did nothing).
+    | unrecognizedClause   // ⛔ LAST — refused BY NAME by ClosedFormatPass (COBOLNET1970)
     ;
 
 // LOCALE locale-name-1 IS { external-locale-name-1 | literal-4 } (§12.3.7).
@@ -358,16 +363,4 @@ cursorClause
     : CURSOR IS? dataReference
     ;
 
-// CHANNEL integer IS data-name — A VENDOR EXTENSION, not an ISO clause: `grep -c CHANNEL specs/ISO_COBOL.md`
-// is 0 and the §12.3.7.2 format lists no CHANNEL. Its IS is therefore not measurable against any printed page
-// and must NOT be relaxed by analogy with the clauses above (kb/Work PB695 group 1 — the audit reported it
-// only because the SPECIAL-NAMES closure swept up a same-token stranger).
-channelClause
-    : CHANNEL integerLiteral IS dataReference
-    ;
-
-// RESERVE integer [CHANNELS]
-reserveClause
-    : RESERVE integerLiteral IDENTIFIER?
-    ;
 

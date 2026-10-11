@@ -53,7 +53,8 @@ public static class LocaleManager
     /// tag, loads and applies its collation (cached), and records it on <c>RunUnit.Current.Locale</c>. Null, "" or
     /// "root" selects the root order.</summary>
     /// <exception cref="CultureNotFoundException">The tag has no CLDR data, no tailoring, and is not a culture .NET recognizes.</exception>
-    /// <exception cref="FormatException">The locale's tailoring file is malformed (the message names file and line).</exception>
+    /// <exception cref="LocaleCollationException">The locale's site collation data (a CLDR or <c>.tailor</c> file) cannot
+    /// be used — malformed, unreadable or stale; the message names the file and, where it has one, the line.</exception>
     public static void SetLocale(string? localeName)
     {
         var info = GetLocale(localeName);        // validates + loads (throws on an unknown tag / a malformed file)
@@ -65,18 +66,21 @@ public static class LocaleManager
 
     /// <summary>The <see cref="LocaleInfo"/> of a tag WITHOUT selecting it (validated, collation built, cached).</summary>
     /// <exception cref="CultureNotFoundException">The tag has no CLDR data, no tailoring, and is not a culture .NET recognizes.</exception>
+    /// <exception cref="LocaleCollationException">The locale's site collation data cannot be used (kb/Work PB2773).</exception>
     public static LocaleInfo GetLocale(string? localeName)
     {
         string tag = Normalize(localeName);
         return s_infos.GetOrAdd(tag, static t =>
         {
-            if (t.Length == 0) return new LocaleInfo("", CollationEngine.ResolveLocale(t), recognizedCulture: true);
             // The ONE known-locale rule (CollationEngine.IsKnownLocale): its own CLDR file, its own / its language's
-            // .tailor, or a culture .NET recognizes — never the CLDR parent chain alone.
+            // .tailor, or a culture .NET recognizes — never the CLDR parent chain alone. Site data that cannot be used
+            // is its own failure, named by its file (kb/Work PB2773), not "no data".
+            var resolved = CollationEngine.ResolveLocale(t);
+            if (resolved.Failure is { } failure) throw failure;
+            if (t.Length == 0) return new LocaleInfo("", resolved, recognizedCulture: true);
             if (!CollationEngine.IsKnownLocale(t))
                 throw new CultureNotFoundException(nameof(localeName), t,
                     $"locale '{t}' is not selectable: no CLDR collation data of its own ({CldrLocaleLoader.DescribeSearch()}), no tailoring file ({TailoringRules.DescribeSearch(t)}) and not a culture .NET recognizes");
-            var resolved = CollationEngine.ResolveLocale(t);
             bool known = LocaleConfig.IsKnownCulture(resolved.Cldr.Tag.BaseTag);
             // The canonical spelling: the tailoring's own @locale when it names this very tag ("es_es" → "es-ES");
             // else the CLDR-normalized base tag with the -u- extension as given.
@@ -91,7 +95,7 @@ public static class LocaleManager
     public static bool TryGetLocale(string? localeName, out LocaleInfo? info)
     {
         try { info = GetLocale(localeName); return true; }
-        catch (CultureNotFoundException) { info = null; return false; }
+        catch (Exception ex) when (ex is CultureNotFoundException or LocaleCollationException) { info = null; return false; }
     }
 
     /// <summary>The selectable tags this system knows by name (root + CLDR + tailored); see

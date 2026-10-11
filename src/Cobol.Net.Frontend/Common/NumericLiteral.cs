@@ -58,8 +58,10 @@ public static class NumericLiteral
     /// <summary>True when <paramref name="text"/> (canonical dot-decimal) has the FLOATING-POINT numeric literal form
     /// of ISO §8.3.3.3.3: a fixed-point significand (optional sign, digits, at most one decimal point), the letter E,
     /// and an optionally signed integer exponent — <c>1.5E+3</c>, <c>-2.5E-2</c>. Fixed-point text and any
-    /// non-numeric operand return false. (Whether the significand carries the decimal point the standard requires is
-    /// the lexer's question; a text of this shape only ever arrives from a numeric-literal token.)</summary>
+    /// non-numeric operand return false. (Whether the significand carries the decimal point the standard requires, and
+    /// whether that point is not its rightmost character (§8.3.3.3.2 3)), is the lexer's question: FLOAT_BODY's
+    /// significand IS the fixed-point DEC_BODY, kb/Work PB2729; a text of this shape only ever arrives from a
+    /// numeric-literal token.)</summary>
     public static bool IsFloatingPointForm(string text)
     {
         string t = text.Trim();
@@ -96,7 +98,9 @@ public static class NumericLiteral
 
     /// <summary>The ISO §8.3.3.3.3 SR2/SR3/SR4 form check of a canonical floating-point literal text (which shall
     /// satisfy <see cref="IsFloatingPointForm"/>). SR2's "shall include a decimal point" is the lexer's shape
-    /// (a point-less <c>1E10</c> is a user-defined word, §8.3.2.1); the digit counts and the zero form are checked
+    /// (a point-less <c>1E10</c> is a user-defined word, §8.3.2.1), and so is the point's position: the significand
+    /// is the fixed-point DEC_BODY, whose point is never the rightmost character (§8.3.3.3.2 3), kb/Work PB2729 —
+    /// <c>3.E2</c> is no token of this shape); the digit counts and the zero form are checked
     /// here — the ONE place, since both the expression funnel and the VALUE funnel normalize through it.</summary>
     public static FloatingLiteralIssue CheckFloatingPointForm(string text)
     {

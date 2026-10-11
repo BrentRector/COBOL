@@ -735,8 +735,8 @@ public sealed partial class DataBinder
         string externalized = name;
         if (re.externalizedNamePhrase() is { } asPhrase)
         {
-            if (ExternalizedName.Screen(asPhrase.literal(), Edition, DiagnosticCatalog.RepositoryProgramSpecifier,
-                    $"REPOSITORY {kind} '{name}' AS {asPhrase.literal().GetText()}", tag, "ISO §12.3.8.3 SR2",
+            if (ExternalizedName.Screen(asPhrase, ReadConstant, Edition, DiagnosticCatalog.RepositoryProgramSpecifier,
+                    $"REPOSITORY {kind} '{name}' AS {ExternalizedName.Written(asPhrase)}", tag, "ISO §12.3.8.3 SR2",
                     LiteralEnv) is not { } literal) return null;
             externalized = literal;
         }
@@ -1275,13 +1275,21 @@ public sealed partial class DataBinder
         }
         OrderTables[name] = text;
         // GR17's implementor half, checked against the ONE resolver the runtime uses (§15.85.4 r2 owns the outcome).
-        if (!CollationEngine.TryGetOrderingTable(text, out _))
-            Edition.Warning(DiagnosticCatalog.OrderTableUnresolved, $"ORDER TABLE {name} IS {raw}: "
-                + $"'{text}' does not name a cultural ordering table this implementation provides (ISO §12.3.7.4 "
-                + "GR17 leaves literal-9's allowable content to the implementor: the default table "
-                + $"'{CollationEngine.DefaultOrderingTableName}' — case-insensitive, space and underscore "
-                + "interchangeable — or a CLDR locale tag naming a tailored collation). Every FUNCTION "
-                + $"STANDARD-COMPARE reference to {name} will set EC-ORDER-NOT-SUPPORTED at run time (§15.85.4 r2)");
+        // A site collation file that cannot be used is that resolver's typed failure, named here with its file, never
+        // a crash of the compile (kb/Work PB2773).
+        if (CollationEngine.TryGetOrderingTable(text, out _)) return;
+        string? failure = CollationEngine.ResolveLocale(text).Failure?.Message;
+        Edition.Warning(DiagnosticCatalog.OrderTableUnresolved, $"ORDER TABLE {name} IS {raw}: "
+            + (failure is null
+                ? $"'{text}' does not name a cultural ordering table this implementation provides (ISO §12.3.7.4 "
+                  + "GR17 leaves literal-9's allowable content to the implementor: the default table "
+                  + $"'{CollationEngine.DefaultOrderingTableName}' — case-insensitive, space and underscore "
+                  + "interchangeable — or a CLDR locale tag naming a tailored collation)"
+                : $"the site collation data for '{text}' cannot be used ({failure}), so it names no cultural "
+                  + "ordering table this implementation provides (ISO §12.3.7.4 GR17 leaves literal-9's allowable "
+                  + "content to the implementor)")
+            + $". Every FUNCTION STANDARD-COMPARE reference to {name} will set EC-ORDER-NOT-SUPPORTED at run time "
+            + "(§15.85.4 r2)");
     }
 
     /// <summary>Build one <c>ALPHABET name IS …</c> clause (ISO §12.3.7 GR7): NATIVE / STANDARD-1 / STANDARD-2 are
@@ -1974,11 +1982,19 @@ public sealed partial class DataBinder
         string name = word.GetText();
         if (FindConstant(name) is { } constant) return constant;
         if (!IsFailedConstant(name))
-            report($"{what}: {operand} is a literal, and '{name}' names no constant entry — a word "
-                + "stands there only as a constant-name (ISO §13.10.3 SR2: \"constant-name-1 may be used anywhere that "
-                + "a format specifies a literal of the class and category of constant-name-1\")");
+            report($"{what}: {ConstantReading.NotAConstantMessage(operand, name)}");
         return null;
     }
+
+    /// <summary>What <paramref name="name"/> stands for at a literal position INSIDE the data bind (kb/Work PB2588) — the
+    /// AS phrase of a REPOSITORY specifier or of an EXTERNAL clause, read by <see cref="ExternalizedName.Screen"/>. The
+    /// same lookup as <see cref="SpecialNamesConstant"/> (<see cref="FindConstant"/> binds the entry on demand and sees
+    /// a container's GLOBAL constant), answered as a <see cref="ConstantReading"/>, the shape the pre-bind reader
+    /// (<see cref="PreBindConstants"/>) gives the AS phrases read before this bind.</summary>
+    internal ConstantReading ReadConstant(string name) =>
+        FindConstant(name) is { } k ? ConstantReading.Of(new ConcatFolder.Folded(k.Category, k.Text))
+        : IsFailedConstant(name) ? ConstantReading.Refused
+        : ConstantReading.NotAConstant;
 
     /// <summary>The characters of an alphabet-entry string literal: a §8.8.3.3 GR3 concatenation folded first — in
     /// the SPECIAL-NAMES environment (§12.3.7.4 GR10's native extremes), with §12.3.7.3 SR11's

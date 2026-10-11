@@ -3,7 +3,7 @@
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        REPOSITORY.
-           CLASS CACC9.
+           CLASS CACC9
            PROPERTY FCNT.
        PROCEDURE DIVISION.
        MAIN.

@@ -13,7 +13,7 @@
            SELECT S1 ASSIGN TO "PB1087N8s.dat".
            SELECT R1 ASSIGN TO "PB1087N8r.dat".
        I-O-CONTROL.
-           SAME RECORD AREA FOR F1 F2.
+           SAME RECORD AREA FOR F1 F2
            SAME RECORD AREA FOR F1 F3.
        DATA DIVISION.
        FILE SECTION.

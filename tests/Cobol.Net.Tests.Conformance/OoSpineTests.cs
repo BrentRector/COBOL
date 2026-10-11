@@ -989,8 +989,8 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS CH24A.
-                CLASS CH24B.
+                CLASS CH24A
+                CLASS CH24B
                 CLASS CH24C.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -1074,7 +1074,7 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS BASE25.
+                CLASS BASE25
                 CLASS SUB25.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -1136,7 +1136,7 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS BASE26.
+                CLASS BASE26
                 CLASS SUB26.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -1309,8 +1309,8 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS ANI30.
-                CLASS DOG30.
+                CLASS ANI30
+                CLASS DOG30
                 CLASS MAK30.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -1397,9 +1397,9 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS ANI31.
-                CLASS DOG31.
-                CLASS FAC31.
+                CLASS ANI31
+                CLASS DOG31
+                CLASS FAC31
                 CLASS SUB31.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -1870,7 +1870,7 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS BAS43.
+                CLASS BAS43
                 CLASS SUB43.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -2228,7 +2228,7 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS CPRP56.
+                CLASS CPRP56
                 PROPERTY BAL.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -2320,7 +2320,7 @@ public sealed class OoSpineTests
             ENVIRONMENT DIVISION.
             CONFIGURATION SECTION.
             REPOSITORY.
-                CLASS CSPK60.
+                CLASS CSPK60
                 INTERFACE ISPK50.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
@@ -2342,13 +2342,16 @@ public sealed class OoSpineTests
 
     // ── Property REFERENCES (§8.4.3.9 — the GR1–GR3 desugar; DEVLOG 607) ────────────────────────────────────
 
+    /// <summary>A driver over class <paramref name="cls"/>; <paramref name="repository"/> is further REPOSITORY
+    /// specifiers WITH the paragraph's one closing period (ISO §12.3.8.2 prints it once, after the last specifier;
+    /// kb/Work PB2727), so the CLASS specifier takes the period only when nothing follows it.</summary>
     private static string PropRefDriver(string pid, string cls, string repository, string statements) => $"""
         IDENTIFICATION DIVISION.
         PROGRAM-ID. {pid}.
         ENVIRONMENT DIVISION.
         CONFIGURATION SECTION.
         REPOSITORY.
-            CLASS {cls}.
+            CLASS {cls}{(repository.Length == 0 ? "." : "")}
         {repository}
         DATA DIVISION.
         WORKING-STORAGE SECTION.
@@ -2457,7 +2460,7 @@ public sealed class OoSpineTests
         ENVIRONMENT DIVISION.
         CONFIGURATION SECTION.
         REPOSITORY.
-            CLASS CUH4A.
+            CLASS CUH4A
             CLASS CUH8B.
         DATA DIVISION.
         WORKING-STORAGE SECTION.

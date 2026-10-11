@@ -5997,6 +5997,26 @@ public static class DiagnosticCatalog
         + "symbolic-character-1. No edition and no dialect admits the trailing spelling; move the phrase.",
         "ISO §12.3.7.2");
 
+    /// <summary>A separator period inside an I-O-CONTROL, SPECIAL-NAMES or REPOSITORY paragraph ends a sentence the
+    /// general format does not end (kb/Work PB2727) — refused by name in ClosedFormatPass through ParagraphPeriods.</summary>
+    public static readonly DiagnosticDescriptor ParagraphInteriorPeriod = new(
+        "COBOLNET3407", "paragraph-interior-period", EditionSeverity.Error,
+        "A separator period is written between two entries of an I-O-CONTROL, SPECIAL-NAMES or REPOSITORY paragraph. "
+        + "Each of these general formats prints ONE separator period after the paragraph's entries (ISO §12.3.7.2, "
+        + "§12.3.8.2; §12.4.6.2 prints a second one only around the APPLY COMMIT clause, which is a sentence of its "
+        + "own), and §5.2.1 binds the punctuation a format prints. Delete the period and keep the one after the last "
+        + "entry.",
+        "ISO §5.2.1");
+
+    /// <summary>An I-O-CONTROL, SPECIAL-NAMES or REPOSITORY paragraph with entries ends without its separator period
+    /// (kb/Work PB2727) — refused by name in ClosedFormatPass through ParagraphPeriods.</summary>
+    public static readonly DiagnosticDescriptor ParagraphPeriodMissing = new(
+        "COBOLNET3408", "paragraph-period-missing", EditionSeverity.Error,
+        "An I-O-CONTROL, SPECIAL-NAMES or REPOSITORY paragraph that holds entries ends without the separator period "
+        + "its general format prints after the last entry (ISO §12.4.6.2, §12.3.7.2, §12.3.8.2; §5.2.1). Write the "
+        + "period after the last entry.",
+        "ISO §5.2.1");
+
     /// <summary>A bare operand that is none of the conditions is used as a condition (kb/Work PB982):
     /// <c>IF WS-X</c> over a PIC X item used to compile with no diagnostic and abort the run unit when reached.</summary>
     public static readonly DiagnosticDescriptor OperandIsNotACondition = new(

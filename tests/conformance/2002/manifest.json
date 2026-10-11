@@ -4,6 +4,7 @@
   "pb2919_hex_literal_ff_is_the_storage_byte",
   "pb2745_statement_context_scope",
   "pb2839_hyphen_underscore_distinct_names",
+  "pb2729_float_significand_forms",
   "pb2844_constant_length_type_subordinate",
   "pb2844_constant_length_same_as_subordinate",
   "pb2465_same_as_after_length_constant",
@@ -819,7 +820,9 @@
   "pb2938_wide_refmod_position_and_length",
   "pb1941_constant_length_inside_open_entry",
   "pb1941_constant_length_report_ahead",
-  "pb2051_parameterized_definition_binds_itself"
+  "pb2051_parameterized_definition_binds_itself",
+  "pb2588_as_constant_name",
+  "pb2727_paragraph_single_period"
   ],
   "pending": []
 }

@@ -113,10 +113,6 @@ internal static class IntegerOperandRules
         [typeof(Core.SymbolicCharacterEntryContext)] = All(IntegerSlot.Not(
             "SYMBOLIC CHARACTERS integer-1 is an ORDINAL whose range, one through the size of the character set, is "
             + "§12.3.7.3 SR16's own rule, reported by DataBinder.SwitchBindSymbolic")),
-        [typeof(Core.ChannelClauseContext)] = All(IntegerSlot.Not(
-            "CHANNEL integer IS … is a vendor extension, not an ISO general format; §5.5 governs general formats")),
-        [typeof(Core.ReserveClauseContext)] = All(IntegerSlot.Not(
-            "SPECIAL-NAMES RESERVE integer CHANNELS is a vendor extension, not an ISO general format")),
 
         // ── PROCEDURE DIVISION HEADERS ──────────────────────────────────────────────────────────────────────
         [typeof(Core.SectionDefinitionContext)] = All(IntegerSlot.Not(
@@ -212,8 +208,6 @@ internal static class IntegerOperandRules
             + "first so that such a program parses exactly as it did; its second and third alternatives write integerOperand "
             + "and bare words (DataBinder.SymbolicEntryGroups), because a constant-name ordinal is the same kind of token as "
             + "the next symbolic-character-1 and only the constant table tells them apart",
-        [typeof(Core.ChannelClauseContext)] = "a vendor extension, not an ISO general format (§5.5 governs general formats)",
-        [typeof(Core.ReserveClauseContext)] = "SPECIAL-NAMES RESERVE … CHANNELS is a vendor extension, not an ISO general format",
         [typeof(Core.SectionDefinitionContext)] = "the 1985 Segmentation module's priority-number, not an integer-n; deleted at 2002",
         [typeof(Core.DeclarativeSectionContext)] = "the 1985 Segmentation module's priority-number, not an integer-n; deleted at 2002",
         [typeof(Core.ScreenLineClauseContext)] = ScreenDeclinedReason,

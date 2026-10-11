@@ -20,7 +20,7 @@
            SELECT F4 ASSIGN TO "pb1139ok4.dat".
            SELECT F5 ASSIGN TO "pb1139ok5.dat".
        I-O-CONTROL.
-           SAME RECORD AREA FOR F2 F3.
+           SAME RECORD AREA FOR F2 F3
            SAME SORT AREA FOR SW F5.
        DATA DIVISION.
        FILE SECTION.

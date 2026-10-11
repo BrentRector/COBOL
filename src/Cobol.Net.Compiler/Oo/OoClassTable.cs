@@ -3,6 +3,7 @@
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
+using CobolNet.Frontend.Preprocessor;
 
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
@@ -97,9 +98,13 @@ public sealed class OoClassTable
         // Built from the SOURCE ELEMENT, not from `site`: the two walks are identical (nothing between a
         // reference and its source element carries a REPOSITORY paragraph or names a class), and starting at
         // the memo key makes that identity a property of the code rather than an argument about it.
-        if (!_scopes.TryGetValue(key, out var scope)) _scopes[key] = scope = OoRepositoryScope.Build(key);
+        if (!_scopes.TryGetValue(key, out var scope)) _scopes[key] = scope = OoRepositoryScope.Build(key, _variables);
         return scope;
     }
+
+    /// <summary>The compilation group's &gt;&gt;DEFINE timeline — what a FROM constant-name written as an AS phrase's
+    /// operand stands for before any DATA DIVISION binds (<see cref="PreBindConstants"/>; kb/Work PB2588).</summary>
+    private DirectiveTimeline<CompilationVariableEvent> _variables = null!;
 
     // Keyed by parse-tree node IDENTITY: a ParserRuleContext does not override Equals, so the default
     // comparer already IS reference equality.
@@ -183,13 +188,14 @@ public sealed class OoClassTable
     /// point the rows it covers were being witnessed.</para>
     /// </summary>
     public static OoClassTable Build(IReadOnlyList<Core.ClassDefinitionContext> classes, EditionContext edition,
-        IReadOnlyList<Core.InterfaceDefinitionContext>? interfaces = null,
-        IReadOnlySet<string>? parameterizedNames = null,
-        IReadOnlyList<Core.ClassDefinitionContext>? parameterizedClasses = null,
-        IReadOnlyList<Core.InterfaceDefinitionContext>? parameterizedInterfaces = null,
-        IReadOnlySet<string>? expandedNames = null)
+        IReadOnlyList<Core.InterfaceDefinitionContext>? interfaces,
+        IReadOnlySet<string>? parameterizedNames,
+        IReadOnlyList<Core.ClassDefinitionContext>? parameterizedClasses,
+        IReadOnlyList<Core.InterfaceDefinitionContext>? parameterizedInterfaces,
+        IReadOnlySet<string>? expandedNames,
+        DirectiveTimeline<CompilationVariableEvent> variables)
     {
-        var table = new OoClassTable { _parameterized = parameterizedNames ?? EmptyNames };
+        var table = new OoClassTable { _parameterized = parameterizedNames ?? EmptyNames, _variables = variables };
         var usedCsNames = new HashSet<string>(StringComparer.Ordinal);
 
         // §11.3.3 SR1 / §11.6.3 SR1 / §11.7.3 SR1 — the AS phrase's literal, screened by the ONE screen
@@ -201,9 +207,11 @@ public sealed class OoClassTable
         {
             if (phrase is null) return declared;
             using var _ = edition.At(phrase);
-            return ExternalizedName.Screen(phrase.literal(), edition,
+            // No DATA DIVISION is bound yet, so a constant-name operand (§13.10.3 SR2) is read off the parse tree
+            // (kb/Work PB2588): a METHOD-ID's from its own and its object's or factory's entries (§11.7.4 GR5).
+            return ExternalizedName.Screen(phrase, k => PreBindConstants.Read(phrase, k, variables), edition,
                        DiagnosticCatalog.ExternalizedNameLiteral,
-                       $"{kind} '{declared}' AS {phrase.literal().GetText()}", "literal-1", rule,
+                       $"{kind} '{declared}' AS {ExternalizedName.Written(phrase)}", "literal-1", rule,
                        LiteralEnvironment.Unscoped, rejectZeroLength)
                    ?? declared;
         }

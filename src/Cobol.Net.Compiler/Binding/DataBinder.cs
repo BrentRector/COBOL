@@ -2006,9 +2006,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         // spaces removed (DOC-A.1-68, kb/Work PB1539).
                         file.ExternalName =
                             (ge.externalizedNamePhrase() is { } asPhrase
-                                ? ExternalizedName.Screen(asPhrase.literal(), Edition,
+                                ? ExternalizedName.Screen(asPhrase, ReadConstant, Edition,
                                     DiagnosticCatalog.ExternalClauseAsLiteral,
-                                    $"file '{name}' IS EXTERNAL AS {asPhrase.literal().GetText()}", "literal-1",
+                                    $"file '{name}' IS EXTERNAL AS {ExternalizedName.Written(asPhrase)}", "literal-1",
                                     "ISO §13.18.22.3 SR3", LiteralEnv, rejectZeroLength: true)
                                 : null)
                             ?? CobolNames.UpperFold(name);
@@ -5881,8 +5881,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // failing the entry: §13.18.22.4 GR5's second sentence then externalizes the record under its own
         // data-name, so the program binds under an already-failed compile instead of cascading.
         string? externalizedAs = externalAs is null ? null
-            : ExternalizedName.Screen(externalAs.literal(), Edition, DiagnosticCatalog.ExternalClauseAsLiteral,
-                $"{entryWhere} IS EXTERNAL AS {externalAs.literal().GetText()}", "literal-1",
+            : ExternalizedName.Screen(externalAs, ReadConstant, Edition, DiagnosticCatalog.ExternalClauseAsLiteral,
+                $"{entryWhere} IS EXTERNAL AS {ExternalizedName.Written(externalAs)}", "literal-1",
                 "ISO §13.18.22.3 SR3", LiteralEnv, rejectZeroLength: true);
         var item = new DataItem
         {

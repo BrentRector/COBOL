@@ -503,8 +503,18 @@ public sealed partial class DataBinder
             string? integer = NumericLiteral.IsIntegerLiteralForm(value.Text) ? CtNumeric.ToIntegerText(value.Number) : null;
             return new ConstantDef(name, PicCategory.Numeric, text, integer, isGlobal, text, spec);
         }
+        var folded = VariableStringValue(value, where);
+        return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec);
+    }
+
+    /// <summary>The class, category and value a STRING-class compilation variable gives the constant entry that names it
+    /// in its FROM phrase (§13.10.4 GR2: "the class and category of constant-name-1 is the same as that of … the
+    /// literal represented by compilation-variable-name-1"). The ONE reading, shared by the data bind
+    /// (<see cref="BindConstantFrom"/>) and the pre-bind reader (<see cref="PreBindConstants"/>), so the two cannot
+    /// disagree on what a FROM constant is.</summary>
+    internal static ConcatFolder.Folded VariableStringValue(CtValue value, string where) =>
         // ⛔ EVERY string category is named: a new CtCategory fails loudly here instead of binding as the last one.
-        var folded = value.Category switch
+        value.Category switch
         {
             CtCategory.Alphanumeric => new ConcatFolder.Folded(PicCategory.Alphanumeric, value.Text),
             CtCategory.National => new ConcatFolder.Folded(PicCategory.National, value.Text),
@@ -512,8 +522,6 @@ public sealed partial class DataBinder
             _ => throw new InvalidOperationException($"{where}: compile-time category {value.Category} has no "
                 + "constant-entry class — CtCategory grew a member this binder does not read"),
         };
-        return new ConstantDef(name, folded.Category, folded.Value, null, isGlobal, folded.RawText, spec);
-    }
 
     /// <summary>AS literal-1 for the STRING classes (§13.10.4 GR1/GR2 — the constant is the literal; class and
     /// category preserved). A §8.8.3 concatenation expression folds to its equivalent single literal FIRST
@@ -542,18 +550,24 @@ public sealed partial class DataBinder
                 + "expression whose operands are all literals (ISO §13.10.2; §13.10.3 SR7)");
             return null;
         }
+        var token = LiteralTokenValue(nn, where);
+        return new ConstantDef(name, token.Category, token.Value, null, isGlobal, token.RawText, spec);
+    }
+
+    /// <summary>The class, category and value of a nonnumeric literal written as ONE literal token — an alphanumeric,
+    /// hexadecimal, national or boolean literal (§13.10.4 GR2 for a constant entry's literal-1). The caller has already
+    /// taken the concatenation, figurative and NULL alternatives. The ONE decoder, shared by the data bind
+    /// (<see cref="BindConstantStringLiteral"/>), the pre-bind reader (<see cref="PreBindConstants"/>) and the AS-phrase
+    /// screen (<see cref="ExternalizedName"/>), whose literal and constant-name operands therefore decode alike.</summary>
+    internal static ConcatFolder.Folded LiteralTokenValue(Core.NonNumericLiteralContext nn, string where) =>
         // ⛔ EVERY alternative is named: a new nonNumericLiteral arm fails loudly here instead of being decoded as the
         // last one listed.
-        var (cat, value) =
-            nn.STRINGLIT() is { } s ? (PicCategory.Alphanumeric, CobolLiteral.Decode(s.GetText()))
-            : nn.HEXLIT() is { } x ? (PicCategory.Alphanumeric, CobolLiteral.DecodeHex(x.GetText()))
-            : nn.NATLIT() is { } nat ? (PicCategory.National, CobolLiteral.Decode(nat.GetText()))
-            : nn.BOOLLIT() is { } b ? (PicCategory.Boolean, CobolLiteral.Decode(b.GetText()))
-            : throw new InvalidOperationException($"{where}: nonNumericLiteral alternative '{nn.GetText()}' has no "
-                + "constant-entry decoding — the grammar rule grew an arm this decoder does not read");
-        return new ConstantDef(name, cat, value, null, isGlobal,
-            new ConcatFolder.Folded(cat, value).RawText, spec);
-    }
+        nn.STRINGLIT() is { } s ? new(PicCategory.Alphanumeric, CobolLiteral.Decode(s.GetText()))
+        : nn.HEXLIT() is { } x ? new(PicCategory.Alphanumeric, CobolLiteral.DecodeHex(x.GetText()))
+        : nn.NATLIT() is { } nat ? new(PicCategory.National, CobolLiteral.Decode(nat.GetText()))
+        : nn.BOOLLIT() is { } b ? new ConcatFolder.Folded(PicCategory.Boolean, CobolLiteral.Decode(b.GetText()))
+        : throw new InvalidOperationException($"{where}: nonNumericLiteral alternative '{nn.GetText()}' has no "
+            + "decoding — the grammar rule grew an arm this decoder does not read");
 
     /// <summary>The arithmetic-expression AS form. §13.10.3 SR1 first: an operand that is a SINGLE numeric
     /// literal is a LITERAL, not an arithmetic expression — <c>AS 0.25</c> keeps class/category numeric with

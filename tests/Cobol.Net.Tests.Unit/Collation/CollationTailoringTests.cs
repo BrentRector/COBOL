@@ -153,7 +153,7 @@ public sealed class CollationTailoringTests
     [InlineData("U+00F1 25718 0020 0002\nU+00F1 25718 0020 0003", "duplicate mapping")]
     public void Parse_RejectsMalformedLines_NamingTheLine(string text, string message)
     {
-        var ex = Assert.Throws<FormatException>(() => TailoringRules.Parse(new StringReader(text), "bad.tailor"));
+        var ex = Assert.Throws<LocaleCollationException>(() => TailoringRules.Parse(new StringReader(text), "bad.tailor"));
         Assert.Contains("bad.tailor(", ex.Message);
         Assert.Contains(message, ex.Message);
     }
@@ -162,7 +162,7 @@ public sealed class CollationTailoringTests
     public void Apply_RefusesAVersionMismatch()
     {
         var rules = TailoringRules.Parse(new StringReader("@version 16.0.0\nU+00F1 25718 0020 0002\n"), "old.tailor");
-        var ex = Assert.Throws<InvalidOperationException>(() => rules.Apply(CollationTable.Root));
+        var ex = Assert.Throws<LocaleCollationException>(() => rules.Apply(CollationTable.Root));
         Assert.Contains("16.0.0", ex.Message);
         Assert.Contains(CollationTable.Root.UcaVersion, ex.Message);
     }

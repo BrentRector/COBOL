@@ -375,8 +375,10 @@ public sealed class CollationTable
     public CollationTable WithTailoring(TailoringRules rules)
     {
         ArgumentNullException.ThrowIfNull(rules);
+        // A site file left at the previous UCA after a runtime upgrade: a DATA problem of that file, raised as the one
+        // resolution failure every consumer turns into its defined outcome (kb/Work PB2773), never a crash.
         if (rules.UcaVersion is { } v && !string.Equals(v, UcaVersion, StringComparison.Ordinal))
-            throw new InvalidOperationException(
+            throw new LocaleCollationException(rules.Source, null,
                 $"tailoring '{rules.Name}' was written for UCA {v} but the base table is UCA {UcaVersion} — its numeric weights are not comparable");
         if (rules.Entries.Count == 0) return this;   // a header-only tailoring (en-US, fr-FR: "the root order is valid") IS this table
 

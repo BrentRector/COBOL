@@ -1240,6 +1240,16 @@ joined the table the same way, which is the table doing its job: a tenth format 
   visitor for the three clauses. It replaced two opposite answers to one spelling: the ALPHABET postfix was an
   accepted "historical superset", the CLASS postfix a bare `COBOL0001: unexpected 'FOR'`. The binders read it only
   to recover the intended class (`DataBinder.ForPhraseIsNational`).
+- **Its punctuation half — a paragraph's separator periods (kb/Work PB2727).** §12.4.6.2 (I-O-CONTROL), §12.3.7.2
+  (SPECIAL-NAMES) and §12.3.8.2 (REPOSITORY) print ONE separator period after the paragraph's entries — §12.4.6.2 a
+  second only around the APPLY COMMIT clause, a sentence of its own — and §5.2.1 binds "the words, phrases, clauses,
+  punctuation, and operands in each general format". The three rules keep a PUNCTUATION SUPERSET, `(entry DOT?)*`
+  written on the paragraph rule itself (SPECIAL-NAMES' periods moved up out of `specialNameEntry`), so the periods are
+  the paragraph's own children; `Frontend/Cst/ParagraphPeriods.cs` is the one table of such paragraphs and splits a
+  paragraph into its sentences, and `ClosedFormatPass` refuses a period that splits a sentence (COBOLNET3407, at the
+  period) and a paragraph ending without its period (COBOLNET3408, at the last entry), at every edition. It replaced a
+  silent "compilers commonly tolerate a period after each" acceptance no dialect register listed.
+  `ParagraphPeriodDriftTests` holds every grammar rule that writes `DOT?` to a row, in both directions.
 - **A closed UNION of formats — the file description entry (kb/Work PB1238).** `fileDescriptionClause` is the
   union of §13.4.5.2's three formats, and §13.4.5.3 SR5/SR7/SR8 bind each entry to exactly ONE of them. Which one
   is decided once, in `Compiler/Binding/FileDescriptionFormats.cs` (`Of`: a relative or indexed file is Format 2;

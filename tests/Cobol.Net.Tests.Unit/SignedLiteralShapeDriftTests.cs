@@ -77,6 +77,24 @@ public sealed class SignedLiteralShapeDriftTests
         }
     }
 
+    /// <summary>⛔ A FLOATING-POINT SIGNIFICAND IS A FIXED-POINT LITERAL, SPELLED ONCE (kb/Work PB2729). §8.3.3.3.3 1) forms
+    /// the floating-point literal "from two fixed-point numeric literals separated by the letter 'E'", and §8.3.3.3.2 3)
+    /// keeps a fixed-point literal's decimal point off its rightmost character. FLOAT_BODY used to spell its own wider
+    /// significand (<c>[0-9]+ '.' [0-9]*</c>) beside DEC_BODY, so <c>VALUE 3.E2</c> reached the backend as C#
+    /// <c>3.E2d</c> (CS1061). Every FLOAT*_BODY must therefore BEGIN with a DEC*_BODY reference and spell no digit or
+    /// separator of the significand itself, so a new float shape inherits the fixed-point rule.</summary>
+    [Fact]
+    public void EveryFloatBody_SignificandIsAFixedPointBody()
+    {
+        string src = LexerSource();
+        var floats = Regex.Matches(src, @"fragment\s+(?<b>FLOAT\w*_BODY)\s*:(?<alts>[^;]*);");
+        Assert.NotEmpty(floats);
+        foreach (Match m in floats)
+            Assert.True(Regex.IsMatch(m.Groups["alts"].Value.Trim(), @"^DEC\w*_BODY\s+'E'\s+\[-\+\]\?\s+INT_BODY$"),
+                $"{m.Groups["b"].Value} is `{m.Groups["alts"].Value.Trim()}` — its significand must be a DEC*_BODY reference "
+                + "and its exponent INT_BODY (§8.3.3.3.3 1) and 3)), never a second spelling of the fixed-point shape");
+    }
+
     [Fact]
     public void EveryDefaultModeNumericToken_ReferencesAFragmentBody()
     {

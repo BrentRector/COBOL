@@ -797,7 +797,6 @@ TABLE       : 'TABLE' ;
 ALPHABET    : 'ALPHABET' ;
 CRT         : 'CRT' ;
 CURSOR      : 'CURSOR' ;
-CHANNEL     : 'CHANNEL' ;
 PROCEED     : 'PROCEED' ;
 UPON        : 'UPON' ;
 USE         : 'USE' ;
@@ -1023,7 +1022,15 @@ QUOTES      : 'QUOTES' ;
 // The body is a FRAGMENT (the Group-B one-body discipline) because THREE tokens consume it: this one, the
 // FN_SIGNED twin (kb/Work R17 — the float shape was the one signed-capable literal with no twin, so
 // `FUNCTION EXP(-1.5E3)` lexed as TWO arguments and drew a false COBOLNET1504).
-fragment FLOAT_BODY : ( [0-9]+ '.' [0-9]* | '.' [0-9]+ ) 'E' [-+]? [0-9]+ ;
+// ⛔ THE SIGNIFICAND IS A FIXED-POINT LITERAL, SO IT IS WRITTEN AS ONE (kb/Work PB2729). §8.3.3.3.3 1): "A floating-point
+// numeric literal is formed from two fixed-point numeric literals separated by the letter 'E' without intervening
+// spaces", and §8.3.3.3.2 3) puts a fixed-point literal's decimal point "anywhere within the literal except as the
+// rightmost character". DEC_BODY is that fixed-point shape; this body used to spell a WIDER copy beside it
+// (`[0-9]+ '.' [0-9]*`), so `VALUE 3.E2` lexed as one FLOATLIT that no form check refused and the backend died on
+// (CS1061), and `COMPUTE X = 1.E2 + 5` compiled. Over DEC_BODY, `3.E2` is INTEGERLIT `3` and a period with no space
+// after it, which SeparatorRule names (§8.3.5 3), COBOLNET2632). The exponent is the other fixed-point literal, an
+// integer ("no decimal point", §8.3.3.3.3 3)). SignedLiteralShapeDriftTests holds every FLOAT*_BODY significand to a DEC*_BODY.
+fragment FLOAT_BODY : DEC_BODY 'E' [-+]? INT_BODY ;
 FLOATLIT    : FLOAT_BODY ;
 
 // The DECIMAL-POINT IS COMMA twin of the floating-point literal (kb/Work PB98): under DECIMAL-POINT IS COMMA "the
@@ -1035,8 +1042,9 @@ FLOATLIT    : FLOAT_BODY ;
 // comma-decimal fixed form assembles in the parser as INTEGERLIT COMMA INTEGERLIT because ',' alone is a token; the
 // float shape needs the E-tail, so it is lexed whole — before this a comma-mode `VALUE 1,5E+3` silently seeded 1 and
 // `MOVE 1,5E+3 TO X` was a parse error). Same body discipline as FLOAT_BODY: fragment + FN_SIGNED twin
-// (SignedLiteralShapeDriftTests scrapes every FLOAT*_BODY).
-fragment FLOAT_COMMA_BODY : ( [0-9]+ ',' [0-9]* | ',' [0-9]+ ) 'E' [-+]? [0-9]+ ;
+// (SignedLiteralShapeDriftTests scrapes every FLOAT*_BODY). Its significand is the comma-decimal fixed-point body, as
+// FLOAT_BODY's is DEC_BODY (kb/Work PB2729): `1,E2` is no literal (§8.3.3.3.2 3)).
+fragment FLOAT_COMMA_BODY : DEC_COMMA_BODY 'E' [-+]? INT_BODY ;
 COMMA_FLOATLIT : FLOAT_COMMA_BODY ;
 
 // ── Shared literal fragment bodies (rearchitecture PHASE 04, Group B) ──

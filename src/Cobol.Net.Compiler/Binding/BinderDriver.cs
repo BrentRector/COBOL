@@ -10,6 +10,7 @@ using CobolNet.Binding.Passes;
 using CobolNet.Binding.Procedure;
 using CobolNet.Common;
 using CobolNet.Frontend.Generated;
+using CobolNet.Frontend.Preprocessor;
 
 using CobolNet.Compiler.Oo;
 
@@ -90,7 +91,7 @@ internal sealed class BinderDriver
         // element below (program units in BindUnitData, methods in the roster loop).
         var propagate = PropagateState.Build(directives.PropagateEvents);
 
-        var (units, classes, table) = CollectUnits(tree, edition,
+        var (units, classes, table) = CollectUnits(tree, edition, directives.CompilationVariables,
             cobolWordsMap ?? CobolNet.Editions.CobolWordsMap.Empty);
         var session = new BindSession
         {
@@ -390,7 +391,8 @@ internal sealed class BinderDriver
     /// into a synthetic <c>programUnit</c> context (identical child shape) so the per-unit binders consume one
     /// context type.</summary>
     private static (List<BoundUnit> Programs, List<OoClassUnit> Classes, OoClassTable Table) CollectUnits(
-        Core.CompilationUnitContext tree, EditionContext edition, CobolNet.Editions.CobolWordsMap words)
+        Core.CompilationUnitContext tree, EditionContext edition, DirectiveTimeline<CompilationVariableEvent> variables,
+        CobolNet.Editions.CobolWordsMap words)
     {
         var all = new List<BoundUnit>();
         var usedClassNames = new HashSet<string>(StringComparer.Ordinal);
@@ -409,13 +411,13 @@ internal sealed class BinderDriver
         // REPOSITORY EXPANDS phrase creates one, and from here on an expansion is an ordinary definition.
         var expanded = OoExpansion.Expand(tree, classDefs, ifaceDefs, edition, words);
         var table = OoClassTable.Build(expanded.Classes, edition, expanded.Interfaces, expanded.ParameterizedNames,
-            expanded.ParameterizedClasses, expanded.ParameterizedInterfaces, expanded.ExpandedNames);
+            expanded.ParameterizedClasses, expanded.ParameterizedInterfaces, expanded.ExpandedNames, variables);
         var classes = table.Classes.Select(sym => new OoClassUnit { Symbol = sym }).ToList();
         return (all, classes, table);
 
         void Collect(Core.ProgramUnitContext ctx, BoundUnit? parent)
         {
-            var unit = MakeUnit(ctx, parent, all.Count, usedClassNames, edition);
+            var unit = MakeUnit(ctx, parent, all.Count, usedClassNames, edition, variables);
             all.Add(unit);
             parent?.Children.Add(unit);
             foreach (var nested in ctx.nestedProgram())
@@ -432,7 +434,8 @@ internal sealed class BinderDriver
     /// broken §10.7.3 SR2's END PROGRAM match, §14.9.4.3 SR15's AS NESTED lookup and the §15.65.4 r4 MODULE-NAME
     /// determination the moment the phrase parsed. They are separate fields now.</para></summary>
     private static BoundUnit MakeUnit(
-        Core.ProgramUnitContext ctx, BoundUnit? parent, int index, HashSet<string> usedClassNames, EditionContext edition)
+        Core.ProgramUnitContext ctx, BoundUnit? parent, int index, HashSet<string> usedClassNames, EditionContext edition,
+        DirectiveTimeline<CompilationVariableEvent> variables)
     {
         var idBody = ctx.identificationDivision()?.identificationBody();
         var pid = idBody?.programIdParagraph();
@@ -514,11 +517,13 @@ internal sealed class BinderDriver
             // function definition is never contained), so the gate keys on the containment, not the kind.
             if (parent is not null)
                 edition.Error(DiagnosticCatalog.ExternalizedNameContained,
-                    $"{kind} '{name}' AS {asPhrase.literal().GetText()}: literal-1 shall not be specified in a "
+                    $"{kind} '{name}' AS {ExternalizedName.Written(asPhrase)}: literal-1 shall not be specified in a "
                     + "program that is contained within another program (ISO §11.10.3 SR2)");
-            else if (ExternalizedName.Screen(asPhrase.literal(), edition,
+            // The unit's DATA DIVISION is not bound yet, so a constant-name operand (§13.10.3 SR2) is read off the
+            // parse tree (kb/Work PB2588).
+            else if (ExternalizedName.Screen(asPhrase, k => PreBindConstants.Read(asPhrase, k, variables), edition,
                          DiagnosticCatalog.ExternalizedNameLiteral,
-                         $"{kind} '{name}' AS {asPhrase.literal().GetText()}", "literal-1", rule,
+                         $"{kind} '{name}' AS {ExternalizedName.Written(asPhrase)}", "literal-1", rule,
                          LiteralEnvironment.Unscoped) is { } lit1)
                 externalized = lit1;
         }

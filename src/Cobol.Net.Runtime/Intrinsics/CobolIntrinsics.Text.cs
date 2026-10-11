@@ -707,7 +707,8 @@ public static partial class CobolIntrinsics
         else if (!CollationEngine.TryGetOrderingTable(orderingTable, out table))
             return OrderNotSupported($"the cultural ordering table '{orderingTable}' is not available on this "
                 + "processor (ISO §15.85.4 r2; §12.3.7.4 GR17 leaves literal-9's allowable content to the "
-                + "implementor)");
+                + "implementor)" + (CollationEngine.ResolveLocale(orderingTable).Failure is { } failure
+                    ? $": its site collation data cannot be used ({failure.Message})" : ""));
         if (lvl is < 1 or > 4)
             return OrderNotSupported($"ordering level {lvl} is not defined in the ordering table "
                 + $"'{orderingTable ?? CollationEngine.DefaultOrderingTableName}', which defines levels 1..4 "

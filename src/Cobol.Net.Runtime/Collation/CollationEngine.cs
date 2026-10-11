@@ -11,11 +11,16 @@ namespace CobolNet.Runtime.Collation;
 /// the CLDR collation (<see cref="Cldr"/>: which file, which type, the <c>-u-</c> keys) that
 /// <see cref="CldrTailoringBuilder"/> applied FIRST, then the site's numeric <c>.tailor</c> layer
 /// (<see cref="Tailoring"/>) on top. <see cref="Unsupported"/> lists what the tag or its CLDR collation asked for
-/// that the engine does not honor (empty for the vast majority of locales).
+/// that the engine does not honor (empty for the vast majority of locales). <see cref="Failure"/> is set when the
+/// locale's collation DATA could not be used at all (kb/Work PB2773): the resolution is then the root order — the
+/// nearest available order — and every consumer reads the failure to reach its own defined outcome.
 /// </summary>
 public sealed record ResolvedLocaleCollation(string Tag, CollationTable Table, CollationOptions Options,
     CldrCollationSelection Cldr, TailoringRules? Tailoring, IReadOnlyList<string> Unsupported, IReadOnlyList<string> Notes)
 {
+    /// <summary>Why the locale's collation data could not be used, or null when it resolved (kb/Work PB2773).</summary>
+    public LocaleCollationException? Failure { get; init; }
+
     /// <summary>The cached collator for the resolution's own settings.</summary>
     public Collator Collator => CollationEngine.For(Table, Options);
 
@@ -106,7 +111,8 @@ public static class CollationEngine
     /// (<see cref="CldrLocaleLoader.ResolveCollation"/> → <see cref="CldrTailoringBuilder"/>) over the root table,
     /// then the site's numeric tailoring for the tag or its language (<see cref="TailoringRules.ForLocale"/>) on top,
     /// and the settings the CLDR collation and the tag's <c>-u-</c> keys declare. Null/empty/"root"/"und" is the root
-    /// order. A malformed <c>.tailor</c> file is an error, not a silent fallback.</summary>
+    /// order. Collation data that cannot be used (a malformed or stale site file) is never a silent fallback and never
+    /// an exception: the resolution carries it as <see cref="ResolvedLocaleCollation.Failure"/> over the root order.</summary>
     public static ResolvedLocaleCollation ResolveLocale(string? localeTag)
     {
         string tag = string.IsNullOrWhiteSpace(localeTag) ? "" : localeTag.Trim().Replace('_', '-');
@@ -114,14 +120,27 @@ public static class CollationEngine
         return s_locales.GetOrAdd(tag, static t => Resolve(t));
     }
 
+    /// <summary>⛔ THE ONE CATCH OF THE RESOLUTION PATH (kb/Work PB2773). Every data problem below it — the CLDR loader,
+    /// the tailoring builder, the <c>.tailor</c> reader, <see cref="CollationTable.WithTailoring"/> — raises
+    /// <see cref="LocaleCollationException"/>, and this records it (cached like any resolution, so a broken file is
+    /// read once) instead of letting a compile, a run unit's start-up or a comparison die of it.</summary>
     private static ResolvedLocaleCollation Resolve(string tag)
     {
-        var selection = CldrLocaleLoader.ResolveCollation(tag);
-        var built = CldrTailoringBuilder.Build(selection, tag.Length == 0 ? "root" : tag);
-        var table = built.Table;
-        var rules = tag.Length == 0 ? null : TailoringRules.ForLocale(selection.Tag.BaseTag);
-        if (rules is not null) table = table.WithTailoring(rules);
-        return new ResolvedLocaleCollation(tag, table, built.Options, selection, rules, built.Unsupported, built.Notes);
+        try
+        {
+            var selection = CldrLocaleLoader.ResolveCollation(tag);
+            var built = CldrTailoringBuilder.Build(selection, tag.Length == 0 ? "root" : tag);
+            var table = built.Table;
+            var rules = tag.Length == 0 ? null : TailoringRules.ForLocale(selection.Tag.BaseTag);
+            if (rules is not null) table = table.WithTailoring(rules);
+            return new ResolvedLocaleCollation(tag, table, built.Options, selection, rules, built.Unsupported, built.Notes);
+        }
+        catch (LocaleCollationException failure)
+        {
+            var rootOrder = new CldrCollationSelection(CldrLocaleTag.Parse(tag), null, null, null, "standard", []);
+            return new ResolvedLocaleCollation(tag, CollationTable.Root, CollationOptions.Default, rootOrder, null,
+                [failure.Message], []) { Failure = failure };
+        }
     }
 
     /// <summary>Forget every resolved locale (a test that writes a tailoring or CLDR file at run time). Tables already
@@ -135,7 +154,9 @@ public static class CollationEngine
     /// <summary>Resolve an <c>ORDER TABLE ordering-name IS literal</c> name (§12.3.7 / §15.85): the standard's
     /// default table name (→ the root table), or a locale tag — one with CLDR collation data (its file, or a parent's;
     /// a <c>-u-co-</c> type is honored), one with a site <c>.tailor</c>, or one .NET recognizes whose order is the root
-    /// order. Anything else is not a supported ordering table (→ EC-ORDER-NOT-SUPPORTED at the reference, §15.85.4 r2).</summary>
+    /// order. Anything else is not a supported ordering table (→ EC-ORDER-NOT-SUPPORTED at the reference, §15.85.4 r2) —
+    /// and so is a locale whose site collation data cannot be used, whose reason is
+    /// <c>ResolveLocale(name).</c><see cref="ResolvedLocaleCollation.Failure"/> (kb/Work PB2773).</summary>
     public static bool TryGetOrderingTable(string? name, out CollationTable table)
     {
         table = CollationTable.Root;
@@ -144,7 +165,9 @@ public static class CollationEngine
         if (IsDefaultOrderingTableName(n)) return true;
         string tag = n.Replace('_', '-');
         if (!IsKnownLocale(tag)) return false;
-        table = TableForLocale(tag);
+        var resolved = ResolveLocale(tag);
+        if (resolved.Failure is not null) return false;
+        table = resolved.Table;
         return true;
     }
 
@@ -155,15 +178,28 @@ public static class CollationEngine
     /// file — an <c>ORDER TABLE</c> literal or a LOCALE name that names nothing must stay unknown
     /// (EC-ORDER-NOT-SUPPORTED; an unselectable locale). The ONE rule <see cref="TryGetOrderingTable"/>,
     /// <see cref="Locale.LocaleManager"/> and <see cref="Locale.LocaleConfig"/> share; a <c>-u-</c> extension is
-    /// ignored for the test and honored by the resolution. Null/empty/"root" is known (the root order).</summary>
+    /// ignored for the test and honored by the resolution. Null/empty/"root" is known (the root order). A locale whose
+    /// own site data cannot be read is NOT known — it is not available in this operating environment (kb/Work PB2773).</summary>
     public static bool IsKnownLocale(string? localeTag)
     {
         if (string.IsNullOrWhiteSpace(localeTag)) return true;
         var parsed = CldrLocaleTag.Parse(localeTag.Trim().Replace('_', '-'));
         string baseTag = parsed.BaseTag;
         if (baseTag.Length == 0) return true;
-        if (CldrLocaleLoader.LoadExact(baseTag) is not null) return true;
-        if (TailoringRules.ForLocale(baseTag) is not null) return true;
+        // A locale whose resolution failed is not available, WHICHEVER source would otherwise make it known: its own
+        // CLDR file can be sound while the site's .tailor layered over it is stale or malformed, and answering true
+        // then would compare in the root order the failed resolution carries, silently (kb/Work PB2773, train 1055
+        // review). ResolveLocale is cached and never asks this method.
+        if (ResolveLocale(localeTag).Failure is not null) return false;
+        try
+        {
+            if (CldrLocaleLoader.LoadExact(baseTag) is not null) return true;
+            if (TailoringRules.ForLocale(baseTag) is not null) return true;
+        }
+        catch (LocaleCollationException)
+        {
+            return false;   // why: ResolveLocale(tag).Failure, which reads the same cached failure
+        }
         return IsKnownCulture(baseTag);
     }
 

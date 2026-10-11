@@ -22,7 +22,6 @@ cobolWord
     | {!keywordContinuesHere()}? BYTES
     | {!keywordContinuesHere()}? CAPACITY
     | {!keywordContinuesHere()}? CENTER
-    | {!keywordContinuesHere()}? CHANNEL
     | {!keywordContinuesHere()}? CYCLE
     | {!keywordContinuesHere()}? DECIMAL_ENCODING
     | {!keywordContinuesHere()}? END_METHOD

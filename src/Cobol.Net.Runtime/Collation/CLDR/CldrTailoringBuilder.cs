@@ -116,7 +116,9 @@ public static class CldrTailoringBuilder
                 return s.Node!.Previous is { } prev ? prev.Value : RootSlot(s.Root);
             int i = Array.BinarySearch(_roots, s.Root);
             if (i < 0) i = ~i;   // an anchor that is not a root: the previous root
-            if (i <= 0) throw new InvalidOperationException($"[before {Level}] has no position before weight {s.Root:X}");
+            // A rule-level problem (the reset names the first weight of its level): Run's per-rule catch skips the rule
+            // and lists it, like every other rule the builder cannot apply (kb/Work PB2773).
+            if (i <= 0) throw new NotSupportedException($"[before {Level}] has no position before weight {s.Root:X}");
             int prevRoot = _roots[i - 1];
             return _after.TryGetValue(prevRoot, out var list) && list.Last is { } last ? last.Value : RootSlot(prevRoot);
         }
@@ -268,9 +270,19 @@ public static class CldrTailoringBuilder
                 return new CldrBuildResult(_base, options, _unsupported, _notes, _rulesApplied);
 
             // ---- number the lines --------------------------------------------------------------------------
-            var pMap = _p.Number();
-            var sMap = _s.Number();
-            var tMap = _t.Number();
+            // Numbering is the whole collation's, not one rule's: a line that cannot be numbered leaves no table to
+            // build, so it is the resolution failure (kb/Work PB2773), never an exception of another type.
+            WeightMap? pMap, sMap, tMap;
+            try
+            {
+                pMap = _p.Number();
+                sMap = _s.Number();
+                tMap = _t.Number();
+            }
+            catch (NotSupportedException ex)
+            {
+                throw new LocaleCollationException(selection.Found?.Source ?? _name, null, ex.Message, ex);
+            }
             Func<int, int> mapP = pMap is null ? x => x : pMap.Map;
             Func<int, int> mapS = sMap is null ? x => x : sMap.Map;
             Func<int, int> mapT = tMap is null ? x => x : tMap.Map;
@@ -406,8 +418,7 @@ public static class CldrTailoringBuilder
         /// expanded) rules, and the effective settings (imports' first, the collation's own on top).</summary>
         private (List<CldrRule> Rules, CldrSettings Settings) Expand(CldrCollation collation, string ownerTag)
         {
-            string key = ownerTag + "/" + collation.Type + "/" + (collation.Alt ?? "");
-            if (!_importing.Add(key)) throw new NotSupportedException($"circular [import] through {key}");
+            _importing.Add(ImportKey(collation, ownerTag));
             var settings = new CldrSettings();
             var rules = new List<CldrRule>();
             foreach (var rule in collation.Rules)
@@ -422,6 +433,13 @@ public static class CldrTailoringBuilder
                         _unsupported.Add($"line {rule.Line}: {imp} — no such collation; nothing imported");
                         continue;
                     }
+                    // A collation already being expanded: a rule-level problem of THIS import, listed like the missing
+                    // type above (it used to throw NotSupportedException past Run's per-rule catch; kb/Work PB2773).
+                    if (_importing.Contains(ImportKey(imported, found.Tag)))
+                    {
+                        _unsupported.Add($"line {rule.Line}: {imp} — circular [import] through {ImportKey(imported, found.Tag)}; nothing imported");
+                        continue;
+                    }
                     var (inner, innerSettings) = Expand(imported, found.Tag);
                     rules.AddRange(inner);
                     settings = settings.Merge(innerSettings);
@@ -429,9 +447,13 @@ public static class CldrTailoringBuilder
                 }
                 else rules.Add(rule);
             }
-            _importing.Remove(key);
+            _importing.Remove(ImportKey(collation, ownerTag));
             return (rules, settings.Merge(collation.Settings));
         }
+
+        /// <summary>The identity of one collation of one file, as the import-cycle check compares it.</summary>
+        private static string ImportKey(CldrCollation collation, string ownerTag) =>
+            ownerTag + "/" + collation.Type + "/" + (collation.Alt ?? "");
 
         // ---- resets and relations ------------------------------------------------------------------------------
 

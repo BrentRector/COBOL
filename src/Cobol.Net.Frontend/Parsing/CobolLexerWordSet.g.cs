@@ -44,7 +44,6 @@ public partial class CobolLexer
         B_XOR,
         CAPACITY,
         CENTER,
-        CHANNEL,
         CLASS_ID,
         CLOCK_UNITS,
         COL,

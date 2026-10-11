@@ -98,7 +98,11 @@ public static class CollationRuntime
             _ = CollationKeyCache.For(info.Collator);      // its key cache
             resolved = true;
         }
-        catch (Exception ex) when (ex is System.Globalization.CultureNotFoundException or FormatException or IOException or InvalidDataException)
+        // Exactly the two ways a default locale cannot be resolved: it names nothing this system knows, or its site
+        // collation data cannot be used (LocaleCollationException, the ONE failure of the resolution path — a malformed
+        // or stale site file used to escape this filter as an InvalidOperationException and kill the first run unit
+        // at start-up; kb/Work PB2773). Anything else is a defect of the runtime and is not hidden here.
+        catch (Exception ex) when (ex is System.Globalization.CultureNotFoundException or LocaleCollationException)
         {
             warning = $"warm-up: {ex.Message}";
         }

@@ -124,17 +124,23 @@ functionIdParagraph
 // an externalized entity:
 //   the PROGRAM-ID paragraph §11.10.2 (Formats 1 and 2) · the FUNCTION-ID paragraph §11.5.2 (Formats 1 and
 //   2) · the CLASS-ID paragraph §11.3.2 · the INTERFACE-ID paragraph §11.6.2 · the METHOD-ID paragraph
-//   §11.7.2 · the REPOSITORY paragraph's program-specifier §12.3.8.2 (the REPOSITORY paragraph's class,
-//   interface, property and user-defined-function specifiers are the remaining sites — they wait on their
-//   subsystems, kb/Work PB237).
+//   §11.7.2 · the REPOSITORY paragraph's class-, interface-, program-, property- and user-defined-function
+//   specifiers §12.3.8.2 (kb/Work PB237, PB974) · the EXTERNAL clause of a file description entry §13.4.5.2 and
+//   of a data description entry §13.18.22.2 (kb/Work PB511).
 // `literal` is deliberately wide here; each paragraph's own syntax rule (PROGRAM-ID §11.10.3 SR1,
 // FUNCTION-ID §11.5.3 SR1, CLASS-ID §11.3.3 SR1, INTERFACE-ID §11.6.3 SR1, METHOD-ID §11.7.3 SR1 and the
 // REPOSITORY paragraph §12.3.8.3 SR2 — the same sentence six times) narrows it at BIND time through the
 // single screen `ExternalizedName.Screen`, matching the cancelTarget/callTarget discipline. The COBOL-2002
 // introduction is gated post-parse by VersionConformancePass ParseArm.VisitExternalizedNamePhrase
 // (externalized-name-as-2002) — a below-2002 use names its edition instead of drawing a bare syntax error.
+// The WORD alternative is a constant-name (kb/Work PB2588): ISO §13.10.3 SR2 — "constant-name-1 may be used
+// anywhere that a format specifies a literal of the class and category of constant-name-1" — puts one in every
+// AS literal position, and the constant entry stands later, in the DATA DIVISION, so the parser cannot tell it
+// from any other word. The operand is exactly one token after AS, so the alternative is unambiguous; the ONE
+// screen decides what the word names (`ExternalizedName.Screen` over the phrase, through the constant reading its
+// caller hands it — `DataBinder.ReadConstant` inside the data bind, `PreBindConstants.Read` before it).
 externalizedNamePhrase
-    : AS literal
+    : AS (literal | cobolWord)
     ;
 
 // ------------------------------------------
@@ -470,8 +476,11 @@ configurationParagraph
 
 // REPOSITORY paragraph (COBOL-2002, ISO §12.3.8) — declares the program prototypes, function prototypes, classes,
 // interfaces and properties a source element references, plus the intrinsic-function-names usable without the word
-// FUNCTION. Each entry starts with its specifier keyword, so the rule cannot over-run into the next section; an
-// optional period after each entry tolerates both the one-period-per-paragraph and period-per-entry styles.
+// FUNCTION. Each entry starts with its specifier keyword, so the rule cannot over-run into the next section.
+// ⛔ ONE SEPARATOR PERIOD: §12.3.8.2 prints `REPOSITORY. [ { specifier } … . ]` — the period inside the bracket, once,
+// after the last specifier. The `DOT?` after every entry is a PUNCTUATION SUPERSET kept so a period after each entry
+// (or none after the last) is refused BY NAME, not as a bare parse error: ClosedFormatPass reads the periods through
+// ParagraphPeriods (COBOLNET3407 / COBOLNET3408; kb/Work PB2727). It was a silent "period-per-entry style" tolerance.
 // ⛔ EVERY SPECIFIER THAT PRINTS `[ AS literal-n ]` CARRIES THE ONE `externalizedNamePhrase` (kb/Work PB974; rendered
 // PDF p334-335 / folios 304-305 — AS underlined, the phrase bracketed, after the declared name and BEFORE the class and
 // interface specifiers' EXPANDS phrase). §12.3.8.4 GR2: "literal-1, literal-2, literal-3, or literal-5 is the

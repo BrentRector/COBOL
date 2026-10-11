@@ -181,7 +181,7 @@ public sealed class ClassClauseForPhraseTests
     [InlineData("PB976OKAF", "CLASS C1 FOR ALPHANUMERIC IS 66 THRU 91 IN S1.")]
     [InlineData("PB976OKN", "CLASS C2 FOR NATIONAL IS N\"0\" THRU N\"9\" HIGH-VALUE 946 THRU 970.")]
     [InlineData("PB976OKNI", "CLASS C2 NATIONAL IS 946 THRU 970 IN NA.")]
-    [InlineData("PB976OKAL", "CLASS C1 IS \"A\".\n    ALPHABET AX IS ALL \"Z\", \"A\" THRU \"C\".")]
+    [InlineData("PB976OKAL", "CLASS C1 IS \"A\"\n    ALPHABET AX IS ALL \"Z\", \"A\" THRU \"C\".")]
     [InlineData("PB976OKSY", "SYMBOLIC CHARACTERS FOR NATIONAL SN IS 946.")]
     public void LegalClauses_AreAccepted(string pid, string clause)
     {

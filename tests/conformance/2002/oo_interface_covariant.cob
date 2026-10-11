@@ -3,9 +3,9 @@
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        REPOSITORY.
-           CLASS CANI3.
-           CLASS CDOG3.
-           CLASS CFAC3.
+           CLASS CANI3
+           CLASS CDOG3
+           CLASS CFAC3
            INTERFACE IMKR3.
        DATA DIVISION.
        WORKING-STORAGE SECTION.

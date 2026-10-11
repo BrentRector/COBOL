@@ -7,8 +7,8 @@
        ENVIRONMENT DIVISION.
        CONFIGURATION SECTION.
        REPOSITORY.
-           CLASS OFANI.
-           CLASS OFDOG.
+           CLASS OFANI
+           CLASS OFDOG
            CLASS OFKEEP.
        DATA DIVISION.
        WORKING-STORAGE SECTION.

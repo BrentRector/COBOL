@@ -2,6 +2,10 @@
  "_comment": "The NEGATIVE corpus (must-REJECT programs; VERSION_TEST_MATRIX_DESIGN P2.8/Phase-2): each enabled entry is <name>.cob + <name>.err (the expected diagnostic substring, e.g. an edition-band code). The editions that must reject are named by the SOURCE, not by this manifest: CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic reads them from the '*> reject-at: <year> ...' header on <name>.cob's FIRST line and throws when it is absent. (This comment used to promise an \"editions\" map; no entry ever carried one and the runner never looked for one.) Seeding: >=1 case per Wave-1 gate + the reserved-word interval witnesses (roadmap Phase 2 W2). The matrix reject cells already pin gate diagnostics; THIS corpus holds the free-form adversarial cases.",
  "enabled": [
   "pb2841-continue-after-non-finite-below-2023",
+  "pb2729-float-significand-point-value",
+  "pb2729-float-significand-point-compute",
+  "pb2729-float-significand-point-argument",
+  "pb2729-float-significand-comma",
   "pb1935-class-condition-paren-subject",
   "pb1935-evaluate-class-paren-subject",
   "pb2497-record-odo-element-tables-below-2014",
@@ -2591,7 +2595,17 @@
   "pb1941-constant-length-cycle-open-entry",
   "pb1941-constant-length-report-cycle",
   "pb2051-parameterized-class-body-unexpanded",
-  "pb2051-parameterized-interface-body-unexpanded"
+  "pb2051-parameterized-interface-body-unexpanded",
+  "pb2588-as-word-names-no-constant",
+  "pb2588-as-numeric-constant",
+  "pb2727-special-names-channel-entry",
+  "pb2727-special-names-reserve-entry",
+  "pb2727-io-control-period-per-clause",
+  "pb2727-io-control-period-missing",
+  "pb2727-special-names-period-per-clause",
+  "pb2727-special-names-period-missing",
+  "pb2727-repository-period-per-specifier",
+  "pb2727-repository-period-missing"
  ],
  "pending": []
 }

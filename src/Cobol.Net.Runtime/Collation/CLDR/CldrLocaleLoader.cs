@@ -38,7 +38,11 @@ public static class CldrLocaleLoader
     public const string EnvDirectory = "COBOL_CLDR_DIR";
 
     private static readonly Lazy<Pack> s_pack = new(Pack.Load, LazyThreadSafetyMode.ExecutionAndPublication);
-    private static readonly ConcurrentDictionary<string, CldrLocaleData?> s_cache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, FileRead> s_cache = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>One file's read, cached either way: its data (null when no file exists), or the
+    /// <see cref="LocaleCollationException"/> it raised, so a malformed site file is read once, not on every lookup.</summary>
+    private readonly record struct FileRead(CldrLocaleData? Data, LocaleCollationException? Failure);
 
     /// <summary>The CLDR release the embedded pack was built from ("release-48-2"), from its manifest.</summary>
     public static string PackRelease => s_pack.Value.Release;
@@ -92,10 +96,12 @@ public static class CldrLocaleLoader
     public static CldrLocaleData Root => Load("root");
 
     /// <summary>The data of EXACTLY this locale (no parent fallback), or null when no file exists for it.</summary>
+    /// <exception cref="LocaleCollationException">The file exists and cannot be read or parsed (kb/Work PB2773).</exception>
     public static CldrLocaleData? LoadExact(string localeName)
     {
         string key = CldrLocaleTag.FileName(localeName);
-        return s_cache.GetOrAdd(key, static k => ReadFile(k));
+        var read = s_cache.GetOrAdd(key, static k => ReadFile(k));
+        return read.Failure is { } failure ? throw failure : read.Data;
     }
 
     /// <summary>The parent chain of a tag, most specific first, ending in "root": "sr-Latn-RS" → sr_Latn_RS, sr_Latn,
@@ -127,7 +133,8 @@ public static class CldrLocaleLoader
 
     /// <summary>Which collation a locale tag means: the <c>-u-co-</c> type (else the chain's default type) found along
     /// the parent chain, with the tag's other <c>-u-</c> settings keys applied over the collation's own settings.
-    /// Never throws for a well-formed tag: a locale no file covers resolves to the root order.</summary>
+    /// A locale no file covers resolves to the root order; a file of the chain that cannot be read or parsed raises
+    /// <see cref="LocaleCollationException"/> (kb/Work PB2773).</summary>
     public static CldrCollationSelection ResolveCollation(string? localeName)
     {
         var tag = CldrLocaleTag.Parse(localeName);
@@ -202,24 +209,42 @@ public static class CldrLocaleLoader
     /// <c>COBOL_CLDR_DIR</c>). The engine's table cache is separate (<see cref="CollationEngine.ClearLocaleCache"/>).</summary>
     public static void ClearCache() => s_cache.Clear();
 
-    private static CldrLocaleData? ReadFile(string fileName)
+    /// <summary>Find and parse one locale file — a site directory's first, else the pack's. ⛔ THE ONE BOUNDARY where a
+    /// CLDR file's data problem becomes the <see cref="LocaleCollationException"/> the resolution path raises (kb/Work
+    /// PB2773): the parser's own <see cref="FormatException"/> (a negated or property UnicodeSet, a malformed rule), the
+    /// XML or JSON reader's, and an unreadable file or directory, each named by its source. It used to escape as a bare
+    /// FormatException, so a malformed site <c>hu.xml</c> crashed the COMPILE of a legal ORDER TABLE program.</summary>
+    private static FileRead ReadFile(string fileName)
     {
-        foreach (string dir in SearchDirectories())
+        string source = fileName;
+        try
         {
-            foreach (string path in Directory.EnumerateFiles(dir))
+            foreach (string dir in SearchDirectories())
             {
-                string stem = Path.GetFileNameWithoutExtension(path);
-                if (!string.Equals(stem, fileName, StringComparison.OrdinalIgnoreCase)) continue;
-                if (path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                source = dir;
+                foreach (string path in Directory.EnumerateFiles(dir))
                 {
-                    using var s = File.OpenRead(path);
-                    return CldrParser.ParseXml(s, path);
+                    string stem = Path.GetFileNameWithoutExtension(path);
+                    if (!string.Equals(stem, fileName, StringComparison.OrdinalIgnoreCase)) continue;
+                    source = path;
+                    if (path.EndsWith(".xml", StringComparison.OrdinalIgnoreCase))
+                    {
+                        using var s = File.OpenRead(path);
+                        return new FileRead(CldrParser.ParseXml(s, path), null);
+                    }
+                    if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
+                        return new FileRead(CldrParser.ParseJson(File.ReadAllText(path), path), null);
                 }
-                if (path.EndsWith(".json", StringComparison.OrdinalIgnoreCase))
-                    return CldrParser.ParseJson(File.ReadAllText(path), path);
             }
+            source = "cldr:" + fileName;
+            return new FileRead(s_pack.Value.Read(fileName), null);
         }
-        return s_pack.Value.Read(fileName);
+        catch (Exception ex) when (ex is FormatException or System.Xml.XmlException or System.Text.Json.JsonException
+                                       or IOException or UnauthorizedAccessException)
+        {
+            return new FileRead(null, new LocaleCollationException(source,
+                ex is System.Xml.XmlException { LineNumber: > 0 } xml ? xml.LineNumber : null, ex.Message, ex));
+        }
     }
 
     /// <summary>The embedded zip: read once, entries parsed on demand.</summary>

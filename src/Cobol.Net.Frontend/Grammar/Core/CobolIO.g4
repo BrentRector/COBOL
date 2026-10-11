@@ -317,9 +317,13 @@ relativeKeyClause
     : RELATIVE KEY? IS? dataReference
     ;
 
-// I-O-CONTROL. The paragraph holds one or more clauses terminated by a period; per ISO §12.4.6 the
-// clauses are not individually period-terminated, but compilers commonly tolerate a period after each,
-// so accept an optional period after every clause (SQ206A writes two SAME clauses before one period).
+// I-O-CONTROL. §12.4.6.2 prints `I-O-CONTROL. [[apply-commit-clause].] [[{same-clause}…].]` (rendered, PDF p363 /
+// folio 333): the run of SAME clauses (with COBOL-85's RERUN and MULTIPLE FILE clauses, superset-parsed) is ONE
+// sentence closed by ONE separator period, and the APPLY COMMIT clause, when written, is a sentence of its own (SQ206A
+// writes two SAME clauses before one period). The `DOT?` after every clause is a PUNCTUATION SUPERSET kept so the
+// misplaced period is refused BY NAME rather than as a bare parse error: ClosedFormatPass reads this rule's periods
+// through ParagraphPeriods (a period that splits the sentence → COBOLNET3407, the closing period missing →
+// COBOLNET3408; kb/Work PB2727), and ParagraphPeriodDriftTests holds every rule that writes `DOT?` to a row there.
 ioControlParagraph
     : I_O_CONTROL DOT (ioControlClause DOT?)*
     ;

@@ -149,7 +149,7 @@ Both go through ONE table construction (`CollationTable.Rebuild(TailoringPlan)`)
 the derived scale the table reports (`Lookup`):
 
 ```
-@version 17.0.0                 # optional — refused (InvalidOperationException) when it differs from the table's UCA version
+@version 17.0.0                 # optional — refused (LocaleCollationException) when it differs from the table's UCA version
 @locale es-ES                   # optional — the tailoring's name
 # code point   primary secondary tertiary [variable]     — one element (the minimal form)
 U+00F1         25718 0020 0002                            # ñ: right after n at level 1
@@ -168,7 +168,19 @@ sequence (a precomposed `ñ`; a contraction keyed `á + U+0323`) also maps that 
 character whose decomposition holds a tailored code point is re-derived from its components (tailor `c` and `ç`
 moves with it; tailor U+0301 and every letter with an acute does) — so a text collates the same however it is
 spelled (`CanonicalClosureDriftTests` checks every decomposable code point, per front-end). Errors name the file and
-line (`FormatException`); a duplicate mapping is an error, not "last wins".
+line (`LocaleCollationException`); a duplicate mapping is an error, not "last wins".
+
+**The failure contract** (kb/Work PB2773). Every data problem on the resolution path is ONE type,
+`LocaleCollationException` (file, line where it has one, reason): a site CLDR file that cannot be read or parsed (raised
+by `CldrLocaleLoader` at the file boundary, cached so it is read once), a `.tailor` that cannot be read or parsed, a
+`.tailor` written for another UCA version (`CollationTable.WithTailoring`), and a CLDR collation the builder cannot
+number. A problem with ONE CLDR rule (a circular `[import]`, a `[before n]` with nothing before it, a relation with no
+reset) is not a failure of the locale: the builder skips the rule and lists it in `Unsupported`. The ONE catch is
+`CollationEngine.ResolveLocale`, which records the failure as `ResolvedLocaleCollation.Failure` over the root order
+(the nearest available order); `TryGetOrderingTable` and `IsKnownLocale` answer false (the locale is not available
+here), `LocaleManager.GetLocale` throws the failure to its host caller, `CollationRuntime.Warmup` reports it as its
+`Warning`, and the compiler's ORDER TABLE check warns COBOLNET1662 naming the file. Nothing on the path crashes a
+compile, a run unit's start-up or a comparison.
 
 **Locale lookup** (`TailoringRules.ForLocale`, `CollationEngine.ForLocale/TableForLocale`): `<tag>.tailor` is
 searched — the exact tag (`es_ES` → `es-ES`, case-insensitively), then the language subtag — first in the directory
@@ -182,7 +194,8 @@ The "traditional" Spanish variant (ch, ll as letters) is CLDR type `traditional`
 `ORDER TABLE ordering-name IS literal` names are resolved by `CollationEngine.TryGetOrderingTable`: the standard's
 default `"ISO 14651_2020_TABLE1"` (case-insensitive, space/underscore interchangeable) → the root table under the
 Standard configuration; a locale tag with a tailoring → that tailored table; a locale tag .NET recognizes → the
-root table; anything else → not supported (the COBOL layer raises `EC-ORDER-NOT-SUPPORTED`).
+root table; anything else — a locale whose site collation data cannot be used included, its reason being
+`ResolveLocale(name).Failure` — → not supported (the COBOL layer raises `EC-ORDER-NOT-SUPPORTED`).
 
 ## 6. How the compiler reaches it
 

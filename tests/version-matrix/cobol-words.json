@@ -944,12 +944,6 @@
    "note": "USE FOR DEBUGGING ON ALL REFERENCES OF ('85; VCR row 7.17)"
   },
   {
-   "token": "CHANNEL",
-   "nameSlot": true,
-   "subscriptTrigger": true,
-   "note": "The SPECIAL-NAMES CHANNEL n IS mnemonic vendor clause (IBM extension). ISO 8.9 does not reserve it and GnuCOBOL 3.2 has no CHANNEL entry in cobc/reserved.c, so outside that clause it is a legal user-defined word. Owner 2026-09-29 (kb/Work PB1689): follow ISO."
-  },
-  {
    "token": "END_METHOD",
    "nameSlot": true,
    "subscriptTrigger": true,

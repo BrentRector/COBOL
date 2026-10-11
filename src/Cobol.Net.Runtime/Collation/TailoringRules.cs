@@ -7,7 +7,8 @@ namespace CobolNet.Runtime.Collation;
 /// <summary>
 /// A locale (or user) TAILORING of the derived collation table: a set of code point → collation element overrides read
 /// from a <c>.tailor</c> file. Applying the rules to a table (<see cref="Apply"/> / <see cref="CollationTable.WithTailoring"/>)
-/// yields a NEW table; the base is never mutated.
+/// yields a NEW table; the base is never mutated. A file that cannot be read or parsed raises <see cref="LocaleCollationException"/>
+/// naming the file and line (kb/Work PB2773).
 /// <para><b>File format</b> — one mapping per line, <c>#</c> starts a comment, blank lines are ignored, every number is
 /// HEXADECIMAL and every weight is in the DERIVED scale the table reports (<see cref="CollationTable.Lookup"/> —
 /// a root primary is the source value shifted left by <see cref="CollationTable.PrimaryShift"/>, so the values strictly
@@ -83,11 +84,19 @@ public sealed class TailoringRules
 
     // ---- loading -------------------------------------------------------------------------------------------------
 
-    /// <summary>Read a <c>.tailor</c> file from disk.</summary>
+    /// <summary>Read a <c>.tailor</c> file from disk. A file that cannot be read is the same
+    /// <see cref="LocaleCollationException"/> as one that cannot be parsed (kb/Work PB2773).</summary>
     public static TailoringRules Load(string path)
     {
-        using var reader = new StreamReader(path, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
-        return Parse(reader, path);
+        try
+        {
+            using var reader = new StreamReader(path, System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            return Parse(reader, path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new LocaleCollationException(path, null, ex.Message, ex);
+        }
     }
 
     /// <summary>The tailoring for a locale tag ("es-ES", "es_ES", "es"), searched as the class summary describes;
@@ -151,10 +160,17 @@ public sealed class TailoringRules
     {
         if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory)) return null;
         // Case-insensitive file match, so "es-es" finds "es-ES.tailor" on a case-sensitive file system too.
-        foreach (string path in Directory.EnumerateFiles(directory, "*" + FileExtension))
-            if (string.Equals(Path.GetFileNameWithoutExtension(path), tag, StringComparison.OrdinalIgnoreCase))
-                return Load(path);
-        return null;
+        string? match;
+        try
+        {
+            match = Directory.EnumerateFiles(directory, "*" + FileExtension)
+                .FirstOrDefault(path => string.Equals(Path.GetFileNameWithoutExtension(path), tag, StringComparison.OrdinalIgnoreCase));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new LocaleCollationException(directory, null, ex.Message, ex);   // a site directory it cannot list
+        }
+        return match is null ? null : Load(match);
     }
 
     private static TailoringRules? FromResource(string tag)
@@ -168,7 +184,8 @@ public sealed class TailoringRules
         return Parse(reader, "resource:" + name);
     }
 
-    /// <summary>Parse the <c>.tailor</c> format (documented in the class summary). Every error names the line.</summary>
+    /// <summary>Parse the <c>.tailor</c> format (documented in the class summary). Every error is a
+    /// <see cref="LocaleCollationException"/> naming the source and the line.</summary>
     public static TailoringRules Parse(TextReader reader, string sourceName)
     {
         ArgumentNullException.ThrowIfNull(reader);
@@ -309,6 +326,6 @@ public sealed class TailoringRules
 
     private static string Describe(int[] cps) => string.Join(" ", cps.Select(c => $"U+{c:X4}"));
 
-    private static FormatException Error(string source, int lineNo, string message) =>
-        new($"{source}({lineNo}): {message}");
+    private static LocaleCollationException Error(string source, int lineNo, string message) =>
+        new(source, lineNo, message);
 }

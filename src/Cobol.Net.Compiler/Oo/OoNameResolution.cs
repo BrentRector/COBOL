@@ -3,6 +3,7 @@
 using Antlr4.Runtime;
 using CobolNet.Binding;
 using CobolNet.Frontend.Generated;
+using CobolNet.Frontend.Preprocessor;
 
 namespace CobolNet.Compiler.Oo;
 
@@ -186,8 +187,10 @@ public sealed class OoRepositoryScope
 
     /// <summary>Build the scope visible at <paramref name="site"/> by walking its parse-tree ancestors: every
     /// REPOSITORY paragraph on the way out contributes (the reference's own source element first, then each
-    /// containing one — §12.3.4 GR1), and a class / interface definition contributes its own name.</summary>
-    public static OoRepositoryScope Build(RuleContext? site)
+    /// containing one — §12.3.4 GR1), and a class / interface definition contributes its own name.
+    /// <paramref name="variables"/> is the group's &gt;&gt;DEFINE timeline, for a FROM constant-name written as a
+    /// specifier's AS operand.</summary>
+    public static OoRepositoryScope Build(RuleContext? site, DirectiveTimeline<CompilationVariableEvent> variables)
     {
         var classes = new Dictionary<string, string?>(CobolNames.Comparer);
         var interfaces = new Dictionary<string, string?>(CobolNames.Comparer);
@@ -213,22 +216,26 @@ public sealed class OoRepositoryScope
             // context does; a statement or clause context has no such child, so the test is a cheap miss.
             for (int i = 0; i < c.ChildCount; i++)
                 if (c.GetChild(i) is Core.EnvironmentDivisionContext env)
-                    Collect(env, classes, interfaces);
+                    Collect(env, classes, interfaces, variables);
         }
         return classes.Count == 0 && interfaces.Count == 0 ? Empty : new OoRepositoryScope(classes, interfaces, formals);
     }
 
     private static void Collect(Core.EnvironmentDivisionContext env, Dictionary<string, string?> classes,
-        Dictionary<string, string?> interfaces)
+        Dictionary<string, string?> interfaces, DirectiveTimeline<CompilationVariableEvent> variables)
     {
         // The source element's OWN specifiers are collected before a containing element's (the ancestor walk runs
         // outward), so TryAdd keeps the innermost declaration — §12.3.4 GR1 spreads a container's entries to
         // contained units, and a contained unit's own specifier for the same name is the one in force there.
         // The literal is read by the PURE ExternalizedName.Peek: DataBinder.BindSpecifierExternalizedName reports
-        // on it, once, and a rejected literal resolves by the declared word — its own fallback.
+        // on it, once, and a rejected literal resolves by the declared word — its own fallback. A constant-name operand
+        // (§13.10.3 SR2; kb/Work PB2588) is read off the parse tree, because no DATA DIVISION is bound yet; it is the
+        // same constant entry the binder's screen reads, so the two agree on the name.
         foreach (var re in SpecifierEntries(env))
         {
-            string? ext = re.externalizedNamePhrase() is { } asPhrase ? ExternalizedName.Peek(asPhrase.literal()) : null;
+            string? ext = re.externalizedNamePhrase() is { } asPhrase
+                ? ExternalizedName.Peek(asPhrase, k => PreBindConstants.Read(asPhrase, k, variables))
+                : null;
             if (re.className() is { } cn) classes.TryAdd(cn.GetText(), ext);
             else if (re.interfaceName() is { } inm) interfaces.TryAdd(inm.GetText(), ext);
         }

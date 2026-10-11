@@ -1,7 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
-using CobolNet.Binding;              // EditionContext
+using Antlr4.Runtime.Tree;           // ITerminalNode — a paragraph's separator period
+using CobolNet.Binding;             // EditionContext
 using CobolNet.Binding.Passes;       // GroupBindContext
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog
 using CobolNet.Frontend.Cst;         // ClosedFormats — the ONE table of closed general formats
@@ -31,7 +32,9 @@ namespace CobolNet.Validation;
 /// parser, in BOTH directions, so a new closed format cannot parse into silence and a stale row cannot linger.
 /// Adding a closed format is `| unrecognizedClause` plus a table row — no code here changes. (The pass owns one
 /// more error production of the same posture, <c>misplacedSpecialNamesForPhrase</c> — a known phrase written in a
-/// position no format prints; see <see cref="VisitMisplacedSpecialNamesForPhrase"/>.)</para>
+/// position no format prints; see <see cref="VisitMisplacedSpecialNamesForPhrase"/> — and the punctuation half of
+/// three paragraph formats, their separator periods, read through <see cref="ParagraphPeriods"/>; see
+/// <see cref="ScreenParagraphPeriods"/>.)</para>
 ///
 /// <para>WHY A PARSE-TREE WALK AND NOT A BINDER HOOK — the <see cref="DeclinedFacilityPass"/> argument, and here
 /// it is load-bearing rather than convenient. The §13.16.2 refusal used to live in <c>DataBinder.BindEntry</c>,
@@ -70,8 +73,52 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
     /// <c>BindEntry</c> early, included), and a new clause list is one table row.</summary>
     public override object? VisitChildren(Antlr4.Runtime.Tree.IRuleNode node)
     {
-        if (node is ParserRuleContext container) ScreenClauseRepetition(container);
+        if (node is ParserRuleContext container)
+        {
+            ScreenClauseRepetition(container);
+            if (ParagraphPeriods.ByContext.TryGetValue(container.GetType(), out var periods))
+                ScreenParagraphPeriods(container, periods);
+        }
         return base.VisitChildren(node);
+    }
+
+    /// <summary>⛔ THE PUNCTUATION HALF OF A CLOSED FORMAT (kb/Work PB2727). ISO §12.4.6.2, §12.3.7.2 and §12.3.8.2
+    /// print ONE separator period after the paragraph's entries — §12.4.6.2 a second only around the APPLY COMMIT
+    /// clause, a sentence of its own — and §5.2.1 binds "the words, phrases, clauses, punctuation, and operands in
+    /// each general format". The grammar superset-parses a period after every entry so the refusal can name the
+    /// rule: a period that splits the paragraph is COBOLNET3407, at the period; a paragraph that ends without its
+    /// closing period is COBOLNET3408, at its last entry. Error at every edition: the 1985, 2002, 2014 and 2023
+    /// formats all print the single period.</summary>
+    private void ScreenParagraphPeriods(ParserRuleContext paragraph, ParagraphPeriod row)
+    {
+        var sentences = ParagraphPeriods.Sentences(paragraph);
+        if (sentences.Count == 0) return;
+        // The one period the format lets stand between two sentences: the boundary of the first sentence that is the
+        // clause it prints as a sentence of its own (the APPLY COMMIT clause) — the period closing it, or, when it is
+        // the last sentence, the period closing the sentence before it. Every other inner period splits a sentence.
+        ITerminalNode? licensed = null;
+        int own = -1;
+        for (int i = 0; sentences.Count > 1 && i < sentences.Count && own < 0; i++)
+            if (ParagraphPeriods.IsOwnSentence(row, sentences[i])) own = i;
+        if (own >= 0) licensed = sentences[own < sentences.Count - 1 ? own : own - 1].Period;
+        for (int i = 0; i < sentences.Count - 1; i++)
+        {
+            var period = sentences[i].Period!;   // every sentence but the last is closed by the period that ends it
+            if (period == licensed) continue;
+            using var at = _edition.At(period.Symbol);
+            _edition.Error(DiagnosticCatalog.ParagraphInteriorPeriod,
+                $"{row.Subject} paragraph: a separator period follows '{WrittenOpening(sentences[i].Entries[^1])}' "
+                + $"and the paragraph goes on with '{WrittenOpening(sentences[i + 1].Entries[0])}' — the ISO "
+                + $"§{row.Clause} general format prints {row.Printed} (§5.2.1); delete this period");
+        }
+        if (sentences[^1].Period is null)
+        {
+            var last = sentences[^1].Entries[^1];
+            using var at = _edition.At(last.Stop);
+            _edition.Error(DiagnosticCatalog.ParagraphPeriodMissing,
+                $"{row.Subject} paragraph: it ends after '{WrittenOpening(last)}' without a separator period — the "
+                + $"ISO §{row.Clause} general format prints {row.Printed} (§5.2.1); write the period");
+        }
     }
 
     /// <summary>Count the elements <paramref name="container"/>'s clause children fill and diagnose each that is

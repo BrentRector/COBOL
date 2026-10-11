@@ -18,7 +18,7 @@
        SPECIAL-NAMES.
            ALPHABET TESTME IS
                     "A" THROUGH "Z", X"00" THRU X"05";
-                    X"41" ALSO X"42", ALSO X"00", X"C1" ALSO X"C2".
+                    X"41" ALSO X"42", ALSO X"00", X"C1" ALSO X"C2"
            ALPHABET FINE
                     "A" ALSO "B" ALSO "C" ALSO "d" ALSO "e" ALSO "f",
                     "g" ALSO "G", "1" THRU "9", X"00".
