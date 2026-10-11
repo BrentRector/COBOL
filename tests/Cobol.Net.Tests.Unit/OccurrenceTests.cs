@@ -134,6 +134,101 @@ public sealed class OccurrenceTests
         Assert.Equal(-cap, CobolTable.OccValueReal(-1.6e38));
     }
 
+    // ── The reference-modification chain (kb/Work PB2938): the same carrier, the same exactness ──
+
+    /// <summary>A reference-modifier position item reads exactly as a subscript does (§8.4.3.3.4 5) over §8.4.2.3.4 GR2):
+    /// the saturated <c>long</c> beside the value the program holds, for every carrier.</summary>
+    [Fact]
+    public void RefModPosition_WideItem_KeepsTheExactText()
+    {
+        Occurrence o = CobolString.RefModPosition(I("100000000000000000001"), Profile(21, 0));
+        Assert.Equal(long.MaxValue, o.Value);
+        Assert.Equal("100000000000000000001", o.ToString());
+        Occurrence scaled = CobolString.RefModPosition(I("10000000000000000000100"), Profile(23, 2));
+        Assert.Equal("100000000000000000001", scaled.ToString());
+        Occurrence inLong = CobolString.RefModPosition(5000000000L, Profile(10, 0));
+        Assert.Equal(5000000000L, inLong.Value);
+        Assert.Equal("5000000000", inLong.ToString());
+    }
+
+    /// <summary>The unsigned-wide carrier: read as the UInt128 it is, never saturated "whatever its fraction" (it used to
+    /// answer <c>long.MaxValue</c> for every value past Int128). A fraction is still a violation, and a scale that
+    /// divides it back inside <c>long</c> makes it a valid position.</summary>
+    [Fact]
+    public void RefModPosition_UnsignedWide_IsReadAsItself()
+    {
+        Occurrence max = CobolString.RefModPosition(UInt128.MaxValue, Profile(39, 0));
+        Assert.Equal(long.MaxValue, max.Value);
+        Assert.Equal("340282366920938463463374607431768211455", max.ToString());
+        UInt128 pow20 = 1;
+        for (int i = 0; i < 20; i++) pow20 *= 10;
+        Occurrence back = CobolString.RefModPosition((UInt128)3402823669209384634UL * pow20, Profile(39, 20));
+        Assert.Equal(3402823669209384634L, back.Value);
+        Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(
+            () => CobolString.RefModPosition(UInt128.MaxValue, Profile(39, 2)));
+    }
+
+    /// <summary>The expression intake keeps the EXACT integer (the twin of <c>CobolTable.OccValue</c>) and the position
+    /// read after the temporary names it.</summary>
+    [Fact]
+    public void RefModValue_IsExact_AndTheReadAfterItNamesTheValue()
+    {
+        Int128 position = CobolString.RefModValue(I("100000000000000000006"), 0);
+        Assert.Equal(I("100000000000000000006"), position);
+        Assert.Equal(I("99999999999999999999999999999999999999"), CobolString.RefModValue(Int128.MaxValue, 0));
+        Assert.Equal(I("100000000000000000000"), CobolString.RefModValueDec(CobolDec.From(1, -20)));
+        Assert.Equal((Int128)123456789012, CobolString.RefModValueReal(123456789012.0));
+        Occurrence o = CobolString.RefModPosition(position, Profile(38, 0, signed: true));
+        Assert.Equal("100000000000000000006", o.ToString());
+    }
+
+    /// <summary>A SPECIFIED length is floored one above the omitted sentinel so it can never read as "to the end", and the
+    /// floor keeps the exact text of the value it moved.</summary>
+    [Fact]
+    public void SpecifiedRefModLength_FloorKeepsTheValueTheProgramHolds()
+    {
+        Occurrence huge = CobolString.SpecifiedRefModLength(CobolString.RefModPosition(I("-100000000000000000001"), Profile(21, 0, signed: true)));
+        Assert.Equal(CobolString.OmittedRefModLength + 1L, huge.Value);
+        Assert.Equal("-100000000000000000001", huge.ToString());
+        Occurrence minusInt = CobolString.SpecifiedRefModLength(-2147483648L);
+        Assert.Equal(CobolString.OmittedRefModLength + 1L, minusInt.Value);
+        Assert.Equal("-2147483648", minusInt.ToString());
+        Assert.Equal(7L, CobolString.SpecifiedRefModLength(7L).Value);
+        Assert.Equal("7", CobolString.SpecifiedRefModLength(7L).ToString());
+    }
+
+    /// <summary>The range test positions by the saturated long and the raise names the exact position, for the read, the
+    /// write and the address; an in-range reference is unchanged.</summary>
+    [Fact]
+    public void RefModRaise_NamesTheExactPositions()
+    {
+        Occurrence wide = CobolString.RefModPosition(I("100000000000000000001"), Profile(21, 0));
+        string read = Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(() => CobolString.RefMod("ABCDE", wide, 1)).Message;
+        Assert.Contains("(100000000000000000001:1) out of range for a 5-position item", read);
+        string write = Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(() => CobolString.SpliceInto("ABCDE", 1, wide, "z")).Message;
+        Assert.Contains("(1:100000000000000000001) out of range for a 5-position receiver", write);
+        string address = Assert.Throws<CobolNet.Runtime.Exceptions.CobolFatalException>(
+            () => CobolString.RefModStartOffset(wide, CobolString.OmittedRefModLength, 5)).Message;
+        Assert.Contains("(100000000000000000001:) out of range for a 5-position item", address);
+        Assert.Equal("BC", CobolString.RefMod("ABCDE", 2, 2));
+        Assert.Equal("BCDE", CobolString.RefMod("ABCDE", 2, CobolString.OmittedRefModLength));
+        Assert.Equal(4, CobolString.RefModStartOffset(5, CobolString.OmittedRefModLength, 5));
+        Assert.Equal("AzCDE", CobolString.SpliceInto("ABCDE", 2, 1, "z"));
+    }
+
+    /// <summary>A literal past <c>long</c> (<c>PositionWideConstant</c>) is the saturated long with the literal's text.</summary>
+    [Theory]
+    [InlineData("100000000000000000001", long.MaxValue, "100000000000000000001")]
+    [InlineData("-100000000000000000001", long.MinValue, "-100000000000000000001")]
+    [InlineData("+100000000000000000001", long.MaxValue, "100000000000000000001")]
+    [InlineData("000000000000000000000000000000000000000000000000000000000000000000000000007", 7L, "7")]
+    public void OfLiteral_SaturatesTheValue_AndKeepsTheLiteralsText(string literal, long value, string text)
+    {
+        Occurrence o = Occurrence.OfLiteral(literal);
+        Assert.Equal(value, o.Value);
+        Assert.Equal(text, o.ToString());
+    }
+
     /// <summary>The temporary's value goes back through the subscript read, which is where the narrowing — and so the
     /// exact text — lives: an expression past <c>long</c> is named by its value.</summary>
     [Fact]

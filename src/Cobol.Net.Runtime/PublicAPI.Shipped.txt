@@ -2943,19 +2943,19 @@ static CobolNet.Runtime.CobolString.Compare(string? left, string? right, char pa
 static CobolNet.Runtime.CobolString.CompareFig(string? left, string? right, bool figIsLeft, CobolNet.Runtime.CobolCollation! collation) -> int
 static CobolNet.Runtime.CobolString.CompareFig(string? left, string? right, bool figIsLeft, char pad = ' ') -> int
 static CobolNet.Runtime.CobolString.FigToWidth(string! seed, int width) -> string!
-static CobolNet.Runtime.CobolString.RefMod(string? s, int leftmost, int length, bool allowZeroLength = false) -> string!
-static CobolNet.Runtime.CobolString.RefModPosition(System.Int128 unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolString.RefModPosition(System.UInt128 unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolString.RefModPosition(long unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolString.RefModPosition(string! image, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolString.RefModPosition(ulong unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolString.RefModStartOffset(int leftmost, int length, int size, bool allowZeroLength = false) -> int
-static CobolNet.Runtime.CobolString.RefModValue(System.Int128 unscaled, int scale) -> long
-static CobolNet.Runtime.CobolString.RefModValueDec(CobolNet.Runtime.CobolDec value) -> long
-static CobolNet.Runtime.CobolString.RefModValueReal(double value) -> long
+static CobolNet.Runtime.CobolString.RefMod(string? s, CobolNet.Runtime.Occurrence leftmost, CobolNet.Runtime.Occurrence length, bool allowZeroLength = false) -> string!
+static CobolNet.Runtime.CobolString.RefModPosition(System.Int128 unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolString.RefModPosition(System.UInt128 unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolString.RefModPosition(long unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolString.RefModPosition(string! image, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolString.RefModPosition(ulong unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolString.RefModStartOffset(CobolNet.Runtime.Occurrence leftmost, CobolNet.Runtime.Occurrence length, int size, bool allowZeroLength = false) -> int
+static CobolNet.Runtime.CobolString.RefModValue(System.Int128 unscaled, int scale) -> System.Int128
+static CobolNet.Runtime.CobolString.RefModValueDec(CobolNet.Runtime.CobolDec value) -> System.Int128
+static CobolNet.Runtime.CobolString.RefModValueReal(double value) -> System.Int128
 static CobolNet.Runtime.CobolString.Repeat(string! s, int n) -> string!
-static CobolNet.Runtime.CobolString.SpecifiedRefModLength(System.Int128 length) -> int
-static CobolNet.Runtime.CobolString.SpliceInto(string? dst, int leftmost, int length, string? slice, char pad = ' ', bool allowZeroLength = false, bool repeat = false) -> string!
+static CobolNet.Runtime.CobolString.SpecifiedRefModLength(CobolNet.Runtime.Occurrence length) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolString.SpliceInto(string? dst, CobolNet.Runtime.Occurrence leftmost, CobolNet.Runtime.Occurrence length, string? slice, char pad = ' ', bool allowZeroLength = false, bool repeat = false) -> string!
 static CobolNet.Runtime.CobolString.Store(string? value, int width, bool justifiedRight = false, char pad = ' ') -> string!
 static CobolNet.Runtime.CobolString.ThruMember(string? read, string? lo, string? hi, CobolNet.Runtime.CobolCollation! collation) -> bool
 static CobolNet.Runtime.CobolString.ThruMember(string? read, string? lo, string? hi, char pad = ' ') -> bool

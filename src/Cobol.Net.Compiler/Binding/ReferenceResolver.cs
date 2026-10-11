@@ -733,8 +733,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// it is known, so <c>X(1:N)</c> is never screened and <c>X(7:N)</c> is refused on its start alone. A length
     /// literal that exceeds the whole item is refused whatever the start, because no start in 1..size can make it fit.
     /// Returns the violated clause's words, or null.</para></summary>
-    internal static string? LiteralRefModRangeViolation(DataItem item, System.Numerics.BigInteger? start,
-        System.Numerics.BigInteger? length, bool omittedLength, bool allowZeroLength)
+    internal static string? LiteralRefModRangeViolation(DataItem item, Int128? start,
+        Int128? length, bool omittedLength, bool allowZeroLength)
     {
         if (item.IsDynamicLength || item.IsAnyLength || HasOdoOnOrBeneathOrDynamicTable(item)) return null;
         int size = RefModPlace.PositionCount(item);
@@ -743,7 +743,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
         if (omittedLength || length is not { } len) return null;
         if (len == 0 && !allowZeroLength)
             return "a zero length is not a positive nonzero integer (ISO §8.4.3.3.4 5) c); REF-MOD-ZERO-LENGTH is not on)";
-        if (len > 0 && (start is { } s2 ? s2 + len - 1 > size : len > size))
+        // (written `len > size - s2 + 1`, never `s2 + len - 1 > size`: a literal near Int128's top would wrap the sum;
+        // s2 is within 1..size here, so the rewritten form cannot overflow)
+        if (len > 0 && (start is { } s2 ? len > size - s2 + 1 : len > size))
             return $"the reference modification ({(start is { } s3 ? s3.ToString() : "…")}:{len}) extends past the "
                 + $"{size}-position item (ISO §8.4.3.3.4 5) c))";
         return null;
@@ -754,8 +756,12 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>The decimal-integer LITERAL a rendered position is, or null when it is anything else (a data-name
     /// read, an expression, a narrowing call) — the screen's "is this position known at compile time".</summary>
-    private static System.Numerics.BigInteger? LiteralPosition(Position? position) =>
-        position is PositionConstant { Value: >= 0 } c ? new System.Numerics.BigInteger(c.Value) : null;
+    private static Int128? LiteralPosition(Position? position) => position switch
+    {
+        PositionConstant { Value: >= 0 } c => c.Value,
+        PositionWideConstant w when w.Value >= 0 => w.Value,   // past long: the screen names the literal itself (kb/Work PB2938)
+        _ => null,
+    };
 
     /// <summary>The hook that answers "is checking for EC-BOUND-REF-MOD enabled at this source line?" — installed by
     /// <c>StatementBinder</c> (which owns the statement-level TURN fold, overlays included) exactly as
@@ -2446,19 +2452,31 @@ public sealed partial class ReferenceResolver(DataBinder data)
     }
 
     /// <summary>An integer literal (a sign before it is a unary operator of the expression, ISO §8.3.3.3.2) as a
-    /// <see cref="PositionConstant"/>; null for any other numeric literal (a decimal or floating-point literal — the
-    /// D18 route applies §8.4.2.3.4 GR1 b)'s integrality rule to it) and for one beyond the host's <c>long</c>.</summary>
+    /// <see cref="PositionConstant"/> — or, past the host's <c>long</c>, a <see cref="PositionWideConstant"/> that keeps
+    /// the value (kb/Work PB2938); null for any other numeric literal (a decimal or floating-point literal — the D18
+    /// route applies §8.4.2.3.4 GR1 b)'s integrality rule to it).</summary>
     private static Position? IntegerLiteral(Core.NumericLiteralContext lit)
     {
         var signed = lit.signedNumericLiteral();
         var core = signed.numericLiteralCore();
         if (core.ChildCount != 1 || core.Start.Type is not (Core.INTEGERLIT or Core.SIGNED_INTEGERLIT)) return null;
-        // THE ONE integer-literal reader (kb/Work PB1058 / PB1579), at the position intakes' long width: a literal past
-        // it saturates and stays out of every range.
-        if (!CobolNet.Validation.IntegerOperandRules.TryHostPosition(core.Start.Text, out long value, out _)) return null;
-        Position constant = new PositionConstant(value);
-        return signed.MINUS() is null ? constant : new PositionNegate(constant);
+        if (HostPosition(core.Start.Text) is not { } constant) return null;
+        return signed.MINUS() is null ? constant
+            : constant is PositionWideConstant w ? new PositionWideConstant(-w.Value)
+            : new PositionNegate(constant);
     }
+
+    /// <summary>⛔ THE ONE integer-literal reader of a position (kb/Work PB1058 / PB1579) at the position intakes' long
+    /// width: a <see cref="PositionConstant"/>, or — for a literal past <c>long</c>, which saturates there and stays out
+    /// of every range — a <see cref="PositionWideConstant"/> holding the literal's own value so a diagnostic can name it
+    /// (kb/Work PB2938), saturated by sign at <see cref="Int128.MaxValue"/> past 38 digits (the standard's numeric literal
+    /// maximum, and the 38-digit position temporary's capacity). Null when <paramref name="text"/> is not an integer.</summary>
+    private static Position? HostPosition(string text) =>
+        !CobolNet.Validation.IntegerOperandRules.TryHostPosition(text, out long value, out bool saturated) ? null
+        : saturated ? new PositionWideConstant(Int128.TryParse(text, System.Globalization.NumberStyles.AllowLeadingSign,
+                System.Globalization.CultureInfo.InvariantCulture, out Int128 wide)
+            ? wide : text[0] == '-' ? -Int128.MaxValue : Int128.MaxValue)
+        : new PositionConstant(value);
 
     /// <summary>A screen the fast path OWES once it commits to rendering the segment — either the §8.8.1.1 class
     /// screen over a resolved item (<see cref="ScreenPositionOperandClass"/>) or the §13.18.38.3 r7 index-name
@@ -2718,7 +2736,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // integer-literal reader (kb/Work PB1579).
         if (qualifiers.Count == 0
             && data.FindConstant(name) is { Category: PicCategory.Numeric, IntegerText: { } integer })
-            return CobolNet.Validation.IntegerOperandRules.TryHostPosition(integer, out long value, out _) ? new PositionConstant(value) : null;
+            return HostPosition(integer);
         // A report VARYING counter in scope (§13.18.64.4 GR4's NOTE: "data-name-1 [may] be used … as a subscript to a source
         // data item") is the compose-local integer the placement declares; it is no data item and has no scale.
         if (qualifiers.Count == 0 && VaryingScope is { } counters && counters.TryGetValue(name, out var counter))

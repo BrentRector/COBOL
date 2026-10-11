@@ -69,24 +69,36 @@ public static class CobolString
     /// length-omitted ref-mod and by the INVOKE §14.8.2.2 rule-1 prefix splice.</summary>
     public const int OmittedRefModLength = int.MinValue;
 
-    /// <summary>A SPECIFIED reference-modifier length narrowed to the runtime <c>int</c>: the saturating
-    /// <see cref="CobolNum.Position32"/> (kb/Work PB1033), floored one above <see cref="OmittedRefModLength"/> so
-    /// a hugely negative specified length can never saturate ONTO the omitted sentinel and be read as "to the
-    /// end" — it stays a negative length, which item 5c rejects.</summary>
-    public static int SpecifiedRefModLength(Int128 length) =>
-        Math.Max(CobolNum.Position32(length), OmittedRefModLength + 1);
+    /// <summary>A SPECIFIED reference-modifier length, floored one above <see cref="OmittedRefModLength"/> so a
+    /// hugely negative specified length can never be the omitted sentinel and be read as "to the end" — it stays a
+    /// negative length, which item 5c rejects (kb/Work PB1033). The floor keeps the exact text of the value it moves
+    /// (<see cref="Occurrence.AtLeast"/>), so the violation still names the length the program holds (kb/Work PB2938).</summary>
+    public static Occurrence SpecifiedRefModLength(Occurrence length) => length.AtLeast(OmittedRefModLength + 1L);
 
     /// <summary>⛔ THE ONE §8.4.3.3.4 item 5c range test, shared by the read (<see cref="RefMod"/>) and the write
     /// (<see cref="SpliceInto"/>) — they were two copies. "leftmost … shall be 1..size; a SPECIFIED length shall
     /// be a positive nonzero integer, with leftmost+length-1 &lt;= size." The last conjunct is written as
-    /// <c>length &gt; size - leftmost + 1</c>: the natural <c>leftmost + length - 1 &gt; size</c> OVERFLOWS an
-    /// <c>int</c> for a length near <c>int.MaxValue</c> (a saturated one included) and wraps to a negative sum
-    /// that passes the test (kb/Work PB1033). <paramref name="leftmost"/> is already within 1..size when it is
-    /// evaluated, so the rewritten form cannot overflow.</summary>
-    private static bool RefModOutOfRange(int leftmost, int length, int size, bool omitted, bool allowZeroLength) =>
+    /// <c>length &gt; size - leftmost + 1</c>: the natural <c>leftmost + length - 1 &gt; size</c> OVERFLOWS for a
+    /// length near the top of its type (a saturated one included) and wraps to a negative sum that passes the test
+    /// (kb/Work PB1033). <paramref name="leftmost"/> is already within 1..size when it is evaluated, so the rewritten
+    /// form cannot overflow. The operands are the positions' <c>long</c> (<see cref="Occurrence.Value"/>, saturated, so
+    /// out of range stays out of range): the test never narrows to <c>int</c>, because the narrowing is what used to
+    /// leave the violation's detail naming 2147483647 for a position the program computed as 10^20 (kb/Work PB2938).</summary>
+    private static bool RefModOutOfRange(long leftmost, long length, int size, bool omitted, bool allowZeroLength) =>
         leftmost < 1 || leftmost > size
         || (!omitted && length < 0) || (length == 0 && !allowZeroLength)
         || (length > 0 && length > size - leftmost + 1);
+
+    /// <summary>⛔ THE ONE EC-BOUND-REF-MOD RAISE of the range-checked reference modification — the read
+    /// (<see cref="RefMod"/>), the write (<see cref="SpliceInto"/>) and the address (<see cref="RefModStartOffset"/>) were
+    /// three copies of this message. The detail names the positions the program holds (<see cref="Occurrence.ToString"/>:
+    /// the exact value even past <c>long</c>, kb/Work PB2938), <paramref name="what"/> being the kind of area they fall
+    /// outside ("item" or "receiver"). Returns normally only where checking is off AND the run unit survives — it does
+    /// not: <see cref="ExceptionState.RefModViolation"/> never returns (kb/Work R60).</summary>
+    private static void RefModViolation(Occurrence leftmost, Occurrence length, bool omitted, int size, string what) =>
+        ExceptionState.RefModViolation(
+            $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
+            + $"{size}-position {what} (ISO §8.4.3.3.4 item 5c)");
 
     /// <summary>A NUMERIC data item as a reference-modifier leftmost-position or length, decoded through the
     /// item's own profile (ISO §8.4.3.3.4 rule 5)c); fix-queue PB41): "If the evaluation of leftmost-position or
@@ -100,34 +112,44 @@ public static class CobolString
     /// checked read (<see cref="CobolNum.ParseImageSending"/>): a position is item identification, which rule 1
     /// names as checked even inside a class condition (kb/Work PB1117 — the tolerant digit scan it replaced made
     /// EC-DATA-INCOMPATIBLE unreachable here and dropped a signed image's sign). Returns <c>long</c> because the
-    /// rendered ref-mod positions are long-valued COBOL expressions that <c>RuntimeApi.RefModStart</c>/
-    /// <c>RefModLength</c> cast at the call site. A fractional position is the same violation as an out-of-range
+    /// rendered ref-mod positions are long-valued COBOL expressions, passed to <see cref="RefMod"/> as they are.
+    /// A fractional position is the same violation as an out-of-range
     /// one and takes the same outcome (<see cref="ExceptionState.RefModViolation"/>: raised when checking is on, the
     /// run unit's termination when it is off — kb/Work R60).</para>
+    /// <para>The result is an <see cref="Occurrence"/> — the saturated <c>long</c> the range test positions by, with the
+    /// item's exact value riding along (kb/Work PB2938) — exactly as <c>CobolTable.Occ</c> returns one for a subscript.</para>
     /// <para>The carrier overloads mirror the subscript side's, and for the same reason: the item's storage form
     /// is decided after the bind-time expression text is produced.</para></summary>
-    public static long RefModPosition(long unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
+    public static Occurrence RefModPosition(long unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
 
     /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
-    public static long RefModPosition(Int128 unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
+    public static Occurrence RefModPosition(Int128 unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
 
     /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
-    public static long RefModPosition(string image, in NumProfile item) => item.ImageExceedsInt128
+    public static Occurrence RefModPosition(string image, in NumProfile item) => item.ImageExceedsInt128
         ? RefModPosition(CobolNum.ParseImageU128Sending(image, item), item)
         : RefModScaled(CobolNum.ParseImageSending(image, item), item.FractionDigits);
 
     /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
-    public static long RefModPosition(ulong unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
+    public static Occurrence RefModPosition(ulong unscaled, in NumProfile item) => RefModScaled(unscaled, item.FractionDigits);
 
     /// <inheritdoc cref="RefModPosition(long, in NumProfile)"/>
-    public static long RefModPosition(UInt128 unscaled, in NumProfile item) =>
-        unscaled > (UInt128)Int128.MaxValue ? long.MaxValue : RefModScaled((Int128)unscaled, item.FractionDigits);
+    /// <remarks>Read as the UNSIGNED-WIDE value it is — never narrowed through <see cref="Int128"/> first, which a value
+    /// at or above 2^127 does not fit — so §8.4.3.3.4 rule 5)c)'s integrality and the position both see the value itself
+    /// (the twin of <c>CobolTable.Occ(UInt128, in NumProfile)</c>: a scale that divides it back inside <c>long</c>'s range
+    /// makes it a valid position, and a fraction is a violation whatever the magnitude).</remarks>
+    public static Occurrence RefModPosition(UInt128 unscaled, in NumProfile item)
+    {
+        if (CobolNum.HasFraction(unscaled, item.FractionDigits))
+            NotAnInteger(CobolNum.PlainValue(unscaled, item.FractionDigits));
+        return Occurrence.Of(unscaled, item.FractionDigits);
+    }
 
-    private static long RefModScaled(Int128 unscaled, int scale)
+    private static Occurrence RefModScaled(Int128 unscaled, int scale)
     {
         if (CobolNum.HasFraction(unscaled, scale))
             NotAnInteger(CobolNum.PlainValue(unscaled, scale));
-        return CobolNum.PositionOf(unscaled, scale);
+        return Occurrence.Of(unscaled, scale);
     }
 
     private static void NotAnInteger(string shown) =>
@@ -138,21 +160,31 @@ public static class CobolString
     /// floating-point item), as the position it denotes — the statement pre-operation's intake, the exact twin of
     /// <c>CobolTable.OccValue</c> differing only in the Table 13 condition it names (kb/Work PB1890). §8.4.3.3.4
     /// rule 5)c): a leftmost-position or length whose evaluation "results in a non-integer value" sets
-    /// EC-BOUND-REF-MOD, so the test reads the EXACT intermediate on its own carrier.</summary>
-    public static long RefModValue(Int128 unscaled, int scale) => RefModScaled(unscaled, scale);
-
-    /// <inheritdoc cref="RefModValue(Int128, int)"/>
-    public static long RefModValueDec(CobolDec value)
+    /// EC-BOUND-REF-MOD, so the test reads the EXACT intermediate on its own carrier.
+    /// <para>The result is the EXACT integer the 38-digit position temporary then holds
+    /// (<see cref="CobolNum.PositionOfWide(Int128, int)"/>), not a <c>long</c>: the position read
+    /// (<see cref="RefModPosition(Int128, in NumProfile)"/>) narrows it, and only that narrowing saturates, so
+    /// EC-BOUND-REF-MOD's detail names the value the expression computed (kb/Work PB2938; the twin of
+    /// <c>CobolTable.OccValue</c>, kb/Work PB2695).</para></summary>
+    public static Int128 RefModValue(Int128 unscaled, int scale)
     {
-        if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-        return CobolNum.PositionOf(value);
+        if (CobolNum.HasFraction(unscaled, scale))
+            NotAnInteger(CobolNum.PlainValue(unscaled, scale));
+        return CobolNum.PositionOfWide(unscaled, scale);
     }
 
     /// <inheritdoc cref="RefModValue(Int128, int)"/>
-    public static long RefModValueReal(double value)
+    public static Int128 RefModValueDec(CobolDec value)
+    {
+        if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return CobolNum.PositionOfWide(value);
+    }
+
+    /// <inheritdoc cref="RefModValue(Int128, int)"/>
+    public static Int128 RefModValueReal(double value)
     {
         if (CobolNum.HasFraction(value)) NotAnInteger(value.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-        return CobolNum.PositionOf(value);
+        return CobolNum.PositionOfWide(value);
     }
 
     /// <summary>
@@ -165,21 +197,19 @@ public static class CobolString
     /// (<see cref="SpliceInto"/>) through <see cref="RefModOutOfRange"/>. So past the range test the slice always
     /// lies wholly inside <paramref name="s"/>: there is nothing to clamp and nothing to pad.
     /// </summary>
-    public static string RefMod(string? s, int leftmost, int length, bool allowZeroLength = false)
+    public static string RefMod(string? s, Occurrence leftmost, Occurrence length, bool allowZeroLength = false)
     {
         s ??= "";
         int size = s.Length;
-        bool omitted = length == OmittedRefModLength;
+        bool omitted = length.Value == OmittedRefModLength;
         // §8.4.3.3.4 (spec :7089), item 5c: leftmost shall be 1..size; a SPECIFIED length shall be a positive nonzero
         // integer (a negative specified length is a violation regardless of the directive — REF-MOD-ZERO-LENGTH,
         // §7.3.23, <paramref name="allowZeroLength"/>, relaxes ONLY the zero case, C14), with leftmost+length-1 <= size.
         // For the OMITTED (to-the-end) form only the leftmost is range-checked.
         if (RefModOutOfRange(leftmost, length, size, omitted, allowZeroLength))
-            ExceptionState.RefModViolation(
-                $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
-                + $"{size}-position item (ISO §8.4.3.3.4 item 5c)");
-        int start = leftmost - 1;
-        int len = omitted ? size - start : length;   // in range: 0 <= len <= size - start
+            RefModViolation(leftmost, length, omitted, size, "item");
+        int start = (int)(leftmost.Value - 1);
+        int len = omitted ? size - start : (int)length.Value;   // in range: 0 <= len <= size - start
         return len == 0 ? "" : s.Substring(start, len);
     }
 
@@ -190,14 +220,12 @@ public static class CobolString
     /// when checking is enabled, the run unit's termination when it is not — so an address cannot be taken from a
     /// reference modifier that a read of the same reference would refuse. <paramref name="size"/> is identifier-1's
     /// positions, or <see cref="int.MaxValue"/> where the item's size is a run-time fact the bind cannot supply.</summary>
-    public static int RefModStartOffset(int leftmost, int length, int size, bool allowZeroLength = false)
+    public static int RefModStartOffset(Occurrence leftmost, Occurrence length, int size, bool allowZeroLength = false)
     {
-        bool omitted = length == OmittedRefModLength;
+        bool omitted = length.Value == OmittedRefModLength;
         if (RefModOutOfRange(leftmost, length, size, omitted, allowZeroLength))
-            ExceptionState.RefModViolation(
-                $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
-                + $"{size}-position item (ISO §8.4.3.3.4 item 5c)");
-        return leftmost - 1;
+            RefModViolation(leftmost, length, omitted, size, "item");
+        return (int)(leftmost.Value - 1);
     }
 
     /// <summary>
@@ -215,22 +243,20 @@ public static class CobolString
     /// is known only here, at run time — kb/Work PB1655). It is <see cref="FigToWidth"/>'s rule applied in place,
     /// so a figurative stored into a slice and one sized against a fixed receiver cannot answer differently.</para>
     /// </summary>
-    public static string SpliceInto(string? dst, int leftmost, int length, string? slice, char pad = ' ',
+    public static string SpliceInto(string? dst, Occurrence leftmost, Occurrence length, string? slice, char pad = ' ',
         bool allowZeroLength = false, bool repeat = false)
     {
         dst ??= ""; slice ??= "";
         int size = dst.Length;
-        bool omitted = length == OmittedRefModLength;
+        bool omitted = length.Value == OmittedRefModLength;
         // §8.4.3.3.4 item 5c — a SPECIFIED length shall be positive nonzero; a zero-length receiving ref-mod is
         // allowed only under REF-MOD-ZERO-LENGTH (§7.3.23), a negative specified length never is (C14); an
         // out-of-range leftmost/length still raises regardless of the directive. The OMITTED form range-checks only
         // the leftmost.
         if (RefModOutOfRange(leftmost, length, size, omitted, allowZeroLength))
-            ExceptionState.RefModViolation(
-                $"reference modification ({leftmost}:{(omitted ? "" : length.ToString())}) out of range for a "
-                + $"{size}-position receiver (ISO §8.4.3.3.4 item 5c)");
-        int start = leftmost - 1;
-        int len = omitted ? size - start : length;   // in range (RefModViolation never returns): 0 <= len <= size - start
+            RefModViolation(leftmost, length, omitted, size, "receiver");
+        int start = (int)(leftmost.Value - 1);
+        int len = omitted ? size - start : (int)length.Value;   // in range (RefModViolation never returns): 0 <= len <= size - start
         if (len == 0) return dst;
         var arr = dst.ToCharArray();
         if (repeat && slice.Length > 0)

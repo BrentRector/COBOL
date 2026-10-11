@@ -18,6 +18,7 @@ internal static class PositionRenderer
     public static string Render(Position p) => p switch
     {
         PositionConstant c => c.Value.ToString(CultureInfo.InvariantCulture),
+        PositionWideConstant w => RuntimeApi.OccurrenceOfLiteral(w.Value.ToString(CultureInfo.InvariantCulture)),
         PositionIndexCell ix => ix.Cell,
         PositionItemRead r => r.Form switch
         {

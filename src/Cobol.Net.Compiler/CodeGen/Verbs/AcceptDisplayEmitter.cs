@@ -91,12 +91,13 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         // as-if PICTURE 1(m) length, the same units RefModPlace.Category and the write-side pad already use.
         if (target is RefModPlace rm)
         {
-            // The ONE ref-mod narrowing (RuntimeApi.RefModStart / RefModLength — saturating, kb/Work PB1033); the
-            // omitted-length width is computed in `long` so a saturated start cannot overflow it, and floored at
-            // zero — the slice write below raises EC-BOUND-REF-MOD for that start (§8.4.3.3.4 item 5c).
+            // The transfer width is a host `int` (AcceptSource.Device), so it is the ONE saturating narrowing of the
+            // ref-mod length (RuntimeApi.RefModLength through HostInt32 — kb/Work PB1033); the omitted-length width is
+            // computed in `long` so a saturated start cannot overflow it, and floored at zero — the slice write below
+            // raises EC-BOUND-REF-MOD for that start or length (§8.4.3.3.4 item 5c), naming the position's exact value.
             string len = rm.Length is { } l
-                ? RuntimeApi.RefModLength(l)
-                : $"(int)global::System.Math.Max(0L, {rm.Inner.Item.OperandPic?.Length ?? rm.Inner.Item.ImageWidth} - (long){RuntimeApi.RefModStart(rm.Start)} + 1)";
+                ? RuntimeApi.HostInt32(RuntimeApi.RefModLength(l))
+                : $"(int)global::System.Math.Max(0L, {rm.Inner.Item.OperandPic?.Length ?? rm.Inner.Item.ImageWidth} - (long)({RuntimeApi.RefModStart(rm.Start)}) + 1)";
             w.Line(PlaceRenderer.Write(target, $"AcceptSource.Device({len})"));
             return;
         }

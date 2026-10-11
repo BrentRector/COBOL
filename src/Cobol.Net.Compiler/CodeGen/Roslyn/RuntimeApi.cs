@@ -1096,21 +1096,23 @@ internal static class RuntimeApi
     public static string HostInt64Literal(string literal) =>
         CobolNum.Position(CobolNum.IntegerLiteralValue(literal)).ToString(System.Globalization.CultureInfo.InvariantCulture) + "L";
 
-    // The ref-mod positions are integer-valued COBOL expressions and the runtime takes `int`, so each is
-    // narrowed at the call site through HostInt32; an omitted length renders the distinct sentinel above rather
-    // than −1. Both rules live HERE and nowhere else: a ref-mod attaches to a storage PLACE (PlaceRenderer,
-    // readable and writable), to a ref-modified FUNCTION RESULT (IntrinsicRenderer, read-only — §8.4.3.3.3 SR2)
-    // and to a ref-modified ACCEPT receiver's transfer width (AcceptDisplayEmitter), and they must agree.
+    // The ref-mod positions are integer-valued COBOL expressions and the runtime takes them as `Occurrence`, the
+    // saturating long that carries the exact value of a position past it (kb/Work PB2938), so the range test names
+    // the position the program holds; C# converts the rendered `long` (or the `Occurrence` a position read returns)
+    // implicitly, and NO narrowing to `int` happens before the runtime's range test. An omitted length renders the
+    // distinct sentinel above rather than −1. Both rules live HERE and nowhere else: a ref-mod attaches to a storage
+    // PLACE (PlaceRenderer, readable and writable), to a ref-modified FUNCTION RESULT (IntrinsicRenderer, read-only —
+    // §8.4.3.3.3 SR2) and to a ref-modified ACCEPT receiver's transfer width (AcceptDisplayEmitter), and they must agree.
 
-    /// <summary>The runtime <c>int</c> leftmost-position from the typed start position (§8.4.3.3.4 item 5b).
-    /// A value past the carrier saturates, so it stays out of range and raises EC-BOUND-REF-MOD (item 5c) rather
-    /// than wrapping onto a position inside the item (kb/Work PB1033).</summary>
-    public static string RefModStart(Position start) => HostInt32(PositionRenderer.Render(start));
+    /// <summary>The leftmost-position argument of the runtime's range-checked reference modification, from the typed
+    /// start position (§8.4.3.3.4 item 5b). A value past the carrier saturates inside the position read, so it stays
+    /// out of range and raises EC-BOUND-REF-MOD (item 5c) rather than wrapping onto a position inside the item
+    /// (kb/Work PB1033), and its exact value reaches the detail (kb/Work PB2938).</summary>
+    public static string RefModStart(Position start) => PositionRenderer.Render(start);
 
-    /// <summary>The runtime <c>int</c> length from the typed length position, or the OMITTED sentinel when the
-    /// "to the end" form was written (§8.4.3.3.4 item 5c). A specified length narrows through
-    /// <see cref="CobolString.SpecifiedRefModLength"/>, which saturates like <see cref="HostInt32"/> but can never
-    /// land on the omitted sentinel.</summary>
+    /// <summary>The length argument from the typed length position, or the OMITTED sentinel when the "to the end" form
+    /// was written (§8.4.3.3.4 item 5c). A specified length passes through <see cref="CobolString.SpecifiedRefModLength"/>,
+    /// which can never be the omitted sentinel and keeps the exact value for the detail.</summary>
     public static string RefModLength(Position? length) =>
         length is null ? OmittedRefModLength
         : length.Int32Literal is >= 0
@@ -1174,6 +1176,11 @@ internal static class RuntimeApi
     public static string TableOcc(string expr, string? profile) => profile is null
         ? $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr})"
         : $"{nameof(CobolTable)}.{nameof(CobolTable.Occ)}({expr}, {profile})";
+
+    /// <summary>An integer literal past <c>long</c> as a position — <c>Occurrence.OfLiteral</c>: the saturated <c>long</c>
+    /// every accessor positions by, with the literal's exact text for the diagnostic (kb/Work PB2938).</summary>
+    public static string OccurrenceOfLiteral(string integerText) =>
+        $"{nameof(Occurrence)}.{nameof(Occurrence.OfLiteral)}({EmitText.CsLiteral(integerText)})";
 
     /// <summary>A numeric item read as a reference-modifier position through its own profile —
     /// <c>CobolString.RefModPosition(x, profile)</c> (kb/Work PB41: the item's value, never its unscaled storage).</summary>

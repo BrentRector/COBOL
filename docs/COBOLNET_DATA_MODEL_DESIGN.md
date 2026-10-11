@@ -1780,9 +1780,29 @@ subscript or DEPENDING condition (`CobolTable.At`, its ODO overload, `OdoExtent`
 each: a `long` overload beside the `Occurrence` one would make every `int` argument ambiguous, because the two
 conversions run both ways. The expression arm (`BoundPositionValue`) keeps the exact value across its temporary
 (`CobolTable.OccValue*` return the `Int128` integer, saturated at the 38-digit temporary's capacity) so the same read
-sees it. The reference-modification twin (`CobolString.RefModPosition`) narrows to `int` and still names the saturated
-`int` in EC-BOUND-REF-MOD's detail: the same shape, one narrowing apart (a different consumer chain, not yet carried). The change removed members
-from the shipped runtime surface, so the runtime MAJOR is 2 (`RuntimeAbiPinDriftTests`).
+sees it. The change removed members from the shipped runtime surface, so the runtime MAJOR is 2
+(`RuntimeAbiPinDriftTests`).
+
+⛔ **THE REFERENCE-MODIFICATION CHAIN CARRIES THE SAME `Occurrence`, AND NOTHING NARROWS TO `int` BEFORE THE RANGE TEST (kb/Work
+PB2938).** `EC-BOUND-REF-MOD`'s detail printed `reference modification (2147483647:1)` for `X(A:1)` with `A PIC 9(21)` holding
+10^20 + 1: the ref-mod API took `int`, so `RuntimeApi.RefModStart` narrowed every position through `HostInt32` at the call
+site and the one place that raises had only the `int` clamp to print. The ref-mod position is an ordinal position of the same
+kind as a subscript (§8.4.3.3.4 5) and §8.4.2.3.4 GR2 are the same out-of-range rule), so it reuses the SAME carrier rather
+than a second copy of it: `CobolString.RefModPosition` returns an `Occurrence` (through `Occurrence.Of`, the one factory),
+`CobolString.RefMod` / `SpliceInto` / `RefModStartOffset` take `Occurrence` leftmost and length, and `RefModOutOfRange` tests
+the saturated `long` (the `size - leftmost + 1` form cannot overflow once `leftmost` is within 1..size), so there is no
+narrowing left to clamp. `RuntimeApi.RefModStart`/`RefModLength` therefore pass the rendered position as it is and C# supplies
+the conversion; only the ACCEPT receiver's transfer width, a host `int` (`AcceptSource.Device`), narrows, through
+`HostInt32`. A specified length goes through `CobolString.SpecifiedRefModLength`, which floors it one above the omitted-length
+sentinel (`Occurrence.AtLeast` keeps the exact text of the value it moves). The expression arm's `RefModValue*` return the
+exact `Int128` the 38-digit temporary holds (`CobolNum.PositionOfWide`), as `OccValue*` do. The three copies of the message
+became one (`CobolString.RefModViolation`). The literal arm is the same chain: an integer literal or integer constant-name
+past `long` was `PositionConstant(long)` clamped at bind, which named `9223372036854775807` in the runtime detail AND in the
+compile-time `COBOLNET2670`/`COBOLNET2671` screen, for a subscript literal as well; `PositionWideConstant(BigInteger)` keeps
+the value (signed, so no negation of a clamp), renders as `Occurrence.OfLiteral("…")`, and `LiteralRefModRangeViolation`
+names it. A negation over a value past `long` is bound through the expression binder like any other operator
+(`Position.ExceedsLongArithmetic`), because `-long.MinValue` wraps. The exact value is bounded by the 38-digit temporary's
+capacity for an expression (a 40-digit product names 10^38 − 1), as PB2695 documents for subscripts.
 
 ⛔ **AND THE FAST PATH MAY NAME ONLY A CARRIER THE EMITTED HELPER DECLARES A PARAMETER FOR (kb/Work PB201).** The bind-time text names the field and lets C# overload resolution supply the conversion — the same device that lets ONE text serve a `long` field and the `string` image the post-bind whole-group analysis may promote it to. But the bet is good only as far as the helper's own overload set reaches. The NUMERIC position read — `CobolTable.Occ(x, in NumProfile)` and `CobolString.RefModPosition(x, in NumProfile)` — takes `long | string | Int128 | ulong | UInt128` at every scale (the profile carries the scale, so no second arity exists), and the NON-numeric `CobolTable.Occ(x)` takes `long | string`. `Int128` must be numeric-admissible also because the D18 segment temp — the 38-digit integer POSITION a subscript or reference-modifier expression denotes (exact up to 10^38 − 1, saturated by sign past it; 19 digits holding the `long`-saturated position until kb/Work PB2695), stored after its integrality is asked on the expression's own carrier (kb/Work PB1890) — is read back through this very path. Before kb/Work PB201 the unscaled set was `long | string` alone and NOTHING checked the operand against it. `DataItem.ElementType` produces more carriers than any overload set ever will: `double`/`float` (a COMP-1/COMP-2 leaf), `ManagedPointer`, `ProgramPointer`, an object-reference type, and a GROUP's per-program `record struct` — these still have no overload and are exactly what the route below exists for — plus, back then, the unscaled `Int128`/`ulong`/`UInt128` of the >18-digit and unsigned-binary tiers, which have one now. For every one of them the emitted text was not C# that compiles. MEASURED in the DEFAULT strict lane, on source §8.8.1.1 and §8.4.2.3.4 GR1b make legal: `E(W-FL)` with `USAGE FLOAT-LONG` → `CS1503 cannot convert from 'double' to 'long'`; `E(W-BIG)` with `PIC 9(20) COMP` → the same from `System.Int128`; `E(W-U)` with `BINARY-DOUBLE UNSIGNED` → from `ulong`; and `W-W(W-FL:2)` at the reference-modification bound. A GROUP subscript under `--permissive` emitted the record struct (CS1503) or, for a class-tier BASED group, a bare COBOL word that is not a C# name at all (CS0103) — so the warning's promise to decode "its digit characters as an unsigned integer" was never kept, and the two group shapes failed DIFFERENTLY.
 

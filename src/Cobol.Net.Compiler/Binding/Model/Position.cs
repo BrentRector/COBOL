@@ -75,13 +75,18 @@ public abstract record Position
             case PositionConstant c:
                 bound = Int128.Abs(c.Value);
                 return false;
+            case PositionWideConstant w:
+                bound = Int128.Abs(w.Value);   // never Int128.MinValue: a literal saturates at ±Int128.MaxValue
+                return false;
             case PositionItemRead { Item.Pic: { } pic } read:
                 bound = DigitsBound(read.Form == PositionReadForm.Digits ? pic.Length : pic.Digits + pic.TrailingPScaling);
                 return false;
             case PositionGroup g:
                 return Bound(g.Inner, out bound);
             case PositionNegate n:
-                return Bound(n.Operand, out bound);
+                // A negation of a value past the host's long is arithmetic the long cannot do: -long.MinValue wraps to
+                // itself, and a negated saturation names a value the program never held (kb/Work PB2938).
+                return Bound(n.Operand, out bound) || bound > long.MaxValue;
             case PositionBinary b:
                 bool exceeds = Bound(b.Left, out Int128 l) | Bound(b.Right, out Int128 r);
                 bound = b.Op == PositionOperator.Multiply
@@ -112,6 +117,16 @@ public abstract record Position
 
 /// <summary>A compile-time integer: an integer literal, an integer constant-name's value, a folded term.</summary>
 public sealed record PositionConstant(long Value) : Position;
+
+/// <summary>⛔ A compile-time integer PAST THE HOST'S <c>long</c> (kb/Work PB2938): an integer literal or constant-name of
+/// 20 or more digits used as a subscript or a reference-modifier position. It is out of every table's and item's range
+/// whatever the table or item (ISO §8.4.2.3.4 GR2, §8.4.3.3.4 5)), but the value the program wrote is what the
+/// diagnostic must name, so the node keeps it exactly, signed, instead of the <c>long</c> clamp a
+/// <see cref="PositionConstant"/> would hold (saturated at ±<see cref="Int128.MaxValue"/> past 38 digits, the position
+/// temporary's own capacity). It renders as the runtime's saturating carrier of that value
+/// (<c>PositionRenderer</c>), and is no literal a static reader may use as a host integer
+/// (<see cref="Position.Int32Literal"/> is null).</summary>
+public sealed record PositionWideConstant(Int128 Value) : Position;
 
 /// <summary>An index-name used as a position: its occurrence cell (<see cref="IndexDeclaration.Cell"/>, a C# member
 /// name — the index-name's storage, never an expression).</summary>
