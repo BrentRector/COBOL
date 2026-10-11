@@ -20,6 +20,7 @@ namespace CobolNet.Tests.Conformance;
 /// assembly bypasses it, and no ambient read in the compiler bypasses the <c>CompilationInputs</c> record.
 /// These run against a PRIVATE store, so they exercise the cache even where it is switched off (CI, the battery).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CompiledProgramCacheDriftTests : IDisposable
 {
     private readonly string _dir = CutRunner.NewTempDir("pb985");

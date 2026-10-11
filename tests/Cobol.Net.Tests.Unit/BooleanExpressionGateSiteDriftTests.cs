@@ -28,6 +28,7 @@ namespace CobolNet.Tests.Unit;
 /// compilation-unit site, and the conditional-compilation stage per compile-time directive fragment — the two
 /// fragment rules the walk never reaches were once "exempt" on that reachability fact alone (kb/Work PB1370).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class BooleanExpressionGateSiteDriftTests
 {
     /// <summary>Grammar rules that reference <c>booleanExpression</c> but must NOT carry a gate call, each with

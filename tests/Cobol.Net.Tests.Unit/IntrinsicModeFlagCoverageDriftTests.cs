@@ -42,6 +42,7 @@ namespace CobolNet.Tests.Unit;
 /// this file's silence is evidence rather than habit.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class IntrinsicModeFlagCoverageDriftTests
 {
     /// <summary>The compile-time flags a rendered call can carry, and the SOURCE construct that turns each ON.

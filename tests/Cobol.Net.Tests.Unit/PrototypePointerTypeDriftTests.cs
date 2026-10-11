@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// matcher the exact line the tree carried and asserts it is caught, and feeds it the repaired line and the signature
 /// readers and asserts they are not.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PrototypePointerTypeDriftTests
 {
     /// <summary>A COMPARISON over the prototype name: a name-equality call or an operator with the property on either side.</summary>

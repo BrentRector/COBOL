@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>An impact-recording build (tools/impact/ImpactRecording.targets) turns the images off, because its probes
 /// are woven into the portable assembly; there the arms require the portable assembly instead.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReadyToRunRuntimeDriftTests
 {
     private const string RuntimeFile = "Cobol.Net.Runtime.dll";

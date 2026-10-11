@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// appear — the one exemption is the §8.9 funnel's user-word list in <c>VersionConformancePass</c>, which answers a
 /// DIFFERENT question (which words are reserved at which edition) over the 2002 set only.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class BooleanOperatorTokenDriftTests
 {
     /// <summary>An upper bound on the token types the lexer defines (a few hundred); the vocabulary answers null

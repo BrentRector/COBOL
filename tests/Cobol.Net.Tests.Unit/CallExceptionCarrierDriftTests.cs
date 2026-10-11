@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// never end in a hyphen (§14.6.13.1.1's open-suffix rule), which is what separates a real name from the two
 /// FAMILY PREFIXES <see cref="CobolCallException.IsProgramOrExternal"/> tests.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CallExceptionCarrierDriftTests
 {
     /// <summary>The files that own the carrier: its declaration and every <c>throw new CobolCallException</c>.

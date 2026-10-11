@@ -19,6 +19,7 @@ namespace CobolNet.Tests.Unit;
 /// to is the table itself (<see cref="Table19.Conflicts"/>), crossed over every pair, exactly as
 /// <see cref="RunUnitFileLockDriftTests"/> holds the host of the process it runs on.</para>
 /// </summary>
+[Trait("Host", "ReFS")]
 public sealed class SidecarColumnLockHostDriftTests
 {
     private static readonly IColumnLockHost Host = SidecarColumnLockHost.Instance;

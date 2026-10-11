@@ -37,6 +37,7 @@ namespace CobolNet.Tests.Unit;
 /// nothing to guard — asserted below so that stops being true loudly rather than silently.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class OperandStringChannelDriftTests
 {
     private static string IntrinsicRendererSource() =>

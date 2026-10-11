@@ -17,6 +17,7 @@ namespace CobolNet.Tests.Unit;
 /// unit's mode for an item's PICTURE. The unit's own mode stays the right answer for exactly the things the unit
 /// itself writes or runs: the closed allowlist below names each, with its reason.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DecimalPointModeDriftTests
 {
     private static readonly Regex UnitModeRead =

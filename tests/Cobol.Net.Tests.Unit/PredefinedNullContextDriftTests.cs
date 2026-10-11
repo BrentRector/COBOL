@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// with the context it implements. A new caller fails the test until it states which SR1 context it is — and an
 /// allowance that no longer has a caller fails it too, so the list cannot rot into a superset.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PredefinedNullContextDriftTests
 {
     /// <summary>Each file that calls <c>NullAdmittingOperand</c>, with the §8.4.3.10.3 SR1 a) context it binds.</summary>

@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// grow a keyword filter over test output again, which is how the defect was written three times.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class TestLegReportDriftTests
 {
     private const string Reporter = "test_leg_report.py";
@@ -37,22 +38,13 @@ public sealed class TestLegReportDriftTests
         string path = TestRepo.Scripts(Reporter);
         Assert.True(File.Exists(path), $"the leg reporter is missing: {path}");
 
-        ProcessObservation r = PythonInstrument.Run(path, "--self-test");
-
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("SELF-TEST: PASS", StringComparison.Ordinal),
-            $"`{Reporter} --self-test` failed (exit {r.ExitCode}):\n{r.Stdout}{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(path, new[]
                  {
                      "calibration: the retired build-local.ps1 filter DROPS the planted message",
                      "calibration: the retired build-local.sh filter DROPS the planted message",
                      "fires MESSAGE", "fires STACK", "fires WHOLE", "fires NO-VERDICT", "fires CLI",
                      "fires UNREADABLE", "silent on GREEN", "silent CLI",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
-                $"`{Reporter} --self-test` no longer drives '{arm}' — a check that has never been seen to fail "
-                + $"is not evidence.\n{r.Stdout}");
-        }
+                 });
     }
 
     /// <summary>

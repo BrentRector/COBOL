@@ -17,6 +17,7 @@ namespace CobolNet.Tests.Unit;
 /// so a host share mode cannot be what answers for the host that cannot express the rule — and the file lock is
 /// the only thing standing between them.</para>
 /// </summary>
+[Trait("Host", "ReFS")]
 public sealed class RunUnitFileLockDriftTests
 {
     private static string Tmp(string tag) =>

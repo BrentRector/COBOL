@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>DISPLAY 1,5</c> as <c>1.5</c>; so the two producers (the operand and the expression-tier literal) are the only
 /// callers of <c>CheckLiteral</c>, and each sets the separator.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class NumericLiteralImageDriftTests
 {
     private static string Binding(params string[] path) => TestRepo.Src(["Cobol.Net.Compiler", "Binding", .. path]);

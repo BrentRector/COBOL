@@ -17,6 +17,7 @@ namespace CobolNet.Tests.Unit;
 /// CI's Linux jobs while it runs the same projects. A Linux job that gains a test project the gate does not know
 /// would be exactly the silent gap the gate exists to close, so that addition is red here until the gate learns it.
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class LinuxGateDriftTests
 {
     [Fact]

@@ -15,6 +15,7 @@ namespace CobolNet.Tests.Unit;
 /// fails CI rather than silently producing an empty/garbled reference. Requires <c>pwsh</c> on PATH (already a
 /// build prerequisite for the ANTLR generation).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class VaultReferenceGeneratorDriftTests
 {
     [Fact]
@@ -34,7 +35,7 @@ public sealed class VaultReferenceGeneratorDriftTests
         using var p = Process.Start(psi)!;
         string stdout = p.StandardOutput.ReadToEnd();
         string stderr = p.StandardError.ReadToEnd();
-        Assert.True(p.WaitForExit(120_000), "gen-vault-reference.ps1 -Check timed out (>120s)");
+        p.WaitForExit(); // both streams are at EOF; no clock decides this test (kb/Work PB3022)
 
         Assert.True(p.ExitCode == 0,
             $"gen-vault-reference.ps1 -Check exited {p.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");

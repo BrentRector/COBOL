@@ -33,6 +33,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>CobolReportWriter.g4</c>, so a future edit that gives either clause its own operand rule fails here
 /// rather than at a golden three waves later.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReportValueOperandDriftTests
 {
     private static string Grammar =>

@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit;
 /// spelling BY ROW; the grammar's <c>usageKeyword</c> alternatives; the binder sites, which name a row by its id; and
 /// <c>docs/CONFORMANCE.md</c> §3.2. A new extension is a row, and every one of these fails until it is complete.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class NonstandardExtensionRegisterDriftTests
 {
     private static NonstandardExtension[] Rows => [.. NonstandardExtensionRegister.Entries];

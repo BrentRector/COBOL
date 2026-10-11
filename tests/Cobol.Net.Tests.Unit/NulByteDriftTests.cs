@@ -32,6 +32,7 @@ namespace CobolNet.Tests.Unit;
 /// (<c>feedback_verdict_evidence_invariant</c>).
 /// </para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class NulByteDriftTests
 {
     /// <summary>The repo-root-relative trees swept.</summary>

@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// refused every BY VALUE formal outright — a second copy of the rule waiting to disagree. Likewise the method formal's
 /// passing mode is compared by the ONE §9.3.8.2.3 rule set (<c>OoConformance.MethodConformanceMismatches</c>, rule 1).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ByValueFormalScreenDriftTests
 {
     private static string Compiler(params string[] parts) => File.ReadAllText(TestRepo.Src(["Cobol.Net.Compiler", .. parts]));

@@ -19,6 +19,7 @@ namespace CobolNet.Tests.Unit;
 /// its own record mis-split) while every existing test stays green, so this gate pins the structure; the behaviour is
 /// <c>2014/pb1562_fixed_clause_file_second_description</c>. <see cref="TheGate_ActuallyFails_WhenAnEntryDoesNotAskForTheForm"/>
 /// drives the predicate with sources built to break it AND to pass it.</para></remarks>
+[Trait("Sweep", "tree")]
 public sealed class FixedFormRecordDriftTests
 {
     private static string Runtime(string file) => File.ReadAllText(TestRepo.Src("Cobol.Net.Runtime", "IO", file));

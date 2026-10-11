@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// from §7.3 itself, so a directive added to the standard's clause list without a row is a red test rather than
 /// a silent under-rejection.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CompilerDirectiveCatalogDriftTests
 {
     /// <summary>Every clause under ISO §7.3 whose heading names a directive — the spec's own roster.</summary>

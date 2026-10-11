@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// holds the two registers together in BOTH directions so neither can rot: a member with no row, a row whose
 /// anchor names no member, or a landed gate still marked todo fails the gate.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DialectBehaviorRegistryDriftTests
 {
     /// <summary>A VCR change-table row number — the same grammar <c>VcrDriftTests</c> parses (Tables 1–6 use

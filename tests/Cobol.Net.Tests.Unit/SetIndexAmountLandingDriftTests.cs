@@ -38,6 +38,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>AugmentSetTarget</c>'s <c>{ix.IndexField} {op}= …</c> makes
 /// <see cref="TheIndexAugmentIsGuarded_NotFormedInTheCarrier"/> red by name.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class SetIndexAmountLandingDriftTests
 {
     private static readonly string SetEmitter =

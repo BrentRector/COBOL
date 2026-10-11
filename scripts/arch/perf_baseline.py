@@ -413,14 +413,15 @@ def wsl_leg(stage_mnt: str, repeat: int) -> int:
 
 def gate_rows(run_dirs: list[str]) -> tuple[dict, list[dict]]:
     """The whole-population gate time, from build-local's own verdict.json. Only a GREEN gate is a whole-population
-    time (a RED one stopped early)."""
+    time (a RED one stopped early; a `LEG 1 ONLY` one ran leg 1). The gate has one shape (kb/Work PB3022), so a row is
+    keyed by the gate's SCOPE: `whole`, the owner's on-demand switch, is the only scope that runs every leg."""
     rows, runs = {}, []
     for d in run_dirs:
         path = os.path.join(d, "verdict.json")
         v = json.load(open(path, encoding="utf-8"))
         if v.get("verdict") != "GREEN":
             raise MeasurementError(f"{path} is {v.get('verdict')}: only a GREEN gate ran the whole population")
-        mode, t = v["mode"], v["timings"]
+        mode, t = v["scope"], v["timings"]
         # The gate's wall time includes its wait for a gate slot (other worktrees' gates), which measures the queue,
         # not the gate: the compared row is the time the gate itself ran.
         waited = re.search(r"waited ([0-9.]+) s", v.get("slot") or "")
@@ -575,7 +576,7 @@ def render(record: dict) -> str:
 
     out += ["", "## Whole-population gate time", ""]
     if record.get("gates"):
-        out += ["| run | mode | ran (wall less the slot wait) | build | legs | populations | slot |",
+        out += ["| run | scope | ran (wall less the slot wait) | build | legs | populations | slot |",
                 "|---|---|--:|--:|--:|---|---|"]
         for g in record["gates"]:
             m = g["mode"]
@@ -724,7 +725,8 @@ def main(argv: list[str]) -> int:
     ap.add_argument("--against", metavar="RECORD", help="compare a fresh measurement (or --current) with this record")
     ap.add_argument("--current", metavar="RECORD", help="with --against: compare this record instead of measuring")
     ap.add_argument("--gate-run", action="append", default=[], metavar="DIR",
-                    help="a GREEN TestResults/build-local/<run> of this commit (repeatable: one per mode)")
+                    help="a GREEN TestResults/build-local/<run> of this commit, gated under the scope `whole` "
+                         "(repeatable)")
     ap.add_argument("--sessions", type=int, default=None,
                     help="measurement sessions pooled into the record (default 2 for a baseline, 1 with --against)")
     ap.add_argument("--repeat", type=int, default=5, help="runs per whole-process row (default 5)")

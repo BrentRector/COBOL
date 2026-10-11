@@ -1,6 +1,6 @@
 ---
 name: gate
-description: Use before every commit and before every merge to choose and run the correct test gate - the ordered gate per commit (build-local -Mode implementer - the whole population planned into two legs, leg 1 only under batched gating, fail-fast, a gate slot), the lander's one-leg whole population per train with per-cluster attribution of a red, and the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
+description: Use before every commit and before every merge to choose and run the correct test gate - the ONE gate (build-local - the whole population planned into two legs, leg 1 run fail-fast inside a gate slot, the same for an implementer's commit, a re-gate after a fix and a landing; CI's merge-group run is the whole-population net), and the comprehensive battery per accumulated batch - and to read the verdict without producing a false green.
 ---
 
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:test-gate` (Skill tool) before reading on. If the plugin is not loaded
@@ -11,10 +11,12 @@ description: Use before every commit and before every merge to choose and run th
 
 # Gate
 
-**Self-check first: which gate is this — an implementer's commit, a lander's train, or the batch's pre-merge?** Each
-has one command below. No gate FILTERS: every gate plans the whole population, ORDERED so a likely red comes first
-(owner, 2026-09-28, kb/Work PB1708: "order, don't skip"); an implementer runs its leg 1 and the lander's train gate
-runs all of it (batched gating, owner 2026-10-10, kb/Work PB2515). What the owner corrected repeatedly was over-gating per
+**Self-check first: is this a change's gate, or the batch's pre-merge?** A change's gate has ONE shape (owner
+2026-10-11, kb/Work PB3015 Q1a, PB3022): an implementer's commit, a re-gate after a fix and a landing all run the same
+command below. No gate FILTERS: every gate plans the whole population, ORDERED so a likely red comes first (owner,
+2026-09-28, kb/Work PB1708: "order, don't skip"), and runs leg 1 of it (batched gating, owner 2026-10-10, kb/Work
+PB2515); CI's merge-group run is the whole-population regression net — local runs confirm the targeted change, CI
+ensures no regression on the rest (owner 2026-10-11 ~11:20). What the owner corrected repeatedly was over-gating per
 fix with the SERIAL suites (the battery, `guard.sh`); the ordered gate is not that — its fail-fast leg 1 returns a red
 in minutes, and a gate slot caps how many run at once.
 
@@ -28,10 +30,10 @@ Build the **solution**, not one project. Building only the compiler project and 
 --no-build` tests whatever compiler was copied into the test bin at its LAST full build — a stale compiler. Local
 goes green while CI fails.
 
-## Per commit — the ordered gate (an implementer)
+## Per change — the ordered gate (every implementer, every re-gate, every landing)
 
 ```
-pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
+pwsh scripts/build-local.ps1 -Priority BelowNormal *> <log>
 ```
 
 The driver, `scripts/run_gate_legs.py` (DESIGN-test-build-ci.md §3.14; kb/Work PB1721), holds the worktree's GATE
@@ -39,28 +41,31 @@ LOCK (a second gate in the same worktree is refused), runs the audits (FAIL-FAST
 audit ends an implementer gate in seconds with `NO LEG RAN`, kb/Work PB2523 — run `python scripts/spec/drift_rules.py`
 and the citation audits yourself before gating to avoid the round trip; one audit, `SELF-TESTS`, is every script
 self-test under `scripts/`, discovered and run in parallel by `scripts/self_tests.py`, kb/Work PB2563 — run
-`python scripts/self_tests.py` yourself after editing a script; an implementer gate passes `--reuse`, so a self-test
-whose inputs are unchanged since a recorded PASS is REUSED, not run, while the lander's gate, CI and the Linux gate run
-and record them all; every self-test that runs takes a place in one machine-wide budget, and one still running an hour
+`python scripts/self_tests.py` yourself after editing a script; every gate passes `--reuse`, so a self-test
+whose inputs are unchanged since a recorded PASS is REUSED, not run (one that runs records its PASS), while CI and the
+Linux gate run them all; every self-test that runs takes a place in one machine-wide budget, and one still running an hour
 after taking it is `SELF-TESTS HANG`, never RED — kb/Work PB2914, DESIGN-test-build-ci.md §3.14.10) and fetches the per-worktree GnuCOBOL corpus
 when absent — both BEFORE it queues, because they read only the tree (kb/Work PB2524) — then takes a GATE SLOT
-(`scripts/gate_slot.py`: at most N implementer gates build or test at once, repository-wide — `gate-slot: waiting, k
+(`scripts/gate_slot.py`: at most N gates build or test at once, repository-wide — `gate-slot: waiting, k
 ahead` is the cap working), builds the solution and lists every discovered case of Conformance, Unit and
 Characterization. The ORDER PLAN (`scripts/gate_plan.py`) puts in leg 1 the tests the change ADDS, the previous gate's
-reds and the cheapest cases the change can reach — the tiers `impacted_tests.py` derives from an impact map, when one
+reds (tier 0a), the host-only witnesses — every class carrying `[Trait("Host", "ReFS")]`, the Windows file-system race
+witnesses CI's NTFS runners may not reproduce (tier 0h, whatever the diff) — the cheap tree-wide sweeps, every class
+carrying `[Trait("Sweep", "tree")]` whose cases are cheap (tier 0c: the bookkeeping reds a population run used to
+find; `HostWitnessTraitDriftTests` keeps both traits on the classes they belong to, kb/Work PB3022) and the cheapest
+cases the change can reach — the tiers `impacted_tests.py` derives from an impact map, when one
 exists — and everything else in leg 2, its collections LONGEST FIRST, timed from the shared timings store every gate
 publishes to after its legs, so a fresh worktree is timed too (kb/Work PB2527). The test hosts run Server GC (kb/Work
 PB2526). Each leg runs the three assemblies concurrently.
 
 - ⭐ **BATCHED GATING** (owner 2026-10-10 10:19 PDT, kb/Work PB2515: "Yes, permanently", after a measured trial from
-  2026-10-07): `-Mode implementer` runs LEG 1 ONLY, names every leg-2 case NOT RUN
+  2026-10-07): the gate runs LEG 1 ONLY, names every leg-2 case NOT RUN
   (`TestResults/build-local/<run>/not-run-*.txt`) and prints `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
-  PB2515): GREEN — … ===` (or `…: RED`). That is the implementer's done-state, and the Linux gate is the lander's, with
-  the rest of the population. The lander's whole-population train gate is the population check for every cluster; a
-  red there is ATTRIBUTED per cluster by re-running only the failing cases on each cluster alone, then fixed in the
-  train or ejected to a finisher (`lander-train-brief.md` step 3, MANDATORY-PRACTICES L12), and every train is
-  recorded with `scripts/orchestrator/train_measure.py record`. The CI invariant holds: the lander runs the whole
-  population, the Linux gate and the oracle before every push.
+  PB2515): GREEN — … ===` (or `…: RED`). That is the done-state of every gate. **A re-gate after a fix runs leg 1
+  again, never the population** (the operator's proposal 3, kb/Work PB3022): the previous reds are tier 0a and the
+  fix's reach is tier 1, so verifying a bookkeeping fix costs seconds, not a 7–34 min population run. The whole
+  population runs once, in CI, on the pushed or queued head; a CI red is ALSO a local-gate defect to root-cause (the
+  CI invariant, kb/Work PB1957).
 - **The owner's switch back is the shared implementer scope `whole`** (`python scripts/gate_slot.py
   set-implementer-scope whole [--until ISO] [--why TEXT]`; the coded default is `leg1`). Under `whole` the implementer
   gate runs both legs FAIL-FAST: a red in leg 1 stops it `RED/INCOMPLETE` and names the remainder, and it is GREEN only
@@ -75,17 +80,21 @@ PB2526). Each leg runs the three assemblies concurrently.
 - **The impact map only ORDERS.** It is recorded ON DEMAND (`python scripts/spec/record_impact_map.py`, a detached
   worktree, ~25 min at BelowNormal, inside a gate slot), never per commit (kb/Work PB1709). With no map, or a stale
   one, the gate still runs everything — the order is plainer, never the population smaller.
-- **An implementer is done only on GREEN**, and then runs CI's Linux legs under WSL (MANDATORY-PRACTICES I8,
-  `bash scripts/linux-gate.sh --nice`).
+- **An implementer is done on `LEG 1 ONLY (batched gating, PB2515): GREEN`** (a plain GREEN only while the owner sets
+  the scope `whole`, and then it runs CI's Linux legs under WSL, MANDATORY-PRACTICES I8, `bash scripts/linux-gate.sh
+  --nice`).
 
-## Per train — the lander
+## Per landing — the same gate on the landing's head
 
 ```
-pwsh scripts/build-local.ps1 -Mode lander *> <log>
+pwsh scripts/build-local.ps1 *> <log>
 ```
 
-The implementer scope never applies to it. No plan, ONE leg — every red of every cluster in one run — no fail-fast and no slot, at Normal priority: the lander
-never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10; from any shell: on a host that is not Linux it runs itself under WSL, kb/Work PB2999) and `push-main.sh`.
+The one gate, at Normal priority, on the train's (or branch's) rebased head: leg 1 holds every cluster's own tests,
+the previous reds, the host-only witnesses and the cheap sweeps. Until the targeted leg also runs under WSL (kb/Work
+PB3022 item 10), the landing keeps `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10; from any shell: on a host
+that is not Linux it runs itself under WSL, kb/Work PB2999). CI's required `ci-gate` runs the whole population on both
+operating systems before `main` moves.
 
 **Do NOT run per commit:** the battery or the serial `scripts/guard.sh`.
 
@@ -137,7 +146,7 @@ re-run). Here, additionally:
   it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
 - `scripts/build-local.{ps1,sh}` prints ONE `=== BUILD-LOCAL GATE: ` verdict line — `GREEN`, `RED`,
   `RED/INCOMPLETE` (stopped after leg 1 under the scope `whole`), `LEG 1 ONLY (batched gating, PB2515): GREEN|RED`
-  (an implementer's leg 1 ran, leg 2 is the lander's — never a whole-population GREEN), `BUILD FAILED` or `NOT RUN` (the lock was held, the
+  (leg 1 ran, leg 2 is CI's — never a whole-population GREEN), `BUILD FAILED` or `NOT RUN` (the lock was held, the
   shared gate settings are malformed, the population could not be listed) — block on that line, never on the exit code. The run directory it names holds
   every leg's full log, trx and identity record, the plan and `verdict.json` (timings, first red, slot).
 

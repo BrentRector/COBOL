@@ -26,14 +26,14 @@ namespace CobolNet.Tests.Unit;
 /// one audit; adding an arm means adding its case here, which is the point.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class CitationAuditSelfTestDriftTests
 {
-    private static ProcessObservation RunSelfTest(string script)
-    {
-        string path = TestRepo.Scripts("spec", script);
-        Assert.True(File.Exists(path), $"the citation audit is missing: {path}");
-        return PythonInstrument.Run(path, "--self-test");
-    }
+    /// <summary>The audit's self-test still DECLARES every case (kb/Work PB2882, PB3022): the runner
+    /// (scripts/self_tests.py) runs it in every gate and CI job and fails on a red case; what it cannot see is a case
+    /// DELETED from the table, so each is named here as the table spells it.</summary>
+    private static void AssertDeclares(string script, params string[] cases) =>
+        SelfTestArmSource.AssertDeclares(TestRepo.Scripts("spec", script), cases);
 
     /// <summary>
     /// The CONSTRUCT-vs-CLAUSE audit: PHANTOM, SUBJECT, HEADER and the ordinal family (FORMAT, FORMAT-RULE,
@@ -42,28 +42,14 @@ public sealed class CitationAuditSelfTestDriftTests
     [Fact]
     public void CodeCitationAudit_ProvesEveryCheckCanFail()
     {
-        var r = RunSelfTest("audit_code_citations.py");
-        Assert.Equal(0, r.ExitCode);
-        Assert.Contains("SELF-TEST: PASS", r.Stdout, StringComparison.Ordinal);
-        foreach (string arm in new[] { "fires SUBJECT", "fires HEADER", "fires PHANTOM", "fires FORMAT",
-                                       "fires RULE", "fires SUBITEM", "fires FORMAT-NAME", "fires FORMAT-RULE",
-                                       // the DIAGNOSTIC-STRING family (kb/Work PB838) — a citation a USER
-                                       // reads, which is the population with the highest cost per error
-                                       "fires DIAG-NO-RULE", "fires DIAG-UNQUALIFIED" })
-        {
-            Assert.True(r.Stdout.Contains(arm, StringComparison.Ordinal),
-                $"`audit_code_citations.py --self-test` no longer drives '{arm}' — a check that has never been "
-                + $"seen to fail is not evidence that the tree is clean.\n{r.Stdout}{r.Stderr}");
-        }
-
-        // Every firing case is paired with a REPAIRED twin that must be silent: an arm that fires on everything
-        // is as useless as one that fires on nothing, and only the twin separates the two.
-        Assert.True(r.Stdout.Contains("silent on the REPAIRED", StringComparison.Ordinal),
-            $"no repaired twin is driven — the arms are proven able to fire and not to stop.\n{r.Stdout}");
-        Assert.True(r.Stdout.Contains("silent calibration", StringComparison.Ordinal),
-            "the DIAGNOSTIC-STRING family drives no SILENT case — its three calibrations (an interpolated "
-            + "`SR{rule}`, the same bare kind in a COMMENT, and an ordinal written `SR 10` with a space) are "
-            + $"what make it gateable, and each was a false positive before it was made.\n{r.Stdout}");
+        AssertDeclares("audit_code_citations.py",
+            "(\"SUBJECT\",", "(\"HEADER\",", "(\"PHANTOM\",", "(\"FORMAT\",", "(\"RULE\",", "(\"SUBITEM\",",
+            "(\"FORMAT-NAME\",", "(\"FORMAT-RULE\",",
+            // the DIAGNOSTIC-STRING family (kb/Work PB838) — a citation a USER reads, the highest cost per error
+            "(\"DIAG-NO-RULE\",", "(\"DIAG-UNQUALIFIED\",",
+            // every firing case is paired with a REPAIRED twin that must be silent, and the DIAGNOSTIC-STRING family
+            // drives its SILENT calibrations: an arm that fires on everything is as useless as one that fires on nothing
+            "silent on the REPAIRED", "silent calibration");
     }
 
     /// <summary>
@@ -74,26 +60,16 @@ public sealed class CitationAuditSelfTestDriftTests
     [Fact]
     public void DocCitationAudit_ProvesEveryArmCanFail()
     {
-        var r = RunSelfTest("audit_doc_citations.py");
-        Assert.Equal(0, r.ExitCode);
-        Assert.Contains("SELF-TEST: PASS", r.Stdout, StringComparison.Ordinal);
-        foreach (string mustDrive in new[]
-                 {
-                     "misfiled on prefix, misfiled",          // the citation precedes the quote
-                     "misfiled on postfix, misfiled",         // and follows it — both orders are read
-                     "elided   on elided quotation",          // PB900 arm B, verbatim as it shipped
-                     "silent   on elided quotation, repaired",
-                     "absent   on paraphrase, not an elision", // what makes ELIDED gateable
-                     "fires   on a file WITHOUT",              // the whole-file opt-out suppresses something
-                     "silent  on the same file WITH it",
-                     // kb/Work PB2525: one process per citation was 75 of the audit's 79 s
-                     "ok   in-process: every ruling made with no process spawned",
-                 })
-        {
-            Assert.True(r.Stdout.Contains(mustDrive, StringComparison.Ordinal),
-                $"`audit_doc_citations.py --self-test` no longer drives '{mustDrive}' — the arm it proves is "
-                + $"unwitnessed, and its silence on the tree means nothing.\n{r.Stdout}{r.Stderr}");
-        }
+        AssertDeclares("audit_doc_citations.py",
+            "(\"prefix, misfiled\", \"misfiled\"",           // the citation precedes the quote
+            "(\"postfix, misfiled\", \"misfiled\"",          // and follows it — both orders are read
+            "(\"elided quotation\", \"elided\"",             // PB900 arm B, verbatim as it shipped
+            "(\"elided quotation, repaired\", None",
+            "(\"paraphrase, not an elision\", \"absent\"",   // what makes ELIDED gateable
+            "fires   on a file WITHOUT",                     // the whole-file opt-out suppresses something
+            "silent  on the same file WITH it",
+            // kb/Work PB2525: one process per citation was 75 of the audit's 79 s
+            "in-process: every ruling made with no process spawned");
     }
 
     /// <summary>
@@ -104,14 +80,7 @@ public sealed class CitationAuditSelfTestDriftTests
     [Fact]
     public void CiteGate_ProvesEveryGuardCanFail()
     {
-        var r = RunSelfTest("cite.py");
-        Assert.Equal(0, r.ExitCode);
-        Assert.Contains("SELF-TEST: PASS", r.Stdout, StringComparison.Ordinal);
-        foreach (string arm in new[] { "fires EMPTY-NEEDLE (check)", "fires EMPTY-NEEDLE (find)", "pins 14.7.7 2) bare",
-                                       "pins 14.9.8.4 1) b)", "accepts the PRINTED form (C6)", "fires on a wrong clause" })
-        {
-            Assert.True(r.Stdout.Contains(arm, StringComparison.Ordinal),
-                $"`cite.py --self-test` no longer drives '{arm}'.\n{r.Stdout}{r.Stderr}");
-        }
+        AssertDeclares("cite.py", "fires EMPTY-NEEDLE (check)", "fires EMPTY-NEEDLE (find)", "pins 14.7.7 2) bare",
+            "pins 14.9.8.4 1) b)", "accepts the PRINTED form (C6)", "fires on a wrong clause");
     }
 }

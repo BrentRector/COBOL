@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit;
 /// <see cref="FileShare.None"/> handle held by the test itself: a host share mode names no requester, so it is
 /// exactly as foreign to the runtime's connector as another program's (<see cref="HostCapability.OutsiderCan"/>).
 /// </summary>
+[Trait("Host", "ReFS")]
 public sealed class SharingRefusalStatusTests
 {
     public enum Org { Sequential, Relative, Indexed }

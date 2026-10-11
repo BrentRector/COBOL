@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>The shape that makes the NEXT rule automatic: the per-rule readers are PRIVATE to <see cref="MoveTable16"/>
 /// and every asker goes through <c>Validity</c> / <c>DataItemRefusal</c>. This class pins both halves.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class MoveTable16AskerDriftTests
 {
     /// <summary>The per-rule readers a caller could compose by hand. None may be reachable from outside the class.</summary>

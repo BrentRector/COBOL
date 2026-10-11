@@ -848,7 +848,7 @@ public sealed class DerivedVerdictDriftTests
     /// blind here — every "Not provided." row is on an optional item, so dropping it changes nothing live —
     /// which is why the self-test below is not retired. <c>derive_verdict_batch.py --self-test</c> drives each
     /// axis against a fabricated catalog and
-    /// a fabricated register, one broken thing at a time; this shells it so it runs every build rather than when
+    /// a fabricated register, one broken thing at a time; the runner (scripts/self_tests.py) runs it in every gate rather than when
     /// a human remembers — the failure mode measured on <c>audit_annex_a1.py</c> on 2026-09-01.
     /// </remarks>
     [Fact]
@@ -856,11 +856,9 @@ public sealed class DerivedVerdictDriftTests
     {
         string script = TestRepo.Scripts("spec", "derive_verdict_batch.py");
         Assert.True(File.Exists(script), $"the derived-verdict batch generator is missing: {script}");
-        var r = PythonInstrument.Run(script, "--self-test");
-
-        Assert.Contains("ALL GREEN (every axis proven able to fail)", r.Stdout, StringComparison.Ordinal);
-        // Asserting the CASE NAMES, not just the exit code: a shrinking self-test still exits 0.
-        foreach (string mustDrive in new[]
+        // Holding the CASE NAMES from the source: a shrinking self-test still exits 0, and the runner
+        // (scripts/self_tests.py) runs it in every gate and CI job (kb/Work PB2882, PB3022).
+        SelfTestArmSource.AssertDeclares(script, new[]
                  {
                      "the REQUIREMENT axis discriminates",
                      "the KIND axis discriminates",
@@ -875,14 +873,7 @@ public sealed class DerivedVerdictDriftTests
                      "a NOTE cannot EXCLUDE a rule",
                      "a NOTE cannot SELECT a rule",
                      "an arm's OWN exclusion does not reach its sibling arm",
-                 })
-        {
-            Assert.Contains(mustDrive, r.Stdout, StringComparison.Ordinal);
-        }
-
-        Assert.Contains("control:", r.Stdout, StringComparison.Ordinal);
-        Assert.DoesNotContain("SELF-TEST FAILED", r.Stdout, StringComparison.Ordinal);
-        Assert.Equal(0, r.ExitCode);
+                 });
     }
 
     /// <summary>Two determinations must never claim the same row: the row would then carry whichever batch ran

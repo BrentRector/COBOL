@@ -14,8 +14,8 @@ namespace CobolNet.Tests.Unit;
 /// <remarks>
 /// The owner made batched gating the rule (2026-10-10, kb/Work PB2515) on what the landers recorded per train against
 /// the per-commit whole population (kb/Work PB1708), and every train is still recorded, so the policy stays measured.
-/// A summary that miscounted would decide the gate policy on a wrong number, so the self-test runs in every Unit run and its arms are
-/// asserted by name: a self-test reduced to its happy path still exits 0. This test measures nothing and times nothing.
+/// A summary that miscounted would decide the gate policy on a wrong number, so the self-test runs in every gate and CI job (scripts/self_tests.py) and its arms are
+/// held here by name from its source (kb/Work PB2882, PB3022): a self-test reduced to its happy path still exits 0.
 /// </remarks>
 public sealed class TrainMeasureDriftTests
 {
@@ -24,21 +24,13 @@ public sealed class TrainMeasureDriftTests
     {
         string script = TestRepo.Scripts("orchestrator", "train_measure.py");
         Assert.True(File.Exists(script), $"the train measurement script is missing: {script}");
-        var r = PythonInstrument.Run(script, "--self-test");
-
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("train_measure SELF-TEST: PASS", StringComparison.Ordinal),
-            $"train_measure.py --self-test failed (exit {r.ExitCode}).\n{r.Stdout}\n{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(script, new[]
                  {
                      "refuses an inconsistent record",
                      "refuses a train recorded twice and rewrites it with --replace",
                      "summarizes changes landed per hour, population runs, red trains, ejections and CI reds per gating mode",
                      "--since narrows the summary",
                      "a queued pull request is recorded with its number and counted apart from CI's verdicts",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
-                $"`train_measure.py --self-test` no longer passes '{arm}'.\n{r.Stdout}{r.Stderr}");
-        }
+                 });
     }
 }

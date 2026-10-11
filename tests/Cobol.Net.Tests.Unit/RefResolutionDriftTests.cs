@@ -11,6 +11,7 @@ namespace CobolNet.Tests.Unit;
 /// before a caller sees it, and a caller that gets no place builds its refusal FROM the answer instead of writing
 /// its own (the pre-PB1030 shapes: an "unresolvable" error on top of the resolver's COBOLNET1639, or a run-time
 /// NotImplemented for an ILLEGAL subscript).</summary>
+[Trait("Sweep", "tree")]
 public sealed class RefResolutionDriftTests
 {
     /// <summary>Every census member has its text and owner — <see cref="DeferredShapes.Describe"/> throws for one

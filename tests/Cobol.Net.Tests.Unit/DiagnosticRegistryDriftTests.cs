@@ -17,6 +17,7 @@ namespace CobolNet.Tests.Unit;
 /// Regenerate: <c>pwsh scripts/gen-diagnostics-doc.ps1</c> (or run this test with
 /// <c>COBOLNET_WRITE_DIAGNOSTICS_DOC=1</c>).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DiagnosticRegistryDriftTests
 {
     /// <summary>The split codes the 0899/1533 migration moved onto descriptors — no bare

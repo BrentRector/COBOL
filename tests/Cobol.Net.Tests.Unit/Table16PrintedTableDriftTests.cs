@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// red here rather than a silent acceptance at run time. It also pins the compiler's ONE mapping of its operand axes to
 /// the headings (<c>Table16Operand.Heading</c>).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class Table16PrintedTableDriftTests
 {
     private static readonly Dictionary<string, Table16Category> Rows = new(StringComparer.Ordinal)

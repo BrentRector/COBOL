@@ -34,6 +34,7 @@ namespace CobolNet.Tests.Unit;
 /// once and no single place could be corrected. It is now
 /// <see cref="DispatchState.RunUseCall(int, PcRange)"/>, and these facts keep it that way.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ProcedureRangeEmptinessDriftTests
 {
     // ── The property the arithmetic cannot have ──────────────────────────────────────────────────────────────

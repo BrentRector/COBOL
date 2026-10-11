@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>// not a COBOL word: &lt;what it is&gt;</c>, so the exception is visible where it is made.
 /// The fold's own answers, and the Annex B screen's, are pinned by value below.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CobolNameFoldDriftTests
 {
     private const string Marker = "// not a COBOL word:";

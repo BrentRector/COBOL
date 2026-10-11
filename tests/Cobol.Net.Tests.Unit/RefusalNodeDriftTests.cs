@@ -18,6 +18,7 @@ namespace CobolNet.Tests.Unit;
 /// <see cref="EditionContext"/> refusal ledger, and <c>StatementBinder.BindStatement</c> fails the compile with
 /// COBOLNET2362 when a statement bound a refusal and drew no error. These tests keep the constructors closed and
 /// keep the two old idioms — report-then-no-op, and failure-guarded no-op — out of the binder.</para></summary>
+[Trait("Sweep", "tree")]
 public sealed class RefusalNodeDriftTests
 {
     private static readonly Type[] RefusalNodes =

@@ -19,6 +19,7 @@ namespace CobolNet.Tests.Unit;
 /// puts margin R, the indicator area and the free-form 255 limit early on a line that holds one. Every column read goes
 /// through <c>FixedFormLine</c> and <c>CharacterPositions</c>.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PhysicalLinesDriftTests
 {
     private static readonly Regex TabOrCr = new(@"\\[rt]", RegexOptions.Compiled);

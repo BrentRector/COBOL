@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// proves no fixed name does, that the families are mutually prefix-free, and that no site outside the naming
 /// authority re-derives a <c>__</c> name from a word.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class SynthesizedNameFamilyDriftTests
 {
     private static readonly Regex StringLiteral = new(@"\$?@?""(?:[^""\\\r\n]|\\.)*""", RegexOptions.Compiled);

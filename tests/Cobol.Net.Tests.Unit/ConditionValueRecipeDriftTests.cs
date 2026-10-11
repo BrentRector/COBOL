@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// pinned by the conformance goldens (<c>pb560_condition_value_*</c> at 85 / 2002 / 2023), and what those
 /// cannot see is a SIXTH branch being added to a private copy tomorrow.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ConditionValueRecipeDriftTests
 {
     private static IEnumerable<(string Rel, string Text)> CompilerSources()

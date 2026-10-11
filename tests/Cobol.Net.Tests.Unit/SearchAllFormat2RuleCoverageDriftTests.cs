@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>⚠ It reads the MODULE SOURCE for the citation, not the compiled assembly: what is being guarded is that
 /// the rule is written down in the one place the rules live, with its number, so the next reader can find it.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class SearchAllFormat2RuleCoverageDriftTests
 {
     /// <summary>The three codes PB445 allocated, and nothing else: the Format-2 rules divide by the OPERAND a

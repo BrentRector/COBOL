@@ -28,6 +28,7 @@ namespace CobolNet.Tests.Unit;
 /// retire <c>push-main.sh</c>, <c>landing_lease.py</c> and the <c>ci/**</c> trigger land with the first change merged
 /// THROUGH the queue, which deletes them (kb/Work PB3024).</para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class LandingPipelineDriftTests
 {
     /// <summary>A step that opens or queues a pull request: the gh CLI's text form, or a Python argument list.</summary>

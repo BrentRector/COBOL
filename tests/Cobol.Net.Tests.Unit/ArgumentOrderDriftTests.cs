@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// its arguments through <c>BindArgOperand</c> inside either entry is ordered automatically; one that binds them
 /// anywhere else is what this test refuses.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ArgumentOrderDriftTests
 {
     private static readonly string CompilerDir = TestRepo.Src("Cobol.Net.Compiler");

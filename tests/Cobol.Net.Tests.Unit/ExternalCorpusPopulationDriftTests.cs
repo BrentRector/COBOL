@@ -42,6 +42,7 @@ namespace CobolNet.Tests.Unit;
 /// the failure mode under repair (<c>feedback_verdict_evidence_invariant</c>).
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ExternalCorpusPopulationDriftTests
 {
     private const string Baseline = "gnucobol-verdict-baseline.tsv";
@@ -56,7 +57,7 @@ public sealed class ExternalCorpusPopulationDriftTests
         {
             var psi = new ProcessStartInfo(exe);
             psi.ArgumentList.Add("--version");
-            if (ProcessObserver.Observe(psi, null, 30_000).Outcome != ProcessOutcome.LaunchFailed) return exe;
+            if (ProcessObserver.Observe(psi, null, ProcessObserver.TimeoutMs).Outcome != ProcessOutcome.LaunchFailed) return exe;
         }
 
         throw new InvalidOperationException(

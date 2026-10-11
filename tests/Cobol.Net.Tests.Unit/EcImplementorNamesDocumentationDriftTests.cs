@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>EC-IMP-suffix</c> exists and item 100 lists the level-2 <c>-IMP</c> names Table 13 defines; both statements are asserted
 /// against <see cref="ExceptionCatalog.Level3Rows"/>.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class EcImplementorNamesDocumentationDriftTests
 {
     private static string RowOf(string key)

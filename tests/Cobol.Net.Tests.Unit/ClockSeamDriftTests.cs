@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// (WHEN-COMPILED is the COMPILATION timestamp, §15.99.3 r2 — compile-time by definition, not a run-unit
 /// reading).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ClockSeamDriftTests
 {
     // Any direct system-clock read: DateTime.Now / DateTimeOffset.Now / *.UtcNow / DateTime.Today.

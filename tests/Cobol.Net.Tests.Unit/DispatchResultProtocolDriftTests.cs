@@ -17,6 +17,7 @@ namespace CobolNet.Tests.Unit;
 /// every value reachable from a consumer predicate so a new value cannot be added without saying what a consumer asks
 /// of it.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DispatchResultProtocolDriftTests
 {
     private static string CodeGenDir =>

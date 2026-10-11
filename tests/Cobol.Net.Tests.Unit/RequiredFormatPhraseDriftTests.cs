@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// found, and that READ's BRACKETED one is NOT — so a regex that stopped matching anything fails loudly instead
 /// of passing vacuously (feedback_green_gates_arent_evidence).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class RequiredFormatPhraseDriftTests
 {
     /// <summary>The words that lead a CONDITIONAL PHRASE in the statement general formats. This is the family the

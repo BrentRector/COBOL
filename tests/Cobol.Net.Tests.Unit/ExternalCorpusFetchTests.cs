@@ -48,7 +48,7 @@ public sealed class ExternalCorpusFetchTests
             psi.ArgumentList.Add("-NoProfile");
             psi.ArgumentList.Add("-Command");
             psi.ArgumentList.Add("exit 0");
-            if (ProcessObserver.Observe(psi, null, 60_000).Outcome != ProcessOutcome.LaunchFailed) return exe;
+            if (ProcessObserver.Observe(psi, null, ProcessObserver.TimeoutMs).Outcome != ProcessOutcome.LaunchFailed) return exe;
         }
 
         throw new InvalidOperationException(
@@ -105,23 +105,14 @@ public sealed class ExternalCorpusFetchTests
         string path = TestRepo.Scripts("external_corpus.py");
         Assert.True(File.Exists(path), $"the corpus rule is missing: {path}");
 
-        ProcessObservation r = PythonInstrument.Run(path, "--self-test");
-
-        Assert.True(r.ExitCode == 0 && r.Stdout.Contains("external_corpus SELF-TEST: PASS", StringComparison.Ordinal),
-            $"`external_corpus.py --self-test` failed (exit {r.ExitCode}):\n{r.Stdout}{r.Stderr}");
-        foreach (string arm in new[]
+        SelfTestArmSource.AssertDeclares(path, new[]
                  {
                      "a present corpus runs NO fetch and is not red",
                      "an absent corpus runs the fetch script once, in that tree, and is not red when it lands",
                      "a fetch that exits non-zero is the named FETCH FAILED red",
                      "a fetch that exits 0 but leaves no marker is the named FETCH FAILED red, never a green",
                      "a fetch that cannot start (no pwsh) is the named FETCH FAILED red, never a crash",
-                 })
-        {
-            Assert.True(r.Stdout.Contains("PASS  " + arm, StringComparison.Ordinal),
-                $"`external_corpus.py --self-test` no longer drives '{arm}' — a check that has never been seen to "
-                + $"fail is not evidence.\n{r.Stdout}");
-        }
+                 });
     }
 
     /// <summary>

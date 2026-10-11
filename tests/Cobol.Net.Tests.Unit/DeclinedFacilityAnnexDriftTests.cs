@@ -30,6 +30,7 @@ namespace CobolNet.Tests.Unit;
 /// wrong silently — these facts are what make "derived" true rather than aspirational (CLAUDE.md rule 5: prefer
 /// the shape that makes the NEXT case automatic, and pair it with a drift test so it stays true).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DeclinedFacilityAnnexDriftTests
 {
     /// <summary>The §2 register — one row per Annex A.3 processor-dependent item.</summary>

@@ -40,6 +40,7 @@ namespace CobolNet.Tests.Unit;
 /// holes is a decision, not a gate: <c>INITIALIZE G REPLACING NUMERIC DATA BY SPACE</c> aborted the run unit
 /// behind it. All three are bound now, and the gate below says the number is ZERO.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ImplicitMoveConstructionDriftTests
 {
     private const string Node = "BoundMove";

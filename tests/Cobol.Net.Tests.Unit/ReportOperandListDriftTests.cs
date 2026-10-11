@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// nothing contradicts (feedback_a_dead_lookup_is_also_unverified), so the wrap is asserted DIRECTLY on the
 /// model here, and it will still be right on the day the OCCURS vehicle lands.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReportOperandListDriftTests
 {
     private static ReportFieldModel Field(int columns, params ReportFieldSource[] sources) => new()

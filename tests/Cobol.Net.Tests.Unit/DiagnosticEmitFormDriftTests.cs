@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// better anyway. This test admits it and bare <c>"COBOLNETnnnn"</c> literals, and rejects only the
 /// <c>.Id</c> spelling in a code position.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DiagnosticEmitFormDriftTests
 {
     // Error( / Warning( / Removed( whose FIRST argument ends in `.Id` — the slug-in-the-code-position mistake.

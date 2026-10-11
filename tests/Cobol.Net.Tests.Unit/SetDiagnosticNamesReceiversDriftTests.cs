@@ -32,6 +32,7 @@ namespace CobolNet.Tests.Unit;
 /// evidence). The behavioural half lives in the negative goldens
 /// <c>pb388-set-pointer-self-sender</c> / <c>pb388-set-object-ref-self-outside-method</c>.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class SetDiagnosticNamesReceiversDriftTests
 {
     /// <summary>The SET-family binders: every file that reports about a SET receiving operand.</summary>

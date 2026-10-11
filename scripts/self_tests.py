@@ -51,16 +51,17 @@ REUSE (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10): every run of a self-t
 with the content of everything it read (scripts/self_test_inputs.py: the files and directory listings its Python
 processes touched, plus what a PowerShell or bash script mentions and the runner itself) in ONE store shared by every
 checkout of the repository, `<git common dir>/cobol-self-test-passes/` (beside the gate slots, never keyed on a branch).
-`--reuse` — the IMPLEMENTER gate's run — reports a self-test REUSED, without running it, while a recorded PASS's inputs
-are all unchanged on this tree; a branch that changes nothing a self-test reads reuses the PASS main's lander gate
-recorded, and a change re-runs exactly the self-tests that read what it changed. The default run — the LANDER's gate,
+`--reuse` — every GATE's run (one shape since kb/Work PB3022) — reports a self-test REUSED, without running it, while
+a recorded PASS's inputs are all unchanged on this tree; a branch that changes nothing a self-test reads reuses the
+PASS an earlier gate recorded, and a change re-runs exactly the self-tests that read what it changed (and records each
+new PASS). The default run —
 CI, the Linux gate, a hand run — reuses nothing: it runs every self-test, and records each PASS. The `--built` phase
 reads build output no key covers, so it always runs and never records.
 
 THE BUDGET (kb/Work PB2914): at most BUDGET_CAP self-tests run at once on the MACHINE, from every gate of every checkout
 together — one OS lock file per place under `<git common dir>/cobol-self-test-slots/`. A self-test waits for a place
 before it starts and holds it to its end, so one gate alone runs as wide as the cores, and N gates share the cores
-instead of multiplying them: a gate's self-test time no longer grows with the number of gates. The implementer's
+instead of multiplying them: a gate's self-test time no longer grows with the number of gates. A gate's
 self-tests keep running BEFORE its gate slot (kb/Work PB2524: a red one fails the gate without queueing behind other
 gates' builds and legs, PB2523); the budget is their own, so they never wait for a whole gate either.
 
@@ -68,8 +69,12 @@ NO VERDICT FROM THE CLOCK (the owner's no-wall-clock rule, 2026-09-25): a self-t
 that is still going HANG_AFTER_S after it took its budget place is stopped and reported HANG, with its output so far —
 its own state, verdict and exit code, never RED.
 
-THE VERDICT LINE: `=== SELF-TESTS: GREEN — n ran, r reused (inputs unchanged since a recorded PASS) in m s (k not run on
-<platform>) ===`, `=== SELF-TESTS: RED — …` or `=== SELF-TESTS: HANG — …`.
+THE VERDICT LINE: `=== SELF-TESTS: GREEN — n ran, r reused (inputs unchanged since a recorded PASS) in m s (budget B
+places machine-wide; w s waited for places) (k not run on <platform>) ===`, `=== SELF-TESTS: RED — …` or
+`=== SELF-TESTS: HANG — …`. A self-test that RAN says WHY on its console line (kb/Work PB3061) — `first run: no PASS
+recorded for <platform>, Python <v>` or `re-run: N input(s) changed since the newest PASS — a, b, c (+k more)` — and
+how long it waited for a budget place when that was a second or more, so a gate log shows what a re-run cost and what
+caused it (50 of 75 re-ran in every first gate of wave 1062, the slowest 6 min, with no line saying why).
 Exit 0 GREEN, 1 RED, 2 NOT RUN (discovery or the submodule fetch failed), 3 HANG (no red, at least one hang).
 """
 from __future__ import annotations
@@ -293,7 +298,8 @@ class Result:
     rc: int | None            # the exit code when it ran; None otherwise
     seconds: float
     output: str
-    note: str = ""            # what the console line adds: why no PASS was recorded, which PASS was reused
+    note: str = ""            # what the console line adds: why it ran (PB3061), why no PASS was recorded, which reused
+    waited: float = 0.0       # seconds it waited for a budget place before it ran (kb/Work PB3061)
 
 
 #: The git identity every self-test commits under, from its private global config (`private_git_config`).
@@ -376,6 +382,14 @@ class PassStore:
 
     def find(self, test: str, platform: str, tree: "inputs.Tree") -> dict | None:
         """The newest recorded PASS of `test` whose inputs are all unchanged on `tree`, or None."""
+        return self.lookup(test, platform, tree)[0]
+
+    def lookup(self, test: str, platform: str, tree: "inputs.Tree") -> tuple[dict | None, str]:
+        """`find`, with WHY when it finds none (kb/Work PB3061): `first run: …` when no PASS of this platform and Python
+        is recorded at all, else the inputs of the newest PASS that changed — so the gate log says what caused a
+        re-run (50 of 75 re-ran in every first gate of wave 1062 with no line saying why)."""
+        newest_changed: list[str] | None = None
+        unusable = 0   # records that are there but are no PASS here: the why-line must not call that a first run
         for path in self._records(test, platform):
             try:
                 text = sharedfile.read_text(path)
@@ -384,14 +398,24 @@ class PassStore:
                 continue  # pruned or half-gone under us: not a PASS
             if (not isinstance(rec, dict) or rec.get("schema") != PASS_SCHEMA or rec.get("test") != test
                     or rec.get("python") != _python()):
+                unusable += 1
                 continue
             try:
-                unchanged = not inputs.Deps.from_json(rec["deps"]).changed(tree)
+                changed = inputs.Deps.from_json(rec["deps"]).changed(tree)
             except (KeyError, TypeError, ValueError, AttributeError):
+                unusable += 1
                 continue  # a record of another shape is not a PASS: the self-test runs, never a crash of the gate
-            if unchanged:
-                return rec
-        return None
+            if not changed:
+                return rec, ""
+            if newest_changed is None:
+                newest_changed = changed
+        if newest_changed is None:
+            if unusable:
+                return None, (f"re-run: {unusable} recorded PASS(es) for {platform} are of another schema, Python or "
+                              f"shape than Python {_python()} reads")
+            return None, f"first run: no PASS recorded for {platform}, Python {_python()}"
+        shown = ", ".join(newest_changed[:3]) + (f" (+{len(newest_changed) - 3} more)" if len(newest_changed) > 3 else "")
+        return None, f"re-run: {len(newest_changed)} input(s) changed since the newest PASS — {shown}"
 
     def record(self, test: str, platform: str, deps: "inputs.Deps", seconds: float, by: str) -> Path:
         d = self._dir(test, platform)
@@ -436,10 +460,13 @@ class Runner:
         here = [t for t in tests if t.runs_on(self.platform)]
         results = [Result(t, NOT_RUN, None, 0.0, "") for t in tests if not t.runs_on(self.platform)]
         todo = []
+        why: dict[str, str] = {}  # why each one runs instead of reusing (kb/Work PB3061); "" when reuse is off
         for t in here:
-            rec = self.store.find(t.path, self.platform, self.tree) if self.reuse and not t.needs_build else None
+            rec, reason = (self.store.lookup(t.path, self.platform, self.tree) if self.reuse and not t.needs_build
+                           else (None, ""))
             if rec is None:
                 todo.append(t)
+                why[t.path] = reason
                 continue
             r = Result(t, REUSED, None, 0.0, "", f"the PASS of {rec.get('when', '?')} by {rec.get('by', '?')}")
             results.append(r)
@@ -450,7 +477,7 @@ class Runner:
             tracer = inputs.install_tracer(scratch / "tracer")
             workers = max(1, min(len(todo) or 1, jobs or BUDGET_CAP))
             with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
-                futures = [pool.submit(self.run_one, t, scratch, git_config, tracer) for t in todo]
+                futures = [pool.submit(self.run_one, t, scratch, git_config, tracer, why[t.path]) for t in todo]
                 for f in concurrent.futures.as_completed(futures):
                     r = f.result()
                     results.append(r)
@@ -464,20 +491,23 @@ class Runner:
         state = f"RED (exit {r.rc})" if r.state == RED else r.state
         self.say(f"self-test {r.test.path}{flag}: {state}"
                  + (f" in {r.seconds:.1f}s" if r.state not in (REUSED, NOT_RUN) else "")
+                 + (f" (after {r.waited:.1f}s waiting for a budget place)" if r.waited >= 1.0 else "")
                  + (f" — {r.note}" if r.note else ""))
         if r.state in (RED, HANG):  # a red or hung self-test's COMPLETE output, as for a red gate leg (kb/Work PB1573)
             for line in r.output.rstrip().splitlines():
                 self.say(f"    {line}")
 
-    def run_one(self, test: SelfTest, scratch: Path, git_config: Path, tracer: Path) -> Result:
+    def run_one(self, test: SelfTest, scratch: Path, git_config: Path, tracer: Path, why: str = "") -> Result:
         coord = Path(tempfile.mkdtemp(prefix="coord-", dir=scratch))
         trace = Path(tempfile.mkdtemp(prefix="trace-", dir=scratch))
         env = _scrubbed_env(os.environ)
         env.update(COBOL_COORD_DIR=str(coord), GIT_CONFIG_GLOBAL=str(git_config), PYTHONIOENCODING="utf-8",
                    PYTHONUTF8="1")
         env = inputs.traced_env(env, tracer, trace, self.repo)
+        asked = time.monotonic()
         with self.budget.place(f"self-test {test.path} of {self.by}"):
             start = time.monotonic()
+            waited = start - asked  # the budget's queue, reported apart from the run itself (kb/Work PB3061)
             try:
                 r = subprocess.run(test.command(), cwd=self.repo, env=env, stdin=subprocess.DEVNULL,
                                    capture_output=True, text=True, encoding="utf-8", errors="replace",
@@ -485,17 +515,20 @@ class Runner:
             except subprocess.TimeoutExpired as e:
                 return Result(test, HANG, None, time.monotonic() - start,
                               f"{_text(e.stdout)}{_text(e.stderr)}\n⛔ HANG: still running {self.hang_after_s:.0f} s "
-                              f"after it took its budget place; stopped (a hang detector, never a verdict on speed)")
+                              f"after it took its budget place; stopped (a hang detector, never a verdict on speed)",
+                              why, waited)
             except OSError as e:
-                return Result(test, RED, 127, time.monotonic() - start, f"⛔ could not start {test.command()[0]}: {e}")
+                return Result(test, RED, 127, time.monotonic() - start, f"⛔ could not start {test.command()[0]}: {e}",
+                              why, waited)
             seconds = time.monotonic() - start
         out = (r.stdout or "") + (r.stderr or "")
         if r.returncode != 0:
-            return Result(test, RED, r.returncode, seconds, out)
+            return Result(test, RED, r.returncode, seconds, out, why, waited)
         try:
-            return Result(test, GREEN, 0, seconds, out, self._record(test, trace, seconds))
+            return Result(test, GREEN, 0, seconds, out, _join(why, self._record(test, trace, seconds)), waited)
         except ValueError as e:  # a `SELF-TEST-READS` that names nothing: the self-test's declaration is the defect
-            return Result(test, RED, 0, seconds, f"{out}\n⛔ it passed, but its PASS cannot be recorded: {e}")
+            return Result(test, RED, 0, seconds, f"{out}\n⛔ it passed, but its PASS cannot be recorded: {e}", why,
+                          waited)
 
     def _record(self, test: SelfTest, trace_dir: Path, seconds: float) -> str:
         """Record the PASS with what it read; returns the console note when it records none."""
@@ -514,6 +547,11 @@ class Runner:
         return ""
 
 
+def _join(*notes: str) -> str:
+    """The console note from its parts, the empty ones dropped."""
+    return "; ".join(n for n in notes if n)
+
+
 def _text(b) -> str:
     if b is None:
         return ""
@@ -526,7 +564,7 @@ def select(tests: list[SelfTest], built: bool) -> tuple[list[SelfTest], list[Sel
 
 
 def verdict(results: list[Result], platform: str, wall: float,
-            deferred: list[SelfTest] | None = None) -> tuple[int, str]:
+            deferred: list[SelfTest] | None = None, budget_cap: int | None = None) -> tuple[int, str]:
     ran = [r for r in results if r.state in (GREEN, RED, HANG)]
     red = [r for r in ran if r.state == RED]
     hung = [r for r in ran if r.state == HANG]
@@ -548,7 +586,9 @@ def verdict(results: list[Result], platform: str, wall: float,
     if hung:
         return HANG_EXIT, f"{VERDICT}HANG — {hangs}{not_run} ==="
     done = f"{len(ran)} ran, {len(reused)} reused (inputs unchanged since a recorded PASS)" if reused else f"{len(ran)} ran"
-    return 0, f"{VERDICT}GREEN — {done} in {wall:.0f}s{not_run} ==="
+    budget = (f" (budget {budget_cap} places machine-wide; {sum(r.waited for r in ran):.0f}s waited for places)"
+              if ran and budget_cap else "")  # kb/Work PB3061: the budget's share of the phase, from the log
+    return 0, f"{VERDICT}GREEN — {done} in {wall:.0f}s{budget}{not_run} ==="
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -559,7 +599,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=None,
                     help="how many of this run's self-tests wait for a budget place at once (default: the cores)")
     ap.add_argument("--reuse", action="store_true",
-                    help="report a self-test REUSED while a recorded PASS's inputs are unchanged (the implementer gate)")
+                    help="report a self-test REUSED while a recorded PASS's inputs are unchanged (every gate)")
     ap.add_argument("--self-test", action="store_true", help="prove the discovery rule and the verdict")
     args = ap.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
@@ -592,7 +632,8 @@ def main(argv: list[str] | None = None) -> int:
         print(f"{VERDICT}NOT RUN — the inputs of the self-tests cannot be read: {e} ===")
         return 2
     results = runner.run(phase, args.jobs)
-    rc, line = verdict(results, platform, time.monotonic() - start, None if args.built else deferred)
+    rc, line = verdict(results, platform, time.monotonic() - start, None if args.built else deferred,
+                       runner.budget.cap)
     print(line, flush=True)
     return rc
 
@@ -741,7 +782,7 @@ def _max_overlap(spans: list[tuple[float, float]]) -> int:
 def fleet_arms(check: Callable[[str, object, object], None]) -> None:
     """kb/Work PB2914: the self-test phase from N CONCURRENT simulated gates over one planted repository — every gate
     its own Runner, Budget and PassStore objects (separate processes in life) over the SAME shared directories. One
-    lander run records; N implementer gates on the unchanged tree re-run nothing; a changed input re-runs exactly the
+    full run records; N gates on the unchanged tree re-run nothing; a changed input re-runs exactly the
     self-tests that read it, never more than the budget at once; a hang is HANG, never RED."""
     with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as s:
         root, spans_dir = Path(d), Path(s)
@@ -786,9 +827,9 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
             return [tuple(map(float, p.read_text(encoding="utf-8").split()))
                     for p in set(spans_dir.glob(f"{name}-*")) - before]
 
-        lander = gate(False, [])
-        check("arm: the lander's run runs every self-test and records each PASS",
-              ([r.state for r in lander], len(list(store_dir.rglob("*.json")))), ([GREEN] * 3, 3))
+        full = gate(False, [])
+        check("arm: a full run (CI, the Linux gate, a hand run) runs every self-test and records each PASS",
+              ([r.state for r in full], len(list(store_dir.rglob("*.json")))), ([GREEN] * 3, 3))
         rec = PassStore(store_dir).find("scripts/test_c.py", plat, inputs.Tree.load(root))
         check("arm: the recorded PASS holds a file read through a name built at run time (the trace saw it)",
               rec is not None and "data/c.txt" in rec["deps"]["files"], True)
@@ -804,7 +845,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         bad.unlink()
         before = set(spans_dir.iterdir())
         unchanged = fleet(True)
-        check(f"arm: {_FLEET_GATES} concurrent implementer gates on an unchanged tree re-run nothing (every one REUSED)",
+        check(f"arm: {_FLEET_GATES} concurrent gates on an unchanged tree re-run nothing (every one REUSED)",
               ({r.state for g in unchanged for r in g}, set(spans_dir.iterdir()) - before), ({REUSED}, set()))
         (root / "data" / "c.txt").write_text("c changed\n", encoding="utf-8")
         before = set(spans_dir.iterdir())
@@ -819,7 +860,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
                by_test["scripts/test_c.py"] <= {GREEN, REUSED}, len(new_runs("test_c.py", before)) == greens),
               ({REUSED}, {REUSED}, True, True, True))
         before = set(spans_dir.iterdir())
-        crowd = fleet(False, which=[found["test_c.py"]])  # four gates that each run it: lander-like, no reuse
+        crowd = fleet(False, which=[found["test_c.py"]])  # four gates that each run it: full runs, no reuse
         check(f"arm: {_FLEET_GATES} gates running the same self-test at once run at most the budget's {_FLEET_CAP} "
               f"at a time, and none hangs",
               (len(new_runs("test_c.py", before)), _max_overlap(new_runs("test_c.py", before)) <= _FLEET_CAP,
@@ -839,6 +880,27 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         check("arm: an edited UNTRACKED import re-runs the self-test that imports it, and only that one",
               {r.test.path: r.state for r in again},
               {"scripts/test_a.py": REUSED, "scripts/test_b.py": GREEN, "scripts/test_c.py": REUSED})
+        notes = {r.test.path: r.note for r in again}
+        check("arm: the re-run's console line says WHY it ran — the input that changed — and a REUSED line names the "
+              "PASS it reused (kb/Work PB3061)",
+              (notes["scripts/test_b.py"], notes["scripts/test_a.py"].startswith("the PASS of")),
+              ("re-run: 1 input(s) changed since the newest PASS — scripts/helper_u.py", True))
+        fresh = Runner(root, plat, lambda _: None, reuse=True, budget=Budget(budget_dir, _FLEET_CAP),
+                       store=PassStore(Path(tempfile.mkdtemp(dir=s))), by="fleet arm").run([found["test_a.py"]])
+        check("arm: a self-test with no PASS recorded at all says so — `first run` — rather than naming a change "
+              "(kb/Work PB3061)", (fresh[0].state, fresh[0].note.startswith("first run: no PASS recorded for")),
+              (GREEN, True))
+        # A record that is THERE but unusable (another schema, Python or shape) is not a first run (train 1063 review).
+        odd = PassStore(Path(tempfile.mkdtemp(dir=s)))
+        src = PassStore(store_dir)._records("scripts/test_a.py", plat)[0]
+        rec_a = json.loads(src.read_text(encoding="utf-8"))
+        rec_a["schema"] = "another"
+        odd._dir("scripts/test_a.py", plat).mkdir(parents=True, exist_ok=True)
+        (odd._dir("scripts/test_a.py", plat) / src.name).write_text(json.dumps(rec_a), encoding="utf-8")
+        other = Runner(root, plat, lambda _: None, reuse=True, budget=Budget(budget_dir, _FLEET_CAP), store=odd,
+                       by="fleet arm").run([found["test_a.py"]])
+        check("arm: a self-test whose recorded PASSes are all unusable says so — never `first run` (train 1063 review)",
+              (other[0].state, other[0].note.startswith("re-run: 1 recorded PASS(es)")), (GREEN, True))
         said: list[str] = []
         hung = gate(False, said, hang_after_s=1.0, which=[found["test_hang.py"]])
         rc, line = verdict(hung, plat, 1.0)

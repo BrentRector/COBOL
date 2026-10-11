@@ -18,6 +18,7 @@ namespace CobolNet.Tests.Unit;
 /// set; this is the guard that stops the next stage from growing a second separator set. Source-form guards, because no
 /// behavioral test can see a stage that happens to be fed only ASCII.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CobolSpaceDriftTests
 {
     /// <summary>Every stage that reads source text as separated words or as lines: all of the preprocessor but the CCVS

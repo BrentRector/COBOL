@@ -27,6 +27,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>ClauseDataName</c> is the ONE capture: it screens the shapes §8.4.2.2.2 Format 1 does not admit and keeps
 /// the qualifiers. These guards keep it the only one.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class OccursOperandCaptureDriftTests
 {
     private static string[] BinderFiles() => Directory.GetFiles(

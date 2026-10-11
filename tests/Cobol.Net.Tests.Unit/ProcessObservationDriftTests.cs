@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// (<c>feedback_one_rule_one_place</c>, <c>feedback_scan_all_similar</c>).
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ProcessObservationDriftTests
 {
     /// <summary>The tell: a test source that both starts a process AND imposes its own bounded wait. Either
@@ -42,14 +43,12 @@ public sealed class ProcessObservationDriftTests
     private static readonly System.Text.RegularExpressions.Regex BoundedWait =
         new(@"WaitForExit\s*\(\s*[^)\s]", System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    // The observer itself, this test (which must quote the needles), and the two generator drift tests, which
-    // run pwsh over a repo script and never compare program OUTPUT — nothing they do can be mistaken for a
-    // compiler verdict. They are named individually rather than pattern-exempted so that adding a third one is
-    // a deliberate edit here, not a silent inheritance.
+    // The observer itself and this test (which must quote the needles). The two generator drift tests that were
+    // exempt here no longer impose a bounded wait (kb/Work PB3022: no fixed time limit in a test), so they no longer
+    // need to be; named individually so that a new exemption is a deliberate edit here, not a silent inheritance.
     private static readonly string[] Exempt =
     [
         "ProcessObservation.cs", "ProcessObservationDriftTests.cs",
-        "GrammarDiagramGeneratorDriftTests.cs", "VaultReferenceGeneratorDriftTests.cs",
     ];
 
     private static IEnumerable<string> TestSources() =>

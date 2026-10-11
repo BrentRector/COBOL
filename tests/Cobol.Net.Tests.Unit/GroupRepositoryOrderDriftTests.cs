@@ -15,6 +15,7 @@ namespace CobolNet.Tests.Unit;
 /// the details a), and a function prototype was replaced by a definition that merely shared its word. The rule now
 /// lives in <c>GroupRepository.Find</c>; this pins that no second reading of it, and no order-blind table, comes back.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class GroupRepositoryOrderDriftTests
 {
     private static readonly string[] SourceRoots = ["Cobol.Net.Compiler", "Cobol.Net.Editions", "Cobol.Net.Runtime"];

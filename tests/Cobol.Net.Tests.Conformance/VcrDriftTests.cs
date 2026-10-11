@@ -19,6 +19,7 @@ namespace CobolNet.Tests.Conformance;
 /// the clause exists and the appendix's quoted fragment is still inside it, the <c>cite.py --check</c> contract.
 /// Mirrors <c>DiagnosticRegistryDriftTests</c> (ONE renderer, in the test).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class VcrDriftTests
 {
     private const string Start = "<!-- GEN:VCR-STATUS START -->";

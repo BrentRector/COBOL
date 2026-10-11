@@ -17,6 +17,7 @@ namespace CobolNet.Tests.Unit;
 /// site that spells it, so the next landing is routed through the one conversion by construction.
 /// <para>A binary64 SENDER narrowed to binary32 is a single rounding of the value the sender holds and is not the
 /// shape: it never mentions a decimal-to-binary64 converter inside the cast, so it is not matched.</para></summary>
+[Trait("Sweep", "tree")]
 public sealed class Binary32SingleRoundingDriftTests
 {
     /// <summary>A <c>(float)</c> cast whose operand text names a decimal→binary64 converter.</summary>

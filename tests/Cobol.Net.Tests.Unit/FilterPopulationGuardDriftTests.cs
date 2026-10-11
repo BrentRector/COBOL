@@ -58,6 +58,7 @@ namespace CobolNet.Tests.Unit;
 /// docstring necessarily quotes <c>--filter</c>.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class FilterPopulationGuardDriftTests
 {
     /// <summary>The guard — a site satisfies the invariant by naming it.</summary>
@@ -200,7 +201,7 @@ public sealed class FilterPopulationGuardDriftTests
         Assert.True(start >= 0, $"{file} has no top-level `jobs:` key — the job splitter cannot have found "
             + "anything, and a scan that looked at nothing must never report clean.");
 
-        var key = new Regex(@"^  (?<name>[A-Za-z0-9_.-]+):\s*$", RegexOptions.None, TimeSpan.FromSeconds(5));
+        var key = new Regex(@"^  (?<name>[A-Za-z0-9_.-]+):\s*$", RegexOptions.NonBacktracking);
         var jobs = new List<(string, string)>();
         string? name = null;
         var body = new StringBuilder();

@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// currently exempt because its facility is owner-declined and it binds to nothing — fails this test rather than
 /// shipping the defect again.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ImplicitStatementSeriesDriftTests
 {
     private static readonly string VerbsDir =

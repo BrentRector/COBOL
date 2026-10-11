@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// subsystem owns is red here until the table owns it (CLAUDE.md rule 5: the next case automatic, and a drift test
 /// keeping it so).
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ArchReviewFleetDriftTests
 {
     [Fact]

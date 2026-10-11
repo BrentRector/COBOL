@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit;
 /// the only independent oracle, and it is also the thing most likely to move, because SR9's list is one of the
 /// sentences a transcription repair touches.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ValueClauseUsageSetDriftTests
 {
     /// <summary>ISO §13.18.63.3 SR9, read out of the spec, split into the usage names it lists: "The VALUE

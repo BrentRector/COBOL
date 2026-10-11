@@ -14,6 +14,7 @@ namespace CobolNet.Tests.Unit;
 /// alternative". This test makes the next front end automatic: a source file that starts a whole-group parse must
 /// also call the shared loop.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReservationGateParseEntryDriftTests
 {
     private static readonly Regex WholeGroupParse = new(@"\.compilationUnit\(\)", RegexOptions.Compiled);

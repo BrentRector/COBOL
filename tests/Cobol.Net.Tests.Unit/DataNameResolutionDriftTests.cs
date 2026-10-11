@@ -15,6 +15,7 @@ namespace CobolNet.Tests.Unit;
 /// <see cref="NameCandidates{T}"/> can be counted, narrowed and read only when it holds exactly one item, and the
 /// first-declared member is granted by the ONE ambiguity verdict alone, under <c>--permissive</c>. These tests keep
 /// both halves true.</summary>
+[Trait("Sweep", "tree")]
 public sealed class DataNameResolutionDriftTests
 {
     /// <summary>The candidate set offers no way to read "the first" — no indexer, no enumeration, no public list.</summary>
