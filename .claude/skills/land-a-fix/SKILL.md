@@ -71,7 +71,7 @@ Use the `gate` skill. Read the verdict line, then commit as a separate call.
   `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title`, stamped from `date "+%Y-%m-%d %H:%M %Z"`. Write narratively —
   what changed, why, what broke, what was learned. Log the failures too. One entry per LANDING ON MAIN, not per
   commit (owner 2026-10-08, kb/Work PB2605): `push-main.sh` refuses a landing whose range adds no new, stamped,
-  top-placed entry (exit 6, `scripts/orchestrator/landing_devlog.py`).
+  top-placed entry (exit 6, `scripts/orchestrator/landing_devlog.py`), and refuses a landing whose arch-oracle baseline is behind its tree (exit 7, `scripts/orchestrator/landing_oracle.py`, kb/Work PB2885: run `scripts/arch/compare_oracle.py`, then `scripts/arch/capture_oracle.py --record`, and commit the manifest).
 - Commit message: write it to a scratchpad file and use `git commit -F <file>`. Do NOT inline a PowerShell
   here-string in the Bash tool — it is POSIX sh and the markers leak into the message.
 - **Update the item's `kb/Work/` note in the SAME commit** — `status: landed`, and `closes_rows:` naming the

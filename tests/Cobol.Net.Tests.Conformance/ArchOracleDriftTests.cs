@@ -137,5 +137,26 @@ public sealed class ArchOracleDriftTests
 
         Assert.Equal(root.GetProperty("cases_total").GetInt32(), cases);
         Assert.Equal(cases, root.GetProperty("population").EnumerateObject().Sum(p => p.Value.GetInt32()));
+
+        // Its INPUTS (kb/Work PB2885): the paths landing_oracle.py holds the baseline to at every landing. Each is a
+        // real repository path, and every data root the row sources read now is among them (or under one).
+        var inputs = root.GetProperty("inputs").EnumerateArray().Select(i => i.GetString()!).ToList();
+        Assert.NotEmpty(inputs);
+        Assert.All(inputs, i => Assert.True(File.Exists(TestRepo.At(i)) || Directory.Exists(TestRepo.At(i)), i));
+        Assert.All(ArchOracle.DataInputs(), d => Assert.Contains(inputs, i => d == i || d.StartsWith(i + "/", StringComparison.Ordinal)));
+    }
+
+    /// <summary>Every enrolled source names the data its cases are read from, and each is a real repository path:
+    /// a source with none would let its data change under a baseline that landing_oracle.py then calls current.</summary>
+    [Fact]
+    public void EveryRowSource_DeclaresTheDataItReads()
+    {
+        Assert.All(ArchOracle.Sources, s =>
+        {
+            Assert.NotEmpty(s.DataRoots);
+            Assert.All(s.DataRoots, p => Assert.True(
+                (File.Exists(p) || Directory.Exists(p)) && !Path.GetRelativePath(TestRepo.Root, p).StartsWith("..", StringComparison.Ordinal),
+                $"{s.Member}: {p} is not a path inside the repository"));
+        });
     }
 }

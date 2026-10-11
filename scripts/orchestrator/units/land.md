@@ -13,7 +13,7 @@ Finished implementer branches are waiting for a lander.
    `READY-TO-PUSH <worktree> <sha>` (L13): hand that line off in `summary`; never push some other way. The lander
    takes the LANDING LEASE before its final rebase and gates (lander-train-brief step 2b, kb/Work PB2537): if
    `python scripts/orchestrator/landing_lease.py status` names another holder, the lander waits for it rather than
-   gating against a main that holder is about to move; push-main.sh releases it. After the push, `python scripts/prune_worktrees.py --apply` removes the branches that landed.
+   gating against a main that holder is about to move; push-main.sh releases it. The lander brings the branches in with ONE command, `python scripts/orchestrator/train_apply.py <its train manifest>` (one commit per cluster; it stops only at a conflict, which the lander resolves), and push-main.sh refuses a train whose arch-oracle baseline is behind its tree (exit 7, kb/Work PB2885). After the push, `python scripts/prune_worktrees.py --apply` removes the branches that landed.
 3. Render the ledger in the same turn: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html` (every figure on it is computed; its
    trend file gains a point when GAP or the register's series moved). You cannot PUBLISH it
    (a headless session has no Artifact tool): the supervisor announces the owed publish after you end, and the attended

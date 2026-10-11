@@ -33,6 +33,8 @@ BRIEFS = {
                              r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched gating, PB2515\)'],  # I9; PB2515
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
                               r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
+                              r'landing_oracle',  # PB2885 (L11): push-main refuses a stale baseline (exit 7)
+                              r'train_apply\.py',  # PB2885 (L1): the clusters come in by one command
                               r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
                               r'linux-gate\.sh',  # PB1732 (L10): CI's Linux legs under WSL before push-main
                               # PB2515 (L12): a red train is attributed per cluster before it is fixed; every train
@@ -41,12 +43,14 @@ BRIEFS = {
                               # PB2537 (L3): one lander on main at a time — the lease before the final rebase and gates
                               r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',
                               *LANDER_HANDOFF],
-    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander',  # PB1732 (L10); PB1721 (L2)
+    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander',
+                        r'compare_oracle', r'landing_oracle', r'train_apply\.py',  # PB2885 (L11, L1)  # PB1732 (L10); PB1721 (L2)
                         r'train_measure\.py record',  # PB2515 (L12)
                         r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',  # PB2537 (L3)
                         *LANDER_HANDOFF],
     'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'-Mode lander',  # PB1721 (L2)
-                               r'landing_lease\.py acquire', *LANDER_HANDOFF],  # PB2537 (L3)
+                               r'landing_lease\.py acquire', *LANDER_HANDOFF,  # PB2537 (L3)
+                               r'compare_oracle', r'landing_oracle'],  # PB2885 (L11): goldens are oracle inputs
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
     # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],

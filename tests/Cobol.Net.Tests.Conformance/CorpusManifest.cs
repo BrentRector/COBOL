@@ -38,7 +38,11 @@ public sealed record CorpusRow(string Name, string Suite, string Status, string[
 /// </summary>
 public static class CorpusManifest
 {
-    private static string ManifestPath => TestRepo.Nist("corpus.tsv");
+    /// <summary>The NIST tree every NIST compile reads from (the manifest and the programs): the one spelling of the
+    /// path, which the architecture oracle also records as an input (<see cref="ArchOracle.RowSource"/>).</summary>
+    internal static string Root { get; } = TestRepo.Nist();
+
+    private static string ManifestPath => Path.Combine(Root, "corpus.tsv");
 
     /// <summary>Every manifest row (comment/blank lines skipped).</summary>
     public static IReadOnlyList<CorpusRow> Rows { get; } = Load();
@@ -94,6 +98,6 @@ public static class CorpusManifest
     /// (<see cref="ArchOracle"/>, kb/Work PB2116) compile a NIST program identically.</summary>
     internal static CompilerDriver.Options CompileOptions(
         string testName, string dll, int edition, bool permissive, bool checkOnly) =>
-        new(TestRepo.Nist("programs", testName + ".cob"), dll, NistTestName: testName, DialectLevel: edition,
+        new(Path.Combine(Root, "programs", testName + ".cob"), dll, NistTestName: testName, DialectLevel: edition,
             Permissive: permissive, CheckOnly: checkOnly);
 }

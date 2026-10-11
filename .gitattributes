@@ -29,3 +29,10 @@ data/unicode/*.txt -text
 data/unicode/*.xml -text
 data/unicode/cldr/** -text
 tests/Cobol.Net.Tests.Unit/TestData/segmentation/*.txt -text
+
+# The public-API baselines (Microsoft.CodeAnalysis.PublicApiAnalyzers) are SETS of lines: two branches that each add a
+# member append to the same place, which a line merge calls a conflict although the answer is always both lines. Train
+# 1052 (2026-10-10) stopped on exactly that in PublicAPI.Unshipped.txt; merge=union takes both sides (git apply -3, which
+# scripts/orchestrator/train_apply.py uses, honors it), and a stale line union keeps fails the build (RS0017), so the
+# gate still sees a wrong set (kb/Work PB2885).
+src/**/PublicAPI.*.txt merge=union

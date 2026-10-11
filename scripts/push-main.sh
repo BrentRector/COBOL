@@ -37,6 +37,8 @@
 #             read it by hand; never re-land it
 #         6 = the landing carries no new DEVLOG entry, or a malformed or misplaced one (scripts/orchestrator/
 #             landing_devlog.py, kb/Work PB2605): main NOT touched; write the entry at the TOP, commit, re-run
+#         7 = the arch-oracle baseline is behind the landing (scripts/orchestrator/landing_oracle.py, kb/Work PB2885):
+#             main NOT touched; compare_oracle.py, then capture_oracle.py --record, commit the manifest, re-run
 
 set -uo pipefail
 
@@ -49,7 +51,7 @@ while [ $# -gt 0 ]; do
     --branch-prefix) PREFIX="${2:?--branch-prefix needs a value}"; shift 2 ;;
     --no-delete)     DELETE_BRANCH=0; shift ;;
     --audit)         AUDIT=1; shift ;;
-    -h|--help)       sed -n '2,39p' "$0"; exit 0 ;;
+    -h|--help)       sed -n '2,/^$/p' "$0"; exit 0 ;;   # the header comment, to its first blank line
     *) echo "push-main.sh: unknown argument '$1'" >&2; exit 2 ;;
   esac
 done
@@ -260,6 +262,18 @@ case $? in
   1) echo "⛔ push-main: this landing carries no valid new DEVLOG entry (above) — main NOT touched." >&2
      exit 6 ;;
   *) die "the DEVLOG landing check could not read the range (above) — main NOT touched" ;;
+esac
+
+# ── THE ARCH-ORACLE BASELINE DESCRIBES THE LANDED TREE (kb/Work PB2885). Re-recording it was prose (lander step 3c,
+# MANDATORY-PRACTICES L11), and train 1049, an operator hand-landing, skipped it: six new cases reached main behind
+# a stale baseline and the next train inherited the drift. landing_oracle.py reads the recorded manifest at $SHA and
+# refuses when any path under its derived `inputs` changed after the commit it names. Refused before a run is spent. ──
+"$PY" scripts/orchestrator/landing_oracle.py --rev "$SHA"
+case $? in
+  0) ;;
+  1) echo "⛔ push-main: the arch-oracle baseline is behind this landing (above) — main NOT touched." >&2
+     exit 7 ;;
+  *) die "the arch-oracle landing check could not read the range or the baseline (above) — main NOT touched" ;;
 esac
 
 # ── THE FILE-SET PARTITION'S GUARANTEE (kb/Work PB2118 Drafts 9-10; DESIGN-architecture-review §8.7). The planner admits

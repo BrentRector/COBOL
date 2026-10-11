@@ -23,6 +23,10 @@ internal static class VersionMatrixCatalogue
         string Source, string Status, string? ExpectDiagnostic, int? ObsoleteIn, string? ExpectDiagnosticBelow,
         IReadOnlyDictionary<string, string>? Copybooks = null);
 
+    /// <summary>The catalogue file: the one spelling of the path, which the architecture oracle also records as an
+    /// input (<see cref="ArchOracle.RowSource"/>). Declared before <see cref="All"/>, whose initializer reads it.</summary>
+    internal static string CataloguePath { get; } = TestRepo.VersionMatrix("constructs.json");
+
     internal static IReadOnlyList<Construct> All { get; } = LoadCatalogue();
 
     /// <summary>Id → construct. The theories look a construct up per ROW (2,127 of them), so this is a dictionary
@@ -96,8 +100,7 @@ internal static class VersionMatrixCatalogue
 
     private static IReadOnlyList<Construct> LoadCatalogue()
     {
-        string path = TestRepo.VersionMatrix("constructs.json");
-        using var doc = JsonDocument.Parse(File.ReadAllText(path));
+        using var doc = JsonDocument.Parse(File.ReadAllText(CataloguePath));
         var list = new List<Construct>();
         foreach (var e in doc.RootElement.GetProperty("constructs").EnumerateArray())
         {

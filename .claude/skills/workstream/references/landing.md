@@ -45,8 +45,8 @@
 - ⭐ **FIVE CLUSTERS PER LANDING (target 5; 4–6 is the band).** A landing is ~90 % fixed cost — bring the work in,
   build, gate, DEVLOG, commit, push — so ⓜ **10.4 M per cluster at k = 1 against 5.1 M at k = 5**, and 4.0 minutes
   of lander per cluster against 9.8. The corpus proves it directly: the golden lander landed 151 rows for 52.9 M =
-  0.35 M/row; the PB383 lander landed 2 rows for 7.2 M = 3.6 M/row — **10×**. Mechanics: bring in each implementer's
-  diff in turn, **one build**, the **WHOLE population of Conformance, Unit and Characterization in one leg** (`build-local.ps1 -Mode lander`; a union of the implementers' filter terms was never a landing gate — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), **one commit per cluster inside the landing** so
+  0.35 M/row; the PB383 lander landed 2 rows for 7.2 M = 3.6 M/row — **10×**. Mechanics: bring every implementer's
+  branch in with ONE command, `scripts/orchestrator/train_apply.py <train manifest>` (one commit per cluster, markers, unmerged paths and silent loss asserted, the citation audits run once; seconds, where train 1052's 15 branches by hand took 201 tool calls and 18 minutes, kb/Work PB2885), **one build**, the **WHOLE population of Conformance, Unit and Characterization in one leg** (`build-local.ps1 -Mode lander`; a union of the implementers' filter terms was never a landing gate — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), **one commit per cluster inside the landing** so
   a red is attributed per cluster by re-running only its failing cases on each cluster alone, then fixed in the train
   or ejected to a finisher, an interaction bisected (MANDATORY-PRACTICES L12, kb/Work PB2515), one DEVLOG entry naming
   every cluster, one push, and the train recorded with `scripts/orchestrator/train_measure.py`. Past six clusters the token curve is

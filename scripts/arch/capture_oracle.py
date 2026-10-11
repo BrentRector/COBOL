@@ -20,6 +20,15 @@ OUTPUT
   and removes the previous one (git history keeps it), so that directory always holds exactly one manifest. A dirty
   tree is refused: a baseline names a commit.
 
+INPUTS (kb/Work PB2885). A manifest also records `inputs`: the repository paths whose content the capture depends on,
+DERIVED, never listed by hand — (a) the host project's MSBuild closure (`code_inputs`: every project its
+ProjectReferences reach, the files the toolchain probes for by walking up from each project directory —
+Directory.Build.props/.targets, Directory.Packages.props, global.json, NuGet.config — and every existing path an
+Include or Import of those files names outside the project directory, such as tests/_shared), and (b) the data the row
+sources read, which the host writes to `inputs.txt` from each row source's DataRoots (ArchOracle.DataInputs, bound to
+the same members its readers open). `scripts/orchestrator/landing_oracle.py` reads it at every landing (push-main.sh,
+exit 7): a landing whose inputs changed after the baseline's commit is refused until it is re-recorded.
+
 DETERMINISM. The same commit captures the same manifest run after run, and on Windows and on Linux but for the
 cases whose diagnostic names a COPY text found by a case-insensitive probe (19 NIST continuity cells at the first
 baseline): the manifest records its platform, and a wave compares captures of one platform. The C# side writes the repository
@@ -37,6 +46,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -79,7 +89,69 @@ def oracle_environment() -> dict[str, str]:
     return env
 
 
-def write_manifest(path: Path, commit: str, dirty: bool, rows: list[list[str]]) -> None:
+# The files the .NET toolchain discovers by walking UP from a project directory (MSBuild's Directory.Build.* and
+# central package management, the SDK's global.json, NuGet's config). Matched case-insensitively, as the tools do.
+PROBED = ("directory.build.props", "directory.build.targets", "directory.packages.props", "global.json",
+          "nuget.config")
+WILDCARD = re.compile(r"[*?]")
+
+
+def _expand(value: str, this_file: Path, project: Path) -> Path | None:
+    """An Include/Import value as a path, with the two directory properties MSBuild authors write; None when it still
+    holds an unexpanded property, item transform or function (nothing on disk can be named by it)."""
+    v = (value.strip().replace("$(MSBuildThisFileDirectory)", str(this_file.parent) + "/")
+         .replace("$(MSBuildProjectDirectory)", str(project.parent)).replace("\\", "/"))
+    if not v or "$(" in v or "@(" in v or "%(" in v or "$([" in v:
+        return None
+    parts = Path(v).parts
+    for i, part in enumerate(parts):          # a wildcard names its directory
+        if WILDCARD.search(part):
+            parts = parts[:i]
+            break
+    if not parts:
+        return None
+    p = Path(*parts)
+    return (p if p.is_absolute() else this_file.parent / p).resolve()
+
+
+def code_inputs(host: Path | None = None, repo: Path = REPO) -> list[str]:
+    """The host project's MSBuild closure as repository-relative paths (see INPUTS in the module docstring)."""
+    import xml.etree.ElementTree as ET
+    repo = repo.resolve()
+    projects: list[Path] = [(host or HOST_PROJECT).resolve()]
+    seen: set[Path] = set()
+    found: set[Path] = set()
+    while projects:
+        project = projects.pop()
+        if project in seen or not project.is_file():
+            continue
+        seen.add(project)
+        found.add(project.parent)
+        probed = []
+        d = project.parent
+        while repo in (d, *d.parents):
+            probed += [e for e in d.iterdir() if e.is_file() and e.name.lower() in PROBED]
+            if d == repo:
+                break
+            d = d.parent
+        found.update(probed)
+        for xml_file in [project, *[p for p in probed if p.suffix.lower() in (".props", ".targets")]]:
+            for element in ET.parse(xml_file).getroot().iter():
+                tag = element.tag.rsplit("}", 1)[-1]
+                for value in filter(None, (element.get("Include") or element.get("Project") or "").split(";")):
+                    path = _expand(value, xml_file, project)
+                    if path is None or repo not in path.parents or not path.exists():
+                        continue
+                    if tag == "ProjectReference":
+                        projects.append(path)
+                    else:
+                        found.add(path)
+    rel = sorted({p.relative_to(repo).as_posix() for p in found})
+    # A path inside another input adds nothing: keep the outermost.
+    return [p for p in rel if not any(p.startswith(q + "/") for q in rel if q != p)]
+
+
+def write_manifest(path: Path, commit: str, dirty: bool, rows: list[list[str]], inputs: list[str]) -> None:
     """One case per line, ordinal id order, so two manifests diff line by line."""
     population: dict[str, int] = {}
     for _, pop, _, _ in rows:
@@ -89,6 +161,7 @@ def write_manifest(path: Path, commit: str, dirty: bool, rows: list[list[str]]) 
              f'  "commit": {json.dumps(commit)},',
              f'  "dirty": {json.dumps(dirty)},',
              f'  "platform": {json.dumps(PLATFORM)},',
+             '  "inputs": [' + ", ".join(json.dumps(i) for i in inputs) + "],",
              f'  "cases_total": {len(rows)},',
              '  "population": {' + ", ".join(f"{json.dumps(k)}: {v}" for k, v in sorted(population.items())) + "},",
              '  "cases": {']
@@ -124,8 +197,13 @@ def capture(*, build: bool = True, jobs: int | None = None, configuration: str =
     rows = [line.split("\t") for line in (out / "cases.tsv").read_text(encoding="utf-8").splitlines() if line]
     if any(len(row) != 4 for row in rows):
         sys.exit("capture_oracle: cases.tsv has a malformed line")
+    data_inputs = [line for line in (out / "inputs.txt").read_text(encoding="utf-8").splitlines() if line]
+    if not data_inputs:
+        sys.exit("capture_oracle: the host wrote no data inputs (inputs.txt); nothing was recorded")
+    inputs = code_inputs()
+    inputs += [d for d in data_inputs if not any(d == c or d.startswith(c + "/") for c in inputs)]
     manifest = out / "manifest.json"
-    write_manifest(manifest, commit, dirty, rows)
+    write_manifest(manifest, commit, dirty, rows, sorted(inputs))
     print(f"capture_oracle: {len(rows)} cases of {label} in {elapsed:.0f} s -> {manifest.relative_to(REPO).as_posix()}")
     return manifest
 
