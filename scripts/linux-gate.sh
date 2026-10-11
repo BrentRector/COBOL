@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # linux-gate.sh — run CI's LINUX test legs locally, under WSL, before a push spends a CI run on them.
 #
-#   From Windows (the normal use), through the PowerShell tool:
-#     wsl -d Ubuntu --cd <worktree> -- bash -lc 'bash scripts/linux-gate.sh [--legs unit,characterization,conformance,guard] [--nice]'
-#   On a Linux host (a cloud session): bash scripts/linux-gate.sh …
+#   From any shell, at the tree's root:  bash scripts/linux-gate.sh [--legs unit,characterization,conformance,guard] [--nice]
+#   On a host that is not Linux (Git Bash, PowerShell's bash) it runs ITSELF under WSL, in the same tree with the same
+#   arguments, and its verdict is that run's (run_on_linux, kb/Work PB2999).
+#   python scripts/self_tests.py runs `bash scripts/linux-gate.sh --self-test` (the host hand-off, with stand-ins).
 #
 # ⛔ WHY IT EXISTS (kb/Work PB1732). The implementer and lander gates ran on Windows only, so CI's Linux jobs were the
 # first Linux run a change ever got. On 2026-09-28 train 71b's first push went RED in `Greenfield unit +
@@ -36,6 +37,79 @@
 # Exit 0 only on GREEN.
 set -u
 
+# ⛔ THE GATE PUTS ITSELF ON ITS HOST (kb/Work PB2999; owner 2026-10-11: "Why not simply require it to invoke using the
+# proper host rather than an after the fact check that the correct host was invoked"). Started from Git Bash — the Bash
+# tool every session has, and the bare command the gate skill gives — this script ran on WINDOWS: it cloned into the
+# Windows home, built with the Windows SDK and printed `LINUX GATE: RED (... build ...)`, a verdict about no Linux leg at
+# all. So on a host that is not Linux it runs itself under WSL (`-d Ubuntu`, the distribution scripts/wsl/ provisions),
+# in this tree with these arguments, and exits with that run's status; the one refusal left is a host with no WSL.
+# MSYS_NO_PATHCONV: Git Bash rewrites an argument that looks like a POSIX path before a Windows program sees it
+# (`/mnt/e/...` became `C:/Program Files/Git/mnt/e/...`, DEVLOG), and the hand-off passes the arguments verbatim.
+# `--exec`, not `--`: after `--`, wsl.exe hands the command line to the distribution's default shell, which parses it
+# again — measured 2026-10-11, `-- bash -lc '... "$@"' linux-gate --legs unit --nice` reached bash as `[/bin/bash][]`,
+# every argument lost; `--exec` gives bash the arguments as they are: `[linux-gate][--legs][unit][--nice]`.
+run_on_linux() {  # the script's own arguments
+  local host here
+  host="$(uname -s)"
+  [ "$host" = "Linux" ] && return 0
+  if ! command -v wsl.exe >/dev/null 2>&1; then
+    echo "=== LINUX GATE: NOT RUN (this host is $host, not Linux, and has no WSL to run the gate on) ==="; exit 2
+  fi
+  here="$(cygpath -w "$(pwd)" 2>/dev/null || pwd)"
+  echo "linux-gate: this host is $host, not Linux: running the gate under WSL (Ubuntu) in $here"
+  MSYS_NO_PATHCONV=1 wsl.exe -d Ubuntu --cd "$here" --exec bash -lc 'bash scripts/linux-gate.sh "$@"' linux-gate "$@"
+  exit $?
+}
+
+# Every --legs name ($legs) is one of the selectable legs, into `wanted`, checked before anything is cloned or built: an
+# unknown name used to reach the leg dispatch, where `selftests` (which always runs) wrote "unknown leg" over the real
+# leg's result file and was reported twice (2026-10-11, PB2999's first live run).
+check_legs() {
+  local leg
+  IFS=',' read -r -a wanted <<< "$legs"
+  for leg in "${wanted[@]}"; do
+    case "$leg" in
+      unit|characterization|conformance|guard) ;;
+      *) echo "linux-gate: unknown leg '$leg' (the selectable legs are unit, characterization, conformance and guard;" \
+              "selftests always runs, and selftests-built with unit or conformance)"
+         echo "=== LINUX GATE: NOT RUN (bad arguments) ==="; exit 2 ;;
+    esac
+  done
+}
+
+# The hand-off, measured with stand-ins for uname, wsl.exe and cygpath (shell functions, so no fake program and no
+# setting is needed, and it runs the same on every host): a Windows host hands every argument to WSL verbatim and
+# returns WSL's status; a host with no WSL is NOT RUN, never RED; a Linux host does not hand off.
+if [ "${1:-}" = "--self-test" ]; then
+  fails=0
+  check() { if [ "$2" = "$3" ]; then echo "  ok    $1"; else echo "  FAIL  $1"; echo "        want: $3"; echo "        got:  $2"; fails=$((fails + 1)); fi; }
+  got="$( uname() { echo MINGW64_NT-10.0-26300; }; cygpath() { echo 'E:\tree'; }
+          wsl.exe() { printf '%s|' "$@"; echo; echo "MSYS_NO_PATHCONV=${MSYS_NO_PATHCONV:-unset}"; return 7; }
+          run_on_linux --legs unit --nice; )"
+  rc=$?
+  check "a Windows host hands its arguments to WSL verbatim, in this tree" "$(echo "$got" | sed -n 2p)" \
+        "-d|Ubuntu|--cd|E:\\tree|--exec|bash|-lc|bash scripts/linux-gate.sh \"\$@\"|linux-gate|--legs|unit|--nice|"
+  check "the hand-off turns Git Bash's path rewriting off" "$(echo "$got" | sed -n 3p)" "MSYS_NO_PATHCONV=1"
+  check "the hand-off's status is WSL's" "$rc" "7"
+  got="$( uname() { echo Darwin; }; PATH=/nonexistent; run_on_linux --nice; )"
+  rc=$?
+  check "a host with no WSL is NOT RUN" "$got" "=== LINUX GATE: NOT RUN (this host is Darwin, not Linux, and has no WSL to run the gate on) ==="
+  check "a host with no WSL exits 2, as every NOT RUN does" "$rc" "2"
+  got="$( uname() { echo Linux; }; wsl.exe() { echo "handed off"; }; run_on_linux --nice; echo "stayed" )"
+  check "a Linux host runs the gate itself" "$got" "stayed"
+  got="$( legs=unit,selftests; check_legs; echo "accepted" )"
+  rc=$?
+  check "an unknown --legs name is NOT RUN (bad arguments) before anything runs" "$(echo "$got" | tail -1)" \
+        "=== LINUX GATE: NOT RUN (bad arguments) ==="
+  check "an unknown --legs name exits 2" "$rc" "2"
+  got="$( legs=unit,characterization,conformance,guard; check_legs; echo "accepted ${wanted[*]}" )"
+  check "the four selectable legs are accepted, in order" "$got" "accepted unit characterization conformance guard"
+  if [ "$fails" -eq 0 ]; then echo "=== LINUX-GATE SELF-TEST: GREEN ==="; exit 0; fi
+  echo "=== LINUX-GATE SELF-TEST: RED ($fails) ==="; exit 1
+fi
+
+run_on_linux "$@"
+
 legs="unit,characterization,conformance,guard"
 nice_prefix=()
 while [ $# -gt 0 ]; do
@@ -45,6 +119,7 @@ while [ $# -gt 0 ]; do
     *) echo "linux-gate: unknown argument '$1'"; echo "=== LINUX GATE: NOT RUN (bad arguments) ==="; exit 2 ;;
   esac
 done
+check_legs
 
 [ -d "$HOME/.dotnet" ] && export DOTNET_ROOT="$HOME/.dotnet" PATH="$HOME/.dotnet:$HOME/.dotnet/tools:$HOME/.local/bin:$PATH"
 export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
@@ -190,7 +265,6 @@ test_leg() {  # <leg> <project> — `dotnet test --no-build` against the ONE bui
   fi
 }
 
-IFS=',' read -r -a wanted <<< "$legs"
 order=(selftests)
 selftests_leg selftests > "$out/selftests.result" 2>&1 &
 start=$(date +%s)
@@ -208,7 +282,6 @@ for leg in "${wanted[@]}"; do
     characterization) proj="tests/Cobol.Net.Tests.Characterization/Cobol.Net.Tests.Characterization.csproj" ;;
     conformance)      proj="tests/Cobol.Net.Tests.Conformance/Cobol.Net.Tests.Conformance.csproj" ;;
     guard)            guard_leg > "$out/guard.result" 2>&1 & continue ;;
-    *) leg_status "$leg" "NOT RUN"; echo "leg $leg: NOT RUN (unknown leg)" > "$out/$leg.result"; continue ;;
   esac
   if [ $brc -ne 0 ]; then
     leg_status "$leg" RED; echo "leg $leg: RED — the Linux BUILD failed (rc=$brc)" > "$out/$leg.result"; continue
@@ -237,7 +310,7 @@ for leg in "${order[@]}"; do
   st="$(cat "$out/$leg.status" 2>/dev/null)"
   case "$st" in
     GREEN) ran="$ran $leg" ;;
-    "NOT RUN") case "$leg" in selftests-built) [ $brc -ne 0 ] && bad="$bad $leg" ;; *) bad="$bad $leg:unknown" ;; esac ;;
+    "NOT RUN") [ $brc -ne 0 ] && bad="$bad $leg" ;;   # only selftests-built is ever NOT RUN (every --legs name was checked)
     *) bad="$bad $leg" ;;
   esac
 done

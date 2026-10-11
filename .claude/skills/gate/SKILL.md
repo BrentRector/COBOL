@@ -85,7 +85,7 @@ pwsh scripts/build-local.ps1 -Mode lander *> <log>
 ```
 
 The implementer scope never applies to it. No plan, ONE leg — every red of every cluster in one run — no fail-fast and no slot, at Normal priority: the lander
-never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10) and `push-main.sh`.
+never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10; from any shell: on a host that is not Linux it runs itself under WSL, kb/Work PB2999) and `push-main.sh`.
 
 **Do NOT run per commit:** the battery or the serial `scripts/guard.sh`.
 

@@ -1471,7 +1471,7 @@ change's first Linux run was CI's. Train 71b showed the cost: a Windows path lit
 on Windows and red in CI's Linux unit job. That was a ~30-minute round trip and a dropped cluster, for a failure a
 2.5-minute WSL run reproduces.
 
-**`scripts/linux-gate.sh`** runs, from any tree (`wsl -d Ubuntu --cd <tree> -- bash -lc 'bash scripts/linux-gate.sh'`),
+**`scripts/linux-gate.sh`** runs, from any tree and any shell (`bash scripts/linux-gate.sh` at the tree's root: on a host that is not Linux it runs itself under WSL with `wsl.exe -d Ubuntu --cd <tree> --exec bash -lc ...`, its arguments verbatim, kb/Work PB2999),
 the test projects CI's Linux jobs run, and the scripts they run: leg `guard` runs `bash scripts/guard-fast.sh`, CI's
 `guard` job (the NIST suite through the `cobol` CLI, the manifest audit, the baseline check and the guard's own
 self-tests), with a `TMPDIR` private to the clone because the guard writes fixed file names there. Leg `selftests`
