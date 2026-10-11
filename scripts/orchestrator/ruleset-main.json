@@ -1,0 +1,67 @@
+{
+  "$comment": "The repository settings and the ruleset on main that make GitHub's merge queue the landing (kb/Work PB3024; DESIGN-test-build-ci.md §3.17.6). Applied ONLY on the owner's explicit go by `python scripts/orchestrator/ruleset.py apply --owner-go \"<the go>\"`, which also deletes the classic branch protection; `ruleset.py check` compares the live state with this file. Keys starting with `$` are notes, never sent.",
+  "repository": {
+    "allow_merge_commit": true,
+    "allow_auto_merge": true,
+    "delete_branch_on_merge": true
+  },
+  "ruleset": {
+    "name": "main: merge queue",
+    "target": "branch",
+    "enforcement": "active",
+    "conditions": {
+      "ref_name": {
+        "include": ["refs/heads/main"],
+        "exclude": []
+      }
+    },
+    "$bypass_actors": "Empty: enforced for administrators, as the classic protection's enforce_admins was (every push is made with the owner's credentials).",
+    "bypass_actors": [],
+    "rules": [
+      {
+        "type": "pull_request",
+        "$parameters": "0 approvals: the review is the wave's reviewer step (kb/Work PB3027), not a GitHub approval.",
+        "parameters": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": false
+        }
+      },
+      {
+        "type": "merge_queue",
+        "$parameters": "Merge method MERGE (a merge commit): the branch's commits stay ancestors of main, so prune_worktrees.py's landed test, carried() and git cherry keep working offline; squash was rejected on the operator's review 2026-10-11 12:16.",
+        "parameters": {
+          "merge_method": "MERGE",
+          "grouping_strategy": "ALLGREEN",
+          "min_entries_to_merge": 1,
+          "max_entries_to_merge": 5,
+          "max_entries_to_build": 5,
+          "min_entries_to_merge_wait_minutes": 5,
+          "check_response_timeout_minutes": 60
+        }
+      },
+      {
+        "type": "required_status_checks",
+        "$parameters": "ci-gate, the terminal job of .github/workflows/build-and-test.yml, reported by GitHub Actions (integration 15368, as the classic protection named it).",
+        "parameters": {
+          "strict_required_status_checks_policy": false,
+          "do_not_enforce_on_create": false,
+          "required_status_checks": [
+            {
+              "context": "ci-gate",
+              "integration_id": 15368
+            }
+          ]
+        }
+      },
+      {
+        "type": "non_fast_forward"
+      },
+      {
+        "type": "deletion"
+      }
+    ]
+  }
+}

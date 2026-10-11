@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
-# push-main.sh — ⛔ THE ONLY WAY A COMMIT REACHES `main`. (Owner decision 2026-09-06, question 23; kb/Work/PB796.)
+# push-main.sh — ⛔ THE ONLY WAY A COMMIT REACHES `main` UNTIL THE MERGE QUEUE IS ACTIVE. (Owner decision 2026-09-06,
+# question 23; kb/Work/PB796.) Once `python scripts/orchestrator/ruleset.py check` reports the queue ACTIVE on main, a
+# landing is a pull request queued by `scripts/orchestrator/enqueue.py` and this script cannot push main any more; the
+# first change landed through the queue deletes it, with landing_lease.py (kb/Work PB3024, operator review 2026-10-11).
 #
 # `main` carries a REQUIRED status check — `ci-gate`, the terminal job of .github/workflows/build-and-test.yml —
 # with `enforce_admins: true`. Every push to this repository is made with the owner's credentials, so an
@@ -20,7 +23,7 @@
 # The brief-level fix ("wait for the run, report its conclusion") was prose in four places. This is the mechanism.
 #
 # ⭐ IT IS IDEMPOTENT AND SAFE TO RE-RUN. A full-matrix run is ~25–30 min, which is longer than an agent's command
-# timeout — so a caller that is cut off simply RUNS IT AGAIN: a sha that already carries a green `ci-gate` skips
+# timeout — so a caller that is cut off simply RUNS IT AGAIN: a sha that already carries a green run (never a PR's) skips
 # straight to the main push, and a run already in flight for that sha is re-attached to, never duplicated. Run it
 # in the background (the Bash tool's `run_in_background`) or re-run it; do not hand-roll the wait.
 #
@@ -287,10 +290,22 @@ if ! "$PY" scripts/orchestrator/landing_check.py --rev "$SHA" --base "$BASE"; th
   exit 3   # its own code (the header's Exit list): a STOP is a re-plan, never a usage error to retry
 fi
 
-green_ci_gate() {   # 1 = this sha already carries a successful `ci-gate` check run
+green_ci_gate() {   # 1 = this sha already carries a successful `ci-gate` check run (what the protection reads)
   local n
   n="$(gh api "repos/$REPO/commits/$1/check-runs?check_name=ci-gate&per_page=100" \
          --jq '[.check_runs[] | select(.conclusion == "success")] | length' 2>/dev/null)"
+  case "${n:-x}" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$n" -gt 0 ]
+}
+
+# ⛔ THE SKIP READS A RUN THAT COULD HAVE RUN THE MATRIX, NEVER A PULL REQUEST'S (kb/Work PB3024). A `pull_request` run is
+# the cheap jobs only, and its green `ci-gate` is attached to the PR's head commit, so `green_ci_gate` would skip a
+# landing whose matrix never ran. The same rule as the workflow's already-verified short-circuit (`changes` job).
+verified_by_a_full_run() {   # 1 = a run of this workflow from any event but pull_request succeeded on sha $1
+  local n
+  n="$(gh api "repos/$REPO/actions/runs?head_sha=$1&per_page=100" \
+         --jq '[.workflow_runs[] | select((.path | startswith(".github/workflows/build-and-test.yml"))
+                and .event != "pull_request" and .conclusion == "success")] | length' 2>/dev/null)"
   case "${n:-x}" in ''|*[!0-9]*) return 1 ;; esac
   [ "$n" -gt 0 ]
 }
@@ -314,8 +329,8 @@ report_red() {      # $1 = run id, $2 = what it means for main
 
 # ── 1. Earn the verdict on the landing branch ────────────────────────────────────────────────────────────────
 RUN_ID=""
-if green_ci_gate "$SHA"; then
-  say "push-main: $SHORT already carries a green ci-gate check — skipping straight to the main push."
+if verified_by_a_full_run "$SHA"; then
+  say "push-main: $SHORT already carries a green run (not a pull request's) — skipping straight to the main push."
 else
   say "push-main: pushing $SHORT to $BRANCH for verification …"
   git push --quiet origin "$SHA:refs/heads/$BRANCH" || die "could not push $BRANCH"
