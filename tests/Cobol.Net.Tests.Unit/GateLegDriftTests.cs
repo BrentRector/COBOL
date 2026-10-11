@@ -136,6 +136,38 @@ public sealed class GateLegDriftTests
     }
 
     /// <summary>
+    /// ONE SHAPE (owner 2026-10-11, kb/Work PB3015 Q1a, PB3022; DESIGN-test-build-ci.md §3.17.3): the gate takes no
+    /// mode, so no brief, skill, script, doc or test may tell anyone to run one — a caller left naming the deleted
+    /// lander mode would fail at the parameter binder, and one naming the implementer mode would teach a distinction
+    /// that no longer exists. History (the DEVLOG, the kb/Work notes, frozen evidence) keeps its words.
+    /// </summary>
+    [Fact]
+    public void TheGate_HasOneShape_NoCallerNamesAMode()
+    {
+        var mode = new Regex(@"(?:-Mode|--mode)\s+(?:" + "implementer" + "|" + "lander" + @")\b", RegexOptions.NonBacktracking);
+        string[] extensions = [".md", ".py", ".ps1", ".sh", ".js", ".cs", ".yml", ".json"];
+        string[] skipped = ["bin", "obj", ".git", "TestResults", "claude-skills", "evidence", "Work", "worktrees"];
+        IEnumerable<string> Walk(string dir) => Directory.Exists(dir)
+            ? Directory.EnumerateFiles(dir).Where(f => extensions.Contains(Path.GetExtension(f)))
+                .Concat(Directory.EnumerateDirectories(dir)
+                    .Where(d => !skipped.Contains(Path.GetFileName(d))).SelectMany(Walk))
+            : [];
+        var files = new[] { ".claude", ".github", "scripts", "docs", "tests" }.SelectMany(d => Walk(TestRepo.At(d)))
+            .Concat(Directory.EnumerateFiles(TestRepo.Root, "*.md")
+                .Where(f => Path.GetFileName(f) is not ("DEVLOG.md" or "STATUS.md")))  // history; a worktree's gitignored checkpoint
+            .ToList();
+        Assert.Contains(files, f => f.EndsWith(Path.Combine("templates", "MANDATORY-PRACTICES.md"), StringComparison.Ordinal));
+        var offenders = files
+            .SelectMany(f => File.ReadLines(f).Select((line, i) => (f, i, line)))
+            .Where(x => mode.IsMatch(x.line))
+            .Select(x => $"{Path.GetRelativePath(TestRepo.Root, x.f)}:{x.i + 1}: {x.line.Trim()}")
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "the gate has ONE shape — `pwsh scripts/build-local.ps1 [-Priority BelowNormal]`, no mode (kb/Work PB3022) — "
+            + "but these lines still name one:\n  " + string.Join("\n  ", offenders));
+    }
+
+    /// <summary>
     /// Arm (6): every <c>dotnet test</c> caller under <c>scripts/</c> runs scrubbed, and no CI workflow sets a
     /// variable that narrows a test run.
     /// </summary>

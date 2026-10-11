@@ -9,7 +9,8 @@ something it reads has changed (kb/Work PB2914; docs/rearchitecture/DESIGN-test-
 pays for it: every implementer gate ran all 68 (kb/Work PB2563), the slowest 4-8 minutes on a quiet host, and a fleet's
 gates ran them all at once until they passed the runner's time limit and failed every gate (kb/Work PB2914).
 scripts/self_tests.py therefore records, with each PASS, the CONTENT of everything the self-test read, and an
-implementer gate reuses that PASS while all of it is unchanged. The lander's gate and CI run every self-test and record.
+gate reuses that PASS while all of it is unchanged (every gate, kb/Work PB3022). CI and the Linux gate run every
+self-test and record.
 
 THE INPUTS OF A RUN (`Deps`) are OBSERVED, not guessed — a list of what a script mentions is far wider than what its
 self-test reads (a hand-derived closure over mentions reached the whole tree from most orchestrator scripts):
@@ -39,7 +40,7 @@ for an edited one (a gate tests the working tree), a submodule's commit for anyt
 ⛔ WHAT NOTHING HERE SEES, named rather than hidden: a PowerShell or bash process's own reads of a path it builds at run
 time (declare it: `SELF-TEST-READS`) and the git commands it runs itself, and `os.stat`-style probes (no audit event).
 A trace that does not contain a Python self-test's own file means the tracer did not run: the runner records no PASS
-for it. The backstop for all three is the lander's gate and CI, which never reuse a PASS.
+for it. The backstop for all three is CI (and the Linux gate), which never reuse a PASS.
 """
 from __future__ import annotations
 

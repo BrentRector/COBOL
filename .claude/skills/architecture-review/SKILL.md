@@ -74,7 +74,7 @@ the `wf_r2_review.js` fleet, launched by the attended operator in three commands
    messages.
 3. **Grammar or lexer changes:** the token-stream differential (the PB1715 form: type, channel, offsets, line,
    column, text and final mode, over every lexer input the suites use) plus a parse-tree shape differential.
-4. **Program output.** The whole-population gate (`build-local.ps1 -Mode implementer`/`-Mode lander`), the Linux
+4. **Program output.** The gate (`build-local.ps1`, leg 1) with CI's whole-population run (kb/Work PB3022), the Linux
    gate (`scripts/linux-gate.sh`), CI through `push-main.sh`, and the GnuCOBOL differential at close.
 5. **Performance** against the R0 baseline (PB2117, which is also kb/Work A6's instrument): the whole-population
    gate time and the compile-throughput benchmark (`brent-tools:performance-diagnosis`).

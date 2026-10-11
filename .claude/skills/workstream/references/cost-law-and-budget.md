@@ -58,13 +58,13 @@ Verify on wave 67 with the same measurement (turns to first edit, read calls, pr
 **⭐ Lander throughput — owner decision 2026-09-22 ("do all that we can").** The lander is the serial bottleneck: train
 47's lander took 84 min, and its whole-Conformance leg measured 9.6 min on a quiet host, 18.5 min at battery #84 and
 30.6 min in train 48, because up to seventeen implementers were running the SAME whole assembly on the same 32 cores.
-(1) Every implementer gate is `build-local.ps1 -Mode implementer`, the ORDERED gate (owner, 2026-09-28, kb/Work
-PB1708: "order, don't skip"), and it holds a GATE SLOT (`scripts/gate_slot.py`, kb/Work PB1720): at most N
-implementer gates build or test at once, repository-wide (N is one shared setting, 3 by default, kb/Work PB2514),
-while the lander (`-Mode lander`) never takes one and never waits. Under batched gating (kb/Work PB2515, the owner's
-rule since 2026-10-10) the implementer gate runs leg 1 only and the lander's train gate is the one whole-population
-run per train (MANDATORY-PRACTICES L12): ≈ 2–3 whole-population runs per 5-change train against ≈ 7–8, measured per
-train by `scripts/orchestrator/train_measure.py`. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
+(1) Every gate is `build-local.ps1`, the ORDERED gate (owner, 2026-09-28, kb/Work
+PB1708: "order, don't skip"), with ONE shape (owner 2026-10-11, kb/Work PB3022): it holds a GATE SLOT
+(`scripts/gate_slot.py`, kb/Work PB1720) — at most N gates build or test at once, repository-wide (N is one shared
+setting, 3 by default, kb/Work PB2514) — and runs leg 1 only (batched gating, kb/Work PB2515); a landing's gate is the
+same command on the train head. The local whole-population run is gone: CI's merge-group run is the population check
+(kb/Work PB3015: on 2026-10-10 the lander's local population runs were 41 % of all lander minutes, 7–53 min each and
+8 of 15 RED under load), measured per landing by `scripts/orchestrator/train_measure.py`. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
 hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
 LANDING UNDER ONE LANDING LEASE (kb/Work PB2537): the next train's lander is dispatched while the previous one is still
 in CI and brings its clusters in at once, then takes the landing lease (`scripts/orchestrator/landing_lease.py`), which

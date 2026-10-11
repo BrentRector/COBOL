@@ -116,20 +116,22 @@ comprehensive pass once the design settles (`PROMPT.md` §4).
 
 ## Testing
 The owner decided on 2026-09-28 (kb/Work PB1708): ORDER, DON'T SKIP. Every gate plans the whole discovered
-population of Conformance, Unit and Characterization, ordered, and no gate filters; an implementer's gate runs leg 1
-and the lander's runs it all (batched gating, owner 2026-10-10, kb/Work PB2515). Per commit, an implementer runs
-`pwsh scripts/build-local.ps1 -Mode implementer -Priority BelowNormal` (MANDATORY-PRACTICES I1/I2; kb/Work PB1721):
-the likely failures first, fail-fast, inside a gate slot that caps how many implementer gates run at once (one shared
-cap, 3 by default, kb/Work PB2514). **Batched gating (owner 2026-10-10, kb/Work PB2515):** an implementer gate runs
-leg 1 only and its verdict reads `LEG 1 ONLY (batched gating, PB2515): GREEN|RED`; the lander's whole-population gate
-is each change's population check, and the implementer leaves the Linux gate to the lander. A self-test whose inputs
-are unchanged since a recorded PASS is reused, never re-run, by an implementer gate (kb/Work PB2914). A lander runs
-`-Mode lander`: the whole population in one leg, with no slot, every self-test run and recorded. A stale or missing impact map only
+population of Conformance, Unit and Characterization, ordered, and no gate filters. **The gate has ONE shape (owner
+2026-10-11, kb/Work PB3015 Q1a, PB3022): `pwsh scripts/build-local.ps1 -Priority BelowNormal`** (MANDATORY-PRACTICES
+I1/I2; kb/Work PB1721) for an implementer's commit, a re-gate after a fix and (at Normal priority) a landing alike:
+the likely failures first, fail-fast, inside a gate slot that caps how many gates run at once (one shared cap, 3 by
+default, kb/Work PB2514). **Batched gating (owner 2026-10-10, kb/Work PB2515):** the gate runs leg 1 only — the
+change's own tests, the previous reds, the host-only witnesses (`[Trait("Host", "ReFS")]`, tier 0h), the cheap
+tree-wide sweeps (`[Trait("Sweep", "tree")]`, tier 0c) and the cheapest reach — and its verdict reads `LEG 1 ONLY
+(batched gating, PB2515): GREEN|RED`; CI is the regression net and the ONLY whole-population run (owner 2026-10-11
+~11:20: "local testing confirms the targeted change; CI/CD ensures no regression on the remaining codebase"). A
+self-test whose inputs are unchanged since a recorded PASS is reused, never re-run, by every gate (kb/Work PB2914,
+PB3022). A stale or missing impact map only
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
-Linux, so every gate runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732). Every
-lander runs all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes (an implementer
-only while the owner sets the scope `whole`). Build `Cobol.Net.sln` (not a single project) before
+Linux, so every landing runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732):
+all four legs (unit, characterization, conformance, and CI's `guard` job), about 6 minutes (an implementer only while
+the owner sets the scope `whole`), until the targeted leg runs on both hosts (kb/Work PB3022 item 10). Build `Cobol.Net.sln` (not a single project) before
 any `--no-build` run. Commands and the current battery baseline are in plan §0 "Gates" and §9.
 ⛔ **THE CI INVARIANT (owner 2026-10-04): GitHub CI must never fail when the same code was tested locally by the same
 processes.** CI is the verification of the local process, never its first run. A CI red is therefore ALSO a defect in the

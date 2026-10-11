@@ -51,16 +51,17 @@ REUSE (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10): every run of a self-t
 with the content of everything it read (scripts/self_test_inputs.py: the files and directory listings its Python
 processes touched, plus what a PowerShell or bash script mentions and the runner itself) in ONE store shared by every
 checkout of the repository, `<git common dir>/cobol-self-test-passes/` (beside the gate slots, never keyed on a branch).
-`--reuse` — the IMPLEMENTER gate's run — reports a self-test REUSED, without running it, while a recorded PASS's inputs
-are all unchanged on this tree; a branch that changes nothing a self-test reads reuses the PASS main's lander gate
-recorded, and a change re-runs exactly the self-tests that read what it changed. The default run — the LANDER's gate,
+`--reuse` — every GATE's run (one shape since kb/Work PB3022) — reports a self-test REUSED, without running it, while
+a recorded PASS's inputs are all unchanged on this tree; a branch that changes nothing a self-test reads reuses the
+PASS an earlier gate recorded, and a change re-runs exactly the self-tests that read what it changed (and records each
+new PASS). The default run —
 CI, the Linux gate, a hand run — reuses nothing: it runs every self-test, and records each PASS. The `--built` phase
 reads build output no key covers, so it always runs and never records.
 
 THE BUDGET (kb/Work PB2914): at most BUDGET_CAP self-tests run at once on the MACHINE, from every gate of every checkout
 together — one OS lock file per place under `<git common dir>/cobol-self-test-slots/`. A self-test waits for a place
 before it starts and holds it to its end, so one gate alone runs as wide as the cores, and N gates share the cores
-instead of multiplying them: a gate's self-test time no longer grows with the number of gates. The implementer's
+instead of multiplying them: a gate's self-test time no longer grows with the number of gates. A gate's
 self-tests keep running BEFORE its gate slot (kb/Work PB2524: a red one fails the gate without queueing behind other
 gates' builds and legs, PB2523); the budget is their own, so they never wait for a whole gate either.
 
@@ -559,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--jobs", type=int, default=None,
                     help="how many of this run's self-tests wait for a budget place at once (default: the cores)")
     ap.add_argument("--reuse", action="store_true",
-                    help="report a self-test REUSED while a recorded PASS's inputs are unchanged (the implementer gate)")
+                    help="report a self-test REUSED while a recorded PASS's inputs are unchanged (every gate)")
     ap.add_argument("--self-test", action="store_true", help="prove the discovery rule and the verdict")
     args = ap.parse_args(argv)
     if hasattr(sys.stdout, "reconfigure"):
@@ -741,7 +742,7 @@ def _max_overlap(spans: list[tuple[float, float]]) -> int:
 def fleet_arms(check: Callable[[str, object, object], None]) -> None:
     """kb/Work PB2914: the self-test phase from N CONCURRENT simulated gates over one planted repository — every gate
     its own Runner, Budget and PassStore objects (separate processes in life) over the SAME shared directories. One
-    lander run records; N implementer gates on the unchanged tree re-run nothing; a changed input re-runs exactly the
+    full run records; N gates on the unchanged tree re-run nothing; a changed input re-runs exactly the
     self-tests that read it, never more than the budget at once; a hang is HANG, never RED."""
     with tempfile.TemporaryDirectory() as d, tempfile.TemporaryDirectory() as s:
         root, spans_dir = Path(d), Path(s)
@@ -786,9 +787,9 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
             return [tuple(map(float, p.read_text(encoding="utf-8").split()))
                     for p in set(spans_dir.glob(f"{name}-*")) - before]
 
-        lander = gate(False, [])
-        check("arm: the lander's run runs every self-test and records each PASS",
-              ([r.state for r in lander], len(list(store_dir.rglob("*.json")))), ([GREEN] * 3, 3))
+        full = gate(False, [])
+        check("arm: a full run (CI, the Linux gate, a hand run) runs every self-test and records each PASS",
+              ([r.state for r in full], len(list(store_dir.rglob("*.json")))), ([GREEN] * 3, 3))
         rec = PassStore(store_dir).find("scripts/test_c.py", plat, inputs.Tree.load(root))
         check("arm: the recorded PASS holds a file read through a name built at run time (the trace saw it)",
               rec is not None and "data/c.txt" in rec["deps"]["files"], True)
@@ -804,7 +805,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         bad.unlink()
         before = set(spans_dir.iterdir())
         unchanged = fleet(True)
-        check(f"arm: {_FLEET_GATES} concurrent implementer gates on an unchanged tree re-run nothing (every one REUSED)",
+        check(f"arm: {_FLEET_GATES} concurrent gates on an unchanged tree re-run nothing (every one REUSED)",
               ({r.state for g in unchanged for r in g}, set(spans_dir.iterdir()) - before), ({REUSED}, set()))
         (root / "data" / "c.txt").write_text("c changed\n", encoding="utf-8")
         before = set(spans_dir.iterdir())
@@ -819,7 +820,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
                by_test["scripts/test_c.py"] <= {GREEN, REUSED}, len(new_runs("test_c.py", before)) == greens),
               ({REUSED}, {REUSED}, True, True, True))
         before = set(spans_dir.iterdir())
-        crowd = fleet(False, which=[found["test_c.py"]])  # four gates that each run it: lander-like, no reuse
+        crowd = fleet(False, which=[found["test_c.py"]])  # four gates that each run it: full runs, no reuse
         check(f"arm: {_FLEET_GATES} gates running the same self-test at once run at most the budget's {_FLEET_CAP} "
               f"at a time, and none hangs",
               (len(new_runs("test_c.py", before)), _max_overlap(new_runs("test_c.py", before)) <= _FLEET_CAP,

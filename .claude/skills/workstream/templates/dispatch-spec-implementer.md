@@ -32,7 +32,7 @@ Never start a build or gate once one exists. No other STOP file is yours (anothe
 ⛔ HOW TO WAIT FOR A LONG JOB (measured 2026-09-22, wave 45): a workflow agent that ENDS ITS TURN while a background
 build/gate is running is RETURNED BY THE HARNESS AND ITS BACKGROUND PROCESS IS KILLED. So:
 1. Start the gate in the background, logging to a file:
-     PowerShell (run_in_background): pwsh -NoProfile -File scripts/build-local.ps1 -Mode implementer -Priority BelowNormal *> <log>
+     PowerShell (run_in_background): pwsh -NoProfile -File scripts/build-local.ps1 -Priority BelowNormal *> <log>
 2. Then BLOCK in the foreground until the verdict line appears, in chunks under the 10-minute tool limit:
      Bash (timeout 590000): timeout 580 bash -c 'until grep -qE "=== BUILD-LOCAL GATE: " "<log>"; do sleep 5; done' ; tail -3 "<log>"
    If it times out with no verdict, issue the SAME command again. Do not use `sleep`; do not end your turn.
@@ -54,14 +54,16 @@ silent-failure-hunter.md and comment-analyzer.md (+ type-design-analyzer.md if y
 
 ⛔ SIBLING SWEEP (CLAUDE.md rule 4): every bug is a pattern. Which ARM of the dispatch did you fix, and where is the other?
 
-GATE — ORDER, DON'T SKIP (owner 2026-09-28; kb/Work PB1708, PB1721): `pwsh scripts/build-local.ps1 -Mode implementer
+GATE — ORDER, DON'T SKIP (owner 2026-09-28; kb/Work PB1708, PB1721): `pwsh scripts/build-local.ps1
 -Priority BelowNormal` — nothing to derive, pass or trim. It takes a gate slot (`gate-slot: waiting, k ahead` is the cap
 working: keep blocking), builds, and plans EVERY discovered case of Conformance, Unit and Characterization into two
-legs — your added tests, your previous gate's reds and the cheapest cases your change reaches in leg 1 — FAIL-FAST.
+legs — your added tests, your previous gate's reds, the host-only witnesses (tier 0h), the cheap tree-wide sweeps
+(tier 0c) and the cheapest cases your change reaches in leg 1 — FAIL-FAST. The gate has ONE shape (kb/Work PB3022): a
+re-gate after a fix runs leg 1 again, never the population.
 ⭐ BATCHED GATING (owner 2026-10-10, kb/Work PB2515, MANDATORY-PRACTICES I1): the gate runs LEG 1 ONLY, names every
 leg-2 case NOT RUN, and is done on `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — …`; a red
-is `…: RED` — fix it and re-gate. The lander's whole-population train gate checks the population and attributes any
-red to your branch. (Only while the owner has set the shared implementer scope to `whole`, as `python
+is `…: RED` — fix it and re-gate. CI's whole-population run checks the population; a CI red attributed to your
+branch is fixed on it. (Only while the owner has set the shared implementer scope to `whole`, as `python
 scripts/gate_slot.py status` shows, does it run both legs, stop `RED/INCOMPLETE` on a leg-1 red, and finish on
 `=== BUILD-LOCAL GATE: GREEN — …`.) ALWAYS `-Priority BelowNormal`; one gate per worktree.
 ⛔ `python scripts/semgrep/verify.py` must not increase any rule's count (train 57 dropped a cluster for +20 BigInteger).

@@ -25,19 +25,19 @@ LANDER_HANDOFF = [r'READY-TO-PUSH <this worktree> <HEAD sha>', r'LOOP STATE: \{L
 # that are cheapest to lose silently.
 BRIEFS = {
     # P4: the stamped handoff (kb/Work/PB1698) — STATUS.md names the commit it describes; a resumer reads the delta.
-    # PB1721: the implementer's gate is the ORDERED gate — `build-local.ps1 -Mode implementer`; PB2515: leg 1 only.
-    'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'STATUS-AT:',
+    # PB1721: the gate is the ORDERED gate — `build-local.ps1 -Priority BelowNormal`; PB2515: leg 1 only; PB3022: one shape.
+    'fix-lane-implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'build-local\.ps1 -Priority BelowNormal', r'STATUS-AT:',
                                       r'status_delta\.py', r'BUILD-LOCAL GATE: GREEN',
                                       # PB1732 (I8): CI's Linux legs run under WSL before the report
                                       r'linux-gate\.sh', r'FIX WHAT YOU FIND',  # I9
                                       r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
-    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'-Mode implementer', r'BUILD-LOCAL GATE: GREEN',
+    'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'build-local\.ps1 -Priority BelowNormal', r'BUILD-LOCAL GATE: GREEN',
                              r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched gating, PB2515\)'],  # I9; PB2515
     'lander-train-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'(?i)pipelin', r'push-main', r'REVIEW THE TRAIN',
                               r'compare_oracle',  # PB2152 (L11): the R0 oracle runs after every train's gate
                               r'landing_oracle',  # PB2885 (L11): push-main refuses a stale baseline (exit 7)
                               r'train_apply\.py',  # PB2885 (L1): the clusters come in by one command
-                              r'-Mode lander',  # PB1721 (L2): the lander's gate is the whole population, one leg
+                              r'build-local\.ps1',  # PB3022 (L2): the lander's gate is the one gate, leg 1 on the train head
                               r'linux-gate\.sh',  # PB1732 (L10): CI's Linux legs under WSL before push-main
                               # PB2515 (L12): a red train is attributed per cluster before it is fixed; every train
                               # is measured
@@ -45,12 +45,12 @@ BRIEFS = {
                               # PB2537 (L3): one lander on main at a time — the lease before the final rebase and gates
                               r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',
                               *LANDER_HANDOFF],
-    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'-Mode lander',
+    'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'build-local\.ps1',
                         r'compare_oracle', r'landing_oracle', r'train_apply\.py',  # PB2885 (L11, L1)  # PB1732 (L10); PB1721 (L2)
                         r'train_measure\.py record',  # PB2515 (L12)
                         r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',  # PB2537 (L3)
                         *LANDER_HANDOFF],
-    'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'-Mode lander',  # PB1721 (L2)
+    'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'build-local\.ps1',  # PB3022 (L2)
                                r'landing_lease\.py acquire', *LANDER_HANDOFF,  # PB2537 (L3)
                                r'compare_oracle', r'landing_oracle'],  # PB2885 (L11): goldens are oracle inputs
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site'],
@@ -65,7 +65,7 @@ BRIEFS = {
                         r'planOf', r'--launch', r'--status', r'--append',
                         # PB2707: the launch is launch.js, the template with its plan from disk; nothing is transcribed
                         r'launch\.js', r'const A = args'],
-    'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'-Mode implementer', r'\{global_stop\}', r'\{stop_file\}',
+    'dispatch-spec-implementer.md': [r'claude-skills', r'BelowNormal', r'build-local\.ps1 -Priority BelowNormal', r'\{global_stop\}', r'\{stop_file\}',
                                      r'\{reports\}',  # PB2980: the report goes in coord.reports_dir(), never the wave's scratch
                                      r'until grep -q', r'where\.py', r'orient\.py', r'semgrep/verify\.py', r'cite\.py --check',
                                      r'Turn cap 220', r'code site', r'leg-1-Conformance\.trx', r'drift_rules\.py', r'STATUS-AT:',

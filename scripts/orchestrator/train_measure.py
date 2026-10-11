@@ -8,8 +8,8 @@
     python scripts/orchestrator/train_measure.py --self-test
 
 WHY. Batched gating is the gate policy (kb/Work PB2515; the owner's decision 2026-10-10, "Yes, permanently", after
-a measured trial from 2026-10-07): an implementer gates leg 1 only, and the lander's whole-population train gate is
-the population check for every cluster. It was decided on what it measured against the per-commit whole population
+a measured trial from 2026-10-07): every gate runs leg 1 only (one shape since kb/Work PB3022), and CI's
+whole-population run is the population check for every cluster. It was decided on what it measured against the per-commit whole population
 (kb/Work PB1708) — changes landed per hour, whole-population runs per train, red trains and their attribution time,
 finishers created by ejection, and CI reds, which must stay ZERO (the CI invariant, kb/Work PB1957) — and every train
 is still recorded, so a policy that stops paying shows in the numbers. Each lander records its train once it has

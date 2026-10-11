@@ -62,7 +62,7 @@ The per-change gate builds the solution and runs EVERY Conformance, Unit and Cha
 tests your change is most likely to break run first:
 
 ```bash
-pwsh scripts/build-local.ps1 -Mode implementer     # or: bash scripts/build-local.sh --mode implementer
+pwsh scripts/build-local.ps1     # or: bash scripts/build-local.sh
 ```
 
 It runs in two legs and stops after the first if anything there fails. Read the `=== BUILD-LOCAL GATE: ` line it

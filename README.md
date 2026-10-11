@@ -86,7 +86,7 @@ Requires the .NET 10 SDK, PowerShell 7+, Python 3.14+ and Java 21+ (ANTLR parser
 
 ```bash
 dotnet build Cobol.Net.sln
-pwsh scripts/build-local.ps1 -Mode implementer   # build + every Conformance, Unit and Characterization test, likely reds first
+pwsh scripts/build-local.ps1   # build + every Conformance, Unit and Characterization test, likely reds first
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the standard-citation rule and the Contributor License
