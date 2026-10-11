@@ -20,8 +20,11 @@ REPO = TMP / "repo"
 (REPO / "kb" / "Work").mkdir(parents=True)
 (REPO / "src" / "Cobol.Net.Editions" / "Diagnostics").mkdir(parents=True)
 (REPO / "src" / "A" / "bin").mkdir(parents=True)
-(REPO / "DEVLOG.md").write_text("# DEVLOG\n\nordering note: newest first\n\n## Entry 41 — x\n\n## Entry 40 — y\n",
-                                encoding="utf-8")
+(REPO / "DEVLOG").mkdir()                                     # one file per entry (kb/Work PB3025)
+(REPO / "DEVLOG" / "README.md").write_text("# DEVLOG\n", encoding="utf-8")
+(REPO / "DEVLOG" / "0041-x.md").write_text("## Entry 41 — x\n\nbody\n", encoding="utf-8")
+(REPO / "DEVLOG" / "0040-y.md").write_text("## Entry 40 — y\n\nbody\n", encoding="utf-8")
+(REPO / "DEVLOG" / "0039a-z.md").write_text("## Entry 39a — z\n\nbody\n", encoding="utf-8")
 for n in (7, 12, 9):
     (REPO / "kb" / "Work" / f"PB{n}.md").write_text("---\nid: x\n---\n", encoding="utf-8")
 (REPO / "kb" / "Work" / "PB99-notes.txt").write_text("not a note", encoding="utf-8")
