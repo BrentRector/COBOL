@@ -62,7 +62,7 @@ report, leak scans, doc prose, link and format sweeps) and `cobol-locator` for r
 location, orient.py / fix_clusters.py / where.py summaries, transcript and log measurements). ⛔ Never pass
 `model` on a mechanical role's `agent()` call: it overrides the frontmatter. A mechanical agent that hits a
 judgment call returns `NEEDS-OPUS: <why>`, and that item is re-dispatched to a judgment role. ⭐ **Fleets run through the Workflow tool on a STANDING owner opt-in (2026-09-25)**, and
-every `agent()` names its role's `agentType` from `.claude/agents/` (`cobol-implementer` · `cobol-lander` ·
+every `agent()` names its role's `agentType` from `.claude/agents/` (`cobol-implementer` · `cobol-lander` · `cobol-reviewer` ·
 `cobol-refuter` · `cobol-adjudicator` · `cobol-clerk` · `cobol-locator`), which fixes that role's effort, turn cap, 1-hour prompt cache
 and — for the read-only roles — a hook that refuses writes inside any git tree (MANDATORY-PRACTICES O4, P12).
 
@@ -92,7 +92,11 @@ gathering"; "use this new rolling functionality as it reduces context and token 
 `Workflow({scriptPath: ".claude/skills/workstream/templates/wf_rolling_wave.js", args})`. There is no wave barrier:
 - **Rolling pool.** `concurrency` workers pull groups from one queue, so a freed slot is refilled the moment an
   implementer returns, never after the slowest of the wave.
-- **Trains as branches finish.** A lander train starts when `train_size` branches are ready. Trains are serialized,
+- **Review on the branch** (MANDATORY-PRACTICES I10, kb/Work PB3027). A DONE implementer's branch is reviewed by ONE
+  read-only `cobol-reviewer` (the `review` skill's branch form) inside its slot; FINDINGS go to a review finisher and
+  the branch is reviewed again (`review_fix_rounds`, 2). Only a branch stamped `Review: CLEAN` at its head is ready;
+  the lander never reviews. `review_findings.py summary <scratch>` measures it.
+- **Trains as branches finish.** A lander train starts when `train_size` reviewed branches are ready. Trains are serialized,
   and each lander re-reads the DEVLOG top and rebases onto whatever the previous train landed. A final remainder of at
   least `min_final_train` branches gets a train; a smaller one is held for the next queue's first train.
 - **Same-file successors.** A file with more open notes than the cluster cap (`fix_clusters.py` caps at 5) becomes
@@ -134,7 +138,7 @@ considered and rejected in that form: split chains become extra turns, and turns
 ## 3. Landing order and mechanics
 
 - ⛔ **ONE LANDING QUEUE WHILE THE LOOP RUNS** (MANDATORY-PRACTICES O11, kb/Work PB2602; `python scripts/orchestrator/coord.py loop-state`): the attended session dispatches NO lander and runs no rolling wave (its trains are landers too); it writes each finished attended branch's report as `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (that exact shape, plan_wave.py `REPORT_NAME`, in `coord.reports_dir()` whatever the wave's scratch, kb/Work PB2980; a suffixed name is invisible) with a header of `Status: DONE`, `Worktree: <Windows path>`, `Branch: <name>`, `HEAD: <sha>`, `Base: <sha>`, and the land units carry the WAITING TO LAND branches in trains of at most six, the most harmful first (`prune_worktrees.py --train`; owner 2026-10-10, kb/Work PB2981: never one train of every waiting branch). If one truly cannot wait, exactly ONE lander carries the train `--train` names. Every lander dispatch names `LOOP STATE: running|stopped` (the dispatch guard refuses one that does not).
-- ⛔ **No branch is left undecided** (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600): `python scripts/prune_worktrees.py` gives every branch a lifecycle state (IN FLIGHT · WAITING TO LAND · LANDED · DECISION); a branch ends LANDED then deleted (`--apply`), or ABANDONED by a decision recorded in its kb/Work note then deleted (`--apply --abandon <branch>`). Nothing is archived. A lander refused `push-main.sh` by the permission layer ends `READY-TO-PUSH <worktree> <sha>` (L13).
+- ⛔ **No branch is left undecided** (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600): `python scripts/prune_worktrees.py` gives every branch a lifecycle state (IN FLIGHT · WAITING FOR REVIEW · WAITING TO LAND · LANDED · DECISION); a branch ends LANDED then deleted (`--apply`), or ABANDONED by a decision recorded in its kb/Work note then deleted (`--apply --abandon <branch>`). Nothing is archived. A lander refused `push-main.sh` by the permission layer ends `READY-TO-PUSH <worktree> <sha>` (L13).
 - Land finished work first; one lander on main at a time, MECHANICALLY: every lander takes the landing lease (`scripts/orchestrator/landing_lease.py acquire`) before its final rebase and gates, a second lander waits for it instead of gating, and `push-main.sh` refuses a landing while another worktree holds it and releases it on exit (kb/Work PB2537); five clusters per landing (4-6 is the band) and never a lander for a 1-2 cluster landing unless it is a blocking fix; one build, the WHOLE population in one leg, one commit per cluster, one DEVLOG entry, one push.
 - The only way a commit reaches `main` is a landing script (MANDATORY-PRACTICES L5, kb/Work PB3024): `python scripts/orchestrator/enqueue.py queue` (a pull request into GitHub's merge queue) once `ruleset.py check` reports the queue ACTIVE, until then `bash scripts/push-main.sh` (the `ci-gate` check is required; both are idempotent; a red is a blocking finding). Never open or queue a pull request by hand. A docs-only landing still runs and still has to be green.
 - Verdict batches are re-applied on the merged tree with `record_verdicts.py`, never merged as JSON hunks.

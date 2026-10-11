@@ -1670,9 +1670,21 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
 1. **Implement** (unchanged): an implementer in its worktree; its gate is the ordered leg 1 (§3.14, scope `leg1`), its
    report `Status: DONE` with the O11 header; it writes its own **DEVLOG entry file** (§3.17.4) with the number its
    dispatch spec allocated, and flips its notes.
-2. **Review on the branch** (new position, PB3027): a read-only reviewer (`cobol-reviewer`, the `review` skill's
-   full-code pass over `origin/main...HEAD` plus the drift rules of the changed files) runs when the branch is DONE,
-   inside the wave; a confirmed finding goes back to the implementer or a finisher. The enqueue step never fixes.
+2. **Review on the branch** (landed, PB3027; MANDATORY-PRACTICES I10): a read-only reviewer (`cobol-reviewer`, the
+   `review` skill's "branch form": the full-code pass over `origin/main...HEAD`, the drift rules of the changed files,
+   fixed time limits in tests, `cite.py --check`, the other dimensions where the diff warrants) runs when the branch is
+   DONE, inside the wave's slot for that group (`wf_rolling_wave.js` `reviewed()`). Every decision is a line in
+   `<scratch>/review-w<wave>-<letter>.jsonl`, appended through `scripts/orchestrator/review_findings.py`, which computes
+   the verdict from the file and stamps it into the report's header — `**Review:** CLEAN <reviewer> <head>` or
+   `FINDINGS <n> <reviewer> <head> <file>` — read back through `plan_wave.parse_review`, the one reader. FINDINGS → a
+   REVIEW FINISHER (a fresh implementer, because a workflow cannot message an agent that has returned: it merges the
+   branch, answers every finding by its id — fixed at its root, or `no_change_needed` with the reason — re-gates and
+   returns DONE), reviewed again, at most `review_fix_rounds` (2) times; after that the FINDINGS stamp stays and
+   `plan_wave.py` plans a finisher for it. Only a branch stamped CLEAN at its tip is landable: the wave hands its
+   trains only those, and `prune_worktrees.py` lists any other DONE branch WAITING FOR REVIEW (a land unit dispatches
+   the reviewer for one finished outside a wave). The landing step never reviews and never fixes; the lander's former
+   train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
+   `review_findings.py summary` measures findings per branch, the re-review rate and reviewer minutes.
 3. **Enqueue** (`scripts/orchestrator/enqueue.py <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; rebase the
    branch onto `origin/main` (a conflict stops it: the branch returns to WAITING with the conflict named, a finisher
    resolves); run the ONE local gate on the rebased head (§3.17.3); run the landing checks that used to live in

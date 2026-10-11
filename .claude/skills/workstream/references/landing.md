@@ -29,7 +29,10 @@
   Base: <sha>
   ```
 
-  `python scripts/prune_worktrees.py --brief` then lists it WAITING TO LAND, and the land units carry such branches
+  `python scripts/prune_worktrees.py --brief` then lists it WAITING FOR REVIEW: dispatch ONE read-only
+  `cobol-reviewer` on it (the `review` skill's branch form, MANDATORY-PRACTICES I10, kb/Work PB3027; the land unit does
+  it for any it finds), whose `review_findings.py stamp` adds `**Review:** CLEAN <reviewer> <head>` under the Status
+  line. Under that stamp it lists WAITING TO LAND (a FINDINGS stamp goes to a finisher), and the land units carry such branches
   in trains of at most six, the most harmful lead first: the next train is exactly what `prune_worktrees.py --train`
   names, and the rest wait for the land unit after it. ⓜ 2026-10-10: one land unit took all 15 waiting branches,
   split them into three serial landers and landed nothing for hours (owner: "do not try and do 15 branches at once",

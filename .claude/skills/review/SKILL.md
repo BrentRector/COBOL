@@ -61,11 +61,47 @@ Repeated logic · two mechanisms doing one job · redundant recomputation of som
 anything a single canonical implementation should absorb. This is the dimension most often skipped and the one the
 owner named explicitly.
 
+## The branch form — one DONE branch, one reviewer, the findings file (kb/Work PB3027)
+
+Every finished fix-lane branch is reviewed ON THE BRANCH before it may land (DESIGN-test-build-ci.md §3.17.2 step 2;
+MANDATORY-PRACTICES I10): the rolling wave dispatches ONE read-only `cobol-reviewer` when an implementer returns DONE,
+and a session dispatches one by hand for a branch it finished itself or one `python scripts/prune_worktrees.py --brief`
+lists WAITING FOR REVIEW. The landing step never reviews and never fixes. The prompt gives the branch, its worktree, its
+head, the implementer's report, the findings file (`<scratch>\review-w<wave>-<letter>.jsonl`; any path without a
+space for a hand dispatch), the reviewer label and the round. Run every command against the branch's worktree
+(`git -C <worktree> …`, `python <worktree>\scripts\…`) and name the tool `RF` below for
+`python <worktree>\scripts\orchestrator\review_findings.py`:
+
+1. `RF start <file> --round <k> --branch <branch> --head <head> --reviewer <label>` — first, before reading the diff.
+2. **The pass**, by yourself (no sub-agents: one branch's diff is one reviewer's work): `git -C <worktree> diff
+   origin/main...<head>` and the code around each hunk; the **full code review** dimension above in full —
+   `python scripts/spec/drift_rules.py <each changed file>` and every SPECIFIC rule it prints, correctness against the
+   CITED rule, the sibling arms, loud failure, comment accuracy, **no fixed time limit in a test**,
+   `python scripts/spec/cite.py --check <clause> "<text>"` on every citation the diff adds; then the other three
+   dimensions where the diff warrants them (a new type or file: architecture and duplication; a hot path: performance).
+   The base skill's Step 6 holds for each candidate: try to REFUTE it, running its scenario when that is cheap; an
+   uncertain candidate is dropped. A finding the implementer's report already answers with a reason you accept is not
+   one.
+3. Each surviving finding, the moment it survives: `RF finding <file> --round <k> '<one JSON object>'` with `file`,
+   `line` (an integer), `category`, `summary` and `failure_scenario` (concrete inputs → the wrong result); `severity`
+   and `fix` are welcome. The tool numbers it `R<k>-<n>`; the finisher answers it by that id.
+4. `RF verdict <file> --round <k>` — CLEAN when the round recorded no finding, else FINDINGS n, computed from the file.
+5. `RF stamp <report> --findings <file>` — writes `**Review:** CLEAN <label> <head>` (or `FINDINGS <n> <label> <head>
+   <file>`) under the report's Status line. CLEAN at the branch's tip is what lists it WAITING TO LAND
+   (`prune_worktrees.py`); FINDINGS sends it to a finisher: the wave's review finisher, or the next wave's planner
+   (`plan_wave.py`). Return the verdict, the count, the head and the stamp line.
+
+A RE-REVIEW (round k > 1) reviews the review finisher's branch: `RF show <file> --round <k-1>` lists the earlier
+findings and the report's `## Review findings` section answers each by id (fixed in a commit, or `no_change_needed` with
+the reason). Raise again only a finding neither fixed nor answered with a reason you accept, and any new defect the fix
+introduced. `RF summary <scratch>` measures the step: findings per branch, the re-review rate, reviewer minutes.
+
 ## Verify, report, scale
 
 The base's Step 6 (adversarial verification), Step 8 (report) and Scale apply as written. Here, additionally:
 
 - **Findings become tracked work in `kb/Work/`** — one note per surviving defect (CLAUDE.md rule 8), never prose
-  that evaporates and never a second list. `docs/rearchitecture/CONFORMANCE-FIX-QUEUE.md` is only a pointer now.
+  that evaporates and never a second list. (The branch form's findings file is not a list of open work: it is the
+  branch's own review record, answered on the branch before it lands.) `docs/rearchitecture/CONFORMANCE-FIX-QUEUE.md` is only a pointer now.
 - Use `ReportFindings` when the host asks for it.
 - The comprehensive whole-source pass is owner-scheduled for the conformance milestone.

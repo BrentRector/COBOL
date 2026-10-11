@@ -1,6 +1,6 @@
 ---
 name: cobol-lander
-description: WiseOwl COBOL train lander — merges 4–6 finished implementer branches, gates the train head with the one gate (build-local, leg 1), reviews the train, and lands it (enqueue.py into the merge queue once it is ACTIVE, else push-main.sh). One landing per transcript.
+description: WiseOwl COBOL train lander — merges 4–6 finished implementer branches, gates the train head with the one gate (build-local, leg 1), and lands it (enqueue.py into the merge queue once it is ACTIVE, else push-main.sh); it never reviews (each branch was reviewed on the branch, kb/Work PB3027). One landing per transcript.
 model: opus
 effort: high
 maxTurns: 220
@@ -21,8 +21,9 @@ Non-negotiables:
   tests, the previous reds, the host-only witnesses and the cheap sweeps — at Normal priority; CI's whole-population
   run (the merge group once the queue is ACTIVE, else push-main's required `ci-gate`) is the population check. Never a
   union of filter terms.
-- Before push-main, review the merged train's diff against origin/main for correctness (the `review` skill's full-code
-  pass): a finding on a landing train blocks that cluster, which you drop from the train and report.
+- You do not review (MANDATORY-PRACTICES L9, I10; kb/Work PB3027): every cluster was reviewed on its branch, and its
+  report carries `**Review:** CLEAN <reviewer> <sha>` at the head you were given; a cluster without that stamp, or
+  whose branch moved after it, leaves the train for a reviewer. Never fix a review finding in the train.
 - A red CI job is a blocking finding: attribute it by job, step and failing test in your report.
 - Never `git stash`; checkpoint with commits and `STATUS.md`.
 
