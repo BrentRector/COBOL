@@ -15,3 +15,14 @@ static CobolNet.Runtime.ProgramTable.ContainedPath(string! containerPath, string
 static CobolNet.Runtime.ProgramTable.OutermostPath(string! externalizedName) -> string!
 static CobolNet.Runtime.SwitchStore.IsVariableName(string! variableName) -> bool
 static CobolNet.Runtime.SwitchStore.Names.get -> System.Collections.Generic.IReadOnlyList<string!>!
+CobolNet.Runtime.Occurrence
+CobolNet.Runtime.Occurrence.Occurrence() -> void
+CobolNet.Runtime.Occurrence.Occurrence(long value) -> void
+CobolNet.Runtime.Occurrence.Value.get -> long
+override CobolNet.Runtime.Occurrence.ToString() -> string!
+static CobolNet.Runtime.Occurrence.implicit operator CobolNet.Runtime.Occurrence(long value) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.Occurrence.implicit operator long(CobolNet.Runtime.Occurrence occurrence) -> long
+static CobolNet.Runtime.CobolNum.PositionOfWide(CobolNet.Runtime.CobolDec value) -> System.Int128
+static CobolNet.Runtime.CobolNum.PositionOfWide(double value) -> System.Int128
+static CobolNet.Runtime.CobolNum.PositionOfWide(System.Int128 unscaled, int scale) -> System.Int128
+static CobolNet.Runtime.Occurrence.implicit operator System.Int128(CobolNet.Runtime.Occurrence occurrence) -> System.Int128

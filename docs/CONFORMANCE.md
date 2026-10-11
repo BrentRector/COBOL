@@ -724,7 +724,8 @@ of an unsupported facility.
   answer, because every range those rules test lies strictly inside the carrier: `GO TO … DEPENDING ON` a
   selector of 4,294,967,297 falls through (§14.9.17.4 GR2), a reference-modifier start of 4,294,967,297 raises
   EC-BOUND-REF-MOD (§8.4.3.3.4 GR5 c), a STRING pointer of 2^64 + 3 overflows and stays unchanged (§14.9.43.4 GR6,
-  GR8). A repeat count saturates at 2^63 − 1, which no terminating run can tell from a larger one; the
+  GR8). A subscript's or OCCURS DEPENDING count's saturated `long` still positions every table, and the diagnostic
+  names the value the program holds, not the clamp (`CobolTable.Occ` returns an `Occurrence`, kb/Work PB2695). A repeat count saturates at 2^63 − 1, which no terminating run can tell from a larger one; the
   observable carrier limits are an **ADVANCING line count** above 2,147,483,647 (≈ 4 GiB of line terminators),
   which advances 2,147,483,647 lines, and the termination status (item 192 above). An UNSTRING TALLYING count is
   summed exactly, never narrowed. `semgrep` rules `cobolnet-integer-value-cast-narrowed` and

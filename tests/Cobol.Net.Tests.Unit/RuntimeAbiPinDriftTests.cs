@@ -46,7 +46,7 @@ public sealed class RuntimeAbiPinDriftTests
 {
     // ── The pins. Change a hash only with the decision the class summary describes. ──
     private const int PinnedMajor = 2;
-    private const string PinnedRuntimeHash = "515C5AA3212AD0FB";
+    private const string PinnedRuntimeHash = "0184A2DFCC3251B5";
     private const int PinnedCallAbi = 1;
     private const string PinnedBoundaryHash = "304F0F7F986F680F";
 

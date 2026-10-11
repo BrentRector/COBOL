@@ -670,6 +670,55 @@ public static partial class CobolNum
         : value <= -9.2e18 ? long.MinValue
         : (long)Math.Truncate(value);
 
+    // ── The position of an EXPRESSION, at the capacity of the 38-digit segment temporary (kb/Work PB2695) ────────
+    // The statement pre-operation that materializes a subscript expression stores its integer position into a
+    // compiler temporary (BoundPositionValue). The temporary holds up to 38 digits, so the position it carries is
+    // the EXACT integer for every value a native intermediate can form, where the 19-digit temporary it replaced
+    // held only the long-saturated one — and the subscript read (CobolTable.Occ) then names the true value in
+    // EC-BOUND-SUBSCRIPT's detail. A value past the temporary's capacity SATURATES to it by sign: it is still out of
+    // every table's range (§8.4.2.3.4 GR2), and a store that wrapped it modulo 10^38 could land it back inside.
+
+    /// <summary>The largest magnitude the 38-digit position temporary holds: 10^38 − 1.</summary>
+    private static Int128 PositionTempMax => Pow10Wide(38) - 1;
+
+    private static Int128 ClampToTemp(Int128 value) =>
+        value > PositionTempMax ? PositionTempMax : value < -PositionTempMax ? -PositionTempMax : value;
+
+    /// <summary>The integer <paramref name="unscaled"/> at <paramref name="scale"/> denotes, truncated toward zero
+    /// and saturated to the 38-digit position temporary. The caller has already raised its position's condition for
+    /// a fractional value (<see cref="HasFraction(Int128, int)"/>). A NEGATIVE scale is a trailing-P value, its
+    /// storage times 10^|scale| (<see cref="PositionOf(Int128, int)"/>'s reading).</summary>
+    public static Int128 PositionOfWide(Int128 unscaled, int scale)
+    {
+        if (scale >= 0) return ClampToTemp(scale == 0 ? unscaled : unscaled / Pow10Wide(scale));
+        if (unscaled == 0) return 0;
+        // |unscaled| ≥ 1 and at most 37 places keep the product inside Int128; beyond either bound the value is
+        // past the temporary's capacity, so it saturates by sign.
+        if (-scale > 37 || CobolDec.UAbs(unscaled) > (UInt128)(PositionTempMax / Pow10Wide(-scale))) return unscaled > 0 ? PositionTempMax : -PositionTempMax;
+        return unscaled * Pow10Wide(-scale);
+    }
+
+    /// <summary><see cref="PositionOfWide(Int128, int)"/> for an SDIDI value, which IS an unscaled significand at a
+    /// scale (<c>Sig × 10^Exp</c>): the same exact saturation, never a binary64 approximation of the magnitude — the
+    /// double nearest 10^38 is 99999999999999997748809823456034029568, below it, so a pre-check written at 1e38
+    /// saturated values the temporary holds exactly (train 1053 review). An exponent more than 38 places below the
+    /// point leaves no integer digit of an Int128 significand.</summary>
+    public static Int128 PositionOfWide(CobolDec value) =>
+        value.Exp < -38 ? 0 : PositionOfWide(value.Sig, -value.Exp);
+
+    /// <summary>The magnitude below which a binary64 value converts to <c>Int128</c> (whose range ends near
+    /// 1.7014e38). It guards only that conversion; the temporary's capacity, 10^38 − 1, is <see cref="ClampToTemp"/>'s,
+    /// applied to the exact converted value (a pre-check at 1e38 had the SDIDI arm's flaw).</summary>
+    private const double Int128Safe = 1.7e38;
+
+    /// <summary><see cref="PositionOfWide(Int128, int)"/> for a binary64 value; NaN denotes no position and reads as
+    /// 0, as <see cref="PositionOf(double)"/> reads it.</summary>
+    public static Int128 PositionOfWide(double value) =>
+        double.IsNaN(value) ? 0
+        : value >= Int128Safe ? PositionTempMax
+        : value <= -Int128Safe ? -PositionTempMax
+        : ClampToTemp((Int128)Math.Truncate(value));
+
     /// <summary>The <see cref="Position(Int128)"/> narrowing to an <c>int</c> — for the consumers whose host
     /// parameter is an <c>int</c>: a reference-modifier position or length, a GO TO … DEPENDING selector, an
     /// ADVANCING or LINAGE line count, an OCCURS DEPENDING current count (kb/Work PB1033). The same rule, the same
@@ -703,6 +752,34 @@ public static partial class CobolNum
         Int128 mag = neg ? -unscaled : unscaled, div = Pow10Wide(scale);
         return $"{(neg ? "-" : "")}{mag / div}.{(mag % div).ToString().PadLeft(scale, '0')}";
     }
+
+    /// <summary><see cref="PlainValue(Int128, int)"/> for an UNSIGNED-WIDE value (a 16-byte unsigned COMP-5 item's
+    /// [0, 2^128) range), which an <see cref="Int128"/> cannot hold above 2^127 − 1.</summary>
+    internal static string PlainValue(UInt128 unscaled, int scale)
+    {
+        if (unscaled <= (UInt128)Int128.MaxValue) return PlainValue((Int128)unscaled, scale);
+        if (scale <= 0) return IntegerValueText(unscaled, scale);
+        UInt128 div = Pow10U(scale);
+        return $"{unscaled / div}.{(unscaled % div).ToString().PadLeft(scale, '0')}";
+    }
+
+    /// <summary>The INTEGER an unscaled/scale pair denotes, as its plain decimal text — the value truncated toward
+    /// zero, which is the position <see cref="PositionOf(Int128, int)"/> narrows. For the diagnostic that must name
+    /// the value the program computed when the position it narrowed to is the saturated <c>long</c>
+    /// (<see cref="Occurrence"/>; kb/Work PB2695).</summary>
+    internal static string IntegerValueText(Int128 unscaled, int scale) =>
+        scale > 0 ? (unscaled / Pow10Wide(scale)).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                  : PlainValue(unscaled, scale);
+
+    /// <inheritdoc cref="IntegerValueText(Int128, int)"/>
+    internal static string IntegerValueText(UInt128 unscaled, int scale) =>
+        scale > 0 ? (unscaled / Pow10U(scale)).ToString(System.Globalization.CultureInfo.InvariantCulture)
+        : scale < 0 && unscaled != 0 ? unscaled.ToString(System.Globalization.CultureInfo.InvariantCulture) + new string('0', -scale)
+        : unscaled.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary><see cref="HasFraction(Int128, int)"/> for an UNSIGNED-WIDE value.</summary>
+    internal static bool HasFraction(UInt128 unscaled, int scale) =>
+        scale > 0 && unscaled % Pow10U(scale) != 0;
 
     /// <summary>Multiply two unscaled operands with overflow checking against the Int128 carrier: raises
     /// <see cref="CobolSizeError"/> EC-SIZE-OVERFLOW (the size error condition, ISO §14.7.5 case 5) when the product

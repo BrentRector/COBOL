@@ -813,7 +813,8 @@
   "pb2751_keyed_write_rule_order",
   "pb2739_copy_after_directive_line",
   "pb2618_no_get_part_store_every_execution",
-  "pb2618_string_into_property_keeps_unreferenced"
+  "pb2618_string_into_property_keeps_unreferenced",
+  "pb2695_wide_item_subscript_and_odo_count"
   ],
   "pending": []
 }

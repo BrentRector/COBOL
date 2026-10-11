@@ -36,26 +36,38 @@ public static class CobolTable
     }
 
     /// <summary>
-    /// The table element at a 1-based <paramref name="occurrence"/> number, as a writable reference.
+    /// The table element at a 1-based <paramref name="occurrence"/> number, as a writable reference. The parameter is
+    /// an <see cref="Occurrence"/> (kb/Work PB2695) so a subscript that left <c>long</c>'s range reaches the
+    /// diagnostic with its exact value; a native <c>long</c> or <c>int</c> converts implicitly, and a conversion to
+    /// <c>long</c> exists too, so the table accessors have exactly ONE overload per job (a <c>long</c> overload beside
+    /// this one would make every <c>int</c> argument ambiguous).
     /// <para><b>Out-of-range</b> (ISO §8.4.2.3.4 GR2): with EC-BOUND-SUBSCRIPT checking ON the condition is raised
-    /// (below); with it OFF — the COBOL-85 semantics, since COBOL-85 has no exception conditions — the reference
-    /// continues benignly per the implementor-defined rule the NIST-85 golden requires: reads see a fresh
-    /// default-valued element (spaces-equivalent for alphanumeric), writes are absorbed. The element is a per-type
-    /// scratch slot, re-defaulted on every out-of-range access. Caveat: a GROUP element's scratch is a zeroed
-    /// struct — its string members are null, so group-level use of an out-of-range element may still fail loudly.</para>
+    /// (<see cref="OutOfRange{T}"/>); with it OFF — the COBOL-85 semantics, since COBOL-85 has no exception
+    /// conditions — the reference continues benignly per the implementor-defined rule the NIST-85 golden requires:
+    /// reads see a fresh default-valued element (spaces-equivalent for alphanumeric), writes are absorbed. The element
+    /// is a per-type scratch slot, re-defaulted on every out-of-range access. Caveat: a GROUP element's scratch is a
+    /// zeroed struct — its string members are null, so group-level use of an out-of-range element may still fail
+    /// loudly. An occurrence that saturated sits at <c>long</c>'s extreme, which no table contains, so it falls
+    /// into the out-of-range outcome with no test of its own.</para>
     /// </summary>
-    public static ref T At<T>(T[] table, long occurrence)
+    public static ref T At<T>(T[] table, Occurrence occurrence)
     {
+        long position = occurrence.Value;
         // A NULL table is itself an out-of-range chain: a multi-dimension reference whose OUTER subscript was
         // out of range continues through the zeroed scratch struct, whose nested OCCURS arrays are null
         // (NC401M's 5-deep FAIL-path read) — every further level resolves benignly too.
-        if (table is not null && occurrence >= 1 && occurrence <= table.Length) return ref table[(int)(occurrence - 1)];
-        // §8.4.2.3.4 GR2 — "If the value of the subscript is not a positive integer or is less than one or is
-        // greater than the highest permissible occurrence number, the EC-BOUND-SUBSCRIPT exception condition is
-        // set to exist." Raised BEFORE the scratch fallback so a CHECKING-ON reference reports the condition;
-        // with checking off the helper returns and the scratch read below stands unchanged.
-        ExceptionState.SubscriptError(
-            $"subscript {occurrence} is outside 1..{(table?.Length ?? 0)} (ISO 8.4.2.3.4 GR2)");
+        if (table is not null && position >= 1 && position <= table.Length) return ref table[(int)(position - 1)];
+        return ref OutOfRange<T>(table, occurrence);
+    }
+
+    /// <summary>⛔ THE ONE OUT-OF-RANGE OUTCOME of a fixed-table reference. §8.4.2.3.4 GR2 — "If the value of the
+    /// subscript is not a positive integer or is less than one or is greater than the highest permissible occurrence
+    /// number, the EC-BOUND-SUBSCRIPT exception condition is set to exist." Raised BEFORE the scratch fallback so a
+    /// CHECKING-ON reference reports the condition; with checking off the helper returns and the scratch read stands
+    /// unchanged. The detail names the subscript's value as the program holds it (<see cref="Occurrence.ToString"/>).</summary>
+    private static ref T OutOfRange<T>(T[]? table, Occurrence occurrence)
+    {
+        ExceptionState.SubscriptError($"subscript {occurrence} is outside 1..{(table?.Length ?? 0)} (ISO 8.4.2.3.4 GR2)");
         Scratch<T>.Slot = typeof(T) == typeof(string) ? (T)(object)string.Empty : default!;
         return ref Scratch<T>.Slot;
     }
@@ -68,11 +80,11 @@ public static class CobolTable
     /// item subordinate to it passes through this level's subscript, so the test is made HERE, before the element is
     /// located (kb/Work PB1268 — only the superordinate group's extent, <see cref="OdoExtent"/>, used to test it).
     /// With checking off the condition is not raised and the element reference proceeds exactly as
-    /// <see cref="At{T}(T[], long)"/>; the subscript's own range is still 1..integer-2 (§8.4.2.3.4 2): "the highest
+    /// <see cref="At{T}(T[], Occurrence)"/>; the subscript's own range is still 1..integer-2 (§8.4.2.3.4 2): "the highest
     /// permissible occurrence number … of an occurs-depending table is the maximum number of occurrences").</summary>
-    public static ref T At<T>(T[] table, long occurrence, long depending, int min, int max)
+    public static ref T At<T>(T[] table, Occurrence occurrence, Occurrence depending, int min, int max)
     {
-        if (depending < min || depending > max)
+        if (depending.Value < min || depending.Value > max)
             ExceptionState.OdoError(
                 $"OCCURS DEPENDING value {depending} is outside {min}..{max} at a reference to the table (ISO 13.18.38.4 GR7)");
         return ref At(table, occurrence);
@@ -104,7 +116,7 @@ public static class CobolTable
     /// <remarks>The digit decode of a non-numeric item's characters — <see cref="CobolNum.DigitMagnitude"/>, the
     /// extension COBOLNET0844's <c>--permissive</c> message promises (kb/Work PB170). Not a rule 2 read: the
     /// operand is not a numeric sending item, so there is no numeric class condition for its content to fail.</remarks>
-    public static long Occ(string image) => CobolNum.Position(CobolNum.DigitMagnitude(image));
+    public static Occurrence Occ(string image) => Occurrence.Of(CobolNum.DigitMagnitude(image), 0);
 
     /// <summary>⛔ THE NUMERIC POSITION READ — a NUMERIC data item used as a subscript, as the current count of an
     /// OCCURS DEPENDING table, or as any other integer the runtime positions by (a RECORD VARYING DEPENDING
@@ -127,34 +139,43 @@ public static class CobolTable
     /// arity. Before PB1117 the image arm was the tolerant <see cref="CobolNum.DigitMagnitude"/> scan, which also
     /// DISCARDED the sign: a signed image holding −1 positioned occurrence 1.</para>
     /// <para>Narrowing SATURATES (<see cref="CobolNum.Position(Int128)"/>): an occurrence number past
-    /// <c>long.MaxValue</c> must stay out of range, or §8.4.2.3.4 GR2's condition is lost to a wrap. With
+    /// <c>long.MaxValue</c> must stay out of range, or §8.4.2.3.4 GR2's condition is lost to a wrap. The result is an
+    /// <see cref="Occurrence"/>: the saturated <c>long</c> every accessor positions by, with the item's exact value
+    /// riding along so the diagnostic names what the program holds (kb/Work PB2695) — and it converts to <c>long</c>
+    /// implicitly for the consumers that only position. With
     /// EC-BOUND-SUBSCRIPT checking OFF a fractional position truncates toward zero and the reference continues —
-    /// the lenient posture <see cref="At{T}"/> takes for an out-of-range occurrence. The FLOAT carriers are
+    /// the lenient posture <see cref="At{T}(T[], Occurrence)"/> takes for an out-of-range occurrence. The FLOAT carriers are
     /// deliberately absent: a float subscript routes to the D18 §15.4 temp, where GR1b is applied once, to the
     /// result.</para></summary>
-    public static long Occ(long unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
+    public static Occurrence Occ(long unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
 
     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
-    public static long Occ(Int128 unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
+    public static Occurrence Occ(Int128 unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
 
     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
-    public static long Occ(string image, in NumProfile item) => item.ImageExceedsInt128
+    public static Occurrence Occ(string image, in NumProfile item) => item.ImageExceedsInt128
         ? Occ(CobolNum.ParseImageU128Sending(image, item), item)
         : OccScaled(CobolNum.ParseImageSending(image, item), item.FractionDigits);
 
     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
-    public static long Occ(ulong unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
+    public static Occurrence Occ(ulong unscaled, in NumProfile item) => OccScaled(unscaled, item.FractionDigits);
 
     /// <inheritdoc cref="Occ(long, in NumProfile)"/>
-    public static long Occ(UInt128 unscaled, in NumProfile item) =>
-        // A value past Int128's range is out of range for every table whatever its fraction: saturate.
-        unscaled > (UInt128)Int128.MaxValue ? long.MaxValue : OccScaled((Int128)unscaled, item.FractionDigits);
+    /// <remarks>Read as the UNSIGNED-WIDE value it is — never narrowed through <see cref="Int128"/> first, which a
+    /// value at or above 2^127 does not fit — so §8.4.2.3.4 GR1b's integrality and the position both see the value
+    /// itself (a scale that divides it back inside <c>long</c>'s range makes it a valid occurrence).</remarks>
+    public static Occurrence Occ(UInt128 unscaled, in NumProfile item)
+    {
+        if (CobolNum.HasFraction(unscaled, item.FractionDigits))
+            NotAnInteger(CobolNum.PlainValue(unscaled, item.FractionDigits));
+        return Occurrence.Of(unscaled, item.FractionDigits);
+    }
 
-    private static long OccScaled(Int128 unscaled, int scale)
+    private static Occurrence OccScaled(Int128 unscaled, int scale)
     {
         if (CobolNum.HasFraction(unscaled, scale))
             NotAnInteger(CobolNum.PlainValue(unscaled, scale));
-        return CobolNum.PositionOf(unscaled, scale);
+        return Occurrence.Of(unscaled, scale);
     }
 
     private static void NotAnInteger(string shown) =>
@@ -166,21 +187,30 @@ public static class CobolTable
     /// EC-BOUND-SUBSCRIPT exception condition is set to exist" — so the test reads the EXACT intermediate, never a
     /// copy stored at a fixed fraction width, which made <c>T(IX + 0.0000000001)</c> an integer. The same lenient
     /// continue as <see cref="Occ(long, in NumProfile)"/> with checking off: the position truncates toward zero.
-    /// Three carriers, three names (an integer literal converts to both <c>Int128</c> and <c>double</c>).</summary>
-    public static long OccValue(Int128 unscaled, int scale) => OccScaled(unscaled, scale);
-
-    /// <inheritdoc cref="OccValue(Int128, int)"/>
-    public static long OccValueDec(CobolDec value)
+    /// Three carriers, three names (an integer literal converts to both <c>Int128</c> and <c>double</c>).
+    /// <para>The result is the EXACT integer the 38-digit position temporary then holds
+    /// (<see cref="CobolNum.PositionOfWide(Int128, int)"/>), not a <c>long</c>: the subscript read
+    /// (<see cref="Occ(Int128, in NumProfile)"/>) narrows it, and only that narrowing saturates, so
+    /// EC-BOUND-SUBSCRIPT's detail names the value the expression computed (kb/Work PB2695).</para></summary>
+    public static Int128 OccValue(Int128 unscaled, int scale)
     {
-        if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-        return CobolNum.PositionOf(value);
+        if (CobolNum.HasFraction(unscaled, scale))
+            NotAnInteger(CobolNum.PlainValue(unscaled, scale));
+        return CobolNum.PositionOfWide(unscaled, scale);
     }
 
     /// <inheritdoc cref="OccValue(Int128, int)"/>
-    public static long OccValueReal(double value)
+    public static Int128 OccValueDec(CobolDec value)
+    {
+        if (value.HasFraction) NotAnInteger(value.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return CobolNum.PositionOfWide(value);
+    }
+
+    /// <inheritdoc cref="OccValue(Int128, int)"/>
+    public static Int128 OccValueReal(double value)
     {
         if (CobolNum.HasFraction(value)) NotAnInteger(value.ToString("R", System.Globalization.CultureInfo.InvariantCulture));
-        return CobolNum.PositionOf(value);
+        return CobolNum.PositionOfWide(value);
     }
 
     /// <summary>The CURRENT character extent of an occurs-depending GROUP operand (ISO/IEC 1989:2023 §13.18.38
@@ -190,16 +220,17 @@ public static class CobolTable
     /// <param name="min">integer-1 of the OCCURS DEPENDING clause — the LOWER bound §13.18.38.4 GR7 requires the
     /// control value to fall within. It was previously absent and the floor hardcoded to 0, so a below-minimum
     /// DEPENDING value silently clamped instead of raising.</param>
-    public static int OdoExtent(long count, int min, int max, int fixedUnits, int elemUnits)
+    public static int OdoExtent(Occurrence count, int min, int max, int fixedUnits, int elemUnits)
     {
         // §13.18.38.4 GR7 — the value "shall fall within the bounds from integer-1 through integer-2. If the
         // value of the data item does not fall within the specified bounds, the EC-BOUND-ODO exception condition
         // is set to exist." Both ends matter; checking off keeps the clamp, whose result GR7's closing sentence
         // makes undefined content and therefore a conforming implementor choice.
-        if (count < min || count > max)
+        long n = count.Value;
+        if (n < min || n > max)
             ExceptionState.OdoError(
                 $"OCCURS DEPENDING value {count} is outside {min}..{max} (ISO 13.18.38.4 GR7)");
-        long c = count < 0 ? 0 : count > max ? max : count;
+        long c = n < 0 ? 0 : n > max ? max : n;
         return fixedUnits + (int)c * elemUnits;
     }
 
@@ -209,7 +240,7 @@ public static class CobolTable
     /// ceiling is where §8.5.1.6.3's trailing-filler rule puts the group's own partial byte, and it is the same
     /// rounding §15.50.4 r9 requires of every other bit width. With <paramref name="positionsPerChar"/> = 1 it is
     /// the identity, so the character channel has ONE arm, never a units branch.</summary>
-    public static int OdoExtentChars(long count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar)
+    public static int OdoExtentChars(Occurrence count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar)
     {
         int units = OdoExtent(count, min, max, fixedUnits, elemUnits);
         return positionsPerChar <= 1 ? units : (units + positionsPerChar - 1) / positionsPerChar;

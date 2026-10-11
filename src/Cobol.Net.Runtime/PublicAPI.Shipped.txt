@@ -219,8 +219,8 @@ CobolNet.Runtime.CobolDynTable<T>.ExitSearch() -> void
 CobolNet.Runtime.CobolDynTable<T>.FromCurrentImage(string! content, int elementWidth, System.Func<T, string!, T>! store) -> void
 CobolNet.Runtime.CobolDynTable<T>.InitializeAll() -> void
 CobolNet.Runtime.CobolDynTable<T>.Recreate<TPart>(System.Collections.Generic.IReadOnlyList<TPart>! parts, TPart blank, System.Func<T, TPart, T>! store) -> void
-CobolNet.Runtime.CobolDynTable<T>.RefReceiving(long occ) -> T
-CobolNet.Runtime.CobolDynTable<T>.RefSending(long occ) -> T
+CobolNet.Runtime.CobolDynTable<T>.RefReceiving(CobolNet.Runtime.Occurrence occurrence) -> T
+CobolNet.Runtime.CobolDynTable<T>.RefSending(CobolNet.Runtime.Occurrence occurrence) -> T
 CobolNet.Runtime.CobolDynTable<T>.SetCapacity(System.Int128 n) -> void
 CobolNet.Runtime.CobolDynTable<T>.SpaceFillElements<TPart>(TPart blank, System.Func<T, TPart, T>! store) -> void
 CobolNet.Runtime.CobolEdit
@@ -1342,9 +1342,9 @@ CobolNet.Runtime.IO.CobolReport.PageCounter.get -> long
 CobolNet.Runtime.IO.CobolReport.Place(CobolNet.Runtime.IO.ReportLineImage! line, int column, string! image) -> void
 CobolNet.Runtime.IO.CobolReport.SetCode(System.Func<string!>! read) -> void
 CobolNet.Runtime.IO.CobolReport.SetPageCounter(long value) -> void
-CobolNet.Runtime.IO.CobolReport.SetSumImage(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<long> subscripts, string! image, in CobolNet.Runtime.NumProfile profile) -> void
+CobolNet.Runtime.IO.CobolReport.SetSumImage(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<CobolNet.Runtime.Occurrence> subscripts, string! image, in CobolNet.Runtime.NumProfile profile) -> void
 CobolNet.Runtime.IO.CobolReport.SetSumImage(int id, string! image, in CobolNet.Runtime.NumProfile profile) -> void
-CobolNet.Runtime.IO.CobolReport.SumImage(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<long> subscripts, in CobolNet.Runtime.NumProfile profile) -> string!
+CobolNet.Runtime.IO.CobolReport.SumImage(int baseId, System.ReadOnlySpan<int> extents, System.ReadOnlySpan<CobolNet.Runtime.Occurrence> subscripts, in CobolNet.Runtime.NumProfile profile) -> string!
 CobolNet.Runtime.IO.CobolReport.SumImage(int id, in CobolNet.Runtime.NumProfile profile) -> string!
 CobolNet.Runtime.IO.CobolReport.SumPresentable(int id) -> bool
 CobolNet.Runtime.IO.CobolReport.SuppressPrinting(int groupIndex) -> void
@@ -2968,24 +2968,24 @@ static CobolNet.Runtime.CobolStringOps.StringTransfer(string? dest, string? sour
 static CobolNet.Runtime.CobolStringOps.UnstringExtract(string? source, string![]! delimiters, bool[]! allFlags, int receiverSize, ref long pointer, out string! field, out string! delimiter) -> int
 static CobolNet.Runtime.CobolTable.AllArgs<T>(System.Func<long[]!, long>![]! counts, System.Func<long[]!, T>! element, System.Func<long[]!, T>? lead = null) -> T[]!
 static CobolNet.Runtime.CobolTable.ArgConcat<T>(params T[]![]! parts) -> T[]!
-static CobolNet.Runtime.CobolTable.At<T>(T[]! table, long occurrence) -> T
-static CobolNet.Runtime.CobolTable.At<T>(T[]! table, long occurrence, long depending, int min, int max) -> T
+static CobolNet.Runtime.CobolTable.At<T>(T[]! table, CobolNet.Runtime.Occurrence occurrence) -> T
+static CobolNet.Runtime.CobolTable.At<T>(T[]! table, CobolNet.Runtime.Occurrence occurrence, CobolNet.Runtime.Occurrence depending, int min, int max) -> T
 static CobolNet.Runtime.CobolTable.ConcatImages<T>(T[]! table, int count, System.Func<T, string!>! image) -> string!
 static CobolNet.Runtime.CobolTable.ConcatVarImages<T>(T[]! table, int count, System.Func<T, CobolNet.Runtime.CobolVarGroup!>! carrier) -> CobolNet.Runtime.CobolVarGroup!
 static CobolNet.Runtime.CobolTable.Fill<T>(int count, System.Func<int, T>! element) -> T[]!
 static CobolNet.Runtime.CobolTable.InSpan(long rank, long lo, long hi, int modulus, int residue) -> bool
-static CobolNet.Runtime.CobolTable.Occ(System.Int128 unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolTable.Occ(System.UInt128 unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolTable.Occ(long unscaled, in CobolNet.Runtime.NumProfile item) -> long
+static CobolNet.Runtime.CobolTable.Occ(System.Int128 unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolTable.Occ(System.UInt128 unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolTable.Occ(long unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
 static CobolNet.Runtime.CobolTable.Occ(long value) -> long
-static CobolNet.Runtime.CobolTable.Occ(string! image) -> long
-static CobolNet.Runtime.CobolTable.Occ(string! image, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolTable.Occ(ulong unscaled, in CobolNet.Runtime.NumProfile item) -> long
-static CobolNet.Runtime.CobolTable.OccValue(System.Int128 unscaled, int scale) -> long
-static CobolNet.Runtime.CobolTable.OccValueDec(CobolNet.Runtime.CobolDec value) -> long
-static CobolNet.Runtime.CobolTable.OccValueReal(double value) -> long
-static CobolNet.Runtime.CobolTable.OdoExtent(long count, int min, int max, int fixedUnits, int elemUnits) -> int
-static CobolNet.Runtime.CobolTable.OdoExtentChars(long count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar) -> int
+static CobolNet.Runtime.CobolTable.Occ(string! image) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolTable.Occ(string! image, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolTable.Occ(ulong unscaled, in CobolNet.Runtime.NumProfile item) -> CobolNet.Runtime.Occurrence
+static CobolNet.Runtime.CobolTable.OccValue(System.Int128 unscaled, int scale) -> System.Int128
+static CobolNet.Runtime.CobolTable.OccValueDec(CobolNet.Runtime.CobolDec value) -> System.Int128
+static CobolNet.Runtime.CobolTable.OccValueReal(double value) -> System.Int128
+static CobolNet.Runtime.CobolTable.OdoExtent(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int elemUnits) -> int
+static CobolNet.Runtime.CobolTable.OdoExtentChars(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar) -> int
 static CobolNet.Runtime.CobolTable.SortInPlace<T>(System.Span<T> occurrences, System.Comparison<T>! compare) -> void
 static CobolNet.Runtime.CobolTable.With<T, R>(T value, System.Func<T, R>! body) -> R
 static CobolNet.Runtime.CobolTiming.ContinueAfter(CobolNet.Runtime.CobolDec seconds, bool checkLessThanZero) -> bool

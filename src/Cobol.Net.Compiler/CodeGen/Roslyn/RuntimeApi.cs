@@ -528,8 +528,9 @@ internal static class RuntimeApi
     /// <summary>The position intake for a subscript or reference-modifier bound that is an arithmetic EXPRESSION —
     /// <c>CobolTable.OccValue*</c> / <c>CobolString.RefModValue*</c> over the value on its OWN carrier, so
     /// §8.4.2.3.4 GR1b / §8.4.3.3.4 rule 5)c)'s integrality test reads the exact intermediate (kb/Work PB1890).
-    /// Keyed by the same carrier kinds as <see cref="IntegerArgOf"/>; the result is the saturated <c>long</c>
-    /// position.</summary>
+    /// Keyed by the same carrier kinds as <see cref="IntegerArgOf"/>; the result is the position's exact integer on the
+    /// 38-digit segment temporary's capacity (saturated by sign past it, kb/Work PB2695) — a table subscript's is an
+    /// <c>Int128</c>, narrowed to <c>long</c> only by the subscript read, so its diagnostic names the true value.</summary>
     public static string PositionValueOf(IntegerArgCarrier carrier, string value, int scale, bool refMod) =>
         (carrier, refMod) switch
         {
@@ -1757,7 +1758,7 @@ internal static class RuntimeApi
         subscripts.Count == 0
             ? counterId.ToString(System.Globalization.CultureInfo.InvariantCulture)
             : $"{counterId}, [{string.Join(", ", extents.Select(e => e.ToString(System.Globalization.CultureInfo.InvariantCulture)))}], "
-              + $"[{string.Join(", ", subscripts.Select(s => $"(long)({s})"))}]";
+              + $"[{string.Join(", ", subscripts)}]";
 
     /// <summary>Read a SUM counter's content as its character image under its GR1 profile <paramref name="profile"/>
     /// (ISO §13.18.54.4 GR1/GR4) — <c>CobolReport.SumImage</c>. <paramref name="counterAddress"/> is

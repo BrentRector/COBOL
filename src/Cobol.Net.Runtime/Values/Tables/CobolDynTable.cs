@@ -74,12 +74,15 @@ public sealed class CobolDynTable<T>
     /// capacity of the table", so an occurrence outside it is §8.4.2.3.4 2)'s out-of-range subscript and sets
     /// EC-BOUND-SUBSCRIPT exactly as <see cref="CobolTable.At{T}"/> does (kb/Work PB1268 — this arm used to return
     /// the scratch slot in silence while the fixed-table accessor raised). With checking off the reference continues
-    /// benignly through a fresh scratch slot, the same policy.</summary>
-    public ref T RefSending(long occ)
+    /// benignly through a fresh scratch slot, the same policy. The subscript is an <see cref="Occurrence"/> (kb/Work
+    /// PB2695), as <see cref="CobolTable.At{T}"/>'s is: the detail names the value the program holds even when it
+    /// left <c>long</c>'s range.</summary>
+    public ref T RefSending(Occurrence occurrence)
     {
+        long occ = occurrence.Value;
         if (occ >= 1 && occ <= _count) return ref _store[(int)(occ - 1)];
         ExceptionState.SubscriptError(
-            $"subscript {occ} is outside 1..{_count}, the current capacity (ISO 8.5.1.9.2, 8.4.2.3.4 GR2)");
+            $"subscript {occurrence} is outside 1..{_count}, the current capacity (ISO 8.5.1.9.2, 8.4.2.3.4 GR2)");
         _scratch = _seedAt((int)occ);
         return ref _scratch;
     }
@@ -90,22 +93,28 @@ public sealed class CobolDynTable<T>
     /// and with checking off continues through the benign scratch slot. An implicit growth
     /// past the expected capacity (TO integer-5) raises the nonfatal EC-BOUND-OVERFLOW through
     /// <see cref="RaiseImplicitOverflow"/> — the ONE §8.5.1.9.6 1) raise every implicit capacity change shares — and
-    /// the growth proceeds regardless, a declarative's RESUME AT NEXT STATEMENT included (kb/Work PB1269).</summary>
-    public ref T RefReceiving(long occ)
+    /// the growth proceeds regardless, a declarative's RESUME AT NEXT STATEMENT included (kb/Work PB1269). Every
+    /// detail text names the subscript's value as the program holds it, even past <c>long</c> (<see cref="Occurrence"/>,
+    /// kb/Work PB2695).</summary>
+    public ref T RefReceiving(Occurrence occurrence)
     {
+        long occ = occurrence.Value;
         if (occ < 1)
         {
-            ExceptionState.SubscriptError($"subscript {occ} is not a positive integer (ISO 8.4.2.3.4 GR2)");
+            ExceptionState.SubscriptError($"subscript {occurrence} is not a positive integer (ISO 8.4.2.3.4 GR2)");
             _scratch = _seedAt((int)occ);
             return ref _scratch;
         }
         if (occ > _count)
         {
-            RaiseImplicitOverflow(occ, "implicit growth");
+            // The growth diagnostics take the requested capacity as an Int128; a subscript that saturated is named by
+            // its exact text instead (null for every other, so the common growth builds no string).
+            string? shown = occurrence.IsSaturated ? occurrence.ToString() : null;
+            RaiseImplicitOverflow(occ, "implicit growth", shown);
             // `occ`, not `(int)occ` — the SAME narrowing the explicit path carried (kb/Work PB459). A receiving
             // reference to occurrence 5 000 000 000 wrapped to 705 032 704 and silently grew the table to it
             // instead of raising GR30's EC-BOUND-TABLE-LIMIT; the `long` widens to GrowTo's Int128 parameter.
-            GrowTo(occ, _createdAt);
+            GrowTo(occ, _createdAt, shown);
             // ⛔ GrowTo may now DECLINE (GR30 leaves the capacity unchanged when checking is off), so the
             // occurrence it was asked for can still not exist. Falling through to `_store[occ-1]` here would be
             // an IndexOutOfRangeException — a raw .NET failure on user source, from the one path where a benign
@@ -130,11 +139,11 @@ public sealed class CobolDynTable<T>
     /// continue, thus exceeding the receiving table's specified expected capacity"), which is why
     /// <see cref="ExceptionEngine.BoundOverflowError"/> does not unwind on the NEXT STATEMENT resume (kb/Work
     /// PB1269). A RESUME AT procedure-name still transfers control out of the statement.</para></summary>
-    private void RaiseImplicitOverflow(Int128 newCapacity, string operation)
+    private void RaiseImplicitOverflow(Int128 newCapacity, string operation, string? shown = null)
     {
         if (_expected is { } exp && newCapacity > exp && _count <= exp)
             ExceptionState.BoundOverflowError(
-                $"OCCURS DYNAMIC {operation} to {newCapacity} exceeds the expected capacity {exp} (ISO §8.5.1.9.6 1))");
+                $"OCCURS DYNAMIC {operation} to {shown ?? newCapacity.ToString()} exceeds the expected capacity {exp} (ISO §8.5.1.9.6 1))");
     }
 
     /// <summary>Raise the current capacity to <paramref name="newCount"/>, seeding new occurrences [old..new)
@@ -148,10 +157,10 @@ public sealed class CobolDynTable<T>
     /// the implementor-maximum test is written ONCE, here, and it has to see the request BEFORE any narrowing.
     /// The explicit-SET path used to hand this an <c>(int)</c> cast of a <c>long</c>, so a capacity request of
     /// 5 000 000 000 WRAPPED to 705 032 704 — a small VALID capacity, silently allocated — instead of raising.</remarks>
-    private void GrowTo(Int128 newCount, Func<int, T> seedAt)
+    private void GrowTo(Int128 newCount, Func<int, T> seedAt, string? shown = null)
     {
         if (newCount <= _count) return;
-        if (newCount > MaxOccurrences) { TableLimit(newCount, $"the implementor maximum ({MaxOccurrences})"); return; }
+        if (newCount > MaxOccurrences) { TableLimit(shown ?? newCount.ToString(), $"the implementor maximum ({MaxOccurrences})"); return; }
         int target = (int)newCount;   // ≤ MaxOccurrences by the test above
         var before = _store;
         try
@@ -168,7 +177,7 @@ public sealed class CobolDynTable<T>
             // OutOfMemoryException killing the process. The larger array, if one was allocated, is dropped and
             // the table keeps its old storage and capacity (the slots seeded above the count are invisible).
             _store = before;
-            TableLimit(newCount, "the resources available at runtime");
+            TableLimit(shown ?? newCount.ToString(), "the resources available at runtime");
             return;
         }
         _count = target;
@@ -179,7 +188,7 @@ public sealed class CobolDynTable<T>
     /// of the table is unchanged"), so with checking off this returns and the table keeps its capacity, rather
     /// than the unconditional throw that used to abort the run unit; with checking on it throws the fatal
     /// condition for the statement's EC dispatch.</summary>
-    private static void TableLimit(Int128 requested, string limit) =>
+    private static void TableLimit(string requested, string limit) =>
         ExceptionState.BoundTableLimitError(
             $"OCCURS DYNAMIC growth to {requested} exceeds {limit} — ISO §8.5.1.9.6 2)");
 
@@ -317,7 +326,7 @@ public sealed class CobolDynTable<T>
     {
         int target = Math.Max(parts.Count, _min);   // §14.6.9.2: the minimum-capacity fill
         RaiseImplicitOverflow(target, "recreation by a variable-length group transfer");
-        if (target > MaxOccurrences) { TableLimit(target, $"the implementor maximum ({MaxOccurrences})"); return; }
+        if (target > MaxOccurrences) { TableLimit(target.ToString(), $"the implementor maximum ({MaxOccurrences})"); return; }
         T[] fresh;
         try
         {
@@ -327,7 +336,7 @@ public sealed class CobolDynTable<T>
         }
         catch (OutOfMemoryException)
         {
-            TableLimit(target, "the resources available at runtime");   // §8.5.1.9.6 2): the table is unchanged
+            TableLimit(target.ToString(), "the resources available at runtime");   // §8.5.1.9.6 2): the table is unchanged
             return;
         }
         _store = fresh;

@@ -646,7 +646,7 @@ public sealed class CobolReport(
     /// subscript (kb/Work PB1271 — see <see cref="SumOccurrence"/>). An out-of-range subscript reads zero once the
     /// EC-BOUND-SUBSCRIPT condition has been raised, the counter twin of an ordinary table's scratch occurrence
     /// (<c>CobolTable.At</c>).</summary>
-    public string SumImage(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts, in NumProfile profile) =>
+    public string SumImage(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<Occurrence> subscripts, in NumProfile profile) =>
         SumOccurrence(baseId, extents, subscripts) is int id and >= 0
             ? _sums[id].ImageOf(profile)
             : CobolNum.FormatImage(Int128.Zero, profile);
@@ -658,7 +658,7 @@ public sealed class CobolReport(
 
     /// <summary>Alter one OCCURRENCE of a repeating SUM entry's counter (GR12 over <see cref="SumOccurrence"/>); a
     /// store through an out-of-range subscript is discarded once EC-BOUND-SUBSCRIPT has been raised.</summary>
-    public void SetSumImage(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts, string image,
+    public void SetSumImage(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<Occurrence> subscripts, string image,
                             in NumProfile profile)
     {
         if (SumOccurrence(baseId, extents, subscripts) is int id and >= 0) _sums[id].Store(image, profile);
@@ -685,15 +685,16 @@ public sealed class CobolReport(
     /// subscript is not a positive integer or is less than one or is greater than the highest permissible
     /// occurrence number, the EC-BOUND-SUBSCRIPT exception condition is set to exist"). Each level is tested on its
     /// own: an out-of-range inner subscript must not wrap into the next outer occurrence.</summary>
-    private int SumOccurrence(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<long> subscripts)
+    private int SumOccurrence(int baseId, ReadOnlySpan<int> extents, ReadOnlySpan<Occurrence> subscripts)
     {
         int linear = 0;
         for (int k = 0; k < extents.Length; k++)
         {
-            long s = subscripts[k];
+            Occurrence subscript = subscripts[k];   // the detail names its exact value, even past long (kb/Work PB2695)
+            long s = subscript.Value;
             if (s < 1 || s > extents[k])
             {
-                ExceptionState.SubscriptError($"report {Name}: sum counter subscript {s} is outside 1..{extents[k]} "
+                ExceptionState.SubscriptError($"report {Name}: sum counter subscript {subscript} is outside 1..{extents[k]} "
                     + "(ISO 8.4.2.3.4 GR2)");
                 return -1;
             }

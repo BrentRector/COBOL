@@ -1,0 +1,9 @@
+EL(K)  I=2
+CAUGHT=EC-BOUND-SUBSCRIPT
+EL(A)  I=9 (unchanged)
+CAUGHT=EC-BOUND-SUBSCRIPT
+EL(N)  I=9 (unchanged)
+CAUGHT=EC-BOUND-SUBSCRIPT
+EL(S)  I=9 (unchanged)
+CAUGHT=EC-BOUND-ODO
+ODE(1) I=9 (unchanged)
