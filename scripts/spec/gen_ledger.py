@@ -611,7 +611,11 @@ def trend_svg(pts: list[dict], bat: dict) -> str:
                      f'{e(stamp[bi])} battery #{e(battery_n)}</text>')
     parts.append(f'<text class="tl-lab" x="{x1}" y="104" text-anchor="end">{e(lab_last)}</text>')
 
-    desc = " · ".join(f"{p['date']} {n(p['gap'])}" for p in pts)
+    # ⛔ THE LABEL SUMMARIZES THE SERIES; IT NEVER LISTS IT (owner 2026-10-10, kb/Work PB2942: "the graph of dots is
+    # fine. But we do not need detail for each dot"). A per-point list grew with every landing (3,458 characters at 191 points)
+    # and every publish re-reads the page; the self-test pins the label's length as independent of the point count.
+    desc = (f"{len(pts)} points from {pts[0]['date']} ({n(pts[0]['gap'])}) to {pts[-1]['date']} ({n(pts[-1]['gap'])}),"
+            f" low {n(lo)}, high {n(hi)}")
     return (f'<svg viewBox="0 0 900 112" role="img" aria-label="GAP rows remaining per landing: {e(desc)}">'
             + "".join(parts) + "</svg>")
 
@@ -668,7 +672,9 @@ def register_svg(pts: list[dict]) -> str:
     parts.append(f'<text class="tl-lab-e" x="40" y="{ybot + 4:.0f}" text-anchor="end">0</text>')
     parts.append(f'<text class="tl-lab" x="{x0}" y="104" text-anchor="start">{e(rp[0]["date"][5:])}</text>')
     parts.append(f'<text class="tl-lab" x="{x1}" y="104" text-anchor="end">{e(rp[-1]["date"][5:])} now</text>')
-    desc = " · ".join(f"{p['date']} {p['compiler_open']} open, {p.get('defects')} defects" for p in rp)
+    # A summary, never a per-point list: the same rule as trend_svg's label (kb/Work PB2942).
+    desc = (f"{len(rp)} points from {rp[0]['date']} ({rp[0]['compiler_open']} open, {rp[0].get('defects')} defects)"
+            f" to {rp[-1]['date']} ({rp[-1]['compiler_open']} open, {rp[-1].get('defects')} defects)")
     return (f'<svg viewBox="0 0 900 112" role="img" aria-label="Open compiler notes per recorded point: {e(desc)}">'
             + "".join(parts) + "</svg>")
 
@@ -1248,6 +1254,22 @@ def self_test() -> int:
     check("measured inputs render numbers: 1 group, 1 wave, 0.5 h, 1.5 points at the burn",
           bool(first) and all(f'<span class="num">{v}</span>' in first.group(1) for v in ("1", "0.5 h", "1.5")),
           first.group(1)[:300] if first else "no row")
+
+    def aria(svg: str) -> str:
+        m = re.search(r'aria-label="([^"]*)"', svg)
+        return m.group(1) if m else ""
+
+    def series(count: int) -> list[dict]:
+        return [{"date": f"2026-10-{1 + i % 28:02d}", "gap": 500 - i, "label": "", "compiler_open": 900 - i,
+                 "defects": 300 - i, "wrong_answer": 10, "crashes": 1, "gap_holders": 50} for i in range(count)]
+
+    few, many = series(3), series(400)
+    for name, draw in (("the GAP trend", lambda pts: trend_svg(pts, {"n": "1", "sha": "none"})),
+                       ("the register chart", register_svg)):
+        small, big = aria(draw(few)), aria(draw(many))
+        check(f"{name}'s label summarizes the series and never lists it (kb/Work PB2942)",
+              bool(small) and abs(len(big) - len(small)) <= 8 and big.count("2026-10-") == 2,
+              f"3 points: {len(small)} chars, 400 points: {len(big)} chars: {big[:200]}")
 
     saved = (REPO, TREND)
     tmp = pathlib.Path(tempfile.mkdtemp(prefix="gen-ledger-test-"))
