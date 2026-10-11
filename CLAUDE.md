@@ -39,7 +39,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
    render`; kb/Work PB3025). Write the entry as `DEVLOG/pending-<slug>.md` (first line `## <Title>`); the landing
    numbers and stamps it with `python scripts/devlog.py stamp <branch>`, as `## Entry NNNN — YYYY-MM-DD HH:MM TZ —
    Title`. **One entry per landing on main** (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits landing
-   on main"; a worktree's checkpoint commits carry no stamped one): `devlog.py check` refuses a landing without it.
+   on main"; a worktree's checkpoint commits carry no stamped one): the landing checks (`enqueue.py checks` → `devlog.py check`) refuse a landing without it.
 7. **Work autonomously.** Commit AND push every checkpoint, with a forensic commit message; each landing on main
    carries its DEVLOG entry (rule 6).
    Grammar changes are pre-authorized. Prompt only for genuine owner decisions — one at a time, as a bare question.

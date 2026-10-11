@@ -1767,10 +1767,14 @@ demand and not committed.
 
 #### 3.17.6 CI and repository settings (PB3024)
 
-- `build-and-test.yml`: add `merge_group:`; `push.branches` becomes `[main]` (the `ci/**` landing branches are gone);
-  the `changes` job runs the matrix on `merge_group` and `workflow_dispatch`, and only the cheap jobs on `pull_request`
-  and on `push` to main (the merged tree was tested as the merge group). `ci-gate`'s `needs:` and its drift check
-  (every job wired) are unchanged.
+- `build-and-test.yml` (landed, PB3024 phase 1): `merge_group:` added; the `changes` job runs the matrix on
+  `merge_group` (base = the group's `base_sha`, so a group of docs-only PRs skips it exactly as a docs-only landing did)
+  and `workflow_dispatch`, only the cheap jobs (`audits`, `ci-gate`) on `pull_request`, and on `push` to main the
+  already-verified short-circuit (the merge-queue commit IS the commit main advances to). ⛔ The short-circuit, and
+  `push-main.sh`'s skip while it lives, count only a successful run of the workflow from an event other than
+  `pull_request`: a PR's cheap `ci-gate` is attached to the PR's HEAD commit — the sha a landing pushes — so a
+  check-run lookup would have read it as a verdict on the matrix. `push.branches` keeps `ci/**` until `push-main.sh`
+  is deleted (below). `ci-gate`'s `needs:` and its drift check (every job wired) are unchanged.
 - A **ruleset** on `main` (classic branch protection has no merge queue): require a pull request, require the merge
   queue with merge method **merge commit** — the branch's commits stay ancestors of `main`, so the branch lifecycle
   (`prune_worktrees.py`'s landed test, `carried()`, `git cherry`) keeps working offline, and `git log --first-parent
@@ -1780,13 +1784,24 @@ demand and not committed.
   Required status check `ci-gate` on the merge group, enforce for administrators (the owner's credentials make every
   push), minimum group size 1, maximum 5, check timeout 60 min. The classic protection is removed in the same change.
 - **Cutover (operator review item 4; owner fast track ~12:58, "Why are we still using push-main?" → "Fast track now"):**
-  every step of this design lands through the THEN-CURRENT pipeline. **Phase 1 = PB3024 alone, today:** the `merge_group`
-  trigger, the committed ruleset and `ruleset.py apply|check`, the lander opening and queueing a pull request per train
-  by hand (`gh pr create`, `gh pr merge --auto --merge`) instead of `push-main.sh`, `push-main.sh` and `landing_lease.py`
-  deleted, the doc sweep — landing once more through `push-main.sh`; applying the ruleset (`ruleset.py apply`, `gh api`
-  from the committed JSON) is an owner-attended step — the attended session asks the owner for an explicit go at that
-  moment (one bare question), because from that instant main accepts only queued pull requests. **Phase 2 = PB3023
-  (`enqueue.py` replaces the hand steps) and PB3025 (the per-entry DEVLOG and its CI check)**, each through the queue.
+  every step of this design lands through the THEN-CURRENT pipeline. **Phase 1 = PB3024, landed FIRST and ALONE (a
+  blocking one-cluster landing), as the last landing through `push-main.sh`:** the `merge_group` trigger and the
+  cheap-PR arm, the committed ruleset (`scripts/orchestrator/ruleset-main.json`) and `ruleset.py check|apply`, and the
+  pull-request step as a SCRIPT, `scripts/orchestrator/enqueue.py queue` (the landing checks, push the branch, open or
+  reuse its pull request, queue it with auto-merge; no CI wait), with `enqueue.py checks` the one landing-check
+  sequence both paths run. **⛔ The operator's review (2026-10-11 13:39, mailbox 20261011-133923):** with
+  `pull_request` limited to the cheap jobs, a PR opened BEFORE the owner applies the ruleset has no merge-group run,
+  its `ci-gate` passes on the cheap jobs, and auto-merge would land it with NO whole-population run. Closed by
+  construction: `enqueue.py queue` refuses (exit 8) before any check, push or pull request unless `ruleset.py check`
+  reports the queue ACTIVE (live ruleset equal to the committed one, the queue present, the classic protection gone);
+  no other tracked file opens or queues a pull request (`LandingPipelineDriftTests`, §3.17.8); until the queue is
+  ACTIVE the lander keeps landing through `push-main.sh`. `push-main.sh`, its `.ps1` shim, `landing_lease.py` and its
+  drift tests, the `ci/**` trigger and MANDATORY-PRACTICES L3/L13 are deleted in the FIRST change landed THROUGH the
+  queue, not in phase 1. **The switch:** the moment phase 1 is on main the attended session asks the owner, one bare
+  question, for the go to run `python scripts/orchestrator/ruleset.py apply --owner-go "<the go>"` (it also sets the
+  repository's auto-merge and delete-branch settings); from that instant main accepts only queued pull requests.
+  **Phase 2 = PB3023 (`enqueue.py` gains the rebase, the one local gate and the DEVLOG stamp) and PB3025 (the
+  per-entry DEVLOG and its CI check)**, each through the queue.
 - `guard` (12.8 min) is the long pole of a merge-group run; sharding it is a follow-up measured after the queue lands.
 
 #### 3.17.7 What each document says after this lands (the implementer's sweep; rule 6, same change set)
@@ -1802,8 +1817,14 @@ only, out of every gate path and brief).
 
 #### 3.17.8 Drift tests that pin the design
 
-`LandingPipelineDriftTests`: the workflow has a `merge_group` trigger and no `ci/**` branch; no file in the tree
-references `push-main.sh`, `landing_lease.py`, `-Mode lander` or `train_apply.py`; `TIER_ORDER` contains `0h` and every
+`LandingPipelineDriftTests` (phase 1, landed): the workflow has a `merge_group` trigger, a `pull_request` arm that
+skips the matrix, and a short-circuit that never counts a pull request's run (push-main.sh's skip too, while it exists;
+once it is gone, no `ci/**` trigger); no tracked file outside the narrative paths (docs, kb, history, tests) opens or
+queues a pull request except `enqueue.py`, and its queue guard precedes its checks, push and pull-request calls; the
+self-test arms of `enqueue.py` and `ruleset.py` are declared. The live ruleset is compared by `ruleset.py check`, whose
+consumers are the landing (exit 8 on anything but ACTIVE) and the session probe's `gate :` line, not an xUnit arm (the
+suite has no dynamic skip, and an offline comparison must read SKIPPED, never green). Later arms, with the change that
+retires each: no file in the tree references `push-main.sh`, `landing_lease.py`, `-Mode lander` or `train_apply.py`; `TIER_ORDER` contains `0h` and every
 race-witness class carries the `Host` trait; `DEVLOG.md` does not exist and every `DEVLOG/*.md` has a well-formed
 header and a unique number; no generated index is tracked (`git ls-files` ∩ the generators' outputs is empty).
 

@@ -44,9 +44,14 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
   PB1732's Linux gate as a gate, and `push-main.sh` once PB3022-PB3028 land; until then the current pipeline stands,
   except that train 1060 (DEVLOG 1959) applied the Q1a shape early by operator steer: Windows leg 1 plus the
   whole WSL Linux gate, CI the whole population. **Q5 fast track (owner ~12:58):** the merge queue comes first —
-  PB3024 phase 1 (the `merge_group` trigger, the committed ruleset, a hand-opened queued PR per train, `push-main.sh`
-  and the lease deleted) is the last landing through `push-main.sh`, then the owner's go applies the ruleset; phase 2
-  is PB3023 (`enqueue.py`) and PB3025 (per-entry DEVLOG). Train 1061 (DEVLOG 1960) recorded it.
+  PB3024 phase 1 (the `merge_group` trigger with only the cheap jobs on a PR, the committed ruleset and `ruleset.py
+  check|apply`, the lander queueing one PR per train through `enqueue.py queue`) lands FIRST and ALONE, as the last
+  landing through `push-main.sh`; then the attended session asks the owner for the go to run `ruleset.py apply`.
+  ⛔ Operator review 2026-10-11 13:39: `enqueue.py` refuses (exit 8) to open or queue a PR until `ruleset.py check`
+  reports the queue ACTIVE, so until the owner applies it the lander keeps landing through `push-main.sh`, which
+  (with `landing_lease.py` and the `ci/**` trigger) is deleted by the FIRST change landed through the queue. Phase 2
+  is PB3023 (`enqueue.py` gains the rebase, the gate and the DEVLOG stamp) and PB3025 (per-entry DEVLOG). Train 1061
+  (DEVLOG 1960) recorded the fast track.
 - **▶ LIVE STATE (2026-10-06 23:40 PDT) — THE COMPLETION PLAN IS DECIDED (kb/Work R69; DEVLOG 1901).** Main is train 1024 plus this plan commit; no compiler code changed. Three owner decisions of 2026-10-06, each recorded in R69 and never to be re-asked:
   - **The legacy `CobolSharp.*` engine is DELETED from main** (trains 1025 and 1027, 2026-10-07; the archive tag `legacy-byte-engine-final` marks `48a44548c`, the last commit holding it; `docs/rearchitecture/LEGACY-ARCHIVE.md` is the pointer). The decision supersedes DEVLOG 997's "keep engine" and amends D14. P15's Cut 2.5 (D10), the prose sweep, the solution rename and the grammar unification run as wave 1028 of the `PB2108` cluster (lead PB2108; the register's `cluster` and `blocked_by` fields carry the membership and order: Cut 1a and 1b in parallel → Cut 2 with the archive tag → the prose sweep, the solution rename, D10 and the grammar unification). v1.0 keeps Cut 3 (the runtime namespace flip) and the §4.2.16 conformance documentation. Evidence: R69 §1 (zero product defects caught since July; its one purpose dissolved when PB750 made the guard greenfield-driven; its costs measured).
   - **R2, the review fleet (2026-10-07 23:06 PDT, DEVLOG 1932):** rebuilt from the owner-approved adversarial review of its first brief (PB2558–PB2561: computed subsystems and shards, inputs once, per-decision checkpoints, three-lens skeptics, scripted filing into PB1754); DESIGN-architecture-review §3 R2 describes it as built. Batch 1 (the small shards: runtime values, editions and diagnostics, the CLI, plus the one whole-codebase clone pass) is ready for the operator; nothing of R2 has run yet.
@@ -894,7 +899,9 @@ deletions off. ⛔ **A bare `git push origin HEAD:main` of an unverified commit 
 never on the table: every push to this repository is made with the owner's credentials, so a rule that spares
 administrators spares every actor there is — the orchestrator's own pushes obey it.
 
-**LAND WITH `bash scripts/push-main.sh`.** It pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
+**LAND WITH `python scripts/orchestrator/enqueue.py queue` once `ruleset.py check` reports the merge queue ACTIVE
+(kb/Work PB3024: one pull request into GitHub's merge queue, whose merge group runs the matrix), and until then WITH
+`bash scripts/push-main.sh`.** push-main.sh pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
 sha, and only on green fast-forwards main and deletes the landing branch; on a red it prints the failing jobs and
 exits non-zero with main untouched. A check run is attached to the COMMIT, not to a branch, which is why the
 verdict earned on `ci/<sha>` is the one the protection reads on main. ⭐ It is IDEMPOTENT — a full matrix is
@@ -1898,7 +1905,8 @@ result. Run the long legs ONE AT A TIME.
   too. `ci-gate` is the workflow's terminal job (`if: always()`, `needs:` every other job, PASS only when each is
   `success` or `skipped`); it is the only stable check name in the file, because every matrix job's check name
   carries its shard and its filter text and every one of them is skipped on a docs-only push.
-  **The landing command is `bash scripts/push-main.sh`** — it pushes HEAD to `ci/<short-sha>`, waits for `ci-gate`
+  **The landing command is `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE (kb/Work
+  PB3024), until then `bash scripts/push-main.sh`** — push-main.sh pushes HEAD to `ci/<short-sha>`, waits for `ci-gate`
   on that exact sha, and only then fast-forwards main and deletes the branch; a red prints the failing jobs and
   exits non-zero with main untouched. It is idempotent, so a caller cut off by a command timeout re-runs it.
   ⚠ `paths-ignore` is GONE from the workflow — it made the workflow decline to START, which a required per-commit

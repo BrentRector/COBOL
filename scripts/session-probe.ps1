@@ -139,7 +139,28 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 # that has quietly gone is the PB796 shape exactly: an instrument answering a different question than the one
 # being asked. Printed unconditionally, green included, and a 404 is told apart from an unreadable API — "I could
 # not look" must never render as "it is off", nor as silence (feedback_green_gates_arent_evidence).
-if (Get-Command gh -ErrorAction SilentlyContinue) {
+# ⭐ THE MERGE QUEUE FIRST (kb/Work PB3024): `ruleset.py check` compares main's live ruleset with the committed
+# scripts/orchestrator/ruleset-main.json. ACTIVE: landings are pull requests queued by enqueue.py and the classic
+# protection is gone (its lookup below would only report the 404 the ruleset replaced). DRIFT: the line names what
+# differs, and enqueue.py refuses every landing until it is fixed. ABSENT (the owner has not applied it yet): the classic
+# protection below is still the gate and push-main.sh still lands. SKIPPED: UNREAD, never a pass.
+# The exit code is read BEFORE any pipeline: `| Select-Object -First 1` stops the native command early and leaves
+# $LASTEXITCODE stale, which printed an ABSENT queue as ACTIVE (measured on this change's first run).
+$queueOut = & python scripts/orchestrator/ruleset.py check 2>&1
+$queueRc = $LASTEXITCODE
+$queueLine = "$(@($queueOut)[0])"
+if ($queueRc -eq 0) {
+    Write-Host "gate   : $queueLine — land with: python scripts/orchestrator/enqueue.py queue"
+} elseif ($queueRc -eq 1) {
+    Write-Host "gate   : ⛔ $queueLine — every landing is refused until it is fixed (python scripts/orchestrator/ruleset.py check)"
+} elseif ($queueRc -eq 4) {
+    Write-Host "gate   : merge queue state UNREAD ($queueLine) — do not infer either path"
+} elseif ($queueRc -ne 3) {
+    Write-Host "gate   : ruleset.py check failed (exit $queueRc): $queueLine"
+}
+if ($queueRc -eq 0) {
+    # the classic protection is gone by design; nothing more to read
+} elseif (Get-Command gh -ErrorAction SilentlyContinue) {
     $prot = & gh api 'repos/{owner}/{repo}/branches/main/protection' 2>&1
     if ($LASTEXITCODE -ne 0) {
         if ("$prot" -match 'Branch not protected|HTTP 404') {
@@ -153,7 +174,7 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
             $ctx = @($j.required_status_checks.contexts)
             $adm = [bool]$j.enforce_admins.enabled
             if (($ctx -contains 'ci-gate') -and $adm) {
-                Write-Host "gate   : main requires ci-gate (enforce_admins on) — land with: bash scripts/push-main.sh"
+                Write-Host "gate   : main requires ci-gate (enforce_admins on); merge queue not applied (ruleset.py apply, on the owner's go) — land with: bash scripts/push-main.sh"
             } else {
                 Write-Host "gate   : ⛔ main protection DRIFTED — contexts=[$($ctx -join ',')] enforce_admins=$adm (expected ci-gate + True)"
             }

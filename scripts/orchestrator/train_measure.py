@@ -3,7 +3,7 @@
 
     python scripts/orchestrator/train_measure.py record --train 1036 --gating batched --started <ISO> --pushed <ISO> \
         --clusters 5 --landed 4 --ejected 1 --population-runs 2 --first-run red --attribution-min 14 \
-        --interaction no --ci green [--fixed-in-train 0] [--note TEXT] [--replace]
+        --interaction no --ci green [--fixed-in-train 0] [--pr N] [--note TEXT] [--replace]
     python scripts/orchestrator/train_measure.py summary [--since <ISO>]
     python scripts/orchestrator/train_measure.py --self-test
 
@@ -15,6 +15,11 @@ finishers created by ejection, and CI reds, which must stay ZERO (the CI invaria
 is still recorded, so a policy that stops paying shows in the numbers. Each lander records its train once it has
 pushed (or given up), `--gating batched` while the implementer scope is `leg1` (the default) and `--gating whole`
 while the owner has set it to `whole`. `summary` computes the comparison PB2515 quotes.
+
+A train landed through GitHub's merge queue (kb/Work PB3024: `scripts/orchestrator/enqueue.py` once `ruleset.py check`
+reports the queue ACTIVE) ends when its pull request is QUEUED, before CI has run on the merge group: it is recorded
+with `--pr <number> --ci queued` and `--pushed` the time it was queued; its merge time is read later from
+`gh pr view <number> --json mergedAt`, and a `--replace` record carries the merge group's verdict.
 
 The records are one JSON object per line in `<coord>/train-measurements.jsonl`, outside every git worktree
 (scripts/orchestrator/coord.py), so no branch switch or worktree removal loses one.
@@ -62,11 +67,15 @@ def make_record(a: argparse.Namespace) -> dict:
     if a.first_run == "green" and (a.attribution_min or a.interaction == "yes"):
         raise ValueError("a green first run has no attribution time and no interaction red")
     if a.landed and a.ci == "none":
-        raise ValueError("a train that landed clusters went through CI: --ci green or red")
+        raise ValueError("a train that landed clusters went through CI: --ci green, red or queued")
+    if a.pr is not None and a.pr < 1:
+        raise ValueError(f"--pr {a.pr} is not a pull-request number")
+    if a.ci == "queued" and a.pr is None:
+        raise ValueError("--ci queued is a pull request in the merge queue: name it with --pr")
     return {"schema": SCHEMA, "train": a.train, "gating": a.gating, "started": started.isoformat(),
             "pushed": pushed.isoformat(), **counts, "first_run": a.first_run,
             "attribution_min": a.attribution_min, "interaction": a.interaction == "yes", "ci": a.ci,
-            "note": a.note or ""}
+            "pr": a.pr, "note": a.note or ""}
 
 
 def read_all(path: pathlib.Path) -> list[dict]:
@@ -110,6 +119,7 @@ def summarize(records: list[dict], since: dt.datetime | None = None) -> list[str
     lines = []
     for gating in GATINGS:
         rs = [r for r in records if r["gating"] == gating and (since is None or _when(r["started"]) >= since)]
+        queued = sum(r["ci"] == "queued" for r in rs)
         if not rs:
             lines.append(f"{gating}: no trains recorded")
             continue
@@ -123,7 +133,8 @@ def summarize(records: list[dict], since: dt.datetime | None = None) -> list[str
             f"red first runs {len(reds)}{attribution}, interaction reds {sum(r['interaction'] for r in rs)}; "
             f"finishers created by ejection {sum(r['ejected'] for r in rs)}; "
             f"fixed in the train {sum(r['fixed_in_train'] for r in rs)}; "
-            f"CI reds {sum(r['ci'] == 'red' for r in rs)} (must be 0)")
+            f"CI reds {sum(r['ci'] == 'red' for r in rs)} (must be 0)"
+            + (f"; queued with no merge-group verdict yet {queued}" if queued else ""))
     return lines
 
 
@@ -138,7 +149,9 @@ def parser() -> argparse.ArgumentParser:
                    help="batched: its implementers gated leg 1 only (scope leg1, the default); whole: the per-commit "
                         "whole population (scope whole)")
     r.add_argument("--started", required=True, help="ISO time with offset: the lander was dispatched")
-    r.add_argument("--pushed", required=True, help="ISO time with offset: push-main finished (or the lander gave up)")
+    r.add_argument("--pushed", required=True,
+                   help="ISO time with offset: push-main finished, or enqueue.py queued the pull request (or the lander "
+                        "gave up)")
     r.add_argument("--clusters", type=int, required=True, help="clusters the train was dispatched with")
     r.add_argument("--landed", type=int, required=True, help="clusters it landed")
     r.add_argument("--ejected", type=int, required=True, help="clusters ejected to a finisher")
@@ -149,7 +162,9 @@ def parser() -> argparse.ArgumentParser:
     r.add_argument("--attribution-min", type=float, help="red first run: minutes from its verdict to its attribution")
     r.add_argument("--interaction", choices=("yes", "no"), default="no",
                    help="a red no single cluster reproduced alone (bisected)")
-    r.add_argument("--ci", required=True, choices=("green", "red", "none"), help="CI's verdict on the pushed head")
+    r.add_argument("--ci", required=True, choices=("green", "red", "none", "queued"),
+                   help="CI's verdict on the pushed head; queued: the pull request is in the merge queue (with --pr)")
+    r.add_argument("--pr", type=int, help="the pull request enqueue.py opened for the train (kb/Work PB3024)")
     r.add_argument("--note", help="anything the numbers do not say")
     r.add_argument("--replace", action="store_true", help="rewrite an already recorded train")
     s = sub.add_parser("summary", help="the trial against the baseline")
@@ -160,7 +175,8 @@ def parser() -> argparse.ArgumentParser:
 #: The self-test's arms, by name (TrainMeasureDriftTests asserts each one ran and passed).
 ARMS = ("refuses an inconsistent record", "refuses a train recorded twice and rewrites it with --replace",
         "summarizes changes landed per hour, population runs, red trains, ejections and CI reds per gating mode",
-        "--since narrows the summary")
+        "--since narrows the summary",
+        "a queued pull request is recorded with its number and counted apart from CI's verdicts")
 
 
 def self_test() -> int:
@@ -179,7 +195,7 @@ def self_test() -> int:
 def _self_test(path: pathlib.Path) -> list[str]:
     """The arms, each failure prefixed with its arm's name."""
     fails: list[str] = []
-    refuse, twice, summary, since_arm = ARMS
+    refuse, twice, summary, since_arm, queued_arm = ARMS
 
     def args(*argv: str) -> argparse.Namespace:
         return parser().parse_args(["record", *argv])
@@ -243,6 +259,22 @@ def _self_test(path: pathlib.Path) -> list[str]:
     since = summarize(recs, _when("2026-10-08T10:00:00-07:00"))
     if not since[0].startswith("batched: 1 train(s), 5 change(s)"):
         fails.append(f"{since_arm}: {since}")
+
+    q = list(green)
+    for k, v in (("--train", "Q1"), ("--ci", "queued"), ("--started", "2026-10-08T13:00:00-07:00"),
+                 ("--pushed", "2026-10-08T14:00:00-07:00")):
+        q[q.index(k) + 1] = v
+    for name, argv in (("--ci queued with no --pr", q), ("a --pr that is not a number above 0", [*q, "--pr", "0"])):
+        try:
+            make_record(args(*argv))
+            fails.append(f"{queued_arm}: accepted {name}")
+        except ValueError:
+            pass
+    record(path, make_record(args(*q, "--pr", "4242")), replace=False)
+    recs = read_all(path)
+    line = summarize(recs)[0]
+    if recs[-1].get("pr") != 4242 or "CI reds 0 (must be 0); queued with no merge-group verdict yet 1" not in line:
+        fails.append(f"{queued_arm}: {recs[-1]} / {line}")
     return fails
 
 

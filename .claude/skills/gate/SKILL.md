@@ -111,6 +111,10 @@ never waits. Then `bash scripts/linux-gate.sh` (MANDATORY-PRACTICES L10; from an
   habit: **`bash scripts/push-main.sh`** pushes HEAD to `ci/<short-sha>`, waits for `ci-gate` on that sha, and only
   then fast-forwards main — a bare `git push origin HEAD:main` of an unverified commit is refused by the server
   (owner decision 2026-09-06, question 23; `kb/Work/PB796`). It is idempotent: re-run it after a timeout.
+  ⭐ Once `python scripts/orchestrator/ruleset.py check` reports GitHub's merge queue ACTIVE on main (the owner
+  applies it, kb/Work PB3024), the landing is `python scripts/orchestrator/enqueue.py queue`: the same landing
+  checks, one pull request into the queue, no CI wait; the merge group runs the matrix and is the CI verdict, and a
+  pull request's own run is the cheap jobs only. enqueue.py refuses (exit 8) while the queue is not ACTIVE.
 - ⚠ **A docs-only push runs `changes` + `ci-gate` and nothing else** — seconds, not a matrix. `paths-ignore` was
   removed because a workflow that declines to START leaves a required per-commit check unsatisfiable; the same
   path list now lives in the `changes` job, one layer down, where it decides whether the MATRIX runs.

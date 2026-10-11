@@ -20,9 +20,23 @@ on:
     # ⚠ Deliberately NOT `branches: '**'`: up to six implementer worktrees push WIP branches all day
     # (`worktree-agent-*`, `impl/*`), and a two-platform matrix per WIP push is precisely the cost this
     # repository has already refused once (the 2026-08-08 owner flag).
+    # ⚠ `ci/**` RETIRES WITH `push-main.sh` (kb/Work PB3024, operator review 2026-10-11): until the merge queue is
+    # ACTIVE on main (`python scripts/orchestrator/ruleset.py check`), push-main.sh is still how a landing reaches
+    # main, so its landing branches still need their run; the first change landed THROUGH the queue deletes
+    # push-main.sh, landing_lease.py and this entry together.
     branches: [ main, 'ci/**' ]
+  # ── THE MERGE QUEUE (kb/Work PB3024; DESIGN-test-build-ci.md §3.17.2 steps 4–5, §3.17.6). A pull request runs the
+  # CHEAP jobs only (`changes`, `audits`, `ci-gate`), so twenty queued PRs never put eighty matrix jobs behind a public
+  # repository's 20-concurrent-job limit; the MERGE GROUP (several queued PRs on top of main) runs the matrix and is the
+  # one whole-population run each change gets. `ci-gate` is the required check on both; on the group it is the full
+  # verdict. The merge-queue commit IS the commit main advances to, so its `push` run takes the already-verified
+  # short-circuit in `changes`. ⛔ A pull request's green `ci-gate` is therefore NOT a verdict on the matrix: nothing
+  # may merge a PR except the queue, which is why `scripts/orchestrator/enqueue.py` refuses to open or queue one unless
+  # `ruleset.py check` reports the queue ACTIVE on main (LandingPipelineDriftTests). ──
   pull_request:
     branches: [ main ]
+  merge_group:
+    types: [ checks_requested ]
   workflow_dispatch:        # manual trigger — a full-matrix run on demand
 
 # ⛔ A PUSH IS NEVER CANCELLED — ITS RUN IS THAT COMMIT'S ONLY VERDICT. With a required per-commit check a
@@ -87,6 +101,9 @@ jobs:
         shell: bash
         env:
           BEFORE: ${{ github.event.before }}
+          # What a merge group or a pull request adds to main is measured from ITS base, not from `before`.
+          GROUP_BASE: ${{ github.event.merge_group.base_sha }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
           SHA: ${{ github.sha }}
           REF: ${{ github.ref }}
           EVENT: ${{ github.event_name }}
@@ -102,10 +119,24 @@ jobs:
           IGNORE='^(DEVLOG/|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/|\.claude/|tools/claude-skills$)'
           ZERO=0000000000000000000000000000000000000000
           code=true; verified=false; reason=""; BASE=""
-          if [ "$EVENT" != "push" ]; then
-            reason="event=$EVENT — a pull_request / dispatch run is always the full matrix"
+          if [ "$EVENT" = "pull_request" ]; then
+            # ⛔ THE CHEAP JOBS ONLY (kb/Work PB3024): the matrix runs on the MERGE GROUP, which tests this PR on top
+            # of main together with the others queued. A PR run is `audits` (citations, self-tests, the work register,
+            # the fleet practices) and `ci-gate`, and its base is the PR's base for the witness-loss audit.
+            code=false
+            BASE="${PR_BASE:-}"
+            reason="event=pull_request — the matrix runs on the merge group (kb/Work PB3024); this run is the cheap jobs only"
+          elif [ "$EVENT" != "push" ] && [ "$EVENT" != "merge_group" ]; then
+            reason="event=$EVENT — a dispatch run is always the full matrix"
           else
-            if [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$ZERO" ] \
+            if [ "$EVENT" = "merge_group" ]; then
+              # The group's base is the main it was built on, so base..sha is every PR in the group: a group whose
+              # PRs are all docs-only skips the matrix exactly as a docs-only landing did before the queue. With no
+              # resolvable base the matrix runs (below).
+              if [ -n "${GROUP_BASE:-}" ] && git cat-file -e "${GROUP_BASE}^{commit}" 2>/dev/null; then
+                BASE="$GROUP_BASE"
+              fi
+            elif [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$ZERO" ] \
                && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null \
                && git merge-base --is-ancestor "$BEFORE" "$SHA"; then
               BASE="$BEFORE"          # the ordinary case: before..sha IS what this push added
@@ -142,13 +173,20 @@ jobs:
           # TWICE per landing — the exact waste the owner flagged on 2026-08-08 over a single spent run. A check
           # run is attached to the COMMIT, so a green `ci-gate` on this sha is a verdict on this exact tree
           # whatever branch earned it. Any failure of the lookup leaves verified=false and the matrix runs.
+          # The merge queue's case is the same: main advances to the merge-group commit, whose `merge_group` run
+          # earned the verdict (kb/Work PB3024).
+          # ⛔ ONLY A RUN THAT COULD HAVE RUN THE MATRIX COUNTS (kb/Work PB3024): a `pull_request` run is the cheap jobs
+          # only, and its green `ci-gate` is attached to the PR's head commit — the very sha a landing may push — so a
+          # check-run lookup would read it as a verdict on the matrix. A successful run of THIS workflow (whose
+          # `ci-gate` is `if: always()`, so a success run is a green ci-gate) from any event but `pull_request` is.
           if [ "$code" = "true" ] && [ "$EVENT" = "push" ]; then
-            n="$(gh api "repos/$REPO/commits/$SHA/check-runs?check_name=ci-gate&per_page=100" \
-                   --jq '[.check_runs[] | select(.conclusion == "success")] | length' 2>/dev/null || echo 0)"
+            n="$(gh api "repos/$REPO/actions/runs?head_sha=$SHA&per_page=100" \
+                   --jq '[.workflow_runs[] | select((.path | startswith(".github/workflows/build-and-test.yml"))
+                          and .event != "pull_request" and .conclusion == "success")] | length' 2>/dev/null || echo 0)"
             case "$n" in ''|*[!0-9]*) n=0 ;; esac
             if [ "$n" -gt 0 ]; then
               verified=true
-              reason="$reason; BUT ci-gate already succeeded on $SHA ($n green check run(s)) — same commit, same tree"
+              reason="$reason; BUT a non-PR run already succeeded on $SHA ($n green run(s)) — same commit, same tree"
             fi
           fi
           run_matrix=true
