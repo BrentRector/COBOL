@@ -45,8 +45,12 @@ public static class DebuggingLineRewriter
     /// <see cref="CommonTokenStream.Fill"/>.
     /// <para>Returns the first debugging line INSIDE A PICTURE OR SUBSCRIPT REGION that is source — the lexer skipped
     /// its text, so the caller must blank its carrier and lex again (<see cref="WithCarrierBlanked"/>), then call this
-    /// again — or <see langword="null"/> when there is none, which is when the token stream is final.</para></summary>
-    public static IToken? Rewrite(CommonTokenStream tokenStream)
+    /// again — or <see langword="null"/> when there is none, which is when the token stream is final.</para>
+    /// <para>When <paramref name="sourceLines"/> is given, the marker of every other debugging line the stream keeps as
+    /// SOURCE is added to it (kb/Work PB2490): the lines the caller may still have to diagnose, because a source line is
+    /// not a comment line and the logical conversion passed it over as one. The list is that of THIS stream — the final
+    /// one's is complete apart from the region lines the caller blanked on the way.</para></summary>
+    public static IToken? Rewrite(CommonTokenStream tokenStream, List<IToken>? sourceLines = null)
     {
         tokenStream.Fill();
         var tokens = tokenStream.GetTokens();
@@ -58,6 +62,7 @@ public static class DebuggingLineRewriter
         var units = new Stack<UnitFrame>();
         var outside = new UnitFrame(inheritedMode: false);   // debugging lines before any unit header: no clause can govern them
         var kept = new List<int>();                          // the region lines that are source (token indices)
+        var keptSource = new List<int>();                    // the other lines that are source (token indices)
         int nextLine = 0;
         for (int v = 0; v < visible.Count; v++)
         {
@@ -73,7 +78,7 @@ public static class DebuggingLineRewriter
                     units.Push(new UnitFrame(units.Count > 0 && units.Peek().Mode));
                     break;
                 case CobolLexer.END when v + 1 < visible.Count && IsUnitKind(tokens[visible[v + 1]].Type):
-                    if (units.Count > 0) Resolve(tokens, units.Pop(), kept);
+                    if (units.Count > 0) Resolve(tokens, units.Pop(), kept, keptSource);
                     break;
                 case CobolLexer.SOURCE_COMPUTER when units.Count > 0 && DeclaresMode(tokens, visible, v):
                     units.Peek().DeclaresMode = true;
@@ -81,9 +86,10 @@ public static class DebuggingLineRewriter
             }
         }
         while (nextLine < lines.Count) (units.Count > 0 ? units.Peek() : outside).Lines.Add(lines[nextLine++]);
-        while (units.Count > 0) Resolve(tokens, units.Pop(), kept);
-        Resolve(tokens, outside, kept);
+        while (units.Count > 0) Resolve(tokens, units.Pop(), kept, keptSource);
+        Resolve(tokens, outside, kept, keptSource);
         tokenStream.Seek(0);
+        sourceLines?.AddRange(keptSource.Select(i => tokens[i]));
         return kept.Count == 0 ? null : tokens[kept.Min()];
     }
 
@@ -172,12 +178,12 @@ public static class DebuggingLineRewriter
         return false;
     }
 
-    private static void Resolve(IList<IToken> tokens, UnitFrame unit, List<int> keptRegionLines)
+    private static void Resolve(IList<IToken> tokens, UnitFrame unit, List<int> keptRegionLines, List<int> keptSourceLines)
     {
         if (unit.Mode)                                  // the unit (or a container) declared the mode: its lines are source
         {
             foreach (var line in unit.Lines)
-                if (line.Region) keptRegionLines.Add(line.Start);   // its text was skipped: the caller lexes it again
+                (line.Region ? keptRegionLines : keptSourceLines).Add(line.Start);   // a region line's text was skipped: the caller lexes it again
             return;
         }
         foreach (var line in unit.Lines) Hide(tokens, line);

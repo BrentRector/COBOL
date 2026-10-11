@@ -249,6 +249,117 @@ public sealed class DiagnosticPositionTests : IDisposable
         Assert.Contains(lines, d => d.Contains("nc.cpy(1,31): error COBOL0307"));
     }
 
+    /// <summary>Two supplementary-plane letters (Annex B extended letters, ISO §8.1.3.2 4)): four UTF-16 units, two
+    /// character positions.</summary>
+    private const string Wide = "\U0001000D\U0001000E";
+
+    /// <summary>⛔ kb/Work PB2983 — ONE column unit for every diagnostic: the CHARACTER POSITION (ISO §6.1 1) a), §6.3.1).
+    /// The parser counts UTF-16 units and the reference-format gates counted positions, so on a line holding a
+    /// supplementary-plane character a parser diagnostic named a column two to the right of the gate's for the same place.
+    /// Each producer arm of the source map is pinned: a plain fixed-form line, a line that also holds a TAB, a continuation
+    /// line (the span a join appends), free form, and a copybook.</summary>
+    [Theory]
+    // ZZZ stands in character position 24 of the line, after two letters of two units each (positions 12-13)
+    [InlineData("supplementary", "       01  Wide PIC X(2) ZZZ.\n", "supplementary.cob(6,24)", "COBOLNET1941")]
+    // a TAB counts one column and the letters one each: the TAB, 01, two blanks, two letters, PIC X(2) and a blank precede ZZZ
+    [InlineData("suptab", "\t01  Wide PIC X(2) ZZZ.\n", "suptab.cob(6,18)", "COBOLNET1941")]
+    public void FixedForm_SupplementaryCharactersCountOnePosition(string name, string dataLine, string position, string code)
+    {
+        Write(name + ".cob", Head + dataLine.Replace("Wide", Wide) + "       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        var (ok, lines) = Compile(name + ".cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.True(lines.Any(d => d.Contains(position + ": error " + code)),
+            $"expected '{position}: error {code}'; got:\n" + string.Join("\n", lines));
+    }
+
+    [Fact] // the parser's diagnostic and a reference-format gate's, on ONE line, name the columns of the same unit
+    public void FixedForm_ParserAndGateOnOneLine_NameTheSameUnit()
+    {
+        // A reference-format error stops the compilation before the parser runs, so the line is compiled twice: as written,
+        // ZZZ is the parser's error at character position 24; with an unseparated floating comment indicator after its period
+        // (ZZZ. occupies positions 24-27), the gate's error is at position 28 - one unit, one line, both counted from the margin.
+        Write("one.cob", Head + $"       01  {Wide} PIC X(2) ZZZ.\n       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        var (ok, lines) = Compile("one.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("one.cob(6,24): error COBOLNET1941"));
+        Write("two.cob", Head + $"       01  {Wide} PIC X(2) ZZZ.*> c\n       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        (ok, lines) = Compile("two.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("two.cob(6,28): error COBOLNET2495"));
+    }
+
+    [Fact] // a continuation line's text is joined onto the latest logical line as spans of its own: the '.' is at position 20
+    public void FixedFormContinuation_SupplementaryCharacters_NameTheirPosition()
+    {
+        Write("scont.cob", Head + $"       PROCEDURE DIVISION.\n           MOVE \"A\n      -    \"{Wide}B\" TO.\n           STOP RUN.\n");
+        var (ok, lines) = Compile("scont.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("scont.cob(8,20): error COBOL0001"));
+    }
+
+    [Fact] // free form reads the whole line: the '.' is at position 18 after the two letters
+    public void FreeForm_SupplementaryCharacters_NameTheirPosition()
+    {
+        Write("sfree.cob", $"IDENTIFICATION DIVISION.\nPROGRAM-ID. PB2983F.\nPROCEDURE DIVISION.\n    MOVE \"{Wide}B\" TO.\n    STOP RUN.\n");
+        var (ok, lines) = Compile("sfree.cob", format: InitialReferenceFormat.Free);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("sfree.cob(4,18): error COBOL0001"));
+    }
+
+    [Fact] // a copybook's text is read by the same walker: ZZZ stands in position 24 of the copybook's line
+    public void Copybook_SupplementaryCharacters_NameTheirPosition()
+    {
+        Write("sup.cpy", $"       01  {Wide} PIC X(2) ZZZ.\n");
+        Write("scopy.cob", Head + "       COPY \"sup.cpy\".\n       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        var (ok, lines) = Compile("scopy.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("sup.cpy(1,24): error COBOLNET1941"));
+    }
+
+    /// <summary>⛔ kb/Work PB2982 — the indicator-column gates name column 7, and column 7 IS the physical column of the
+    /// indicator on every line the gates fire on. A TAB written in positions 1-7 fills through position 8 (DOC-A.1-157), so
+    /// the indicator area of such a line holds a space and the line is no continuation line (the hyphen after the tab
+    /// stands in position 9, program text), and a supplementary-plane character in the sequence area is one position, so
+    /// it does not move the indicator either (ISO §6.3.1: "The indicator area is the 7th character position of a line").</summary>
+    [Fact]
+    public void FixedForm_IndicatorGates_NameColumn7_WhateverTheSequenceAreaHolds()
+    {
+        // six supplementary-plane characters in the sequence area; the hyphen indicator continues a NATIONAL literal (§6.3.5 2))
+        string sequence = string.Concat(Enumerable.Repeat("\U0001D400", 6));
+        Write("seq.cob", Head + $"       PROCEDURE DIVISION.\n           DISPLAY N\"A\n{sequence}-    \"B\".\n           STOP RUN.\n");
+        var (ok, lines) = Compile("seq.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("seq.cob(8,7): error COBOLNET2685"));
+        Assert.Contains(lines, d => d.Contains("seq.cob(8,7): warning COBOLNET0903"));   // the 2023 obsolescence gate, same column
+
+        // a TAB-led hyphen is program text at position 9, not a continuation indicator: no continuation gate fires
+        Write("tab.cob", Head + "       PROCEDURE DIVISION.\n           DISPLAY \"A\n\t-    \"B\".\n           STOP RUN.\n");
+        (_, lines) = Compile("tab.cob", format: InitialReferenceFormat.Fixed);
+        Assert.DoesNotContain(lines, d => d.Contains("COBOLNET0903") || d.Contains("COBOLNET2685") || d.Contains("COBOLNET2687"));
+    }
+
+    [Fact] // kb/Work PB2490 - a debugging line that is SOURCE (the unit says WITH DEBUGGING MODE) between the parts of a
+    // continued literal is diagnosed where it is written, in a copybook too: the copybook is read by the same walker, and
+    // the line is named by its own file and physical line, not by a resultant ordinal.
+    public void SourceDebuggingLine_BetweenLiteralParts_InACopybook_IsDiagnosedAtItsOwnLine()
+    {
+        Write("dbg.cpy", "           MOVE \"" + new string('A', 55) + "\n      D    DISPLAY \"X\".\n      -    \"TAIL\" TO W.\n");
+        string unit(string clause) =>
+            "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. PB2490C.\n       ENVIRONMENT DIVISION.\n"
+            + "       CONFIGURATION SECTION.\n       SOURCE-COMPUTER. IBM-PC" + clause + ".\n       DATA DIVISION.\n"
+            + "       WORKING-STORAGE SECTION.\n       01 W PIC X(80).\n       PROCEDURE DIVISION.\n"
+            + "           COPY \"dbg.cpy\".\n           STOP RUN.\n";
+        Write("dbgon.cob", unit(" WITH DEBUGGING MODE"));
+        var (ok, lines) = Compile("dbgon.cob", edition: 85, format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("dbg.cpy(2,7): error COBOLNET3473"));
+        // without the clause the same line is a comment (§6.3.5 2)), the literal is joined and the program is accepted
+        Write("dbgoff.cob", unit(""));
+        (ok, lines) = Compile("dbgoff.cob", edition: 85, format: InitialReferenceFormat.Fixed);
+        Assert.True(ok, string.Join("\n", lines));
+        Assert.DoesNotContain(lines, d => d.Contains("COBOLNET3473"));
+    }
+
     [Fact] // kb/Work PB1671 — a COPY / REPLACE / directive diagnostic names the column of what it is about, not column 1
     public void TextManipulationAndDirectiveDiagnostics_NameTheirColumn()
     {

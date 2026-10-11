@@ -2923,6 +2923,18 @@ public static class DiagnosticCatalog
         + "multiple-character indicator shall be specified on the same line. All characters forming an invocation "
         + "operator shall be specified on the same line.\" Write all its characters on one line.", "ISO §6.3.5 2)");
 
+    /// <summary>COBOLNET3473 — a debugging line (indicator <c>D</c>) that is SOURCE, because its source unit's
+    /// SOURCE-COMPUTER paragraph says WITH DEBUGGING MODE, written between the parts of a continued literal (kb/Work
+    /// PB2490). §6.3.5 2) lets only comment lines and blank lines stand there; ISO 2023 has no debugging line, so the
+    /// choice follows rule 1's precedence to GnuCOBOL 3.2.0, which rejects the program with -fdebugging-line
+    /// ("continuation character expected"). Without the clause the same line is a comment and the literal is joined.</summary>
+    public static readonly DiagnosticDescriptor DebuggingLineBetweenLiteralParts = new(
+        "COBOLNET3473", "debugging-line-between-literal-parts", EditionSeverity.Error,
+        "A debugging line (indicator D) stands between the parts of a continued literal, and under WITH DEBUGGING MODE "
+        + "it is source, not a comment. ISO §6.3.5 2): \"Comment lines and blank lines may be interspersed among lines "
+        + "containing the parts of a literal\" - a source line may not. Move the debugging line out of the literal, or "
+        + "remove WITH DEBUGGING MODE so that the line is a comment.", "ISO §6.3.5 2)");
+
     /// <summary>COBOLNET2689 — an inline comment on a line that ends in a floating literal continuation indicator
     /// (kb/Work PB1359). §6.3.7.3 / §6.4.4.3: an inline comment may be written on any line except one that contains
     /// a floating literal continuation indicator.</summary>

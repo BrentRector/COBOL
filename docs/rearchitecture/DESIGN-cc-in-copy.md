@@ -162,9 +162,9 @@ becomes a physical one. `OriginWriter` assembles the outputs: a slice of a mappe
 rebased to the column it lands on; text a stage writes itself takes one span at the position it stands for
 (`MappedText.PointAt`). The stages and their splice rules —
 - the reference-format conversion (`ReferenceFormatProcessor.LogicalLineBuilder`, fed a `TextSite` per physical line:
-  the program text's start index in the expanded line and the line's `TabMap`) BEARS the spans: a fixed-form line's
-  program text maps from position 8, a free-form line from position 1, a line that held a tab gets a span wherever the
-  physical columns stop running one for one, and a continuation join appends the continuation's own span (its line,
+  the program text's start index in the expanded line and the line's `ColumnMap`) BEARS the spans: a fixed-form line's
+  program text maps from position 8, a free-form line from position 1, a line that held a tab or a supplementary-plane
+  character gets a span wherever the physical columns (character positions) stop running one for one, and a continuation join appends the continuation's own span (its line,
   and the column of its first appended character — the one after its opening quotation symbol for a literal), so the
   joined line keeps its head line's NUMBER while every fragment keeps its own line and column; a discarded
   `>>SOURCE FORMAT` directive line keeps its slot;

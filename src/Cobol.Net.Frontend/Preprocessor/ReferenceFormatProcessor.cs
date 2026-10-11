@@ -316,15 +316,16 @@ public static partial class ReferenceFormatProcessor
         return fixedLine.HasProgramText && fixedLine.Indicator.Value == ' ' ? fixedLine.ProgramText : null;
     }
 
-    /// <summary>The 0-based PHYSICAL index of the directive indicator of a line <see cref="DirectiveText"/> read as a
-    /// directive in the given form — where a diagnostic about the line points, as every other directive's does
-    /// (<see cref="CompilerDirectiveLine.IndicatorIndex"/>; kb/Work PB1801): the program-text area's start in fixed form
-    /// (0 in free form) plus the spaces before the indicator, mapped back through the line's tab map.</summary>
+    /// <summary>The 0-based PHYSICAL column (a character position of the line as the file holds it, kb/Work PB2983) of
+    /// the directive indicator of a line <see cref="DirectiveText"/> read as a directive in the given form — where a
+    /// diagnostic about the line points, as every other directive's does (<see cref="CompilerDirectiveLine.IndicatorIndex"/>;
+    /// kb/Work PB1801): the program-text area's start in fixed form (0 in free form) plus the spaces before the
+    /// indicator, mapped back through the line's column map.</summary>
     private static int DirectiveIndicatorIndex(PhysicalLine line, bool fixedForm)
     {
         int start = fixedForm ? new FixedFormLine(line.Text).ProgramTextIndex : 0;
         int expanded = start + CompilerDirectiveLine.IndicatorIndex(DirectiveText(line.Text, fixedForm)!);
-        return line.Tabs is null ? expanded : line.Tabs.ToPhysical(expanded);
+        return line.Columns is null ? expanded : line.Columns.ToPhysical(expanded);
     }
 
     /// <summary>For the <see cref="InitialReferenceFormat.Auto"/> detector only: the index of the first line that is a

@@ -41,9 +41,9 @@ internal static class CharacterPositions
 
     /// <summary>Whether any UTF-16 unit of <paramref name="text"/> is a surrogate — the only text in which a position and
     /// an index differ (a vectorized scan, so the BMP-only text of nearly every line pays one pass).</summary>
-    private static bool HasSurrogate(ReadOnlySpan<char> text) => text.IndexOfAnyInRange('\uD800', '\uDFFF') >= 0;
+    internal static bool HasSurrogate(ReadOnlySpan<char> text) => text.IndexOfAnyInRange('\uD800', '\uDFFF') >= 0;
 
     /// <summary>The UTF-16 units of the character at <paramref name="index"/>: two for a valid surrogate pair, else one.</summary>
-    private static int UnitsAt(ReadOnlySpan<char> text, int index)
+    internal static int UnitsAt(ReadOnlySpan<char> text, int index)
         => char.IsHighSurrogate(text[index]) && index + 1 < text.Length && char.IsLowSurrogate(text[index + 1]) ? 2 : 1;
 }

@@ -117,7 +117,11 @@ public sealed class Frontend
                 Preprocess(normalized, referenceFormats, sourcePath, passDiagnostics, referenceFormatGates, implicitOps, formatOps);
             var passLineMap = new SourceLineMap(processed.Lines);
             LineMap = passLineMap;
-            var (tree, parsed) = LexAndParse(processed.Text, sourcePath, directives.CobolWordsMap, passDiagnostics);
+            var (tree, parsed, sourceDebuggingLines) = LexAndParse(processed.Text, sourcePath, directives.CobolWordsMap, passDiagnostics);
+            // A debugging line the §6.5 walk passed over as a comment between the parts of a literal, and that the unit's
+            // WITH DEBUGGING MODE makes source, is a source line there (kb/Work PB2490).
+            referenceFormatGates.OnSourceDebuggingLines(
+                sourceDebuggingLines.Select(t => passLineMap.Origin(t.Line)).OfType<SourceOrigin>());
             bool mayMatter = directives.HasLineScopedEvents() || encounters.Directives.Any(e => e.ChangesState)
                 || formats.Values.Any(f => f.DirectiveLines.Count > 0);
             // The ops are read off the parse tree even when the parse reported errors: the state an op restores is what
@@ -382,8 +386,8 @@ public sealed class Frontend
     /// error was reported); the tree of a parse that reported errors is the parser's RECOVERED one, for the one reader that
     /// can use it (<see cref="Parse"/>'s §14.9.28.4 GR14 op placement) and never an answer to hand on.
     /// </summary>
-    private (CobolParserCore.CompilationUnitContext Tree, bool Parsed) LexAndParse(string text, string sourcePath, CobolWordsMap cobolWordsMap,
-        DiagnosticBag diagnostics)
+    private (CobolParserCore.CompilationUnitContext Tree, bool Parsed, IReadOnlyList<IToken> SourceDebuggingLines) LexAndParse(
+        string text, string sourcePath, CobolWordsMap cobolWordsMap, DiagnosticBag diagnostics)
     {
         // >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4): the LEXER applies the group's synonyms and de-reserved words to each
         // token as it emits it (TokenRetypes.PrimeLexer, kb/Work PB1372), so PIC's mode switch, the FUNCTION argument
@@ -402,7 +406,7 @@ public sealed class Frontend
         while (true)
         {
             var attemptDiagnostics = new DiagnosticBag();
-            var (tree, parsed) = LexAndParseOnce(text, sourcePath, cobolWordsMap, retypes, edition, attemptDiagnostics);
+            var (tree, parsed, sourceDebuggingLines) = LexAndParseOnce(text, sourcePath, cobolWordsMap, retypes, edition, attemptDiagnostics);
             if (tree.TokenRetypes.LexesDifferentlyFrom(retypes, edition))
             {
                 retypes = tree.TokenRetypes;
@@ -410,14 +414,14 @@ public sealed class Frontend
             }
             foreach (var d in attemptDiagnostics.Diagnostics) diagnostics.Add(d);
             diagnostics.AddCompileOutput(attemptDiagnostics.CompileOutput);
-            return (tree, parsed);
+            return (tree, parsed, sourceDebuggingLines);
         }
     }
 
     /// <summary>One lex + parse of <paramref name="text"/> with <paramref name="retypes"/> priming the lexer (see
     /// <see cref="LexAndParse"/>), reporting into <paramref name="diagnostics"/>.</summary>
-    private (CobolParserCore.CompilationUnitContext Tree, bool Parsed) LexAndParseOnce(string text, string sourcePath,
-        CobolWordsMap cobolWordsMap, TokenRetypes retypes, EditionInfo edition, DiagnosticBag diagnostics)
+    private (CobolParserCore.CompilationUnitContext Tree, bool Parsed, IReadOnlyList<IToken> SourceDebuggingLines) LexAndParseOnce(
+        string text, string sourcePath, CobolWordsMap cobolWordsMap, TokenRetypes retypes, EditionInfo edition, DiagnosticBag diagnostics)
     {
         // FIRST: a fixed-form debugging line is source or comment per its unit's WITH DEBUGGING MODE clause (kb/Work PB1705);
         // every reader after this one sees only the lines that are source. A line inside an open PICTURE or subscript
@@ -426,12 +430,21 @@ public sealed class Frontend
         // ends when none is left, at most once per debugging line. `text` then IS the text every later reader
         // offsets into (the §8.3.5 / §13.18.40.3 rules below, the fragment re-parses of the tree's regions).
         CommonTokenStream tokens;
+        // The debugging lines that stay SOURCE: the region lines blanked on the way (their marker is gone from the final
+        // stream) and the final stream's own (kb/Work PB2490).
+        var sourceDebuggingLines = new List<IToken>();
         while (true)
         {
             var lexer = new CobolLexer(new AntlrInputStream(text));
             retypes.PrimeLexer(lexer, edition);
             tokens = new CommonTokenStream(lexer);
-            if (DebuggingLineRewriter.Rewrite(tokens) is not { } sourceRegionLine) break;
+            var streamSourceLines = new List<IToken>();
+            if (DebuggingLineRewriter.Rewrite(tokens, streamSourceLines) is not { } sourceRegionLine)
+            {
+                sourceDebuggingLines.AddRange(streamSourceLines);
+                break;
+            }
+            sourceDebuggingLines.Add(sourceRegionLine);
             text = DebuggingLineRewriter.WithCarrierBlanked(text, sourceRegionLine);
         }
         ZeroTokenRewriter.Rewrite(tokens);
@@ -473,7 +486,7 @@ public sealed class Frontend
         var tree = ReservationGateRewriter.ParseToFixpoint(parser, tokens, retypes, diagnostics,
             (bag, witness) => ParsePass(parser, tokens, bag, witness, sourcePath));
 
-        return (tree, parser.NumberOfSyntaxErrors == 0);
+        return (tree, parser.NumberOfSyntaxErrors == 0, sourceDebuggingLines);
     }
 
     /// <summary>One parse of the whole token stream from token 0: fast SLL prediction first (with a

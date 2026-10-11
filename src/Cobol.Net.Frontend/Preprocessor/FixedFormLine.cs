@@ -17,7 +17,12 @@ internal readonly struct FixedFormLine
     /// <summary>Positions in the sequence number area (positions 1–6).</summary>
     public const int SequenceAreaLength = 6;
 
-    /// <summary>The 0-based position of the indicator area (position 7).</summary>
+    /// <summary>The 0-based position of the indicator area (position 7; ISO §6.3.1: "The indicator area is the 7th
+    /// character position of a line"). It is also THE PHYSICAL COLUMN of every indicator character a diagnostic can name
+    /// (kb/Work PB2982): a tab of the sequence area (positions 1–6) or of position 7 fills through position 8
+    /// (DOC-A.1-157), so an indicator that is not a space is never preceded by a tab, and positions are characters
+    /// (<see cref="CharacterPositions"/>), so a supplementary-plane character in the sequence area does not move it
+    /// either.</summary>
     public const int IndicatorColumn = 6;
 
     /// <summary>The 0-based position where the program-text area begins (position 8).</summary>

@@ -183,14 +183,17 @@ public sealed class CharacterPositionsTests
         Assert.Equal(Wides(8) + new string(' ', 8) + "X", PhysicalLines.Read(Wides(8) + "\tX").Lines[0].Text);
     }
 
-    [Fact] // the tab map still names UTF-16 INDEXES of the physical line (the tab is one unit, its fill is several)
-    public void TheTabMap_IsInUtf16Indexes()
+    [Fact] // kb/Work PB2983: the column map names CHARACTER POSITIONS of the physical line (the tab is one position,
+    // its fill is several expanded characters; a wide character is one position, its two UTF-16 units are two indexes)
+    public void TheColumnMap_IsInCharacterPositions()
     {
         var line = PhysicalLines.Read(Wides(3) + "\tX").Lines[0];
-        Assert.NotNull(line.Tabs);
-        Assert.Equal(6, line.Tabs!.ToExpanded(6));                           // the tab begins after six units
-        Assert.Equal(6, line.Tabs.ToPhysical(6));                            // and its first fill space is that tab
-        Assert.Equal(7, line.Tabs.ToPhysical(11));                           // X is physical index 7
+        Assert.NotNull(line.Columns);
+        Assert.Equal(0, line.Columns!.ToPhysical(0));                         // the first unit of the first wide character
+        Assert.Equal(0, line.Columns.ToPhysical(1));                          // its second unit is the same character
+        Assert.Equal(3, line.Columns.ToPhysical(6));                          // the tab's first fill space is the tab, position 4
+        Assert.Equal(3, line.Columns.ToPhysical(10));                         // and so is its last (positions 4-8 hold the fill)
+        Assert.Equal(4, line.Columns.ToPhysical(11));                         // X is physical position 5 (0-based 4)
     }
 
     [Fact] // §6.1 3) a): a free-form line has at most 255 character positions — 128 wide characters are 128, not 256

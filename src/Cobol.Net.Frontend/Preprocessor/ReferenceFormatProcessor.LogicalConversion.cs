@@ -76,7 +76,7 @@ public static partial class ReferenceFormatProcessor
             string area = fixedLine.ProgramText;
             int lineNo = line.Number;
             // The program-text area is resultant text from its first character, which is position 8 (kb/Work PB1801).
-            var site = new TextSite(lineNo, FixedFormLine.SourceAreaStart, fixedLine.ProgramTextIndex, line.Tabs);
+            var site = new TextSite(lineNo, fixedLine.ProgramTextIndex, line.Columns);
             var kind = KindOf(indicator.Value);
             switch (CommentEntryOf(kind, area))
             {
@@ -208,7 +208,7 @@ public static partial class ReferenceFormatProcessor
         {
             int positions = CharacterPositions.Count(line.Text);
             if (positions > FreeFormMaxPositions) gates?.OnFreeFormLineTooLong(file, line.Number, positions);
-            builder.Add(line.Text, new TextSite(line.Number, Column: 0, Index: 0, line.Tabs), fixedContinuation: false);
+            builder.Add(line.Text, new TextSite(line.Number, Index: 0, line.Columns), fixedContinuation: false);
         }
         return builder.Result;
     }

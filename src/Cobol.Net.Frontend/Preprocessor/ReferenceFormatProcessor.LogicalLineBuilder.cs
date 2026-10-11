@@ -89,7 +89,9 @@ public static partial class ReferenceFormatProcessor
         /// literal, or one a floating indicator continues) is passed over like a comment line — "Comment lines and blank
         /// lines may be interspersed among lines containing the parts of a literal" (§6.3.5 2)) — so the continuation line
         /// after it still continues the literal (kb/Work PB1914; GnuCOBOL reads the line as a comment unless
-        /// <c>-fdebugging-line</c>). It stays in the output as a logical line of its own, after the line it interrupts;</item>
+        /// <c>-fdebugging-line</c>). It stays in the output as a logical line of its own, after the line it interrupts, and
+        /// is NOTED to the gates: once the unit's WITH DEBUGGING MODE is known, a line that is source there is a source
+        /// line between the parts of a literal, which GnuCOBOL rejects and which is diagnosed (COBOLNET3473; kb/Work PB2490);</item>
         /// <item>any other debugging line is a new logical line and the join target from now on, so a continuation line
         /// after it continues the debugging line ("continuation of debugging lines is permitted").</item>
         /// </list></summary>
@@ -109,6 +111,7 @@ public static partial class ReferenceFormatProcessor
             var spans = site.Spans(file, carrier.Length, 0, text.Length - carrier.Length);   // the carrier is written, not read
             if (_latest >= 0 && (_literal.AwaitsFloating || _literal.InLiteral && !_literal.PendingClose))
             {
+                gates?.NoteDebuggingLineBetweenLiteralParts(file, site.Line);
                 _lines.Add(text);
                 _origins.Add(spans);
                 return;
@@ -138,7 +141,7 @@ public static partial class ReferenceFormatProcessor
                 return;
             }
             if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
-                DropDirectiveContinuation(site, site.Col(text, first));
+                DropDirectiveContinuation(site, site.Col(first));
             else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, site, fixedContinuation);
             else if (_latest >= 0 && fixedContinuation) ContinueFixed(text, first, site);
             else NewLine(text, site);
@@ -188,7 +191,7 @@ public static partial class ReferenceFormatProcessor
             int contentAt = AfterOpeningQuote(text, first, state.Quote, site);
             string content = text[contentAt..];
             if (!fixedForm && PartIsEmpty(content, state.Quote))
-                gates?.OnEmptyLiteralPart(file, site.Line, site.Col(text, contentAt));
+                gates?.OnEmptyLiteralPart(file, site.Line, site.Col(contentAt));
             Join(_lines[_latest], content, 0, state, site.At(contentAt), fixedContinuation);
         }
 
@@ -255,7 +258,7 @@ public static partial class ReferenceFormatProcessor
         {
             char c = text[first];
             if (c == quote) return first + 1;
-            gates?.OnContinuationQuote(file, site.Line, site.Col(text, first), quote);
+            gates?.OnContinuationQuote(file, site.Line, site.Col(first), quote);
             return c is '"' or '\'' ? first + 1 : first;
         }
 
@@ -299,23 +302,23 @@ public static partial class ReferenceFormatProcessor
                 case ScanStopKind.FloatingContinuation:
                     // The introduction gate is asked in FIXED form only, as the floating comment indicator's is (see
                     // ReportComment): free form is itself a 2002 introduction and this is its only continuation.
-                    if (fixedForm) gates?.OnFloatingLiteralContinuation(file, site.Line, site.Col(text, at));
-                    if (stop.CommentFollows) gates?.OnCommentAfterFloatingContinuation(file, site.Line, site.Col(text, at));
+                    if (fixedForm) gates?.OnFloatingLiteralContinuation(file, site.Line, site.Col(at));
+                    if (stop.CommentFollows) gates?.OnCommentAfterFloatingContinuation(file, site.Line, site.Col(at));
                     // Never on a fixed continuation line (§6.2.3.2 SR5). A literal continued BOTH ways (SR4) is found where
                     // the second form is written: by ContinueFloating (a hyphen in column 7 after a floating indicator) and
                     // by ContinueFixed (a hyphen after a literal a floating indicator continued before).
-                    if (fixedContinuation) gates?.OnFloatingOnFixedContinuation(file, site.Line, site.Col(text, at));
+                    if (fixedContinuation) gates?.OnFloatingOnFixedContinuation(file, site.Line, site.Col(at));
                     // A literal opened in THIS text with no content before the indicator (a carried-in literal's part is
                     // ContinueFloating's PartIsEmpty).
                     if (!fixedForm && stop.LiteralStart >= 0 && scanFrom + stop.LiteralStart == at)
-                        gates?.OnEmptyLiteralPart(file, site.Line, site.Col(text, at));
+                        gates?.OnEmptyLiteralPart(file, site.Line, site.Col(at));
                     state = state with { AwaitsFloating = true, Form = ContinuationForm.Floating };
                     return text[..at];
                 case ScanStopKind.Directive:
                     // §7.3.3 SR2: a compiler directive is preceded only by spaces. The directive and the rest of the line
                     // are not program text — they are what the author meant as a directive — so they are cut, and the
                     // parser does not add a second, nameless error for the stray indicator (kb/Work PB1690).
-                    gates?.OnDirectiveAfterProgramText(file, site.Line, site.Col(text, at));
+                    gates?.OnDirectiveAfterProgramText(file, site.Line, site.Col(at));
                     return text[..at];
                 default:
                     return text;
@@ -337,8 +340,8 @@ public static partial class ReferenceFormatProcessor
         private void ReportComment(string text, int at, TextSite site)
         {
             if (gates is null) return;
-            if (fixedForm) gates.OnFloatingComment(file, site.Line, site.Col(text, at));
-            if (at > 0 && text[at - 1] != ' ') gates.OnUnseparatedFloatingComment(file, site.Line, site.Col(text, at));
+            if (fixedForm) gates.OnFloatingComment(file, site.Line, site.Col(at));
+            if (at > 0 && text[at - 1] != ' ') gates.OnUnseparatedFloatingComment(file, site.Line, site.Col(at));
         }
 
         /// <summary>A new logical line: the §6.5 6) / 8) join target from now on.</summary>
@@ -355,35 +358,37 @@ public static partial class ReferenceFormatProcessor
     /// <summary>
     /// WHERE PROGRAM TEXT STANDS in its physical line (kb/Work PB1801): the text a classifier hands the
     /// <see cref="LogicalLineBuilder"/> — the program-text area of a fixed-form line, a whole free-form line — begins at
-    /// 0-based character position <see cref="Column"/> and index <see cref="Index"/> of the EXPANDED line of physical line
-    /// <see cref="Line"/>, whose <see cref="Tabs"/> (null when it held none) lead back to the characters the file holds.
-    /// The one place a position of that text becomes a physical column: a diagnostic's (<see cref="Col"/>) and a
-    /// resultant line's origin spans (<see cref="Spans"/>), so the two can never disagree.
+    /// index <see cref="Index"/> of the EXPANDED line of physical line <see cref="Line"/>, whose <see cref="Columns"/>
+    /// (null when it held neither a tab nor a supplementary-plane character, so an index IS a position) lead back to the
+    /// character positions the file holds. The one place an index of that text becomes a physical column: a diagnostic's
+    /// (<see cref="Col"/>) and a resultant line's origin spans (<see cref="Spans"/>), so the two can never disagree, and
+    /// the one column unit is the CHARACTER POSITION (<see cref="CharacterPositions"/>, kb/Work PB2983).
     /// </summary>
-    private readonly record struct TextSite(int Line, int Column, int Index, TabMap? Tabs)
+    private readonly record struct TextSite(int Line, int Index, ColumnMap? Columns)
     {
         /// <summary>The site of the text from its index <paramref name="i"/> on.</summary>
-        public TextSite At(int i) => this with { Column = Column + i, Index = Index + i };
+        public TextSite At(int i) => this with { Index = Index + i };
 
-        /// <summary>The 0-based physical column of the character at <paramref name="i"/> of <paramref name="text"/> — the
-        /// column a diagnostic names: a character position (<see cref="CharacterPositions"/>) of a line without a tab,
-        /// the character's own index on a line that held one (a TAB counts one column, as in the user's editor).</summary>
-        public int Col(string text, int i) => Tabs is null ? Column + CharacterPositions.PositionAt(text, i) : Tabs.ToPhysical(Index + i);
+        /// <summary>The 0-based physical column of the character at index <paramref name="i"/> of the text — the column a
+        /// diagnostic names: its character position in the line as the file holds it (a TAB counts one column, as in the
+        /// user's editor, and a supplementary-plane character counts one, not two).</summary>
+        public int Col(int i) => Columns is null ? Index + i : Columns.ToPhysical(Index + i);
 
         /// <summary>A one-span origin of text at <paramref name="i"/>, written at resultant column
         /// <paramref name="resultColumn"/>.</summary>
         public OriginSpan Span(string file, int resultColumn, int i)
-            => new(resultColumn, new SourceOrigin(file, Line), Tabs is null ? Index + i : Tabs.ToPhysical(Index + i));
+            => new(resultColumn, new SourceOrigin(file, Line), Col(i));
 
         /// <summary>The origin spans of the <paramref name="length"/> characters of the text from <paramref name="i"/>
-        /// on, written at resultant column <paramref name="resultColumn"/>: one span, or on a line that held a tab a new
-        /// one wherever the physical columns stop running one for one (a tab's expansion all maps to the tab).</summary>
+        /// on, written at resultant column <paramref name="resultColumn"/>: one span, or on a line that held a tab or a
+        /// supplementary-plane character a new one wherever the physical columns stop running one for one (a tab's
+        /// expansion all maps to the tab, and the second unit of a supplementary character to the character).</summary>
         public List<OriginSpan> Spans(string file, int resultColumn, int i, int length)
         {
             var spans = new List<OriginSpan> { Span(file, resultColumn, i) };
-            if (Tabs is null) return spans;
+            if (Columns is null) return spans;
             for (int k = 1; k < length; k++)
-                if (Tabs.ToPhysical(Index + i + k) != Tabs.ToPhysical(Index + i + k - 1) + 1)
+                if (Col(i + k) != Col(i + k - 1) + 1)
                     spans.Add(Span(file, resultColumn + k, i + k));
             return spans;
         }

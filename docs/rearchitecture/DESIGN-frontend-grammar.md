@@ -805,8 +805,8 @@ reference formats, and the only place source comments are recognized. Its model:
   **terminators** (DOC-A.1-156: LF, or CR LF; a CR not followed by LF is a character of the line — GnuCOBOL's
   `ppinput`; the lexer's line end is the LF only, so no stage ends a line at a lone CR); **tabs** (DOC-A.1-157: every
   TAB becomes the one to eight spaces up to the next tab stop — positions 1, 9, 17, … — everywhere, literals included,
-  owner decision R55; the line keeps a `TabMap` from expanded position to physical index ONLY when it held a tab, for the
-  physical columns PB1801 needs); **the `--nist` archive markers** (`*HEADER,` / `*END-OF,` become empty lines, only when
+  owner decision R55; the line keeps a `ColumnMap` from expanded index to physical CHARACTER POSITION ONLY when it held a
+  tab or a supplementary-plane character, for the physical columns PB1801 and PB2983 need); **the `--nist` archive markers** (`*HEADER,` / `*END-OF,` become empty lines, only when
   `ccvsIndicators`, PB1803); and the line NUMBER (every `PhysicalLine` carries the file's own, so a SOURCE FORMAT segment
   needs no offset). Every consumer — `IsFixedForm` (the Auto detector), `FirstSourceDirectiveCandidate` / `DirectiveText`
   / `FormatSegments`, `FixedFormConverter.Convert` and `ConvertFreeLines` — takes `ReadOnlySpan<PhysicalLine>` and never
@@ -822,11 +822,18 @@ reference formats, and the only place source comments are recognized. Its model:
 - **The source map carries the column** (kb/Work PB1801, PB1688, PB1671): `MappedText` records a `LineOrigin` per
   resultant line — ordered `OriginSpan`s, each a physical line and the PHYSICAL column its stretch starts at — born
   where the reference format reads each physical line (`TextSite`: the program text's index in the expanded line and
-  the line's `TabMap`, so a tab counts one column as in the editor) and carried by `OriginWriter` through COPY,
+  the line's `ColumnMap`, so a tab counts one column as in the editor, and a supplementary-plane character one, not
+  two) and carried by `OriginWriter` through COPY,
   REPLACE and conditional compilation (`DESIGN-cc-in-copy.md` §3.5). A fixed-form diagnostic names the column the text
   was written in (positions 1–7 dropped by §6.5 no longer shift it), a continuation fragment its own line and column,
   and a COPY / REPLACE diagnostic the column of the operand it is about. The reference-format gates' program-text
-  columns go through the same `TextSite` (`Col`), so the two can never disagree.
+  columns go through the same `TextSite` (`Col`), so the two can never disagree. **One column unit** (kb/Work PB2983):
+  a diagnostic's column is a CHARACTER POSITION of the physical line (§6.1 1) a), §6.3.1), never a UTF-16 index. The
+  parser reports a UTF-16 index of the resultant text, and the span structure is the conversion: a span runs one
+  resultant unit per physical position, and `TextSite.Spans` ends a span at each tab and at each supplementary-plane
+  character, so `LineOrigin.Locate` needs no knowledge of the text. The indicator-column gates (`FixedFormLine.IndicatorColumn`)
+  need no site: a tab written in positions 1–7 fills through position 8, so an indicator that is not a space is
+  always at position 7 (kb/Work PB2982).
 - **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
   directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
   line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the
@@ -896,8 +903,10 @@ reference formats, and the only place source comments are recognized. Its model:
   like any source line (`LogicalLineBuilder.EmitDebugging`: the literal state it ends in is tracked, a blank one is a
   blank line, kb/Work PB1914) and, so that both readings agree on every other line, a `D` line written while the latest
   logical line is inside a literal that needs its continuation is passed over like a comment — the continuation line
-  after it continues the literal (§6.3.5 2)) — and keeps a logical line of its own after the joined one
-  (docs/CONFORMANCE.md D-DEBUG);
+  after it continues the literal (§6.3.5 2)) — and keeps a logical line of its own after the joined one, NOTED to the
+  per-compilation `ReferenceFormatDiagnostics` (docs/CONFORMANCE.md D-DEBUG; kb/Work PB2490: `Rewrite` also names the
+  lines it keeps as source, `Frontend.Parse` hands their origins back to the diagnostics, and a noted line that is
+  source stands between the parts of a literal where only comment and blank lines may — COBOLNET3473);
   `Parsing/DebuggingLineRewriter` (first in `Frontend.LexAndParse`) keeps those tokens when the line's source unit, or a
   unit containing it (§12.3.5.4 GR1), declares SOURCE-COMPUTER … WITH DEBUGGING MODE and moves them to the
   `ABSENT_DEBUG_LINE` channel otherwise, so the parser, `SeparatorRule` and `PictureSeparatorPeriodRule` never read an

@@ -45,43 +45,60 @@ public sealed class PhysicalLinesTests
     [InlineData("\"A\tB\"", "\"A      B\"")]      // inside a literal too (owner decision, kb/Work R55)
     public void ATabAdvancesToTheNextTabStop(string source, string expected) => Assert.Equal(expected, Texts(source)[0]);
 
-    [Fact] // the tab map (kb/Work PB1801): born here, present only on a line that held a tab.
-    public void TheTabMapIsPresentOnlyWhereATabWas()
+    [Fact] // the column map (kb/Work PB1801, PB2983): born here, present only on a line that held a tab or a
+    // supplementary-plane character — on any other line an index of the text IS its character position.
+    public void TheColumnMapIsPresentOnlyWhereATabOrASupplementaryCharacterWas()
     {
-        var set = PhysicalLines.Read("plain\n\tX\n");
-        Assert.Null(set[0].Tabs);
-        Assert.NotNull(set[1].Tabs);
+        var set = PhysicalLines.Read("plain\n\tX\n\U0001D400X\n");
+        Assert.Null(set[0].Columns);
+        Assert.NotNull(set[1].Columns);
+        Assert.NotNull(set[2].Columns);
         Assert.Equal(2, set[1].Number);
     }
 
-    [Fact] // For every physical index i: ToPhysical(ToExpanded(i)) == i; no U+0009 survives; every expanded position
-    // names the character that produced it — over every line of up to four characters drawn from {X, TAB, space}.
-    public void TabMapRoundTrips_AndNoTabSurvives()
+    [Fact] // DOC-A.1-157 / §6.1 1) c): over every line of up to four characters drawn from {X, TAB, space, a
+    // supplementary-plane character}, no U+0009 survives, and the expanded text and the column map agree with the
+    // DEFINITION — a tab fills the positions up to the next stop of 8 and counts ONE physical column, a
+    // supplementary-plane character is two UTF-16 units and ONE physical column, and an index past the end of the
+    // expanded text continues the line one for one.
+    public void ColumnMapFollowsTheDefinition_AndNoTabSurvives()
     {
-        char[] alphabet = ['X', '\t', ' '];
+        string[] alphabet = ["X", "\t", " ", "\U0001D400"];
         for (int length = 0; length <= 4; length++)
         {
             int combinations = (int)Math.Pow(alphabet.Length, length);
             for (int n = 0; n < combinations; n++)
             {
-                var raw = new char[length];
+                var characters = new string[length];
                 int rest = n;
-                for (int i = 0; i < length; i++) { raw[i] = alphabet[rest % alphabet.Length]; rest /= alphabet.Length; }
-                string physical = new(raw);
+                for (int i = 0; i < length; i++) { characters[i] = alphabet[rest % alphabet.Length]; rest /= alphabet.Length; }
+                string physical = string.Concat(characters);
                 var line = PhysicalLines.Read(physical)[0];
                 Assert.DoesNotContain('\t', line.Text);
-                var tabs = line.Tabs;
-                if (!physical.Contains('\t')) { Assert.Null(tabs); Assert.Equal(physical, line.Text); continue; }
-                Assert.NotNull(tabs);
-                for (int i = 0; i < physical.Length; i++)
+
+                // The oracle: the expanded text and, for each of its UTF-16 indexes, the physical position that made it.
+                var expected = new System.Text.StringBuilder();
+                var positions = new List<int>();
+                int column = 0;
+                for (int p = 0; p < length; p++)
                 {
-                    Assert.Equal(i, tabs.ToPhysical(tabs.ToExpanded(i)));
-                    if (physical[i] != '\t') Assert.Equal(physical[i], line.Text[tabs.ToExpanded(i)]);
+                    if (characters[p] == "\t")
+                        do { expected.Append(' '); positions.Add(p); column++; } while (column % PhysicalLines.TabWidth != 0);
+                    else
+                    {
+                        expected.Append(characters[p]);
+                        for (int u = 0; u < characters[p].Length; u++) positions.Add(p);
+                        column++;
+                    }
                 }
-                Assert.Equal(line.Text.Length, tabs.ToExpanded(physical.Length));
-                Assert.Equal(physical.Length, tabs.ToPhysical(line.Text.Length));
-                for (int e = 0; e < line.Text.Length; e++)
-                    if (physical[tabs.ToPhysical(e)] == '\t') Assert.Equal(' ', line.Text[e]);
+                Assert.Equal(expected.ToString(), line.Text);
+                bool special = physical.Contains('\t') || characters.Contains("\U0001D400");
+                if (!special) { Assert.Null(line.Columns); continue; }
+                var columns = line.Columns;
+                Assert.NotNull(columns);
+                for (int e = 0; e < positions.Count; e++) Assert.Equal(positions[e], columns.ToPhysical(e));
+                Assert.Equal(length, columns.ToPhysical(line.Text.Length));        // the expanded length is the physical length
+                Assert.Equal(length + 3, columns.ToPhysical(line.Text.Length + 3)); // and the line goes on one for one
             }
         }
     }

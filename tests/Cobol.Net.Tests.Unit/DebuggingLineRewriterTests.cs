@@ -145,6 +145,23 @@ public sealed class DebuggingLineRewriterTests
         AssertComment(tokens, "SECONDLINE");     // a separate unit names no clause
     }
 
+    /// <summary>kb/Work PB2490: the markers of the debugging lines the stream keeps as SOURCE are named to the caller, who
+    /// diagnoses the ones the logical conversion passed over as comments (a source line between the parts of a literal). The
+    /// lines of a unit with no clause are comments, and a comment is named to no one.</summary>
+    [Fact]
+    public void Rewrite_NamesTheDebuggingLinesThatAreSource_PerUnit()
+    {
+        string[] lines = [
+            "PROGRAM-ID. A.", "SOURCE-COMPUTER. IBM-PC WITH DEBUGGING MODE.", D("DISPLAY KEPT."), "END PROGRAM A.",
+            "PROGRAM-ID. B.", D("DISPLAY HIDDEN."), "END PROGRAM B."];
+        var stream = new CommonTokenStream(new CobolLexer(new AntlrInputStream(string.Join("\n", lines) + "\n")));
+        var source = new List<IToken>();
+        Assert.Null(DebuggingLineRewriter.Rewrite(stream, source));
+        var kept = Assert.Single(source);
+        Assert.Equal(CobolLexer.DEBUG_LINE, kept.Type);
+        Assert.Equal(3, kept.Line);                       // the line of unit A; unit B's line is a comment
+    }
+
     [Fact]
     public void HideAll_HidesEveryLine_ClauseOrNot()
     {

@@ -21,7 +21,9 @@ namespace CobolNet.Frontend.Preprocessor;
 /// CHARACTER and not one UTF-16 unit (<see cref="CharacterPositions"/>, kb/Work PB1966) — and is replaced by
 /// the one to eight spaces that fill the gap, EVERYWHERE, an alphanumeric literal included (owner decision, kb/Work
 /// R55: the tab is an input-medium positioning control, not a character of the literal; <c>X"09"</c> is how a
-/// program puts a TAB in data). No tab survives this stage, so no later stage has a tab rule.</item>
+/// program puts a TAB in data). No tab survives this stage, so no later stage has a tab rule. A line that held a tab
+/// or a supplementary-plane character keeps a <see cref="ColumnMap"/> from each expanded index to the character
+/// position the file holds it at, which is the ONE column unit every diagnostic is named in (kb/Work PB2983).</item>
 /// <item><b>Archive markers</b> (kb/Work PB1803): the NIST CCVS archive-control lines <c>*HEADER,…</c> and
 /// <c>*END-OF,…</c> that delimit members of <c>newcob.val</c> are blanked — and ONLY when the CCVS dialect is on
 /// (<c>--nist</c>), because they are never valid COBOL and in any other compilation a column-7 <c>R</c> or a free-form
@@ -60,36 +62,38 @@ public static class PhysicalLines
 
     private static PhysicalLine Line(int number, ReadOnlySpan<char> raw, bool ccvsIndicators)
     {
-        if (raw.IndexOf('\t') < 0)
-            return new PhysicalLine(number, IsArchiveMarker(raw, ccvsIndicators) ? "" : raw.ToString(), Tabs: null);
+        if (raw.IndexOf('\t') < 0 && !CharacterPositions.HasSurrogate(raw))
+            return new PhysicalLine(number, IsArchiveMarker(raw, ccvsIndicators) ? "" : raw.ToString(), Columns: null);
 
         var text = new StringBuilder(raw.Length + TabWidth);
-        var toExpanded = new int[raw.Length + 1];
-        int position = 0;   // the 0-based character position the next character lands on (CharacterPositions: not text.Length)
-        for (int i = 0; i < raw.Length; i++)
+        var toPhysical = new List<int>(raw.Length + TabWidth + 1);
+        int position = 0;   // the 0-based character position the next EXPANDED character lands on (not text.Length)
+        int physical = 0;   // the 0-based character position of the character being read, in the line as the file holds it
+        for (int i = 0; i < raw.Length; physical++)
         {
-            toExpanded[i] = text.Length;
+            int units = CharacterPositions.UnitsAt(raw, i);
             if (raw[i] != '\t')
             {
-                text.Append(raw[i]);
-                // The low half of a valid surrogate pair is the same character as its high half.
-                if (!(char.IsLowSurrogate(raw[i]) && i > 0 && char.IsHighSurrogate(raw[i - 1]))) position++;
+                // A supplementary-plane character is two UTF-16 units but ONE position; both units map to it.
+                text.Append(raw.Slice(i, units));
+                for (int u = 0; u < units; u++) toPhysical.Add(physical);
+                position++;
+                i += units;
                 continue;
             }
             // The next tab stop strictly after the tab's own position: positions 1, 9, 17, … (0-based 0, 8, 16, …).
+            // Every space the tab fills maps to the tab, which is ONE position of the file.
             text.Append(' ');
+            toPhysical.Add(physical);
             position++;
-            while (position % TabWidth != 0) { text.Append(' '); position++; }
+            while (position % TabWidth != 0) { text.Append(' '); toPhysical.Add(physical); position++; }
+            i++;
         }
-        toExpanded[raw.Length] = text.Length;
-        var toPhysical = new int[text.Length + 1];
-        for (int i = 0; i < raw.Length; i++)
-            for (int e = toExpanded[i]; e < toExpanded[i + 1]; e++) toPhysical[e] = i;
-        toPhysical[text.Length] = raw.Length;
+        toPhysical.Add(physical);
         string expanded = text.ToString();
         return IsArchiveMarker(expanded, ccvsIndicators)
-            ? new PhysicalLine(number, "", Tabs: null)
-            : new PhysicalLine(number, expanded, new TabMap(toExpanded, toPhysical));
+            ? new PhysicalLine(number, "", Columns: null)
+            : new PhysicalLine(number, expanded, new ColumnMap([.. toPhysical]));
     }
 
     private static bool IsArchiveMarker(ReadOnlySpan<char> line, bool ccvsIndicators)
@@ -104,8 +108,10 @@ public static class PhysicalLines
 /// <summary>One line of source or library text as the line-entry stage defines it (<see cref="PhysicalLines"/>).</summary>
 /// <param name="Number">The 1-based number of the line in its file.</param>
 /// <param name="Text">The line without its terminator, every tab expanded to spaces.</param>
-/// <param name="Tabs">The map between expanded and physical positions, present only when the line held a tab.</param>
-public readonly record struct PhysicalLine(int Number, string Text, TabMap? Tabs);
+/// <param name="Columns">The map from an index of <paramref name="Text"/> to the character position the file holds it at,
+/// present only when the line held a tab or a supplementary-plane character — on any other line the index IS the
+/// position.</param>
+public readonly record struct PhysicalLine(int Number, string Text, ColumnMap? Columns);
 
 /// <summary>The lines of one file, in order — what EVERY reference-format consumer reads instead of the raw text.</summary>
 public sealed class PhysicalLineSet(PhysicalLine[] lines)
@@ -115,27 +121,21 @@ public sealed class PhysicalLineSet(PhysicalLine[] lines)
     public ReadOnlySpan<PhysicalLine> Lines => lines;
 }
 
-/// <summary>The correspondence between the positions of an expanded line and the characters of the physical line it was
-/// read from — what a diagnostic needs to name the column the programmer sees in their editor (kb/Work PB1801). The
-/// spaces a tab expanded to all map to the tab's own index.</summary>
-public sealed class TabMap
+/// <summary>The correspondence between the indexes of an expanded line and the CHARACTER POSITIONS of the physical line it
+/// was read from — what a diagnostic needs to name the column the programmer sees in their editor (kb/Work PB1801,
+/// PB2983). The spaces a tab expanded to all map to the tab's own position (a tab counts one column, as in every
+/// editor), and the two UTF-16 units of a supplementary-plane character map to its one position
+/// (<see cref="CharacterPositions"/>), so a column never depends on how many code units the text is encoded in.</summary>
+public sealed class ColumnMap
 {
-    private readonly int[] _toExpanded;
     private readonly int[] _toPhysical;
 
-    internal TabMap(int[] toExpanded, int[] toPhysical)
-    {
-        _toExpanded = toExpanded;
-        _toPhysical = toPhysical;
-    }
+    internal ColumnMap(int[] toPhysical) => _toPhysical = toPhysical;
 
-    /// <summary>The 0-based expanded position where the character at 0-based physical index <paramref name="physical"/>
-    /// begins (the physical length maps to the expanded length).</summary>
-    public int ToExpanded(int physical) => _toExpanded[physical];
-
-    /// <summary>The 0-based physical index of the character that produced the 0-based expanded position
-    /// <paramref name="expanded"/> (the expanded length maps to the physical length, and a position past it continues
-    /// the line one for one — the program-text area of a short fixed-form line is read as space-filled to margin R).</summary>
+    /// <summary>The 0-based character position, in the physical line, of the character that produced the 0-based expanded
+    /// index <paramref name="expanded"/> (the expanded length maps to the physical length in positions, and an index past
+    /// it continues the line one for one — the program-text area of a short fixed-form line is read as space-filled to
+    /// margin R).</summary>
     public int ToPhysical(int expanded)
     {
         int end = _toPhysical.Length - 1;   // the expanded length

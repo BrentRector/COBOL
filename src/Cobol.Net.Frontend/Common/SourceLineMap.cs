@@ -18,9 +18,12 @@ public readonly record struct SourceOrigin(string File, int Line)
 
 /// <summary>One stretch of a resultant line piece (kb/Work PB1801): the characters from 0-based resultant column
 /// <see cref="ResultColumn"/> up to the next span's came from <see cref="Origin"/>, the first of them at 0-based
-/// PHYSICAL column <see cref="SourceColumn"/> of that line and each next one a column further. A physical column is an
-/// index of the line as the file holds it — before the line-entry stage expanded its tabs, so a TAB counts one, as in
-/// every editor (the reference-format stage that bears the spans splits them at each tab).</summary>
+/// PHYSICAL column <see cref="SourceColumn"/> of that line and each next one a column further. A physical column is a
+/// CHARACTER POSITION of the line as the file holds it — before the line-entry stage expanded its tabs, so a TAB counts
+/// one, as in every editor, and a supplementary-plane character counts one (kb/Work PB2983), whereas a resultant column
+/// is a UTF-16 index of the resultant text, which is what the parser reports. The spans carry that conversion: the
+/// reference-format stage that bears them splits a span at each tab and at each supplementary-plane character, so within
+/// a span one resultant unit is exactly one physical position.</summary>
 public readonly record struct OriginSpan(int ResultColumn, SourceOrigin Origin, int SourceColumn);
 
 /// <summary>

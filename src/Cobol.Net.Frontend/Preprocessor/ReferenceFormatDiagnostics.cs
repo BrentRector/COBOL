@@ -25,6 +25,11 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
 {
     private bool _col7Flagged, _wordFlagged, _floatingCommentFlagged, _floatingContinuationFlagged, _debuggingLineFlagged;
 
+    /// <summary>The debugging lines (physical file and line) the §6.5 walk passed over because a literal awaited its
+    /// continuation (kb/Work PB2490): comment lines when their source unit says no WITH DEBUGGING MODE, which is not known
+    /// until the whole text is read, and then <see cref="OnSourceDebuggingLines"/> reports the ones it turns out are source.</summary>
+    private readonly HashSet<SourceOrigin> _debuggingLinesBetweenLiteralParts = [];
+
     private EditionInfo Edition => EditionInfo.Of(dialectLevel, permissive);
 
     private static Common.SourceLocation At(string file, int line, int column = 0) =>
@@ -46,6 +51,26 @@ public sealed class ReferenceFormatDiagnostics(int dialectLevel, bool permissive
     /// <c>debugging-line-removed-2014</c>). Gated once per compilation, at its first use.</summary>
     public void OnDebuggingLine(string file, int line)
         => GateOnce(ref _debuggingLineFlagged, Constructs.DebuggingLineRemoved2014, file, line, FixedFormLine.IndicatorColumn);
+
+    /// <summary>A debugging line written between the parts of a continued literal, passed over by the logical conversion
+    /// as it would a comment line (kb/Work PB2490). Whether it is one is decided later, per source unit, by
+    /// <c>DebuggingLineRewriter</c>; <see cref="OnSourceDebuggingLines"/> reports it if the unit's mode makes it source.</summary>
+    public void NoteDebuggingLineBetweenLiteralParts(string file, int line)
+        => _debuggingLinesBetweenLiteralParts.Add(new SourceOrigin(file, line));
+
+    /// <summary>§6.3.5 2) - COBOLNET3473: every debugging line in <paramref name="sourceLines"/> (the origins of the lines
+    /// <c>DebuggingLineRewriter</c> kept as source) that stands between the parts of a continued literal. Only a comment
+    /// line or a blank line may; a source line there is what GnuCOBOL rejects with -fdebugging-line ("continuation
+    /// character expected"). Reported at the line's indicator.</summary>
+    public void OnSourceDebuggingLines(IEnumerable<SourceOrigin> sourceLines)
+    {
+        foreach (var origin in sourceLines)
+            if (_debuggingLinesBetweenLiteralParts.Contains(origin))
+                diagnostics.ReportError(Editions.Diagnostics.DiagnosticCatalog.DebuggingLineBetweenLiteralParts.Code,
+                    "a debugging line (indicator D) is source under WITH DEBUGGING MODE, and a source line shall not stand "
+                    + "between the parts of a continued literal: only comment lines and blank lines may (ISO §6.3.5 2))",
+                    At(origin.File, origin.Line, FixedFormLine.IndicatorColumn), default);
+    }
 
     private void GateOnce(ref bool flagged, string constructId, string file, int line, int column)
     {

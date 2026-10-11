@@ -369,6 +369,37 @@ public sealed class LogicalLineBuilderTests
         Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);
     }
 
+    [Theory] // kb/Work PB2490: the walk cannot know whether the debugging line is a comment (no WITH DEBUGGING MODE) or
+             // source, so it NOTES the line it passed over, and the line is diagnosed (COBOLNET3473) only when the rewriter
+             // reports it as source - a source line is outside §6.3.5 2): only comment lines and blank lines may be there.
+    [InlineData(false, false)]
+    [InlineData(true, true)]
+    public void DebuggingLine_PassedOverInALiteral_IsDiagnosedOnlyWhenItIsSource(bool isSource, bool diagnosed)
+    {
+        const string prefix = "    MOVE \"";
+        string src = ToMarginR("000100", " ", prefix, 'A') + "\n000200D    DISPLAY \"X\".\n000300-    \"TAIL\" TO V.\n";
+        var bag = new DiagnosticBag();
+        var gates = new ReferenceFormatDiagnostics(85, permissive: false, bag);
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped(src, gates, "t.cob", true, out _, false);
+        Assert.DoesNotContain(bag.Diagnostics, d => d.IsError);            // the walk itself reports nothing
+        var debuggingLine = m.Lines[1].Origin;                              // the logical line the debugging line kept (physical line 2)
+        Assert.Equal(2, debuggingLine.Line);
+        gates.OnSourceDebuggingLines(isSource ? new[] { debuggingLine } : Array.Empty<SourceOrigin>());
+        var d = bag.Diagnostics.Where(x => x.Code == "COBOLNET3473").ToArray();
+        Assert.Equal(diagnosed ? 1 : 0, d.Length);
+        if (diagnosed) Assert.Equal((1, 6), (d[0].Location.Line, d[0].Location.Column));   // 0-based: line 2, the indicator column
+    }
+
+    [Fact] // a debugging line the walk did NOT pass over (no literal awaits its continuation) is never diagnosed, source or not
+    public void DebuggingLine_OutsideALiteral_IsNeverDiagnosed()
+    {
+        var bag = new DiagnosticBag();
+        var gates = new ReferenceFormatDiagnostics(85, permissive: false, bag);
+        var m = ReferenceFormatProcessor.NormalizeToFreeFormMapped("000100     STOP RUN.\n000200D    DISPLAY \"X\".\n", gates, "t.cob", true, out _, false);
+        gates.OnSourceDebuggingLines([m.Lines[1].Origin]);
+        Assert.DoesNotContain(bag.Diagnostics, d => d.Code == "COBOLNET3473");
+    }
+
     [Fact] // a debugging line after a line that needs no continuation is the latest logical line: its continuation is its own
     public void DebuggingLine_ThenAContinuationLine_ContinuesTheDebuggingLine()
     {
