@@ -108,7 +108,7 @@ one session.
 |---|---|---|---|
 | `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned, the last lander train landed through `push-main.sh`, the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
 | `campaign` | Opus | only with `-Cluster <lead>[,<lead>...]`: a wave-type unit is due (a handoff named `wave` or `campaign`, or nothing else fired), a lead's cluster has a ready note and the last wave-type unit was not a `campaign`; the ready leads take turns (section 3.2, section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
-| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14). It carries the train `prune_worktrees.py --train` names: at most six of the branches it lists WAITING TO LAND (`TRAIN_MAX`, the owner's band of 4-6), the most harmful lead first, the attended session's included; the rest wait for the next land unit (kb/Work PB2981). While the loop runs the attended session dispatches no lander and writes its finished branches' DONE reports for this unit instead, in `coord.reports_dir()` (MANDATORY-PRACTICES O11, kb/Work PB2602, PB2980) |
+| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14). First it dispatches one read-only `cobol-reviewer` for each branch `prune_worktrees.py` lists WAITING FOR REVIEW (a DONE branch with no `Review: CLEAN` stamp at its tip; the review skill's branch form, kb/Work PB3027); it never reviews in the train and never fixes a finding. It carries the train `prune_worktrees.py --train` names: at most six of the branches it lists WAITING TO LAND (`TRAIN_MAX`, the owner's band of 4-6), the most harmful lead first, the attended session's included; the rest wait for the next land unit (kb/Work PB2981). While the loop runs the attended session dispatches no lander and writes its finished branches' DONE reports for this unit instead, in `coord.reports_dir()` (MANDATORY-PRACTICES O11, kb/Work PB2602, PB2980) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
 | `owner-question` | none | a handoff carries `owner_question` | immediately: the supervisor appends the question to `OWNER-QUESTIONS.md` and STOPS; it never guesses and never starts a session for it |
@@ -631,7 +631,9 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    wave 1045 held. An aborted dispatch is released with `--release`.
 2. **Finishers first.** (a) A note whose newest report (by wave, then time; header lines only) says `SPLIT` or
    `NOT STARTED`, whatever its branch's state (a `land` unit lands only `DONE` branches, so an unlanded `SPLIT` branch
-   held for one was stranded; kb/Work PB2575): one finisher group per predecessor report. (b) The half
+   held for one was stranded; kb/Work PB2575), or says `DONE` with a branch review stamped `Review: FINDINGS` (kb/Work
+   PB3027: the landing step never fixes a finding; the finisher's `pred` names the findings file and asks for every
+   finding answered by its id): one finisher group per predecessor report. (b) The half
    clusters, one finisher group each. (c) An `UNLANDED` branch whose commit subjects name an open note no report
    covers. Each finisher's `pred` is a fixed paragraph naming the predecessor report, branch, worktree, head and the
    branch's class (cherry-pick if unlanded, orient from the report if landed). A finisher on a primary file absorbs
@@ -826,7 +828,7 @@ Owner 2026-10-04: "Publish ledger each time." The page is the owner's live view 
 `conformance-ledger-artifact`), and a stale page is worse than none. Publishing is the one step a headless unit CANNOT do:
 its session has no `Artifact` tool (probed 2026-10-04 on Haiku: asked whether the tool is available, it answers NO), and a
 wrapper around the claude.ai API would be a second author of the page. So the work splits where the capability is:
-- **A unit renders** (`units/wave.md` step 5, `units/land.md` step 3): `python scripts/spec/gen_ledger.py --out
+- **A unit renders** (`units/wave.md` step 5, `units/land.md` step 4): `python scripts/spec/gen_ledger.py --out
   {COORD}\ledger.html`; every figure on the page is computed and none is hand-written (the in-flight narrative was
   removed, kb/Work PB2912).
 - **The supervisor announces.** After every unit it runs `ledger_state.py owed`, which compares the page's own stamp (the

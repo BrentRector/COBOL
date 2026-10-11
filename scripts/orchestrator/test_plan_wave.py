@@ -171,6 +171,28 @@ check("its pred cherry-picks the unlanded branch",
       bool(g5) and all(s in g5.pred for s in ("worktree-wf_ggg-4", "UNLANDED", "cherry-pick")), True)
 check("done with a note not started still awaits landing", p5["awaiting_landing"].get("worktree-wf_hhh-5"),
       ["PB7", "PB12"])
+# 6b'. A DONE BRANCH WHOSE REVIEW STAMPED FINDINGS IS A FINISHER (kb/Work PB3027): the land unit never fixes a review
+#      finding, so the finisher's pred names the findings file and the answer-by-id rule. A CLEAN stamp still awaits
+#      landing; a placeholder `Review:` line stamps nothing.
+RV_REPORTS = TMP / "reports-review"
+RV_REPORTS.mkdir()
+(RV_REPORTS / "w1062e-PB5-report.md").write_text(
+    "# PB5 report\n**Status:** DONE · **branch:** `worktree-wf_rv-1` · **HEAD:** `6666666ff`\n"
+    "**Review:** FINDINGS 2 w1062e-review-r1 6666666ff E:/s/review-w1062-e.jsonl\n\n## Reproduced?\n", encoding="utf-8")
+(RV_REPORTS / "w1062f-PB7-report.md").write_text(
+    "# PB7 report\n**Status:** DONE · **branch:** `worktree-wf_rv-2` · **HEAD:** `7777777aa`\n"
+    "**Review:** CLEAN w1062f-review-r1 7777777aa\n\n## Reproduced?\n", encoding="utf-8")
+rv_reports = pw.load_reports(RV_REPORTS)
+check("the review stamps parse", [(r.review.verdict, r.review.findings) if r.review else None for r in rv_reports],
+      [("FINDINGS", 2), ("CLEAN", 0)])
+p5r = pw.plan(notes, CLUSTERS, HALF, rv_reports, lambda b: "UNLANDED", {}, RULES, budget_points=100)
+g5r = next((g for g in p5r["groups"] if "PB5" in g.notes), None)
+check("a FINDINGS stamp is a finisher whose pred names the findings file and the answer rule",
+      (g5r.kind if g5r else None, bool(g5r) and all(s in g5r.pred for s in ("review-w1062-e.jsonl", "no_change_needed",
+                                                                              "git merge worktree-wf_rv-1"))),
+      ("finisher", True))
+check("a CLEAN stamp awaits landing", p5r["awaiting_landing"].get("worktree-wf_rv-2"), ["PB7"])
+check("a placeholder Review line stamps nothing", pw.parse_review("**Review:** stamped by the branch reviewer"), None)
 
 # 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
 #     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.
