@@ -793,6 +793,7 @@
   "l1_write_indexed_every_key",
   "pb690_line_sequential_byte_image_2023",
   "pb1542_code_set_line_sequential",
+  "pb2834_ls_rewrite_size_before_charset",
   "pb1363_conditional_compilation_structure_legal",
   "pb1365_turn_checking_implied_on",
   "pb1365_turn_checking_with_location_implied_on",

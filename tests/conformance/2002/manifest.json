@@ -824,7 +824,8 @@
   "pb1941_constant_length_report_ahead",
   "pb2051_parameterized_definition_binds_itself",
   "pb2588_as_constant_name",
-  "pb2727_paragraph_single_period"
+  "pb2727_paragraph_single_period",
+  "pb2848_lock_ceiling_after_record_rules"
   ],
   "pending": []
 }

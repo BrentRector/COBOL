@@ -167,6 +167,25 @@ public abstract class FileConnector
     /// nothing: the caller owns the single <see cref="Status"/> assignment (the '43' gate drops exactly once).</summary>
     protected string? PermanentErrorReplay() => _permanentError;
 
+    /// <summary>⛔ THE LAST CHECK OF A WRITE OR REWRITE, ASKED BY THE ORGANIZATION ITSELF (kb/Work PB2848). The
+    /// registry sets it for the statement when the statement requests a NEW record lock
+    /// (<c>FileRegistry.WriteSharedInStatement</c> / <c>RewriteSharedInStatement</c>); it answers the failing status —
+    /// §12.4.5.9.4 GR7's '54' / '53', <i>"Any I-O statement that attempts to obtain a record lock that would exceed
+    /// either limit is unsuccessful"</i> — or null. The lock is the statement's effect on success (§14.9.51.4 GR11, the
+    /// WRITE's: the record lock <i>"is set when the execution of the WRITE statement is successful"</i>; §14.9.35.4 GR12
+    /// the REWRITE's), so the ceiling is judged only on a statement that has passed every rule of its own, and the
+    /// statement must still be
+    /// unsuccessful with the file untouched (GR15 / GR14): <see cref="RefusedAtCommit"/> is therefore asked once, by
+    /// each organization's WRITE and REWRITE, at the instant before it first changes the physical file or its
+    /// store. The registry used to test the ceiling BEFORE calling the organization, so a record that broke GR14's
+    /// size rule, '91' or a key rule answered '54' (DOC-A.1-104 (2): among unsuccessful values the statement's own
+    /// rules come first). Cleared by the registry when the statement ends.</summary>
+    internal Func<string?>? CommitGate { get; set; }
+
+    /// <summary>The failing status of <see cref="CommitGate"/>, or null: the call every organization's WRITE and
+    /// REWRITE makes once its own rules have passed and before it changes anything.</summary>
+    private protected string? RefusedAtCommit() => CommitGate?.Invoke();
+
     /// <summary>Set the I-O status directly (facade-level conditions: a locked-file OPEN, a REEL/UNIT CLOSE) — an
     /// attempted access like any other status assignment.</summary>
     public void SetStatus(string status) => Status = status;
@@ -983,6 +1002,16 @@ public abstract class FileConnector
     protected string ToMedium(string nativeImage, bool national) => MediumEncoding is MediumEncoding.Utf8
         ? LineSequentialEncoding.ToChannel(nativeImage, national)
         : FileCharacterSet.ToChannel(nativeImage, CodeSet);
+
+    /// <summary>⛔ THE BYTES A RECORD IMAGE OCCUPIES ON THE MEDIUM — <see cref="ToMedium"/>'s length, but TOTAL, so a
+    /// size rule that is stated before a character-set rule can be tested before it (§14.9.35.4 GR17 b) before d);
+    /// kb/Work PB2834). A UTF-8 file counts through <see cref="LineSequentialEncoding.ChannelLength"/>; every other
+    /// encoding is one channel unit per character (<see cref="FileCharacterSet.ToChannel"/> maps character for
+    /// character), so a character the file's coded character set has no image for still takes the one byte any
+    /// image of it would.</summary>
+    private protected int MediumLength(string nativeImage, bool national) => MediumEncoding is MediumEncoding.Utf8
+        ? LineSequentialEncoding.ChannelLength(nativeImage, national)
+        : nativeImage.Length;
 
     /// <summary>⛔ THE ONE ANSWER TO "can this record be written in the file's coded character set?" for every
     /// organization's WRITE and REWRITE (owner decision kb/Work R47; Annex A.1 item 31; kb/Work PB690, PB1150,

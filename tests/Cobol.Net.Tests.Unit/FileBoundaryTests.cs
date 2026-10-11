@@ -350,6 +350,23 @@ public sealed class FileBoundaryTests : IDisposable
         Assert.Throws<InvalidOperationException>(() => LineSequentialEncoding.ToChannel("A\uD83D", nationalArea: false));
     }
 
+    /// <summary>kb/Work PB2834 — <see cref="LineSequentialEncoding.ChannelLength"/> is <c>ToChannel</c>'s length where an
+    /// image exists, and TOTAL: a lone surrogate (no UTF-8 form, so no image) counts at the fewest bytes any image
+    /// could take, one, which is what lets REWRITE's GR17 b) size rule run before d)'s character-set rule.</summary>
+    [Fact]
+    public void LineSequentialEncoding_ChannelLength_IsToChannelsLength_AndTotal()
+    {
+        string text = "h" + EAcute + Euro + "￿😀";
+        Assert.Equal(LineSequentialEncoding.ToChannel(text, nationalArea: false).Length,
+            LineSequentialEncoding.ChannelLength(text, nationalArea: false));
+        string pairs = CobolBits.NatBytes(Euro + "A");
+        Assert.Equal(LineSequentialEncoding.ToChannel(pairs, nationalArea: true).Length,
+            LineSequentialEncoding.ChannelLength(pairs, nationalArea: true));
+        Assert.Equal(2, LineSequentialEncoding.ChannelLength("A\uD83D", nationalArea: false));       // lone high surrogate: 1 byte
+        Assert.Equal(5, LineSequentialEncoding.ChannelLength("\uDCE9😀", nationalArea: false));   // 1 + a 4-byte pair
+        Assert.Equal(0, LineSequentialEncoding.ChannelLength("", nationalArea: false));
+    }
+
     /// <summary>⛔ THE STORAGE-BYTE LAW (kb/Work PB1759, design D29): byte 0xFF is HIGH-VALUE (U+FFFF), every other byte
     /// b is U+00bb, and a character's byte is its low byte — so U+00FF and U+FFFF share 0xFF, and the fixed-record
     /// channel writes HIGH-VALUE as 0xFF and reads 0xFF back as HIGH-VALUE.</summary>

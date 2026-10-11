@@ -371,7 +371,15 @@ public static class CobolFile
     /// the run unit — Table 19's arbitration state and the keyed record stores are keyed on it, compared under the
     /// host's case rule (<see cref="HostFile.PhysicalFileComparer"/>) — so <c>data.dat</c>, <c>./data.dat</c> and the
     /// full path must be one key. (A symbolic or hard link is still a second spelling: the identity is the path,
-    /// docs/CONFORMANCE.md DOC-A.1-71.)</para></summary>
+    /// docs/CONFORMANCE.md DOC-A.1-71.)</para>
+    /// <para>⛔ IT IS TOTAL (kb/Work PB2848): it runs where no OPEN's I-O-status catch exists — at registration, and in
+    /// <see cref="FileConnector.AssociationFailure"/> before the OPEN body — and the content of a data-name-1
+    /// (§12.4.5.3 GR3 b)) is an arbitrary string, so a spelling the host cannot make absolute (a path longer than the
+    /// host allows, a NUL) must not escape as a .NET exception. Such a spelling names no physical file the host can
+    /// reach, so it is returned as written; it is its own identity, and the OPEN that follows meets the host's
+    /// refusal where every other open failure is already an I-O status ('35' for a probe that finds nothing, '30'
+    /// for a creation the host refuses; <c>FileConnector.Open</c>). The content that §12.4.5.3 GR3 b) itself calls
+    /// not consistent, empty or carrying a control character, is '31' before this is asked.</para></summary>
     public static string ResolveHostPath(string assignTarget)
     {
         // An EMPTY target identifies NO physical file, and the empty host path is exactly how a connector says
@@ -380,6 +388,11 @@ public static class CobolFile
         // runs FileConnector.Associate. (Without this the empty target became the literal file ".txt".)
         if (assignTarget.Length == 0) return "";
         bool looksLikeAPath = assignTarget.Contains('.') || assignTarget.Contains('/') || assignTarget.Contains('\\');
-        return Path.GetFullPath(looksLikeAPath ? assignTarget : assignTarget.ToLowerInvariant() + ".txt");
+        string spelling = looksLikeAPath ? assignTarget : assignTarget.ToLowerInvariant() + ".txt";
+        try { return Path.GetFullPath(spelling); }
+        catch (Exception refused) when (refused is ArgumentException or IOException or NotSupportedException)
+        {
+            return spelling;   // the host cannot make it absolute: see the remarks — the OPEN reports what the host says
+        }
     }
 }

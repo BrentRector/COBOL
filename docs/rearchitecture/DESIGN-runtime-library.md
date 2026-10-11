@@ -624,11 +624,24 @@ it with two `FileRegistry` instances (two run units sharing no table and no hand
 `REWRITE`, `IGNORING LOCK`, a sibling's `WRITE` visible at the next statement, every run unit's update surviving
 every CLOSE, and a `RETRY` (n TIMES and FOREVER) that waits outside the mutex.
 
+**The record-lock CEILING is the last check of a WRITE or REWRITE (kb/Work PB2848).** §12.4.5.9.4 GR7's `54` / `53`
+judge the lock a statement requests, and that lock is the statement's effect on success (§14.9.51.4 GR11, §14.9.35.4
+GR12), so the registry no longer asks the ceiling before calling the organization. It hands the connector a
+`FileConnector.CommitGate` for the statement (`FileRegistry.LockCeilingRefusal`, only when the statement requests a NEW
+lock) and every organization's WRITE and REWRITE asks it once (`RefusedAtCommit()`), after its own rules and before it
+first changes the file or its store: the sequential record, line and print arms, `RelativeConnector.Write`/`Replace`,
+`IndexedConnector.Write`/`Rewrite`. A new organization or arm inherits the order by calling it at its commit point;
+`CommitGateDriftTests` measures every one with a gate that always refuses.
+
 **The SEQUENTIAL organization publishes its record locks the same way (kb/Work PB2692).** Its `RecordLockHandle` is
 the handle beneath its reader or writer (`HostFile.HandleOf`), and three facts make the published lock guard the
 right record across run units. (1) A writer that registered a record-locking posture opens its handle READ-WRITE
 (`SequentialConnector.HostAccess`): the presence byte is a SHARED hold, which Linux refuses through a write-only
-descriptor, and a lock with no presence byte is invisible to every other run unit's hot-path test. (2) A sharing
+descriptor, and a lock with no presence byte is invisible to every other run unit's hot-path test. The read half is
+a PREFERENCE for OUTPUT and a NEED for EXTEND (kb/Work PB2848): OUTPUT creates the file and has no record to read,
+so a host that refuses the read (a write-only file) still grants the write, `OpenWriter` falls back to the mode's
+write-only handle, and that connector numbers its records by the in-run-unit mint (`_writerReads` is false) and
+publishes no presence; EXTEND numbers the records already in the file and answers `37` without the read. (2) A sharing
 writer's released record is NUMBERED OFF THE MEDIUM (`ReleaseRecord` → `PhysicalOrdinalOfRelease`): the record lands
 where `SharedAppendStream.ReleaseStart` says, and its ordinal is one more than the records starting before that
 offset, counted incrementally by the one framing-aware count (`CountRecords`). The in-run-unit mint

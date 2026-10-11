@@ -38,20 +38,49 @@ public static class LineSequentialEncoding
     /// them — so a lone surrogate here is a write path that skipped the screen, and it fails loudly.</summary>
     public static string ToChannel(string native, bool nationalArea)
     {
-        string text = nationalArea ? CobolBits.NatReadWindow(native, 0, native.Length / CobolBits.BytesPerNational) : native;
+        string text = Characters(native, nationalArea);
         var sb = new System.Text.StringBuilder(text.Length);
         for (int i = 0; i < text.Length; i++)
         {
-            int cp = text[i];
-            if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
-                cp = char.ConvertToUtf32(text[i], text[++i]);
-            else if (char.IsSurrogate(text[i]))
+            int cp = NextCodePoint(text, ref i);
+            if (cp is >= 0xD800 and <= 0xDFFF)
                 throw new InvalidOperationException($"the record contains the lone surrogate U+{cp:X4}, which is outside "
                     + "the line sequential character set, and no WRITE or REWRITE screen refused it (ISO §14.9.51.4 GR23)");
             Put(sb, cp);
         }
         return sb.ToString();
     }
+
+    /// <summary>⛔ THE NUMBER OF MEDIUM BYTES a record image occupies — <see cref="ToChannel"/>'s length, but TOTAL:
+    /// it answers for a record holding a lone surrogate, which has no UTF-8 form and so no byte image (the
+    /// character §14.9.35.4 GR17 d) refuses). That is what lets REWRITE test GR17 b)'s size rule BEFORE d)'s character
+    /// set, in the rules' own order (kb/Work PB2834): a character with no image is counted at the fewest bytes ANY
+    /// image could give it, the one byte its escape stands for (<see cref="FromChannel"/>), so b) is judged only on
+    /// what holds whatever image the character might be given, and a record that exceeds the replaced line even
+    /// then is '44' whatever else is wrong with it.</summary>
+    internal static int ChannelLength(string native, bool nationalArea)
+    {
+        string text = Characters(native, nationalArea);
+        int bytes = 0;
+        for (int i = 0; i < text.Length; i++)
+        {
+            int cp = NextCodePoint(text, ref i);
+            bytes += cp is >= 0xD800 and <= 0xDFFF ? 1 : Utf8Length(cp);
+        }
+        return bytes;
+    }
+
+    /// <summary>The CHARACTERS of a native record image: a national area's UTF-16BE pairs decoded (D-N1), an
+    /// alphanumeric area as it is.</summary>
+    private static string Characters(string native, bool nationalArea) =>
+        nationalArea ? CobolBits.NatReadWindow(native, 0, native.Length / CobolBits.BytesPerNational) : native;
+
+    /// <summary>The code point at <paramref name="i"/>: a surrogate pair as its one scalar value (the index moves past
+    /// the pair), a lone surrogate as its own code unit.</summary>
+    private static int NextCodePoint(string text, ref int i) =>
+        char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1])
+            ? char.ConvertToUtf32(text[i], text[++i])
+            : text[i];
 
     /// <summary>The native record image of a line just read (channel characters, one per byte, the delimiter and any
     /// byte-order mark already removed).</summary>
@@ -102,16 +131,28 @@ public static class LineSequentialEncoding
         return n;
     }
 
+    /// <summary>The number of bytes in the UTF-8 form of the scalar value <paramref name="cp"/> (Unicode 15 Table 3-6):
+    /// the ONE statement of the length thresholds, shared by <see cref="ChannelLength"/> and <see cref="Put"/>, so the
+    /// size REWRITE measures and the bytes WRITE emits cannot drift apart.</summary>
+    private static int Utf8Length(int cp) => cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+
     private static void Put(System.Text.StringBuilder sb, int cp)
     {
-        if (cp < 0x80) { sb.Append((char)cp); return; }
-        if (cp < 0x800) { sb.Append((char)(0xC0 | (cp >> 6))).Append((char)(0x80 | (cp & 0x3F))); return; }
-        if (cp < 0x10000)
+        switch (Utf8Length(cp))
         {
-            sb.Append((char)(0xE0 | (cp >> 12))).Append((char)(0x80 | ((cp >> 6) & 0x3F))).Append((char)(0x80 | (cp & 0x3F)));
-            return;
+            case 1:
+                sb.Append((char)cp);
+                return;
+            case 2:
+                sb.Append((char)(0xC0 | (cp >> 6))).Append((char)(0x80 | (cp & 0x3F)));
+                return;
+            case 3:
+                sb.Append((char)(0xE0 | (cp >> 12))).Append((char)(0x80 | ((cp >> 6) & 0x3F))).Append((char)(0x80 | (cp & 0x3F)));
+                return;
+            default:
+                sb.Append((char)(0xF0 | (cp >> 18))).Append((char)(0x80 | ((cp >> 12) & 0x3F)))
+                  .Append((char)(0x80 | ((cp >> 6) & 0x3F))).Append((char)(0x80 | (cp & 0x3F)));
+                return;
         }
-        sb.Append((char)(0xF0 | (cp >> 18))).Append((char)(0x80 | ((cp >> 12) & 0x3F)))
-          .Append((char)(0x80 | ((cp >> 6) & 0x3F))).Append((char)(0x80 | (cp & 0x3F)));
     }
 }

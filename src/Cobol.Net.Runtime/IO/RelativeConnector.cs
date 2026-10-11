@@ -436,6 +436,7 @@ public sealed class RelativeConnector : KeyedConnector
         var frame = Framed(rec, image, extents);
         if (!StoreHolds(_st.FramedBytesAfterPut(slot, frame)))
             return Status = FileStatusCode.BoundaryViolation;              // '24' §14.9.51.4 GR33 b)
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         _st.Put(slot, frame);
         if (sequentialRelease) _lastReleasedSlot = slot;
         _lastSlot = slot;                                                  // GR29 a) — MOVEd back into the key item
@@ -494,6 +495,7 @@ public sealed class RelativeConnector : KeyedConnector
     {
         var frame = Framed(stored, image, extents);
         if (!StoreHolds(_st.FramedBytesAfterPut(slot, frame))) return FileStatusCode.BoundaryViolation;   // '24'
+        if (RefusedAtCommit() is { } lockRefused) return lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         _st.Put(slot, frame);
         return FileStatusCode.Success;
     }

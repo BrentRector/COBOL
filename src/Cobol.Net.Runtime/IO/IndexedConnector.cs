@@ -613,6 +613,7 @@ public sealed class IndexedConnector : KeyedConnector
         // the store's capacity (Annex A.1 item 107, KeyedConnector.StoreHolds), tested before the release.
         if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents, _alts.Count + 1)))
             return Status = FileStatusCode.BoundaryViolation;              // '24' GR42d
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         // §14.9.51.4 GR40 — the WRITE RELEASES the record, so it is positioned last in the duplicate set of
         // EVERY key at once: one fresh ordinal stamped into every slot (the prime slot doubles as the record's
         // release order in the physical file — see KeyedRec.Ordinals).
@@ -674,6 +675,7 @@ public sealed class IndexedConnector : KeyedConnector
         if (!StoreHolds(_st.RecordBytes + IndexedStore.FrameBytes(stored, extents, target.Ordinals.Length)
             - IndexedStore.FrameBytes(target.Image, target.Extents, target.Ordinals.Length)))
             return Status = FileStatusCode.BoundaryViolation;                                   // '24'
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         // §14.9.35.4 GR24 a) — "When the value of a specific alternate record key is not changed, the order of
         // retrieval when that key is the key of reference remains unchanged" — so ONLY the keys this REWRITE
         // actually changed are re-stamped; b) puts the record "last within the set of duplicate records" of

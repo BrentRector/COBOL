@@ -227,7 +227,9 @@ public sealed class SequentialConnector : FileConnector
             NoteRelease();                         // …and now visible, so no sibling's read-ahead may hide it
         }
         if (SharedPhysical is not { } shared) return;
-        _writeOrdinal = anotherWriter
+        // …and a writer the host denied READ (OpenWriter's write-only OUTPUT fallback, kb/Work PB2848) cannot count
+        // the medium: a count it could not make would refuse, AFTER the flush above, a record that is in the file.
+        _writeOrdinal = anotherWriter && _writerReads
             ? PhysicalOrdinalOfRelease((SharedAppendStream)_writer!.BaseStream)   // §9.1.16 identity, off the medium
             : ++shared.ReleasedOrdinal;                                           // …or the only writer's mint
     }
@@ -365,7 +367,22 @@ public sealed class SequentialConnector : FileConnector
         // The file coded character set's STRICT encoding (kb/Work PB690): every write arm refuses a record holding
         // a character with no byte image before it reaches this writer ('91' / '71'), so the exception fallback is
         // the guard that keeps that refusal the only answer — never Latin-1's silent '?'.
-        var stream = HostFile.OpenConnectorWriteStream(HostPath, mode, HostAccess(Mode), HostShare);
+        FileAccess access = HostAccess(Mode);
+        Stream stream;
+        try { stream = HostFile.OpenConnectorWriteStream(HostPath, mode, access, HostShare); }
+        // ⛔ A WRITE-ONLY FILE IS NOT '37' TO AN OUTPUT OPEN (kb/Work PB2848). The read half of a record-locking
+        // writer's handle is the lock ANNOUNCEMENT's need (HostAccess), not the open mode's: OUTPUT creates the file,
+        // so it has no records to read, and §14.9.27.4 GR3's '37' is "insufficient authority … to open the file" for
+        // the mode — the write this open asked for is the one the host grants. The connector then holds a write-only
+        // handle: it cannot count records off the medium nor announce a presence the host refuses (EBADF is no
+        // conflict, OfdRegionLocks), so ReleaseRecord numbers its records by the run unit's mint. EXTEND does not
+        // take this arm: it numbers the records already in the file, which it cannot do without reading them.
+        catch (UnauthorizedAccessException) when (Mode is FileOpenMode.Output && access != FileLockPosture.AccessOf(Mode))
+        {
+            access = FileLockPosture.AccessOf(Mode);
+            stream = HostFile.OpenConnectorWriteStream(HostPath, mode, access, HostShare);
+        }
+        _writerReads = (access & FileAccess.Read) != 0;
         StreamWriter w;
         try
         {
@@ -386,6 +403,11 @@ public sealed class SequentialConnector : FileConnector
     /// the stream is opened, cleared where it is disposed.</summary>
     private Microsoft.Win32.SafeHandles.SafeFileHandle? _handle;
 
+    /// <summary>Whether the writer's handle was granted READ access, so the connector can count records off the
+    /// medium (<see cref="PhysicalOrdinalOfRelease"/>). False only for the write-only OUTPUT handle
+    /// <see cref="OpenWriter"/> falls back to when the host refuses the read half; set by every OpenWriter.</summary>
+    private bool _writerReads;
+
     /// <inheritdoc/>
     /// <remarks>⛔ THE SEQUENTIAL ARM OF PB2660 (kb/Work PB2692). §9.1.16, <i>"While locked by a given file
     /// connector, a record is not accessible to another file connector in the same or a different run unit"</i>,
@@ -404,7 +426,9 @@ public sealed class SequentialConnector : FileConnector
     /// its record locks with no announcement, and every other run unit's hot-path test
     /// (<c>FileRegistry.NoRecordIsLocked</c>) would read the file as unlocked. Read is the one access the band
     /// admits beyond a mode's floor (<c>FileLockPostureDriftTests</c>), and only a connector that registered a
-    /// record-locking posture (<see cref="FileConnector.SharedPhysical"/>) asks for it.</remarks>
+    /// record-locking posture (<see cref="FileConnector.SharedPhysical"/>) asks for it. For OUTPUT the read is a
+    /// PREFERENCE: a host that refuses it still grants the write (<see cref="OpenWriter"/>, kb/Work PB2848); for
+    /// EXTEND it is a need, because the record ordinals a lock is published under are counted off the medium.</remarks>
     internal override FileAccess HostAccess(FileOpenMode mode) =>
         mode is FileOpenMode.Output or FileOpenMode.Extend && SharedPhysical is not null
             ? FileAccess.ReadWrite
@@ -1234,6 +1258,7 @@ public sealed class SequentialConnector : FileConnector
         // Asked of what the WRITE TRANSFERS: a varying record's positions past its length never reach the medium.
         if (!_lineSequential && RecordHasCharacterWithoutByteImage(image.AsSpan(0, Math.Min(image.Length, len))))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         if (IsVarying)
         {
             if (_lineSequential) EmitRecordLine(TrimRecordEnd(FitRecord(image, len, national), national), national);
@@ -1329,6 +1354,7 @@ public sealed class SequentialConnector : FileConnector
         // (kb/Work PB690; DOC-A.1-159 / DOC-A.1-31).
         if (!_lineSequential && RecordHasCharacterWithoutByteImage(image.AsSpan(0, Math.Min(image.Length, len))))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' §9.1.13.11 (DOC-A.1-110)
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53' — as WriteRecord (kb/Work PB2848)
         _printControl = true;
         string text = TrimRecordEnd(IsVarying ? FitRecord(image, len, national) : image, national);
         // §14.9.51.4 GR25 e)/f) — the ONE advance, placed before or after the presentation by the statement's
@@ -1750,6 +1776,7 @@ public sealed class SequentialConnector : FileConnector
         string record = FitRecord(image, len, national);
         if (RecordHasCharacterWithoutByteImage(record))
             return Status = FileStatusCode.CharacterWithoutByteImage;   // '91' — the WRITE's rule (R47)
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record, national);
         RecordExtents? replacing = Framed(record, image, extents).Extents;
         string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
@@ -1758,9 +1785,10 @@ public sealed class SequentialConnector : FileConnector
     }
 
     /// <summary>§14.9.35.4 GR17, the line sequential REWRITE, in its own order: a) a READ that transferred only
-    /// part of the record ⇒ '44' (§9.1.13.7 item 4 d)); d) a record area holding a character outside the line
-    /// sequential character set ⇒ '71'; b) a record of MORE bytes than the record being replaced ⇒ '44';
-    /// c) a record of fewer bytes is space-filled to the replaced record's length and replaces it ⇒ '00'.
+    /// part of the record ⇒ '44' (§9.1.13.7 item 4 d)); b) a record of MORE bytes than the record being replaced
+    /// ⇒ '44'; d) a record area holding a character outside the line sequential character set ⇒ '71' — the rules'
+    /// own order, b) ahead of d), so a too-long record holding such a character is a size violation (kb/Work
+    /// PB2834); c) a record of fewer bytes is space-filled to the replaced record's length and replaces it ⇒ '00'.
     /// <para>⛔ b) and c) compare <paramref name="len"/> — the number of bytes in record-name-1 (or data-name-1's
     /// content), UNTRIMMED. The trailing-space rule a line sequential WRITE applies (§14.9.51.4 GR21, "any spaces
     /// to the right of the rightmost non-space character are not transferred") is a WRITE rule; GR17 has none,
@@ -1772,14 +1800,17 @@ public sealed class SequentialConnector : FileConnector
         if (_lastLineStart < 0 || _reader is not { BaseStream: { CanSeek: true, CanWrite: true } stream })
             return NotRewritableInPlace();
         if (_lastReadLinePartial) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 a)
+        // b) and c) compare BYTES — the record's bytes ON THE MEDIUM against the bytes of the record it replaces in
+        // place (DOC-A.1-115): under a one-byte encoding that is its length; a UTF-8 character may take two to four.
+        // b) is stated before d) and is tested before it (kb/Work PB2834, the line sequential sibling of PB2751's
+        // WRITE reorder): MediumLength is total, so it measures a record whose character has no byte image too.
+        string record = FitRecord(image, len, national);
+        int bytes = MediumLength(record, national);
+        if (bytes > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 b)
         // GR17 d) routes through the SHARED set (kb/Work PB329): a REWRITE and a WRITE of the identical record
         // area reach the identical verdict (Annex A.1 item 115).
         if (RecordAreaOutsideLineCharacterSet(image, national)) return Status = FileStatusCode.LineRecordInvalidChar;   // '71' GR17 d)
-        // b) and c) compare BYTES — the record's bytes ON THE MEDIUM against the bytes of the record it replaces in
-        // place (DOC-A.1-115): under a one-byte encoding that is its length; a UTF-8 character may take two to four.
-        string record = FitRecord(image, len, national);
-        int bytes = ToMedium(record, national).Length;
-        if (bytes > _lastLineBytes) return Status = FileStatusCode.RecordSizeViolation;   // '44' GR17 b)
+        if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         // c) space-fills to the replaced record's byte length: one space per missing byte — the space is one byte in
         // every encoding, and a NATIONAL area's space is a two-char pair in the image but one UTF-8 byte on the medium.
         int perByte = MediumEncoding is MediumEncoding.Utf8 && national ? CobolBits.BytesPerNational : 1;

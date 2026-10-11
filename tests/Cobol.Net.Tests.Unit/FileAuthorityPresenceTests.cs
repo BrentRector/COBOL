@@ -390,6 +390,87 @@ public sealed class FileAuthorityPresenceTests : IDisposable
         Assert.Equal("37", reg.Status("F"));
     }
 
+    /// <summary>⛔ kb/Work PB2848 — a record-locking OUTPUT writer on a file this process may WRITE but not READ
+    /// is successful. §14.9.27.4 GR3's '37' is "insufficient authority … to open the file" for the mode, and the
+    /// mode here is OUTPUT: the connector's handle asks for READ as well only so a Linux host accepts the lock
+    /// presence announcement (<c>SequentialConnector.HostAccess</c>), which is a preference of the lock, not a
+    /// need of the open. The connector keeps a write-only handle and numbers its records by the run unit's mint,
+    /// because it cannot count the medium; the record is in the file. Run on a file that
+    /// <see cref="NotReadable"/> denies READ and still grants WRITE, SHARING WITH ALL OTHER so the writer takes the
+    /// record-locking posture and the sharing flush.</summary>
+    [Fact]
+    public void OpenOutput_RecordLockingWriterOnAWriteOnlyFile_IsSuccessful()
+    {
+        if (NotReadable() is not { } witness) { NoPrecondition(); return; }
+        Assert.True(HostFile.PermitsWrite(witness), "The premise is a file the host lets this process write.");
+        var reg = Register("seq", witness, optional: false);
+        reg.RegisterSharing("F", FileSharing.AllOther, FileLockMode.Manual, false);
+        reg.OpenStatic("F", FileOpenMode.Output);
+        Assert.Equal("00", reg.Status("F"));
+        reg.Write("F", "WRITE-ONLY-REC-01", -1, null);
+        Assert.Equal("00", reg.Status("F"));
+        reg.Close("F");
+        Assert.Equal("00", reg.Status("F"));
+        RestoreWindowsOrUnixRead(witness);
+        Assert.Equal("WRITE-ONLY-REC-01", File.ReadAllText(witness));
+    }
+
+    /// <summary>The other side of the same boundary: EXTEND on that file stays '37'. A record-locking EXTEND writer
+    /// numbers the records already in the file (§9.1.16's identity is the ordinal), which it cannot do without
+    /// reading them, so for EXTEND the read half is the open's need and not a preference.</summary>
+    [Fact]
+    public void OpenExtend_RecordLockingWriterOnAWriteOnlyFile_Is37()
+    {
+        if (NotReadable() is not { } witness) { NoPrecondition(); return; }
+        var reg = Register("seq", witness, optional: false);
+        reg.RegisterSharing("F", FileSharing.AllOther, FileLockMode.Manual, false);
+        reg.OpenStatic("F", FileOpenMode.Extend);
+        Assert.Equal("37", reg.Status("F"));
+    }
+
+    /// <summary>⛔ kb/Work PB2848 — the host path of an ASSIGN target the host cannot make absolute is data, not a
+    /// crash. <see cref="CobolFile.ResolveHostPath"/> runs at registration and before the OPEN body, outside every
+    /// I-O-status catch, and the content of a data-name-1 is an arbitrary string (§12.4.5.3 GR3 b)): a path longer
+    /// than the host allows or a NUL threw <see cref="PathTooLongException"/> / <see cref="ArgumentException"/>
+    /// out of the run unit. The spelling is returned as written and the OPEN reports what the host says.
+    /// <para>A NUL is refused by every host. A 40,000-character spelling is refused where the host bounds a path's
+    /// length (Windows); a host whose path resolution has no such bound (Linux) makes it absolute, and that absolute
+    /// path is then its identity. Either way nothing escapes, so the long case asserts the two outcomes the host may
+    /// choose between, never one host's.</para></summary>
+    [Theory]
+    [InlineData(40000)]
+    [InlineData(-1)]
+    public void ResolveHostPath_ASpellingTheHostCannotMakeAbsolute_IsReturnedAsWritten(int length)
+    {
+        string target = length < 0 ? "dir/a\0b.dat" : new string('a', length) + ".dat";
+        string resolved = CobolFile.ResolveHostPath(target);
+        if (length < 0)
+        {
+            Assert.Equal(target, resolved);
+            return;
+        }
+        Assert.True(resolved == target || (Path.IsPathRooted(resolved) && resolved.EndsWith(target, StringComparison.Ordinal)),
+            $"neither the spelling as written nor its absolute form: {resolved[..Math.Min(120, resolved.Length)]}");
+    }
+
+    [Theory]
+    [InlineData(FileOpenMode.Input, "35")]
+    [InlineData(FileOpenMode.Output, "30")]
+    public void Open_ADynamicTargetTheHostCannotMakeAbsolute_IsAnIoStatus(FileOpenMode mode, string expected)
+    {
+        var reg = Register("seq", Path.Combine(_root, "placeholder.dat"), optional: false);
+        reg.Open("F", mode, new string('a', 40000) + ".dat", assignDynamic: true, page: null);
+        Assert.Equal(expected, reg.Status("F"));
+    }
+
+    /// <summary>Give <paramref name="witness"/> its read access back so the test can read what the write-only
+    /// handle wrote — <see cref="Dispose"/> restores it too, but a test that reads the file needs it now.</summary>
+    private static void RestoreWindowsOrUnixRead(string witness)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) RestoreWindowsAccess(witness);
+        else File.SetUnixFileMode(witness, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+    }
+
     /// <summary>The escape hatch for the two capability helpers, classified exactly as
     /// <see cref="TheDenyHelperWorksOnThisHost"/> is. Each is measured separately, because they establish
     /// different preconditions through different mechanisms — a read-only attribute or mode bit for GR16's

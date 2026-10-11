@@ -1552,21 +1552,29 @@ public sealed class FileRegistry
         var meta = ShareOf(name);             // §12.4.5.9.4 GR1 b) 2. for a clause-less connector — never an early exit
         var st = _physical.For(c.HostPath);   // the connector's LIVE association (§12.4.5.3 GR3), never a cached copy
         ReleasePriorRecordLocks(meta, st, name);   // §14.9.51.4 GR10 / §12.4.5.9.4 GR6
-        // GR11 — and never under a permanent error in effect (§9.1.13.1, kb/Work PB1541): that WRITE is refused by the
-        // connector before any record is released, so no lock may be pre-flighted for it ('53'/'54' would outrank).
-        bool wantLock = phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name) && c.PermanentErrorInEffect is null;
-        if (wantLock)
-        {
-            string pf = _physical.PreflightNewLock(st, name);   // §12.4.5.9 GR7 — the statement fails BEFORE the write (§14.9.51 GR15)
-            if (pf != FileStatusCode.Success) { c.SetStatus(pf); return pf; }
-        }
+        bool wantLock = phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name);   // GR11
         // A file of FIXED-length records carries a variable-length record in its fixed form (D-FRA (vi)).
         var (medium, mediumExtents) = c.FixedForm(image, extents);
-        string status = WriteAnyOrg(c, medium, length, page, advance, mediumExtents, nationalRecord);
+        // ⛔ §12.4.5.9.4 GR7's ceiling ('54' / '53') is the LAST check of a statement that requests a new lock, and the
+        // statement still fails BEFORE the write (§14.9.51 GR15): the organization asks the gate once its own rules
+        // have passed, immediately before it changes the file (FileConnector.CommitGate, kb/Work PB2848). It used to
+        // be asked here, ahead of the organization, so a record that broke GR14's size rule answered '54' where
+        // DOC-A.1-104 (2) gives '44'. A permanent error in effect (§9.1.13.1, kb/Work PB1541) is replayed by the
+        // organization before the gate is reached, so no lock is pre-flighted for that WRITE either.
+        string status;
+        if (wantLock) c.CommitGate = () => LockCeilingRefusal(st, name);
+        try { status = WriteAnyOrg(c, medium, length, page, advance, mediumExtents, nationalRecord); }
+        finally { c.CommitGate = null; }
         if (wantLock && status.Length > 0 && status[0] == '0' && c.LastWrittenRecordId is { Length: > 0 } recId)
             _physical.LockRecord(st, name, recId, c);   // GR11 — the just-released record's lock is set
         return status;
     }
+
+    /// <summary>The <see cref="FileConnector.CommitGate"/> of a statement that requests a NEW record lock: §12.4.5.9.4
+    /// GR7's '54' (this connector holds its maximum) or '53' (this run unit does), else null. Acquires nothing — the
+    /// lock is set only when the statement has succeeded.</summary>
+    private string? LockCeilingRefusal(PhysicalFileTable.State st, string name) =>
+        _physical.PreflightNewLock(st, name) is var refusal && refusal != FileStatusCode.Success ? refusal : null;
 
     /// <summary>Governed REWRITE for a sharing-active connector, any organization (§14.9.35 GR11/GR12 + §14.7.9):
     /// the pre-operation conflict check against the record identified for rewriting (locked by another connector
@@ -1597,17 +1605,18 @@ public sealed class FileRegistry
             // position indicator untouched, which holds because nothing has been committed yet.
             if (ConflictOnLockedRecord(name, st, target, ignoringLock: false, retryKind, retryAmount) is { } conflict)
                 return conflict;
-            // (post-conflict-check any surviving lock on the target is this connector's own — re-lock is
-            // idempotent per §9.1.16 GR8 self-access, so pre-flight only a genuinely NEW lock)
-            if (phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name)
-                && !st.RecordLocks.ContainsKey(target))
-            {
-                string pf = _physical.PreflightNewLock(st, name);   // §12.4.5.9 GR7 pre-flight (§14.9.35 GR14 — no update on failure)
-                if (pf != FileStatusCode.Success) { c.SetStatus(pf); return pf; }
-            }
         }
         var (medium, mediumExtents) = c.FixedForm(image, extents);   // D-FRA (vi), as WriteShared
-        string status = RewriteAnyOrg(c, medium, length, mediumExtents, nationalRecord);
+        // §12.4.5.9.4 GR7's ceiling, the last check of the statement and still before the update (§14.9.35 GR14), asked
+        // by the organization through the commit gate exactly as WriteShared does (kb/Work PB2848). Post-conflict-check
+        // any surviving lock on the target is this connector's own — re-lock is idempotent per §9.1.16 GR8
+        // self-access, so only a genuinely NEW lock is gated.
+        string status;
+        if (target.Length > 0 && phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name)
+            && !st.RecordLocks.ContainsKey(target))
+            c.CommitGate = () => LockCeilingRefusal(st, name);
+        try { status = RewriteAnyOrg(c, medium, length, mediumExtents, nationalRecord); }
+        finally { c.CommitGate = null; }
         if (status.Length > 0 && status[0] == '0' && target.Length > 0)
         {
             if (phrase == FileRecordLock.WithLock && LocksEffective(meta, st, name))
