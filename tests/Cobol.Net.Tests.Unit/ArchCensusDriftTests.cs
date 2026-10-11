@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// re-run (<c>python scripts/arch/census.py</c>).
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ArchCensusDriftTests
 {
     private static readonly Regex SolutionProject = new(

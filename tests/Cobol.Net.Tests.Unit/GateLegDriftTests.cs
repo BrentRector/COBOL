@@ -52,6 +52,7 @@ namespace CobolNet.Tests.Unit;
 /// Characterization assemblies (their own GateLegDriftTests), because each audits the assembly it runs in.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class GateLegDriftTests
 {
     private const string PopulationTool = "test_population.py";
@@ -85,12 +86,13 @@ public sealed class GateLegDriftTests
     /// <summary>
     /// Arm (3), the driver half: <c>run_gate_legs.py --self-test</c> passes and still drives every arm by name — the
     /// fail-fast stop and its named remainder, the population's dropped, duplicated and skipped cases, the identity
-    /// mismatches, the empty leg, the no-plan fallback, the scrubbed all-or-none handshake, the lander's single leg,
-    /// the refused second gate (kb/Work PB1721; DESIGN-test-build-ci.md section 3.14.4), and the implementer scope
+    /// mismatches, the empty leg, the no-plan fallback, the scrubbed all-or-none handshake,
+    /// the refused second gate (kb/Work PB1721; DESIGN-test-build-ci.md section 3.14.4), ONE SHAPE for every gate
+    /// (kb/Work PB3022: no mode, a slot, the audits ahead of it, fail-fast), the scope
     /// <c>leg1</c> of batched gating (kb/Work PB2515), the coded default when no scope is set: leg 1 only, its verdict
     /// <c>LEG 1 ONLY (batched gating, PB2515)</c>, never a plain GREEN; and the
-    /// audits' fail-fast (kb/Work PB2523): a red audit stops an implementer gate before the build, never a lander's;
-    /// and the audits run before the implementer's gate slot is taken (kb/Work PB2524); and every gate publishes its
+    /// audits' fail-fast (kb/Work PB2523): a red audit stops the gate before the build;
+    /// and the audits run before the gate slot is taken (kb/Work PB2524); and every gate publishes its
     /// measured durations to the shared timings store a fresh worktree's plan reads (kb/Work PB2527). ⛔ This test does
     /// not run the self-test (kb/Work PB2882): the runner runs it in every gate and CI job, and this holds that each arm
     /// is still DECLARED (<see cref="SelfTestArmSource"/>); run a second time under the harness's fixed 120 s budget it
@@ -118,14 +120,15 @@ public sealed class GateLegDriftTests
                      "scope leg1 (batched gating): leg 1 only, every leg-2 case named NOT RUN",
                      "scope leg1: a red in leg 1 is LEG 1 ONLY: RED",
                      "scope leg1 with no plan: the one leg IS the whole population",
-                     "malformed shared gate settings: the implementer gate is NOT RUN",
-                     "a red audit (a stale drift-rules index) STOPS the implementer gate before the build",
-                     "a red audit in -Mode lander is RED and the legs still run",
+                     "malformed shared gate settings: the gate is NOT RUN",
+                     "a red audit (a stale drift-rules index) STOPS the gate before the build",
                      "the audits and the corpus fetch run BEFORE the gate slot is taken",
                      "shared gate settings that turn malformed while the gate queues: NOT RUN",
                      "every gate that ran a leg publishes its measured durations to the shared timings store",
                      "a failed publish to the timings store is reported and recorded, and the verdict is unaffected",
-                     "-Mode lander: ONE leg, every assembly, no plan, no handshake, no slot, and no fail-fast",
+                     "a hung self-test is `SELF-TESTS HANG` in the gate's reasons, never RED, and every gate's self-tests run with --reuse",
+                     "a defect in work beside the critical path is a named RED with its traceback",
+                     "ONE SHAPE (kb/Work PB3022): every gate takes a slot, runs its audits before it and stops at a red in",
                      "a second gate in the same worktree is REFUSED",
                      "a defect in the driver still ends in ONE verdict line",
                      "the gate lock is per worktree",

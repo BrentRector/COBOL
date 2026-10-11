@@ -4,6 +4,7 @@
     python scripts/spec/drift_rules.py                 # regenerate docs/DRIFT_RULES.md
     python scripts/spec/drift_rules.py --check         # exit 1 if docs/DRIFT_RULES.md is stale (CI `audits` job)
     python scripts/spec/drift_rules.py <path> [...]    # the drift rules that govern these files — run BEFORE editing
+    python scripts/spec/drift_rules.py --sweeps        # every tree-wide sweep's class (the `Sweep` trait's set)
 
 Why (owner, 2026-09-25): 216 drift tests each carry their rule in their own <summary>, but no skill surfaced them, so
 agents learned each rule only by tripping it at the gate. The rule stays in ONE place — the test that enforces it — and
@@ -102,6 +103,14 @@ def render(rows):
     return "\n".join(out) + "\n"
 
 
+def is_sweep(row):
+    """A TREE-WIDE SWEEP reads some path above SPECIFIC_DEPTH: a whole tree, or a file at its top. ONE rule: the
+    per-file query lists such a test after the specific ones, and the gate's plan runs every cheap one in leg 1 at
+    every gate (tier 0c, scripts/gate_plan.py), through the `[Trait("Sweep", "tree")]` its class carries
+    (HostWitnessTraitDriftTests holds the two equal; kb/Work PB3022)."""
+    return any(len(p.split("/")) < SPECIFIC_DEPTH for p in row["paths"])
+
+
 def governing(rows, target):
     rel = pathlib.Path(target).resolve()
     try:
@@ -128,6 +137,11 @@ def main(argv):
     sys.stdout.reconfigure(encoding="utf-8")
     rows = index()
     text = render(rows)
+    if argv[:1] == ["--sweeps"]:
+        for r in rows:
+            if is_sweep(r):
+                print(r["test"])
+        return 0
     if argv[:1] == ["--check"]:
         current = OUT.read_text(encoding="utf-8") if OUT.exists() else ""
         if current != text:

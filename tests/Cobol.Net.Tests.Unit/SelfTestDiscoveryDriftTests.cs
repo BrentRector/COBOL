@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit;
 /// runner (and none names a self-test itself), and the runner's own arms, a planted failing self-test turning it RED
 /// among them, still fire.
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class SelfTestDiscoveryDriftTests
 {
     private static readonly Regex QuotedFlag = new(@"[""']--self-test[""']", RegexOptions.Compiled);

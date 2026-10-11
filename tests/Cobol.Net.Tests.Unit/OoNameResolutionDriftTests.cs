@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// the funnel, or an ADJUDICATED re-lookup with its reason and its call count pinned. A new NAME REFERENCE
 /// site fails here until it goes through the funnel.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class OoNameResolutionDriftTests
 {
     /// <summary>Adjudicated direct callers: file → (expected call count, reason). Every one of these RE-LOOKS-UP

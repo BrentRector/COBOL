@@ -15,6 +15,7 @@ namespace CobolNet.Tests.Unit;
 /// cleaning pass (or a broken script/missing tool) fails CI rather than silently producing empty/garbled diagrams.
 /// Requires <c>pwsh</c> and <c>java</c> on PATH (both already build prerequisites for the ANTLR generation).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class GrammarDiagramGeneratorDriftTests
 {
     [Fact]

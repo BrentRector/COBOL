@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Conformance;
 /// table measures both lanes on it automatically, which is the property the run law's single computation
 /// (<see cref="CobolNet.Binding.Model.BitLayout"/>'s run map) exists to keep true.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class BitRunImageDriftTests
 {
     /// <summary>Boolean data (PICTURE symbol 1 / USAGE BIT) and GROUP-USAGE are COBOL-2002 introductions, so

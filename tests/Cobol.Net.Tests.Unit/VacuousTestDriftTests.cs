@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// Each detector is driven first by a fixture that MUST trip it — one of the deleted stub files verbatim, and the
 /// empty-banner shape — so a detector that silently stopped looking would turn this test red rather than green.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class VacuousTestDriftTests
 {
     private static readonly string[] TestAssemblies =

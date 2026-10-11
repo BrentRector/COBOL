@@ -28,6 +28,7 @@ namespace CobolNet.Tests.Unit;
 /// class only holds it to two shapes it must already have — every § cell resolves, and every diagnostic code the
 /// register names is a code that actually exists.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class AnnexA3RegisterDriftTests
 {
     /// <summary>The literal §2 heading — the register's own anchor in the conformance document.</summary>

@@ -27,6 +27,7 @@ namespace CobolNet.Tests.Unit;
 /// The second is the one that keeps the first true, because the defect was never a wrong answer in a rule — it
 /// was a rule written down more than once.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class FigurativeOperandClassifierDriftTests
 {
     /// <summary>The Formats 1–5 words, each in the three spellings the tree can produce: bare, ALL-glued and

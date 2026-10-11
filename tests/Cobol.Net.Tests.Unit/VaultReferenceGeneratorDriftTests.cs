@@ -15,6 +15,7 @@ namespace CobolNet.Tests.Unit;
 /// fails CI rather than silently producing an empty/garbled reference. Requires <c>pwsh</c> on PATH (already a
 /// build prerequisite for the ANTLR generation).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class VaultReferenceGeneratorDriftTests
 {
     [Fact]

@@ -33,6 +33,7 @@ namespace CobolNet.Tests.Unit;
 /// each of the three INTO binders reaches that method. It cannot see an arm that calls the builder and then
 /// ignores the result — the four-edition golden <c>pb339_into_current_record</c> covers the behaviour.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class IntoSenderDriftTests
 {
     private const string Operand = "BoundCurrentRecord";

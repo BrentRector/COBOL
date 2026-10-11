@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// grow a keyword filter over test output again, which is how the defect was written three times.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class TestLegReportDriftTests
 {
     private const string Reporter = "test_leg_report.py";

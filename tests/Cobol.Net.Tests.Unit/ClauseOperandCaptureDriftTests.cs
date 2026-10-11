@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>⚠ It reads SOURCE TEXT, which is unusual here and deliberate. The property is "no second copy of this
 /// rule exists", and a second copy is by definition something no run-time observation of the first can see.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ClauseOperandCaptureDriftTests
 {
     private static string DataBinderSource() => File.ReadAllText(

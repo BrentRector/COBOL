@@ -20,6 +20,7 @@ namespace CobolNet.Tests.Unit;
 /// printed standard to the array is closed.
 /// </para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PictureTable10DriftTests
 {
     /// <summary>Parse Table 10 out of the transcription: the data rows are the markdown rows whose trailing 24

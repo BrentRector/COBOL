@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit;
 /// section-name, paragraph-name or level-number. Both rule tables are DATA (<c>UserWordKinds</c>) rebuilt below from the
 /// standard's own text, so an edit to either, or to the standard's wording, cannot drift silently.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class UserWordDeclarationDriftTests
 {
     /// <summary>The §8.3.2.2 types no binder declares, and why. A type here shall NOT also be declared (the list

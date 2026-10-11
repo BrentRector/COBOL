@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>PlaceDecorator</c> or any concrete decorator type), or carries an adjudicated exemption below with its
 /// reason. A NEW decorator kind — or a new switch — then cannot silently rejoin the hole.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PlaceStorageFormSwitchDriftTests
 {
     /// <summary>The concrete STORAGE forms — a switch arm naming one of these is asking "where does this live?".

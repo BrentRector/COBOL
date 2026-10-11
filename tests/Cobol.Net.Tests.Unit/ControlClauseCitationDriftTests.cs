@@ -18,6 +18,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>⭐ IT CARRIES NO LIST OF ITS OWN. The expected rule text is re-derived from
 /// <c>specs/ISO_COBOL.md</c> on every run, so a transcription repair flows through instead of going stale.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ControlClauseCitationDriftTests
 {
     /// <summary>The lettered syntax rules of §13.18.16.3, keyed by their printed number, read out of the spec.</summary>

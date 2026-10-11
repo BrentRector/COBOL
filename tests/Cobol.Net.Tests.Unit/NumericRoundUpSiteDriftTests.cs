@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>Proven to FAIL before it was trusted: pointing <c>RetryTimes</c> back at <c>Align(…, 0)</c> makes
 /// <see cref="EveryRoundUpRuledEmitSite_UsesAlignRoundedUp"/> red by name.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class NumericRoundUpSiteDriftTests
 {
     /// <summary>The emit sites governed by a "rounded up to the next whole number" clause: the file, the method

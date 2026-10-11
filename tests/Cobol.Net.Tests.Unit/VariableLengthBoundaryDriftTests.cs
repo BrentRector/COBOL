@@ -27,6 +27,7 @@ namespace CobolNet.Tests.Unit;
 /// looks like any other diagnostic to a corpus runner that never compiles the program.</item>
 /// </list>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class VariableLengthBoundaryDriftTests
 {
     /// <summary>Count occurrences in CODE only — these predicates are discussed at length in doc comments, so a

@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// rule of that shape fails until its binder re-reads the qualifier — the silent parse this note spent its life
 /// in cannot recur unannounced.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class TrailingInPhraseDriftTests
 {
     /// <summary>Rule → the binder file and member that re-read its trailing qualifier by symbol.</summary>

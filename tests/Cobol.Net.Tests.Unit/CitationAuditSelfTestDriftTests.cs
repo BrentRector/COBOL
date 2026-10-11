@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// one audit; adding an arm means adding its case here, which is the point.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class CitationAuditSelfTestDriftTests
 {
     private static ProcessObservation RunSelfTest(string script)

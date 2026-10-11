@@ -41,6 +41,7 @@ namespace CobolNet.Tests.Unit;
 /// been observed green is indistinguishable from one that inspects nothing
 /// (<c>feedback_green_gates_arent_evidence</c>). It re-runs both predicates over a spec built to break them.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CatalogCoverageDriftTests
 {
     // ── the shapes, shared with scripts/spec/extract_rule_catalog.py ────────────────────────────────────

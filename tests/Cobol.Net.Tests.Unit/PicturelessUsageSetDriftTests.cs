@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>The transcription is also the thing most likely to move: SR8's list is one of the sentences a spec
 /// repair touches, and this test carries the repair through instead of going stale.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PicturelessUsageSetDriftTests
 {
     /// <summary>ISO §13.16.3 SR8's first sentence, read out of the spec, split into the usage names it lists:

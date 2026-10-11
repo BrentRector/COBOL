@@ -42,6 +42,7 @@ namespace CobolNet.Tests.Unit;
 /// the failure mode under repair (<c>feedback_verdict_evidence_invariant</c>).
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ExternalCorpusPopulationDriftTests
 {
     private const string Baseline = "gnucobol-verdict-baseline.tsv";

@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// other, and <c>PictureCompositionTests</c>' 3 000-vs-30 000-symbol ratio read 36x against a bound of 30 on untouched
 /// code — it now counts the Table-10 walk's role tests (<c>PictureComposition.WalkObserver</c>) instead.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class NoWallClockAssertionDriftTests
 {
     // An elapsed-time reading on one side of a < / <= / > / >= comparison.

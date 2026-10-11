@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>MoveEmitter.EmitOverlapPrefill</c> renders every <see cref="OverlapPrefillKind"/> — so a new corner is one
 /// enum member, one classifier arm and one emitter arm, and cannot be classified without being rendered.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class MoveOverlapDriftTests
 {
     private static string Src(params string[] parts) =>

@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// <see cref="OperandClassScreen.ClassesOf"/>) are disjoint from what the row admits — so a new row is exercised
 /// against every shape by adding its template, and a template-less row fails (5).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class OperandClassScreenDriftTests
 {
     /// <summary>The class shapes, each with the classes ISO assigns it: §8.5.2.1 Table 2 for the class, §5.5

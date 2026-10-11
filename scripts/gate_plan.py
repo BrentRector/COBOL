@@ -24,13 +24,23 @@ THE TIERS (per case; a key shared by several cases takes the lowest):
   0a  a case of a test method the diff ADDS · a corpus row whose manifest entry or golden files the diff changes ·
       red at the previous gate — always leg 1 (an EDITED test or harness is tier 1 through the map: a whole changed
       test file would put every row of its theories here — 5,774 cases for 68b X, evidence b4);
+  0h  a HOST-ONLY WITNESS (kb/Work PB3022; DESIGN-test-build-ci.md §3.17.3): its class carries the xUnit trait
+      `[Trait("Host", v)]` with v in HOST_ONLY — a property of this host CI's runners lack (`ReFS`: the Windows
+      file-system race witnesses, which CI's NTFS runners may not reproduce) — always leg 1, whatever the diff, and
+      exempt from the collection cap: CI's whole-population run is no net for them;
+  0c  a CHEAP TREE-WIDE CHECK (kb/Work PB3022, the operator's proposal 2): its class carries `[Trait("Sweep", ...)]`
+      (a drift test that scans a whole tree: an index, a register, a citation sweep) and its recorded time is at most
+      SWEEP_CHEAP_SECONDS — leg 1 at every gate within the collection cap, so a gate catches the bookkeeping red a
+      later whole-population run used to find;
   0u  known to no timing source and to no map (genuinely new) — charged the assembly's median time and admitted to
       leg 1, in declaration order, within LEG_ONE_UNKNOWN_BUDGET; the overflow LEADS leg 2;
   1–3 impacted_tests.py's tiers (§3.13); with no map, every case is tier 1.
-LEG 1 = tier 0a + the admitted 0u + the cheapest tier-1 cases while their recorded time stays within LEG_ONE_BUDGET
-and each case's collection's budgeted leg-1 time within LEG_ONE_COLLECTION_CAP (tier 0 is exempt from the cap).
+LEG 1 = tier 0a + 0h + the cheap 0c + the admitted 0u + the cheapest tier-1 cases while their recorded time stays
+within LEG_ONE_BUDGET and each case's collection's budgeted leg-1 time within LEG_ONE_COLLECTION_CAP (tiers 0a and 0h
+are exempt from the cap). Trait membership is DERIVED from the test sources (`class_traits`), never listed here;
+`HostWitnessTraitDriftTests` holds the scan to the compiled attributes and the witnesses to their trait.
 LEG 2 = everything else, collections LONGEST FIRST. Degenerate inputs are decided PER ASSEMBLY: no timings → leg 1
-is tier 0a alone; an assembly whose whole recorded time fits the collection cap runs entirely in leg 1; an empty
+is tier 0a and 0h alone; an assembly whose whole recorded time fits the collection cap runs entirely in leg 1; an empty
 leg 1, or one holding the whole population, makes the assembly ONE leg.
 
 THE PLAN FILE (`--out`), canonical JSON (UTF-8, sorted keys, no insignificant whitespace):
@@ -47,6 +57,7 @@ Usage:
     python scripts/gate_plan.py --out plan.json --list Conformance=conf.txt --list Unit=unit.txt \\
         --list Characterization=char.txt [--base <sha> [--head <sha>]] [--map <file> | --store <dir>] \\
         [--previous-run <dir>]
+    python scripts/gate_plan.py --traits          # the class traits the scan finds, per assembly (JSON)
     python scripts/gate_plan.py --self-test
 """
 
@@ -68,13 +79,32 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "spec"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import impacted_tests  # noqa: E402
-from test_population import LISTED_MARK, PopulationError, parse_listing  # noqa: E402
+from test_population import GATED_ASSEMBLIES, LISTED_MARK, PopulationError, parse_listing  # noqa: E402
 
 PLAN_SCHEMA = 1
 LEG_ONE_BUDGET = 0.02            # of the assembly's recorded test-seconds, for tier 1
 LEG_ONE_UNKNOWN_BUDGET = 0.02    # of the assembly's recorded test-seconds, for tier 0u (charged the median)
 LEG_ONE_COLLECTION_CAP = 15.0    # seconds of one collection's BUDGETED leg-1 time (xunit runs a collection serially)
-TIER_ORDER = ("0a", "0u", "1", "2", "3")
+TIER_ORDER = ("0a", "0h", "0c", "0u", "1", "2", "3")
+#: ⛔ THE HOST-ONLY TRAIT VALUES — ONE table (kb/Work PB3022; DESIGN-test-build-ci.md §3.17.3). A test class carrying
+#: `[Trait("Host", v)]` with v here is tier 0h: it witnesses a property of THIS host that CI's runners lack, so the
+#: local gate is the only run that can see it fail. A Host value not here is an ordinary case.
+HOST_TRAIT = "Host"
+HOST_ONLY = {
+    "ReFS": "E: is ReFS and CI's Windows runner is NTFS; they delete differently — the PB2917 sidecar-unlink race "
+            "reproduced here in 20 of 7,200 probes (operator, 2026-10-11 11:19)",
+}
+#: A class carrying `[Trait("Sweep", ...)]` scans a whole tree (drift_rules.py's tree-wide sweep); its cases are tier
+#: 0c when each costs at most SWEEP_CHEAP_SECONDS of recorded time.
+SWEEP_TRAIT = "Sweep"
+SWEEP_CHEAP_SECONDS = 2.0
+#: `[Trait("<name>", "<value>")]` on a class: the attribute line, then any further attribute or doc-comment lines, then
+#: the class declaration. `HostWitnessTraitDriftTests` holds this scan equal to the attributes the compiler sees.
+CLASS_TRAIT_RE = re.compile(
+    r'^[ \t]*\[Trait\("(?P<name>\w+)",\s*"(?P<value>[^"]*)"\)\][ \t]*\r?\n'
+    r'(?:[ \t]*(?:\[[^\n]*\]|///[^\n]*)[ \t]*\r?\n)*'
+    r'[ \t]*(?:(?:public|internal|private|protected|sealed|static|partial|abstract|file)\s+)*class\s+(?P<cls>\w+)',
+    re.MULTILINE)
 TRX_NS = "{http://microsoft.com/schemas/VisualStudio/TeamTest/2010}"
 PARTITION_CLASS_RE = re.compile(r"(?P<family>.+)_P\d+")
 
@@ -106,6 +136,25 @@ def leg_of(plan: dict, assembly: str, display: str) -> int:
     """THE LEG FUNCTION: total over every name, deterministic, and disjoint by construction."""
     a = plan["assemblies"].get(assembly)
     return 2 if a is not None and name_key(display) in set(a["leg2"]) else 1
+
+
+def class_traits(project: Path) -> dict[str, dict[str, set[str]]]:
+    """Per test class declared under `project` (bin/ and obj/ excluded), its class-level xUnit traits:
+    {class: {trait name: {values}}}. Read from the sources (CLASS_TRAIT_RE), so the gate needs no build to plan."""
+    found: dict[str, dict[str, set[str]]] = defaultdict(lambda: defaultdict(set))
+    for f in sorted(project.rglob("*.cs")):
+        if {"bin", "obj"} & set(f.relative_to(project).parts):
+            continue
+        for m in CLASS_TRAIT_RE.finditer(f.read_text(encoding="utf-8-sig", errors="replace")):
+            found[m.group("cls")][m.group("name")].add(m.group("value"))
+    return {c: {n: set(v) for n, v in t.items()} for c, t in found.items()}
+
+
+def trait_sets(traits: dict[str, dict[str, set[str]]]) -> tuple[set[str], set[str]]:
+    """(the host-only classes: tier 0h, the sweep classes: tier 0c when cheap) of one assembly's class traits."""
+    host = {c for c, t in traits.items() if t.get(HOST_TRAIT, set()) & HOST_ONLY.keys()}
+    sweep = {c for c, t in traits.items() if SWEEP_TRAIT in t}
+    return host, sweep
 
 
 def read_listing(path: Path) -> list[str]:
@@ -266,6 +315,8 @@ class Context:
     previous: Timings
     recorded: Timings                       # the map's durations
     collection_of_class: dict[str, str] = field(default_factory=dict)
+    host_classes: set[str] = field(default_factory=set)    # tier 0h (HOST_ONLY trait), by class
+    sweep_classes: set[str] = field(default_factory=set)   # tier 0c when cheap (SWEEP_TRAIT), by class
 
 
 @dataclass
@@ -281,11 +332,16 @@ class KeyGroup:
         return (self.per_case if self.per_case is not None else median) * len(self.cases)
 
 
-def tier_of(display: str, key: str, ctx: Context, timed: bool, has_timings: bool) -> str:
+def tier_of(display: str, key: str, ctx: Context, per_case: float | None, has_timings: bool) -> str:
     if (method_of(display) in ctx.added_tests or key in ctx.reds
             or any(f'name: "{g}"' in display for g in ctx.goldens)):
         return "0a"
-    if has_timings and not timed and key not in ctx.map_known:
+    cls = class_of(key)  # the class without its partition suffix: a trait is declared on the family
+    if cls in ctx.host_classes:
+        return "0h"
+    if cls in ctx.sweep_classes and per_case is not None and per_case <= SWEEP_CHEAP_SECONDS:
+        return "0c"
+    if has_timings and per_case is None and key not in ctx.map_known:
         return "0u"
     if ctx.every_tier1 or key not in ctx.tiers:
         return "1"
@@ -303,7 +359,7 @@ def plan_assembly(displays: list[str], ctx: Context) -> dict:
     for u in units.values():
         prev = ctx.previous.seconds(u.key) if ctx.previous else None
         u.per_case = prev if prev is not None else ctx.recorded.seconds(u.key)
-        u.tier = min((tier_of(d, u.key, ctx, u.per_case is not None, has_timings) for d, _ in u.cases),
+        u.tier = min((tier_of(d, u.key, ctx, u.per_case, has_timings) for d, _ in u.cases),
                      key=TIER_ORDER.index)
     known = [u.per_case for u in units.values() for _ in u.cases if u.per_case is not None]
     median = statistics.median(known) if known else 0.0
@@ -315,11 +371,25 @@ def plan_assembly(displays: list[str], ctx: Context) -> dict:
     overflow: list[KeyGroup] = []
     budget_per: dict[str, float] = defaultdict(float)
     reason = ""
+
+    def fits(u: KeyGroup) -> dict[str, float] | None:
+        """Its recorded seconds per collection, when adding it keeps each within LEG_ONE_COLLECTION_CAP; else None."""
+        part: dict[str, float] = defaultdict(float)
+        for _, c in u.cases:
+            part[c] += u.per_case or 0.0
+        return None if any(budget_per[c] + s > LEG_ONE_COLLECTION_CAP for c, s in part.items()) else part
+
     if has_timings and whole <= LEG_ONE_COLLECTION_CAP:
         leg1 = list(order)
         reason = f"its whole recorded time {whole:.1f} s fits the collection cap"
     else:
-        leg1 = [u for u in order if u.tier == "0a"]
+        leg1 = [u for u in order if u.tier in ("0a", "0h")]  # exempt from the budgets and the collection cap
+        for u in sorted((u for u in order if u.tier == "0c"), key=lambda u: (u.cost(median), u.index)):
+            part = fits(u)
+            if part is not None:  # a cheap sweep beyond its collection's cap stays in leg 2, never nowhere
+                leg1.append(u)
+                for c, sec in part.items():
+                    budget_per[c] += sec
         spent = 0.0
         for u in (u for u in order if u.tier == "0u"):
             if spent + u.cost(median) <= LEG_ONE_UNKNOWN_BUDGET * total:
@@ -332,17 +402,15 @@ def plan_assembly(displays: list[str], ctx: Context) -> dict:
             for u in sorted((u for u in order if u.tier == "1"), key=lambda u: (u.cost(median), u.index)):
                 if acc + u.cost(median) > LEG_ONE_BUDGET * total:
                     break
-                part: dict[str, float] = defaultdict(float)
-                for _, c in u.cases:
-                    part[c] += u.per_case or 0.0
-                if any(budget_per[c] + s > LEG_ONE_COLLECTION_CAP for c, s in part.items()):
+                part = fits(u)
+                if part is None:
                     continue
                 leg1.append(u)
                 acc += u.cost(median)
                 for c, s in part.items():
                     budget_per[c] += s
         else:
-            reason = "no timings: leg 1 is tier 0a alone"
+            reason = "no timings: leg 1 is tier 0a and 0h alone"
 
     in_leg1 = {u.key for u in leg1}
     rest = [u for u in order if u.key not in in_leg1]
@@ -392,7 +460,8 @@ def canonical(obj: dict) -> bytes:
 
 
 def build_plan(listings: dict[str, list[str]], analysis: impacted_tests.Analysis, previous: Timings,
-               reds: set[str], base: str | None) -> dict:
+               reds: set[str], base: str | None, traits: dict[str, dict[str, dict[str, set[str]]]]) -> dict:
+    """The plan of every assembly in `listings`; `traits` is each assembly's `class_traits` (tiers 0h and 0c)."""
     m = analysis.map
     recorded = map_timings(m)
     map_known = {name_key(row[2]) for row in (m or {}).get("tests", [])}
@@ -402,17 +471,19 @@ def build_plan(listings: dict[str, list[str]], analysis: impacted_tests.Analysis
     plan: dict = {"schema": PLAN_SCHEMA, "base": base, "map": m["commit"] if m else None,
                   "map_state": analysis.map_state, "every_tier1": analysis.reach.every_tier1,
                   "constants": {"LEG_ONE_BUDGET": LEG_ONE_BUDGET, "LEG_ONE_UNKNOWN_BUDGET": LEG_ONE_UNKNOWN_BUDGET,
-                                "LEG_ONE_COLLECTION_CAP": LEG_ONE_COLLECTION_CAP},
+                                "LEG_ONE_COLLECTION_CAP": LEG_ONE_COLLECTION_CAP,
+                                "SWEEP_CHEAP_SECONDS": SWEEP_CHEAP_SECONDS, "HOST_ONLY": sorted(HOST_ONLY)},
                   "timings": previous.source if previous else recorded.source, "assemblies": {}}
     for asm, displays in listings.items():
         tiers: dict[str, int] = {}
         for display, t in analysis.tiers.get(asm, {}).items():
             k = name_key(display)
             tiers[k] = min(tiers.get(k, 3), t)
+        host, sweep = trait_sets(traits.get(asm, {}))
         ctx = Context(tiers=tiers, map_known=map_known, every_tier1=bool(analysis.reach.every_tier1),
                       added_tests=analysis.reach.added_tests.get(asm, set()), goldens=analysis.reach.goldens,
                       reds=reds, previous=previous, recorded=recorded,
-                      collection_of_class=collection_of_class.get(asm, {}))
+                      collection_of_class=collection_of_class.get(asm, {}), host_classes=host, sweep_classes=sweep)
         plan["assemblies"][asm] = plan_assembly(displays, ctx)
     plan["sha256"] = hashlib.sha256(canonical(plan)).hexdigest()
     return plan
@@ -430,6 +501,11 @@ def summary_lines(plan: dict, out: Path) -> list[str]:
                      + (f" — {s['one_leg_reason']}" if s["one_leg_reason"] else ""))
     lines.append(f"gate_plan: map {plan['map_state']}, timings {plan['timings']}; plan {plan['sha256'][:12]} → {out}")
     return lines
+
+
+def gated_traits(repo: Path) -> dict[str, dict[str, dict[str, set[str]]]]:
+    """`class_traits` of every gated assembly's project (test_population.GATED_ASSEMBLIES)."""
+    return {asm: class_traits(repo / project) for asm, project in GATED_ASSEMBLIES.items()}
 
 
 def write_plan(plan: dict, out: Path) -> str:
@@ -522,6 +598,44 @@ def self_test() -> int:
     p = plan_assembly(cheap + [f"{ns}Changed.M"], ctx(added_tests={"M"}))
     check("no timings: leg 1 is tier 0a alone and nothing is tier 0u",
           p["leg1"] == [f"{ns}Changed.M"] and p["stats"]["tiers"]["0u"] == 0 and p["legs"] == [1, 2], p["stats"])
+    # tier 0h: a host-only witness is leg 1 whatever the diff, its cost and the collection cap (kb/Work PB3022).
+    race = [f"{ns}RaceWitness_P1.Unlink{i}" for i in range(30)]
+    t5 = timed([(d, 1.0) for d in cheap] + [(pole, 1000.0)] + [(d, 2.0) for d in race])
+    k5 = {name_key(d) for d in cheap + [pole] + race}
+    p = plan_assembly(cheap + [pole] + race, ctx(previous=t5, map_known=k5, tiers={k: 3 for k in k5},
+                                                 host_classes={"RaceWitness"}))
+    check("tier 0h: a host-only witness class is in leg 1 whatever the diff, over the collection cap",
+          p["stats"]["tiers"]["0h"] == 30 and all(name_key(d) in p["leg1"] for d in race)
+          and p["stats"]["leg1_floor_seconds"] == 60.0, p["stats"])
+    p = plan_assembly(cheap + [f"{ns}RaceWitness.M"], ctx(host_classes={"RaceWitness"}))
+    check("tier 0h with no timings: the witness is still leg 1",
+          p["leg1"] == [f"{ns}RaceWitness.M"] and p["stats"]["tiers"]["0h"] == 1, p["stats"])
+    # tier 0c: a cheap sweep is leg 1 within the cap; a dear one, and an untimed one, are not.
+    sweeps = [f"{ns}IndexSweep.M{i}" for i in range(20)] + [f"{ns}DearSweep.M"]
+    t6 = timed([(d, 1.0) for d in cheap] + [(pole, 1000.0)] + [(d, 1.0) for d in sweeps[:20]]
+               + [(sweeps[20], SWEEP_CHEAP_SECONDS + 1.0)])
+    k6 = {name_key(d) for d in cheap + [pole] + sweeps}
+    p = plan_assembly(cheap + [pole] + sweeps + [f"{ns}UntimedSweep.M"],
+                      ctx(previous=t6, map_known=k6 | {f"{ns}UntimedSweep.M"}, tiers={k: 3 for k in k6},
+                          sweep_classes={"IndexSweep", "DearSweep", "UntimedSweep"}))
+    check("tier 0c: a cheap sweep's cases fill leg 1 up to the collection cap; a dear or untimed sweep is not 0c",
+          p["stats"]["tiers"]["0c"] == 20 and sum(k.startswith(f"{ns}IndexSweep.") for k in p["leg1"]) == 15
+          and f"{ns}DearSweep.M" in p["leg2"] and p["stats"]["tiers"]["1"] == 1, p["stats"])
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "proj"
+        (src / "obj").mkdir(parents=True)
+        (src / "A.cs").write_text("\n".join([
+            '[Trait("Host", "ReFS")]', "/// <summary>x</summary>", "[Collection(\"c\")]",
+            "public sealed class RaceA", "{", '    [Trait("Host", "ReFS")]', "    public void NotAClass() {}", "}",
+            '[Trait("Sweep", "tree")]', "internal static partial class SweepB {}",
+            '[Trait("Host", "Elsewhere")]', "public class OtherHost {}"]), encoding="utf-8")
+        (src / "obj" / "G.cs").write_text('[Trait("Host", "ReFS")]\npublic class Generated {}', encoding="utf-8")
+        tr = class_traits(src)
+        host, sweep = trait_sets(tr)
+        check("the trait scan reads class-level traits through attributes and doc comments, never a method's, never "
+              "obj/; only a HOST_ONLY value is tier 0h",
+              host == {"RaceA"} and sweep == {"SweepB"} and tr.get("OtherHost") == {"Host": {"Elsewhere"}}
+              and "Generated" not in tr and "NotAClass" not in str(tr), tr)
     # empty leg 1: one leg, leg 2 only (the driver does not invoke the assembly for leg 1).
     p = plan_assembly(cheap, ctx())
     check("an empty leg 1 makes the assembly one leg (leg 2)", p["legs"] == [2] and not p["leg1"]
@@ -602,7 +716,7 @@ def self_test() -> int:
         lf.write_text(listing, encoding="utf-8")
         check("a --list-tests output reads back as its display names", read_listing(lf) == cheap[:3])
         a = impacted_tests.Analysis(None, "none", impacted_tests.Reach(every_tier1=["no map"]), {})
-        full = build_plan({"Conformance": read_listing(lf)}, a, Timings("none"), set(), None)
+        full = build_plan({"Conformance": read_listing(lf)}, a, Timings("none"), set(), None, {})
         out = Path(tmp) / "plan.json"
         digest = write_plan(full, out)
         body = json.loads(out.read_text(encoding="utf-8"))
@@ -624,6 +738,8 @@ def main() -> int:
     ap.add_argument("--map", type=Path, help="an explicit impact map (otherwise the store is searched)")
     ap.add_argument("--store", type=Path, help="the map store (default <git common dir>/cobol-impact)")
     ap.add_argument("--previous-run", type=Path, help="the previous gate's run directory (its trx files)")
+    ap.add_argument("--traits", action="store_true",
+                    help="print every gated assembly's class traits as JSON (HostWitnessTraitDriftTests reads it)")
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()
     try:
@@ -633,6 +749,11 @@ def main() -> int:
         pass
     if args.self_test:
         return self_test()
+    if args.traits:
+        repo = Path(__file__).resolve().parents[1]
+        print(json.dumps({a: {c: {n: sorted(v) for n, v in sorted(t.items())} for c, t in sorted(tr.items())}
+                          for a, tr in gated_traits(repo).items()}, indent=1, sort_keys=True))
+        return 0
     if not args.out or not args.list:
         ap.error("--out and at least one --list are required")
     listings = {}
@@ -644,7 +765,7 @@ def main() -> int:
     impacted_tests.HEAD = impacted_tests.git("rev-parse", args.head) if args.head else None
     analysis = impacted_tests.analyse(args.base, None, args.map, args.store)
     previous, reds = read_previous_run(args.previous_run) if args.previous_run else (Timings("none"), set())
-    plan = build_plan(listings, analysis, previous, reds, args.base)
+    plan = build_plan(listings, analysis, previous, reds, args.base, gated_traits(Path(__file__).resolve().parents[1]))
     digest = write_plan(plan, args.out)
     for line in summary_lines(plan, args.out):
         print(line, file=sys.stderr)

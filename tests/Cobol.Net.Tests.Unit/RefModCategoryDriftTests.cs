@@ -30,6 +30,7 @@ namespace CobolNet.Tests.Unit;
 /// A behavioural golden would therefore pin nothing; the rule is a pure function, so it is tested as one.
 /// </para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class RefModCategoryDriftTests
 {
     private static PicInfo Pic(PicCategory cat, Usage usage = Usage.Display) =>

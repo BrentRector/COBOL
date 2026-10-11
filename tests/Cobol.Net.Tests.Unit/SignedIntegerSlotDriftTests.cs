@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// pins the decision in BOTH directions so neither can be undone silently: the unsigned rule may not grow a
 /// sign, and a new signed slot may not be added without landing here.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class SignedIntegerSlotDriftTests
 {
     private static string GrammarDir() => TestRepo.Src("Cobol.Net.Frontend", "Grammar");

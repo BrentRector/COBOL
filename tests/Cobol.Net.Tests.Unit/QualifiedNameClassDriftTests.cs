@@ -14,6 +14,7 @@ namespace CobolNet.Tests.Unit;
 /// resolution of each §8.4.2.2.2 qualified-name format; these tests hold it to the standard's own format list, in
 /// both directions, and hold each named member to existence — so a name class added later cannot arrive unrouted.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class QualifiedNameClassDriftTests
 {
     private static readonly Regex FormatHeading =

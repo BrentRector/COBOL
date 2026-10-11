@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>The runtime half pins each carrier AT the bound: the closest argument outside is raised, the bound itself
 /// (or the nearest legal value inside, where binary64 rounds it onto an illegal one) is admitted.</para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class IntrinsicArgumentDomainDriftTests
 {
     private static readonly Regex Row = new(

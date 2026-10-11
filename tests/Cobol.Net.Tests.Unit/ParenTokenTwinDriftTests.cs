@@ -40,6 +40,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>DiagnosticEmitFormDriftTests</c> precedent — "no runtime test can see a mistake only a caller can make".
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ParenTokenTwinDriftTests
 {
     /// <summary>The escape hatch, spelled so it is greppable and so writing it is a visible choice.</summary>

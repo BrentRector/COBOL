@@ -42,6 +42,7 @@ namespace CobolNet.Tests.Unit;
 /// this leaf have a run of digit CHARACTERS?" belongs there and should appear in NEITHER column here.
 /// </para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DisplayUsageUnionDriftTests
 {
     /// <summary>⛔ THE ONE comment stripper both readers below use — these predicates are discussed at length in

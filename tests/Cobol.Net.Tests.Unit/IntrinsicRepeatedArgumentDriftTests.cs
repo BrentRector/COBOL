@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>Keyed on the ELLIPSIS CHARACTER inside the format's <c>&lt;pre&gt;</c> block, never on prose: the
 /// formats are diagrams, and this is the one mark the transcription preserved uniformly.</para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class IntrinsicRepeatedArgumentDriftTests
 {
     private static readonly Regex Row = new(

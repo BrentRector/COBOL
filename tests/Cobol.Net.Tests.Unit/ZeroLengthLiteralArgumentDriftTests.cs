@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>specs/ISO_COBOL.md</c> and fails when one is neither declared nor explicitly adjudicated. A seventh clause
 /// then costs a table row instead of going unnoticed for as long as these five did.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ZeroLengthLiteralArgumentDriftTests
 {
     /// <summary>Functions whose clause carries the rule but whose schema deliberately does not, each with the

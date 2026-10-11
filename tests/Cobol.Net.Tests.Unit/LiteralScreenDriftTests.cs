@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// a SUBSCRIPT-mode capture (a hole exactly as long as <c>X"…"</c> had no twin there); since kb/Work PB2113 it is
 /// parsed in place, so its literals are the ordinary tokens of the walked tree.
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class LiteralScreenDriftTests
 {
     /// <summary>The lexer fragments whose match IS a literal of class alphanumeric, boolean or national.</summary>

@@ -37,6 +37,7 @@ namespace CobolNet.Tests.Unit;
 /// part the runner cannot see — an arm deleted, renamed or left out of the count is red here by name.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class GateSlotDriftTests
 {
     /// <summary>The arms, in the order the self-test runs them; each label is the first argument of an

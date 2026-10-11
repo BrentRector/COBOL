@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// are <see cref="CrossRunUnitKeyedStoreDriftTests"/> and <see cref="CrossRunUnitSequentialLockDriftTests"/>, which run
 /// on both hosts too.</para>
 /// </summary>
+[Trait("Host", "ReFS")]
 public sealed class RegionLocksDriftTests
 {
     private static readonly Regex RegionFileName = new(@"^r4[0-9a-f]{15}-[SX]-[0-9a-f]{32}$", RegexOptions.Compiled);

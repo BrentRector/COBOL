@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// type cannot be built around its report; and the measured members refuse, while a genuine deferral still
 /// compiles and still announces itself.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class BoundDeferralDriftTests
 {
     /// <summary>The vocabulary of a violated rule. A deferral names what WiseOwl COBOL has not built; if its message

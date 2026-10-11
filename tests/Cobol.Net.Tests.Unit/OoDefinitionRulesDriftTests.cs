@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>COBOLNET1519</c> by literal code; (5) the same screen's GLOBAL-clause walk (§13.18.27.3 SR4, kb/Work PB1045)
 /// knows every grammar rule that carries the clause, and is the only reporter of <c>COBOLNET1520</c>.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class OoDefinitionRulesDriftTests
 {
     [Fact]

@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// COBOL source: the word-character question has its own answer (<see cref="CobolCharacterRepertoire.IsLetter"/>),
 /// and a test of some other string's characters carries the marker <c>// not a COBOL character:</c>.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class BasicLetterDriftTests
 {
     private const string Marker = "// not a COBOL character:";

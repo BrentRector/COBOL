@@ -13,6 +13,7 @@ namespace CobolNet.Tests.Unit;
 /// and the code lacks is a compilation-variable-name this compiler would accept (§7.3.11.3 SR1, §7.3.8.4.3 SR1), and
 /// a word the code has and the table lacks is legal source it would reject.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CompilerDirectiveWordsDriftTests
 {
     /// <summary>The §8.12 table, read from the specification itself: every cell of the pipe table between the

@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// checks are set-based (order-independent). Content-filter rule: never print a full word list — mismatches
 /// report counts and at most a few offending tokens.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CobolWordsDriftTests
 {
     private sealed record WordRow(string Token, bool NameSlot, bool SubscriptTrigger);

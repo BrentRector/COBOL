@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// behaviour; this pins the rule.
 /// </para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class FloatQuantizeHeadroomDriftTests
 {
     /// <summary>Every (integer-digits, scale) pair a legal PICTURE can present: ISO §13.18.40.3 SR14 caps the

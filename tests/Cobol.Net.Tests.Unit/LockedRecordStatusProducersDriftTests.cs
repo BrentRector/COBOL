@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// item 152 (write the new circumstance into §7) — never to widen the expected set silently. The behavioural half,
 /// '51' for a genuinely locked record, is pinned by <c>conformance:2002/pb669_lock_visibility_plain_connector</c>.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class LockedRecordStatusProducersDriftTests
 {
     /// <summary>A use of the '51' constant that COMPARES it (a consumer), not one that yields it.</summary>

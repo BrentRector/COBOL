@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// evaluator of the bit-alignment proof) is named nowhere under <c>src/</c>.</item>
 /// </list>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PositionCarrierDriftTests
 {
     /// <summary>The string properties of the place model and the position nodes, each with why it is a NAME — of a C#

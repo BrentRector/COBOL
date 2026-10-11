@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// compiler source spells a refusal of the table, the compiler's entry delegates to it, the run-time relations ask it, and
 /// the table answers each arm from the class facts an operand carries.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ObjectReferenceSetDriftTests
 {
     /// <summary>The refusal texts only the table writes: a second copy of an arm in the compiler would spell one.</summary>

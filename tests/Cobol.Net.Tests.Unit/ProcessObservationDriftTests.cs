@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// (<c>feedback_one_rule_one_place</c>, <c>feedback_scan_all_similar</c>).
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ProcessObservationDriftTests
 {
     /// <summary>The tell: a test source that both starts a process AND imposes its own bounded wait. Either

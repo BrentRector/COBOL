@@ -23,6 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// reason. The two RAISING-phrase files may bypass <c>TryResolve</c> (an unresolved word there may legally be
 /// a CLASS name, §14.2.2 SR8/SR9) but MUST call <c>EcNameResolution.Advise</c> on accepted names — asserted.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class EcNameResolutionDriftTests
 {
     /// <summary>Adjudicated direct <c>ExceptionCatalog.TryGet</c> callers: file → (expected call count, reason,

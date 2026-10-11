@@ -52,7 +52,7 @@ CASES = [
     ("dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
     ("dotnet build Cobol.Net.sln -c Debug && dotnet test x.csproj > t.log", True),
     ("bash scripts/push-main.sh > p.log 2>&1; git log -1", True),
-    ("pwsh -File scripts/build-local.ps1 -Mode implementer *> b.log || true", True),
+    ("pwsh -File scripts/build-local.ps1 -Priority BelowNormal *> b.log || true", True),
     ("bash scripts/push-main.sh > p.log 2>&1; echo \"rc=$?\"; grep -E landed p.log | tail -2", False),
     ("dotnet build Cobol.Net.sln -c Debug -v q 2>&1 | grep -E 'error|Build succeeded'", False),
     ("cd /e/COBOL && dotnet build Cobol.Net.sln -c Debug > b.log 2>&1", False),
@@ -63,7 +63,7 @@ CASES = [
     ("git add -- scripts/push-main.sh DEVLOG.md && git commit -q -m x", False),
     ("sed -n 17,20p scripts/push-main.sh && head -3 x.txt", False),
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
-    ("pwsh -NoProfile -File scripts/build-local.ps1 -Mode lander > b.log 2>&1; git status", True),
+    ("pwsh -NoProfile -File scripts/build-local.ps1 > b.log 2>&1; git status", True),
     ("bash scripts/push-main.sh > p.log 2>&1 && git log -1", True),
     # 6. WSL lifecycle commands are the owner's to run
     ("wsl --terminate Ubuntu", True),

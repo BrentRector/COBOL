@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>specs/ISO_COBOL.md</c> on every run (the <c>ControlClauseCitationDriftTests</c> pattern), so a
 /// transcription repair flows through instead of going stale.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReportSumOperandCaptureDriftTests
 {
     private static string BinderPath =>

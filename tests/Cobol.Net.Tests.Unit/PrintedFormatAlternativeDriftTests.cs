@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// regex that stopped matching fails loudly instead of passing vacuously
 /// (feedback_green_gates_arent_evidence).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PrintedFormatAlternativeDriftTests
 {
     private static readonly string[] GrammarFiles =

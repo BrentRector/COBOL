@@ -20,6 +20,7 @@ namespace CobolNet.Tests.Unit;
 /// does not hold (so the ONE 2023 comparer is exact for those editions once the lexer has written E.2 item 14's two
 /// letters in their spelling).
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class AnnexBCDriftTests
 {
     private static readonly string[] Spec = File.ReadAllLines(TestRepo.Specs("ISO_COBOL.md"));

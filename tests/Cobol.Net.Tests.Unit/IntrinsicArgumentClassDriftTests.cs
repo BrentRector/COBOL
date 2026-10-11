@@ -27,6 +27,7 @@ namespace CobolNet.Tests.Unit;
 /// restructuring stick: "pair it with a drift test so 'automatic' stays true".
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class IntrinsicArgumentClassDriftTests
 {
     private static string CatalogSource() =>

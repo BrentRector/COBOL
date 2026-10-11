@@ -39,6 +39,7 @@ namespace CobolNet.Tests.Unit;
 /// deliberately lossy copy, because a green gate that never looked at anything is indistinguishable from one that
 /// works (<c>feedback_green_gates_arent_evidence</c>).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DescriptionCopyCompletenessDriftTests
 {
     /// <summary>A property that HOLDS state — it has a setter (public, internal or <c>init</c>), or it is a

@@ -21,6 +21,7 @@ namespace CobolNet.Tests.Unit.Collation;
 /// release cannot slip an unrendered letter into a result; (3) no product source outside the snapshot classes reads a
 /// culture's <c>DateTimeFormat</c> / <c>NumberFormat</c>, so a new caller cannot reintroduce the raw read.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class LocaleTextNormalizationDriftTests
 {
     private static bool IsHostVarying(char c) =>

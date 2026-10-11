@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// so a non-ASCII source is simulated at each such character; and ANTLR never caches the EOF transition, so
 /// the token that reaches the end of its input is simulated once per input.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class LexerDfaCacheDriftTests(ITestOutputHelper output)
 {
     /// <summary>Why a <see cref="LexerATNSimulator.Match"/> call would leave the cached DFA.</summary>

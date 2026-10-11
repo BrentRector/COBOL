@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// re-inlining of the search into one of these two — fails here until it goes through the funnel or is
 /// adjudicated WITH its reason.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReportGroupResolutionDriftTests
 {
     private const string FunnelRel = @"Binding\ReportGroupResolution.cs";

@@ -19,6 +19,7 @@ namespace CobolNet.Tests.Conformance;
 /// removed/edited <c>[InlineData]</c> case is NOT flagged here: it is harmless, because the comparison never reads a
 /// hash no test requests, and a case-level census needs the run-time hash of every case, which no static scan has.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DifferentialGoldenDriftTests
 {
     private static string ConformanceDir => TestRepo.Tests("Cobol.Net.Tests.Conformance");

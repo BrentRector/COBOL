@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// CONSTRUCTION, and these facts are what keep it so: a new path that built or adopted a table some other way would
 /// have to say whose OCCURS clause it agrees with, and fails here first.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class DynamicCapacityAgreementDriftTests
 {
     private static readonly Regex Construction = new(@"new\s+CobolDynTable\s*<", RegexOptions.Compiled);

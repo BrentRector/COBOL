@@ -58,6 +58,7 @@ namespace CobolNet.Tests.Unit;
 /// docstring necessarily quotes <c>--filter</c>.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class FilterPopulationGuardDriftTests
 {
     /// <summary>The guard — a site satisfies the invariant by naming it.</summary>

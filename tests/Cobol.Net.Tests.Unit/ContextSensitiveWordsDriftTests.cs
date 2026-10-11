@@ -20,6 +20,7 @@ namespace CobolNet.Tests.Unit;
 /// rejected outright (kb/Work PB250).</para>
 /// Content-filter rule: report counts and at most a few offending words, never a list.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ContextSensitiveWordsDriftTests
 {
     /// <summary>The C# table equals the canonical JSON, both directions, word AND context column.</summary>

@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// two readers of §7.3.25.4's expansion, and <c>ExceptionCatalog.DirectiveCovers</c> exists so the expansion is
 /// written once; this test is what keeps the two ANSWERS equal after that.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class EcCheckingProfileDriftTests
 {
     /// <summary>(1) The absence IS the fix. A bind-time "is checking enabled" flag on the RAISING phrase can only

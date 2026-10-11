@@ -28,6 +28,7 @@ namespace CobolNet.Tests.Unit;
 /// way round". Either half alone stays legal — locating an asset beside the test assembly is a different question.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class TestRepoDriftTests
 {
     /// <summary>Where a hand-rolled root-finder starts from.</summary>

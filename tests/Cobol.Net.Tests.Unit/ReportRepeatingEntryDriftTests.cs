@@ -31,6 +31,7 @@ namespace CobolNet.Tests.Unit;
 /// both, and a second axis test would be a second copy of that split.</item>
 /// </list>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ReportRepeatingEntryDriftTests
 {
     private static string BinderText() => File.ReadAllText(

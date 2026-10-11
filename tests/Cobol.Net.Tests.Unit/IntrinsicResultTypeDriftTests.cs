@@ -39,6 +39,7 @@ namespace CobolNet.Tests.Unit;
 /// dead-guard failure, inside the guard against a dead lookup.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class IntrinsicResultTypeDriftTests
 {
     private static string CatalogSource() =>

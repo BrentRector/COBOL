@@ -10,6 +10,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>BoundConditionError</c>, and it fails the compile (COBOLNET2319) when no failing diagnostic has been recorded.
 /// This test keeps every other <c>new BoundConditionError(</c> out of the compiler, so a new refusal path cannot
 /// reopen the silent-compile / loud-run channel by writing its own.</summary>
+[Trait("Sweep", "tree")]
 public sealed class ConditionErrorConstructionDriftTests
 {
     private static readonly Regex Construction = new(@"new\s+BoundConditionError\s*\(", RegexOptions.Compiled);

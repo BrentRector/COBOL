@@ -34,6 +34,7 @@ namespace CobolNet.Tests.Unit;
 /// when one is added or removed.
 /// </para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class V59ImagePredicateDriftTests
 {
     private static string Read(params string[] parts) => File.ReadAllText(TestRepo.At(parts));

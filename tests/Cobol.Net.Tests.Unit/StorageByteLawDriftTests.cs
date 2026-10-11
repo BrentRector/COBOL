@@ -16,6 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>MOVE HIGH-VALUES TO REC</c>), and a U+00FF character literal is the retired Latin-1 HIGH-VALUE pin coming back
 /// (kb/Work PB1093). Both are refused here, so the next byte-form codec or figurative site is routed through the one
 /// law by construction.</summary>
+[Trait("Sweep", "tree")]
 public sealed class StorageByteLawDriftTests
 {
     private static readonly Regex ByteToCharCast = new(@"\(char\)\s*\(byte\)", RegexOptions.Compiled);

@@ -47,6 +47,7 @@ namespace CobolNet.Tests.Unit;
 /// has touched. It runs every check above against rows built to break it, one defect class at a time.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class SpecTraceabilityInventoryDriftTests
 {
     // ── the artifacts under test ─────────────────────────────────────────────────────────────────────

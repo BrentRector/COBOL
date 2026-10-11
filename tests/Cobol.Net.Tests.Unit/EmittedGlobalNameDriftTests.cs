@@ -26,6 +26,7 @@ namespace CobolNet.Tests.Unit;
 /// Roslyn syntax tree, so the code between an interpolation's braces is not read as text) and is red when one spells
 /// <c>System.</c>, <c>CobolNet.</c> or <c>Microsoft.</c> without <c>global::</c> in front.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class EmittedGlobalNameDriftTests
 {
     /// <summary>A root namespace at the start of a qualified name: not preceded by a name character, a member dot, the

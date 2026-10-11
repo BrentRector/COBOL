@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// row is an adjudication: name the rule that makes the reference denote its own item, or the reason the
 /// reference still denotes the item underneath.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class PlaceDenotedItemDriftTests
 {
     /// <summary>Kinds whose reference denotes the item the place already carries — the base answer, with the

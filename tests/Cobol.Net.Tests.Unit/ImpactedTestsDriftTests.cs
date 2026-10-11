@@ -32,6 +32,7 @@ namespace CobolNet.Tests.Unit;
 /// under <c>src/</c> is compiled with the probe and instrumented.
 /// </para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class ImpactedTestsDriftTests
 {
     /// <summary>A vstest filter term — which the impact analysis must never print (kb/Work PB1721).</summary>

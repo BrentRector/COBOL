@@ -27,6 +27,7 @@ namespace CobolNet.Tests.Unit;
 /// synthesizes for a record struct and the
 /// <c>ICobolProgram</c> surface a program class implements, and is red when one is in neither seed.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class CsNameReservationDriftTests
 {
     /// <summary>An emitted member declaration — a string literal that opens with an accessibility modifier:

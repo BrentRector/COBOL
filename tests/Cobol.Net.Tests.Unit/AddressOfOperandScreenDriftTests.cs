@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// comment-stripped sources. It cannot see an arm that calls the screen and ignores its answer; the negative corpus
 /// (<c>pb1407-address-of-*</c>, <c>pb1062-address-of-object-data</c>) covers the behaviour.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class AddressOfOperandScreenDriftTests
 {
     private const string Owner = "PtrBinder.cs";
