@@ -49,7 +49,7 @@ public class BASE : CobolObject
     public override void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)
     {
         if (CobolNames.Same(name, "FACTORYOBJECT")   // the normalized key is the Annex C fold (PB1402)
-            && StandardMethodCrossing.Matches(args, returning))
+            && StandardMethodCrossing.Matches(args, returning, StandardMethodCrossing.FactoryObjectReturning))
         {
             returning!.Value = FACTORYOBJECT();
             return;
@@ -116,7 +116,7 @@ public class BASE__FACTORY : CobolObject
     public override void __CobolInvoke(string name, CobolInvokeArg[] args, CobolInvokeArg? returning)
     {
         if (CobolNames.Same(name, "NEW")   // the normalized key is the Annex C fold (PB1402)
-            && StandardMethodCrossing.Matches(args, returning))
+            && StandardMethodCrossing.Matches(args, returning, StandardMethodCrossing.NewReturning))
         {
             returning!.Value = __New();
             return;
@@ -128,21 +128,36 @@ public class BASE__FACTORY : CobolObject
 /// <summary>ISO §9.3.6's MATCH for a universal invocation of a BASE method (kb/Work PB480). Both §16.2 methods take no
 /// parameters and return an object reference described ACTIVE-CLASS, so an invocation with an argument (match rule 1:
 /// "The number of invocation parameters shall be equal"), without a RETURNING item (rule 1: "if there is a returning item
-/// in the invoked method …"), or whose RETURNING item a SET cannot receive an object reference into (rule 6) does not
-/// match: the search goes on up the chain and ends in EC-OO-METHOD (§9.3.6 resolution step 6), exactly as for a method
-/// written in COBOL — it used to raise EC-OO-UNIVERSAL, which §14.9.23.4 GR7 c) reserves for a BOUND method. Whether
-/// the returned object's CLASS conforms to a typed receiving item is a question only the object can answer, so the
-/// caller's delivery asks it (<see cref="CobolObject.NarrowUniversal{T}"/>; §14.8.3.3 rule 2).</summary>
+/// in the invoked method …"), or whose RETURNING item a SET cannot receive the method's returning item into (rule 6) does
+/// not match: the search goes on up the chain and ends in EC-OO-METHOD (§9.3.6 resolution step 6), exactly as for a
+/// method written in COBOL — it used to raise EC-OO-UNIVERSAL, which §14.9.23.4 GR7 c) reserves for a BOUND method.
+/// Rule 6 is the §14.9.39.3 table over the two descriptions (kb/Work PB2463): an ACTIVE-CLASS sender's class is "the
+/// class containing the data item" (SR12 b) 2.), here the standard class BASE, so New and FactoryObject match a
+/// universal receiving item, one described with BASE (FACTORY OF BASE for FactoryObject) and an ACTIVE-CLASS one of the
+/// same FACTORY presence (SR14 a)). Whether the returned object's CLASS conforms to the receiving item is then a question
+/// only the object can answer, so the caller's delivery asks it (<see cref="CobolObject.NarrowUniversal{T}"/>; §14.8.3.3
+/// rule 2).</summary>
 internal static class StandardMethodCrossing
 {
-    /// <summary>The §16.2 returning item, <c>OBJECT REFERENCE ACTIVE-CLASS</c>.</summary>
-    private static readonly ActivationDescription ActiveClassReturning = new()
+    /// <summary>The standard class BASE as an ACTIVE-CLASS description's class facts: §16.1 gives it no superclass, and
+    /// no source element can name the formal interfaces of §16.2, so it implements none a SET could relate — the
+    /// compiler's own symbol for BASE (<c>OoStandardClasses.BuildBase</c>) carries none either.</summary>
+    private static readonly string[] BaseClass = [CobolNames.Fold("BASE")];
+
+    /// <summary>§16.2 BaseFactoryInterface's New: <c>01 outObject usage object reference active-class.</c></summary>
+    public static readonly ActivationDescription NewReturning = ActiveClass(factory: false);
+
+    /// <summary>§16.2 BaseInterface's FactoryObject: <c>01 outFactory usage object reference factory of
+    /// active-class.</c> — FACTORY, so SR12 b) 3. and SR14 a) ask a FACTORY receiving item.</summary>
+    public static readonly ActivationDescription FactoryObjectReturning = ActiveClass(factory: true);
+
+    private static ActivationDescription ActiveClass(bool factory) => new()
     {
         Shape = ActivationShape.ObjectReference, Category = ActivationCategory.Object,
-        ObjectKind = ObjectReferenceKind.ActiveClass,
+        ObjectKind = ObjectReferenceKind.ActiveClass, Factory = factory, ObjectClasses = BaseClass, ObjectInterfaces = [],
     };
 
-    public static bool Matches(CobolInvokeArg[] args, CobolInvokeArg? returning) =>
+    public static bool Matches(CobolInvokeArg[] args, CobolInvokeArg? returning, ActivationDescription methodReturning) =>
         args.Length == 0 && returning is not null
-        && ActivationRelations.ReturningMatches(returning.Description, ActiveClassReturning);
+        && ActivationRelations.ReturningMatches(returning.Description, methodReturning);
 }

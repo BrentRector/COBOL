@@ -25,8 +25,10 @@ public static class ActivationDescriptions
 {
     /// <summary>The description of <paramref name="item"/>, or null when the item has no universal crossing form — a
     /// group with neither a character image, a variable-length carrier nor (strongly typed) a leaf vector, or a
-    /// PICTURE-less elementary item.</summary>
-    public static ActivationDescription? Of(DataItem item)
+    /// PICTURE-less elementary item. An object reference carries its class facts from <paramref name="classes"/>, the
+    /// group's class table (<see cref="OoClassTable.SetOperand"/>; kb/Work PB2463), which §9.3.6 match rule 6 and the
+    /// SET conformance of §14.8.2.3.3 / §14.8.3.3 relate at run time; with no table it carries none.</summary>
+    public static ActivationDescription? Of(DataItem item, OoClassTable? classes)
     {
         if (StrongTypeModel.IsStrongGroup(item))
             // §8.5.2.1: "Both the class and the category of a strongly-typed group item are the type-name specified in
@@ -78,21 +80,19 @@ public static class ActivationDescriptions
         if (p.Category is PicCategory.ObjectReference)
         {
             var d = p.ObjectRef ?? ObjectRefDescriptor.Universal;
+            var facts = classes?.SetOperand(d);
             return new ActivationDescription
             {
                 Shape = ActivationShape.ObjectReference,
                 Category = ActivationCategory.Object,
-                ObjectKind = d.Kind switch
-                {
-                    ObjectRefKind.Universal => ObjectReferenceKind.Universal,
-                    ObjectRefKind.Interface => ObjectReferenceKind.Interface,
-                    ObjectRefKind.ActiveClass => ObjectReferenceKind.ActiveClass,
-                    _ => ObjectReferenceKind.ObjectClass,
-                },
-                // The containing class of an ACTIVE-CLASS description is not part of it (§9.3.8.2.3 rule 2 d)).
+                ObjectKind = d.RuntimeKind,
+                // The containing class of an ACTIVE-CLASS description is not part of its identity (§9.3.8.2.3 rule 2
+                // d)); the SET table reads it from the class facts (ObjectClasses' first entry).
                 ObjectName = d.IsActiveClass || d.Name is null ? null : CobolNames.Fold(d.Name),
                 Factory = d.Factory,
                 Only = d.Only,
+                ObjectClasses = Folded(facts?.Classes),
+                ObjectInterfaces = Folded(facts?.Interfaces),
             };
         }
         return new ActivationDescription
@@ -140,11 +140,15 @@ public static class ActivationDescriptions
         };
     }
 
+    /// <summary>The class facts of a description as it carries them: folded, as <see cref="ActivationDescription.ObjectName"/>
+    /// is, so a rendered description spells one name one way.</summary>
+    private static string[]? Folded(IReadOnlyList<string>? names) => names?.Select(CobolNames.Fold).ToArray();
+
     /// <summary>The description of a PLACE an activation names — an argument or a RETURNING item: a reference-modified
     /// operand is the unique data item §8.4.3.3.4 GR5 creates (<see cref="OfReferenceModification"/>), any other place
     /// the item it denotes (<see cref="Of"/>). Null for a place that denotes no item and is not reference-modified.</summary>
-    public static ActivationDescription? OfPlace(Place p) =>
-        p is RefModPlace r ? OfReferenceModification(r) : p.DenotedItem is { } item ? Of(item) : null;
+    public static ActivationDescription? OfPlace(Place p, OoClassTable? classes) =>
+        p is RefModPlace r ? OfReferenceModification(r) : p.DenotedItem is { } item ? Of(item, classes) : null;
 
     /// <summary>⛔ THE DESCRIPTION OF ONE CALL ARGUMENT whose activated program is located by name at run time (kb/Work
     /// PB165) — what §14.9.4.4 GR3 d) compares with the activated program's registered formal
@@ -153,14 +157,14 @@ public static class ActivationDescriptions
     /// <paramref name="programRestriction"/> is a program-address-identifier's prototype's signature class), and a BY
     /// CONTENT / BY VALUE argument that has no storage as the sending VALUE §14.8.2.3.3 rule 2 names
     /// (<see cref="OfValue"/>). Null for an omitted argument (§14.9.4.4 GR11), which has nothing to describe.</summary>
-    public static ActivationDescription? OfCallArgument(BoundCallArg a, string? programRestriction)
+    public static ActivationDescription? OfCallArgument(BoundCallArg a, string? programRestriction, OoClassTable? classes)
     {
         if (a.Omitted) return null;
         // §14.9.4.2 Format 2's boolean-expression-1: a boolean value (§8.8.2), with the character image of its bits.
         if (a.ContentBool is not null) return Value(ActivationShape.Literal, ActivationCategory.Boolean, Table16Category.Boolean);
         if (a.DataAddress is { } data) return OfAddress(new BoundAddressOperand(data, null), null);
         if (a.ProgramAddress is { } program) return OfAddress(new BoundAddressOperand(null, program), programRestriction);
-        if (a.Place is { } p) return OfPlace(p);
+        if (a.Place is { } p) return OfPlace(p, classes);
         return a.Value is { } v ? OfValue(v) : null;
     }
 
@@ -205,8 +209,8 @@ public static class ActivationDescriptions
 
     /// <summary>The description of a method's formal parameter: its item's, with the OPTIONAL phrase (§9.3.6 match
     /// rules 1 and 3 b)) and the BY VALUE phrase (rule 3 a)). Null when the item has no crossing form.</summary>
-    public static ActivationDescription? OfFormal(OoFormal formal) =>
-        Of(formal.Item) is { } d ? With(d, formal.Optional, formal.ByValue) : null;
+    public static ActivationDescription? OfFormal(OoFormal formal, OoClassTable? classes) =>
+        Of(formal.Item, classes) is { } d ? With(d, formal.Optional, formal.ByValue) : null;
 
     /// <summary>The description of an ADDRESS-IDENTIFIER argument (kb/Work PB1137): §8.4.3.11.4 GR1 — "a unique data
     /// item of class pointer and category data-pointer", restricted to its operand's type when that is a

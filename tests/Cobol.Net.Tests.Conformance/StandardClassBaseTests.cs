@@ -255,9 +255,13 @@ public sealed class StandardClassBaseTests
 
     /// <summary>BaseInterface's FactoryObject is not FINAL, so a subclass may OVERRIDE it; SUPER reaches BASE's, and
     /// an invocation through a typed reference dispatches to the override. Through a UNIVERSAL factory reference,
-    /// New creates the factory's class, and the result conforms to a receiver described with that class.</summary>
+    /// New creates an object of the factory's class: the universal FactoryObject invocation on it dispatches to the
+    /// subclass's override and answers the subclass's factory.
+    /// <para>The receivers of the universal invocations are universal. A receiver described with the subclass does not
+    /// match BASE's New (§9.3.6 rule 6: its returning item is ACTIVE-CLASS in BASE, and §14.9.39.3 SR12 b) 2. relates
+    /// the class containing it, BASE, to the receiver's class; kb/Work PB2463), which the next test pins.</para></summary>
     [Fact]
-    public void FactoryObject_Override_AndUniversalNew_IntoAConformingTypedReceiver()
+    public void FactoryObject_Override_AndUniversalNew_CreatesTheFactorysClass()
     {
         var (ok, stdout, detail) = CompileAndRun("""
             IDENTIFICATION DIVISION.
@@ -271,13 +275,15 @@ public sealed class StandardClassBaseTests
             01 O USAGE OBJECT REFERENCE SCB8.
             01 F USAGE OBJECT REFERENCE FACTORY OF SCB8.
             01 U USAGE OBJECT REFERENCE.
+            01 V USAGE OBJECT REFERENCE.
             PROCEDURE DIVISION.
                 INVOKE SCB8 "NEW" RETURNING O
                 INVOKE O "FactoryObject" RETURNING F
                 INVOKE F "WHO"
                 SET U TO F
-                INVOKE U "NEW" RETURNING O
-                INVOKE O "FactoryObject" RETURNING F
+                INVOKE U "NEW" RETURNING V
+                INVOKE V "FactoryObject" RETURNING U
+                INVOKE U "WHO"
                 STOP RUN.
             END PROGRAM SCB8M.
 
@@ -308,12 +314,13 @@ public sealed class StandardClassBaseTests
             END CLASS SCB8.
             """);
         Assert.True(ok, detail);
-        Assert.Equal("OVERRIDDEN\nSCB8-FACTORY\nOVERRIDDEN", CutRunner.Normalize(stdout));
+        Assert.Equal("OVERRIDDEN\nSCB8-FACTORY\nOVERRIDDEN\nSCB8-FACTORY", CutRunner.Normalize(stdout));
     }
 
-    /// <summary>§14.9.23.4 GR7c through a universal receiver: New creates an object of the FACTORY's class, and a
-    /// typed receiving item of an unrelated class does not conform — a runtime stop naming both classes, never an
-    /// unchecked cast (CobolObject.NarrowUniversal).</summary>
+    /// <summary>A universal New into a typed receiving item stops the run unit, never an unchecked cast: BASE's New
+    /// returns an ACTIVE-CLASS reference whose containing class is BASE, which SR12 b) 2. does not relate to the
+    /// receiver's class, so §9.3.6 rule 6 finds no matching method and the search ends in EC-OO-METHOD (§9.3.6
+    /// resolution step 6; kb/Work PB2463).</summary>
     [Fact]
     public void UniversalNew_IntoANonConformingTypedReceiver_StopsAtRunTime()
     {
@@ -355,6 +362,7 @@ public sealed class StandardClassBaseTests
             """);
         Assert.False(ok, "the non-conforming delivery must stop the run unit");
         Assert.Equal("BEFORE", CutRunner.Normalize(stdout));
-        Assert.Contains("does not conform", detail);
+        Assert.Contains("EC-OO-METHOD", detail);
+        Assert.Contains("implements no method named 'new' that matches", detail);
     }
 }

@@ -809,7 +809,8 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 args[i] = args[i] with
                 {
                     Description = ActivationDescriptions.OfCallArgument(args[i],
-                        args[i].ProgramAddress?.Prototype is { } addressed ? host.ProgramRestrictionIdentityOf(addressed) : null),
+                        args[i].ProgramAddress?.Prototype is { } addressed ? host.ProgramRestrictionIdentityOf(addressed) : null,
+                        host.OoClasses),
                 };
         }
         // The CALL's receivers -- each BY REFERENCE argument and the RETURNING item -- are identified at its start
@@ -821,7 +822,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             UsedOverflowSpelling = usedOverflow,
             IsPointerTarget = isPointerTarget,
             CalleeSignatureKnown = callee is not null,
-            ReturningDescription = callee is null && returning is { } described ? ActivationDescriptions.OfPlace(described) : null,
+            ReturningDescription = callee is null && returning is { } described ? ActivationDescriptions.OfPlace(described, host.OoClasses) : null,
         };
     }
 

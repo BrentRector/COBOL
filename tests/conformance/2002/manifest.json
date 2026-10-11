@@ -27,6 +27,8 @@
   "pb1545_hex_alphanumeric_literal",
   "pb1567_string_delimited_omitted",
   "pb2076_universal_returning_move_match",
+  "pb2463_universal_returning_set_match",
+  "pb2463_call_object_reference_set_conformance",
   "pb2464_prototype_pointer_signature_type",
   "pb1670_replacing_partial_word_copy_replace",
   "pb1042_redefines_national_table_initialize",

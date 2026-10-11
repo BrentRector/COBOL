@@ -1456,7 +1456,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
             // A REFERENCE-MODIFIED argument is the unique data item §8.4.3.3.4 GR5/GR6 create, never the description of
             // the item it windows (it used to cross under identifier-1's whole description).
-            if ((p is RefModPlace rm ? ActivationDescriptions.OfReferenceModification(rm) : ActivationDescriptions.Of(p.Item))
+            if ((p is RefModPlace rm ? ActivationDescriptions.OfReferenceModification(rm) : ActivationDescriptions.Of(p.Item, host.OoClasses))
                 is not { } d)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
@@ -1477,7 +1477,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "to storage");
             }
             if (!OoScreenReturning(rp, retRef, methodName: null)) return BoundRejected.Reported(ctx.Edition);
-            retDesc = ActivationDescriptions.Of(rp.Item);
+            retDesc = ActivationDescriptions.Of(rp.Item, host.OoClasses);
             if (retDesc is null)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",

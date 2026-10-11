@@ -168,6 +168,54 @@ public sealed class OoClassTable
         }
     }
 
+    /// <summary>⛔ THE CLASS FACTS OF ONE OBJECT-REFERENCE DESCRIPTION, as ISO §14.9.39.3 SR10 / SR12 relate them
+    /// (<see cref="ObjectReferenceOperand"/>; kb/Work PB2463) — the ONE derivation both the compile-time SET table
+    /// (<see cref="OoConformance.ObjectRefAssignmentMismatch(OoClassTable, ObjectRefDescriptor, ObjectRefDescriptor, bool)"/>)
+    /// and the run-time descriptions (<see cref="ActivationDescriptions"/>, <c>ActivationDescription.ObjectClasses</c> /
+    /// <c>ObjectInterfaces</c>) read. An object-class-name description — and an ACTIVE-CLASS one, whose class is "the
+    /// class containing the data item" (SR10 c), SR12 b) 2.) — has its class and every class it inherits from, and the
+    /// §11.8.4 GR2 closure of what its objects (its factory object, FACTORY written) implement (SR10 b) / c)); an
+    /// interface-name description has the interface and every interface it inherits from (SR10 a): "an interface that
+    /// identifies int-1 or an interface inheriting from int-1"). A name this table does not resolve has neither.</summary>
+    public ObjectReferenceOperand SetOperand(ObjectRefDescriptor d)
+    {
+        IReadOnlyList<string>? classes = null, interfaces = null;
+        if (d.Kind is ObjectRefKind.Interface && FindInterface(d.Name!) is { } i)
+            interfaces = InterfaceLineage(i);
+        else if (d.Kind is ObjectRefKind.ObjectClass or ObjectRefKind.ActiveClass && d.Name is { } n && Find(n) is { } c)
+        {
+            classes = ClassLineage(c);
+            interfaces = ImplementsClosure(c, d.Factory).Select(x => x.Name).ToArray();
+        }
+        return new ObjectReferenceOperand(d.RuntimeKind, d.Name, d.Factory, d.Only, classes, interfaces);
+    }
+
+    /// <summary>The class and every class it inherits from, nearest first (cycle-safe; §11.3.3 SR4 refuses a cycle).</summary>
+    private static string[] ClassLineage(OoClassSymbol cls)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<OoClassSymbol>();
+        for (OoClassSymbol? c = cls; c is not null && seen.Add(c); c = c.Base)
+            names.Add(c.Name);
+        return [.. names];
+    }
+
+    /// <summary>The interface and every interface it inherits from, itself first (cycle-safe).</summary>
+    private static string[] InterfaceLineage(OoInterfaceSymbol iface)
+    {
+        var names = new List<string>();
+        var seen = new HashSet<OoInterfaceSymbol>();
+        var stack = new Stack<OoInterfaceSymbol>([iface]);
+        while (stack.Count > 0)
+        {
+            var cur = stack.Pop();
+            if (!seen.Add(cur)) continue;
+            names.Add(cur.Name);
+            foreach (var b in cur.Inherits) stack.Push(b);
+        }
+        return [.. names];
+    }
+
     /// <summary>
     /// Build the table from the group's class definitions (pass-1: identity + roster only — no data or statement
     /// binding). Structural diagnostics raised here, each per its ISO rule: duplicate class name / emitted-type

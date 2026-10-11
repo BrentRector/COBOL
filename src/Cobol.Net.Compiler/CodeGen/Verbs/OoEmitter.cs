@@ -297,7 +297,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         static string KeyEntry(string name, DataItem? item) => item is null ? CobolNames.UpperFold(name)
             : $"{CobolNames.UpperFold(name)}@{RecordLayout.OffsetOf(item)?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "?"}"
               + $":{(item.IsGroup ? "G" : "E")}{item.ByteWidth}:"
-              + (ActivationDescriptions.Of(item) is { } d ? $"{d.Category}/{d.Clauses}/{d.Positions}" : "-");
+              + (ActivationDescriptions.Of(item, classes: null) is { } d ? $"{d.Category}/{d.Clauses}/{d.Positions}" : "-");
         // k) "the same SUPPRESS WHEN phrase" — the operand as the literal position read it (form, class, characters,
         // figurative kind), so `SUPPRESS WHEN "XX"` and `SUPPRESS WHEN SPACE` differ and an absent phrase is empty.
         static string Suppress(SuppressWhenOperand? s) => s is null ? ""
@@ -575,9 +575,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             var b = cases[c].Binding!;
             if (b.Formals.Any(f => f.ByValue)) continue;   // never a match (EmitCobolInvokeCase), so never asked
             for (int i = 0; i < b.Formals.Count; i++)
-                if (ActivationDescriptions.OfFormal(b.Formals[i]) is { } fd)
+                if (ActivationDescriptions.OfFormal(b.Formals[i], ecState.OoClasses) is { } fd)
                     w.Line($"private static readonly {nameof(ActivationDescription)} {CaseDescription(c, i)} = {RuntimeApi.ActivationDescriptionNew(fd)};");
-            if (b.Returning is { } r && ActivationDescriptions.Of(r) is { } rd)
+            if (b.Returning is { } r && ActivationDescriptions.Of(r, ecState.OoClasses) is { } rd)
                 w.Line($"private static readonly {nameof(ActivationDescription)} {CaseDescription(c, -1)} = {RuntimeApi.ActivationDescriptionNew(rd)};");
         }
         using (w.Block("public override void __CobolInvoke(string __name, CobolInvokeArg[] __a, CobolInvokeArg? __ret)"))
@@ -638,8 +638,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         }
         // A formal or returning item with no universal crossing form (a Tier-C group) can match no argument: the binder
         // refuses every such argument (COBOLNET0866), so no description of the caller's can be its.
-        if (formalsList.Any(f => ActivationDescriptions.OfFormal(f) is null)
-            || returning is not null && ActivationDescriptions.Of(returning) is null)
+        if (formalsList.Any(f => ActivationDescriptions.OfFormal(f, ecState.OoClasses) is null)
+            || returning is not null && ActivationDescriptions.Of(returning, ecState.OoClasses) is null)
         {
             w.Line("break;   // a formal or returning item with no universal crossing form matches no invocation");
             return;

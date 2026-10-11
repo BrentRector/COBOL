@@ -363,11 +363,12 @@ public static class ActivationRelations
     /// <summary>§9.3.6 rule 6: is a SET of <paramref name="sending"/> into <paramref name="receiving"/> (of SET class
     /// <paramref name="setClass"/>) valid by ISO §14.9.39.3?
     /// <list type="bullet">
-    /// <item>object — Format 5 SR9: "Identifier-4 shall be an object reference". ⚠ SR10–SR14's CLASS conditions (the
-    /// sender's class the receiver's class or a subclass, an interface it implements, the ONLY and FACTORY phrases) are
-    /// NOT asked here: a description carries a class NAME and the run time has no class hierarchy to read it against,
-    /// so an unrelated class matches and the delivery refuses the object (<see cref="CobolObject.NarrowUniversal{T}"/>,
-    /// EC-OO-UNIVERSAL where rule 6 makes it a non-match, EC-OO-METHOD) — kb/Work PB2463.</item>
+    /// <item>object — Format 5 SR9: "Identifier-4 shall be an object reference", and SR10 / SR12 / SR14's CLASS
+    /// conditions — the sender's class the receiver's class or a subclass, an interface it implements, the ONLY and
+    /// FACTORY phrases — through the ONE table both phases ask (<see cref="ObjectReferenceSet.Refusal"/>), over the class
+    /// facts each description carries (<see cref="ActivationDescription.ObjectClasses"/>,
+    /// <see cref="ActivationDescription.ObjectInterfaces"/>). A method returning an object of an UNRELATED class is
+    /// therefore not a match, and the search ends in EC-OO-METHOD (§9.3.6 6)) — kb/Work PB2463.</item>
     /// <item>index — Format 1 SR2: "Identifier-2 shall reference a data item of class index".</item>
     /// <item>data-pointer — Format 7 SR17 / SR19: a data-pointer, and a restricted one on either side needs the other
     /// "restricted to the same type".</item>
@@ -390,9 +391,20 @@ public static class ActivationRelations
                                                  || string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal),
             ActivationCategory.DataPointer or ActivationCategory.FunctionPointer =>
                 string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal),
-            _ => true,
+            ActivationCategory.Object => ObjectReferenceSet.Refusal(ObjectOperand(sending), ObjectOperand(receiving)) is null,
+            _ => true,   // index — SR2 asks only the class, which SetClass compared
         };
     }
+
+    /// <summary>An object-reference description as the §14.9.39.3 Format 5 table reads it. An ACTIVE-CLASS description
+    /// names its containing class through its class facts (the first of <see cref="ActivationDescription.ObjectClasses"/>),
+    /// since the class is not part of the description's §9.3.6 3 d) identity (<see cref="ActivationDescription.ObjectName"/>
+    /// is null for it).</summary>
+    private static ObjectReferenceOperand ObjectOperand(ActivationDescription d) =>
+        new(d.ObjectKind,
+            d.ObjectKind is ObjectReferenceKind.ActiveClass ? d.ObjectClasses is [var containing, ..] ? containing : null
+                : d.ObjectName,
+            d.Factory, d.Only, d.ObjectClasses, d.ObjectInterfaces);
 
     /// <summary>§9.3.6 rule 7: is a MOVE of <paramref name="sending"/> to <paramref name="receiving"/> valid by ISO
     /// §14.9.25.3? Its syntax rules over two data items, in SR order: SR1 (neither of class index, object or pointer —
@@ -431,15 +443,23 @@ public static class ActivationRelations
     private static string? ReturningConformance(ActivationDescription receiving, ActivationDescription sending)
     {
         // §14.8.3.3: "If either of the operands is an object reference, the corresponding item shall be an object
-        // reference", and rule 1 / rule 2: "the conformance rules are the same as if a SET statement were performed" —
-        // which classes a SET admits is the object's run-time class, which the delivery checks
-        // (CobolObject.NarrowUniversal; rule 2 b) 4.: through a universal receiver the sending operand has the universal
-        // description).
+        // reference", and rule 1: a returning item "not described with an ACTIVE-CLASS phrase" conforms as "if a SET
+        // statement were performed in the activated runtime element with the returning item in the activated element as
+        // the sending operand and the corresponding returning item in the activating element as the receiving operand"
+        // — the §14.9.39.3 table over the two descriptions (kb/Work PB2463). Rule 2's ACTIVE-CLASS sender is described
+        // by how the method was INVOKED (2 b) 1.–4.), which a run-time dispatch does not carry, so the object's own class
+        // is what the delivery checks (CobolObject.NarrowUniversal).
         if (receiving.Shape is ActivationShape.ObjectReference || sending.Shape is ActivationShape.ObjectReference)
-            return receiving.Shape is ActivationShape.ObjectReference && sending.Shape is ActivationShape.ObjectReference
-                ? null
-                : $"the returning item ({sending}) and the receiving item ({receiving}) are not both object references "
-                  + "(ISO §14.8.3.3)";
+        {
+            if (receiving.Shape is not ActivationShape.ObjectReference || sending.Shape is not ActivationShape.ObjectReference)
+                return $"the returning item ({sending}) and the receiving item ({receiving}) are not both object references "
+                    + "(ISO §14.8.3.3)";
+            if (sending.ObjectKind is ObjectReferenceKind.ActiveClass) return null;
+            return ObjectReferenceSet.Refusal(ObjectOperand(sending), ObjectOperand(receiving)) is { } why
+                ? $"the returning item ({sending}) is not a valid sending operand of a SET into the receiving item "
+                  + $"({receiving}): {why} (ISO §14.8.3.3 rule 1)"
+                : null;
+        }
         if (receiving.Shape is ActivationShape.StrongGroup || sending.Shape is ActivationShape.StrongGroup)
             return receiving.StrongType is not null
                    && string.Equals(receiving.StrongType, sending.StrongType, StringComparison.Ordinal)

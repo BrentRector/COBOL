@@ -37,3 +37,32 @@ static CobolNet.Runtime.CobolNum.PositionOfWide(System.Int128 unscaled, int scal
 static CobolNet.Runtime.Occurrence.implicit operator System.Int128(CobolNet.Runtime.Occurrence occurrence) -> System.Int128
 static CobolNet.Runtime.CobolDec.FromUnsigned(System.UInt128 magnitude, int scale, CobolNet.Runtime.CobolRounding mode) -> CobolNet.Runtime.CobolDec
 static CobolNet.Runtime.Occurrence.OfLiteral(string! integer) -> CobolNet.Runtime.Occurrence
+CobolNet.Runtime.ActivationDescription.ObjectClasses.get -> string![]?
+CobolNet.Runtime.ActivationDescription.ObjectClasses.init -> void
+CobolNet.Runtime.ActivationDescription.ObjectInterfaces.get -> string![]?
+CobolNet.Runtime.ActivationDescription.ObjectInterfaces.init -> void
+CobolNet.Runtime.ObjectReferenceOperand
+CobolNet.Runtime.ObjectReferenceOperand.Classes.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CobolNet.Runtime.ObjectReferenceOperand.Classes.init -> void
+CobolNet.Runtime.ObjectReferenceOperand.Deconstruct(out CobolNet.Runtime.ObjectReferenceKind Kind, out string? Name, out bool Factory, out bool Only, out System.Collections.Generic.IReadOnlyList<string!>? Classes, out System.Collections.Generic.IReadOnlyList<string!>? Interfaces) -> void
+CobolNet.Runtime.ObjectReferenceOperand.Equals(CobolNet.Runtime.ObjectReferenceOperand other) -> bool
+CobolNet.Runtime.ObjectReferenceOperand.Factory.get -> bool
+CobolNet.Runtime.ObjectReferenceOperand.Factory.init -> void
+CobolNet.Runtime.ObjectReferenceOperand.Interfaces.get -> System.Collections.Generic.IReadOnlyList<string!>?
+CobolNet.Runtime.ObjectReferenceOperand.Interfaces.init -> void
+CobolNet.Runtime.ObjectReferenceOperand.Kind.get -> CobolNet.Runtime.ObjectReferenceKind
+CobolNet.Runtime.ObjectReferenceOperand.Kind.init -> void
+CobolNet.Runtime.ObjectReferenceOperand.Name.get -> string?
+CobolNet.Runtime.ObjectReferenceOperand.Name.init -> void
+CobolNet.Runtime.ObjectReferenceOperand.ObjectReferenceOperand() -> void
+CobolNet.Runtime.ObjectReferenceOperand.ObjectReferenceOperand(CobolNet.Runtime.ObjectReferenceKind Kind, string? Name, bool Factory, bool Only, System.Collections.Generic.IReadOnlyList<string!>? Classes, System.Collections.Generic.IReadOnlyList<string!>? Interfaces) -> void
+CobolNet.Runtime.ObjectReferenceOperand.Only.get -> bool
+CobolNet.Runtime.ObjectReferenceOperand.Only.init -> void
+CobolNet.Runtime.ObjectReferenceOperand.Spelled.get -> string!
+CobolNet.Runtime.ObjectReferenceSet
+override CobolNet.Runtime.ObjectReferenceOperand.GetHashCode() -> int
+static CobolNet.Runtime.ObjectReferenceOperand.operator !=(CobolNet.Runtime.ObjectReferenceOperand left, CobolNet.Runtime.ObjectReferenceOperand right) -> bool
+static CobolNet.Runtime.ObjectReferenceOperand.operator ==(CobolNet.Runtime.ObjectReferenceOperand left, CobolNet.Runtime.ObjectReferenceOperand right) -> bool
+static CobolNet.Runtime.ObjectReferenceSet.Refusal(CobolNet.Runtime.ObjectReferenceOperand send, CobolNet.Runtime.ObjectReferenceOperand recv, bool activeClassSenderAdmitted = true) -> string?
+~override CobolNet.Runtime.ObjectReferenceOperand.Equals(object obj) -> bool
+~override CobolNet.Runtime.ObjectReferenceOperand.ToString() -> string

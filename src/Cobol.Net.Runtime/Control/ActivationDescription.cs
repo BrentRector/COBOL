@@ -201,6 +201,20 @@ public sealed record ActivationDescription
     /// <summary>The ONLY phrase of an object reference.</summary>
     public bool Only { get; init; }
 
+    /// <summary>The CLASSES an object-reference description's objects belong to, as ISO §14.9.39.3 SR12 a) 2. / b) 2. and
+    /// SR10 relate them (<see cref="ObjectReferenceOperand.Classes"/>): the class the description names — for
+    /// ACTIVE-CLASS, "the class containing the data item" — followed by every class it inherits from, folded. Null for a
+    /// universal or interface-name description and for an ACTIVE-CLASS one with no containing class. §9.3.6 match rule
+    /// 6 reads it: a method returning an object of an UNRELATED class is not a match (kb/Work PB2463).</summary>
+    public string[]? ObjectClasses { get; init; }
+
+    /// <summary>The INTERFACES an object-reference description's objects implement, as ISO §14.9.39.3 SR10 relates them
+    /// (<see cref="ObjectReferenceOperand.Interfaces"/>): for an interface-name description that interface and every
+    /// interface it inherits from; for an object-class-name or ACTIVE-CLASS description the §11.8.4 GR2 closure of the
+    /// class's IMPLEMENTS clauses (its factory definition's when the FACTORY phrase is written), folded. Null for a
+    /// universal description (kb/Work PB2463).</summary>
+    public string[]? ObjectInterfaces { get; init; }
+
     /// <summary>A FORMAL parameter described with the OPTIONAL phrase (§9.3.6 match rules 1 and 3 b)).</summary>
     public bool Optional { get; init; }
 

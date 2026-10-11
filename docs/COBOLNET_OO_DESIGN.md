@@ -330,7 +330,11 @@ RECEIVERS: an interface-typed `USAGE OBJECT REFERENCE IFOO` is legal (0813 accep
 §13.18.60.2); INVOKE through it resolves over `AllPrototypes()` (§14.9.23.3 SR4e; 0825 on a miss) and emits
 static C# interface dispatch behind the same GR5 null guard; `ObjectRefAssignmentMismatch` (kb/Work PB389) carries the
 interface branch (class→implemented-interface via the closure; interface→inherited-interface) and ALL
-NEW/RETURNING/argument paths route through it. PROPERTY (§13.18.42) DECLARATIONS are LIVE: the clause
+NEW/RETURNING/argument paths route through it. The §14.9.39.3 SR8 / SR10 / SR12 / SR14 table itself is the runtime's
+`ObjectReferenceSet.Refusal` over two `ObjectReferenceOperand`s (kb/Work PB2463): the compiler builds each operand's
+class facts from its class table (`OoClassTable.SetOperand` — the class and its ancestors, the §11.8.4 GR2 implements
+closure, an interface and the interfaces it inherits) and the run time reads the same facts from the
+`ActivationDescription`s that cross a universal INVOKE or a CALL located at run time, so the two phases ask ONE table. PROPERTY (§13.18.42) DECLARATIONS are LIVE: the clause
 synthesizes accessors per GR1/GR2 under the PINNED §11.7.4 GR1a names `__GET_<P>`/`__SET_<P>` — the
 "clone" of the subject description is the SUBJECT DataItem itself (identical by construction), and the
 emitter renders DIRECT field bodies (`=> subject;` / `{ subject = __V; }`) — observably identical to the
@@ -543,12 +547,22 @@ numeric-edited included) and `ActivationDescriptionFieldDriftTests` (every descr
 the carrier and spelled by the renderer); the goldens `conformance:2002/pb480_universal_match_relations`,
 `conformance:2002/pb1112_active_class_universal`, `conformance:2014/pb480_universal_variable_length` and
 `conformance:2014/pb480_universal_variable_length_shapes` pin each arm, and
-`conformance:2002/pb2076_universal_returning_move_match` rules 6 and 7; `Table16PrintedTableDriftTests` holds the one
+`conformance:2002/pb2076_universal_returning_move_match` rules 6 and 7, `conformance:2002/pb2463_universal_returning_set_match`
+rule 6's object-reference arms and `conformance:2002/pb2463_call_object_reference_set_conformance` the CALL lane's; `Table16PrintedTableDriftTests` holds the one
 Table 16 to the printed table cell for cell.
-**Residue:** rule 6 for an OBJECT REFERENCE returning item asks only that both items are object references: §14.9.39.3
-SR10–SR14's class conditions need the class hierarchy, which a description (a class NAME) does not carry, so a method
-returning an unrelated class matches and the delivery (`CobolObject.NarrowUniversal`) raises EC-OO-UNIVERSAL where the
-rule makes it EC-OO-METHOD (kb/Work PB2463). A PROGRAM- or FUNCTION-pointer's restriction is its prototype's SIGNATURE
+Rule 6 for an OBJECT REFERENCE returning item is the §14.9.39.3 Format 5 table (`ObjectReferenceSet.Refusal`, the one
+copy the compiler's SET screens ask too) over CLASS FACTS each description carries (`ActivationDescription.ObjectClasses`
+— the class, for ACTIVE-CLASS "the class containing the data item", and its ancestors; `ObjectInterfaces` — the
+interfaces its objects implement, or an interface and those it inherits), built by `OoClassTable.SetOperand` (kb/Work
+PB2463): a method returning an unrelated class, an interface the receiver's class is not, a universal reference into a
+typed item, or an ACTIVE-CLASS item of a class that is not the receiver's or a subclass does not match, and the search
+ends in EC-OO-METHOD. The standard class BASE's New and FactoryObject describe their returning items as written in BASE
+(`StandardMethodCrossing`), so through a universal receiver they match a universal item, one described with BASE (FACTORY
+OF BASE) or ACTIVE-CLASS of the same FACTORY presence. §14.8.3.3 rule 1 is the same table at the bound method's and a
+CALL's conformance (`ActivationRelations.ReturningConformance`), and §14.8.2.3.3's object-reference BY CONTENT argument
+of a CALL asks it through `MaySet`. **Residue:** §14.8.3.3 rule 2 describes an ACTIVE-CLASS returning item's sending
+operand by how the method was INVOKED (2 b) 1.–4.), which a run-time dispatch does not carry, so the object's own class is
+what the delivery (`CobolObject.NarrowUniversal`) checks. A PROGRAM- or FUNCTION-pointer's restriction is its prototype's SIGNATURE
 class, not its name (§13.18.60.4 GR25 / GR26; kb/Work PB2464): `PrototypeSignatureClasses` partitions a group's
 prototypes by `PrototypeSignatures.Same`, `DataBinder.ResolveRestrictedPrototypes` stamps each pointer item with its
 class (`DataItem.PointerRestrictionIdentity`), and `PrototypeSignatures.RestrictionIdentity` is the one reader — the

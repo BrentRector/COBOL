@@ -822,7 +822,7 @@ internal sealed class ProgramEmitter
                 int rq = fc;
                 while (rq > 0 && u.Data.LinkageFormals[rq - 1].Optional) rq--;
                 string? retItem = u.Data.LinkageReturning is { } ri && u.Refs.ResolveItem(ri) is { } retPlace
-                    ? CallEmitter.RegisteredReturning(retPlace, Current.Ctx.SignEncoding, describe: u.Data.ArgMismatchChecking) : null;
+                    ? Current.Call.RegisteredReturning(retPlace, describe: u.Data.ArgMismatchChecking) : null;
                 // Each FORMAL's registered description (kb/Work PB165), for §14.8.2's argument comparison at a dynamic
                 // CALL — the whole description only by a unit that checks EC-PROGRAM-ARG-MISMATCH itself (GR3d's activated
                 // half) — and each NUMERIC formal's carrier and each non-numeric ELEMENTARY formal's record builder from every

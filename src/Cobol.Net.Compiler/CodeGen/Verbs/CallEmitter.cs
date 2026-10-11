@@ -554,8 +554,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// the unit checks EC-PROGRAM-ARG-MISMATCH itself (<paramref name="describe"/>; kb/Work PB165) — emitted at the unit's
     /// <c>ProgramRegistry.Register</c>, so §14.9.4.4 GR3 d) can compare the pair at call initiation. Null when it states
     /// nothing.</summary>
-    internal static string? RegisteredReturning(Place p, SignEncoding signEncoding, bool describe) =>
-        RegisteredBoundary(p, signEncoding, BoundaryLength(p), describe ? ActivationDescriptions.OfPlace(p) : null);
+    internal string? RegisteredReturning(Place p, bool describe) =>
+        RegisteredBoundary(p, ctx.SignEncoding, BoundaryLength(p), describe ? ActivationDescriptions.OfPlace(p, ecState.OoClasses) : null);
 
     /// <summary>⛔ THE REGISTERED DESCRIPTION of one FORMAL (<c>BoundaryItem</c>, kb/Work PB165): what the activated unit
     /// states for a formal so that §14.8.2 has something to compare an argument with at a CALL whose activated program is
@@ -573,7 +573,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// positional.</summary>
     internal string RegisteredFormal(Place p, bool describe) =>
         RegisteredBoundary(p, ctx.SignEncoding, describe ? ArgumentLength(p) : RuntimeApi.UnstatedBoundaryLength,
-            describe ? ActivationDescriptions.OfPlace(p) : null, p.DenotedItem is { } formal ? FormalLanding(formal) : null)
+            describe ? ActivationDescriptions.OfPlace(p, ecState.OoClasses) : null, p.DenotedItem is { } formal ? FormalLanding(formal) : null)
         ?? RuntimeApi.UnstatedBoundaryItem;
 
     /// <summary>The registered landing of <paramref name="formal"/> (<c>BoundaryItem.Landing</c>), or null when the crossing

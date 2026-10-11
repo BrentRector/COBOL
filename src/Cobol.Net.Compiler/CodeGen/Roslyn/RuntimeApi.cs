@@ -2395,6 +2395,7 @@ internal static class RuntimeApi
                 bool b => b ? "true" : null,
                 int n => n == 0 ? null : n.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 int[] a => $"new int[] {{ {string.Join(", ", a.Select(x => x.ToString(System.Globalization.CultureInfo.InvariantCulture)))} }}",
+                string[] names => $"new string[] {{ {string.Join(", ", names.Select(x => Microsoft.CodeAnalysis.CSharp.SymbolDisplay.FormatLiteral(x, quote: true)))} }}",
                 GroupAtom[] atoms => GroupAtomsNew(atoms),
                 Enum e =>Convert.ToInt32(e, System.Globalization.CultureInfo.InvariantCulture) == 0 ? null : $"{e.GetType().Name}.{e}",
                 _ => throw new InvalidOperationException(

@@ -119,8 +119,8 @@ public sealed class PictureClauseIdentityDriftTests
         foreach (var formal in items)
             foreach (var arg in items)
             {
-                var df = ActivationDescriptions.Of(formal)!;
-                var da = ActivationDescriptions.Of(arg)!;
+                var df = ActivationDescriptions.Of(formal, classes: null)!;
+                var da = ActivationDescriptions.Of(arg, classes: null)!;
                 pairs++;
                 bool identical = OoConformance.DescriptionMismatch(formal, arg) is null;
                 bool matches = ActivationRelations.Matches(da, null, df, null!)

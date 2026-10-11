@@ -75,12 +75,13 @@ public abstract class CobolObject
             "INVOKE: the object reference used as the receiver is null (ISO §14.9.23.4 GR5)");
 
     /// <summary>Deliver an object reference that crossed a UNIVERSAL invocation (D10) into a receiving item of type
-    /// <typeparamref name="T"/>. The delivery follows the SET rules (§14.8.3.3 rule 1), and through a universal
-    /// receiver the class of the object is a RUNTIME fact: the §9.3.6 rule 6 match
-    /// (<see cref="ActivationRelations.ReturningMatches"/>) asks only that both returning items are object references,
-    /// so a method written in COBOL whose returning item names an unrelated class reaches this delivery too, and the
-    /// standard class BASE's New and FactoryObject return ACTIVE-CLASS results (§16.2) whose class is the receiver's
-    /// own, which only the object can answer. A non-conforming object is §14.9.23.4 GR7c's EC-OO-UNIVERSAL when the activator checks for it,
+    /// <typeparamref name="T"/>. The delivery follows the SET rules (§14.8.3.3), and through a universal receiver the
+    /// class of the object is a RUNTIME fact: the §9.3.6 rule 6 match (<see cref="ActivationRelations.ReturningMatches"/>)
+    /// already refused a method whose returning item's DESCRIPTION a SET could not send into the receiving item (an
+    /// unrelated class, an interface the class does not implement; kb/Work PB2463), but a returning item described
+    /// ACTIVE-CLASS — the standard class BASE's New and FactoryObject among them (§16.2) — references an object of the
+    /// class the method was invoked on (§13.18.60.4 GR22 e)), which only the object can answer. A non-conforming object
+    /// is §14.9.23.4 GR7c's EC-OO-UNIVERSAL when the activator checks for it,
     /// and otherwise still cannot proceed into typed code (<see cref="CobolImplementorFatalException"/>) — never an
     /// unchecked cast's InvalidCastException.</summary>
     public static T? NarrowUniversal<T>(object? value, string what) where T : class

@@ -151,15 +151,18 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
            && (IsActiveClass || CobolNames.Same(Name, other.Name));
 
     /// <summary>How the description reads back in a diagnostic — the phrases as written, so a message never
-    /// has to say "universal" about a typed reference (the PB389 misdiagnosis).</summary>
-    public string Spelled => Kind switch
+    /// has to say "universal" about a typed reference (the PB389 misdiagnosis). The ONE spelling is the run-time
+    /// operand's (<see cref="ObjectReferenceOperand.Spelled"/>), which the §14.9.39.3 table's own refusals read.</summary>
+    public string Spelled => new ObjectReferenceOperand(RuntimeKind, Name, Factory, Only, null, null).Spelled;
+
+    /// <summary>The run-time kind of this description (<see cref="ObjectReferenceKind"/>) — the ONE mapping between the
+    /// compiler's and the runtime's names for the four §13.18.60.2 alternatives.</summary>
+    public ObjectReferenceKind RuntimeKind => Kind switch
     {
-        ObjectRefKind.Universal => "a UNIVERSAL object reference",
-        ObjectRefKind.Interface => $"an object reference described with interface-name '{Name}'",
-        ObjectRefKind.ActiveClass => $"an object reference described {(Factory ? "FACTORY OF " : "")}ACTIVE-CLASS "
-            + (Name is null ? "(in an interface method prototype)" : $"(containing class '{Name}')"),
-        _ => "an object reference described "
-             + (Factory ? "FACTORY OF " : "") + $"'{Name}'" + (Only ? " ONLY" : ""),
+        ObjectRefKind.Universal => ObjectReferenceKind.Universal,
+        ObjectRefKind.Interface => ObjectReferenceKind.Interface,
+        ObjectRefKind.ActiveClass => ObjectReferenceKind.ActiveClass,
+        _ => ObjectReferenceKind.ObjectClass,
     };
 
     /// <summary>The general-format phrase text, for a message that must echo the description verbatim.</summary>
