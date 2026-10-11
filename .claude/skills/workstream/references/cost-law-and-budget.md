@@ -64,7 +64,7 @@ implementer gates build or test at once, repository-wide (N is one shared settin
 while the lander (`-Mode lander`) never takes one and never waits. Under batched gating (kb/Work PB2515, the owner's
 rule since 2026-10-10) the implementer gate runs leg 1 only and the lander's train gate is the one whole-population
 run per train (MANDATORY-PRACTICES L12): ≈ 2–3 whole-population runs per 5-change train against ≈ 7–8, measured per
-train by `scripts/orchestrator/train_measure.py`. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
+train on the retired train records (the BEFORE column of `scripts/orchestrator/landing_measure.py summary`). (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
 hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
 LANDING UNDER ONE LANDING LEASE (kb/Work PB2537): the next train's lander is dispatched while the previous one is still
 in CI and brings its clusters in at once, then takes the landing lease (`scripts/orchestrator/landing_lease.py`), which

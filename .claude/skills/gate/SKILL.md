@@ -59,7 +59,7 @@ PB2526). Each leg runs the three assemblies concurrently.
   the rest of the population. The lander's whole-population train gate is the population check for every cluster; a
   red there is ATTRIBUTED per cluster by re-running only the failing cases on each cluster alone, then fixed in the
   train or ejected to a finisher (`lander-train-brief.md` step 3, MANDATORY-PRACTICES L12), and every train is
-  recorded with `scripts/orchestrator/train_measure.py record`. The CI invariant holds: the lander runs the whole
+  recorded by `scripts/orchestrator/landing_measure.py` (`enqueue.py queue` writes the record). The CI invariant holds: the lander runs the whole
   population, the Linux gate and the oracle before every push.
 - **The owner's switch back is the shared implementer scope `whole`** (`python scripts/gate_slot.py
   set-implementer-scope whole [--until ISO] [--why TEXT]`; the coded default is `leg1`). Under `whole` the implementer

@@ -56,8 +56,8 @@ account in the coordination directory, and this script prints it after a render 
                                                        owner's decision PB2911), the external repository's slices
                                                        and v1.0's gates
     <coord>/readings.json + model_rules.json          pacing and the estimate: the newest meter reading against the
-    + <coord>/train-measurements.jsonl                 owner's caps, the burn since the week's first reading, the
-    + fix_clusters.py                                  batched trains' landing rate and the fix lane's own groups;
+    + <coord>/landing-measurements.jsonl               owner's caps, the burn since the week's first reading, the
+    + fix_clusters.py                                  landing rate (landing_measure.py) and the fix lane's own groups;
                                                        "not available" / UNMEASURED where this machine has no
                                                        coordination directory or submodule (so a page rendered in CI
                                                        says so; NOT stamp inputs — a new reading makes --check report
@@ -794,11 +794,14 @@ def inputs_text(inputs: dict) -> str:
                      f'tokens per weekly point; a lander {n(c["lander_tokens"])} at {n(cal[c["lander_model"]])} '
                      f'{e(c["lander_model"])} tokens per point, one per train')
     if rate:
-        items.append(f'the landing rate (<span class="mono">train_measure.py</span>, {e(rate["gating"])} gating): '
-                     f'<span class="num">{rate["per_h"]:.2f}</span> changes per hour, {n(rate["landed"])} changes in '
-                     f'{rate["window_h"]:.1f} h over {n(rate["trains"])} trains')
+        per = (f', <span class="num">{rate["median_min"]:.0f}</span> minutes per landing (median, DONE to main)'
+               if rate.get("median_min") is not None else "")
+        items.append(f'the landing rate (<span class="mono">landing_measure.py</span>, {e(rate["source"])}): '
+                     f'<span class="num">{rate["per_h"]:.2f}</span> changes per hour{per}, {n(rate["changes"])} changes in '
+                     f'{rate["window_h"]:.1f} h over {n(rate["landings"])} landings')
     else:
-        items.append(f'the landing rate: {UNMEASURED} (no <span class="mono">train-measurements.jsonl</span> on this machine)')
+        items.append(f'the landing rate: {UNMEASURED} (no <span class="mono">landing-measurements.jsonl</span> or '
+                     f'<span class="mono">train-measurements.jsonl</span> on this machine)')
     if burn:
         items.append(f'the measured burn (<span class="mono">readings.json</span>, {e(burn["account"])}): '
                      f'<span class="num">{burn["per_h"]:.1f}</span> weekly points per hour, {burn["from_pct"]:g} % → '
@@ -1183,7 +1186,7 @@ TEMPLATE = """<title>{title}</title>
 
 
 <footer>
-  <p><strong>Every number on this page is computed — none is remembered, none is hand-written.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicates, what remains and its lanes through <span class="mono">ledger_plan.py</span> (the fix lane's population from <span class="mono">.agent-fleet.json</span>, the campaign and held clusters from the owner's decision PB2911), the estimate from <span class="mono">fix_clusters.py</span>, <span class="mono">model_rules.json</span>, <span class="mono">train_measure.py</span> and the orchestrator's meter readings, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
+  <p><strong>Every number on this page is computed — none is remembered, none is hand-written.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicates, what remains and its lanes through <span class="mono">ledger_plan.py</span> (the fix lane's population from <span class="mono">.agent-fleet.json</span>, the campaign and held clusters from the owner's decision PB2911), the estimate from <span class="mono">fix_clusters.py</span>, <span class="mono">model_rules.json</span>, <span class="mono">landing_measure.py</span> and the orchestrator's meter readings, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
   <p class="mono">Snapshot: {head_date} · measured tree {head_sha} — the last commit that touched an input this page reports, so an unrelated commit cannot make a correct page look stale · {rows} rows · {closed} closed · {gap} GAP · {adjudicated} adjudicated · battery #{bat_n} on {bat_sha} · A.1 {a1_discharged}/{a1_scope} · register {work_items} notes, {work_open} open, {work_actionable} actionable · {comp_n} known compiler notes.</p>
 </footer>
 
@@ -1247,9 +1250,14 @@ def self_test() -> int:
                       "lander_tokens": 480000, "lander_model": "opus"},
              "calibration": {"tokens_per_point": {"sonnet": 4000000, "opus": 1600000}}}
     full = {"rules": rules, "fix_groups": {"clusters": [{"notes": [{"id": "PB9001"}]}], "unsited": []},
-            "rate": {"per_h": 2.0, "landed": 4, "window_h": 2.0, "trains": 1, "gating": "batched"},
+            "rate": {"per_h": 2.0, "changes": 4, "window_h": 2.0, "landings": 1, "median_min": 30.0,
+                     "source": "pull requests through the merge queue"},
             "burn": {"per_h": 3.0, "from_pct": 0.0, "to_pct": 3.0, "hours": 1.0, "account": "t"}}
     page = render_remaining(rem, ledger_plan.bucket_estimates(rem, full), cp, full)
+    check("the landing rate input names its source, changes per hour and minutes per landing",
+          all(t in inputs_text(full) for t in ("landing_measure.py", "pull requests through the merge queue",
+                                               '<span class="num">2.00</span> changes per hour',
+                                               '<span class="num">30</span> minutes per landing')), inputs_text(full)[-300:])
     first = re.search(r"Known compiler defects and analyses</td>(.*?)</tr>", page[page.index("Estimate, from"):], re.S)
     check("measured inputs render numbers: 1 group, 1 wave, 0.5 h, 1.5 points at the burn",
           bool(first) and all(f'<span class="num">{v}</span>' in first.group(1) for v in ("1", "0.5 h", "1.5")),

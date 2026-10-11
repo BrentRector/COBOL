@@ -52,7 +52,7 @@
   branch in with ONE command, `scripts/orchestrator/train_apply.py <train manifest>` (one commit per cluster, markers, unmerged paths and silent loss asserted, the citation audits run once; seconds, where train 1052's 15 branches by hand took 201 tool calls and 18 minutes, kb/Work PB2885), **one build**, the **WHOLE population of Conformance, Unit and Characterization in one leg** (`build-local.ps1 -Mode lander`; a union of the implementers' filter terms was never a landing gate — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), **one commit per cluster inside the landing** so
   a red is attributed per cluster by re-running only its failing cases on each cluster alone, then fixed in the train
   or ejected to a finisher, an interaction bisected (MANDATORY-PRACTICES L12, kb/Work PB2515), one DEVLOG entry naming
-  every cluster, one push, and the train recorded with `scripts/orchestrator/train_measure.py`. Past six clusters the token curve is
+  every cluster, one push, and the landing recorded by `scripts/orchestrator/landing_measure.py`. Past six clusters the token curve is
   flat and the gate-attribution risk is not. Template: `templates/lander-train-brief.md`.
 - ⛔ **Never spend a lander on a 1–2 cluster landing** unless nothing else is ready — that is the k = 1 corner of the
   table above, at twice the cost per cluster. If only one cluster is finished, hold it and dispatch the lander when
