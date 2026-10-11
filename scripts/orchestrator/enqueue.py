@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """enqueue.py — THE LANDING STEP, A SCRIPT: one finished branch, brought up to main, gated, its DEVLOG entry stamped,
 checked, and handed to GitHub's merge queue as one pull request (kb/Work PB3023, PB3024; DESIGN-test-build-ci.md
-§3.17.2 step 3, §3.17.5, §3.17.6). No agent lands anything: the loop's `enqueue` unit runs this per WAITING TO LAND
+sections 3.17.2 step 3, 3.17.5 and 3.17.6). No agent lands anything: the loop's `enqueue` unit runs this per WAITING TO LAND
 branch, and an agent is dispatched only for what a script cannot decide (a conflict, a red gate, a queue bounce).
 
     python scripts/orchestrator/enqueue.py land <branch> [--worktree <path>] [--dry-run]     THE landing step

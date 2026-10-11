@@ -126,7 +126,7 @@ Set-Content -Path (Join-Path $sv 'units.jsonl') -Encoding utf8 -Value @(
 $hs = Set-Handoff $sv 'starved' @{ next_unit = 'enqueue'; next_unit_reason = 'a train is ready' }
 $s1 = Next-Unit $sv @('--handoff', $hs, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json
 $st1 = @($s1.starved | Where-Object { $_ })   # absent before the change: an empty list, never an error
-Check 'a starved campaign is reported even when another unit is chosen' "$($s1.unit) $($st1.Count) $(if ($st1) { "$($st1[0].cluster) $($st1[0].waves)" })" 'land 1 CAMP 2'
+Check 'a starved campaign is reported even when another unit is chosen' "$($s1.unit) $($st1.Count) $(if ($st1) { "$($st1[0].cluster) $($st1[0].waves)" })" 'enqueue 1 CAMP 2'
 Check 'the starvation is measured from the first choice that saw it ready' $(if ($st1) { [Math]::Round([double]$st1[0].hours) }) 9
 # (ConvertFrom-Json turns the ISO string into a DateTime)
 Check 'the starvation names the last campaign wave' $(if ($st1) { ([datetime]$st1[0].last_campaign_at).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm') }) $t0.AddHours(-12).ToString('yyyy-MM-ddTHH:mm')
