@@ -8,6 +8,14 @@ $Fake = Join-Path $Here 'testdata/fake-claude.ps1'
 $Root = Join-Path ([IO.Path]::GetTempPath()) "orch-test-$([guid]::NewGuid().ToString('N').Substring(0, 8))"
 $Tele = Join-Path $Root 'telemetry'
 New-Item -ItemType Directory -Force -Path $Tele | Out-Null
+# The repository the supervisor under test reads (-RepoDir; kb/Work PB2590): a scratch directory that is not a git tree
+# (clean, nothing unpushed, no worktrees, as the campaign part's), so no case's timing or unit choice depends on this
+# machine's real repository. Its 30-odd worktrees made every checkpoint probe take minutes on a loaded host, and the
+# startup watchdog's case went red. A case that needs the real repository (the ledger stamp) passes -RepoDir $RealRepo.
+$FxRepo = Join-Path $Root 'repo'
+New-Item -ItemType Directory -Force -Path $FxRepo | Out-Null
+$RealRepo = Split-Path (Split-Path $Here -Parent) -Parent
+$FakePython = Join-Path $Here 'testdata/fake-python.ps1'
 $script:fails = @()
 $script:checked = 0
 
@@ -23,7 +31,8 @@ function Run-Orch([string]$case, [string]$mode, [string[]]$extra, [scriptblock]$
     if ($before) { & $before $coord }
     $env:FAKE_CLAUDE_MODE = $mode
     $env:FAKE_CLAUDE_MARK = $mark
-    $out = & pwsh -NoProfile -File $Orch -ClaudeExe $Fake -CoordDir $coord -TelemetryDir $Tele -BackoffBaseSeconds 0 -IdleCloseSeconds 1 @extra 2>&1
+    $repo = if ($extra -contains '-RepoDir') { @() } else { @('-RepoDir', $FxRepo) }
+    $out = & pwsh -NoProfile -File $Orch -ClaudeExe $Fake -CoordDir $coord -TelemetryDir $Tele -BackoffBaseSeconds 0 -IdleCloseSeconds 1 @repo @extra 2>&1
     $code = $LASTEXITCODE
     $runs = if (Test-Path $mark) { @(Get-Content $mark).Count } else { 0 }
     $units = if (Test-Path (Join-Path $coord 'units.jsonl')) { @(Get-Content (Join-Path $coord 'units.jsonl') | ForEach-Object { $_ | ConvertFrom-Json }) } else { @() }
