@@ -1,0 +1,4 @@
+## Entry 1793 — 2026-09-29 18:59 PDT — PB1148: a GO TO out of a PERFORM's exit paragraph no longer returns to the PERFORM
+
+The dispatcher's return test (`__atExit && __pc == __exitPc + 1`) could not tell the exit paragraph COMPLETING from an explicit GO TO (or RESUME AT) to the paragraph that physically follows it, so `PERFORM M2` with `M2. GO TO M3.` returned to the PERFORM where §14.6.3 rule 1 and §14.9.28.4 GR5 put the return mechanism after a last statement that never executes. `ExplicitTransferOut` (GO TO, altered GO TO, RESUME AT) clears `__atExit` before the jump; EXIT PARAGRAPH / EXIT SECTION / NEXT SENTENCE keep the ordinary transfer, being the implied return. One site serves every dispatch method, so the sweep is that one test. Closes GR-14.6.3-1 and GR-14.9.33.4-3; GAP 800 to 798.
+

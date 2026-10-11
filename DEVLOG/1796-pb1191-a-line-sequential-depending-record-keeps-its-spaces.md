@@ -1,0 +1,4 @@
+## Entry 1796 — 2026-09-29 19:32 PDT — PB1191: a line sequential DEPENDING record keeps its spaces; only the space character is stripped
+
+`FileConnector.TrimRecordEnd` ran on every line sequential WRITE, keyed on none of what §14.9.51.4 GR21/GR22 key it on. Two of the three legs are fixed: a FD whose RECORD clause has the DEPENDING phrase registers `RecordLengthFromDepending` and is written at data-name-1's length (GR22), and the alphanumeric arm strips `' '` only, not every Unicode White_Space character (so U+00A0 is transferred). The third — the strip choosing national vs alphanumeric from record-name-1's category rather than the per-connector flag — needs the WRITE statement to carry its category into the connector and is left owed on the note (HALF). Closes GR-14.9.51.4-22; GAP 796 to 795.
+
