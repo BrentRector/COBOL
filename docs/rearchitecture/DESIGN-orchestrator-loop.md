@@ -489,7 +489,10 @@ mechanisms, in order of how little they trust the model:
    every 10 s) and at the unit's end. It holds the stream counters (calls, context, cost), the running background-task
    count, and every linked worktree's branch, head, commits ahead of `origin/main`, uncommitted-file count (the owner's
    `settings.local.json` and `STATUS.md` excluded) and `STATUS.md` headline, plus the unit's last milestones. No model
-   is involved and a failed write never ends the unit.
+   is involved and a failed write never ends the unit. ⛔ The writes during the unit run in the BACKGROUND, one at a
+   time (a write due while one runs is skipped), and only the end-of-unit write waits: the worktree probe takes minutes
+   on a loaded host, and a synchronous write stalled the event loop (no stdout read, no startup-watchdog tick, no STOP
+   check) until a hung unit outlived the watchdog (kb/Work PB2590).
 2. **`milestones.jsonl`, written by the unit's model** at every milestone (`units/common.md`): one line, `{at, what}`
    plus `shas` or `branches`. It carries what the supervisor cannot see: the decision and its reason.
 3. **The synthesized handoff** (`checkpoint.py synthesize`): when a unit ends with no valid handoff (a crash, a kill,
