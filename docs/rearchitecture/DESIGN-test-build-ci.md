@@ -1340,8 +1340,10 @@ ReadyToRun runtime for the programs the tests run.
   Job object, the descriptor withheld from Linux children, the per-worktree git dir, the cap read once per process
   (kb/Work PB2514's defect), `status` probing only the slots below the cap, and the defaults reverted to cap 1 and
   scope `whole` (the expiry, defaults and clear arms). It passes on
-  Windows and under WSL, and `GateSlotDriftTests` (Unit) runs it in every Unit run, including CI's Linux unit jobs,
-  so each operating system's arm is proven where it runs. Every helper process it starts exits once its sentinel
+  Windows and under WSL, and the self-test runner (`scripts/self_tests.py`) runs it in the lander's gate, the Linux
+  gate and CI's Linux and Windows jobs, so each operating system's arm is proven where it runs; `GateSlotDriftTests`
+  (Unit) holds the arms by name and the ALL GREEN count to them WITHOUT re-running it (kb/Work PB2882: its duplicate
+  run under the test harness's fixed 120 s budget went red under a lander gate's load). Every helper process it starts exits once its sentinel
   file is deleted, so a red arm leaves nothing running on the host. ⛔ The cap does not span operating systems: a
   Windows lock and a WSL lock on a drvfs mount do not see each other; the repository's gates run on Windows
   (`build-local.ps1`), and the WSL legs of the Linux gate (section 3.15) are not counted against the cap.

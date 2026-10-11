@@ -812,7 +812,7 @@ def self_test() -> int:
 
     def inproc(repo: Path, *argv: str) -> subprocess.CompletedProcess:
         """`main(argv)` in THIS process, its output captured: the same CLI path as `cli` without an interpreter start
-        per call (the self-test runs under `GateSlotDriftTests`' harness budget)."""
+        per call (the self-test is a long pole of the gate's self-test phase, kb/Work PB2882)."""
         out, err = io.StringIO(), io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             rc = main([*argv, "--repo", str(repo)])
