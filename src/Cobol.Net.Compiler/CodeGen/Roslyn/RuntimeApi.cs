@@ -828,13 +828,20 @@ internal static class RuntimeApi
     /// member rename breaks HERE, never the generated text.</summary>
     public static string RoundingText(CobolRounding mode) => $"{nameof(CobolRounding)}.{mode}";
 
-    /// <summary>A floating-point intermediate landed to a scaled integer at a target fraction scale — the CHECKED
-    /// <c>CobolFloat.ToScaled</c> (saturates past the carrier so a capacity check raises — an ON SIZE ERROR / EC-SIZE
-    /// store, an intermediate consumer) or the UNCHECKED <c>CobolFloat.ToScaledUnchecked</c> (the low-order digits —
-    /// a MOVE, §14.6.8.2 r4; the no-phrase store; INVOKE BY CONTENT). The caller names the LANDING (kb/Work PB77) —
-    /// there is no default, so a new site has to say which store it is.</summary>
+    /// <summary>A floating-point intermediate landed to a scaled integer at a target fraction scale for a STORE — the
+    /// CHECKED <c>CobolFloat.ToScaled</c> (RAISES the size error past the carrier — an ON SIZE ERROR / EC-SIZE
+    /// store; never a saturated sentinel, kb/Work PB2967) or the UNCHECKED <c>CobolFloat.ToScaledUnchecked</c> (the
+    /// low-order digits — a MOVE, §14.6.8.2 r4; the no-phrase store; INVOKE BY CONTENT). The caller names the LANDING
+    /// (kb/Work PB77) — there is no default, so a new site has to say which store it is. An INTERMEDIATE consumer
+    /// (no store, no capacity check) takes <see cref="FloatToScaledIntermediate"/>.</summary>
     public static string FloatToScaled(string value, string scale, CobolRounding mode, bool checkedLanding) =>
         $"{nameof(CobolFloat)}.{(checkedLanding ? nameof(CobolFloat.ToScaled) : nameof(CobolFloat.ToScaledUnchecked))}({value}, {scale}, {RoundingText(mode)})";
+
+    /// <summary>A floating-point operand landed for an INTERMEDIATE consumer — an alignment, an argument, a subscript
+    /// (<c>NumericRenderer.Align</c> / <c>AlignRoundedUp</c>): <c>CobolFloat.ToScaledSaturating</c>, the landing that
+    /// saturates past the carrier because no store follows to be fooled by the sentinel (kb/Work PB77, PB2967).</summary>
+    public static string FloatToScaledIntermediate(string value, string scale, CobolRounding mode) =>
+        $"{nameof(CobolFloat)}.{nameof(CobolFloat.ToScaledSaturating)}({value}, {scale}, {RoundingText(mode)})";
 
     /// <summary>An arithmetic value transferred into a FLOATING-POINT resultant identifier under the receiver's
     /// §14.7.4.3 mode — <c>FloatResultant</c>'s entry for the value's carrier (binary64, SDIDI, scaled signed or

@@ -91,11 +91,13 @@ public sealed class CobolIntrinsicsMinValueTests
     private const string ThirtyFourNines = "9999999999999999999999999999999999";
 
     [Fact]
-    public void NumvalF_AtTheLargestAdmittedSignificand_SaturatesAtAScaleThatLeavesTheCarrier()
+    public void NumvalF_AtTheLargestAdmittedSignificand_RaisesAtAScaleThatLeavesTheCarrier()
     {
-        // 10^34 − 1 shifted by +5 digits exceeds Int128: the CHECKED landing saturates, the sign applied after.
-        Assert.Equal(Int128.MaxValue, CobolIntrinsics.NumvalF(ThirtyFourNines, 5, digitCap: 34, checkedLanding: true));
-        Assert.Equal(-Int128.MaxValue, CobolIntrinsics.NumvalF("-" + ThirtyFourNines, 5, digitCap: 34, checkedLanding: true));
+        // 10^34 − 1 shifted by +5 digits exceeds Int128: the CHECKED landing RAISES (kb/Work PB2967), either sign.
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolIntrinsics.NumvalF(ThirtyFourNines, 5, digitCap: 34, checkedLanding: true)).EcName);
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolIntrinsics.NumvalF("-" + ThirtyFourNines, 5, digitCap: 34, checkedLanding: true)).EcName);
         Assert.Equal(Int128.Parse(ThirtyFourNines), CobolIntrinsics.NumvalF(ThirtyFourNines, 0, digitCap: 34, checkedLanding: true));
     }
 

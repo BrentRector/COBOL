@@ -829,7 +829,8 @@
   "pb2848_lock_ceiling_after_record_rules",
   "pb2548_template_clauses_resolve",
   "pb2548_template_counter_per_use_site",
-  "pb2548_template_counter_unused_elsewhere"
+  "pb2548_template_counter_unused_elsewhere",
+  "pb2967_float_result_wide_binary_receiver_size_error"
   ],
   "pending": []
 }

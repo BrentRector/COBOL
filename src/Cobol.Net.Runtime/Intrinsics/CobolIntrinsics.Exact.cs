@@ -487,10 +487,11 @@ public static partial class CobolIntrinsics
     /// <summary>Shift an exact unscaled value by <paramref name="shift"/> decimal places. Past the <c>Int128</c>
     /// carrier the LANDING decides (kb/Work PB77 — the two-form rule every carrier now follows, PB74's
     /// <c>CobolDec.ToUnscaledChecked</c>/<c>ToUnscaled</c> being the first): a CHECKED landing (ON SIZE ERROR /
-    /// EC-SIZE checking) SATURATES instead of wrapping — safe for the same reason <c>ReceiverContext.WorkingScale</c>
-    /// makes the float quantizer's safe: the emitter caps the working scale at the receiver's headroom, so a
-    /// saturated value still exceeds the receiver's capacity after the store's rescale and RAISES the size error
-    /// (§14.7.5 case 5) rather than storing silently; an UNCHECKED landing (a MOVE sender — §14.6.8.2 r4; the
+    /// EC-SIZE checking) RAISES <see cref="CobolFloat.BeyondCarrier"/> (EC-SIZE-TRUNCATION, §14.7.5 case 3) instead
+    /// of wrapping — and, since kb/Work PB2967, instead of saturating: the saturated sentinel only reached a size
+    /// error where the receiver's capacity was smaller than the carrier (the emitter caps the working scale at the
+    /// receiver's headroom for that), and a 16-byte COMP-5 receiver's capacity IS the carrier, so it stored the
+    /// sentinel and took NOT ON SIZE ERROR; an UNCHECKED landing (a MOVE sender — §14.6.8.2 r4; the
     /// no-phrase store — §14.6.13.1.3 item 8) keeps the LOW-ORDER digits through <c>CobolNum.RescaleStoreCap</c>
     /// (the digits a ≤38-digit store could never use are dropped BEFORE the multiply), because a truncating store
     /// has no check to expose a sentinel and truncating one stored garbage (<c>MOVE FUNCTION NUMVAL-F("5E+30") TO
@@ -508,9 +509,11 @@ public static partial class CobolIntrinsics
         if (shift == 0) return unscaled;
         if (shift < 0) return -shift > 38 ? Int128.Zero : unscaled / Pow10.AsWide(-shift);
         if (!checkedLanding) return CobolNum.RescaleStoreCap(unscaled, 0, shift, CobolRounding.Truncation);
-        if (shift > 38) return unscaled > 0 ? Int128.MaxValue : Int128.MinValue;
+        // The CHECKED landing RAISES past the carrier, it never saturates (kb/Work PB2967): the sentinel is invisible to a
+        // receiver as wide as the carrier (a 16-byte COMP-5), exactly as for CobolFloat.ToScaled.
+        if (shift > 38) throw CobolFloat.BeyondCarrier();
         Int128 limit = Int128.MaxValue / Pow10.AsWide(shift);
-        if (CobolDec.UAbs(unscaled) > (UInt128)limit) return unscaled > 0 ? Int128.MaxValue : Int128.MinValue;   // UAbs, not Int128.Abs: total over MinValue (kb/Work PB2698)
+        if (CobolDec.UAbs(unscaled) > (UInt128)limit) throw CobolFloat.BeyondCarrier();   // UAbs, not Int128.Abs: total over MinValue (kb/Work PB2698)
         return unscaled * Pow10.AsWide(shift);
     }
 

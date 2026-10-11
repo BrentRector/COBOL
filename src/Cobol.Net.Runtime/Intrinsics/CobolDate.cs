@@ -501,7 +501,7 @@ public static class CobolDate
     /// for a value in the form it is the truncation it always was. NaN is in no time form (neither comparison
     /// holds) and lands out of it; ±∞ saturate out of it.</summary>
     public static Int128 SecondsOfReal(double seconds) =>
-        double.IsNaN(seconds) ? Int128.MinValue : CobolFloat.ToScaled(seconds, 9, CobolRounding.TowardLesser);
+        double.IsNaN(seconds) ? Int128.MinValue : CobolFloat.ToScaledSaturating(seconds, 9, CobolRounding.TowardLesser);
 
     /// <summary>The SDIDI sibling of <see cref="SecondsOfReal"/>, scale 18 — the documented §15.3.3.2 maximum
     /// fraction width (CONFORMANCE.md item 202). A magnitude the Int128 carrier cannot hold at scale 18 is past both

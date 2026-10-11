@@ -68,3 +68,4 @@ static CobolNet.Runtime.ObjectReferenceSet.Refusal(CobolNet.Runtime.ObjectRefere
 ~override CobolNet.Runtime.ObjectReferenceOperand.Equals(object obj) -> bool
 ~override CobolNet.Runtime.ObjectReferenceOperand.ToString() -> string
 static CobolNet.Runtime.ExternalizedNames.FormWritten(string? written, int dialectLevel) -> string!
+static CobolNet.Runtime.CobolFloat.ToScaledSaturating(double v, int scale, CobolNet.Runtime.CobolRounding mode) -> System.Int128

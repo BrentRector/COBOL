@@ -39,11 +39,12 @@ public static partial class CobolIntrinsics
     /// FUNCTION BODY (see <see cref="Float.Log"/>), never here — so this saturation cannot mask it. (CA24.)
     /// <para>
     /// ⛔ <b><paramref name="scale"/> IS NOT FREE — IT MUST BE <c>ReceiverContext.FloatWorkingScale</c> (PB13).</b>
-    /// This function saturating is SAFE only when the caller chose a scale that leaves the sentinel above the
-    /// receiver's digit capacity, so the store's capacity check raises the size error. That is a property of the
-    /// CALLER, not of this function — it cannot be checked here, because a scaled unscaled-value carries no
-    /// receiver. <c>CobolFloat.ToScaled</c> gets the same guarantee for free by landing AT the receiver's scale;
-    /// this one lands at a WORKING scale, and a later rescale down is what used to hide the sentinel.
+    /// The cap keeps a value that FITS the receiver inside the <see cref="Int128"/> carrier at the working scale, so
+    /// the checked landing's raise past the carrier (kb/Work PB2967) is exactly "does not fit any receiver". That is
+    /// a property of the CALLER, not of this function — it cannot be checked here, because a scaled unscaled-value
+    /// carries no receiver. <c>CobolFloat.ToScaled</c> gets the same guarantee for free by landing AT the
+    /// receiver's scale; this one lands at a WORKING scale, and a later rescale down is what used to hide the
+    /// saturation sentinel this landing no longer produces.
     /// </para>
     /// </summary>
     /// <remarks>
@@ -335,9 +336,9 @@ public static partial class CobolIntrinsics
 
     /// <param name="checkedLanding">The LANDING's form (kb/Work PB77 — the same two-form rule as
     /// <c>CobolFloat.ToScaled</c> / <c>ToScaledUnchecked</c> and <c>CobolDec.ToUnscaledChecked</c> / <c>ToUnscaled</c>):
-    /// <c>true</c> under ON SIZE ERROR / EC-SIZE checking, where a value past the carrier SATURATES so the store's
-    /// capacity check raises the size error (PB13's invariant — the working scale keeps the sentinel above the
-    /// receiver's capacity); <c>false</c> for the no-phrase store (§14.6.13.1.3 item 8 — the receiver takes the
+    /// <c>true</c> under ON SIZE ERROR / EC-SIZE checking, where a value past the carrier RAISES the size error
+    /// (<see cref="CobolFloat.BeyondCarrier"/>, EC-SIZE-TRUNCATION — kb/Work PB2967; it used to saturate and leave
+    /// the receiver's capacity check to notice, which a receiver as wide as the carrier cannot); <c>false</c> for the no-phrase store (§14.6.13.1.3 item 8 — the receiver takes the
     /// LOW-ORDER digits of the result, the documented disposition), where the sentinel had no check to expose it and
     /// its low digits were stored as the answer (<c>COMPUTE X = FUNCTION EXP10(40)</c> stored 03715 in PIC 9(5)). An
     /// unchecked ±∞ lands as zero (no digits), exactly as the MOVE landing does. Since kb/Work PB647 moved the
@@ -363,7 +364,7 @@ public static partial class CobolIntrinsics
         // ambient gate). NaN only — an over-range ±∞ is a legal overflow that saturates like a finite over-range
         // value (the receiver store size-truncates).
         if (double.IsNaN(d)) return Exceptions.ExceptionState.ArgumentError("floating-point intrinsic argument out of domain (NaN result)");
-        if (double.IsInfinity(d)) return !checkedLanding ? Int128.Zero : d > 0 ? Int128.MaxValue : Int128.MinValue;
+        if (double.IsInfinity(d)) return !checkedLanding ? Int128.Zero : throw CobolFloat.BeyondCarrier();
         // ⛔ THE SAME LANDING AS A MOVE'S, BY CONSTRUCTION (kb/Work PB623). This is the ARITHMETIC channel's
         // quantizer — `COMPUTE r = FUNCTION TAN(x)` reaches the receiver through here where `MOVE FUNCTION TAN(x)
         // TO r` reaches it through CobolFloat.ToScaledUnchecked — and while each held its own `d * 10^scale` in
@@ -387,8 +388,11 @@ public static partial class CobolIntrinsics
                 "ROUNDED MODE IS PROHIBITED on an inexact float-to-fixed arithmetic transfer "
                 + "(ISO §14.7.4.3 r7 — EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
         if (CobolFloat.TryExactScaled(d, scale, mode, out Int128 landed)) return landed;
-        return checkedLanding ? (d > 0 ? Int128.MaxValue : Int128.MinValue)
-             : CobolFloat.LowOrderDigits(d, scale, mode);   // the same rounding as above
+        // ⛔ PAST THE CARRIER THE CHECKED FORM RAISES, IT NEVER SATURATES (kb/Work PB2967). The sentinel it used to
+        // return ("so the capacity check raises") is invisible to a receiver whose capacity IS the carrier — a
+        // 16-byte COMP-5 — which stored 2^127 - 1 and took NOT ON SIZE ERROR.
+        if (checkedLanding) throw CobolFloat.BeyondCarrier();
+        return CobolFloat.LowOrderDigits(d, scale, mode);   // the same rounding as above
     }
 
 }

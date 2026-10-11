@@ -761,8 +761,9 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // Every consumer of a receiver-less numeric already has a Real arm and is MORE correct on it: a relation
         // compares natively (§8.8.4.2.4 — "comparison proceeds by the rules of native arithmetic", the same arm a
         // COMP-2 operand takes), the text channel renders through the one CobolFloat.Display a float ITEM uses
-        // (§14.9.11.4 GR1), and a MOVE source lands through CobolFloat.ToScaled AT THE RECEIVER'S SCALE — which is
-        // the saturation-safe form, since the store's capacity check then sees the sentinel undivided.
+        // (§14.9.11.4 GR1), and a MOVE source lands through CobolFloat.ToScaledUnchecked AT THE RECEIVER'S SCALE — which is
+        // the form that cannot hide a size error: the checked landing RAISES past the carrier (kb/Work PB2967) and
+        // the unchecked one keeps the low-order digits, so no saturation sentinel is ever stored as a value.
         // This is what makes FUNCTION SQRT(2) and a COMP-2 item holding that value the SAME value everywhere,
         // which OperandText.NumericIntrinsicText already documented as required and the ws = 9 form silently broke.
         // ⛔ THE UNQUANTIZED ARMS KEEP THE RAISE SITE. FromDouble is where an out-of-domain NaN became the §15.3
@@ -1640,7 +1641,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     ///   <item>a FIXED-POINT operand passes through at its own scale with NO narrowing cast — the former
     ///         <c>(long)(expr)</c> silently WRAPPED a wide picture's unscaled form (a 9(5)V9(15) item holding
     ///         the in-range 45296.5 fabricated 02:20:03), and the runtime now takes <see cref="Int128"/>;</item>
-    ///   <item>a FLOAT operand lands through the checked <c>CobolFloat.ToScaled</c> at scale 9 — the
+    ///   <item>a FLOAT operand lands through <c>CobolFloat.ToScaledSaturating</c> at scale 9 — the
     ///         FORMATTED-CURRENT-DATE nanosecond convention, and every reliable binary64 fraction digit under a
     ///         5-integer-digit bound — where the former cast truncated to WHOLE seconds;</item>
     ///   <item>an SDIDI operand (a legal §15.3 type-10 expression under a standard mode) lands exactly at scale

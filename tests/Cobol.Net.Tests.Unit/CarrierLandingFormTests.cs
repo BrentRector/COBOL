@@ -11,8 +11,9 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// kb/Work PB77 — every carrier's landing into a fixed-point receiver has TWO forms, chosen by the LANDING and never
-/// by the value: the CHECKED landing (ON SIZE ERROR / EC-SIZE checking) SATURATES past the Int128 carrier so the
-/// receiver's capacity check raises the size error (PB13); the UNCHECKED landing (a MOVE — ISO §14.6.8.2 r4
+/// by the value: the CHECKED landing (ON SIZE ERROR / EC-SIZE checking) RAISES the size error past the Int128
+/// carrier (EC-SIZE-TRUNCATION, PB2967 - it saturated until then, which a receiver as wide as the carrier cannot
+/// see); the UNCHECKED landing (a MOVE — ISO §14.6.8.2 r4
 /// "truncation on either end"; the no-phrase arithmetic store — §14.6.13.1.3 item 8; INVOKE BY CONTENT) keeps the
 /// LOW-ORDER digits, never a sentinel. The SDIDI carrier had both since PB74 (<c>CobolDec.ToUnscaledChecked</c> /
 /// <c>ToUnscaled</c>); the native exact family (<c>CobolIntrinsics.Rescaled</c>) and the float family
@@ -65,7 +66,7 @@ public sealed class CarrierLandingFormTests
 
     // ── the float family's two landings ───────────────────────────────────────────────────────────────────────
 
-    /// <summary>Inside the carrier the two landings are ONE function (the same product, the same rounding).</summary>
+    /// <summary>Inside the carrier the three landings are ONE function (the same product, the same rounding).</summary>
     [Theory]
     [InlineData(1.15, 2)]
     [InlineData(-8.2, 1)]
@@ -74,38 +75,49 @@ public sealed class CarrierLandingFormTests
     public void ToScaledUnchecked_InsideTheCarrier_IsToScaled(double v, int scale)
     {
         foreach (CobolRounding mode in Enum.GetValues<CobolRounding>())
+        {
             Assert.Equal(CobolFloat.ToScaled(v, scale, mode), CobolFloat.ToScaledUnchecked(v, scale, mode));
+            Assert.Equal(CobolFloat.ToScaledSaturating(v, scale, mode), CobolFloat.ToScaledUnchecked(v, scale, mode));
+        }
     }
 
-    /// <summary>Past the carrier: the CHECKED landing saturates (the store's capacity check raises); the UNCHECKED one
-    /// lands the exact low-order digits — and a non-finite value lands zero, never a sentinel to truncate.</summary>
+    /// <summary>Past the carrier: the CHECKED landing RAISES EC-SIZE-TRUNCATION (kb/Work PB2967 - never a sentinel a
+    /// 16-byte receiver would accept); the SATURATING (intermediate) one clamps; the UNCHECKED one lands the exact
+    /// low-order digits - and a non-finite value lands zero, never a sentinel to truncate.</summary>
     [Fact]
-    public void ToScaled_PastTheCarrier_SaturatesChecked_LandsLowOrderDigitsUnchecked()
+    public void ToScaled_PastTheCarrier_RaisesChecked_SaturatesIntermediate_LandsLowOrderDigitsUnchecked()
     {
-        Assert.Equal(Int128.MaxValue, CobolFloat.ToScaled(1.0e40, 0, CobolRounding.Truncation));
-        Assert.Equal(Int128.MinValue, CobolFloat.ToScaled(-2.5e40, 5, CobolRounding.Truncation));
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(1.0e40, 0, CobolRounding.Truncation)).EcName);
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(-2.5e40, 5, CobolRounding.Truncation)).EcName);
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(double.NegativeInfinity, 0, CobolRounding.Truncation)).EcName);
+        Assert.Equal(Int128.Zero, CobolFloat.ToScaled(double.NaN, 3, CobolRounding.Truncation));   // NaN lands zero, in range, silent
+        Assert.Equal(Int128.MaxValue, CobolFloat.ToScaledSaturating(1.0e40, 0, CobolRounding.Truncation));
+        Assert.Equal(Int128.MinValue, CobolFloat.ToScaledSaturating(-2.5e40, 5, CobolRounding.Truncation));
+        Assert.Equal(Int128.Zero, CobolFloat.ToScaledSaturating(double.NaN, 3, CobolRounding.Truncation));
         Assert.Equal(Int128.Parse("303786028427003666890752"), CobolFloat.ToScaledUnchecked(1.0e40, 0, CobolRounding.Truncation));
         Assert.Equal(Int128.Parse("-155002161260194579873792"), CobolFloat.ToScaledUnchecked(-2.5e40, 0, CobolRounding.Truncation));
-        Assert.Equal(Int128.MaxValue, CobolFloat.ToScaled(double.PositiveInfinity, 0, CobolRounding.Truncation));
+        Assert.Equal(Int128.MaxValue, CobolFloat.ToScaledSaturating(double.PositiveInfinity, 0, CobolRounding.Truncation));
         Assert.Equal(Int128.Zero, CobolFloat.ToScaledUnchecked(double.PositiveInfinity, 0, CobolRounding.Truncation));
         Assert.Equal(Int128.Zero, CobolFloat.ToScaledUnchecked(double.NaN, 3, CobolRounding.Truncation));
     }
 
     /// <summary>The working-scale quantizer (<c>FromDouble</c>, the arithmetic-receiver landing) follows the same
-    /// two-form rule: checked saturates, unchecked lands the low-order digits at the working scale.</summary>
+    /// two-form rule: checked RAISES (kb/Work PB2967), unchecked lands the low-order digits at the working scale.</summary>
     [Fact]
     public void FromDouble_PastTheCarrier_FollowsTheLanding()
     {
-        Assert.Equal(Int128.MaxValue, CobolIntrinsics.FromDouble(1.0e40, 9, CobolRounding.NearestAwayFromZero, checkedLanding: true));
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolIntrinsics.FromDouble(1.0e40, 9, CobolRounding.NearestAwayFromZero, checkedLanding: true)).EcName);
         Assert.Equal(Int128.Parse("303786028427003666890752") * 1_000_000_000 % Ten38, CobolIntrinsics.FromDouble(1.0e40, 9, CobolRounding.NearestAwayFromZero) % Ten38);
         Assert.Equal(Int128.Zero, CobolIntrinsics.FromDouble(double.PositiveInfinity, 9, CobolRounding.NearestAwayFromZero));
-        Assert.Equal(Int128.MaxValue, CobolIntrinsics.FromDouble(double.PositiveInfinity, 9, CobolRounding.NearestAwayFromZero, checkedLanding: true));
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolIntrinsics.FromDouble(double.PositiveInfinity, 9, CobolRounding.NearestAwayFromZero, checkedLanding: true)).EcName);
         Assert.Equal(CobolIntrinsics.FromDouble(2.5, 0, CobolRounding.Truncation), CobolIntrinsics.FromDouble(2.5, 0, CobolRounding.Truncation, checkedLanding: true));   // inside: one function
     }
 
     // ── the native exact family's two landings ───────────────────────────────────────────────────────────────
 
-    /// <summary>NUMVAL-F("5E+30") at working scale 9 is 5×10^39 — past the carrier: checked saturates, unchecked
+    /// <summary>NUMVAL-F("5E+30") at working scale 9 is 5×10^39 — past the carrier: checked RAISES, unchecked
     /// keeps the low-order digits (all zero, so 0 — what a MOVE into PIC V9(9) / PIC 9(5) must store, §14.6.8.2 r4).
     /// <para>⛔ NUMVAL AND NUMVAL-C ARE NOT HERE, AND THAT IS THE POINT (kb/Work PB251). §15.67.4 r1 / §15.68.4 r1
     /// fix their returned value with no arithmetic-mode qualification, so they have no scaled-<c>Int128</c>
@@ -115,7 +127,8 @@ public sealed class CarrierLandingFormTests
     [Fact]
     public void NumvalFamily_PastTheCarrier_FollowsTheLanding()
     {
-        Assert.Equal(Int128.MaxValue, CobolIntrinsics.NumvalF("5E+30", 9, checkedLanding: true));
+        Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(
+            () => CobolIntrinsics.NumvalF("5E+30", 9, checkedLanding: true)).EcName);
         Assert.Equal(Int128.Zero, CobolIntrinsics.NumvalF("5E+30", 9));
         Assert.Equal(Int128.Parse("-1000000000000000"), CobolIntrinsics.NumvalF("-1E+6", 9));   // inside: unchanged
         // The same 31-digit argument through the ONE NUMVAL projection: exact, with no landing to choose.
@@ -286,6 +299,11 @@ public sealed class CarrierLandingFormTests
         Assert.True(m.Success, "RuntimeApi.FloatToScaled must take `bool checkedLanding` with NO default (kb/Work PB77) — the "
             + "landing form is the caller's statement to make.");
         Assert.Contains("nameof(CobolFloat.ToScaledUnchecked)", src);
+        Assert.Contains("nameof(CobolFloat.ToScaled)", src);
+        // The INTERMEDIATE consumer's saturating landing is a SEPARATE entry, so the store form can never be asked
+        // for it by a flag: a sentinel into a store is the PB2967 defect.
+        Assert.Contains("public static string FloatToScaledIntermediate(string value, string scale, CobolRounding mode)", src);
+        Assert.Contains("nameof(CobolFloat.ToScaledSaturating)", src);
     }
 
     /// <summary>The quantizer / exact-family renders that reach the runtime with a working scale carry the ONE
@@ -397,8 +415,8 @@ public sealed class CarrierLandingFormTests
     /// landing agreeing with itself: the landing answers from an <see cref="Int128"/> multiply-and-shift whenever
     /// man·5^scale fits the carrier, and this is what proves that bound. The magnitudes straddle 2^53 (where the
     /// old binary64 product started rounding), the 10^22 largest exactly-representable power of ten, and the
-    /// Int128 carrier itself — where the two LANDING FORMS diverge and are checked apart (kb/Work PB77: checked
-    /// saturates, unchecked keeps the low-order digits).</summary>
+    /// Int128 carrier itself — where the LANDING FORMS diverge and are checked apart (kb/Work PB77/PB2967: checked
+    /// raises, intermediate saturates, unchecked keeps the low-order digits).</summary>
     [Fact]
     public void EveryLanding_MatchesAnIndependentExactOracle_AcrossTheCarrierBoundaries()
     {
@@ -422,14 +440,16 @@ public sealed class CarrierLandingFormTests
                         if (exact >= (BigInteger)Int128.MinValue && exact <= (BigInteger)Int128.MaxValue)
                         {
                             Assert.True((Int128)exact == CobolFloat.ToScaled(v, scale, mode), "checked landing: " + why);
+                            Assert.True((Int128)exact == CobolFloat.ToScaledSaturating(v, scale, mode), "intermediate landing: " + why);
                             Assert.True((Int128)exact == CobolFloat.ToScaledUnchecked(v, scale, mode), "unchecked landing: " + why);
                             checkedRows++;
                         }
                         else
                         {
                             // Past the carrier the LANDING FORM decides, and the two forms are different answers.
-                            Assert.True((exact > 0 ? Int128.MaxValue : Int128.MinValue) == CobolFloat.ToScaled(v, scale, mode),
-                                "past-carrier saturation: " + why);
+                            Assert.True((exact > 0 ? Int128.MaxValue : Int128.MinValue) == CobolFloat.ToScaledSaturating(v, scale, mode),
+                                "past-carrier saturation (intermediate): " + why);
+                            Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(v, scale, mode));
                             Assert.True((Int128)(exact % BigInteger.Pow(10, 38)) == CobolFloat.ToScaledUnchecked(v, scale, mode),
                                 "past-carrier low-order digits: " + why);
                             uncheckedRows++;

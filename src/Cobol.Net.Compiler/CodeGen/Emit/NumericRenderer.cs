@@ -1019,9 +1019,9 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// COMP-2 operand; PB13 widened it by keeping a receiver-less FLOAT-FAMILY result in binary64 too, so the
     /// arm is landed at the ONE choke point rather than at each of the forty-odd call sites
     /// (feedback_change_the_dispatch_not_the_callers). A float lands through the same
-    /// <c>CobolFloat.ToScaled</c> every other float→fixed transfer uses — the saturation-SAFE one, because it
-    /// lands AT the requested scale, so an out-of-range magnitude stays above the caller's capacity check
-    /// instead of being rescaled back into range. TRUNCATION matches this helper's existing contract (alignment
+    /// <c>CobolFloat.ToScaledSaturating</c> — the INTERMEDIATE landing (kb/Work PB2967: a STORE takes the checked
+    /// one, which raises past the carrier), which lands AT the requested scale, so an out-of-range magnitude stays
+    /// a huge sentinel for the caller's range test instead of being rescaled back into range. TRUNCATION matches this helper's existing contract (alignment
     /// is not a ROUNDED transfer; §14.7.7 rule 3 NOTE 1 gives ROUNDED only to the final transfer).</para></summary>
     /// <para>⛔ AND THE <c>Dec</c> ARM IS THE ONE IT WAS MISSING (fix-queue PB32/PB14). The paragraph above
     /// declares this helper TOTAL over the carrier kinds; <see cref="NumX"/> has THREE — exact scaled
@@ -1049,7 +1049,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     public static string Align(NumX x, int toScale, CobolRounding mode = CobolRounding.Truncation) =>
         // CHECKED: an intermediate consumer has no capacity check downstream, so a value past the carrier stays the
         // loud sentinel here — never the low-order digits a STORE may take (kb/Work PB77; the Dec arm below raises).
-        x.Real ? RuntimeApi.FloatToScaled(x.Expr, $"{toScale}", mode, checkedLanding: true)
+        x.Real ? RuntimeApi.FloatToScaledIntermediate(x.Expr, $"{toScale}", mode)
         // A Dec that the Int128 carrier cannot hold at this scale is a SIZE ERROR condition (EC-SIZE-OVERFLOW —
         // §14.7.5 case 5, A.1 item 179 "checked"; kb/Work PB69), never the low-order-digits landing a STORE may
         // use: an intermediate consumer has no capacity check downstream to catch a truncated value.
@@ -1095,7 +1095,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// once — here — and AllocateReal's ceiling is that rule realised inside the statement's own outcome
     /// machinery; the drift test knows about the exemption by name.</para></summary>
     public static string AlignRoundedUp(NumX x) =>
-        x.Real ? RuntimeApi.FloatToScaled(x.Expr, "0", CobolRounding.TowardGreater, checkedLanding: true)
+        x.Real ? RuntimeApi.FloatToScaledIntermediate(x.Expr, "0", CobolRounding.TowardGreater)
         : x.Dec ? RuntimeApi.DecToUnscaledIntermediate(x.Expr, "0", CobolRounding.TowardGreater)
         : x.U ? AlignRoundedUp(DeU(x))
         : x.Scale == 0 ? x.Expr

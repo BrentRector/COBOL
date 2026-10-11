@@ -306,26 +306,53 @@ public static class CobolFloat
         return den.IsOne ? num : CobolNum.RoundDiv(num, den, mode);
     }
 
-    /// <summary>Convert a native double to an UNSCALED <see cref="Int128"/> at <paramref name="scale"/> fraction
-    /// digits, rounded per <paramref name="mode"/> — the CHECKED double→scaled-integer landing for a store INTO a
-    /// fixed-point receiver (D16). The result then flows through the existing <c>CobolNum.Store</c>/<c>TryStore</c>
-    /// funnel (whose rescale is identity, since we land AT the receiver scale — no double-rounding), which applies
-    /// the digit capacity + SIZE ERROR check. NaN → 0 (implementor-defined; the resulting 0 is in range and exact,
-    /// so the store commits it silently — NO SIZE ERROR / EC-SIZE is raised for a NaN source). ±Infinity and any
-    /// magnitude beyond the wide engine SATURATE to <see cref="Int128.MaxValue"/>/<see cref="Int128.MinValue"/> so
-    /// that capacity check fires SIZE ERROR reliably — never a silent-wrong store.
-    /// <para>⛔ THIS IS THE CHECKED LANDING (kb/Work PB77) — the form for a store whose capacity check RAISES: an
-    /// arithmetic statement under ON SIZE ERROR / EC-SIZE checking (§14.7.5 case 3), and every intermediate consumer
-    /// with no capacity check downstream (an alignment, an argument), where a huge sentinel is the loud answer. A
-    /// TRUNCATING landing — a MOVE (§14.6.8.2 r4: "truncation on either end"), the no-phrase arithmetic store
-    /// (§14.6.13.1.3 item 8 — "the implementor defines … how any receiving operands are affected", and WiseOwl COBOL's
-    /// documented disposition is the low-order digits), INVOKE BY CONTENT — takes <see cref="ToScaledUnchecked"/>
-    /// instead: it has no check to see the sentinel, and truncating a sentinel stores garbage
-    /// (<c>MOVE FUNCTION NUMVAL-F("5E+30") TO PIC V9(9)</c> stored 884105727, the low digits of
-    /// <c>Int128.MaxValue</c>). The SDIDI carrier's <c>CobolDec.ToUnscaledChecked</c> / <c>ToUnscaled</c> pair is the
-    /// same two-form rule (PB74). The two forms differ ONLY in what they do with a value the carrier cannot hold:
-    /// the VALUE itself is <see cref="TryExactScaled"/> for both (kb/Work PB623).</para></summary>
+    /// <summary>The CHECKED landing of a binary64 into a fixed-point receiver (kb/Work PB77): the final transfer of an
+    /// arithmetic statement under ON SIZE ERROR / EC-SIZE checking (D16). The value is rounded per
+    /// <paramref name="mode"/> at <paramref name="scale"/> fraction digits as an UNSCALED <see cref="Int128"/> and
+    /// then flows through the existing <c>CobolNum.TryStore</c>/<c>StoreOrRaise</c> funnel (whose rescale is
+    /// identity, since we land AT the receiver scale — no double-rounding), which applies the digit capacity +
+    /// SIZE ERROR check. NaN → 0 (implementor-defined; the resulting 0 is in range and exact, so the store commits
+    /// it silently — NO SIZE ERROR / EC-SIZE is raised for a NaN source).
+    /// <para>⛔ A VALUE THE <see cref="Int128"/> CARRIER CANNOT HOLD — ±Infinity included — RAISES
+    /// <see cref="CobolSizeError"/> EC-SIZE-TRUNCATION (§14.7.5 case 3 with no-phrase rule 4); it is NEVER a saturated
+    /// sentinel (kb/Work PB2967). The sentinel this landing used to hand the store (<c>Int128.MaxValue</c>, "so the
+    /// capacity check fires") works only for a receiver whose capacity is SMALLER than the carrier. A 16-byte
+    /// COMP-5 receiver's capacity IS the carrier (<c>CobolNum.InBinaryRange</c>: every <see cref="Int128"/> is in
+    /// range), so the sentinel passed as a legal value: <c>COMPUTE R = FUNCTION VARIANCE(A, 1) ON SIZE ERROR</c>
+    /// into <c>PIC S9(19) COMP-5</c> stored 2^127 - 1 and took NOT ON SIZE ERROR, where the same statement into a
+    /// <c>PIC S9(18)</c> took ON SIZE ERROR. A sentinel is an IN-BAND signal about a value that no longer exists;
+    /// the raise is the out-of-band one, and it is the twin of the SDIDI carrier's
+    /// <c>CobolDec.ToUnscaledChecked</c> (kb/Work PB74), which has always raised here. The statement's size-error
+    /// catch already maps it to the flag with the condition's name, and the receiver is left unchanged.</para>
+    /// <para>The three float→fixed landings are the SDIDI lane's three, one for one: <see cref="ToScaledUnchecked"/>
+    /// (a MOVE (§14.6.8.2 r4: "truncation on either end"), the no-phrase store (§14.6.13.1.3 item 8, DOC-A.1-70),
+    /// INVOKE BY CONTENT — the low-order digits), this one (a final transfer that RAISES), and
+    /// <see cref="ToScaledSaturating"/> (an INTERMEDIATE consumer — <c>CobolDec.ToUnscaledIntermediate</c>'s twin).
+    /// The forms differ ONLY in what they do with a value the carrier cannot hold: the VALUE itself is
+    /// <see cref="TryExactScaled"/> for all three (kb/Work PB623).</para></summary>
     public static Int128 ToScaled(double v, int scale, CobolRounding mode)
+    {
+        if (double.IsNaN(v)) return Int128.Zero;
+        if (TryExactScaled(v, scale, mode, out Int128 landed)) return landed;
+        throw BeyondCarrier();
+    }
+
+    /// <summary>The §14.7.5 case-3 size error of a float→fixed FINAL TRANSFER whose value no fixed-point receiver can
+    /// hold because the <see cref="Int128"/> carrier cannot (kb/Work PB2967) — the ONE raise
+    /// <see cref="ToScaled"/> and the checked <c>CobolIntrinsics.FromDouble</c> / <c>NumvalF</c> landings share.
+    /// EC-SIZE-TRUNCATION is the condition no-phrase rule 4 names; the SDIDI lane's
+    /// <c>CobolDec.ToUnscaledChecked</c> raises the same one for the same fact.</summary>
+    internal static CobolSizeError BeyondCarrier() =>
+        new("a float result is further from zero than any fixed-point receiver permits "
+            + "(ISO §14.7.5 case 3 — EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
+
+    /// <summary>The SATURATING landing of a binary64 for an INTERMEDIATE consumer — an alignment, an argument, a
+    /// subscript — that has no store and so no capacity check of its own to refuse a value (kb/Work PB77):
+    /// <see cref="ToScaled"/> without the raise. NaN → 0; ±Infinity and every magnitude beyond the carrier
+    /// SATURATE to <see cref="Int128.MaxValue"/>/<see cref="Int128.MinValue"/>, so a later range test reads a huge
+    /// value, never a plausible one. ⛔ NEVER the form for a STORE: a saturated sentinel is indistinguishable from a
+    /// legal value in a receiver whose capacity is the whole carrier (kb/Work PB2967).</summary>
+    public static Int128 ToScaledSaturating(double v, int scale, CobolRounding mode)
     {
         if (double.IsNaN(v)) return Int128.Zero;
         if (TryExactScaled(v, scale, mode, out Int128 landed)) return landed;

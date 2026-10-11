@@ -295,8 +295,8 @@ and the operations are the SDIDI ones; comparisons likewise convert each operand
 it (a float via `CobolDec.FromDouble`) and compare in SDIDI (§8.8.4.2.4 — under standard-decimal arithmetic
 each operand not already a standard-decimal intermediate is converted to that form and the comparison is made
 between the two intermediates). Store to a FIXED receiver lands via a new
-`CobolFloat.ToScaled(double,scale,mode)` (double→unscaled Int128, rounded; ±Inf/overflow saturate so the existing
-capacity check fires SIZE ERROR; NaN→0+latch EC-SIZE) then the EXISTING `CobolNum.Store`/`TryStore` funnel (ROUNDED +
+`CobolFloat.ToScaled(double,scale,mode)` (double→unscaled Int128, rounded; ±Inf/overflow past the carrier
+RAISE `CobolSizeError` EC-SIZE-TRUNCATION, never a saturated sentinel, kb/Work PB2967; NaN→0) then the EXISTING `CobolNum.Store`/`TryStore` funnel (ROUNDED +
 SIZE ERROR for free; MOVE truncates toward zero §14.6.8.2, COMPUTE uses the receiver ROUNDED mode). An arithmetic
 store INTO a float receiver is the float arm of the same funnel (`FloatResultant`, kb/Work PB1196): the value — exact
 for a scaled/SDIDI carrier, the binary64 intermediate for a `Real` one — is rounded ONCE into the receiver's binary
@@ -441,8 +441,11 @@ factor of ~15 — and reported NO SIZE ERROR. The cap restores BOTH halves of th
 makes it sufficient rather than merely better: a value that fits can no longer saturate, and a value that does not
 saturates to a sentinel that STILL exceeds the receiver after the rescale, so the store raises the size error
 condition (§14.7.5 case 5 — a native intermediate outside its implementor-defined range, that range being declared
-checked under §8.8.1.3). This is the same discipline `CobolFloat.ToScaled` already relied on; it got the guarantee
-free by landing AT the receiver's scale, and only the working-scale path lost it.
+checked under §8.8.1.3). Since kb/Work PB2967 the checked landing no longer relies on the sentinel at all: a
+value past the `Int128` carrier RAISES EC-SIZE-TRUNCATION (`CobolFloat.BeyondCarrier`), because a saturated
+sentinel is invisible to a receiver whose capacity IS the carrier (a 16-byte COMP-5: `COMPUTE R = FUNCTION
+VARIANCE(A, 1)` stored 2^127 - 1 and took NOT ON SIZE ERROR). The cap still matters: it keeps a value that fits the
+receiver inside the carrier at the working scale, so "past the carrier" is exactly "fits no receiver".
 
 Rule (b) is the half no working-scale choice can reach, because with no receiver there is no scale to quantize TO
 and the `ws = 9` stand-in was arbitrary. §15.4.1 leaves "the characteristics and representation of the returned
@@ -451,7 +454,7 @@ family's returned value IS a binary64** — the quantization is part of the TRAN
 (§14.6.8), not part of the value. Every consumer of a receiver-less numeric already had a `Real` arm and is more
 correct on it: a relation compares natively (§8.8.4.2.4, the arm a COMP-2 operand already took), the text channel
 renders through the one `CobolFloat.Display` a float ITEM uses (§14.9.11.4 GR1), and a MOVE source lands through
-`CobolFloat.ToScaled` at the receiver's scale — the saturation-safe form. This is also what `docs/CONFORMANCE.md`
+`CobolFloat.ToScaledUnchecked` at the receiver's scale — no sentinel is ever stored as a value. This is also what `docs/CONFORMANCE.md`
 had ALREADY documented ("a FLOAT-valued function renders through the same shortest-round-trip `CobolFloat.Display`
 a COMP-2 item does, so the function and an item holding its value agree"); the working-scale form silently broke
 it, printing `2.000000000` for `FUNCTION SQRT(4)` against a determination that says "no zero padding", and
@@ -867,7 +870,13 @@ forms since PB74 (`CobolDec.ToUnscaledChecked` / `ToUnscaled`); the pair now exi
 store could never use dropped BEFORE the multiply) and the float family (`CobolFloat.ToScaled` checked /
 `ToScaledUnchecked` unchecked — inside the carrier ONE function, `CobolFloat.TryExactScaled`; past it
 `CobolFloat.LowOrderDigits`, the SAME exact expansion taken modulo 10^38, rounded by the ONE `CobolNum.RoundDiv`
-kernel; `CobolIntrinsics.FromDouble(…, checkedLanding)` likewise). The emitter NAMES the landing at every site —
+kernel; `CobolIntrinsics.FromDouble(…, checkedLanding)` likewise). ⛔ THE CHECKED FORM RAISES, IT NEVER SATURATES
+(kb/Work PB2967): past the carrier `ToScaled`, the checked `FromDouble` and the checked `Rescaled` throw
+`CobolSizeError` EC-SIZE-TRUNCATION — the twin of `CobolDec.ToUnscaledChecked` — because the saturated
+`Int128.MaxValue` they used to return is a LEGAL value in a 16-byte COMP-5 receiver (its capacity is the whole
+carrier), which stored it and took NOT ON SIZE ERROR. An INTERMEDIATE consumer (no store: `NumericRenderer.Align` /
+`AlignRoundedUp`, the formatted-time seconds) takes the third form, `CobolFloat.ToScaledSaturating`, through
+`RuntimeApi.FloatToScaledIntermediate`. The emitter NAMES the landing at every site —
 `RuntimeApi.FloatToScaled(…, bool checkedLanding)` has no
 default; `NumericRenderer.StoreArgs(…, checkedLanding)` takes it from `ecState.SizeErrVar` (arithmetic) or `false`
 (`StoreExpr`: MOVE, INVOKE); the quantizer / NUMVAL-family renders carry the ONE `NumericRenderer.CheckedFlag`

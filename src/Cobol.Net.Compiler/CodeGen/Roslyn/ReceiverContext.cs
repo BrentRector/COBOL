@@ -40,7 +40,7 @@ namespace CobolNet.CodeGen;
 /// receiver's scale (the parsed decimal lands digit-for-digit), while a genuinely scale-less receiver-less
 /// context (a relation operand, a text operand, an argument, a subscript) takes the float family's binary64.
 /// The float family itself does not consult it — its value HAS no exact form, so its MOVE landing is binary64
-/// through <c>CobolFloat.ToScaled</c> either way.
+/// through <c>CobolFloat.ToScaled</c> / <c>ToScaledUnchecked</c> either way.
 /// </param>
 /// <param name="FloatEdited">
 /// True when the resultant identifier is a FLOATING-POINT numeric-edited item (data-model design D21 /
@@ -149,7 +149,7 @@ internal readonly record struct ReceiverContext(
     ///         10^IntegerDigits − 1 for every ws ≤ 38 − IntegerDigits. So the saturation can no longer be
     ///         SILENT: it is guaranteed to raise the size error condition (§14.7.5 case 5).</item>
     /// </list>
-    /// That is the same discipline <c>CobolFloat.ToScaled</c> already relies on — saturation is safe exactly when
+    /// That is the same discipline <c>CobolFloat.ToScaled</c> already relies on — a landing past the carrier is a size error exactly when
     /// the landing scale keeps the sentinel above the receiver's capacity, and unsafe when a later rescale shrinks
     /// it back into range. UNDER-counting <see cref="IntegerDigits"/> would break invariant 2; over-counting only
     /// costs fraction digits, which is why the count is deliberately generous.

@@ -616,8 +616,8 @@ public static class CobolArgAdapt
     /// <see cref="CobolFloat.ToScaled"/>, NOT the unchecked twin: past the <c>Int128</c> carrier
     /// <c>ToScaledUnchecked</c> hands back the exact expansion's LOW-ORDER digits (kb/Work PB77), which is the
     /// checking-off disposition and would pass the capacity test as a small value — the §14.7.5 case-3 fact is
-    /// about the ALGEBRAIC result, so the checked lane takes the saturating landing the capacity test then
-    /// rejects.</summary>
+    /// about the ALGEBRAIC result, so the checked lane takes the landing that RAISES past the carrier
+    /// (kb/Work PB2967: never a saturated sentinel, which a 16-byte COMP-5 formal would accept).</summary>
     private static Int128 LandChecked(double value, int toScale, in NumProfile receiver) =>
         CobolNum.StoreOrRaise(CobolFloat.ToScaled(value, toScale, CobolRounding.Truncation),
                               toScale, receiver, CobolRounding.Truncation);
