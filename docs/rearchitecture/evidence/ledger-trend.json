@@ -3067,6 +3067,48 @@
       "gap_holders": 53,
       "label": "Train 1059: DEVLOG 1958; arc",
       "battery": null
+    },
+    {
+      "sha": "91174a36",
+      "date": "2026-10-11",
+      "gap": 103,
+      "closed": 4244,
+      "dns": 457,
+      "compiler_open": 106,
+      "defects": 37,
+      "wrong_answer": 10,
+      "crashes": 9,
+      "gap_holders": 53,
+      "label": "A PB2982 + PB2983 + PB2490:",
+      "battery": null
+    },
+    {
+      "sha": "26731e6e",
+      "date": "2026-10-11",
+      "gap": 103,
+      "closed": 4244,
+      "dns": 457,
+      "compiler_open": 103,
+      "defects": 34,
+      "wrong_answer": 10,
+      "crashes": 8,
+      "gap_holders": 53,
+      "label": "H PB2964 + PB2498 + PB2589 (",
+      "battery": null
+    },
+    {
+      "sha": "7e362970",
+      "date": "2026-10-11",
+      "gap": 103,
+      "closed": 4244,
+      "dns": 457,
+      "compiler_open": 105,
+      "defects": 36,
+      "wrong_answer": 11,
+      "crashes": 9,
+      "gap_holders": 53,
+      "label": "Train 1060: DEVLOG 1959; arc",
+      "battery": null
     }
   ],
   "program": [
