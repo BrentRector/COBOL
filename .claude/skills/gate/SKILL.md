@@ -11,7 +11,7 @@ description: Use before every commit and before every merge to choose and run th
 
 # Gate
 
-**Self-check first: which gate is this — an implementer's commit, a lander's train, or the batch's pre-merge?** Each
+**Self-check first: which gate is this — an implementer's commit, a landing (`enqueue.py land`), or the batch's pre-merge?** Each
 has one command below. No gate FILTERS: every gate plans the whole population, ORDERED so a likely red comes first
 (owner, 2026-09-28, kb/Work PB1708: "order, don't skip"); an implementer runs its leg 1 and the lander's train gate
 runs all of it (batched gating, owner 2026-10-10, kb/Work PB2515). What the owner corrected repeatedly was over-gating per
@@ -55,12 +55,11 @@ PB2526). Each leg runs the three assemblies concurrently.
 - ⭐ **BATCHED GATING** (owner 2026-10-10 10:19 PDT, kb/Work PB2515: "Yes, permanently", after a measured trial from
   2026-10-07): `-Mode implementer` runs LEG 1 ONLY, names every leg-2 case NOT RUN
   (`TestResults/build-local/<run>/not-run-*.txt`) and prints `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
-  PB2515): GREEN — … ===` (or `…: RED`). That is the implementer's done-state, and the Linux gate is the lander's, with
-  the rest of the population. The lander's whole-population train gate is the population check for every cluster; a
-  red there is ATTRIBUTED per cluster by re-running only the failing cases on each cluster alone, then fixed in the
-  train or ejected to a finisher (`lander-train-brief.md` step 3, MANDATORY-PRACTICES L12), and every train is
-  recorded with `scripts/orchestrator/train_measure.py record`. The CI invariant holds: the lander runs the whole
-  population, the Linux gate and the oracle before every push.
+  PB2515): GREEN — … ===` (or `…: RED`). That is the implementer's done-state. The landing (`python scripts/orchestrator/enqueue.py land <branch>`, kb/Work
+  PB3023, MANDATORY-PRACTICES L1, L2) re-runs this gate on the branch merged with origin/main plus CI's Linux legs under
+  WSL, and CI's merge-group run is the population check; a red at the landing is the branch's own (one branch per pull
+  request) and goes to ONE `cobol-finisher` (L12). The CI invariant holds: nothing reaches main but a tested merge group
+  (or, while the queue is not ACTIVE, a `ci/<sha>` run push-main.sh waited for).
 - **The owner's switch back is the shared implementer scope `whole`** (`python scripts/gate_slot.py
   set-implementer-scope whole [--until ISO] [--why TEXT]`; the coded default is `leg1`). Under `whole` the implementer
   gate runs both legs FAIL-FAST: a red in leg 1 stops it `RED/INCOMPLETE` and names the remainder, and it is GREEN only
