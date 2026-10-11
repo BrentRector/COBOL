@@ -361,7 +361,7 @@ class Deriver:
 def install_tracer(directory: Path) -> Path:
     """Write the tracer as `sitecustomize.py` into `directory`, which `traced_env` puts first on PYTHONPATH."""
     directory.mkdir(parents=True, exist_ok=True)
-    (directory / "sitecustomize.py").write_text(TRACER, encoding="utf-8")
+    (directory / "sitecustomize.py").write_text(TRACER, encoding="utf-8", newline="\n")
     return directory
 
 
@@ -532,7 +532,7 @@ def self_test() -> int:
         }
         for rel, text in planted.items():
             (root / rel).parent.mkdir(parents=True, exist_ok=True)
-            (root / rel).write_text(text, encoding="utf-8")
+            (root / rel).write_text(text, encoding="utf-8", newline="\n")
         blobs = {rel: f"blob-{i}" for i, rel in enumerate(planted)}
         blobs["tools/sub"] = "commit-1"
         tree = Tree(root, blobs, frozenset({"tools/sub"}))

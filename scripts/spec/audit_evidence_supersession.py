@@ -343,25 +343,25 @@ def self_test() -> int:
         subprocess.run(["git", "-C", d, "init", "-q"], check=True)   # the path arm reads the git index
         p = root / "case.json"
         for kind, doc, silencer in cases:
-            p.write_text(json.dumps(doc, indent=1), encoding="utf-8")
+            p.write_text(json.dumps(doc, indent=1), encoding="utf-8", newline="\n")
             fires = any(f.kind == kind for f in scan([p], rules, root)[0])
             print(f"  {'ok  ' if fires else 'FAIL'} {kind:<7} fires on a document built to break it")
             ok &= fires
             if silencer:
                 marked = {BANNER_KEY: doc[BANNER_KEY], MARKER_KEY: marker,
                           **{k: v for k, v in doc.items() if k != BANNER_KEY}}
-                p.write_text(json.dumps(marked, indent=1), encoding="utf-8")
+                p.write_text(json.dumps(marked, indent=1), encoding="utf-8", newline="\n")
                 silent = not any(f.kind == kind for f in scan([p], rules, root)[0])
                 print(f"  {'ok  ' if silent else 'FAIL'} {kind:<7} silent on the same document WITH {MARKER_KEY}")
                 ok &= silent
         # The coordinate drift arm reports and never gates — both halves matter. The cited FILE has to exist,
         # or the `path` arm fires first and "gates nothing" would pass for the wrong reason.
         (root / "src" / "Cobol.Net.Frontend" / "Grammar" / "Core").mkdir(parents=True, exist_ok=True)
-        (root / "src" / "Cobol.Net.Frontend" / "Grammar" / "Core" / "Fake.g4").write_text("", encoding="utf-8")
+        (root / "src" / "Cobol.Net.Frontend" / "Grammar" / "Core" / "Fake.g4").write_text("", encoding="utf-8", newline="\n")
         subprocess.run(["git", "-C", d, "add", "-A"], check=True)
         p.write_text(json.dumps({BANNER_KEY: banner,
                                  "e": ["src/Cobol.Net.Frontend/Grammar/Core/Fake.g4:900 — realRule"]}, indent=1),
-                     encoding="utf-8")
+                     encoding="utf-8", newline="\n")
         f2, drift, _ = scan([p], rules, root)
         moved = len(drift) == 1 and not f2
         print(f"  {'ok  ' if moved else 'FAIL'} anchor  a MOVED rule is reported as drift and gates nothing")

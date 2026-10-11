@@ -289,7 +289,7 @@ def main() -> int:
         if len(show) > 80:
             print(f"  … and {len(show) - 80} more")
     if args.json:
-        pathlib.Path(args.json).write_text(json.dumps(rows, indent=2), encoding="utf-8")
+        pathlib.Path(args.json).write_text(json.dumps(rows, indent=2), encoding="utf-8", newline="\n")
         print(f"\nwrote {args.json}")
     print("\n⚠ counts, not geometry — confirm every candidate against the printed page before editing")
     return 0

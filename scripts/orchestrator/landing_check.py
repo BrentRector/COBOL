@@ -287,7 +287,7 @@ def self_test() -> int:
 
     def write(rel: str, text: str) -> None:
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo / rel).write_text(text, encoding="utf-8")
+        (repo / rel).write_text(text, encoding="utf-8", newline="\n")
 
     sh("init", "-q", "-b", "main")
     for f in ("src/A.cs", "src/B.cs", "src/C.cs", "docs/D.md"):
@@ -388,7 +388,7 @@ def self_test() -> int:
         wt = root / name
         sh("worktree", "add", "-q", "-b", name, str(wt), "origin/main")
         for f, t in edits.items():
-            (wt / f).write_text(t, encoding="utf-8")
+            (wt / f).write_text(t, encoding="utf-8", newline="\n")
         subprocess.run(["git", "-C", str(wt), "add", "-A"], check=True, capture_output=True)
         env = dict(os.environ, GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
                    GIT_COMMITTER_EMAIL="t@t", GIT_COMMITTER_DATE=f"@{when} +0000", GIT_AUTHOR_DATE=f"@{when} +0000")

@@ -176,12 +176,12 @@ def self_test() -> int:
     # The CLI arm the gates actually call: the exit code IS the verdict.
     with tempfile.TemporaryDirectory() as tmp:
         log = pathlib.Path(tmp, "unit.log")
-        log.write_text("\n".join(FAILED_TRANSCRIPT) + "\n", encoding="utf-8")
+        log.write_text("\n".join(FAILED_TRANSCRIPT) + "\n", encoding="utf-8", newline="\n")
         r = subprocess.run([sys.executable, __file__, "--name", "unit", "--log", str(log), "--rc", "1"],
                            capture_output=True, text=True, encoding="utf-8", errors="backslashreplace")
         case("fires CLI: a red log exits 1 and prints the planted message",
              r.returncode == 1 and PLANT in r.stdout, f"rc={r.returncode}\n{r.stdout}{r.stderr}")
-        log.write_text("\n".join(PASSED_TRANSCRIPT) + "\n", encoding="utf-8")
+        log.write_text("\n".join(PASSED_TRANSCRIPT) + "\n", encoding="utf-8", newline="\n")
         r = subprocess.run([sys.executable, __file__, "--name", "unit", "--log", str(log), "--rc", "0"],
                            capture_output=True, text=True, encoding="utf-8", errors="backslashreplace")
         case("silent CLI: a green log exits 0", r.returncode == 0, f"rc={r.returncode}\n{r.stdout}{r.stderr}")

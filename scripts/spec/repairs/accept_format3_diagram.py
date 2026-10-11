@@ -109,7 +109,7 @@ def main() -> int:
     lines[exc_idx[0]] = EXC_NEW          # replace the LATER one first, so the earlier index stays valid
     lines[at_idx[0]] = AT_NEW
     text = "\n".join(lines) + "\n"
-    SPEC.write_text(text, encoding="utf-8")
+    SPEC.write_text(text, encoding="utf-8", newline="\n")
 
     if "\\left[\\begin{array}{l} \\text{ON EXCEPTION" in text:
         sys.exit("FATAL: the ON EXCEPTION LaTeX block survived the rewrite")

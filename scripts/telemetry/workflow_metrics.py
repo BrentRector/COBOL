@@ -77,7 +77,7 @@ def main():
     out = {"workflow_dir": d.name, "agents": len(rows), "returned": sum(r["returned"] for r in rows), "rows": rows}
     text = json.dumps(out, indent=1, ensure_ascii=False)
     if a.out:
-        pathlib.Path(a.out).write_text(text, encoding="utf-8")
+        pathlib.Path(a.out).write_text(text, encoding="utf-8", newline="\n")
         print(f"wrote {a.out}: {out['agents']} agents, {out['returned']} returned")
     else:
         sys.stdout.reconfigure(encoding="utf-8")

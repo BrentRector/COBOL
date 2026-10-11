@@ -107,7 +107,7 @@ def main() -> int:
         "pages_swept": sorted(pages_swept),
         "compare_files": len(compares), "verify_files": len(verifies),
         "confirmed": confirmed, "refuted": refuted, "unverified": unverified,
-    }, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    }, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
     lines = ["# Spec reconciliation ledger (generated)", "",
              "> Merged from the per-agent files in this directory by `scripts/spec/merge_reconciliation.py`.",
@@ -133,7 +133,7 @@ def main() -> int:
         for r in refuted:
             lines += [f"- p{r['page']} · {r['kind']} — {r.get('verifier','')[:240]}"]
         lines.append("")
-    REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
     print(f"\nwrote {LEDGER.relative_to(REPO)} and {REPORT.relative_to(REPO)}")
     return 0

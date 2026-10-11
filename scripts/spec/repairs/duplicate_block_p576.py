@@ -90,7 +90,7 @@ def main() -> int:
 
     # Keep exactly one blank line between the page-575 tail and the page-576 anchor.
     lines[keep_end + 1:anchor576] = ["\n"]
-    SPEC.write_text("".join(lines), encoding="utf-8")
+    SPEC.write_text("".join(lines), encoding="utf-8", newline="\n")
 
     text = "".join(lines)
     bad = [a for a in DUPED_ANCHORS if text.count(a) != 1]

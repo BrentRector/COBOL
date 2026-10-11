@@ -761,7 +761,7 @@ def main() -> int:
                 raise SystemExit(f"⛔ slug {slug!r} (subject {subject!r}) is not [a-z0-9-] — it becomes a file "
                                  f"name, and a stray ':' or '*' silently redirects or refuses the write")
             (args.out / f"in-{slug}.json").write_text(
-                json.dumps(doc, indent=1, ensure_ascii=False), encoding="utf-8")
+                json.dumps(doc, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
             slugs.append(slug)
             if len(parts) > 1:
                 part_index[slug] = part

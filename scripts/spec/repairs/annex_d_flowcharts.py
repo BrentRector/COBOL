@@ -390,7 +390,7 @@ def main() -> int:
     for num, body in drawn.items():
         new, old = splice(lines, num, body)
         print(f"Figure {num}: {old} lines → {new}")
-    SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     print(f"\napplied to {SPEC_MD.relative_to(REPO)}")
     return 0
 

@@ -191,7 +191,7 @@ def main_write() -> int:
         shutil.rmtree(OUT)
     OUT.mkdir(parents=True)
     for name, text in notes.items():
-        (OUT / name).write_text(text, encoding="utf-8")
+        (OUT / name).write_text(text, encoding="utf-8", newline="\n")
 
     total = len(rows)
     gaps = sum(1 for r in rows if r["state"] == "GAP")

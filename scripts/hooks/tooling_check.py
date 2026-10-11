@@ -192,9 +192,9 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as d:
         tr = pathlib.Path(d) / "t.jsonl"
         tr.write_text('{"type":"permission-mode","permissionMode":"auto"}\n{"type":"user","permissionMode":"auto"}\n'
-                      'not json "permissionMode"\n{"type":"user","permissionMode":"bypassPermissions"}\n', encoding="utf-8")
+                      'not json "permissionMode"\n{"type":"user","permissionMode":"bypassPermissions"}\n', encoding="utf-8", newline="\n")
         empty = pathlib.Path(d) / "e.jsonl"
-        empty.write_text('{"type":"user"}\n', encoding="utf-8")
+        empty.write_text('{"type":"user"}\n', encoding="utf-8", newline="\n")
         cases = [({"permission_mode": "bypassPermissions"}, "auto", "OK"),
                  ({"permission_mode": "auto"}, "auto", "ASK-OWNER"),
                  ({"permission_mode": "default", "transcript_path": str(tr)}, None, "ASK-OWNER"),   # the payload wins

@@ -380,7 +380,7 @@ def main() -> int:
             print(f'  {v:24} {t:16} {n}')
 
     os.makedirs(os.path.dirname(a.report), exist_ok=True)
-    with open(a.report, 'w', encoding='utf-8') as fh:
+    with open(a.report, 'w', encoding='utf-8', newline="\n") as fh:
         json.dump({'summary': {f'{v}': n for v, n in by_v.items()},
                    'byTier': {f'{v}|{t}': n for (v, t), n in by_vt.items()},
                    'cases': results}, fh, indent=1)

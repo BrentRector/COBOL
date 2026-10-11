@@ -901,7 +901,7 @@ def main() -> int:
         "blocks": len(blocks_seen),
         "parse_gaps": [{"section": s, "kind": k} for s, k in gaps],
         "rules": rules,
-    }, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    }, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(f"\nwrote {OUT.relative_to(REPO)}  ({OUT.stat().st_size / 1_048_576:.1f} MB)")
     return 0
 

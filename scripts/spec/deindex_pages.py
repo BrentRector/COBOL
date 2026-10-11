@@ -124,7 +124,7 @@ def main() -> int:
         print(f"  {v:5d}  ({100*v/total:4.1f}%)  {k}")
 
     if args.apply:
-        SPEC_MD.write_text("\n".join(out) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied to {SPEC_MD}")
     return 0
 

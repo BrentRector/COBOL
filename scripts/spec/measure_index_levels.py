@@ -106,7 +106,7 @@ def main() -> int:
     if args.write:
         DATA.parent.mkdir(parents=True, exist_ok=True)
         DATA.write_text(json.dumps(dict(sorted(unambiguous.items())), indent=0, ensure_ascii=False),
-                        encoding="utf-8")
+                        encoding="utf-8", newline="\n")
         print(f"\nwrote {DATA.relative_to(REPO)}")
     return 0
 

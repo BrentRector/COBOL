@@ -655,7 +655,7 @@ def self_test() -> int:
         def commit(path, text, msg, cwd=repo):
             p = pathlib.Path(cwd) / path
             p.parent.mkdir(parents=True, exist_ok=True)
-            p.write_text(text, encoding='utf-8')
+            p.write_text(text, encoding='utf-8', newline="\n")
             g('add', path, cwd=cwd)
             g('commit', '-q', '-m', msg, cwd=cwd)
 
@@ -703,7 +703,7 @@ def self_test() -> int:
         commit('src/U.cs', 'class UniformUnlanded {}\n', 'unlanded-train')
         (landed_coord / 'scratch' / 'train7777-manifest.json').write_text(json.dumps(
             [{'cluster': 'K', 'branch': 'unlanded-train', 'base': g('rev-parse', 'main').stdout.strip(),
-              'head': g('rev-parse', 'unlanded-train').stdout.strip()}]), encoding='utf-8')
+              'head': g('rev-parse', 'unlanded-train').stdout.strip()}]), encoding='utf-8', newline="\n")
         for b, f, name in (('carried', 'src/K.cs', 'KiloCarried'), ('carried-moved', 'src/M.cs', 'MikeMoved'),
                            ('picked', 'src/P.cs', 'PapaPicked'), ('picked-lost', 'src/Q.cs', 'QuebecLost')):
             g('switch', '-q', '-c', b, 'main')
@@ -727,7 +727,7 @@ def self_test() -> int:
         manifest.append({'cluster': 'E', 'branch': 'ejected', 'base': g('merge-base', 'ejected', 'main').stdout.strip(),
                          'head': g('rev-parse', 'ejected').stdout.strip()})
         commit('DEVLOG.md', 'train 9999\n', 'Train 9999: DEVLOG 1, the train\'s last commit')
-        (landed_coord / 'scratch' / 'train9999-manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
+        (landed_coord / 'scratch' / 'train9999-manifest.json').write_text(json.dumps(manifest), encoding='utf-8', newline="\n")
         for b, f, text in (('picked', 'src/P.cs', 'class PapaPicked { int LaterOnMain; }\n'),
                            ('picked-lost', 'src/Q.cs', 'class QuebecRenamed {}\n')):
             g('cherry-pick', b)
@@ -746,7 +746,7 @@ def self_test() -> int:
         wt = tmp / 'worktrees'
         # worktrees: dirty-but-merged (DECISION), locked by a live agent, locked by a dead pid (LANDED), detached
         g('worktree', 'add', '-q', '-b', 'dirty-merged', str(wt / 'dirty-merged'), 'main')
-        (wt / 'dirty-merged' / 'scratch.txt').write_text('uncommitted\n', encoding='utf-8')
+        (wt / 'dirty-merged' / 'scratch.txt').write_text('uncommitted\n', encoding='utf-8', newline="\n")
         g('worktree', 'add', '-q', '-b', 'agent-live', str(wt / 'agent-live'), 'main')
         g('worktree', 'lock', '--reason', 'claude agent live (pid 101)', str(wt / 'agent-live'))
         g('worktree', 'add', '-q', '-b', 'agent-dead', str(wt / 'agent-dead'), 'main')
@@ -754,7 +754,7 @@ def self_test() -> int:
         g('worktree', 'add', '-q', '--detach', str(wt / 'pin'), 'main')
         # unreadable: a landed worktree whose status git cannot produce (a corrupt index) holding an untracked file
         g('worktree', 'add', '-q', '-b', 'unreadable', str(wt / 'unreadable'), 'main')
-        (wt / 'unreadable' / 'precious.txt').write_text('uncommitted\n', encoding='utf-8')
+        (wt / 'unreadable' / 'precious.txt').write_text('uncommitted\n', encoding='utf-8', newline="\n")
         (repo / '.git' / 'worktrees' / 'unreadable' / 'index').write_bytes(b'not an index')
         rdir = tmp / 'reports'
         rdir.mkdir()
@@ -774,7 +774,7 @@ def self_test() -> int:
                 # PB2708: a carried branch's lead note is still open, so without the train record it read WAITING TO LAND
                 ('w9998i-PB10-report.md', 'Status: DONE\nBranch: carried\n', 10),
                 ('w9998j-PB11-report.md', 'Status: DONE\nBranch: carried-moved\n', 11)):
-            (rdir / name).write_text(text, encoding='utf-8')
+            (rdir / name).write_text(text, encoding='utf-8', newline="\n")
             os.utime(rdir / name, (hours(h), hours(h)))
         # age everything but `fresh` past --min-age: the branch reflogs, each worktree's HEAD log
         common = repo / '.git'
@@ -824,15 +824,15 @@ def self_test() -> int:
         cdir = tmp / 'coord'
         (cdir / 'scratch').mkdir(parents=True)
         (cdir / 'landing-lease.json').write_text(json.dumps({'holder': 'train 9999 lander', 'worktree': str(tmp),
-                                                             'expires_at': '2099-01-01T00:00:00+00:00'}), encoding='utf-8')
-        (cdir / 'scratch' / 'train9999-manifest.json').write_text(json.dumps([{'branch': 'done-branch'}]), encoding='utf-8')
-        (cdir / 'scratch' / 'train99990-manifest.json').write_text(json.dumps([{'branch': 'orphan'}]), encoding='utf-8')
+                                                             'expires_at': '2099-01-01T00:00:00+00:00'}), encoding='utf-8', newline="\n")
+        (cdir / 'scratch' / 'train9999-manifest.json').write_text(json.dumps([{'branch': 'done-branch'}]), encoding='utf-8', newline="\n")
+        (cdir / 'scratch' / 'train99990-manifest.json').write_text(json.dumps([{'branch': 'orphan'}]), encoding='utf-8', newline="\n")
         in_train = landing_train_members(cdir)
         check(in_train == {'done-branch': '9999'}, f'the members of the train holding the lease: {in_train}')
         check(lifecycle(rows['done-branch'], in_flight_slugs=set(), min_age=180, live=live, in_train=in_train)[0]
               == 'IN FLIGHT', 'a member of the train landing now is IN FLIGHT, not WAITING TO LAND')
         (cdir / 'landing-lease.json').write_text(json.dumps({'holder': 'train 9999 lander', 'worktree': str(tmp),
-                                                             'expires_at': '2000-01-01T00:00:00+00:00'}), encoding='utf-8')
+                                                             'expires_at': '2000-01-01T00:00:00+00:00'}), encoding='utf-8', newline="\n")
         check(landing_train_members(cdir) == {}, 'an expired lease carries no train')
         # THE TRAIN SIZE (kb/Work PB2981): of eight waiting rows the next train is TRAIN_MAX, the most harmful lead
         # first, a compiler fix before process work at equal harm, the oldest report first; the rest are held
@@ -859,7 +859,7 @@ def self_test() -> int:
         notes = tmp / 'Work'
         notes.mkdir()
         (notes / 'PB8.md').write_text('---\nid: PB8\n---\nThe orphan branch: ABANDONED 2026-10-08, the approach was '
-                                      'replaced by PB9.\nsplit-branch: not abandoned, a finisher takes it.\n', encoding='utf-8')
+                                      'replaced by PB9.\nsplit-branch: not abandoned, a finisher takes it.\n', encoding='utf-8', newline="\n")
         out = []
         n = apply(list(rows.values()), repo=repo, abandon=['orphan', 'split-branch', 'fresh', 'dirty-merged'],
                   work_dir=notes, say=out.append)

@@ -134,7 +134,7 @@ def main() -> int:
         print(f"   {old.strip()[:60]}\n     -> {new.strip()[:70]}")
 
     if args.apply:
-        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied to {SPEC_MD.relative_to(REPO)}")
     return 0
 

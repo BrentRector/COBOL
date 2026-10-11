@@ -994,7 +994,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     gfile.write_text(json.dumps({"wave": wave, "scratch": str(scratch), "base": f"{head} (origin/main when planned)",
                                  "stop_file": str(stop_file), "groups": gjson}, indent=1, ensure_ascii=False) + "\n",
-                     encoding="utf-8")
+                     encoding="utf-8", newline="\n")
     args = {"scratch": str(scratch), "wave": wave, "stop_file": str(stop_file), "global_stop": str(coord.global_stop(a.coord)),
             "concurrency": rules["wave"]["concurrency"], "train_size": train,
             "min_final_train": rules["wave"]["min_final_train"], "devlog_n": alloc.peek("devlog", REPO, cdir),
@@ -1003,7 +1003,7 @@ def main(argv: list[str] | None = None) -> int:
             "groups": [{k: j[k] for k in ("letter", "lead", "notes", "codes", "model", "after") if k in j}
                        for j in gjson]}
     afile = scratch / f"wf-args-w{wave}.json"
-    afile.write_text(json.dumps(args, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    afile.write_text(json.dumps(args, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     record_dispatch(cdir, wave, p["groups"], terminal)
     print(f"wrote {gfile} and {afile}; the dispatch ledger {cdir / DISPATCH_LEDGER}")
     rc = subprocess.call([sys.executable, str(MAKE_SPECS), str(gfile)], cwd=REPO)

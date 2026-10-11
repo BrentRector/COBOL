@@ -296,7 +296,7 @@ def _self_test() -> int:
         check("unknown dir refused", True, True)
     with tempfile.TemporaryDirectory() as t:
         d = pathlib.Path(t)
-        (d / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "u-1", "emailAddress": "a@b"}}), encoding="utf-8")
+        (d / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": "u-1", "emailAddress": "a@b"}}), encoding="utf-8", newline="\n")
         row = {"name": "probe", "config_dir": str(d), "weekly_reset": {"weekday": 0, "hour": 0, "minute": 0, "tz": "UTC"},
                "quota": {"weekly_cap_pct": 50}}
         r2 = dict(rules, accounts={"list": [row]})
@@ -304,7 +304,7 @@ def _self_test() -> int:
         check("uuid and email read from the global config", (p.uuid, p.email), ("u-1", "a@b"))
         check("per-account quota override", (p.quota["weekly_cap_pct"], p.quota["daily_pct"]),
               (50, rules["quota"]["daily_pct"]))
-        (d / ".claude.json").write_text("{not json", encoding="utf-8")
+        (d / ".claude.json").write_text("{not json", encoding="utf-8", newline="\n")
         check("unreadable global config -> no uuid", p.uuid, None)
     _skill_review_cases(check)
     for f in fails:
@@ -325,7 +325,7 @@ def _skill_review_cases(check) -> None:
             d.mkdir(parents=True, exist_ok=True)
             for name in skills:
                 (d / "skills" / name).mkdir(parents=True, exist_ok=True)
-            (d / "settings.json").write_text(json.dumps({"enabledPlugins": plugins}), encoding="utf-8")
+            (d / "settings.json").write_text(json.dumps({"enabledPlugins": plugins}), encoding="utf-8", newline="\n")
 
         def stamp(d: pathlib.Path, days_ago: float) -> None:
             (d / SKILL_REVIEW_STAMP).touch()

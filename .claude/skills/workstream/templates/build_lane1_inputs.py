@@ -152,7 +152,7 @@ for fam, rows in sorted(groups.items()):
             payload["posture"] = ("A DOCUMENTED-NON-SUPPORT row closes ONLY on a test proving we DIAGNOSE the declined "
                                   "construct (or that the documented behaviour is what actually happens). Read the two "
                                   "owning notes first; they carry the licence and the source shapes to measure.")
-        (OUT / f"in-{slug}.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8")
+        (OUT / f"in-{slug}.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
         index.append((slug, len(part), subjects))
 
 print(f"{len(conf)} CONFORMS-untested + {len(dns)} DNS-untested = {len(conf) + len(dns)} rows → {len(index)} files")

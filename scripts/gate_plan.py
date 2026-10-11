@@ -242,7 +242,7 @@ def publish_timings(store: Path, run: Path, discovered: set[str], by: str, now: 
     store.parent.mkdir(parents=True, exist_ok=True)
     tmp = store.with_name(f"{store.name}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps({"schema": TIMINGS_STORE_SCHEMA, "updated": now, "by": by, "durations": merged},
-                              ensure_ascii=False, sort_keys=True, separators=(",", ":")), encoding="utf-8")
+                              ensure_ascii=False, sort_keys=True, separators=(",", ":")), encoding="utf-8", newline="\n")
     os.replace(tmp, store)
     return len(measured), note
 
@@ -559,7 +559,7 @@ def self_test() -> int:
         body = "".join(f'<UnitTestResult testName="{n}" duration="{d}" outcome="Passed" />' for n, d in rows)
         (run_dir / "leg-1-Conformance.trx").write_text(
             '<?xml version="1.0" encoding="utf-8"?><TestRun xmlns="http://microsoft.com/schemas/VisualStudio/'
-            f'TeamTest/2010"><Results>{body}</Results></TestRun>', encoding="utf-8")
+            f'TeamTest/2010"><Results>{body}</Results></TestRun>', encoding="utf-8", newline="\n")
 
     with tempfile.TemporaryDirectory() as tmp:
         store = timings_store(Path(tmp) / "common")
@@ -584,7 +584,7 @@ def self_test() -> int:
         p = plan_assembly([short_c, renumbered], ctx(previous=shared, map_known=set(), every_tier1=True))
         check("timed from the store, leg 2 starts with the longest collection",
               p["stats"]["timed"] and (p["leg2"] or p["leg1"])[0] == name_key(renumbered), p)
-        store.write_text("{ not json", encoding="utf-8")
+        store.write_text("{ not json", encoding="utf-8", newline="\n")
         try:
             read_shared_timings(store)
             malformed_read_refused = False
@@ -599,7 +599,7 @@ def self_test() -> int:
     listing = f"Test run for x.dll\n{LISTED_MARK}\n" + "\n".join("    " + d for d in cheap[:3]) + "\n"
     with tempfile.TemporaryDirectory() as tmp:
         lf = Path(tmp) / "list.txt"
-        lf.write_text(listing, encoding="utf-8")
+        lf.write_text(listing, encoding="utf-8", newline="\n")
         check("a --list-tests output reads back as its display names", read_listing(lf) == cheap[:3])
         a = impacted_tests.Analysis(None, "none", impacted_tests.Reach(every_tier1=["no map"]), {})
         full = build_plan({"Conformance": read_listing(lf)}, a, Timings("none"), set(), None)

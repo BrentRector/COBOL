@@ -94,7 +94,7 @@ def priority_flags(priority: str) -> dict:
 
 def run(cmd: list[str], log: Path, cwd: Path, slot: Slot, env: dict | None = None,
         priority: str = "BelowNormal") -> int:
-    with open(log, "w", encoding="utf-8", errors="replace") as fh:
+    with open(log, "w", encoding="utf-8", errors="replace", newline="\n") as fh:
         proc = subprocess.run(cmd, cwd=cwd, stdout=fh, stderr=subprocess.STDOUT, **priority_flags(priority),
                               **slot.spawn_kwargs(env=env))
     return proc.returncode
@@ -357,7 +357,7 @@ def record(args: argparse.Namespace, sha: str, store: Path, wt: Path, raw: Path,
         problems = check(m)
         m["problems"] = problems
         out = store / (f"{sha}.partial.json.gz" if args.filter else f"{sha}.json.gz")
-        with gzip.open(out, "wt", encoding="utf-8") as fh:
+        with gzip.open(out, "wt", encoding="utf-8", newline="\n") as fh:
             json.dump(m, fh, separators=(",", ":"))
         print(f"  tests recorded: {len(m['tests'])} · probe entries: {len(m['entries'])} · "
               f"children: {m['children']}")

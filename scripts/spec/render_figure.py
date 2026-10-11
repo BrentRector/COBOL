@@ -863,7 +863,7 @@ def sheet(doc, pages, out_path, extract, classify_page):
                          f'<img src="{printed_crop(page, lo, hi)}" alt="printed figure"></div>')
             parts.append(f'<div><p class="lbl">generated</p>{PRE_OPEN}{body}</pre></div>')
             parts.append("</div>")
-    out_path.write_text("\n".join(parts), encoding="utf-8")
+    out_path.write_text("\n".join(parts), encoding="utf-8", newline="\n")
     return len(parts)
 
 

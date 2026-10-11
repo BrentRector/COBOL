@@ -348,7 +348,7 @@ def main() -> int:
         return 0
     args.out.parent.mkdir(parents=True, exist_ok=True)
     payload = {"batch": "derived:" + "+".join(names), "records": records}
-    args.out.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    args.out.write_text(json.dumps(payload, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     print(f"\nwrote {args.out}")
     print("⛔ NOW VALIDATE IT:\n    " + RECORD.format(args.out))
     return 0

@@ -356,7 +356,7 @@ def _self_test() -> int:
         check("id is the file name", m["id"], p.stem)
         check("created_at has a zone", m["created_at"], "2026-10-07T13:47:05-07:00")
         win = r"E:\COBOL-coord\scratch\briefs\x.md"
-        (cdir / "x.md").write_text("x", encoding="utf-8")
+        (cdir / "x.md").write_text("x", encoding="utf-8", newline="\n")
         p2 = send(cdir, to="mythos", kind="info", subject="a Windows path", body="b", refs=[str(cdir / "x.md"), "branch x @ abc"],
                   sender="operator", now=when)
         check("a Windows path survives the round trip", _load(p2)["refs"][0], str(cdir / "x.md"))
@@ -395,7 +395,7 @@ def _self_test() -> int:
         check("done moves it with the result", (p.exists(), _load(d)["result"]["status"], d.parent.name), (False, "done", "done"))
         hand = inbox(cdir, "operator") / "20261007-134800-mythos-info-hand.json"
         hand.write_text(json.dumps({"id": hand.stem, "from": "mythos", "to": "operator", "kind": "info", "subject": "s",
-                                    "body": "b", "refs": []}), encoding="utf-8")
+                                    "body": "b", "refs": []}), encoding="utf-8", newline="\n")
         got, why3 = take(cdir, hand.stem)
         check("a hand-built message with empty refs is declined, not taken",
               (got, (box(cdir) / "done" / hand.name).exists(), "refs is empty" in "; ".join(why3)), (None, True, True))
