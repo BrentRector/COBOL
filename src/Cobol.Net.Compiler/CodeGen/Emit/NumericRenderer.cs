@@ -776,10 +776,19 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     public string DecOperand(NumX x) => x switch
     {
         { U: true } u => RuntimeApi.DecLiftRoundedUnsigned(u.Expr, u.Scale, IntermediateMode),
-        { Dec: true } or { Real: true } or { Wide: true } => DecOperandExact(x),
-        { Digits: >= 1 } e when e.Digits <= ExactLiftDigits => DecOperandExact(x),
+        _ when !LiftRounds(x) => DecOperandExact(x),
         _ => RuntimeApi.DecLiftRounded(x.Expr, x.Scale, IntermediateMode),
     };
+
+    /// <summary>Does lifting <paramref name="x"/> into the SDIDI ROUND it (§8.8.1.5.2 r1)? The ONE answer to that
+    /// question: <see cref="DecOperand"/> acts on it and the intrinsic renderer asks it of a function's argument
+    /// (<c>IntrinsicRenderer.ArgumentRoundsAtLift</c>, kb/Work PB2965), so a function whose equivalent arithmetic
+    /// expression lifts its argument is routed to the SDIDI exactly when the lift would change the value. A Dec, a
+    /// float and a wide intermediate are already SDIDI-bound (the float's conversion is §8.8.1.5.1's, not a rounding
+    /// of an exact value); an unsigned-wide operand and a fixed-point operand whose digit bound is past
+    /// <see cref="ExactLiftDigits"/> or unknown (Digits 0, nothing provable) round.</summary>
+    internal bool LiftRounds(NumX x) =>
+        x.U || (!x.Dec && !x.Real && !x.Wide && !(x.Digits >= 1 && x.Digits <= ExactLiftDigits));
 
     /// <summary>The widest digit bound <see cref="DecOperand"/> lifts EXACTLY. Under STANDARD-DECIMAL it is the SDIDI's
     /// own 34 (§8.8.1.5.2 r1 rounds every wider operand). Under NATIVE arithmetic the Dec lane (DOC-A.1-82) carries an

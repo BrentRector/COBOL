@@ -901,8 +901,9 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     private NumX RawArg(BoundIntrinsicCall ic, int i) => num.AsNum(ic.Args[i], num.Receiver);
 
     /// <summary>An argument lifted to a <c>CobolDec</c> expression from its RAW carrier: a Dec operand passes
-    /// through, a float converts per §8.8.1.5.1, a fixed-point operand lifts exactly — never quantized.</summary>
-    /// <remarks>INTAKE(LIFTED) — lifted to the SDIDI from the RAW carrier — exact for a fixed-point operand, §8.8.1.5.1 for a float; the value is preserved, the carrier is not.</remarks>
+    /// through, a float converts per §8.8.1.5.1, a fixed-point operand lifts through <see cref="NumericRenderer.DecOperand"/>
+    /// (exactly within the SDIDI's 34 digits, rounded once past them — §8.8.1.5.2 r1) — never quantized to a working scale.</summary>
+    /// <remarks>INTAKE(LIFTED) — lifted to the SDIDI from the RAW carrier — exact for a fixed-point operand within 34 digits and rounded once past them (§8.8.1.5.2 r1), §8.8.1.5.1 for a float; the value is preserved up to the SDIDI's own precision, the carrier is not.</remarks>
     private string DecArg(BoundIntrinsicCall ic, int i) => num.DecOperand(RawArg(ic, i));
 
     /// <remarks>INTAKE(LIFTED) — the variadic form of <see cref="DecArg"/> — same contract, per element.</remarks>
@@ -1140,6 +1141,41 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     }.ToFrozenSet(StringComparer.Ordinal);
 
     /// <summary>
+    /// ⛔ THE THIRD ROUTE TO THE SDIDI BODY, AND THE ONLY ONE DECIDED FROM THE ARGUMENT'S LIFT (kb/Work PB2965): the
+    /// unary exact-family arms whose returned value has an EQUIVALENT ARITHMETIC EXPRESSION over their argument —
+    /// ABS (§15.7.4 r1), SIGN (§15.81.4 r1), INTEGER-PART (§15.49.4 r1) and FRACTION-PART (§15.42.4 r1) — and so,
+    /// under a standard arithmetic mode, equal that expression evaluated in the SDIDI (§15.4.1 r1).
+    /// </summary>
+    /// <remarks>
+    /// <para>The expression's operand <c>argument-1</c> is converted into the SDIDI and "if the operand value cannot be
+    /// expressed exactly in an SDIDI, the value is rounded according to the rules in 11.9.11" (§8.8.1.5.2 r1). The
+    /// exact Int128 body is digit-identical to that evaluation ONLY while the lift is exact (D3's documented
+    /// equivalence), so these arms keep their Int128 body for an argument whose digit bound is within the SDIDI's 34
+    /// digits and take <see cref="RenderDec"/> when the lift would round (<see cref="ArgumentRoundsAtLift"/>, which
+    /// asks <see cref="NumericRenderer.LiftRounds"/> — the SAME predicate the operand lift acts on): a 16-byte binary
+    /// container holds 39 digits, and <c>FUNCTION ABS(S)</c> of S = -2^127 is the rounded
+    /// 170141183460469231731687303715884100000, a value its receiver holds, where the Int128 body answered the
+    /// size error of an |Int128.MinValue| the SDIDI never forms.</para>
+    /// <para>⛔ INTEGER (<c>Floor</c>) IS DELIBERATELY ABSENT. §15.44.4 r1 gives it no equivalent arithmetic expression
+    /// — "the greatest integer less than or equal to the value of argument-1" — so §15.4.1 r1 does not make its
+    /// argument an operand of an arithmetic expression, and the value of a data item argument is the item's own
+    /// (INTEGER-PART's EAE reaches INTEGER with an argument that is ALREADY an SDIDI, the ABS term). MAX / MIN /
+    /// ORD-MAX / ORD-MIN are absent for the same reason (§15.59.4 / §15.63.4 return the CONTENT of an argument).
+    /// <c>ExactCarrierBoundaryDriftTests</c> pins both facts.</para>
+    /// </remarks>
+    internal static readonly FrozenSet<string> EquivalentExpressionUnaryArms = new[]
+    {
+        "AbsScaled", "SignOf", "Truncate", "FractionPart",
+    }.ToFrozenSet(StringComparer.Ordinal);
+
+    /// <summary>Does lifting this call's argument into the SDIDI round it (§8.8.1.5.2 r1) under the statement's
+    /// arithmetic mode? Asked only of an <see cref="EquivalentExpressionUnaryArms"/> member under a standard mode.</summary>
+    /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded, so no value semantics apply.</remarks>
+    private bool ArgumentRoundsAtLift(BoundIntrinsicCall ic) =>
+        num.StandardDecimal && EquivalentExpressionUnaryArms.Contains(ic.Sig.RuntimeMethod)
+        && ic.Args.Any(a => num.LiftRounds(num.AsNum(a, num.Receiver)));
+
+    /// <summary>
     /// Under a standard arithmetic mode, evaluate a §15.4.1 r1 function's equivalent arithmetic expression ON
     /// the SDIDI carrier (<c>CobolIntrinsics.*Dec</c>) and return the result as a Dec-valued <see cref="NumX"/>
     /// that lands at the receiver ONCE — the PB56 Dec-carrier body, replacing the interim per-argument
@@ -1147,8 +1183,10 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// </summary>
     /// <remarks>
     /// <para>Routing, in ONE line: <c>CrossAlignedNativeArms ∪ StandardValueFixedByRule</c> route here for EVERY
-    /// argument shape, and everything else routes here only when a RAW argument is Dec or float. The NON-aligning
-    /// exact-EAE functions with an all-fixed-point list stay on the exact Int128 family, whose every EAE step is
+    /// argument shape, and everything else routes here only when a RAW argument is Dec or float — or, for an
+    /// <see cref="EquivalentExpressionUnaryArms"/> member, when the argument's lift would ROUND
+    /// (<see cref="ArgumentRoundsAtLift"/>, kb/Work PB2965). The remaining NON-aligning exact-EAE functions with an
+    /// all-fixed-point list stay on the exact Int128 family, whose every EAE step is
     /// then digit-identical to the SDIDI evaluation (documented equivalence, <c>COBOLNET_NUMERIC_DESIGN.md</c> D3;
     /// the &gt;34-digit exact residue keeps MORE precision than per-op rounding would) — that equivalence is what
     /// ALIGNMENT breaks, which is exactly why the aligning arms are unconditional (see
@@ -1172,7 +1210,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // arm precedes this set; the pair is listed below anyway because their argument is a STRING, so
         // AnyDecOrRealRaw is false and without the membership this early-out would return null under native.
         bool alwaysSdidi = CrossAlignedNativeArms.Contains(m) || StandardValueFixedByRule.Contains(m);
-        if (!alwaysSdidi && !AnyDecOrRealRaw(ic)) return null;
+        if (!alwaysSdidi && !AnyDecOrRealRaw(ic) && !ArgumentRoundsAtLift(ic)) return null;
 
         string mode = num.IntermediateMode;
         return m switch

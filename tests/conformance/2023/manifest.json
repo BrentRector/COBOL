@@ -452,6 +452,7 @@
   "pb2918_sdidi_lift_prohibited",
   "pb2918_native_dec_lane_wide_binary_operand",
   "pb2966_sdidi_unsigned_wide_operand_and_landing",
+  "pb2965_sdidi_equivalent_expression_functions_round_wide_argument",
   "pb66_float_edited_comma_mode",
   "pb66_float_edited_algebraic_and_checking",
   "pb2643_float_edited_deedit_blank_and_normalized",

@@ -349,4 +349,79 @@ public sealed class ExactCarrierBoundaryDriftTests
             + "COMBINED-DATETIME(1, WS-S) did not). Give the function a RenderDec arm over a `…Dec` body. "
             + "Offenders: " + string.Join(", ", offenders));
     }
+
+    // ── 4. A unary arm decides whether its argument is an operand of an equivalent arithmetic expression ────
+    //
+    // ⛔ THE FOURTH INVARIANT (kb/Work PB2965). Invariant 3 asks whether an arm HAS a Dec body; this asks when a
+    // fixed-point-only call may NOT use the exact Int128 body under STANDARD-DECIMAL. A function with an equivalent
+    // arithmetic expression (§15.4.1 r1) equals that expression evaluated in the SDIDI, whose operands are lifted
+    // with the ROUNDING §8.8.1.5.2 r1 prescribes — so for an argument the lift would round (a 16-byte binary
+    // container holds 39 digits to the SDIDI's 34) the exact body is the wrong value. EquivalentExpressionUnaryArms
+    // routes those arms; a unary arm that is in NEITHER that set nor the one named exception below was never asked.
+
+    /// <summary>The unary fraction-bearing arms with NO equivalent arithmetic expression, each with its reason:
+    /// INTEGER (<c>Floor</c>) — §15.44.4 r1 defines it as "the greatest integer less than or equal to the value of
+    /// argument-1", so its argument is a value, not an operand of an expression.</summary>
+    private static readonly string[] UnaryArmsWithNoEquivalentExpression = ["Floor"];
+
+    /// <summary>The exact switch's UNARY arms: one <c>Arg(ic, 0)</c> intake and nothing that aligns, pairs or
+    /// takes a second argument.</summary>
+    private static List<string> UnaryExactArms() =>
+        [.. ArmsOf(ExactSwitchBody())
+             .Where(a => Regex.Matches(a.Body, @"\bArg\(ic,\s*0\)").Count >= 1
+                      && !Regex.IsMatch(a.Body, @"\bArg\(ic,\s*[1-9]\)|\bAlignedArgs(Ex)?\(|\bRawArgPairs\(|\bNumericRenderer\.Align\("))
+             .SelectMany(a => a.Labels)
+             .Distinct(StringComparer.Ordinal)];
+
+    /// <summary>⛔ EVERY UNARY EXACT ARM IS DECIDED: it is in <c>EquivalentExpressionUnaryArms</c> (routed to the
+    /// SDIDI when its argument's lift rounds) or in the named exceptions above, never in neither and never in
+    /// both. A new unary function therefore cannot ship on the exact Int128 body by omission.</summary>
+    [Fact]
+    public void EveryUnaryExactArm_IsEitherRoutedByItsArgumentLiftOrNamedAsHavingNoEquivalentExpression()
+    {
+        var unary = UnaryExactArms();
+        Assert.True(unary.Count >= 5,
+            $"only {unary.Count} unary arms found ({string.Join(", ", unary.Order())}) — the scan has stopped seeing the exact switch");
+        foreach (string arm in unary)
+        {
+            bool routed = IntrinsicRenderer.EquivalentExpressionUnaryArms.Contains(arm);
+            bool exempt = UnaryArmsWithNoEquivalentExpression.Contains(arm);
+            Assert.True(routed ^ exempt,
+                $"the unary arm {arm} is " + (routed ? "both routed and exempt" : "neither routed nor exempt")
+                + ": under ARITHMETIC IS STANDARD-DECIMAL a function whose returned value is an equivalent arithmetic "
+                + "expression (§15.4.1 r1) reads its argument as an SDIDI operand, which ROUNDS past 34 digits "
+                + "(§8.8.1.5.2 r1). Add it to IntrinsicRenderer.EquivalentExpressionUnaryArms with a RenderDec arm, or "
+                + "name it in UnaryArmsWithNoEquivalentExpression with the clause that gives it no expression (kb/Work PB2965).");
+        }
+        foreach (string arm in IntrinsicRenderer.EquivalentExpressionUnaryArms)
+        {
+            Assert.Contains(arm, unary);                                // the set is not stale
+            Assert.Contains(arm, DecArmLabels());                       // and the routed body exists
+        }
+    }
+
+    /// <summary>The selection arms stay OUT of the set for the reason MAX / MIN left the cross-aligned set: the
+    /// returned value is the CONTENT of an argument (§15.59.4 r1, §15.63.4 r1), not an expression over it.</summary>
+    [Fact]
+    public void ThePureSelectionArms_AreNotRoutedByTheirArgumentLift()
+    {
+        foreach (string sel in new[] { "MaxScaled", "MinScaled", "OrdMax", "OrdMin", "Floor" })
+            Assert.False(IntrinsicRenderer.EquivalentExpressionUnaryArms.Contains(sel),
+                $"{sel} returns a value defined without an equivalent arithmetic expression (§15.59.4 r1, §15.63.4 r1, "
+                + "§15.71.4 r1, §15.72.4 r1, §15.44.4 r1), so its argument is not an SDIDI operand and is not rounded (kb/Work PB2965)");
+    }
+
+    /// <summary>The predicate both consumers share. The ONE place a digit bound is compared with the SDIDI's
+    /// precision is <c>NumericRenderer.LiftRounds</c>; <c>IntrinsicRenderer</c> asks it and never restates 34.</summary>
+    [Fact]
+    public void TheLiftPredicate_IsAskedNeverRestatedByTheIntrinsicRenderer()
+    {
+        string body = Regex.Replace(RendererSource(), @"//[^\n]*", "");
+        int at = body.IndexOf("private bool ArgumentRoundsAtLift(", StringComparison.Ordinal);
+        Assert.True(at > 0, "ArgumentRoundsAtLift is gone — the routing no longer asks the lift predicate");
+        string method = body[at..body.IndexOf(';', at)];
+        Assert.Contains("num.LiftRounds(", method);
+        Assert.DoesNotContain(".Digits", method);
+        Assert.DoesNotMatch(@"\b34\b", method);
+    }
 }

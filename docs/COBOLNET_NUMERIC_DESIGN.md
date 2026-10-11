@@ -88,7 +88,10 @@ NUMERIC-EDITED formatting: PORT the proven two-pass legacy `PicRuntime.FormatByE
 >   fixed-point** — every EAE step is exact in both engines
 >   (the documented-equivalence header of `CobolIntrinsics.Exact.cs`; the one recorded residue: an exact result
 >   past 34 digits — FACTORIAL 31–33, a >34-digit SUM chain — keeps MORE precision than the per-op-rounded
->   SDIDI would).
+>   SDIDI would). ⛔ **The word "satisfies" holds only while the argument's lift is EXACT (kb/Work PB2965, D27):**
+>   for ABS / SIGN / INTEGER-PART / FRACTION-PART — the unary functions with an equivalent arithmetic expression — an
+>   argument whose digit bound is past the SDIDI's 34 (a 16-byte binary container, an unknown bound) is ROUNDED by
+>   §8.8.1.5.2 r1, so those calls take the SDIDI body; INTEGER and the selection functions have no expression and stay exact.
 >   ⛔ **THIS PARAGRAPH READ "already satisfies it", UNQUALIFIED, AND THAT WAS FALSE IN THREE MEASURED WAYS
 >   (fix-queue PB32, 2026-08-03).** It is recorded here rather than quietly reworded because the claim is what
 >   made the family look reviewed:
@@ -1127,3 +1130,21 @@ only a magnitude past 2^128 is the §14.7.5 case 3 size error (the signed twin's
 pins the order (the Dec lane returns before the funnel); `CobolDecWideLiftTests` pins the landing.
 **Pinned by** `2023/pb2918_sdidi_lift_of_wide_binary_container`, `2023/pb2918_sdidi_lift_prohibited`,
 `2023/pb2918_native_dec_lane_wide_binary_operand`, `2023/pb2966_sdidi_unsigned_wide_operand_and_landing`.
+
+**The same question decides which function bodies a fixed-point-only call may use (kb/Work PB2965).** Whether a lift rounds
+is `NumericRenderer.LiftRounds`, the one predicate `DecOperand` acts on. Under STANDARD-DECIMAL a function whose returned
+value has an EQUIVALENT ARITHMETIC EXPRESSION — ABS (§15.7.4 r1), SIGN (§15.81.4 r1), INTEGER-PART (§15.49.4 r1),
+FRACTION-PART (§15.42.4 r1), `IntrinsicRenderer.EquivalentExpressionUnaryArms` — equals that expression evaluated in the
+SDIDI (§15.4.1 r1), so its argument is an operand the expression lifts, and D3's "the exact Int128 body is digit-identical to
+the SDIDI evaluation" holds only while the lift is exact. `IntrinsicRenderer.RenderDec` therefore claims such a call when
+`LiftRounds` is true for its argument (a 16-byte container, an unknown bound) and leaves it on the Int128 body otherwise:
+`FUNCTION ABS(S)` with S = −2^127 in `PIC S9(19) COMP-5` is the rounded 170141183460469231731687303715884100000, a value its
+receiver holds, where the Int128 body answered the size error of |−2^127|, and `FUNCTION FRACTION-PART` of a
+`PIC S9(22)V9(9) COMP-5` holding −2^127 is −0.8841, the SDIDI's −170141183460469231731687303715.8841 less its integer part,
+where the exact body answered −0.884105728. **INTEGER (`Floor`) and the pure-selection functions (MAX, MIN, ORD-MAX, ORD-MIN)
+stay exact:** §15.44.4 r1 ("the greatest integer less than or equal to the value of argument-1") and §15.59.4 r1 /
+§15.63.4 r1 ("the content of the argument-1") give them no equivalent arithmetic expression, so their argument is a value and
+not an operand, and D3's recorded residue (an exact result past 34 digits keeps more precision) is the determination that
+covers what a temporary SDIDI would hold. `ExactCarrierBoundaryDriftTests` pins the set (every unary exact arm is routed or
+named as having no expression, the selection arms stay out, the intrinsic renderer asks `LiftRounds` and never restates 34).
+**Pinned by** `2023/pb2965_sdidi_equivalent_expression_functions_round_wide_argument`.
