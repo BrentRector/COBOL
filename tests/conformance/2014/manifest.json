@@ -236,7 +236,8 @@
   "pb2818_dyn_bit_table",
   "pb2690_fixed_group_vlg_element_tables_call",
   "pb2690_fixed_group_vlg_element_tables_invoke",
-  "pb2967_numval_f_wide_binary_receiver_size_error"
+  "pb2967_numval_f_wide_binary_receiver_size_error",
+  "pb2964_length_bit_variable_group"
  ],
  "pending": []
 }

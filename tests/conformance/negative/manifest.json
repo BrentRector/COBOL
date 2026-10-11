@@ -2618,7 +2618,8 @@
   "pb2548-template-renames-unresolved",
   "pb2548-template-key-unresolved",
   "pb2548-template-odo-counter-not-integer",
-  "pb2548-template-dynamic-from-to"
+  "pb2548-template-dynamic-from-to",
+  "pb2589-repository-function-at-85"
  ],
  "pending": []
 }

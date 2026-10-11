@@ -62,11 +62,15 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             string fn = fw.Written;
             if (!ctx.Data.IsRepositoryIntrinsic(fw))   // the ONE REPOSITORY membership (kb/Work PB1083)
             {
+                // Where the REPOSITORY FUNCTION entry does not exist yet (the same constructs.json row KeywordOmittedFunction
+                // and the entry's own gate read, kb/Work PB2589) there is nothing to add: the word FUNCTION is the only form.
+                string remedy = ConstructRegistry.IsAvailable(ctx.Edition.Edition, Constructs.RepositoryFunction2002)
+                    ? $"write 'FUNCTION {fn}', or add 'REPOSITORY. FUNCTION {fn} INTRINSIC.' (or FUNCTION ALL INTRINSIC)."
+                    : $"the REPOSITORY FUNCTION entry is a COBOL-2002 introduction (targeting COBOL-{ctx.Edition.DialectLevel}), "
+                      + $"so write 'FUNCTION {fn}'.";
                 ctx.Edition.Error("COBOLNET1543",
                     $"'{fn}' is written without the word FUNCTION, but the REPOSITORY paragraph does not declare "
-                    + $"it. ISO §8.4.3.2.3 SR2 allows the omission only for an intrinsic named in REPOSITORY — "
-                    + $"write 'FUNCTION {fn}', or add 'REPOSITORY. FUNCTION {fn} INTRINSIC.' (or FUNCTION ALL "
-                    + "INTRINSIC).");
+                    + $"it. ISO §8.4.3.2.3 SR2 allows the omission only for an intrinsic named in REPOSITORY — {remedy}");
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {fn}");
             }
             // The parenthesis after the name is the ARGUMENT LIST (subscriptPart) unless it holds a colon, in which
@@ -299,8 +303,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     {
         // Keyword omission via the REPOSITORY FUNCTION specifier is a COBOL-2002 introduction (§12.3.8) — below
         // 2002 the routing is inert, so the 85/NIST surface is byte-invariant (a lone name(args) stays a data
-        // reference exactly as before). The FUNCTION-keyword form is unaffected at every edition.
-        if (ctx.Edition.DialectLevel < 2002) return null;
+        // reference exactly as before). The FUNCTION-keyword form is unaffected at every edition. ⛔ The edition is
+        // the constructs.json row of the declaration that licenses the omission (kb/Work PB2589): the entry's own gate
+        // (VersionConformancePass ParseArm.VisitRepositoryEntry) and this route read ONE fact, not two copies of 2002.
+        if (!ConstructRegistry.IsAvailable(ctx.Edition.Edition, Constructs.RepositoryFunction2002)) return null;
         if (dref.cobolWord() is not { } cw) return null;                    // special registers (LINAGE/LINE/PAGE-COUNTER) are never functions
         var suffixes = dref.dataReferenceSuffix();
         // ⛔ ZERO SUFFIXES IS A LEGAL FORM, and requiring exactly one made every ZERO-ARGUMENT intrinsic
@@ -2381,8 +2387,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// the same composer DISPLAY uses, so LENGTH(G) equals the displayed width) - for a struct-resident group
     /// and, through the cell's own composition, for a cell-backed one (an EXTERNAL record, an ADDRESS-OF-taken
     /// record); a group neither can take is reported as a named loud stage (§1.4), never as an
-    /// under-count. A bit-bearing group (its ByteWidth is the §8.5.1.6.3 layout extent, not a sum) is likewise
-    /// staged rather than corrected by subtraction.</para>
+    /// under-count. A group holding USAGE BIT items takes the same paths (kb/Work PB2964, PB2498): its ByteWidth is
+    /// the §8.5.1.6.3 layout extent, and each runtime-length subordinate it holds is a whole-byte item on byte
+    /// boundaries, so subtracting its counted extent leaves the fixed part exactly; the OCCURS DEPENDING table of
+    /// bit elements, whose occurrences share bytes, is counted in bit positions
+    /// (<see cref="BoundOdoExtent.PositionsPerCharacter"/>), and a bit GROUP's LENGTH is those positions
+    /// (§15.50.4 r1) rather than the bytes they occupy.</para>
     /// </remarks>
     private BoundExpr VariableLengthGroupSum(IntrinsicSig sig, BoundFieldOperand op, bool bytes)
     {
@@ -2401,15 +2411,26 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // item 57: LENGTH(G) equals the displayed width), so the length is the image's, through the ONE composer
         // DISPLAY uses; a group the composer cannot take (a cell-backed or bit-bearing one) stays the named stage.
         BoundExpr ImageOrStage(string what) =>
-            group.CurrentExtentImageCapable && !group.HasBitDescendant
+            group.CurrentExtentImageCapable
                 && inner is MemberPlace or DynTablePlace or RedefViewPlace { Coding: VarGroupWindow }
                 ? new BoundIntrinsicCall(sig, [op], PicCategory.Numeric) { OverCurrentImage = true }
                 : Stage(what);
 
-        if (group.HasBitDescendant)
-            return Stage("a group holding USAGE BIT items and a runtime-length subordinate — its fixed extent is a "
-                         + "§8.5.1.6.3 layout, not a sum");
-        long fixedPart = group.ByteWidth;
+        // ⛔ A BIT-BEARING GROUP IS LAID OUT, NOT SUMMED (§8.5.1.6.3; kb/Work PB2964, PB2498) — and its layout is
+        // what makes the fixed part computable: DataItem.ByteWidth already folds the bit runs (BitLayout.ExtentBits),
+        // and every runtime-length subordinate is a WHOLE-BYTE item that starts on a byte boundary and leaves the
+        // next item on one (BitLayout.SharesByteWith: a dynamic-capacity table shares no byte, a non-bit item
+        // advances to its natural boundary), so taking its counted extent out of the byte total leaves exactly the
+        // fixed part. Only an OCCURS DEPENDING table of bit elements breaks that — its occurrences pack into
+        // shared bytes — and it is counted in BIT positions below (the OdoGroupPlace unit).
+        // §15.50.4 r1: a bit GROUP's length is its boolean positions, not bytes — the unit the table term is built in.
+        bool bitPositions = !bytes && group.GroupUsage is GroupUsage.Bit;
+        // §15.50.4 r2: a national GROUP's length is its national character positions (2 bytes each, D-N1) — the
+        // unit its table term is built in. Neither a bit nor a national group can be variable-length (§13.18.29.3
+        // SR1), so an OCCURS DEPENDING table is the only runtime part either can hold.
+        bool nationalPositions = !bytes && group.GroupUsage is GroupUsage.National;
+        long fixedPart = bitPositions || nationalPositions ? ItemLength.Positions(group) : group.ByteWidth;
+        long dynamicBytes = 0;   // the bytes of dynamic-capacity tables subtracted so far (one occurrence each)
         BoundExpr? runtime = null;
         void Add(BoundExpr e) => runtime = runtime is null ? e : new BoundBinary(runtime, '+', e);
         BoundExpr? failure = null;
@@ -2440,6 +2461,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     if (tablePath is null || c.OccursSpec?.CapacityRegister is not { } reg)
                     { failure = Stage($"the dynamic-capacity table '{c.CobolName ?? c.CsName}' could not be addressed"); return; }
                     fixedPart -= c.ByteWidth;
+                    dynamicBytes += c.ByteWidth;
                     Add(new BoundBinary(new BoundNumRef(new CapacityRegisterPlace(tablePath, reg)), '*',
                                         new BoundNumLiteral(c.ByteWidth.ToString())));
                 }
@@ -2454,11 +2476,40 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     if (odo is null)   // the resolver wraps every ODO group operand — struct member or class-tier window (kb/Work PB80); reaching here is a shape it could not resolve
                     { failure = Stage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' has no resolvable data-name-1 place"); return; }
                     int elem = c.ByteWidth, max = c.Occurs ?? 1;
-                    fixedPart -= (long)elem * max;
                     // r4a / r2a — a BASED entry not associated with actual data answers the maximum (GR8b): the
                     // entry's data-address field guards the ODO term (kb/Work PB80).
-                    Add(new BoundOdoExtent(odo.Depending, spec.Min, max, 0, elem)
-                        { BasedAddress = group.Class?.BasedPointerField });   // null for a non-BASED class
+                    string? basedAddress = group.Class?.BasedPointerField;   // null for a non-BASED class
+                    if (group.HasBitDescendant)
+                    {
+                        // §8.5.1.6.3 — in a bit-bearing group the table's occurrences may share bytes with each other
+                        // and with the items before it, so the extent is counted in BIT positions exactly as the
+                        // OdoGroupPlace counts the group's own image (OdoModel.WrapGroup): the table's placement
+                        // offset plus count × stride (BitLayout.StartBitOf / StrideBits — never total − elem × max,
+                        // which would charge rule 4's trailing filler to the prefix). A character-counted group
+                        // takes the ceiling (§15.50.4 r9 / §15.14.4 r4); a bit group's LENGTH is the positions.
+                        int prefixBits = BitLayout.StartBitOf(group, c), strideBits = BitLayout.StrideBits(c);
+                        if (prefixBits < 0)
+                        { failure = Stage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' follows an overlay chain whose layout is not modelled"); return; }
+                        // The last occurrence's trailing filler is not part of the extent (BitLayout.StrideBits); in whole
+                        // characters that is the same number, in boolean positions it is not.
+                        if (bitPositions && strideBits != BitLayout.WidthBits(c))
+                        { failure = Stage($"the ALIGNED OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' of a bit group — its occurrences are padded to whole bytes, which a boolean-position count cannot state"); return; }
+                        long endBits = prefixBits + (long)max * strideBits;
+                        // The dynamic-capacity tables found so far each sit in the prefix as ONE occurrence (whole bytes,
+                        // on byte boundaries): their runtime terms add the full capacity, so the prefix counts none.
+                        fixedPart += bitPositions ? 0 : dynamicBytes;
+                        fixedPart -= bitPositions ? endBits : BitLayout.Characters((int)endBits);
+                        Add(new BoundOdoExtent(odo.Depending, spec.Min, max,
+                                prefixBits - (bitPositions ? 0 : (int)dynamicBytes * BitLayout.BitsPerCharacter), strideBits,
+                                bitPositions ? 1 : BitLayout.BitsPerCharacter)
+                            { BasedAddress = basedAddress });
+                    }
+                    else
+                    {
+                        if (nationalPositions) elem = ItemLength.Positions(c);
+                        fixedPart -= (long)elem * max;
+                        Add(new BoundOdoExtent(odo.Depending, spec.Min, max, 0, elem) { BasedAddress = basedAddress });
+                    }
                 }
                 else if (c.Occurs is { } times)
                 {

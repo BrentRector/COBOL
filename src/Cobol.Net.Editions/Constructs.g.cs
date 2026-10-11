@@ -169,6 +169,7 @@ public static class Constructs
     public const string ExternalizedNameAs2002 = "externalized-name-as-2002";
     public const string RepositoryProgram2002 = "repository-program-2002";
     public const string RepositoryProperty2002 = "repository-property-2002";
+    public const string RepositoryFunction2002 = "repository-function-2002";
     public const string PropertyClause2002 = "property-clause-2002";
     public const string ImplementsClause2002 = "implements-clause-2002";
     public const string MethodPropertySelector2002 = "method-property-selector-2002";

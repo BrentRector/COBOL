@@ -260,8 +260,13 @@ public sealed record BoundReportVaryingRef(string CsName) : BoundExpr;
 /// <paramref name="MaxOccurs"/>] with EC-BOUND-ODO set outside them (§13.18.38.4 GR7). A scale-0 integer,
 /// runtime-sourced from <paramref name="Depending"/> (data-name-1's place). Produced only by the LENGTH /
 /// BYTE-LENGTH variable-length-group builder; the backend renders <c>CobolTable.OdoExtent</c> — the SAME helper
-/// the group's sending image slices with, so the two extents cannot disagree.</summary>
-public sealed record BoundOdoExtent(Place Depending, int MinOccurs, int MaxOccurs, int FixedWidth, int ElemWidth) : BoundExpr
+/// the group's sending image slices with, so the two extents cannot disagree. The widths are in the group's own
+/// position unit: characters, or — in a group holding USAGE BIT items (§8.5.1.6.3; kb/Work PB2964) — BIT positions,
+/// with <paramref name="PositionsPerCharacter"/> positions to a character (8) so the extent rounds up to whole
+/// characters (<c>CobolTable.OdoExtentChars</c>, the image channel's rounding), or 1 when the positions ARE the
+/// answer (a bit group's LENGTH in boolean positions, §15.50.4 r1).</summary>
+public sealed record BoundOdoExtent(Place Depending, int MinOccurs, int MaxOccurs, int FixedWidth, int ElemWidth,
+    int PositionsPerCharacter = 1) : BoundExpr
 {
     /// <summary>The BASED entry's data-address field (<c>__addr_X</c>) when the group is a BASED record (kb/Work PB80):
     /// §15.50.4 r4a / §15.14.4 r2a — "if argument-1 is a based entry not associated with actual data … the length

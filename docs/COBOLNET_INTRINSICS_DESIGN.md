@@ -399,7 +399,7 @@ LENGTH(FUNCTION LENGTH(X))`) is not a literal the source wrote: `BoundNumLiteral
 (`BindIntrinsicCore`) to every syntax rule that asks "is this operand a literal" (kb/Work PB1662). What the catch-all
 refuses is named for what was WRITTEN — `WrittenForm`: a numeric literal, or an arithmetic expression.
 
-**`VariableLengthGroupSum` is one expression, in BYTES, from ONE width walk corrected for what it cannot know:**
+**`VariableLengthGroupSum` is one expression, in BYTES (positions for a bit or national GROUP), from ONE width walk corrected for what it cannot know:**
 `ByteWidth` counts an ODO table at its MAXIMUM, a dynamic-capacity table as ONE occurrence and a dynamic-length leaf
 as zero, so the builder subtracts the first two and adds the runtime term for each — the ODO table's current extent
 as a `BoundOdoExtent` (data-name-1's value clamped to [integer-1, integer-2] with EC-BOUND-ODO outside, §13.18.38.4
@@ -409,8 +409,16 @@ through a `CapacityRegisterPlace` (the register is now minted for EVERY dynamic 
 `CAPACITY IN` — `DataBinder.DynamicResolve`). Every subordinate's place is DERIVED from the group's own access path
 (a `MemberSegment` per level), so a subscripted or nested group sums correctly. The one shape it will not sum is
 NAMED, never miscounted: a runtime-length item INSIDE a table element (a per-occurrence loop; §15.50.4 r7c's "based
-on their current capacity" defines only the fixed-element case), and a bit-bearing group (its `ByteWidth` is the
-§8.5.1.6.3 layout, not a sum) — both a loud stage with the shape in the message. An ODO group inside a BASED entry
+on their current capacity" defines only the fixed-element case; the group's current image states it when the
+current-extent composer takes the group), a loud stage with the shape in the message. **A group that holds USAGE BIT
+items takes the same walk (kb/Work PB2964, PB2498):** `ByteWidth` is the §8.5.1.6.3 layout extent, and the dynamic
+leaves and dynamic-capacity tables it holds are whole-byte items on byte boundaries (`BitLayout.SharesByteWith`), so
+the subtraction leaves the fixed part exactly; a dynamic-capacity table of bit elements counts capacity × the
+ceil(n / 8) element length (CONFORMANCE.md DOC-A.1-61). An ODO table in such a group is counted in BIT positions —
+`BitLayout.StartBitOf` + `StrideBits`, the unit `OdoModel.WrapGroup` counts the group's image in — and
+`BoundOdoExtent.PositionsPerCharacter` rounds it up to whole characters (8; §15.50.4 r9 / §15.14.4 r4) or leaves it
+as the answer (1; a bit GROUP's LENGTH is its boolean positions, r1). A national GROUP's LENGTH is its national
+positions (r2), built the same way. An ODO group inside a BASED entry
 or a REDEFINES-class record is never wrapped as an `OdoGroupPlace` by the resolver, so its r4 extent (and its GR8
 sending slice) is not applied — kb/Work PB80. PHYSICAL (§15.50.4 r8 / §15.14.4 r7) is accepted on both functions
 and transparent under WiseOwl COBOL's determination that a group is physically located where it is defined
@@ -694,6 +702,15 @@ word goes through `CobolWordsMap.Resolve` (GR14 —
 an UNDEFINE'd or SUBSTITUTE'd-away name leaves the ALL list, a SUBSTITUTE literal-5 or EQUATE literal-2 joins it)
 and its function's D8 window (`IntrinsicSig.IsDefinedAt` — Annex E.2 item 13's seven names are prohibited under ALL
 only from 2023). Golden `2023/pb1083_repository_all_cobol_words`; negatives `pb1083-*`.
+
+**The edition of the omission is the edition of its declaration (kb/Work PB2589).** The REPOSITORY FUNCTION entry
+(§12.3.8.2's intrinsic-function-specifier and user-defined-function-specifier — three grammar alternatives, one
+construct) is a 2002 introduction: the constructs.json row `repository-function-2002`, gated at the declaration by
+`VersionConformancePass.ParseArm.VisitRepositoryEntry` beside its CLASS / INTERFACE / PROGRAM / PROPERTY siblings
+(COBOLNET0900), so a program below 2002 cannot write the declaration that §8.4.3.2.3 SR2 requires before FUNCTION may
+be omitted. `KeywordOmittedFunction` is inert where the row is not available and the reserved-name arm names the
+missing edition in its COBOLNET1543 text; both read the row through `ConstructRegistry.IsAvailable`, never a literal
+2002. Golden `2002/pb2589_repository_function_keyword_omitted`; negative `pb2589-repository-function-at-85`.
 
 **The same funnel is the one-type-per-word census (kb/Work PB990, §8.3.2.2).** "*Within a source element, a given
 user-defined word may be used as only one type of user-defined word*" is asked at `DeclareUserWord` too

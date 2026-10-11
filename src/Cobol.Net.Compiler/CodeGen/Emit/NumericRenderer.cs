@@ -263,12 +263,18 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     // kb/Work PB61): CobolTable.OdoExtent over data-name-1's current count — scale 0, EC-BOUND-ODO inside.
     public NumX Visit(BoundOdoExtent n)
     {
-        string extent = RuntimeApi.TableOdoExtent(PlaceRenderer.CountRead(n.Depending),
-            n.MinOccurs, n.MaxOccurs, n.FixedWidth, n.ElemWidth);
+        // The widths are in the group's own position unit; a bit-bearing group's are BIT positions (kb/Work PB2964), and
+        // the extent then rounds up to whole characters — the rounding the group's image channel takes
+        // (RuntimeApi.TableOdoExtentChars), the identity when the positions ARE characters or are the answer.
+        string extent = n.PositionsPerCharacter == 1
+            ? RuntimeApi.TableOdoExtent(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs, n.FixedWidth, n.ElemWidth)
+            : RuntimeApi.TableOdoExtentChars(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs,
+                n.FixedWidth, n.ElemWidth, n.PositionsPerCharacter);
         // A BASED entry not associated with actual data answers GR8b's maximum (§15.50.4 r4a / §15.14.4 r2a —
         // kb/Work PB80); the null test comes FIRST, before data-name-1 (possibly inside the entry) is read.
+        long maximum = (n.FixedWidth + (long)n.MaxOccurs * n.ElemWidth + n.PositionsPerCharacter - 1) / n.PositionsPerCharacter;
         return new(n.BasedAddress is { } addr
-            ? $"({RuntimeApi.PtrIsNull(addr)} ? (long){n.FixedWidth + (long)n.MaxOccurs * n.ElemWidth} : {extent})"
+            ? $"({RuntimeApi.PtrIsNull(addr)} ? (long){maximum} : {extent})"
             : extent, 0);
     }
     public NumX Visit(BoundBinary n)

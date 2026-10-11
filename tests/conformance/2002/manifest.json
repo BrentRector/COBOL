@@ -831,7 +831,9 @@
   "pb2548_template_clauses_resolve",
   "pb2548_template_counter_per_use_site",
   "pb2548_template_counter_unused_elsewhere",
-  "pb2967_float_result_wide_binary_receiver_size_error"
+  "pb2967_float_result_wide_binary_receiver_size_error",
+  "pb2498_length_odo_bit_national_group",
+  "pb2589_repository_function_keyword_omitted"
   ],
   "pending": []
 }

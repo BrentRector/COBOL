@@ -374,23 +374,28 @@ public sealed class IntrinsicFunctionDifferentialTests
         // and pinning it GREEN held a gap open (feedback_green_test_can_hold_a_gap_open): §15.14.3 r1 admits
         // "a data item of any class or category" and §8.4.3.3.4 GR6 makes a ref-mod a data item, so that shape
         // is a conforming reference with the answer 2 (kb/Work PB61, AR-15.14.3-1). It is now the POSITIVE
-        // twin below. The one NAMED residue left in the LENGTH family is a variable-length group that also holds
-        // USAGE BIT items (VariableLengthGroupSum's documented loud stage: its fixed extent is a §8.5.1.6.3 layout,
-        // not a sum): that is the shape that proves the doctrine now, and it stays loud with the shape in its
-        // message. (kb/Work PB244: the FIXED-OCCURS table of runtime-length elements is summed per occurrence, and
-        // an OCCURS DEPENDING or dynamic-capacity table of them - struct-resident or cell-backed - is the length of
-        // its current image — the positive twins, below.)
+        // twin below. A variable-length group that also holds USAGE BIT items was the next residue and is now
+        // summed too (kb/Work PB2964, PB2498: the fixed part is the §8.5.1.6.3 layout, golden
+        // 2014/pb2964_length_bit_variable_group). The one NAMED residue left in the LENGTH family is a table of
+        // runtime-length elements in a group that ALSO holds an OCCURS DEPENDING table of bit items: the table's
+        // total is a per-occurrence loop that only the group's current-extent image can state, and that composer
+        // does not take a bit-bearing ODO group (DataItem.CurrentExtentComposes), so VariableLengthGroupSum's
+        // ImageOrStage stays the documented loud stage and names the table. That is the shape that proves the
+        // doctrine now. (kb/Work PB244: the FIXED-OCCURS table of runtime-length elements is summed per
+        // occurrence, and an OCCURS DEPENDING or dynamic-capacity table of them - struct-resident or cell-backed -
+        // is the length of its current image — the positive twins, below.)
         var (ok, output, detail) = new CobolNetCompiler(2023).CompileAndRun(
             Program("01 WS-X PIC X(5) VALUE \"ABCDE\".\n01 T PIC 9(4).",
                 "    MOVE FUNCTION BYTE-LENGTH(WS-X(1:2)) TO T.\n    DISPLAY T."));
         Assert.True(ok, detail);
         Assert.Contains("0002", output);
         (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun(
-            Program("01 G.\n   05 BA PIC 1 USAGE BIT.\n   05 BB PIC 1 USAGE BIT.\n   05 D PIC X DYNAMIC LENGTH.\n01 T PIC 9(4).",
-                "    MOVE \"ab\" TO D.\n    MOVE FUNCTION LENGTH(G) TO T.\n    DISPLAY T."));
+            Program("01 N PIC 9 VALUE 2.\n01 G.\n   05 TD OCCURS DYNAMIC CAPACITY IN CP.\n      10 DD PIC X DYNAMIC LENGTH.\n"
+                    + "   05 H.\n      10 B PIC 1 USAGE BIT.\n      10 TB PIC 1 USAGE BIT OCCURS 1 TO 8 DEPENDING ON N.\n01 T PIC 9(4).",
+                "    MOVE \"ab\" TO DD(1).\n    MOVE FUNCTION LENGTH(G) TO T.\n    DISPLAY T."));
         Assert.False(ok);
         Assert.Contains("LENGTH", detail);
-        Assert.Contains("USAGE BIT items and a runtime-length subordinate", detail);
+        Assert.Contains("the dynamic-capacity table 'TD' has a runtime-length element", detail);
     }
 
     /// <summary>kb/Work PB244 - the cell-backed twin of

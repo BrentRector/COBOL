@@ -1628,6 +1628,14 @@ internal sealed class VersionConformancePass
                 _p.Check(Constructs.RepositoryInterface2002, $"REPOSITORY INTERFACE '{ifn.GetText()}'");
             else if (ctx.CLASS() is not null && ctx.className() is { } cn)
                 _p.Check(Constructs.RepositoryClass2002, $"REPOSITORY CLASS '{cn.GetText()}'");
+            // §12.3.8.2's intrinsic-function-specifier (`FUNCTION ALL INTRINSIC`, `FUNCTION name … INTRINSIC`) and
+            // user-defined-function-specifier (`FUNCTION name [AS literal-5]`): the three FUNCTION alternatives are one
+            // specifier family and one 2002 introduction (kb/Work PB2589). It is the declaration §8.4.3.2.3 SR2 requires
+            // before a function-identifier may omit the word FUNCTION, so an '85 program cannot write the omitted form.
+            else if (ctx.FUNCTION() is not null)
+                _p.Check(Constructs.RepositoryFunction2002, ctx.ALL() is not null
+                    ? "REPOSITORY FUNCTION ALL INTRINSIC"
+                    : $"REPOSITORY FUNCTION {string.Join(' ', ctx.functionName().Select(f => f.GetText()))}");
             return base.VisitChildren(ctx);
         }
 

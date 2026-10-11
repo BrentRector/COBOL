@@ -2135,6 +2135,19 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. RPRQ1.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    PROPERTY PRQX.\nPROCEDURE DIVISION.\nMAIN.\n    STOP RUN.\n"
   },
   {
+   "id": "repository-function-2002",
+   "status": "active",
+   "description": "The REPOSITORY FUNCTION entry — §12.3.8.2's intrinsic-function-specifier (`FUNCTION ALL INTRINSIC` / `FUNCTION { intrinsic-function-name-1 } … INTRINSIC`) and user-defined-function-specifier (`FUNCTION function-prototype-name-1 [AS literal-5]`) — introduced 2002 with the REPOSITORY paragraph itself: the '85 CONFIGURATION SECTION has no REPOSITORY paragraph. Introduction-gated post-bind by VersionConformancePass ParseArm.VisitRepositoryEntry beside its CLASS/INTERFACE/PROGRAM/PROPERTY siblings; below 2002 the gate names the edition (COBOLNET0900). It is also THE edition fact the keyword-omitted function reference reads (§8.4.3.2.3 SR2 allows the omission only for a name the REPOSITORY declares): IntrinsicBinder.KeywordOmittedFunction is inert where the entry is not available, and the reserved-name arm (SUM, SIGN, RANDOM, LENGTH) reaches only a REPOSITORY the gate has already refused (kb/Work PB2589).",
+   "display": "the REPOSITORY FUNCTION entry",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §12.3.8.2 (intrinsic-function-specifier, user-defined-function-specifier); §8.4.3.2.3 SR2",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "kb/Work PB2589 — the keyword-omitted reserved intrinsic compiled at --std 85 because the declaration that licenses the omission was ungated",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. RFNQ1.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    FUNCTION ALL INTRINSIC.\nPROCEDURE DIVISION.\nMAIN.\n    STOP RUN.\n"
+  },
+  {
    "id": "property-clause-2002",
    "status": "active",
    "description": "The PROPERTY data-description clause (ISO 13.18.42) - introduced 2002 (OO). {is2002()}?-gated in dataDescriptionClause plus the valueItem loop guard (at 2002+ PROPERTY is reserved (8.9) so it terminates a VALUE clause instead of parsing as a constant-name operand); accessors synthesize per GR1/GR2 under the pinned __GET_/__SET_ names (11.7.4 GR1a). Below 2002 the W1.5 parse-layer mapping names the edition (0900). The sample writes the clause where 13.18.42.3 SR1 permits it - the working-storage section of an instance definition (kb/Work PB1273: a PROPERTY clause in a program is COBOLNET2563).",

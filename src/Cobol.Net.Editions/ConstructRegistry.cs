@@ -18,6 +18,14 @@ public static partial class ConstructRegistry
     public static ConstructDialectStatus? Find(string id) =>
         (_byId ??= Entries.ToDictionary(e => e.Id, StringComparer.Ordinal)).GetValueOrDefault(id);
 
+    /// <summary>True when the construct <paramref name="id"/> is in force at <paramref name="edition"/> — the quiet
+    /// twin of <see cref="Check"/> for a site that must BRANCH on the edition fact instead of reporting it (a binder
+    /// route that is inert below the edition that introduced its declaration surface, kb/Work PB2589). It reads the
+    /// same row <see cref="Check"/> reports from, so the branch and the diagnostic cannot name different editions.</summary>
+    public static bool IsAvailable(EditionInfo edition, string id) =>
+        (Find(id) ?? throw new ArgumentException($"unregistered construct id '{id}'", nameof(id)))
+            .StatusAt(edition.Year) == ConstructAvailability.Available;
+
     /// <summary>
     /// THE gating entry point: evaluate <paramref name="id"/> at <paramref name="edition"/> and report the
     /// verdict to <paramref name="sink"/> at the severity <see cref="EditionSeverityPolicy"/> dictates —
