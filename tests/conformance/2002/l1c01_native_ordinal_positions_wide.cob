@@ -28,7 +28,12 @@
       *> CHAR-NATIONAL are 2002 constructs.
       *> DERIVATION of every .out line:
       *>   ORD(X"00")  U+0000, the lowest ordinal     -> ORD-X00=00001
-      *>   ORD(X"FF")  U+00FF = 255                   -> ORD-XFF=00256
+      *>   ORD(X"FF")  the byte 0xFF is U+FFFF, the
+      *>               highest native character (the
+      *>               storage-byte law; kb/Work PB2919
+      *>               reversed the former U+00FF)     -> ORD-XFF=65536
+      *>   ORD("ÿ")    U+00FF = 255 (a character, not
+      *>               a hexadecimal byte)             -> ORD-YUML=00256
       *>   ORD("€")    U+20AC = 8364 (the set is all
       *>               65,536 code units, not 256)   -> ORD-EURO=08365
       *>   ORD(N"A")   national U+0041, same numbering -> ORD-NA=00066
@@ -46,6 +51,8 @@
            DISPLAY "ORD-X00=" R
            COMPUTE R = FUNCTION ORD(X"FF")
            DISPLAY "ORD-XFF=" R
+           COMPUTE R = FUNCTION ORD("ÿ")
+           DISPLAY "ORD-YUML=" R
            COMPUTE R = FUNCTION ORD("€")
            DISPLAY "ORD-EURO=" R
            COMPUTE R = FUNCTION ORD(N"A")

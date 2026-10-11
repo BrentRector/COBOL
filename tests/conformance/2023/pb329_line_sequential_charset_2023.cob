@@ -122,10 +122,13 @@
       *> ---- F. the boundary. SPACE (U+0020) is the LOWEST member;
       *>         DEL (U+007F) and the Latin-1 supplement are members
       *>         too, so an ordinary 8-bit text file never reports 09.
+      *>         (The U+00FF character is written as the literal "ÿ":
+      *>         the hexadecimal X"FF" is the byte 0xFF, U+FFFF, kb/Work
+      *>         PB2919.)
            OPEN OUTPUT OUTF.
            MOVE "A B" TO O-REC.
            MOVE X"7F" TO O-REC(4:1).
-           MOVE X"FF" TO O-REC(5:1).
+           MOVE "ÿ" TO O-REC(5:1).
            MOVE "Z" TO O-REC(6:1).
            WRITE O-REC.
            DISPLAY "B1=" OUT-ST.

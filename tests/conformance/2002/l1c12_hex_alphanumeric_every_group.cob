@@ -26,19 +26,20 @@
       *> THE DOCUMENTED CHOICE (docs/CONFORMANCE.md row DOC-A.1-95):
       *>   "The case does not arise: every
       *> hex-character-sequence has a corresponding character." Group hh
-      *>   is the character U+00hh, stored
+      *>   is the character with that DISPLAY byte (U+00hh, except
+      *>   FF, which is U+FFFF by the storage-byte law), stored
       *> "including the control codes 00-1F, 7F and 80-9F, with no
       *>   diagnostic and no exception
       *> condition. Example: X"80FF0041" is four characters whose
-      *>   FUNCTION ORD values are 129, 256, 1
+      *>   FUNCTION ORD values are 129, 65536, 1
       *> and 66."  (Native collating sequence: ordinal = code + 1.)
       *> DERIVATION OF THE EXPECTED OUTPUT:
       *>   X"80FF0041" is four characters, one per group
       *>     => LEN:4
-      *>   its characters' ORD values: 80->129, FF->256, 00->1, 41->66
-      *>     => ORD:129 256 001 066
+      *>   its characters' ORD values: 80->129, FF->65536, 00->1, 41->66
+      *>     => ORD:00129 65536 00001 00066
       *>   the edge groups 1F, 7F, 9F in WS-H: 31+1, 127+1, 159+1
-      *>     => ORD:032 128 160
+      *>     => ORD:00032 00128 00160
       *>   X"41" is the character "A" (same bit configuration, GR4)
       *>     => EQ-A
       *>   with every EC checked, no exception condition is raised by
@@ -52,10 +53,10 @@
        WORKING-STORAGE SECTION.
        01  WS-G    PIC X(4).
        01  WS-H    PIC X(3) VALUE X"1F7F9F".
-       01  O1      PIC 999.
-       01  O2      PIC 999.
-       01  O3      PIC 999.
-       01  O4      PIC 999.
+       01  O1      PIC 9(5).
+       01  O2      PIC 9(5).
+       01  O3      PIC 9(5).
+       01  O4      PIC 9(5).
        01  WS-LEN  PIC 9.
        PROCEDURE DIVISION.
        MAIN-P.

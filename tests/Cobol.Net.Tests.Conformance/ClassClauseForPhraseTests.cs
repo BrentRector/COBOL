@@ -138,8 +138,15 @@ public sealed class ClassClauseForPhraseTests
     /// THROUGH the native set, outnumbers STANDARD-1's 128 (the positive control's 26 do not).</summary>
     [Fact]
     public void MoreCharactersThanTheInSet_IsSR17_5() =>
-        Rejects("PB976B5", "CLASS C9 IS 1 THRU 2 X\"00\" THRU X\"FF\" IN S1.",
+        Rejects("PB976B5", "CLASS C9 IS 1 THRU 2 X\"00\" THRU \"ÿ\" IN S1.",
             "256 characters are specified — more than the 128 characters of the character set referenced by alphabet-name-4 (STANDARD-1) (ISO §12.3.7.3 SR17 b5)");
+
+    /// <summary>kb/Work PB2919 — the hexadecimal literal X"FF" is the byte 0xFF, U+FFFF (the storage-byte law), so
+    /// <c>X"00" THRU X"FF"</c> names the whole 65,536-character native set, not the Latin-1 block of the test above.</summary>
+    [Fact]
+    public void HexRangeToFF_NamesTheWholeNativeSet_IsSR17_5() =>
+        Rejects("PB2919B5", "CLASS C9 IS 1 THRU 2 X\"00\" THRU X\"FF\" IN S1.",
+            "65536 characters are specified — more than the 128 characters of the character set referenced by alphabet-name-4 (STANDARD-1) (ISO §12.3.7.3 SR17 b5)");
 
     /// <summary>§12.3.7.3 SR11 — "Literal-1, literal-2, literal-3, literal-4, literal-5, literal-6, and literal-9 shall
     /// specify neither a symbolic-character figurative constant nor a zero-length literal", for the CLASS clause and

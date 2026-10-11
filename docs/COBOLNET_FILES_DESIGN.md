@@ -2101,7 +2101,11 @@ bit runs, OCCURS, national), which is two mechanisms for one job.
 **Accepted cost (owner R52, generalized; DOC-A.1-31).** U+00FF and U+FFFF share the byte 0xFF, so a real `ÿ` that
 passes through a byte — the record medium of a fixed-record file, or a byte-form storage position (a group MOVE of
 `ÿ` over a COMP field) — returns as HIGH-VALUE. In an alphanumeric leaf in memory it stays U+00FF, the literal
-`X"FF"` stays U+00FF, and a LINE SEQUENTIAL file (UTF-8, PB1760) carries it exactly.
+`ÿ` is written as the literal `"ÿ"` or `FUNCTION CHAR(256)`, and a LINE SEQUENTIAL file (UTF-8, PB1760) carries it
+exactly. The hexadecimal literal `X"FF"` is NOT that character: it is the byte 0xFF, so it takes the law's character,
+U+FFFF, exactly like a binary item's byte (kb/Work PB2919; §8.3.3.2.4 GR4 — the literal's characters "[have] the bit
+configuration specified by" each digit pair). Were the literal U+00FF, the REDEFINES view of a binary -2 (bytes FF FF FF FE)
+would compare unequal to `X"FFFFFFFE"`, and two items holding the same value would have different images.
 
 **A CODE-SET file.** No alphabet's correspondence names U+FFFF, so HIGH-VALUE crosses a CODE-SET medium as that coded
 character set's HIGHEST code unit — 0xFF under `EBCDIC`, 0x7F under STANDARD-1 / STANDARD-2 / `ASCII` — and that unit

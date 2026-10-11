@@ -69,7 +69,7 @@ public sealed class InitialStateBackgroundDriftTests : CobolNetTestBase
     [InlineData("X\"5A\"", 0x5A)]
     [InlineData("X'5A'", 0x5A)]
     [InlineData("x\"00\"", 0x00)]
-    [InlineData("X\"ff\"", 0xFF)]
+    [InlineData("X\"ff\"", 0xFFFF)]   // kb/Work PB2919: the byte 0xFF is U+FFFF (the storage-byte law), as in every X"hh"
     [InlineData("\"Z\"", -1)]         // format 1 — NOT hexadecimal-alphanumeric, however short
     [InlineData("'Z'", -1)]
     [InlineData("\"AB\"", -1)]

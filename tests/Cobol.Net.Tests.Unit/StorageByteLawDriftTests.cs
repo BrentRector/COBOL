@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Text.RegularExpressions;
+using CobolNet.Common;
+using CobolNet.Runtime;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -22,7 +24,7 @@ public sealed class StorageByteLawDriftTests
 
     private static IEnumerable<(string File, int Line, string Text)> Hits(Regex rx)
     {
-        foreach (string project in new[] { "Cobol.Net.Runtime", "Cobol.Net.Compiler" })
+        foreach (string project in new[] { "Cobol.Net.Runtime", "Cobol.Net.Compiler", "Cobol.Net.Frontend" })
             foreach (string file in Directory.EnumerateFiles(TestRepo.Src(project), "*.cs", SearchOption.AllDirectories))
             {
                 if (file.Replace('\\', '/').Contains("/obj/") || file.Replace('\\', '/').Contains("/bin/")) continue;
@@ -43,6 +45,35 @@ public sealed class StorageByteLawDriftTests
         var hits = Hits(ByteToCharCast).ToList();
         Assert.True(hits.Count == 0, "image the byte through StorageByte.ToChar, never (char)(byte):\n"
             + string.Join("\n", hits.Select(h => $"{h.File}:{h.Line}: {h.Text}")));
+    }
+
+    /// <summary>⛔ A HEXADECIMAL ALPHANUMERIC LITERAL IS A BYTE-TO-CHARACTER SITE TOO (kb/Work PB2919). X"hh" is the
+    /// character whose DISPLAY byte is hh (§8.3.3.2.4 GR4), so it is imaged by the same law as a binary item's
+    /// storage: X"FF" is U+FFFF, which makes <c>IF GX = X"FFFFFFFE"</c> true for the REDEFINES view of a binary -2.
+    /// Every decoder of the pair form (the literal, the COPY library-text name's digits) is this one mapping.</summary>
+    [Fact]
+    public void HexAlphanumericLiteralPairsAreImagedByTheStorageByteLaw()
+    {
+        for (int b = 0; b <= 0xFF; b++)
+        {
+            string expected = StorageByte.ToChar((byte)b).ToString();
+            Assert.Equal(expected, CobolLiteral.DecodeHex($"X\"{b:X2}\""));
+            Assert.Equal(expected, CobolLiteral.DecodeHex($"X'{b:x2}'"));
+            Assert.Equal(expected, CobolLiteral.Decode($"X\"{b:X2}\""));
+            Assert.Equal(expected, CobolLiteral.DecodeHexDigits($"{b:X2}"));
+        }
+        Assert.Equal(NativeCollatingSequence.HighValue, CobolLiteral.DecodeHex("X\"FF\"")[0]);
+        Assert.Equal("￿￿￿þ", CobolLiteral.DecodeHex("X\"FFFFFFFE\""));
+        Assert.Equal(StorageByte.ToChars([0xFF, 0xFF, 0xFF, 0xFE]), CobolLiteral.DecodeHex("X\"FFFFFFFE\""));
+        Assert.Null(CobolLiteral.DecodeHexDigits("F"));
+        Assert.Null(CobolLiteral.DecodeHexDigits("ZZ"));
+    }
+
+    /// <summary>A national hexadecimal group is a UTF-16 code unit (§8.3.3.5.4 GR4), not a byte: NX"00FF" stays U+00FF.</summary>
+    [Fact]
+    public void HexNationalLiteralGroupsAreCodeUnitsNotBytes()
+    {
+        Assert.Equal("ÿ", CobolLiteral.Decode("NX\"00FF\""));
     }
 
     [Fact]

@@ -626,7 +626,7 @@ public sealed class CopyProcessor(
             var literal = TextWordScanner.DecomposeLiteral(w.Value);
             name = !literal.Terminated || !literal.IsAlphanumeric ? null
                 : literal.Prefix.Length == 0 ? literal.Content
-                : DecodeHexadecimal(literal.Content);
+                : CobolNet.Common.CobolLiteral.DecodeHexDigits(literal.Content);
             if (name is null)
                 LiteralForm(w.Start, $"{w.Value} is not an alphanumeric literal — §7.2.3.3 SR5: \"Literal-1 and "
                     + "literal-2 shall be alphanumeric literals\"");
@@ -657,23 +657,6 @@ public sealed class CopyProcessor(
             return null;
         }
         return name;
-    }
-
-    /// <summary>The value of a hexadecimal alphanumeric literal's content (§8.3.3.2.2 format 2: each pair of
-    /// hexadecimal digits is one alphanumeric character); null when the content is not an even number of
-    /// hexadecimal digits.</summary>
-    private static string? DecodeHexadecimal(string hexDigits)
-    {
-        if (hexDigits.Length % 2 != 0) return null;
-        var chars = new char[hexDigits.Length / 2];
-        for (int i = 0; i < chars.Length; i++)
-        {
-            if (!byte.TryParse(hexDigits.AsSpan(2 * i, 2), System.Globalization.NumberStyles.AllowHexSpecifier,
-                    System.Globalization.CultureInfo.InvariantCulture, out byte b))
-                return null;
-            chars[i] = (char)b;
-        }
-        return new string(chars);
     }
 
     /// <summary>Report a §7.2.3.3 SR1 / SR2 placement violation (COBOLNET2451) at a SOURCE origin.</summary>

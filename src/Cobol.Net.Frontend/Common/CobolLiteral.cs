@@ -322,7 +322,12 @@ public static class CobolLiteral
 
     /// <summary>Decode <paramref name="digits"/> as groups of <paramref name="perChar"/> hexadecimal digits, one
     /// character per group — the §8.3.3.5.4 GR4 hexadecimal-national mapping, and the shape §8.3.3.2's
-    /// alphanumeric hex form uses with <paramref name="perChar"/> = 2. A trailing partial group violates
+    /// alphanumeric hex form uses with <paramref name="perChar"/> = 2 (§8.3.3.2.4 GR4 — "each of which has the bit
+    /// configuration specified by one occurrence of hex-character-sequence-1"). A two-digit group is the alphanumeric
+    /// character whose DISPLAY byte has that bit configuration, so it is imaged by the ONE storage-byte law
+    /// (<see cref="StorageByte.ToChar"/>): <c>X"FF"</c> is the byte 0xFF, i.e. U+FFFF, the native HIGH-VALUE and the same
+    /// character a binary or packed item's byte 0xFF has through a REDEFINES (kb/Work PB2919); a four-digit group is the
+    /// national character whose UTF-16 code unit is that value. A trailing partial group violates
     /// §8.3.3.5.3 SR5 (and a non-hexadecimal digit §8.3.3.5.3 SR4 / §8.3.3.2.3 SR5) and yields the empty string:
     /// the literal screen reports the violation (<see cref="HexGroupViolation"/>, <see cref="RepertoireViolation"/>),
     /// so a malformed literal has no value to produce.</summary>
@@ -332,7 +337,10 @@ public static class CobolLiteral
         if (digits.Length % perChar != 0 || !IsInRepertoire(digits)) return "";
         var chars = new char[digits.Length / perChar];
         for (int i = 0; i < chars.Length; i++)
-            chars[i] = (char)Convert.ToInt32(digits.Substring(i * perChar, perChar), 16);
+        {
+            int unit = Convert.ToInt32(digits.Substring(i * perChar, perChar), 16);
+            chars[i] = perChar == 2 ? StorageByte.ToChar((byte)unit) : (char)unit;
+        }
         return new string(chars);
     }
 
@@ -344,6 +352,12 @@ public static class CobolLiteral
     /// hex, kb/Work PB1136) included — and by the §8.8.3 concatenation fold.</summary>
     public static string DecodeHex(string raw)
         => SplitLiteral(raw) is { Prefix: "X" } lit ? DecodeHexGroups(lit.Body[1..^1], 2) : "";
+
+    /// <summary>The value of the digits between an <c>X"…"</c> literal's delimiters, or <see langword="null"/> when they
+    /// are not an even number of hexadecimal digits — the same pair-to-character mapping as <see cref="DecodeHex"/> for a
+    /// consumer (the COPY library-text name, §7.2.3.3) that holds the content apart from its delimiters.</summary>
+    public static string? DecodeHexDigits(string digits)
+        => digits.Length % 2 != 0 || !IsInRepertoire(digits) ? null : DecodeHexGroups(digits, 2);
 
     /// <summary>If <paramref name="raw"/> is the figurative <c>ALL "literal"</c> / <c>ALL 'literal'</c> form (a
     /// VALUE / level-88 operand text), the decoded literal; otherwise <see langword="null"/> (e.g. <c>ALL ZEROS</c>,

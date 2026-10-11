@@ -240,8 +240,9 @@ internal static class OptionsBinder
         if (raw is null || raw.Length != 5) return null;                       // X + quote + 2 digits + quote
         if (raw[0] is not ('X' or 'x')) return null;
         if (raw[1] is not ('"' or '\'') || raw[4] != raw[1]) return null;
-        return int.TryParse(raw.AsSpan(2, 2), System.Globalization.NumberStyles.HexNumber,
-                            System.Globalization.CultureInfo.InvariantCulture, out int b) ? (char)b : null;
+        // The ONE hexadecimal-alphanumeric decoder maps the byte to its character by the storage-byte law
+        // (X"FF" is U+FFFF, kb/Work PB2919); a private (char)b here was a second copy of that mapping.
+        return CobolNet.Common.CobolLiteral.DecodeHex(raw) is { Length: 1 } one ? one[0] : null;
     }
 
     /// <summary>The storage-section targets of the INITIALIZE clause. ISO §11.9.10.2 encloses

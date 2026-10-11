@@ -38,7 +38,11 @@ public static class NativeCollatingSequence
 /// numeric view decodes 0xFF from U+FFFF through <see cref="ToByte"/>.</para>
 /// <para><b>Accepted cost</b> (owner R52, docs/CONFORMANCE.md DOC-A.1-31): a real <c>ÿ</c> (U+00FF) that passes
 /// through a byte — the record medium or a byte-form storage position — returns as HIGH-VALUE. In an alphanumeric
-/// leaf in memory it stays U+00FF, and so does the literal <c>X"FF"</c>.</para></summary>
+/// leaf in memory it stays U+00FF (the literal <c>"ÿ"</c>, <c>FUNCTION CHAR(256)</c>).</para>
+/// <para><b>A hexadecimal literal is a byte too</b> (kb/Work PB2919). <c>X"hh"</c> is the character whose bit
+/// configuration is hh (§8.3.3.2.4 GR4), so <c>CobolLiteral.DecodeHex</c> images each pair through
+/// <see cref="ToChar"/>: <c>X"FF"</c> is U+FFFF, the HIGH-VALUE character — the same character a binary item's byte
+/// 0xFF has through a REDEFINES, which is what makes <c>IF GX = X"FFFFFFFE"</c> true for the view of a binary -2.</para></summary>
 public static class StorageByte
 {
     /// <summary>The character that stands for <paramref name="b"/>.</summary>
