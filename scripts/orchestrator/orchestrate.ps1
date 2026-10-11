@@ -615,6 +615,8 @@ try {
         try {
             $ls = Invoke-Py @((Join-Path $Here 'ledger_state.py'), 'owed', '--repo', $RepoDir)
             if ($ls -match '^owed') {
+                # $ls is read on origin/main, fetched (kb/Work PB2987); when it says the checkout is behind, the
+                # publisher fast-forwards it before rendering, and mark-published refuses until then.
                 Say "LEDGER PUBLISH OWED ($ls): render with gen_ledger.py (it writes $CoordDir\ledger.html and prints this account's artifact URL), publish it there, then ledger_state.py mark-published (--url the first time an account publishes)"
                 # The attended operator session is woken by its mailbox, not by this log (kb/Work PB2482): one open
                 # `publish` message per stamp (--unless-pending), pointing at this unit's log.

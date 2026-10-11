@@ -790,7 +790,8 @@ exits nonzero on a failure; no framework): `test_alloc.py` (including two real p
 concurrently with no duplicate), `test_inventory_ratchet.py` (a fabricated reopen, a GAP rise, the marker),
 `test_budget.py` (with each account's reset, readings and telemetry), `scripts/hooks/test_dispatch_guard.py` (rule 0: a loop
 unit's fleet launch refused after `STOP-UNIT`, an attended session's not), `test_ledger_state.py` (owed until the current stamp is
-marked, owed again after an input-touching commit, not after an unrelated one; per account, the first mark needs `--url`),
+marked, owed again after an input-touching commit, not after an unrelated one; per account, the first mark needs `--url`;
+a landing pushed from another clone is owed while the checkout is behind, and the mark refuses until it is fast-forwarded),
 `account.py --self-test`, `mailbox.py --self-test` (section 15), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
@@ -830,8 +831,14 @@ wrapper around the claude.ai API would be a second author of the page. So the wo
 - **The supervisor announces.** After every unit it runs `ledger_state.py owed`, which compares the page's own stamp (the
   last commit touching an input of the page, `gen_ledger.STAMP_PATHS`, imported so the two cannot disagree) with
   `ledger-published.json`, and prints `LEDGER PUBLISH OWED` in its log when they differ. `stop.ps1 -Status` shows the same.
+  The stamp is read on MAIN — `origin/main`, fetched first (`--main-ref`) — never on the checkout's HEAD (kb/Work
+  PB2987): every landing is pushed from its own worktree, so the main checkout the supervisor passes as `--repo` stays
+  behind until someone fast-forwards it, and a HEAD stamp read `current` after train 1056 had landed.
 - **The attended session publishes** and records it: `Artifact` publish of the rendered page to the existing URL, then
-  `python scripts/orchestrator/ledger_state.py mark-published`.
+  `python scripts/orchestrator/ledger_state.py mark-published`. The page is rendered from the checkout, so when the
+  checkout's stamp is not main's, `owed` and `gen_ledger.py`'s last line say to fast-forward it first (`git merge
+  --ff-only origin/main`) and `mark-published` refuses (exit 2): a page that does not describe main is never marked
+  current.
 - **Per account** (kb/Work PB2481, section 2.1): an artifact belongs to the claude.ai account that published it, and
   another account cannot update it. `ledger-published.json` is therefore `{"accounts": {<name>: {url, stamp,
   published_at}}}`; `owed` compares the running account's stamp; `mark-published --url <url>` records the account's
