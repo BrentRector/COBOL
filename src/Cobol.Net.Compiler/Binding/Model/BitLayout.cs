@@ -60,9 +60,18 @@ internal static class BitLayout
     /// <para><b>§13.18.57.4 GR2 d)</b>: a TYPE subject whose type describes a group "is aligned as though it were a
     /// level 1 item", and §8.5.1.6.3 puts "a level 1 bit group … at the first bit of a byte" — the second conjunct
     /// (<see cref="DataItem.AlignedAsLevelOne"/>; kb/Work PB1569).</para>
+    ///
+    /// <para>⛔ <b>A DYNAMIC-CAPACITY TABLE SHARES NO BYTE, NEITHER WAY (kb/Work PB2818).</b> §8.5.1.9.1 3): "table data
+    /// items are not required to be contiguous in physical memory. The size, location, and time of physical allocation
+    /// of a dynamic-capacity table are implementor-defined", so its occurrences are out-of-line storage that cannot
+    /// continue the bit position of the item before it, and the item after it cannot continue theirs. This
+    /// implementation gives such a table the first bit position of its own byte (§8.5.1.6.3 "all other bit data items"),
+    /// each occurrence ceil(n/8) characters of its own (<see cref="RunBits"/>), and so the table has the relative byte
+    /// position §8.5.1.12.2 correspondence asks for — the determination recorded in <c>docs/CONFORMANCE.md</c> §7.</para>
     /// </summary>
     public static bool SharesByteWith(DataItem? prev, DataItem c) =>
-        !c.IsAligned                                            // §13.18.1.4 GR1 — an ALIGNED subject never shares
+        !c.IsDynamicTable && prev?.IsDynamicTable != true       // §8.5.1.9.1 — a dynamic-capacity table is out of line (below)
+        && !c.IsAligned                                         // §13.18.1.4 GR1 — an ALIGNED subject never shares
         && !c.AlignedAsLevelOne                                 // §13.18.57.4 GR2 d) — nor does a group-typed subject
         && IsBitItem(c) && prev is not null && IsBitItem(prev)   // §8.5.1.6.3 rules 1 and 2 — both sides bit items…
         && prev.Level == c.Level;                                // …"of the same level"
@@ -115,7 +124,7 @@ internal static class BitLayout
     /// (D20/PB79): a bit LEAF, or a GROUP-USAGE BIT group, which contributes its <c>AsBits()</c> carrier and its
     /// exact extent. Only siblings WITHIN a group form runs — level-01 records never share a byte.</summary>
     private static bool RunMember(DataItem x) =>
-        IsBitLeaf(x) || (x.GroupUsage is GroupUsage.Bit && x.Parent is not null);
+        !x.IsDynamicTable && (IsBitLeaf(x) || (x.GroupUsage is GroupUsage.Bit && x.Parent is not null));
 
     /// <summary>The bit positions a §8.5.1.6.3 run MEMBER contributes — a bit leaf's declared boolean positions, a
     /// bit group's exact extent (its as-if PICTURE 1(m) length), times its OCCURS (D20/PB79).
@@ -126,7 +135,8 @@ internal static class BitLayout
     /// per-occurrence extent used as a WIDTH (the Tier-B bit window, kb/Work PB203) and the one used as a STRIDE
     /// (a subscripted bit member) cannot drift apart.</para></summary>
     public static int RunBits(DataItem m) =>
-        m.Occurs is not { } n || n <= 1 ? WidthBits(m)
+        m.IsDynamicTable ? RoundUpToByte(WidthBits(m))
+        : m.Occurs is not { } n || n <= 1 ? WidthBits(m)
         : StrideBits(m) * (n - 1) + WidthBits(m);
 
     /// <summary>⛔ THE CHARACTER POSITIONS A §8.5.1.6.3 RUN OCCUPIES in its group's image — its members' bits packed

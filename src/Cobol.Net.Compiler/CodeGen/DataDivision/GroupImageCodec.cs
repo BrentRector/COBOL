@@ -421,7 +421,12 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                                                 : $"{d.CsName}.CurrentImage(static __e => __e.CurrentImage())"
             // The element lane mirrors PhysicalModel's numLeaf rule exactly: a NATIVE numeric element goes
             // through its byte-form lane (float via the distinctly-named IEEE lane), a string-carried element
-            // (alphanumeric / edited / StoreAsImage) passes through.
+            // (alphanumeric / edited / StoreAsImage) passes through. A USAGE BIT element is the third lane (kb/Work
+            // PB2818): its carrier is the '0'/'1' string of its boolean positions, and its slice of the image is
+            // those positions PACKED into ceil(n/8) characters (§8.5.1.6.3, §13.18.60.4 GR5) - the width ByteWidth gives
+            // the table's element, which FromCurrentImage divides the carried content by.
+            : BitLayout.IsBitLeaf(d)
+                ? $"{d.CsName}.CurrentImage(__e => {RuntimeApi.BitsPack("__e", $"{d.Pic!.Length}")})"
             : !d.StoreAsImage && d.Pic is { HasImageByteForm: true }
                 ? (d.Pic.IsFloat
                     ? $"{d.CsName}.CurrentImage(__e => {RuntimeApi.NumFormatImageFloat("__e", d.ProfileName, d.Pic.IsSingle)})"
@@ -768,7 +773,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     }
 
     /// <summary>The inverse of <see cref="CurrentMemberImage"/>'s dynamic-table element lane, arm for arm: a
-    /// group element distributes through its own <c>FromImage</c>, a NATIVE numeric element decodes through its
+    /// group element distributes through its own <c>FromImage</c>, a USAGE BIT element unpacks its n positions from
+    /// the ceil(n / 8) characters (kb/Work PB2818), a NATIVE numeric element decodes through its
     /// byte-form lane (a float through the distinctly-named IEEE lane), a string-carried element passes
     /// through. The seed occurrence is handed in so a group element keeps the arrays its initializer
     /// allocated. <c>sending: false</c> for the same reason the two <c>FromImage</c> sites below use it
@@ -776,6 +782,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// reference was the write that produced the image, not this redistribution of it into members.</summary>
     private static string TableElementFromImage(DataItem d) =>
         d.IsGroup ? "(__e, __x) => { __e.FromImage(__x); return __e; }"
+        : BitLayout.IsBitLeaf(d) ? $"(__e, __x) => {RuntimeApi.BitsUnpack("__x", $"{d.Pic!.Length}")}"
         : !d.StoreAsImage && d.Pic is { HasImageByteForm: true }
             ? (d.Pic.IsFloat
                 ? $"(__e, __x) => ({d.Pic.ClrType}){RuntimeApi.NumParseImageFloat("__x", d.ProfileName, binary32Carrier: d.Pic.IsSingle)}"

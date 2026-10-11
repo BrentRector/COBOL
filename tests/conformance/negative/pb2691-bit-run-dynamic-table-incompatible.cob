@@ -1,12 +1,13 @@
       *> reject-at: 2014 2023
-      *> kb/Work PB2691 - a dynamic-capacity table packed into a bit run.
-      *> 8.5.1.6.3 puts T at "the next bit position in storage" after A (a
-      *> same-level bit item), so T starts inside A's byte and occupies no
-      *> relative byte positions of its own. 8.5.1.12.2 makes two tables
-      *> correspond only when "they occupy the same relative byte positions
-      *> within their groups", so 8.5.1.12.1 rule 1 finds no table
-      *> corresponding to T: G1 is compatible with no group, and 14.9.25.3
-      *> SR9 refuses the MOVE.
+      *> kb/Work PB2691, PB2818 - a bit run opposite a dynamic-capacity table.
+      *> G2 packs A and the 3-bit fixed table T into ONE byte (8.5.1.6.3), so
+      *> its D starts at relative byte 1. G1 puts A in byte 0 and its dynamic
+      *> table T of bit items out of line at byte 1 (8.5.1.9.1 rule 3; PB2818),
+      *> one element long for the comparison (8.5.1.12.3), so its D starts at
+      *> byte 2. 8.5.1.12.2: dynamic-length items correspond only "if they
+      *> start at the same relative byte positions within their groups", so
+      *> G1 is compatible with no group of G2's shape and 14.9.25.3 SR9 refuses
+      *> the MOVE.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2691NEG.
        DATA DIVISION.

@@ -20,6 +20,7 @@
   "pb2689-dynamic-table-inside-shorter-group",
   "pb2691-vlg-bit-member-below-2014",
   "pb2691-bit-run-dynamic-table-incompatible",
+  "pb2818-dyn-bit-table-below-2014",
   "pb1544-call-by-value-symbolic-character",
   "pb1544-call-by-value-constant-name",
   "pb1544-call-format1-by-content-constant-name",

@@ -83,12 +83,8 @@ internal static class VariableLengthCompatibility
 
     /// <summary>A group's §8.5.1.12 atoms (<see cref="GroupAtom"/>, the runtime's model, which the ONE walk
     /// <see cref="GroupCompatibility.Walk"/> reads) with the declaring item of each — a diagnostic names it, and a
-    /// table atom's item is the subject of §8.5.1.12.3 sentence 2's element recursion. <c>Unplaced</c> is the first
-    /// bit-run member found that is or holds a dynamic-capacity table inside a §8.5.1.6.3 bit run that is not
-    /// byte-granular (<see cref="Atoms"/>): that table's bits are packed with its neighbours', so it occupies no relative
-    /// BYTE positions of its own and §8.5.1.12.2's correspondence ("they occupy the same relative byte positions within
-    /// their groups") cannot pair it — the group is compatible with no group (§8.5.1.12.1 rule 1).</summary>
-    private readonly record struct Laid(GroupAtom[] Atoms, DataItem[] Items, DataItem? Unplaced);
+    /// table atom's item is the subject of §8.5.1.12.3 sentence 2's element recursion.</summary>
+    private readonly record struct Laid(GroupAtom[] Atoms, DataItem[] Items);
 
     /// <summary>A table atom of <paramref name="c"/>: one occurrence's byte and character lengths, and — when the
     /// element is a group — the element's own atoms, which §8.5.1.12.3's "their elements are compatible" recurses
@@ -97,13 +93,11 @@ internal static class VariableLengthCompatibility
         new(kind, c.ByteWidth * occurrences, c.ImageWidth * occurrences, c.ByteWidth, c.ImageWidth,
             c.IsGroup ? sink.Element(c) : null);
 
-    /// <summary>The accumulator of one <see cref="AtomsOf"/> walk: the atoms, their items, and the first dynamic-capacity
-    /// table found with no relative byte position (<see cref="Laid"/>'s <c>Unplaced</c>).</summary>
+    /// <summary>The accumulator of one <see cref="AtomsOf"/> walk: the atoms and their items.</summary>
     private sealed class Sink
     {
         public readonly List<GroupAtom> Atoms = [];
         public readonly List<DataItem> Items = [];
-        public DataItem? Unplaced;
 
         public void Add(GroupAtom atom, DataItem item)
         {
@@ -111,15 +105,10 @@ internal static class VariableLengthCompatibility
             Items.Add(item);
         }
 
-        /// <summary>A table element's own atoms, its placement folded into this walk's.</summary>
-        public GroupAtom[] Element(DataItem element)
-        {
-            var laid = AtomsOf(element);
-            Unplaced ??= laid.Unplaced;
-            return laid.Atoms;
-        }
+        /// <summary>A table element's own atoms.</summary>
+        public GroupAtom[] Element(DataItem element) => AtomsOf(element).Atoms;
 
-        public Laid ToLaid() => new([.. Atoms], [.. Items], Unplaced);
+        public Laid ToLaid() => new([.. Atoms], [.. Items]);
     }
 
     /// <summary>The group's byte layout as a FLAT left-to-right atom sequence: REDEFINES subtrees dropped
@@ -139,8 +128,9 @@ internal static class VariableLengthCompatibility
     /// (<see cref="BitLayout.IsByteGranular"/>) is therefore ONE fixed atom of <see cref="BitLayout.RunCharacters"/>
     /// bytes — the slice the physical-field walk gives the run in the carrier — named by its leader; a byte-granular
     /// run's members each start on a byte boundary, so they take the per-item arms below unchanged and a table among
-    /// them keeps its table atom. A dynamic-capacity table in a run that is not byte-granular has no relative byte
-    /// position, which the sink records (<see cref="Laid"/>).</para></summary>
+    /// them keeps its table atom. A dynamic-capacity table is no run member at all (<see cref="BitLayout.RunsOf"/>,
+    /// kb/Work PB2818): it is out-of-line storage that starts a byte of its own, so its atom has the relative byte
+    /// position §8.5.1.12.2 pairs tables by, and the item after it starts on the next byte boundary.</para></summary>
     private static void Atoms(DataItem g, Sink sink)
     {
         var runs = BitLayout.RunsOf(g.Children);
@@ -154,7 +144,6 @@ internal static class VariableLengthCompatibility
                 int chars = BitLayout.RunCharacters(run);
                 sink.Add(new GroupAtom(GroupAtomKind.Fixed, chars, chars), c);
                 runRest = run.Count - 1;
-                sink.Unplaced ??= run.FirstOrDefault(m => m.IsDynamicTable || ReferenceResolver.HasVariableLengthSubordinate(m));
                 continue;
             }
             if (c.IsDynamicTable)
@@ -217,11 +206,10 @@ internal static class VariableLengthCompatibility
     /// <summary>⛔ THE GROUP'S §8.5.1.12 ATOMS as the run time reads them (<see cref="GroupAtom"/>) — what a universal
     /// dispatch carries in an <see cref="ActivationDescription"/> so the ONE walk can decide a pair compiled apart
     /// (kb/Work PB480). A USAGE BIT member is laid by §8.5.1.6.3's bit runs (<see cref="Atoms"/>; kb/Work PB2691), so a
-    /// group holding one has atoms like any other. <see langword="null"/> for a non-group, and for a group with a
-    /// dynamic-capacity table packed into a bit run (<see cref="Laid"/>'s <c>Unplaced</c>) — compatible with no group,
-    /// so <see cref="Mismatch"/> has already refused every pair a statement could make of it.</summary>
+    /// group holding one has atoms like any other, a dynamic-capacity table of bit items included (kb/Work PB2818).
+    /// <see langword="null"/> for a non-group.</summary>
     public static GroupAtom[]? GroupAtoms(DataItem g) =>
-        ItemCategory.IsGroupItem(g) && AtomsOf(g) is { Unplaced: null } laid ? laid.Atoms : null;
+        ItemCategory.IsGroupItem(g) ? AtomsOf(g).Atoms : null;
 
     /// <summary>True when a group's atoms have anything but fixed material — a table or a variable-length member, the
     /// only atoms §8.5.1.12.2's correspondence can pair. Fixed material alone states nothing beyond the group's length,
@@ -273,11 +261,6 @@ internal static class VariableLengthCompatibility
             return $"'{(oneGroup ? other : one).CobolName}' is not a group: a variable-length group is "
                 + "compatible only with a group (ISO §8.5.1.12.1)";
         Laid a = AtomsOf(one), b = AtomsOf(other);
-        if ((a.Unplaced is not null ? (one, a.Unplaced) : b.Unplaced is not null ? (other, b.Unplaced) : default)
-            is (DataItem host, DataItem packed))
-            return $"the dynamic-capacity table in '{packed.CobolName}' of '{host.CobolName}' shares its bytes with USAGE BIT "
-                + "items (ISO §8.5.1.6.3), so it occupies no relative byte positions of its own and the other group has no "
-                + "table corresponding to it (ISO §8.5.1.12.1 rule 1 / §8.5.1.12.2)";
         return GroupCompatibility.Walk(a.Atoms, b.Atoms) is { } why ? Reason(why, a, b, one, other) : null;
     }
 

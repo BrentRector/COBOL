@@ -322,7 +322,11 @@ public sealed record RedefViewPlace(AccessPath Backing, Position Offset, int Wid
             return window with { Coding = new NationalWindow(positions) };
         if (!BitLayout.IsBitItem(item)) return window;
         // 8 × (the runtime byte displacement) + the member's static in-class bit offset, then the in-class levels.
-        Position classBit = new PositionConstant(item.ClassBitOffset);
+        // A dynamic-capacity table referenced by its subscript IS its element, at offset zero of the element cell -
+        // the same law ReferenceResolver gives the BYTE origin (`item.IsDynamicTable ? 0 : item.ClassOffset`); the bit
+        // arm lacked it, so a table of USAGE BIT elements beside other members of a cell-backed (EXTERNAL / BASED)
+        // group was read and written at its reservation's bit in the PARENT scope, past its own one-byte cell (kb/Work PB2818).
+        Position classBit = new PositionConstant(item.IsDynamicTable ? 0 : item.ClassBitOffset);
         Position at = runtimeByteDisplacement is null
             ? classBit
             : new PositionBinary(
