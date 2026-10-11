@@ -260,7 +260,10 @@ public sealed class Frontend
         copy.RegisterReferenceFormat(sourcePath, referenceFormats);
         var manipulated = ConditionalCompilationProcessor.Manipulate(normalized, copy, LeftDirectives,
             diagnostics, sourcePath, DialectLevel, Permissive, Inputs, implicitOps);
-        var mapped = manipulated.Text;
+        // The --nist CCVS placeholder substitution is the first text stage after COPY (so placeholders in library text are
+        // substituted). A placeholder and its substitute differ in length, so it is a MAPPED stage like every other that
+        // changes columns (kb/Work PB2986): the line map below is built from ITS output.
+        var mapped = NistTestName is { } nist ? NistPreprocessor.Process(manipulated.Text, nist) : manipulated.Text;
 
         // From here on the text is in its FINAL line frame: every stage below is line-count preserving (asserted),
         // so `mapped.Lines` stays the origin of each resultant line and the directive stages' event lines are the
@@ -268,13 +271,6 @@ public sealed class Frontend
         string text = mapped.Text;
         int linesBefore = CountLines(text);
         var lineMap = new SourceLineMap(mapped.Lines);   // the directive stages' diagnostics name SOURCE lines through it
-        if (NistTestName is { } nist)
-        {
-            text = NistPreprocessor.Process(text, nist);
-            if (CountLines(text) != linesBefore)
-                throw new InvalidOperationException(
-                    "NistPreprocessor changed the line count — the source-line map would misattribute every later line (kb/Work PB82)");
-        }
 
         // The POSITION-RULED directive sites (ISO §7.3.20.3 SR4 / §7.3.22.3 SR4 / §7.3.25.3 SR5) — recorded
         // BEFORE the TURN stage blanks its lines, so all three words are still in the text and ONE scan answers

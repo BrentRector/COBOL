@@ -150,12 +150,10 @@ GR5's revert holds by construction.
 
 ### §3.5 The origin map (kb/Work PB82 — landed 2026-08-18; columns kb/Work PB1801 / PB1688)
 
-Every stage of the chain that CHANGES the line count or the columns is MAPPED (one exception, kb/Work PB2986: the
-`--nist` placeholder substitution, `NistPreprocessor.Process` in `Frontend.cs`, changes columns after the line map is
-built and is asserted only to keep the line count): it takes and returns a `MappedText`
-(the text plus ONE `LineOrigin` per `Split('
-')` piece — the invariant the constructor asserts), and its string
-overload is the mapped one's `.Text` (one implementation, never two). A `LineOrigin` is the piece's ordered list of
+Every stage of the chain that CHANGES the line count or the columns is MAPPED, with no exception (the `--nist`
+placeholder substitution, `NistPreprocessor.Process`, was the last one, kb/Work PB2986): it takes and returns a
+`MappedText` (the text plus ONE `LineOrigin` per `Split('\n')` piece — the invariant the constructor asserts), and its
+string overload is the mapped one's `.Text` (one implementation, never two). A `LineOrigin` is the piece's ordered list of
 `OriginSpan(ResultColumn, SourceOrigin(File, Line), SourceColumn)`: the characters from a resultant column on came
 from that physical line, starting at that PHYSICAL column (an index of the line as the file holds it, so a TAB counts
 one, as in the user's editor). The piece is NAMED by its first span's line (`LineOrigin.Origin`, the PB82 rule: the
@@ -186,11 +184,18 @@ rebased to the column it lands on; text a stage writes itself takes one span at 
   from the resultant text; kept text keeps its origins, a replacement's text takes ONE span at the position of the
   text it replaced (the only honest answer for synthesized text), and the text after it on the line keeps its own
   columns. `ReplaceLineMap` is the same pass over line-index origins: where each input line lands in the
-  resultant text (the directive encounters' resultant lines, kb/Work PB1066).
+  resultant text (the directive encounters' resultant lines, kb/Work PB1066);
+- `NistPreprocessor.Process(MappedText, testName)` (under `--nist` only, after COPY and REPLACE): every CCVS
+  placeholder substitution goes through ONE loop (`RewriteMatches`) that appends the text between matches as a slice
+  of the input and the substitute as text at the position of the placeholder it replaces, so a substitute longer or
+  shorter than its placeholder (`XXXXX058` → `"CONTROL"`, `XXXXX083` → `DOTNET`), a deleted card (`XXXXX069`) and the
+  rewrite inside a SELECT entry (`RewriteRegions`, which maps the entry's slice and splices it back) all leave every
+  later character at its physical column. Placeholders in COPY library text are substituted after the copybook's
+  lines are spliced in, so they carry the copybook's file and line (`DiagnosticPositionTests`).
 
 `Frontend.Preprocess` returns the final `MappedText`, publishes `Frontend.LineMap` (`SourceLineMap`: resultant
-line → origin; `Locate(line, column, fallbackFile)` is the ONE conversion to a 0-based `SourceLocation`), asserts every later stage (NIST
-substitution, the six directive stages) is line-count preserving, and hands the map to the parser listener
+line → origin; `Locate(line, column, fallbackFile)` is the ONE conversion to a 0-based `SourceLocation`) built from
+the NIST stage's output, asserts the six directive stages are line-count preserving, and hands the map to the parser listener
 (`CobolErrorListener` — which also stopped reporting every syntax error one line late), to the directive stages'
 diagnostics, and (via `CompilerDriver` → `EditionContext.LineMap`) to the binder's diagnostic cursor and
 `EXCEPTION-LOCATION`. The `>>TURN` / `>>FLAG` / `>>REF-MOD-ZERO-LENGTH` event lines are compared with token lines

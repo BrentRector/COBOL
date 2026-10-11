@@ -1,5 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Text.RegularExpressions;
+using CobolNet.Frontend.Common;
+
 namespace CobolNet.Frontend.Preprocessor;
 
 /// <summary>
@@ -43,18 +46,22 @@ public static class NistPreprocessor
         new() { ("RL213A", "021") };
 
     /// <summary>
-    /// Replace NIST XXXXX placeholders in COBOL source text.
+    /// Replace NIST XXXXX placeholders in COBOL source text. A MAPPED stage (kb/Work PB2986, DESIGN-cc-in-copy.md
+    /// §3.5): a placeholder and its substitute differ in length (<c>XXXXX058</c> is 8 characters, <c>"CONTROL"</c> 9), so
+    /// every substitution is written through <see cref="OriginWriter"/> — the characters to its right keep the physical
+    /// column they were written at, and a substitute takes the position of the placeholder it stands for. The line count
+    /// never changes: no substitute holds a line terminator, and the <see cref="MappedText"/> constructor asserts it.
     /// </summary>
-    /// <param name="source">Raw or normalized COBOL source text.</param>
+    /// <param name="source">The normalized, COPY-expanded COBOL source text with the origins of its lines.</param>
     /// <param name="testName">NIST test program name (e.g., "NC101A"). Used to derive
     /// the output file name so each test writes to its own file.</param>
-    /// <returns>Source text with placeholders replaced.</returns>
-    public static string Process(string source, string testName)
+    /// <returns>The text with placeholders replaced, and the origins of what it now holds.</returns>
+    public static MappedText Process(MappedText source, string testName)
     {
         // ── File assignments ──
 
         // XXXXX055: printer assignment → string literal with test name
-        source = source.Replace("XXXXX055", $"\"{testName}\"");
+        source = Literal(source, "XXXXX055", $"\"{testName}\"");
 
         // XXXXX001 / XXXXX002 are data-file ASSIGN targets. They are NOT special-cased to a shared literal
         // here — they flow through the organization-aware mapping below (line 72) like every other
@@ -65,7 +72,7 @@ public static class NistPreprocessor
         // absent-file test (SQ141A/SQ142A) saw a leftover shared file and got status 00 instead of 35.
 
         // XXXXX058: control card file assignment
-        source = source.Replace("XXXXX058", "\"CONTROL\"");
+        source = Literal(source, "XXXXX058", "\"CONTROL\"");
 
         // XXXXX065: "4-digit integer for the NUMBER OF RECORDS" the ST115A/ST117A SORT chain builds into its
         // input file (used as a PROCEDURE-division loop bound `… GREATER THAN XXXXX065` and divided by 51 to
@@ -75,8 +82,7 @@ public static class NistPreprocessor
         // both sides) — IX106A embeds the 5-char string "XXXXX065" inside a longer test-data literal
         // ("…XXXXXXXXXX065ALTKEY1…", i.e. preceded by 'X' and followed by 'A'); a plain .Replace would
         // corrupt that baselined literal, so the lookbehind/lookahead excludes it.
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?<![A-Za-z0-9])XXXXX065(?![A-Za-z0-9])", "204");
+        source = Rewrite(source, new Regex(@"(?<![A-Za-z0-9])XXXXX065(?![A-Za-z0-9])"), _ => "204");
 
         // XXXXX063: the implementor's native collating sequence as a 51-character nonnumeric literal — the
         // 51 distinct key characters the ST sort/merge tests use, listed in ascending native-collating order.
@@ -88,8 +94,7 @@ public static class NistPreprocessor
         // against (ST137A's SRT-TEST-003..005 fail). Token-boundary anchored so it never matches the embedded
         // "…XXXXXXXX063A…" inside IX106A's baselined test-data literal. A MatchEvaluator emits the literal
         // (its '$' characters are passed through verbatim, not interpreted as a replacement template).
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?<![A-Za-z0-9])XXXXX063(?![A-Za-z0-9])",
+        source = Rewrite(source, new Regex(@"(?<![A-Za-z0-9])XXXXX063(?![A-Za-z0-9])"),
             _ => "\" $$()*+,-./0123456789;<=>ABCDEFGHIJKLMNOPQRSTUVWXYZ\"");
 
         // XXXXX064: the implementor's native collating sequence in DESCENDING order as a 51-character
@@ -99,8 +104,7 @@ public static class NistPreprocessor
         // the legacy's blank placeholder — ST144A re-baselined with this change, the ST137A/ST147A precedent,
         // DEVLOG ~293). Token-boundary anchored + MatchEvaluator exactly as for 063 (IX106A embeds "…064…"
         // inside a baselined test-data literal; '$' must not act as a replacement template).
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?<![A-Za-z0-9])XXXXX064(?![A-Za-z0-9])",
+        source = Rewrite(source, new Regex(@"(?<![A-Za-z0-9])XXXXX064(?![A-Za-z0-9])"),
             _ => "\"ZYXWVUTSRQPONMLKJIHGFEDCBA>=<;9876543210/.-,+*)($$ \"");
 
         // Data-file ASSIGN targets shared across run units by X-card number, mapped (per SELECT…period
@@ -136,79 +140,44 @@ public static class NistPreprocessor
         //       run past the whole comment block into real code (no real period until then), and because the
         //       comment says INDEXED it would wrongly map the following SEQUENTIAL XXXXX001/014 — destroying
         //       the per-program isolation those absent-file status tests depend on.
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?m)^ *SELECT\b(?:\*>[^\n]*\n|[^.])*\.",
-            m =>
-            {
-                string sel = System.Text.RegularExpressions.Regex.Replace(
-                    m.Value, @"XXXXD(\d+)", "\"TF$1\"");
-                bool optional = System.Text.RegularExpressions.Regex.IsMatch(sel, @"\bSELECT\s+OPTIONAL\b");
-                if (!optional)
-                {
-                    sel = System.Text.RegularExpressions.Regex.Replace(sel, @"XXXXP(\d+)", "\"TF$1\"");
-                    if (System.Text.RegularExpressions.Regex.IsMatch(sel, @"\b(RELATIVE|INDEXED)\b"))
-                        sel = System.Text.RegularExpressions.Regex.Replace(
-                            sel, @"(ASSIGN\s+(?:TO\s+)?)XXXXX(\d+)", "$1\"TF$2\"");
-                }
-                else if (System.Text.RegularExpressions.Regex.IsMatch(sel, @"\b(RELATIVE|INDEXED)\b"))
-                {
-                    // A SELECT OPTIONAL RELATIVE/INDEXED file normally keeps its implementor-name (so the
-                    // Binder qualifies it per program-id) — that isolation is REQUIRED by the self-producing
-                    // "absent optional" family (IX216A/217A/218A OPEN INPUT/EXTEND of an absent optional
-                    // indexed file expects status 05/AT-END 10, NOT 00 from a leftover shared TF###; likewise
-                    // SQ202A/203A). But a HANDFUL of OPTIONAL consumers legitimately read a file a SEPARATE
-                    // producer program created and therefore MUST share that producer's "TF###". RL213A is
-                    // one: RL212A (a distinct program) writes 500 records to RL-FS1 via the non-OPTIONAL
-                    // `ASSIGN TO XXXXP021` → "TF021", then RL213A `SELECT OPTIONAL RL-FS1 ASSIGN TO XXXXX021`
-                    // OPENs EXTEND, appends 501–520, and re-reads all 520. Left implementor-name-qualified,
-                    // RL213A's RL-FS1 resolves to its own empty per-program file and every record-number check
-                    // FAILs (ISO §13.18.43 OPTIONAL phrase governs only presence semantics, not the physical
-                    // assignment target). The allow-list maps the OPTIONAL XXXXX### → "TF###" for exactly the
-                    // (test, X-card) pairs that are cross-program consumers, never touching the isolation family.
-                    sel = System.Text.RegularExpressions.Regex.Replace(
-                        sel, @"(ASSIGN\s+(?:TO\s+)?)XXXXX(\d+)",
-                        mm => OptionalSharedAssign.Contains((testName, mm.Groups[2].Value))
-                            ? mm.Groups[1].Value + "\"TF" + mm.Groups[2].Value + "\""
-                            : mm.Value);
-                }
-                return sel;
-            });
+        source = RewriteRegions(source, new Regex(@"(?m)^ *SELECT\b(?:\*>[^\n]*\n|[^.])*\."),
+            region => MapSelectDataFiles(region, testName));
 
         // ── SPECIAL-NAMES ──
 
         // XXXXX051: implementor switch name 1 (SPECIAL-NAMES ... IS switch-name)
-        source = source.Replace("XXXXX051", "SWITCH-1");
+        source = Literal(source, "XXXXX051", "SWITCH-1");
 
         // XXXXX052: implementor switch name 2
-        source = source.Replace("XXXXX052", "SWITCH-2");
+        source = Literal(source, "XXXXX052", "SWITCH-2");
 
         // XXXXX056: display output device implementor-name
-        source = source.Replace("XXXXX056", "CONSOLE");
+        source = Literal(source, "XXXXX056", "CONSOLE");
 
         // XXXXX057: accept input device implementor-name
-        source = source.Replace("XXXXX057", "CONSOLE");
+        source = Literal(source, "XXXXX057", "CONSOLE");
 
         // XXXXX073: the feature-name of a WRITE ... ADVANCING mnemonic-name (SQ207M). CSP — "suppress spacing", a
         // zero-line advance — is the feature-name whose rule the SQ207M golden encodes (the record lands on the
         // current line). Substituted since kb/Work PB862: the unsubstituted placeholder used to bind as a "device"
         // only because the SPECIAL-NAMES binder accepted any word as a system-name (§12.3.7.3 SR8 now refuses it).
-        source = source.Replace("XXXXX073", "CSP");
+        source = Literal(source, "XXXXX073", "CSP");
 
         // ── CONFIGURATION ──
 
         // XXXXX082: SOURCE-COMPUTER
-        source = source.Replace("XXXXX082", "COBOLSHARP");
+        source = Literal(source, "XXXXX082", "COBOLSHARP");
 
         // XXXXX083: OBJECT-COMPUTER
-        source = source.Replace("XXXXX083", "DOTNET");
+        source = Literal(source, "XXXXX083", "DOTNET");
 
         // XXXXX068: MEMORY SIZE value (obsolete COBOL-74 clause, semantically inert)
-        source = source.Replace("XXXXX068", "65535");
+        source = Literal(source, "XXXXX068", "65535");
 
         // ── Data/FD clauses ──
 
         // XXXXX084: implementor-specific label clause value (LABEL RECORDS)
-        source = source.Replace("XXXXX084", "STANDARD");
+        source = Literal(source, "XXXXX084", "STANDARD");
 
         // XXXXX086/087/088: the implementor's own DATA DESCRIPTION of a file/label identifier item. The card is
         // written `01 IX-FD1-ID1` / `XXXXX086.` — the whole clause list is the X-card, and the implementor
@@ -222,8 +191,7 @@ public static class NistPreprocessor
         // items bound with no description at all and no diagnostic, which is the silent misbind that closing the
         // clause list exists to end. Token-boundary anchored, the XXXXX063/064/065 discipline (IX106A embeds
         // these digit runs inside a baselined test-data literal).
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?<![A-Za-z0-9])XXXXX08[678](?![A-Za-z0-9])", "PICTURE X(10)");
+        source = Rewrite(source, new Regex(@"(?<![A-Za-z0-9])XXXXX08[678](?![A-Za-z0-9])"), _ => "PICTURE X(10)");
 
         // XXXXX069 / XXXXX053: the two X-cards that name a construct WiseOwl COBOL DOES NOT PROVIDE, so the card is
         // DELETED — which is the CCVS-documented action for an optional card the implementor does not supply,
@@ -241,22 +209,94 @@ public static class NistPreprocessor
         // so an FD and an I-O-CONTROL paragraph bound a description the program never wrote and no diagnostic
         // said so — the same silent misbind PB487 found under XXXXX086-088. Token-boundary anchored, the
         // XXXXX063/064/065 discipline (IX106A embeds these digit runs inside a baselined test-data literal).
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?<![A-Za-z0-9])XXXXX069(?![A-Za-z0-9])", "");
-        source = System.Text.RegularExpressions.Regex.Replace(
-            source, @"(?<![A-Za-z0-9])XXXXX053(?![A-Za-z0-9])\s*\.", "");
+        source = Rewrite(source, new Regex(@"(?<![A-Za-z0-9])XXXXX069(?![A-Za-z0-9])"), _ => "");
+        source = Rewrite(source, new Regex(@"(?<![A-Za-z0-9])XXXXX053(?![A-Za-z0-9])\s*\."), _ => "");
 
         // ── Literal values ──
 
         // XXXXX081: non-COBOL characters value (implementor-defined)
-        source = source.Replace("XXXXX081", "\"!@#$%^&*\"");
+        source = Literal(source, "XXXXX081", "\"!@#$%^&*\"");
 
         // XXXXX090: CLASS definition character value (ordinal "A")
-        source = source.Replace("XXXXX090", "\"A\"");
+        source = Literal(source, "XXXXX090", "\"A\"");
 
         // XXXXX091: CLASS definition character range end value (ordinal "D")
-        source = source.Replace("XXXXX091", "\"D\"");
+        source = Literal(source, "XXXXX091", "\"D\"");
 
         return source;
+    }
+
+    /// <summary>One SELECT entry (<paramref name="entry"/>, the text from its SELECT keyword to its terminating period,
+    /// with its origins) with its data-file ASSIGN targets mapped to the shared <c>"TF###"</c> literals the rules above
+    /// the call describe. Every substitution is mapped, so a diagnostic inside the entry names the user's column.</summary>
+    private static MappedText MapSelectDataFiles(MappedText entry, string testName)
+    {
+        var sel = Rewrite(entry, new Regex(@"XXXXD(\d+)"), m => "\"TF" + m.Groups[1].Value + "\"");
+        bool optional = Regex.IsMatch(sel.Text, @"\bSELECT\s+OPTIONAL\b");
+        if (!optional)
+        {
+            sel = Rewrite(sel, new Regex(@"XXXXP(\d+)"), m => "\"TF" + m.Groups[1].Value + "\"");
+            if (Regex.IsMatch(sel.Text, @"\b(RELATIVE|INDEXED)\b"))
+                sel = Rewrite(sel, new Regex(@"(?<=ASSIGN\s+(?:TO\s+)?)XXXXX(\d+)"), m => "\"TF" + m.Groups[1].Value + "\"");
+        }
+        else if (Regex.IsMatch(sel.Text, @"\b(RELATIVE|INDEXED)\b"))
+        {
+            // A SELECT OPTIONAL RELATIVE/INDEXED file normally keeps its implementor-name (so the
+            // Binder qualifies it per program-id) — that isolation is REQUIRED by the self-producing
+            // "absent optional" family (IX216A/217A/218A OPEN INPUT/EXTEND of an absent optional
+            // indexed file expects status 05/AT-END 10, NOT 00 from a leftover shared TF###; likewise
+            // SQ202A/203A). But a HANDFUL of OPTIONAL consumers legitimately read a file a SEPARATE
+            // producer program created and therefore MUST share that producer's "TF###". RL213A is
+            // one: RL212A (a distinct program) writes 500 records to RL-FS1 via the non-OPTIONAL
+            // `ASSIGN TO XXXXP021` → "TF021", then RL213A `SELECT OPTIONAL RL-FS1 ASSIGN TO XXXXX021`
+            // OPENs EXTEND, appends 501–520, and re-reads all 520. Left implementor-name-qualified,
+            // RL213A's RL-FS1 resolves to its own empty per-program file and every record-number check
+            // FAILs (ISO §13.18.43 OPTIONAL phrase governs only presence semantics, not the physical
+            // assignment target). The allow-list maps the OPTIONAL XXXXX### → "TF###" for exactly the
+            // (test, X-card) pairs that are cross-program consumers, never touching the isolation family.
+            sel = Rewrite(sel, new Regex(@"(?<=ASSIGN\s+(?:TO\s+)?)XXXXX(\d+)"),
+                m => OptionalSharedAssign.Contains((testName, m.Groups[1].Value)) ? "\"TF" + m.Groups[1].Value + "\"" : m.Value);
+        }
+        return sel;
+    }
+
+    /// <summary>Replace every match of <paramref name="pattern"/> in <paramref name="text"/> by the string
+    /// <paramref name="replacement"/> yields (never a template — a <c>$</c> is a character), keeping the origin of every
+    /// character that stays and giving a replacement the position of the text it replaced (kb/Work PB2986).</summary>
+    private static MappedText Rewrite(MappedText text, Regex pattern, Func<Match, string> replacement) =>
+        RewriteMatches(text, pattern, (w, m) =>
+        {
+            string r = replacement(m);
+            if (r.Length > 0) w.Append(r, text.PointAt(m.Index));
+        });
+
+    /// <summary>Replace every match of <paramref name="pattern"/> in <paramref name="text"/> by the MAPPED text
+    /// <paramref name="rewrite"/> makes of the match's own slice (a region whose inner substitutions are mapped).</summary>
+    private static MappedText RewriteRegions(MappedText text, Regex pattern, Func<MappedText, MappedText> rewrite) =>
+        RewriteMatches(text, pattern, (w, m) => w.AppendMapped(rewrite(text.Slice(m.Index, m.Length))));
+
+    /// <summary>Replace a literal placeholder token (an ordinal match, as <see cref="string.Replace(string, string)"/>).</summary>
+    private static MappedText Literal(MappedText text, string token, string replacement) =>
+        text.Text.Contains(token, StringComparison.Ordinal)
+            ? Rewrite(text, new Regex(Regex.Escape(token)), _ => replacement)
+            : text;
+
+    /// <summary>THE mapped substitution loop: the text between matches is appended as a slice (it keeps its origins), each
+    /// match is handed to <paramref name="write"/> to append what stands in its place. A pattern that matches nowhere
+    /// returns <paramref name="text"/> itself.</summary>
+    private static MappedText RewriteMatches(MappedText text, Regex pattern, Action<OriginWriter, Match> write)
+    {
+        var m = pattern.Match(text.Text);
+        if (!m.Success) return text;
+        var w = new OriginWriter();
+        int last = 0;
+        for (; m.Success; m = m.NextMatch())
+        {
+            w.AppendSlice(text, last, m.Index - last);
+            write(w, m);
+            last = m.Index + m.Length;
+        }
+        w.AppendSlice(text, last, text.Text.Length - last);
+        return w.Finish();
     }
 }

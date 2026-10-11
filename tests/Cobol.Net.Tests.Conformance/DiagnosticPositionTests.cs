@@ -212,6 +212,43 @@ public sealed class DiagnosticPositionTests : IDisposable
         Assert.Contains(lines, d => d.Contains("r7.cob(8,41): error COBOL0001"));
     }
 
+    /// <summary>⛔ kb/Work PB2986 — the --nist CCVS placeholder substitution is a MAPPED stage: a placeholder and its
+    /// substitute differ in length, and every token to the right of one keeps the column the programmer wrote it at. Each
+    /// arm of the stage is pinned with a ')' (a stray token the parser reports) written after the placeholder: the
+    /// substitute LONGER than the placeholder (<c>XXXXX058</c> → <c>"CONTROL"</c>, 8 → 9), SHORTER (<c>XXXXX083</c> →
+    /// <c>DOTNET</c>, 8 → 6), the SELECT-entry arm that rewrites inside a region (<c>XXXXP001</c> → <c>"TF001"</c>), a
+    /// DELETED card (<c>XXXXX069</c>, 8 → 0), and a placeholder in COPY library text, which takes the copybook's
+    /// own file, line and column.</summary>
+    [Fact]
+    public void Nist_PlaceholderSubstitution_KeepsTheColumnsToItsRight()
+    {
+        Write("nx.cob", Head + "       PROCEDURE DIVISION.\n           DISPLAY XXXXX058 W ) .\n           STOP RUN.\n");
+        var (ok, lines) = Compile("nx.cob", edition: 85, nist: "NX");
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("nx.cob(7,31): error COBOL0307"));   // longer: the ')' is in column 31
+
+        Write("ns.cob", "       IDENTIFICATION DIVISION.\n       PROGRAM-ID. NS.\n       ENVIRONMENT DIVISION.\n"
+            + "       CONFIGURATION SECTION.\n       OBJECT-COMPUTER. XXXXX083 ) .\n"   // shorter: the ')' is in column 34
+            + "       INPUT-OUTPUT SECTION.\n       FILE-CONTROL.\n"
+            + "           SELECT F ASSIGN TO XXXXP001 ORGANIZATION IS RELATIVE ) .\n"   // in a SELECT entry: column 65
+            + "       DATA DIVISION.\n       PROCEDURE DIVISION.\n           STOP RUN.\n");
+        (ok, lines) = Compile("ns.cob", edition: 85, nist: "NS");
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("ns.cob(5,34): error COBOL0307"));
+        Assert.Contains(lines, d => d.Contains("ns.cob(8,65): error COBOL0312"));
+
+        Write("nd.cob", Head + "       PROCEDURE DIVISION.\n           DISPLAY XXXXX069 W ) .\n           STOP RUN.\n");
+        (ok, lines) = Compile("nd.cob", edition: 85, nist: "ND");
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("nd.cob(7,31): error COBOL0307"));   // deleted: the ')' STAYS in column 31
+
+        Write("nc.cpy", "           DISPLAY XXXXX058 W ) .\n");
+        Write("nk.cob", Head + "       PROCEDURE DIVISION.\n           COPY \"nc.cpy\".\n           STOP RUN.\n");
+        (ok, lines) = Compile("nk.cob", edition: 85, nist: "NK");
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("nc.cpy(1,31): error COBOL0307"));
+    }
+
     [Fact] // kb/Work PB1671 — a COPY / REPLACE / directive diagnostic names the column of what it is about, not column 1
     public void TextManipulationAndDirectiveDiagnostics_NameTheirColumn()
     {
