@@ -151,10 +151,13 @@ guard_leg() {
   # `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on PB322's TERMINATES rows was invisible to
   # every local leg. Its scratch is private to this clone (the guard writes fixed file names under TMPDIR, and
   # implementers run this gate concurrently). Its own `dotnet build` of the CLI is up to date after the ONE build.
-  local start rc secs summary
+  # ⛔ The scratch lies BESIDE the clone, never inside it (kb/Work PB2989): `selftests-built` runs at the same time and
+  # keys its inputs by every untracked file of the clone (scripts/self_test_inputs.py), so a guard temp file listed by
+  # `git ls-files -o` and deleted before `git hash-object` read it made that leg NOT RUN (train 1056b, 2026-10-11).
+  local start rc secs summary gtmp="$snap.guard-tmp"
   start=$(date +%s)
-  mkdir -p "$snap/.guard-tmp"
-  ( cd "$snap" && TMPDIR="$snap/.guard-tmp" "${nice_prefix[@]}" bash scripts/guard-fast.sh ) > "$out/guard.log" 2>&1
+  rm -rf "$gtmp"; mkdir -p "$gtmp"
+  ( cd "$snap" && TMPDIR="$gtmp" "${nice_prefix[@]}" bash scripts/guard-fast.sh ) > "$out/guard.log" 2>&1
   rc=$?
   secs=$(( $(date +%s) - start ))
   summary="$(grep -E '^=== (NIST \(|NIST AUDIT: population|ALL GREEN|FAILURES)' "$out/guard.log" | tr '\n' ' ')"
