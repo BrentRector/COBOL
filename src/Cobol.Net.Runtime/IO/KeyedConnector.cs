@@ -158,6 +158,7 @@ public abstract class KeyedConnector : FileConnector
         // Taken ONCE: the store is read and written positionally through it (never through the stream's buffer,
         // kb/Work PB2660), and it is the handle the store mutex and this connector's record locks are held by.
         _handle = taken.SafeFileHandle;
+        _regions = HostRegionLocks.Open(_handle, HostPath, writable: Mode is not FileOpenMode.Input);
         _coherent = FileLockPosture.AdmitsAnotherWriter(HostShare);
         return taken;
     }
@@ -169,8 +170,12 @@ public abstract class KeyedConnector : FileConnector
     {
         // The field is cleared whatever the disposal throws (a final flush refused on an exhausted medium — the
         // disposal still closes the host handle), so a later CLOSE or re-OPEN never meets a disposed handle.
-        try { _store?.Dispose(); }
-        finally { _store = null; _handle = null; _coherent = false; _areas = null; }
+        try { _regions?.Dispose(); }   // the region locks first, while the handle they were taken through is still open
+        finally
+        {
+            try { _store?.Dispose(); }
+            finally { _store = null; _handle = null; _regions = null; _coherent = false; _areas = null; }
+        }
     }
 
     /// <summary>⛔ THIS CONNECTOR'S INPUT-OUTPUT AREAS — ISO §12.4.5.14.3 GR1, <i>"If the RESERVE clause is specified,
@@ -239,6 +244,11 @@ public abstract class KeyedConnector : FileConnector
     /// (<see cref="HostRegionLocks"/>). Null whenever <see cref="Store"/> is.</summary>
     private SafeFileHandle? _handle;
 
+    /// <summary>This connector's endpoint on the host's region locks (<see cref="RegionLocks"/>, kb/Work PB2936): made
+    /// with <see cref="_handle"/> by <see cref="TakeFileLock"/>, disposed — every byte it holds given back — by
+    /// <see cref="ReleaseFileLock"/>. Null whenever <see cref="_handle"/> is.</summary>
+    private RegionLocks? _regions;
+
     /// <summary>⛔ Whether ANOTHER RUN UNIT may write this physical file while this connector holds it open — its
     /// §9.1.15 file lock admits another writer (<see cref="FileLockPosture.AdmitsAnotherWriter"/>), which only
     /// <c>SHARING WITH ALL OTHER</c> does (§9.1.15 3), <i>"allows concurrent access to a physical file through other
@@ -267,10 +277,7 @@ public abstract class KeyedConnector : FileConnector
     private protected abstract long ReleaseMint { get; }
 
     /// <inheritdoc/>
-    internal override SafeFileHandle? RecordLockHandle => _handle;
-
-    /// <inheritdoc/>
-    internal override bool RecordLockHandleWritable => _handle is not null && Mode is not FileOpenMode.Input;
+    internal override RegionLocks? RecordLocks => _regions;
 
     /// <summary>⛔ ENTER A COHERENT STATEMENT (kb/Work PB2660). For a connector another run unit may write
     /// (<see cref="_coherent"/>): take the store's cross-run-unit MUTEX (<see cref="HostRegionLocks.StoreMutexByte"/>)
@@ -293,7 +300,7 @@ public abstract class KeyedConnector : FileConnector
         if (store.StatementDepth++ > 0) return;   // the run unit is already inside the mutex
         try
         {
-            store.MutexHolder = HoldStoreMutex();
+            store.MutexHolder = HoldStoreMutex(exclusive: _regions!.Writable);
             if (ReadGeneration() is { } stamped && stamped != store.Generation) Reload(store);
             store.VersionAtEntry = store.Version;
         }
@@ -331,7 +338,7 @@ public abstract class KeyedConnector : FileConnector
     {
         if (--store.StatementDepth > 0) return;
         store.StatementDepth = 0;
-        if (store.MutexHolder is { } holder) HostRegionLocks.Release(holder, HostRegionLocks.StoreMutexByte);
+        store.MutexHolder?.Release(HostRegionLocks.StoreMutexByte);
         store.MutexHolder = null;
     }
 
@@ -358,12 +365,12 @@ public abstract class KeyedConnector : FileConnector
 
     /// <summary>The store mutex, held for the length of one statement — exclusive through a writable handle, shared
     /// through an <c>OPEN INPUT</c> connector's read-only one (a reader never changes the store, and Linux refuses
-    /// an exclusive lock through a read-only descriptor; <see cref="HostRegionLocks.Hold"/>). Null when the host
+    /// an exclusive lock through a read-only descriptor; <see cref="RegionLocks.Hold"/>). Null when the host
     /// cannot carry the lock, and the run unit then has no protection against another's writer but the file lock
-    /// (docs/CONFORMANCE.md DOC-A.1-75).</summary>
-    private SafeFileHandle? HoldStoreMutex() =>
-        HostRegionLocks.Hold(_handle!, HostRegionLocks.StoreMutexByte, exclusive: RecordLockHandleWritable, wait: true)
-            == OfdRegionLocks.Result.Ok ? _handle : null;
+    /// (docs/CONFORMANCE.md DOC-A.1-75). <paramref name="exclusive"/> is true for a writer's whole-store persist,
+    /// which excludes a reader too; the statement's own mutex follows the connector's access.</summary>
+    private RegionLocks? HoldStoreMutex(bool exclusive) =>
+        _regions!.Hold(HostRegionLocks.StoreMutexByte, exclusive, wait: true) == RegionLockResult.Ok ? _regions : null;
 
     /// <summary>The generation stamped in the physical file now — null for a file holding no store header this
     /// build reads (an empty file, before its creation arm writes one).</summary>
@@ -393,10 +400,9 @@ public abstract class KeyedConnector : FileConnector
             return;
         }
         if (into.StatementDepth > 0) { Reload(into); return; }   // already inside the mutex
-        var holder = HostRegionLocks.Hold(_handle, HostRegionLocks.StoreMutexByte, exclusive: RecordLockHandleWritable,
-            wait: true) == OfdRegionLocks.Result.Ok ? _handle : null;
+        var holder = HoldStoreMutex(exclusive: _regions!.Writable);
         try { Reload(into); }
-        finally { if (holder is not null) HostRegionLocks.Release(holder, HostRegionLocks.StoreMutexByte); }
+        finally { holder?.Release(HostRegionLocks.StoreMutexByte); }
     }
 
     /// <summary>⛔ THE ONE PERSIST — every statement that changed a coherent store, every CLOSE that owes one, and the
@@ -406,10 +412,7 @@ public abstract class KeyedConnector : FileConnector
     private protected void Persist(KeyedStore store)
     {
         var handle = _handle!;
-        SafeFileHandle? holder = null;
-        if (store.StatementDepth == 0)
-            holder = HostRegionLocks.Hold(handle, HostRegionLocks.StoreMutexByte, exclusive: true, wait: true)
-                == OfdRegionLocks.Result.Ok ? handle : null;
+        var holder = store.StatementDepth == 0 ? HoldStoreMutex(exclusive: true) : null;
         try
         {
             ulong generation = (ReadGeneration() ?? store.Generation) + 1;
@@ -420,7 +423,7 @@ public abstract class KeyedConnector : FileConnector
             store.Generation = generation;
             store.PersistedVersion = store.Version;
         }
-        finally { if (holder is not null) HostRegionLocks.Release(holder, HostRegionLocks.StoreMutexByte); }
+        finally { holder?.Release(HostRegionLocks.StoreMutexByte); }
     }
 
     /// <summary>Persist at the CLOSE when this run unit holds records the file does not — the whole-store model's

@@ -112,9 +112,9 @@ internal abstract class KeyedStore
     /// thread of control, so a nested entry re-enters rather than deadlocking against itself.</summary>
     public int StatementDepth { get; set; }
 
-    /// <summary>The handle holding the store's cross-run-unit mutex while <see cref="StatementDepth"/> is non-zero —
+    /// <summary>The endpoint holding the store's cross-run-unit mutex while <see cref="StatementDepth"/> is non-zero —
     /// null when no statement is inside it, or when the host cannot carry the lock.</summary>
-    public Microsoft.Win32.SafeHandles.SafeFileHandle? MutexHolder { get; set; }
+    internal RegionLocks? MutexHolder { get; set; }
 
     /// <summary>The <see cref="Version"/> when the outermost statement entered — so the statement persists only
     /// what IT changed.</summary>

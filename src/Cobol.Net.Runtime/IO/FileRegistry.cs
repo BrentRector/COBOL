@@ -1223,7 +1223,7 @@ public sealed class FileRegistry
 
     /// <summary>⛔ Does a file connector of ANOTHER run unit hold a lock on a record of this connector's physical
     /// file (kb/Work PB2660)? Only possible when this connector publishes and tests record locks across run units
-    /// (<c>RecordLockHandle</c>) and its own sharing mode admits another connector at all — under
+    /// (<c>RecordLocks</c>) and its own sharing mode admits another connector at all — under
     /// <c>SHARING WITH NO OTHER</c> nobody else is there (§9.1.15 1), "exclusive access"), and §12.4.5.9.4 GR3 makes
     /// the LOCK MODE clause of no effect — and then the host's presence byte answers it in one question. When it
     /// does, the hot-path shortcuts below that read "this run unit's table is empty" as "no record is locked" no

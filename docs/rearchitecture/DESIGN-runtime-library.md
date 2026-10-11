@@ -452,22 +452,46 @@ refuses the reader rule 2 admits; it is a second expression of the same table:
   x86-64/arm64), no host on Windows (`HostFile.ShareModesAreMandatory`), `SidecarColumnLockHost` everywhere else.
   Both hosts publish BEFORE they test and never count the asker's own publication, which is the whole of the
   race-freedom argument. Adding a host is one class and one line in the choice.
-- **The lock-file host (`SidecarColumnLockHost`).** macOS has no host primitive for the Linux bytes: its classic
-  `fcntl` locks are process-owned, its open-file-description commands are private, and `fcntl` is variadic, which
-  Apple's arm64 calling convention passes differently from a fixed P/Invoke signature — so the class makes NO native
-  call. A holder's lock is a FILE — `.wolk-<16 hex digits>/<column>-<guid>` in a directory BESIDE the physical
-  file (the digits: SHA-256 of the file's name under `HostFile.PhysicalFileKey`, the case rule that
-  `HostFile.PhysicalFileComparer` also reads) — held open through `HostFile.OpenLockHolder` (`FileShare` other than
-  `None`, hence a shared `flock`) and tested by `HostFile.IsHeldByAnother` (an exclusive request, refused while the
-  holder lives; the kernel drops the lock with the descriptor, so a killed run unit holds nothing). A lock file
-  PER HOLDER and not per column, because a request row can refuse its own column and a `flock` cannot say "anybody
-  but me" about a file the asker holds: the tester skips only its own file. A holder creates and locks
-  `pending-<guid>`, verifies the lock is in force (a host that does not refuse the second request — a network file
-  system, `DOTNET_SYSTEM_IO_DISABLEFILELOCKING` — is `Unavailable`) and RENAMES it to its column name, so the testers,
-  which read only column names, never see a half-published holder; a column file or pending file they can open freely
-  belongs to a dead run unit and is deleted. The CLOSE deletes the file BEFORE closing the descriptor (a `fork` for
-  `CALL "SYSTEM"` holds a copy of the description until its `exec`; a name nobody can see cannot refuse a successor)
-  and the directory with its last file. A directory the process may not write is `Unavailable`, never an exception.
+- **The lock-file primitive (`SidecarLockFiles`) and its column policy (`SidecarColumnLockHost`).** macOS has no host
+  primitive for the Linux bytes: its classic `fcntl` locks are process-owned, its open-file-description commands are
+  private, and `fcntl` is variadic, which Apple's arm64 calling convention passes differently from a fixed P/Invoke
+  signature — so the class makes NO native call. A holder's lock is a FILE — `.wolk-<16 hex digits>/<column>-<guid>`
+  in a directory BESIDE the physical file (the digits: SHA-256 of the file's name under `HostFile.PhysicalFileKey`,
+  the case rule that `HostFile.PhysicalFileComparer` also reads) — held open through `HostFile.OpenLockHolder` (an
+  EXCLUSIVE `flock`: `FileShare.None` on Unix, `FileShare.Delete` alone on Windows, where share modes are mandatory
+  and the open file must still be renamed) and tested by `HostFile.ProbeLockFile` (a read open under a share mode
+  that admits every other reader and writer — a SHARED `flock` — refused only while a holder lives; the kernel drops
+  the lock with the descriptor, so a killed run unit holds nothing). ⛔ HOLDERS EXCLUSIVE, PROBES SHARED, so two
+  testers sweeping one dead file never read each other as a holder (kb/Work PB2917: exclusive probes made the second
+  tester's OPEN '61' for a connector that did not exist). The probe answers four states — `Live` (the sharing
+  refusal), `Dead` (opened freely: the caller retires it, below), `Gone`, and `Unobservable` (the process may not open it,
+  or it is not a file): an unobservable holder is neither free nor swept, and a request row that refuses its column
+  is refused. A lock file PER HOLDER and not per column, because a request row can refuse its own column and a
+  `flock` cannot say "anybody but me" about a file the asker holds: the tester skips only its own file. A holder
+  creates and locks `pending-<guid>`, verifies the lock is in force (a host that does not refuse the probe — a
+  network file system, `DOTNET_SYSTEM_IO_DISABLEFILELOCKING` — is `Unavailable`; a pending file a tester reaped in the
+  meantime is retried, not `Unavailable`) and RENAMES it to its final name, so the testers, which read only final
+  names, never see a half-published holder; a file they can open freely belongs to a dead run unit and is deleted. The
+  CLOSE takes the file's name BEFORE closing the descriptor (a `fork` for `CALL "SYSTEM"` holds a copy of the description
+  until its `exec`; a name nobody can see cannot refuse a successor) and the directory with its last file. ⛔ NO NAME A PROBER READS IS DELETED IN PLACE (`SidecarLockFiles.Retire`, train 1056b): where share modes are mandatory a file deleted while another handle has it open stays listed, delete-pending, and every open of it is "access denied", the unobservable holder's answer, which no bound on asking again tells apart; so a lock file there is renamed to `gone-<guid>` (a wire value no tester probes) before it is deleted, and "access denied" is always an answer. A directory
+  the process may not write is `Unavailable`, never an exception — except that a user who may not WRITE the lock
+  directory still LOOKS: a live or unobservable conflicting holder refuses it. A user who may enter the lock directory but not LIST it cannot look: every holder is unobservable to it, so a request row that refuses any column is refused (the train 1056b review: the other user of a `0711` parent, whose mode the lock directory copies). ⛔ THE CROSS-USER MODEL: the lock
+  directory is created with the permissions of the physical file's directory (`HostFile.CreateLockDirectory`) and a
+  holder's file takes the directory's read and write bits and always its owner's own (`HostFile.OpenLockHolder`: the holder probes its own file before publishing it), not the first holder's umask,
+  so a second user of a group-writable shared directory can publish into it and read the first user's files (macOS
+  gives a new directory the group of its parent). The determination is `docs/CONFORMANCE.md` DOC-A.1-75.
+- **The region locks on the same primitive (`SidecarRegionLocks`, kb/Work PB2936).** The record locks and the store
+  mutex of a shared keyed file (below) are held through a `RegionLocks` endpoint made by the host of the process
+  (`IRegionLockHost`, `HostRegionLocks.HostOfThisProcess`): `HandleRegionLocks` where the lock belongs to the
+  connector's own handle (Windows `LockFileEx`, Linux OFD), `SidecarRegionLocks` everywhere else. A held byte is a
+  lock file in the SAME lock directory, `r<byte as 16 hex digits>-<S|X>-<guid>` (⛔ a wire value), published and
+  probed exactly as a column file is (`SidecarLockFiles.Publish`, `Observe`): an exclusive hold is refused by any
+  other live holder of the byte, a shared one by an exclusive holder, the asker skips only its own file, a waiting
+  hold retries after a jittered pause, and an unobservable holder (or a lock directory the asker may enter but not list) is `Held` to a non-waiting hold and `Unavailable`
+  to a waiting one (it cannot wait for a release it cannot see). Classic `fcntl` record locks cannot stand in: they
+  belong to the process, and any second connector's CLOSE in the same run unit would drop the first's. A witness can
+  run any connector on the lock-file host on any machine (`HostRegionLocks.Forcing`), so `RegionLocksDriftTests` and
+  the cross-run-unit scenarios hold macOS's expression to the same contract as Windows's and Linux's.
 - **Guards.** `RunUnitFileLockDriftTests` opens a file in one `FileRegistry` and then in a second — a second
   registry shares nothing with the first, neither the `PhysicalFileTable` nor a handle — for every sharing spelling
   × open mode × sharing spelling × open mode × organization (768 pairs) and asserts the second OPEN is `61` exactly
@@ -491,7 +515,7 @@ part in no protocol meets only the share mode of the connector's own handle, who
   `FileLockPostureDriftTests.TheHostsShareModeSemanticsAreTheDocumentedOnes` asserts the measurement against this
   paragraph, so if the host moves, the gate goes red naming this section rather than an assertion being adjusted.
 - **On macOS** (and every Unix that is not Linux on x86-64/arm64) the file lock is the LOCK FILE PER HOLDER of
-  `SidecarColumnLockHost` (kb/Work PB2484, the bullet "The lock-file host" above), so every WiseOwl COBOL run unit
+  `SidecarColumnLockHost` (kb/Work PB2484, the bullet "The lock-file primitive" above), so every WiseOwl COBOL run unit
   is arbitrated by Table 19 there too; an outside program meets the share mode only, as on Linux. The classic
   `fcntl` locks macOS offers are process-owned and cannot be used for the reason above.
 
@@ -594,8 +618,8 @@ the mutex, so no run unit reads a
   (`ComposeStore`) and decodes (`DecodeStore`) the image. A persist the medium refuses is the statement's own
   §9.1.13.6 item 1 `30`.
 - **Published RECORD LOCKS (`PhysicalFileTable.LockRecord` / `HolderOf`, `HostRegionLocks.RecordLockByte`).** Every
-  lock the run unit grants through a connector that has a `RecordLockHandle` (the keyed organizations) is also held
-  as a byte-range lock on that handle, on one byte of the record region (SHA-256 of the record identity, 60 bits,
+  lock the run unit grants through a connector that has `RecordLocks` (the keyed organizations) is also held
+  as a region lock on that endpoint, on one byte of the record region (SHA-256 of the record identity, 60 bits,
   far beyond any record), and every release gives it back. `HolderOf` answers the conflict question once:
   this run unit's table for its own connectors, the host for every other run unit — and says WHICH, because only a
   holder outside the run unit can release while a statement waits (`RetryAttempt.HolderOutsideRunUnit`,
@@ -604,23 +628,30 @@ the mutex, so no run unit reads a
   `RETRY FOREVER` against it is therefore not DOC-A.1-109's deadlock. Two distinct records share a byte with
   probability 2^-60, and the only consequence would be an over-cautious `51` across run units, never a missed one.
 
-**The host primitive is `HostRegionLocks` (`IO/Sharing/`), and the byte map is its one table.** Windows
-`LockFileEx`/`UnlockFileEx` (per handle, mandatory for the covered bytes, all of which lie at 2^62 or beyond); Linux
-open-file-description locks through `OfdRegionLocks` (classic `fcntl` locks are per process). Linux refuses an
+**The host primitive is the `RegionLocks` endpoint (`IO/Sharing/`), and the byte map in `HostRegionLocks` is its one
+table.** A connector holds one endpoint per handle, made by the host of the process (`IRegionLockHost`,
+`HostRegionLocks.HostOfThisProcess`, chosen once): `HandleRegionLocks` — Windows `LockFileEx`/`UnlockFileEx` (per
+handle, mandatory for the covered bytes, all of which lie at 2^62 or beyond) and Linux open-file-description locks
+through `OfdRegionLocks` (classic `fcntl` locks are per process) — or `SidecarRegionLocks` (a lock file per held byte,
+the bullet "The region locks on the same primitive" above) on every other host. Linux refuses an
 exclusive lock through a descriptor not open for writing, so an `OPEN INPUT` connector holds the mutex SHARED (a
 reader never changes the store) and, on Linux only, publishes a record lock shared and then TESTS it, giving it back
 if another handle holds the byte — publish then test, as `RunUnitFileLock` does. A Windows reader publishes its record
-lock EXCLUSIVELY (`HostRegionLocks.ExclusiveNeedsWritableHandle`): `LockFileEx` takes an exclusive lock through a
+lock EXCLUSIVELY (`RegionLocks.ExclusiveNeedsWritableHandle`): `LockFileEx` takes an exclusive lock through a
 read-only handle, and its locks are per handle, so a test through the handle that holds the byte shared meets its own
-hold and answers held with nobody else holding it. The region map: `RegionBase` = 2^62; the five
+hold and answers held with nobody else holding it; a lock file has no such limit and holds exclusively whatever the
+connector's access. The region map: `RegionBase` = 2^62; the five
 Table 19 column bytes at +0..+4 (`RunUnitFileLock`); the store mutex at +0x100; the LOCK-PRESENCE byte at +0x101,
 held shared by every handle that holds at least one published record lock, so a statement asks that one byte
 (`PhysicalFileTable.AnotherRunUnitHoldsLocks`) before it pays for a record identity, a SHA-256 and a record byte; the
-record region at 2^62 + 2^60 for 2^60 bytes. A host without byte-range locks (macOS) answers `Unavailable` for the store mutex, the
-presence byte and every record byte, and each run unit keeps only its own record locks and store
-(docs/CONFORMANCE.md DOC-A.1-75); the five Table 19 column bytes are the exception, which macOS carries as lock files
-(`SidecarColumnLockHost`, kb/Work PB2484) because a column needs no byte-range lock, only a held file. `CrossRunUnitKeyedStoreDriftTests` measures
-it with two `FileRegistry` instances (two run units sharing no table and no handle): `51` on `READ WITH LOCK` and
+record region at 2^62 + 2^60 for 2^60 bytes. On macOS the same bytes are lock files (`SidecarRegionLocks`, kb/Work
+PB2936; the five Table 19 column bytes likewise, `SidecarColumnLockHost`, kb/Work PB2484): a byte offset cannot be
+locked there without a native call whose ABI differs on Apple's arm64, but a held file can be named for the byte, the
+mode and the holder. A host that cannot hold the lock at all (a directory the process may not write, a network file
+system without `flock`) answers `Unavailable` and the run unit keeps only its own record locks and store
+(docs/CONFORMANCE.md DOC-A.1-75). `CrossRunUnitKeyedStoreDriftTests` and `CrossRunUnitSequentialLockDriftTests`
+measure it with two `FileRegistry` instances (two run units sharing no table and no handle) on the host of the machine
+AND on the lock-file host (`RegionHostKind`): `51` on `READ WITH LOCK` and
 `REWRITE`, `IGNORING LOCK`, a sibling's `WRITE` visible at the next statement, every run unit's update surviving
 every CLOSE, and a `RETRY` (n TIMES and FOREVER) that waits outside the mutex.
 
@@ -633,7 +664,7 @@ first changes the file or its store: the sequential record, line and print arms,
 `IndexedConnector.Write`/`Rewrite`. A new organization or arm inherits the order by calling it at its commit point;
 `CommitGateDriftTests` measures every one with a gate that always refuses.
 
-**The SEQUENTIAL organization publishes its record locks the same way (kb/Work PB2692).** Its `RecordLockHandle` is
+**The SEQUENTIAL organization publishes its record locks the same way (kb/Work PB2692).** Its `RecordLocks` endpoint is made for
 the handle beneath its reader or writer (`HostFile.HandleOf`), and three facts make the published lock guard the
 right record across run units. (1) A writer that registered a record-locking posture opens its handle READ-WRITE
 (`SequentialConnector.HostAccess`): the presence byte is a SHARED hold, which Linux refuses through a write-only

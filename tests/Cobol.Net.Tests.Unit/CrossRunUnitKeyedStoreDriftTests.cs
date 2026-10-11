@@ -30,10 +30,6 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
     private static string Tmp(string tag) =>
         Path.Combine(Path.GetTempPath(), $"pb2660-{tag}-{Guid.NewGuid():N}.dat");
 
-    /// <summary>Whether this host carries the byte-range locks the cross-run-unit half rests on (Windows; Linux
-    /// x86-64/arm64). Elsewhere the run unit has only its own guarantees (docs/CONFORMANCE.md DOC-A.1-75).</summary>
-    private static bool HostCarriesRegionLocks => OperatingSystem.IsWindows() || OfdRegionLocks.Available;
-
     private static void Register(FileRegistry reg, string name, string host, Org org, bool optional = false,
         FileSharing? sharing = FileSharing.AllOther)
     {
@@ -97,11 +93,13 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
     }
 
     [Theory]
-    [InlineData(Org.Relative)]
-    [InlineData(Org.Indexed)]
-    public void AnotherRunUnitsRecordLock_Answers51_AndItsUpdatesSurviveTheFirstClose(Org org)
+    [InlineData(Org.Relative, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Indexed, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Relative, RegionHostKind.LockFiles)]
+    [InlineData(Org.Indexed, RegionHostKind.LockFiles)]
+    public void AnotherRunUnitsRecordLock_Answers51_AndItsUpdatesSurviveTheFirstClose(Org org, RegionHostKind regionHost)
     {
-        if (!HostCarriesRegionLocks) return;
+        using var forced = RegionHostSeam.Use(regionHost);
         string host = Tmp($"lock-{org}");
         try
         {
@@ -147,11 +145,13 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
     /// it; the question must not count the asker's own hold, which on Windows (per-handle LockFileEx) an exclusive test
     /// lock through the same handle does, so the lock was refused with '51' by nobody (lander review, train 1042).</summary>
     [Theory]
-    [InlineData(Org.Relative)]
-    [InlineData(Org.Indexed)]
-    public void AnInputConnectorsReadWithLock_Succeeds_AndIsSeenByAnotherRunUnit(Org org)
+    [InlineData(Org.Relative, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Indexed, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Relative, RegionHostKind.LockFiles)]
+    [InlineData(Org.Indexed, RegionHostKind.LockFiles)]
+    public void AnInputConnectorsReadWithLock_Succeeds_AndIsSeenByAnotherRunUnit(Org org, RegionHostKind regionHost)
     {
-        if (!HostCarriesRegionLocks) return;
+        using var forced = RegionHostSeam.Use(regionHost);
         string host = Tmp($"input-lock-{org}");
         try
         {
@@ -183,13 +183,17 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
     /// holder is not the deadlock docs/CONFORMANCE.md DOC-A.1-109 detects: the holder can release, so the wait goes
     /// on until it does.</summary>
     [Theory]
-    [InlineData(Org.Relative, FileRetryKind.Times)]
-    [InlineData(Org.Indexed, FileRetryKind.Times)]
-    [InlineData(Org.Relative, FileRetryKind.Forever)]
-    [InlineData(Org.Indexed, FileRetryKind.Forever)]
-    public void ARetryWaitsForTheOtherRunUnit_OutsideTheStoreMutex(Org org, FileRetryKind kind)
+    [InlineData(Org.Relative, FileRetryKind.Times, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Indexed, FileRetryKind.Times, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Relative, FileRetryKind.Forever, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Indexed, FileRetryKind.Forever, RegionHostKind.OfThisProcess)]
+    [InlineData(Org.Relative, FileRetryKind.Times, RegionHostKind.LockFiles)]
+    [InlineData(Org.Indexed, FileRetryKind.Times, RegionHostKind.LockFiles)]
+    [InlineData(Org.Relative, FileRetryKind.Forever, RegionHostKind.LockFiles)]
+    [InlineData(Org.Indexed, FileRetryKind.Forever, RegionHostKind.LockFiles)]
+    public void ARetryWaitsForTheOtherRunUnit_OutsideTheStoreMutex(Org org, FileRetryKind kind, RegionHostKind regionHost)
     {
-        if (!HostCarriesRegionLocks) return;
+        using var forced = RegionHostSeam.Use(regionHost);
         string host = Tmp($"retry-{org}");
         try
         {
@@ -206,8 +210,8 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
             FileRegistry.PauseObserver.Value = _ =>
             {
                 using var probe = new FileStream(host, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
-                Assert.NotEqual(OfdRegionLocks.Result.Held,
-                    HostRegionLocks.HeldByAnother(probe.SafeFileHandle, HostRegionLocks.StoreMutexByte));
+                using var probeRegions = HostRegionLocks.Open(probe.SafeFileHandle, host, writable: true);
+                Assert.NotEqual(RegionLockResult.Held, probeRegions.HeldByAnother(HostRegionLocks.StoreMutexByte));
                 if (++pauses == 2) a.Unlock("A", records: true);   // the first re-attempt still meets the lock
             };
             try
@@ -272,12 +276,15 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
     /// release ordinals are PERSISTED with the records, never renumbered from file position. A reload that renumbered
     /// them moved every record after B's deleted one down by one, and A's READ NEXT skipped D3.</summary>
     [Theory]
-    [InlineData("delete")]
-    [InlineData("rewrite")]
-    [InlineData("write")]
-    public void ADuplicateKeyWalk_KeepsItsPlace_AcrossAnotherRunUnitsChange(string change)
+    [InlineData("delete", RegionHostKind.OfThisProcess)]
+    [InlineData("rewrite", RegionHostKind.OfThisProcess)]
+    [InlineData("write", RegionHostKind.OfThisProcess)]
+    [InlineData("delete", RegionHostKind.LockFiles)]
+    [InlineData("rewrite", RegionHostKind.LockFiles)]
+    [InlineData("write", RegionHostKind.LockFiles)]
+    public void ADuplicateKeyWalk_KeepsItsPlace_AcrossAnotherRunUnitsChange(string change, RegionHostKind regionHost)
     {
-        if (!HostCarriesRegionLocks) return;
+        using var forced = RegionHostSeam.Use(regionHost);
         string host = Tmp($"dups-{change}");
         try
         {

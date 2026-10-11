@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Unit;
 /// same or a different run unit, except by the execution of a READ statement with the IGNORING LOCK phrase"</i>;
 /// §9.1.13.8 1): <i>"I-O status = 51. The input-output statement is unsuccessful due to an attempt to access a record
 /// that is currently locked by another file connector"</i>.
-/// <para>Before PB2692 the sequential connector published no record lock (it had no <c>RecordLockHandle</c>), so a
+/// <para>Before PB2692 the sequential connector published no record lock (it had no <c>RecordLocks</c> endpoint), so a
 /// second run unit's READ WITH LOCK of a record the first held answered '00'; its reader served a record another run
 /// unit had rewritten from its read-ahead buffer; and a sharing writer numbered its released records from a mint only
 /// its own run unit advanced, so after another run unit's append its lock guarded a different record. A second
@@ -21,8 +21,6 @@ namespace CobolNet.Tests.Unit;
 public sealed class CrossRunUnitSequentialLockDriftTests
 {
     public enum Framing { Fixed, Line, Varying }
-
-    private static bool HostCarriesRegionLocks => OperatingSystem.IsWindows() || OfdRegionLocks.Available;
 
     private static string Tmp(string tag) =>
         Path.Combine(Path.GetTempPath(), $"pb2692-{tag}-{Guid.NewGuid():N}.dat");
@@ -65,12 +63,15 @@ public sealed class CrossRunUnitSequentialLockDriftTests
     /// reads it, and the holder's UNLOCK gives it to the other run unit — which then rewrites the record the FILE
     /// holds, and the first run unit's next READ sees that rewrite rather than its own read-ahead.</summary>
     [Theory]
-    [InlineData(Framing.Fixed)]
-    [InlineData(Framing.Line)]
-    [InlineData(Framing.Varying)]
-    public void AnotherRunUnitsRecordLock_Answers51_AndItsRewriteIsReadFromTheFile(Framing framing)
+    [InlineData(Framing.Fixed, RegionHostKind.OfThisProcess)]
+    [InlineData(Framing.Line, RegionHostKind.OfThisProcess)]
+    [InlineData(Framing.Varying, RegionHostKind.OfThisProcess)]
+    [InlineData(Framing.Fixed, RegionHostKind.LockFiles)]
+    [InlineData(Framing.Line, RegionHostKind.LockFiles)]
+    [InlineData(Framing.Varying, RegionHostKind.LockFiles)]
+    public void AnotherRunUnitsRecordLock_Answers51_AndItsRewriteIsReadFromTheFile(Framing framing, RegionHostKind regionHost)
     {
-        if (!HostCarriesRegionLocks) return;
+        using var forced = RegionHostSeam.Use(regionHost);
         string host = Tmp($"lock-{framing}");
         try
         {
@@ -113,12 +114,15 @@ public sealed class CrossRunUnitSequentialLockDriftTests
     /// has appended, the record is the file's fourth, so another run unit's READ WITH LOCK of record 4 answers '51'
     /// and of record 3 (the other appender's) '00'. A mint advanced only by the writer's own run unit called it 3.</summary>
     [Theory]
-    [InlineData(Framing.Fixed)]
-    [InlineData(Framing.Line)]
-    [InlineData(Framing.Varying)]
-    public void ASharingWritersLock_GuardsTheRecordAtItsPhysicalPlace(Framing framing)
+    [InlineData(Framing.Fixed, RegionHostKind.OfThisProcess)]
+    [InlineData(Framing.Line, RegionHostKind.OfThisProcess)]
+    [InlineData(Framing.Varying, RegionHostKind.OfThisProcess)]
+    [InlineData(Framing.Fixed, RegionHostKind.LockFiles)]
+    [InlineData(Framing.Line, RegionHostKind.LockFiles)]
+    [InlineData(Framing.Varying, RegionHostKind.LockFiles)]
+    public void ASharingWritersLock_GuardsTheRecordAtItsPhysicalPlace(Framing framing, RegionHostKind regionHost)
     {
-        if (!HostCarriesRegionLocks) return;
+        using var forced = RegionHostSeam.Use(regionHost);
         string host = Tmp($"write-{framing}");
         try
         {

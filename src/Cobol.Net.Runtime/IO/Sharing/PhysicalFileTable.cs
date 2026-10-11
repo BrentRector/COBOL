@@ -1,7 +1,5 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using Microsoft.Win32.SafeHandles;
-
 namespace CobolNet.Runtime.IO;
 
 /// <summary>Who holds the record lock a statement has run into (ISO §9.1.16) — the answer the RETRY discipline
@@ -42,13 +40,13 @@ internal sealed class PhysicalFileTable
 
         /// <summary>record-id → the handle through which that lock is PUBLISHED to other run units
         /// (<see cref="HostRegionLocks.RecordLockByte"/>, kb/Work PB2660) — a subset of <see cref="RecordLocks"/>:
-        /// a lock taken through a connector with no <c>RecordLockHandle</c>, or on a host that cannot carry the
-        /// byte-range lock, is this run unit's alone. Every release gives the published byte back.</summary>
-        public readonly Dictionary<string, SafeFileHandle> Published = new(StringComparer.Ordinal);
+        /// a lock taken through a connector with no <c>RecordLocks</c>, or on a host that cannot carry the
+        /// region lock, is this run unit's alone. Every release gives the published byte back.</summary>
+        public readonly Dictionary<string, RegionLocks> Published = new(StringComparer.Ordinal);
 
-        /// <summary>How many of <see cref="Published"/>'s locks each handle holds — the handle holds
+        /// <summary>How many of <see cref="Published"/>'s locks each endpoint holds — the endpoint holds
         /// <see cref="HostRegionLocks.LockPresenceByte"/> while its count is above zero.</summary>
-        public readonly Dictionary<SafeFileHandle, int> PublishedPerHandle = [];
+        public readonly Dictionary<RegionLocks, int> PublishedPerEndpoint = [];
 
         /// <summary>⭐ The SEQUENTIAL release-ordinal mint for this physical file (kb/Work PB739): the ordinal
         /// of the record most recently released to the operating environment through any sharing-active
@@ -120,7 +118,7 @@ internal sealed class PhysicalFileTable
     /// record the connector already holds is idempotent (GR8 self-access). Enforces the connector ceiling (54)
     /// and the run-unit ceiling (53). Returns 00 on grant.
     /// <para>⛔ AND PUBLISHES IT to every other run unit through <paramref name="holder"/>'s
-    /// <c>RecordLockHandle</c> (kb/Work PB2660): §9.1.16 makes a locked record inaccessible to a file connector
+    /// <c>RecordLocks</c> (kb/Work PB2660): §9.1.16 makes a locked record inaccessible to a file connector
     /// <i>"in the same or a different run unit"</i>, and this table is one run unit's. A byte another run unit
     /// already holds refuses the grant with '51' — the host's answer is the arbiter between run units, exactly as
     /// this table is within one.</para></summary>
@@ -135,12 +133,12 @@ internal sealed class PhysicalFileTable
             if (CobolNames.Same(o, name)) mine++;
         if (mine >= ConnectorLockMax) return FileStatusCode.ConnectorLockLimit;   // 54 (GR7)
         if (TotalRunUnitLocks() >= RunUnitLockMax) return FileStatusCode.RunUnitLockLimit;   // 53 (GR7)
-        if (holder?.RecordLockHandle is { } handle)
+        if (holder?.RecordLocks is { } regions)
         {
-            switch (Publish(handle, holder.RecordLockHandleWritable, HostRegionLocks.RecordLockByte(recId)))
+            switch (Publish(regions, HostRegionLocks.RecordLockByte(recId)))
             {
-                case OfdRegionLocks.Result.Held: return FileStatusCode.RecordLocked;   // 51 — another run unit holds it
-                case OfdRegionLocks.Result.Ok: Published(st, recId, handle); break;
+                case RegionLockResult.Held: return FileStatusCode.RecordLocked;   // 51 — another run unit holds it
+                case RegionLockResult.Ok: Published(st, recId, regions); break;
             }
         }
         st.RecordLocks[recId] = name;
@@ -149,47 +147,47 @@ internal sealed class PhysicalFileTable
 
     /// <summary>Take the record's byte for this run unit: exclusively wherever the host allows it — through a
     /// writable handle, and through any handle on Windows; through a read-only handle where an exclusive lock needs a
-    /// writable one (an <c>OPEN INPUT</c> connector on Linux, <see cref="HostRegionLocks.ExclusiveNeedsWritableHandle"/>)
+    /// writable one (an <c>OPEN INPUT</c> connector on Linux, <see cref="RegionLocks.CanHoldExclusive"/>)
     /// as a SHARED hold that is then TESTED, and given back if another handle holds the byte too — publish, then test,
     /// the <see cref="RunUnitFileLock"/> pattern, so two run units can never both believe they hold it.</summary>
-    private static OfdRegionLocks.Result Publish(SafeFileHandle handle, bool writable, long recordByte)
+    private static RegionLockResult Publish(RegionLocks regions, long recordByte)
     {
-        bool exclusive = writable || !HostRegionLocks.ExclusiveNeedsWritableHandle;
-        var taken = HostRegionLocks.Hold(handle, recordByte, exclusive, wait: false);
-        if (taken != OfdRegionLocks.Result.Ok || exclusive) return taken;
-        if (HostRegionLocks.HeldByAnother(handle, recordByte) != OfdRegionLocks.Result.Held) return taken;
-        HostRegionLocks.Release(handle, recordByte);
-        return OfdRegionLocks.Result.Held;
+        bool exclusive = regions.CanHoldExclusive;
+        var taken = regions.Hold(recordByte, exclusive, wait: false);
+        if (taken != RegionLockResult.Ok || exclusive) return taken;
+        if (regions.HeldByAnother(recordByte) != RegionLockResult.Held) return taken;
+        regions.Release(recordByte);
+        return RegionLockResult.Held;
     }
 
-    /// <summary>Record a published lock, and announce the first one of a handle on the presence byte.</summary>
-    private static void Published(State st, string recId, SafeFileHandle handle)
+    /// <summary>Record a published lock, and announce the first one of an endpoint on the presence byte.</summary>
+    private static void Published(State st, string recId, RegionLocks regions)
     {
-        st.Published[recId] = handle;
-        int held = st.PublishedPerHandle.GetValueOrDefault(handle);
-        st.PublishedPerHandle[handle] = held + 1;
+        st.Published[recId] = regions;
+        int held = st.PublishedPerEndpoint.GetValueOrDefault(regions);
+        st.PublishedPerEndpoint[regions] = held + 1;
         if (held == 0)
-            _ = HostRegionLocks.Hold(handle, HostRegionLocks.LockPresenceByte, exclusive: false, wait: false);
+            _ = regions.Hold(HostRegionLocks.LockPresenceByte, exclusive: false, wait: false);
     }
 
     /// <summary>Whether a file connector of ANOTHER run unit holds any record lock on the physical file
     /// <paramref name="asker"/>'s handle is open on — the presence byte, one host question (kb/Work PB2660).</summary>
     public static bool AnotherRunUnitHoldsLocks(FileConnector asker) =>
-        asker.RecordLockHandle is { } handle
-        && HostRegionLocks.HeldByAnother(handle, HostRegionLocks.LockPresenceByte) == OfdRegionLocks.Result.Held;
+        asker.RecordLocks is { } regions
+        && regions.HeldByAnother(HostRegionLocks.LockPresenceByte) == RegionLockResult.Held;
 
     /// <summary>⛔ THE ONE QUESTION "is <paramref name="recId"/> locked by a file connector OTHER than
     /// <paramref name="name"/>?" — and by whom. This run unit's table answers for this run unit; for a record it
     /// does not list, the host answers for every other run unit, asked through <paramref name="asker"/>'s
-    /// <c>RecordLockHandle</c> (§9.1.16, <i>"in the same or a different run unit"</i>; kb/Work PB2660). A connector
-    /// with no such handle can only learn about its own run unit.</summary>
+    /// <c>RecordLocks</c> (§9.1.16, <i>"in the same or a different run unit"</i>; kb/Work PB2660). A connector
+    /// with no such endpoint can only learn about its own run unit.</summary>
     public static RecordLockHolder HolderOf(State st, string name, string recId, FileConnector? asker)
     {
         if (st.RecordLocks.TryGetValue(recId, out var owner))
             return CobolNames.Same(owner, name)
                 ? RecordLockHolder.None : RecordLockHolder.ThisRunUnit;
-        return asker?.RecordLockHandle is { } handle
-            && HostRegionLocks.HeldByAnother(handle, HostRegionLocks.RecordLockByte(recId)) == OfdRegionLocks.Result.Held
+        return asker?.RecordLocks is { } regions
+            && regions.HeldByAnother(HostRegionLocks.RecordLockByte(recId)) == RegionLockResult.Held
             ? RecordLockHolder.AnotherRunUnit
             : RecordLockHolder.None;
     }
@@ -215,12 +213,12 @@ internal sealed class PhysicalFileTable
     private static void Unlock(State st, string recId)
     {
         st.RecordLocks.Remove(recId);
-        if (!st.Published.Remove(recId, out var handle)) return;
-        HostRegionLocks.Release(handle, HostRegionLocks.RecordLockByte(recId));
-        int left = st.PublishedPerHandle[handle] - 1;
-        if (left > 0) { st.PublishedPerHandle[handle] = left; return; }
-        st.PublishedPerHandle.Remove(handle);
-        HostRegionLocks.Release(handle, HostRegionLocks.LockPresenceByte);
+        if (!st.Published.Remove(recId, out var regions)) return;
+        regions.Release(HostRegionLocks.RecordLockByte(recId));
+        int left = st.PublishedPerEndpoint[regions] - 1;
+        if (left > 0) { st.PublishedPerEndpoint[regions] = left; return; }
+        st.PublishedPerEndpoint.Remove(regions);
+        regions.Release(HostRegionLocks.LockPresenceByte);
     }
 
     /// <summary>Release every record lock <paramref name="name"/> holds EXCEPT one on <paramref name="keepId"/>

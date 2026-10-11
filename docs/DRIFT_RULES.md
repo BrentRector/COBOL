@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-316 drift tests.
+317 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -252,6 +252,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [RefModCategoryDriftTests](../tests/Cobol.Net.Tests.Unit/RefModCategoryDriftTests.cs) | ⛔ REFERENCE MODIFICATION PRESERVES THE CATEGORY (ISO §8.4.3.3.4 GR6) — fix-queue PB20. | `src` |
 | [RefResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/RefResolutionDriftTests.cs) | kb/Work PB1030 — the reference resolver answers a CLOSED RefResolution (Place \| Reported \| Deferred), and a silent null is unrepresentable only while three things stay true: every deferred shape is in the DeferredShape census with a description, the resolver puts every deferral on the unbuilt ledger before a caller sees it, and a caller that gets no place builds its refusal FROM the answer instead… | `src/Cobol.Net.Compiler` |
 | [RefusalNodeDriftTests](../tests/Cobol.Net.Tests.Unit/RefusalNodeDriftTests.cs) | kb/Work PB1029 — a refusal must carry its diagnostic IN THE TYPE. | `src/Cobol.Net.Compiler` |
+| [RegionLocksDriftTests](../tests/Cobol.Net.Tests.Unit/RegionLocksDriftTests.cs) | ⛔ EVERY HOST OF THE REGION LOCKS KEEPS ONE CONTRACT, AND THE LOCK-FILE HOST IS HELD TO IT ON EVERY MACHINE (kb/Work PB2936). | — |
 | [RelationalOperatorFormatDriftTests](../tests/Cobol.Net.Tests.Unit/RelationalOperatorFormatDriftTests.cs) | ⛔ THE ONE RELATIONAL-OPERATOR RULE IS THE PRINTED SET OF ISO §8.8.4.2.2 FORMAT 1, AND NOTHING WIDER (kb/Work PB1034). | `src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4` |
 | [RenamesPlaceBuilderDriftTests](../tests/Cobol.Net.Tests.Unit/RenamesPlaceBuilderDriftTests.cs) | ⛔ A LEVEL-66 RENAMES ENTRY'S PLACE IS BUILT BY THE ONE ITEM→PLACE BUILDER, SO EVERY REFERENCE TO IT TAKES THE SAME TAIL AS EVERY OTHER ITEM (kb/Work PB1380). | — |
 | [ReportGroupResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/ReportGroupResolutionDriftTests.cs) | ⛔ A REPORT-GROUP REFERENCE RESOLVES THROUGH ONE FUNNEL (ReportGroupResolution — kb/Work PB365), AND THIS KEEPS IT TRUE. | `src/Cobol.Net.Compiler` |

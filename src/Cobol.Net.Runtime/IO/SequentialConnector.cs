@@ -349,7 +349,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        _handle = stream.SafeFileHandle;
+        TakeRegions(stream.SafeFileHandle);
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -394,14 +394,30 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        _handle = HostFile.HandleOf(stream);
+        TakeRegions(HostFile.HandleOf(stream));
         return w;
     }
 
-    /// <summary>The host handle beneath this connector's reader or writer — its §9.1.15 file lock, and the handle
-    /// its §9.1.16 record locks are published to other run units through (<see cref="RecordLockHandle"/>). Set where
-    /// the stream is opened, cleared where it is disposed.</summary>
-    private Microsoft.Win32.SafeHandles.SafeFileHandle? _handle;
+    /// <summary>The endpoint on the host's region locks for the handle beneath this connector's reader or writer — its
+    /// §9.1.15 file lock — through which its §9.1.16 record locks are published to other run units
+    /// (<see cref="RecordLocks"/>, kb/Work PB2936). Made where the stream is opened, disposed (every byte it holds
+    /// given back) where the stream is.</summary>
+    private RegionLocks? _regions;
+
+    /// <summary>Make the endpoint for the stream just opened on <paramref name="handle"/>; one a previous handle of this
+    /// connector had (a rebuilt reader) is given up with that handle.</summary>
+    private void TakeRegions(Microsoft.Win32.SafeHandles.SafeFileHandle handle)
+    {
+        _regions?.Dispose();
+        _regions = HostRegionLocks.Open(handle, HostPath, writable: Mode is not FileOpenMode.Input);
+    }
+
+    /// <summary>Give the endpoint up with the handle it was made for.</summary>
+    private void GiveUpRegions()
+    {
+        _regions?.Dispose();
+        _regions = null;
+    }
 
     /// <summary>Whether the writer's handle was granted READ access, so the connector can count records off the
     /// medium (<see cref="PhysicalOrdinalOfRelease"/>). False only for the write-only OUTPUT handle
@@ -413,10 +429,7 @@ public sealed class SequentialConnector : FileConnector
     /// connector, a record is not accessible to another file connector in the same or a different run unit"</i>,
     /// is a rule of every organization, and a sequential record's lock identity is its ordinal, which every run
     /// unit computes alike (<see cref="LastReadRecordId"/>; <see cref="ReleaseRecord"/> for a released one).</remarks>
-    internal override Microsoft.Win32.SafeHandles.SafeFileHandle? RecordLockHandle => _handle;
-
-    /// <inheritdoc/>
-    internal override bool RecordLockHandleWritable => _handle is not null && Mode is not FileOpenMode.Input;
+    internal override RegionLocks? RecordLocks => _regions;
 
     /// <inheritdoc/>
     /// <remarks>⛔ A WRITER THAT SETS RECORD LOCKS ALSO READS (kb/Work PB2692). A connector publishes the fact that
@@ -1112,7 +1125,7 @@ public sealed class SequentialConnector : FileConnector
         finally
         {
             try { _writer?.Dispose(); }
-            finally { _reader = null; _writer = null; _handle = null; }
+            finally { _reader = null; _writer = null; GiveUpRegions(); }
         }
     }
 
@@ -1164,7 +1177,7 @@ public sealed class SequentialConnector : FileConnector
             // present" state) DOES survive — §14.9.6.4 GR6; the next OPEN resets it.
             _reader = null;
             _writer = null;
-            _handle = null;   // its locks went with it (§9.1.15: the CLOSE removes the file lock)
+            GiveUpRegions();   // its locks went with it (§9.1.15: the CLOSE removes the file lock)
             EndLinagePage();   // …and neither does the logical page — see EndLinagePage
         }
         ModeKnown = false;   // §9.1.4 — after a successful CLOSE the file is in no open mode

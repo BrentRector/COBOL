@@ -333,18 +333,116 @@ public static class HostFile
         catch (UnauthorizedAccessException) { return false; }
     }
 
+    // ── The lock FILE of a holder (SidecarLockFiles — kb/Work PB2484, PB2917, PB2936) ─────────────────────────────────
+    // A host whose lock is a file per holder asks the operating environment three things about a lock file, and asks
+    // them HERE: create-and-hold one (OpenLockHolder), is its holder alive (ProbeLockFile), and make its directory
+    // (CreateLockDirectory). The probe answers FOUR states, not two, because the two-valued answer this replaced read
+    // "I may not open it" as "nobody holds it" (PB2917).
+
+    /// <summary>What a holder's lock file says about its holder, as <see cref="ProbeLockFile"/> reads it.</summary>
+    internal enum LockFileState
+    {
+        /// <summary>A holder keeps the lock: the host refused the probe because the holder's own handle excludes it.</summary>
+        Live,
+        /// <summary>No handle holds the lock: the probe opened the file freely, so its holder was killed (or never
+        /// finished publishing it). The caller may delete it.</summary>
+        Dead,
+        /// <summary>The file is gone — its holder closed, or another tester swept it, since the caller listed it.</summary>
+        Gone,
+        /// <summary>This process cannot tell: the file belongs to a user who gave it no read access to this one, it is
+        /// not a file, or the host failed for a reason that is not a sharing refusal. NEITHER free NOR swept — a caller
+        /// that cannot observe a holder cannot say there is none (kb/Work PB2917).</summary>
+        Unobservable,
+    }
+
     /// <summary>Create the lock file of ONE holder at <paramref name="lockFilePath"/> and hold it open — the other
-    /// half of <see cref="IsHeldByAnother"/> for a host whose file lock is a file per holder
-    /// (<see cref="SidecarColumnLockHost"/>, kb/Work PB2484). It is a lock file, not a physical file: nothing a program
+    /// half of <see cref="ProbeLockFile"/>, for a host whose lock is a file per holder
+    /// (<see cref="SidecarLockFiles"/>, kb/Work PB2484). It is a lock file, not a physical file: nothing a program
     /// reads or writes is ever in it.
-    /// <para>⛔ <see cref="FileMode.CreateNew"/>, so a name is one holder's for ever, and a share mode other than
-    /// <see cref="FileShare.None"/>, which is what makes .NET take a SHARED <c>flock</c> on Unix: every
-    /// <see cref="IsHeldByAnother"/> (an exclusive request) is then refused while this stream lives, and no holder's
-    /// stream refuses another holder's tester. <see cref="FileShare.Delete"/> lets Windows rename the open file.
+    /// <para>⛔ <see cref="FileMode.CreateNew"/>, so a name is one holder's for ever. ⛔ A HOLDER TAKES THE EXCLUSIVE LOCK
+    /// AND A TESTER ASKS FOR A SHARED ONE, so two testers never exclude each other: a tester that held the lock for its
+    /// probe made a dead file look live to the next tester, and that tester's OPEN was refused '61' for no connector
+    /// (kb/Work PB2917, the train 1052 review). .NET takes <c>LOCK_EX</c> for <see cref="FileShare.None"/> and
+    /// <c>LOCK_SH</c> for every other value, so on Unix the holder asks for <see cref="FileShare.None"/>; Windows' share
+    /// modes are mandatory and per-access, and there <see cref="FileShare.Delete"/> alone refuses every other read while
+    /// letting the open file be renamed (publication renames it). A <see cref="ProbeLockFile"/> is therefore refused
+    /// while this stream lives, and no holder's stream refuses another holder's tester. And ⛔ ITS PERMISSIONS ARE THE LOCK DIRECTORY'S, not the creator's umask (kb/Work PB2917): the file is
+    /// created with the mode the process's umask leaves — 0600 under a umask of 077 — which another user who may enter
+    /// the directory cannot open, so its holder would read as unobservable to every tester of that user. A lock file
+    /// holds no data; it is given the read and write bits of its directory, and always its owner's own: the holder probes
+    /// its own file before publishing it, and a directory whose owner bits lack read (write and search only) would leave
+    /// the holder blind to its own lock, read as a host that cannot hold one, and the OPEN granted with none.
     /// Throws what a <see cref="FileStream"/> throws; the caller maps it.</para></summary>
-    internal static FileStream OpenLockHolder(string lockFilePath) =>
-        new(lockFilePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.ReadWrite | FileShare.Delete,
-            bufferSize: 1, FileOptions.None);
+    internal static FileStream OpenLockHolder(string lockFilePath)
+    {
+        var stream = new FileStream(lockFilePath, FileMode.CreateNew, FileAccess.ReadWrite,
+            ShareModesAreMandatory ? FileShare.Delete : FileShare.None, bufferSize: 1, FileOptions.None);
+        if (!OperatingSystem.IsWindows())
+        {
+            try
+            {
+                const UnixFileMode readWrite = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead
+                    | UnixFileMode.GroupWrite | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+                File.SetUnixFileMode(stream.SafeFileHandle, (File.GetUnixFileMode(Path.GetDirectoryName(lockFilePath)!) & readWrite)
+                    | UnixFileMode.UserRead | UnixFileMode.UserWrite);
+            }
+            // A file system with no Unix modes (FAT, exFAT, an SMB share) refuses the change; its files carry the
+            // mount's permissions for every user, which is the sharing the change exists to give. The lock itself is
+            // unaffected, so the holder is kept: only the cross-user alignment is best effort.
+            catch (UnauthorizedAccessException) { }
+            catch (IOException) { }
+        }
+        return stream;
+    }
+
+    /// <summary>Is the holder of the lock file at <paramref name="lockFilePath"/> alive? Asked by requesting the file
+    /// for READ under a share mode that admits every other reader and writer, which only a holder's
+    /// <see cref="OpenLockHolder"/>'s exclusive share mode refuses — so the question never excludes another asker, and a file nobody holds
+    /// is simply opened and closed. The four answers are <see cref="LockFileState"/>'s; only the sharing refusal is
+    /// <see cref="LockFileState.Live"/> and only a free open is <see cref="LockFileState.Dead"/>.
+    /// <para>⛔ "ACCESS DENIED" IS ALWAYS AN ANSWER, asked once. Windows also answers it for a DELETE-PENDING file (deleted
+    /// while another handle still has it open), which is a file about to be gone, not another user's, and no bound on
+    /// asking again tells the two apart (train 1056b measured 25 % of such files still listed). So no name a prober reads
+    /// is ever deleted in place: <see cref="SidecarLockFiles.Retire"/> renames it away first, and only the retired name,
+    /// which nobody probes, can be delete-pending.</para></summary>
+    internal static LockFileState ProbeLockFile(string lockFilePath)
+    {
+        try
+        {
+            using var _ = new FileStream(lockFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            return LockFileState.Dead;
+        }
+        catch (FileNotFoundException) { return LockFileState.Gone; }
+        catch (DirectoryNotFoundException) { return LockFileState.Gone; }
+        catch (IOException e) when (IsSharingRefusal(e)) { return LockFileState.Live; }
+        catch (IOException) { return LockFileState.Unobservable; }
+        catch (UnauthorizedAccessException) { return LockFileState.Unobservable; }   // another user's file, or a directory
+    }
+
+    /// <summary>Create the lock directory <paramref name="directory"/> beside a physical file, ⛔ WITH THE PERMISSIONS OF
+    /// THE DIRECTORY THE PHYSICAL FILE IS IN (kb/Work PB2917): the first holder's umask (0755 at the default 022) would
+    /// make a second user who may write the physical file's directory unable to publish into the lock directory, and
+    /// that user's OPEN would be granted where §9.1.15 2) requires the refusal. Only the creator applies the mode, and
+    /// only to a directory it created; a directory that exists is the first holder's and is left as it is. Windows has
+    /// no such mode.</summary>
+    internal static void CreateLockDirectory(string directory)
+    {
+        if (OperatingSystem.IsWindows()) { Directory.CreateDirectory(directory); return; }
+        try { _ = File.GetUnixFileMode(directory); return; }                // exists: another holder's
+        catch (FileNotFoundException) { }
+        catch (DirectoryNotFoundException) { }
+        Directory.CreateDirectory(directory);
+        try
+        {
+            const UnixFileMode shared = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute
+                | UnixFileMode.GroupRead | UnixFileMode.GroupWrite | UnixFileMode.GroupExecute
+                | UnixFileMode.OtherRead | UnixFileMode.OtherWrite | UnixFileMode.OtherExecute | UnixFileMode.StickyBit;
+            File.SetUnixFileMode(directory, File.GetUnixFileMode(Path.GetDirectoryName(directory)!) & shared);
+        }
+        catch (UnauthorizedAccessException) { }   // not ours to chmod (a sibling created it a moment ago): its mode stands
+        catch (IOException) { }                   // the directory is gone again: the publisher's retry creates it
+    }
+
 
     /// <summary>Are this host's share modes MANDATORY and PER-ACCESS — a handle opened with <see cref="FileShare.Read"/>
     /// refuses an outside writer, and one opened <see cref="FileShare.None"/> refuses every other handle? That is

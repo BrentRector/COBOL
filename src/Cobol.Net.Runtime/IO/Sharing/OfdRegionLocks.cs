@@ -79,17 +79,6 @@ internal static class OfdRegionLocks
         OperatingSystem.IsLinux() && Environment.Is64BitProcess
         && RuntimeInformation.ProcessArchitecture is Architecture.X64 or Architecture.Arm64;
 
-    /// <summary>What a region operation reported.</summary>
-    internal enum Result
-    {
-        /// <summary>The operation took effect / the region is free of any other holder.</summary>
-        Ok,
-        /// <summary>Another description holds the region.</summary>
-        Held,
-        /// <summary>This host (kernel, filesystem or process shape) cannot carry the lock.</summary>
-        Unavailable,
-    }
-
     /// <summary>Open <paramref name="hostPath"/> read-only for the sole purpose of holding region locks on it,
     /// or null when this host cannot (the ABI is not Linux x86-64/arm64, the kernel lacks OFD locks, the file is
     /// absent or this process may not read it — each is the OPEN's own question to answer, never this one's).
@@ -136,13 +125,13 @@ internal static class OfdRegionLocks
     /// description — EXCLUSIVE (incompatible with every other holder; the descriptor must be open for writing) or
     /// SHARED (compatible with every other shared holder, incompatible with an exclusive one). With
     /// <paramref name="wait"/> the call blocks until the byte can be had (<c>F_OFD_SETLKW</c>, re-issued when a
-    /// signal interrupts it); without it a conflicting holder answers <see cref="Result.Held"/> at once.</summary>
-    internal static Result Hold(SafeFileHandle handle, long offset, bool exclusive, bool wait)
+    /// signal interrupts it); without it a conflicting holder answers <see cref="RegionLockResult.Held"/> at once.</summary>
+    internal static RegionLockResult Hold(SafeFileHandle handle, long offset, bool exclusive, bool wait)
     {
         while (true)
         {
             var request = new Flock { Type = exclusive ? F_WRLCK : F_RDLCK, Whence = 0, Start = offset, Length = 1 };
-            var result = Classify(handle, wait ? F_OFD_SETLKW : F_OFD_SETLK, ref request, onSuccess: Result.Ok,
+            var result = Classify(handle, wait ? F_OFD_SETLKW : F_OFD_SETLK, ref request, onSuccess: RegionLockResult.Ok,
                 out bool interrupted);
             if (!interrupted) return result;
         }
@@ -151,11 +140,11 @@ internal static class OfdRegionLocks
     /// <summary>Does a description OTHER than <paramref name="handle"/>'s hold the byte at
     /// <paramref name="offset"/>? The question is asked as an exclusive request (<c>F_OFD_GETLK</c> with
     /// <c>F_WRLCK</c>), which any foreign holder of any kind conflicts with, and nothing is taken.</summary>
-    internal static Result HeldByAnother(SafeFileHandle handle, long offset)
+    internal static RegionLockResult HeldByAnother(SafeFileHandle handle, long offset)
     {
         var request = new Flock { Type = F_WRLCK, Whence = 0, Start = offset, Length = 1 };
-        var result = Classify(handle, F_OFD_GETLK, ref request, onSuccess: Result.Ok);
-        return result == Result.Ok && request.Type != F_UNLCK ? Result.Held : result;
+        var result = Classify(handle, F_OFD_GETLK, ref request, onSuccess: RegionLockResult.Ok);
+        return result == RegionLockResult.Ok && request.Type != F_UNLCK ? RegionLockResult.Held : result;
     }
 
     /// <summary>Give back every lock <paramref name="handle"/>'s description holds in
@@ -167,13 +156,13 @@ internal static class OfdRegionLocks
     internal static void Release(SafeFileHandle handle, long offset, long length)
     {
         var request = new Flock { Type = F_UNLCK, Whence = 0, Start = offset, Length = length };
-        _ = Classify(handle, F_OFD_SETLK, ref request, onSuccess: Result.Ok);
+        _ = Classify(handle, F_OFD_SETLK, ref request, onSuccess: RegionLockResult.Ok);
     }
 
-    private static Result Classify(SafeFileHandle handle, int command, ref Flock request, Result onSuccess) =>
+    private static RegionLockResult Classify(SafeFileHandle handle, int command, ref Flock request, RegionLockResult onSuccess) =>
         Classify(handle, command, ref request, onSuccess, out _);
 
-    private static Result Classify(SafeFileHandle handle, int command, ref Flock request, Result onSuccess,
+    private static RegionLockResult Classify(SafeFileHandle handle, int command, ref Flock request, RegionLockResult onSuccess,
         out bool interrupted)
     {
         interrupted = false;
@@ -183,9 +172,9 @@ internal static class OfdRegionLocks
             handle.DangerousAddRef(ref added);
             if (NativeFcntl((int)handle.DangerousGetHandle(), command, ref request) >= 0) return onSuccess;
             int errno = Marshal.GetLastPInvokeError();
-            if (errno is EAGAIN or EACCES) return Result.Held;   // F_OFD_SETLK's refusal: another description holds an incompatible lock
-            if (errno == EINTR) { interrupted = true; return Result.Unavailable; }   // a signal broke a waiting request
-            return Result.Unavailable;   // EINVAL (this kernel has no OFD locks), ENOLCK, EOPNOTSUPP, ENOSYS, EBADF — none of them is a conflict
+            if (errno is EAGAIN or EACCES) return RegionLockResult.Held;   // F_OFD_SETLK's refusal: another description holds an incompatible lock
+            if (errno == EINTR) { interrupted = true; return RegionLockResult.Unavailable; }   // a signal broke a waiting request
+            return RegionLockResult.Unavailable;   // EINVAL (this kernel has no OFD locks), ENOLCK, EOPNOTSUPP, ENOSYS, EBADF — none of them is a conflict
         }
         finally { if (added) handle.DangerousRelease(); }
     }

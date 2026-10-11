@@ -32,16 +32,16 @@ internal sealed class OfdColumnLockHost : IColumnLockHost
         {
             switch (OfdRegionLocks.Hold(region, ByteOf(own), exclusive: false, wait: false))
             {
-                case OfdRegionLocks.Result.Held: return RunUnitFileLock.Outcome.Refused;   // someone holds our byte exclusively: not our protocol, not ours to override
-                case OfdRegionLocks.Result.Unavailable: return RunUnitFileLock.Outcome.Unavailable;
+                case RegionLockResult.Held: return RunUnitFileLock.Outcome.Refused;   // someone holds our byte exclusively: not our protocol, not ours to override
+                case RegionLockResult.Unavailable: return RunUnitFileLock.Outcome.Unavailable;
             }
 
             foreach (var column in refused)
             {
                 switch (OfdRegionLocks.HeldByAnother(region, ByteOf(column)))
                 {
-                    case OfdRegionLocks.Result.Held: return RunUnitFileLock.Outcome.Refused;
-                    case OfdRegionLocks.Result.Unavailable: return RunUnitFileLock.Outcome.Unavailable;
+                    case RegionLockResult.Held: return RunUnitFileLock.Outcome.Refused;
+                    case RegionLockResult.Unavailable: return RunUnitFileLock.Outcome.Unavailable;
                 }
             }
             hold = new Held(region);

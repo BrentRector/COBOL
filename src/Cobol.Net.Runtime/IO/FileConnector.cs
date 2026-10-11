@@ -624,16 +624,13 @@ public abstract class FileConnector
     /// post-read lock acquisition targets; §14.9.30 GR11c/d).</summary>
     public virtual string LastReadRecordId => "";
 
-    /// <summary>The handle through which this connector's record locks are PUBLISHED to other run units
-    /// (<see cref="HostRegionLocks"/>, kb/Work PB2660) — §9.1.16, <i>"While locked by a given file connector, a
-    /// record is not accessible to another file connector in the same or a different run unit"</i>. Null for a
-    /// connector whose locks only its own run unit can see; <see cref="PhysicalFileTable"/> then keeps them in its
-    /// table alone.</summary>
-    internal virtual Microsoft.Win32.SafeHandles.SafeFileHandle? RecordLockHandle => null;
-
-    /// <summary>Whether <see cref="RecordLockHandle"/> is open for writing, so it can hold an EXCLUSIVE lock
-    /// (<see cref="HostRegionLocks.Hold"/>).</summary>
-    internal virtual bool RecordLockHandleWritable => false;
+    /// <summary>The endpoint through which this connector's record locks are PUBLISHED to other run units
+    /// (<see cref="RegionLocks"/>, kb/Work PB2660, PB2936) — §9.1.16, <i>"While locked by a given file connector, a
+    /// record is not accessible to another file connector in the same or a different run unit"</i>. Made by the host of
+    /// the process for the connector's own handle when the handle is taken, and disposed (every byte it holds given
+    /// back) when the handle is given up. Null for a connector whose locks only its own run unit can see;
+    /// <see cref="PhysicalFileTable"/> then keeps them in its table alone.</summary>
+    internal virtual RegionLocks? RecordLocks => null;
 
     /// <summary>Enter one record statement's hold on the connector's store — see <see cref="StoreStatement"/>.
     /// Inert for every organization but the keyed ones.</summary>
