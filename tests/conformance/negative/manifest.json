@@ -2353,6 +2353,7 @@
   "pb1419-udf-float-returning-at-85",
   "pb1164-call-returning-superclass-into-subclass",
   "pb1144-dyn-element-move-illegal",
+  "pb1938-through-alias-element-move-illegal",
   "pb1668-if-truth-word",
   "pb1668-and-truth-word",
   "pb1412-shift-only-condition-below-2023",

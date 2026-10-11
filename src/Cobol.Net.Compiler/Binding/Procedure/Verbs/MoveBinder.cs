@@ -228,11 +228,11 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         for (int t = 0; t < targets.Count; t++)
         {
             if (MoveClassifier.VariableLengthGroupSender(source, targets[t]) is not { } send) continue;
-            foreach (var (sTable, rTable) in VariableLengthCompatibility.CorrespondingTables(send.Item, targets[t].Item))
+            foreach (var (sSite, rSite) in VariableLengthCompatibility.CorrespondingTables(send.Item, targets[t].Item))
             {
-                if (sTable.IsGroup || rTable.IsGroup) continue;                         // GR4: the image IS the move
-                if (OoConformance.DescriptionMismatch(sTable, rTable) is null) continue;  // identity conversion
-                (moves ??= []).Add(ElementMove(t, send, sTable, targets[t], rTable));
+                if (sSite.Table.IsGroup || rSite.Table.IsGroup) continue;                         // GR4: the image IS the move
+                if (OoConformance.DescriptionMismatch(sSite.Table, rSite.Table) is null) continue;  // identity conversion
+                (moves ??= []).Add(ElementMove(t, send, sSite, targets[t], rSite));
             }
         }
         return moves ?? [];
@@ -242,27 +242,44 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// occurrence number, each reached from its OWN group's resolved place through the ONE bind-time cursor
     /// (<see cref="PlaceCursor"/> — so a subscripted or qualified group keeps its subscripts), and the two current
     /// counts of §14.6.9.1 (<see cref="OccurrenceCounts.Current"/>).</summary>
-    private TableElementMove ElementMove(int target, Place send, DataItem sTable, Place recv, DataItem rTable)
+    private TableElementMove ElementMove(int target, Place send, VariableLengthCompatibility.TableSite sSite,
+                                         Place recv, VariableLengthCompatibility.TableSite rSite)
     {
         string v = $"__vlm{_elementLoopVar++}";
-        var sCur = TableCursor(send, sTable);
-        var rCur = TableCursor(recv, rTable);
-        var sCount = sCur is null ? null : OccurrenceCounts.Current(sTable, sCur.StoragePath, ctx.Refs);
-        var rCount = rCur is null ? null : OccurrenceCounts.Current(rTable, rCur.StoragePath, ctx.Refs);
-        if (sCur is null || rCur is null || sCount is null || rCount is null)
-            return new TableElementMove(target, v, sCount, rCount, null,
-                $"the element moves of the corresponding tables '{sTable.CobolName ?? "FILLER"}' and "
-                + $"'{rTable.CobolName ?? "FILLER"}' of a variable-length group MOVE: a table reached through a storage "
+        var s = ReachElement(send, sSite, v);
+        var r = ReachElement(recv, rSite, v);
+        if (s is not { } sReach || r is not { } rReach)
+            return new TableElementMove(target, v, s?.Count, r?.Count, null,
+                $"the element moves of the corresponding tables '{sSite.Table.CobolName ?? "FILLER"}' and "
+                + $"'{rSite.Table.CobolName ?? "FILLER"}' of a variable-length group MOVE: a table reached through a storage "
                 + "form whose element places this implementation does not build (ISO §14.6.9.2)");
-        var elementMove = BindMoveOf(new BoundFieldOperand(ElementPlace(sCur, sTable, v)),
-            [ElementPlace(rCur, rTable, v)], ImplicitMovePhrase.TableElement);
-        return new TableElementMove(target, v, sCount, rCount, elementMove, null);
+        var elementMove = BindMoveOf(new BoundFieldOperand(sReach.Element), [rReach.Element], ImplicitMovePhrase.TableElement);
+        return new TableElementMove(target, v, sReach.Count, rReach.Count, elementMove, null);
+    }
+
+    /// <summary>⛔ THE ONE REACH FROM A GROUP OPERAND TO ONE OF ITS CORRESPONDING TABLES' ELEMENTS (kb/Work PB1144,
+    /// PB1938): occurrence <paramref name="v"/> of the table at <paramref name="site"/> and the table's current count
+    /// (§14.6.9.1). A table of an ordinary group is reached from the group's resolved place down its ancestor chain
+    /// (<see cref="TableCursor"/>); a table leaf in the span of a level-66 THROUGH alias is not a subordinate of the alias
+    /// item (§13.18.45.4 GR2 — the alias "includes" the record's elementary items and owns none), so it is reached as
+    /// the RECORD's table at the outer occurrences its span part names (<see cref="RenamesSpanPart.SubscriptsFor"/>),
+    /// through the ONE item→place builder every verb operand uses. Null when no element place is built for the table's
+    /// storage form.</summary>
+    private (Place Element, AllCount Count)? ReachElement(Place group, VariableLengthCompatibility.TableSite site, string v)
+    {
+        var table = site.Table;
+        if (site.Part is { } part)
+            return ctx.Refs.ResolveItemAt(table, part.SubscriptsFor(new PositionLocal(v))) is { } element
+                && OccurrenceCounts.Current(table, null, ctx.Refs) is { } count
+                ? (element, count) : null;
+        return TableCursor(group, table) is { } cur && OccurrenceCounts.Current(table, cur.StoragePath, ctx.Refs) is { } n
+            ? (ElementPlace(cur, table, v), n) : null;
     }
 
     /// <summary>The cursor at <paramref name="table"/> inside the resolved group <paramref name="group"/>: down the
     /// table's ancestor chain from the group (§8.5.1.12's atoms flatten only scalar subordinate groups, so no OCCURS
-    /// level lies between them). Null when the table is not a subordinate of the group's item (a level-66 alias,
-    /// whose atoms are its span's leaves) or a storage form on the way has no cursor.</summary>
+    /// level lies between them). Null when the table is not a subordinate of the group's item or a storage form on
+    /// the way has no cursor; a level-66 THROUGH alias's table leaves are never asked of it (<see cref="ReachElement"/>).</summary>
     private static PlaceCursor? TableCursor(Place group, DataItem table)
     {
         var chain = new Stack<DataItem>();

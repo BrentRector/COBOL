@@ -1031,7 +1031,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 // PB96): the cell's storage image, then a BYTE slice of it when the part does not cover the whole cell
                 // — bytes, because the cell's image is its storage bytes (SpanLeafPlace), so a slice that splits a
                 // national character is as addressable as any other (kb/Work PB2466).
-                if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : occIdx), out gap) is not { } cell)
+                if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : new PositionConstant(occIdx)), out gap) is not { } cell)
                     return null;
                 if (part.IsPartial) cell = new RefModPlace(cell, new PositionConstant(part.StartByte), new PositionConstant(part.LengthBytes));
                 leafPlaces.Add(cell);
@@ -1045,7 +1045,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
             int occ = leaf.Occurs ?? 1;
             for (int k = 1; k <= occ; k++)
             {
-                if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : k), out gap) is not { } lp) return null;
+                if (SpanLeafPlace(leaf, part.SubscriptsFor(leaf.Occurs is null ? null : new PositionConstant(k)), out gap) is not { } lp) return null;
                 widths.Add(leaf.ByteWidth);   // a whole part: every occurrence, at the leaf's storage width (kb/Work PB96, PB1665)
                 leafPlaces.Add(lp);
             }

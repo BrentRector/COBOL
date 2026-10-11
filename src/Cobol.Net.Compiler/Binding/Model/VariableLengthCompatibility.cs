@@ -83,8 +83,12 @@ internal static class VariableLengthCompatibility
 
     /// <summary>A group's §8.5.1.12 atoms (<see cref="GroupAtom"/>, the runtime's model, which the ONE walk
     /// <see cref="GroupCompatibility.Walk"/> reads) with the declaring item of each — a diagnostic names it, and a
-    /// table atom's item is the subject of §8.5.1.12.3 sentence 2's element recursion.</summary>
-    private readonly record struct Laid(GroupAtom[] Atoms, DataItem[] Items);
+    /// table atom's item is the subject of §8.5.1.12.3 sentence 2's element recursion.
+    /// <c>Parts</c> is the span part of each atom of a THROUGH alias (kb/Work PB1938) — the record's storage window the atom
+    /// lies in, which is what locates a table leaf (the leaf item alone does not: one leaf under an OCCURS group is a part
+    /// per occurrence of the group) — and null for every atom of an ordinary group, whose tables are located by the path
+    /// from the group's own item.</summary>
+    private readonly record struct Laid(GroupAtom[] Atoms, DataItem[] Items, RenamesSpanPart?[] Parts);
 
     /// <summary>A table atom of <paramref name="c"/>: one occurrence's byte and character lengths, and — when the
     /// element is a group — the element's own atoms, which §8.5.1.12.3's "their elements are compatible" recurses
@@ -98,17 +102,19 @@ internal static class VariableLengthCompatibility
     {
         public readonly List<GroupAtom> Atoms = [];
         public readonly List<DataItem> Items = [];
+        public readonly List<RenamesSpanPart?> Parts = [];
 
-        public void Add(GroupAtom atom, DataItem item)
+        public void Add(GroupAtom atom, DataItem item, RenamesSpanPart? part = null)
         {
             Atoms.Add(atom);
             Items.Add(item);
+            Parts.Add(part);
         }
 
         /// <summary>A table element's own atoms.</summary>
         public GroupAtom[] Element(DataItem element) => AtomsOf(element).Atoms;
 
-        public Laid ToLaid() => new([.. Atoms], [.. Items]);
+        public Laid ToLaid() => new([.. Atoms], [.. Items], [.. Parts]);
     }
 
     /// <summary>The group's byte layout as a FLAT left-to-right atom sequence: REDEFINES subtrees dropped
@@ -191,7 +197,7 @@ internal static class VariableLengthCompatibility
             // national leaf's character is two bytes) are RenamesSpanPart.Positions, the one conversion.
             sink.Add(part.IsWhole && leaf.Occurs is { } n
                 ? TableAtom(leaf, GroupAtomKind.Table, n, sink)
-                : new GroupAtom(GroupAtomKind.Fixed, part.LengthBytes, part.Positions), leaf);
+                : new GroupAtom(GroupAtomKind.Fixed, part.LengthBytes, part.Positions), leaf, part);
         }
     }
 
@@ -272,14 +278,21 @@ internal static class VariableLengthCompatibility
     /// space-filled fixed-length table" (§8.5.1.12.2's last sentence) — no table of the other group — and is not
     /// listed. Consumer: the §14.9.25.4 GR9 MOVE, whose §14.6.9.2 element moves are per corresponding pair (kb/Work
     /// PB1144). Empty when the pair is not compatible or either side is not a group.</summary>
-    public static IReadOnlyList<(DataItem One, DataItem Other)> CorrespondingTables(DataItem one, DataItem other)
+    public static IReadOnlyList<(TableSite One, TableSite Other)> CorrespondingTables(DataItem one, DataItem other)
     {
         if (!ItemCategory.IsGroupItem(one) || !ItemCategory.IsGroupItem(other)) return [];
         Laid a = AtomsOf(one), b = AtomsOf(other);
         var pairs = new List<(int First, int Second)>();
         if (GroupCompatibility.Walk(a.Atoms, b.Atoms, pairs) is not null) return [];
-        return [.. pairs.Where(p => a.Atoms[p.First].IsTable).Select(p => (a.Items[p.First], b.Items[p.Second]))];
+        return [.. pairs.Where(p => a.Atoms[p.First].IsTable)
+            .Select(p => (new TableSite(a.Items[p.First], a.Parts[p.First]), new TableSite(b.Items[p.Second], b.Parts[p.Second])))];
     }
+
+    /// <summary>WHERE a corresponding table lies in its group (kb/Work PB1938): <paramref name="Table"/> is the table's
+    /// item, and <paramref name="Part"/> is null for a table inside the group's own subtree — reached by the path from
+    /// the group's item — and the <see cref="RenamesSpanPart"/> of a table leaf in the span of a level-66 THROUGH alias
+    /// (§13.18.45.4 GR2), which owns no subordinates: the table is the record's, at the outer occurrences the part names.</summary>
+    public readonly record struct TableSite(DataItem Table, RenamesSpanPart? Part);
 
     /// <summary>⛔ THE PAIR-RELATIVE LENGTHS of two groups at least one of which is a variable-length group, in
     /// CHARACTER positions — the only lengths a size rule may compare for such a pair (kb/Work PB965). A
