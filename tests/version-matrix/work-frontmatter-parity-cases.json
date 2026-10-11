@@ -33,7 +33,7 @@
    }
   },
   {
-   "name": "the same note with CRLF line endings — every note in the register is CRLF in the working tree",
+   "name": "the same note with CRLF line endings — still a note (the register is LF; the line-endings audit names a CR)",
    "text": "---\r\nid: PB245\r\nkind: defect\r\nstatus: landed\r\ninventory_rows: [AR-15.7.3-1]\r\ncloses_rows: [RV-15.4.1-4, AR-15.40.3-5]\r\n---\r\nbody\r\n",
    "expect": {
     "note": true, "id": "PB245", "kind": "defect", "status": "landed",

@@ -159,7 +159,7 @@ public sealed class ObjectRefDescriptorDriftTests
         END METHOD MK.
         END OBJECT.
         END CLASS DRIFTC.
-        """).Replace("\r\n", "\n");
+        """);
 
     private static (bool Ok, string Detail) Compile(string source)
     {

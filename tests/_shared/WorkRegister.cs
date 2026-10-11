@@ -66,10 +66,9 @@ internal static class WorkRegister
     }
 
     /// <summary>
-    /// The frontmatter block: everything between the opening <c>---</c> line and the closing one. <c>\r?\n</c>
-    /// because every note is CRLF in a Windows working tree (<c>core.autocrlf</c>) and LF in the object store —
-    /// a reader that hard-codes one of the two answers "this is not a note" for the whole register on the other
-    /// checkout.
+    /// The frontmatter block: everything between the opening <c>---</c> line and the closing one. The register is
+    /// LF (kb/Work PB3029); <c>\r?\n</c> because a reader that hard-codes LF would answer "this is not a note" for
+    /// a note a Windows tool wrote CRLF — SILENTLY — where the line-endings audit names it.
     /// </summary>
     private static readonly Regex FrontMatter =
         new(@"\A---\r?\n(?<body>.*?)\r?\n---[ \t]*(?:\r?\n|\z)", RegexOptions.Singleline | RegexOptions.Compiled);

@@ -218,10 +218,10 @@ def migrate() -> int:
     return 0
 
 
-#: The frontmatter block: everything between the opening `---` line and the closing one. `\r?\n` because every
-#: note in the register is CRLF in the working tree (`core.autocrlf`) and LF in the object store, and the C# twin
-#: reads the file's BYTES — a reader that hard-codes one of the two answers "this is not a note" for a whole
-#: register on the other checkout.
+#: The frontmatter block: everything between the opening `---` line and the closing one. The register is LF
+#: (kb/Work PB3029); `\r?\n` because a reader that hard-codes LF would answer "this is not a note" for a note a
+#: Windows tool wrote CRLF — SILENTLY — where the line-endings audit (scripts/line_endings.py) names it. The C#
+#: twin (tests/_shared/WorkRegister.cs) reads the same bytes the same way.
 FRONT = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
 #: A frontmatter key. Anything else on a line — a colon inside a title, a wrapped list's continuation — is not
 #: one. A VALUE is a list when it opens with `[`, whatever its key: list-ness is a property of the value, so a
