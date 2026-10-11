@@ -1866,7 +1866,7 @@ result. Run the long legs ONE AT A TIME.
 
 ### Gates — what to run, and when
 
-- **PER CHANGE — the ONE ordered gate (kb/Work PB1708, PB1721, PB3022; `DESIGN-test-build-ci.md` §3.14, §3.17.3):**
+- **PER CHANGE — the ONE ordered gate (kb/Work PB1708, PB1721, PB3022; `DESIGN-test-build-ci.md` §3.14 and section 3.17.3):**
   `pwsh scripts/build-local.ps1 -Priority BelowNormal` (bash: `scripts/build-local.sh`), the same for an
   implementer's commit, a re-gate and a landing (at Normal priority). ORDER, DON'T SKIP (owner, 2026-09-28): its
   driver `scripts/run_gate_legs.py` holds the worktree's gate lock, runs the audits (before it queues, kb/Work

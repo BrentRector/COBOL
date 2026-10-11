@@ -35,7 +35,7 @@ public sealed class GrammarDiagramGeneratorDriftTests
         using var p = Process.Start(psi)!;
         string stdout = p.StandardOutput.ReadToEnd();
         string stderr = p.StandardError.ReadToEnd();
-        Assert.True(p.WaitForExit(180_000), "gen-grammar-diagrams.ps1 -Check timed out (>180s)");
+        p.WaitForExit(); // both streams are at EOF; no clock decides this test (kb/Work PB3022)
 
         Assert.True(p.ExitCode == 0,
             $"gen-grammar-diagrams.ps1 -Check exited {p.ExitCode}\nSTDOUT:\n{stdout}\nSTDERR:\n{stderr}");

@@ -37,7 +37,7 @@ internal static class PythonInstrument
         {
             var psi = new ProcessStartInfo(exe);
             psi.ArgumentList.Add("--version");
-            if (ProcessObserver.Observe(psi, null, 30_000).Outcome != ProcessOutcome.LaunchFailed) return exe;
+            if (ProcessObserver.Observe(psi, null, ProcessObserver.TimeoutMs).Outcome != ProcessOutcome.LaunchFailed) return exe;
         }
 
         throw new InvalidOperationException(
