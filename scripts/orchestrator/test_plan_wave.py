@@ -9,6 +9,7 @@ waits (blockers in two chains, the owner, a frontier model), and work.py check's
 Run: python scripts/orchestrator/test_plan_wave.py   (no build, no git; the campaign section needs the
 tools/claude-skills submodule, and its absence is a FAIL)."""
 import pathlib
+import re
 import subprocess
 import sys
 import tempfile
@@ -217,6 +218,15 @@ check("a rendered spec names the global stop", str(coord.global_stop()) in (spec
 check("a rendered spec names the fleet's own stop", str(coord.fleet_stop(TMP, "w77")) in (specs or [""])[0], True)
 check("a rendered spec passes check_practices", [m for m in check_practices.check(spec_file, check_practices.SPEC)
                                                  if "report" not in m], [])
+# 7c. THE ONE REPORTS DIRECTORY (kb/Work PB2980): the report path is coord.reports_dir() whatever the wave's scratch
+#     (here TMP), and check_practices refuses a spec that writes its report under the scratch instead
+report_line = next((l for l in (specs or [""])[0].splitlines() if l.startswith("Report:")), "")
+check("a rendered spec's report is in coord.reports_dir(), not the wave's scratch",
+      (str(coord.reports_dir()) in report_line, str(TMP) in report_line), (True, False))
+check("check_practices accepts the rendered report path",
+      bool(re.search(check_practices.RENDERED_REPORT, report_line)), True)
+check("check_practices refuses a report under the wave's scratch",
+      bool(re.search(check_practices.RENDERED_REPORT, f"Report: {TMP}\\reports\\w77a-PB1-report.md")), False)
 try:
     mds.render({k: v for k, v in CFG77.items() if k != "stop_file"}, gjson[0])
     check("no stop_file, no spec", "rendered", "KeyError")

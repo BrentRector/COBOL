@@ -21,13 +21,16 @@ check_practices.py over the specs AND the groups file (exit 1 on a miss).
 Every spec names TWO stop files (kb/Work PB2483): the owner's global stop (`coord.global_stop()`) and this fleet's own
 `stop_file` (`coord.fleet_stop(scratch, scope)`; plan_wave.py writes it). A fleet stopped by its own file never stops
 another session's agents.
+
+Every spec's report path is in `coord.reports_dir()`, never under the wave's `scratch` (kb/Work PB2980): the land unit
+and the branch survey read that one directory, and a report anywhere else is never landed.
 """
 import json, pathlib, subprocess, sys
 
 HERE = pathlib.Path(__file__).resolve().parent
 TEMPLATE = HERE / 'templates' / 'dispatch-spec-implementer.md'
 sys.path.insert(0, str(HERE.parents[2] / 'scripts' / 'orchestrator'))
-import coord  # noqa: E402  (the one definition of the stop files)
+import coord  # noqa: E402  (the one definition of the stop files and the reports directory)
 
 
 def render(cfg, g, tpl=None):
@@ -38,7 +41,7 @@ def render(cfg, g, tpl=None):
         raise KeyError("stop_file (this fleet's own STOP-<scope>, kb/Work PB2483; plan_wave.py writes it)")
     pred = g.get('pred', '')
     return tpl.format(wave=cfg['wave'], base=cfg['base'], S=str(cfg['scratch']), pred=(pred + '\n') if pred else '',
-                      global_stop=str(coord.global_stop()), stop_file=cfg['stop_file'],
+                      global_stop=str(coord.global_stop()), stop_file=cfg['stop_file'], reports=str(coord.reports_dir()),
                       **{k: v for k, v in g.items() if k != 'pred'})
 
 

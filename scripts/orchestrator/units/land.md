@@ -3,11 +3,15 @@ UNIT: land.
 Finished implementer branches are waiting for a lander.
 1. Load the `workstream` skill; read .claude/skills/workstream/references/landing.md and
    .claude/skills/workstream/templates/lander-train-brief.md.
-2. The candidates are EVERY branch `python scripts/prune_worktrees.py --brief` lists WAITING TO LAND (its newest
-   `w<wave><letter>-PB<lead>-report.md` under {SCRATCH}\reports says DONE: the loop's own branches AND the attended
+2. The candidates are the branches `python scripts/prune_worktrees.py --brief` lists WAITING TO LAND (its newest
+   `w<wave><letter>-PB<lead>-report.md` under {COORD}\scratch\reports says DONE: the loop's own branches AND the attended
    session's, which writes its finished branches' reports there instead of dispatching a lander while the loop runs,
-   MANDATORY-PRACTICES O11, kb/Work PB2602), plus the previous handoff's `branches_pending` with status DONE. Carry
-   them ALL in ONE train. Dispatch one cobol-lander train over them, its prompt naming `LOOP STATE: running` (the
+   MANDATORY-PRACTICES O11, kb/Work PB2602). ⛔ The train is EXACTLY the rows `python scripts/prune_worktrees.py --train`
+   names TRAIN: at most six (the owner's band of 4-6 clusters), the most harmful lead first. The HELD rows stay WAITING
+   TO LAND for the next land unit; name them in the handoff's `branches_pending`. Never one train of every waiting
+   branch (owner 2026-10-10, kb/Work PB2981: a 15-branch train split into three serial landers and landed nothing for
+   hours). A previous handoff's `branches_pending` is already in the survey. An operator steer that names the train
+   (`handoff.last.json`) wins over `--train`. Dispatch one cobol-lander train over them, its prompt naming `LOOP STATE: running` (the
    dispatch guard refuses a lander call without it), with lead ids from `python scripts/orchestrator/alloc.py pb 5`,
    and stay until it lands or reports every drop. A lander whose push-main.sh the permission layer refused reports
    `READY-TO-PUSH <worktree> <sha>` (L13): hand that line off in `summary`; never push some other way. The lander
