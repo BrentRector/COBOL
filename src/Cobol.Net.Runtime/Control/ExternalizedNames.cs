@@ -21,7 +21,9 @@ namespace CobolNet.Runtime;
 /// and GR4 b); DOC-A.1-219, kb/Work PB1402) — so <c>CALL "sub-p"</c> reaches <c>PROGRAM-ID. SUB-P</c> and
 /// <c>CALL "prüf"</c> reaches <c>PROGRAM-ID. PRÜF</c>, by the same equality the compiler's name tables use.
 /// §8.3.2.2 2) then makes every source element that names the same externalized name refer to the same
-/// instance.</item>
+/// instance. The comparer is 2023's at every edition, so a name below 2023 is first written in its edition's
+/// spelling (<see cref="FormInEdition"/>) — by the binder for a literal, by the emitted C# for a data item's value
+/// (kb/Work PB2840, PB2991) — and then meets the registered name by this one equality.</item>
 /// </list>
 /// </summary>
 public static class ExternalizedNames
@@ -30,13 +32,15 @@ public static class ExternalizedNames
     /// and trailing spaces removed (DOC-A.1-68). A null value forms the empty name, which names nothing.</summary>
     public static string Form(string? written) => (written ?? "").Trim(' ');
 
-    /// <summary>Form an externalized name from a literal WRITTEN IN SOURCE TEXT (a CALL / CANCEL target, an AS literal,
-    /// an INVOKE method name): <see cref="Form"/>, then the EDITION's spelling (<see cref="CobolNames.EditionSpelling"/>,
-    /// kb/Work PB2840). The literal names what a word names — a PROGRAM-ID, a METHOD-ID — and the lexer wrote that
-    /// word in the edition's Annex C spelling, so below 2023 <c>CALL "X&lt;final sigma&gt;"</c> reaches
-    /// <c>PROGRAM-ID. X&lt;sigma&gt;</c> (Annex E.2 item 14 deleted the pair's mapping at 2023 only). Run-time data
-    /// (an identifier's value) is not source text and takes <see cref="Form"/> alone, compared by the 2023 mapping.</summary>
-    public static string FormWritten(string? written, int dialectLevel) => CobolNames.EditionSpelling(Form(written), dialectLevel);
+    /// <summary>Form an externalized name that NAMES A WORD, as the edition <paramref name="dialectLevel"/> compares
+    /// words: <see cref="Form"/>, then the EDITION's spelling (<see cref="CobolNames.EditionSpelling"/>, kb/Work PB2840,
+    /// PB2991). A name names what a word names — a PROGRAM-ID, a METHOD-ID — and the lexer wrote that word in the
+    /// edition's Annex C spelling, so below 2023 <c>CALL "X&lt;final sigma&gt;"</c> reaches
+    /// <c>PROGRAM-ID. X&lt;sigma&gt;</c> (Annex E.2 item 14 deleted the pair's mapping at 2023 only). The ONE function
+    /// for both ways the name arrives: a literal written in source text (the binder calls it) and an identifier's
+    /// value held in a data item (the emitted C# calls it, with the compiled program's edition, because the run time
+    /// compares every name by the 2023 mapping and carries no edition of its own).</summary>
+    public static string FormInEdition(string? value, int dialectLevel) => CobolNames.EditionSpelling(Form(value), dialectLevel);
 
     /// <summary>True when <paramref name="written"/> is not already in its formed shape — the one question a
     /// bind-time screen asks before warning that an AS literal's spaces are not part of the name.</summary>

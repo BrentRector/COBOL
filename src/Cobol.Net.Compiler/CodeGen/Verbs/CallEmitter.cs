@@ -261,7 +261,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 : $"ProgramRegistry.CallPointer({PlaceRenderer.Read(pf.Place)}, {head}{site});";
         string nameExpr = c.LiteralName is { } literal
             ? CsLiteral(literal)
-            : OperandText.AsString(c.DynamicName!, num);   // GR3b — the identifier's value at CALL time (GR3a: read once); ProgramTable forms the name
+            : RuntimeApi.ExternalizedNameInEdition(OperandText.AsString(c.DynamicName!, num),
+                ctx.Data.Edition.DialectLevel);   // GR3b — the identifier's value at CALL time (GR3a: read once), formed in the edition's spelling (PB2991)
         return $"ProgramRegistry.CallProgram({nameExpr}, {head}"
             + $"{(c.IsFunction ? ", notFoundEc: \"EC-FUNCTION-NOT-FOUND\"" : "")}"   // §8.4.3.2.4 GR6b
             + $"{site});";
@@ -1431,7 +1432,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         var ecProg = EnabledProgramNames();
         foreach (var (literal, dynamic) in c.Targets)
         {
-            string nameExpr = literal is { } l ? CsLiteral(l) : OperandText.AsString(dynamic!, num);
+            string nameExpr = literal is { } l ? CsLiteral(l)
+                : RuntimeApi.ExternalizedNameInEdition(OperandText.AsString(dynamic!, num), ctx.Data.Edition.DialectLevel);
             string call = $"ProgramRegistry.Cancel({nameExpr}, {CsLiteral(callState.SelfPath)});";
             if (ecProg.Count == 0)
             {

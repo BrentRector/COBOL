@@ -56,7 +56,10 @@ public abstract class CobolObject
     /// (§8.3.2.2) by the ONE Annex C fold, <see cref="CobolNames.Fold(string)"/> (kb/Work PB1402 — this upper-cased by
     /// the host's case mapping, which disagrees with Annex C on the extended letters). The ONE word mapping: the
     /// INVOKE literal is normalized through it at bind time, and every generated case label is the method's
-    /// EXTERNALIZED name through it (<c>OoMethodSymbol.DispatchKey</c>).</summary>
+    /// EXTERNALIZED name through it (<c>OoMethodSymbol.DispatchKey</c>). The fold is 2023's at every edition, so an
+    /// identifier-2 value reaches it already written in the compiled program's edition spelling
+    /// (<c>RuntimeApi.ExternalizedNameInEdition</c>, <see cref="ExternalizedNames.FormInEdition"/>; kb/Work PB2991), as the
+    /// literal does through <c>OoBinder.OoMethodNameOf</c>.</summary>
     public static string NormalizeMethodName(string raw) => CobolNames.Fold(ExternalizedNames.Form(raw));
 
     /// <summary>Adopt this object's CLASS static storage — every method's WORKING-STORAGE, OO deep-dive D3 — into

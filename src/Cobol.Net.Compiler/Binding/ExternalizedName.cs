@@ -161,7 +161,7 @@ internal static class ExternalizedName
     /// <summary>§8.3.2.2 2)'s FORMATION half — "the content of the literal specified in that AS phrase is a name
     /// that is externalized to the operating environment. The implementor defines the formation and mapping rules
     /// of these names." — applied through the ONE rule every externalized name takes
-    /// (<see cref="CobolNet.Runtime.ExternalizedNames.FormWritten"/>, DOC-A.1-68): leading and trailing spaces are not
+    /// (<see cref="CobolNet.Runtime.ExternalizedNames.FormInEdition"/>, DOC-A.1-68): leading and trailing spaces are not
     /// part of the name. The run-time CALL / CANCEL / program-address / INVOKE side forms its target through the
     /// same function, which is why <c>PROGRAM-ID. S AS "trail  "</c> is now reached by <c>CALL "trail"</c> and by
     /// <c>CALL "trail  "</c> alike (kb/Work PB1539). Removing the spaces is reported as a WARNING (COBOLNET2642),
@@ -174,7 +174,7 @@ internal static class ExternalizedName
     {
         // The edition's spelling too (kb/Work PB2840): the name registered is the one a CALL literal of the same
         // edition forms, so the two meet whichever Annex C the edition is under.
-        string formed = CobolNet.Runtime.ExternalizedNames.FormWritten(written, edition.Edition.Year);
+        string formed = CobolNet.Runtime.ExternalizedNames.FormInEdition(written, edition.Edition.Year);
         if (!CobolNet.Runtime.ExternalizedNames.HasFormationSpaces(written)) return formed;
         if (formed.Length == 0 && zeroLengthRefused)
         {

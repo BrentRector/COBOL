@@ -861,7 +861,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             // spaces only is NOT zero-length (SR2 admits it) and stays legal: it forms the empty name, which the
             // run-time locate reports as EC-PROGRAM-NOT-FOUND (§14.9.4.4 GR3 b). The name is also written in the
             // edition's spelling (kb/Work PB2840), as the PROGRAM-ID word it names was lexed.
-            if (sl.Value.Length != 0) return CobolNet.Runtime.ExternalizedNames.FormWritten(sl.Value, ctx.Edition.Edition.Year);
+            if (sl.Value.Length != 0) return CobolNet.Runtime.ExternalizedNames.FormInEdition(sl.Value, ctx.Edition.Edition.Year);
             ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass,
                 $"{verb} with a zero-length literal program name (ISO {clause})");
             return null;

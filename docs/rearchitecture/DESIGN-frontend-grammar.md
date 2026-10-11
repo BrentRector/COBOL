@@ -1487,8 +1487,10 @@ lowercase with Annex C. Three pieces, each in one place:
   item 14 (U+0131 → i, U+03C2 → U+03C3 before 2023), so the lexer writes those letters in their edition's fold
   (`CobolNames.EditionSpelling`, primed through `TokenRetypes.PrimeLexer`) and the one comparer then answers for the
   edition. A LITERAL that names a word (an AS literal, a CALL / CANCEL / `ADDRESS OF` target, an INVOKE method name)
-  is source text too, so it is written in the same spelling when it is formed (`ExternalizedNames.FormWritten`,
-  `OoBinder.OoMethodNameOf`; kb/Work PB2840); a name held in a data item is run-time data and maps by the 2023 table. A C# identifier derived from a word keeps its extended letters, escaping only those C# cannot hold
+  is source text too, so it is written in the same spelling when it is formed (`ExternalizedNames.FormInEdition`,
+  `OoBinder.OoMethodNameOf`; kb/Work PB2840); a name held in a data item is formed by the same function, which the
+  emitted C# calls with the compiled program's edition (`RuntimeApi.ExternalizedNameInEdition`; kb/Work PB2991),
+  because the run time compares every name by the 2023 table and carries no edition of its own. A C# identifier derived from a word keeps its extended letters, escaping only those C# cannot hold
   (`DataItem.IdentifierCharacters`); one whose word IS the identity (a class, interface, method, property, program
   or formal) is `DataItem.WordIdentifier`, the `Sanitize` of the word's `UpperFold`, so two spellings of one word are
   one C# member and two words are two (kb/Work PB1965: the host's upper-casing wrote final sigma and sigma alike at

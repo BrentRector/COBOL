@@ -170,16 +170,16 @@ public sealed class CobolNameFoldDriftTests
         Assert.Same(basic, CobolNames.EditionSpelling(basic, 2014));
     }
 
-    /// <summary>A name WRITTEN in source text is formed (spaces) and written in the edition's spelling (kb/Work PB2840),
-    /// so below 2023 the literal and the word it names meet; run-time data takes <c>Form</c> alone.</summary>
+    /// <summary>A name is formed (spaces) and written in the edition's spelling (kb/Work PB2840, PB2991), so below 2023
+    /// the name — a literal in source or the value of a data item — and the word it names meet.</summary>
     [Theory]
     [InlineData("  Xς  ", 2014, "Xσ")]
     [InlineData("  Xς  ", 2023, "Xς")]
     [InlineData("ıTEM", 2002, "iTEM")]
     [InlineData("SUB-P", 2014, "SUB-P")]
-    public void FormWritten_FormsAndWritesTheEditionSpelling(string written, int edition, string expected)
+    public void FormInEdition_FormsAndWritesTheEditionSpelling(string written, int edition, string expected)
     {
-        Assert.Equal(expected, ExternalizedNames.FormWritten(written, edition));
+        Assert.Equal(expected, ExternalizedNames.FormInEdition(written, edition));
         Assert.Equal(written.Trim(' '), ExternalizedNames.Form(written));
     }
 

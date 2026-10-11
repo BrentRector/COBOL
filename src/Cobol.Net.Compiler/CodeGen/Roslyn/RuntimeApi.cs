@@ -2421,6 +2421,18 @@ internal static class RuntimeApi
             $"new {nameof(GroupAtom)}({nameof(GroupAtomKind)}.{a.Kind}, {a.Bytes}, {a.Chars}, {a.ElementBytes}, "
             + $"{a.ElementChars}, {(a.Element is { } e ? GroupAtomsNew(e) : "null")})"))} }}";
 
+    /// <summary>⛔ THE ONE WAY A NAME HELD IN A DATA ITEM REACHES THE RUN TIME'S NAME LOOKUPS (kb/Work PB2991): the item's
+    /// character image <paramref name="valueExpr"/>, formed and written in the compiled program's edition spelling
+    /// (<see cref="ExternalizedNames.FormInEdition"/>) exactly as the binder writes a literal that names a program or
+    /// method (kb/Work PB2840), because the run time maps every name by the 2023 Annex C table and has no edition of
+    /// its own. Below 2023 <c>CALL WS-NAME</c> holding <c>Z&lt;final sigma&gt;</c> therefore reaches
+    /// <c>PROGRAM-ID. Z&lt;sigma&gt;</c> as <c>CALL "Z&lt;final sigma&gt;"</c> does; at 2023 (<see cref="CobolNames.HasEditionSpelling"/>
+    /// false) the expression is emitted unchanged, since the 2023 mapping is already the edition's.</summary>
+    public static string ExternalizedNameInEdition(string valueExpr, int dialectLevel) =>
+        CobolNames.HasEditionSpelling(dialectLevel)
+            ? $"{nameof(ExternalizedNames)}.{nameof(ExternalizedNames.FormInEdition)}({valueExpr}, {dialectLevel})"
+            : valueExpr;
+
     /// <summary>Normalize a runtime method-name value for universal dispatch (D-U6) —
     /// <c>CobolObject.NormalizeMethodName</c>.</summary>
     public static string ObjNormalizeMethodName(string nameExpr) =>

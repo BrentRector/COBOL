@@ -89,8 +89,11 @@ internal sealed class PtrEmitter(EmitContext ctx, NumericRenderer num, EcState e
     /// vendor <c>TO ENTRY</c> identifier reads it the same way; kb/Work PB1417 + PB1452). It is the operand's character
     /// IMAGE (<see cref="OperandText.FieldImage"/>), never <see cref="PlaceRenderer.Read"/>: SR1 admits an alphanumeric
     /// or national GROUP item (§8.5.2.1), whose <c>Read</c> is its record struct and not a string — the ref-modified
-    /// slice and an elementary item read as the same string either way.</summary>
-    private static string NameImage(Place name) => OperandText.FieldImage(name);
+    /// slice and an elementary item read as the same string either way. The name is formed in the compiled program's
+    /// edition spelling (<see cref="RuntimeApi.ExternalizedNameInEdition"/>, kb/Work PB2991), as a literal naming the same
+    /// program is.</summary>
+    private string NameImage(Place name) =>
+        RuntimeApi.ExternalizedNameInEdition(OperandText.FieldImage(name), ctx.Data.Edition.DialectLevel);
 
     /// <summary>The C# value expression of an address-identifier OPERAND (§8.4.3.1.2 identifier Format 9), either
     /// arm — a <c>ManagedPointer</c> for the data arm, a <c>ProgramPointer</c> for the program arm.</summary>

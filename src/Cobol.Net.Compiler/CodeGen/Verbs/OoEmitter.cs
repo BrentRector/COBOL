@@ -815,7 +815,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // of the data item referenced by identifier-2"), so an alphanumeric or national GROUP sends its
             // positions as an elementary item does — PlaceRenderer.Read handed the group's struct to a string
             // parameter (CS1503; kb/Work PB1136).
-            : RuntimeApi.ObjNormalizeMethodName(OperandText.FieldImage(u.MethodSource!));
+            : RuntimeApi.ObjNormalizeMethodName(RuntimeApi.ExternalizedNameInEdition(
+                OperandText.FieldImage(u.MethodSource!), Ctx.Data.Edition.DialectLevel));   // the edition's spelling, as the literal's (PB2991)
         w.Line($"{RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(u.Receiver))}.__CobolInvoke({selector}, __ua{id}, __ur{id});");
         if (u.Returning is { } ret)
             w.Line(OoUnivCallerWrite(ret, $"__ur{id}!.Value") + "   // RETURNING delivery (§14.9.23.4 GR8)");

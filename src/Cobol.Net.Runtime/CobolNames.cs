@@ -150,6 +150,12 @@ public static partial class CobolNames
         return false;
     }
 
+    /// <summary>True when the edition <paramref name="dialectLevel"/>'s Annex C differs from the 2023 table the ONE comparer
+    /// implements, so a name must be written in <see cref="EditionSpelling"/> to be compared as that edition would: every
+    /// edition below 2023 (Annex E.2 item 14 deleted the final-sigma and dotless-i mappings at 2023). The single question
+    /// the lexer's spelling, the bind-time literal formation and the emitted run-time name formation all ask.</summary>
+    public static bool HasEditionSpelling(int dialectLevel) => dialectLevel < 2023;
+
     /// <summary>The spelling under which the ONE (2023) comparer answers as the edition <paramref name="dialectLevel"/>'s
     /// Annex C would: each character whose fold differs between the two tables, and is not left as itself by the
     /// edition's, is written as the edition's fold (below 2023: dotless i U+0131 as <c>i</c>, final sigma U+03C2 as
@@ -157,7 +163,7 @@ public static partial class CobolNames
     /// word from then on. At 2023 and for a word of basic characters it returns <paramref name="word"/> itself.</summary>
     public static string EditionSpelling(string word, int dialectLevel)
     {
-        if (dialectLevel >= 2023) return word;
+        if (!HasEditionSpelling(dialectLevel)) return word;
         int i = 0;
         while (i < word.Length && word[i] < 0x80) i++;
         if (i == word.Length) return word;
