@@ -124,6 +124,7 @@ AUDITS = (
     ("WITNESS LOSS", ["scripts/spec/audit_witness_loss.py", "--check"]),
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
+    ("LINE ENDINGS", ["scripts/line_endings.py", "--check"]),
     ("SELF-TESTS", ["scripts/self_tests.py"]),
 )
 #: ⛔ WHO REUSES A SELF-TEST'S RECORDED PASS (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10): the IMPLEMENTER's audits

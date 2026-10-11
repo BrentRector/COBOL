@@ -263,6 +263,12 @@ jobs:
       - name: Spec corrections — every flag, Addendum entry, printed form and page agree (verify_publishable.py)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/verify_publishable.py
+      # One line ending, LF (kb/Work PB3029): no tracked text file's blob or checkout holds a CR, and every Python writer
+      # states newline=. Here it guards the INDEX (a commit made outside git's attributes); windows-build-test runs it
+      # again over a Windows checkout, the bytes `core.autocrlf` used to turn CRLF.
+      - name: Line endings — LF in every tracked text file, index and checkout (line_endings.py --check)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/line_endings.py --check
       # EVERY script self-test, DISCOVERED (kb/Work PB2563): each test_*.py / test_*.ps1 and each script handling
       # --self-test under scripts/ — the hook self-tests, cite.py, ledger_plan.py, landing_check.py and the orchestrator's,
       # which until PB2563 were named here one by one while eleven of them ran nowhere. The same runner is an audit of the
@@ -689,6 +695,12 @@ jobs:
         if: ${{ !cancelled() }}
         shell: pwsh
         run: python scripts/self_tests.py
+      # The one line ending over a WINDOWS checkout (kb/Work PB3029): `.gitattributes` makes it LF whatever the runner's
+      # `core.autocrlf`, so the bytes these legs compiled and compared are the bytes the Linux jobs read.
+      - name: Line endings on a Windows checkout (line_endings.py --check)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: python scripts/line_endings.py --check
       - name: Upload test results (TRX)
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
