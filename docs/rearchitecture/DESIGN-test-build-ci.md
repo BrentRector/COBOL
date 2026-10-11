@@ -1769,10 +1769,14 @@ demand and not committed.
   squashed head is never an ancestor of main, so every lifecycle tool would have to key on the merged-PR record instead.
   Required status check `ci-gate` on the merge group, enforce for administrators (the owner's credentials make every
   push), minimum group size 1, maximum 5, check timeout 60 min. The classic protection is removed in the same change.
-- **Cutover (operator review item 4):** every step of this design lands through the THEN-CURRENT pipeline. PB3023 and
-  PB3024 are ONE landing — the last one through `push-main.sh` — and applying the ruleset (`gh api` from the committed
-  JSON) is an owner-attended step: the lander asks the owner for an explicit go at that moment (one bare question),
-  because from that instant main accepts only queued pull requests.
+- **Cutover (operator review item 4; owner fast track ~12:58, "Why are we still using push-main?" → "Fast track now"):**
+  every step of this design lands through the THEN-CURRENT pipeline. **Phase 1 = PB3024 alone, today:** the `merge_group`
+  trigger, the committed ruleset and `ruleset.py apply|check`, the lander opening and queueing a pull request per train
+  by hand (`gh pr create`, `gh pr merge --auto --merge`) instead of `push-main.sh`, `push-main.sh` and `landing_lease.py`
+  deleted, the doc sweep — landing once more through `push-main.sh`; applying the ruleset (`ruleset.py apply`, `gh api`
+  from the committed JSON) is an owner-attended step — the attended session asks the owner for an explicit go at that
+  moment (one bare question), because from that instant main accepts only queued pull requests. **Phase 2 = PB3023
+  (`enqueue.py` replaces the hand steps) and PB3025 (the per-entry DEVLOG and its CI check)**, each through the queue.
 - `guard` (12.8 min) is the long pole of a merge-group run; sharding it is a follow-up measured after the queue lands.
 
 #### 3.17.7 What each document says after this lands (the implementer's sweep; rule 6, same change set)
