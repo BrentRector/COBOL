@@ -777,6 +777,14 @@ public sealed class DataItem
         "the LIMIT phrase of the DYNAMIC LENGTH clause (ISO §13.18.19.4 GR2), riding it")]
     public int DynMaxSize { get; set; } = CobolNet.Runtime.CobolDynString.MaxLength;
 
+    /// <summary>⛔ THE MAXIMUM SIZE OF A VARIABLE-LENGTH COMPONENT (<c>CellComponents.IsComponent</c>), in the unit a
+    /// layout counts it in — the ONE reader every layout asks (the cell group window, an element shape, a declared
+    /// group's contiguous layout; kb/Work PB2833): a dynamic-capacity table's maximum capacity in occurrences
+    /// (<see cref="OccursSpec.MaxCapacity"/>, §8.5.1.9.1 2), a dynamic-length item's maximum size in characters
+    /// (<see cref="DynMaxSize"/>, §8.5.1.10.1). Two copies of this choice, one per layout, are how the table arm came
+    /// to read the OCCURS maximum a dynamic table does not have.</summary>
+    public int VariableComponentMax => OccursSpec is { IsDynamic: true } dynamic ? dynamic.MaxCapacity : DynMaxSize;
+
     /// <summary>The SPECIAL-NAMES dynamic-length structure this item's DYNAMIC LENGTH clause names (ISO §13.18.19.3
     /// SR2 — dynamic-length-structure-name-1), or null when the clause names none and the structure is the
     /// implementor's (SR3). Its PREFIXED length field is one of <see cref="DynMaxSize"/>'s §8.5.1.10.1 candidates, and

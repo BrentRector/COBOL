@@ -623,7 +623,10 @@ content-validation half is separately answered by the declined A.4.14 facility (
   (`RedefViewPlace.Cell` / `DynOrdinal`, `PlaceCursor.DynamicElement`). The composer's own exclusion is the declared
   group's (`DataItem.CurrentExtentImageCapable`): a cell-backed group whose dynamic-capacity table's element holds a
   component of its own carries that table NESTED, each element cell read and stored by the element's own shape
-  (`CellGroupShape`, with its components' maximum sizes `DynMax`; `StorageCell.VarGroupAt` / `StoreVarGroupAt`'s
+  (`CellGroupShape`, with its components' maximum sizes `DynMax` — read from `DataItem.VariableComponentMax`, the ONE
+  reader every layout asks: a dynamic-length item's `LIMIT`, a dynamic-capacity table's `OccursSpec.MaxCapacity`, the
+  implementor's maximum of §8.5.1.9.1 2) "unlimited capacity", never `TO` (only the expected capacity, §13.18.38.4 GR17)
+  and never `OccursSpec.Max`, which is zero for such a table; kb/Work PB2833; `StorageCell.VarGroupAt` / `StoreVarGroupAt`'s
   `elems`; kb/Work PB2496), exactly as a declared group's carrier does. The OCCURS DEPENDING table of a cell-backed group is
   the window's trailing storage (`VarGroupWindow.Odo`, `OdoTail`; see the variable-length group section).
 - **D-SLOT the MANAGED SLOTS of a shared storage area** (kb/Work PB231, 2026-09-05 — the pointer third). A
@@ -1679,6 +1682,18 @@ kb/Work PB978), never the first declared. Three §13.18.57.3 syntax rules are en
 subject needs an elementary type — weak-invariant, not just STRONG), **1537** SR2 (a TYPE entry must be followed
 immediately by a subordinate or level-88 entry, else a silent member-merge / CS1061 leak), **1538** SR5 (no USAGE/SIGN
 on a group superordinate to a TYPE subject). The 15xx TYPEDEF band spans **1529–1538**.
+
+**⛔ A TYPE DECLARATION IS SCREENED AS WRITTEN, NOT PLACED (kb/Work PB2548, after PB2071).** The post-build resolvers of the
+clauses that name another entry — RENAMES operands (`RenamesOwners()`), OCCURS KEY data-names (`OccursKeyResolve`), DEPENDING ON
+(`OdoResolve`) and the OCCURS DYNAMIC FROM / TO rule (`DynamicResolve`) — walk `ClauseResolutionForest()`: the storage roots AND
+every template (`TypeDecls`, root and members). An unused template's `RENAMES NOSUCH`, `KEY IS NOSUCH`, non-integer counter or
+`FROM 3 TO 2` is refused at the declaration (§4.3: a syntax rule binds the source as written), with the same words a clone would
+use, so a used template's error is one diagnostic (`EditionContext.AddOnce`). `TemplateClauseResolutionDriftTests` pins the list.
+Two things stay with the PLACEMENT, because §13.18.57.4 GR1 makes a TYPE clause "as though the data description … had been coded in
+place": the DEPENDING ON counter is looked up where the description lands (§8.4.2.2.1 rule 5), so a counter that neither the
+declaration nor the program defines is NOT an error in an unused template — a use site may supply it, and its clone reports it
+(COBOLNET0851) — and SR18/SR21's record attributes are the clone's to ask; and the CAPACITY register is minted per placed table,
+never per declaration (§13.18.58.4 GR2).
 
 **RISKS flagged:** `OccursSpec` sharing on clone (verify it holds NAMES re-resolved by `OdoResolve`, not cached
 resolved items); `INDEXED BY` in a TYPEDEF used ≥2× — RESOLVED (kb/Work PB919: per-declaration index cells); method/OO-scope

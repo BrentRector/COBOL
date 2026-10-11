@@ -603,7 +603,7 @@ public sealed record VarGroupWindow(AccessPath Cell, Position DynBase, IReadOnly
         return parts.Count == 0 ? null
             : new VarGroupWindow(cell, dynBase,
                 parts.Select(p => p.At).ToList(),
-                parts.Select(p => DynMaxOf(p.Item)).ToList(),
+                parts.Select(p => p.Item.VariableComponentMax).ToList(),
                 parts.Select(p => p.Item.IsDynamicTable ? 0 : FileModel.StructureOf(p.Item)?.Code ?? 0).ToList(),
                 parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToList(),
                 OdoOf(group),
@@ -631,14 +631,9 @@ public sealed record VarGroupWindow(AccessPath Cell, Position DynBase, IReadOnly
         return parts.Count == 0 ? null
             : new CellGroupShape(table.ByteWidth, parts.Select(p => p.At).ToArray(),
                 parts.Select(p => p.Item.IsDynamicTable ? p.Item.ByteWidth : 0).ToArray(),
-                parts.Select(p => DynMaxOf(p.Item)).ToArray(),
+                parts.Select(p => p.Item.VariableComponentMax).ToArray(),
                 parts.Select(p => p.Item.IsDynamicTable ? ElementShapeOf(p.Item) : null).ToArray());
     }
-
-    /// <summary>A component's maximum size, the window's and an element shape's one reading: a dynamic-capacity
-    /// table's maximum capacity, a dynamic-length item's maximum size in characters (§8.5.1.10.1).</summary>
-    private static int DynMaxOf(DataItem component) =>
-        component.IsDynamicTable ? component.OccursSpec?.Max ?? 0 : component.DynMaxSize;
 
     /// <summary>True when <paramref name="group"/> would take this coding.</summary>
     public static bool Applies(DataItem group) => group.IsGroup && CellComponents.Of(group).Any();

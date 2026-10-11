@@ -2608,7 +2608,11 @@
   "pb2727-repository-period-per-specifier",
   "pb2727-repository-period-missing",
   "pb1688-fixed-form-diagnostic-column",
-  "pb2848-lock-clause-below-2002"
+  "pb2848-lock-clause-below-2002",
+  "pb2548-template-renames-unresolved",
+  "pb2548-template-key-unresolved",
+  "pb2548-template-odo-counter-not-integer",
+  "pb2548-template-dynamic-from-to"
  ],
  "pending": []
 }

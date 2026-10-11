@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-312 drift tests.
+316 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -303,6 +303,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [Table12StatementNameDriftTests](../tests/Cobol.Net.Tests.Unit/Table12StatementNameDriftTests.cs) | ⛔ Table12StatementNames IS ISO Table 12's 'Statement name' COLUMN, AND THIS RE-DERIVES IT FROM THE SPEC — BOTH DIRECTIONS. | — |
 | [Table16PrintedTableDriftTests](../tests/Cobol.Net.Tests.Unit/Table16PrintedTableDriftTests.cs) | ⛔ THE ONE TABLE 16 AGREES WITH THE PRINTED ONE, CELL FOR CELL (kb/Work PB2076). | `specs/ISO_COBOL.md` |
 | [TableInitialStateRunsDriftTests](../tests/Cobol.Net.Tests.Unit/TableInitialStateRunsDriftTests.cs) | ⛔ A TABLE'S INITIAL STATE IS EMITTED FROM ITS OCCURRENCE RUNS, NEVER ELEMENT BY ELEMENT (kb/Work PB1722). | `src/Cobol.Net.Compiler/CodeGen/DataDivision` |
+| [TemplateClauseResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/TemplateClauseResolutionDriftTests.cs) | ⛔ A POST-BUILD CLAUSE RESOLVER WALKS THE TYPE DECLARATIONS TOO, AND THE LIST IS CLOSED (kb/Work PB2548, PB2071). | `src/Cobol.Net.Compiler/Binding` |
 | [TestLegReportDriftTests](../tests/Cobol.Net.Tests.Unit/TestLegReportDriftTests.cs) | ⛔ A GATE MAY TRIM A PASSING TEST LEG, NEVER A FAILING ONE (kb/Work/PB1573). | `scripts`, `scripts/run_gate_legs.py` |
 | [TestPartitionCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/TestPartitionCoverageDriftTests.cs) | THE drift gate for this assembly's partitioned test families (TestPartitioning, plan §11 A13). | — |
 | [TestRepoDriftTests](../tests/Cobol.Net.Tests.Unit/TestRepoDriftTests.cs) | Keeps the repo-root locator collapsed to ONE implementation. | `tests`, `Cobol.Net.sln`, `src/Cobol.Net.Compiler`, `tests/version-matrix/constructs.json`, `tests/nist/corpus.tsv`, `docs/COBOLNET_REARCHITECTURE_PLAN.md` … |

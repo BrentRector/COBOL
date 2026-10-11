@@ -32,8 +32,20 @@ public sealed class OccursSpec
     /// <see cref="Max"/> for a fixed (Format 1) table.</summary>
     public required int Min { get; init; }
 
-    /// <summary>integer-2 — the maximum occurrence count, the allocated physical capacity (§8.5.1.8).</summary>
+    /// <summary>integer-2 — the maximum occurrence count, the allocated physical capacity (§8.5.1.8). ZERO for a
+    /// DYNAMIC-capacity table, which has no allocated maximum: ask <see cref="MaxCapacity"/> for "how many occurrences
+    /// can it hold".</summary>
     public required int Max { get; init; }
+
+    /// <summary>⛔ THE ONE ANSWER TO "HOW MANY OCCURRENCES CAN THIS TABLE HOLD?" for a layout that sizes a table
+    /// component by its maximum (<c>VarGroupWindow</c>, <c>CellGroupShape</c>, a declared group's contiguous layout):
+    /// <see cref="Max"/> for a fixed or OCCURS DEPENDING table (§8.5.1.7, §8.5.1.8), and for a DYNAMIC-capacity table
+    /// the IMPLEMENTOR'S maximum (<c>CobolDynTable.MaxOccurrences</c>, docs/CONFORMANCE.md DOC-A.1-60), because
+    /// §8.5.1.9.1 2) says "it may have an unlimited capacity". ⚠ NOT <see cref="ExpectedMax"/> (<c>TO integer-5</c>):
+    /// §13.18.38.4 GR17 makes that only "the expected capacity of the table", and a SET past it sets EC-BOUND-SET and
+    /// still grows the table (§14.9.39.4 GR30), so it bounds nothing. Reading <see cref="Max"/> here gave every dynamic
+    /// table a maximum of zero (kb/Work PB2833).</summary>
+    public int MaxCapacity => IsDynamic ? CobolNet.Runtime.CobolDynTable<byte>.MaxOccurrences : Max;
 
     /// <summary>The <c>DEPENDING ON data-name-1</c> name as written, or <see langword="null"/> for a fixed
     /// (Format 1) table.</summary>

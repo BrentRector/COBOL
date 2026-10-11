@@ -750,9 +750,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             switch (p.Kind)
             {
                 case VarPartKind.Fixed: off += p.Field.Width; break;
-                case VarPartKind.DynLeaf: layout.Add((off, 1, p.Item!.DynMaxSize, FileModel.StructureOf(p.Item)?.Code ?? 0)); break;
+                case VarPartKind.DynLeaf: layout.Add((off, 1, p.Item!.VariableComponentMax, FileModel.StructureOf(p.Item)?.Code ?? 0)); break;
                 case VarPartKind.DynTable:
-                case VarPartKind.DynGroupTable: layout.Add((off, p.Field.Width, p.Item!.OccursSpec?.Max ?? 0, 0)); break;
+                case VarPartKind.DynGroupTable: layout.Add((off, p.Field.Width, p.Item!.VariableComponentMax, 0)); break;
                 case VarPartKind.Nested: ContiguousLayout(p.Item!, off, layout); off += p.FixedWidth; break;
                 case VarPartKind.NestedTable:
                 case VarPartKind.OdoTable:   // the components at the table's MAXIMUM: where compare / the boundary look for them

@@ -225,7 +225,7 @@ public sealed partial class DataBinder
     /// index and each clone must bind its OWN key (§13.18.58.4 GR1), exactly as its DEPENDING ON does.</para></summary>
     internal void OccursKeyResolve()
     {
-        foreach (var table in AllItems())
+        foreach (var table in ClauseResolutionForest())
         {
             if (table.OccursSpec is not { Keys.Count: > 0 } spec) continue;
             using var _ = Edition.At(table);
@@ -331,11 +331,22 @@ public sealed partial class DataBinder
                 + "seven\" (ISO §13.18.38.3 SR10) — at most seven subscripts may be specified (§8.4.2.3.3 SR3)");
         }
 
-        foreach (var item in AllItems())
+        foreach (var item in ClauseResolutionForest())
         {
             if (item.OccursSpec is not { DependingName: { } depName } spec) continue;
             using var _ = Edition.At(item);
             string subject = item.CobolName ?? item.CsName;
+            // ⛔ A TYPE DECLARATION IS SCREENED, NOT PLACED (kb/Work PB2548). Its OCCURS DEPENDING ON phrase is source (§4.3),
+            // so every rule that is a fact of the declaration alone — SR16's bounds, the counter's own SR17/SR2 when it
+            // resolves — is asked of it; a use site is asked again through its clone. But §13.18.57.4 GR1 makes a TYPE
+            // clause "as though the data description … had been coded in place", so data-name-1 is looked up where the
+            // description is PLACED (§8.4.2.2.1 rule 5: the groups superordinate to the subject): a name the declaration
+            // and the program do not define may be a sibling of the use site, and an unused library type whose counter
+            // each user supplies is legal source. A name the declaration does not define is therefore NOT an error here — the clone
+            // that places it reports it (COBOLNET0851) — and the rules that read the PLACEMENT (SR18/SR21's GLOBAL and
+            // EXTERNAL attributes of the record, SR20's range across the records of one storage area) are the clone's to
+            // ask; SR20 and SR22 over the declaration's own entries are asked here.
+            bool declaration = InTypeDeclaration(item);
 
             // SR16: 0 ≤ integer-1 < integer-2.
             if (spec.Min < 0 || spec.Min >= spec.Max)
@@ -360,8 +371,14 @@ public sealed partial class DataBinder
             string writtenDep = WrittenQualified(depName, spec.DependingQualifiers);
             string depFace = $"OCCURS … DEPENDING ON data-name-1 of '{subject}'";
             var tier = EntryClauseCandidates(item, depName, spec.DependingQualifiers, ScopeOf(item.Root));
+            // A declaration's counter is judged here only when the DECLARATION defines it: an item of the same name
+            // elsewhere in the program is not where a use site will find it (§8.4.2.2.1 rule 5 qualifies from the
+            // placement), so neither its ambiguity nor its SR17 category is a fact of the declaration (train 1055
+            // review: an unused template beside two unrelated CNTs drew COBOLNET1639).
+            if (declaration) tier = tier.Where(c => ReferenceEquals(c.Root, item.Root));
             if (tier.Count == 0)
             {
+                if (declaration) continue;   // placed, and so checked, by each clone (above)
                 Edition.Error("COBOLNET0851", $"OCCURS … DEPENDING ON '{writtenDep}' on '{subject}': data-name-1 "
                     + (spec.DependingQualifiers.Count > 0
                         ? "is not defined under the given qualifiers (ISO §8.4.2.2.1: uniqueness shall be established "
@@ -384,7 +401,7 @@ public sealed partial class DataBinder
             // record's length). "Described in the same data division" holds by construction: this pass runs inside
             // Bind, before a contained program inherits any container's names, so data-name-1 resolved among this
             // element's own items.
-            if (DependingAttributeFault(item, dep) is { } attributeFault)
+            if (!declaration && DependingAttributeFault(item, dep) is { } attributeFault)
                 Edition.Error(DiagnosticCatalog.OccursDependingAttributeMismatch,
                     $"OCCURS … DEPENDING ON '{writtenDep}' on '{subject}': {attributeFault}");
 
@@ -529,7 +546,7 @@ public sealed partial class DataBinder
         // §8.5.1.9.1 item 3 (:8195) — the roots of every FILE SECTION record, so a dynamic table in one is rejected.
         var fileRecordRoots = new HashSet<DataItem>(Files.SelectMany(f => f.Records));
 
-        foreach (var item in AllItems())
+        foreach (var item in ClauseResolutionForest())
         {
             if (item.OccursSpec is not { IsDynamic: true } spec) continue;
             using var _ = Edition.At(item);
@@ -549,6 +566,11 @@ public sealed partial class DataBinder
                 Edition.Error("COBOLNET1522", $"OCCURS DYNAMIC FROM {from} TO {to} on '{subject}': the expected "
                     + $"capacity (TO integer-5) shall be greater than the minimum capacity (FROM integer-4) "
                     + "(ISO §13.18.38.3 SR28)");
+
+            // ⛔ A TYPE DECLARATION DEFINES NO REGISTER (kb/Work PB2548): SR28 above is a fact of the written phrase and is
+            // asked of the declaration too (§4.3), but the CAPACITY register is "implicitly defined" by an OCCURS entry that
+            // IS placed (SR30), and a type declaration has no storage (§13.18.58.4 GR2) — each clone mints its own.
+            if (InTypeDeclaration(item)) continue;
 
             // ⛔ NO GUARD BELONGS HERE FOR A **FORMAT 1** VALUE ON OR UNDER A DYNAMIC ENTRY, AND THE RULE THAT
             //    LOOKS LIKE ONE DOES NOT REACH IT (kb/Work PB500 — this is the SECOND arm of the same two-arm

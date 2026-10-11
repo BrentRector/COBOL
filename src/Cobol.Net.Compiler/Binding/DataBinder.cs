@@ -4449,7 +4449,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // A REDEFINES written in a TYPEDEF template is asked too (kb/Work PB2071): `05 G TYPE T2. 05 H REDEFINES G.`
         // in an unused template redefines the strongly-typed G from outside its strong subtree exactly as it would in
         // a record.
-        foreach (var item in AllItems().Concat(TemplateItems()))
+        foreach (var item in ClauseResolutionForest())
             if (item.RedefinesKind is RedefinitionKind.Clause && item.RedefinesTarget is { } tgt
                 && StrongTypeModel.IsStronglyTyped(tgt)
                 && !ReferenceEquals(StrongTypeModel.StrongRoot(item), StrongTypeModel.StrongRoot(tgt)))
@@ -8187,8 +8187,22 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>Every item that owns level-66 entries: a record's own, and the groups a TYPE clause applied a
     /// TYPEDEF with RENAMES clauses to (<see cref="CloneRenamesOnto"/>, kb/Work PB1304). The ONE enumeration the
-    /// RENAMES passes walk, so an alias on a group inside a record is resolved and screened like a record's.</summary>
-    private List<DataItem> RenamesOwners() => AllItems().Where(i => i.Renames66.Count > 0).ToList();
+    /// RENAMES passes walk, so an alias on a group inside a record is resolved and screened like a record's. A TYPEDEF
+    /// template's own aliases (<c>01 U TYPEDEF. … 66 R RENAMES x.</c>) are owned by the template, which is off
+    /// <see cref="Roots"/>: <see cref="ClauseResolutionForest"/> reaches it (kb/Work PB2548).</summary>
+    private List<DataItem> RenamesOwners() => ClauseResolutionForest().Where(i => i.Renames66.Count > 0).ToList();
+
+    /// <summary>⛔ THE FOREST A POST-BUILD CLAUSE RESOLVER WALKS (kb/Work PB2548, PB2071): the WORKING-STORAGE forest
+    /// (<see cref="AllItems"/>) AND the TYPEDEF templates — each template's level-1 entry and the members under it
+    /// (<see cref="TemplateItems"/>). A type declaration has no storage (ISO §13.18.58.4 GR2) but its clauses are source
+    /// (§4.3), and a clause that names another entry of the declaration — a RENAMES operand, an OCCURS KEY data-name, a
+    /// DEPENDING ON counter inside the type, a REDEFINES target — has an answer that does not wait for a use: an
+    /// unused template's `RENAMES NOSUCH` or `KEY IS NOSUCH` compiled clean while the same clause in a record was
+    /// refused, because every resolver but REDEFINES walked <see cref="AllItems"/>, the roots. Each resolver of a clause
+    /// that names an item asks THIS forest (a drift test pins the list), and the rules that hold only of a PLACED
+    /// description — the DEPENDING ON name that a use site may supply (§13.18.57.4 GR1, "coded in place"), the
+    /// CAPACITY register a table defines — ask <see cref="InTypeDeclaration"/> and leave a template alone.</summary>
+    private IEnumerable<DataItem> ClauseResolutionForest() => AllItems().Concat(TypeDecls.Values).Concat(TemplateItems());
 
     /// <summary>Every item in the WORKING-STORAGE forest, in declaration (pre-order DFS) order.</summary>
     private IEnumerable<DataItem> AllItems() => Roots.SelectMany(PreOrder);

@@ -839,7 +839,9 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         // PB1951's sibling). In a cell-backed class (EXTERNAL) a dynamic-length item or a dynamic-capacity table inside
         // the element lives in the cell's component slots (VarGroupWindow), and the element's contiguous image
         // (§8.5.1.11.2) cannot be cut back into components unambiguously — two dynamic-length items run together, and
-        // a dynamic-capacity table's content was dropped. The carrier holds every component apart, so the element
+        // a dynamic-capacity table beside one takes whatever the take step leaves it (the window's table maximum was
+        // zero until kb/Work PB2833 made it the implementor's, DataItem.VariableComponentMax; the image is still
+        // ambiguous). The carrier holds every component apart, so the element
         // placed back (GR24) is the element that was read: at its maximum extent (the whole element, as an activation
         // boundary carries it) and stored as the same storage (no receiving description truncates it).
         bool carried = At(ts.Table, new PositionConstant(1)).Undecorated is RedefViewPlace { Coding: VarGroupWindow };
