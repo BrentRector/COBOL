@@ -788,11 +788,11 @@ def inputs_text(inputs: dict) -> str:
         items.append(f'the planner (<span class="mono">model_rules.json</span> <span class="mono">wave</span>): '
                      f'{n(w["max_notes_per_group"])} notes per group (a campaign\'s and a held cluster\'s groups are counted '
                      f'at this cap, a lower bound: a campaign clusters by the sites its notes name), {n(w["max_groups"])} groups '
-                     f'per wave, {n(w["train_size"])} groups per train, implementers on {e(m)}')
+                     f'per wave, implementers on {e(m)}')
         items.append(f'the cost constants (<span class="mono">cost</span>, <span class="mono">calibration</span>): a group '
                      f'{n(c["per_group_tokens"][m])} + {n(c["per_note_tokens"][m])} tokens per note at {n(cal[m])} {e(m)} '
-                     f'tokens per weekly point; a lander {n(c["lander_tokens"])} at {n(cal[c["lander_model"]])} '
-                     f'{e(c["lander_model"])} tokens per point, one per train')
+                     f'tokens per weekly point; a landing {n(c["landing_tokens"])} at {n(cal[c["landing_model"]])} '
+                     f'{e(c["landing_model"])} tokens per point, one per group (enqueue.py, kb/Work PB3023)')
     if rate:
         items.append(f'the landing rate (<span class="mono">train_measure.py</span>, {e(rate["gating"])} gating): '
                      f'<span class="num">{rate["per_h"]:.2f}</span> changes per hour, {n(rate["landed"])} changes in '
@@ -1242,9 +1242,9 @@ def self_test() -> int:
     cells = re.findall(r'<td class="r">(.*?)</td>', est)
     check("a missing input renders UNMEASURED, never a number",
           bool(cells) and all(c == UNMEASURED for c in cells), str(cells)[:300])
-    rules = {"wave": {"max_notes_per_group": 5, "max_groups": 8, "train_size": 5, "implementer_model": "sonnet"},
+    rules = {"wave": {"max_notes_per_group": 5, "max_groups": 8, "implementer_model": "sonnet"},
              "cost": {"per_group_tokens": {"sonnet": 400000}, "per_note_tokens": {"sonnet": 240000},
-                      "lander_tokens": 480000, "lander_model": "opus"},
+                      "landing_tokens": 96000, "landing_model": "opus"},
              "calibration": {"tokens_per_point": {"sonnet": 4000000, "opus": 1600000}}}
     full = {"rules": rules, "fix_groups": {"clusters": [{"notes": [{"id": "PB9001"}]}], "unsited": []},
             "rate": {"per_h": 2.0, "landed": 4, "window_h": 2.0, "trains": 1, "gating": "batched"},

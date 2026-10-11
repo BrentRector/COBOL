@@ -27,7 +27,7 @@ cost the orchestrator a hand-written groups.json; this computes it.
 5. MODEL per group from model_rules.json (Opus for design-heavy files and areas, an open design question, or a note
    that already failed twice; Sonnet otherwise; never Fable).
 6. COST per group from model_rules.json; groups are taken in rank order while they fit (a group that does not fit is
-   skipped and a smaller later one may still fit; a successor only with its predecessor), plus one lander per train.
+   skipped and a smaller later one may still fit; a successor only with its predecessor), plus each group's landing (kb/Work PB3023).
 7. Codes (three per group) and lead-id blocks (five per train) come from alloc.py; --dry-run peeks and reserves
    nothing, and writes nothing.
 8. A note whose body says it needs a frontier model under the owner's approval (model_rules.json
@@ -572,9 +572,10 @@ def group_cost(model: str, n_notes: int, rules: dict[str, Any]) -> float:
     return (c["per_group_tokens"][model] + c["per_note_tokens"][model] * n_notes) / cal["tokens_per_point"][model]
 
 
-def lander_cost(rules: dict[str, Any]) -> float:
+def landing_cost(rules: dict[str, Any]) -> float:
+    """The points one group's landing costs: the enqueue unit's model turns for its branch (kb/Work PB3023)."""
     c = rules["cost"]
-    return c["lander_tokens"] / rules["calibration"]["tokens_per_point"][c["lander_model"]]
+    return c["landing_tokens"] / rules["calibration"]["tokens_per_point"][c["landing_model"]]
 
 
 def branch_resume(branch: str, nid_list: list[str]) -> str:
@@ -766,11 +767,10 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         placed.append(g)
     groups = placed
 
-    # Fill the budget in rank order (finishers first); one lander per train.
+    # Fill the budget in rank order (finishers first); every group pays for its own landing (kb/Work PB3023).
     chosen: list[Group] = []
     skipped: list[Group] = []
     spent = 0.0
-    train = wave_rules["train_size"]
     for g in groups:
         if max_groups is not None and len(chosen) >= max_groups:
             skipped.append(g)
@@ -778,15 +778,13 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         if g.after and g.after not in {c.letter for c in chosen}:
             skipped.append(g)
             continue
-        landers_after = math.ceil((len(chosen) + 1) / train) - math.ceil(len(chosen) / train)
-        need = g.cost + landers_after * lander_cost(rules)
+        need = g.cost + landing_cost(rules)
         if spent + need > budget_points + 1e-9:
             skipped.append(g)
             continue
         chosen.append(g)
         spent += need
     return {"groups": chosen, "skipped": skipped, "awaiting_landing": awaiting, "points": spent,
-            "trains": math.ceil(len(chosen) / train) if chosen else 0,
             "unlanded_without_note": sorted(b for b, ids in unlanded.items() if not ids), "waiting": waiting}
 
 
@@ -834,14 +832,6 @@ def as_group_json(g: Group, wave: str, notes: dict[str, Note], codes: str) -> di
 #: RECENT_ENTRIES entries, and of those the first RECENT_LINES lines for wave and train labels.
 RECENT_ENTRIES = 20
 RECENT_LINES = 200
-
-
-def previous_train(repo: pathlib.Path) -> str:
-    for text in devlog.newest(repo, RECENT_ENTRIES):
-        m = re.match(r"^## Entry \d+ .*?\bTrain (\d+[a-z]?)", text)
-        if m:
-            return f"train {m.group(1)}"
-    return "the previous train (see DEVLOG/)"
 
 
 def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path | None = None) -> int:
@@ -996,23 +986,17 @@ def main(argv: list[str] | None = None) -> int:
     waiting.update(p["waiting"])
 
     wave = str(next_wave(REPO, reports, cdir)) if a.wave == "next" else str(a.wave)
-    train = rules["wave"]["train_size"]
     peek_code = alloc.peek("code", REPO, cdir)
-    peek_pb = alloc.peek("pb", REPO, cdir)
     per = rules["wave"]["codes_per_group"]
-    gjson, blocks = [], []
+    gjson = []
     for k, g in enumerate(p["groups"]):
         if a.dry_run:
             first = peek_code + k * per
         else:
             first, _ = alloc.allocate("code", per, REPO, cdir)
         gjson.append(as_group_json(g, wave, notes, alloc.render("code", first, per)))
-    for t in range(p["trains"]):
-        n = rules["wave"]["lead_ids_per_train"]
-        first = peek_pb + t * n if a.dry_run else alloc.allocate("pb", n, REPO, cdir)[0]
-        blocks.append(alloc.render("pb", first, n))
 
-    print(f"=== WAVE {wave} PLAN{campaign}: {len(p['groups'])} groups, {p['trains']} train(s), {p['points']:.2f} of "
+    print(f"=== WAVE {wave} PLAN{campaign}: {len(p['groups'])} groups, {p['points']:.2f} of "
           f"{budget_points:.2f} weekly points{' (DRY RUN: nothing reserved or written)' if a.dry_run else ''} ===")
     for g, j in zip(p["groups"], gjson):
         print(f"  {j['letter']:>3} {g.model:6} {('after ' + g.after) if g.after else '':9} {g.kind:8} "
@@ -1028,7 +1012,6 @@ def main(argv: list[str] | None = None) -> int:
         print("  UNLANDED branches naming no open note (judgment): " + ", ".join(p["unlanded_without_note"]))
     print(f"  next {len(p['skipped'])} candidates skipped (budget, cap or predecessor): " +
           ", ".join(f"{g.letter}({'+'.join(g.notes[:2])}{'…' if len(g.notes) > 2 else ''})" for g in p["skipped"][:8]))
-    print(f"  lead-id blocks: {', '.join(blocks) or 'none'}; previous {previous_train(REPO)}")
     if a.dry_run or not p["groups"]:
         return 0
 
@@ -1045,8 +1028,7 @@ def main(argv: list[str] | None = None) -> int:
                                  "stop_file": str(stop_file), "groups": gjson}, indent=1, ensure_ascii=False) + "\n",
                      encoding="utf-8")
     args = {"scratch": str(scratch), "wave": wave, "stop_file": str(stop_file), "global_stop": str(coord.global_stop(a.coord)),
-            "concurrency": rules["wave"]["concurrency"], "train_size": train,
-            "min_final_train": rules["wave"]["min_final_train"], "previous_train": previous_train(REPO), "lead_id_blocks": blocks,
+            "concurrency": rules["wave"]["concurrency"],
             "implementer_model": rules["wave"]["implementer_model"], "authorization": a.authorization,
             "groups": [{k: j[k] for k in ("letter", "lead", "notes", "codes", "model", "after") if k in j}
                        for j in gjson]}
