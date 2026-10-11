@@ -18,17 +18,34 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
 {
     private static readonly Int128 Limit34 = Pow10.AsWide(34);
 
-    /// <summary>Lift a fixed-point operand (unscaled value + scale) into SDIDI form — exact (≤31 digits always
-    /// fits the 34-digit significand, §8.8.1.5.2).</summary>
+    /// <summary>Lift a fixed-point operand (unscaled value + scale) into SDIDI form — EXACT, with no rounding and no
+    /// range check: the value is carried as given. ⛔ A caller passes only an operand whose unscaled magnitude is
+    /// known to be at most 34 digits (a literal, a ≤31-digit item, a count), or one that wants the exact wide carrier
+    /// on purpose (the native lane's round-to-odd bodies). A STANDARD-DECIMAL operand that may hold more digits — a
+    /// 16-byte binary container owns 39 (§13.18.60.4 GR12 "The implementor may allow a wider range"; DOC-A.1-123) —
+    /// is converted by <see cref="FromParsed"/> /
+    /// <see cref="FromUnsigned"/>, because §8.8.1.5.2 r1 ROUNDS it to the SDIDI's 34 digits (kb/Work PB2918).</summary>
     public static CobolDec From(Int128 unscaled, int scale) => new(unscaled, -scale);
 
-    /// <summary>Lift an exactly-parsed decimal — significand × 10^<paramref name="exp"/>, the value a NUMVAL-F
-    /// argument represents under standard-decimal arithmetic (§15.69.4 r3; fix-queue PB60) — into SDIDI form
-    /// through the ONE rounding funnel. A ≤34-digit significand passes exactly (no rounding); the §8.8.1.5.2 r2
-    /// range check applies, which <see cref="From"/> may skip only because a fixed-point operand can never leave
-    /// the decimal128 range — a 4-digit E-exponent can (10^9999 ⇒ EC-SIZE-OVERFLOW; 10^-9999 rounds onto the
-    /// 10^-6176 subnormal quantum under <paramref name="mode"/> and, at zero, EC-SIZE-UNDERFLOW).</summary>
+    /// <summary>The ONE standard-decimal OPERAND conversion for a significand that may exceed the SDIDI's 34 digits:
+    /// the value significand × 10^<paramref name="exp"/> — an exactly-parsed decimal (a NUMVAL-F argument,
+    /// §15.69.4 r3, fix-queue PB60), a floating-point literal, or a signed binary container of up to 39 digits
+    /// (kb/Work PB2918) — lifted through the ONE rounding funnel. ISO §8.8.1.5.2 r1: "If the operand value cannot be
+    /// expressed exactly in an SDIDI, the value is rounded according to the rules in 11.9.11, INTERMEDIATE ROUNDING
+    /// clause". A ≤34-digit significand passes exactly (no rounding); a wider one rounds ONCE under
+    /// <paramref name="mode"/> (PROHIBITED ⇒ EC-SIZE-TRUNCATION, §11.9.11.2 r3d). The §8.8.1.5.2 r2 range check
+    /// applies, which <see cref="From"/> may skip only because a fixed-point operand can never leave the decimal128
+    /// range — a 4-digit E-exponent can (10^9999 ⇒ EC-SIZE-OVERFLOW; 10^-9999 rounds onto the 10^-6176 subnormal
+    /// quantum under <paramref name="mode"/> and, at zero, EC-SIZE-UNDERFLOW). <c>Int128.MinValue</c> is a legal
+    /// significand (its magnitude is read through <see cref="UAbs"/>).</summary>
     public static CobolDec FromParsed(Int128 sig, int exp, CobolRounding mode) => Round34(sig, exp, sticky: false, mode);
+
+    /// <summary>The unsigned twin of <see cref="FromParsed"/> for a fixed-point operand (scale
+    /// <paramref name="scale"/>) held in a 16-byte UNSIGNED binary container, whose range [0, 2^128) exceeds the
+    /// signed <see cref="Int128"/> the other lift takes (kb/Work PB2918): §8.8.1.5.2 r1 rounds it to 34 digits under
+    /// <paramref name="mode"/> exactly as it does a signed one.</summary>
+    public static CobolDec FromUnsigned(UInt128 magnitude, int scale, CobolRounding mode) =>
+        magnitude == 0 ? new CobolDec(0, 0) : Round34Wide(0, magnitude, negative: false, -scale, mode);
 
     /// <summary>FUNCTION E under a standard arithmetic mode — the EXACT §15.27.3 r3 value
     /// (2.718281828459045235360287471352662, the full 34-digit SDIDI significand; kb/Work R18). The compiler
@@ -829,7 +846,11 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         if (shift >= 0)
         {
             Int128 sig = Sig;
-            if (DigitCount(Int128.Abs(sig)) + shift > 38)
+            // ⛔ THE CARRIER'S OWN FIT TEST, NOT A DIGIT COUNT (kb/Work PB2918): "at most 38 digits" refused every
+            // 39-digit value although Int128 holds up to 1.7 × 10^38 — a standard-decimal result of about
+            // -1.7014E+38 (inside the container of a 16-byte COMP-5 receiver) was a size error — and
+            // Int128.Abs(MinValue) threw. CobolNum.WideningFits is the one predicate every widening shares.
+            if (!CobolNum.WideningFits(sig, shift))
             {
                 if (intermediate)
                     throw new CobolSizeError("an intermediate value exceeds the native Int128 carrier at this scale "

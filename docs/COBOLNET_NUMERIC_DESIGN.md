@@ -1093,3 +1093,28 @@ ON is 23:59:60 in FORMATTED-TIME, FORMATTED-DATETIME and LOCALE-TIME-FROM-SECOND
 `2023/pb1510_intermediate_rounding_*`, `2023/pb1686_sum_counter_adds_like_add`, `2023/pb1526_integer_argument_has_integral_value`,
 `2023/pb638_unsigned_wide_item_as_integer_argument`, `2023/pb1379_time_form_floor_float_carriers_*`, `CobolDecSignedTailTests`,
 `CobolNumDivideAlignmentTests`, `CobolDateSecondsLandingTests` and `IntrinsicCarrierAgreementDriftTests`.
+
+### D27. A fixed-point operand enters the SDIDI through ONE lift, and that lift ROUNDS to the intermediate's 34 digits (§8.8.1.5.2 r1). (kb/Work PB2918.)
+`NumericRenderer.DecOperand` is the only operand lift: an operand whose `NumX.Digits` bound is within 34 lifts exactly
+(`CobolDec.From`, no rounding needed); one that may hold more — a 16-byte binary container owns 39 digits, and an operand
+of unknown bound may be anything — goes through `CobolDec.FromParsed(unscaled, -scale, mode)`, which rounds ONCE under the
+INTERMEDIATE ROUNDING mode (§8.8.1.5.2 r1: "If the operand value cannot be expressed exactly in an SDIDI, the value is
+rounded according to the rules in 11.9.11"; PROHIBITED ⇒ EC-SIZE-TRUNCATION, §11.9.11.2 r3d) and is `Int128.MinValue`-safe
+(the magnitude is `CobolDec.UAbs`). An unsigned-wide operand takes `CobolDec.FromUnsigned` (its range [0, 2^128) is past the
+Int128 the arithmetic funnel admits, but a relation's operand and a function argument are VALUES). The rule holds in every
+mode, with the bound the lane can carry exactly (`NumericRenderer.ExactLiftDigits`): 34 under STANDARD-DECIMAL; 38 in a
+NATIVE statement with a Dec operand (a float literal, an integer power; CONFORMANCE.md DOC-A.1-82), whose operations carry
+an exact operand of up to 38 digits (`CobolDec.AddSigned`'s wide scratch, kb/Work PB1510) and reduce it once at the
+result, and whose relations compare such a value exactly (DOC-A.1-179 (3)) — so a native 36-digit product is not
+pre-rounded (that rounded it twice, and turned `pb156_float_literal_exact_native`'s LANE leg EQ), while a 16-byte
+container's 39th digit or an unknown bound is. The ROUND-TO-ODD consumers (`DecMulToOdd` / `DecDivToOdd`, via `DecOperandExact`) keep the
+exact lift on purpose: they reduce the exact value once, and a pre-rounded operand would be rounded twice.
+Before, `From` put a 39-digit significand into the intermediate unrounded, past the 34-digit invariant `CobolDec.Add` and
+the other operations assume, and `COMPUTE R = S + 1` with S = −2^127 took ON SIZE ERROR for a result R holds (and the
+native `S + S * 0.5E0`, whose result no container holds, stored a wrapped value with NOT ON SIZE ERROR).
+The landing is the same rule's other half: `CobolDec.ToUnscaledCore` asks `CobolNum.WideningFits` (the carrier's own fit
+test, MinValue-safe), where it used to count digits (`> 38`) and refused every 39-digit value Int128 holds.
+`SdidiOperandLiftDriftTests` pins that no emit site spells the exact lift outside `DecOperandExact`, and that
+`DecOperandExact` has only the two round-to-odd consumers; `CobolDecWideLiftTests` pins the lift per mode.
+**Pinned by** `2023/pb2918_sdidi_lift_of_wide_binary_container`, `2023/pb2918_sdidi_lift_prohibited`,
+`2023/pb2918_native_dec_lane_wide_binary_operand`.

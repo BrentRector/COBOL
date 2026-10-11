@@ -763,6 +763,17 @@ internal static class RuntimeApi
     public static string DecFrom(string unscaled, string scale) =>
         $"{nameof(CobolDec)}.{nameof(CobolDec.From)}({unscaled}, {scale})";
 
+    /// <summary>A fixed-point value of UNBOUNDED width lifted into SDIDI form as a STANDARD-DECIMAL operand —
+    /// <c>CobolDec.FromParsed(unscaled, -scale, mode)</c>, which rounds a significand past the SDIDI's 34 digits under
+    /// the INTERMEDIATE ROUNDING mode (ISO §8.8.1.5.2 r1; kb/Work PB2918). <see cref="DecFrom"/> is the exact lift for
+    /// an operand proven to fit.</summary>
+    public static string DecLiftRounded(string unscaled, int scale, string modeExpr) =>
+        $"{nameof(CobolDec)}.{nameof(CobolDec.FromParsed)}({unscaled}, {-scale}, {modeExpr})";
+
+    /// <summary>The unsigned-wide twin of <see cref="DecLiftRounded"/> — <c>CobolDec.FromUnsigned</c>.</summary>
+    public static string DecLiftRoundedUnsigned(string unsigned, int scale, string modeExpr) =>
+        $"{nameof(CobolDec)}.{nameof(CobolDec.FromUnsigned)}({unsigned}, {scale}, {modeExpr})";
+
     /// <summary>The §8.8.1.5.1 implementor-defined float→SDIDI operand conversion — <c>CobolDec.FromDouble</c>
     /// (the shortest round-trip decimal identity of the IEEE value; P10 Step 12).</summary>
     public static string DecFromDouble(string doubleExpr) =>

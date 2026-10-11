@@ -745,18 +745,59 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     internal string IntermediateMode => $"CobolRounding.{ctx.Data.Options.IntermediateRounding}";
 
     /// <summary>Render an operand in SDIDI form: an already-decimal intermediate passes through; a fixed-point
-    /// value lifts EXACTLY via <c>CobolDec.From</c> (≤31 digits always representable, §8.8.1.5.2); a FLOAT
+    /// value within <see cref="ExactLiftDigits"/> lifts EXACTLY via <c>CobolDec.From</c>, and one that may hold more (a 16-byte binary
+    /// container, an operand of unknown bound) ROUNDS via <c>CobolDec.FromParsed</c> / <c>FromUnsigned</c> under the
+    /// INTERMEDIATE ROUNDING mode (§8.8.1.5.2 r1; kb/Work PB2918); a FLOAT
     /// (Real) operand converts via <c>CobolDec.FromDouble</c> — the §8.8.1.5.1 implementor-defined float→SDIDI
     /// conversion (the shortest round-trip decimal, ≤17 digits, always exact in the 34-digit significand).</summary>
-    // An unsigned-wide operand funnels through DeU first: the SDIDI's 34-digit significand cannot hold a
-    // 39-digit value either (§8.8.1.5.2 r2 would range-check it out), so the failure is the size-error condition.
-    public string DecOperand(NumX x) => DeU(x) switch
+    // ⛔ THE LIFT OF AN OPERAND THAT MAY OUTGROW THE LANE IS THE ROUNDING ONE, IN EVERY MODE (kb/Work PB2918).
+    // §8.8.1.5.2 r1: "If the operand value cannot be expressed exactly in an SDIDI, the value is rounded according to
+    // the rules in 11.9.11" — and a 16-byte binary container (COMP-5, BINARY-DOUBLE, …) owns 39 digits, so its
+    // NumX.Digits bound is past the SDIDI's 34 (and an operand of unknown bound, Digits 0, may be anything). The exact
+    // `CobolDec.From` put such a significand INTO the intermediate unrounded, past the 34-digit invariant every
+    // CobolDec operation assumes, and the next operation took Int128.MinValue's magnitude and raised a size error for
+    // `COMPUTE R = S + 1` whose value R holds. The lane is the SDIDI's under STANDARD-DECIMAL and under a NATIVE
+    // statement that carries a Dec operand (CombineCore: a float literal, an integer power); both round, at the lift,
+    // an operand the lane cannot carry exactly — past 34 digits under STANDARD-DECIMAL, past the native lane's 38-digit
+    // exact scratch otherwise (ExactLiftDigits; CONFORMANCE.md DOC-A.1-123). The ROUND-TO-ODD consumers (the
+    // exact product and quotient, DecOperandExact) keep the exact lift ON PURPOSE: they reduce the exact value ONCE,
+    // and an operand pre-rounded to 34 digits would be rounded twice.
+    // An UNSIGNED-WIDE operand takes the same rule through its own twin (CobolDec.FromUnsigned): its range [0, 2^128)
+    // is past the Int128 the arithmetic funnel (DeU / Widen, DOC-A.1-179 (2)) admits, but this method is also the
+    // lift of a RELATION's operand and of a function argument, which compare and convert the VALUE.
+    public string DecOperand(NumX x) => x switch
+    {
+        { U: true } u => RuntimeApi.DecLiftRoundedUnsigned(u.Expr, u.Scale, IntermediateMode),
+        { Dec: true } or { Real: true } or { Wide: true } => DecOperandExact(x),
+        { Digits: >= 1 } e when e.Digits <= ExactLiftDigits => DecOperandExact(x),
+        _ => RuntimeApi.DecLiftRounded(x.Expr, x.Scale, IntermediateMode),
+    };
+
+    /// <summary>The widest digit bound <see cref="DecOperand"/> lifts EXACTLY. Under STANDARD-DECIMAL it is the SDIDI's
+    /// own 34 (§8.8.1.5.2 r1 rounds every wider operand). Under NATIVE arithmetic the Dec lane (DOC-A.1-82) carries an
+    /// exact operand of up to 38 digits — <c>CobolDec.AddSigned</c>'s wide scratch, kb/Work PB1510 — and reduces it ONCE
+    /// at the result, and a native relation compares such a value exactly (DOC-A.1-179 (3)); pre-rounding a 35- to
+    /// 38-digit product to 34 there rounded it twice and turned `A18 * B18 + 0.0E+0 = A18 * B18` true (pb156's LANE
+    /// leg). Only a bound past that scratch — a 16-byte container's 39th digit, or an unknown bound — rounds at the lift
+    /// in a native statement (kb/Work PB2918).</summary>
+    private int ExactLiftDigits => StandardDecimal ? SdidiDigits : NativeDecExactDigits;
+
+    /// <summary>The native Dec lane's exact operand width: <c>CobolDec.AddSigned</c>'s 38-digit wide scratch.</summary>
+    private const int NativeDecExactDigits = 38;
+
+    /// <summary>An operand in SDIDI form with a fixed-point value lifted EXACTLY, whatever its width — the form the
+    /// round-to-odd product and quotient consume (see <see cref="DecOperand"/>).</summary>
+    private string DecOperandExact(NumX x) => DeU(x) switch
     {
         { Dec: true } d => d.Expr,
         { Real: true } r => RuntimeApi.DecFromDouble(r.Expr),
         { Wide: true } w => RuntimeApi.WideToDec(w.Expr, w.Scale),   // the lowering: round-to-odd, 34 digits (kb/Work PB1900)
         var v => $"CobolDec.From({v.Expr}, {v.Scale})",
     };
+
+    /// <summary>The SDIDI's precision (decimal128, ISO §8.8.1.5.2 NOTE 2): an exact operand whose
+    /// <see cref="NumX.Digits"/> bound is within it lifts with no rounding.</summary>
+    private const int SdidiDigits = 34;
 
     private NumX CombineNative(NumX a, string op, NumX b) => op switch
     {
@@ -823,12 +864,12 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
             int digits = a.Digits + b.Digits;
             if (digits <= RuntimeApi.WideMaxDigits)
                 return new NumX(RuntimeApi.WideMul(WideOperand(a), WideOperand(b)), a.Scale + b.Scale, Digits: digits, Wide: true);
-            return new NumX(RuntimeApi.DecMulToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
+            return new NumX(RuntimeApi.DecMulToOdd(DecOperandExact(a), DecOperandExact(b)), 0, Dec: true);
         }
         // A wide operand beside one of unknown bound (an intrinsic's value, a windowed view): the product cannot be proved
         // to fit the wide form, so it is formed on the SDIDI by round-to-odd like every nested product past the carrier.
         if (a.Wide || b.Wide)
-            return new NumX(RuntimeApi.DecMulToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
+            return new NumX(RuntimeApi.DecMulToOdd(DecOperandExact(a), DecOperandExact(b)), 0, Dec: true);
         string product = known
             ? $"((Int128)({a.Expr}) * ({b.Expr}))"
             : $"CobolNum.MulChecked({a.Expr}, {b.Expr})";
@@ -866,7 +907,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // PB2694): `COMPUTE FE = 1 / HUGE + 0` cut the quotient at the hint scale plus guard digits and stored
         // +0.00E+00 as well, and the set context (ReceiverContext.OfSet) carries the flag for that reason.
         if (a.Wide || b.Wide || _rcv.FloatEdited)
-            return new NumX(RuntimeApi.DecDivToOdd(DecOperand(a), DecOperand(b)), 0, Dec: true);
+            return new NumX(RuntimeApi.DecDivToOdd(DecOperandExact(a), DecOperandExact(b)), 0, Dec: true);
         int ds;
         CobolRounding mode;
         if (_outermost && _rcv.RoundsAtItsScale)

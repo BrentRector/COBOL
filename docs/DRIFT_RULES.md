@@ -6,7 +6,7 @@ Every `*DriftTests` class enforces ONE structural rule, and that rule's single h
 This page is derived from them. **Before editing a file, ask which rules govern it:**
 `python scripts/spec/drift_rules.py <path>` (specific rules first, then the tree-wide sweeps).
 
-311 drift tests.
+312 drift tests.
 
 | Drift test | Rule | Scans |
 |---|---|---|
@@ -267,6 +267,7 @@ This page is derived from them. **Before editing a file, ask which rules govern 
 | [RuntimeAbiPinDriftTests](../tests/Cobol.Net.Tests.Unit/RuntimeAbiPinDriftTests.cs) | ⛔ THE TWO VERSIONS A COMPILED MODULE IS REFUSED BY ARE PINNED BESIDE WHAT THEY GUARD (kb/Work PB2097; docs/rearchitecture/DESIGN-external-repository.md §15.4, §17.2 "Boundary layout"). | `src/Cobol.Net.Runtime/PublicAPI.Shipped.txt` |
 | [RuntimeApiWindowDriftTests](../tests/Cobol.Net.Tests.Unit/RuntimeApiWindowDriftTests.cs) | ⛔ A REFERENCE MODIFICATION THE PROGRAM WROTE AND A WINDOW THE COMPILER CHOSE ARE TWO EMITS, AND THE FIRST LIST IS CLOSED (kb/Work PB1707 part 2, owner decision R60). | `src/Cobol.Net.Compiler/CodeGen` |
 | [ScreenFacilityConstructDriftTests](../tests/Cobol.Net.Tests.Unit/ScreenFacilityConstructDriftTests.cs) | The Annex A.4.2 (screen handling) REFUSAL, held from the three directions a negative golden cannot reach (kb/Work PB260). | `tests/version-matrix/cobol-words.json`, `src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4`, `src/Cobol.Net.Frontend/Grammar`, `src/Cobol.Net.Frontend/Grammar/Core/CobolScreen.g4`, `src/Cobol.Net.Frontend/Grammar/Core/CobolSpecialNames.g4` |
+| [SdidiOperandLiftDriftTests](../tests/Cobol.Net.Tests.Unit/SdidiOperandLiftDriftTests.cs) | ⛔ A FIXED-POINT OPERAND ENTERS THE STANDARD-DECIMAL INTERMEDIATE THROUGH ONE LIFT, AND THAT LIFT ROUNDS (kb/Work PB2918). | `src/Cobol.Net.Compiler/CodeGen`, `src/Cobol.Net.Compiler/CodeGen/Emit/NumericRenderer.cs` |
 | [SearchAllFormat2RuleCoverageDriftTests](../tests/Cobol.Net.Tests.Unit/SearchAllFormat2RuleCoverageDriftTests.cs) | ⛔ THE GUARD THAT KEEPS "ONE MODEL, SEVEN PREDICATES" TRUE (kb/Work PB445). | `specs/ISO_COBOL.md`, `src/Cobol.Net.Compiler/Binding/Validation/SearchAllFormat2Rules.cs`, `src/Cobol.Net.Compiler/Binding/Model/OdoModel.cs` |
 | [SearchOperandResolutionDriftTests](../tests/Cobol.Net.Tests.Unit/SearchOperandResolutionDriftTests.cs) | ⛔ THE PB443 INVARIANT: a SEARCH operand is a WRITTEN REFERENCE, resolved by ISO §8.4.2.2 — never a BASE WORD looked up and tie-broken by declaration order. | `src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SearchBinder.cs` |
 | [SelfTestDiscoveryDriftTests](../tests/Cobol.Net.Tests.Unit/SelfTestDiscoveryDriftTests.cs) | ⛔ EVERY SCRIPT SELF-TEST RUNS IN EVERY GATE AND IN CI, THROUGH ONE DISCOVERING RUNNER (kb/Work PB2563): scripts/self_tests.py finds every self-test under scripts/, and the local gate's audits, the Linux gate and CI's jobs all run that runner and name no self-test by hand; only the implementer's gate may REUSE a PASS recorded for unchanged inputs, while the lander's gate, the Linux gate and CI run … | `scripts/self_tests.py`, `scripts/run_gate_legs.py`, `scripts/linux-gate.sh`, `.github/workflows/build-and-test.yml`, `scripts/build-local.ps1`, `scripts/build-local.sh` … |

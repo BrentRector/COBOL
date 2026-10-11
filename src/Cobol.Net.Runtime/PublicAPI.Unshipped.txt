@@ -28,3 +28,4 @@ static CobolNet.Runtime.CobolNum.PositionOfWide(CobolNet.Runtime.CobolDec value)
 static CobolNet.Runtime.CobolNum.PositionOfWide(double value) -> System.Int128
 static CobolNet.Runtime.CobolNum.PositionOfWide(System.Int128 unscaled, int scale) -> System.Int128
 static CobolNet.Runtime.Occurrence.implicit operator System.Int128(CobolNet.Runtime.Occurrence occurrence) -> System.Int128
+static CobolNet.Runtime.CobolDec.FromUnsigned(System.UInt128 magnitude, int scale, CobolNet.Runtime.CobolRounding mode) -> CobolNet.Runtime.CobolDec
