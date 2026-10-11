@@ -37,6 +37,13 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
   whole-population trains 0.71/h, confounded by the cap; no CI red that batching let through) is in PB2515. They are
   `gate_slot.py`'s coded defaults (`DEFAULT_SCOPE`, `DEFAULT_SLOTS`; train 1052), and `gate_slot.py clear` drops the
   bridging settings that carried them before.
+- **▶ LANDING PIPELINE REDESIGN (owner 2026-10-11, kb/Work PB3015 Q1a/Q1b/Q2/Q3; design
+  `docs/rearchitecture/DESIGN-test-build-ci.md` §3.17):** the lander's local gate becomes the targeted leg 1 on both hosts and
+  CI's whole population the regression net; landing goes through GitHub's merge queue,
+  one PR per finished branch, one DEVLOG file per entry. It supersedes PB2515's lander half, PB2537's landing lease,
+  PB1732's Linux gate as a gate, and `push-main.sh` once PB3022-PB3028 land; until then the current pipeline stands,
+  except that train 1060 (DEVLOG 1959) applied the Q1a shape early by operator steer: Windows leg 1 plus the
+  whole WSL Linux gate, CI the whole population.
 - **▶ LIVE STATE (2026-10-06 23:40 PDT) — THE COMPLETION PLAN IS DECIDED (kb/Work R69; DEVLOG 1901).** Main is train 1024 plus this plan commit; no compiler code changed. Three owner decisions of 2026-10-06, each recorded in R69 and never to be re-asked:
   - **The legacy `CobolSharp.*` engine is DELETED from main** (trains 1025 and 1027, 2026-10-07; the archive tag `legacy-byte-engine-final` marks `48a44548c`, the last commit holding it; `docs/rearchitecture/LEGACY-ARCHIVE.md` is the pointer). The decision supersedes DEVLOG 997's "keep engine" and amends D14. P15's Cut 2.5 (D10), the prose sweep, the solution rename and the grammar unification run as wave 1028 of the `PB2108` cluster (lead PB2108; the register's `cluster` and `blocked_by` fields carry the membership and order: Cut 1a and 1b in parallel → Cut 2 with the archive tag → the prose sweep, the solution rename, D10 and the grammar unification). v1.0 keeps Cut 3 (the runtime namespace flip) and the §4.2.16 conformance documentation. Evidence: R69 §1 (zero product defects caught since July; its one purpose dissolved when PB750 made the guard greenfield-driven; its costs measured).
   - **R2, the review fleet (2026-10-07 23:06 PDT, DEVLOG 1932):** rebuilt from the owner-approved adversarial review of its first brief (PB2558–PB2561: computed subsystems and shards, inputs once, per-decision checkpoints, three-lens skeptics, scripted filing into PB1754); DESIGN-architecture-review §3 R2 describes it as built. Batch 1 (the small shards: runtime values, editions and diagnostics, the CLI, plus the one whole-codebase clone pass) is ready for the operator; nothing of R2 has run yet.
