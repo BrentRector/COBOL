@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """landing_oracle.py — A LANDING CARRIES AN ARCH-ORACLE BASELINE THAT DESCRIBES ITS OWN TREE, checked where every
-landing passes (scripts/push-main.sh, exit 7, before a CI run is spent; kb/Work PB2885).
+landing passes (scripts/orchestrator/enqueue.py checks, exit 7, before a CI run is spent; kb/Work PB2885).
 
     python scripts/orchestrator/landing_oracle.py [--rev HEAD]
     python scripts/orchestrator/landing_oracle.py --self-test
@@ -41,7 +41,7 @@ RECORDED = "docs/rearchitecture/evidence/arch-oracle"
 SHOW_PATHS = 12
 RECORD = ("python scripts/arch/compare_oracle.py   (explain every difference by cluster in the DEVLOG entry), then "
           "python scripts/arch/capture_oracle.py --record   on the committed train, commit the new manifest, and run "
-          "push-main.sh again (lander-train-brief step 3c, MANDATORY-PRACTICES L11)")
+          "the landing again (lander-train-brief step 3c, MANDATORY-PRACTICES L11)")
 
 
 class RangeError(Exception):

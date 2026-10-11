@@ -65,6 +65,10 @@ CASES = [
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
     ("pwsh -NoProfile -File scripts/build-local.ps1 -Mode lander > b.log 2>&1; git status", True),
     ("bash scripts/push-main.sh > p.log 2>&1 && git log -1", True),
+    # 5c. the merge-queue landing is a verdict command too (kb/Work PB3024)
+    ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt > q.log 2>&1 && git log -1", True),
+    ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt > q.log 2>&1; echo \"rc=$?\"", False),
+    ("git add -- scripts/orchestrator/enqueue.py && git commit -q -m x", False),
     # 6. WSL lifecycle commands are the owner's to run
     ("wsl --terminate Ubuntu", True),
     ("wsl.exe --export Ubuntu E:/x.tar", True),
@@ -117,6 +121,7 @@ UNIT_CASES = [
     ("cd /e/Sites/wiseowlsoftware.com; git push", True),
     ("git push -u origin claude/batch-7", True),
     ("bash scripts/push-main.sh", False),
+    ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt", False),   # its push is the script's
     ("git log --grep=push", False),
     ("git log --oneline -3 -- scripts/push-main.sh", False),
     ("git commit -q -m 'document git push for the owner'", False),

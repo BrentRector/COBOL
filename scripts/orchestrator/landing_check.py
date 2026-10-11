@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""landing_check.py — the file-set partition's GUARANTEE, checked where every landing passes (scripts/push-main.sh).
+"""landing_check.py — the file-set partition's GUARANTEE, checked where every landing passes
+(scripts/orchestrator/enqueue.py checks, exit 3).
 
 WHY (kb/Work PB2118 Drafts 9-10; DESIGN-architecture-review §8.7). The owner made the mechanical file-set partition the
 ONLY gate between the R3 restructuring waves (cluster PB2119) and the fix lane's trains (PB2118 question 5). The

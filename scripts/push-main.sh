@@ -255,40 +255,18 @@ if ! git merge-base --is-ancestor "$BASE" "$SHA"; then
      A landing is a pure fast-forward; this script never force-pushes."
 fi
 
-# ── EVERY LANDING ON MAIN CARRIES A NEW DEVLOG ENTRY (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits
-# landing on main"; an implementer's WIP checkpoints carry none, the lander writes the train's one). Checked HERE, on
-# this landing's own range (DEVLOG.md at $BASE against DEVLOG.md at $SHA), because every landing passes here and a
-# commit cannot know whether it will land. Refused before a run is spent. ──
-"$PY" scripts/orchestrator/landing_devlog.py --rev "$SHA" --base "$BASE"
-case $? in
+# ── THE LANDING CHECKS, ONE SEQUENCE IN ONE PLACE (scripts/orchestrator/enqueue.py checks; kb/Work PB3024): the DEVLOG
+# entry (PB2605, exit 6), the arch-oracle baseline (PB2885, exit 7) and the R3 file-set partition (PB2118, exit 3),
+# each on this landing's own range and refused before a run is spent. The merge-queue landing (enqueue.py queue) runs
+# the same sequence, so the two landing paths cannot disagree while both exist. ──
+"$PY" scripts/orchestrator/enqueue.py checks --rev "$SHA" --base "$BASE"
+CHECKS_RC=$?
+case $CHECKS_RC in
   0) ;;
-  1) echo "⛔ push-main: this landing carries no valid new DEVLOG entry (above) — main NOT touched." >&2
-     exit 6 ;;
-  *) die "the DEVLOG landing check could not read the range (above) — main NOT touched" ;;
+  3|6|7) echo "⛔ push-main: a landing check refused this landing (above; exit $CHECKS_RC in the header's list) — main NOT touched." >&2
+         exit $CHECKS_RC ;;
+  *) die "a landing check could not read the range (above) — main NOT touched" ;;
 esac
-
-# ── THE ARCH-ORACLE BASELINE DESCRIBES THE LANDED TREE (kb/Work PB2885). Re-recording it was prose (lander step 3c,
-# MANDATORY-PRACTICES L11), and train 1049, an operator hand-landing, skipped it: six new cases reached main behind
-# a stale baseline and the next train inherited the drift. landing_oracle.py reads the recorded manifest at $SHA and
-# refuses when any path under its derived `inputs` changed after the commit it names. Refused before a run is spent. ──
-"$PY" scripts/orchestrator/landing_oracle.py --rev "$SHA"
-case $? in
-  0) ;;
-  1) echo "⛔ push-main: the arch-oracle baseline is behind this landing (above) — main NOT touched." >&2
-     exit 7 ;;
-  *) die "the arch-oracle landing check could not read the range or the baseline (above) — main NOT touched" ;;
-esac
-
-# ── THE FILE-SET PARTITION'S GUARANTEE (kb/Work PB2118 Drafts 9-10; DESIGN-architecture-review §8.7). The planner admits
-# an R3 restructuring wave on its COMPUTED file set, an estimate three refuter rounds each found a hole in; this is
-# where a miss is caught instead of landed. landing_check.py compares what this landing ACTUALLY changed with its
-# declared set (R3 work) and with every in-flight branch (when either side is R3 work): a file outside the set, or
-# one shared with an earlier-dispatched branch, STOPS the landing before a run is spent, and the later branch
-# re-plans and rebases. Every landing passes here, so it is the ONE place the check runs. ──
-if ! "$PY" scripts/orchestrator/landing_check.py --rev "$SHA" --base "$BASE"; then
-  echo "⛔ push-main: the landing check STOPPED this landing (above): re-plan the named work and rebase — main NOT touched." >&2
-  exit 3   # its own code (the header's Exit list): a STOP is a re-plan, never a usage error to retry
-fi
 
 green_ci_gate() {   # 1 = this sha already carries a successful `ci-gate` check run (what the protection reads)
   local n

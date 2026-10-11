@@ -6,10 +6,13 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
 
   git stash / --autostash   the stash stack is SHARED by every linked worktree (common git dir); PB713's implementer
                             popped the registrar's stash. WIP goes into a commit (workstream skill, references/landing.md).
-  bare push to main         main requires the ci-gate check; the only route is `bash scripts/push-main.sh`
-                            (owner decision Q23, 2026-09-06). A push to ci/<sha> or any other branch is fine.
+  bare push to main         main requires the ci-gate check; the route is a pull request queued by
+                            `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE, and until
+                            then `bash scripts/push-main.sh` (owner decision Q23, 2026-09-06; kb/Work PB3024). A push
+                            to ci/<sha> or any other branch is fine.
   direct push in a unit     inside an orchestrator unit (COBOL_COORD_DIR set) ANY `git push`, any repository, any
-                            flags: a unit lands through `bash scripts/push-main.sh` and never publishes another repo
+                            flags: a unit lands through a landing script (enqueue.py, or push-main.sh while the merge
+                            queue is not ACTIVE) and never publishes another repo
                             (owner 2026-10-05, kb/Work/PB2044: the wave unit pushed the public skills repo's main with
                             `git push -q origin HEAD:main`, which the deny rule's text pattern missed).
   escapes in a heredoc      heredoc bodies with backslash escapes were mangled or mis-escaped in six sessions (and the
@@ -110,8 +113,10 @@ for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;
     args = m.group(1)
     if re.search(r"(?:^|\s|:)(?:refs/heads/)?main(?:\s|$)", args):
         block("a direct push to main is refused by the server (required `ci-gate` check). Land with "
+              "`python scripts/orchestrator/enqueue.py queue` (a pull request into the merge queue) once "
+              "`python scripts/orchestrator/ruleset.py check` reports the queue ACTIVE; until then with "
               "`bash scripts/push-main.sh` — it pushes ci/<sha>, waits for green, then fast-forwards main. "
-              "It is idempotent; run it with run_in_background and block on its log.")
+              "Both are idempotent; run push-main.sh with run_in_background and block on its log.")
 # 2b. ANY direct `git push`, in ANY repository, inside an orchestrator unit (owner 2026-10-05, kb/Work/PB2044).
 # Rule 2 guards THIS repo's main and deliberately leaves another repository to its own rules, so an attended session may
 # push the sites and the public skills repo. A unit has no such need and runs under `bypassPermissions`: on 2026-10-05 the
@@ -147,7 +152,8 @@ if os.environ.get("COBOL_COORD_DIR"):
     payloads = [m.group(2) for m in _SHELL_PAYLOAD.finditer(scan)]
     if any(_PUSH.search(t) for t in [_QUOTED.sub(" ", scan)] + payloads):
         block("a direct `git push` is refused inside an orchestrator unit (any repository, any flags). Land this "
-              "repository's work with `bash scripts/push-main.sh`. A change to ANOTHER repository (the public skills "
+              "repository's work with `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE "
+              "(`ruleset.py check`), else `bash scripts/push-main.sh`. A change to ANOTHER repository (the public skills "
               "repo, a site) is never published by a unit: hand it off as an owed push in the handoff and the "
               "attended session or the owner publishes it (kb/Work/PB2044).")
 # 3. backslash escapes inside a heredoc body
@@ -176,9 +182,10 @@ if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
 # an interpreter (`bash scripts/push-main.sh`, `pwsh -File scripts/build-local.ps1`). A command that merely NAMES one of
 # those files (`git add -- scripts/push-main.sh`, `sed -n 1,5p scripts/push-main.sh`) is not one: matching anywhere in the
 # segment blocked such harmless commands and cost extra turns (2026-10-04).
-_GATE_SCRIPT = r"(?:\./)?\S*(?:build-local\.(?:ps1|sh)|push-main\.sh|battery\.sh|guard(?:-fast)?\.sh)\b"
+_GATE_SCRIPT = (r"(?:\./)?\S*(?:build-local\.(?:ps1|sh)|push-main\.sh|battery\.sh|guard(?:-fast)?\.sh"
+                r"|orchestrator/enqueue\.py)\b")
 VERDICT = re.compile(r"^(?:\w+=\S*\s+)*(?:dotnet\s+(?:test|build)\b|"
-                     r"(?:(?:bash|sh|pwsh|powershell)(?:\.exe)?\s+(?:-\S+\s+)*)?" + _GATE_SCRIPT + r")")
+                     r"(?:(?:bash|sh|pwsh|powershell|python3?|py)(?:\.exe)?\s+(?:-\S+\s+)*)?" + _GATE_SCRIPT + r")")
 READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-String|Get-Content|findstr|type)\b")
 
 

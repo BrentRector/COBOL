@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """landing_devlog.py — EVERY LANDING ON MAIN CARRIES A NEW DEVLOG ENTRY, checked where every landing passes
-(scripts/push-main.sh, before a CI run is spent).
+(scripts/orchestrator/enqueue.py checks, run by enqueue.py queue and by push-main.sh, before a CI run is spent).
 
     python scripts/orchestrator/landing_devlog.py [--rev HEAD] [--base origin/main]
     python scripts/orchestrator/landing_devlog.py --self-test
@@ -17,8 +17,9 @@ main checkout the hook file lived in, so a commit in a worktree (`cd <wt> && git
 its worktree) was judged by main's empty index and passed silently (kb/Work PB2605), and the rule held only for
 commits made in the main checkout. Making it follow the commit's own tree would have put an `ask` in front of every
 implementer checkpoint (a stall, or a silent pass, in an unattended bypassPermissions unit), and a commit cannot know
-whether it will land. A landing can: push-main.sh is THE ONLY WAY a commit reaches main (owner decision Q23,
-kb/Work PB796), so this check runs there once, on the landing's own commit range, and nowhere else.
+whether it will land. A landing can: every landing passes `enqueue.py checks` (the merge-queue landing,
+kb/Work PB3024, and push-main.sh while the queue is not ACTIVE; owner decision Q23, kb/Work PB796), so this
+check runs there once, on the landing's own commit range, and nowhere else.
 
 WHAT IT CHECKS, on the trees of the range itself (`git show <base>:DEVLOG.md` against `git show <rev>:DEVLOG.md`,
 never an index or a working tree):
@@ -87,7 +88,7 @@ def check(base_text: str | None, rev_text: str | None) -> tuple[list[str], list[
                  "renumber it to the top entry + 1 (MANDATORY-PRACTICES L8)") if reused else
                 ("the landing carries no new DEVLOG entry. Every landing on main carries one (owner 2026-10-08, "
                  "kb/Work PB2605): write it at the TOP of DEVLOG.md with `python scripts/prepend-devlog.py "
-                 f"<entry.md>`, headed `{FORMAT}`, commit it, and run push-main.sh again")], []
+                 f"<entry.md>`, headed `{FORMAT}`, commit it, and re-run the landing")], []
     reasons = [f"the new heading `{line[:90]}` lacks the required stamp `{FORMAT}` (take it from "
                f"`date \"+%Y-%m-%d %H:%M %Z\"`)" for _, line in new if not STAMPED.match(line)]
     if [pos for pos, _ in new] != list(range(len(new))):
