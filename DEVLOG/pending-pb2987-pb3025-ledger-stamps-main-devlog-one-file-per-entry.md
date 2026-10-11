@@ -26,4 +26,4 @@ Every header was kept as written. The history held four surprises: twenty number
 entries 1191a–1191d, twelve headers with a double-encoded dash, and undated early entries. A letter in the FILE name
 (`0185b-…` above `0185a-…`) keeps each duplicate pair in its original order without a hand list. CLAUDE.md rule 6, the
 briefs (the implementer writes the pending entry; a train lander folds its clusters' pending files into one and
-stamps it), the skills, DOC_INDEX, plan §0 and the two design docs describe the new shape.
+stamps it), the skills, DOC_INDEX, the plan and the two design docs describe the new shape.

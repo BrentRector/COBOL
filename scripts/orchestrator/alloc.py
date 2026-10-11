@@ -43,7 +43,7 @@ CATALOG = pathlib.Path("src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs"
 # ── truth: one rule per kind ─────────────────────────────────────────────────────────────────────────────────────
 def devlog_top(repo: pathlib.Path) -> int:
     """The highest entry number in the repository's DEVLOG/ (one file per entry, kb/Work PB3025: devlog.py's rule)."""
-    top = devlog.highest(devlog.worktree_files(repo))
+    top = devlog.highest(devlog.names_in(repo))
     if not top:
         raise SystemExit(f"⛔ no entry file in {repo / devlog.DIR}")
     return top

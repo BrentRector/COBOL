@@ -175,15 +175,21 @@ def entries(files: dict[str, str]) -> list[tuple[tuple[int, str], str]]:
     return sorted(((k, n) for n in files if (k := key_of(n))), reverse=True)
 
 
-def highest(files: dict[str, str]) -> int:
-    return max((k[0] for k, _ in entries(files)), default=0)
+def highest(names) -> int:
+    """The highest entry number among file names (a {name: text} dict iterates its names)."""
+    return max((k[0] for n in names if (k := key_of(n))), default=0)
+
+
+def names_in(repo: pathlib.Path) -> list[str]:
+    """The file names of DEVLOG/ in the working tree, without reading any file."""
+    d = repo / DIR
+    return [p.name for p in d.iterdir() if p.is_file()] if d.is_dir() else []
 
 
 def newest(repo: pathlib.Path, count: int) -> list[str]:
     """The texts of the `count` newest entries of the working tree, newest first, reading only those files."""
-    d = repo / DIR
-    names = sorted(((k, p.name) for p in d.iterdir() if (k := key_of(p.name))), reverse=True) if d.is_dir() else []
-    return [(d / n).read_bytes().decode("utf-8").replace("\r\n", "\n") for _, n in names[:count]]
+    names = sorted(((k, n) for n in names_in(repo) if (k := key_of(n))), reverse=True)
+    return [(repo / DIR / n).read_bytes().decode("utf-8").replace("\r\n", "\n") for _, n in names[:count]]
 
 
 # ── render ───────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -302,7 +308,9 @@ def stamp(wt: pathlib.Path, number: int, now: dt.datetime) -> tuple[str, str]:
     name = entry_name(number, "", title)
     (wt / DIR / name).write_bytes((header + "\n" + body.rstrip("\n") + "\n\n").encode("utf-8"))
     (wt / DIR / pending[0]).unlink()
-    _git(wt, "add", "-A", "--", DIR, check=True)  # the pending file's removal (tracked or not) and the entry
+    # exactly these two paths: the entry, and the pending file's removal (tracked or not); nothing else in DEVLOG/
+    _git(wt, "add", "--", f"{DIR}/{name}", check=True)
+    _git(wt, "rm", "-q", "--cached", "--ignore-unmatch", "--", f"{DIR}/{pending[0]}", check=True)
     return name, header
 
 
@@ -311,7 +319,7 @@ def run_stamp(repo: pathlib.Path, branch: str, coord_override: str | None) -> in
     import alloc  # noqa: PLC0415
     import coord  # noqa: PLC0415
     wt = worktree_of(repo, branch)
-    if not any(PENDING_NAME.match(n) for n in worktree_files(wt)):
+    if not any(PENDING_NAME.match(n) for n in names_in(wt)):
         raise SystemExit(f"⛔ devlog stamp: {wt / DIR} has no pending entry to stamp")
     number, _ = alloc.allocate("devlog", 1, wt, coord.coord_dir(coord_override))
     name, header = stamp(wt, number, dt.datetime.now().astimezone())
@@ -467,7 +475,7 @@ def self_test() -> int:
                             "--coord", str(cdir)], capture_output=True, text=True, encoding="utf-8", env=env)
     ok("stamp: a branch with no pending entry is refused, nothing allocated", again.returncode != 0 and
        json.loads((cdir / "alloc.json").read_text(encoding="utf-8")).get("devlog") == 12, again.stdout + again.stderr)
-    ok("next: the highest number in the tree", highest(worktree_files(wt)) == 12)
+    ok("next: the highest number in the tree", highest(names_in(wt)) == 12)
     ok("zone: a spelled-out zone name is abbreviated as date +%Z prints it",
        zone_abbrev(dt.datetime(2026, 10, 11, tzinfo=dt.timezone(dt.timedelta(hours=-7), "Pacific Daylight Time")))
        == "PDT")
@@ -504,8 +512,9 @@ def self_test() -> int:
        f"staged={staged}; asked by: {asked}; hooks run: {ran}; registered but missing: {sorted(missing)}")
 
     # THE REPOSITORY'S OWN LOG: every gate and CI run this self-test, so the whole of DEVLOG/ is held to `lint`.
-    own = lint(worktree_files(REPO), (REPO / MONOLITH).exists())
-    ok(f"this repository's {DIR}/ passes lint ({len(entries(worktree_files(REPO)))} entries)", not own, "; ".join(own[:5]))
+    own_files = worktree_files(REPO)
+    own = lint(own_files, (REPO / MONOLITH).exists())
+    ok(f"this repository's {DIR}/ passes lint ({len(entries(own_files))} entries)", not own, "; ".join(own[:5]))
 
     sh("worktree", "remove", "--force", str(wt))
     shutil.rmtree(root, ignore_errors=True)
@@ -553,10 +562,10 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(repo, a.base, a.rev)
     if a.cmd == "stamp":
         return run_stamp(repo, a.branch, a.coord)
-    files = worktree_files(repo)
     if a.cmd == "next":
-        print(highest(files))
+        print(highest(names_in(repo)))
         return 0
+    files = worktree_files(repo)
     text = render(files, a.since)
     if a.out:
         pathlib.Path(a.out).write_bytes(text.encode("utf-8"))
