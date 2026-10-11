@@ -214,6 +214,8 @@ def before_figures(trains: list[dict]) -> dict | None:
         return None
     landed = sum(r["landed"] for r in rs)
     window_h = (max(_when(r["pushed"]) for r in rs) - min(_when(r["started"]) for r in rs)).total_seconds() / 3600
+    if landed < 1 or window_h <= 0:       # a rate needs a landed change over a window above zero
+        return None
     per_change = [m for r in rs for m in [_minutes(r["started"], r["pushed"])] * r["landed"]]
     return {"trains": len(rs), "changes": landed, "window_h": window_h, "per_h": landed / window_h,
             "floor": {"median": median(per_change), "p90": percentile(per_change, 90)} if per_change else None,
@@ -386,29 +388,34 @@ def complete(path: pathlib.Path, gh: Gh, only: int | None = None, say: Say = pri
     return 2 if bad else 0
 
 
-def freeze(coord_dir: pathlib.Path, say: Say = print, today: str | None = None) -> int:
+def freeze(coord_dir: pathlib.Path, say: Say = print, today: str | None = None, frozen: pathlib.Path = FROZEN_TRAINS,
+           first_after: pathlib.Path = FIRST_AFTER) -> int:
     """Copy the retired train file and the first after-summary under the evidence directory. Refused until a pull
-    request has landed (the first after-summary needs a landing) and when a frozen copy already differs."""
+    request has landed (the first after-summary needs a landing), when the first after-summary already exists, and when
+    a frozen copy already differs: frozen evidence is written once and never edited."""
     src = coord_dir / RETIRED_TRAINS
     recs = read_all(coord_dir / FILE)
     if not any(r.get("merged") for r in recs):
         say("⛔ freeze: no pull request has landed yet — the first after-summary needs one")
         return 2
-    if not src.exists() and not FROZEN_TRAINS.exists():
+    if first_after.exists():
+        say(f"⛔ freeze: {first_after} exists — the first after-summary is written once and never edited")
+        return 2
+    if not src.exists() and not frozen.exists():
         say(f"⛔ freeze: {src} does not exist and nothing is frozen")
         return 2
     if src.exists():
         data = src.read_bytes().replace(b"\r\n", b"\n")
-        if FROZEN_TRAINS.exists() and FROZEN_TRAINS.read_bytes() != data:
-            say(f"⛔ freeze: {FROZEN_TRAINS} exists and differs from {src}; the evidence is never edited")
+        if frozen.exists() and frozen.read_bytes() != data:
+            say(f"⛔ freeze: {frozen} exists and differs from {src}; the evidence is never edited")
             return 2
-        FROZEN_TRAINS.write_bytes(data)
-    lines = summarize(recs, read_all(FROZEN_TRAINS))
-    FIRST_AFTER.write_text(
+        frozen.write_bytes(data)
+    lines = summarize(recs, read_all(frozen))
+    first_after.write_text(
         f"# The first after-summary ({today or dt.date.today().isoformat()})\n\n> FROZEN EVIDENCE: written by "
         "`landing_measure.py freeze`, never edited.\n\n```\n" + "\n".join(lines) + "\n```\n",
         encoding="utf-8", newline="\n")
-    say(f"landing-measure: froze {FROZEN_TRAINS.name} and {FIRST_AFTER.name} under {EVIDENCE_DIR}")
+    say(f"landing-measure: froze {frozen.name} and {first_after.name} under {frozen.parent}")
     return 0
 
 
@@ -479,6 +486,11 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     r = read_all(path)[0]
     if r["enqueued"] != t("10:00") or r["done"] != t("09:00") or r["branch"] != "b17" or r["local_gate_s"] != 300.0:
         fails.append(f"{patch_arm}: {r}")
+    cli = patch_from_args(parser().parse_args(["record", "--pr", "5", "--branch", "b5", "--changes", "3", "--enqueued",
+                                               t("10:00"), "--bounces", "2", "--bounce-causes", "conflict, load-timing"]))
+    made = patch_record(None, cli)
+    if (made["changes"], made["bounces"], made["bounce_causes"], made["branch"]) != (3, 2, ["conflict", "load-timing"], "b5"):
+        fails.append(f"{patch_arm}: the command line's mapping: {made}")
     # refusals
     for name, p in (("merged before enqueued", {"pr": 17, "merged": t("09:50")}),
                     ("an unknown cause", {"pr": 17, "bounces": 1, "bounce_causes": ["flake"]}),
@@ -577,8 +589,19 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     cd.mkdir()
     lines = []
     waits = freeze(cd, say=lines.append)
-    if waits != 2 or quotes_missing:
-        fails.append(f"{freeze_arm}: waited={waits} missing={quotes_missing} {lines}")
+    ev = tmp / "evidence"
+    ev.mkdir()
+    fz, fa = ev / "frozen.jsonl", ev / "first.md"
+    (tmp / RETIRED_TRAINS).write_bytes(json.dumps(trains[0]).encode("utf-8") + bytes([13, 10]))
+    first = freeze(tmp, say=lines.append, today="2026-10-12", frozen=fz, first_after=fa)
+    written = fa.read_text(encoding="utf-8") if fa.exists() else ""
+    again = freeze(tmp, say=lines.append, frozen=fz, first_after=fa)            # the first after-summary exists
+    fa.unlink()
+    (tmp / RETIRED_TRAINS).write_text("{}" + chr(10), encoding="utf-8")
+    differs = freeze(tmp, say=lines.append, frozen=fz, first_after=fa)          # the frozen copy would change
+    if not (waits == 2 and first == 0 and again == 2 and differs == 2 and not fa.exists() and not quotes_missing
+            and bytes([13]) not in fz.read_bytes() and "AFTER (merge queue" in written):
+        fails.append(f"{freeze_arm}: waited={waits} first={first} again={again} differs={differs} missing={quotes_missing} {lines}")
     return fails
 
 
