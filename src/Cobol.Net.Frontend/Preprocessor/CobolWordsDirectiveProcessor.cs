@@ -162,7 +162,7 @@ public static class CobolWordsDirectiveProcessor
             Invalid(diag, loc, ">>COBOL-WORDS requires an EQUATE, UNDEFINE, SUBSTITUTE, or RESERVE option (ISO §7.3.10.2)");
             return false;
         }
-        switch (kw.Text.ToUpperInvariant())
+        switch (CobolNames.UpperFold(kw.Text))
         {
             case "EQUATE":   // EQUATE literal-1 WITH literal-2
                 return TryBinary(toks, "WITH", CobolWordsAction.Equate, line, diag, loc, definitionOf, out op);

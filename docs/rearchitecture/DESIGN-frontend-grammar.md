@@ -1479,11 +1479,15 @@ lowercase with Annex C. Three pieces, each in one place:
   `Comparer` every name table uses, `Same` / `StartsWith` / `EndsWith` / `Contains` over spans, and `UpperFold`, a
   word's one upper-case spelling (the fold with the basic letters raised), which is the key wherever a word is
   compared by ordinal or with an upper-case keyword. No compiler, frontend or Editions file compares a word by
-  `OrdinalIgnoreCase` or keys one by the host's `ToUpperInvariant` (`CobolNameFoldDriftTests`; a string that is not a
-  COBOL word says so on its line). The table is COBOL 2023's; the only fold difference a COBOL 2002/2014 word can observe is E.2
+  `OrdinalIgnoreCase`, keys one by the host's `ToUpperInvariant`, or compares one with a keyword through it
+  (`CobolNameFoldDriftTests` scans EVERY project under `src`, derived from the directory list, minus the named
+  subtrees that hold no COBOL word, and the Runtime is one of them: a string that is not a COBOL word says so on
+  its line; kb/Work PB2845). The table is COBOL 2023's; the only fold difference a COBOL 2002/2014 word can observe is E.2
   item 14 (U+0131 → i, U+03C2 → U+03C3 before 2023), so the lexer writes those letters in their edition's fold
   (`CobolNames.EditionSpelling`, primed through `TokenRetypes.PrimeLexer`) and the one comparer then answers for the
-  edition. A C# identifier derived from a word keeps its extended letters, escaping only those C# cannot hold
+  edition. A LITERAL that names a word (an AS literal, a CALL / CANCEL / `ADDRESS OF` target, an INVOKE method name)
+  is source text too, so it is written in the same spelling when it is formed (`ExternalizedNames.FormWritten`,
+  `OoBinder.OoMethodNameOf`; kb/Work PB2840); a name held in a data item is run-time data and maps by the 2023 table. A C# identifier derived from a word keeps its extended letters, escaping only those C# cannot hold
   (`DataItem.IdentifierCharacters`); one whose word IS the identity (a class, interface, method, property, program
   or formal) is `DataItem.WordIdentifier`, the `Sanitize` of the word's `UpperFold`, so two spellings of one word are
   one C# member and two words are two (kb/Work PB1965: the host's upper-casing wrote final sigma and sigma alike at

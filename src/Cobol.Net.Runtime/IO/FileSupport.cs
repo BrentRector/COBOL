@@ -207,7 +207,7 @@ public static class HostFile
     /// verbatim ASSIGN text, so two spellings of one file were two physical files (two record stores, no Table 19
     /// conflict between them) and, on Linux, two files were one.</summary>
     public static StringComparer PhysicalFileComparer { get; } =
-        FileSystemFoldsCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        FileSystemFoldsCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;   // not a COBOL word: a host file path
 
     /// <summary>Does this host's DEFAULT file system treat two spellings that differ only in case as one file
     /// (Windows, macOS)? The one fact behind <see cref="PhysicalFileComparer"/> and <see cref="PhysicalFileKey"/>.</summary>

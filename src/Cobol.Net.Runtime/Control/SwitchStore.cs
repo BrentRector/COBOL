@@ -21,7 +21,7 @@ public sealed class SwitchStore
 {
     /// <summary>Per-run-unit switch state keyed by implementor switch-name — the §12.3.7 GR4 NOTE 1 run-unit
     /// scope (one switch referenced by all runtime elements of the run unit).</summary>
-    private readonly Dictionary<string, bool> _states = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> _states = new(CobolNames.Comparer);
 
     /// <summary>The prefix of the external facility's variables: <c>COBOL_</c> — the one place the family
     /// <c>COBOL_&lt;SWITCH-NAME&gt;</c> is spelled (<see cref="RuntimeConfig"/> registers the family by it).</summary>
@@ -56,9 +56,9 @@ public sealed class SwitchStore
 
         string? envValue = Environment.GetEnvironmentVariable(VariableNameFor(implementorName));
         state = envValue is not null
-            && (envValue.Equals("ON", StringComparison.OrdinalIgnoreCase)
+            && (envValue.Equals("ON", StringComparison.OrdinalIgnoreCase)   // not a COBOL word: an environment variable value
                 || envValue == "1"
-                || envValue.Equals("TRUE", StringComparison.OrdinalIgnoreCase));
+                || envValue.Equals("TRUE", StringComparison.OrdinalIgnoreCase));   // not a COBOL word: an environment variable value
         _states[implementorName] = state;
         return state;
     }

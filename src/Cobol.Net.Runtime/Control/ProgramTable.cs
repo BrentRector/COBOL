@@ -880,7 +880,7 @@ public sealed class ProgramTable
             if (!System.IO.File.Exists(path))
                 path = System.IO.Directory.EnumerateFiles(dir, "*.dll").FirstOrDefault(f =>
                     string.Equals(System.IO.Path.GetFileNameWithoutExtension(f), name,
-                        StringComparison.OrdinalIgnoreCase)) ?? "";
+                        StringComparison.OrdinalIgnoreCase)) ?? "";   // not a COBOL word: a file name
             if (path.Length == 0) return false;
             var asm = System.Runtime.Loader.AssemblyLoadContext.Default.LoadFromAssemblyPath(path);
             var record = asm.GetCustomAttributesData()

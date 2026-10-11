@@ -13,6 +13,8 @@
   "pb2629-formatted-time-offset-below-2014",
   "pb1965-kelvin-spelled-reserved-word",
   "pb1965-method-names-one-word-before-2023",
+  "pb2845-flag-option-word-folded-by-host-case-mapping",
+  "pb2840-invoke-literal-final-sigma-is-another-word-at-2023",
   "pb2511-sort-table-subject-refmod",
   "pb2468-condition-name-refmod-if",
   "pb2468-condition-name-refmod-search-all",

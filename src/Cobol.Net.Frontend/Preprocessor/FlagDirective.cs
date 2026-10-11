@@ -122,10 +122,12 @@ public static class FlagOptions
     public static IReadOnlyList<FlagOption> OptionsOf(FlagDirective directive) =>
         [.. All.Where(o => o.Directive == directive).Select(o => o.Option)];
 
-    /// <summary>Resolve a general-format option WORD (case-insensitive) to its option within
-    /// <paramref name="directive"/>; null when the word is not a valid option of that directive.</summary>
+    /// <summary>Resolve a general-format option WORD to its option within <paramref name="directive"/>; null when the
+    /// word is not a valid option of that directive. The word is a COBOL word, so it is keyed by the Annex C fold
+    /// (<see cref="DirWordComparer"/>, ISO §8.1.3.2 GR3 b) — never by the host's case mapping, which would find an
+    /// option under a spelling Annex C does not give it (kb/Work PB2845).</summary>
     public static FlagOption? TryOption(FlagDirective directive, string word) =>
-        ByWord.TryGetValue((directive, word.ToUpperInvariant()), out var info) ? info.Option : null;
+        ByWord.TryGetValue((directive, word), out var info) ? info.Option : null;
 
     /// <summary>FLAG-14 b's construct test (ISO §7.3.15.4 GR4 b; Annex E.2 item 6): "a compile-time arithmetic
     /// expression that could give a different result" — an expression that EVALUATES something, i.e. carries a binary
@@ -189,9 +191,9 @@ public static class FlagDirectiveLine
 
         // The second pair of braces: a trailing ON/OFF, written or not, identically for both directives.
         int end = tokens.Length;
-        if (end > 0 && tokens[^1].ToUpperInvariant() is "ON" or "OFF")
+        if (end > 0 && CobolNames.UpperFold(tokens[^1]) is var last && last is "ON" or "OFF")
         {
-            on = tokens[^1].ToUpperInvariant() == "ON";
+            on = last == "ON";
             end--;
         }
 
@@ -200,7 +202,7 @@ public static class FlagDirectiveLine
         var picked = new List<FlagOption>();
         for (int i = 0; i < end; i++)
         {
-            string w = tokens[i].ToUpperInvariant();
+            string w = CobolNames.UpperFold(tokens[i]);   // the directive's words are COBOL words: Annex C, not the host (kb/Work PB2845)
             if (w == "ALL")
             {
                 if (allWritten) { error = Repeated(tokens[i]); return false; }

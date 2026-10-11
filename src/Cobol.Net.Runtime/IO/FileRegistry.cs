@@ -15,8 +15,8 @@ namespace CobolNet.Runtime.IO;
 /// </summary>
 public sealed class FileRegistry
 {
-    private readonly Dictionary<string, FileConnector> _files = new(StringComparer.OrdinalIgnoreCase);
-    private readonly HashSet<string> _locked = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, FileConnector> _files = new(CobolNames.Comparer);
+    private readonly HashSet<string> _locked = new(CobolNames.Comparer);
     private int _instSeq;   // the per-object instance-file connector-key sequence (M2-OO-1i; reset for determinism)
     // The GC finalizer thread (~CobolObject) can request a per-object CLOSE at any moment, but the registry is a
     // single-thread structure — so the finalizer only ENQUEUES the key (thread-safe); the actual CloseAndDrop
@@ -36,7 +36,7 @@ public sealed class FileRegistry
     private readonly record struct ConnectorShare(FileSharing? Sharing, FileLockMode LockMode, bool Multiple);
 
     /// <summary>The per-connector declared sharing/lock metadata (a connector is "sharing-active" iff present).</summary>
-    private readonly Dictionary<string, ConnectorShare> _connectorShares = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ConnectorShare> _connectorShares = new(CobolNames.Comparer);
 
     /// <summary>The physical-file sharing/record-lock registry (§9.1.15/§9.1.16).</summary>
     private readonly PhysicalFileTable _physical = new();
@@ -72,9 +72,9 @@ public sealed class FileRegistry
     /// it.</summary>
     private static bool ReadKeyCheck() =>
         Environment.GetEnvironmentVariable(KeyCheckVariable)?.Trim() is not { } v
-        || !(v.Equals("OFF", StringComparison.OrdinalIgnoreCase) || v == "0"
-             || v.Equals("FALSE", StringComparison.OrdinalIgnoreCase)
-             || v.Equals("NO", StringComparison.OrdinalIgnoreCase));
+        || !(v.Equals("OFF", StringComparison.OrdinalIgnoreCase) || v == "0"   // not a COBOL word: an environment variable value
+             || v.Equals("FALSE", StringComparison.OrdinalIgnoreCase)   // not a COBOL word: an environment variable value
+             || v.Equals("NO", StringComparison.OrdinalIgnoreCase));   // not a COBOL word: an environment variable value
 
     /// <summary>Reset the registry (run-unit start): drain GC closes, close the sequential connectors (the
     /// pre-registry semantics — keyed connectors are dropped without a close, exactly as before), clear
@@ -889,7 +889,7 @@ public sealed class FileRegistry
     private bool OpenByAnotherConnector(string name, string host)
     {
         foreach (var (other, c) in _files)
-            if (!string.Equals(other, name, StringComparison.OrdinalIgnoreCase)
+            if (!CobolNames.Same(other, name)
                 && c.IsOpen && HostFile.PhysicalFileComparer.Equals(c.HostPath, host))
                 return true;
         return false;
@@ -1119,7 +1119,7 @@ public sealed class FileRegistry
         var st = _physical.For(c.HostPath);
         foreach (var (other, existing) in st.Open)
         {
-            if (string.Equals(other, name, StringComparison.OrdinalIgnoreCase)) continue;
+            if (CobolNames.Same(other, name)) continue;
             if (Table19.Conflicts(request: (sharing, mode), existing))
             {
                 c.SetStatus(FileStatusCode.FileSharingConflict);   // 61 — §9.1.13.9 item 1
@@ -1341,7 +1341,7 @@ public sealed class FileRegistry
     {
         // What this READ found — so an unsuccessful verdict reached AFTER these actions (ReadExceedsRecordMaximum) restores it.
         c.RecordLockHeldBeforeRead = st.RecordLocks.TryGetValue(recId, out var holder)
-            && string.Equals(holder, name, StringComparison.OrdinalIgnoreCase);
+            && CobolNames.Same(holder, name);
         if (ReadSetsRecordLock(meta, phrase) && LocksEffective(meta, st, name))
             _physical.LockRecord(st, name, recId, c);           // GR11 c)/d)
         else if (meta.Multiple && phrase == FileRecordLock.WithNoLock)

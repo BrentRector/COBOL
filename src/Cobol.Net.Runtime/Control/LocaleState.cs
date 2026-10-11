@@ -124,9 +124,9 @@ public static class LocaleIdentification
     {
         string s = (external ?? "").Trim();
         if (s.Length == 0) return "";
-        if (s.Equals("INVARIANT", StringComparison.OrdinalIgnoreCase) || s.Equals("ROOT", StringComparison.OrdinalIgnoreCase)
-            || s.Equals("C", StringComparison.OrdinalIgnoreCase) || s.Equals("POSIX", StringComparison.OrdinalIgnoreCase)
-            || s.Equals("und", StringComparison.OrdinalIgnoreCase))
+        if (s.Equals("INVARIANT", StringComparison.OrdinalIgnoreCase) || s.Equals("ROOT", StringComparison.OrdinalIgnoreCase)   // not a COBOL word: a locale identification (BCP 47 / POSIX text)
+            || s.Equals("C", StringComparison.OrdinalIgnoreCase) || s.Equals("POSIX", StringComparison.OrdinalIgnoreCase)   // not a COBOL word: a locale identification (BCP 47 / POSIX text)
+            || s.Equals("und", StringComparison.OrdinalIgnoreCase))   // not a COBOL word: a locale identification (BCP 47 / POSIX text)
             return "";
         string? modifier = null;
         int at = s.IndexOf('@');
@@ -142,7 +142,7 @@ public static class LocaleIdentification
             // unavailable (EC-LOCALE-MISSING at use), never silently the plain locale.
             if (!Collation.Cldr.CldrLocaleLoader.IsCollationType(modifier)) return s + "@" + modifier;
             string type = Collation.Cldr.CldrCollation.CanonicalType(modifier);
-            s = s.Contains("-u-", StringComparison.OrdinalIgnoreCase) ? s + "-co-" + type : s + "-u-co-" + type;
+            s = s.Contains("-u-", StringComparison.OrdinalIgnoreCase) ? s + "-co-" + type : s + "-u-co-" + type;   // not a COBOL word: a locale identification (BCP 47 / POSIX text)
         }
         return s;
     }

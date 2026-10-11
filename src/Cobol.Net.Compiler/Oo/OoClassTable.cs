@@ -85,6 +85,7 @@ public sealed class OoClassTable
     /// paragraph").</summary>
     public bool IsParameterized(string name) => _parameterized.Contains(name);
     private IReadOnlySet<string> _parameterized = EmptyNames;
+    private int _dialectLevel;   // the edition's year: the spelling the repository AS literals are read in (kb/Work PB2840)
     private static readonly IReadOnlySet<string> EmptyNames = new HashSet<string>();
 
     /// <summary>The §8.4.6.4 name scope visible at <paramref name="site"/> — memoized per SOURCE ELEMENT so the
@@ -98,7 +99,8 @@ public sealed class OoClassTable
         // Built from the SOURCE ELEMENT, not from `site`: the two walks are identical (nothing between a
         // reference and its source element carries a REPOSITORY paragraph or names a class), and starting at
         // the memo key makes that identity a property of the code rather than an argument about it.
-        if (!_scopes.TryGetValue(key, out var scope)) _scopes[key] = scope = OoRepositoryScope.Build(key, _variables);
+        if (!_scopes.TryGetValue(key, out var scope))
+            _scopes[key] = scope = OoRepositoryScope.Build(key, _variables, _dialectLevel);
         return scope;
     }
 
@@ -243,7 +245,11 @@ public sealed class OoClassTable
         IReadOnlySet<string>? expandedNames,
         DirectiveTimeline<CompilationVariableEvent> variables)
     {
-        var table = new OoClassTable { _parameterized = parameterizedNames ?? EmptyNames, _variables = variables };
+        var table = new OoClassTable
+        {
+            _parameterized = parameterizedNames ?? EmptyNames, _variables = variables,
+            _dialectLevel = edition.Edition.Year,
+        };
         var usedCsNames = new HashSet<string>(StringComparer.Ordinal);
 
         // §11.3.3 SR1 / §11.6.3 SR1 / §11.7.3 SR1 — the AS phrase's literal, screened by the ONE screen

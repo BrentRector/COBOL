@@ -52,9 +52,11 @@ internal static class ExternalizedName
 
     /// <summary>The value an AS phrase gives, WITHOUT diagnosing — for a reader that must know the externalized name
     /// but is not the phrase's screen (OoRepositoryScope, kb/Work PB974). Null for any operand <see cref="Screen"/>
-    /// would reject, so both agree on which names exist.</summary>
-    public static string? Peek(Core.ExternalizedNamePhraseContext phrase, Func<string, ConstantReading> constants) =>
-        Screen(phrase, constants, new EditionContext(2023), DiagnosticCatalog.ExternalizedNameLiteral, "", "", "",
+    /// would reject, so both agree on which names exist. <paramref name="dialectLevel"/> is the edition's year, whose
+    /// spelling the name is formed in (kb/Work PB2840), as the screen forms it.</summary>
+    public static string? Peek(Core.ExternalizedNamePhraseContext phrase, Func<string, ConstantReading> constants,
+        int dialectLevel) =>
+        Screen(phrase, constants, new EditionContext(dialectLevel), DiagnosticCatalog.ExternalizedNameLiteral, "", "", "",
             LiteralEnvironment.Unscoped, rejectZeroLength: true);
 
     /// <summary>Screen one AS phrase's operand against its clause's syntax rule and return the externalized name it
@@ -159,7 +161,7 @@ internal static class ExternalizedName
     /// <summary>§8.3.2.2 2)'s FORMATION half — "the content of the literal specified in that AS phrase is a name
     /// that is externalized to the operating environment. The implementor defines the formation and mapping rules
     /// of these names." — applied through the ONE rule every externalized name takes
-    /// (<see cref="CobolNet.Runtime.ExternalizedNames.Form"/>, DOC-A.1-68): leading and trailing spaces are not
+    /// (<see cref="CobolNet.Runtime.ExternalizedNames.FormWritten"/>, DOC-A.1-68): leading and trailing spaces are not
     /// part of the name. The run-time CALL / CANCEL / program-address / INVOKE side forms its target through the
     /// same function, which is why <c>PROGRAM-ID. S AS "trail  "</c> is now reached by <c>CALL "trail"</c> and by
     /// <c>CALL "trail  "</c> alike (kb/Work PB1539). Removing the spaces is reported as a WARNING (COBOLNET2642),
@@ -170,8 +172,10 @@ internal static class ExternalizedName
     private static string? Form(string written, EditionContext edition, string where, string tag,
         bool zeroLengthRefused)
     {
-        if (!CobolNet.Runtime.ExternalizedNames.HasFormationSpaces(written)) return written;
-        string formed = CobolNet.Runtime.ExternalizedNames.Form(written);
+        // The edition's spelling too (kb/Work PB2840): the name registered is the one a CALL literal of the same
+        // edition forms, so the two meet whichever Annex C the edition is under.
+        string formed = CobolNet.Runtime.ExternalizedNames.FormWritten(written, edition.Edition.Year);
+        if (!CobolNet.Runtime.ExternalizedNames.HasFormationSpaces(written)) return formed;
         if (formed.Length == 0 && zeroLengthRefused)
         {
             edition.Error(DiagnosticCatalog.ExternalizedNameAllSpaces,

@@ -337,7 +337,7 @@ public sealed class CobolReport(
     private Func<int, bool>? _beforeReporting;
 
     private ReportGroup? _reportHeading, _pageHeading, _pageFooting, _reportFooting;
-    private readonly Dictionary<string, ReportGroup> _details = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, ReportGroup> _details = new(CobolNames.Comparer);
     private readonly SortedDictionary<int, ReportGroup> _controlHeadings = [];   // by control level (0 = most major)
     private readonly SortedDictionary<int, ReportGroup> _controlFootings = [];
 
@@ -426,7 +426,7 @@ public sealed class CobolReport(
             if (detailName is null) return 0;
             int n = 0;
             foreach (var d in UponDetails)
-                if (d.Equals(detailName, StringComparison.OrdinalIgnoreCase)) n++;
+                if (CobolNames.Same(d, detailName)) n++;
             return n;
         }
     }
@@ -907,7 +907,7 @@ public sealed class CobolReport(
         // (§13.18.54.4 GR7 c) 2), SR4 g)'s twin for UPON): the event is this GENERATE, the counter the target's.
         if (detailName is not null)
             foreach (var (triggerDetail, target, sumId, apply) in _generateTriggers)
-                if (triggerDetail.Equals(detailName, StringComparison.OrdinalIgnoreCase))
+                if (CobolNames.Same(triggerDetail, detailName))
                     target.Accumulate(sumId, apply);
 
         // GR4d / GR5b: the specified detail — unless summary reporting (GR2).

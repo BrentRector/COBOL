@@ -36,7 +36,7 @@ namespace CobolNet.Runtime.Globalization;
 /// </summary>
 public sealed class LocaleFacts
 {
-    private static readonly ConcurrentDictionary<string, LocaleFacts> s_cache = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, LocaleFacts> s_cache = new(StringComparer.OrdinalIgnoreCase);   // not a COBOL word: a locale tag
 
     /// <summary>True when the process runs in .NET invariant globalization mode (every culture is the invariant
     /// one — probed once through the runtime switch and a culture-data probe).</summary>

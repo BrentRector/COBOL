@@ -42,7 +42,7 @@ public static class RecordLayoutNotice
 {
     /// <summary>Emitted once per (file, host path) pair — a program that OPENs the same file in a loop should not
     /// produce a wall of identical notices.</summary>
-    private static readonly HashSet<string> Reported = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> Reported = new(StringComparer.OrdinalIgnoreCase);   // not a COBOL word: a host file path
 
     /// <summary>Report a fixed-length record-sequential file whose byte length is not a whole multiple of its
     /// declared record length. <paramref name="hostPath"/> is the resolved host file — the name the ASSIGN clause

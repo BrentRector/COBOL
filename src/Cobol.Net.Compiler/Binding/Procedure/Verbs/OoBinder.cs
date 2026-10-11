@@ -360,13 +360,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // roster selection above used, so the printed rule is derived, never chosen per arm (kb/Work PB1136).
                 string selfRule = (isSuper, host.OoInFactory) switch
                 {
-                    (false, true) => "§14.9.23.3 SR4 f) — literal-1 shall name a method contained in the factory "
+                    (false, true) => "§14.9.23.3 SR4 f) — literal-1 shall be the name of a method contained in the factory "
                                      + "interface of the class containing the INVOKE statement",
-                    (false, false) => "§14.9.23.3 SR4 g) — literal-1 shall name a method contained in the instance "
+                    (false, false) => "§14.9.23.3 SR4 g) — literal-1 shall be the name of a method contained in the instance "
                                       + "interface of the class containing the INVOKE statement",
-                    (true, true) => "§14.9.23.3 SR4 h) — literal-1 shall name a method contained in the factory "
+                    (true, true) => "§14.9.23.3 SR4 h) — literal-1 shall be the name of a method contained in the factory "
                                     + "interface of a class inherited by the class containing the INVOKE statement",
-                    (true, false) => "§14.9.23.3 SR4 i) — literal-1 shall name a method contained in the instance "
+                    (true, false) => "§14.9.23.3 SR4 i) — literal-1 shall be the name of a method contained in the instance "
                                      + "interface of a class inherited by the class containing the INVOKE statement",
                 };
                 if (host.OoInFactory && IsStandardNew(methodName))
@@ -494,7 +494,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         }
         if (IsStandardNew(method))
             return NewWithoutBase($"INVOKE {cls.Name} \"{method}\"", cls,
-                "§14.9.23.3 SR3 — literal-1 shall name a method defined in the factory interface of object-class-name-1");
+                "§14.9.23.3 SR3 — literal-1 shall be the name of a method defined in the factory interface of object-class-name-1");
         return BoundRejected.Report(ctx.Edition, "COBOLNET0825",
             $"INVOKE {cls.Name} \"{method}\": class '{cls.Name}' (and its inheritance chain) does not "
             + "define a FACTORY method named '" + method + "' (ISO §14.9.23.3 SR3 — literal-1 shall name "
@@ -633,13 +633,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // the same two facts the roster lookup above used, never written per arm (kb/Work PB1136).
         string typedRule = (rdesc.Kind is ObjectRefKind.ActiveClass, rdesc.Factory) switch
         {
-            (false, true) => "§14.9.23.3 SR4 a) — literal-1 shall name a method contained in the factory interface of "
+            (false, true) => "§14.9.23.3 SR4 a) — literal-1 shall be the name of a method contained in the factory interface of "
                              + "that object-class-name",
-            (false, false) => "§14.9.23.3 SR4 b) — literal-1 shall name a method contained in the instance interface "
+            (false, false) => "§14.9.23.3 SR4 b) — literal-1 shall be the name of a method contained in the instance interface "
                               + "of that object-class-name",
-            (true, true) => "§14.9.23.3 SR4 c) — literal-1 shall name a method contained in the factory interface of "
+            (true, true) => "§14.9.23.3 SR4 c) — literal-1 shall be the name of a method contained in the factory interface of "
                             + "the class containing the INVOKE statement",
-            (true, false) => "§14.9.23.3 SR4 d) — literal-1 shall name a method contained in the instance interface "
+            (true, false) => "§14.9.23.3 SR4 d) — literal-1 shall be the name of a method contained in the instance interface "
                              + "of the class containing the INVOKE statement",
         };
         if (m is null && rdesc.Factory && IsStandardNew(method))
@@ -1806,8 +1806,17 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// national character per four-digit group (§8.3.3.5.4 GR4) exactly as it does in a MOVE or a DISPLAY — a private
     /// copy here stripped the N and ran the ALPHANUMERIC hex codec, making every digit pair a character. An
     /// alphanumeric or national concatenation expression stands wherever a literal of that class may (§8.8.3.3 GR3),
-    /// in BOTH spellings — the inline form used to refuse one.</para></summary>
-    private string? OoMethodNameOf(Core.LiteralContext? lit)
+    /// in BOTH spellings — the inline form used to refuse one.</para>
+    /// <para>The value is written in the EDITION's spelling (<see cref="CobolNames.EditionSpelling"/>, kb/Work PB2840): the
+    /// literal names a method as the word in its METHOD-ID does, and the lexer wrote that word in the edition's Annex C
+    /// spelling, so below 2023 INVOKE O "X&lt;final sigma&gt;" finds METHOD-ID X&lt;sigma&gt; (Annex E.2 item 14 deleted
+    /// the pair's mapping at 2023 only). The ONE producer of a method-name literal's value, so the statement form and
+    /// every inline segment agree.</para></summary>
+    private string? OoMethodNameOf(Core.LiteralContext? lit) =>
+        OoMethodNameValueOf(lit) is { } value ? CobolNames.EditionSpelling(value, ctx.Edition.Edition.Year) : null;
+
+    /// <summary>The literal's decoded value, before <see cref="OoMethodNameOf"/> writes it in the edition's spelling.</summary>
+    private string? OoMethodNameValueOf(Core.LiteralContext? lit)
     {
         if (lit?.nonNumericLiteral() is not { } nn) return null;
         if (nn.concatenationExpression() is { } concat)

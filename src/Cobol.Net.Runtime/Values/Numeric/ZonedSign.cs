@@ -135,7 +135,7 @@ public static class ZonedSign
         SignEncoding[] values = Enum.GetValues<SignEncoding>();
         for (int i = 0; i < names.Length; i++)
         {
-            if (!string.Equals(names[i], text, StringComparison.OrdinalIgnoreCase)) continue;
+            if (!string.Equals(names[i], text, StringComparison.OrdinalIgnoreCase)) continue;   // not a COBOL word: the text of a --sign-encoding option
             encoding = values[i];
             return true;
         }

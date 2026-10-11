@@ -36,7 +36,7 @@ internal sealed class PhysicalFileTable
         /// neither clause nor phrase is recorded under the implementor default of its open mode
         /// (<see cref="FileRegistry.ImplementorDefaultSharing"/>).</summary>
         public readonly Dictionary<string, (FileSharing Sharing, FileOpenMode Mode)> Open =
-            new(StringComparer.OrdinalIgnoreCase);
+            new(CobolNames.Comparer);
         /// <summary>record-id → the connector name that holds its lock.</summary>
         public readonly Dictionary<string, string> RecordLocks = new(StringComparer.Ordinal);
 
@@ -127,12 +127,12 @@ internal sealed class PhysicalFileTable
     public string LockRecord(State st, string name, string recId, FileConnector? holder)
     {
         if (st.RecordLocks.TryGetValue(recId, out var owner))
-            return string.Equals(owner, name, StringComparison.OrdinalIgnoreCase)
+            return CobolNames.Same(owner, name)
                 ? FileStatusCode.Success                     // self re-lock (GR8) — idempotent
                 : FileStatusCode.RecordLocked;               // 51 — another connector holds it
         int mine = 0;
         foreach (var o in st.RecordLocks.Values)
-            if (string.Equals(o, name, StringComparison.OrdinalIgnoreCase)) mine++;
+            if (CobolNames.Same(o, name)) mine++;
         if (mine >= ConnectorLockMax) return FileStatusCode.ConnectorLockLimit;   // 54 (GR7)
         if (TotalRunUnitLocks() >= RunUnitLockMax) return FileStatusCode.RunUnitLockLimit;   // 53 (GR7)
         if (holder?.RecordLockHandle is { } handle)
@@ -186,7 +186,7 @@ internal sealed class PhysicalFileTable
     public static RecordLockHolder HolderOf(State st, string name, string recId, FileConnector? asker)
     {
         if (st.RecordLocks.TryGetValue(recId, out var owner))
-            return string.Equals(owner, name, StringComparison.OrdinalIgnoreCase)
+            return CobolNames.Same(owner, name)
                 ? RecordLockHolder.None : RecordLockHolder.ThisRunUnit;
         return asker?.RecordLockHandle is { } handle
             && HostRegionLocks.HeldByAnother(handle, HostRegionLocks.RecordLockByte(recId)) == OfdRegionLocks.Result.Held
@@ -197,7 +197,7 @@ internal sealed class PhysicalFileTable
     /// <summary>Release every record lock held by <paramref name="name"/> on <paramref name="st"/> (UNLOCK, CLOSE).</summary>
     public static void ReleaseAllForConnector(State st, string name)
     {
-        var mine = st.RecordLocks.Where(kv => string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase))
+        var mine = st.RecordLocks.Where(kv => CobolNames.Same(kv.Value, name))
             .Select(kv => kv.Key).ToList();
         foreach (var k in mine) Unlock(st, k);
     }
@@ -206,7 +206,7 @@ internal sealed class PhysicalFileTable
     public static void ReleaseSingle(State st, string name, string recId)
     {
         if (st.RecordLocks.TryGetValue(recId, out var owner)
-            && string.Equals(owner, name, StringComparison.OrdinalIgnoreCase))
+            && CobolNames.Same(owner, name))
             Unlock(st, recId);
     }
 
@@ -230,7 +230,7 @@ internal sealed class PhysicalFileTable
     public static void ReleaseAllExcept(State st, string name, string keepId)
     {
         var mine = st.RecordLocks
-            .Where(kv => string.Equals(kv.Value, name, StringComparison.OrdinalIgnoreCase)
+            .Where(kv => CobolNames.Same(kv.Value, name)
                 && !string.Equals(kv.Key, keepId, StringComparison.Ordinal))
             .Select(kv => kv.Key).ToList();
         foreach (var k in mine) Unlock(st, k);
@@ -244,7 +244,7 @@ internal sealed class PhysicalFileTable
     {
         int mine = 0;
         foreach (var o in st.RecordLocks.Values)
-            if (string.Equals(o, name, StringComparison.OrdinalIgnoreCase)) mine++;
+            if (CobolNames.Same(o, name)) mine++;
         if (mine >= ConnectorLockMax) return FileStatusCode.ConnectorLockLimit;     // 54 (GR7)
         if (TotalRunUnitLocks() >= RunUnitLockMax) return FileStatusCode.RunUnitLockLimit;   // 53 (GR7)
         return FileStatusCode.Success;

@@ -189,8 +189,10 @@ public sealed class OoRepositoryScope
     /// REPOSITORY paragraph on the way out contributes (the reference's own source element first, then each
     /// containing one — §12.3.4 GR1), and a class / interface definition contributes its own name.
     /// <paramref name="variables"/> is the group's &gt;&gt;DEFINE timeline, for a FROM constant-name written as a
-    /// specifier's AS operand.</summary>
-    public static OoRepositoryScope Build(RuleContext? site, DirectiveTimeline<CompilationVariableEvent> variables)
+    /// specifier's AS operand. The AS literals are read in the spelling of <paramref name="dialectLevel"/>, the
+    /// edition's (kb/Work PB2840).</summary>
+    public static OoRepositoryScope Build(RuleContext? site, DirectiveTimeline<CompilationVariableEvent> variables,
+        int dialectLevel)
     {
         var classes = new Dictionary<string, string?>(CobolNames.Comparer);
         var interfaces = new Dictionary<string, string?>(CobolNames.Comparer);
@@ -216,13 +218,13 @@ public sealed class OoRepositoryScope
             // context does; a statement or clause context has no such child, so the test is a cheap miss.
             for (int i = 0; i < c.ChildCount; i++)
                 if (c.GetChild(i) is Core.EnvironmentDivisionContext env)
-                    Collect(env, classes, interfaces, variables);
+                    Collect(env, classes, interfaces, variables, dialectLevel);
         }
         return classes.Count == 0 && interfaces.Count == 0 ? Empty : new OoRepositoryScope(classes, interfaces, formals);
     }
 
     private static void Collect(Core.EnvironmentDivisionContext env, Dictionary<string, string?> classes,
-        Dictionary<string, string?> interfaces, DirectiveTimeline<CompilationVariableEvent> variables)
+        Dictionary<string, string?> interfaces, DirectiveTimeline<CompilationVariableEvent> variables, int dialectLevel)
     {
         // The source element's OWN specifiers are collected before a containing element's (the ancestor walk runs
         // outward), so TryAdd keeps the innermost declaration — §12.3.4 GR1 spreads a container's entries to
@@ -234,7 +236,7 @@ public sealed class OoRepositoryScope
         foreach (var re in SpecifierEntries(env))
         {
             string? ext = re.externalizedNamePhrase() is { } asPhrase
-                ? ExternalizedName.Peek(asPhrase, k => PreBindConstants.Read(asPhrase, k, variables))
+                ? ExternalizedName.Peek(asPhrase, k => PreBindConstants.Read(asPhrase, k, variables), dialectLevel)
                 : null;
             if (re.className() is { } cn) classes.TryAdd(cn.GetText(), ext);
             else if (re.interfaceName() is { } inm) interfaces.TryAdd(inm.GetText(), ext);

@@ -4,6 +4,8 @@
   "pb2841_continue_after_non_finite",
   "pb2757_medium_bytes_not_bom_sniffed",
   "pb1965_annex_c_word_keys",
+  "pb2845_flag_option_word_annex_c_fold",
+  "pb2840_literal_names_two_words_at_2023",
   "pb1928_cobol_words_boolean_function_operand",
   "pb2697_set_capacity_trailing_p",
   "pb2647_set_size_not_finite",

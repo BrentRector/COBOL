@@ -308,7 +308,7 @@ public sealed class ExceptionEngine
     private void StageLastName(string[]? pdRaising, string? statement, string? location)
     {
         if (LastName is not { } n) return;   // GR1b3b — nothing is raised, the RAISING phrase is ignored
-        if (ExceptionCatalog.UnderLevel2(n, "EC-USER") && !Names(pdRaising).Contains(n, StringComparer.OrdinalIgnoreCase))
+        if (ExceptionCatalog.UnderLevel2(n, "EC-USER") && !Names(pdRaising).Contains(n, CobolNames.Comparer))
         {
             // GR1b3a's third sentence — the fatality comes from the catalog (Table 13), never a literal here.
             bool fatal = !ExceptionCatalog.TryGet(RaisingNotSpecified, out var rns)
@@ -334,8 +334,8 @@ public sealed class ExceptionEngine
     /// GOBACK's return.</summary>
     public bool StageAutomaticPropagation(string name)
     {
-        if (string.Equals(name, "EC-FLOW-GLOBAL-EXIT", StringComparison.OrdinalIgnoreCase)
-            || string.Equals(name, "EC-FLOW-GLOBAL-GOBACK", StringComparison.OrdinalIgnoreCase))
+        if (CobolNames.Same(name, "EC-FLOW-GLOBAL-EXIT")
+            || CobolNames.Same(name, "EC-FLOW-GLOBAL-GOBACK"))
             return false;
         StageLastName(null, null, null);   // "as if … RAISING LAST EXCEPTION" — no PD-header operand: a fatal name is never EC-USER
         return true;

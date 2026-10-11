@@ -3,6 +3,7 @@
 using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Runtime;
+using CobolNet.Runtime.Exceptions;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -10,13 +11,16 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ A COBOL WORD IS COMPARED BY ONE FOLD, ANNEX C, AND BY NOTHING ELSE (kb/Work PB1402; ISO §8.1.3.2 GR3 b) and
-/// GR4 b)). Every name table and every word comparison in the compiler (Cobol.Net.Compiler), the frontend
-/// (Cobol.Net.Frontend) and the edition tables (Cobol.Net.Editions, kb/Work PB1965) goes through
-/// <see cref="CobolNames"/>; .NET's ordinal-ignore-case comparison may not appear there, and neither may its
-/// <c>ToUpperInvariant</c> as a word's key (<see cref="CobolNames.UpperFold"/> is that key), because it upper-cases by the host's case mapping and disagrees with Annex C on the extended letters (it
-/// makes final sigma the same letter as sigma and a lowercase Cherokee syllable the same as its capital, and keeps
-/// U+0130 and the Kelvin sign apart from i and k). The one exception is a comparison of a string that is not a COBOL
-/// word — a file-system path, a command-line option — and that line says so with the marker
+/// GR4 b)). Every name table and every word comparison in EVERY project under <c>src</c> goes through
+/// <see cref="CobolNames"/> (kb/Work PB1965, PB2845); .NET's ordinal-ignore-case comparison may not appear there, and
+/// neither may its <c>ToUpperInvariant</c> / <c>ToLowerInvariant</c> as a word's KEY or as the word a keyword is
+/// compared with (<see cref="CobolNames.UpperFold"/> is that key), because it upper-cases by the host's case mapping
+/// and disagrees with Annex C on the extended letters (it makes final sigma the same letter as sigma, long s the same
+/// as s, and a lowercase Cherokee syllable the same as its capital, and keeps U+0130 and the Kelvin sign apart from i
+/// and k). The projects are DERIVED from the directory list, so a project added tomorrow is scanned tomorrow; the
+/// exceptions are named, never listed by inclusion: a source subtree that holds no COBOL word
+/// (<see cref="NotCobolWordSubtrees"/>, each with its reason) and a single line that compares a string that is not a
+/// COBOL word — a file-system path, a command-line option, an environment value — which says so with the marker
 /// <c>// not a COBOL word: &lt;what it is&gt;</c>, so the exception is visible where it is made.
 /// The fold's own answers, and the Annex B screen's, are pinned by value below.
 /// </summary>
@@ -24,39 +28,74 @@ public sealed class CobolNameFoldDriftTests
 {
     private const string Marker = "// not a COBOL word:";
 
-    /// <summary>The projects whose name tables and comparisons are COBOL words: the compiler, the front end, and the
-    /// edition tables (the <c>&gt;&gt;COBOL-WORDS</c> map, the directive catalog, the §8.10 and implementor-name
-    /// tables), which reference the runtime for the fold since kb/Work PB1965.</summary>
-    private static readonly string[] WordProjects = ["Cobol.Net.Compiler", "Cobol.Net.Frontend", "Cobol.Net.Editions"];
+    /// <summary>The source subtrees (relative to <c>src</c>, with <c>/</c>) that hold NO COBOL word, each with the
+    /// reason; everything else under every <c>src/Cobol.Net.*</c> project is scanned.</summary>
+    private static readonly (string Subtree, string Reason)[] NotCobolWordSubtrees =
+    [
+        ("Cobol.Net.Runtime/Collation", "the CLDR collation data and BCP 47 locale tags the collation engine reads: locale text, not words"),
+    ];
 
-    /// <summary>The host's upper-casing standing as a word's KEY (kb/Work PB1965): a C# identifier derived from a word
-    /// (<c>Sanitize(x).ToUpperInvariant()</c>), a word looked up in the <c>&gt;&gt;COBOL-WORDS</c> map
-    /// (<c>Resolve(x.ToUpperInvariant())</c>), and an item's default externalized name
-    /// (<c>CobolName.ToUpperInvariant()</c>). Each is <see cref="CobolNames.UpperFold"/> (or
-    /// <c>DataItem.WordIdentifier</c>) now.</summary>
+    /// <summary>The host's upper-casing standing as a word's KEY or as the word a keyword is compared with: a C#
+    /// identifier derived from a word (<c>Sanitize(x).ToUpperInvariant()</c>), a word looked up in the
+    /// <c>&gt;&gt;COBOL-WORDS</c> map (<c>Resolve(x.ToUpperInvariant())</c>), an item's default externalized name
+    /// (<c>CobolName.ToUpperInvariant()</c>) — each is <see cref="CobolNames.UpperFold"/> (or
+    /// <c>DataItem.WordIdentifier</c>) now (kb/Work PB1965) — and, since kb/Work PB2845, the same host mapping as the
+    /// argument of any table operation (<c>ByWord.TryGetValue((directive, word.ToUpperInvariant()), …)</c>), as an
+    /// indexer, and as the left side of a keyword comparison (<c>x.ToUpperInvariant() == "ON"</c>, <c>is</c>,
+    /// <c>switch</c>). A <c>char.ToUpperInvariant(c)</c> is a character, not a word, and carries empty parentheses on
+    /// no call.</summary>
     private static readonly System.Text.RegularExpressions.Regex HostUpperKey = new(
-        @"Sanitize\([^;]*\)\.ToUpperInvariant\(|\bResolve\([^;]*\.ToUpperInvariant\(|\bCobolName!?\.ToUpperInvariant\(",
+        @"Sanitize\([^;]*\)\.ToUpperInvariant\(|\bResolve\([^;]*\.ToUpperInvariant\(|\bCobolName!?\.ToUpperInvariant\("
+        + @"|\b(TryGetValue|ContainsKey|Contains|TryAdd|Add|Remove|Find|Lookup|GetValueOrDefault)\([^;]*\.To(Upper|Lower)Invariant\(\)"
+        + @"|\[[^\]]*\.To(Upper|Lower)Invariant\(\)\]"
+        + @"|\.To(Upper|Lower)Invariant\(\)\s*(==|!=|\bis\b|\bswitch\b)",
         System.Text.RegularExpressions.RegexOptions.Compiled);
 
-    [Fact]
-    public void NoHostUpperCase_AsTheKeyOfACobolWord()
+    /// <summary>Every project under <c>src</c>, derived from the directory list.</summary>
+    private static IEnumerable<string> WordProjects() =>
+        Directory.EnumerateDirectories(TestRepo.Src(), "Cobol.Net.*").Select(d => Path.GetFileName(d)!).Order(StringComparer.Ordinal);
+
+    /// <summary>Every non-comment source line of every scanned project, as <c>(path from the repository root, 1-based
+    /// line, text)</c>; the line carrying the <see cref="Marker"/> is not returned.</summary>
+    private static IEnumerable<(string Rel, int Line, string Text)> ScannedLines()
     {
-        var hits = new List<string>();
-        foreach (string project in WordProjects)
+        foreach (string project in WordProjects())
             foreach (string file in Directory.EnumerateFiles(TestRepo.Src(project), "*.cs", SearchOption.AllDirectories))
             {
                 string rel = Path.GetRelativePath(TestRepo.Root, file);
                 if (rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
                     .Any(p => p is "obj" or "bin" or "Generated")) continue;
+                string fromSrc = Path.GetRelativePath(TestRepo.Src(), file).Replace('\\', '/');
+                if (NotCobolWordSubtrees.Any(n => fromSrc.StartsWith(n.Subtree + "/", StringComparison.Ordinal))) continue;
                 string[] lines = File.ReadAllLines(file);
                 for (int i = 0; i < lines.Length; i++)
-                    if (!lines[i].TrimStart().StartsWith("//", StringComparison.Ordinal) && HostUpperKey.IsMatch(lines[i]))
-                        hits.Add($"{rel}:{i + 1}: {lines[i].Trim()}");
+                    if (!lines[i].TrimStart().StartsWith("//", StringComparison.Ordinal)   // prose, not a comparison
+                        && !lines[i].Contains(Marker, StringComparison.Ordinal))
+                        yield return (rel, i + 1, lines[i].Trim());
             }
+    }
+
+    [Fact]
+    public void TheScan_ReachesEveryProject_IncludingTheRuntime()
+    {
+        string[] projects = [.. WordProjects()];
+        foreach (string expected in new[] { "Cobol.Net.Compiler", "Cobol.Net.Frontend", "Cobol.Net.Editions", "Cobol.Net.Runtime" })
+            Assert.Contains(expected, projects);
+        Assert.Contains(ScannedLines(), l => l.Rel.Contains("CobolNames.cs", StringComparison.Ordinal));
+        Assert.DoesNotContain(ScannedLines(), l => l.Rel.Contains("Collation", StringComparison.Ordinal) && l.Rel.Contains("CldrLocaleLoader", StringComparison.Ordinal));
+        foreach (var (subtree, _) in NotCobolWordSubtrees)
+            Assert.True(Directory.Exists(TestRepo.Src(subtree.Split('/'))), $"the excluded subtree '{subtree}' no longer exists: remove its entry");
+    }
+
+    [Fact]
+    public void NoHostUpperCase_AsTheKeyOfACobolWord()
+    {
+        var hits = ScannedLines().Where(l => HostUpperKey.IsMatch(l.Text)).Select(l => $"{l.Rel}:{l.Line}: {l.Text}").ToList();
         Assert.True(hits.Count == 0,
-            "a COBOL word's upper-case key is CobolNames.UpperFold (a C# identifier: DataItem.WordIdentifier), never "
-            + "the host's ToUpperInvariant, which keeps the Kelvin sign apart from K and joins final sigma with sigma:\n"
-            + string.Join("\n", hits));
+            "a COBOL word's upper-case key is CobolNames.UpperFold (a C# identifier: DataItem.WordIdentifier), and a word "
+            + "is compared with a keyword as CobolNames.UpperFold(word) is \"KEYWORD\" — never the host's "
+            + "ToUpperInvariant, which keeps the Kelvin sign apart from K and joins final sigma with sigma and long s with s; "
+            + $"a string that is not a COBOL word carries '{Marker} <what>':\n" + string.Join("\n", hits));
     }
 
     /// <summary>The one upper-case spelling: Annex C's fold with only the basic letters raised.</summary>
@@ -83,24 +122,10 @@ public sealed class CobolNameFoldDriftTests
     }
 
     [Fact]
-    public void NoOrdinalIgnoreCase_OverACobolWord_InTheCompilerOrTheFrontend()
+    public void NoOrdinalIgnoreCase_OverACobolWord_InAnyProject()
     {
-        var hits = new List<string>();
-        foreach (string project in WordProjects)
-            foreach (string file in Directory.EnumerateFiles(TestRepo.Src(project), "*.cs", SearchOption.AllDirectories))
-            {
-                string rel = Path.GetRelativePath(TestRepo.Root, file);
-                if (rel.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
-                    .Any(p => p is "obj" or "bin" or "Generated")) continue;
-                string[] lines = File.ReadAllLines(file);
-                for (int i = 0; i < lines.Length; i++)
-                {
-                    string code = lines[i].TrimStart();
-                    if (code.StartsWith("//", StringComparison.Ordinal)) continue;   // prose, not a comparison
-                    if (lines[i].Contains("OrdinalIgnoreCase", StringComparison.Ordinal) && !lines[i].Contains(Marker, StringComparison.Ordinal))
-                        hits.Add($"{rel}:{i + 1}: {code}");
-                }
-            }
+        var hits = ScannedLines().Where(l => l.Text.Contains("OrdinalIgnoreCase", StringComparison.Ordinal))
+            .Select(l => $"{l.Rel}:{l.Line}: {l.Text}").ToList();
         Assert.True(hits.Count == 0,
             "compare a COBOL word with CobolNames (Comparer / Same / StartsWith / EndsWith / Contains), never with "
             + $"OrdinalIgnoreCase; a string that is not a COBOL word carries '{Marker} <what>':\n" + string.Join("\n", hits));
@@ -142,6 +167,31 @@ public sealed class CobolNameFoldDriftTests
         Assert.Equal("ıTEM", CobolNames.EditionSpelling("ıTEM", 2023));
         const string basic = "WS-TOTAL";
         Assert.Same(basic, CobolNames.EditionSpelling(basic, 2014));
+    }
+
+    /// <summary>A name WRITTEN in source text is formed (spaces) and written in the edition's spelling (kb/Work PB2840),
+    /// so below 2023 the literal and the word it names meet; run-time data takes <c>Form</c> alone.</summary>
+    [Theory]
+    [InlineData("  Xς  ", 2014, "Xσ")]
+    [InlineData("  Xς  ", 2023, "Xς")]
+    [InlineData("ıTEM", 2002, "iTEM")]
+    [InlineData("SUB-P", 2014, "SUB-P")]
+    public void FormWritten_FormsAndWritesTheEditionSpelling(string written, int edition, string expected)
+    {
+        Assert.Equal(expected, ExternalizedNames.FormWritten(written, edition));
+        Assert.Equal(written.Trim(' '), ExternalizedNames.Form(written));
+    }
+
+    /// <summary>An exception-name is a COBOL word compared by the Annex C fold, and its open <c>EC-USER-</c> suffix is
+    /// basic characters only (§14.6.13.1.1): long s has no Annex C mapping, so it is not the basic letter s
+    /// (the host's upper-casing made <c>EC-USER-ſ</c> the name <c>EC-USER-S</c>, kb/Work PB2845).</summary>
+    [Theory]
+    [InlineData("EC-USER-S", true)]
+    [InlineData("ec-user-s", true)]
+    [InlineData("EC-USER-\u017F", false)]
+    public void ExceptionCatalog_FoldsByAnnexC_NotByTheHostCaseMapping(string name, bool known)
+    {
+        Assert.Equal(known, ExceptionCatalog.TryGet(name, out _));
     }
 
     [Theory]

@@ -629,8 +629,8 @@ public static partial class CobolIntrinsics
         string cur = currency.Trim();
         return cur.Length == 0
             || cur.Any(c => char.IsAsciiDigit(c) || c is '*' or '+' or '-' or ',' or '.')
-            || cur.Contains("CR", StringComparison.OrdinalIgnoreCase)
-            || cur.Contains("DB", StringComparison.OrdinalIgnoreCase);
+            || cur.Contains("CR", StringComparison.OrdinalIgnoreCase)   // not a COBOL word: a currency-string character test on data
+            || cur.Contains("DB", StringComparison.OrdinalIgnoreCase);   // not a COBOL word: a currency-string character test on data
     }
 
     // ── The §15.93/§15.94 TEST validators — position-reporting scanners beside their value parsers ────────────

@@ -67,3 +67,4 @@ static CobolNet.Runtime.ObjectReferenceOperand.operator ==(CobolNet.Runtime.Obje
 static CobolNet.Runtime.ObjectReferenceSet.Refusal(CobolNet.Runtime.ObjectReferenceOperand send, CobolNet.Runtime.ObjectReferenceOperand recv, bool activeClassSenderAdmitted = true) -> string?
 ~override CobolNet.Runtime.ObjectReferenceOperand.Equals(object obj) -> bool
 ~override CobolNet.Runtime.ObjectReferenceOperand.ToString() -> string
+static CobolNet.Runtime.ExternalizedNames.FormWritten(string? written, int dialectLevel) -> string!

@@ -73,8 +73,8 @@ public static class ExceptionCatalog
     /// <summary>Is <paramref name="ecName"/> one of GR27 a)'s end-of-page conditions — the conditions a WRITE's
     /// own END-OF-PAGE phrase takes precedence over (§14.9.51.4 GR27 b)-d))?</summary>
     public static bool IsEndOfPage(string? ecName) =>
-        string.Equals(ecName, IoEop, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(ecName, IoEopOverflow, StringComparison.OrdinalIgnoreCase);
+        CobolNames.Same(ecName, IoEop)
+        || CobolNames.Same(ecName, IoEopOverflow);
 
     // ── The level-2 family names (§14.6.13.1.1, 23 names + EC-CONTINUE) ───────────────────────────────────────
     // NOTE: the §14.6.13.1.1 prose lists 23 level-2 names and omits EC-CONTINUE, yet Table 13 carries the
@@ -92,7 +92,7 @@ public static class ExceptionCatalog
 
     private static Dictionary<string, EcInfo> Build()
     {
-        var t = new Dictionary<string, EcInfo>(StringComparer.OrdinalIgnoreCase);
+        var t = new Dictionary<string, EcInfo>(CobolNames.Comparer);
         t[EcAll] = new EcInfo(EcAll, 1, null, EcFatality.Hierarchy, 2002);
         foreach (string l2 in Level2Names)
             t[l2] = new EcInfo(l2, 2, null, EcFatality.Hierarchy, l2 is "EC-CONTINUE" or "EC-MCS" or "EC-EXTERNAL" ? 2023 : 2002);
@@ -253,7 +253,7 @@ public static class ExceptionCatalog
     public static bool TryGet(string name, out EcInfo info)
     {
         if (Table.TryGetValue(name, out info)) return true;
-        string upper = name.ToUpperInvariant();
+        string upper = CobolNames.UpperFold(name);
         if (upper.StartsWith("EC-USER-", StringComparison.Ordinal) && ValidOpenSuffix(upper["EC-USER-".Length..]))
         {
             info = new EcInfo(upper, 3, "EC-USER", EcFatality.Nonfatal, 2002);
@@ -268,7 +268,7 @@ public static class ExceptionCatalog
     /// directives (§8.12 — "all of the exception-names specified in 14.6.13.1", which lists EC-IMP-<i>suffix</i>), so
     /// <c>CompilerDirectiveWords.IsReserved</c> asks this.</summary>
     public static bool IsImplementorSuffixForm(string name) =>
-        name.StartsWith("EC-IMP-", StringComparison.OrdinalIgnoreCase) && ValidOpenSuffix(name["EC-IMP-".Length..]);
+        CobolNames.StartsWith(name, "EC-IMP-") && ValidOpenSuffix(name["EC-IMP-".Length..]);
 
     /// <summary>The §14.6.13.1.1 open-suffix character rule: basic letters, basic digits, hyphen and underscore;
     /// the hyphen or underscore shall not be the last character.</summary>
@@ -285,7 +285,7 @@ public static class ExceptionCatalog
     {
         string? best = null;
         foreach (string l2 in Level2Names)
-            if (level3Name.StartsWith(l2 + "-", StringComparison.OrdinalIgnoreCase)
+            if (CobolNames.StartsWith(level3Name, l2 + "-")
                 && (best is null || l2.Length > best.Length))
                 best = l2;
         return best;
@@ -294,11 +294,11 @@ public static class ExceptionCatalog
     /// <summary>True when <paramref name="level3Name"/> falls under <paramref name="level2Name"/>
     /// (§14.9.49.4 GR3d/f selection; case-insensitive, longest-family-prefix discipline).</summary>
     public static bool UnderLevel2(string level3Name, string level2Name) =>
-        string.Equals(Level2OfName(level3Name), level2Name, StringComparison.OrdinalIgnoreCase);
+        CobolNames.Same(Level2OfName(level3Name), level2Name);
 
     /// <summary>True when <paramref name="name"/> begins with the COBOL characters <c>EC-I-O</c>
     /// (the §14.9.49.3 SR13 / §7.3.25.3 SR4 file-association test).</summary>
-    public static bool IsIoName(string name) => name.StartsWith("EC-I-O", StringComparison.OrdinalIgnoreCase);
+    public static bool IsIoName(string name) => CobolNames.StartsWith(name, "EC-I-O");
 
     /// <summary>Does a <c>&gt;&gt;TURN</c> directive naming <paramref name="directiveName"/> cover level-3
     /// <paramref name="level3"/> — the §7.3.25.4 hierarchy expansion, written ONCE. EC-ALL covers every name
@@ -311,9 +311,9 @@ public static class ExceptionCatalog
     /// (kb/Work PB408).</para></summary>
     public static bool DirectiveCovers(string directiveName, string level3)
     {
-        if (directiveName.Equals(level3, StringComparison.OrdinalIgnoreCase)) return true;
-        if (level3.Equals("EC-I-O-WARNING", StringComparison.OrdinalIgnoreCase)) return false;   // explicit only (GR4)
-        if (directiveName.Equals(EcAll, StringComparison.OrdinalIgnoreCase)) return true;        // GR2
+        if (CobolNames.Same(directiveName, level3)) return true;
+        if (CobolNames.Same(level3, "EC-I-O-WARNING")) return false;   // explicit only (GR4)
+        if (CobolNames.Same(directiveName, EcAll)) return true;        // GR2
         return TryGet(directiveName, out var info) && info.Level == 2
             && UnderLevel2(level3, directiveName);                                               // GR3
     }
@@ -381,7 +381,7 @@ public static class ExceptionCatalog
     public static int IoBit(string ecName)
     {
         for (int i = 0; i < IoMaskNames.Length; i++)
-            if (IoMaskNames[i].Equals(ecName, StringComparison.OrdinalIgnoreCase)) return 1 << i;
+            if (CobolNames.Same(IoMaskNames[i], ecName)) return 1 << i;
         return 0;
     }
 }

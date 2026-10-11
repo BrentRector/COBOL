@@ -54,7 +54,7 @@ public sealed class EcCheckingProfile
     /// <summary>Build a profile from its ordered events (the compiler side — <c>TurnState.ProfileAt</c>).</summary>
     public static EcCheckingProfile FromEvents(IEnumerable<(string Ec, bool On)> events)
     {
-        var list = events.Select(e => (Ec: e.Ec.ToUpperInvariant(), e.On)).ToArray();
+        var list = events.Select(e => (Ec: CobolNames.UpperFold(e.Ec), e.On)).ToArray();
         if (list.Length == 0) return None;
         return new EcCheckingProfile(
             string.Join(";", list.Select(e => (e.On ? "+" : "-") + e.Ec)), list);
@@ -72,7 +72,7 @@ public sealed class EcCheckingProfile
             var parts = s.Split(';', StringSplitOptions.RemoveEmptyEntries);
             var evs = new (string, bool)[parts.Length];
             for (int i = 0; i < parts.Length; i++)
-                evs[i] = (parts[i][1..].ToUpperInvariant(), parts[i][0] == '+');
+                evs[i] = (CobolNames.UpperFold(parts[i][1..]), parts[i][0] == '+');
             return new EcCheckingProfile(s, evs);
         });
     }

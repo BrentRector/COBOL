@@ -30,6 +30,14 @@ public static class ExternalizedNames
     /// and trailing spaces removed (DOC-A.1-68). A null value forms the empty name, which names nothing.</summary>
     public static string Form(string? written) => (written ?? "").Trim(' ');
 
+    /// <summary>Form an externalized name from a literal WRITTEN IN SOURCE TEXT (a CALL / CANCEL target, an AS literal,
+    /// an INVOKE method name): <see cref="Form"/>, then the EDITION's spelling (<see cref="CobolNames.EditionSpelling"/>,
+    /// kb/Work PB2840). The literal names what a word names — a PROGRAM-ID, a METHOD-ID — and the lexer wrote that
+    /// word in the edition's Annex C spelling, so below 2023 <c>CALL "X&lt;final sigma&gt;"</c> reaches
+    /// <c>PROGRAM-ID. X&lt;sigma&gt;</c> (Annex E.2 item 14 deleted the pair's mapping at 2023 only). Run-time data
+    /// (an identifier's value) is not source text and takes <see cref="Form"/> alone, compared by the 2023 mapping.</summary>
+    public static string FormWritten(string? written, int dialectLevel) => CobolNames.EditionSpelling(Form(written), dialectLevel);
+
     /// <summary>True when <paramref name="written"/> is not already in its formed shape — the one question a
     /// bind-time screen asks before warning that an AS literal's spaces are not part of the name.</summary>
     public static bool HasFormationSpaces(string written) =>

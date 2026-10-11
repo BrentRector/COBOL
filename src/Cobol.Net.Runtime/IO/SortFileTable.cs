@@ -50,7 +50,7 @@ internal sealed class SortStore
 /// table needs no lock; a new run unit is a new object, so it starts with no store.</summary>
 public sealed class SortFileTable
 {
-    private readonly Dictionary<string, SortStore> _stores = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, SortStore> _stores = new(CobolNames.Comparer);
 
     /// <summary>The store of <paramref name="name"/>, created empty when no statement has begun on it.</summary>
     internal SortStore Get(string name)

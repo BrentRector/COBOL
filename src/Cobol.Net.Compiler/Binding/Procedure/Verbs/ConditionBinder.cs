@@ -767,7 +767,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // offers no other reading there. It falls to the name arms below and draws their §8.4.2.1 COBOLNET1639
         // (`IF X IS BOOLEAN` at 85 used to compile clean for a moment on this branch — measured).
         string? userWord = cls.cobolWord()?.GetText();
-        if (kind is not null && cls.Start.Text.ToUpperInvariant() is var kw
+        if (kind is not null && CobolNames.UpperFold(cls.Start.Text) is var kw
             && !Editions.ReservedWordSet.Default.RejectsAt(kw, ctx.Edition.Edition.Year))
         {
             kind = null;

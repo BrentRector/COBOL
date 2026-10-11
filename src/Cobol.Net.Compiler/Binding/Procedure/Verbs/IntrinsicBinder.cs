@@ -1695,7 +1695,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>The §15.19.2 CONVERT format words (reserved within the argument list, like TRIM's LEADING/TRAILING).</summary>
     private static bool IsConvertFormatWord(string w) =>
-        w.ToUpperInvariant() is "ANY" or "ALPHANUMERIC" or "ANUM" or "HEX" or "NATIONAL" or "NAT" or "BYTE";
+        CobolNet.Runtime.CobolNames.UpperFold(w) is "ANY" or "ALPHANUMERIC" or "ANUM" or "HEX" or "NATIONAL" or "NAT" or "BYTE";
 
     /// <summary>MODULE-NAME (§15.65) — one mandatory phrase keyword selecting a runtime element of the running
     /// COBOL hierarchy (§15.65.2: ACTIVATING/CURRENT/NESTED/STACK/TOP-LEVEL; <c>TOP-LEVEL</c> is one hyphenated

@@ -64,7 +64,7 @@ internal static class FigurativeConstants
     /// H(IGH-VALUE/S), L(OW-VALUE/S), and — where the caller's context admits the pointer figurative as a
     /// character fill (<paramref name="includeNull"/>, ISO §8.3.3.6.4 — the VALUE-init and SET-TO-TRUE word
     /// maps historically accept NULL/NULLS as LOW-VALUE) — N(ULL/S).</summary>
-    public static char? KindOf(string word, bool includeNull = false) => word.ToUpperInvariant() switch
+    public static char? KindOf(string word, bool includeNull = false) => CobolNames.UpperFold(word) switch
     {
         "ZERO" or "ZEROS" or "ZEROES" => 'Z',
         "SPACE" or "SPACES" => 'S',

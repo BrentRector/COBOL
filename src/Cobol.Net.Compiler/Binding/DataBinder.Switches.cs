@@ -1941,7 +1941,7 @@ public sealed partial class DataBinder
     /// here, never the sequence being defined. SPACE, QUOTE and ZERO are their §8.3.3.6 characters.
     /// <para>Null for any other word, which is then not an operand at all. Both native sequences answer HIGH-VALUE
     /// U+FFFF (owner decision kb/Work R52 — <see cref="CobolNet.Runtime.NativeCollatingSequence"/>).</para></summary>
-    private static string? AlphabetFigurative(string word) => word.ToUpperInvariant() switch
+    private static string? AlphabetFigurative(string word) => CobolNames.UpperFold(word) switch
     {
         "HIGH-VALUE" or "HIGH-VALUES" => CobolNet.Runtime.NativeCollatingSequence.HighValue.ToString(),
         "LOW-VALUE" or "LOW-VALUES" => CobolNet.Runtime.NativeCollatingSequence.LowValue.ToString(),
