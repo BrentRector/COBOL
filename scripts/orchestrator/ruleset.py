@@ -236,7 +236,9 @@ def apply(gh: Gh, committed: dict, owner_go: str, dry_run: bool, say: Callable[[
         say(f"ruleset apply on {repo}:{BRANCH} — owner's go: {owner_go}")
         settings = []
         for k, v in want["repository"].items():
-            settings += ["-F", f"{k}={json.dumps(v)}"]
+            # -f sends a string as typed; -F converts true/false/null/numbers (a string through -F keeps no quotes, but
+            # one through json.dumps would arrive WITH them)
+            settings += ["-f", f"{k}={v}"] if isinstance(v, str) else ["-F", f"{k}={json.dumps(v)}"]
         if call(["api", "--method", "PATCH", f"repos/{repo}", *settings]):
             return 1
         existing = find_ruleset(gh, repo, want["ruleset"]["name"])
@@ -362,7 +364,11 @@ def self_test() -> int:
            refused and rc_create == EXIT[ABSENT]   # the fake keeps answering "no ruleset" after the POST
            and [c[2] for c in created] == ["PATCH", "POST", "DELETE"]
            and [c[2] for c in updated] == ["PATCH", "PUT", "DELETE"]
-           and updated[1][3].endswith("/rulesets/7") and updated[2][3].endswith("/branches/main/protection"),
+           and updated[1][3].endswith("/rulesets/7") and updated[2][3].endswith("/branches/main/protection")
+           # a boolean setting is typed (-F), a string one is sent as typed (-f), and no value carries JSON quotes
+           and created[0][created[0].index("allow_auto_merge=true") - 1] == "-F"
+           and created[0][created[0].index("merge_commit_message=PR_BODY") - 1] == "-f"
+           and not any('"' in a for a in created[0]),
            f"refused={refused} rc={rc_create} created={created} updated={updated}")
 
     rules = {r["type"]: r.get("parameters", {}) for r in want["ruleset"]["rules"]}

@@ -1,9 +1,12 @@
 {
   "$comment": "The repository settings and the ruleset on main that make GitHub's merge queue the landing (kb/Work PB3024; DESIGN-test-build-ci.md §3.17.6). Applied ONLY on the owner's explicit go by `python scripts/orchestrator/ruleset.py apply --owner-go \"<the go>\"`, which also deletes the classic branch protection; `ruleset.py check` compares the live state with this file. Keys starting with `$` are notes, never sent.",
+  "$repository": "allow_auto_merge: enqueue.py queues a PR whose checks are still running. merge_commit_message PR_BODY: `git log --first-parent main` reads the landing's forensic message on its merge commit. merge_commit_title stays MERGE_MESSAGE ('Merge pull request #N from …'), never PR_TITLE: a merge commit subjected `Train <label>:` would be read by prune_worktrees.py's train_heads as the train's last commit, and its first-parent walk would leave the train's Train-Cluster commits behind.",
   "repository": {
     "allow_merge_commit": true,
     "allow_auto_merge": true,
-    "delete_branch_on_merge": true
+    "delete_branch_on_merge": true,
+    "merge_commit_title": "MERGE_MESSAGE",
+    "merge_commit_message": "PR_BODY"
   },
   "ruleset": {
     "name": "main: merge queue",
