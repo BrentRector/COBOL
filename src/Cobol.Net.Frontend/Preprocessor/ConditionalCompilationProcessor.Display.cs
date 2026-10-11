@@ -55,11 +55,14 @@ public static partial class ConditionalCompilationProcessor
 
     /// <summary>The value of the PARAMETER phrase's compilation-variable-name from the operating environment (§7.3.11.4
     /// GR4, §7.3.12.4 GR3), or null when none is made available: the environment variable named by the name in its
-    /// canonical UPPER-CASE spelling (DOC-A.1-49, DOC-A.1-55) — a COBOL word is case-insensitive (§8.3.1), so every
-    /// spelling of one name reads ONE variable. The ONE lookup of the DEFINE and DISPLAY directives, recorded on the
-    /// compilation's inputs (kb/Work PB985, PB1533).</summary>
+    /// canonical UPPER-CASE spelling (DOC-A.1-49, DOC-A.1-55), which is <see cref="CobolNames.UpperFold"/> — the Annex C
+    /// fold of §8.1.3.2 GR3 b) with the basic letters raised, the ONE upper-case key of a COBOL word — and not the
+    /// host's <c>ToUpperInvariant</c>. A compilation-variable-name is a COBOL word, so every spelling of one name (§8.3.1;
+    /// the Kelvin sign and K, which Annex C.2 maps together) reads ONE variable, and two names Annex C keeps apart read
+    /// two. The ONE lookup of the DEFINE and DISPLAY directives, recorded on the compilation's inputs (kb/Work PB985,
+    /// PB1533, PB2990).</summary>
     private static string? ParameterText(string name, CompilationInputs inputs) =>
-        inputs.GetEnvironmentVariable(name.ToUpperInvariant());
+        inputs.GetEnvironmentVariable(CobolNames.UpperFold(name));
 
     /// <summary>The streams an UPON phrase names, in the order written, or null (reported) when it breaks its format.
     /// §7.3.12.4 GR6: no UPON phrase is as if UPON LISTING; GR5 a): LISTING is "the same device as that used for source

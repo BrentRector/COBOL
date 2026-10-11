@@ -1478,7 +1478,8 @@ lowercase with Annex C. Three pieces, each in one place:
 - **The fold** — `CobolNames` (Runtime, because the run-time externalized-name match needs it too): `Fold`, the
   `Comparer` every name table uses, `Same` / `StartsWith` / `EndsWith` / `Contains` over spans, and `UpperFold`, a
   word's one upper-case spelling (the fold with the basic letters raised), which is the key wherever a word is
-  compared by ordinal or with an upper-case keyword. No compiler, frontend or Editions file compares a word by
+  compared by ordinal, with an upper-case keyword, or as the name of the environment variable a PARAMETER phrase reads
+  (`ConditionalCompilationProcessor.ParameterText`, DOC-A.1-49 / DOC-A.1-55; kb/Work PB2990). No compiler, frontend or Editions file compares a word by
   `OrdinalIgnoreCase`, keys one by the host's `ToUpperInvariant`, or compares one with a keyword through it
   (`CobolNameFoldDriftTests` scans EVERY project under `src`, derived from the directory list, minus the named
   subtrees that hold no COBOL word, and the Runtime is one of them: a string that is not a COBOL word says so on

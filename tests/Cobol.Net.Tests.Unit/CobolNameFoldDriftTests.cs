@@ -40,13 +40,14 @@ public sealed class CobolNameFoldDriftTests
     /// <c>&gt;&gt;COBOL-WORDS</c> map (<c>Resolve(x.ToUpperInvariant())</c>), an item's default externalized name
     /// (<c>CobolName.ToUpperInvariant()</c>) — each is <see cref="CobolNames.UpperFold"/> (or
     /// <c>DataItem.WordIdentifier</c>) now (kb/Work PB1965) — and, since kb/Work PB2845, the same host mapping as the
-    /// argument of any table operation (<c>ByWord.TryGetValue((directive, word.ToUpperInvariant()), …)</c>), as an
+    /// argument of any table operation (<c>ByWord.TryGetValue((directive, word.ToUpperInvariant()), …)</c>) or of an
+    /// environment lookup (<c>GetEnvironmentVariable(name.ToUpperInvariant())</c>, kb/Work PB2990), as an
     /// indexer, and as the left side of a keyword comparison (<c>x.ToUpperInvariant() == "ON"</c>, <c>is</c>,
     /// <c>switch</c>). A <c>char.ToUpperInvariant(c)</c> is a character, not a word, and carries empty parentheses on
     /// no call.</summary>
     private static readonly System.Text.RegularExpressions.Regex HostUpperKey = new(
         @"Sanitize\([^;]*\)\.ToUpperInvariant\(|\bResolve\([^;]*\.ToUpperInvariant\(|\bCobolName!?\.ToUpperInvariant\("
-        + @"|\b(TryGetValue|ContainsKey|Contains|TryAdd|Add|Remove|Find|Lookup|GetValueOrDefault)\([^;]*\.To(Upper|Lower)Invariant\(\)"
+        + @"|\b(TryGetValue|ContainsKey|Contains|TryAdd|Add|Remove|Find|Lookup|GetValueOrDefault|GetEnvironmentVariable)\([^;]*\.To(Upper|Lower)Invariant\(\)"
         + @"|\[[^\]]*\.To(Upper|Lower)Invariant\(\)\]"
         + @"|\.To(Upper|Lower)Invariant\(\)\s*(==|!=|\bis\b|\bswitch\b)",
         System.Text.RegularExpressions.RegexOptions.Compiled);
