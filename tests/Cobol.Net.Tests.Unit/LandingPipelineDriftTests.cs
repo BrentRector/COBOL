@@ -157,6 +157,10 @@ public sealed class LandingPipelineDriftTests
             "apply refuses without the owner's go, and with it sets the repository, creates or updates the ruleset by "
                 + "name and deletes the classic protection",
             "the committed ruleset requires a pull request, the merge queue with a merge commit and ci-gate, with no bypass",
+            // The pair guard (kb/Work PB3024, the first apply's HTTP 422): GitHub accepts three (title, message) pairs.
+            "the committed repository settings name a merge-commit pair GitHub accepts",
+            "apply refuses MERGE_MESSAGE+PR_BODY (GitHub's invalid_merge_commit_setting_combo, the first apply's 422) "
+                + "before any call reaches GitHub",
         });
     }
 }

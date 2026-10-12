@@ -1812,8 +1812,13 @@ demand and not committed.
 - A **ruleset** on `main` (classic branch protection has no merge queue): require a pull request, require the merge
   queue with merge method **merge commit** — the branch's commits stay ancestors of `main`, so the branch lifecycle
   (`prune_worktrees.py`'s landed test, `carried()`, `git cherry`) keeps working offline, and `git log --first-parent
-  main` reads one merge commit per landing whose message is the PR body (the forensic record; the implementer's
-  checkpoint commits sit beneath it). Squash was considered and rejected on the operator's review (2026-10-11 12:16): a
+  main` reads one merge commit per landing — GitHub's `Merge pull request #N from …` subject with the PR's one-line
+  title as its body. GitHub pairs the MERGE_MESSAGE title only with PR_TITLE (its three pairs are PR_TITLE+PR_BODY,
+  PR_TITLE+BLANK and MERGE_MESSAGE+PR_TITLE; the first apply, 2026-10-11 16:27, asked for MERGE_MESSAGE+PR_BODY and
+  was refused), and PR_TITLE as the subject would put `Train <label>:` on the merge commit, which
+  `prune_worktrees.py`'s `train_heads` reads as a train's last commit. The forensic record of a landing is therefore
+  the branch's own commits beneath the merge commit and the PR body, never the merge commit's message;
+  `ruleset.py` refuses any pair outside GitHub's three before it calls GitHub. Squash was considered and rejected on the operator's review (2026-10-11 12:16): a
   squashed head is never an ancestor of main, so every lifecycle tool would have to key on the merged-PR record instead.
   Required status check `ci-gate` on the merge group, enforce for administrators (the owner's credentials make every
   push), minimum group size 1, maximum 5, check timeout 60 min. The classic protection is removed in the same change.

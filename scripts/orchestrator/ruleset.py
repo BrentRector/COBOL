@@ -52,6 +52,10 @@ from typing import Callable
 HERE = pathlib.Path(__file__).resolve().parent
 COMMITTED = HERE / "ruleset-main.json"
 BRANCH = "main"
+#: GitHub accepts exactly these (merge_commit_title, merge_commit_message) pairs — its `invalid_merge_commit_setting_combo`,
+#: met at the first apply 2026-10-11 16:27, which asked for MERGE_MESSAGE+PR_BODY and got HTTP 422 (kb/Work PB3024). The
+#: committed settings are checked against them before any call, so an invalid pair never reaches GitHub.
+VALID_MERGE_COMMIT_PAIRS = {("PR_TITLE", "PR_BODY"), ("PR_TITLE", "BLANK"), ("MERGE_MESSAGE", "PR_TITLE")}
 TIMEOUT_S = 120   # a hang guard on one gh call: a call that never answers is SKIPPED (not observed), never a verdict
 
 ACTIVE, DRIFT, ABSENT, SKIPPED = "ACTIVE", "DRIFT", "ABSENT", "SKIPPED"
@@ -79,6 +83,17 @@ def real_gh(args: list[str]) -> tuple[int, str, str]:
 
 def load_committed(path: pathlib.Path = COMMITTED) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def merge_commit_pair_problem(repository: dict) -> str:
+    """"" when the repository settings name a merge-commit pair GitHub accepts (VALID_MERGE_COMMIT_PAIRS), else what
+    is wrong, in GitHub's terms."""
+    pair = (repository.get("merge_commit_title"), repository.get("merge_commit_message"))
+    if pair in VALID_MERGE_COMMIT_PAIRS:
+        return ""
+    allowed = ", ".join("+".join(p) for p in sorted(VALID_MERGE_COMMIT_PAIRS))
+    return (f"merge_commit_title={pair[0]} with merge_commit_message={pair[1]} is not a pair GitHub accepts "
+            f"(invalid_merge_commit_setting_combo); the pairs are {allowed}")
 
 
 def strip_notes(value):
@@ -207,6 +222,9 @@ def apply(gh: Gh, committed: dict, owner_go: str, dry_run: bool, say: Callable[[
             "runs main accepts only queued pull requests.")
         return 2
     want = strip_notes(committed)
+    if problem := merge_commit_pair_problem(want["repository"]):
+        say(f"⛔ ruleset apply: {problem} — nothing was sent (kb/Work PB3024)")
+        return 2
     calls: list[list[str]] = []
 
     def call(args: list[str], body: dict | None = None) -> int:
@@ -367,7 +385,7 @@ def self_test() -> int:
            and updated[1][3].endswith("/rulesets/7") and updated[2][3].endswith("/branches/main/protection")
            # a boolean setting is typed (-F), a string one is sent as typed (-f), and no value carries JSON quotes
            and created[0][created[0].index("allow_auto_merge=true") - 1] == "-F"
-           and created[0][created[0].index("merge_commit_message=PR_BODY") - 1] == "-f"
+           and created[0][created[0].index("merge_commit_message=PR_TITLE") - 1] == "-f"
            and not any('"' in a for a in created[0]),
            f"refused={refused} rc={rc_create} created={created} updated={updated}")
 
@@ -380,6 +398,14 @@ def self_test() -> int:
            and [c.get("context") for c in checks] == ["ci-gate"]
            and want["repository"].get("allow_auto_merge") is True, json.dumps(rules))
 
+    expect("the committed repository settings name a merge-commit pair GitHub accepts",
+           merge_commit_pair_problem(want["repository"]) == "", merge_commit_pair_problem(want["repository"]))
+    invalid = copy.deepcopy(committed)
+    invalid["repository"].update(merge_commit_title="MERGE_MESSAGE", merge_commit_message="PR_BODY")
+    sent: list[list[str]] = []
+    rc = apply(_fake(base, sent), invalid, "a go", False, say=lambda _: None)
+    expect("apply refuses MERGE_MESSAGE+PR_BODY (GitHub's invalid_merge_commit_setting_combo, the first apply's 422) "
+           "before any call reaches GitHub", rc == 2 and sent == [], f"rc {rc} sent {sent}")
     print(f"=== ruleset.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")
     return 1 if failures else 0
 
