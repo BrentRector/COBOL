@@ -1498,9 +1498,14 @@ of an unsupported facility.
   kb/Work PB2690 the store was dropped silently and the argument kept its capacity. **Determination (the only latitude
   the standard leaves):** a copy of the argument crosses the boundary and only the finished view comes back, so a store
   past the capacity is recognised by its EFFECT: the capacity becomes the highest occurrence of the formal's table whose
-  image is not all spaces (the image the view showed for an occurrence the argument lacks, §8.5.1.12.2 last sentence). A
+  image is not all spaces (the image the view showed for an occurrence the argument lacks: "all the remaining elements of
+  the receiving table are space filled", §14.6.9.2 2)). A
   callee that only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only), and one that
-  stores spaces into an occurrence the argument lacks cannot be told from one that did not store. The same law holds one
+  stores spaces into an occurrence the argument lacks cannot be told from one that did not store. **Known departure
+  (kb/Work PB2690, REMAINING):** the items of a created occurrence that the callee did not store, and the intermediate
+  occurrences, come back space filled, where §8.5.1.9.5 initializes them "as though they had been the subject of a statement of
+  the form INITIALIZE ... WITH FILLER ALL TO VALUE THEN TO DEFAULT" when the table says INITIALIZED (without it their content is
+  undefined, so only an INITIALIZED table is affected). The same law holds one
   level down for a dynamic-capacity table nested in an element, and across an INVOKE (`CobolVarGroup.Overlay`'s
   `OverlaidTable` / `GrownCount`, shared by the CALL and INVOKE boundaries). A fixed-length ARGUMENT cannot
   grow (it has no more occurrences); a BY CONTENT formal never reaches the argument (§14.2.3 GR9). The ISO text decides the

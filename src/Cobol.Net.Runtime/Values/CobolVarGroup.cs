@@ -398,7 +398,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// space-filled occurrences (<see cref="Reshape"/>) and sees only the finished view, so a store is recognised by its
     /// effect — the capacity becomes the highest occurrence whose image is not all spaces. A callee that only READS the
     /// occurrences past the capacity leaves it alone, and one that stores spaces there leaves the table as it was
-    /// (the stored image and the absent occurrence are the same characters).</summary>
+    /// (the stored image and the absent occurrence are the same characters). ⚠ KNOWN DEPARTURE (kb/Work PB2690,
+    /// REMAINING): the created occurrences' items the callee did not store, and the intermediate occurrences, are the
+    /// space fill, where §8.5.1.9.5 initializes them from the INITIALIZED default; the carrier does not yet carry the table's
+    /// default element, which only the argument's own description knows.</summary>
     private static string OverlaidTable(string was, string now, int elementChars)
     {
         if (elementChars <= 0 || now.Length <= was.Length) return Overlaid(was, now);

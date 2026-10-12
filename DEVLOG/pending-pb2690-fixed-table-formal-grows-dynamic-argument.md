@@ -39,6 +39,16 @@ the inner-occurrence store of `...ReachesAFixedGroupFormal_AndItsStoresOverlay`)
 sibling sweep found no other writer that drops a store past a dynamic table's capacity: MOVE and RETURNING recreate the
 receiving table through `Reshape`, and the fixed-argument direction has no occurrence to create. No diagnostic codes used.
 
+**Branch review round 1.** Three findings. R1-2 (a wrong clause): the space fill of an occurrence the argument lacks is
+section 14.6.9.2 2) ("all the remaining elements of the receiving table are space filled"), not 8.5.1.12.2's last sentence,
+which governs a trailing table past the shorter group's end; D-VGB and the golden now cite the right clause. R1-3: the note
+heading still said the related arm was open. R1-1 (a real departure): the occurrences a boundary store creates come back
+space filled, where section 8.5.1.9.5 initializes the unreferenced items of an INITIALIZED table from the default (probe: the
+caller prints `[ab|  |r ] 3`, a direct store prints `[ab|ab|rb] 3`). It is not fixed here: the table's default element exists
+only as a C# seed expression on the `CobolDynTable`, so it would have to travel on the argument carrier from two builders
+(`GroupImageCodec` AsVarImage, `StorageCell.VarGroupAt`) and six carrier rebuilds, a mechanism of its own. PB2690 is `half`
+with a REMAINING section naming the sites, and D-VGB records the departure.
+
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261012T192144Z-cfdfc4`, Conformance
 5,008/11,492, Unit 32,713/33,454, Characterization 36/36; the three goldens and the negative Passed in
 `leg-1-Conformance.trx`). The Linux gate is the landing's.

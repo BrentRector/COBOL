@@ -13,7 +13,8 @@
       *> subscript". The two descriptions are compatible (8.5.1.12.3: the dynamic-
       *> capacity table is "considered to be the same length as the corresponding
       *> table"), so the call is legal; the callee reads a space-filled occurrence
-      *> where the argument has none (8.5.1.12.2, last sentence) and a callee that
+      *> where the argument has none (14.6.9.2 2: the remaining elements are
+      *> "space filled") and a callee that
       *> never stores past the capacity creates nothing (8.5.1.9.3 acts only on a
       *> receiving reference).
       *>
