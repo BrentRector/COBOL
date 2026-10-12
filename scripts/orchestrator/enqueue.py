@@ -337,13 +337,15 @@ def pull_request_text(wt: pathlib.Path, base: str, branch: str) -> tuple[str, st
     return title, f"{body.strip()}\n\nBranch: `{branch}`\n\nCommits:\n{commits}\n"
 
 
-def merge_main(wt: pathlib.Path, branch: str, base: str) -> list[str] | None:
-    """Fetch origin's main and MERGE it into the branch when the branch does not already contain it (steps 2 and 4).
-    None when the branch now contains main; else the conflicted files, with the merge aborted and the branch unchanged.
-    A fetch that fails is ["(git fetch failed: …)"], never a pass."""
+def fetch_main(wt: pathlib.Path) -> str | None:
+    """Fetch origin's main into refs/remotes/origin/main: None, or why it failed (a usage/state stop, never a pass)."""
     f = _git(wt, "fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main")
-    if f.returncode != 0:
-        return [f"(git fetch origin main failed: {f.stderr.strip()})"]
+    return None if f.returncode == 0 else f"git fetch origin main failed: {f.stderr.strip()}"
+
+
+def merge_main(wt: pathlib.Path, branch: str, base: str) -> list[str] | None:
+    """MERGE the fetched main into the branch when the branch does not already contain it (steps 2 and 4). None when
+    the branch now contains main; else the conflicted files, with the merge aborted and the branch unchanged."""
     if _git(wt, "merge-base", "--is-ancestor", base, "HEAD").returncode == 0:
         return None
     if _git(wt, "merge", "--no-edit", "-m", f"Merge origin/main into {branch} (enqueue.py)", base).returncode == 0:
@@ -390,9 +392,8 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
     if dirty := dirty_paths(wt):
         return end(2, f"REFUSED — the worktree {wt} has {len(dirty)} uncommitted path(s) ({dirty[0].strip()}): commit "
                       "or remove them; a landing carries only commits")
-    f = _git(wt, "fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main")
-    if f.returncode != 0:
-        return end(2, f"REFUSED — git fetch origin main failed: {f.stderr.strip()}")
+    if failed := fetch_main(wt):
+        return end(2, f"REFUSED — {failed}")
     base = "refs/remotes/origin/main"
     if _git(wt, "rev-parse", "HEAD").stdout.strip() == _git(wt, "rev-parse", base).stdout.strip():
         return end(0, "NOTHING TO LAND — the branch is origin/main")
@@ -430,6 +431,8 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
         mark.write_text(head + "\n", encoding="utf-8")
     # 4. Main again (it moves while a branch gates: R1-2), the DEVLOG stamp, the queue.
     for attempt in range(1, CATCH_UP + 1):
+        if failed := fetch_main(wt):
+            return end(2, f"NOT QUEUED — {failed} (the gated head is not gated again on a re-run)")
         if files := merge_main(wt, branch, base):
             return conflicted(files, "after the gate")
         if (stamp or _stamp)(wt, branch) != 0:
