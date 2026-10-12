@@ -180,8 +180,8 @@ internal static class EcNameResolution
         // (kb/Work PB100), removed when PB64 T1 claimed that module and gave its names real raise sites.
         if (DeclinedModuleOf(info.Name) is { } declined)
         {
-            // The row's descriptor decides, as at every declined site (EditionContext.Declined): Warning = the
-            // processor-dependent facility's name is accepted inert, Error = the optional module's name is refused.
+            // The row's descriptor decides, as at every declined site (EditionContext.Declined), never the annex
+            // that lists the facility: Warning = the name is accepted inert and named, Error = it is refused.
             if (declined.Descriptor.Severity == EditionSeverity.Warning)
             {
                 edition.Declined(declined.Descriptor,
