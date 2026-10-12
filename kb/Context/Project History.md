@@ -4,7 +4,7 @@ area: context
 status: draft
 last_updated: 2026-07-23
 related_files:
-  - DEVLOG.md
+  - DEVLOG/README.md
   - PROMPT.md
   - CLAUDE.md
   - docs/COBOLNET_DESIGN.md
@@ -49,7 +49,7 @@ records blast radius + gate results.
 
 ## Key concepts
 - CobolSharp (the legacy byte-array engine, NIST-oracle era) → **2026-06-08 pivot** → COBOL.NET (typed-native, spec-first).
-- DEVLOG.md is the ONLY historical doc; descending order; real date+time header stamps; one entry per landing on main (kb/Work PB2605).
+- DEVLOG/ is the ONLY historical doc: one file per entry, rendered newest first by `scripts/devlog.py render`; real date+time header stamps, completed at the landing by `devlog.py stamp`; one entry per landing on main (kb/Work PB2605, PB3025).
 - Legacy compiler survives only as a differential oracle until G8/P15 cut-over.
 - Doctrine sources: [[PROMPT]], [[CLAUDE]], [[CONSTRAINTS]].
 

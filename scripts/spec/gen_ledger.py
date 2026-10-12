@@ -1381,6 +1381,14 @@ def main() -> int:
     import account  # noqa: PLC0415
     import ledger_state  # noqa: PLC0415  (imports this module for STAMP_PATHS; loaded only here, after a render)
     print(ledger_state.publish_hint(COORD_DIR, account.current().name))
+    # The page describes THIS checkout; a checkout behind main (every landing is pushed from a lander's worktree) renders
+    # a page mark-published will refuse, so say so here, before the publish (kb/Work PB2987).
+    try:
+        stale = ledger_state.stale_checkout_line(REPO, ledger_state.state(REPO, COORD_DIR, account.current().name))
+    except ledger_state.NoMain as e:
+        stale = f"main's stamp not read ({e})"
+    if stale:
+        print(f"⛔ NOT MAIN'S PAGE: {stale}")
     return 0
 
 

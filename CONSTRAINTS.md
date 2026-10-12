@@ -6,7 +6,7 @@
 
 Scope note (single-write rule): **doctrine → `PROMPT.md`** · **process rules + the session-start sequence →
 `CLAUDE.md`** · **phases, worklist and live state → `docs/COBOLNET_REARCHITECTURE_PLAN.md` §0** ·
-**history → `DEVLOG.md`**. This file holds the catalog and nothing else.
+**history → `DEVLOG/`**. This file holds the catalog and nothing else.
 
 ---
 

@@ -77,8 +77,8 @@ corpora, not markdown. Then grep the whole doc set and fix EVERY occurrence.
 **When the stale thing is live state duplicated across many sites, do not repoint each site** — that re-drifts on
 the next change. Add one authoritative banner that supersedes the local copies and POINTS at plan §0.
 
-Every doc except `DEVLOG.md` reads as CURRENT state — no "was X, now Y", no commit hashes, no phase provenance
-tags. Leave genuinely historical artifacts alone: `DEVLOG.md`, `PHASE4_RECONCILIATION.md`, and the
+Every doc except the DEVLOG (`DEVLOG/`) reads as CURRENT state — no "was X, now Y", no commit hashes, no phase provenance
+tags. Leave genuinely historical artifacts alone: `DEVLOG/`, `PHASE4_RECONCILIATION.md`, and the
 `PHASE-*`/`SURVEY-*`/`CRITIQUE-*` records are point-in-time.
 
 ## At every phase close

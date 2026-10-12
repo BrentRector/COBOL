@@ -85,7 +85,7 @@
   — trains 10 through 20 — reported a green Windows-only gate and nobody looked (`kb/Work/PB796`).
 - ⚠ **A docs-only landing still runs — and still has to be green.** `paths-ignore` is GONE from the workflow (it
   made the workflow decline to START, which a required per-commit check reads as "blocked forever"); the `changes`
-  job now decides whether the MATRIX runs from the same path list, so a landing touching only `DEVLOG.md`,
+  job now decides whether the MATRIX runs from the same path list, so a landing touching only `DEVLOG/`,
   `docs/**`, `kb/**`, `PROMPT.md`, `CLAUDE.md` or `README.md` finishes in seconds. "No run for my sha" is no longer
   an answer — it is a failure, and `push-main.sh` treats it as one.
 - Verdict batches are RE-APPLIED on the merged tree (`record_verdicts.py`), never merged as inventory JSON hunks.
