@@ -1976,7 +1976,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     + "LENGTH over the subscripted inner table instead.");
                 return null;
             default:
-                // CapacityRefFault.None cannot reach here (its Place is non-null by construction), and every other
+                // CapacityRefFault.None cannot reach here (its Place is returned before the switch), and every other
                 // member has a case above — CapacityRegisterReferenceDriftTests pins that, so a new fault cannot
                 // ship diagnostic-less. This arm is an internal-error backstop, never a user-reachable path.
                 throw new InvalidOperationException(
