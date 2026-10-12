@@ -79,9 +79,11 @@ internal static class EcNameResolution
     /// <summary>⛔ THE DECLINED-MODULE EXCEPTION-NAME TABLE. The prefixes name DISJOINT families — a row matches only
     /// its prefix followed by a hyphen or the end of the name (<see cref="DeclinedModuleOf"/>) — so no row can
     /// shadow another and the order is immaterial.
-    /// <para>⛔ EACH ROW'S DESCRIPTOR SEVERITY IS ITS POSTURE, read in <see cref="Advise"/> exactly as
-    /// <see cref="EditionContext.Declined"/> reads it at every other declined site: an <c>Error</c> row REFUSES the
-    /// name, a <c>Warning</c> row ACCEPTS it inert and names the facility. There is no second table and no flag.</para>
+    /// <para>⛔ EACH ROW'S DESCRIPTOR IS ITS POSTURE, read in <see cref="Advise"/> through
+    /// <see cref="EditionContext.Refuses"/>, the one rule <see cref="EditionContext.Declined"/> reports by at every
+    /// other declined site: an <c>Error</c> row REFUSES the name (unless its descriptor is <c>PermissiveInert</c>
+    /// and the compile is <c>--permissive</c>), a <c>Warning</c> row ACCEPTS it inert and names the facility. There
+    /// is no second table and no flag.</para>
     /// <para>WHY REFUSING THE NAME IS THE CONFORMING ANSWER for an OPTIONAL module, not over-strictness: §14.6.13.1.1 says "The
     /// implementor is not required to raise any exception conditions for level-3 exception-names that are
     /// associated with optional language elements … that the implementor has not implemented" — and that is
@@ -165,9 +167,11 @@ internal static class EcNameResolution
     /// a documented-nowhere truncation (Phase-B F6). Below 2023 the word itself cannot reach here (the 31-char
     /// COBOL-2002 word limit rejects it first), so no edition guard is needed. One advisory per spelling —
     /// the same name legitimately appears at TURN + RAISE + USE in one program.</summary>
-    /// <returns><see langword="false"/> when the name was REFUSED (a declined module whose row carries an
-    /// Error descriptor: EC-SCREEN, EC-VALIDATE, the three commit-and-rollback names) — every caller must treat
-    /// that as an unresolved name. An accept-inert row (EC-MCS) is named and returns <see langword="true"/>.</returns>
+    /// <returns><see langword="false"/> when the name was REFUSED (a declined module whose row's descriptor
+    /// <see cref="EditionContext.Refuses"/> it: EC-SCREEN always, EC-VALIDATE and the three commit-and-rollback
+    /// names unless the compile is <c>--permissive</c>) — every caller must treat that as an unresolved name. An
+    /// accepted row (EC-MCS, and the PermissiveInert rows under <c>--permissive</c>) is named and returns
+    /// <see langword="true"/>.</returns>
     public static bool Advise(EditionContext edition, EcInfo info, string where = "exception-name")
     {
         // ⛔ EVERY DECLINED MODULE'S EXCEPTION-NAME REFUSAL LIVES HERE, NOT AT THE SIX WRITING SITES (each
@@ -180,17 +184,11 @@ internal static class EcNameResolution
         // (kb/Work PB100), removed when PB64 T1 claimed that module and gave its names real raise sites.
         if (DeclinedModuleOf(info.Name) is { } declined)
         {
-            // The row's descriptor decides, as at every declined site (EditionContext.Declined), never the annex
-            // that lists the facility: Warning = the name is accepted inert and named, Error = it is refused.
-            if (declined.Descriptor.Severity == EditionSeverity.Warning)
-            {
-                edition.Declined(declined.Descriptor,
-                    $"the exception-name {info.Name} of {declined.Facility} ({declined.Annex}), written in "
-                    + $"{where}, is accepted, but no statement of that facility sets the condition here, so it "
-                    + "exists only when a RAISE statement raises it (§14.6.13.1.1 licenses raising nothing for such "
-                    + $"a name); {declined.Documentation} records the decline");
-            }
-            else
+            // The row's descriptor decides under this compile's options, by the ONE rule EditionContext.Declined
+            // reports with (EditionContext.Refuses), never by a local severity test and never by the annex that
+            // lists the facility: an accepted name (a Warning row, or a PermissiveInert Error row under
+            // --permissive) is named and resolves; a refused one is named and does not.
+            if (edition.Refuses(declined.Descriptor))
             {
                 edition.Declined(declined.Descriptor,
                     $"the exception-name {info.Name} of {declined.Facility} ({declined.Annex}), written in "
@@ -200,6 +198,11 @@ internal static class EcNameResolution
                     + "such a name, but not ACCEPTING it");
                 return false;
             }
+            edition.Declined(declined.Descriptor,
+                $"the exception-name {info.Name} of {declined.Facility} ({declined.Annex}), written in "
+                + $"{where}, is accepted, but no statement of that facility sets the condition here, so it "
+                + "exists only when a RAISE statement raises it (§14.6.13.1.1 licenses raising nothing for such "
+                + $"a name); {declined.Documentation} records the decline");
         }
         if (info.Level != 3 || info.Name.Length <= 31) return true;
         if (edition.Warnings.Any(w =>

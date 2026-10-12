@@ -308,15 +308,28 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// <para><paramref name="seen"/> is the site's naming of WHICH element of the module was written (the
     /// module owns the code, the site owns the spelling); omit it and the descriptor's own
     /// <see cref="DiagnosticDescriptor.Title"/> is the whole message — the byte-identical shape the
-    /// accept-inert sites emitted before this seam existed.</para></summary>
+    /// accept-inert sites emitted before this seam existed.</para>
+    /// <para>A site whose BINDING depends on the posture (it binds the element inert when accepted and drops it
+    /// when refused) asks <see cref="Refuses"/>, the same rule this method applies, and never re-reads the
+    /// descriptor's severity itself.</para></summary>
     public void Declined(DiagnosticDescriptor descriptor, string? seen = null)
     {
         string message = seen is null ? descriptor.Title : $"{seen}: {descriptor.Title}";
-        bool refuse = descriptor.Severity == EditionSeverity.Error
-                      && !(descriptor.PermissiveInert && Permissive);
-        if (refuse) Error(descriptor.Code, message);
+        if (Refuses(descriptor)) Error(descriptor.Code, message);
         else Warning(descriptor.Code, message);
     }
+
+    /// <summary>⛔ THE ONE REFUSE RULE for a declined element, under THIS compile's options: an
+    /// <see cref="EditionSeverity.Error"/> descriptor refuses, unless it is
+    /// <see cref="DiagnosticDescriptor.PermissiveInert"/> and the compile is <see cref="Permissive"/>, in which case
+    /// the element is accepted inert like a <see cref="EditionSeverity.Warning"/> row. <see cref="Declined"/>
+    /// reports by it, and a site that must also BIND by the posture (EcNameResolution.Advise: an accepted
+    /// exception-name resolves, a refused one does not) reads it here. A local
+    /// <c>descriptor.Severity == …</c> test drops the permissive half: under <c>--permissive</c> the name was
+    /// warned as accepted and then dropped, and the RAISE that wrote it died as COBOLNET2362, a refusal with no
+    /// rule-naming diagnostic (kb/Work PB374 review R1-1).</summary>
+    public bool Refuses(DiagnosticDescriptor descriptor) =>
+        descriptor.Severity == EditionSeverity.Error && !(descriptor.PermissiveInert && Permissive);
 
     /// <summary>The <see cref="IDiagnosticSink"/> bridge: render a structured <see cref="EditionDiagnostic"/>
     /// back onto the legacy string channels with byte-identical text — an <see cref="EditionSeverity.Error"/>

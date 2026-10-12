@@ -226,6 +226,70 @@ public sealed class DocumentedNonSupportWitnessTests
         Assert.Equal(2, mcs.Count(w => w.Contains("EC-MCS-MESSAGE-LENGTH", StringComparison.Ordinal)));
     }
 
+    /// <summary>A DECLINED OPTIONAL MODULE'S EXCEPTION-NAME UNDER <c>--permissive</c> IS ACCEPTED, AND THEN IT RESOLVES
+    /// (kb/Work PB374 review R1-1). COBOLNET1710 is an Error descriptor marked <c>PermissiveInert</c>, so
+    /// <c>EditionContext.Declined</c> warns rather than refuses under <c>--permissive</c>; the exception-name funnel
+    /// decided by a local severity test instead, warned the name as accepted, dropped it anyway, and the RAISE that
+    /// wrote it died as COBOLNET2362, a refusal no diagnostic names. Each source is the strict-mode NEGATIVE that
+    /// pins the refusal (so the two postures read one file), at the three sites that reach the funnel by different
+    /// paths: RAISE, &gt;&gt;TURN and a USE declarative.</summary>
+    [Theory]
+    [InlineData("declined-ec-validate-raise", "EC-VALIDATE-CONTENT")]
+    [InlineData("declined-ec-validate-turn", "EC-VALIDATE")]
+    [InlineData("declined-ec-validate-use", "EC-VALIDATE-FORMAT")]
+    [InlineData("declined-ec-flow-rollback-raise", "EC-FLOW-ROLLBACK")]
+    [InlineData("declined-ec-flow-commit-turn", "EC-FLOW-COMMIT")]
+    [InlineData("declined-ec-flow-apply-commit-use", "EC-FLOW-APPLY-COMMIT")]
+    public void DeclinedModuleExceptionName_Permissive_IsAcceptedAndResolves(string negative, string name)
+    {
+        string source = Golden("negative", negative);
+        var (strictOk, _, _) = EditionHarness.CompileFull(source, 2023);
+        Assert.False(strictOk, $"{negative} compiled under the strict posture; the refusal it pins is gone");
+
+        var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023, permissive: true);
+        Assert.True(ok, $"a PermissiveInert declined exception-name must compile under --permissive: "
+                        + string.Join("\n", errors));
+        Assert.Contains(warnings, w => w.Contains("COBOLNET1710", StringComparison.Ordinal)
+                                       && w.Contains(name, StringComparison.Ordinal)
+                                       && w.Contains("is accepted", StringComparison.Ordinal));
+    }
+
+    /// <summary>The accepted name is a REAL operand, not a tolerated one: the reviewer's own scenario, a USE declarative
+    /// for EC-VALIDATE-CONTENT and a RAISE of it under <c>--permissive</c>, with checking enabled by &gt;&gt;TURN, runs
+    /// the declarative (§14.9.29.4 GR1, "If exception-name-1 is specified, the associated exception condition is
+    /// raised") and continues after the RAISE, the condition being NONFATAL in Table 13. The complement keeps the
+    /// rule honest: EC-SCREEN's descriptor is not PermissiveInert (an inert screen statement would move the wrong
+    /// data), so <c>--permissive</c> still refuses its names.</summary>
+    [Fact]
+    public void DeclinedModuleExceptionName_Permissive_RaiseReachesTheDeclarative_ScreenStillRefused()
+    {
+        const string source = """
+                   >>TURN EC-VALIDATE-CONTENT CHECKING ON
+                   IDENTIFICATION DIVISION.
+                   PROGRAM-ID. PB374PV.
+                   PROCEDURE DIVISION.
+                   DECLARATIVES.
+                   D-SEC SECTION.
+                       USE AFTER EXCEPTION CONDITION EC-VALIDATE-CONTENT.
+                   D-PARA.
+                       DISPLAY "HANDLER".
+                   END DECLARATIVES.
+                   MAIN SECTION.
+                   M-PARA.
+                       RAISE EXCEPTION EC-VALIDATE-CONTENT.
+                       DISPLAY "AFTER".
+                       STOP RUN.
+            """;
+        var (ok, stdout, detail) = EditionHarness.CompileAndRun(source, 2023, permissive: true);
+        Assert.True(ok, detail);
+        Assert.Equal("HANDLER\nAFTER", stdout.ReplaceLineEndings("\n").TrimEnd('\n'));
+
+        var (screenOk, screenErrors, _) = EditionHarness.CompileFull(Golden("negative", "a42-ec-screen-raise"), 2023,
+                                                                     permissive: true);
+        Assert.False(screenOk, "EC-SCREEN is not PermissiveInert; --permissive must not accept its names");
+        Assert.Contains(screenErrors, e => e.Contains("COBOLNET1707", StringComparison.Ordinal));
+    }
+
     /// <summary>The OPTIONS FLOAT-DECIMAL clause → COBOLNET2424 (kb/Work R43 / PB579). Annex A.3 item 13 makes
     /// the clause processor-dependent and dependent on the standard decimal floating-point usages, which are not
     /// provided (item 19); §4.2.6 ¶3 compels the warning. It is the decline that LEAKED — the clause compiled

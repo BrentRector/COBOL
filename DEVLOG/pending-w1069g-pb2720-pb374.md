@@ -26,8 +26,9 @@ the start of a line in area B already compiled), so it is reported as a lead.
 - **EC-MCS exception-names** compiled in silence at 2023 (`>>TURN EC-MCS-ABNORMAL-TERMINATION CHECKING ON`, exit 0).
   Asynchronous messaging is Annex A.3 item 4 (processor-dependent), so §4.2.6's compile-time warning is owed and
   refusing the names would be the wrong posture. `EcNameResolution.DeclinedEcFamilies` gains an `EC-MCS` row whose
-  descriptor is the Warning `McsFacilityUnsupported` (COBOLNET1578). `Advise` reads the row's severity: a Warning
-  row names the facility and resolves the name, and an Error row refuses as before. A RAISE still raises the
+  descriptor is the Warning `McsFacilityUnsupported` (COBOLNET1578). `Advise` reads the row's posture through
+  `EditionContext.Refuses`, the one rule `Declined` reports by: an accepted row names the facility and resolves the
+  name, and a refused row refuses as before. A RAISE still raises the
   condition (§14.9.29.4 GR1) and reaches a USE declarative or a WHEN phrase. The 1578 title now covers both
   surfaces. Golden `2023/pb374_ec_mcs_names_accept_inert`; negative `pb374-ec-mcs-name-below-2023` (COBOLNET0878 at
   2002/2014); a witness test counts the five warnings (TURN, USE, RAISE ×2, WHEN).
@@ -52,3 +53,19 @@ COBOLNET1578 has been asserted since PB1198. `CobolParserCoreBase` had `facility
 
 No inventory row changed: there are no rows for §14.4.3 or §6.4.1, and the RECEIVE/SEND rows stay
 DOCUMENTED-NON-SUPPORT.
+
+### Branch review round 1
+
+R1-1: the first cut of `Advise` decided the posture with `if (descriptor.Severity == EditionSeverity.Warning)`, a
+second, incomplete copy of the refuse rule `EditionContext.Declined` applies (Error refuses unless the descriptor is
+`PermissiveInert` and the compile is `--permissive`). Under `--std 2023 --permissive`, `RAISE EXCEPTION
+EC-VALIDATE-CONTENT` got the COBOLNET1710 warning that accepts the name, then `Advise` returned false, and the compile
+died as COBOLNET2362 (a refusal with no rule-naming diagnostic). Main failed the same way, since its `Advise` returned
+false for every declined row. The rule now has one home, `EditionContext.Refuses`, which `Declined` reports by and
+`Advise` binds by. Under `--permissive` the EC-VALIDATE and commit-and-rollback names are accepted and resolve; a
+RAISE of one reaches its USE declarative. EC-SCREEN's descriptor is not `PermissiveInert`, so its names are still
+refused. Swept the other `Declined` callers: none branches on the posture (the data-division and APPLY COMMIT sites
+only report), so `Advise` was the only binding site. New theory
+`DeclinedModuleExceptionName_Permissive_IsAcceptedAndResolves` reads the six strict negatives under `--permissive`,
+and `…_RaiseReachesTheDeclarative_ScreenStillRefused` runs the reviewer's scenario and the EC-SCREEN complement.
+R1-2: appending the PB374 note's Landed section had split its Code site line; the line is whole again.
