@@ -412,7 +412,8 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
 
     def conflicted(files: list[str], when: str) -> int:
         blocked(branch, wt, f"BLOCKED: enqueue — bringing origin/main in {when} conflicted in {', '.join(files)} "
-                            f"(kb/Work PB3023): a finisher merges origin/main, resolves, re-gates, re-runs enqueue.py")
+                            f"(kb/Work PB3023, PB3103): a finisher merges origin/main, resolves and re-gates; the new tip is "
+                            f"reviewed, then the landing lane lands it")
         return end(EXIT_CONFLICT, f"CONFLICT in {', '.join(files)} — merge aborted, branch unchanged")
     blocked = blocked or (lambda b, w, line: record_blocked(b, w, line, say))
     wt = worktree or worktree_of(repo, branch)

@@ -55,5 +55,14 @@ units/enqueue.md step 4, finisher-brief.md, wf_rolling_wave.js's meta, landing.m
 comment, SKILL.md (two more) and DESIGN-orchestrator-loop.md's failure table; all now say the lane lands and the unit
 re-arms. `LandingLaneDriftTests` also requires step 3 to name `land_lane.py rearm`.
 
+**Branch review round 2 (R2-1).** Round 1's wording sweep missed four sentences its pattern could not match:
+prune_worktrees.py's BOUNCED row (a finisher "re-runs enqueue.py"), the cobol-finisher role definition ("landed by the
+enqueue unit"), a plan_wave.py comment ("its finished work is the enqueue unit's") and the BLOCKED line enqueue.py
+writes on a conflict ("re-runs enqueue.py"). All four now say the finisher returns DONE, the new tip is reviewed, the
+landing lane lands it, and a no-commit resolution is re-armed. Nothing guarded this wording but a hand grep, so
+`LandingLaneDriftTests.NoCurrentFile_SaysTheEnqueueUnitLands` now sweeps the tracked tree outside the history paths for
+the retired phrasings. Its planted-failure fact checks that each phrasing is found and that the current sentences
+("lands nothing itself", "its lane lands it", "the enqueue unit's `rearm`") are not.
+
 **Measure after it lands:** `landing_measure.py summary` (DONE → enqueued → merged per pull request) for the first waves
 after the lane against wave 1069's landings.
