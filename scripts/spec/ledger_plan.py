@@ -495,13 +495,16 @@ def self_test() -> int:
 
 
 def main() -> int:
+    # Both streams in UTF-8 BEFORE argparse can print (its --help carries the docstring's non-ASCII): a redirected
+    # stream is the host's code page on Windows otherwise (kb/Work PB2615's class).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except AttributeError:   # a replaced stream (a test harness's) has no reconfigure
+            pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--self-test", action="store_true", help="fire every arm on planted registers, then the real one")
     a = ap.parse_args()
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
     if a.self_test:
         return self_test()
     bad = live_problems()

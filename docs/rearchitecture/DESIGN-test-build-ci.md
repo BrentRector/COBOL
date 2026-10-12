@@ -1797,18 +1797,17 @@ demand and not committed.
   PB3016's policy question (may THIS wave land?) by removing the mechanism; `train_size` and `min_final_train` go.
 - **Measurement** (PB3028, landed): `landing_measure.py` replaced `train_measure.py`, which is deleted with its drift
   test. One record per pull request in `<coord>/landing-measurements.jsonl`, built up by patches because no tool sees
-  a whole landing: `enqueue.py queue` writes the enqueue time, DONE (the newest implementer report naming the branch,
-  written before the queue) and the worktree's local gate seconds (the sum of its `verdict.json` `timings.wall_s`);
+  a whole landing: `enqueue.py queue` writes the enqueue time, each carried change's DONE (`done_times`: the committer time of the HEAD commit its DONE implementer report names, never the report file's time, which the branch review's stamp rewrites; the changes are the reports naming the branch plus those a train commit's `Report:` line names, one per lead note, each the earliest of its finisher chain) and the worktree's local gate seconds (the sum of its `verdict.json` `timings.wall_s`);
   `record --review-clean` and `--bounce-causes` (cluster-defect · load-timing · conflict · infrastructure) are named by
   whoever knows; `complete` reads `mergedAt`, the count of FAILED merge-group runs of the PR (a run GitHub cancelled
   because an earlier entry failed is a ripple, not a bounce) and the successful run's wall from `gh`. A field never
   observed stays null and prints UNMEASURED (a missing observation is not a zero); a bounce with no named cause prints
-  UNATTRIBUTED. `summary` prints changes landed per hour, median and p90 minutes DONE → on main, bounces per landing and
+  UNATTRIBUTED. `summary` prints changes landed per hour, median and p90 minutes DONE → on main per change, bounces per landing and
   their causes, merge-group CI wall and local gate minutes as the AFTER column beside the BEFORE column from the retired
   train records (batched gating) and the frozen 2026-10-10 evidence; `freeze` copies the train records and the first
   after-summary under `evidence/fleet-optimization/` once a PR has landed. The completion ledger's landing rate and its
   minutes per landing come from the same file (`landing_measure.landing_rate_input`: the queue's own from two landings,
-  else the trains'). The design is judged by changes landed per hour and minutes per landing, before and after.
+  else the trains', whose minutes are lander start → push, a floor; the headline names what its minutes measure and the ledger prints that label). The design is judged by changes landed per hour and minutes per landing, before and after.
 
 #### 3.17.6 CI and repository settings (PB3024)
 

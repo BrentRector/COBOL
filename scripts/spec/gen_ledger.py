@@ -794,7 +794,9 @@ def inputs_text(inputs: dict) -> str:
                      f'tokens per weekly point; a lander {n(c["lander_tokens"])} at {n(cal[c["lander_model"]])} '
                      f'{e(c["lander_model"])} tokens per point, one per train')
     if rate:
-        per = (f', <span class="num">{rate["median_min"]:.0f}</span> minutes per landing (median, DONE to main)'
+        # What the minutes measure is the headline's to say (landing_measure.headline): DONE → on main for the merge
+        # queue, a floor (lander start → push) for the retired trains. Never a label of this page's own.
+        per = (f', median <span class="num">{rate["median_min"]:.0f}</span> minutes ({e(rate["median_measures"])})'
                if rate.get("median_min") is not None else "")
         items.append(f'the landing rate (<span class="mono">landing_measure.py</span>, {e(rate["source"])}): '
                      f'<span class="num">{rate["per_h"]:.2f}</span> changes per hour{per}, {n(rate["changes"])} changes in '
@@ -1251,13 +1253,19 @@ def self_test() -> int:
              "calibration": {"tokens_per_point": {"sonnet": 4000000, "opus": 1600000}}}
     full = {"rules": rules, "fix_groups": {"clusters": [{"notes": [{"id": "PB9001"}]}], "unsited": []},
             "rate": {"per_h": 2.0, "changes": 4, "window_h": 2.0, "landings": 1, "median_min": 30.0,
-                     "source": "pull requests through the merge queue"},
+                     "source": "pull requests through the merge queue", "median_measures": "DONE → on main, per change"},
             "burn": {"per_h": 3.0, "from_pct": 0.0, "to_pct": 3.0, "hours": 1.0, "account": "t"}}
     page = render_remaining(rem, ledger_plan.bucket_estimates(rem, full), cp, full)
     check("the landing rate input names its source, changes per hour and minutes per landing",
           all(t in inputs_text(full) for t in ("landing_measure.py", "pull requests through the merge queue",
                                                '<span class="num">2.00</span> changes per hour',
-                                               '<span class="num">30</span> minutes per landing')), inputs_text(full)[-300:])
+                                               '<span class="num">30</span> minutes (DONE → on main, per change)')),
+          inputs_text(full)[-300:])
+    floor = {**full, "rate": {**full["rate"], "source": "the retired trains, batched gating",
+                              "median_measures": "lander start → push per landed change: a floor for DONE → on main"}}
+    check("the retired trains' minutes are labelled the floor they are, never DONE to main",
+          "a floor for DONE → on main" in inputs_text(floor) and "DONE to main" not in inputs_text(floor),
+          inputs_text(floor)[-300:])
     first = re.search(r"Known compiler defects and analyses</td>(.*?)</tr>", page[page.index("Estimate, from"):], re.S)
     check("measured inputs render numbers: 1 group, 1 wave, 0.5 h, 1.5 points at the burn",
           bool(first) and all(f'<span class="num">{v}</span>' in first.group(1) for v in ("1", "0.5 h", "1.5")),
@@ -1328,6 +1336,13 @@ def self_test() -> int:
 
 
 def main() -> int:
+    # Both streams in UTF-8 BEFORE argparse can print (its --help and usage errors carry the docstring's non-ASCII):
+    # a redirected stream is the host's code page on Windows otherwise (kb/Work PB2615's class).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except AttributeError:   # a replaced stream (a test harness's) has no reconfigure
+            pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=pathlib.Path, default=DEFAULT_OUT,
                     help=f"HTML to write (default {DEFAULT_OUT})")
@@ -1340,11 +1355,6 @@ def main() -> int:
                     help="add the register's series to the trend points recorded before it existed, each measured "
                          "from its own sha's tree, write the trend file and stop (kb/Work PB2912)")
     a = ap.parse_args()
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
-
     if a.self_test:
         return self_test()
     if a.backfill_register:

@@ -19,7 +19,8 @@
      rebase), reuse the branch's open pull request or open one (`gh pr create`), and queue it (`gh pr merge --auto`; the
      merge method is the queue's own, MERGE, so the branch's commits stay ancestors of main).
   5. Print `ENQUEUED pr=<n> sha=<sha> branch=<branch> url=<url>`, write the landing's measurement record (kb/Work
-     PB3028, landing_measure.py: DONE from the implementer's report, enqueued now, the worktree's local gate seconds;
+     PB3028, landing_measure.py: each carried change's DONE from git (landing_measure.done_times), enqueued now, the
+     worktree's local gate seconds;
      a record that cannot be written is a loud warning, never a failed landing) and exit 0. It never waits for CI:
      the merge group runs the matrix, and a red there bounces only this PR (`landing_measure.py complete` reads the
      outcome from GitHub).

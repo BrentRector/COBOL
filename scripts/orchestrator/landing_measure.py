@@ -19,7 +19,10 @@ merge queue (kb/Work PB3024). The retired file's records are the "before" column
 THE RECORD, one JSON object per pull request in `<coord>/landing-measurements.jsonl` (outside every git worktree,
 scripts/orchestrator/coord.py), built up by PATCHES: each `record` call sets only the fields it names, and the others
 stay as an earlier call left them, because no single tool sees the whole life of a landing.
-  done          the implementer's finish (its report's time) — `enqueue.py queue` fills it from the reports directory
+  done_each     when each change the pull request carries was finished: one time per change (per lead note), the
+                committer time of the HEAD commit its DONE implementer report names — git's time, never a report
+                file's, which the branch review rewrites when it stamps (`done_times`); `enqueue.py queue` fills it
+  done          the earliest of `done_each` (the order check below runs on it); a later patch never moves it later
   review_clean  the finish review came back clean — whoever ran the review records it (`record --review-clean`)
   enqueued      the FIRST time the branch was queued (a bounce and a re-enqueue keep it: the wait includes the bounce)
   merged        GitHub's `mergedAt` — `complete` reads it
@@ -32,8 +35,8 @@ stay as an earlier call left them, because no single tool sees the whole life of
 A field never observed stays null and `summary` says how many landings lack it: a MISSING observation is not a zero.
 
 `summary` prints the after column (this file) beside the before column (the retired train records, then the frozen
-2026-10-10 evidence): changes landed per hour, median and p90 minutes DONE → on main, bounces per landing and their
-causes, merge-group CI wall, local gate minutes. `freeze` copies the retired train file under
+2026-10-10 evidence): changes landed per hour, median and p90 minutes DONE → on main per change, bounces per landing
+and their causes, merge-group CI wall, local gate minutes. `freeze` copies the retired train file under
 docs/rearchitecture/evidence/fleet-optimization/ together with the first after-summary (it refuses until a pull request
 has landed), after which `summary` reads the tracked copy and the coordination directory's file is no longer needed.
 """
@@ -46,6 +49,7 @@ import os
 import pathlib
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 from typing import Callable
@@ -67,6 +71,11 @@ SCHEMA = 1
 CAUSES = ("cluster-defect", "load-timing", "conflict", "infrastructure")
 STAMPS = ("done", "review_clean", "enqueued", "merged")      # in the order a landing passes them
 UNMEASURED = "UNMEASURED"
+#: The line train_apply.py writes into each cluster commit it brings into a lander's train (`Report: <path>`).
+TRAILER_REPORT = re.compile(r"^Report:[ \t]*(\S[^\r\n]*?)[ \t]*$", re.M)
+#: What each headline's minutes measure, said where the figure is made so no reader re-labels it (finding R1-3).
+MEASURES_AFTER = "DONE → on main, per change"
+MEASURES_TRAINS = "lander start → push per landed change: a floor for DONE → on main, without the wait for a lander"
 
 #: The 2026-10-10 evidence's figures that the train records cannot give (the lander minutes in gates and in push-main
 #: plus CI, the CI wall). Typed from the frozen evidence file; `self_test` re-reads that file and fails when a
@@ -78,6 +87,7 @@ EVIDENCE_QUOTES = ("567 lander minutes, of which 233 (41 %) inside Windows/WSL g
 
 Gh = Callable[[list[str]], tuple[int, str, str]]
 Say = Callable[[str], None]
+Git = Callable[[list[str]], tuple[int, str]]   # git argv -> (exit, stdout), in the landing worktree
 
 
 def _when(text: str) -> dt.datetime:
@@ -121,6 +131,9 @@ def validate(rec: dict) -> dict:
         raise ValueError(f"pull request {rec['pr']} has no --branch (the first record of a landing names it)")
     if rec["changes"] < 1:
         raise ValueError(f"--changes {rec['changes']} must be at least 1")
+    each = [_when(t) for t in rec["done_each"]]
+    if rec.get("enqueued") and any(t > _when(rec["enqueued"]) for t in each):
+        raise ValueError(f"pull request {rec['pr']}: a change finished after it was enqueued ({rec['done_each']})")
     stamps = [(k, _when(rec[k])) for k in STAMPS if rec.get(k)]
     for (ka, ta), (kb, tb) in zip(stamps, stamps[1:]):
         if tb < ta:
@@ -143,14 +156,17 @@ def validate(rec: dict) -> dict:
 
 
 def patch_record(existing: dict | None, patch: dict) -> dict:
-    """`existing` with every non-None field of `patch` laid over it, validated. The FIRST `enqueued` is kept."""
+    """`existing` with every non-None field of `patch` laid over it, validated. The FIRST `enqueued` and `done_each`
+    are kept and `done` only moves earlier: a re-enqueue after a bounce is the same landing, still waiting."""
     rec = {"schema": SCHEMA, "pr": patch["pr"], "branch": None, "changes": 1, "done": None, "review_clean": None,
-           "enqueued": None, "merged": None, "bounces": None, "bounce_causes": [], "ci_wall_s": None,
+           "enqueued": None, "merged": None, "bounces": None, "bounce_causes": [], "done_each": [], "ci_wall_s": None,
            "local_gate_s": None, "local_gate_runs": None, "note": "", **(existing or {})}
     for k, v in patch.items():
-        if v is None or (k == "bounce_causes" and not v):
+        if v is None or (k in ("bounce_causes", "done_each") and not v):
             continue
-        if k == "enqueued" and rec.get("enqueued"):
+        if k in ("enqueued", "done_each") and rec.get(k):
+            continue
+        if k == "done" and rec.get("done") and _when(v) >= _when(rec["done"]):
             continue
         rec[k] = v
     return validate(rec)
@@ -182,6 +198,11 @@ def _minutes(a: str, b: str) -> float:
     return (_when(b) - _when(a)).total_seconds() / 60
 
 
+def _dones(rec: dict) -> list[str]:
+    """Each change's finish (`done_each`), else the one `done` a hand `record --done` gave, else none."""
+    return rec.get("done_each") or ([rec["done"]] if rec.get("done") else [])
+
+
 def after_figures(recs: list[dict]) -> dict:
     """The after column from the landing records (`merged` ones are the landings)."""
     landed = [r for r in recs if r.get("merged")]
@@ -191,9 +212,9 @@ def after_figures(recs: list[dict]) -> dict:
         window_h = (max(_when(r["merged"]) for r in landed) - min(starts)).total_seconds() / 3600
         out["window_h"] = window_h
         out["per_h"] = out["changes"] / window_h if window_h > 0 else None
-    mins = [_minutes(r["done"], r["merged"]) for r in landed if r.get("done")]
+    mins = [_minutes(d, r["merged"]) for r in landed for d in _dones(r)]
     out["done_to_main"] = ({"n": len(mins), "median": median(mins), "p90": percentile(mins, 90)} if mins else None)
-    out["no_done"] = len(landed) - len(mins)
+    out["no_done"] = sum(1 for r in landed if not _dones(r))
     counted = [r for r in landed if r.get("bounces") is not None]
     causes = {c: sum(r["bounce_causes"].count(c) for r in counted) for c in CAUSES}
     out["bounces"] = {"n": len(counted), "total": sum(r["bounces"] for r in counted), "causes": causes,
@@ -224,17 +245,21 @@ def before_figures(trains: list[dict]) -> dict | None:
 
 def headline(recs: list[dict], trains: list[dict]) -> dict | None:
     """The one landing rate the completion ledger and its remaining-work estimate use: the merge queue's own when at
-    least two pull requests have landed over a window above zero, else the retired trains' batched rate."""
+    least two pull requests have landed over a window above zero, else the retired trains' batched rate. Its
+    `median_measures` says what `median_min` is: DONE → on main only for the merge queue; the trains' minutes are
+    lander start → push, a floor (before_figures), and a reader prints that label, never its own."""
     a = after_figures(recs)
     if a["landings"] >= 2 and a.get("per_h"):
         d = a["done_to_main"]
         return {"per_h": a["per_h"], "changes": a["changes"], "window_h": a["window_h"], "landings": a["landings"],
-                "source": "pull requests through the merge queue", "median_min": d["median"] if d else None}
+                "source": "pull requests through the merge queue", "median_min": d["median"] if d else None,
+                "median_measures": MEASURES_AFTER}
     b = before_figures(trains)
     if b:
         f = b["floor"]
         return {"per_h": b["per_h"], "changes": b["changes"], "window_h": b["window_h"], "landings": b["trains"],
-                "source": "the retired trains, batched gating", "median_min": f["median"] if f else None}
+                "source": "the retired trains, batched gating", "median_min": f["median"] if f else None,
+                "median_measures": MEASURES_TRAINS}
     return None
 
 
@@ -253,8 +278,8 @@ def summarize(recs: list[dict], trains: list[dict], since: dt.datetime | None = 
                                                               if a["landings"] else "no pull request has landed yet") + ")")),
                  f"{b['per_h']:.2f} ({b['changes']} changes, {b['trains']} trains, {b['window_h']:.1f} h)" if b else UNMEASURED))
     d = a["done_to_main"]
-    rows.append(("minutes DONE → on main, median / p90",
-                 (f"{d['median']:.0f} / {d['p90']:.0f} ({d['n']} landing(s))" if d else UNMEASURED)
+    rows.append(("minutes DONE → on main per change, median / p90",
+                 (f"{d['median']:.0f} / {d['p90']:.0f} ({d['n']} change(s))" if d else UNMEASURED)
                  + (f"; {a['no_done']} landing(s) with no DONE time" if a["no_done"] else ""),
                  (f"{b['floor']['median']:.0f} / {b['floor']['p90']:.0f} per landed change (lander start → push: a floor)"
                   if b and b["floor"] else UNMEASURED)))
@@ -295,25 +320,73 @@ def before_path(coord_dir: pathlib.Path | None = None) -> pathlib.Path:
 
 # ── observation: what enqueue.py can see, and what `complete` reads from GitHub ──────────────────────────────────
 
-def done_from_report(branch: str, reports_dir: pathlib.Path, not_after: str) -> str | None:
-    """The finish time of the implementer that worked on `branch`: the newest report in `reports_dir` whose header
-    (first 12 lines) names the branch on a `branch` line, as its file's modification time. A report written after
-    `not_after` is ignored (a lander's report about the branch it queued from is written AFTER the queue; it is no
-    implementer's DONE); None when none is left."""
-    if not reports_dir.is_dir():
-        return None
+def _report_header(p: pathlib.Path) -> str:
+    """A report's header: its lines above the first `## ` heading (the same header plan_wave and the review stamp read)."""
+    head = []
+    for i, line in enumerate(p.read_text(encoding="utf-8", errors="replace").splitlines()):
+        if i > 0 and line.startswith("## "):
+            break
+        head.append(line)
+    return "\n".join(head)
+
+
+def _names_branch(header: str, branch: str) -> bool:
+    """The header names `branch` on a line that says `branch` (exactly that name, not a longer one containing it)."""
     pat = re.compile(r"(?<![\w/.\-])" + re.escape(branch) + r"(?![\w/.\-])")
-    hits = []
-    for p in reports_dir.glob("*.md"):
-        try:
-            head = p.read_text(encoding="utf-8", errors="replace").splitlines()[:12]
-        except OSError:
-            continue
-        if any("branch" in ln.lower() and pat.search(ln) for ln in head):
-            hits.append(p)
-    limit = _when(not_after).timestamp()
-    times = [m for m in (p.stat().st_mtime for p in hits) if int(m) <= int(limit)]   # stamps are whole seconds
-    return dt.datetime.fromtimestamp(max(times)).astimezone().isoformat(timespec="seconds") if times else None
+    return any("branch" in ln.lower() and pat.search(ln) for ln in header.splitlines())
+
+
+def git_runner(cwd: pathlib.Path) -> Git:
+    def run(args: list[str]) -> tuple[int, str]:
+        p = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace")
+        return p.returncode, p.stdout
+    return run
+
+
+def done_times(branch: str, reports_dir: pathlib.Path, not_after: str, git: Git,
+               upstream: str = "refs/remotes/origin/main") -> list[str]:
+    """When each change this landing carries was FINISHED: one ISO time per change, earliest first ([] when none is
+    known). The time is git's, never a file's: the committer time of the HEAD commit a DONE implementer report names
+    (the implementer's last commit, minutes before its report). A report file's time is NOT used, because the branch
+    review rewrites the report it stamps (review_findings.py stamp, kb/Work PB3027) and a finisher's re-review re-stamps
+    its own, so a file time is the LAST rewrite, never the finish (review finding R1-1 of PB3028's branch).
+
+    The changes are found from two seeds, each a DONE report (plan_wave.parse_report: its status, lead note and HEAD):
+      - a report whose header names `branch` (the implementer's own branch, queued as it is);
+      - a report a commit in `upstream..HEAD` names on its `Report:` line: train_apply.py writes one per cluster it
+        brings into a lander's train, whose branch no implementer report names (review finding R1-2).
+    A change is one LEAD note: its time is the earliest of every DONE report with that lead whose HEAD is an ancestor
+    of the seed's HEAD — so a review finisher's branch, which merged its predecessor's (kb/Work PB3027, I10), keeps the
+    first implementer's finish, and the review and finisher wait is inside DONE → on main. (A branch REBASED onto main
+    rewrites its predecessor's commits; the chain then ends at the finisher's own report.) A report whose HEAD commit
+    is after `not_after` (the queue) is no DONE of this landing, and a lander's report (status LANDED) is no seed."""
+    import plan_wave  # noqa: PLC0415  (THE report reader: status, lead and HEAD are parsed in one place)
+    reps = [r for r in plan_wave.load_reports(reports_dir) if r.status == "DONE" and r.head]
+    if not reps:
+        return []
+    rc, log = git(["log", "--format=%B", f"{upstream}..HEAD"])
+    named = {pathlib.PureWindowsPath(m.group(1).strip()).name for m in TRAILER_REPORT.finditer(log if rc == 0 else "")}
+    seeds = [r for r in reps if r.path.name in named or _names_branch(_report_header(r.path), branch)]
+    limit = _when(not_after)
+    times: dict[str, str | None] = {}
+
+    def finished(sha: str) -> str | None:
+        if sha not in times:
+            rc, out = git(["show", "-s", "--format=%cI", sha])
+            t = out.strip() if rc == 0 and out.strip() else None
+            times[sha] = t if t and _when(t) <= limit else None
+        return times[sha]
+
+    def is_ancestor(a: str, b: str) -> bool:
+        return a == b or git(["merge-base", "--is-ancestor", a, b])[0] == 0
+
+    per_lead: dict[str, dt.datetime] = {}
+    for s in seeds:
+        chain = [r for r in reps if r.lead == s.lead and (r is s or is_ancestor(r.head, s.head))]
+        found = [_when(t) for r in chain if (t := finished(r.head))]
+        if found:
+            per_lead[s.lead] = min([*found, *([per_lead[s.lead]] if s.lead in per_lead else [])])
+    return [t.isoformat() for t in sorted(per_lead.values())]
 
 
 def local_gate(worktree: pathlib.Path) -> tuple[float, int] | None:
@@ -329,13 +402,15 @@ def local_gate(worktree: pathlib.Path) -> tuple[float, int] | None:
 
 
 def record_enqueued(path: pathlib.Path, worktree: pathlib.Path, branch: str, pr: int, reports_dir: pathlib.Path,
-                    changes: int | None = None, enqueued: str | None = None) -> dict:
-    """What `enqueue.py queue` can record the moment a pull request is queued: the branch, the enqueue time, the DONE
-    time from the reports directory and the local gate seconds from the worktree's verdict.json files."""
+                    changes: int | None = None, enqueued: str | None = None, git: Git | None = None) -> dict:
+    """What `enqueue.py queue` can record the moment a pull request is queued: the branch, the enqueue time, each
+    carried change's finish (`done_times`, run in the landing worktree) and the local gate seconds from the worktree's
+    verdict.json files. `changes` defaults to the changes found (one per lead note), else 1."""
     at = enqueued or now_iso()
     g = local_gate(worktree)
-    return record(path, {"pr": pr, "branch": branch, "changes": changes, "enqueued": at,
-                         "done": done_from_report(branch, reports_dir, at),
+    each = done_times(branch, reports_dir, at, git or git_runner(worktree))
+    return record(path, {"pr": pr, "branch": branch, "changes": changes or len(each) or None, "enqueued": at,
+                         "done": each[0] if each else None, "done_each": each,
                          "local_gate_s": round(g[0], 1) if g else None, "local_gate_runs": g[1] if g else None})
 
 
@@ -461,13 +536,15 @@ def patch_from_args(a: argparse.Namespace) -> dict:
 # ── self-test ────────────────────────────────────────────────────────────────────────────────────────────────────
 ARMS = ("a record is a patch: later calls fill fields, the first enqueue time stays, and every stamp must follow the last",
         "an inconsistent record is refused: stamps out of order, an unknown cause, causes with no bounces, a bad number",
-        "done comes from the newest report naming the branch, never from one written after the queue",
+        "done is each carried change's earliest DONE report by its HEAD commit's time, never a report file's time: a "
+        "finisher keeps its predecessor's, a train's changes come from its Report lines, nothing after the queue counts",
         "local gate seconds are the sum of every verdict.json in the worktree",
         "complete reads the merge time, counts only failed merge-group runs as bounces and takes the CI wall of the "
         "successful run",
         "summary sets the after column beside the before column, names unattributed bounces and says UNMEASURED for a "
         "figure it never saw",
-        "the headline is the merge queue's rate from two landings and the retired trains' rate before that",
+        "the headline is the merge queue's rate from two landings and the retired trains' rate before that, each "
+        "saying what its minutes measure",
         "freeze waits for a landing, refuses to rewrite the frozen copy, and the evidence figures are in the evidence file")
 
 
@@ -486,6 +563,9 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     r = read_all(path)[0]
     if r["enqueued"] != t("10:00") or r["done"] != t("09:00") or r["branch"] != "b17" or r["local_gate_s"] != 300.0:
         fails.append(f"{patch_arm}: {r}")
+    record(path, {"pr": 17, "done": t("09:20")})                         # a later DONE never moves it later
+    if read_all(path)[0]["done"] != t("09:00"):
+        fails.append(f"{patch_arm}: a later done moved the earliest: {read_all(path)[0]}")
     cli = patch_from_args(parser().parse_args(["record", "--pr", "5", "--branch", "b5", "--changes", "3", "--enqueued",
                                                t("10:00"), "--bounces", "2", "--bounce-causes", "conflict, load-timing"]))
     made = patch_record(None, cli)
@@ -506,20 +586,52 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
             pass
     if len(read_all(path)) != 1 or read_all(path)[0]["bounces"] is not None:
         fails.append(f"{refuse_arm}: a refused patch changed the file: {read_all(path)}")
-    # done_from_report
+    # done_times: git's commit time of each DONE report's HEAD, never the file's time (review findings R1-1, R1-2)
     rd = tmp / "reports"
     rd.mkdir()
-    (rd / "old.md").write_text("DONE\n**branch:** `other-b17-x`\n", encoding="utf-8")
-    (rd / "mine.md").write_text("DONE\n**Status:** DONE · **branch:** `b17` · **HEAD:** abc\n", encoding="utf-8")
-    (rd / "lander.md").write_text("DONE\nbranch b17\n", encoding="utf-8")
-    os.utime(rd / "mine.md", (1_800_000_000, 1_800_000_000))
-    os.utime(rd / "lander.md", (1_900_000_000, 1_900_000_000))
-    at_mine = dt.datetime.fromtimestamp(1_800_000_000).astimezone().isoformat(timespec="seconds")
-    after = dt.datetime.fromtimestamp(1_850_000_000).astimezone().isoformat(timespec="seconds")
-    got = done_from_report("b17", rd, after)
-    if got != at_mine or done_from_report("b17", rd, "2000-01-01T00:00:00+00:00") is not None \
-            or done_from_report("zzz", rd, after) is not None or done_from_report("b1", rd, after) is not None:
-        fails.append(f"{done_arm}: {got} vs {at_mine}")
+
+    def report(name: str, status: str, branch: str, head: str) -> pathlib.Path:
+        p = rd / name
+        p.write_text(f"# {name}\n\n**Status:** {status} · **branch:** `{branch}` · **HEAD:** `{head}`\n"
+                     f"**Review:** CLEAN r {head}\n\n## Rule\n", encoding="utf-8")
+        os.utime(p, (1_900_000_000, 1_900_000_000))        # stamped long after: a file time would be the stamp's
+        return p
+    report("w1-PB1-report.md", "DONE", "b17", "aaaaaaa1")          # the implementer
+    report("w2-PB1-report.md", "DONE", "b17f", "bbbbbbb2")         # its review finisher, which merged b17
+    report("w1-PB2-report.md", "DONE", "c2", "ccccccc3")           # another change, brought into a train
+    report("w1-PB3-report.md", "SPLIT", "b17", "ddddddd4")         # not finished
+    report("w3-PB4-report.md", "DONE", "b17", "eeeeeee5")          # committed after the queue
+    report("w1-PB5-report.md", "DONE", "b170", "fffffff6")         # a longer branch name
+    (rd / "t1-lander-report.md").write_text("Status: LANDED\nBranch: b17\nHEAD: aaaaaaa9\n", encoding="utf-8")
+    commits = {"aaaaaaa1": t("09:00"), "bbbbbbb2": t("09:50"), "ccccccc3": t("08:00"), "ddddddd4": t("07:00"),
+               "eeeeeee5": t("23:00"), "fffffff6": t("06:00"), "aaaaaaa9": t("05:00")}
+
+    def fake_git(log: str = "", ancestry: frozenset = frozenset({("aaaaaaa1", "bbbbbbb2")})) -> Git:
+        def run(args: list[str]) -> tuple[int, str]:
+            if args[0] == "log":
+                return 0, log
+            if args[:2] == ["show", "-s"]:
+                return (0, commits[args[-1]] + chr(10)) if args[-1] in commits else (128, "")
+            if args[:2] == ["merge-base", "--is-ancestor"]:
+                return (0 if (args[2], args[3]) in ancestry else 1), ""
+            return 2, ""
+        return run
+    q = t("10:30")
+    trailers = chr(10).join(["Cluster A brought in by scripts/orchestrator/train_apply.py", "Notes: PB2",
+                             "Report: E:" + chr(92) + "COBOL-coord" + chr(92) + "w1-PB2-report.md", "",
+                             "Report: (none named)", "Report: /coord/scratch/reports/w2-PB1-report.md"])
+    got = {"own": done_times("b17", rd, q, fake_git()),
+           "finisher": done_times("b17f", rd, q, fake_git()),
+           "rebased finisher": done_times("b17f", rd, q, fake_git(ancestry=frozenset())),
+           "train": done_times("lander-x", rd, q, fake_git(trailers)),
+           "before every finish": done_times("b17", rd, t("08:30"), fake_git()),
+           "no report": done_times("zzz", rd, q, fake_git())}
+    want = {"own": [t("09:00")], "finisher": [t("09:00")], "rebased finisher": [t("09:50")],
+            "train": [t("08:00"), t("09:00")], "before every finish": [], "no report": []}
+    rpath = tmp / "enqueued.jsonl"
+    rec = record_enqueued(rpath, tmp / "no-worktree", "lander-x", 40, rd, enqueued=q, git=fake_git(trailers))
+    if got != want or (rec["done"], rec["done_each"], rec["changes"]) != (t("08:00"), want["train"], 2):
+        fails.append(f"{done_arm}: {got} (want {want}); enqueued record {rec}")
     # local gate
     wt = tmp / "wt"
     for i, w in enumerate((100.5, 200.0)):
@@ -562,7 +674,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
                "landed": 9, "ejected": 0, "ci": "green"}]
     one = summarize(read_all(path), trains)
     text = "\n".join(one)
-    want = ["0.41 (1 change(s), 1 pull request(s), 2.4 h)", "2.00 (8 changes, 2 trains, 4.0 h)", "146 / 146 (1 landing(s))",
+    want = ["0.41 (1 change(s), 1 pull request(s), 2.4 h)", "2.00 (8 changes, 2 trains, 4.0 h)", "146 / 146 (1 change(s))",
             "0.12 ejected to a finisher per landed change; 1 CI red(s); causes UNMEASURED",
             "1.00 (1 in 1 landing(s); cluster-defect 1)", "median 15.5, p90 15.5 (1 landing(s))",
             "median 5.0, total 5 (1 landing(s))"]
@@ -579,6 +691,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     record(path, patch)
     h2 = headline(read_all(path), trains)
     if not (h0 and h0["source"].startswith("the retired trains") and abs(h0["per_h"] - 2.0) < 1e-9
+            and h0["median_measures"] == MEASURES_TRAINS and h2 and h2["median_measures"] == MEASURES_AFTER
             and h2 and h2["source"].startswith("pull requests") and h2["landings"] == 2 and h2["per_h"] > 0
             and headline([], []) is None):
         fails.append(f"{headline_arm}: {h0} / {h2}")

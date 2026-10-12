@@ -29,13 +29,15 @@ public sealed class LandingMeasureDriftTests
         {
             "a record is a patch: later calls fill fields, the first enqueue time stays, and every stamp must follow the last",
             "an inconsistent record is refused: stamps out of order, an unknown cause, causes with no bounces, a bad number",
-            "done comes from the newest report naming the branch, never from one written after the queue",
+            "done is each carried change's earliest DONE report by its HEAD commit's time, never a report file's time: a "
+                + "finisher keeps its predecessor's, a train's changes come from its Report lines, nothing after the queue counts",
             "local gate seconds are the sum of every verdict.json in the worktree",
             "complete reads the merge time, counts only failed merge-group runs as bounces and takes the CI wall of the "
                 + "successful run",
             "summary sets the after column beside the before column, names unattributed bounces and says UNMEASURED for a "
                 + "figure it never saw",
-            "the headline is the merge queue's rate from two landings and the retired trains' rate before that",
+            "the headline is the merge queue's rate from two landings and the retired trains' rate before that, each "
+                + "saying what its minutes measure",
             "freeze waits for a landing, refuses to rewrite the frozen copy, and the evidence figures are in the evidence file",
         });
     }
