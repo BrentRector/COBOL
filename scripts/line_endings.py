@@ -34,11 +34,13 @@ from __future__ import annotations
 
 import argparse
 import ast
+import io
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -126,6 +128,8 @@ TEXT_ON_T_OPENERS = frozenset({"gzip", "bz2", "lzma"})
 #: (`codecs.open` always opens the file in binary mode): never a text writer, and `newline=` is not a parameter.
 BINARY_OPENERS = frozenset({"os", "tarfile", "zipfile", "shelve", "dbm", "webbrowser", "codecs"})
 TEMPFILES = frozenset({"NamedTemporaryFile", "TemporaryFile", "SpooledTemporaryFile"})
+#: Tokens that carry no code: `add_newline` looks past them for the last token before a call's `)`.
+LAYOUT_TOKENS = frozenset({tokenize.COMMENT, tokenize.NL, tokenize.NEWLINE, tokenize.INDENT, tokenize.DEDENT})
 
 
 def _mode(node: ast.Call, position: int) -> str | None:
@@ -195,27 +199,43 @@ def scan_writers(root: Path) -> list[str]:
 
 
 def add_newline(source: str) -> tuple[str, int]:
-    """`source` with `newline="\\n"` added to every call `writer_calls` names, and how many it changed. The AST's end
-    offsets are UTF-8 byte columns, so the insertion is made in bytes, last call first, so no offset moves."""
-    calls = sorted(writer_calls(source), key=lambda c: (c.end_lineno, c.end_col_offset), reverse=True)
-    lines = source.encode("utf-8").split(LF)
+    """`source` with `newline="\\n"` added to every call `writer_calls` names, and how many it changed.
+
+    The keyword goes right after the last TOKEN before the call's closing parenthesis. A comment, a blank line or a
+    comment line between that token and the parenthesis is not a token, so the keyword never lands inside a comment
+    (review finding R1-1: the textual look-back this replaced appended it after a trailing `# ...`). Insertions are
+    made last first, so no position moves. The rewrite is re-scanned before it is returned: one that no longer parses
+    (SyntaxError) or that leaves a writer unstated (ValueError) raises, so `--fix-writers` never writes a file or
+    reports a change it did not make."""
+    calls = writer_calls(source)
+    if not calls:
+        return source, 0
+    lines = source.split("\n")
+    code = [t for t in tokenize.generate_tokens(io.StringIO(source).readline) if t.type not in LAYOUT_TOKENS]
+    at = {t.start: k for k, t in enumerate(code)}
+    edits = []
     for call in calls:
-        row = call.end_lineno - 1
-        close = call.end_col_offset - 1  # the call's closing parenthesis
-        line = lines[row]
-        assert line[close:close + 1] == b")", f"line {call.end_lineno}: the call does not end at a parenthesis"
-        before = line[:close].rstrip()
-        # Look back past blank lines (a multi-line call) for a trailing comma.
-        back, prev = row, before
-        while not prev and back > 0:
-            back -= 1
-            prev = lines[back].rstrip()
-        sep = b" " if prev.endswith(b",") else b", "
-        if not before:  # `)` alone on its line: put the keyword on the line above, after its comma
-            lines[back] = prev + (b"" if prev.endswith(b",") else b",") + b' newline="\\n",' + lines[back][len(prev):]
-            continue
-        lines[row] = before + sep + b'newline="\\n"' + line[close:]
-    return LF.join(lines).decode("utf-8"), len(calls)
+        row = call.end_lineno
+        # The AST's columns are UTF-8 byte offsets; tokenize's, and the str lines', are characters.
+        col = len(lines[row - 1].encode("utf-8")[:call.end_col_offset - 1].decode("utf-8"))
+        k = at.get((row, col))
+        if k is None or code[k].string != ")":
+            raise ValueError(f"line {row}: the call does not end at a parenthesis")
+        last = code[k - 1]
+        if last.string == ",":  # a trailing comma: the keyword keeps one after it
+            text = ' newline="\\n",'
+        elif call.args or call.keywords:
+            text = ', newline="\\n"'
+        else:  # no argument: `last` is the call's own `(`
+            text = 'newline="\\n"'
+        edits.append((last.end, text))
+    for (row, col), text in sorted(edits, reverse=True):
+        lines[row - 1] = lines[row - 1][:col] + text + lines[row - 1][col:]
+    fixed = "\n".join(lines)
+    left = writer_calls(fixed)
+    if left:
+        raise ValueError(f"the rewrite left {len(left)} writer(s) unstated, at line(s) {[c.lineno for c in left]}")
+    return fixed, len(calls)
 
 
 def fix_writers(root: Path) -> int:
@@ -224,11 +244,8 @@ def fix_writers(root: Path) -> int:
         path = root / rel
         if not path.exists():
             continue
-        data = path.read_bytes()
-        source = data.decode("utf-8")
-        fixed, n = add_newline(source)
+        fixed, n = add_newline(path.read_bytes().decode("utf-8"))
         if n:
-            ast.parse(fixed)  # a rewrite that no longer parses is a defect of this tool: stop before writing it
             path.write_bytes(fixed.encode("utf-8"))
             print(f"  {rel}: {n} writer(s)")
             total += n
@@ -390,13 +407,32 @@ def self_test() -> int:
         "bz2.open('y.bz2', mode='at')",                       # 30 finding
         "lzma.open('y.xz', 'wt')",                            # 31 finding
         "codecs.open('x', 'w', 'utf-8')",                     # ok: always binary underneath; `'x'` is a NAME here
+        "open(",
+        "    'x',",
+        "    'w',  # the mode",
+        ")",                                                  # 33 finding: a comment after the trailing comma
+        "p.write_text(",
+        "    'd', encoding='utf-8'  # enc",
+        ")",                                                  # 37 finding: a comment, no trailing comma
+        "open(",
+        "    'x',",
+        "    'w'",
+        "    # a comment line, then a blank line",
+        "",
+        ")",                                                  # 40 finding
+        "open('x', ('w'))",                                   # 46 finding: a parenthesized last argument
         "",
     ])
     lines = sorted(c.lineno for c in writer_calls(planted))
     expect("arm WRITERS: every unstated text-mode write is found, and nothing else", lines,
-           [4, 6, 10, 11, 12, 13, 14, 19, 23, 29, 30, 31])
+           [4, 6, 10, 11, 12, 13, 14, 19, 23, 29, 30, 31, 33, 37, 40, 46])
     fixed, n = add_newline(planted)
-    expect("--fix-writers changes every finding", n, 12)
+    expect("--fix-writers changes every finding", n, 16)
+    # Review finding R1-1: the keyword follows the last argument TOKEN, so a comment after it stays a comment.
+    expect("--fix-writers never writes the keyword into a comment",
+           [fixed.splitlines()[k] for k in (34, 37, 41, 45)],
+           ["    'w', newline=\"\\n\",  # the mode", "    'd', encoding='utf-8', newline=\"\\n\"  # enc",
+            "    'w', newline=\"\\n\"", "open('x', ('w'), newline=\"\\n\")"])
     compressed = planted.splitlines()[24:32]  # lines 25-32: the import, then the gzip/bz2/lzma/codecs opens
     expect("--fix-writers leaves a binary-mode gzip/bz2/lzma/codecs open untouched",
            [line for line in fixed.splitlines()[24:32] if line in compressed],
