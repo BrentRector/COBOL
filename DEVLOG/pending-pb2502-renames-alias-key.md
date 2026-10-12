@@ -24,4 +24,10 @@ renames; `GroupKindsOf` forwards to the renamed item. `docs/COBOLNET_DATA_MODEL_
 every alias). RENAMES keys exist since COBOL-85, so the positives are 85; there is no earlier edition for a negative. Probed on the fix and not pinned: an alias key in the secondary
 01 of a multi-record FD, and one after a DYNAMIC LENGTH member (the PB1025 contiguous window); both read the right record.
 
+**Self-review.** Architecture: one rule in one place per reader (position, width, kind), no wrapper. Code: the forwards implement 13.18.45.4 GR1/GR2 (the alias's place is data-name-2's); the
+sibling arms (RECORD KEY, ALTERNATE KEY, SORT key, READ/START key of reference, variable-length window) were swept and probed. Performance: one null test on a cold path. Duplication: none added.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261012T191542Z-2cb312`: Conformance 5,088 · Unit 32,721 · Characterization 36 ran; the three new
+corpus cases Passed in `leg-1-Conformance.trx`). `scripts/semgrep/verify.py` PASS, no count rose.
+
 **Rows.** None: no inventory row claims that an alias is positioned in the record (`closes_rows: []` with its reason).
