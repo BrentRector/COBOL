@@ -118,18 +118,21 @@ def _slug(branch: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "-", branch).strip("-") or "branch"
 
 
-def attempts(cdir: pathlib.Path) -> list[dict[str, Any]]:
-    """Every attempt, oldest first (ids sort by their UTC stamp). An unreadable file is skipped, said by `status`."""
+def attempts(cdir: pathlib.Path, unreadable: list[str] | None = None) -> list[dict[str, Any]]:
+    """Every attempt, oldest first (ids sort by their UTC stamp). A file that is not an attempt record is left out and
+    its path appended to `unreadable`, which the tick and `status` say (a lost record could relaunch its branch)."""
     d = lane_dir(cdir) / ATTEMPTS
     out = []
     for p in sorted(d.glob("*.json")) if d.is_dir() else []:
         try:
             rec = coord.read_json(p, None)
         except ValueError:
-            continue
-        if isinstance(rec, dict):
+            rec = None
+        if isinstance(rec, dict) and isinstance(rec.get("branch"), str) and rec.get("id"):
             rec["_path"] = str(p)
             out.append(rec)
+        elif unreadable is not None:
+            unreadable.append(str(p))
     return out
 
 
@@ -405,7 +408,10 @@ def tick(cdir: pathlib.Path, repo: pathlib.Path, *,
         say(f"land lane: a tick is already running ({ExclusiveLock.holder(d / TICK_LOCK)}); nothing done")
         return 0
     with lock:
-        atts = attempts(cdir)
+        unreadable: list[str] = []
+        atts = attempts(cdir, unreadable)
+        for p in unreadable:
+            say(f"land lane: {p} is not an attempt record; left out (its branch may be landed again): inspect it")
         reap(cdir, atts, alive, say)
         try:
             rows, order = survey(repo, cdir)
@@ -422,6 +428,9 @@ def tick(cdir: pathlib.Path, repo: pathlib.Path, *,
             dec = decide(row["tip"], branches.get(row["name"], []),
                          lambda r=row: overlap_free(r["worktree"]) if r["worktree"] else (False, "no worktree"))
             if not dec.launch:
+                if branches.get(row["name"]) and classify(branches[row["name"]][-1]) == FREE \
+                        and finished(branches[row["name"]][-1]):
+                    say(f"land lane: {row['name']}: {dec.why}")   # why an exit 3 still waits, every tick
                 continue
             if not row["worktree"]:
                 say(f"land lane: {row['name']}: WAITING TO LAND with no worktree; not launched (enqueue.py needs one)")
@@ -473,6 +482,7 @@ class Lane:
     rows: list[dict[str, Any]]
     latest: list[tuple[dict[str, Any], str]]   # each branch's latest attempt and its effective class
     halt: str | None
+    unreadable: list[str]                      # attempt files that are not attempt records
 
     def survey_age_min(self, now: dt.datetime | None = None) -> float | None:
         return None if self.survey_at is None else ((now or _now()) - self.survey_at).total_seconds() / 60
@@ -485,9 +495,10 @@ def view(cdir: pathlib.Path) -> Lane:
     except ValueError:
         s = None
     at = dt.datetime.fromisoformat(s["at"]) if isinstance(s, dict) and s.get("at") else None
-    latest = [(atts[-1], effective(atts)) for atts in by_branch(attempts(cdir)).values()]
+    unreadable: list[str] = []
+    latest = [(atts[-1], effective(atts)) for atts in by_branch(attempts(cdir, unreadable)).values()]
     halt = (d / HALT).read_text(encoding="utf-8").strip() if (d / HALT).exists() else None
-    return Lane(at, (s or {}).get("rows", []) if isinstance(s, dict) else [], latest, halt)
+    return Lane(at, (s or {}).get("rows", []) if isinstance(s, dict) else [], latest, halt, unreadable)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -533,6 +544,8 @@ def status_lines(cdir: pathlib.Path, now: dt.datetime | None = None) -> list[str
                                               "`land_lane.py tick`" if age > SURVEY_MAX_AGE_MIN else ""))
     out = [f"=== LAND LANE: {n['running']} running · {n[STOPPED]} stopped · {n[DONE]} enqueued · "
            f"{n[FREE] + n[ONCE]} to retry · {survey}{' · HALTED: ' + lane.halt if lane.halt else ''} ==="]
+    out += [f"UNREADABLE       {p}: not an attempt record (inspect it; its branch may be landed again)"
+            for p in lane.unreadable]
     order = {"running": 0, STOPPED: 1, HALTED: 2, FREE: 3, ONCE: 3, DONE: 4}
     for a, cls in sorted(lane.latest, key=lambda t: (order.get(t[1], 9), t[0]["branch"])):
         mark = " [collected]" if a.get("collected") else ""
@@ -741,6 +754,13 @@ def self_test() -> int:
                    "already running" in " ".join(f9.said), str(f9.said))
         finally:
             held.release()
+        (lane_dir(c9) / ATTEMPTS).mkdir(parents=True, exist_ok=True)
+        (lane_dir(c9) / ATTEMPTS / "torn.json").write_text("{not json", encoding="utf-8", newline="\n")
+        f9.tick(c9)
+        expect("an attempt file that is not a record is said by the tick and by status, never dropped in silence",
+               any("torn.json" in s and "not an attempt record" in s for s in f9.said)
+               and any(ln.startswith("UNREADABLE") and "torn.json" in ln for ln in status_lines(c9)),
+               f"{f9.said} {status_lines(c9)}")
 
         # 10. the real launch path: a DETACHED runner records rc, the verdict and the end head of its argv.
         c10 = fresh("runner")

@@ -21,9 +21,9 @@ implementer gates.
    range; exit 2, 9 or DIED are retried once; exit 4, 5, 6, 7, 11 (or a repeated 2/9) are STOPPED for the enqueue
    unit. A retry is driven by the lane's attempt record, not the survey: a run that commits makes the survey read the
    branch IN FLIGHT. `status` prints one line per branch, `collect` marks attempts the enqueue unit handled,
-   `clear-halt` is the operator's. `--self-test`: 29 checks (planted survey rows, exit 3 with and without the overlap,
+   `clear-halt` is the operator's. `--self-test`: 30 checks (planted survey rows, exit 3 with and without the overlap,
    exit 5 at the same and a new head, exit 9 then 2, DIED (before and after the run committed), exit 8 halting a second ready branch and the mailbox
-   message, the three stops, ENQUEUED and its collection, a stale survey, the tick lock, and a real detached runner).
+   message, the three stops, ENQUEUED and its collection, a stale survey, the tick lock, an unreadable attempt file said aloud, and a real detached runner).
 2. `orchestrate.ps1`: `Start-LaneTick` / `Complete-LaneTick`, the checkpoint's background pattern (PB2590): a tick as
    each unit starts and every `-LandLaneSeconds` (300; 0 runs no lane), one at a time, never awaited, never fatal.
 3. `gate_slot.py`: ticket classes, `ticket-<seq>-landing.lock` beside `ticket-<seq>.lock`; every landing ticket is
