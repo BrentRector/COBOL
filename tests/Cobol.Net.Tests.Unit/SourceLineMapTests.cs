@@ -85,6 +85,26 @@ public sealed class SourceLineMapTests : IDisposable
         Assert.Equal("r.cob(1,18)", m.Slice(12, 2).LocateAt(0).ToString());   // a slice begun mid-line is rebased
     }
 
+    [Fact] // kb/Work PB3031: written text counts a CHARACTER POSITION per character (ISO §6.1 1) a)), not a UTF-16 unit
+    public void OriginWriter_WrittenTextWithSupplementaryCharacters_CountsOnePositionPerCharacter()
+    {
+        string wide = "\U0001000D\U0001000E";
+        var input = MappedText.Identity("MOVE OLD TO X.", "r.cob");
+        var w = new OriginWriter();
+        w.AppendSlice(input, 0, 5);
+        w.Append((wide + " B" + wide + "C").AsSpan(), input.PointAt(5));   // 2 + 1 + 1 + 2 + 1 = 7 positions, 11 units
+        w.AppendSlice(input, 8, input.Text.Length - 8);
+        var m = w.Finish();
+        Assert.Equal("MOVE " + wide + " B" + wide + "C TO X.", m.Text);
+        Assert.Equal("r.cob(1,6)", m.LocateAt(5).ToString());    // the first letter: the replaced word's position
+        Assert.Equal("r.cob(1,6)", m.LocateAt(6).ToString());    // its second unit: the same position
+        Assert.Equal("r.cob(1,7)", m.LocateAt(7).ToString());    // the second letter
+        Assert.Equal("r.cob(1,9)", m.LocateAt(10).ToString());   // B: the two letters and the blank stand at positions 6-8
+        Assert.Equal("r.cob(1,10)", m.LocateAt(11).ToString());  // the first letter of the second pair
+        Assert.Equal("r.cob(1,12)", m.LocateAt(15).ToString());  // C: seven positions in all
+        Assert.Equal("r.cob(1,14)", m.LocateAt(m.Text.Length - 1).ToString());   // the final '.' keeps its own column
+    }
+
     /// <summary>⛔ No consumer can reach a column-less origin of a POSITION (kb/Work PB1801): MappedText answers a position
     /// with a full <see cref="SourceLocation"/> (or a <see cref="LineOrigin"/> to write at), never a bare
     /// <see cref="SourceOrigin"/>, so a diagnostic cannot again print the column of the resultant text.</summary>
