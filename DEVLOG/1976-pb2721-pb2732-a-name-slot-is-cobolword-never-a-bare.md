@@ -1,4 +1,4 @@
-## Entry 1971 — 2026-10-12 14:48 PDT — PB2721 + PB2732: a name slot is cobolWord, never a bare IDENTIFIER, and an index-name is a word
+## Entry 1976 — 2026-10-12 16:02 PDT — PB2721 + PB2732: a name slot is cobolWord, never a bare IDENTIFIER, and an index-name is a word
 
 Wave 1069 H took two R2 findings that share one root: a user-defined-word slot in the grammar that does not admit the
 word set its declaration admits. ISO §8.3.2.1 3) lets a §8.10 context-sensitive word be a user-defined word outside its
