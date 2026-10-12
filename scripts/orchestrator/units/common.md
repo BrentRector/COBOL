@@ -21,8 +21,8 @@ supervisor starts the next unit after you end.
 - A decision only the owner can make: never guess. End with `outcome: owner-question` and `owner_question`
   (CLAUDE.md rule 7; memory feedback_spec_before_asking_owner: search the ISO text first).
 - Ids and codes only from `python scripts/orchestrator/alloc.py` (never read "next free" by hand). Land only through
-  `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023: the merge queue once `ruleset.py check`
-  reports it ACTIVE, else push-main.sh, chosen by the script). Never select the Fable model.
+  `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023: one pull request into the merge queue; it
+  refuses while `ruleset.py check` does not report the queue ACTIVE). Never select the Fable model.
 - FORBIDDEN: the WSL lifecycle commands `wsl --terminate`, `wsl --shutdown`, `wsl --update`, `wsl --export`,
   `wsl --unregister` (they kill every other session's Linux gate). Run WSL from PowerShell, with scripts in files.
 - The coordination directory is {COORD}; the fleet scratch directory (reports under `reports\`) is {SCRATCH}.

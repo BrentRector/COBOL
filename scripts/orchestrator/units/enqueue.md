@@ -2,10 +2,11 @@ UNIT: enqueue.
 
 Finished branches are waiting to land. Landing is a SCRIPT, `python scripts/orchestrator/enqueue.py land <branch>`
 (kb/Work PB3023; DESIGN-test-build-ci.md section 3.17.2 step 3): it merges origin/main into the branch, runs the gate on
-both hosts under the shared gate slot, stamps the branch's DEVLOG entry, runs the landing checks and hands the branch to
-GitHub's merge queue as one pull request (or, while `ruleset.py check` does not report the queue ACTIVE, lands it
-through push-main.sh). There is no train and no lander: this unit runs the script and dispatches an agent only for
-what a script cannot decide.
+both hosts under the shared gate slot, merges main in again if it moved meanwhile (no second gate: the merge group
+runs the whole population), stamps the branch's DEVLOG entry, runs the landing checks and hands the branch to GitHub's
+merge queue as one pull request. Main takes only queued pull requests, so while `ruleset.py check` does not report the
+queue ACTIVE the script refuses before it merges or gates anything (exit 8). There is no train and no lander: this unit
+runs the script and dispatches an agent only for what a script cannot decide.
 1. Load the `workstream` skill (the dispatch guard refuses a finisher or reviewer otherwise); read
    .claude/skills/workstream/references/landing.md.
 2. REVIEW FIRST (MANDATORY-PRACTICES I10; kb/Work PB3027): for each row `python scripts/prune_worktrees.py --brief`
@@ -20,21 +21,21 @@ what a script cannot decide.
    lists them (the most harmful lead first, kb/Work PB2981's ranking); an operator steer that names branches
    (`handoff.last.json`) wins. For each, `python scripts/orchestrator/enqueue.py land <branch>` with `run_in_background`
    to its own log, then BLOCK on the log's `=== ENQUEUE: ` line (`timeout 580 bash -c 'until grep -q "=== ENQUEUE: "
-   <log>; do sleep 5; done'`, re-issued until it prints; never end a turn while one runs). While the merge queue is
-   ACTIVE start them all at once: each gate takes the shared gate slot, so at most the cap gate together and the rest
-   wait there. While it is not, run them ONE AT A TIME (push-main.sh holds the landing lease and waits for CI). Read
-   each verdict:
+   <log>; do sleep 5; done'`, re-issued until it prints; never end a turn while one runs). Start them all at once:
+   each gate takes the shared gate slot, so at most the cap gate together and the rest wait there, and main moving under
+   a gate is merged in by the script itself. Read each verdict:
    - `ENQUEUED`: the pull request is in the queue; GitHub tests it in a merge group and merges it. The branch is ON
      MAIN only once the PR has merged (`gh pr view <n> --json state,mergedAt`); until then it reads ENQUEUED.
-   - `LANDED` (push-main): on main.
-   - `CONFLICT` (exit 4), `GATE RED` (exit 5), a DEVLOG refusal (exit 6), a stale arch-oracle baseline (exit 7) or a
-     push-main CI red (exit 10): the reason is in the log and in the branch's report (`BLOCKED: enqueue …`): step 4.
+   - `QUEUE NOT ACTIVE` (exit 8): nothing was merged or gated; `ruleset.py check` names why (DRIFT, ABSENT, SKIPPED).
+     Land nothing another way: name it in the handoff for the attended session.
+   - `CONFLICT` (exit 4, before or after the gate), `GATE RED` (exit 5), a DEVLOG refusal (exit 6) or a stale
+     arch-oracle baseline (exit 7): the reason is in the log and in the branch's report (`BLOCKED: enqueue …`): step 4.
    - `UNREVIEWED` (exit 11): the branch's tip is not covered by its CLEAN review stamp (MANDATORY-PRACTICES I10): it
      goes back to step 2's reviewer, never to a finisher and never landed another way.
    - exit 3 (the landing check's STOP: the branch shares a file with earlier-dispatched in-flight work): never retry
      as is; name it in the handoff with the check's lines.
-   - exit 9 (GitHub refused the push, the PR or the queue) or exit 10 for a held landing lease: re-run once; if it
-     repeats, name it in the handoff.
+   - exit 9 (GitHub refused the push, the PR or the queue) or exit 2 `NOT QUEUED — main moved under every one of …`:
+     re-run once (the gated head is not gated again); if it repeats, name it in the handoff.
    - A permission refusal of `enqueue.py land` (the auto-mode classifier, a denied prompt): never retry it, rephrase it
      or land another way (MANDATORY-PRACTICES L13); hand off `READY-TO-LAND <worktree> <branch>` in `summary`.
 4. FINISHERS. For each branch that stopped in step 3, and each row `prune_worktrees.py --brief` lists BOUNCED (the merge

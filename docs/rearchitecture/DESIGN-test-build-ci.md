@@ -106,7 +106,9 @@ copy, no trigger-side twin to drift against), which diffs `github.event.before .
 run, so the fast-forward onto main does not pay for the matrix a second time, and it carries the drift check that
 asserts every job id is in `ci-gate`'s `needs` list.
 
-**The landing protocol is `scripts/push-main.sh`, and it is the only way a commit reaches main**: push HEAD to
+**The landing protocol WAS `scripts/push-main.sh` (superseded by §3.17: since the ruleset went ACTIVE, main takes only
+pull requests GitHub's merge queue tested, and `enqueue.py land` is the one landing step; PB3024 deletes the script)**:
+push HEAD to
 `ci/<short-sha>` → find the run for that exact sha → `gh run watch --exit-status` → on green fast-forward main and
 delete the branch, on red print the failing jobs and exit non-zero with main untouched. A check run is attached to
 the COMMIT, not to a branch, which is why the verdict earned on `ci/<sha>` is the one the protection reads on main.
@@ -1698,7 +1700,12 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    predecessor or a sibling carries conflict resolutions in its merge commits, which a rebase discards and asks for
    again, and the queue lands by merge commit anyway (a conflict stops it, exit 4: the merge is aborted, the branch's
    report gains `BLOCKED: enqueue … conflict in <files>`, a `cobol-finisher` resolves); run the ONE local gate on the
-   merged head (§3.17.3; exit 5 on a red, the host named; a commit gated GREEN is not gated again on a re-run);
+   merged head (§3.17.3; exit 5 on a red, the host named; a commit gated GREEN, or a head that differs from it only
+   by main's commits, clean merges and DEVLOG-only commits — `prune_worktrees.unreviewed_since`, the review's coverage
+   rule — is not gated again on a re-run); bring main in AGAIN when it moved during the gate, without a second gate
+   (review R1-2, corrected at implementation: the queue merges other pull requests while a branch gates, `queue` takes
+   only a head that descends from main, and re-gating every such head would race the queue forever; the merge group
+   below integrates the branch on the current main and runs the whole population; a conflict here is exit 4 too);
    `devlog.py stamp` numbers the entry (re-stamping one main has overtaken); run the landing checks that used to live in
    `push-main.sh` — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
@@ -1820,8 +1827,10 @@ demand and not committed.
   GraphQL read of the open pull requests: in the merge queue → ENQUEUED, removed from it at the branch's tip → BOUNCED
   with GitHub's reason; offline the states are git-only); one `cobol-clerk` files the reports' leads; render the ledger;
   hand off. It is mostly a script run; its model turns are the review and finisher dispatches and the handoff. While
-  the queue is not ACTIVE, `enqueue.py land` lands through `push-main.sh` (one branch at a time under its lease) so the
-  lander's retirement does not wait for the owner's ruleset go.
+  the queue is not ACTIVE, `enqueue.py land` refuses before it merges or gates anything (exit 8): main takes only
+  queued pull requests (the ruleset binds administrators), so a push-main arm could land nothing and gated half an hour
+  with no lease held (review R1-1, corrected at implementation; the phase-1 bridge that kept push-main until the
+  owner's ruleset go retired once the ruleset was ACTIVE).
 - The **train, the lander role, `lander-train-brief.md`, `lander-brief.md` and `train_apply.py` are retired** (PB3023;
   CLAUDE.md rule 4: deleted, never wrapped); `golden-lander-brief.md` became `golden-lane-brief.md` (the lane-1
   integrator, landing through `enqueue.py land --lane golden`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing

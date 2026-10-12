@@ -139,8 +139,9 @@ if (Get-Command gh -ErrorAction SilentlyContinue) {
 # ⭐ THE MERGE QUEUE FIRST (kb/Work PB3024): `ruleset.py check` compares main's live ruleset with the committed
 # scripts/orchestrator/ruleset-main.json. ACTIVE: landings are pull requests queued by enqueue.py and the classic
 # protection is gone (its lookup below would only report the 404 the ruleset replaced). DRIFT: the line names what
-# differs, and enqueue.py refuses every landing until it is fixed. ABSENT (the owner has not applied it yet): the classic
-# protection below is still the gate and push-main.sh still lands. SKIPPED: UNREAD, never a pass.
+# differs, and enqueue.py refuses every landing until it is fixed. ABSENT (no ruleset on main): enqueue.py refuses every
+# landing too (exit 8; kb/Work PB3023 review R1-1), and the classic protection below is read. SKIPPED: UNREAD, never a
+# pass.
 # The exit code is read BEFORE any pipeline: `| Select-Object -First 1` stops the native command early and leaves
 # $LASTEXITCODE stale, which printed an ABSENT queue as ACTIVE (measured on this change's first run).
 $queueOut = & python scripts/orchestrator/ruleset.py check 2>&1
@@ -171,7 +172,7 @@ if ($queueRc -eq 0) {
             $ctx = @($j.required_status_checks.contexts)
             $adm = [bool]$j.enforce_admins.enabled
             if (($ctx -contains 'ci-gate') -and $adm) {
-                Write-Host "gate   : main requires ci-gate (enforce_admins on); merge queue not applied (ruleset.py apply, on the owner's go) — land with: python scripts/orchestrator/enqueue.py land <branch> (it lands through push-main.sh)"
+                Write-Host "gate   : ⛔ main requires ci-gate (enforce_admins on) but the merge queue is not applied (ruleset.py apply, on the owner's go) — enqueue.py land refuses every landing until ruleset.py check reports ACTIVE"
             } else {
                 Write-Host "gate   : ⛔ main protection DRIFTED — contexts=[$($ctx -join ',')] enforce_admins=$adm (expected ci-gate + True)"
             }

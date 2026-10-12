@@ -9,7 +9,6 @@ THE STOPS AND WHAT EACH ASKS:
 - DEVLOG (exit 6) — the branch needs its own `DEVLOG/pending-<slug>.md` whose first line is `## <Title>` (or one stamped entry `enqueue.py` re-stamps; a merged-in predecessor's pending entry is folded into the same one entry by the stamp): write or fix it; never number or stamp it yourself.
 - ORACLE (exit 7) — `python scripts/arch/compare_oracle.py`; explain every differing case by its class in the report; then `python scripts/arch/capture_oracle.py --record` and commit the manifest.
 - BOUNCED — the merge group's CI red: `gh run view <id> --log-failed` names the job, step and test; attribute it (yours, or already red on main: `gh run list --branch main --limit 5`); fix yours on the branch. A red already on main is reported, not "fixed" here.
-- CI red under push-main (exit 10) — the same as BOUNCED, from the `ci/<sha>` run push-main.sh printed.
 
 THEN, in order:
 1. Checkpoint: `git add -A -- . ":!.claude/settings.local.json"`, `git reset -q -- STATUS.md`, assert no conflict marker is staged, `git commit -m "WIP checkpoint: <what>"`, then rewrite STATUS.md with FIRST LINE `STATUS-AT: <git rev-parse HEAD>` (P4; a hook refuses your next commit otherwise). Never `git stash`.

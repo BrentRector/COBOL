@@ -130,7 +130,7 @@ tree-wide sweeps (`[Trait("Sweep", "tree")]`, tier 0c) and the cheapest reach â€
 self-test whose inputs are unchanged since a recorded PASS is reused, never re-run, by every gate (kb/Work PB2914,
 PB3022). **A branch lands through ONE script, `python scripts/orchestrator/enqueue.py land <branch>`** (kb/Work
 PB3023): it merges origin/main in, runs the one gate and CI's Linux legs, stamps the DEVLOG entry, runs the landing
-checks and queues one pull request in GitHub's merge queue (push-main.sh while the queue is not ACTIVE); there is no
+checks and queues one pull request in GitHub's merge queue (it refuses while the queue is not ACTIVE); there is no
 lander and no train. A stale or missing impact map only
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on

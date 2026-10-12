@@ -120,8 +120,9 @@ Fable only with explicit approval per dispatch, which an unattended loop cannot 
 > §3.17, the SSOT for it).** The `enqueue` unit (`units/enqueue.md`) runs `scripts/orchestrator/enqueue.py land` for
 > every WAITING TO LAND branch, in harm order: it merges `origin/main` into the branch, runs the gate on both hosts under
 > the shared gate slot, stamps the DEVLOG entry, runs the DEVLOG-entry, oracle and R3 partition checks, opens the
-> branch's pull request and adds it to GitHub's merge queue (while `ruleset.py check` does not report the queue ACTIVE
-> it lands through `push-main.sh`, which keeps the landing lease of §4.7 until PB3024 deletes both). The unit's own
+> branch's pull request and adds it to GitHub's merge queue (main moving during the gate is merged in again, without a
+> second gate; while `ruleset.py check` does not report the queue ACTIVE it refuses before merging or gating anything,
+> so it never runs `push-main.sh` and takes no landing lease, §4.7). The unit's own
 > turns are the review dispatches, the `cobol-finisher` dispatches (a conflict, a red gate, a queue bounce) and the
 > handoff. A `wave` unit ends when its Workflow returned: it starts no lander and lands no train (`wf_rolling_wave.js`
 > lost its trains, PB3016 by removal).
@@ -406,8 +407,9 @@ split with a claim undecided. One session's stop must never abort another sessio
 ### 4.7 The landing lease: one lander on main at a time (`landing_lease.py`, kb/Work PB2537)
 
 > ⛔ **Retired by `DESIGN-test-build-ci.md` §3.17 (owner 2026-10-11, kb/Work PB3015/PB3024): GitHub's merge queue
-> serializes landings, so there is no lease to take; `landing_lease.py`, its drift tests and MANDATORY-PRACTICES L3 go
-> when PB3024 lands.** The record below explains why the lease existed.
+> serializes landings, so there is no lease to take; `enqueue.py land` never runs `push-main.sh` (kb/Work PB3023 review
+> R1-1), and `landing_lease.py`, `push-main.sh` and their drift tests go with PB3024's remaining step.** The record
+> below explains why the lease existed.
 
 `push-main.sh` refuses a HEAD that is not a descendant of origin/main, so it serialized the PUSH. A landing's cost
 comes before that step: the final rebase, the whole-population lander gate, the Linux gate, the oracle and CI, about
@@ -424,12 +426,12 @@ keep running r1 repeatedly for zero gain".
   no reader holds the file open while a writer replaces it (Windows refuses that). A file that is not a lease is never
   guessed free or held: every verb exits 2 with the reason, and push-main dies on it. The exit codes are the contract
   push-main acts on: 0 own/done, 1 (`check` only) free, 4 held by another worktree, 2 could not answer.
-- **Acquire** (`push-main.sh` itself, which `enqueue.py land` runs while the merge queue is not ACTIVE; the lander
-  briefs that acquired it before their final rebase retired with the lander, kb/Work PB3023): `acquire --holder …
+- **Acquire** (`push-main.sh` itself, which no landing step runs any more: `enqueue.py land` refuses while the merge
+  queue is not ACTIVE; the lander briefs that acquired it before their final rebase retired with the lander, kb/Work
+  PB3023): `acquire --holder …
   --reason … --wait-min 9` takes a free lease, re-takes the caller's own, or takes over a DEAD one (its expiry passed,
   or its worktree no longer exists; logged as a `takeover`). While another worktree holds a live one it polls, and
-  after the wait it prints `WAIT` and exits 4: push-main.sh refuses, `enqueue.py land` exits 10, and the enqueue unit
-  re-runs it once (MANDATORY-PRACTICES L3).
+  after the wait it prints `WAIT` and exits 4: push-main.sh refuses.
 - **Renew, expire.** The expiry is 30 minutes after the last heartbeat. push-main renews every minute in a background
   loop that ends with it, because its CI wait is the longest step. A holder that died stops renewing, and its lease is
   taken over 30 minutes later.

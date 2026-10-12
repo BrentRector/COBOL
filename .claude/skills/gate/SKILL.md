@@ -117,17 +117,16 @@ operating systems before `main` moves.
 - ⛔ **AND IT IS NO LONGER OPTIONAL TO READ IT: `ci-gate` IS A REQUIRED STATUS CHECK ON `main`.** `ci-gate` is the
   workflow's terminal job — `if: always()`, `needs:` every other job, PASS only when each is `success` or
   `skipped` — and it is the ONE stable check name the protection can require (every matrix job's check name
-  carries its shard AND its filter text, and every one of them is skipped on a docs-only push). Protection is
-  `strict: false`, `enforce_admins: true`, force-pushes and deletions off. So the landing gate is a SCRIPT, not a
-  habit: **`bash scripts/push-main.sh`** (which `python scripts/orchestrator/enqueue.py land <branch>` runs while the
-  merge queue is not ACTIVE; never run it by hand) pushes HEAD to `ci/<short-sha>`, waits for `ci-gate` on that sha, and only
-  then fast-forwards main — a bare `git push origin HEAD:main` of an unverified commit is refused by the server
-  (owner decision 2026-09-06, question 23; `kb/Work/PB796`). It is idempotent: re-run it after a timeout.
-  ⭐ Once `python scripts/orchestrator/ruleset.py check` reports GitHub's merge queue ACTIVE on main (the owner
-  applies it, kb/Work PB3024), `python scripts/orchestrator/enqueue.py land <branch>` (THE landing step, kb/Work
-  PB3023) ends in one pull request into the queue instead of push-main.sh: no CI wait; the merge group runs the matrix
-  and is the CI verdict, and a pull request's own run is the cheap jobs only. Never run its inner `queue` verb by hand:
-  `land` is what merges main in, gates and stamps the DEVLOG entry.
+  carries its shard AND its filter text, and every one of them is skipped on a docs-only push). It is required ON THE
+  MERGE GROUP by the ruleset on main (`scripts/orchestrator/ruleset-main.json`, applied on the owner's go, kb/Work
+  PB3024): main takes only pull requests GitHub's merge queue has tested, administrators included, so a bare
+  `git push origin HEAD:main` is refused by the server (owner decision 2026-09-06, question 23; `kb/Work/PB796`). The
+  landing is therefore a SCRIPT, not a habit: **`python scripts/orchestrator/enqueue.py land <branch>`** (kb/Work
+  PB3023) merges main in, gates, stamps the DEVLOG entry and ends in one pull request into the queue: no CI wait; the
+  merge group runs the matrix and is the CI verdict, and a pull request's own run is the cheap jobs only. It refuses
+  (exit 8) before merging or gating anything while `ruleset.py check` does not report the queue ACTIVE. Never run its
+  inner `queue` verb by hand: `land` is what merges main in, gates and stamps the DEVLOG entry. `push-main.sh` is no
+  longer a landing path (kb/Work PB3024 deletes it).
 - ⚠ **A docs-only push runs `changes` + `ci-gate` and nothing else** — seconds, not a matrix. `paths-ignore` was
   removed because a workflow that declines to START leaves a required per-commit check unsatisfiable; the same
   path list now lives in the `changes` job, one layer down, where it decides whether the MATRIX runs.

@@ -15,9 +15,12 @@ the oracle and CI. On 2026-10-07 the R1 lander rebased three times as the loop l
 window, re-gated each time, and ended SPLIT at its turn cap with every gate and CI green and nothing on main. Owner
 19:30 PDT: "this is stupid. we cannot keep running r1 repeatedly for zero gain".
 
-THE LEASE. One JSON file, `<coord>/landing-lease.json`, outside every worktree (coord.py). A lander ACQUIRES it before
-its final rebase and its gates, RENEWS it while it works, and `push-main.sh` RELEASES it when the push succeeds or
-fails. It records the holder, the reason, the worktree that holds it, a heartbeat and an expiry, so a dead lander
+THE LEASE. One JSON file, `<coord>/landing-lease.json`, outside every worktree (coord.py). `push-main.sh` ACQUIRES it
+(the landers that took it before their final rebase and gates retired with the lander, kb/Work PB3023), RENEWS it while
+CI runs, and RELEASES it when the push succeeds or fails. No landing step runs push-main.sh now: `enqueue.py land`
+lands only through GitHub's merge queue, which orders main itself, and kb/Work PB3024's remaining step deletes this
+file with push-main.sh.
+It records the holder, the reason, the worktree that holds it, a heartbeat and an expiry, so a dead lander
 cannot hold main: a lease whose expiry has passed, or whose worktree no longer exists, is TAKEN OVER by the next
 acquire (and the takeover is logged). Its owner is the WORKTREE: a lander that resumes in the same worktree re-takes
 its own lease, and `push-main.sh` needs no argument to know whether its caller holds it.
@@ -35,8 +38,8 @@ Every read-modify-write runs under `coord.locked(cdir, "landing-lease.lock")`. E
 appended to `<coord>/landing-lease.jsonl`, the record of how long landers waited and what was taken over.
 
 Callers: `scripts/push-main.sh` (takes the lease itself when its caller holds none, refuses with exit 4 when another
-holds it, renews it while CI runs, releases it on exit; `enqueue.py land` runs it while the merge queue is not ACTIVE,
-kb/Work PB3023), `next_unit.py` (no `enqueue` unit while a lease is live) and
+holds it, renews it while CI runs, releases it on exit; no landing step runs it, kb/Work PB3023 review R1-1),
+`next_unit.py` (no `enqueue` unit while a lease is live) and
 `stop.ps1 -Status`. Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 4.7.
 """
 from __future__ import annotations

@@ -5,14 +5,16 @@
 - ⛔ **THE LANDING IS A SCRIPT: `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023; MANDATORY-PRACTICES
   L1; DESIGN-test-build-ci.md §3.17.2 step 3).** One finished branch, one pull request. It merges origin/main into the
   branch (never a rebase: a branch that merged a same-file predecessor keeps its conflict resolutions), runs the ordered
-  gate and CI's Linux legs on the merged head under the shared gate slot (a commit gated GREEN is not gated again),
-  stamps the branch's `DEVLOG/pending-<slug>.md` (`devlog.py stamp`, the number from `alloc.py devlog`), runs the landing
-  checks (`devlog.py check` 6, `landing_oracle.py` 7, `landing_check.py` 3) and hands the branch to GitHub's merge
-  queue (`enqueue.py queue`: the PR titled from the DEVLOG entry, its body the entry and the commits; the queue's merge
-  commit keeps the branch's commits ancestors of main). While `ruleset.py check` does not report the queue ACTIVE it
-  lands through `push-main.sh` instead. Every run ends on one `=== ENQUEUE: ` line: run it in the background and block
-  on that line. Exits: 4 conflict · 5 a gate not GREEN · 3/6/7 a landing check · 9 GitHub refused · 10 push-main did not
-  land it. ⓜ 2026-10-10 under the trains: 233 of 567 lander minutes (41 %) were local whole-population gates, 94 more
+  gate and CI's Linux legs on the merged head under the shared gate slot (a commit gated GREEN, or a head that differs
+  from it only by main's commits, clean merges and DEVLOG-only commits, is not gated again), merges main in again when
+  it moved during the gate (no second gate: the merge group runs the whole population on the current main), stamps the
+  branch's `DEVLOG/pending-<slug>.md` (`devlog.py stamp`, the number from `alloc.py devlog`), runs the landing checks
+  (`devlog.py check` 6, `landing_oracle.py` 7, `landing_check.py` 3) and hands the branch to GitHub's merge queue
+  (`enqueue.py queue`: the PR titled from the DEVLOG entry, its body the entry and the commits; the queue's merge commit
+  keeps the branch's commits ancestors of main). Main takes only queued pull requests, so while `ruleset.py check` does
+  not report the queue ACTIVE it refuses before merging or gating anything. Every run ends on one `=== ENQUEUE: ` line:
+  run it in the background and block on that line. Exits: 4 conflict (before or after the gate) · 5 a gate not GREEN ·
+  3/6/7 a landing check · 8 the queue not ACTIVE · 9 GitHub refused · 11 unreviewed. ⓜ 2026-10-10 under the trains: 233 of 567 lander minutes (41 %) were local whole-population gates, 94 more
   push-main holding the lease while CI ran the same population, 10 landers for 6 trains, the first commit on main 6 h
   49 min into the day (kb/Work PB3015).
 - **Who runs it.** While the orchestrator loop runs (`python scripts/orchestrator/coord.py loop-state` prints `LOOP
@@ -34,16 +36,16 @@
   skill's branch form, MANDATORY-PRACTICES I10, kb/Work PB3027); a `Review: CLEAN` stamp at its tip makes it WAITING TO
   LAND. With the loop STOPPED the attended session runs `enqueue.py land` by hand for its own branch, no agent needed.
 - **What a script cannot decide goes to ONE finisher (L12).** A conflict (exit 4), a red gate (5), a DEVLOG or oracle
-  refusal (6, 7), a push-main CI red (10), or a pull request the queue BOUNCED (`prune_worktrees.py` reads ENQUEUED and
+  refusal (6, 7), or a pull request the queue BOUNCED (`prune_worktrees.py` reads ENQUEUED and
   BOUNCED from one GraphQL read of the open pull requests; offline the states are git-only) is the branch's own: one
   `cobol-finisher` with `templates/finisher-brief.md` fixes it at the root, gates and returns DONE; its commits are reviewed on the branch (I10) before `enqueue.py land` takes the new tip (an unreviewed tip is exit 11).
   Exit 3 (the landing check's STOP) is never retried as is. A permission refusal of `enqueue.py land` is handed off,
   never retried or routed around: `READY-TO-LAND <worktree> <branch>` (L13).
-- **The landing lease lives on the push-main path only (kb/Work PB2537).** `push-main.sh` takes
-  `scripts/orchestrator/landing_lease.py`'s lease, renews it while CI runs and releases it on exit (exit 4 while another
-  worktree holds it), and `next_unit.py` starts no `enqueue` unit while a lease is live; so while the queue is not
-  ACTIVE, landings go one at a time. A merge-queue landing takes no lease: the queue orders main. The lease, push-main.sh
-  and the `ci/**` branches go with the first change landed through the queue (kb/Work PB3024).
+- **No landing takes a lease: the merge queue orders main (kb/Work PB2537, PB3023 review R1-1).** `enqueue.py land`
+  never runs `push-main.sh` (main refuses a direct push since the ruleset went ACTIVE), so every waiting branch is
+  enqueued at once and main moving under a gate is merged in by the script. `push-main.sh`,
+  `scripts/orchestrator/landing_lease.py` and the `ci/**` branches are no longer a landing path; kb/Work PB3024's
+  remaining step deletes them.
 - ⛔ **No branch is left undecided (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600).** After every landing,
   `python scripts/prune_worktrees.py` (the lifecycle survey) then `--apply`, which deletes the LANDED branches; a branch
   that will not land is ABANDONED by a line in its kb/Work note (naming the branch, the word ABANDONED, the reason) and

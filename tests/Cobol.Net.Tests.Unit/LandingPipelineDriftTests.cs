@@ -100,6 +100,26 @@ public sealed class LandingPipelineDriftTests
         }
     }
 
+    /// <summary>enqueue.py's <c>land</c> asks for an ACTIVE queue before it merges main in, gates or stamps, and has no
+    /// other path onto main: the ruleset binds administrators, so a gate spent while the queue is off could land nothing,
+    /// and the former push-main.sh arm gated for half an hour with no landing lease held (kb/Work PB3023 review R1-1).</summary>
+    [Fact]
+    public void TheLandGuard_PrecedesTheMergeTheGateAndTheStamp_AndThereIsNoOtherPath()
+    {
+        string source = File.ReadAllText(TestRepo.Scripts("orchestrator", "enqueue.py"));
+        int landDef = source.IndexOf("\ndef land(", StringComparison.Ordinal);
+        Assert.True(landDef > 0, "enqueue.py has no `def land(` — the landing step moved; re-point this test");
+        string body = source[landDef..source.IndexOf("\ndef ", landDef + 1, StringComparison.Ordinal)];
+        int guard = body.IndexOf("if st != ruleset.ACTIVE:", StringComparison.Ordinal);
+        Assert.True(guard > 0, "enqueue.py's land() no longer tests the merge queue for ACTIVE");
+        foreach (string step in new[] { "merge_main(wt", "gates(wt)", "(stamp or _stamp)", "queue(wt" })
+        {
+            int at = body.IndexOf(step, StringComparison.Ordinal);
+            Assert.True(at > guard, $"in enqueue.py's land(), `{step}` is {(at < 0 ? "missing" : "BEFORE the queue guard")}");
+        }
+        Assert.DoesNotContain("push-main", body);
+    }
+
     [Fact]
     public void TheWorkflow_RunsTheMatrixOnTheMergeGroup_AndTheCheapJobsOnAPullRequest()
     {
@@ -140,22 +160,30 @@ public sealed class LandingPipelineDriftTests
             "an ACTIVE queue pushes the branch, opens one pull request and queues it with --auto",
             "a re-run reuses the branch's open pull request, moves its head and queues it again",
             "GitHub's refusal of the pull request list, the pull request or the queue is exit 9, never 0",
-            "HEAD beside origin/main is refused (rebase first), and HEAD on main is refused before any check",
+            "HEAD beside origin/main is refused (main brought in first), and HEAD on main is refused before any check",
             "HEAD at origin/main has nothing to land; an empty title or body is a usage error",
             "checks runs the three landing scripts on the range in order and maps each refusal to its own code: "
                 + "DEVLOG 6, oracle 7, landing check 3, unreadable 2",
             // kb/Work PB3023: the whole landing step, one script
+            "land: the migrating landing (the whole history added as files) titles its pull request from its ONE new "
+                + "entry, the landing rule's own (devlog.landing_entries)",
             "land: a dirty worktree is refused (exit 2) before anything is fetched, merged or gated",
             "land: a conflict bringing main in is exit 4: the merge is aborted, the branch unchanged, the report told "
                 + "which files, and nothing gated",
             "land: main is MERGED in (the branch's commits kept), and a host's red gate is exit 5 with the host named "
                 + "in the report, before any stamp",
-            "land: the queue not ACTIVE lands through push-main.sh after the gate and the stamp, opening no pull request",
-            "land: a re-run on the commit already gated GREEN does not gate again, a new commit does; push-main's "
-                + "landing-check refusal keeps its own code",
+            // review R1-1: main takes only queued pull requests, so nothing is merged or gated while the queue is off
+            "land: the queue not ACTIVE (ABSENT, DRIFT or SKIPPED) is exit 8 before anything is merged, gated, "
+                + "stamped or pushed: main takes only queued pull requests (kb/Work PB3023 review R1-1)",
             "land: an ACTIVE queue opens one pull request titled from the DEVLOG entry, whose body carries the entry "
                 + "and the commits, and queues it",
-            "land: push-main.sh failing (a CI red) is exit 10, never 0",
+            "land: a re-run on the commit already gated GREEN does not gate again, a new commit does; a landing "
+                + "check's refusal keeps its own code",
+            // review R1-2: the queue merges other pull requests while a branch gates
+            "land: main moving during the gate is merged in again WITHOUT a second gate and the branch is queued on "
+                + "the new main; a re-run on that head (a clean merge after the gated one) is not gated again",
+            "land: a conflict bringing the moved main in after the gate is exit 4: the merge is aborted, the branch "
+                + "unchanged, the report told, and nothing pushed or queued",
             // MANDATORY-PRACTICES I10, L9 (kb/Work PB3027): only a tip its CLEAN review stamp covers lands
             "review: a tip that moved after its CLEAN review only by main's commits, a clean merge of main and a "
                 + "DEVLOG-only commit is still reviewed",

@@ -57,8 +57,8 @@ Every outcome ends on ONE line `=== ENQUEUE: <OUTCOME> … ===` for a caller to 
   5. Print `ENQUEUED pr=<n> sha=<sha> branch=<branch> url=<url>` and exit 0. It never waits for CI: the merge group
      runs the matrix, and a red there bounces only this PR.
 
-`checks` — THE LANDING CHECKS, one sequence in one place (push-main.sh runs it too until PB3024 deletes it), each refusing on
-the landing's own range before a CI run is spent:
+`checks` — THE LANDING CHECKS, one sequence in one place (push-main.sh runs it too until PB3024 deletes it), each
+refusing on the landing's own range before a CI run is spent:
   devlog.py check   (exactly one new, stamped DEVLOG/ entry, numbered above main's; kb/Work PB2605, PB3025) → exit 6
   landing_oracle.py (the arch-oracle baseline describes the landed tree; kb/Work PB2885) → exit 7
   landing_check.py  (the R3 file-set partition and in-flight overlap; kb/Work PB2118) → exit 3 (STOP: re-plan, never

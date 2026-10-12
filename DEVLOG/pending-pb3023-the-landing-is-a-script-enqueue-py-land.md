@@ -49,5 +49,13 @@ its CLEAN stamp, and the finisher returns DONE for a re-review instead of landin
 and clerk lanes, which I10 does not review, pass `--lane`). The rest was stale text naming retired artifacts or the
 inner `queue` verb as the route.
 
-Left for others, named in the notes: push-main.sh, landing_lease.py and `ci/**` go with the first queued landing
-(PB3024); the landing measurement with PB3028.
+The second review round found the landing step itself could not land in the live configuration: its push-main arm
+merged and gated for half an hour with no landing lease held, though main now refuses a direct push; any pull request
+the queue merged during a gate made `queue` refuse a head that no longer descended from main, and every re-run
+re-gated into the same race; and the pull request was titled from a file-name test that read this migrating branch as
+1,940 new entries. `land` now refuses before it merges or gates anything while the queue is not ACTIVE, merges a moved
+main in again after its gate without a second gate (the merge group runs the whole population on the current main),
+and titles the pull request from `devlog.new_entries`, the one definition the DEVLOG check and the re-stamp read too.
+
+Left for others, named in the notes: push-main.sh, landing_lease.py and `ci/**` are no longer called by any landing
+step and are deleted by PB3024's remaining step; the landing measurement with PB3028.
