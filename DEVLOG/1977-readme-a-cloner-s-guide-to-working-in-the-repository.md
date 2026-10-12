@@ -1,4 +1,4 @@
-## README: a cloner's guide to working in the repository, building and running the compiler
+## Entry 1977 — 2026-10-12 16:09 PDT — README: a cloner's guide to working in the repository, building and running the compiler
 
 The owner, 2026-10-12: "ensure the README.md in the COBOL repo root is up to date and comprehensively informs a repo
 cloner how to work in the repo, build and run the compiler", written by a writing skill. The Mythos session rewrote
@@ -26,3 +26,4 @@ What changed, and why each part is there:
   section now names the inventory file and the commands that compute the numbers for the commit the reader is on.
 
 No code changed.
+
