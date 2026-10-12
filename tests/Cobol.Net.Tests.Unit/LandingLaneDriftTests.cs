@@ -25,6 +25,7 @@ namespace CobolNet.Tests.Unit;
 /// <para>The lane's own decisions (which exit is retried, which waits for the enqueue unit, the halt, the stops) are
 /// <c>land_lane.py --self-test</c>'s, which the self-test runner discovers and runs in every gate and in CI.</para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class LandingLaneDriftTests
 {
     /// <summary>A command that lands a branch: <c>enqueue.py land</c>, however it is spelled out.</summary>

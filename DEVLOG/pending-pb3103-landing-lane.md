@@ -62,7 +62,10 @@ writes on a conflict ("re-runs enqueue.py"). All four now say the finisher retur
 landing lane lands it, and a no-commit resolution is re-armed. Nothing guarded this wording but a hand grep, so
 `LandingLaneDriftTests.NoCurrentFile_SaysTheEnqueueUnitLands` now sweeps the tracked tree outside the history paths for
 the retired phrasings. Its planted-failure fact checks that each phrasing is found and that the current sentences
-("lands nothing itself", "its lane lands it", "the enqueue unit's `rearm`") are not.
+("lands nothing itself", "its lane lands it", "the enqueue unit's `rearm`") are not. Reading the tracked tree makes
+the class a tree-wide sweep (`drift_rules.py --sweeps`), so it carries `[Trait("Sweep", "tree")]`: the landing's Linux
+gate found it without the trait (`HostWitnessTraitDriftTests.TheSweepTrait_IsExactlyDriftRulesTreeWideSweeps_AndThePlannerSeesEveryTrait`),
+a test the Windows leg 1 never runs because its recorded 7.2 s exceeds the planner's 2-second cheap-sweep bound.
 
 **Measure after it lands:** `landing_measure.py summary` (DONE → enqueued → merged per pull request) for the first waves
 after the lane against wave 1069's landings.
