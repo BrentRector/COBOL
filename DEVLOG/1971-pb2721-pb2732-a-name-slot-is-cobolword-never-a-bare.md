@@ -1,4 +1,4 @@
-## PB2721 + PB2732: a name slot is cobolWord, never a bare IDENTIFIER, and an index-name is a word
+## Entry 1971 — 2026-10-12 14:48 PDT — PB2721 + PB2732: a name slot is cobolWord, never a bare IDENTIFIER, and an index-name is a word
 
 Wave 1069 H took two R2 findings that share one root: a user-defined-word slot in the grammar that does not admit the
 word set its declaration admits. ISO §8.3.2.1 3) lets a §8.10 context-sensitive word be a user-defined word outside its
@@ -41,3 +41,4 @@ which made those tokens cobolWord alternatives); it gains the golden and the dri
 4,777/11,490, Unit 32,629/33,455, Characterization 36/36 in leg 1), with the new golden, negative and drift test among
 the passes; the inventory and register drift tests leg 1 left out pass in a targeted run (22/22). Semgrep counts are
 unchanged.
+
