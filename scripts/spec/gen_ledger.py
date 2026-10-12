@@ -788,11 +788,11 @@ def inputs_text(inputs: dict) -> str:
         items.append(f'the planner (<span class="mono">model_rules.json</span> <span class="mono">wave</span>): '
                      f'{n(w["max_notes_per_group"])} notes per group (a campaign\'s and a held cluster\'s groups are counted '
                      f'at this cap, a lower bound: a campaign clusters by the sites its notes name), {n(w["max_groups"])} groups '
-                     f'per wave, {n(w["train_size"])} groups per train, implementers on {e(m)}')
+                     f'per wave, implementers on {e(m)}')
         items.append(f'the cost constants (<span class="mono">cost</span>, <span class="mono">calibration</span>): a group '
                      f'{n(c["per_group_tokens"][m])} + {n(c["per_note_tokens"][m])} tokens per note at {n(cal[m])} {e(m)} '
-                     f'tokens per weekly point; a lander {n(c["lander_tokens"])} at {n(cal[c["lander_model"]])} '
-                     f'{e(c["lander_model"])} tokens per point, one per train')
+                     f'tokens per weekly point; a landing {n(c["landing_tokens"])} at {n(cal[c["landing_model"]])} '
+                     f'{e(c["landing_model"])} tokens per point, one per group (enqueue.py, kb/Work PB3023)')
     if rate:
         # What the minutes measure is the headline's to say (landing_measure.headline): DONE → on main for the merge
         # queue, a floor (lander start → push) for the retired trains. Never a label of this page's own.
@@ -1247,9 +1247,9 @@ def self_test() -> int:
     cells = re.findall(r'<td class="r">(.*?)</td>', est)
     check("a missing input renders UNMEASURED, never a number",
           bool(cells) and all(c == UNMEASURED for c in cells), str(cells)[:300])
-    rules = {"wave": {"max_notes_per_group": 5, "max_groups": 8, "train_size": 5, "implementer_model": "sonnet"},
+    rules = {"wave": {"max_notes_per_group": 5, "max_groups": 8, "implementer_model": "sonnet"},
              "cost": {"per_group_tokens": {"sonnet": 400000}, "per_note_tokens": {"sonnet": 240000},
-                      "lander_tokens": 480000, "lander_model": "opus"},
+                      "landing_tokens": 96000, "landing_model": "opus"},
              "calibration": {"tokens_per_point": {"sonnet": 4000000, "opus": 1600000}}}
     full = {"rules": rules, "fix_groups": {"clusters": [{"notes": [{"id": "PB9001"}]}], "unsited": []},
             "rate": {"per_h": 2.0, "changes": 4, "window_h": 2.0, "landings": 1, "median_min": 30.0,
@@ -1399,6 +1399,14 @@ def main() -> int:
     import account  # noqa: PLC0415
     import ledger_state  # noqa: PLC0415  (imports this module for STAMP_PATHS; loaded only here, after a render)
     print(ledger_state.publish_hint(COORD_DIR, account.current().name))
+    # The page describes THIS checkout; a checkout behind main (every landing is pushed from a lander's worktree) renders
+    # a page mark-published will refuse, so say so here, before the publish (kb/Work PB2987).
+    try:
+        stale = ledger_state.stale_checkout_line(REPO, ledger_state.state(REPO, COORD_DIR, account.current().name))
+    except ledger_state.NoMain as e:
+        stale = f"main's stamp not read ({e})"
+    if stale:
+        print(f"⛔ NOT MAIN'S PAGE: {stale}")
     return 0
 
 

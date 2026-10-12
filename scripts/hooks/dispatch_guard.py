@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """PreToolUse hook (matcher Agent|Workflow) — REFUSE a fleet dispatch unless the `workstream` skill was loaded in this
-session, and refuse an implementer or lander dispatch whose brief is not a checked, rendered spec or template.
+session, and refuse an implementer or finisher dispatch whose brief is not a checked, rendered spec or template.
 
 Owner, 2026-09-30, after an orchestrator hand-wrote three implementer briefs from memory and skipped
 .claude/skills/workstream/SKILL.md (MANDATORY-PRACTICES O9): "Reconfigure such that all future sessions cannot skip
 learning this." A sentence in CLAUDE.md or memory was already there and was skipped, so the rule is structural:
 
   0. In a unit of the orchestrator loop (the supervisor exports COBOL_LOOP_UNIT), a Workflow call or an implementer or
-     lander Agent call is refused while the supervisor's wind-down signal <coord>/STOP-UNIT exists (kb/Work PB2597).
-  1. Agent (cobol-implementer or cobol-lander) and Workflow calls need a Skill call for `workstream` earlier in THIS
+     finisher Agent call is refused while the supervisor's wind-down signal <coord>/STOP-UNIT exists (kb/Work PB2597).
+  1. Agent (cobol-implementer or cobol-finisher) and Workflow calls need a Skill call for `workstream` earlier in THIS
      session's transcript (or a /workstream command). The skill is what carries the mandatory practices.
-  2. An Agent call for cobol-implementer or cobol-lander must name, in its prompt, a RENDERED spec
+  2. An Agent call for cobol-implementer or cobol-finisher must name, in its prompt, a RENDERED spec
      (`msg-w<wave>-<letter>.txt`, from make_dispatch_specs.py) or a brief under workstream/templates, and
      check_practices.py must print `=== PRACTICES CHECK: GREEN ===` over it. A hand-written inline brief is refused.
 
@@ -26,10 +26,9 @@ hook must never wedge a session).
      script and args) AND from every brief, spec or args file it names, one level deep: a prompt that names only its
      brief carries its notes there (Draft 9, the eighth refuter's K2). Recording never blocks: a failure to record
      is silent, like every other hook failure. The landing check (landing_check.py) is the guarantee behind it.
-  4. A cobol-lander Agent call names the orchestrator loop's state, filled in (`LOOP STATE: running|stopped`, from
-     `python scripts/orchestrator/coord.py loop-state`), in its prompt or its rendered spec: while the loop runs its
-     land unit is the one landing queue (MANDATORY-PRACTICES O11, kb/Work PB2602: attended landers raced it for main,
-     and every train was rebased, re-gated and re-run in CI each time the other landed).
+There is no lander to guard (kb/Work PB3023): a branch lands through `scripts/orchestrator/enqueue.py land`, a script, and
+its rule 4 (a lander dispatch named the loop's state) retired with the role; LandingPipelineDriftTests holds that no other
+file opens or queues a pull request.
 """
 import json
 import os
@@ -55,8 +54,7 @@ PLAN_WAVE = REPO / "scripts" / "orchestrator" / "plan_wave.py"
 READ_ONLY_ROLES = {"cobol-refuter", "cobol-adjudicator", "cobol-locator", "cobol-reviewer", "Explore", "Plan", "claude-code-guide",
                    "statusline-setup"}
 TEMPLATES = REPO / ".claude" / "skills" / "workstream" / "templates"
-JUDGMENT_ROLES = {"cobol-implementer", "cobol-lander"}
-LOOP_STATE = re.compile(r"LOOP STATE:\s*(?:running|stopped)\b")   # rule 4: filled in, never the {LOOP_STATE} placeholder
+JUDGMENT_ROLES = {"cobol-implementer", "cobol-finisher"}
 LOADED = re.compile(
     r'"skill"\s*:\s*"(?:[\w-]+:)?workstream"'                     # a Skill tool call
     r'|<command-name>/?workstream</command-name>'                  # the user typed /workstream
@@ -131,7 +129,7 @@ if tool == "Agent" and role not in JUDGMENT_ROLES:
 transcript = data.get("transcript_path") or ""
 if transcript and not skill_loaded(transcript):
     block("this session has not loaded the `workstream` skill. Invoke it with the Skill tool (skill: workstream) and "
-          "follow it BEFORE dispatching any implementer, lander or fleet: it carries .claude/skills/workstream/"
+          "follow it BEFORE dispatching any implementer, finisher or fleet: it carries .claude/skills/workstream/"
           "templates/MANDATORY-PRACTICES.md, the rendered-spec rule (make_dispatch_specs.py, check_practices.py), the "
           "rolling wave, the meter read and the graceful STOP. Owner 2026-09-30: no session may skip it.")
 
@@ -152,14 +150,6 @@ if tool == "Agent":
         sys.exit(0)
     if "=== PRACTICES CHECK: GREEN ===" not in out.stdout:
         block("check_practices.py is not GREEN over this brief:\n" + (out.stdout + out.stderr)[-1500:])
-    # ONE LANDING QUEUE (MANDATORY-PRACTICES O11, kb/Work PB2602): a lander dispatch names the loop's state, filled in,
-    # so the dispatcher has looked before racing the loop's land unit for main.
-    named = prompt + "".join(p.read_text(encoding="utf-8", errors="replace") for p in specs)
-    if role == "cobol-lander" and not LOOP_STATE.search(named):
-        block("a lander dispatch must name the loop's state, filled in: `LOOP STATE: running` or `LOOP STATE: stopped` "
-              "(from `python scripts/orchestrator/coord.py loop-state`). While the loop runs its land unit is the ONE "
-              "landing queue: write the attended branch's DONE report instead, or, if it truly cannot wait, dispatch "
-              "ONE lander carrying every WAITING TO LAND branch and say why (MANDATORY-PRACTICES O11, kb/Work PB2602).")
     record_hand_dispatch(args, role)
 else:
     record_hand_dispatch(args, "", "Workflow")

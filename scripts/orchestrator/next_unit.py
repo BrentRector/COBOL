@@ -10,22 +10,22 @@ Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-l
      one included) and every check below, because the operator is the one actor that sees the whole machine. The
      campaign rule does not re-decide it either; a `campaign` steer runs the first --cluster lead.
   1. the handoff carries owner_question            -> owner-question
-  2. the handoff names next_unit                    -> that unit (but not `land` while the landing lease is held);
+  2. the handoff names next_unit                    -> that unit (but not `enqueue` while the landing lease is held);
      a wave-type unit (`wave` or `campaign`) names only a WAVE, and with --cluster the campaign rule below decides
      its lane (kb/Work PB2522)
   3. no meter reading of THIS account in 3 hours   -> meter (two accounts share readings.json; kb/Work PB2478)
   4. the repository is dirty or has unpushed commits -> resume
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
-  6. branches_pending with status DONE               -> land, unless another lander holds the landing lease
-     (landing_lease.py, kb/Work PB2537): then rule 7 chooses, and its reason says the land waits and on whom (a
-     handoff that named `land` is deferred the same way, at rule 2)
+  6. branches_pending with status DONE               -> enqueue, unless push-main.sh holds the landing lease
+     (landing_lease.py, kb/Work PB2537): then rule 7 chooses, and its reason says the enqueue waits and on whom (a
+     handoff that named `enqueue` is deferred the same way, at rule 2)
   7. otherwise                                       -> wave
 THE CAMPAIGN RULE (--cluster LEAD, repeatable: the CAMPAIGN lane, kb/Work PB2120) decides every wave-type choice, from
 rule 2 or rule 7: `campaign` when a lead's cluster has a ready note and the last wave-type unit was not a campaign, so
 campaign waves alternate with fix-lane waves; the ready leads take turns, least recently run first, and the JSON names
 the one chosen in `cluster`. A wave-type choice then carries `campaign` (run | between | waiting | landed | unknown, the
-lane as a whole), and its reason keeps a land the lease deferred. With --cluster every choice but an owner question
+lane as a whole), and its reason keeps an enqueue the lease deferred. With --cluster every choice but an owner question
 carries `campaigns` ({lead: ready | waiting | landed | unknown}: the supervisor ends a lead's lane at `landed` and
 records the map in units.jsonl) and `starved` (the leads whose ready note has waited through more than one wave-type
 unit since their own last campaign wave, measured from that record). Without --cluster the output is the fix lane's,
@@ -201,12 +201,12 @@ def campaign_choice(lanes: dict[str, dict], history: list[dict], named_reason: s
 def base_choice(h: dict, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetime, last_failed: bool,
                 last_started: dt.datetime | None, max_meter_age_h: float,
                 acct_name: str) -> tuple[dict[str, str], str]:
-    """Rules 2 to 7: the unit, before the campaign rule decides the lane of a wave-type one, and the land the landing
+    """Rules 2 to 7: the unit, before the campaign rule decides the lane of a wave-type one, and the enqueue the landing
     lease deferred ('' when none), which the campaign rule's reason keeps."""
-    # ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while another lander holds the landing lease a `land` unit would
-    # only wait for it, so neither a handoff naming `land` nor finished branches start one; the other rules choose.
+    # ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while push-main.sh holds the landing lease (an enqueue.py landing while the merge queue is not ACTIVE) an `enqueue` unit would
+    # only wait for it, so neither a handoff naming `enqueue` nor finished branches start one; the other rules choose.
     lease = landing_lease.current(cdir, now)
-    land_deferred = lease is not None and h.get("next_unit") == "land"
+    land_deferred = lease is not None and h.get("next_unit") == "enqueue"
     if h.get("next_unit") and not land_deferred:
         return {"unit": h["next_unit"], "reason": "named by the last handoff: " + h.get("next_unit_reason", "")}, ""
     age = meter_age_hours(cdir, now, acct_name)
@@ -224,10 +224,10 @@ def base_choice(h: dict, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetim
             return {"unit": "resume", "reason": "unlanded branches from the last unit: " + ", ".join(fresh)}, ""
     done = [b["branch"] for b in h.get("branches_pending", []) if b.get("status") == "DONE"]
     if done and lease is None:
-        return {"unit": "land", "reason": "finished branches waiting: " + ", ".join(done)}, ""
+        return {"unit": "enqueue", "reason": "finished branches waiting: " + ", ".join(done)}, ""
     deferred = ""
     if done or land_deferred:
-        deferred = (f"; land deferred ({', '.join(done) or 'named by the last handoff'}): the landing lease is "
+        deferred = (f"; enqueue deferred ({', '.join(done) or 'named by the last handoff'}): the landing lease is "
                     + landing_lease.describe(lease, now))
     return {"unit": "wave", "reason": "nothing pending" + deferred}, deferred
 
@@ -253,7 +253,7 @@ def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt
     lanes = lane_states(clusters, work_dir)
     history = unit_history(cdir)
     if choice["unit"] in WAVE_TYPES and not choice.get("operator"):
-        # The handoff named THIS wave only when its next_unit is wave-type: a `land` the lease deferred named none.
+        # The handoff named THIS wave only when its next_unit is wave-type: an `enqueue` the lease deferred named none.
         named = h.get("next_unit_reason", "") if h.get("next_unit") in WAVE_TYPES else None
         choice = campaign_choice(lanes, history, named)
         choice["reason"] += deferred

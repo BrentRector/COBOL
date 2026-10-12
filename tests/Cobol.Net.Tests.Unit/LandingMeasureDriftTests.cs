@@ -50,7 +50,7 @@ public sealed class LandingMeasureDriftTests
     {
         Assert.False(File.Exists(TestRepo.Scripts("orchestrator", "train_measure.py")),
             "scripts/orchestrator/train_measure.py was replaced by landing_measure.py (kb/Work PB3028): delete it, never keep a second writer");
-        string[] narrative = ["docs/", "kb/", "adjudication/", "specs/", "tests/", "DEVLOG.md"];
+        string[] narrative = ["docs/", "kb/", "adjudication/", "specs/", "tests/", "DEVLOG/"];
         const string TheReplacement = "scripts/orchestrator/landing_measure.py";   // names the script it replaced, once, in its docstring
         IReadOnlyList<string> tracked = TrackedTree.Files();
         Assert.True(tracked.Count >= 1000, $"`git ls-files` reported only {tracked.Count} paths — the sweep would scan nothing");

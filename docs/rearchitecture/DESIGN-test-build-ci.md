@@ -97,7 +97,7 @@ measured on `5bf5a7f1`), so any shard edit renames the context, and every matrix
 push, which a required check reads as "never reported".
 
 **The doc-only skip moved one layer down.** `paths-ignore` used to make the workflow decline to START for a
-`DEVLOG.md` / `docs/**` / `kb/**` / `PROMPT.md` / `CLAUDE.md` / `README.md` push — incompatible with a per-commit
+`DEVLOG/**` / `docs/**` / `kb/**` / `PROMPT.md` / `CLAUDE.md` / `README.md` push — incompatible with a per-commit
 required check, which has nothing to satisfy when no run exists. The identical list now lives in `changes` (one
 copy, no trigger-side twin to drift against), which diffs `github.event.before .. github.sha` and outputs
 `run_matrix`; every other job carries `needs: changes` + `if: needs.changes.outputs.run_matrix == 'true'`. When
@@ -106,7 +106,9 @@ copy, no trigger-side twin to drift against), which diffs `github.event.before .
 run, so the fast-forward onto main does not pay for the matrix a second time, and it carries the drift check that
 asserts every job id is in `ci-gate`'s `needs` list.
 
-**The landing protocol is `scripts/push-main.sh`, and it is the only way a commit reaches main**: push HEAD to
+**The landing protocol WAS `scripts/push-main.sh` (superseded by §3.17: since the ruleset went ACTIVE, main takes only
+pull requests GitHub's merge queue tested, and `enqueue.py land` is the one landing step; PB3024 deletes the script)**:
+push HEAD to
 `ci/<short-sha>` → find the run for that exact sha → `gh run watch --exit-status` → on green fast-forward main and
 delete the branch, on red print the failing jobs and exit non-zero with main untouched. A check run is attached to
 the COMMIT, not to a branch, which is why the verdict earned on `ci/<sha>` is the one the protection reads on main.
@@ -401,8 +403,8 @@ checkout (a failed regen fails the build — keep).
   reviewed-re-baselined in this change set"), a top STATE banner naming the current phase, and the owner-decisions
   table. This is what a future engineer resumes the REARCH from; the plan §0 banner is the feature-drive live
   state and cross-links to it.
-- **DEVLOG.md** — unchanged discipline (descending, real timestamp, one entry per landing on main, checked by `push-main.sh` through
-  `scripts/orchestrator/landing_devlog.py`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
+- **DEVLOG/** — one file per entry (§3.17.4, kb/Work PB3025), rendered descending; a real timestamp; one entry per
+  landing on main, checked by `push-main.sh` and CI through `python scripts/devlog.py check`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
   `feedback_devlog*` memories. Each rearch phase commit references its ROADMAP phase id.
 - **`docs/DOC_INDEX.md`** — add rows for `COBOLNET_REARCHITECTURE_PLAN.md` (the migration SSOT / ROADMAP),
   `DIAGNOSTICS.md`, this doc, and the sibling `DESIGN-*` / `PHASE-*` docs; keep the "one canonical doc per subsystem" rule.
@@ -1685,22 +1687,37 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    returns DONE), reviewed again, at most `review_fix_rounds` (2) times; after that the FINDINGS stamp stays and
    `plan_wave.py` plans a finisher for it. Only a branch stamped CLEAN at its tip is landable: the wave hands its
    trains only those, and `prune_worktrees.py` lists any other DONE branch WAITING FOR REVIEW (a land unit dispatches
-   the reviewer for one finished outside a wave). The landing step never reviews and never fixes; the lander's former
-   train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
+   the reviewer for one finished outside a wave). The landing step never reviews and never fixes, but it ENFORCES the
+   stamp: `enqueue.py land` refuses (exit 11, UNREVIEWED) a branch whose newest report's CLEAN stamp names no commit of
+   it, or after which it gained a commit that is not main's, a clean merge of main (its tree the auto-merge of its
+   parents) or DEVLOG-only — a finisher's fix, a hand-resolved conflict — so that work is reviewed at its new tip first;
+   the lanes I10 does not review (the registrar, the golden lane, the clerk: notes and spec-derived goldens) name
+   themselves with `--lane`. The lander's former train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
    `review_findings.py summary` measures findings per branch, the re-review rate and reviewer minutes.
-3. **Enqueue** (`scripts/orchestrator/enqueue.py <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; rebase the
-   branch onto `origin/main` (a conflict stops it: the branch returns to WAITING with the conflict named, a finisher
-   resolves); run the ONE local gate on the rebased head (§3.17.3); run the landing checks that used to live in
-   `push-main.sh` — `landing_devlog.py` (exactly one new entry file, well-formed) and `landing_check.py` (the R3 file-set
+3. **Enqueue** (`scripts/orchestrator/enqueue.py land <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch;
+   the review stamp (step 2; exit 11); MERGE
+   `origin/main` into the branch — not a rebase, corrected at implementation: a branch that merged a same-file
+   predecessor or a sibling carries conflict resolutions in its merge commits, which a rebase discards and asks for
+   again, and the queue lands by merge commit anyway (a conflict stops it, exit 4: the merge is aborted, the branch's
+   report gains `BLOCKED: enqueue … conflict in <files>`, a `cobol-finisher` resolves); run the ONE local gate on the
+   merged head (§3.17.3; exit 5 on a red, the host named; a commit gated GREEN, or a head that differs from it only
+   by main's commits, clean merges and DEVLOG-only commits — `prune_worktrees.unreviewed_since`, the review's coverage
+   rule — is not gated again on a re-run); bring main in AGAIN when it moved during the gate, without a second gate
+   (review R1-2, corrected at implementation: the queue merges other pull requests while a branch gates, `queue` takes
+   only a head that descends from main, and re-gating every such head would race the queue forever; the merge group
+   below integrates the branch on the current main and runs the whole population; a conflict here is exit 4 too);
+   `devlog.py stamp` numbers the entry (re-stamping one main has overtaken); run the landing checks that used to live in
+   `push-main.sh` — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
-   whole population, no whole-leg WSL run (the targeted leg runs on both hosts, §3.17.3), no waiting for CI.
+   whole population, no waiting for CI. Until the targeted leg runs on both hosts (§3.17.3, PB3022 item 10) the
+   gate at enqueue adds CI's Linux legs under WSL (`linux-gate.sh --nice`); then that row goes.
 4. **The merge queue** (PB3024): GitHub builds the merge group (several queued PRs on top of `main`), the workflow runs on
    the `merge_group` event — the full matrix: Linux and Windows, the sharded conformance legs, unit + characterization,
    the population check (§3.14.4), audits, guard, INV-1 — `ci-gate` stays the one required check, and main advances in
    order. A red bounces only the PR that caused it (GitHub re-tests the rest); the loop sees the bounce
    (`gh pr view --json mergeQueueEntry,statusCheckRollup`), names the CI red in the branch's report and dispatches a
-   finisher; the fixed branch is enqueued again.
+   finisher; the fixed branch is reviewed again at its new tip (step 2), then enqueued again.
 5. **On `main`**: the merged commit is the tested merge-group tree. The `push` run keeps only `changes` + `ci-gate` (the
    record the probe reads); the matrix runs on `merge_group` and `workflow_dispatch`. On `pull_request` only the cheap
    jobs run (audits, the DEVLOG and work-register checks), so twenty PRs do not queue eighty matrix jobs behind the
@@ -1755,15 +1772,29 @@ demand and not committed.
   is renamed and its header completed, one commit on the branch before the pull request opens), so number order IS
   enqueue order IS queue order IS landing order, and "newest first" by number is newest first on main (operator review
   item 2; a bounced PR keeps its number, gaps are fine). `python scripts/devlog.py render [--since NNNN] [--out <file>]`
-  prints the descending narrative (`DEVLOG.rendered.md` is gitignored); `devlog.py check` is what `landing_devlog.py`
-  becomes (exactly one new, stamped entry file in the PR, header well-formed, number unused on `main`; a `pending-`
-  file in a PR is a red). **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
+  prints the descending narrative (`DEVLOG/README.md` first, then the entries newest first, the files concatenated
+  byte for byte; `DEVLOG.rendered.md` is gitignored); `devlog.py check` is the landing rule `landing_devlog.py` was
+  (exactly one new, stamped entry file in the PR — new meaning a header the base's history lacks — numbered above
+  every number on the base, header well-formed; a `pending-` file, a stray file, an entry whose header disagrees with
+  its name, two files with one number, the monolith back, or a deleted entry is a red — a deleted entry counts the
+  base's monolith too, header by header, so the one landing that migrates the log cannot drop an entry main has), run
+  by the landing checks (`enqueue.py checks`, which push-main.sh runs too) and by CI's `audits` job on every pull request, merge group and `ci/**` landing branch. Its tree half (`lint`) also runs
+  over the repository's own `DEVLOG/` in `devlog.py --self-test`, so every gate holds the whole log to it. **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
   format"):** LF everywhere — `.gitattributes` `* text=auto eol=lf`, `merge.renormalize`, one normalization landing,
   tools write LF, a drift check refuses a CR in any tracked text file; the index is already LF for 15,234 files, so the
   change is what the WORKING TREE shows each OS, and the entry files below are written LF. A ONE-TIME migration script
-  splits the 1,976 entries of the 7.1 MB CRLF `DEVLOG.md` into files content-faithfully with LF line endings (PB3029)
-  and deletes `DEVLOG.md` and `prepend-devlog.py` in the same landing; CLAUDE.md rule 6, the `devlog` memory and skill, `session-probe`, the ledger
-  and every brief that says "the TOP of DEVLOG.md" change in that landing. Rule 6's substance is untouched: one entry per
+  (`scripts/devlog_migrate.py`, deleted by the landing that runs it last, on main's `DEVLOG.md` after its final rebase,
+  and which writes the history's range into `DEVLOG/README.md`) split every entry of the 7.1 MB
+  mixed-CRLF `DEVLOG.md` into files with LF line endings (PB3029), PROVED by rendering them byte-identical to the
+  LF-normalized monolith, and deleted `DEVLOG.md`, `prepend-devlog.py` and `landing_devlog.py`. The history keeps
+  every header as written; the twenty numbers the monolith used twice (008-014, 171-185) and 1191a-1191d carry a
+  letter in the FILE name (`0185b-…` above `0185a-…`) so the render keeps the monolith's order; CLAUDE.md rule 6, the skills and every brief that said "the TOP of
+  DEVLOG.md" changed in that landing (`session-probe` and the ledger read no DEVLOG; the `devlog` memory and the public
+  `brent-tools:devlog` skill live outside this repository and are the attended session's to update). `enqueue.py
+  land` (PB3023) stamps, one branch per landing: a branch that merged an unlanded predecessor (a same-file successor,
+  a review finisher; `prune_worktrees.contained`) lands that predecessor THROUGH it, so `devlog.py stamp` folds every
+  pending file the branch carries into its one entry, oldest first, each body under its own title
+  (MANDATORY-PRACTICES L8). Rule 6's substance is untouched: one entry per
   landing on main, newest first, the only history.
 - **Generated indexes leave the tree (PB3026, landed):** a derived index is a RENDERED VIEW: gitignored, rendered on demand
   by its generator, never committed. `scripts/rendered_views.py` holds the ONE registry (`VIEWS`): `docs/DRIFT_RULES.md`
@@ -1790,14 +1821,27 @@ demand and not committed.
 
 #### 3.17.5 The loop's units and the fleet after this design (PB3023, PB3024, PB3027; DESIGN-orchestrator-loop.md §3, §4.7, §9)
 
-- `land` becomes **`enqueue`**: for every WAITING TO LAND branch (`prune_worktrees.py --brief`), in harm order, run
-  `enqueue.py`; dispatch a finisher for a rebase conflict or a queue bounce; render the ledger; hand off. It is mostly
-  a script run; its model turns are the finisher dispatches and the handoff.
-- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md`, `golden-lander-brief.md`, `train_apply.py`,
-  `landing_lease.py`, `push-main.sh` and the `ci/**` branches retire** (CLAUDE.md rule 4: delete, never wrap).
-  `cobol-lander` becomes `cobol-finisher` (resolve a conflict, fix a bounce, re-enqueue; turn cap 160).
-- `wf_rolling_wave.js` **starts no lander**: a wave produces DONE branches; the enqueue unit lands them. This removes
-  PB3016's policy question (may THIS wave land?) by removing the mechanism; `train_size` and `min_final_train` go.
+- `land` became **`enqueue`** (PB3023, `units/enqueue.md`): for every WAITING TO LAND branch (`prune_worktrees.py
+  --brief`, which lists them in harm order), run `enqueue.py land`; dispatch ONE `cobol-finisher` (`finisher-brief.md`)
+  for a conflict, a red gate, a DEVLOG or oracle refusal, or a queue bounce (`prune_worktrees.py` BOUNCED, from one
+  GraphQL read of the open pull requests: in the merge queue → ENQUEUED, removed from it at the branch's tip → BOUNCED
+  with GitHub's reason; offline the states are git-only); one `cobol-clerk` files the reports' leads; render the ledger;
+  hand off. It is mostly a script run; its model turns are the review and finisher dispatches and the handoff. While
+  the queue is not ACTIVE, `enqueue.py land` refuses before it merges or gates anything (exit 8): main takes only
+  queued pull requests (the ruleset binds administrators), so a push-main arm could land nothing and gated half an hour
+  with no lease held (review R1-1, corrected at implementation; the phase-1 bridge that kept push-main until the
+  owner's ruleset go retired once the ruleset was ACTIVE).
+- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md` and `train_apply.py` are retired** (PB3023;
+  CLAUDE.md rule 4: deleted, never wrapped); `golden-lander-brief.md` became `golden-lane-brief.md` (the lane-1
+  integrator, landing through `enqueue.py land --lane golden`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing
+  order is `--brief`'s); `dispatch_guard.py`'s lander rule went with the role. `cobol-lander` became `cobol-finisher`
+  (resolve a conflict, fix a red or a bounce, gate and return DONE: its commits are reviewed on the branch before the
+  next enqueue unit lands the new tip; turn cap 160). `landing_lease.py`,
+  `push-main.sh` and the `ci/**` branches retire with the first change landed through the queue (PB3024).
+- `wf_rolling_wave.js` **starts no lander** (PB3023): a wave produces DONE branches reviewed CLEAN; the enqueue unit
+  lands them. This removed PB3016's policy question (may THIS wave land?) with the mechanism; `train_size`,
+  `min_final_train`, `lead_ids_per_train` and the lead-id blocks are gone, and the planner prices each group's landing
+  at `landing_tokens` (`model_rules.json`) instead of one lander per train.
 - **Measurement** (PB3028, landed): `landing_measure.py` replaced `train_measure.py`, which is deleted with its drift
   test. One record per pull request in `<coord>/landing-measurements.jsonl`, built up by patches because no tool sees
   a whole landing: `enqueue.py queue` writes the enqueue time, each carried change's DONE (`done_times`: the committer time of the HEAD commit its DONE implementer report names, never the report file's time, which the branch review's stamp rewrites; the changes are the reports naming the branch plus those a train commit's `Report:` line names, one per lead note, each the earliest of its finisher chain; a report whose HEAD is already an ancestor of origin/main is a change that landed before this one and counts for nothing, because the queue's MERGE method makes every landed head an ancestor of every later branch) and the worktree's local gate seconds (the sum of its `verdict.json` `timings.wall_s`);
@@ -1881,11 +1925,12 @@ queues a pull request except `enqueue.py`, and its queue guard precedes its chec
 self-test arms of `enqueue.py` and `ruleset.py` are declared. The live ruleset is compared by `ruleset.py check`, whose
 consumers are the landing (exit 8 on anything but ACTIVE) and the session probe's `gate :` line, not an xUnit arm (the
 suite has no dynamic skip, and an offline comparison must read SKIPPED, never green). Later arms, with the change that
-retires each: no file in the tree references `push-main.sh`, `landing_lease.py` or `train_apply.py`; `DEVLOG.md` does
-not exist and every `DEVLOG/*.md` has a well-formed header and a unique number; no generated index is tracked
+retires each: no file in the tree references `push-main.sh`, `landing_lease.py` or `train_apply.py`; no generated index is tracked
 (`git ls-files` ∩ the generators' outputs is empty). Landed with kb/Work PB3022's first part: `GateLegDriftTests` (no
 caller names a gate mode) and `HostWitnessTraitDriftTests` (`TIER_ORDER` contains `0h` and every race-witness class
-carries the `Host` trait).
+carries the `Host` trait). Landed with kb/Work PB3025: `DEVLOG.md` does not exist and every `DEVLOG/*.md` has a
+well-formed header and a unique number (`devlog.py --self-test`'s `lint` arm over the repository's own `DEVLOG/`, run
+by every gate's self-tests and CI's `audits` job).
 
 ---
 

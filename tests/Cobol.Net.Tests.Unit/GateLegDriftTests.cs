@@ -154,7 +154,7 @@ public sealed class GateLegDriftTests
             : [];
         var files = new[] { ".claude", ".github", "scripts", "docs", "tests" }.SelectMany(d => Walk(TestRepo.At(d)))
             .Concat(Directory.EnumerateFiles(TestRepo.Root, "*.md")
-                .Where(f => Path.GetFileName(f) is not ("DEVLOG.md" or "STATUS.md")))  // history; a worktree's gitignored checkpoint
+                .Where(f => Path.GetFileName(f) != "STATUS.md"))  // a worktree's gitignored checkpoint (the history, DEVLOG/, is not walked)
             .ToList();
         Assert.Contains(files, f => f.EndsWith(Path.Combine("templates", "MANDATORY-PRACTICES.md"), StringComparison.Ordinal));
         var offenders = files

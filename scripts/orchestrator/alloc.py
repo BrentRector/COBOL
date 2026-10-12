@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The ONE locked allocator for DEVLOG entry numbers, kb/Work `PB` ids and `COBOLNET` diagnostic codes.
+"""The ONE locked allocator for DEVLOG entry numbers (`devlog.py stamp` takes them), kb/Work `PB` ids and `COBOLNET` diagnostic codes.
 
     python scripts/orchestrator/alloc.py devlog          # reserve the next DEVLOG entry number   -> 1866
     python scripts/orchestrator/alloc.py pb 5            # reserve five kb/Work ids                -> PB1982-PB1986
@@ -29,9 +29,11 @@ import sys
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import coord  # noqa: E402
 
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+import devlog  # noqa: E402  (the one reader of DEVLOG/)
+
 LOCK = "alloc.lock"
 KINDS = ("devlog", "pb", "code")
-ENTRY = re.compile(r"^## Entry (\d+)\b")
 PB_FILE = re.compile(r"^PB(\d+)\.md$")
 CODE = re.compile(r"COBOLNET(\d{4})")
 CATALOG_CODE = re.compile(r'"COBOLNET(\d{4})"')
@@ -40,13 +42,11 @@ CATALOG = pathlib.Path("src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs"
 
 # ── truth: one rule per kind ─────────────────────────────────────────────────────────────────────────────────────
 def devlog_top(repo: pathlib.Path) -> int:
-    """The first line-start `## Entry NNN` of DEVLOG.md: the file is DESCENDING, so that is the newest entry."""
-    with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            m = ENTRY.match(line)
-            if m:
-                return int(m.group(1))
-    raise SystemExit(f"⛔ no '## Entry NNN' line in {repo / 'DEVLOG.md'}")
+    """The highest entry number in the repository's DEVLOG/ (one file per entry, kb/Work PB3025: devlog.py's rule)."""
+    top = devlog.highest(devlog.names_in(repo))
+    if not top:
+        raise SystemExit(f"⛔ no entry file in {repo / devlog.DIR}")
+    return top
 
 
 def pb_max(repo: pathlib.Path) -> int:

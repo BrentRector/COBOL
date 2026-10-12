@@ -2,24 +2,27 @@
 
 ## 3. Landing order and mechanics
 
-- **Land finished work first**; read-only fleets are staged behind landings. **One lander on main at a time** (DEVLOG
-  numbering and fast-forward ordering); **one LANDING per lander transcript** (§2) — split the queue into fresh agents.
-- ⛔ **ONE LANDER ON MAIN AT A TIME IS A LEASE, NOT A COURTESY (kb/Work PB2537).** Every lander — the loop's `land`
-  unit and an attended one alike — takes the landing lease before its FINAL rebase and its gates:
-  `python scripts/orchestrator/landing_lease.py acquire --holder … --reason … --wait-min 9`, re-issued until `ACQUIRED`
-  (lander-train-brief step 2b). A second lander waits; it never gates against a main another lander is about to move.
-  The lease records the holder, the reason, the worktree, a heartbeat and an expiry (30 min after the last renew), so a
-  dead lander's lease is taken over; `renew` at every step, and `push-main.sh` re-takes it, refuses a landing while
-  another worktree holds it (exit 4), renews it while CI runs and releases it on exit. `next_unit.py` starts no `land`
-  unit while a lease is live; `stop.ps1 -Status` shows the holder. ⓜ push-main used to serialize only the push: on
-  2026-10-07 the R1 lander lost the race to trains 1034 and 1034b, re-gated three times (≈ 30 min of the whole machine
-  each) and ended SPLIT with every gate and CI green and nothing on main.
-- ⛔ **ONE LANDING QUEUE WHILE THE LOOP RUNS (MANDATORY-PRACTICES O11, kb/Work PB2602).** Check first:
-  `python scripts/orchestrator/coord.py loop-state`. While it prints `LOOP STATE: running`, the loop's land unit is the
-  only lander: the attended session dispatches no lander and runs no rolling wave (its trains are landers). A finished
-  attended branch becomes a report the land unit collects — the file name EXACTLY
-  `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (plan_wave.py `REPORT_NAME`: `w1038v-PB2600-report.md`
-  is seen, `w1038v-PB2600-report-v2.md` is not), its header:
+- ⛔ **THE LANDING IS A SCRIPT: `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023; MANDATORY-PRACTICES
+  L1; DESIGN-test-build-ci.md §3.17.2 step 3).** One finished branch, one pull request. It merges origin/main into the
+  branch (never a rebase: a branch that merged a same-file predecessor keeps its conflict resolutions), runs the ordered
+  gate and CI's Linux legs on the merged head under the shared gate slot (a commit gated GREEN, or a head that differs
+  from it only by main's commits, clean merges and DEVLOG-only commits, is not gated again), merges main in again when
+  it moved during the gate (no second gate: the merge group runs the whole population on the current main), stamps the
+  branch's `DEVLOG/pending-<slug>.md` (`devlog.py stamp`, the number from `alloc.py devlog`), runs the landing checks
+  (`devlog.py check` 6, `landing_oracle.py` 7, `landing_check.py` 3) and hands the branch to GitHub's merge queue
+  (`enqueue.py queue`: the PR titled from the DEVLOG entry, its body the entry and the commits; the queue's merge commit
+  keeps the branch's commits ancestors of main). Main takes only queued pull requests, so while `ruleset.py check` does
+  not report the queue ACTIVE it refuses before merging or gating anything. Every run ends on one `=== ENQUEUE: ` line:
+  run it in the background and block on that line. Exits: 4 conflict (before or after the gate) · 5 a gate not GREEN ·
+  3/6/7 a landing check · 8 the queue not ACTIVE · 9 GitHub refused · 11 unreviewed. ⓜ 2026-10-10 under the trains: 233 of 567 lander minutes (41 %) were local whole-population gates, 94 more
+  push-main holding the lease while CI ran the same population, 10 landers for 6 trains, the first commit on main 6 h
+  49 min into the day (kb/Work PB3015).
+- **Who runs it.** While the orchestrator loop runs (`python scripts/orchestrator/coord.py loop-state` prints `LOOP
+  STATE: running`), its `enqueue` unit (`scripts/orchestrator/units/enqueue.md`) runs it for every branch `python
+  scripts/prune_worktrees.py --brief` lists WAITING TO LAND, in the order it lists them (the most harmful lead first,
+  kb/Work PB2981's ranking): the attended session lands nothing itself and writes each finished attended branch's report
+  where the unit collects it — the file name EXACTLY `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md`
+  (plan_wave.py `REPORT_NAME`), its header:
 
   ```
   Status: DONE
@@ -29,65 +32,47 @@
   Base: <sha>
   ```
 
-  `python scripts/prune_worktrees.py --brief` then lists it WAITING FOR REVIEW: dispatch ONE read-only
-  `cobol-reviewer` on it (the `review` skill's branch form, MANDATORY-PRACTICES I10, kb/Work PB3027; the land unit does
-  it for any it finds), whose `review_findings.py stamp` adds `**Review:** CLEAN <reviewer> <head>` under the Status
-  line. Under that stamp it lists WAITING TO LAND (a FINDINGS stamp goes to a finisher), and the land units carry such branches
-  in trains of at most six, the most harmful lead first: the next train is exactly what `prune_worktrees.py --train`
-  names, and the rest wait for the land unit after it. ⓜ 2026-10-10: one land unit took all 15 waiting branches,
-  split them into three serial landers and landed nothing for hours (owner: "do not try and do 15 branches at once",
-  kb/Work PB2981). If a landing truly cannot wait, exactly ONE lander carries the train `--train` names and its
-  manifest says why. Every lander dispatch names `LOOP STATE: running|stopped` (filled in);
-  `scripts/hooks/dispatch_guard.py` refuses a `cobol-lander` call that does not. ⓜ 2026-10-08: attended landers and
-  the land unit raced for main, and every train was rebased, re-gated and re-run in CI each time the other landed.
-- ⛔ **A refused `push-main.sh` is handed off, never retried (MANDATORY-PRACTICES L13, kb/Work PB2601).** A lander
-  whose `bash scripts/push-main.sh` the permission layer refuses leaves the train committed and gated and ends with the
-  first line `READY-TO-PUSH <worktree> <sha>`; the dispatching session runs push-main.sh from that worktree.
+  `prune_worktrees.py --brief` lists it WAITING FOR REVIEW until ONE read-only `cobol-reviewer` stamps it (the `review`
+  skill's branch form, MANDATORY-PRACTICES I10, kb/Work PB3027); a `Review: CLEAN` stamp at its tip makes it WAITING TO
+  LAND. With the loop STOPPED the attended session runs `enqueue.py land` by hand for its own branch, no agent needed.
+- **What a script cannot decide goes to ONE finisher (L12).** A conflict (exit 4), a red gate (5), a DEVLOG or oracle
+  refusal (6, 7), or a pull request the queue BOUNCED (`prune_worktrees.py` reads ENQUEUED and
+  BOUNCED from one GraphQL read of the open pull requests; offline the states are git-only) is the branch's own: one
+  `cobol-finisher` with `templates/finisher-brief.md` fixes it at the root, gates and returns DONE; its commits are reviewed on the branch (I10) before `enqueue.py land` takes the new tip (an unreviewed tip is exit 11).
+  Exit 3 (the landing check's STOP) is never retried as is. A permission refusal of `enqueue.py land` is handed off,
+  never retried or routed around: `READY-TO-LAND <worktree> <branch>` (L13).
+- **No landing takes a lease: the merge queue orders main (kb/Work PB2537, PB3023 review R1-1).** `enqueue.py land`
+  never runs `push-main.sh` (main refuses a direct push since the ruleset went ACTIVE), so every waiting branch is
+  enqueued at once and main moving under a gate is merged in by the script. `push-main.sh`,
+  `scripts/orchestrator/landing_lease.py` and the `ci/**` branches are no longer a landing path; kb/Work PB3024's
+  remaining step deletes them.
 - ⛔ **No branch is left undecided (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600).** After every landing,
   `python scripts/prune_worktrees.py` (the lifecycle survey) then `--apply`, which deletes the LANDED branches; a branch
   that will not land is ABANDONED by a line in its kb/Work note (naming the branch, the word ABANDONED, the reason) and
   then `--apply --abandon <branch>`. Nothing is archived (owner 00:52: "Archiving to a bundle serves no use and wastes
   disk space").
-- ⭐ **FIVE CLUSTERS PER LANDING (target 5; 4–6 is the band).** A landing is ~90 % fixed cost — bring the work in,
-  build, gate, DEVLOG, commit, push — so ⓜ **10.4 M per cluster at k = 1 against 5.1 M at k = 5**, and 4.0 minutes
-  of lander per cluster against 9.8. The corpus proves it directly: the golden lander landed 151 rows for 52.9 M =
-  0.35 M/row; the PB383 lander landed 2 rows for 7.2 M = 3.6 M/row — **10×**. Mechanics: bring every implementer's
-  branch in with ONE command, `scripts/orchestrator/train_apply.py <train manifest>` (one commit per cluster, markers, unmerged paths and silent loss asserted, the citation audits run once; seconds, where train 1052's 15 branches by hand took 201 tool calls and 18 minutes, kb/Work PB2885), **one build**, **the one gate on the train head** (`build-local.ps1`, leg 1: every cluster's own tests, the previous reds, the host-only witnesses and the cheap sweeps; CI runs the whole population, kb/Work PB3022; a union of the implementers' filter terms was never a landing gate — CI's `rest` shard is exactly the tests no term names, and it was red on the first push of trains 39, 40 and 41 in one day), **one commit per cluster inside the landing** so
-  a red is attributed per cluster by re-running only its failing cases on each cluster alone, then fixed in the train
-  or ejected to a finisher, an interaction bisected (MANDATORY-PRACTICES L12, kb/Work PB2515), one DEVLOG entry naming
-  every cluster, one push, and the landing recorded by `scripts/orchestrator/landing_measure.py`. Past six clusters the token curve is
-  flat and the gate-attribution risk is not. Template: `templates/lander-train-brief.md`.
-- ⛔ **Never spend a lander on a 1–2 cluster landing** unless nothing else is ready — that is the k = 1 corner of the
-  table above, at twice the cost per cluster. If only one cluster is finished, hold it and dispatch the lander when
-  the train is full; a blocking fix is the exception and is landed alone on purpose, said so in the report.
 - ⭐ **A free implementer slot is filled within the TURN it frees** — mechanically, by the rolling wave (§2,
   `templates/wf_rolling_wave.js`), whose queue is filled from `fix_clusters.py` — never at the next convenient moment. ⓜ The fix lane ran at **under 15 % utilization** of the ≤3 cap for six days
   (~2.7 mechanisms/day delivered against ~24/day of capacity) purely because slots sat empty behind landings and
   behind the evidence lane. Keep a standing queue of apply-ready contracts so the dispatch is one turn.
 - A worktree-isolated agent cannot run git against the shared checkout (the harness refuses `-C`, `cd`, EnterWorktree):
-  landers take the landing lease, `git fetch origin && git rebase origin/main`, gate in THEIR worktree, and land with
-  **`bash scripts/push-main.sh`**; the orchestrator runs `git merge --ff-only origin/main` locally and removes dead
-  worktrees itself with `python scripts/prune_worktrees.py --apply` (never a hand `git branch -D`: the survey's
-  classification is the only thing that tells a landed branch from unlanded work, O10).
-- ⛔ **THE ONLY WAY A COMMIT REACHES `main` IS `bash scripts/push-main.sh`, AND THE SERVER ENFORCES IT.** `main`
-  carries a REQUIRED status check — `ci-gate`, the terminal job of the workflow — with `enforce_admins: true`, so a
-  bare `git push origin HEAD:main` of an unverified commit is REFUSED. Admin exemption was never an option: every
-  push here is made with the owner's credentials, so a rule that spares administrators spares everyone, and the
-  orchestrator's own pushes obey this one (owner decision 2026-09-06, question 23). The script pushes HEAD to
-  `ci/<short-sha>`, watches the run for that exact sha, and only then fast-forwards main and deletes the branch; on
-  a red it prints the failing jobs and exits non-zero with main untouched.
-  ⭐ It is IDEMPOTENT — a full-matrix run is ~25–30 min, longer than a command timeout, so a cut-off caller simply
-  re-runs it (or runs it with `run_in_background`); a sha that already carries a green `ci-gate` skips straight to
-  the main push. A red is still a BLOCKING finding, attributed by job / step / failing test in the report, and the
-  orchestrator lands that fix alone before the next train. **The local battery runs on ONE host; the CI's Linux job
-  is the only Linux gate — a test that depends on host ACL or file-lock semantics is not proven until CI is green.**
-  ⓜ main was red for 29 h across 16 consecutive completed runs (2026-09-05/06) while every landing in that window
-  — trains 10 through 20 — reported a green Windows-only gate and nobody looked (`kb/Work/PB796`).
+  `enqueue.py land` works in the branch's own worktree, and the orchestrator removes dead worktrees itself with
+  `python scripts/prune_worktrees.py --apply` (never a hand `git branch -D`: the survey's classification is the only
+  thing that tells a landed branch from unlanded work, O10).
+- ⛔ **NOTHING REACHES `main` BUT A TESTED TREE, AND THE SERVER ENFORCES IT.** `main` carries a REQUIRED status check —
+  `ci-gate`, the terminal job of the workflow — enforced for administrators (every push here is made with the owner's
+  credentials, so a rule that spares administrators spares everyone; owner decision 2026-09-06, question 23). Through the
+  merge queue, `ci-gate` runs on the merge group, and a red bounces only the pull request that caused it; through
+  push-main.sh, on `ci/<short-sha>` before main fast-forwards. A red is a BLOCKING finding attributed by job / step /
+  failing test, fixed on its branch. **The local gate runs on ONE Windows host plus WSL; CI's runners are the other
+  hosts — a test that depends on host ACL or file-lock semantics is not proven until CI is green.** ⓜ main was red for
+  29 h across 16 consecutive completed runs (2026-09-05/06) while every landing in that window reported a green
+  Windows-only gate and nobody looked (`kb/Work/PB796`).
 - ⚠ **A docs-only landing still runs — and still has to be green.** `paths-ignore` is GONE from the workflow (it
   made the workflow decline to START, which a required per-commit check reads as "blocked forever"); the `changes`
-  job now decides whether the MATRIX runs from the same path list, so a landing touching only `DEVLOG.md`,
+  job now decides whether the MATRIX runs from the same path list, so a landing touching only `DEVLOG/`,
   `docs/**`, `kb/**`, `PROMPT.md`, `CLAUDE.md` or `README.md` finishes in seconds. "No run for my sha" is no longer
-  an answer — it is a failure, and `push-main.sh` treats it as one.
+  an answer — it is a failure.
 - Verdict batches are RE-APPLIED on the merged tree (`record_verdicts.py`), never merged as inventory JSON hunks.
 - ⛔ A checkpoint file never enters a landing: every landing `git add` excludes it —
   `git add -A -- . ":!.claude/settings.local.json"` then `git reset -q -- STATUS.md`; ⛔ **not** `":!STATUS.md"`

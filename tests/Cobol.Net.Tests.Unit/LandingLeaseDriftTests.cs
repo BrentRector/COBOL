@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Unit;
 /// renew or release; lets a resuming lander re-take its own lease; admits exactly one of six parallel acquires;
 /// answers <c>push-main.sh</c>'s <c>check</c> with own, free or held elsewhere; stops every verb with exit 2 on a
 /// file that is not a lease (never 0, 1 or 4, which push-main acts on); and shows <c>next_unit.py</c> starts no
-/// <c>land</c> unit while a lease is live.
+/// <c>enqueue</c> unit while a lease is live.
 /// </summary>
 /// <remarks>
 /// On 2026-10-07 the R1 lander lost the race to main three times (trains 1034 and 1034b landed inside its ~50-minute
@@ -41,7 +41,7 @@ public sealed class LandingLeaseDriftTests
                      "parallel acquires: exactly one wins",
                      "check answers push-main: own, free or held elsewhere",
                      "a file that is not a lease stops every verb loudly",
-                     "the loop starts no land unit while a lease is live",
+                     "the loop starts no enqueue unit while a lease is live",
                  });
     }
 }

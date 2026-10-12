@@ -11,7 +11,12 @@
   --account NAME                                another account of model_rules.json than the one CLAUDE_CONFIG_DIR selects
 
 The stamp is the page's own: the last commit that touched an input the page reports (gen_ledger.STAMP_PATHS, imported, so
-the two can never disagree about what makes the page stale). A headless unit cannot publish (it has no Artifact tool:
+the two can never disagree about what makes the page stale), read on MAIN (`--main-ref`, default `origin/main`, fetched
+first), never on the checkout's HEAD (kb/Work PB2987): every landing is pushed from a lander's own worktree, so the main
+checkout the supervisor passes as `--repo` stays at whatever train someone last fast-forwarded it to, and a stamp read
+there said `current` for a train that had landed. The rendered page is still the checkout's tree, so `mark-published`
+refuses unless the checkout's stamp IS main's (the page published describes main), and `owed` names a stale checkout so
+the publisher fast-forwards it before rendering. A headless unit cannot publish (it has no Artifact tool:
 probed 2026-10-04), so it only renders `<coord>/ledger.html`; the supervisor announces `owed` after every unit, and the
 attended session publishes (owner 2026-10-04: "publish ledger each time") and marks it.
 
@@ -43,10 +48,31 @@ class NoUrl(LookupError):
     """The account has never published the ledger and no --url names its artifact."""
 
 
-def stamp(repo: pathlib.Path) -> str:
-    r = subprocess.run(["git", "log", "-1", "--format=%h", "--", *gen_ledger.STAMP_PATHS], cwd=repo,
-                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+MAIN_REF = "origin/main"
+
+
+class NoMain(LookupError):
+    """The main ref names no commit that touches a ledger input (a wrong --main-ref, or not this repository)."""
+
+
+def _git(repo: pathlib.Path, *args: str) -> subprocess.CompletedProcess:
+    return subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+
+
+def stamp(repo: pathlib.Path, rev: str = "HEAD") -> str:
+    """The last commit at or before `rev` that touched a ledger input, abbreviated; "" when none or `rev` is unknown."""
+    r = _git(repo, "log", "-1", "--format=%h", rev, "--", *gen_ledger.STAMP_PATHS)
     return r.stdout.strip() if r.returncode == 0 else ""
+
+
+def refresh(repo: pathlib.Path, ref: str) -> str:
+    """Fetch the remote branch `ref` names (`<remote>/<branch>`) so its stamp is main's now, not at the last fetch.
+    Returns "" on success, else the reason; a ref naming no configured remote is a local ref and needs no fetch."""
+    remote, sep, branch = ref.partition("/")
+    if not sep or remote not in _git(repo, "remote").stdout.split():
+        return ""
+    r = _git(repo, "fetch", "--quiet", remote, branch)
+    return "" if r.returncode == 0 else (r.stderr.strip().splitlines() or [f"git fetch exit {r.returncode}"])[-1]
 
 
 def published(cdir: pathlib.Path, acct_name: str) -> dict:
@@ -54,10 +80,25 @@ def published(cdir: pathlib.Path, acct_name: str) -> dict:
     return (coord.read_json(cdir / MARKER, {}).get("accounts") or {}).get(acct_name) or {}
 
 
-def state(repo: pathlib.Path, cdir: pathlib.Path, acct_name: str) -> dict:
-    now, rec = stamp(repo), published(cdir, acct_name)
-    return {"state": "current" if now and now == rec.get("stamp") else "owed", "stamp": now,
+def state(repo: pathlib.Path, cdir: pathlib.Path, acct_name: str, ref: str = MAIN_REF, fetch: bool = True) -> dict:
+    """Owed or current against MAIN's stamp, plus the checkout's own stamp (the tree gen_ledger.py renders)."""
+    fetch_error = refresh(repo, ref) if fetch else ""
+    now = stamp(repo, ref)
+    if not now:
+        raise NoMain(f"{ref} names no commit touching a ledger input in {repo}"
+                     + (f" (fetch failed: {fetch_error})" if fetch_error else ""))
+    rec, checkout = published(cdir, acct_name), stamp(repo)
+    return {"state": "current" if now == rec.get("stamp") else "owed", "stamp": now, "main_ref": ref,
+            "checkout_stamp": checkout, "checkout_current": checkout == now, "fetch_error": fetch_error,
             "published_stamp": rec.get("stamp", ""), "account": acct_name, "url": rec.get("url")}
+
+
+def stale_checkout_line(repo: pathlib.Path, st: dict) -> str:
+    """What the publisher must do first when the checkout renders another page than main's; "" when it is main's."""
+    if st["checkout_current"]:
+        return ""
+    return (f"the checkout {repo} renders the ledger at {st['checkout_stamp'] or 'nothing'}, not {st['main_ref']}'s "
+            f"{st['stamp']}: fast-forward it first (git -C {repo} merge --ff-only {st['main_ref']}), then render")
 
 
 def mark(cdir: pathlib.Path, acct_name: str, s: str, url: str | None, now: dt.datetime) -> dict:
@@ -86,6 +127,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("cmd", choices=("owed", "mark-published", "url"))
     ap.add_argument("--repo", default=str(coord.REPO))
+    ap.add_argument("--main-ref", default=MAIN_REF, help="the ref whose stamp is the truth (default origin/main, fetched)")
+    ap.add_argument("--no-fetch", action="store_true", help="read --main-ref as it stands, without fetching it")
     ap.add_argument("--coord")
     ap.add_argument("--account", help="a named account (default: the one CLAUDE_CONFIG_DIR selects)")
     ap.add_argument("--url", help="mark-published: the artifact this account published to")
@@ -104,22 +147,29 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "url":
         print(publish_hint(cdir, name))
         return 0
+    try:
+        st = state(repo, cdir, name, a.main_ref, fetch=not a.no_fetch)
+    except NoMain as e:
+        print(f"ledger_state: {e}", file=sys.stderr)
+        return 2
     if a.cmd == "mark-published":
-        s = stamp(repo)
-        if not s:
-            print("no stamp: not a repository with the ledger's inputs", file=sys.stderr)
+        # The page was rendered from the checkout: marking main's stamp published while the checkout is behind (or
+        # ahead) would record a page that does not describe main as current (kb/Work PB2987).
+        if not st["checkout_current"]:
+            print(f"ledger_state: not marked: {stale_checkout_line(repo, st)}, publish, and mark again", file=sys.stderr)
             return 2
         try:
-            rec = mark(cdir, name, s, a.url, dt.datetime.now(dt.timezone.utc).astimezone())
+            rec = mark(cdir, name, st["stamp"], a.url, dt.datetime.now(dt.timezone.utc).astimezone())
         except NoUrl as e:
             print(str(e), file=sys.stderr)
             return 2
-        print(f"marked published: {s} for {name} at {rec['url']}")
+        print(f"marked published: {st['stamp']} for {name} at {rec['url']}")
         return 0
-    st = state(repo, cdir, name)
+    stale = stale_checkout_line(repo, st)
     print(json.dumps(st) if a.json else
           f"{st['state']} {st['stamp']} (last published {st['published_stamp'] or 'never'} by {name}"
-          f"{' to ' + st['url'] if st['url'] else ', no artifact yet for this account'})")
+          f"{' to ' + st['url'] if st['url'] else ', no artifact yet for this account'}"
+          f"{'; ' + stale if stale else ''}{'; fetch failed: ' + st['fetch_error'] if st['fetch_error'] else ''})")
     return 0
 
 

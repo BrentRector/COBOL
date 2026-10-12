@@ -52,7 +52,7 @@ namespace CobolNet.Tests.Unit;
 /// </list>
 /// <para>
 /// ⚠ SCOPE — the EXECUTABLE surfaces: everything under <c>scripts/</c> and every workflow under
-/// <c>.github/workflows/</c>. Docs are excluded deliberately: <c>DEVLOG.md</c> is the historical record and
+/// <c>.github/workflows/</c>. Docs are excluded deliberately: <c>DEVLOG/</c> is the historical record and
 /// quotes the gate commands as they were on the day, so scanning it would demand rewriting history to make a
 /// test green. The guard itself is the one file exempt from its own rule — it is the mechanism, and its
 /// docstring necessarily quotes <c>--filter</c>.

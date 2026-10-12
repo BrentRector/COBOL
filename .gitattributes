@@ -11,13 +11,6 @@
 # wave 72 group G). Git Bash on Windows runs LF scripts unchanged.
 *.sh text eol=lf
 
-# DEVLOG.md is the ONE tracked file stored with CRLF in the object database (every other text file normalizes to
-# LF under core.autocrlf). That was implicit — no attribute governed it — and the log's append discipline depends
-# on it: entries are inserted by writing BYTES, and a silent renormalization would rewrite all 36k lines in a
-# single diff. Declaring it here makes the exception intentional and immune to `git add --renormalize`.
-# This matches what Git already does, so it introduces no diff.
-DEVLOG.md -text
-
 # The PINNED Unicode data under data/unicode/ is CONTENT-ADDRESSED: root-collation.manifest.json records the
 # SHA-256 of each input file's BYTES, and CollationTableTests.Manifest_InputsAndOutput_MatchTheCommittedFiles
 # re-hashes them to prove the committed table IS the generator's output over the committed sources. Under
@@ -32,7 +25,7 @@ tests/Cobol.Net.Tests.Unit/TestData/segmentation/*.txt -text
 
 # The public-API baselines (Microsoft.CodeAnalysis.PublicApiAnalyzers) are SETS of lines: two branches that each add a
 # member append to the same place, which a line merge calls a conflict although the answer is always both lines. Train
-# 1052 (2026-10-10) stopped on exactly that in PublicAPI.Unshipped.txt; merge=union takes both sides (git apply -3, which
-# scripts/orchestrator/train_apply.py uses, honors it), and a stale line union keeps fails the build (RS0017), so the
-# gate still sees a wrong set (kb/Work PB2885).
+# 1052 (2026-10-10) stopped on exactly that in PublicAPI.Unshipped.txt; merge=union takes both sides (`git merge`, which
+# enqueue.py land uses to bring origin/main into a branch, honors it; kb/Work PB3023), and a stale line union keeps fails
+# the build (RS0017), so the gate still sees a wrong set (kb/Work PB2885).
 src/**/PublicAPI.*.txt merge=union

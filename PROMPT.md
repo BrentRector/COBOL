@@ -3,7 +3,7 @@
 > **This file is DOCTRINE — the standing "how we build" that does not change session to session.**
 > It deliberately does not restate what other files own:
 > **process rules → `CLAUDE.md`** · **the work register → `kb/Work/` (the ONLY one — CLAUDE.md rule 8)** · **live state → plan §0** · **anti-pattern catalog → `CONSTRAINTS.md`** ·
-> **design → `docs/COBOLNET_DESIGN.md` + the deep-dives** · **history → `DEVLOG.md`**.
+> **design → `docs/COBOLNET_DESIGN.md` + the deep-dives** · **history → `DEVLOG/`**.
 > Where this file and one of those disagree, the owning file wins and this one gets fixed.
 
 ## 1. The mission
@@ -28,7 +28,7 @@ A change is finished when all of the following are true. If one is not, the chan
 - **One mechanism.** No second type/helper/dispatch doing a job something already does.
 - **Cited.** Each implemented rule carries its exact ISO §/GR in the code.
 - **Proven.** Its spec-derived golden exists, is registered in the same commit, and the wave-local gate is green.
-- **Documented.** Docs current in the same change set; a `DEVLOG.md` entry; committed and pushed.
+- **Documented.** Docs current in the same change set; a `DEVLOG/` entry; committed and pushed.
 
 ## 3. Architectural commitments
 

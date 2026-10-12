@@ -1,7 +1,7 @@
 # The legacy byte engine — archive pointer
 
 The CobolSharp byte engine is not on `main`. Owner decision R69 (`kb/Work/R69.md`) deleted it in PHASE 15 Cut 2
-(`kb/Work/PB2110.md`). This page says where it is preserved and how to run it. History lives in `DEVLOG.md`.
+(`kb/Work/PB2110.md`). This page says where it is preserved and how to run it. History lives in `DEVLOG/`.
 
 ## Where it is
 

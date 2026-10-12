@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Self-test for plan_wave.py on fabricated notes, clusters and reports: work awaiting landing is never re-planned,
 finishers come first and name their predecessor, clusters rank by rows claimed, a second group on a file is a
-same-file successor, the model routing rules, the budget fill (with landers and successors), and that the groups
+same-file successor, the model routing rules, the budget fill (with landings and successors), and that the groups
 render through the real dispatch-spec template and pass check_practices.py's same-file rule; that the fix lane's whole
 plan equals the golden the pre-campaign planner wrote; and the campaign lane (--cluster, kb/Work PB2120): cluster
 selection whatever the harm flags, the blocked_by order, site clustering per depth, the `after:` derivation, the
@@ -137,18 +137,18 @@ check("failed twice -> opus", (G[("PB10",)].model, "2 times" in G[("PB10",)].why
 check("never fable", {g.model for g in p["groups"]} <= set(RULES["routing"]["allowed"]), True)
 
 # 6. budget fill: a tight budget takes the first finisher only; its successor's predecessor rule holds
-one = pw.group_cost(G[("PB3", "PB6", "PB7", "PB12")].model, 4, RULES) + pw.lander_cost(RULES)
+one = pw.group_cost(G[("PB3", "PB6", "PB7", "PB12")].model, 4, RULES) + pw.landing_cost(RULES)
 p2 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=one + 0.01)
-check("tight budget: first group + its lander", ([g.notes for g in p2["groups"]], p2["trains"]), ([["PB3", "PB6", "PB7", "PB12"]], 1))
-check("points include the lander", round(p2["points"], 6), round(one, 6))
-small = pw.group_cost("sonnet", 1, RULES) + pw.lander_cost(RULES)
+check("tight budget: first group + its landing", [g.notes for g in p2["groups"]], [["PB3", "PB6", "PB7", "PB12"]])
+check("points include the landing", round(p2["points"], 6), round(one, 6))
+small = pw.group_cost("sonnet", 1, RULES) + pw.landing_cost(RULES)
 p3 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=small + 0.01)
 check("a group that does not fit is skipped, a smaller later one taken", [g.notes for g in p3["groups"]], [["PB4"]])
 check("successor never without predecessor", any(g.after for g in p3["groups"]), False)
 p4 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=100,
              max_groups=2)
 check("max groups", len(p4["groups"]), 2)
-check("trains", p["trains"], -(-len(p["groups"]) // RULES["wave"]["train_size"]))
+check("no train: the plan carries no train count (kb/Work PB3023)", "trains" in p, False)
 
 # 6b. A SPLIT REPORT ON AN UNLANDED BRANCH IS A FINISHER, NOT "AWAITING LANDING" (kb/Work PB2575): a `land` unit lands
 #     only DONE branches, so holding it stranded the work (waves 1020 D and 1032 A). Its pred cherry-picks the branch.
@@ -315,7 +315,7 @@ def fingerprint(pl, letter_json):
                         "notes": g.notes, "file": g.file, "files": g.files, "pred": g.pred, "cost": round(g.cost, 9),
                         "json": letter_json.get(g.letter)} for g in pl["groups"]],
             "skipped": [[g.letter, g.after, g.notes] for g in pl["skipped"]],
-            "awaiting_landing": pl["awaiting_landing"], "points": round(pl["points"], 9), "trains": pl["trains"],
+            "awaiting_landing": pl["awaiting_landing"], "points": round(pl["points"], 9),
             "unlanded_without_note": pl["unlanded_without_note"]}
 
 
@@ -407,7 +407,7 @@ if fc:
     check("campaign groups pass check_practices' successor rule", check_practices.same_file_without_successor(cfile), [])
     for g in cg:
         mds.render(dict(CFG77, wave="78"), g)
-    only_b = pw.group_cost("opus", 1, RULES) + pw.lander_cost(RULES)
+    only_b = pw.group_cost("opus", 1, RULES) + pw.landing_cost(RULES)
     cp2 = pw.plan(cnotes, copen, chalf, [], lambda b: "ABSENT", {}, RULES, budget_points=only_b * 1.5, deps=cdeps)
     check("a dependent is never chosen without its blocker's group",
           all(g.after in {c.letter for c in cp2["groups"]} for g in cp2["groups"] if g.after), True)
@@ -688,8 +688,9 @@ check("an untracked path is missing even if a local file has that name",
 # PB2562: a train label is a taken wave number, because a wave's first train is labelled with the wave number.
 with tempfile.TemporaryDirectory() as td:
     tdir = pathlib.Path(td)
-    (tdir / "DEVLOG.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL + "## Entry 1 — wave 1034 dispatched" + NL,
-                                     encoding="utf-8")
+    (tdir / "DEVLOG").mkdir()                                    # one file per entry (kb/Work PB3025)
+    (tdir / "DEVLOG" / "0002-train-1036.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL, encoding="utf-8")
+    (tdir / "DEVLOG" / "0001-wave-1034.md").write_text("## Entry 1 — wave 1034 dispatched" + NL, encoding="utf-8")
     check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
     # PB2806: a wave recorded in the dispatch ledger with no report yet (another session's) is a taken number too
     pw.record_dispatch(tdir, "1045", [pw.Group(kind="cluster", notes=["PB5"], file="", files=["src/X.cs"], letter="a")],

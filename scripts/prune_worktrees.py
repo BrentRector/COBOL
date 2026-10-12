@@ -5,7 +5,6 @@ remove the ones whose work is on main, and the ones abandoned by a recorded deci
     python scripts/prune_worktrees.py                      # dry run: the lifecycle table, nothing touched
     python scripts/prune_worktrees.py --brief              # the verdict line and only the rows someone must act on
     python scripts/prune_worktrees.py --json               # the same survey as JSON (the operator tick reads it)
-    python scripts/prune_worktrees.py --train              # THE NEXT TRAIN: at most TRAIN_MAX WAITING TO LAND rows
     python scripts/prune_worktrees.py --apply [--abandon <branch> ...]
     python scripts/prune_worktrees.py --self-test          # a scratch repository with one branch in every state
 
@@ -19,10 +18,7 @@ who acts next:
                    writes `claude agent <id> (pid N)`; a lock with no pid was placed by hand and counts as live), a
                    dispatch-ledger wave group still in flight names it (`<coord>/inflight-groups.json`, the planner's
                    ledger, read through plan_wave.inflight_file_sets; the branch name starts with the group's slug
-                   `w<wave><letter>`), the train whose lander holds the landing lease carries it (its manifest,
-                   landing_train_members), the train whose pull request is OPEN in GitHub's merge queue carries it
-                   (queued_train_members, kb/Work PB3024: it lands when the PR merges; offline the rule is git-only), or it
-                   was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
+                   `w<wave><letter>`), or it was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
                    Nobody touches it.
                    A branch with no report whose tip is contained in a fix-lane branch that is IN FLIGHT or waiting
                    (a same-file predecessor, a branch a review finisher merged) is IN FLIGHT too: it lands through
@@ -33,9 +29,21 @@ who acts next:
                    step never reviews and never fixes a finding. A stamp at an older head is unreviewed work.
   WAITING TO LAND  not on main, its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py
                    REPORT_NAME, under coord.reports_dir()) says `Status: DONE`, and its header's review stamp is CLEAN
-                   at the branch's tip: a land unit's train takes it. A train carries at most TRAIN_MAX of them, the
-                   most harmful first (`--train`, kb/Work PB2981); the rest wait for the land unit after it. (A stamp
-                   that says FINDINGS is a DECISION row: the next wave's finisher answers them, plan_wave.py.)
+                   at the branch's tip, or at an older head followed only by mechanical commits (main merged in
+                   cleanly, the DEVLOG stamp: `unreviewed_since`, the one coverage rule `enqueue.py land` enforces
+                   too): the loop's enqueue unit runs `enqueue.py land <branch>` on it (kb/Work PB3023),
+                   one branch at a time, the most harmful lead first (`--brief` lists them in that order, kb/Work
+                   PB2981's ranking). (A stamp that says FINDINGS is a DECISION row: the next wave's finisher answers
+                   them, plan_wave.py.)
+  ENQUEUED         its pull request is open in GitHub's merge queue, or set to join it (auto-merge on): the queue tests it
+                   in a merge group and lands it (kb/Work PB3024). Nobody touches it.
+  BOUNCED          its pull request is open but the queue REMOVED it (a red merge group, a conflict, a timeout: the
+                   reason is GitHub's) and its head is still the branch's tip: the enqueue unit dispatches ONE finisher
+                   with the reason named, which fixes the branch and re-runs enqueue.py. A tip that moved past the
+                   bounced head is the fix, and reads by its report again.
+                   The pull-request states come from ONE GraphQL read (`pull_requests`); offline, unauthenticated or with
+                   no gh it is empty and the lifecycle is git-only (a non-observation, never a claim that nothing is
+                   queued).
   LANDED           its work is on main by content (MERGED or LANDED below) and its worktree holds nothing uncommitted:
                    `--apply` deletes it.
   DECISION         everything else: a person or the operator decides — land it (via a finisher when SPLIT), or ABANDON it
@@ -44,7 +52,8 @@ who acts next:
 The CONTENT class (why this exists, 2026-09-30): `git merge-base --is-ancestor` clears only branches whose commits are
 literally in main. A train re-applies, rebases and conflict-resolves each cluster's commits, so a LANDED cluster's branch
 is never an ancestor and 40+ branches and 19 worktrees piled up from earlier waves. The test that does decide it is
-content, and it is derived on each run:
+content, and it is derived on each run (a merge-queue landing is a merge commit, so from PB3023 on a branch's
+commits are ancestors of main and MERGED decides; the rest stays for the branches trains landed before it):
 
   MERGED   the branch tip is an ancestor of origin/main.
   LANDED   not an ancestor, but MERGING it into origin/main would change nothing: `git merge-tree --write-tree
@@ -102,7 +111,7 @@ METH = re.compile(r'^\+\s*(?:(?:public|internal|private|protected|static|sealed|
                   r'[\w<>\[\],.?()\s]+?\s+(\w+)\s*\(')
 TEST = re.compile(r'^\+\s*public (?:async )?(?:void|Task)\s+(\w+)\s*\(')
 LANDED_CONTENT = ('MERGED', 'LANDED')
-STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'LANDED', 'DECISION')
+STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'ENQUEUED', 'BOUNCED', 'LANDED', 'DECISION')
 LOCK_PID = re.compile(r'\(pid (\d+)\)')
 SETTINGS = ':!.claude/settings.local.json'   # always dirty in an agent's worktree, never work (2026-10-03)
 
@@ -321,6 +330,34 @@ class Row:
     why: str = ''
     how: str = ''                   # a LANDED row whose own merge would change main: how its work got there (carried)
     tip: str = ''                   # the branch's tip sha (a review stamp covers exactly one head)
+    review_holds: bool = False      # its CLEAN stamp names an older head and every commit since is mechanical
+                                    # (unreviewed_since: main's, a clean merge of main, DEVLOG-only)
+
+
+def mechanical(commit: str, repo=REPO) -> bool:
+    """A commit that changes nothing a reviewer reads: a merge whose tree IS the clean merge of its two parents (no hand
+    resolution: what `enqueue.py land`'s own `git merge origin/main` makes), or a commit that changes only DEVLOG/ (an
+    entry, its stamp, a re-stamp)."""
+    parents = git('rev-list', '--parents', '-n', '1', commit, cwd=repo).stdout.split()[1:]
+    if len(parents) == 2:
+        clean = git('merge-tree', '--write-tree', *parents, cwd=repo)
+        return clean.returncode == 0 and clean.stdout.split()[:1] == [
+            git('rev-parse', f'{commit}^{{tree}}', cwd=repo).stdout.strip()]
+    if len(parents) == 1:
+        paths = git('diff-tree', '--no-commit-id', '--name-only', '-r', commit, cwd=repo).stdout.split()
+        return bool(paths) and all(p.startswith('DEVLOG/') for p in paths)
+    return False
+
+
+def unreviewed_since(reviewed: str, tip: str, *, repo=REPO, base: str = 'refs/remotes/origin/main') -> list[str] | None:
+    """THE REVIEW'S COVERAGE (MANDATORY-PRACTICES I10, L9; kb/Work PB3027, PB3023), one rule read by this survey and by
+    `enqueue.py land`: the commits of `tip` after the `reviewed` head that no reviewer read, newest first — every commit
+    not on `base` but a mechanical one (above). [] = the review still covers the tip; None = `reviewed` is not a commit
+    of `tip` (unreadable, or another history), so it covers nothing."""
+    full = git('rev-parse', '--verify', '--quiet', f'{reviewed}^{{commit}}', cwd=repo).stdout.strip()
+    if not full or not tip or git('merge-base', '--is-ancestor', full, tip, cwd=repo).returncode != 0:
+        return None
+    return [c for c in git('rev-list', tip, f'^{full}', f'^{base}', cwd=repo).stdout.split() if not mechanical(c, repo)]
 
 
 @dataclasses.dataclass
@@ -338,15 +375,19 @@ REPORT_SLACK_MIN = 10   # an agent writes its report right after its last STATUS
 
 
 def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours: float = 24,
-              live: Callable[[str | None], bool] = live_lock, in_train: dict[str, str] | None = None,
-              queued: dict[str, str] | None = None) -> tuple[str, str]:
+              live: Callable[[str | None], bool] = live_lock,
+              prs: dict[str, PullRequest] | None = None) -> tuple[str, str]:
     """THE lifecycle rule (module doc), as a pure function of what the survey measured: (state, the evidence)."""
     if live(row.lock):
         return 'IN FLIGHT', f'worktree locked by a live agent ({row.lock or "locked by hand"})'
-    if in_train and row.name in in_train and row.content not in LANDED_CONTENT:
-        return 'IN FLIGHT', f'a member of train {in_train[row.name]}, whose lander holds the landing lease now'
-    if queued and row.name in queued and row.content not in LANDED_CONTENT:
-        return 'IN FLIGHT', f'{queued[row.name]}: it lands when that pull request merges (kb/Work PB3024)'
+    pr = (prs or {}).get(row.name)
+    if pr and row.content not in LANDED_CONTENT:
+        if pr.queued:
+            return 'ENQUEUED', f'pull request #{pr.number} is in the merge queue ({pr.url}): it lands when the queue merges it'
+        if pr.bounced and (not row.tip or row.tip == pr.head):
+            return 'BOUNCED', (f'pull request #{pr.number} was removed from the merge queue ({pr.bounced}; {pr.url}): ONE '
+                               'finisher fixes the branch and returns DONE; its new tip is reviewed before enqueue.py '
+                               'land takes it (kb/Work PB3023)')
     slug = next((s for s in sorted(in_flight_slugs) if re.match(re.escape(s) + r'(?![a-z0-9])', row.name.lower())), None)
     if slug:
         return 'IN FLIGHT', f'dispatch ledger: group {slug} is still in flight'
@@ -367,9 +408,10 @@ def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours:
             return 'DECISION', (f'{rep.name}: DONE {rep.age_min / 60:.0f} h ago and never landed (over {stale_hours:g} h): '
                                 f'land it or record why not; ' + evidence(row))
         rv = rep.review
-        if rv and rv.verdict == 'CLEAN' and rv.covers(row.tip):
-            return 'WAITING TO LAND', (f'{rep.name}: Status DONE, Review CLEAN at {rv.sha[:12]} ({rv.reviewer}); a land '
-                                       f'unit takes it (`--train` names the next train)')
+        if rv and rv.verdict == 'CLEAN' and (rv.covers(row.tip) or row.review_holds):
+            since = '' if rv.covers(row.tip) else ' (later commits mechanical: main merged in, the DEVLOG stamp)'
+            return 'WAITING TO LAND', (f'{rep.name}: Status DONE, Review CLEAN at {rv.sha[:12]} ({rv.reviewer}){since}; '
+                                       f'the enqueue unit lands it (enqueue.py land)')
         if rv and rv.verdict == 'FINDINGS' and rv.covers(row.tip):
             return 'DECISION', (f'{rep.name}: DONE, but its branch review found {rv.findings} finding(s) ({rv.file}): '
                                 f'a finisher answers them, and the next wave plans it (plan_wave.py, kb/Work PB3027); '
@@ -439,54 +481,47 @@ def newest_report(reports: list[Report], branch: str | None, path: str | None) -
     return hit
 
 
-def landing_train_members(coord_dir: pathlib.Path | None = None) -> dict[str, str]:
-    """{branch: train label} for the members of the train whose lander holds the landing lease NOW: the manifest
-    `<coord>/scratch/train<label>-manifest.json` whose label the lease holder names (`train <label> lander`). They are
-    being carried, so no other train takes them (kb/Work PB2708, 2026-10-10: train 1056's five members read WAITING TO
-    LAND while their lander carried them, and `--train` picked four of them again)."""
-    import landing_lease  # noqa: PLC0415
-    cdir = coord_dir or coord.coord_path()
-    lease = landing_lease.current(cdir) if cdir.is_dir() else None
-    out: dict[str, str] = {}
-    for f in (cdir / 'scratch').glob('train*-manifest.json') if lease else ():
-        label = f.name[len('train'):-len('-manifest.json')]
-        if re.search(rf'\btrain {re.escape(label)}\b', str(lease.get('holder', ''))):
-            members = coord.read_json(f, []) or []
-            out.update({m['branch']: label for m in members if isinstance(m, dict) and m.get('branch')})
-    return out
+@dataclasses.dataclass
+class PullRequest:
+    number: int
+    url: str
+    head: str                       # the PR's head commit
+    queued: bool                    # in the merge queue, or auto-merge on (it joins the queue when its checks allow)
+    bounced: str = ''               # the queue removed it: GitHub's reason (the newest RemovedFromMergeQueueEvent)
 
 
-def queued_train_members(coord_dir: pathlib.Path | None = None, gh=None) -> dict[str, str]:
-    """{branch: why it is IN FLIGHT} for every OPEN pull request into main (kb/Work PB3024): its head branch (the
-    lander's), and, when its title is `Train <label>: …`, every member of `<coord>/scratch/train<label>-manifest.json`.
-    A queued train no longer holds the landing lease (enqueue.py ends without a CI wait), so without this its members read
-    WAITING TO LAND again and the next train would carry them twice. Offline, unauthenticated or with no gh it is {} and
-    the lifecycle is git-only (a non-observation, never a claim that nothing is queued)."""
+PR_QUERY = ('query($owner:String!,$name:String!){repository(owner:$owner,name:$name){pullRequests(states:OPEN,'
+            'baseRefName:"main",first:100){nodes{number url headRefName headRefOid isInMergeQueue '
+            'autoMergeRequest{enabledAt} timelineItems(itemTypes:[REMOVED_FROM_MERGE_QUEUE_EVENT],last:1){nodes{'
+            '... on RemovedFromMergeQueueEvent{reason createdAt}}}}}}}')
+
+
+def pull_requests(gh=None) -> dict[str, PullRequest]:
+    """{head branch: its OPEN pull request into main}, from ONE GraphQL read (kb/Work PB3023): whether the merge queue
+    holds it and, when the queue removed it, GitHub's reason. Offline, unauthenticated or with no gh it is {} and the
+    lifecycle is git-only (a non-observation, never a claim that nothing is queued)."""
     import ruleset  # noqa: PLC0415  (its gh runner: a hang guard, and Unobserved on any failure to read)
     run = gh or ruleset.real_gh
     try:
-        rc, out, _ = run(['pr', 'list', '--base', 'main', '--state', 'open', '--limit', '100',
-                          '--json', 'number,title,headRefName'])
-        prs = json.loads(out) if rc == 0 else []
-    except (ruleset.Unobserved, ValueError):
+        rc, out, _ = run(['repo', 'view', '--json', 'nameWithOwner', '--jq', '.nameWithOwner'])
+        owner, _, name = out.strip().partition('/')
+        if rc != 0 or not name:
+            return {}
+        rc, out, _ = run(['api', 'graphql', '-f', f'query={PR_QUERY}', '-F', f'owner={owner}', '-F', f'name={name}'])
+        nodes = json.loads(out)['data']['repository']['pullRequests']['nodes'] if rc == 0 else []
+    except (ruleset.Unobserved, ValueError, KeyError, TypeError):
         return {}
-    cdir = coord_dir or coord.coord_path()
-    out_: dict[str, str] = {}
-    for pr in prs if isinstance(prs, list) else ():
-        number, title, head = pr.get('number'), str(pr.get('title') or ''), str(pr.get('headRefName') or '')
-        if head:
-            out_[head] = f'the head of pull request #{number}, open in the merge queue'
-        m = re.match(r'Train (\S+?):', title)
-        f = cdir / 'scratch' / f'train{m.group(1)}-manifest.json' if m else None
-        if f is not None and f.is_file():
-            try:
-                members = coord.read_json(f, []) or []
-            except ValueError:
-                members = []
-            for mem in members if isinstance(members, list) else ():
-                if isinstance(mem, dict) and mem.get('branch'):
-                    out_.setdefault(str(mem['branch']), f'a member of train {m.group(1)}, queued as pull request #{number}')
-    return out_
+    prs: dict[str, PullRequest] = {}
+    for n in nodes if isinstance(nodes, list) else ():
+        if not isinstance(n, dict) or not n.get('headRefName'):
+            continue
+        removed = [e for e in ((n.get('timelineItems') or {}).get('nodes') or []) if isinstance(e, dict) and e]
+        queued = bool(n.get('isInMergeQueue')) or bool(n.get('autoMergeRequest'))
+        prs[str(n['headRefName'])] = PullRequest(
+            int(n.get('number') or 0), str(n.get('url') or ''), str(n.get('headRefOid') or ''), queued,
+            '' if queued or not removed else f"removed from the queue: {removed[-1].get('reason') or 'no reason given'} "
+                                             f"at {removed[-1].get('createdAt') or '?'}")
+    return prs
 
 
 def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool]) -> set[str]:
@@ -500,11 +535,9 @@ def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bo
 
 def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset(), min_age: int = 180,
            stale_hours: float = 24, live: Callable[[str | None], bool] = live_lock,
-           in_train: dict[str, str] | None = None, queued: dict[str, str] | None = None,
-           coord_dir: pathlib.Path | None = None) -> list[Row]:
-    """Every local branch but main, and every detached worktree, measured and given its lifecycle state. `in_train`:
-    {branch: train label} of the train landing now (landing_train_members); `queued`: {branch: why} of the open pull
-    requests in the merge queue (queued_train_members)."""
+           prs: dict[str, PullRequest] | None = None, coord_dir: pathlib.Path | None = None) -> list[Row]:
+    """Every local branch but main, and every detached worktree, measured and given its lifecycle state. `prs`:
+    {branch: its open pull request into main} (pull_requests)."""
     names = main_names(repo)
     trees = worktrees(repo)
     by_branch = {t.branch: t for t in trees if t.branch}
@@ -538,13 +571,16 @@ def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset
     with ThreadPoolExecutor(max_workers=16) as pool:   # subprocess-bound: ~1-3 s a branch, 35 s for 29 one by one
         rows = list(pool.map(measure, branches)) + list(pool.map(measure_detached, [t for t in trees if not t.branch]))
     for r in rows:
+        rv = r.report.review if r.report else None
+        if rv and rv.verdict == 'CLEAN' and r.tip and not rv.covers(r.tip):
+            r.review_holds = unreviewed_since(rv.sha, r.tip, repo=repo) == []
         r.state, r.why = lifecycle(r, in_flight_slugs=set(slugs), min_age=min_age, stale_hours=stale_hours, live=live,
-                                   in_train=in_train, queued=queued)
+                                   prs=prs)
     contained(rows, repo)
     return rows
 
 
-CARRIER_STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND')
+CARRIER_STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'ENQUEUED', 'BOUNCED')
 
 
 def contained(rows: list[Row], repo=REPO) -> None:
@@ -569,17 +605,9 @@ def contained(rows: list[Row], repo=REPO) -> None:
 def verdict(rows: list[Row]) -> str:
     n = {s: sum(1 for r in rows if r.state == s) for s in STATES}
     return (f'=== BRANCH LIFECYCLE: {len(rows)} · {n["IN FLIGHT"]} in flight · {n["WAITING FOR REVIEW"]} waiting for '
-            f'review · {n["WAITING TO LAND"]} waiting to land · '
+            f'review · {n["WAITING TO LAND"]} waiting to land · {n["ENQUEUED"]} enqueued · {n["BOUNCED"]} bounced · '
             f'{n["LANDED"]} landed (--apply deletes) · {n["DECISION"]} need a DECISION'
             + (' (owner rule 2026-10-08, kb/Work PB2600: land it or abandon it in its kb/Work note, then delete) ===' if n['DECISION'] else ' ==='))
-
-
-# ⛔ THE TRAIN SIZE (owner 2026-10-10, kb/Work PB2981): a train carries 4-6 clusters, never every waiting branch. On the
-# morning of 2026-10-10 the land unit took all 15 WAITING TO LAND branches (13 clusters) into ONE train: its lander split
-# it into three serial agents and nothing reached main for hours; that evening 15 were waiting again ("do not try and do
-# 15 branches at once. We'll just hit the same issues as this morning"). So the next train is computed here, and the
-# land unit carries exactly it.
-TRAIN_MAX = 6
 
 
 def note_rank(work_dir: pathlib.Path | None = None) -> Callable[[str], tuple[int, int]]:
@@ -600,12 +628,12 @@ def note_rank(work_dir: pathlib.Path | None = None) -> Callable[[str], tuple[int
     return rank
 
 
-def next_train(rows: list[Row], rank: Callable[[str], tuple[int, int]], size: int = TRAIN_MAX) -> tuple[list[Row], list[Row]]:
-    """(the next train, the rows it leaves WAITING for a later one): the WAITING TO LAND rows ordered by their report's
-    lead note (`rank`), then the OLDEST report first, then the name; the first `size` of them."""
-    waiting = sorted((r for r in rows if r.state == 'WAITING TO LAND'),
-                     key=lambda r: (*rank(r.report.lead), -r.report.age_min, r.name))
-    return waiting[:size], waiting[size:]
+def landing_order(rows: list[Row], rank: Callable[[str], tuple[int, int]]) -> list[Row]:
+    """The WAITING TO LAND rows in the order the enqueue unit lands them, one at a time (kb/Work PB2981's ranking, kept
+    by PB3023): by their report's lead note (`rank`: the most harmful first, a compiler fix before process work), then
+    the OLDEST report first, then the name."""
+    return sorted((r for r in rows if r.state == 'WAITING TO LAND'),
+                  key=lambda r: (*rank(r.report.lead), -r.report.age_min, r.name))
 
 
 ABANDONED = re.compile(r'(?i)(?<!not )\babandoned\b')   # "not abandoned" records the opposite decision
@@ -694,9 +722,9 @@ def main(argv=None):
     ap.add_argument('--stale-hours', type=float, default=24,
                     help='a DONE report older than this that never landed needs a DECISION (default 24)')
     ap.add_argument('--reports', type=pathlib.Path, help='the fix-lane reports directory (default coord.reports_dir())')
-    ap.add_argument('--brief', action='store_true', help='the verdict line and the WAITING FOR REVIEW, WAITING TO LAND and DECISION rows only')
-    ap.add_argument('--train', action='store_true',
-                    help=f'the next train: at most {TRAIN_MAX} WAITING TO LAND rows, the most harmful first (kb/Work PB2981)')
+    ap.add_argument('--brief', action='store_true',
+                    help='the verdict line and the rows someone must act on: WAITING FOR REVIEW, WAITING TO LAND (in '
+                         'landing order), BOUNCED and DECISION')
     ap.add_argument('--json', action='store_true', help='the survey as JSON: every row with its state and evidence')
     ap.add_argument('--no-fetch', action='store_true')
     ap.add_argument('--self-test', action='store_true')
@@ -708,25 +736,15 @@ def main(argv=None):
     terminal = note_terminal()
     rows = survey(reports=report_index(a.reports or coord.reports_dir(), terminal),
                   slugs=in_flight_slugs(None, terminal), min_age=a.min_age, stale_hours=a.stale_hours,
-                  in_train=landing_train_members(), queued=queued_train_members())
-    rank = note_rank()
-    train, held = next_train(rows, rank)
+                  prs=pull_requests())
+    order = landing_order(rows, note_rank())
     if a.json:
         print(json.dumps({'verdict': verdict(rows), 'rows': [dataclasses.asdict(r) for r in rows],
-                          'train': [r.name for r in train], 'held': [r.name for r in held]}, indent=1))
-        return 0
-    if a.train:
-        print(f'=== NEXT TRAIN: {len(train)} of {len(train) + len(held)} WAITING TO LAND (at most {TRAIN_MAX} per train, '
-              f'the most harmful lead first; kb/Work PB2981) ===')
-        for tag, group in (('TRAIN', train), ('HELD', held)):
-            for r in group:
-                harm, process = rank(r.report.lead)
-                print(f'{tag:6} {r.name} — {r.report.name} ({r.report.lead}: harm {-harm}, '
-                      f'{"process" if process else "compiler"}){"; waits for the land unit after this one" if tag == "HELD" else ""}')
+                          'landing_order': [r.name for r in order]}, indent=1))
         return 0
     for st in STATES:
-        for r in sorted((r for r in rows if r.state == st), key=lambda r: r.name):
-            if a.brief and st in ('IN FLIGHT', 'LANDED'):
+        for r in order if st == 'WAITING TO LAND' else sorted((r for r in rows if r.state == st), key=lambda r: r.name):
+            if a.brief and st in ('IN FLIGHT', 'ENQUEUED', 'LANDED'):
                 continue
             print(f'{st:15} {r.name}{" [worktree]" if r.worktree and r.content != "DETACHED" else ""} — {r.why}')
     print(verdict(rows))
@@ -785,12 +803,16 @@ def self_test() -> int:
                      # stamp at a head the branch has since moved past; `pred` carries no report and lands through
                      # `succ`, which was cut from it and is DONE and reviewed CLEAN
                      ('unreviewed', 'src/N.cs'), ('review-findings', 'src/O.cs'), ('reviewed-moved', 'src/S.cs'),
-                     ('pred', 'src/T.cs'), ('fnd-pred', 'src/W.cs')):
+                     ('pred', 'src/T.cs'), ('fnd-pred', 'src/W.cs'), ('reviewed-stamped', 'src/Y.cs')):
             g('switch', '-q', '-c', b, 'main')
             commit(f, f'class {b.replace("-", "_").title()}X {{}}\n', b)
         reviewed_at = g('rev-parse', 'reviewed-moved').stdout.strip()
         g('switch', '-q', 'reviewed-moved')
         commit('src/S.cs', 'class ReviewedMovedX { int AfterTheReview; }\n', 'a commit after the review')
+        # `reviewed-stamped`: CLEAN at a head, then only the DEVLOG stamp enqueue.py makes: still reviewed (kb/Work PB3023)
+        stamped_at = g('rev-parse', 'reviewed-stamped').stdout.strip()
+        g('switch', '-q', 'reviewed-stamped')
+        commit('DEVLOG/0042-the-fix.md', '## Entry 42 — 2026-10-11 20:00 PDT — the fix\n\nWhy.\n', 'DEVLOG 42: stamp')
         g('switch', '-q', '-c', 'succ', 'pred')
         commit('src/V.cs', 'class SuccessorX {}\n', 'succ')
         # `fnd-pred` was reviewed FINDINGS; a later wave's finisher `fnd-fix` merged it and was reviewed CLEAN
@@ -838,13 +860,13 @@ def self_test() -> int:
         # but its lander ejected it: no E commit in train 9999, and the earlier train's E must not carry it
         commit('src/K0.cs', 'class KiloEarlier {}\n', 'K PB2: an earlier train\'s cluster K\n\nTrain-Cluster: K\n')
         commit('src/E0.cs', 'class EchoEarlier {}\n', 'E PB3: an earlier train\'s cluster E\n\nTrain-Cluster: E\n')
-        commit('DEVLOG.md', 'train 9998\n', 'Train 9998: DEVLOG 0, the earlier train\'s last commit')
+        commit('DEVLOG/9998-train.md', 'train 9998\n', 'Train 9998: DEVLOG 0, the earlier train\'s last commit')
         train_commit('carried', 'src/K.cs', 'class KiloCarried { int EditedInTrain; }\n', 'K')
         k9999 = g('log', '-1', '--format=%h').stdout.strip()
         train_commit('carried-moved', 'src/M.cs', 'class MikeMoved { int EditedInTrain; }\n', 'M')
         manifest.append({'cluster': 'E', 'branch': 'ejected', 'base': g('merge-base', 'ejected', 'main').stdout.strip(),
                          'head': g('rev-parse', 'ejected').stdout.strip()})
-        commit('DEVLOG.md', 'train 9999\n', 'Train 9999: DEVLOG 1, the train\'s last commit')
+        commit('DEVLOG/9999-train.md', 'train 9999\n', 'Train 9999: DEVLOG 1, the train\'s last commit')
         (landed_coord / 'scratch' / 'train9999-manifest.json').write_text(json.dumps(manifest), encoding='utf-8')
         for b, f, text in (('picked', 'src/P.cs', 'class PapaPicked { int LaterOnMain; }\n'),
                            ('picked-lost', 'src/Q.cs', 'class QuebecRenamed {}\n')):
@@ -888,6 +910,8 @@ def self_test() -> int:
                 ('w9998m-PB14-report.md', 'Status: DONE\nBranch: reviewed-moved\n'
                                           f'**Review:** CLEAN w9998m-review-r1 {reviewed_at[:12]}\n', 10),
                 ('w9998n-PB15-report.md', f'Status: DONE\nBranch: succ\n**Review:** CLEAN w9998n-r1 {tips["succ"]}\n', 10),
+                ('w9998q-PB17-report.md', 'Status: DONE\nBranch: reviewed-stamped\n'
+                                          f'**Review:** CLEAN w9998q-review-r1 {stamped_at[:12]}\n', 10),
                 ('w9998o-PB16-report.md', 'Status: DONE\nBranch: fnd-pred\n**Review:** FINDINGS 1 w9998o-r1 '
                                           f'{tips["fnd-pred"]} E:/s/review-w9998-o.jsonl\n', 10),
                 ('w9998p-PB16-report.md', f'Status: DONE\nBranch: fnd-fix\n**Review:** CLEAN w9998p-r1 {tips["fnd-fix"]}\n', 10),
@@ -925,7 +949,8 @@ def self_test() -> int:
                 'carried': 'LANDED', 'carried-moved': 'DECISION', 'add-del': 'DECISION', 'picked': 'LANDED',
                 'picked-lost': 'DECISION', 'unlanded-train': 'DECISION', 'ejected': 'DECISION',
                 'unreviewed': 'WAITING FOR REVIEW', 'review-findings': 'DECISION', 'reviewed-moved': 'WAITING FOR REVIEW',
-                'pred': 'IN FLIGHT', 'succ': 'WAITING TO LAND', 'fnd-pred': 'IN FLIGHT', 'fnd-fix': 'WAITING TO LAND'}
+                'pred': 'IN FLIGHT', 'succ': 'WAITING TO LAND', 'fnd-pred': 'IN FLIGHT', 'fnd-fix': 'WAITING TO LAND',
+                'reviewed-stamped': 'WAITING TO LAND'}
         for name, state in want.items():
             got = rows.get(name)
             check(got is not None and got.state == state, f'{name}: want {state}, got {got.state if got else "no row"} ({got.why if got else ""})')
@@ -956,52 +981,52 @@ def self_test() -> int:
         check('patch-equivalent' in rows['picked'].why, f'a cherry-picked branch says so: {rows["picked"].why}')
         check(rows['picked-lost'].content == 'CHECK' and rows['picked-lost'].lost == ['QuebecLost'],
               f'a cherry-picked branch with a name main lacks stays CHECK: {rows["picked-lost"].lost}')
-        # THE TRAIN LANDING NOW (PB2708): its manifest's members are IN FLIGHT, never WAITING TO LAND; the label binds
-        # only at a word boundary (train 99990 is not train 9999)
-        cdir = tmp / 'coord'
-        (cdir / 'scratch').mkdir(parents=True)
-        (cdir / 'landing-lease.json').write_text(json.dumps({'holder': 'train 9999 lander', 'worktree': str(tmp),
-                                                             'expires_at': '2099-01-01T00:00:00+00:00'}), encoding='utf-8')
-        (cdir / 'scratch' / 'train9999-manifest.json').write_text(json.dumps([{'branch': 'done-branch'}]), encoding='utf-8')
-        (cdir / 'scratch' / 'train99990-manifest.json').write_text(json.dumps([{'branch': 'orphan'}]), encoding='utf-8')
-        in_train = landing_train_members(cdir)
-        check(in_train == {'done-branch': '9999'}, f'the members of the train holding the lease: {in_train}')
-        check(lifecycle(rows['done-branch'], in_flight_slugs=set(), min_age=180, live=live, in_train=in_train)[0]
-              == 'IN FLIGHT', 'a member of the train landing now is IN FLIGHT, not WAITING TO LAND')
-        (cdir / 'landing-lease.json').write_text(json.dumps({'holder': 'train 9999 lander', 'worktree': str(tmp),
-                                                             'expires_at': '2000-01-01T00:00:00+00:00'}), encoding='utf-8')
-        check(landing_train_members(cdir) == {}, 'an expired lease carries no train')
-        # THE QUEUED TRAIN (kb/Work PB3024): an open pull request titled `Train <label>:` keeps its manifest's members and
-        # its own head IN FLIGHT after the lease is released; offline it is a non-observation ({}), never a claim
+        # THE PULL-REQUEST STATES (kb/Work PB3023, PB3024): ONE GraphQL read; a PR in the queue (or with auto-merge on) is
+        # ENQUEUED; one the queue removed, still at the branch's tip, is BOUNCED with GitHub's reason; a bounced PR whose
+        # branch moved on (the finisher's fix) reads by its report again; offline it is a non-observation ({})
         def fake_gh(args):
-            return 0, json.dumps([{'number': 17, 'title': 'Train 9999: five clusters', 'headRefName': 'lander-9999'},
-                                  {'number': 18, 'title': 'docs: a hand PR', 'headRefName': 'docs-x'}]), ''
-        queued = queued_train_members(cdir, fake_gh)
-        check(set(queued) == {'done-branch', 'lander-9999', 'docs-x'} and '#17' in queued['done-branch'],
-              f'the members and heads of the open pull requests: {queued}')
-        state, why = lifecycle(rows['done-branch'], in_flight_slugs=set(), min_age=180, live=live, queued=queued)
-        check(state == 'IN FLIGHT' and 'pull request #17' in why, f'a member of a queued train is IN FLIGHT: {state} {why}')
+            if args[:2] == ['repo', 'view']:
+                return 0, 'o/r\n', ''
+            removed = {'nodes': [{'reason': 'FAILED_CHECKS', 'createdAt': '2026-10-11T20:00:00Z'}]}
+            return 0, json.dumps({'data': {'repository': {'pullRequests': {'nodes': [
+                {'number': 17, 'url': 'u17', 'headRefName': 'done-branch', 'headRefOid': tips['done-branch'],
+                 'isInMergeQueue': True, 'autoMergeRequest': None, 'timelineItems': {'nodes': []}},
+                {'number': 18, 'url': 'u18', 'headRefName': 'succ', 'headRefOid': tips['succ'],
+                 'isInMergeQueue': False, 'autoMergeRequest': None, 'timelineItems': removed},
+                {'number': 19, 'url': 'u19', 'headRefName': 'fnd-fix', 'headRefOid': 'an-older-head',
+                 'isInMergeQueue': False, 'autoMergeRequest': None, 'timelineItems': removed},
+                {'number': 20, 'url': 'u20', 'headRefName': 'unreviewed', 'headRefOid': 'x',
+                 'isInMergeQueue': False, 'autoMergeRequest': {'enabledAt': 'now'}, 'timelineItems': removed}]}}}}), ''
+        prs = pull_requests(fake_gh)
+        pr_rows = {r.name: r for r in survey(repo, reports=report_index(rdir, terminal), slugs={'w9999a'}, min_age=180,
+                                             stale_hours=24, live=live, coord_dir=landed_coord, prs=prs)}
+        got = {b: pr_rows[b].state for b in ('done-branch', 'succ', 'fnd-fix', 'unreviewed', 'pred', 'merged')}
+        check(got == {'done-branch': 'ENQUEUED', 'succ': 'BOUNCED', 'fnd-fix': 'WAITING TO LAND',
+                      'unreviewed': 'ENQUEUED', 'pred': 'IN FLIGHT', 'merged': 'LANDED'}
+              and 'FAILED_CHECKS' in pr_rows['succ'].why and '#17' in pr_rows['done-branch'].why,
+              f'the merge queue states: a queued or auto-merge PR is ENQUEUED, a removed one at the tip BOUNCED with '
+              f'its reason, a moved tip reads by its report, a predecessor of a bounced branch lands through it: {got}')
 
         def offline_gh(args):
             import ruleset  # noqa: PLC0415
             raise ruleset.Unobserved('no network')
-        check(queued_train_members(cdir, offline_gh) == {} and queued_train_members(cdir, lambda a: (1, '', 'x')) == {},
-              'offline, or a gh failure, the queued set is empty (git-only lifecycle)')
-        # THE TRAIN SIZE (kb/Work PB2981): of eight waiting rows the next train is TRAIN_MAX, the most harmful lead
-        # first, a compiler fix before process work at equal harm, the oldest report first; the rest are held
+        check(pull_requests(offline_gh) == {} and pull_requests(lambda a: (1, '', 'x')) == {},
+              'offline, or a gh failure, the pull-request states are empty (git-only lifecycle)')
+        # THE LANDING ORDER (kb/Work PB2981's ranking, kept by PB3023): the WAITING TO LAND rows, the most harmful lead
+        # first, a compiler fix before process work at equal harm, the oldest report first; nothing else
         def waiting(name, lead, age):
             return Row(name, 'CHECK', [], [], 1, None, None, 0, 999.0, '',
                        Report(f'w1a-{lead}-report.md', 'DONE', lead, False, age), 'WAITING TO LAND')
         ranks = {'PB1': (-8, 0), 'PB2': (-4, 0), 'PB3': (0, 0), 'PB4': (0, 1)}
         eight = [waiting(f'b{i}', lead, age) for i, (lead, age) in enumerate(
             (('PB4', 500), ('PB3', 10), ('PB3', 90), ('PB1', 5), ('PB4', 50), ('PB2', 7), ('PB3', 30), ('PB4', 900)))]
-        train, held = next_train(eight + [dataclasses.replace(eight[0], name='landed-row', state='LANDED')],
-                                 lambda n: ranks.get(n, (0, 1)))
-        check([r.name for r in train] == ['b3', 'b5', 'b2', 'b6', 'b1', 'b7'] and [r.name for r in held] == ['b0', 'b4'],
-              f'the next train is the {TRAIN_MAX} most harmful waiting rows, compiler before process, oldest first: '
-              f'{[r.name for r in train]}, held {[r.name for r in held]}')
-        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 30 · 5 in flight · 2 waiting for review · '
-                                                      '3 waiting to land · 5 landed'),
+        order = landing_order(eight + [dataclasses.replace(eight[0], name='landed-row', state='LANDED')],
+                              lambda n: ranks.get(n, (0, 1)))
+        check([r.name for r in order] == ['b3', 'b5', 'b2', 'b6', 'b1', 'b7', 'b0', 'b4'],
+              f'the landing order is the most harmful lead first, compiler before process, oldest first: '
+              f'{[r.name for r in order]}')
+        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 31 · 5 in flight · 2 waiting for review · '
+                                                      '4 waiting to land · 0 enqueued · 0 bounced · 5 landed'),
               f'verdict line: {verdict(list(rows.values()))}')
         # the pure rule: a lock with no pid is honoured; a ledger slug matches only at a word boundary
         r0 = dataclasses.replace(rows['orphan'], lock='')
