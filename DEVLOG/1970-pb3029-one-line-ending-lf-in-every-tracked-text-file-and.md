@@ -1,4 +1,4 @@
-## Entry 1968 — 2026-10-12 02:19 PDT — PB3029: one line ending, LF, in every tracked text file and every checkout; PB3097: the finisher role loads again
+## Entry 1970 — 2026-10-12 02:58 PDT — PB3029: one line ending, LF, in every tracked text file and every checkout; PB3097: the finisher role loads again
 
 ### PB3029: LF everywhere, enforced
 
@@ -56,3 +56,4 @@ in CI's `audits` and `windows-build-test` jobs and listed in the WSL and cloud s
 
 
 **Arch-oracle baseline.** The landing oracle refused the first landing (exit 7): nine of its input paths changed after baseline fb934cb4a329, all of them this branch's own CRLF-to-LF rewrites (four goldens' .out files, a copybook, three test sources and the conformance README). compare_oracle.py: IDENTICAL, 7780 cases (baseline fb934cb4a329, new 60d47c6d52a9). A line-ending rewrite changes no compiled output, so there is no difference to explain. capture_oracle.py --record wrote 60d47c6d52a9.manifest.json.
+
