@@ -1774,9 +1774,11 @@ demand and not committed.
   every header as written; the twenty numbers the monolith used twice (008-014, 171-185) and 1191a-1191d carry a
   letter in the FILE name (`0185b-…` above `0185a-…`) so the render keeps the monolith's order; CLAUDE.md rule 6, the skills and every brief that said "the TOP of
   DEVLOG.md" changed in that landing (`session-probe` and the ledger read no DEVLOG; the `devlog` memory and the public
-  `brent-tools:devlog` skill live outside this repository and are the attended session's to update). Until
-  `enqueue.py` (PB3023) lands, the LANDER stamps: a train folds its clusters' pending files into its one entry and runs
-  `devlog.py stamp` after its final rebase (MANDATORY-PRACTICES L1). Rule 6's substance is untouched: one entry per
+  `brent-tools:devlog` skill live outside this repository and are the attended session's to update). `enqueue.py
+  land` (PB3023) stamps, one branch per landing: a branch that merged an unlanded predecessor (a same-file successor,
+  a review finisher; `prune_worktrees.contained`) lands that predecessor THROUGH it, so `devlog.py stamp` folds every
+  pending file the branch carries into its one entry, oldest first, each body under its own title
+  (MANDATORY-PRACTICES L8). Rule 6's substance is untouched: one entry per
   landing on main, newest first, the only history.
 - **Generated indexes leave the tree (PB3026, landed):** a derived index is a RENDERED VIEW: gitignored, rendered on demand
   by its generator, never committed. `scripts/rendered_views.py` holds the ONE registry (`VIEWS`): `docs/DRIFT_RULES.md`

@@ -4,8 +4,8 @@ docs/rearchitecture/DESIGN-test-build-ci.md section 3.17.4).
 
     python scripts/devlog.py render [--since NNNN] [--out FILE]   the descending narrative (README, then newest first)
     python scripts/devlog.py stamp <branch> [--coord DIR] [--base origin/main]
-                                                                   number and stamp the branch's pending entry (or
-                                                                   re-stamp one main has overtaken); one commit
+                                                                   number and stamp the branch's pending entries as
+                                                                   one (or re-stamp one main has overtaken); one commit
     python scripts/devlog.py check [--base origin/main] [--rev HEAD] the landing rule, on the trees of the range
     python scripts/devlog.py next                                  the highest entry number in DEVLOG/ (the allocator's floor)
     python scripts/devlog.py --self-test
@@ -30,7 +30,9 @@ THE FLOW. The implementer writes `DEVLOG/pending-<slug>.md` whose first line is 
 whose body follows. `stamp <branch>` runs when the branch is enqueued: it allocates the number through
 `scripts/orchestrator/alloc.py devlog` (so number order is enqueue order is landing order), renames the file to
 `NNNN-<slug>.md`, completes the header with the number and the current stamp, and commits that in the branch's
-worktree. `check` is the landing rule (owner 2026-10-08, kb/Work PB2605: it covers "Only commits landing on main"),
+worktree. A branch that merged an unlanded predecessor (a same-file successor, a review finisher) carries that
+predecessor's pending entry too and lands it, so `stamp` folds every pending entry into the ONE new entry, oldest
+first (one landing on main, one entry). `check` is the landing rule (owner 2026-10-08, kb/Work PB2605: it covers "Only commits landing on main"),
 run where every landing passes and on every pull request and merge group in CI.
 
 WHAT `check` REFUSES (exit 1), on the committed trees of <base> and <rev>, never an index or a working tree:
@@ -304,27 +306,42 @@ def worktree_of(repo: pathlib.Path, branch: str) -> pathlib.Path:
     raise SystemExit(f"⛔ devlog stamp: no worktree has branch {branch} checked out")
 
 
+def added_order(wt: pathlib.Path, name: str) -> tuple[int, str]:
+    """When `DEVLOG/<name>` first entered the branch's history (its oldest adding commit's time; an uncommitted file
+    sorts last), then the name: the order a stamp folds pending entries in, the predecessor's first."""
+    times = _git(wt, "log", "--diff-filter=A", "--format=%ct", "--", f"{DIR}/{name}").stdout.split()
+    return (int(times[-1]) if times else sys.maxsize, name)
+
+
 def stamp(wt: pathlib.Path, number: int, now: dt.datetime) -> tuple[str, str]:
-    """Rename the worktree's one pending entry to its numbered name and complete its header; returns (name, header).
-    The caller allocates `number` and commits."""
+    """Number the worktree's pending entry and complete its header; returns (name, header). The caller allocates
+    `number` and commits.
+
+    A branch normally carries ONE pending entry. A branch that merged an unlanded predecessor (a same-file successor,
+    a review finisher: MANDATORY-PRACTICES O2, I10) carries the predecessor's too, and lands it: the predecessor lands
+    THROUGH it (prune_worktrees.contained), so its landing is one landing on main and gets ONE entry (kb/Work PB2605).
+    The entries are folded into that one, oldest first: the titles joined by `; `, each body under its own title."""
     files = worktree_files(wt)
-    pending = sorted(n for n in files if PENDING_NAME.match(n))
-    if len(pending) != 1:
-        raise SystemExit(f"⛔ devlog stamp: {wt / DIR} holds {len(pending)} pending entries ({', '.join(pending) or 'none'}); "
-                         "a branch carries exactly one, `pending-<slug>.md` whose first line is `## <Title>`")
-    text = files[pending[0]]
-    m = PENDING_HEADER.match(first_line(text))
-    if not m:
-        raise SystemExit(f"⛔ devlog stamp: {DIR}/{pending[0]} must start with `## <Title>` (no number, no stamp)")
-    title = m.group("title").strip()
+    pending = sorted((n for n in files if PENDING_NAME.match(n)), key=lambda n: added_order(wt, n))
+    if not pending:
+        raise SystemExit(f"⛔ devlog stamp: {wt / DIR} holds no pending entry; a branch carries one, "
+                         "`pending-<slug>.md` whose first line is `## <Title>`")
+    parts = []
+    for n in pending:
+        m = PENDING_HEADER.match(first_line(files[n]))
+        if not m:
+            raise SystemExit(f"⛔ devlog stamp: {DIR}/{n} must start with `## <Title>` (no number, no stamp)")
+        parts.append((m.group("title").strip(), (files[n].split("\n", 1)[1] if "\n" in files[n] else "").strip("\n")))
+    title = "; ".join(t for t, _ in parts)
+    body = parts[0][1] if len(parts) == 1 else "\n\n".join(f"### {t}\n\n{b}" for t, b in parts)
     header = f"## Entry {number} {DASH} {now.strftime('%Y-%m-%d %H:%M')} {zone_abbrev(now)} {DASH} {title}"
-    body = text.split("\n", 1)[1] if "\n" in text else ""
     name = entry_name(number, "", title)
-    (wt / DIR / name).write_bytes((header + "\n" + body.rstrip("\n") + "\n\n").encode("utf-8"))
-    (wt / DIR / pending[0]).unlink()
-    # exactly these two paths: the entry, and the pending file's removal (tracked or not); nothing else in DEVLOG/
+    (wt / DIR / name).write_bytes((header + "\n\n" + body + "\n\n").encode("utf-8"))
+    for n in pending:
+        (wt / DIR / n).unlink()
+    # exactly these paths: the entry, and each pending file's removal (tracked or not); nothing else in DEVLOG/
     _git(wt, "add", "--", f"{DIR}/{name}", check=True)
-    _git(wt, "rm", "-q", "--cached", "--ignore-unmatch", "--", f"{DIR}/{pending[0]}", check=True)
+    _git(wt, "rm", "-q", "--cached", "--ignore-unmatch", "--", *(f"{DIR}/{n}" for n in pending), check=True)
     return name, header
 
 
@@ -554,6 +571,38 @@ def self_test() -> int:
        and not check(commit_files(repo, "main")[0], set(), *commit_files(repo, "impl"))[0],
        restamp.stdout + restamp.stderr + repr(names))
     ok("next: the highest number in the tree", highest(names_in(wt)) == 14)
+    # FOLD (kb/Work PB3023 review R1-3): a successor that merged an unlanded predecessor carries both pending entries
+    # and lands both (the predecessor lands THROUGH it): ONE entry, the predecessor's first, each body kept
+    sh("checkout", "-q", "main")
+    pred = root / "pred"
+    sh("worktree", "add", "-q", "-b", "pred", str(pred), "main")
+    tree({f"{DIR}/pending-pb1-pred.md": "## PB1: the predecessor\n\nThe predecessor's body.\n"}, cwd=pred)
+    sh("add", "-A", cwd=pred)
+    env["GIT_COMMITTER_DATE"] = "2026-10-11T10:00:00"     # the predecessor's entry is the older one
+    sh("commit", "-qm", "WIP checkpoint: the predecessor", cwd=pred)
+    env["GIT_COMMITTER_DATE"] = "2026-10-11T11:00:00"
+    succ = root / "succ"
+    sh("worktree", "add", "-q", "-b", "succ", str(succ), "main")
+    tree({f"{DIR}/pending-a-succ.md": "## PB2: the successor\n\nThe successor's body.\n"}, cwd=succ)
+    sh("add", "-A", cwd=succ)
+    sh("commit", "-qm", "WIP checkpoint: the successor", cwd=succ)
+    del env["GIT_COMMITTER_DATE"]
+    sh("merge", "-q", "--no-edit", "pred", cwd=succ)
+    fold = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve()), "stamp", "succ", "--repo", str(repo),
+                           "--coord", str(cdir), "--base", "main"], capture_output=True, text=True, encoding="utf-8",
+                          env=env)
+    names = sorted(p.name for p in (succ / DIR).iterdir())
+    folded = [n for n in names if n.startswith("0015-")]
+    text = (succ / DIR / folded[0]).read_text(encoding="utf-8") if folded else ""
+    ok("stamp: two pending entries (a merged predecessor's and the branch's) fold into ONE entry, the predecessor's "
+       "first, both bodies kept, and the branch passes check",
+       fold.returncode == 0 and folded == ["0015-pb1-the-predecessor-pb2-the-successor.md"]
+       and first_line(text).endswith("PB1: the predecessor; PB2: the successor")
+       and text.index("### PB1: the predecessor") < text.index("### PB2: the successor")
+       and "The predecessor's body." in text and "The successor's body." in text
+       and not any(n.startswith("pending-") for n in names) and not sh("status", "--porcelain", cwd=succ)
+       and not check(commit_files(repo, "main")[0], set(), *commit_files(repo, "succ"))[0],
+       fold.stdout + fold.stderr + repr(names))
     ok("zone: a spelled-out zone name is abbreviated as date +%Z prints it",
        zone_abbrev(dt.datetime(2026, 10, 11, tzinfo=dt.timezone(dt.timedelta(hours=-7), "Pacific Daylight Time")))
        == "PDT")
