@@ -173,8 +173,9 @@ public sealed class DocumentedNonSupportWitnessTests
     /// declined one. The facility has TWO statements, RECEIVE (§14.9.31) and SEND (§14.9.38), and until this test
     /// only the SEND site was asserted anywhere (GobackGeneralFormatTests) — so the count, not the code, is the
     /// assertion: a decline wired into one statement's binder arm and not the other would still produce one
-    /// COBOLNET1578 (feedback_two_arm_dispatch). The facility is a COBOL-2023 introduction; below it both words
-    /// are ordinary user-defined words (negative/user-word-receive).
+    /// COBOLNET1578 (feedback_two_arm_dispatch). The facility is a COBOL-2023 introduction; below it the two formats
+    /// draw COBOLNET0900 and no COBOLNET1578 (negative/pb374-async-messaging-below-2023, kb/Work PB374), and at
+    /// 2002/2014 both words are ordinary user-defined words (negative/user-word-receive).
     /// <para>The golden's <c>.out</c> pins the INERT half: with no message I-O neither ON EXCEPTION nor NOT ON
     /// EXCEPTION runs, where a conforming facility runs exactly one of them at each statement (§14.9.31.4 GR4/GR5,
     /// §14.9.38.4 GR2/GR3).</para></summary>
@@ -185,6 +186,24 @@ public sealed class DocumentedNonSupportWitnessTests
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023);
         Assert.True(ok, $"an ACCEPT-INERT declined facility must still COMPILE: {string.Join("\n", errors)}");
         Assert.Equal(2, warnings.Count(w => w.Contains(McsNonSupport, StringComparison.Ordinal)));
+    }
+
+    /// <summary>BELOW 2023 THE FORMATS ARE AN INTRODUCTION, NOT THE FACILITY (kb/Work PB374). RECEIVE and SEND are
+    /// §8.9-reserved at COBOL-85 too (the '85 communication module), so a reservation test recognized the 2023 formats
+    /// at --std 85 and compiled them under the 2023 facility's COBOLNET1578. Every edition below 2023 now refuses each
+    /// statement with the introduction gate, and names no facility it does not have: the negative corpus asserts the
+    /// error code only, so the absence of the warning is asserted here.</summary>
+    [Theory]
+    [InlineData(85)]
+    [InlineData(2002)]
+    [InlineData(2014)]
+    public void McsStatements_Below2023_AnswerTheIntroductionGate_NotTheFacility(int edition)
+    {
+        string source = Golden("negative", "pb374-async-messaging-below-2023");
+        var (ok, errors, warnings) = EditionHarness.CompileFull(source, edition);
+        Assert.False(ok, $"the asynchronous messaging formats compiled at COBOL-{edition}");
+        Assert.Equal(2, errors.Count(e => e.Contains("COBOLNET0900", StringComparison.Ordinal)));
+        Assert.DoesNotContain(warnings, w => w.Contains(McsNonSupport, StringComparison.Ordinal));
     }
 
     /// <summary>THE SAME FACILITY'S EXCEPTION-NAMES → COBOLNET1578, ONCE PER WRITTEN NAME, AND STILL ACCEPTED (kb/Work

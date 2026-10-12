@@ -1812,6 +1812,10 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
 1. **Message Control System (MCS) asynchronous messaging** (E.3.2 item 1 / A.3 item 4): `SEND`, `RECEIVE`,
    and MESSAGE-TAG data items (the ISO/IEC 1989:2023 MCS surface — the pre-2002 COMMUNICATION SECTION is not part
    of this edition). Processor-dependent; not provided. The statements are accepted-inert with **COBOLNET1578**.
+   They are a COBOL-2023 introduction, and below `--std 2023` the edition pass answers **COBOLNET0900**
+   (`async-messaging-2023`) and the facility is not named: §8.9 reserves RECEIVE and SEND at COBOL-85 too, for the
+   '85 communication module, so the 2023 formats are recognized at every edition and gated on introduction, never
+   on reservation (kb/Work PB374; `conformance:negative/pb374-async-messaging-below-2023`).
    The **MESSAGE-TAG usage** is instead REFUSED BY NAME with **COBOLNET1943**, in BOTH its spellings
    (§13.18.60.2 prints `[ USAGE IS ]` as optional, so bare `01 M MESSAGE-TAG.` is the same clause as
    `01 M USAGE MESSAGE-TAG.`). It cannot join the accept-inert band for the reason 1560/1705/1706/1707 cannot:
