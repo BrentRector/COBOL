@@ -59,7 +59,7 @@ the tools it runs). Contents:
 | `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from: a unit's own, one the supervisor synthesized for a dead unit (section 5.1), or the operator's steer once its unit starts (section 4.8) |
 | `handoff.operator.json` | the operator (`steer.ps1`) | the operator's pending steer (section 4.8): validated against `handoff.schema.json`, it wins the next choice over every other handoff and is consumed (archived beside the unit's log, copied to `handoff.last.json`) when its unit starts |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
-| `land-lane\` | `land_lane.py` (the supervisor's tick, its detached runners, the enqueue unit's `collect`, the operator's `clear-halt`) | the landing lane's state (section 4.9): `attempts\<id>.json` (one per `enqueue.py land` run: branch, head, log, runner pid, exit code, verdict, end head, collected), `survey.json` (the last tick's branch survey, which `next_unit.py` reads), `HALT` (a run ended QUEUE NOT ACTIVE) and `tick.lock` |
+| `land-lane\` | `land_lane.py` (the supervisor's tick, its detached runners, the enqueue unit's `collect` and `rearm`, the operator's `clear-halt`) | the landing lane's state (section 4.9): `attempts\<id>.json` (one per `enqueue.py land` run: branch, head, log, runner pid, exit code, verdict, end head, collected), `survey.json` (the last tick's branch survey, which `next_unit.py` reads), `rearm\<branch>.json` (the enqueue unit's re-arm of a branch at its tip: one more attempt at an unchanged head), `HALT` (a run ended QUEUE NOT ACTIVE) and `tick.lock` |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
 | `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
 | `inflight-groups.json` | `plan_wave.py` (without `--dry-run`), and `scripts/hooks/dispatch_guard.py` for every write-capable Agent call and every Workflow call it admits | the dispatch ledger: every group planned or dispatched by hand whose notes are not all landed or retired, with the files it was planned on and when (`at`); the campaign lane's file-set partition reads it, so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `enqueue.py land`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the groups whose declared files its diff meets); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>` (section 9.1; kb/Work PB2118 Drafts 7–10) |
@@ -177,8 +177,9 @@ lost agent work exceeds that cost. Open decision D3.
    Older unlanded branches do not trigger it, so an abandoned branch cannot cause a `resume` loop; `plan_wave.py`
    still sees them.
 6. AGENT WORK for the enqueue unit → `enqueue` (`land_lane.agent_work`, kb/Work PB3103): the landing lane's survey
-   (younger than `land_lane.SURVEY_MAX_AGE_MIN`, 30 min) lists a branch WAITING FOR REVIEW or BOUNCED, or a lane
-   attempt STOPPED or ENQUEUED is not yet collected (its finisher or reviewer, its leads, its landing record). The
+   (younger than `land_lane.SURVEY_MAX_AGE_MIN`, 30 min) lists a branch WAITING FOR REVIEW, or BOUNCED while the lane
+   is neither landing it nor re-armed to (its finisher resolved it with no commit), or a lane attempt STOPPED or
+   ENQUEUED is not yet collected (its finisher or reviewer, its leads, its landing record). The
    lane lands every WAITING TO LAND branch itself (section 4.9), so a handoff's `DONE` branches alone start no enqueue
    unit, unless the lane has no current survey (it is not ticking; the enqueue unit's step 3 ticks it)
    (`test_orchestrate_campaign.ps1` 8f). No landing waits for another: GitHub's merge queue orders main (section 4.7).
@@ -362,7 +363,7 @@ registered by this change (open decision D2).
 
 | Failure | What it would cost | Guard |
 |---|---|---|
-| two supervisors run at once | double dispatch, id collisions, two enqueue units landing one branch | `orchestrate.lock` with a live-PID check |
+| two supervisors run at once | double dispatch, id collisions, two landing lanes landing one branch | `orchestrate.lock` with a live-PID check |
 | a unit crashes at start (auth, a bad flag, a hook refusing everything) | the loop spins and burns quota | the circuit breaker: three fast or failed units stop the loop and write an owner note |
 | a unit ends without a handoff | the next unit starts blind | schema validation; an invalid handoff is a failure and the next unit is `resume`, which rebuilds state from disk |
 | a unit's context grows without bound | each call costs more than a fresh start | `STOP-UNIT` at the soft cap `-MaxContextTokens` of the unit's own messages (not its subagents'); the fleet stop and, after the grace period, a kill only at the hard cap `-HardContextTokens` (section 4.3) |
@@ -459,20 +460,22 @@ said in the supervisor's log, a failure said and the unit continuing. A tick:
 2. SURVEYS: `git fetch`, then `prune_worktrees.survey` and its landing order (imported, never re-parsed from text),
    written to `land-lane\survey.json`.
 3. LAUNCHES, unless `HALT`, the loop's `STOP-UNIT` or `STOP`, or the owner's global `scratch\STOP` exists (a running
-   `enqueue.py land` finishes either way; it is idempotent): for every WAITING TO LAND row in survey order, and every
-   branch whose last attempt the lane may retry with its tip still that attempt's end head, `land_lane.decide` says
+   `enqueue.py land` finishes either way; it is idempotent): for every WAITING TO LAND row in survey order, every
+   branch whose last attempt the lane may retry with its tip still that attempt's end head, and every branch the
+   enqueue unit re-armed at its current tip (a BOUNCED one included), `land_lane.decide` says
    whether to start `enqueue.py land <branch> --worktree <wt>`, DETACHED (its own process group, out of the
    supervisor's job where Windows allows it), its output in `logs\land-lane-<branch>-<stamp>.log`:
 
 | The branch's last attempt | The lane |
 |---|---|
-| none, or at another head (a finisher's commit, reviewed CLEAN) | launches |
 | running | waits |
+| re-armed by the enqueue unit at this head (`land_lane.py rearm`) | launches, once: the launch consumes the re-arm; a re-arm whose branch moved is dropped |
+| none, or at another head (a finisher's commit, reviewed CLEAN) | launches |
 | `ENQUEUED` or `NOTHING TO LAND` (exit 0) at this head | nothing: the queue has it |
 | exit 3, the landing check's STOP (the branch shares a file with earlier-dispatched in-flight work, kb/Work PB2701) | retries at this head once `landing_check.py` passes on the branch's own range |
 | exit 2 (main moved under every catch-up merge), exit 9 (GitHub refused), or a DIED runner | retries ONCE at this head |
 | exit 8, QUEUE NOT ACTIVE | HALT; relaunches once the operator runs `land_lane.py clear-halt` |
-| exit 4, 5, 6, 7, 11, or a second exit 2 or 9 at this head | STOPPED: never relaunched at this head; the enqueue unit's |
+| exit 4, 5, 6, 7, 11, or a second exit 2 or 9 at this head | STOPPED: never relaunched at this head unless re-armed; the enqueue unit's |
 
 A run that commits (main merged in, the DEVLOG stamp) makes the survey read the branch IN FLIGHT, so a retry is driven
 by the lane's own attempt record, never by the survey. Mid-wave landing meets exit 3 more often than the enqueue unit
@@ -482,8 +485,11 @@ attended session.
 **What the enqueue unit keeps.** The judgment (units/enqueue.md): step 2's reviews, step 3 reads `land_lane.py status`
 (one line per branch: its latest attempt, its verdict, its log, who acts next) and sends each STOPPED attempt to a
 finisher (step 4) or a reviewer (exit 11), files the leads of each ENQUEUED one (step 5), completes the landing records
-(step 6b) and then `land_lane.py collect`s them. When `status` says the survey is stale, the unit runs one
-`land_lane.py tick` itself. `next_unit.py` starts an enqueue unit only for that agent work (section 3.2 rule 6).
+(step 6b) and then `land_lane.py collect`s them. A stop resolved WITHOUT a new commit leaves the head unchanged, and
+the lane never relaunches a stopped or queued head by itself, so the unit re-arms it, `land_lane.py rearm <branch>
+--why <cause>`: a bounce or a red its finisher attributes to infrastructure, load timing or main (once main carries the
+fix), or an UNREVIEWED exit 11 whose tip step 2's reviewer has since stamped CLEAN (kb/Work PB3103 review R1-1). When
+`status` says the survey is stale, the unit runs one `land_lane.py tick` itself. `next_unit.py` starts an enqueue unit only for that agent work (section 3.2 rule 6).
 
 **Landing gates first.** The gate a landing starts is served before every waiting implementer gate
 (`DESIGN-test-build-ci.md` section 3.14.6, `gate_slot.py`'s landing class); the cap is unchanged, so the machine's

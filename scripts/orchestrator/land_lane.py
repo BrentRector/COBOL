@@ -6,6 +6,7 @@ the moment it is ready, while whatever unit runs keeps running (kb/Work PB3103; 
     python scripts/orchestrator/land_lane.py tick [--repo DIR]      reap, survey, start every eligible landing
     python scripts/orchestrator/land_lane.py status [--json]        one line per branch: running, stopped, queued
     python scripts/orchestrator/land_lane.py collect <branch> ...   the enqueue unit has handled these attempts
+    python scripts/orchestrator/land_lane.py rearm <branch> --why T the enqueue unit: land it again at its CURRENT tip
     python scripts/orchestrator/land_lane.py clear-halt             the operator: the merge queue is ACTIVE again
     python scripts/orchestrator/land_lane.py run <attempt file>     (the detached runner `tick` starts; not by hand)
     python scripts/orchestrator/land_lane.py --self-test
@@ -24,6 +25,12 @@ STATE, all under `<coord>/land-lane/` (the coordination directory, never a workt
                       writes one only to mark it DIED (its runner is gone with no rc).
   survey.json         the last tick's branch survey (prune_worktrees' rows, imported, never re-parsed from its text):
                       what next_unit.py reads to decide whether the enqueue unit has AGENT work.
+  rearm/<branch>.json the enqueue unit's re-arm of a branch at its tip (branch, head, why, at): a stop that was resolved
+                      WITHOUT a new commit (a bounce or a red the finisher attributes to infrastructure, load timing or
+                      main itself once main carries the fix; an UNREVIEWED exit 11 whose tip a reviewer has since stamped
+                      CLEAN) is landed again at the SAME head, once; the launch consumes it, and a tip that moved makes
+                      it stale (dropped, said). Without it a STOPPED, DONE or BOUNCED branch at an unchanged head would
+                      wait forever: the lane never relaunches it there and the enqueue unit lands nothing itself.
   HALT                written when a run ends QUEUE NOT ACTIVE (exit 8): no attempt starts until the operator runs
                       `clear-halt`; the operator is named through the mailbox.
   tick.lock           an OS lock: one tick at a time (a second exits at once, saying so).
@@ -36,9 +43,11 @@ THE TICK, in order:
      running `enqueue.py land` finishes either way: it is idempotent). The candidates are the WAITING TO LAND rows in
      survey order, then the branches whose last attempt a script may retry (below) and whose tip is still that
      attempt's end head (a run that committed makes the survey read the branch IN FLIGHT, so a retry is the lane's own
-     record, never the survey's). Each candidate is decided by `decide`:
-       no attempt, or a NEW HEAD (a finisher's commit, reviewed)  launch
+     record, never the survey's), then the branches the enqueue unit re-armed at their current tip (BOUNCED ones
+     included). Each candidate is decided by `decide`:
        a run in flight                                             wait
+       re-armed by the enqueue unit at this head                   launch (once: the launch consumes the re-arm)
+       no attempt, or a NEW HEAD (a finisher's commit, reviewed)  launch
        ENQUEUED or NOTHING TO LAND (exit 0) at this head           nothing to do: the queue has it
        exit 3 — the landing check's STOP: the branch shares a file with earlier-dispatched in-flight work (kb/Work
                 PB2701)                                            retried at this head once `landing_check.py` passes
@@ -47,15 +56,18 @@ THE TICK, in order:
                 PR or the queue), or a runner that DIED           retried ONCE at this head (enqueue.md's own rule)
        exit 8 — QUEUE NOT ACTIVE                                   HALT (above); relaunched once the halt is cleared
        anything else — CONFLICT 4, GATE RED 5, a DEVLOG refusal 6, a stale oracle baseline 7, UNREVIEWED 11, an exit
-                2 or 9 retried once already                       STOPPED: never relaunched at this head; the
-                                                                   enqueue unit dispatches its finisher or reviewer
+                2 or 9 retried once already                       STOPPED: never relaunched at this head unless
+                                                                   re-armed; the enqueue unit dispatches its finisher
+                                                                   or reviewer, and re-arms a stop resolved with no
+                                                                   new commit (`rearm`)
      A launch writes the attempt and starts `land_lane.py run <attempt>` DETACHED (its own process group, out of the
      supervisor's job where Windows allows it), which runs `enqueue.py land <branch> --worktree <wt>` with its output in
      the log and records the outcome. (A permission refusal cannot happen here: a script has no permission layer.)
 `status` prints each branch's latest attempt; the enqueue unit reads it (units/enqueue.md step 3), sends each STOPPED
 attempt to a finisher or a reviewer, files the leads of each ENQUEUED one, and then `collect`s them. `agent_work` is
-next_unit.py's one reader: the enqueue unit starts only for agent work (WAITING FOR REVIEW, BOUNCED, a stopped attempt,
-an ENQUEUED one to collect), never merely because a handoff lists DONE branches the lane is landing.
+next_unit.py's one reader: the enqueue unit starts only for agent work (WAITING FOR REVIEW, a BOUNCED branch the lane is
+neither landing nor re-armed to land, a stopped attempt, an ENQUEUED one to collect), never merely because a handoff
+lists DONE branches the lane is landing.
 
 Exit: 0 done (a tick already running included) · 1 the survey or a launch failed (printed; the supervisor never treats
 it as fatal) · 2 usage.
@@ -87,6 +99,7 @@ LANE_DIR = "land-lane"
 ATTEMPTS = "attempts"
 SURVEY = "survey.json"
 HALT = "HALT"
+REARM = "rearm"
 TICK_LOCK = "tick.lock"
 EXIT_CHECK_STOP = 3      # enqueue.py: landing_check.py's STOP (the branch shares a file with in-flight work)
 EXIT_STATE = 2           # enqueue.py: usage or state, among them "main moved under every catch-up merge"
@@ -207,14 +220,18 @@ class Decision:
     why: str
 
 
-def decide(tip: str, atts: list[dict[str, Any]], overlap_free: Callable[[], tuple[bool, str]]) -> Decision:
-    """Whether to start `enqueue.py land` for a branch at `tip`, given its attempts (oldest first). The global stops
-    (HALT, STOP, STOP-UNIT) are the caller's; `overlap_free` is asked only for an exit 3 at this head."""
-    if not atts:
-        return Decision(True, "first attempt")
-    last = atts[-1]
-    if not finished(last):
+def decide(tip: str, atts: list[dict[str, Any]], overlap_free: Callable[[], tuple[bool, str]],
+           rearmed: dict[str, Any] | None = None) -> Decision:
+    """Whether to start `enqueue.py land` for a branch at `tip`, given its attempts (oldest first) and the enqueue
+    unit's re-arm of it, if any. The global stops (HALT, STOP, STOP-UNIT) are the caller's; `overlap_free` is asked
+    only for an exit 3 at this head."""
+    last = atts[-1] if atts else None
+    if last is not None and not finished(last):
         return Decision(False, f"being landed (attempt {last['id']}, pid {last.get('pid')})")
+    if rearmed is not None and rearmed.get("head") == tip:
+        return Decision(True, f"re-armed by the enqueue unit at this head ({rearmed.get('why') or 'no reason given'})")
+    if last is None:
+        return Decision(True, "first attempt")
     if tip not in (last.get("head"), last.get("end_head")):
         return Decision(True, f"new head {tip[:12]} (the last attempt ended at {str(last.get('end_head'))[:12]})")
     cls = classify(last)
@@ -230,7 +247,8 @@ def decide(tip: str, atts: list[dict[str, Any]], overlap_free: Callable[[], tupl
     if cls == ONCE and trailing(atts, ONCE) < 2:
         return Decision(True, f"{'its runner DIED' if rc is None else f'exit {rc}'} at this head: retried once")
     return Decision(False, f"STOPPED at this head ({'exit ' + str(rc) if rc is not None else 'DIED'}: "
-                           f"{last.get('verdict') or 'no verdict line'}): the enqueue unit's; a new head re-arms it")
+                           f"{last.get('verdict') or 'no verdict line'}): the enqueue unit's; a new head or its "
+                           "`rearm` lands it again")
 
 
 def tip_of(worktree: str | None) -> str | None:
@@ -310,6 +328,73 @@ def notify_operator(cdir: pathlib.Path, subject: str, body: str, ref: str, say: 
         say(f"land lane: the operator's mailbox was not written ({exc}); {subject}")
 
 
+# ── the enqueue unit's re-arm ──────────────────────────────────────────────────────────────────────────────────────
+def rearm_path(cdir: pathlib.Path, branch: str) -> pathlib.Path:
+    return lane_dir(cdir) / REARM / f"{_slug(branch)}.json"
+
+
+def rearms(cdir: pathlib.Path, unreadable: list[str] | None = None) -> dict[str, dict[str, Any]]:
+    """Every pending re-arm by branch. A file that is not a re-arm record is left out and its path appended to
+    `unreadable` (the tick and `status` say it: a lost re-arm leaves its branch waiting)."""
+    d = lane_dir(cdir) / REARM
+    out: dict[str, dict[str, Any]] = {}
+    for p in sorted(d.glob("*.json")) if d.is_dir() else []:
+        try:
+            rec = coord.read_json(p, None)
+        except ValueError:
+            rec = None
+        if isinstance(rec, dict) and isinstance(rec.get("branch"), str) and isinstance(rec.get("head"), str):
+            out[rec["branch"]] = rec
+        elif unreadable is not None:
+            unreadable.append(str(p))
+    return out
+
+
+def drop_stale_rearms(cdir: pathlib.Path, rows: list[dict[str, Any]], say: Say) -> dict[str, dict[str, Any]]:
+    """The pending re-arms still at their branch's surveyed tip. One whose branch moved (a new commit: the lane treats
+    it as a new head anyway) or left the survey is deleted and said; the rest are returned for `candidates`."""
+    unreadable: list[str] = []
+    pending = rearms(cdir, unreadable)
+    for p in unreadable:
+        say(f"land lane: {p} is not a re-arm record; left out (its branch waits for a new head): inspect it")
+    tips = {r["name"]: r["tip"] for r in rows}
+    for branch, rec in list(pending.items()):
+        if tips.get(branch) != rec["head"]:
+            rearm_path(cdir, branch).unlink(missing_ok=True)
+            del pending[branch]
+            where = f"at {str(tips[branch])[:12]}" if branch in tips else "no longer surveyed"
+            say(f"land lane: {branch}: the re-arm at {rec['head'][:12]} is stale (the branch is {where}); dropped")
+    return pending
+
+
+def rearm(cdir: pathlib.Path, branch: str, why: str, say: Say = print,
+          tip_for: Callable[[str | None], str | None] = tip_of) -> int:
+    """Re-arm `branch` at its worktree's CURRENT tip: the next tick lands it again there, once. The enqueue unit's call,
+    for a stop resolved with no new commit (module doc, `rearm/`). Refused while an attempt is running."""
+    atts = by_branch(attempts(cdir)).get(branch, [])
+    if atts and not finished(atts[-1]):
+        say(f"land lane: {branch}: attempt {atts[-1]['id']} is still running; nothing to re-arm")
+        return 1
+    worktree = atts[-1].get("worktree") if atts else None
+    if not worktree:
+        try:
+            s = coord.read_json(lane_dir(cdir) / SURVEY, None)
+        except ValueError:
+            s = None
+        rows = s.get("rows", []) if isinstance(s, dict) else []
+        worktree = next((r.get("worktree") for r in rows if r.get("name") == branch), None)
+    tip = tip_for(worktree)
+    if not tip:
+        say(f"land lane: {branch}: no worktree tip to re-arm at (worktree {worktree or 'unknown'}: no attempt and no "
+            "survey row names one); nothing re-armed")
+        return 1
+    path = rearm_path(cdir, branch)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    coord.write_json(path, {"branch": branch, "head": tip, "why": why, "at": _now().isoformat(timespec="seconds")})
+    say(f"land lane: {branch}: re-armed at {tip[:12]} ({why}); the next tick lands it again")
+    return 0
+
+
 # ── the tick ───────────────────────────────────────────────────────────────────────────────────────────────────────
 def stop_reason(cdir: pathlib.Path) -> str | None:
     """Why no attempt may start now: the loop's STOP-UNIT or STOP, the owner's global stop, or HALT."""
@@ -354,10 +439,12 @@ def reap(cdir: pathlib.Path, atts: list[dict[str, Any]], alive: Callable[[int | 
             save(a)
 
 
-def candidates(rows: list[dict[str, Any]], order: list[str],
-               branches: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+def candidates(rows: list[dict[str, Any]], order: list[str], branches: dict[str, list[dict[str, Any]]],
+               rearmed: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """The WAITING TO LAND rows in landing order, then every branch whose last attempt the lane may retry and whose tip
-    is still that attempt's end head, unless the queue holds it or it landed."""
+    is still that attempt's end head, unless the queue holds it or it landed, then every branch the enqueue unit
+    re-armed at its current tip (a BOUNCED one included: `enqueue.py land` reuses its open pull request and queues it
+    again), unless the queue holds it or it landed."""
     named = {r["name"]: r for r in rows}
     out = [named[n] for n in order if n in named and named[n]["state"] == "WAITING TO LAND"]
     seen = {r["name"] for r in out}
@@ -369,6 +456,13 @@ def candidates(rows: list[dict[str, Any]], order: list[str],
         if r["state"] in ("ENQUEUED", "BOUNCED", "LANDED") or r["tip"] != last.get("end_head") or not r["worktree"]:
             continue
         out.append(r)
+        seen.add(branch)
+    for branch, rec in (rearmed or {}).items():
+        r = named.get(branch)
+        if branch in seen or r is None or not r["worktree"] or r["state"] in ("ENQUEUED", "LANDED"):
+            continue
+        if r["tip"] == rec.get("head"):
+            out.append(r)
     return out
 
 
@@ -386,6 +480,7 @@ def launch(cdir: pathlib.Path, repo: pathlib.Path, row: dict[str, Any], why: str
            "collected": False, "_path": str(path)}
     save(rec)
     rec["pid"] = start([sys.executable, str(pathlib.Path(__file__).resolve()), "run", str(path)], log)
+    rearm_path(cdir, row["name"]).unlink(missing_ok=True)   # a re-arm buys ONE attempt: this one
     # The runner may already have finished (a fast refusal) and written its outcome: keep it, add only the pid.
     current = coord.read_json(path, {})
     if "rc" in current:
@@ -423,10 +518,12 @@ def tick(cdir: pathlib.Path, repo: pathlib.Path, *,
             say(f"land lane: {why}: no landing starts (a running one finishes)")
             return 0
         branches = by_branch(atts)
+        pending = drop_stale_rearms(cdir, rows, say)
         failed = 0
-        for row in candidates(rows, order, branches):
+        for row in candidates(rows, order, branches, pending):
             dec = decide(row["tip"], branches.get(row["name"], []),
-                         lambda r=row: overlap_free(r["worktree"]) if r["worktree"] else (False, "no worktree"))
+                         lambda r=row: overlap_free(r["worktree"]) if r["worktree"] else (False, "no worktree"),
+                         pending.get(row["name"]))
             if not dec.launch:
                 if branches.get(row["name"]) and classify(branches[row["name"]][-1]) == FREE \
                         and finished(branches[row["name"]][-1]):
@@ -482,7 +579,8 @@ class Lane:
     rows: list[dict[str, Any]]
     latest: list[tuple[dict[str, Any], str]]   # each branch's latest attempt and its effective class
     halt: str | None
-    unreadable: list[str]                      # attempt files that are not attempt records
+    unreadable: list[str]                      # attempt and re-arm files that are not records
+    rearms: dict[str, dict[str, Any]]          # the enqueue unit's pending re-arms, by branch
 
     def survey_age_min(self, now: dt.datetime | None = None) -> float | None:
         return None if self.survey_at is None else ((now or _now()) - self.survey_at).total_seconds() / 60
@@ -498,7 +596,8 @@ def view(cdir: pathlib.Path) -> Lane:
     unreadable: list[str] = []
     latest = [(atts[-1], effective(atts)) for atts in by_branch(attempts(cdir, unreadable)).values()]
     halt = (d / HALT).read_text(encoding="utf-8").strip() if (d / HALT).exists() else None
-    return Lane(at, (s or {}).get("rows", []) if isinstance(s, dict) else [], latest, halt, unreadable)
+    pending = rearms(cdir, unreadable)
+    return Lane(at, (s or {}).get("rows", []) if isinstance(s, dict) else [], latest, halt, unreadable, pending)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -509,14 +608,17 @@ class AgentWork:
 
 def agent_work(cdir: pathlib.Path, now: dt.datetime | None = None) -> AgentWork:
     """What only the enqueue unit's agents (or its clerk and its records) can do: rows WAITING FOR REVIEW or BOUNCED in
-    a survey younger than SURVEY_MAX_AGE_MIN, STOPPED attempts not yet collected, and ENQUEUED attempts not yet
-    collected (their leads and landing records)."""
+    a survey younger than SURVEY_MAX_AGE_MIN (a BOUNCED one only while the lane is neither landing it nor re-armed to:
+    its finisher already resolved it), STOPPED attempts not yet collected, and ENQUEUED attempts not yet collected
+    (their leads and landing records)."""
     lane = view(cdir)
     age = lane.survey_age_min(now)
     reasons = []
+    landing = {a["branch"] for a, c in lane.latest if c == "running"} | set(lane.rearms)
     if age is not None and age <= SURVEY_MAX_AGE_MIN:
         for state in ("WAITING FOR REVIEW", "BOUNCED"):
-            names = [r["name"] for r in lane.rows if r.get("state") == state]
+            names = [r["name"] for r in lane.rows if r.get("state") == state
+                     and not (state == "BOUNCED" and r["name"] in landing)]
             if names:
                 reasons.append(f"{state.lower()}: {', '.join(names)}")
     stopped = [f"{a['branch']} ({outcome(a)})" for a, c in lane.latest if c == STOPPED and not a.get("collected")]
@@ -544,8 +646,10 @@ def status_lines(cdir: pathlib.Path, now: dt.datetime | None = None) -> list[str
                                               "`land_lane.py tick`" if age > SURVEY_MAX_AGE_MIN else ""))
     out = [f"=== LAND LANE: {n['running']} running · {n[STOPPED]} stopped · {n[DONE]} enqueued · "
            f"{n[FREE] + n[ONCE]} to retry · {survey}{' · HALTED: ' + lane.halt if lane.halt else ''} ==="]
-    out += [f"UNREADABLE       {p}: not an attempt record (inspect it; its branch may be landed again)"
+    out += [f"UNREADABLE       {p}: not a lane record (inspect it; its branch may be landed again, or wait)"
             for p in lane.unreadable]
+    out += [f"{'REARMED':16} {b} @{str(r.get('head'))[:12]}: {r.get('why') or '-'} — the next tick lands it again at "
+            f"this head (re-armed {r.get('at')})" for b, r in sorted(lane.rearms.items())]
     order = {"running": 0, STOPPED: 1, HALTED: 2, FREE: 3, ONCE: 3, DONE: 4}
     for a, cls in sorted(lane.latest, key=lambda t: (order.get(t[1], 9), t[0]["branch"])):
         mark = " [collected]" if a.get("collected") else ""
@@ -793,6 +897,55 @@ def self_test() -> int:
         expect("a runner that died after committing is retried from its record at the branch's new tip",
                f11.tick(c11) == ["w9b"] and attempts(c11)[0].get("end_head") == head,
                f"{f11.started} {attempts(c11)[0]}")
+
+        # 12. a stop resolved WITHOUT a new commit (review R1-1): the enqueue unit's `rearm` lands it again at the same
+        #     head, once; a BOUNCED branch is the enqueue unit's only until it is re-armed or being landed.
+        c12 = fresh("rearm")
+        f12 = Fake([row("w10a", "WAITING TO LAND", "v1"), row("w10b", "WAITING TO LAND", "x1")])
+        f12.tick(c12)
+        finish(c12, "w10a", 5, "GATE RED (Windows) on v1: a red already on main")
+        finish(c12, "w10b", 0, "ENQUEUED", end_head="x2")
+        f12.live.clear()
+        f12.rows = [row("w10a", "DECISION", "v1"), row("w10b", "BOUNCED", "x2")]   # the merge group removed w10b
+        collect(c12, ["w10a", "w10b"], say=lambda s: None)
+        expect("a collected exit 5 at an unchanged head, and a BOUNCED branch, are not relaunched by themselves",
+               f12.tick(c12) == [] and agent_work(c12).reasons == ["bounced: w10b"], f"{f12.started} {agent_work(c12).reasons}")
+        tips = {str(root / "wt-w10a"): "v1", str(root / "wt-w10b"): "x2"}
+        said: list[str] = []
+        expect("rearm records a finished, collected exit 5 at its worktree's tip",
+               rearm(c12, "w10a", "main carries the fix", say=said.append, tip_for=tips.get) == 0
+               and coord.read_json(rearm_path(c12, "w10a"), {}).get("head") == "v1", str(said))
+        expect("rearm records the BOUNCED branch at its tip, and it stops being the enqueue unit's work",
+               rearm(c12, "w10b", "bounce: infrastructure (runner lost)", say=said.append, tip_for=tips.get) == 0
+               and agent_work(c12).reasons == [] and any(ln.startswith("REARMED") and "w10b" in ln
+                                                         for ln in status_lines(c12)),
+               f"{said} {agent_work(c12).reasons}")
+        expect("a re-armed branch is landed again at the SAME head, the BOUNCED one included",
+               sorted(f12.tick(c12)) == ["w10a", "w10b"] and not rearm_path(c12, "w10a").exists()
+               and not rearm_path(c12, "w10b").exists(), f"{f12.started} {f12.said}")
+        running = [a for a in attempts(c12) if not finished(a)]
+        expect("rearm is refused while the branch's attempt is running (nothing written)",
+               bool(running) and rearm(c12, "w10a", "x", say=said.append, tip_for=tips.get) == 1
+               and not rearm_path(c12, "w10a").exists(), str(said))
+        finish(c12, "w10a", 5, "GATE RED (Windows) on v1: main still red")
+        f12.live.clear()
+        expect("a re-arm buys ONE attempt: the same stop at the same head again is not relaunched",
+               "w10a" not in f12.tick(c12), str(f12.started))
+        rearm(c12, "w10a", "main carries the fix", say=said.append, tip_for=tips.get)
+        f12.rows[0] = row("w10a", "WAITING FOR REVIEW", "v2")                   # a finisher committed after all
+        out12 = f12.tick(c12)
+        expect("a re-arm whose branch moved is stale: dropped and said (the new tip goes through review first)",
+               "w10a" not in out12 and not rearm_path(c12, "w10a").exists()
+               and any("stale" in s and "w10a" in s for s in f12.said), f"{out12} {f12.said}")
+        c12b = fresh("rearm-unreviewed")
+        f12b = Fake([row("w11a", "WAITING TO LAND", "y1")])
+        f12b.tick(c12b)
+        finish(c12b, "w11a", 11, "UNREVIEWED (the tip is not covered by its CLEAN stamp)")
+        f12b.live.clear()
+        stopped_first = f12b.tick(c12b) == []
+        rearm(c12b, "w11a", "reviewed CLEAN at y1", say=said.append, tip_for=lambda wt: "y1")
+        expect("an UNREVIEWED exit 11 waits, then a reviewer's CLEAN stamp plus rearm lands it at the same head",
+               stopped_first and f12b.tick(c12b) == ["w11a"], f"{f12b.started} {f12b.said}")
     finally:
         for dirpath, _, files in os.walk(root):  # git writes read-only objects, which rmtree cannot delete on Windows
             for name in files:
@@ -820,6 +973,10 @@ def main(argv: list[str] | None = None) -> int:
     st.add_argument("--json", action="store_true")
     co = sub.add_parser("collect", help="the enqueue unit handled these branches' finished attempts")
     co.add_argument("branches", nargs="+")
+    rr = sub.add_parser("rearm", help="the enqueue unit: land the branch again at its current tip (a stop resolved "
+                                      "with no new commit)")
+    rr.add_argument("branch")
+    rr.add_argument("--why", required=True, help="what resolved the stop (the finisher's or reviewer's finding)")
     sub.add_parser("clear-halt", help="the operator: the merge queue is ACTIVE again; the lane may start landings")
     ru = sub.add_parser("run", help=argparse.SUPPRESS)
     ru.add_argument("attempt", type=pathlib.Path)
@@ -835,12 +992,14 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps({"survey_at": lane.survey_at.isoformat() if lane.survey_at else None, "halt": lane.halt,
                               "attempts": [{**{k: v for k, v in at.items() if k != "_path"}, "class": cls}
                                            for at, cls in lane.latest],
-                              "agent_work": agent_work(cdir).reasons}, indent=1))
+                              "rearms": list(lane.rearms.values()), "agent_work": agent_work(cdir).reasons}, indent=1))
         else:
             print("\n".join(status_lines(cdir)))
         return 0
     if a.verb == "collect":
         return collect(cdir, a.branches)
+    if a.verb == "rearm":
+        return rearm(cdir, a.branch, a.why)
     if a.verb == "clear-halt":
         halt = lane_dir(cdir) / HALT
         if not halt.exists():

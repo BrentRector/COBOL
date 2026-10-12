@@ -43,5 +43,17 @@ implementer gates.
    background from Invoke-Unit at least twice, and enqueue.md step 3 names `land_lane.py status` and runs no
    `enqueue.py land`, with a planted-step arm.
 
+**Branch review round 1 (two findings, both fixed).** R1-1: a stop resolved WITHOUT a new commit had no way back
+into the lane. `decide` never relaunches a STOPPED or queued attempt at the same head, `candidates` skipped BOUNCED
+rows, and step 3 may no longer run `enqueue.py land`, so a bounce its finisher attributed to infrastructure, a GATE RED
+that was main's own, or an UNREVIEWED exit 11 later stamped CLEAN would have stranded its branch silently. The fix is
+the enqueue unit's `land_lane.py rearm <branch> --why <cause>`: a `land-lane/rearm/<branch>.json` record at the
+worktree's tip that `candidates` and `decide` honour once (the launch consumes it, a moved tip drops it, a running
+attempt refuses it), and `agent_work` no longer counts a BOUNCED branch the lane is landing or re-armed to land.
+Self-test case 12 plants all three stops (8 checks). R1-2: the wording sweep had missed MANDATORY-PRACTICES O2 and L12,
+units/enqueue.md step 4, finisher-brief.md, wf_rolling_wave.js's meta, landing.md's exit-3 line, check_practices.py's
+comment, SKILL.md (two more) and DESIGN-orchestrator-loop.md's failure table; all now say the lane lands and the unit
+re-arms. `LandingLaneDriftTests` also requires step 3 to name `land_lane.py rearm`.
+
 **Measure after it lands:** `landing_measure.py summary` (DONE → enqueued → merged per pull request) for the first waves
 after the lane against wave 1069's landings.

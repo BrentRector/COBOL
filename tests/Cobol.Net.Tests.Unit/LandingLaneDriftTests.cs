@@ -73,6 +73,9 @@ public sealed class LandingLaneDriftTests
         Assert.True(step3.Length > 0, "scripts/orchestrator/units/enqueue.md has no step 3; re-point this test");
         Assert.Contains("land_lane.py status", step3, StringComparison.Ordinal);
         Assert.DoesNotMatch(LandCommand, step3);
+        // A stop resolved with no new commit leaves the head unchanged and the lane never relaunches it there by itself:
+        // step 3 must name the unit's way to land it again (review R1-1), or that branch waits forever.
+        Assert.Contains("land_lane.py rearm", step3, StringComparison.Ordinal);
     }
 
     /// <summary>⭐ The step-3 reader's failure branch, fired: a planted prompt whose step 3 lands is caught, and the

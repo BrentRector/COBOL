@@ -1,7 +1,7 @@
 export const meta = {
   name: 'rolling-wave',
-  description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), each DONE branch reviewed on the branch; the wave starts no lander: the loop\'s enqueue unit lands every branch reviewed CLEAN (kb/Work PB3023)',
-  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; review each DONE branch (kb/Work PB3027); the enqueue unit lands them (enqueue.py land, kb/Work PB3023).',
+  description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), each DONE branch reviewed on the branch; the wave starts no lander: the loop\'s landing lane lands every branch reviewed CLEAN (kb/Work PB3023, PB3103)',
+  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; review each DONE branch (kb/Work PB3027); the loop\'s landing lane lands them (land_lane.py runs enqueue.py land, kb/Work PB3023, PB3103).',
   phases: [
     { title: 'Implement', detail: 'cobol-implementer per group, isolated worktrees, rolling pool; a review finisher per round of findings' },
     { title: 'Review', detail: 'one read-only cobol-reviewer per DONE branch (the review skill branch form)' },

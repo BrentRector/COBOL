@@ -19,7 +19,9 @@ unit keeps the judgment: the reviews, the finishers, the leads, the records and 
    findings file `{COORD}\scratch\review-<branch>.jsonl`, the reviewer label `enqueue-review-<branch>-r1`, round 1, both
    stop files, and says: follow "The branch form" of `.claude/skills/review/SKILL.md`. A CLEAN stamp makes the row
    WAITING TO LAND for step 3; a FINDINGS stamp makes it a DECISION row whose finisher the next wave plans
-   (plan_wave.py). Never fix a finding here.
+   (plan_wave.py). Never fix a finding here. A CLEAN stamp on a branch whose lane attempt stopped `UNREVIEWED` (exit
+   11) at the same tip changes no commit, so the lane would never land it again by itself: re-arm it,
+   `python scripts/orchestrator/land_lane.py rearm <branch> --why "reviewed CLEAN at <tip>"`.
 3. THE LANDING LANE'S RESULTS. This step starts no landing of its own: the lane lands every WAITING TO LAND branch
    (kb/Work PB3103). Read `python scripts/orchestrator/land_lane.py status`: one line per branch, its latest attempt
    (the `=== ENQUEUE: ` verdict, the log) and who acts next. When its header says the survey is STALE or that the lane
@@ -44,16 +46,21 @@ unit keeps the judgment: the reviews, the finishers, the leads, the records and 
      name it in the handoff.
    When steps 4 and 5 have handled them, `python scripts/orchestrator/land_lane.py collect <branch> ...` for every
    STOPPED and DONE branch this unit handled, so the next choice of unit does not count them again (next_unit.py rule
-   6). A finisher's new tip re-arms the branch in the lane once it is reviewed CLEAN.
+   6). A finisher's new tip is landed by the lane once it is reviewed CLEAN (a new head). A stop resolved with NO new
+   commit is landed again only on this unit's word: `python scripts/orchestrator/land_lane.py rearm <branch> --why
+   "<what resolved it>"` (the lane lands it once more at the same head, on its next tick; steps 2 and 4 say when).
 4. FINISHERS. For each branch that stopped in step 3, and each row `prune_worktrees.py --brief` lists BOUNCED (the merge
    queue removed its pull request; GitHub's reason named), dispatch ONE `cobol-finisher` (Agent tool, model opus; all
    of them in one message) with `.claude/skills/workstream/templates/finisher-brief.md`, its prompt naming the branch,
    its worktree, its report, the stop line verbatim (or the PR number and the bounce reason, with the merge group's
    failed run from `gh run list --event merge_group --limit 20`) and both stop files. The finisher fixes the branch at
    its root, gates it and returns DONE; it never lands: its commits are unreviewed, so the branch reads WAITING FOR
-   REVIEW and the next enqueue unit's step 2 reviews the new tip before step 3 lands it (`enqueue.py land` refuses an
-   unreviewed tip with exit 11, UNREVIEWED: never a finisher's case to work around). Stay until every finisher
-   returns.
+   REVIEW and the next enqueue unit's step 2 reviews the new tip before the landing lane lands it (`enqueue.py land`
+   refuses an unreviewed tip with exit 11, UNREVIEWED: never a finisher's case to work around). Stay until every
+   finisher returns. A finisher that resolved its stop with NO commit of its own (a bounce it attributes to
+   infrastructure or load timing; a red already on main) leaves the head unchanged, so the lane would never land it
+   again by itself: re-arm it (`land_lane.py rearm <branch> --why "<the finisher's finding>"`) when the cause is gone,
+   and for a red still on main name it in the handoff and re-arm it once main carries the fix.
 5. LEADS. The reports of the branches the lane queued (step 3's DONE lines, not yet collected) carry new defects as
    note-ready paragraphs (their "New defects" section, the implementers' `leads`). Dispatch ONE `cobol-clerk` with ids from `python scripts/orchestrator/alloc.py pb <n>`
    (one note per MECHANISM, grepped against kb/Work first, MANDATORY-PRACTICES R1-R3), in a worktree cut from
