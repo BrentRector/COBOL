@@ -28,8 +28,8 @@ the attributes — so this check holds the rule, in three arms:
                few sites (the generators, the test-side regeneration modes); the WORKING TREE arm catches a new one at
                the next Windows gate.
 
-Explicitly byte-exact files are exempt from every arm: the pinned Unicode/CLDR inputs (content-addressed by SHA-256),
-DEVLOG.md until kb/Work PB3025 migrates it, and a golden that carries a deliberate lone CR.
+Explicitly byte-exact files are exempt from every arm: the pinned Unicode/CLDR inputs (content-addressed by SHA-256)
+and a conformance fixture whose lone CRs are its subject.
 """
 from __future__ import annotations
 

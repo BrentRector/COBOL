@@ -15,6 +15,7 @@ So each adopted capability is CHECKED here, never assumed, and every line is one
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -29,6 +30,58 @@ CONFIG = account.config_dir()   # THIS session's account: its user settings, ski
 CLOUD = os.environ.get("CLAUDE_CODE_REMOTE") == "true"
 ROLES = ["cobol-implementer", "cobol-finisher", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator",
          "cobol-reviewer"]
+
+
+#: Where Claude Code reads a definition from a markdown file's YAML frontmatter, and what each must name itself: an agent
+#: role's `name` is its file stem, a skill's is its directory. A frontmatter that does not parse is never loaded, and
+#: nothing says so: `Agent(subagent_type: "cobol-finisher")` answered "Agent type 'cobol-finisher' not found" while this
+#: check printed OK, because it asked only whether the file EXISTED (kb/Work PB3097).
+FRONTMATTER_KINDS = (("agents", "agents/*.md", lambda p: p.stem),
+                     ("skills", "skills/*/SKILL.md", lambda p: p.parent.name),
+                     ("commands", "commands/*.md", None))   # a command's frontmatter is optional and names nothing
+FRONTMATTER = re.compile(r"\A---\r?\n(.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
+
+
+def frontmatter_problems(path: pathlib.Path, want_name: str | None) -> list[str]:
+    """Why Claude Code would not load this definition file: its frontmatter must parse as YAML into a mapping with a
+    non-empty `description` (and, when `want_name` is given, a `name` equal to it). [] when it loads. PyYAML is the
+    parser, the YAML authority this repository has (a hand-rolled subset would accept exactly the plain scalar holding
+    `: ` that broke the finisher role)."""
+    import yaml   # imported here so a host without PyYAML still prints every other TOOLING line (check() reports it)
+    text = path.read_text(encoding="utf-8")
+    m = FRONTMATTER.match(text)
+    if not m:
+        return ["no `---` frontmatter block at the top of the file"] if want_name else []
+    try:
+        data = yaml.safe_load(m.group(1))
+    except yaml.YAMLError as exc:
+        mark = getattr(exc, "problem_mark", None)
+        where = f" (frontmatter line {mark.line + 1})" if mark else ""
+        return [f"frontmatter is not valid YAML{where}: {getattr(exc, 'problem', None) or exc} — quote the value or "
+                "use a block scalar (`: ` inside a plain scalar starts a mapping)"]
+    if not isinstance(data, dict):
+        return [f"frontmatter is a {type(data).__name__}, not a mapping"]
+    problems = []
+    if want_name is not None and data.get("name") != want_name:
+        problems.append(f"name is {data.get('name')!r}, not {want_name!r}")
+    if not isinstance(data.get("description"), str) or not data["description"].strip():
+        problems.append("no non-empty description")
+    return problems
+
+
+def definition_problems(claude_dir: pathlib.Path, roles: list[str]) -> list[str]:
+    """Every agent role, skill and command definition under `claude_dir` that Claude Code would not load, plus every
+    required role whose file is missing; [] when all load."""
+    try:
+        import yaml  # noqa: F401
+    except ImportError:
+        return ["PyYAML is not installed, so no definition can be proved to load (`python -m pip install pyyaml`)"]
+    out = [f"agents/{r}.md is missing" for r in roles if not (claude_dir / "agents" / f"{r}.md").exists()]
+    for _, pattern, name_of in FRONTMATTER_KINDS:
+        for path in sorted(claude_dir.glob(pattern)):
+            rel = path.relative_to(claude_dir).as_posix()
+            out += [f"{rel}: {p}" for p in frontmatter_problems(path, name_of(path) if name_of else None)]
+    return out
 
 
 def load(p):
@@ -101,9 +154,11 @@ def check(payload: dict | None = None):
         status, detail = permission_mode_line(payload, default_mode)
         add(status, "permission mode", detail)
 
-    missing = [r for r in ROLES if not (REPO / ".claude" / "agents" / f"{r}.md").exists()]
-    add("OK" if not missing else "ASK-OWNER", "role agents (.claude/agents)",
-        "workflows select them with agentType" if not missing else f"missing {missing} — restore from git before dispatching")
+    broken = definition_problems(REPO / ".claude", ROLES)
+    add("OK" if not broken else "ASK-OWNER", "role agents and skills (.claude/agents, skills, commands)",
+        "every definition's frontmatter parses and names itself, so each LOADS; workflows select roles with agentType"
+        if not broken else "; ".join(broken) + " — Claude Code never loads such a file (`Agent(subagent_type)` answers "
+        "'not found'): fix it, or restore it from git, before dispatching")
 
     proj = load(REPO / ".claude" / "settings.json")
     hooks = json.dumps(proj.get("hooks", {}))
@@ -214,6 +269,34 @@ def self_test() -> int:
                for l in START_SESSION.read_text(encoding="utf-8").splitlines()):
         fails.append(f"{START_SESSION.name} no longer starts claude with {flag}: OWNER_PERMISSION_MODE "
                      f"({OWNER_PERMISSION_MODE}) no longer describes how sessions start")
+    # kb/Work PB3097: a definition Claude Code cannot parse is a failure, never OK — the finisher role's exact defect
+    # (an unquoted description holding `DONE: its commits`), a name that is not the file's, a missing description.
+    with tempfile.TemporaryDirectory() as d:
+        claude = pathlib.Path(d)
+        (claude / "agents").mkdir()
+        (claude / "skills" / "good-skill").mkdir(parents=True)
+        role = "---\nname: {name}\ndescription: {desc}\nmodel: opus\n---\n\nbody\n"
+        for stem, name, desc in [("good", "good", "fixes one branch, gates it, and returns DONE; reviewed next"),
+                                 ("colon", "colon", "fixes one branch, gates it, and returns DONE: its commits are reviewed"),
+                                 ("renamed", "other", "a role whose name is not its file"),
+                                 ("silent", "silent", "''")]:
+            (claude / "agents" / f"{stem}.md").write_text(role.format(name=name, desc=desc), encoding="utf-8", newline="\n")
+        (claude / "skills" / "good-skill" / "SKILL.md").write_text(
+            "---\nname: good-skill\ndescription: a skill that loads\n---\n", encoding="utf-8", newline="\n")
+        got = definition_problems(claude, ["good", "colon", "absent"])
+        want = {"agents/absent.md is missing": "a required role's missing file",
+                "agents/colon.md: frontmatter is not valid YAML": "the finisher role's `: ` in a plain scalar (PB3097)",
+                "agents/renamed.md: name is 'other'": "a name that is not the file stem",
+                "agents/silent.md: no non-empty description": "an empty description"}
+        for prefix, what in want.items():
+            if not any(g.startswith(prefix) for g in got):
+                fails.append(f"definition_problems does not report {what}: {got}")
+        if len(got) != len(want):
+            fails.append(f"definition_problems reports {len(got)} problem(s), want {len(want)} (a loadable file is "
+                         f"never reported): {got}")
+    live = definition_problems(REPO / ".claude", ROLES)
+    if live:
+        fails.append(f"this repository's own definitions would not load: {live}")
     for f in fails:
         print(f"FAIL  {f}")
     print(f"=== TOOLING_CHECK SELF-TEST: {'GREEN' if not fails else f'RED ({len(fails)})'} ===")

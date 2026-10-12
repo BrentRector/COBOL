@@ -55,7 +55,8 @@ Reading its output:
 ## 3b. Act on the TOOLING block (kb/Work R49) — the same hook prints it after the probe
 
 `scripts/hooks/tooling_check.py` checks every adopted capability instead of assuming it: the Workflow opt-in, the
-role agents (`.claude/agents/`, selected with `agentType`), the guard hook, the telemetry sink, the C# LSP and the
+role agents and skills (every `.claude/agents/`, `skills/` and `commands/` frontmatter must PARSE as YAML and name
+itself, or Claude Code never loads it: kb/Work PB3097), the guard hook, the telemetry sink, the C# LSP and the
 weekly `/skill-doctor` review. Each line is `OK`, `REPAIRED` (fixed automatically, no permission needed), `N/A`, or
 **`ASK-OWNER`** — ⛔ **ask the owner about every `ASK-OWNER` line NOW, one bare AskUserQuestion each; never skip one**
 (owner 2026-09-25: permission-gated features must trigger a query, not silently go unused). Rerun it by hand with
