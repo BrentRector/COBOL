@@ -1,4 +1,4 @@
-## PB3103: the loop's landing lane — a reviewed branch lands the moment it is ready, beside whatever unit runs; landing gates first in the gate-slot queue
+## Entry 1979 — 2026-10-12 16:37 PDT — PB3103: the loop's landing lane — a reviewed branch lands the moment it is ready, beside whatever unit runs; landing gates first in the gate-slot queue
 
 **Why (owner-approved design, 2026-10-12, "Supervisor lane (Recommended)").** Wave 1069 measured the cost of landing
 through a unit: group D was stamped `Review: CLEAN` at 12:34 PDT and E and F by 13:05, and all three read WAITING TO
@@ -69,3 +69,4 @@ a test the Windows leg 1 never runs because its recorded 7.2 s exceeds the plann
 
 **Measure after it lands:** `landing_measure.py summary` (DONE → enqueued → merged per pull request) for the first waves
 after the lane against wave 1069's landings.
+
