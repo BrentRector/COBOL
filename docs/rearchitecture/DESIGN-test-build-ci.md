@@ -100,20 +100,19 @@ push, which a required check reads as "never reported".
 `DEVLOG/**` / `docs/**` / `kb/**` / `PROMPT.md` / `CLAUDE.md` / `README.md` push — incompatible with a per-commit
 required check, which has nothing to satisfy when no run exists. The identical list now lives in `changes` (one
 copy, no trigger-side twin to drift against), which diffs `github.event.before .. github.sha` and outputs
-`run_matrix`; every other job carries `needs: changes` + `if: needs.changes.outputs.run_matrix == 'true'`. When
-`before` is unusable — which is EVERY landing, since `ci/<short-sha>` is always a new branch — the base is
-`merge-base(origin/main, sha)`. `changes` also short-circuits a sha that already carries a green `ci-gate` check
-run, so the fast-forward onto main does not pay for the matrix a second time, and it carries the drift check that
-asserts every job id is in `ci-gate`'s `needs` list.
+`run_matrix`; every other job carries `needs: changes` + `if: needs.changes.outputs.run_matrix == 'true'`. A merge
+group's base is its `merge_group.base_sha`, so a group of docs-only pull requests skips the matrix; a pull request never
+runs it (its run is the cheap jobs, §3.17.6); a push to main diffs from `before`, and with no resolvable `before` the
+matrix runs. `changes` also short-circuits a push whose sha already carries a green run of the workflow from an event
+other than `pull_request` — the merge group's, since the queue advances main to the very commit it tested — so main's
+push run does not pay for the matrix a second time, and it carries the drift check that asserts every job id is in
+`ci-gate`'s `needs` list.
 
-**The landing protocol WAS `scripts/push-main.sh` (superseded by §3.17: since the ruleset went ACTIVE, main takes only
-pull requests GitHub's merge queue tested, and `enqueue.py land` is the one landing step; PB3024 deletes the script)**:
-push HEAD to
-`ci/<short-sha>` → find the run for that exact sha → `gh run watch --exit-status` → on green fast-forward main and
-delete the branch, on red print the failing jobs and exit non-zero with main untouched. A check run is attached to
-the COMMIT, not to a branch, which is why the verdict earned on `ci/<sha>` is the one the protection reads on main.
-The push trigger is therefore `branches: [ main, 'ci/**' ]`; `cancel-in-progress` is restricted to `pull_request`,
-because a cancelled push run leaves its sha permanently unlandable.
+**The landing protocol is `enqueue.py land` into GitHub's merge queue (§3.17):** main takes only pull requests the queue
+tested (the ruleset binds administrators), so the push trigger is `branches: [ main ]` and the one push it sees is the
+merge-queue commit. `cancel-in-progress` is restricted to `pull_request`, because a cancelled push run leaves its sha
+permanently unlandable. The direct-push landing script that preceded the queue, its `ci/` landing branches and its
+landing lease are deleted (kb/Work PB3024's closing change).
 
 ### 1.5 Drift discipline (a genuine strength — preserve it)
 `ConstructRegistryDriftTests` binds `constructs.json` ↔ in-code `ConstructRegistry` both directions;
@@ -135,10 +134,11 @@ replace — the guard that exists because ~6 rebuilds under a running 60-agent f
 agent works in the caller's own tree, and both trees are derived, never listed: the caller's tree is the nearest
 ancestor holding a `.git` entry (a directory in the main checkout, a file in a worktree) of WHERE THE BUILD RUNS —
 the project a `dotnet` command names, else the directory the shell is in when it runs it. That directory comes from
-`scripts/hooks/shell_location.py`, the ONE parser of both shells' location changes (`cd`, `pushd`/`popd`, a
-subshell, `bash -c`; `Set-Location`/`sl`/`chdir`/`Push-Location` with `-Path`/`-LiteralPath`, `pwsh
--WorkingDirectory`, `Start-Process -WorkingDirectory`), which `worktree_rm_allow.py`, `forbidden_commands.py` and
-`status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
+`scripts/hooks/shell_location.py`, the ONE parser of both shells' command lines and location changes (`cd`,
+`pushd`/`popd`, a subshell, an and-or list a single `&` backgrounds, `bash -c`; `Set-Location`/`sl`/`chdir`/
+`Push-Location` with `-Path`/`-LiteralPath`, `pwsh -WorkingDirectory`, `Start-Process -WorkingDirectory`), which
+`worktree_rm_allow.py`, `forbidden_commands.py` (its push, verdict-chaining, WSL and backgrounded-`cd` rules; kb/Work
+PB3095) and `status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
 <worktree>; dotnet build` was judged to build in the main checkout);
 the main checkout is that root, or the `gitdir:` target parsed out of the worktree's `.git` file (parsed, not
 shelled out — this runs before every `dotnet` call); and a foreign agent's tree is
@@ -404,7 +404,7 @@ checkout (a failed regen fails the build — keep).
   table. This is what a future engineer resumes the REARCH from; the plan §0 banner is the feature-drive live
   state and cross-links to it.
 - **DEVLOG/** — one file per entry (§3.17.4, kb/Work PB3025), rendered descending; a real timestamp; one entry per
-  landing on main, checked by `push-main.sh` and CI through `python scripts/devlog.py check`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
+  landing on main, checked by `enqueue.py land` and CI through `python scripts/devlog.py check`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
   `feedback_devlog*` memories. Each rearch phase commit references its ROADMAP phase id.
 - **`docs/DOC_INDEX.md`** — add rows for `COBOLNET_REARCHITECTURE_PLAN.md` (the migration SSOT / ROADMAP),
   `DIAGNOSTICS.md`, this doc, and the sibling `DESIGN-*` / `PHASE-*` docs; keep the "one canonical doc per subsystem" rule.
@@ -1496,7 +1496,8 @@ deleted from a self-test, which still exits 0, so a Unit drift test names the ar
 literals joined; an f-string arm named as its source spells it). A drift test that ran the self-test again did so under
 the test harness's fixed 120 s per-process budget (`COBOLNET_RUN_TIMEOUT_MS`), and under a lander's gate beside the WSL
 Linux gate each went past it with every arm passing: `GateSlotDriftTests` (train 1055), then
-`SelfTestDiscoveryDriftTests`, `LandingLeaseDriftTests` and `GateLegDriftTests`' two driver tests (train 1058;
+`SelfTestDiscoveryDriftTests`, the landing lease's drift test (retired since, kb/Work PB3024) and `GateLegDriftTests`'
+two driver tests (train 1058;
 `self_tests.py --self-test` 19 s alone, over 120 s twice in that train's first gate).
 
 ### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
@@ -1581,7 +1582,7 @@ misses (the rule of section 3.14.1, ORDER, DON'T SKIP).
 **Limits.**
 - The local WSL distro is the same Ubuntu release as the pinned `ubuntu-26.04` runner (upgraded in place 2026-10-04),
   but it runs Microsoft's WSL kernel, not the runner's, and the gate runs Debug where CI also runs Release (kb/Work
-  PB1957 lists every remaining difference). It catches platform assumptions, and CI through `push-main.sh` remains
+  PB1957 lists every remaining difference). It catches platform assumptions, and CI's merge-group run remains
   the proof.
 - The gate cap (section 3.14.6) does not span operating systems, so WSL legs are not counted against it.
 
@@ -1653,8 +1654,8 @@ as the gate slot runs it, three rounds): a change to a runtime source costs 8.5�
 
 Measured on 2026-10-10 (frozen: `evidence/fleet-optimization/2026-10-11-pipeline-measurement-2026-10-10.md`): of 567
 lander minutes, 233 (41 %) were local whole-population gate runs — 7–13 min on a quiet host, 25–53 min under load, 8
-of 15 RED, mostly from fixed time limits under load — and 94 (16.5 %) were `push-main.sh` holding the landing lease
-while CI ran the same population a third time on 20 free runners in 13 min; 10 landers for 6 trains; first commit on
+of 15 RED, mostly from fixed time limits under load — and 94 (16.5 %) were the former direct-push landing script holding the
+landing lease while CI ran the same population a third time on 20 free runners in 13 min; 10 landers for 6 trains; first commit on
 main 6 h 49 min after the day began. The owner, 2026-10-11:
 
 - ~10:38: "We are free to completely rearchitect the build pipeline as needed to be maximally productive and minimally costly."
@@ -1715,7 +1716,7 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    only a head that descends from main, and re-gating every such head would race the queue forever; the merge group
    below integrates the branch on the current main and runs the whole population; a conflict here is exit 4 too);
    `devlog.py stamp` numbers the entry (re-stamping one main has overtaken); run the landing checks that used to live in
-   `push-main.sh` — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
+   the former direct-push landing script — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
    whole population, no waiting for CI. Until the targeted leg runs on both hosts (§3.17.3, PB3022 item 10) the
@@ -1786,7 +1787,7 @@ demand and not committed.
   every number on the base, header well-formed; a `pending-` file, a stray file, an entry whose header disagrees with
   its name, two files with one number, the monolith back, or a deleted entry is a red — a deleted entry counts the
   base's monolith too, header by header, so the one landing that migrates the log cannot drop an entry main has), run
-  by the landing checks (`enqueue.py checks`, which push-main.sh runs too) and by CI's `audits` job on every pull request, merge group and `ci/**` landing branch. Its tree half (`lint`) also runs
+  by the landing checks (`enqueue.py checks`, run by `enqueue.py land`) and by CI's `audits` job on every pull request and merge group. Its tree half (`lint`) also runs
   over the repository's own `DEVLOG/` in `devlog.py --self-test`, so every gate holds the whole log to it. **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
   format"):** LF everywhere — `.gitattributes` `* text=auto eol=lf`, `merge.renormalize`, one normalization landing,
   tools write LF, a drift check refuses a CR in any tracked text file; the index is already LF for 15,234 files, so the
@@ -1836,16 +1837,16 @@ demand and not committed.
   with GitHub's reason; offline the states are git-only); one `cobol-clerk` files the reports' leads; render the ledger;
   hand off. It is mostly a script run; its model turns are the review and finisher dispatches and the handoff. While
   the queue is not ACTIVE, `enqueue.py land` refuses before it merges or gates anything (exit 8): main takes only
-  queued pull requests (the ruleset binds administrators), so a push-main arm could land nothing and gated half an hour
-  with no lease held (review R1-1, corrected at implementation; the phase-1 bridge that kept push-main until the
-  owner's ruleset go retired once the ruleset was ACTIVE).
-- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md` and `train_apply.py` are retired** (PB3023;
+  queued pull requests (the ruleset binds administrators), so a direct-push arm could land nothing and gated half an hour
+  with no lease held (review R1-1, corrected at implementation; the phase-1 bridge that kept the direct-push landing
+  until the owner's ruleset go retired once the ruleset was ACTIVE).
+- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md` and the train applier are retired** (PB3023;
   CLAUDE.md rule 4: deleted, never wrapped); `golden-lander-brief.md` became `golden-lane-brief.md` (the lane-1
   integrator, landing through `enqueue.py land --lane golden`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing
   order is `--brief`'s); `dispatch_guard.py`'s lander rule went with the role. `cobol-lander` became `cobol-finisher`
   (resolve a conflict, fix a red or a bounce, gate and return DONE: its commits are reviewed on the branch before the
-  next enqueue unit lands the new tip; turn cap 160). `landing_lease.py`,
-  `push-main.sh` and the `ci/**` branches retire with the first change landed through the queue (PB3024).
+  next enqueue unit lands the new tip; turn cap 160). The landing lease, the direct-push landing script and its `ci/**`
+  branches are deleted (PB3024's closing change, the first branch cut after PB3023 landed).
 - `wf_rolling_wave.js` **starts no lander** (PB3023): a wave produces DONE branches reviewed CLEAN; the enqueue unit
   lands them. This removed PB3016's policy question (may THIS wave land?) with the mechanism; `train_size`,
   `min_final_train`, `lead_ids_per_train` and the lead-id blocks are gone, and the planner prices each group's landing
@@ -1855,10 +1856,12 @@ demand and not committed.
   a whole landing: `enqueue.py queue` writes the enqueue time, each carried change's DONE (`done_times`: the committer time of the HEAD commit its DONE implementer report names, never the report file's time, which the branch review's stamp rewrites; the changes are the reports naming the branch plus those a train commit's `Report:` line names, one per lead note, each the earliest of its finisher chain; a report whose HEAD is already an ancestor of origin/main is a change that landed before this one and counts for nothing, because the queue's MERGE method makes every landed head an ancestor of every later branch) and the worktree's local gate seconds (the sum of its `verdict.json` `timings.wall_s`);
   `record --review-clean` and `--bounce-causes` (cluster-defect · load-timing · conflict · infrastructure) are named by
   whoever knows; `complete` reads `mergedAt`, the count of FAILED merge-group runs of the PR (a run GitHub cancelled
-  because an earlier entry failed is a ripple, not a bounce) and the successful run's wall from `gh`. A field never
+  because an earlier entry failed is a ripple, not a bounce), the count of FAILED `pull_request` runs on the PR's head
+  branch (`pre_queue_reds`, kb/Work PB3096: a PR red before the queue never reaches a merge group, so `bounces` cannot
+  see it; a branch with no pull-request run at all stays null) and the successful run's wall from `gh`. A field never
   observed stays null and prints UNMEASURED (a missing observation is not a zero); a bounce with no named cause prints
   UNATTRIBUTED. `summary` prints changes landed per hour, median and p90 minutes DONE → on main per change, bounces per landing and
-  their causes, merge-group CI wall and local gate minutes as the AFTER column beside the BEFORE column from the retired
+  their causes, pull-request reds before the queue per landing, merge-group CI wall and local gate minutes as the AFTER column beside the BEFORE column from the retired
   train records (batched gating) and the frozen 2026-10-10 evidence; `freeze` copies the train records and the first
   after-summary under `evidence/fleet-optimization/` once a PR has landed. The completion ledger's landing rate and its
   minutes per landing come from the same file (`landing_measure.landing_rate_input`: the queue's own from two landings,
@@ -1869,11 +1872,13 @@ demand and not committed.
 - `build-and-test.yml` (landed, PB3024 phase 1): `merge_group:` added; the `changes` job runs the matrix on
   `merge_group` (base = the group's `base_sha`, so a group of docs-only PRs skips it exactly as a docs-only landing did)
   and `workflow_dispatch`, only the cheap jobs (`audits`, `ci-gate`) on `pull_request`, and on `push` to main the
-  already-verified short-circuit (the merge-queue commit IS the commit main advances to). ⛔ The short-circuit, and
-  `push-main.sh`'s skip while it lives, count only a successful run of the workflow from an event other than
-  `pull_request`: a PR's cheap `ci-gate` is attached to the PR's HEAD commit — the sha a landing pushes — so a
-  check-run lookup would have read it as a verdict on the matrix. `push.branches` keeps `ci/**` until `push-main.sh`
-  is deleted (below). `ci-gate`'s `needs:` and its drift check (every job wired) are unchanged.
+  already-verified short-circuit (the merge-queue commit IS the commit main advances to; measured on the first three
+  queued landings, PRs 7–9: each `push` run found its merge group's green run on the same sha and skipped the matrix).
+  ⛔ The short-circuit counts only a successful run of the workflow from an event other than `pull_request`: a PR's
+  cheap `ci-gate` is attached to the PR's HEAD commit, so a check-run lookup would have read it as a verdict on the
+  matrix. `push.branches` is `[ main ]` (PB3024's closing change dropped the `ci/**` landing branches), and the
+  DEVLOG-entry check runs only on `pull_request` and `merge_group`. `ci-gate`'s `needs:` and its drift check (every job
+  wired) are unchanged.
 - A **ruleset** on `main` (classic branch protection has no merge queue, and GitHub offers a merge queue only to an
   ORGANIZATION-owned repository — the second apply, 2026-10-11 18:44, was refused with `Invalid rule 'merge_queue'` on
   the personal account's repository, so the repository is `WiseOwlSoftware/COBOL`: owner decision 2026-10-11, kb/Work
@@ -1892,7 +1897,7 @@ demand and not committed.
   push), minimum group size 1, maximum 5, check timeout 60 min. The classic protection is removed in the same change.
 - **Cutover (operator review item 4; owner fast track ~12:58, "Why are we still using push-main?" → "Fast track now"):**
   every step of this design lands through the THEN-CURRENT pipeline. **Phase 1 = PB3024, landed FIRST and ALONE (a
-  blocking one-cluster landing), as the last landing through `push-main.sh`:** the `merge_group` trigger and the
+  blocking one-cluster landing), as the last landing through the direct-push landing script:** the `merge_group` trigger and the
   cheap-PR arm, the committed ruleset (`scripts/orchestrator/ruleset-main.json`) and `ruleset.py check|apply`, and the
   pull-request step as a SCRIPT, `scripts/orchestrator/enqueue.py queue` (the landing checks, push the branch, open or
   reuse its pull request, queue it with auto-merge; no CI wait), with `enqueue.py checks` the one landing-check
@@ -1901,11 +1906,11 @@ demand and not committed.
   its `ci-gate` passes on the cheap jobs, and auto-merge would land it with NO whole-population run. Closed by
   construction: `enqueue.py queue` refuses (exit 8) before any check, push or pull request unless `ruleset.py check`
   reports the queue ACTIVE (live ruleset equal to the committed one, the queue present, the classic protection gone);
-  no other tracked file opens or queues a pull request (`LandingPipelineDriftTests`, §3.17.8); until the queue is
-  ACTIVE the lander kept landing through `push-main.sh`. `push-main.sh`, `landing_lease.py` and their drift tests, the
-  `ci/**` trigger and MANDATORY-PRACTICES L3/L13 are deleted by PB3024's closing change, cut right after PB3023 lands —
-  not by the first queued landings (PB3077, PB3078), because PB3023 rewrites 39 of the 48 files that retirement touches
-  (kb/Work PB3078). **The switch happened 2026-10-11 19:14:** on the owner's go (16:27) the attended session ran
+  no other tracked file opens or queues a pull request (`LandingPipelineDriftTests`, §3.17.8); until the queue was
+  ACTIVE the lander kept landing through the direct-push script. That script, the landing lease and their drift tests,
+  the `ci/**` trigger and MANDATORY-PRACTICES L3/L13's references to them were deleted by PB3024's closing change, cut
+  right after PB3023 landed — not by the first queued landings (PB3077, PB3078), because PB3023 rewrote 39 of the 48
+  files that retirement touches (kb/Work PB3078). **The switch happened 2026-10-11 19:14:** on the owner's go (16:27) the attended session ran
   `python scripts/orchestrator/ruleset.py apply --owner-go "<the go>"` (it also set the repository's auto-merge and
   delete-branch settings) — after the repository's transfer to the WiseOwlSoftware organization, the merge queue being
   organization-only (PB3078); from that instant main accepts only queued pull requests.
@@ -1927,13 +1932,15 @@ only, out of every gate path and brief).
 #### 3.17.8 Drift tests that pin the design
 
 `LandingPipelineDriftTests` (phase 1, landed): the workflow has a `merge_group` trigger, a `pull_request` arm that
-skips the matrix, and a short-circuit that never counts a pull request's run (push-main.sh's skip too, while it exists;
-once it is gone, no `ci/**` trigger); no tracked file outside the narrative paths (docs, kb, history, tests) opens or
+skips the matrix, and a short-circuit that never counts a pull request's run; no tracked file outside the narrative paths (docs, kb, history, tests) opens or
 queues a pull request except `enqueue.py`, and its queue guard precedes its checks, push and pull-request calls; the
 self-test arms of `enqueue.py` and `ruleset.py` are declared. The live ruleset is compared by `ruleset.py check`, whose
 consumers are the landing (exit 8 on anything but ACTIVE) and the session probe's `gate :` line, not an xUnit arm (the
-suite has no dynamic skip, and an offline comparison must read SKIPPED, never green). Later arms, with the change that
-retires each: no file in the tree references `push-main.sh`, `landing_lease.py` or `train_apply.py`; no generated index is tracked
+suite has no dynamic skip, and an offline comparison must read SKIPPED, never green). Landed with PB3024's closing
+change (`TheDirectPushLanding_IsRetired_AndNothingNamesIt`, with its planted-name arm): the direct-push landing
+script (both forms), the landing lease and the train applier do not exist, the push trigger is `[ main ]` with no
+`ci/**`, and no tracked file outside the history paths (`DEVLOG/`, `docs/rearchitecture/evidence/`, `kb/Work/`,
+`adjudication/`) names any of them by file name. A later arm, with the change that retires it: no generated index is tracked
 (`git ls-files` ∩ the generators' outputs is empty). Landed with kb/Work PB3022's first part: `GateLegDriftTests` (no
 caller names a gate mode) and `HostWitnessTraitDriftTests` (`TIER_ORDER` contains `0h` and every race-witness class
 carries the `Host` trait). Landed with kb/Work PB3025: `DEVLOG.md` does not exist and every `DEVLOG/*.md` has a

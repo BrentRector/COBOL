@@ -25,8 +25,8 @@ CASES = [
     ("git push origin HEAD:main", True),
     ("git push origin main", True),
     ("git push -q origin HEAD:refs/heads/main", True),
-    ("git push origin HEAD:ci/abc123", False),
-    ("bash scripts/push-main.sh", False),
+    ("git push origin HEAD:worktree-agent-abc123", False),                # a work branch, never main
+    ("python scripts/orchestrator/enqueue.py land worktree-agent-abc123", False),   # the landing script itself
     ("cd /e/claude-skills && git push -q origin main", False),
     ("cd /e/COBOL && git push origin HEAD:main", True),
     ("cd E:/CobolSharp && git push origin HEAD:main", True),     # the pre-rename folder name is still this repo
@@ -51,20 +51,26 @@ CASES = [
     # 5. chaining after a verdict command
     ("dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
     ("dotnet build Cobol.Net.sln -c Debug && dotnet test x.csproj > t.log", True),
-    ("bash scripts/push-main.sh > p.log 2>&1; git log -1", True),
+    ("python scripts/orchestrator/enqueue.py land b > l.log 2>&1; git log -1", True),
     ("pwsh -File scripts/build-local.ps1 -Priority BelowNormal *> b.log || true", True),
-    ("bash scripts/push-main.sh > p.log 2>&1; echo \"rc=$?\"; grep -E landed p.log | tail -2", False),
+    ("python scripts/orchestrator/enqueue.py land b > l.log 2>&1; echo \"rc=$?\"; grep -E ENQUEUE l.log | tail -2", False),
     ("dotnet build Cobol.Net.sln -c Debug -v q 2>&1 | grep -E 'error|Build succeeded'", False),
     ("cd /e/COBOL && dotnet build Cobol.Net.sln -c Debug > b.log 2>&1", False),
     ("timeout 580 bash -c 'tail -n +1 -f b.log | grep -m1 VERDICT' ; tail -3 b.log", False),
     ("git status --short && git log --oneline -3", False),
     ("bash -c 'dotnet test x.csproj > t.log && echo done'", False),
     # 5b. a command that merely NAMES a gate or landing script is not a verdict command
-    ("git add -- scripts/push-main.sh DEVLOG/1961-x.md && git commit -q -m x", False),
-    ("sed -n 17,20p scripts/push-main.sh && head -3 x.txt", False),
+    ("git add -- scripts/build-local.ps1 DEVLOG/1961-x.md && git commit -q -m x", False),
+    ("sed -n 17,20p scripts/orchestrator/enqueue.py && head -3 x.txt", False),
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
     ("pwsh -NoProfile -File scripts/build-local.ps1 > b.log 2>&1; git status", True),
-    ("bash scripts/push-main.sh > p.log 2>&1 && git log -1", True),
+    ("python scripts/orchestrator/enqueue.py land b > l.log 2>&1 && git log -1", True),
+    # 5b'. the chain is read by the SHARED parser (review R1-1's sibling): a comment's apostrophe, an escaped quote or a
+    # heredoc before the chain no longer hides it
+    ("git status  # don't" + chr(10) + "dotnet build x.sln > b.log 2>&1 && git commit -m x", True),
+    ("echo it" + BS + "'s here && dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
+    ("cat > m.txt <<'EOF'" + chr(10) + "x" + chr(10) + "EOF" + chr(10) + "dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
+    ("dotnet test x.csproj > t.log 2>&1 & git status", False),           # a background `&` is not a chain (as before)
     # 5c. the merge-queue landing is a verdict command too (kb/Work PB3024)
     ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt > q.log 2>&1 && git log -1", True),
     ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt > q.log 2>&1; echo \"rc=$?\"", False),
@@ -83,6 +89,28 @@ CASES = [
     ("wsl -l -v", False),
     ("git commit -q -m 'document wsl --terminate and wsl --export for the owner'", False),
     ("grep -n 'wsl --export' docs/x.md", False),
+    ("bash -c 'wsl --shutdown'", True),                                  # a -c payload's command is a command
+    ("echo y | wsl --terminate Ubuntu", True),                           # so is a pipeline's later side
+    # 7. a `cd` inside a BACKGROUNDED list with another command after its `&` (MANDATORY-PRACTICES P14(b), kb/Work PB3095)
+    ("cd /e/x && git log -1 > a.txt & git status > b.txt &", True),     # the 2026-10-11 shape: b ran in the caller's dir
+    ("cd /e/x && a & b", True),
+    ("pushd /e/x && a & b", True),
+    ("cd /e/x || exit 1 && a & wait", True),
+    ("cd /e/x && git log -1", False),                                    # a plain chain: the cd binds what follows
+    ("cd /e/x && git log -1 &", False),                                  # backgrounded, nothing after the `&`
+    ("cd /e/x; a & b", False),                                           # the cd is its own list: it moves the caller
+    ("git -C /e/x log -1 > a.txt & git -C /e/y status > b.txt &", False),
+    ("cd /e/x && dotnet build x.sln > b.log 2>&1", False),               # `2>&1` is a redirection, not a background `&`
+    ("cd /e/x && a &> l.log", False),                                    # `&>` too
+    ("cd /e/x && a |& tee l.log", False),                                # and `|&`
+    ("echo 'cd /e/x && a & b'", False),                                  # quoted text is text
+    # review R1-1: the rule reads the SHARED parser, so a comment's apostrophe or an escaped quote cannot hide the list
+    ("git status  # don't worry" + chr(10) + "cd /e/x && a & b", True),
+    ("echo it" + BS + "'s here && cd /e/x && a & b", True),
+    ("cat > m.txt <<'EOF'" + chr(10) + "cd /e/x && a & b" + chr(10) + "EOF" + chr(10) + "git status", False),   # heredoc body
+    ("bash -c 'cd /e/x && a & b'", True),                                # a -c payload is a command line
+    ("(cd /e/x && a) & b", False),                                       # the subshell already scopes the cd
+    ("{ cd /e/x; a; } & b", True),                                       # a { } group is in the backgrounded list
 ]
 
 
@@ -94,6 +122,8 @@ PS_CASES = [
     ("Set-Location E:/COBOL; git push origin main", True),
     ("git push origin HEAD:main", True),
     ("git stash", True),
+    ("Set-Location E:/x && a & b", True),                                # the same backgrounded list in PowerShell 7
+    ("Set-Location E:/x; & pwsh -File y.ps1", False),                    # `&` that starts a command is the call operator
 ]
 
 
@@ -117,13 +147,13 @@ UNIT_CASES = [
     ("git -C E:/claude-skills push origin main", True),
     ("git -c core.askpass=x push origin v1.18.0", True),
     ("git --no-pager push --quiet origin HEAD:refs/heads/main", True),
-    ("git push origin HEAD:ci/abc123", True),
+    ("git push origin HEAD:worktree-agent-abc123", True),
     ("cd /e/Sites/wiseowlsoftware.com; git push", True),
     ("git push -u origin claude/batch-7", True),
-    ("bash scripts/push-main.sh", False),
+    ("python scripts/orchestrator/enqueue.py land worktree-agent-abc123", False),   # its push is the script's
     ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt", False),   # its push is the script's
     ("git log --grep=push", False),
-    ("git log --oneline -3 -- scripts/push-main.sh", False),
+    ("git log --oneline -3 -- scripts/orchestrator/enqueue.py", False),
     ("git commit -q -m 'document git push for the owner'", False),
     ('git commit -q -m "PB2044: a unit ran git push -q origin HEAD:main"', False),
     ("bash -c 'cd /e/claude-skills && git push -q origin main'", True),       # the payload of bash -c IS a command line

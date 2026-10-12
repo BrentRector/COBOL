@@ -70,7 +70,7 @@ Use the `gate` skill. Read the verdict line, then commit as a separate call.
   too. The landing numbers and stamps it with `python scripts/devlog.py stamp <branch>` (the number from
   `alloc.py devlog`, the header completed as `## Entry NNNN — YYYY-MM-DD HH:MM TZ — Title`, one commit). One entry
   per LANDING ON MAIN, not per commit (owner 2026-10-08, kb/Work PB2605): the landing checks
-  (`scripts/orchestrator/enqueue.py checks`, run by push-main.sh and by the merge-queue landing, kb/Work PB3024)
+  (`scripts/orchestrator/enqueue.py checks`, run by `enqueue.py land` before the pull request, kb/Work PB3023)
   refuse a landing whose range adds no new, stamped entry numbered above main's, or more than one, or deletes one
   (exit 6, `scripts/devlog.py check`), and refuse a landing whose arch-oracle baseline is behind its tree (exit 7, `scripts/orchestrator/landing_oracle.py`, kb/Work PB2885: run `scripts/arch/compare_oracle.py`, then `scripts/arch/capture_oracle.py --record`, and commit the manifest).
 - Commit message: write it to a scratchpad file and use `git commit -F <file>`. Do NOT inline a PowerShell

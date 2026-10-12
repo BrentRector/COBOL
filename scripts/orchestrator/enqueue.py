@@ -14,7 +14,7 @@ branch, and an agent is dispatched only for what a script cannot decide (a confl
      THE QUEUE GUARD, before anything is merged or gated: `ruleset.py check` must report the merge queue ACTIVE, or the
      exit is 8 with the branch unchanged. Main accepts only queued pull requests (the ruleset binds administrators too),
      so there is no other path to land by, and a gate spent while the queue is not ACTIVE could land nothing (kb/Work
-     PB3023 review R1-1: the former push-main.sh arm merged and gated for half an hour with no landing lease held).
+     PB3023 review R1-1: the former direct-push landing arm merged and gated for half an hour with nothing holding main).
      THE REVIEW (MANDATORY-PRACTICES I10, L9; kb/Work PB3027): the branch's newest fix-lane report must carry
      `**Review:** CLEAN <reviewer> <head>` naming a commit of the branch, and every later commit must be main's, a clean
      merge of main (its tree the auto-merge of its parents) or DEVLOG-only; anything else (a finisher's fix, a
@@ -61,7 +61,7 @@ Every outcome ends on ONE line `=== ENQUEUE: <OUTCOME> … ===` for a caller to 
      the merge group runs the matrix, and a red there bounces only this PR (`landing_measure.py complete` reads the
      outcome from GitHub).
 
-`checks` — THE LANDING CHECKS, one sequence in one place (push-main.sh runs it too until PB3024 deletes it), each
+`checks` — THE LANDING CHECKS, one sequence in one place (`land` runs it before it opens the pull request), each
 refusing on the landing's own range before a CI run is spent:
   devlog.py check   (exactly one new, stamped DEVLOG/ entry, numbered above main's; kb/Work PB2605, PB3025) → exit 6
   landing_oracle.py (the arch-oracle baseline describes the landed tree; kb/Work PB2885) → exit 7

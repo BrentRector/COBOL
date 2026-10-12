@@ -61,7 +61,7 @@ commits are ancestors of main and MERGED decides; the rest stays for the branche
            the earlier test (every added file and every declared C# name on main) called a branch that only MODIFIED
            existing files LANDED, so an unlanded method-body fix would have been deleted.
            Also LANDED when its own merge would change main but its work reached main as OTHER commits (carried(), kb/Work
-           PB2708): a train_apply.py commit on origin/main brought in exactly its head (a lander that edits a cluster in
+           PB2708): a commit of the retired train applier on origin/main brought in exactly its head (a lander that edits a cluster in
            the train changes the merge), or every one of its commits is patch-equivalent to one on main (`git cherry`, a
            finisher's cherry-pick) and it declares no name main lacks. The row's evidence says which.
   CHECK    every added file exists, but merging it would still change main: an unlanded fix to existing files, a
@@ -160,13 +160,13 @@ def uncommitted(path) -> int:
 # main, so the merge test alone reads CHECK: after train 1042b landed, three of its members read WAITING TO LAND (the next
 # land unit would have re-carried them) and seven read DECISION; after train 1053, branch-records-r1716 (53Y) read
 # WAITING TO LAND. The record of what a train took is its MANIFEST (`<coord>/scratch/train<label>-manifest.json`: per
-# cluster its branch, base and head) plus, on origin/main, the train's commits: train_apply.py gives each cluster's
-# commit a `Train-Cluster: <cluster>` trailer, and the train ends in a `Train <label>: ...` commit. A member whose
+# cluster its branch, base and head) plus, on origin/main, the train's commits: the retired train applier gave each
+# cluster's commit a `Train-Cluster: <cluster>` trailer, and the train ends in a `Train <label>: ...` commit. A member whose
 # trailer commit is in its train's range (train_clusters: back from the train's last commit to the member's base or to
 # another train's commit, whichever is nearer, since trains reuse cluster letters) was brought in, its diff is in main's
 # history, and deleting the branch loses nothing even where a later commit withdrew the fix. The commit BODY is not the
 # record: landers rewrite it (train 1053's 53A and 53G kept only the trailer). A member with no trailer commit (a train
-# before train_apply.py, or a lander that dropped the trailer: train 1053's 53P) stays a hand decision.
+# before the train applier, or a lander that dropped the trailer: train 1053's 53P) stays a hand decision.
 _trains: dict[tuple[str, str], dict[str, list[tuple[str, str]]]] = {}
 
 
@@ -835,7 +835,7 @@ def self_test() -> int:
 
         def train_commit(branch, path, text, cluster):
             tip = g('rev-parse', branch).stdout.strip()
-            base = g('merge-base', branch, 'main').stdout.strip()      # where the branch was cut, as train_apply records
+            base = g('merge-base', branch, 'main').stdout.strip()      # where the branch was cut, as the train applier recorded
             manifest.append({'cluster': cluster, 'branch': branch, 'base': base, 'head': tip})
             # the body a lander rewrote: only the trailer survives (train 1053's 53A and 53G)
             commit(path, text, f'{cluster} PB1: the cluster as the lander edited it\n\nTrain-Cluster: {cluster}\n')

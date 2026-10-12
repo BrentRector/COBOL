@@ -64,6 +64,13 @@ with tempfile.TemporaryDirectory() as tmp:
         ("a subshell's cd ends at its )", f"(cd {W} && dotnet build) && dotnet test", [wt, main]),
         ("a { } group's cd persists", f"{{ cd {W}; }} && dotnet build", [wt]),
         ("a background cd does not move the shell", f"cd {W} & dotnet build", [main]),
+        # a single `&` backgrounds the WHOLE and-or list, so a `cd` joined to it by `&&` moves only that job (PB3095)
+        ("a backgrounded list's cd ends at its &", f"cd {W} && git fetch & dotnet build", [main]),
+        ("inside the backgrounded list the cd binds", f"cd {W} && dotnet build & git status", [wt]),
+        ("a backgrounded { } group's cd ends at its &", f"{{ cd {W}; }} & dotnet build", [main]),
+        ("a comment's apostrophe opens no quote (review R1-1)",
+         f"# don't build in main\ncd {W} && git fetch & dotnet build", [main]),
+        ("a cd in its own list moves the shell", f"cd {W}; git fetch & dotnet build", [wt]),
         ("a piped cd does not move the shell", f"cd {W} | cat; dotnet build", [main]),
         ("a variable set in the same call", f"WT={W}; cd $WT && dotnet build", [wt]),
         ("a braced variable", f"export WT={W}; cd ${{WT}}/ && dotnet build", [wt]),
@@ -114,6 +121,8 @@ with tempfile.TemporaryDirectory() as tmp:
         ("a child's Set-Location does not come back",
          f'pwsh -Command "Set-Location {Wn}; dotnet build"; dotnet test', [wt, main]),
         ("& is the call operator, not a separator", f'Set-Location {Wn}; & dotnet build', [wt]),
+        ("a backgrounded chain's Set-Location ends at its & (PB3095)", f"Set-Location {Wn} && git fetch & dotnet build",
+         [main]),
         ("a here-string is data", f"$m = @'\nSet-Location {Wn}\n'@\ndotnet build", [main]),
         ("*> redirection does not split", f"Set-Location {Wn}; dotnet build *> b.log; \"EXIT=$LASTEXITCODE\"", [wt]),
     ]:
@@ -128,6 +137,13 @@ with tempfile.TemporaryDirectory() as tmp:
     check("location_targets: PowerShell -Path and -WorkingDirectory",
           sl.location_targets(f"Set-Location -Path E:/a; Start-Process git -WorkingDirectory E:/b", P), ["E:/a", "E:/b"])
     check("location_targets: a bare cd names nothing", sl.location_targets("cd && git push", B), [])
+    stranded = lambda cmd, shell=B: [s.stranded for s in sl.steps(cmd, str(main), shell) if s.stranded]
+    check("stranded: the step after a backgrounded list's cd", stranded("cd /e/x && a & b &"), [("/e/x",)])
+    check("stranded: nothing when the cd is its own list", stranded("cd /e/x; a & b"), [])
+    check("stranded: nothing after a trailing &", stranded("cd /e/x && a &"), [])
+    check("stranded: an escaped quote opens no quote (review R1-1)",
+          stranded("echo it\\'s here && cd /e/x && a & b"), [("/e/x",)])
+    check("stranded: a PowerShell 7 job", stranded("Set-Location E:/x && a & b", P), [("E:/x",)])
     commit = lambda cmd, shell=B: [sl.git_dir(s) for s in sl.steps(cmd, str(main), shell) if "commit" in s.words]
     check("git_dir: -C", commit(f"git -C {W} commit -m x"), [wt])
     check("git_dir: cd then -C relative", commit(f"cd {W} && git -C sub commit -m x"), [wt / "sub"])

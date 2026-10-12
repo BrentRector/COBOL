@@ -31,7 +31,6 @@ closed per weekly-quota point.
 | `scripts/orchestrator/budget.py` | the weekly and session quota estimator (section 8) |
 | `scripts/orchestrator/plan_wave.py` + `model_rules.json` | the deterministic wave planner and its routing and cost constants (section 9) |
 | `scripts/orchestrator/coord.py` | names the coordination directory, loads `model_rules.json`, reads and writes JSON atomically through `scripts/sharedfile.py` (the one Windows share-retry rule, which `gate_slot.py` uses too; kb/Work PB2564), and holds its one short mutex (`locked(cdir, name)`: the allocator's and the landing lease's) |
-| `scripts/orchestrator/landing_lease.py` | the landing lease: one lander on main at a time (section 4.7) |
 | `scripts/orchestrator/mailbox.py` | the two attended sessions' mailbox: send, list, take, finish and watch messages, and `operator-session.json` (section 15) |
 | `scripts/account-profile.ps1` | seeds a named account's config dir from the default one (section 2.1) |
 | `scripts/orchestrator/account.py` | the ONE resolver of the Claude account a script runs as: its config dir, its global config and account id, its row of `model_rules.json` `accounts` (section 2.1) |
@@ -47,9 +46,6 @@ the tools it runs). Contents:
 |---|---|---|
 | `alloc.json` | `alloc.py` | the highest value reserved so far per kind |
 | `alloc.lock` | `alloc.py` (through `coord.locked`) | the allocator's lock (atomic create; stale after 60 s) |
-| `landing-lease.json` | `landing_lease.py`: every lander (`acquire`, `renew`), `push-main.sh` (re-take, renew, release) | the LANDING LEASE (section 4.7): `{holder, reason, worktree, branch, host, acquired_at, heartbeat_at, expires_at, ttl_min}`, absent when no lander holds main |
-| `landing-lease.lock` | `landing_lease.py` (through `coord.locked`) | the lease's read-modify-write lock (the same mutex as `alloc.lock`) |
-| `landing-lease.jsonl` | `landing_lease.py` | one line per `acquire`, `takeover` (with the dead lease's holder and why it was dead) and `release` (minutes held, outcome) |
 | `readings.json` | the `meter` unit (via `budget.py --record`) | owner-meter readings, a list of `{noted_at, account, weekly_pct, session_pct, session_reset}`; each account reads only its own (section 8) |
 | `orchestrate.lock` | the supervisor | one instance only: `{pid, started_at, host}` |
 | `STOP` | the owner (`stop.ps1`) | closes work down as soon as possible without losing any: a running unit is wound down (below), then the loop ends; `stop.ps1 -Clear` removes it |
@@ -64,7 +60,7 @@ the tools it runs). Contents:
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
 | `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
-| `inflight-groups.json` | `plan_wave.py` (without `--dry-run`), and `scripts/hooks/dispatch_guard.py` for every write-capable Agent call and every Workflow call it admits | the dispatch ledger: every group planned or dispatched by hand whose notes are not all landed or retired, with the files it was planned on and when (`at`); the campaign lane's file-set partition reads it, so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `push-main.sh`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the groups whose declared files its diff meets); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>` (section 9.1; kb/Work PB2118 Drafts 7–10) |
+| `inflight-groups.json` | `plan_wave.py` (without `--dry-run`), and `scripts/hooks/dispatch_guard.py` for every write-capable Agent call and every Workflow call it admits | the dispatch ledger: every group planned or dispatched by hand whose notes are not all landed or retired, with the files it was planned on and when (`at`); the campaign lane's file-set partition reads it, so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `enqueue.py land`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the groups whose declared files its diff meets); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>` (section 9.1; kb/Work PB2118 Drafts 7–10) |
 | `member-index/<treeKey>.members.json.gz` | `plan_wave.py --cluster` (`member_index.current`) | the member index regenerated for the planner's own tree when no committed record has its `treeKey`: the planner never plans on a stale index (kb/Work PB2118 Draft 9) |
 | `scratch/train<label>-manifest.json` | the retired train landers (none written since kb/Work PB3023) | a past train's members; `prune_worktrees.py` still reads the landed ones (`train_heads`) to classify the branches those trains carried |
 | `units.jsonl` | the supervisor | one line per unit (section 4.5) |
@@ -122,7 +118,7 @@ Fable only with explicit approval per dispatch, which an unattended loop cannot 
 > the shared gate slot, stamps the DEVLOG entry, runs the DEVLOG-entry, oracle and R3 partition checks, opens the
 > branch's pull request and adds it to GitHub's merge queue (main moving during the gate is merged in again, without a
 > second gate; while `ruleset.py check` does not report the queue ACTIVE it refuses before merging or gating anything,
-> so it never runs `push-main.sh` and takes no landing lease, §4.7). The unit's own
+> and there is no other path onto main, §4.7). The unit's own
 > turns are the review dispatches, the `cobol-finisher` dispatches (a conflict, a red gate, a queue bounce) and the
 > handoff. A `wave` unit ends when its Workflow returned: it starts no lander and lands no train (`wf_rolling_wave.js`
 > lost its trains, PB3016 by removal).
@@ -164,8 +160,7 @@ lost agent work exceeds that cost. Open decision D3.
    operator is the one actor that sees the whole machine (the loop, the attended landings, the owner's answers).
    `orchestrate.ps1 -Unit` is a steer like any other (section 4.8).
 1. The handoff carries `owner_question` → `owner-question` (stop).
-2. The handoff names `next_unit` → that unit; but a handoff naming `enqueue` while push-main.sh holds the landing lease
-   (section 4.7) is passed over, and the rules below choose. A wave-type unit (`wave` or `campaign`) names only a WAVE: with
+2. The handoff names `next_unit` → that unit. A wave-type unit (`wave` or `campaign`) names only a WAVE: with
    `--cluster` the campaign rule at the end of this list decides which lane it runs, and the handoff's reason is kept
    in the choice's reason (kb/Work PB2522). Rule 2 used to return the named unit outright, ahead of the campaign rule,
    so a model that wrote `wave` in every handoff starved a ready campaign note indefinitely: PB2151, the legacy
@@ -179,9 +174,8 @@ lost agent work exceeds that cost. Open decision D3.
    calls `UNLANDED` received a commit after the last unit started (an agent of a unit that died) → `resume`.
    Older unlanded branches do not trigger it, so an abandoned branch cannot cause a `resume` loop; `plan_wave.py`
    still sees them.
-6. The handoff lists `branches_pending` with status `DONE` → `enqueue`, unless a live landing lease is held (section 4.7):
-   an `enqueue` unit would only wait for that push-main.sh landing, so rule 7 chooses and its reason ends `enqueue deferred (<branches>):
-   the landing lease is held by <holder> …`. The land runs at the first choice after the lease is released or dies.
+6. The handoff lists `branches_pending` with status `DONE` → `enqueue`. No landing waits for another: GitHub's merge
+   queue orders main (section 4.7), so nothing defers it (`test_orchestrate_campaign.ps1` 8f).
 7. Otherwise → `wave`. (A stale ledger page is not a reason for a unit: a headless unit cannot publish it, section 14.
    The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`, the unit `enqueue` replaced.)
 
@@ -191,10 +185,8 @@ every wave-type choice, from rule 2 or rule 7: `campaign` when a lead's cluster 
 alternate with fix-lane waves; otherwise `wave`. Among several ready leads the one whose own last `campaign` line is
 oldest (never run counts as oldest; ties in `-Cluster` order) takes the turn, and the JSON names it in `cluster`. A
 wave-type choice also carries `campaign` for the lane as a whole: `run`, `between`, `waiting` (no lead has a ready
-note), `landed` (every lead's cluster is landed or retired) or `unknown`. A land the landing lease deferred (rule 6,
-or a handoff's `enqueue` at rule 2) stays at the end of that choice's reason, and a deferred handoff `enqueue` names no wave:
-the campaign rule then treats the wave as rule 7's (`next_unit.py#base_choice` returns the deferral beside the
-choice; `test_orchestrate_campaign.ps1` 8f). With `--cluster` EVERY choice but an owner
+note), `landed` (every lead's cluster is landed or retired) or `unknown`. An `enqueue` choice (rule 2 or 6) stays `enqueue`
+in the campaign lane too. With `--cluster` EVERY choice but an owner
 question carries `campaigns` (`{lead: ready | waiting | landed | unknown}`; the supervisor ends a lead's lane at
 `landed`, runs the fix lane alone once no lead is left, and records the map in that unit's `units.jsonl` line) and
 `starved`: each lead whose ready note has waited through MORE THAN ONE wave-type unit since its own last campaign
@@ -287,7 +279,8 @@ Each iteration, in this order:
 - A decision that only the owner can make ends the unit with `outcome: owner-question` and an `owner_question`;
   never guess (CLAUDE.md rule 7, the owner-decision protocol).
 - Forbidden to every unit: the WSL lifecycle commands `wsl --terminate`, `--shutdown`, `--update`, `--export`,
-  `--unregister` (they kill every other session's Linux gate). Land only through `bash scripts/push-main.sh`.
+  `--unregister` (they kill every other session's Linux gate). Land only through
+  `python scripts/orchestrator/enqueue.py land <branch>` (the enqueue unit; main refuses a direct push).
 - A `wave` unit loads the `workstream` skill before the Workflow call (`dispatch_guard.py` refuses it otherwise),
   runs `plan_wave.py`, which renders the specs with `make_dispatch_specs.py` and runs `check_practices.py`, then
   starts `wf_rolling_wave.js` with the args file `plan_wave.py` wrote.
@@ -303,10 +296,10 @@ gone, the hooks above are the only guard, which is why the WSL lifecycle command
 
 An ATTENDED session is started by `scripts/start-session.ps1` with `--dangerously-skip-permissions` (owner decision
 2026-09-20), i.e. `bypassPermissions`. A session started any other way runs in its account's `permissions.defaultMode`
-(account 2's is `auto`), whose classifier refused a lander's `push-main.sh` on 2026-10-08 (kb/Work PB2601). So the
-session-start TOOLING block measures the mode (the hook payload's `permission_mode`, else the last `permissionMode`
-the transcript recorded) and prints `ASK-OWNER permission mode` when it is not the owner's; and a lander refused
-`push-main.sh` hands the gated train off as `READY-TO-PUSH <worktree> <sha>` (MANDATORY-PRACTICES L13).
+(account 2's is `auto`), whose classifier refused a lander's direct-push landing on 2026-10-08 (kb/Work PB2601). So
+the session-start TOOLING block measures the mode (the hook payload's `permission_mode`, else the last `permissionMode`
+the transcript recorded) and prints `ASK-OWNER permission mode` when it is not the owner's; and an agent refused
+`enqueue.py land` hands the gated branch off as `READY-TO-LAND <worktree> <branch>` (MANDATORY-PRACTICES L13).
 
 ### 4.3 The context policy (graceful stop; kb/Work PB2597)
 
@@ -363,7 +356,7 @@ registered by this change (open decision D2).
 
 | Failure | What it would cost | Guard |
 |---|---|---|
-| two supervisors run at once | double dispatch, id collisions, two landers racing `push-main.sh` | `orchestrate.lock` with a live-PID check |
+| two supervisors run at once | double dispatch, id collisions, two enqueue units landing one branch | `orchestrate.lock` with a live-PID check |
 | a unit crashes at start (auth, a bad flag, a hook refusing everything) | the loop spins and burns quota | the circuit breaker: three fast or failed units stop the loop and write an owner note |
 | a unit ends without a handoff | the next unit starts blind | schema validation; an invalid handoff is a failure and the next unit is `resume`, which rebuilds state from disk |
 | a unit's context grows without bound | each call costs more than a fresh start | `STOP-UNIT` at the soft cap `-MaxContextTokens` of the unit's own messages (not its subagents'); the fleet stop and, after the grace period, a kill only at the hard cap `-HardContextTokens` (section 4.3) |
@@ -374,7 +367,7 @@ registered by this change (open decision D2).
 | the quota runs out mid-week | the owner's other work (the TENET project) is starved | `budget.py`: `hold-day` at the cumulative daily allowance, `stop-week` at the weekly cap |
 | the 5-hour session window runs out mid-unit | a unit killed at the limit | `hold-session` at the soft stop (`session_soft_stop_pct`, 97 % since 2026-10-07) before a unit starts |
 | two sessions allocate the same id or code | a renumbering pass (five collisions in one day, 2026-09) | `alloc.py`: one lock, reservations outside every worktree |
-| two landers (the loop's and an attended one, or two trains) rebase and gate at once | the one that pushes second rebases, renumbers its DEVLOG entry and re-gates (≈ 30 min of the whole machine each time); the R1 lander lost three times on 2026-10-07 and ended SPLIT with nothing landed | the landing lease (section 4.7) |
+| two landers (the loop's and an attended one, or two trains) rebase and gate at once | the one that pushes second rebases, renumbers its DEVLOG entry and re-gates (≈ 30 min of the whole machine each time); the R1 lander lost three times on 2026-10-07 and ended SPLIT with nothing landed | GitHub's merge queue orders main, and `enqueue.py land` merges a moved main in without a second gate (section 4.7) |
 | a landing reopens a closed inventory row | silent conformance regression | `inventory_ratchet.py` (section 7) |
 | the owner wants it stopped | losing agent work if the process were killed | `STOP` (`stop.ps1`): a graceful wind-down of the running unit and its fleet, a kill only after the grace period |
 | a unit's model ends a turn with a fleet in flight | a one-shot `claude -p` terminates background tasks 600 s later and the fleet dies (wave 1017) | the supervisor holds stdin open and closes it only when idle with no background task |
@@ -404,66 +397,26 @@ split with a claim undecided. One session's stop must never abort another sessio
 - **Clearing.** The supervisor removes only `STOP-loop` at a unit's start; `stop.ps1 -Clear` removes the loop's files,
   and only `-Clear -Global` removes the global one.
 
-### 4.7 The landing lease: one lander on main at a time (`landing_lease.py`, kb/Work PB2537)
+### 4.7 No landing lease: GitHub's merge queue orders main (kb/Work PB2537, PB3023, PB3024)
 
-> ⛔ **Retired by `DESIGN-test-build-ci.md` §3.17 (owner 2026-10-11, kb/Work PB3015/PB3024): GitHub's merge queue
-> serializes landings, so there is no lease to take; `enqueue.py land` never runs `push-main.sh` (kb/Work PB3023 review
-> R1-1), and `landing_lease.py`, `push-main.sh` and their drift tests go with PB3024's remaining step.** The record
-> below explains why the lease existed.
-
-`push-main.sh` refuses a HEAD that is not a descendant of origin/main, so it serialized the PUSH. A landing's cost
-comes before that step: the final rebase, the whole-population lander gate, the Linux gate, the oracle and CI, about
-50 minutes. Every train the loop landed inside that window made a waiting lander rebase, renumber its DEVLOG entry and
-re-gate; on 2026-10-07 the R1 lander (approved 17:42 PDT) lost to trains 1034 and 1034b, re-gated three times and ended
-SPLIT at its turn cap with every gate and CI green and nothing on main. Owner 19:30 PDT: "this is stupid. we cannot
-keep running r1 repeatedly for zero gain".
-
-- **The lease** is one file, `<coord>\landing-lease.json` (section 2), so every session and every worktree sees the
-  same one. It records the holder (who), the reason (what is landing), the WORKTREE that holds it, a heartbeat and an
-  expiry. Its owner is the worktree: a lander that resumes in the same worktree re-takes its own lease, and push-main
-  needs no argument to know whether its caller holds it. Every change is a read-modify-write under
-  `coord.locked(cdir, "landing-lease.lock")`, and every read (`check`, `status`, `next_unit.py`) takes the same lock, so
-  no reader holds the file open while a writer replaces it (Windows refuses that). A file that is not a lease is never
-  guessed free or held: every verb exits 2 with the reason, and push-main dies on it. The exit codes are the contract
-  push-main acts on: 0 own/done, 1 (`check` only) free, 4 held by another worktree, 2 could not answer.
-- **Acquire** (`push-main.sh` itself, which no landing step runs any more: `enqueue.py land` refuses while the merge
-  queue is not ACTIVE; the lander briefs that acquired it before their final rebase retired with the lander, kb/Work
-  PB3023): `acquire --holder …
-  --reason … --wait-min 9` takes a free lease, re-takes the caller's own, or takes over a DEAD one (its expiry passed,
-  or its worktree no longer exists; logged as a `takeover`). While another worktree holds a live one it polls, and
-  after the wait it prints `WAIT` and exits 4: push-main.sh refuses.
-- **Renew, expire.** The expiry is 30 minutes after the last heartbeat. push-main renews every minute in a background
-  loop that ends with it, because its CI wait is the longest step. A holder that died stops renewing, and its lease is
-  taken over 30 minutes later.
-- **push-main.sh is the backstop.** Before it spends a CI run it re-takes the lease (or takes it, when the caller
-  took none: a registrar's docs landing, the operator's own push), and REFUSES the landing with exit 4 while another
-  worktree holds it, so an unleased landing can no longer move main under a leased one. Its renewer retries through a
-  transient failure and stops only on `LOST`, logging to a file push-main prints if the lease is gone later. It checks
-  the lease again before the push to main (free: it takes it back; taken over: exit 4 with the renewer's log) and
-  releases it when it exits, landed or not, saying so loudly when the release fails. A re-run that finds its sha
-  already on main (an earlier run landed and was killed before its trap) releases its worktree's lease too. A lander
-  that stops before push-main runs `release --outcome …`; only the holder's worktree can release or renew.
-- **The directory must be absolute.** `coord.coord_dir()` refuses a relative coordination directory: the default is a
-  Windows path, which on Linux is a relative name, and a lease created inside one checkout would bind no one else.
-- **The loop** (`next_unit.py`, section 3.2 rules 2 and 6) starts no `enqueue` unit while a lease is live: the land is
-  deferred, the reason names the holder, and the loop runs a wave or a campaign instead. `stop.ps1 -Status` prints
-  the lease line (`landing lease: free`, `held by …`, or `DEAD (…)`), and `landing_lease.py status` is the same line.
-- **Tests.** `landing_lease.py --self-test` (asserted arm by arm by `LandingLeaseDriftTests` in every Unit run) plants
-  two landers and shows the second waits and gates only after the first releases; takes over an expired lease and one
-  whose worktree is gone; refuses a renew or release by a non-holder; re-takes a resuming holder's lease; admits exactly
-  one of six parallel acquires; answers push-main's `check`; exits 2 on a file that is not a lease; and runs
-  next_unit's `choose` in process to show no `enqueue` unit starts while a lease is live. The bash layer
-  (push-main's exit mapping, renewer and trap) has no automated test: it needs gh and a remote; it was exercised by
-  hand on a harness of its own lines (held elsewhere, corrupt, released and taken over mid-run). `test_orchestrate_campaign.ps1` (8c) proves next_unit's deferral
-  and the `stop.ps1 -Status` line.
+Main takes only pull requests the merge queue tested (the ruleset binds administrators; `DESIGN-test-build-ci.md`
+§3.17), so landings never race for it: `enqueue.py land` merges `origin/main` in, gates, merges main in again when it
+moved during the gate (no second gate: the merge group runs the whole population on the current main), and queues one
+pull request; every branch waiting to land is enqueued at once (section 3.2 rule 6). **A past decision, kept for its
+reason:** under the direct-push landing (before 2026-10-11) the push itself was serialized but a landing's ~50 minutes
+of rebase, gates and CI were not, and every train landed inside that window made a waiting lander rebase, renumber its
+DEVLOG entry and re-gate; on 2026-10-07 the R1 lander lost to trains 1034 and 1034b three times and ended SPLIT with
+nothing on main (owner 19:30 PDT: "this is stupid. we cannot keep running r1 repeatedly for zero gain"). The landing
+lease (PB2537, 2026-10-07) serialized landers for that; the queue made the race impossible, and the lease, its drift
+test and the direct-push landing script were deleted by PB3024's closing change (2026-10-11).
 
 ### 4.8 Steering the loop: the operator (kb/Work PB2596)
 
 The attended OPERATOR session (section 2.1) sees what no unit can: an attended landing in flight, the owner's answer to
-a question, a plan the owner changed. On 2026-10-07 at 23:50 it wrote its instruction (run a wave; hold push-main) into
+a question, a plan the owner changed. On 2026-10-07 at 23:50 it wrote its instruction (run a wave; hold the landing) into
 `handoff.json`; the supervisor deletes that file at every unit start and `next_unit.py` reads only `handoff.last.json`,
 which still held the synthesized handoff of a failed `meter` unit, so the 23:53 restart ran `resume`, whose handoff named
-a `land` unit that would have raced the operator's R2 lander at push-main. There is now ONE steering path:
+a `land` unit that would have raced the operator's R2 lander for main. There is now ONE steering path:
 
 - **`pwsh scripts/orchestrator/steer.ps1 -Unit <wave|campaign|land|resume|meter> -Reason "<why>" [-Summary "<instruction>"]`**
   writes `handoff.operator.json`: `{unit: operator, outcome: done, next_unit, next_unit_reason, summary}`, validated
@@ -535,8 +488,7 @@ and the repository.
     quoted `"COBOLNET\d{4}"` in `src/Cobol.Net.Editions/Diagnostics/DiagnosticCatalog.cs`. This is the rule
     `session-probe.ps1` used to compute itself; it now calls `alloc.py peek code --probe` and prints that line, so
     the rule exists once.
-- **The lock** is `coord.locked(cdir, "alloc.lock")`, the coordination directory's one short mutex (the landing lease
-  uses the same one, section 4.7): an atomic create (`os.open` with `O_CREAT | O_EXCL`) holding the PID and time.
+- **The lock** is `coord.locked(cdir, "alloc.lock")`, the coordination directory's one short mutex: an atomic create (`os.open` with `O_CREAT | O_EXCL`) holding the PID and time.
   A lock older than 60 seconds is stale (the allocator holds it for milliseconds) and is broken by an atomic rename
   to a unique name, so two breakers cannot both win. A waiter retries for 30 seconds, then fails loudly.
 - **Reservations** persist in `alloc.json` (`{"devlog": n, "pb": n, "code": n}`), written to a temporary file and
@@ -566,7 +518,7 @@ as `audit_witness_loss.py`, whose `rows_at` it reuses).
 - Exit 0 green, 1 with the offending row ids printed, 2 when the inventory does not exist at `base`.
 
 **Wiring (described, not done here):** the landing runs it as one of `enqueue.py checks` (beside
-`landing_oracle.py`, before the pull request or push-main.sh), and CI's `audits` job runs it with the `changes`
+`landing_oracle.py`, before the pull request), and CI's `audits` job runs it with the `changes`
 job's `BASE`, exactly as it runs `audit_witness_loss.py`. The orchestrator decides when to turn it on (open decision
 D5), because it changes the landing contract.
 
@@ -801,8 +753,7 @@ a landing pushed from another clone is owed while the checkout is behind, and th
 `account.py --self-test`, `mailbox.py --self-test` (section 15), `test_checkpoint.py` (real linked worktrees: committed, dirty, clean; a synthesized handoff checked
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
-partial last line), `landing_lease.py --self-test` (two landers, takeover, holder-only renew and release, a race;
-section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `landing_measure.py --self-test` (the per-pull-request landing record, its completion from GitHub and the summary
+partial last line), `landing_measure.py --self-test` (the per-pull-request landing record, its completion from GitHub and the summary
 against the retired train records, kb/Work PB3028; `LandingMeasureDriftTests` also pins its arms), `landing_check.py
 --self-test` (section 4.7's file-set guarantee). The supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the

@@ -66,7 +66,7 @@ were answered on 2026-10-07 (R69 §7).
 
 ## 3. Phases
 
-Every phase lands through the normal lander and `push-main.sh`. Every phase is behavior-neutral by the §4 contract.
+Every phase lands through `enqueue.py land` and GitHub's merge queue, like every branch. Every phase is behavior-neutral by the §4 contract.
 Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this document.
 
 ### R0 — Baseline and oracle (measured, before any opinion)
@@ -1643,7 +1643,7 @@ named, never the train.
 **The planner's set is the ADMISSION estimate; the landing check is the GUARANTEE** (PB2118 Drafts 9–10). Three refuter
 rounds each found a new hole in the computed set (hand lists, then the index's blind spots, then its staleness), so a
 remaining miss must stop a landing, never land silently. `scripts/orchestrator/landing_check.py` runs in
-`scripts/push-main.sh`, the one way a commit reaches `main`, before a CI run is spent. It reads the notes a landing
+`enqueue.py land` (its `checks` step), the one way a commit reaches `main`, before a CI run is spent. It reads the notes a landing
 WORKS ON (the ids leading its commit subjects, ranges expanded, and the notes whose `status` it changes; a commit that
 only mentions a note does not work on it) and compares the landing's ACTUAL diff (`git diff --name-only --no-renames
 origin/main...<rev>`: a moved file counts at its old path too, and the planner's admission reads diffs the same way,
@@ -1669,9 +1669,9 @@ not recognise. An aborted dispatch's entry never expires on a clock; it is relea
 <wave|group|note>`). Fix-lane work against fix-lane work is a train's ordinary merge and is not checked. The check
 costs 7.6 s on a real range with 33 worktrees (the ninth refuter measured 64 s for Draft 9: the per-worktree reads now
 run on a thread pool, and a branch's register changes are one patch, not two reads per note). A STOP is
-`push-main.sh`'s exit 3. It is enforced where every landing passes, not by the server: CI has no worktrees and no
-dispatch ledger to compare with, so the server-side check is the existing `ci-gate`, and the forbidden-commands hook
-refuses a bare push to `main`. The domain is
+`enqueue.py land`'s exit 3. It is enforced where every landing passes, not by the server: CI has no worktrees and no
+dispatch ledger to compare with, so the server-side check is `ci-gate` on the merge group, and the ruleset refuses a
+direct push to `main`. The domain is
 the campaign's code roots and extensions (`model_rules.json` `campaign`) without `.md`: a document both sides edit is
 a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 25 cases) plants an out-of-set edit, a
 two-branch overlap, a rename each way, a `WIP checkpoint:`-only R3 worktree, a train against its own implementer

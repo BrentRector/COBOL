@@ -6,14 +6,12 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
 
   git stash / --autostash   the stash stack is SHARED by every linked worktree (common git dir); PB713's implementer
                             popped the registrar's stash. WIP goes into a commit (workstream skill, references/landing.md).
-  bare push to main         main requires the ci-gate check; the ONE route is
+  bare push to main         main takes only queued pull requests (the ruleset binds administrators); the ONE route is
                             `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023: main merged in, the
-                            gate, the DEVLOG stamp, then a pull request into the merge queue once it is ACTIVE, until
-                            then `bash scripts/push-main.sh`; owner decision Q23, 2026-09-06; kb/Work PB3024). A push
-                            to ci/<sha> or any other branch is fine.
+                            gate, the DEVLOG stamp, then one pull request into GitHub's merge queue; owner decision Q23,
+                            2026-09-06; kb/Work PB3024). A push to a work branch is fine.
   direct push in a unit     inside an orchestrator unit (COBOL_COORD_DIR set) ANY `git push`, any repository, any
-                            flags: a unit lands through a landing script (enqueue.py, or push-main.sh while the merge
-                            queue is not ACTIVE) and never publishes another repo
+                            flags: a unit lands through the landing script (enqueue.py) and never publishes another repo
                             (owner 2026-10-05, kb/Work/PB2044: the wave unit pushed the public skills repo's main with
                             `git push -q origin HEAD:main`, which the deny rule's text pattern missed).
   escapes in a heredoc      heredoc bodies with backslash escapes were mangled or mis-escaped in six sessions (and the
@@ -22,13 +20,18 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
                             property (FullyQualifiedName~X).
   unredirected filtered     a filtered `dotnet test` whose output is neither redirected nor piped floods the context
   dotnet test               and hides the verdict line; log it and read the verdict line (the gate skill).
-  chaining after a verdict  a build / test / gate / push-main command followed by `&&`, `||` or `;` and another
+  chaining after a verdict  a build / test / gate / landing command followed by `&&`, `||` or `;` and another
                             command: the chain's exit status is its LAST command's, so the verdict is masked or acted
                             on unread (`dotnet test … && git commit` committed on a false green). Allowed after it: an
                             `echo … $?` that CAPTURES the status, and once captured, read-only commands on the log.
                             Owner 2026-09-27 (adopting the no-chaining idea from carlymr/carlys-claude-skills in a
                             targeted form: independent commands go as parallel tool calls in one turn, because a
                             blanket ban would add turns, and agent cost is quadratic in turns).
+  `cd` in a backgrounded    a location change (`cd`, `pushd`, `Set-Location`, ...) inside an and-or list that a single
+  list, then more           `&` sends to the background, with another command after that `&` (MANDATORY-PRACTICES
+                            P14(b), kb/Work PB3095): `cd X && a & b &` runs `a` in a background subshell under X and
+                            `b` in the CALLER's directory; a landing audit written that way reported a false OK into
+                            the queue on 2026-10-11. Use absolute paths or `git -C <dir>`.
 
   WSL lifecycle commands    `wsl --terminate/--shutdown/--update/--export/--import/--unregister/--install` (owner
                             2026-10-04): they can end the owner's open session or burn tens of GB, so only the owner runs
@@ -115,15 +118,15 @@ for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;
     if re.search(r"(?:^|\s|:)(?:refs/heads/)?main(?:\s|$)", args):
         block("a direct push to main is refused by the server (required `ci-gate` check). Land with "
               "`python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): it merges origin/main in, "
-              "runs the gate, stamps the DEVLOG entry and queues one pull request once `ruleset.py check` reports the "
-              "merge queue ACTIVE, else lands through `bash scripts/push-main.sh`. It is idempotent; run it with "
+              "runs the gate, stamps the DEVLOG entry and queues one pull request into GitHub's merge queue (it "
+              "refuses while `ruleset.py check` does not report the queue ACTIVE). It is idempotent; run it with "
               "run_in_background and block on its `=== ENQUEUE: ` line.")
 # 2b. ANY direct `git push`, in ANY repository, inside an orchestrator unit (owner 2026-10-05, kb/Work/PB2044).
 # Rule 2 guards THIS repo's main and deliberately leaves another repository to its own rules, so an attended session may
 # push the sites and the public skills repo. A unit has no such need and runs under `bypassPermissions`: on 2026-10-05 the
 # wave unit published the public skills repo's main with `git push -q origin HEAD:main` from a scratch clone, and the
 # project's deny rule (a TEXT pattern, `git push origin HEAD:main`) missed it because of the extra `-q`. A unit lands
-# through `bash scripts/push-main.sh`, whose command text contains no `git push`; the supervisor exports
+# through `python scripts/orchestrator/enqueue.py land`, whose command text contains no `git push`; the supervisor exports
 # COBOL_COORD_DIR into every unit's environment and hooks (also in its subagents) inherit it. Attended sessions and
 # cloud sessions never have it set, so their pushes are untouched. The pattern is the git SUBCOMMAND after any global
 # options (`-C dir`, `-c k=v`, `--no-pager`), so flags before or after cannot dodge it and `git log --grep=push` is not hit.
@@ -154,7 +157,7 @@ if os.environ.get("COBOL_COORD_DIR"):
     if any(_PUSH.search(t) for t in [_QUOTED.sub(" ", scan)] + payloads):
         block("a direct `git push` is refused inside an orchestrator unit (any repository, any flags). Land this "
               "repository's work with `python scripts/orchestrator/enqueue.py land <branch>` (it queues a pull "
-              "request once the merge queue is ACTIVE, else lands through push-main.sh). A change to ANOTHER repository (the public skills "
+              "request into GitHub's merge queue). A change to ANOTHER repository (the public skills "
               "repo, a site) is never published by a unit: hand it off as an owed push in the handoff and the "
               "attended session or the owner publishes it (kb/Work/PB2044).")
 # 3. backslash escapes inside a heredoc body
@@ -180,41 +183,46 @@ if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
 
 # 5. chaining after a verdict command
 # A verdict command is a command that RUNS one: `dotnet test|build`, or a gate / landing script invoked directly or through
-# an interpreter (`bash scripts/push-main.sh`, `pwsh -File scripts/build-local.ps1`). A command that merely NAMES one of
-# those files (`git add -- scripts/push-main.sh`, `sed -n 1,5p scripts/push-main.sh`) is not one: matching anywhere in the
+# an interpreter (`python scripts/orchestrator/enqueue.py land b`, `pwsh -File scripts/build-local.ps1`). A command that
+# merely NAMES one of those files (`git add -- scripts/build-local.ps1`, `sed -n 1,5p scripts/orchestrator/enqueue.py`)
+# is not one: matching anywhere in the
 # segment blocked such harmless commands and cost extra turns (2026-10-04).
-_GATE_SCRIPT = (r"(?:\./)?\S*(?:build-local\.(?:ps1|sh)|push-main\.sh|battery\.sh|guard(?:-fast)?\.sh"
+_GATE_SCRIPT = (r"(?:\./)?\S*(?:build-local\.(?:ps1|sh)|battery\.sh|guard(?:-fast)?\.sh"
                 r"|orchestrator/enqueue\.py)\b")
 VERDICT = re.compile(r"^(?:\w+=\S*\s+)*(?:dotnet\s+(?:test|build)\b|"
                      r"(?:(?:bash|sh|pwsh|powershell|python3?|py)(?:\.exe)?\s+(?:-\S+\s+)*)?" + _GATE_SCRIPT + r")")
 READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-String|Get-Content|findstr|type)\b")
 
 
-def _segments(text: str):
-    """Split a command line on top-level `&&`, `||` and `;`, ignoring quoted text (a separator inside a quoted
-    string or a `bash -c '…'` argument is not a separator of THIS command line)."""
-    out, cur, q, i = [], [], None, 0
-    while i < len(text):
-        ch = text[i]
-        if q:
-            cur.append(ch)
-            if ch == q:
-                q = None
-        elif ch in "'\"":
-            q = ch
-            cur.append(ch)
-        elif text.startswith("&&", i) or text.startswith("||", i):
-            out.append("".join(cur)); cur = []; i += 2; continue
-        elif ch == ";" or ch == "\n":
-            out.append("".join(cur)); cur = []
-        else:
-            cur.append(ch)
-        i += 1
-    out.append("".join(cur))
-    return [s.strip() for s in out if s.strip()]
+# Rules 5-7 read the command line through the ONE shared parser (`shell_location.steps`, kb/Work PB2599): quotes,
+# escapes, comments, heredoc bodies, here-strings, `( … )`/`{ … }` groups and `bash -c` payloads are its to know, never
+# a private scanner's (the branch review of PB3024, R1-1: a private splitter opened a quote on a comment's apostrophe and
+# failed open). The whole command goes to it, heredoc included; a parse failure leaves these rules nothing to judge.
+try:
+    _steps = shell_location.steps(cmd, None, shell_location.shell_of(data.get("tool_name")))
+except Exception:  # noqa: BLE001
+    _steps = []
 
 
-segs = _segments(commands)
+def _segments(steps) -> list[str]:
+    """The command line's segments: each a command or pipeline ended by `&&`, `||`, `;` or a newline (a pipe or a
+    background `&` keeps what follows in the same segment). A group or a `-c` payload is one opaque part, `( … )`: a
+    verdict command inside one is not this command line's chain."""
+    out: list[str] = []
+    cur: list[str] = []
+    for st in steps:
+        part = st.text if st.depth == 0 else "( … )"
+        if not (part == "( … )" and cur and cur[-1] == part):
+            cur.append(part)
+        if st.sep not in ("|", "&"):
+            out.append(" | ".join(cur))
+            cur = []
+    if cur:
+        out.append(" | ".join(cur))
+    return out
+
+
+segs = _segments(_steps)
 
 # 6. WSL lifecycle commands (owner 2026-10-04): `wsl --terminate/--shutdown/--update/--export/--import/--unregister/--install`
 # can end the owner's open session, race a procedure they run by hand, or burn tens of GB of disk, so NO agent or unattended
@@ -222,8 +230,8 @@ segs = _segments(commands)
 # whose command IS wsl is checked, so a commit message or a grep pattern that mentions the flags passes.
 WSL_LIFECYCLE = re.compile(r"^(?:\w+=\S*\s+)*(?:&\s+)?(?:\S*[\\/])?wsl(?:\.exe)?\s+(?:[^|;&]*\s)?"
                            r"(?:--terminate|-t|--shutdown|--update|--export|--import|--unregister|--install)\b")
-for seg in segs:
-    if WSL_LIFECYCLE.match(seg):
+for _st in _steps:   # every simple command, a `-c` payload's and a pipeline's later sides too
+    if WSL_LIFECYCLE.match(_st.text):
         block("WSL lifecycle commands (`--terminate`, `--shutdown`, `--update`, `--export`, `--import`, `--unregister`, "
               "`--install`) are the OWNER's to run (owner 2026-10-04: they can end an open session or burn disk). Give the "
               "owner the exact command and wait; commands inside a distro (`wsl -d Ubuntu -e ...`) are fine.")
@@ -244,5 +252,23 @@ for i, seg in enumerate(segs[:-1]):
               "same call, append `; echo \"EXIT=$?\"` (read-only commands may follow that). Independent commands go "
               "as parallel tool calls in one turn.")
         break
+
+# 7. a location change inside a BACKGROUNDED and-or list that another command follows (MANDATORY-PRACTICES P14(b),
+# kb/Work PB3095). A single `&` ends an and-or list and runs THE WHOLE LIST in a background subshell (bash) or job
+# (PowerShell 7), so a `cd` joined to it by `&&`/`||` moves only that subshell: `cd X && a & b &` runs `a` under X and
+# `b` in the caller's directory. On 2026-10-11 a landing audit written that way reported a false OK into the queue. A
+# `cd` in its OWN list (`cd X; a & b`) moves the calling shell and stays allowed, as do `cd X && a` and `cd X && a &`
+# with nothing after the `&`. The list structure is the shared parser's (`shell_location.steps`, kb/Work PB2599): it
+# knows quotes, escapes, comments, heredocs, redirections and PowerShell's call operator, and it marks the first step
+# after such a list with the list's location changes (`Step.stranded`).
+for _n, _after in enumerate(_steps):
+    if _after.stranded:
+        _moves = " ".join(t or "(home)" for t in _after.stranded)
+        block(f"a location change to `{_moves[:60]}` sits in an and-or list that a single `&` sends to the background, "
+              f"and `{_after.text[:50]}` follows the `&`: the backgrounded list ends there, so the location change "
+              "binds only that background subshell and every command after the `&` runs in the CALLER's directory "
+              "(2026-10-11: a landing audit written this way reported a false OK). Use absolute paths or `git -C <dir>` "
+              "instead of `cd` (MANDATORY-PRACTICES P14(b), kb/Work PB3095); independent commands go as parallel tool "
+              "calls in one turn.")
 
 sys.exit(0)

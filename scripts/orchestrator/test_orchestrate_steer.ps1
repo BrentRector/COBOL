@@ -17,11 +17,11 @@ $StopPs = Join-Path $Here 'stop.ps1'
 $SteerPs = Join-Path $Here 'steer.ps1'
 $synth = { param($c) Set-Content -Path (Join-Path $c 'handoff.last.json') -Encoding utf8 -Value '{"schema_version":1,"unit":"meter","outcome":"split","summary":"synthesized for a dead meter unit","next_unit":"resume","synthesized":true}' }
 $st = Join-Path $Root 'steerscript'
-& pwsh -NoProfile -File $SteerPs -Unit wave -Reason 'run a wave; hold push-main' -CoordDir $st | Out-Null
+& pwsh -NoProfile -File $SteerPs -Unit wave -Reason 'run a wave; hold the enqueue' -CoordDir $st | Out-Null
 $sh = Get-Content (Join-Path $st 'handoff.operator.json') -Raw
 Check 'steer.ps1 writes the operator handoff' "$LASTEXITCODE $(($sh | ConvertFrom-Json).unit) $(($sh | ConvertFrom-Json).next_unit)" '0 operator wave'
 Check 'the operator handoff validates against handoff.schema.json' ($sh | Test-Json -SchemaFile (Join-Path $Here 'handoff.schema.json')) $true
-Check 'stop.ps1 -Status shows the pending steer' ((& pwsh -NoProfile -File $StopPs -Status -CoordDir $st) -join ' ' -match "operator steer: next unit 'wave' \(run a wave; hold push-main\)") $true
+Check 'stop.ps1 -Status shows the pending steer' ((& pwsh -NoProfile -File $StopPs -Status -CoordDir $st) -join ' ' -match "operator steer: next unit 'wave' \(run a wave; hold the enqueue\)") $true
 & pwsh -NoProfile -File $StopPs -Clear -CoordDir $st | Out-Null
 Check 'stop.ps1 -Clear leaves the steer' (Test-Path (Join-Path $st 'handoff.operator.json')) $true
 & pwsh -NoProfile -File $SteerPs -Unit enqueue -Reason ('x' * 401) -CoordDir $st 2>$null | Out-Null

@@ -6,7 +6,7 @@ description: Use before every commit and before every merge to choose and run th
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:test-gate` (Skill tool) before reading on. If the plugin is not loaded
 > (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/test-gate/SKILL.md` instead
 > (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
-> what is specific to WiseOwl COBOL — commands, paths, CI and push-main, the owner's dated decisions — and wins on
+> what is specific to WiseOwl COBOL — commands, paths, CI and the merge queue, the owner's dated decisions — and wins on
 > conflict. Pinned: **brent-tools 1.20.0** (`tools/claude-skills`, kb/Work/PB1699).
 
 # Gate
@@ -125,8 +125,8 @@ operating systems before `main` moves.
   PB3023) merges main in, gates, stamps the DEVLOG entry and ends in one pull request into the queue: no CI wait; the
   merge group runs the matrix and is the CI verdict, and a pull request's own run is the cheap jobs only. It refuses
   (exit 8) before merging or gating anything while `ruleset.py check` does not report the queue ACTIVE. Never run its
-  inner `queue` verb by hand: `land` is what merges main in, gates and stamps the DEVLOG entry. `push-main.sh` is no
-  longer a landing path (kb/Work PB3024 deletes it).
+  inner `queue` verb by hand: `land` is what merges main in, gates and stamps the DEVLOG entry. There is no other
+  landing path: main refuses a direct push (kb/Work PB3024).
 - ⚠ **A docs-only push runs `changes` + `ci-gate` and nothing else** — seconds, not a matrix. `paths-ignore` was
   removed because a workflow that declines to START leaves a required per-commit check unsatisfiable; the same
   path list now lives in the `changes` job, one layer down, where it decides whether the MATRIX runs.
@@ -144,7 +144,7 @@ The base's "Read the verdict line", "Flakes and attribution" and "A filter that 
 written (full output to a file, no source edits while a gate runs, no flake without the test's name and an isolated
 re-run). Here, additionally:
 
-- **Never chain ANYTHING after a verdict command** (build, test, `build-local`, `push-main.sh`, battery) with `&&`,
+- **Never chain ANYTHING after a verdict command** (build, test, `build-local`, `enqueue.py land`, battery) with `&&`,
   `||` or `;` — MANDATORY-PRACTICES P14, and the guard hook (`scripts/hooks/forbidden_commands.py` rule 5) BLOCKS
   it. To capture the status in the same call, append `; echo "EXIT=$?"`; read-only commands may follow that.
 - `scripts/build-local.{ps1,sh}` prints ONE `=== BUILD-LOCAL GATE: ` verdict line — `GREEN`, `RED`,

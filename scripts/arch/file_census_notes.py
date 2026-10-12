@@ -448,7 +448,7 @@ def file_set_lines(moves):
             ("the names above and every member of their types its target names" if moves
              else "every type its Sites declare") + "), on the index of the current tree; "
             "`plan_wave.py --cluster` admits the wave on that set, the landing check (`landing_check.py`, run by "
-            "push-main.sh) stops a landing that changed a file outside it, and `python scripts/arch/member_index.py "
+            "`enqueue.py land`) stops a landing that changed a file outside it, and `python scripts/arch/member_index.py "
             "--note <id>` prints it.", ""]
     return out
 
