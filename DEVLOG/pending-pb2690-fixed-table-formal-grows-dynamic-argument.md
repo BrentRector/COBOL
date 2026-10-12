@@ -52,3 +52,5 @@ with a REMAINING section naming the sites, and D-VGB records the departure.
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261012T192144Z-cfdfc4`, Conformance
 5,008/11,492, Unit 32,713/33,454, Characterization 36/36; the three goldens and the negative Passed in
 `leg-1-Conformance.trx`). The Linux gate is the landing's.
+
+**Branch review round 2.** The reviewer found that the half-status note still carried a title and heading that read as finished work; the title now leads with the REMAINING INITIALIZED-default item, the heading says HALF, and spec_refs gains 8.5.1.9.3 and 8.5.1.9.5, so `work.py next` and the planners see what is open. Register-only change.
