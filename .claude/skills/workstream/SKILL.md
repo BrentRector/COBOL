@@ -1,6 +1,6 @@
 ---
 name: workstream
-description: Use BEFORE dispatching any fleet, lander, implementer or adjudication workflow, and before starting or supervising the orchestrator loop (scripts/orchestrator/orchestrate.ps1, the default way to run the fix lane) - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
+description: Use BEFORE dispatching any fleet, finisher, implementer or adjudication workflow, and before starting or supervising the orchestrator loop (scripts/orchestrator/orchestrate.ps1, the default way to run the fix lane) - the owner's standing instructions (2026-09-02) for running workstreams so a session-limit kill costs at most one step and a restart never repeats work - checkpoint to disk, fresh agents from checkpoints, a hard concurrency budget, finished work landed first, central id allocation. Carries the brief and workflow templates.
 ---
 
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:agent-fleet` (Skill tool) before reading on. If the plugin is not loaded
@@ -48,13 +48,13 @@ description: Use BEFORE dispatching any fleet, lander, implementer or adjudicati
 > read each unit's handoff; decide every DECISION row `python scripts/prune_worktrees.py --brief` prints (land it via a
 > finisher, or abandon it in its kb/Work note; never carry it forward) and remove the LANDED ones with `--apply`
 > (MANDATORY-PRACTICES O10, PB2600); run the battery on its cadence. Hand-dispatching a Workflow stays legal for a
-> supervised one-off that starts NO lander (the land unit is the one landing queue while the loop runs: O11, PB2602),
+> supervised one-off (the waves start no lander; the loop's enqueue unit is the one landing path while it runs: O11, PB3023),
 > and everything below still governs it. Do not edit the main checkout
 > while a unit runs: work in a worktree.
 
 The orchestrator (the session model) dispatches, reconciles, gates and commits; every other job — probe, implement,
 validate, adversarial review, land — is a subagent, and ⭐ **THE MODEL FOLLOWS THE ROLE** (MANDATORY-PRACTICES P1,
-owner 2026-09-27): JUDGMENT roles (implementer, lander, adjudicator, refuter, registrar, reviewer) run the latest
+owner 2026-09-27): JUDGMENT roles (implementer, finisher, adjudicator, refuter, registrar, reviewer) run the latest
 Opus by the ALIAS `opus` (Opus 5.5 since 2026-09-22 — never pin a dated id; `~/.claude/settings.json` sets
 `CLAUDE_CODE_SUBAGENT_MODEL=opus` as the default), and the workflow passes `model: 'opus'` for them. MECHANICAL
 roles run Sonnet from their own frontmatter: `cobol-clerk` for chores that write (filing notes from a structured
@@ -62,7 +62,7 @@ report, leak scans, doc prose, link and format sweeps) and `cobol-locator` for r
 location, orient.py / fix_clusters.py / where.py summaries, transcript and log measurements). ⛔ Never pass
 `model` on a mechanical role's `agent()` call: it overrides the frontmatter. A mechanical agent that hits a
 judgment call returns `NEEDS-OPUS: <why>`, and that item is re-dispatched to a judgment role. ⭐ **Fleets run through the Workflow tool on a STANDING owner opt-in (2026-09-25)**, and
-every `agent()` names its role's `agentType` from `.claude/agents/` (`cobol-implementer` · `cobol-lander` · `cobol-reviewer` ·
+every `agent()` names its role's `agentType` from `.claude/agents/` (`cobol-implementer` · `cobol-finisher` · `cobol-reviewer` ·
 `cobol-refuter` · `cobol-adjudicator` · `cobol-clerk` · `cobol-locator`), which fixes that role's effort, turn cap, 1-hour prompt cache
 and — for the read-only roles — a hook that refuses writes inside any git tree (MANDATORY-PRACTICES O4, P12).
 
@@ -82,10 +82,10 @@ Read `references/checkpointing.md` before writing a dispatch prompt, briefing a 
 
 - Turn caps: 160 for any read-only agent, 400 for an implementer; at the cap, checkpoint and return `SPLIT`. A job that will not fit is SPLIT, never extended.
 - One mechanism per implementer. The fill unit is a GROUP computed by `fix_clusters.py` (never hand-picked), one group per subsystem, orientation through `orient.py` before any source is read.
-- Budget: 1 lander + at most 6 implementers + one 4-wide read-only chunk; workflows take `concurrency` args and run chunks with `parallel()` in a loop, never a 16-wide `pipeline`; a fleet over ~40 agents is split.
-- The gate (one shape, kb/Work PB3022): `build-local.ps1 -Priority BelowNormal` (holds a gate slot under the shared cap, 3 by default, kb/Work PB2514; leg 1 only — batched gating, the coded default implementer scope `leg1`, kb/Work PB2515); lander gate: the same one gate on the train head (kb/Work PB3022), CI the population check for every cluster, a red attributed per cluster and every train recorded with `train_measure.py` (MANDATORY-PRACTICES L12). Trains of 4-6 clusters, one landing per lander transcript, the next lander dispatched while the previous train is in CI.
+- Budget: at most 6 implementers + one 4-wide read-only chunk; workflows take `concurrency` args and run chunks with `parallel()` in a loop, never a 16-wide `pipeline`; a fleet over ~40 agents is split.
+- The gate (one shape, kb/Work PB3022): `build-local.ps1 -Priority BelowNormal` (holds a gate slot under the shared cap, 3 by default, kb/Work PB2514; leg 1 only — batched gating, the coded default implementer scope `leg1`, kb/Work PB2515); the landing's gate: `enqueue.py land` runs the same gate on the merged head plus CI's Linux legs, one branch per pull request, and CI's merge-group run is the population check (MANDATORY-PRACTICES L1, L2).
 
-Read `references/cost-law-and-budget.md` before sizing a wave, setting caps, grouping fixes or dispatching a lander; it carries the cost law and its measurements, the four speed levers, and the lander-throughput decisions.
+Read `references/cost-law-and-budget.md` before sizing a wave, setting caps or grouping fixes; it carries the cost law and its measurements, the four speed levers, and the lander-throughput decisions.
 
 ⭐ **THE FIX LANE IS A ROLLING WAVE — owner 2026-09-27 ("fix related work together … minimize repetitive context
 gathering"; "use this new rolling functionality as it reduces context and token use").** Every fix-lane dispatch is
@@ -95,10 +95,10 @@ gathering"; "use this new rolling functionality as it reduces context and token 
 - **Review on the branch** (MANDATORY-PRACTICES I10, kb/Work PB3027). A DONE implementer's branch is reviewed by ONE
   read-only `cobol-reviewer` (the `review` skill's branch form) inside its slot; FINDINGS go to a review finisher and
   the branch is reviewed again (`review_fix_rounds`, 2). Only a branch stamped `Review: CLEAN` at its head is ready;
-  the lander never reviews. `review_findings.py summary <scratch>` measures it.
-- **Trains as branches finish.** A lander train starts when `train_size` reviewed branches are ready. Trains are serialized,
-  and each lander re-reads the DEVLOG top and rebases onto whatever the previous train landed. A final remainder of at
-  least `min_final_train` branches gets a train; a smaller one is held for the next queue's first train.
+  the landing never reviews. `review_findings.py summary <scratch>` measures it.
+- **No lander, no train (kb/Work PB3023).** The wave ends when its groups return; every branch reviewed CLEAN is the
+  loop's `enqueue` unit's, which lands each with `scripts/orchestrator/enqueue.py land` (main merged in, the gate on both
+  hosts under the gate slot, the DEVLOG stamp, the landing checks, one pull request into the merge queue).
 - **Same-file successors.** A file with more open notes than the cluster cap (`fix_clusters.py` caps at 5) becomes
   two or more groups, and each later one declares `after: '<predecessor letter>'`. The successor waits for its
   predecessor, merges its branch, and orients from that report's "For the next implementer" section and STATUS.md
@@ -118,10 +118,10 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   once, not once per cluster. It is a FRESH agent, not a longer transcript, because of the quadratic cost law above:
   the cap exists because the sixth defect in one transcript costs more than a new agent, and the successor keeps the
   cheap part (the learned context) without the expensive part (the long transcript).
-- **Args:** `{ scratch, wave, concurrency (6), train_size (5), min_final_train (3), implementer_model ('opus'; 'sonnet' when the owner allows it; a group's own `model` overrides it, so one wave can mix Sonnet and Opus groups), previous_train,
-  lead_id_blocks: ["PBa-PBb", …] (one block per train), groups: [{ letter, lead, notes, codes, after? }] }`.
+- **Args:** `{ scratch, wave, stop_file, global_stop, concurrency (6), implementer_model ('opus'; 'sonnet' when the owner allows it; a group's own `model` overrides it, so one wave can mix Sonnet and Opus groups),
+  groups: [{ letter, lead, notes, codes, after? }], review_fix_rounds (2), reviewer_ceiling_min (90) }`.
 - **Return payloads are capped** (kb/Work PB1912, owner 2026-10-02): an implementer's `summary` is at most 900 characters,
-  `leads` at most 6 of at most 500, and the lander's final text at most 25 lines, because everything an agent returns is
+  `leads` at most 6 of at most 500, and a finisher's final text at most 25 lines, because everything an agent returns is
   re-read by the orchestrator on every later turn. The detail lives in the report file. Experiment pending: compare the
   workflow output size with waves 1001 (31,864 bytes) and 1002 (27,210).
 - **Specs.** Render them with `make_dispatch_specs.py <groups.json>`, which takes the same groups plus `slug`,
@@ -137,10 +137,10 @@ considered and rejected in that form: split chains become extra turns, and turns
 
 ## 3. Landing order and mechanics
 
-- ⛔ **ONE LANDING QUEUE WHILE THE LOOP RUNS** (MANDATORY-PRACTICES O11, kb/Work PB2602; `python scripts/orchestrator/coord.py loop-state`): the attended session dispatches NO lander and runs no rolling wave (its trains are landers too); it writes each finished attended branch's report as `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (that exact shape, plan_wave.py `REPORT_NAME`, in `coord.reports_dir()` whatever the wave's scratch, kb/Work PB2980; a suffixed name is invisible) with a header of `Status: DONE`, `Worktree: <Windows path>`, `Branch: <name>`, `HEAD: <sha>`, `Base: <sha>`, and the land units carry the WAITING TO LAND branches in trains of at most six, the most harmful first (`prune_worktrees.py --train`; owner 2026-10-10, kb/Work PB2981: never one train of every waiting branch). If one truly cannot wait, exactly ONE lander carries the train `--train` names. Every lander dispatch names `LOOP STATE: running|stopped` (the dispatch guard refuses one that does not).
-- ⛔ **No branch is left undecided** (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600): `python scripts/prune_worktrees.py` gives every branch a lifecycle state (IN FLIGHT · WAITING FOR REVIEW · WAITING TO LAND · LANDED · DECISION); a branch ends LANDED then deleted (`--apply`), or ABANDONED by a decision recorded in its kb/Work note then deleted (`--apply --abandon <branch>`). Nothing is archived. A lander refused `push-main.sh` by the permission layer ends `READY-TO-PUSH <worktree> <sha>` (L13).
-- Land finished work first; one lander on main at a time, MECHANICALLY: every lander takes the landing lease (`scripts/orchestrator/landing_lease.py acquire`) before its final rebase and gates, a second lander waits for it instead of gating, and `push-main.sh` refuses a landing while another worktree holds it and releases it on exit (kb/Work PB2537); five clusters per landing (4-6 is the band) and never a lander for a 1-2 cluster landing unless it is a blocking fix; one build, the WHOLE population in one leg, one commit per cluster, one DEVLOG entry, one push.
-- The only way a commit reaches `main` is a landing script (MANDATORY-PRACTICES L5, kb/Work PB3024): `python scripts/orchestrator/enqueue.py queue` (a pull request into GitHub's merge queue) once `ruleset.py check` reports the queue ACTIVE, until then `bash scripts/push-main.sh` (the `ci-gate` check is required; both are idempotent; a red is a blocking finding). Never open or queue a pull request by hand. A docs-only landing still runs and still has to be green.
+- ⛔ **ONE LANDING PATH, AND ONE QUEUE WHILE THE LOOP RUNS** (MANDATORY-PRACTICES L1, O11, kb/Work PB2602, PB3023; `python scripts/orchestrator/coord.py loop-state`): a branch lands only through `python scripts/orchestrator/enqueue.py land <branch>`. While the loop runs, its `enqueue` unit runs it for every WAITING TO LAND branch and the attended session runs no rolling wave and lands nothing itself: it writes each finished attended branch's report as `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (header `Status: DONE` · `Worktree:` · `Branch:` · `HEAD:` · `Base:`) for the enqueue unit to collect. With the loop stopped it runs `enqueue.py land` by hand for its own branch.
+- ⛔ **No branch is left undecided** (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600): `python scripts/prune_worktrees.py` gives every branch a lifecycle state (IN FLIGHT · WAITING FOR REVIEW · WAITING TO LAND · LANDED · DECISION); a branch ends LANDED then deleted (`--apply`), or ABANDONED by a decision recorded in its kb/Work note then deleted (`--apply --abandon <branch>`). Nothing is archived. An agent refused `enqueue.py land` by the permission layer ends `READY-TO-LAND <worktree> <branch>`; the dispatching session runs it (MANDATORY-PRACTICES L13).
+- Land finished work first, ONE BRANCH PER PULL REQUEST (MANDATORY-PRACTICES L1, L12): `enqueue.py land` gates each branch under the shared gate slot and queues it; a conflict, a red gate or a queue bounce goes to ONE `cobol-finisher` (`templates/finisher-brief.md`). While the queue is not ACTIVE, `enqueue.py land` lands through `push-main.sh`, which takes the landing lease (`scripts/orchestrator/landing_lease.py`, kb/Work PB2537), so those landings go one at a time.
+- The only way a commit reaches `main` is `python scripts/orchestrator/enqueue.py land <branch>` (MANDATORY-PRACTICES L5, kb/Work PB3023, PB3024): a pull request into GitHub's merge queue (`enqueue.py queue`) once `ruleset.py check` reports the queue ACTIVE, until then `bash scripts/push-main.sh` (the `ci-gate` check is required; both are idempotent; a red is a blocking finding). Never open or queue a pull request by hand. A docs-only landing still runs and still has to be green.
 - Verdict batches are re-applied on the merged tree with `record_verdicts.py`, never merged as JSON hunks.
 - A checkpoint file never enters a landing: `git add -A -- . ":!.claude/settings.local.json"` then `git reset -q -- STATUS.md`.
 - `git stash` is forbidden in this repo; WIP goes into a commit.
@@ -148,7 +148,7 @@ considered and rejected in that form: split chains become extra turns, and turns
 - Read-only fleets probe a pinned worktree with its own built compiler; the comprehensive battery runs in a worktree cut at the batch head, never on main.
 - The ledger artifact is refreshed after every landing that moves GAP / DOCUMENTED-NON-SUPPORT / the actionable count and at every battery close; `scripts/semgrep/verify.py` must not increase its red baseline.
 
-Read `references/landing.md` before dispatching a lander, landing, pushing, running a battery or refreshing the ledger.
+Read `references/landing.md` before dispatching a finisher, landing, pushing, running a battery or refreshing the ledger.
 
 ## 4. Central allocation
 
@@ -156,9 +156,9 @@ The orchestrator allocates `kb/Work` ids and diagnostic-code ranges in the dispa
 (five collisions in one day each cost a renumbering pass). Every allocation goes through ONE locked allocator,
 `python scripts/orchestrator/alloc.py pb N | code N | devlog`, which keeps the reservations of in-flight worktrees
 outside every worktree, so two sessions never hand out the same value (`peek <kind>` reads without reserving;
-`scripts/orchestrator/plan_wave.py` allocates a wave's codes and lead-id blocks through it). DEVLOG numbers are read
-from the file at landing time (top entry + 1): a lander takes top + 1 whatever `alloc.py devlog` reserved, so re-read
-the top before committing an entry that waited for a rebase (entry 1880 was renumbered after train 1018b took 1879). `session-probe` prints `alloc.py peek code --probe`: the next free
+`scripts/orchestrator/plan_wave.py` allocates a wave's codes through it, the enqueue unit its lead ids). DEVLOG numbers
+are allocated at enqueue: `devlog.py stamp` (run by `enqueue.py land`) takes the next one from `alloc.py devlog` and
+re-stamps an entry main has overtaken (kb/Work PB3025, PB3023); nobody numbers an entry by hand. `session-probe` prints `alloc.py peek code --probe`: the next free
 diagnostic code above every code in `src/`, the catalog and the reservations.
 
 ## 5. On restart after a cutoff
@@ -172,9 +172,8 @@ before its stream: it names the real cause (the 600 s background ceiling).
 
 ## 6. Templates (substitute the session's paths for `{SCRATCH}`, `{PIN}`)
 
-`templates/` beside this file: `implementer-brief.md` · `lander-brief.md` (ONE cluster) ·
-**`lander-train-brief.md` (the five-cluster train — the default when more than two clusters are ready)** ·
-`golden-lander-brief.md` · `registrar-brief.md` · `wf_lane3_adjudicate.js` · `wf_lane3_refute.js` ·
+`templates/` beside this file: `implementer-brief.md` · `finisher-brief.md` (ONE branch `enqueue.py land` stopped on, or
+the merge queue bounced) · `golden-lane-brief.md` · `registrar-brief.md` · `wf_lane3_adjudicate.js` · `wf_lane3_refute.js` ·
 `wf_lane1_draft.js` · `wf_lane1_validate.js` · `merge_batch.py` · `build_lane1_inputs.py`. Each carries the
 checkpoint protocol and its turn cap already; dispatch by pointing the agent at the file plus the substitutions,
 never by pasting the brief into the prompt.

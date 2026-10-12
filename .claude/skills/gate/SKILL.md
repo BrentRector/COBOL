@@ -63,9 +63,11 @@ PB2526). Each leg runs the three assemblies concurrently.
   (`TestResults/build-local/<run>/not-run-*.txt`) and prints `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
   PB2515): GREEN — … ===` (or `…: RED`). That is the done-state of every gate. **A re-gate after a fix runs leg 1
   again, never the population** (the operator's proposal 3, kb/Work PB3022): the previous reds are tier 0a and the
-  fix's reach is tier 1, so verifying a bookkeeping fix costs seconds, not a 7–34 min population run. The whole
-  population runs once, in CI, on the pushed or queued head; a CI red is ALSO a local-gate defect to root-cause (the
-  CI invariant, kb/Work PB1957).
+  fix's reach is tier 1, so verifying a bookkeeping fix costs seconds, not a 7–34 min population run. The landing
+  (`python scripts/orchestrator/enqueue.py land <branch>`, kb/Work PB3023, MANDATORY-PRACTICES L1, L2) runs this same
+  gate on the branch merged with origin/main, plus CI's Linux legs under WSL; a red at the landing is the branch's own
+  (one branch per pull request) and goes to ONE `cobol-finisher` (L12). The whole population runs once, in CI, on the
+  pushed or queued head; a CI red is ALSO a local-gate defect to root-cause (the CI invariant, kb/Work PB1957).
 - **The owner's switch back is the shared implementer scope `whole`** (`python scripts/gate_slot.py
   set-implementer-scope whole [--until ISO] [--why TEXT]`; the coded default is `leg1`). Under `whole` the implementer
   gate runs both legs FAIL-FAST: a red in leg 1 stops it `RED/INCOMPLETE` and names the remainder, and it is GREEN only

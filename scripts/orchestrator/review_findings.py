@@ -11,7 +11,7 @@ decision in `<scratch>/review-w<wave>-<letter>.jsonl`, the verdict computed from
     python scripts/orchestrator/review_findings.py --self-test
 
 WHY A RECORD AND A TOOL. Until PB3027 the review of finished work ran inside the lander, between its gates: review
-shards were 23 % of the land units' subagent tokens on 2026-10-10 and sat on the landing's critical path, and every
+shards were 23 % of the enqueue units' subagent tokens on 2026-10-10 and sat on the landing's critical path, and every
 finding fixed in the train re-gated every cluster (kb/Work PB3015, its evidence table 6). The review now runs on the
 BRANCH when its implementer returns DONE: ONE read-only `cobol-reviewer` (the `review` skill's branch form), inside the
 rolling wave or dispatched by hand for an attended branch. The reviewer cannot write in a git tree (its hook), and a

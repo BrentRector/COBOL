@@ -144,6 +144,18 @@ public sealed class LandingPipelineDriftTests
             "HEAD at origin/main has nothing to land; an empty title or body is a usage error",
             "checks runs the three landing scripts on the range in order and maps each refusal to its own code: "
                 + "DEVLOG 6, oracle 7, landing check 3, unreadable 2",
+            // kb/Work PB3023: the whole landing step, one script
+            "land: a dirty worktree is refused (exit 2) before anything is fetched, merged or gated",
+            "land: a conflict bringing main in is exit 4: the merge is aborted, the branch unchanged, the report told "
+                + "which files, and nothing gated",
+            "land: main is MERGED in (the branch's commits kept), and a host's red gate is exit 5 with the host named "
+                + "in the report, before any stamp",
+            "land: the queue not ACTIVE lands through push-main.sh after the gate and the stamp, opening no pull request",
+            "land: a re-run on the commit already gated GREEN does not gate again, a new commit does; push-main's "
+                + "landing-check refusal keeps its own code",
+            "land: an ACTIVE queue opens one pull request titled from the DEVLOG entry, whose body carries the entry "
+                + "and the commits, and queues it",
+            "land: push-main.sh failing (a CI red) is exit 10, never 0",
         });
         SelfTestArmSource.AssertDeclares(TestRepo.Scripts("orchestrator", "ruleset.py"), new[]
         {

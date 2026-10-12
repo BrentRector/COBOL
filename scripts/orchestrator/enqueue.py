@@ -1,12 +1,34 @@
 #!/usr/bin/env python3
-"""enqueue.py — THE LANDING STEP: the landing checks, then one pull request per landing into GitHub's merge queue
-(kb/Work PB3024 phase 1; DESIGN-test-build-ci.md §3.17.2 step 3, §3.17.6).
+"""enqueue.py — THE LANDING STEP, A SCRIPT: one finished branch, brought up to main, gated, its DEVLOG entry stamped,
+checked, and handed to GitHub's merge queue as one pull request (kb/Work PB3023, PB3024; DESIGN-test-build-ci.md
+sections 3.17.2 step 3, 3.17.5 and 3.17.6). No agent lands anything: the loop's `enqueue` unit runs this per WAITING TO LAND
+branch, and an agent is dispatched only for what a script cannot decide (a conflict, a red gate, a queue bounce).
 
+    python scripts/orchestrator/enqueue.py land <branch> [--worktree <path>] [--dry-run]     THE landing step
     python scripts/orchestrator/enqueue.py queue --title "<one-line subject>" --body-file <forensic message> [--dry-run]
     python scripts/orchestrator/enqueue.py checks [--rev HEAD] [--base origin/main]
     python scripts/orchestrator/enqueue.py --self-test
 
-`queue`, run in the landing worktree on its committed, rebased HEAD:
+`land <branch>`, from any checkout (the branch's worktree is found by `git worktree list`, or named by --worktree):
+  1. The worktree must be clean (STATUS.md and the harness's settings.local.json aside): a landing carries only commits.
+  2. `git fetch` origin's main and, when the branch does not already contain it, MERGE it into the branch (never a
+     rebase: a branch that merged a same-file predecessor or a sibling carries conflict resolutions in its merge
+     commits, which a rebase throws away and asks for again; the queue lands by merge commit anyway, so the branch's
+     history stays as written). A conflict is aborted, the branch's report gains `BLOCKED: … conflict in <files>`, and
+     the exit is 4: a finisher resolves it.
+  3. THE GATE on the merged head, every host in GATES, each under the shared gate slot `build-local.ps1` takes (the cap
+     of 3, so concurrent enqueues queue there and never beyond it): a verdict that is not GREEN (or no verdict line) is
+     exit 5, the report gains `BLOCKED: <host> gate … at enqueue — <verdict>`. A green head is recorded in the worktree's
+     git directory (`enqueue-gated`), so a re-run on the SAME commit (a GitHub refusal, exit 9) does not gate it again.
+  4. `devlog.py stamp <branch>`: the branch's `DEVLOG/pending-<slug>.md` is numbered (alloc.py devlog: enqueue order is
+     number order) and stamped in one commit; an entry main has overtaken since an earlier enqueue is re-stamped.
+  5. While `ruleset.py check` reports the merge queue ACTIVE: `queue` (below), the pull request titled with the entry's
+     title and carrying the entry and the commit list as its body (the merge commit's message, ruleset-main.json).
+     Otherwise `bash scripts/push-main.sh` in the worktree: the same landing checks, the full matrix on `ci/<sha>`, a
+     fast-forward of main (it waits for CI; it goes when PB3024's first queued landing deletes it).
+Every outcome ends on ONE line `=== ENQUEUE: <OUTCOME> … ===` for a caller to block on (MANDATORY-PRACTICES P2).
+
+`queue`, run in the landing worktree on its committed, up-to-date HEAD:
   1. ⛔ THE QUEUE GUARD, FIRST: `ruleset.py check` must report the merge queue ACTIVE on main, or nothing is pushed or
      opened (exit 8). The operator's review (2026-10-11 13:39): a pull request runs only the cheap CI jobs, so its
      `ci-gate` passes on them; opened before the ruleset exists, `gh pr merge --auto` would merge it with NO
@@ -29,13 +51,16 @@ the landing's own range before a CI run is spent:
                     retry as is)
 A check that cannot read its range is exit 2 (NOT RUN, never a pass).
 
-Exit: 0 queued (or nothing to land) · 2 usage or state (rebase first, no branch, a check could not run) · 3/6/7 a
-landing check refused (above) · 8 the merge queue is not ACTIVE: land with push-main.sh · 9 GitHub refused the push,
-the pull request or the queue (main untouched; re-run after the cause is fixed — every step is idempotent).
+Exit: 0 queued, landed (push-main) or nothing to land · 2 usage or state (a dirty worktree, no branch, HEAD behind
+main, a check could not run) · 3/6/7 a landing check refused (above) · 4 bringing main in conflicted · 5 a gate is not
+GREEN · 8 the merge queue is not ACTIVE (`queue` only; `land` takes push-main then) · 9 GitHub refused the push, the
+pull request or the queue (main untouched; re-run after the cause is fixed — every step is idempotent) · 10 push-main.sh
+did not land it (its own exit code is printed: a CI red, the landing lease held).
 """
 from __future__ import annotations
 
 import argparse
+import os
 import pathlib
 import re
 import shutil
@@ -46,10 +71,25 @@ from typing import Callable
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+sys.path.insert(0, str(HERE.parent))
 import ruleset  # noqa: E402
 
+EXIT_CONFLICT = 4
+EXIT_GATE = 5
 EXIT_QUEUE_NOT_ACTIVE = 8
 EXIT_GITHUB = 9
+EXIT_PUSH_MAIN = 10
+VERDICT = "=== ENQUEUE: "
+# THE GATE AT ENQUEUE (DESIGN-test-build-ci.md §3.17.2 step 3, §3.17.3): (host, command run in the worktree, its verdict
+# line's prefix). THE ONE GATE (kb/Work PB3022: one shape, no mode; a landing's gate runs at Normal priority) on
+# Windows, then CI's Linux legs under WSL (the operator's steer 2026-10-11 12:37: the landing keeps the whole-leg WSL
+# gate until PB3022 item 10 makes the one gate run leg 1 on both hosts; then the Linux row goes and build-local's own
+# verdict covers both). On a Linux host only the Linux twin of the one gate runs.
+GATES_WINDOWS = (("Windows", ["pwsh", "-NoProfile", "-File", "scripts/build-local.ps1"], "=== BUILD-LOCAL GATE: "),
+                 ("Linux", ["bash", "scripts/linux-gate.sh", "--nice"], "=== LINUX GATE: "))
+GATES_LINUX = (("Linux", ["bash", "scripts/build-local.sh"], "=== BUILD-LOCAL GATE: "),)
+GREEN = re.compile(r"^(?:LEG 1 ONLY \([^)]*\): )?GREEN\b")
+GATED_MARK = "enqueue-gated"     # in the worktree's git directory: the head this script last gated GREEN
 # (the check's name, its command under scripts/, its refusal's exit code here, whether it takes --base, whether its
 # every non-zero is a refusal). A refusal is the script's exit 1; any other non-zero is "could not run", except for
 # landing_check.py, whose every non-zero is a STOP (push-main's rule).
@@ -168,6 +208,173 @@ def queue(cwd: pathlib.Path, title: str, body_file: str, *, gh: Gh, state: Calla
         return EXIT_GITHUB
     say(f"ENQUEUED pr={number} sha={sha} branch={branch} url={url}")
     return 0
+
+
+# ── land: the whole step for one branch ─────────────────────────────────────────────────────────────────────────
+Gate = Callable[[pathlib.Path], list[tuple[str, bool, str]]]
+
+
+def worktree_of(repo: pathlib.Path, branch: str) -> pathlib.Path | None:
+    """The worktree that has `branch` checked out, or None."""
+    path = None
+    for line in _git(repo, "worktree", "list", "--porcelain").stdout.splitlines():
+        if line.startswith("worktree "):
+            path = pathlib.Path(line[len("worktree "):])
+        elif line == f"branch refs/heads/{branch}" and path is not None:
+            return path
+    return None
+
+
+def dirty_paths(wt: pathlib.Path) -> list[str]:
+    return [ln for ln in _git(wt, "status", "--porcelain").stdout.splitlines()
+            if not ln.endswith((".claude/settings.local.json", " STATUS.md"))]
+
+
+def run_gates(wt: pathlib.Path, gates=None) -> list[tuple[str, bool, str]]:
+    """Each host's gate in order, fail-fast: [(host, green, its verdict line or why there is none)]. The output goes to
+    `<worktree>/TestResults/enqueue/<host>-gate.log`; only the verdict line decides (never the exit code alone)."""
+    gates = gates if gates is not None else (GATES_WINDOWS if os.name == "nt" else GATES_LINUX)
+    logs = wt / "TestResults" / "enqueue"
+    logs.mkdir(parents=True, exist_ok=True)
+    out: list[tuple[str, bool, str]] = []
+    for host, cmd, prefix in gates:
+        log = logs / f"{host.lower()}-gate.log"
+        with log.open("wb") as f:
+            rc = subprocess.run(cmd, cwd=wt, stdout=f, stderr=subprocess.STDOUT).returncode
+        lines = [ln.strip() for ln in log.read_bytes().decode("utf-8", errors="replace").splitlines()
+                 if ln.strip().startswith(prefix)]
+        if not lines:
+            out.append((host, False, f"no `{prefix.strip()}` line (exit {rc}; {log})"))
+            return out
+        verdict = lines[-1]
+        green = rc == 0 and bool(GREEN.match(verdict[len(prefix):]))
+        out.append((host, green, verdict))
+        if not green:
+            return out
+    return out
+
+
+def record_blocked(branch: str, wt: pathlib.Path, line: str, say: Say,
+                   reports_dir: pathlib.Path | None = None) -> None:
+    """Append `line` to the branch's newest fix-lane report (prune_worktrees' reader), so the finisher and the next
+    survey see why the landing stopped. A branch with no report is said so; nothing is invented."""
+    import prune_worktrees  # noqa: PLC0415  (scripts/: it imports coord and plan_wave back)
+    import coord  # noqa: PLC0415
+    rdir = reports_dir or coord.reports_dir()
+    rep = prune_worktrees.newest_report(prune_worktrees.report_index(rdir, lambda n: False), branch, str(wt))
+    if rep is None:
+        say(f"enqueue: no fix-lane report under {rdir} names {branch}; recorded nowhere but here: {line}")
+        return
+    with (rdir / rep.name).open("a", encoding="utf-8") as f:
+        f.write(f"\n{line}\n")
+    say(f"enqueue: recorded in {rep.name}: {line}")
+
+
+def pull_request_text(wt: pathlib.Path, base: str, branch: str) -> tuple[str, str]:
+    """(title, body) of the branch's pull request: the title of the ONE DEVLOG entry the branch adds, and as the body
+    (which the merge queue's merge commit carries, ruleset-main.json) that entry and the branch's commit list."""
+    added = [n for n in _git(wt, "diff", "--name-only", "--diff-filter=A", f"{base}..HEAD", "--", "DEVLOG/").stdout.split()
+             if re.match(r"DEVLOG/\d{4,}-", n)]
+    if len(added) != 1:
+        return "", ""
+    text = (wt / added[0]).read_bytes().decode("utf-8").replace("\r\n", "\n")
+    header, _, body = text.partition("\n")
+    m = re.match(r"^## Entry (\d+) \S+ \S+ \S+ \S+ \S+ (.+)$", header)
+    title = f"DEVLOG {m.group(1)}: {m.group(2).strip()}" if m else header.lstrip("# ").strip()
+    commits = _git(wt, "log", "--no-merges", "--format=- %h %s", f"{base}..HEAD").stdout.strip()
+    return title, f"{body.strip()}\n\nBranch: `{branch}`\n\nCommits:\n{commits}\n"
+
+
+def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: Gh,
+         state: Callable[[], tuple[str, str]], checks: Callable[[pathlib.Path, str, str], int],
+         gates: Gate = run_gates, stamp: Callable[[pathlib.Path, str], int] | None = None,
+         push_main: Callable[[pathlib.Path], int] | None = None, blocked: Callable[[str, pathlib.Path, str], None]
+         | None = None, dry_run: bool = False, say: Say = print) -> int:
+    """THE landing step (module doc); the collaborators are parameters so the self-test drives every exit arm."""
+    def end(rc: int, outcome: str) -> int:
+        say(f"{VERDICT}{outcome} ({branch}) ===")
+        return rc
+    blocked = blocked or (lambda b, w, line: record_blocked(b, w, line, say))
+    wt = worktree or worktree_of(repo, branch)
+    if wt is None or _git(wt, "branch", "--show-current").stdout.strip() != branch:
+        return end(2, f"REFUSED — no worktree has {branch} checked out (pass --worktree)")
+    if branch == "main":
+        return end(2, "REFUSED — main is not a branch to land")
+    if dirty := dirty_paths(wt):
+        return end(2, f"REFUSED — the worktree {wt} has {len(dirty)} uncommitted path(s) ({dirty[0].strip()}): commit "
+                      "or remove them; a landing carries only commits")
+    f = _git(wt, "fetch", "--quiet", "origin", "+refs/heads/main:refs/remotes/origin/main")
+    if f.returncode != 0:
+        return end(2, f"REFUSED — git fetch origin main failed: {f.stderr.strip()}")
+    base = "refs/remotes/origin/main"
+    if _git(wt, "rev-parse", "HEAD").stdout.strip() == _git(wt, "rev-parse", base).stdout.strip():
+        return end(0, "NOTHING TO LAND — the branch is origin/main")
+    # 2. Main in, by merge.
+    if _git(wt, "merge-base", "--is-ancestor", base, "HEAD").returncode != 0:
+        if dry_run:
+            return end(0, f"DRY RUN — would merge origin/main into {branch}, gate, stamp and land it")
+        m = _git(wt, "merge", "--no-edit", "-m", f"Merge origin/main into {branch} (enqueue.py)", base)
+        if m.returncode != 0:
+            files = _git(wt, "diff", "--name-only", "--diff-filter=U").stdout.split()
+            _git(wt, "merge", "--abort")
+            blocked(branch, wt, f"BLOCKED: enqueue — bringing origin/main in conflicted in {', '.join(files) or '?'} "
+                                f"(kb/Work PB3023): a finisher merges origin/main, resolves, re-gates, re-runs enqueue.py")
+            return end(EXIT_CONFLICT, f"CONFLICT in {', '.join(files) or '?'} — merge aborted, branch unchanged")
+    elif dry_run:
+        return end(0, f"DRY RUN — {branch} contains origin/main; would gate, stamp and land it")
+    # 3. The gate, once per commit.
+    head = _git(wt, "rev-parse", "HEAD").stdout.strip()
+    mark = pathlib.Path(_git(wt, "rev-parse", "--absolute-git-dir").stdout.strip()) / GATED_MARK
+    if mark.is_file() and mark.read_text(encoding="utf-8").strip() == head:
+        say(f"enqueue: {head[:12]} was gated GREEN by an earlier enqueue run ({mark}); not gated again")
+    else:
+        results = gates(wt)
+        for host, green, line in results:
+            say(f"enqueue: {host} gate: {line}")
+        bad = next(((h, line) for h, g, line in results if not g), None) if results else ("(none)", "no gate ran")
+        if bad:
+            blocked(branch, wt, f"BLOCKED: enqueue — the {bad[0]} gate is not GREEN on {head[:12]}: {bad[1]}")
+            return end(EXIT_GATE, f"GATE RED ({bad[0]}) on {head[:12]}")
+        mark.write_text(head + "\n", encoding="utf-8")
+    # 4. The DEVLOG entry's number and stamp. Its commit changes only DEVLOG/, which no gate leg tests, so the gated mark
+    # moves to it: a re-run on the stamped head is the same tested tree.
+    if (stamp or _stamp)(wt, branch) != 0:
+        return end(6, "DEVLOG STAMP FAILED (above): the branch needs one `DEVLOG/pending-<slug>.md`")
+    stamped = _git(wt, "rev-parse", "HEAD").stdout.strip()
+    if stamped != head and all(p.startswith("DEVLOG/") for p in
+                               _git(wt, "diff", "--name-only", head, stamped).stdout.split()):
+        mark.write_text(stamped + "\n", encoding="utf-8")
+    # 5. The queue, or push-main while the queue is not ACTIVE.
+    st, detail = state()
+    if st == ruleset.ACTIVE:
+        title, body = pull_request_text(wt, base, branch)
+        if not title:
+            return end(6, "NO ENTRY — the branch adds no single stamped DEVLOG entry to title its pull request")
+        body_file = pathlib.Path(_git(wt, "rev-parse", "--absolute-git-dir").stdout.strip()) / "enqueue-pr-body.md"
+        body_file.write_text(body, encoding="utf-8")
+        rc = queue(wt, title, str(body_file), gh=gh, state=state,
+                   checks=lambda sha, b: checks(wt, sha, b), say=say)
+        return end(rc, "ENQUEUED" if rc == 0 else f"NOT QUEUED (exit {rc}, above)")
+    say(f"enqueue: the merge queue is not ACTIVE (ruleset: {st} — {detail}); landing through push-main.sh, which runs "
+        "the same landing checks and waits for CI's whole matrix on ci/<sha>")
+    rc = (push_main or _push_main)(wt)
+    if rc == 0:
+        return end(0, f"LANDED by push-main.sh ({_git(wt, 'rev-parse', 'HEAD').stdout.strip()[:12]})")
+    return end(rc if rc in (3, 6, 7) else EXIT_PUSH_MAIN, f"NOT LANDED — push-main.sh exit {rc} (above)")
+
+
+def _stamp(wt: pathlib.Path, branch: str) -> int:
+    """`devlog.py stamp` when the branch still has a pending entry or one main has overtaken; 0 when it is stamped."""
+    devlog = [sys.executable, str(HERE.parent / "devlog.py")]
+    base = ["--base", "refs/remotes/origin/main"]
+    if not any((wt / "DEVLOG").glob("pending-*.md")) and \
+            subprocess.run([*devlog, "check", "--rev", "HEAD", *base], cwd=wt, capture_output=True).returncode == 0:
+        return 0
+    return subprocess.run([*devlog, "stamp", branch, "--repo", str(wt), *base], cwd=wt).returncode
+
+
+def _push_main(wt: pathlib.Path) -> int:
+    return subprocess.run(["bash", "scripts/push-main.sh"], cwd=wt).returncode
 
 
 # ── self-test ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -310,6 +517,115 @@ def self_test() -> int:
                mapped == [6, 7, 3, 2, 3, 0] and not missing
                and seen == [(devlog_check, ["--rev", "S", "--base", "B"]), (oracle, ["--rev", "S"]),
                             (partition, ["--rev", "S", "--base", "B"])], f"{mapped} {seen} missing={missing}")
+
+        # ── land (kb/Work PB3023): a branch `fix` in its own worktree, cut before main moved twice ──────────────────
+        sh(wt, "switch", "--quiet", "main")
+        sh(wt, "reset", "--quiet", "--hard", "origin/main")
+        lw = root / "fix-wt"
+        sh(wt, "worktree", "add", "--quiet", "-b", "fix", str(lw), "main")
+        (lw / "c.txt").write_text("the fix", encoding="utf-8")
+        sh(lw, "add", "c.txt")
+        sh(lw, "commit", "--quiet", "-m", "the fix")
+        (wt / "d.txt").write_text("main moves again", encoding="utf-8")
+        sh(wt, "add", "d.txt")
+        sh(wt, "commit", "--quiet", "-m", "main moves again")
+        sh(wt, "push", "--quiet", "origin", "main")
+        fix_tip = sh(lw, "rev-parse", "HEAD")
+
+        def stamper(calls: list[str]):
+            def stamp(w: pathlib.Path, b: str) -> int:
+                calls.append(b)
+                if not (w / "DEVLOG").is_dir():
+                    (w / "DEVLOG").mkdir()
+                    (w / "DEVLOG" / "0042-pb1-the-fix.md").write_text(
+                        "## Entry 42 — 2026-10-11 14:00 PDT — PB1: the fix\n\nWhy it was wrong.\n", encoding="utf-8")
+                    sh(w, "add", "DEVLOG")
+                    sh(w, "commit", "--quiet", "-m", "DEVLOG 42: stamp the entry")
+                return 0
+            return stamp
+
+        def gates_of(results: list[tuple[str, bool, str]], ran: list[int]) -> Gate:
+            return lambda w: ran.append(1) or list(results)
+        green = [("Windows", True, "=== BUILD-LOCAL GATE: GREEN ==="), ("Linux", True, "=== LINUX GATE: GREEN ===")]
+        absent = lambda: (ruleset.ABSENT, "no ruleset")   # noqa: E731
+        notes: list[str] = []
+        record = lambda b, w, line: notes.append(line)    # noqa: E731
+
+        (lw / "stray.txt").write_text("uncommitted", encoding="utf-8")
+        ran: list[int] = []
+        rc_dirty = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+                        gates=gates_of(green, ran), stamp=stamper([]), push_main=lambda w: 0, blocked=record,
+                        say=lines.append)
+        (lw / "stray.txt").unlink()
+        expect("land: a dirty worktree is refused (exit 2) before anything is fetched, merged or gated",
+               rc_dirty == 2 and not ran and sh(lw, "rev-parse", "HEAD") == fix_tip
+               and lines[-1].startswith(VERDICT + "REFUSED"), f"{rc_dirty} {lines[-1:]}")
+
+        (lw / "d.txt").write_text("the branch's own d", encoding="utf-8")       # main added d.txt too: a conflict
+        sh(lw, "add", "d.txt")
+        sh(lw, "commit", "--quiet", "-m", "a clash")
+        clash_tip = sh(lw, "rev-parse", "HEAD")
+        ran = []
+        rc_conflict = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+                           gates=gates_of(green, ran), stamp=stamper([]), push_main=lambda w: 0, blocked=record,
+                           say=lines.append)
+        expect("land: a conflict bringing main in is exit 4: the merge is aborted, the branch unchanged, the report "
+               "told which files, and nothing gated",
+               rc_conflict == EXIT_CONFLICT and not ran and sh(lw, "rev-parse", "HEAD") == clash_tip
+               and not dirty_paths(lw) and notes and "d.txt" in notes[-1] and notes[-1].startswith("BLOCKED:"),
+               f"{rc_conflict} {notes[-1:]}")
+        sh(lw, "reset", "--quiet", "--hard", fix_tip)
+
+        ran, stamped = [], []
+        rc_red = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+                      gates=gates_of([("Windows", True, "G"), ("Linux", False, "=== LINUX GATE: RED (x) ===")], ran),
+                      stamp=stamper(stamped), push_main=lambda w: 0, blocked=record, say=lines.append)
+        merged = sh(lw, "rev-parse", "HEAD")
+        expect("land: main is MERGED in (the branch's commits kept), and a host's red gate is exit 5 with the host "
+               "named in the report, before any stamp",
+               rc_red == EXIT_GATE and ran and not stamped and "Linux" in notes[-1]
+               and _git(lw, "merge-base", "--is-ancestor", "origin/main", "HEAD").returncode == 0
+               and _git(lw, "merge-base", "--is-ancestor", fix_tip, "HEAD").returncode == 0, f"{rc_red} {notes[-1:]}")
+
+        ran, stamped, pushed = [], [], []
+        rc_pm = land(root, "fix", lw, gh=fake_gh([], log := []), state=absent, checks=lambda w, s, b: 0,
+                     gates=gates_of(green, ran), stamp=stamper(stamped), push_main=lambda w: pushed.append(w) or 0,
+                     blocked=record, say=lines.append)
+        expect("land: the queue not ACTIVE lands through push-main.sh after the gate and the stamp, opening no pull "
+               "request",
+               rc_pm == 0 and ran and stamped == ["fix"] and pushed == [lw] and not log
+               and lines[-1].startswith(VERDICT + "LANDED"), f"{rc_pm} {log} {lines[-1:]}")
+
+        ran, pushed = [], []
+        rc_again = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+                        gates=gates_of(green, ran), stamp=stamper([]), push_main=lambda w: pushed.append(w) or 6,
+                        blocked=record, say=lines.append)
+        ran_after_new_commit: list[int] = []
+        (lw / "e.txt").write_text("a finisher's commit", encoding="utf-8")
+        sh(lw, "add", "e.txt")
+        sh(lw, "commit", "--quiet", "-m", "a finisher's commit")
+        land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+             gates=gates_of(green, ran_after_new_commit), stamp=stamper([]), push_main=lambda w: 0, blocked=record,
+             say=lines.append)
+        expect("land: a re-run on the commit already gated GREEN does not gate again, a new commit does; push-main's "
+               "landing-check refusal keeps its own code",
+               not ran and ran_after_new_commit and rc_again == 6, f"{ran} {ran_after_new_commit} {rc_again}")
+
+        prs = []
+        log = []
+        rc_q = land(root, "fix", lw, gh=fake_gh(prs, log), state=active, checks=lambda w, s, b: 0,
+                    gates=gates_of(green, []), stamp=stamper([]), push_main=lambda w: 1 / 0, blocked=record,
+                    say=lines.append)
+        create = next((a for a in log if a[:2] == ["pr", "create"]), [])
+        expect("land: an ACTIVE queue opens one pull request titled from the DEVLOG entry, whose body carries the entry "
+               "and the commits, and queues it",
+               rc_q == 0 and create and create[create.index("--title") + 1] == "DEVLOG 42: PB1: the fix"
+               and "Why it was wrong." in pathlib.Path(create[create.index("--body-file") + 1]).read_text(encoding="utf-8")
+               and lines[-1].startswith(VERDICT + "ENQUEUED"), f"{rc_q} {create} {lines[-3:]}")
+        rc_pm_red = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+                         gates=gates_of(green, []), stamp=stamper([]), push_main=lambda w: 1, blocked=record,
+                         say=lines.append)
+        expect("land: push-main.sh failing (a CI red) is exit 10, never 0", rc_pm_red == EXIT_PUSH_MAIN, str(rc_pm_red))
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"=== enqueue.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")
@@ -331,6 +647,10 @@ def main(argv: list[str] | None = None) -> int:
     c = sub.add_parser("checks", help="the landing checks on base..rev")
     c.add_argument("--rev", default="HEAD")
     c.add_argument("--base", default="origin/main")
+    lnd = sub.add_parser("land", help="THE landing step: main in, the gate, the DEVLOG stamp, the checks, the queue")
+    lnd.add_argument("branch")
+    lnd.add_argument("--worktree", type=pathlib.Path, help="the branch's worktree (default: found by git worktree list)")
+    lnd.add_argument("--dry-run", action="store_true", help="say what it would do; change nothing")
     a = ap.parse_args(argv)
     if a.self_test:
         return self_test()
@@ -344,6 +664,9 @@ def main(argv: list[str] | None = None) -> int:
     if a.verb == "queue":
         return queue(cwd, a.title, a.body_file, gh=ruleset.real_gh, state=queue_state,
                      checks=lambda sha, base: run_checks(sha, base, _script_runner(cwd)), dry_run=a.dry_run)
+    if a.verb == "land":
+        return land(cwd, a.branch, a.worktree, gh=ruleset.real_gh, state=queue_state,
+                    checks=lambda wt, sha, base: run_checks(sha, base, _script_runner(wt)), dry_run=a.dry_run)
     ap.print_help()
     return 2
 

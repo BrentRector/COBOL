@@ -1685,9 +1685,13 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    the reviewer for one finished outside a wave). The landing step never reviews and never fixes; the lander's former
    train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
    `review_findings.py summary` measures findings per branch, the re-review rate and reviewer minutes.
-3. **Enqueue** (`scripts/orchestrator/enqueue.py <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; rebase the
-   branch onto `origin/main` (a conflict stops it: the branch returns to WAITING with the conflict named, a finisher
-   resolves); run the ONE local gate on the rebased head (§3.17.3); run the landing checks that used to live in
+3. **Enqueue** (`scripts/orchestrator/enqueue.py land <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; MERGE
+   `origin/main` into the branch — not a rebase, corrected at implementation: a branch that merged a same-file
+   predecessor or a sibling carries conflict resolutions in its merge commits, which a rebase discards and asks for
+   again, and the queue lands by merge commit anyway (a conflict stops it, exit 4: the merge is aborted, the branch's
+   report gains `BLOCKED: enqueue … conflict in <files>`, a `cobol-finisher` resolves); run the ONE local gate on the
+   merged head (§3.17.3; exit 5 on a red, the host named; a commit gated GREEN is not gated again on a re-run);
+   `devlog.py stamp` numbers the entry (re-stamping one main has overtaken); run the landing checks that used to live in
    `push-main.sh` — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
@@ -1799,14 +1803,24 @@ demand and not committed.
 
 #### 3.17.5 The loop's units and the fleet after this design (PB3023, PB3024, PB3027; DESIGN-orchestrator-loop.md §3, §4.7, §9)
 
-- `land` becomes **`enqueue`**: for every WAITING TO LAND branch (`prune_worktrees.py --brief`), in harm order, run
-  `enqueue.py`; dispatch a finisher for a rebase conflict or a queue bounce; render the ledger; hand off. It is mostly
-  a script run; its model turns are the finisher dispatches and the handoff.
-- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md`, `golden-lander-brief.md`, `train_apply.py`,
-  `landing_lease.py`, `push-main.sh` and the `ci/**` branches retire** (CLAUDE.md rule 4: delete, never wrap).
-  `cobol-lander` becomes `cobol-finisher` (resolve a conflict, fix a bounce, re-enqueue; turn cap 160).
-- `wf_rolling_wave.js` **starts no lander**: a wave produces DONE branches; the enqueue unit lands them. This removes
-  PB3016's policy question (may THIS wave land?) by removing the mechanism; `train_size` and `min_final_train` go.
+- `land` became **`enqueue`** (PB3023, `units/enqueue.md`): for every WAITING TO LAND branch (`prune_worktrees.py
+  --brief`, which lists them in harm order), run `enqueue.py land`; dispatch ONE `cobol-finisher` (`finisher-brief.md`)
+  for a conflict, a red gate, a DEVLOG or oracle refusal, or a queue bounce (`prune_worktrees.py` BOUNCED, from one
+  GraphQL read of the open pull requests: in the merge queue → ENQUEUED, removed from it at the branch's tip → BOUNCED
+  with GitHub's reason; offline the states are git-only); one `cobol-clerk` files the reports' leads; render the ledger;
+  hand off. It is mostly a script run; its model turns are the review and finisher dispatches and the handoff. While
+  the queue is not ACTIVE, `enqueue.py land` lands through `push-main.sh` (one branch at a time under its lease) so the
+  lander's retirement does not wait for the owner's ruleset go.
+- The **train, the lander role, `lander-train-brief.md`, `lander-brief.md` and `train_apply.py` are retired** (PB3023;
+  CLAUDE.md rule 4: deleted, never wrapped); `golden-lander-brief.md` became `golden-lane-brief.md` (the lane-1
+  integrator, landing through `enqueue.py land`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing
+  order is `--brief`'s); `dispatch_guard.py`'s lander rule went with the role. `cobol-lander` became `cobol-finisher`
+  (resolve a conflict, fix a red or a bounce, land with `enqueue.py land`; turn cap 160). `landing_lease.py`,
+  `push-main.sh` and the `ci/**` branches retire with the first change landed through the queue (PB3024).
+- `wf_rolling_wave.js` **starts no lander** (PB3023): a wave produces DONE branches reviewed CLEAN; the enqueue unit
+  lands them. This removed PB3016's policy question (may THIS wave land?) with the mechanism; `train_size`,
+  `min_final_train`, `lead_ids_per_train` and the lead-id blocks are gone, and the planner prices each group's landing
+  at `landing_tokens` (`model_rules.json`) instead of one lander per train.
 - **Measurement continues** (PB3028): `landing_measure.py` replaces `train_measure.py` — per PR: DONE → enqueued →
   on main, bounces and their causes, CI wall; `summary` compares against the 2026-10-10 evidence. The design is judged
   by changes landed per hour and by minutes and tokens per landing, before and after.

@@ -66,7 +66,7 @@ the tools it runs). Contents:
 | `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
 | `inflight-groups.json` | `plan_wave.py` (without `--dry-run`), and `scripts/hooks/dispatch_guard.py` for every write-capable Agent call and every Workflow call it admits | the dispatch ledger: every group planned or dispatched by hand whose notes are not all landed or retired, with the files it was planned on and when (`at`); the campaign lane's file-set partition reads it, so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `push-main.sh`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the groups whose declared files its diff meets); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>` (section 9.1; kb/Work PB2118 Drafts 7–10) |
 | `member-index/<treeKey>.members.json.gz` | `plan_wave.py --cluster` (`member_index.current`) | the member index regenerated for the planner's own tree when no committed record has its `treeKey`: the planner never plans on a stale index (kb/Work PB2118 Draft 9) |
-| `scratch/train<label>-manifest.json` | each train lander, first (`wf_rolling_wave.js` gives it the JSON) | a train's members: per cluster its notes, branch, worktree, base and head. `scripts/orchestrator/train_apply.py` brings the members in from it, one commit per cluster in its order (lander-train-brief step 1, kb/Work PB2885). The landing check reads every manifest: a member of the landing's own train is not in flight against it, and another train's member is identified by its notes (kb/Work PB2118 Draft 10) |
+| `scratch/train<label>-manifest.json` | the retired train landers (none written since kb/Work PB3023) | a past train's members; `prune_worktrees.py` still reads the landed ones (`train_heads`) to classify the branches those trains carried |
 | `units.jsonl` | the supervisor | one line per unit (section 4.5) |
 | `OWNER-QUESTIONS.md` | the supervisor | questions only the owner can answer; the loop stops after writing one |
 | `logs\` | the supervisor | the raw stream-json of every unit, its archived handoff, and the breaker's notes |
@@ -106,9 +106,9 @@ one session.
 
 | Unit | Model | Starts when | Ends when |
 |---|---|---|---|
-| `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned, the last lander train landed through `push-main.sh`, the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
+| `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned (it starts no lander: its DONE branches are the next `enqueue` unit's), the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
 | `campaign` | Opus | only with `-Cluster <lead>[,<lead>...]`: a wave-type unit is due (a handoff named `wave` or `campaign`, or nothing else fired), a lead's cluster has a ready note and the last wave-type unit was not a `campaign`; the ready leads take turns (section 3.2, section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
-| `land` | Opus | finished implementer branches exist with no lander (a previous wave unit ended early), or a handoff says `next_unit: land` | the train landed (or was dropped with reasons) and the ledger rendered to `{COORD}\ledger.html` (section 14). First it dispatches one read-only `cobol-reviewer` for each branch `prune_worktrees.py` lists WAITING FOR REVIEW (a DONE branch with no `Review: CLEAN` stamp at its tip; the review skill's branch form, kb/Work PB3027); it never reviews in the train and never fixes a finding. It carries the train `prune_worktrees.py --train` names: at most six of the branches it lists WAITING TO LAND (`TRAIN_MAX`, the owner's band of 4-6), the most harmful lead first, the attended session's included; the rest wait for the next land unit (kb/Work PB2981). While the loop runs the attended session dispatches no lander and writes its finished branches' DONE reports for this unit instead, in `coord.reports_dir()` (MANDATORY-PRACTICES O11, kb/Work PB2602, PB2980) |
+| `enqueue` | Opus | finished branches exist (`branches_pending` DONE, `prune_worktrees.py` WAITING TO LAND or BOUNCED), or a handoff says `next_unit: enqueue` | every WAITING TO LAND branch went through `enqueue.py land` (ENQUEUED, LANDED, or stopped with its finisher dispatched), the leads filed, `prune_worktrees.py --apply` run and the ledger rendered to `{COORD}\ledger.html` (section 14). First it dispatches one read-only `cobol-reviewer` for each branch `prune_worktrees.py` lists WAITING FOR REVIEW (kb/Work PB3027); its prompt is `units/enqueue.md` (kb/Work PB3023) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
 | `owner-question` | none | a handoff carries `owner_question` | immediately: the supervisor appends the question to `OWNER-QUESTIONS.md` and STOPS; it never guesses and never starts a session for it |
@@ -116,14 +116,15 @@ one session.
 Fable is never selected: the supervisor refuses any model name other than `opus` and `sonnet` (owner 2026-10-02:
 Fable only with explicit approval per dispatch, which an unattended loop cannot obtain).
 
-> ⛔ **The landing pipeline is redesigned (owner 2026-10-11, kb/Work PB3015; the design is `DESIGN-test-build-ci.md`
-> §3.17, the SSOT for it).** When PB3023/PB3024 land: the `land` unit becomes **`enqueue`** — for every WAITING TO LAND
-> branch, in harm order, `scripts/orchestrator/enqueue.py` rebases it onto `origin/main`, runs the ONE local gate (leg 1
-> plus the host-only witnesses), the DEVLOG-entry and R3 partition checks, opens its pull request and adds it to
-> GitHub's merge queue; the unit's own turns are the finisher dispatches (a rebase conflict, a queue bounce) and the
+> ⛔ **The landing is a script (owner 2026-10-11, kb/Work PB3015, PB3023; the design is `DESIGN-test-build-ci.md`
+> §3.17, the SSOT for it).** The `enqueue` unit (`units/enqueue.md`) runs `scripts/orchestrator/enqueue.py land` for
+> every WAITING TO LAND branch, in harm order: it merges `origin/main` into the branch, runs the gate on both hosts under
+> the shared gate slot, stamps the DEVLOG entry, runs the DEVLOG-entry, oracle and R3 partition checks, opens the
+> branch's pull request and adds it to GitHub's merge queue (while `ruleset.py check` does not report the queue ACTIVE
+> it lands through `push-main.sh`, which keeps the landing lease of §4.7 until PB3024 deletes both). The unit's own
+> turns are the review dispatches, the `cobol-finisher` dispatches (a conflict, a red gate, a queue bounce) and the
 > handoff. A `wave` unit ends when its Workflow returned: it starts no lander and lands no train (`wf_rolling_wave.js`
-> loses its trains, PB3016 by removal). There is no landing lease (§4.7) and no `push-main.sh`. The rows above describe
-> the loop as built until then.
+> lost its trains, PB3016 by removal).
 
 ### 3.1 How a Workflow in flight constrains unit boundaries
 
@@ -162,14 +163,14 @@ lost agent work exceeds that cost. Open decision D3.
    operator is the one actor that sees the whole machine (the loop, the attended landings, the owner's answers).
    `orchestrate.ps1 -Unit` is a steer like any other (section 4.8).
 1. The handoff carries `owner_question` → `owner-question` (stop).
-2. The handoff names `next_unit` → that unit; but a handoff naming `land` while another lander holds the landing lease
+2. The handoff names `next_unit` → that unit; but a handoff naming `enqueue` while push-main.sh holds the landing lease
    (section 4.7) is passed over, and the rules below choose. A wave-type unit (`wave` or `campaign`) names only a WAVE: with
    `--cluster` the campaign rule at the end of this list decides which lane it runs, and the handoff's reason is kept
    in the choice's reason (kb/Work PB2522). Rule 2 used to return the named unit outright, ahead of the campaign rule,
    so a model that wrote `wave` in every handoff starved a ready campaign note indefinitely: PB2151, the legacy
    retirement's last note, sat ready and undispatched 2026-10-07 05:40–14:31 PDT through eight units (three of them
    fix-lane waves) while every supervisor start logged `campaign lane: cluster PB2108, 1 open note(s), 1 ready`. The alternation is the
-   supervisor's rule, not the model's. A handoff's `land`, `resume` or `meter`, and an owner question (rule 1), still
+   supervisor's rule, not the model's. A handoff's `enqueue`, `resume` or `meter`, and an owner question (rule 1), still
    outrank the campaign.
 3. The newest meter reading is older than 3 hours (`quota.meter_max_age_hours`), or there is none → `meter`.
 4. The repository is dirty (ignoring `.claude/settings.local.json`) or has unpushed commits → `resume`.
@@ -177,11 +178,11 @@ lost agent work exceeds that cost. Open decision D3.
    calls `UNLANDED` received a commit after the last unit started (an agent of a unit that died) → `resume`.
    Older unlanded branches do not trigger it, so an abandoned branch cannot cause a `resume` loop; `plan_wave.py`
    still sees them.
-6. The handoff lists `branches_pending` with status `DONE` → `land`, unless a live landing lease is held (section 4.7):
-   a `land` unit would only wait for that lander, so rule 7 chooses and its reason ends `land deferred (<branches>):
+6. The handoff lists `branches_pending` with status `DONE` → `enqueue`, unless a live landing lease is held (section 4.7):
+   an `enqueue` unit would only wait for that push-main.sh landing, so rule 7 chooses and its reason ends `enqueue deferred (<branches>):
    the landing lease is held by <holder> …`. The land runs at the first choice after the lease is released or dies.
 7. Otherwise → `wave`. (A stale ledger page is not a reason for a unit: a headless unit cannot publish it, section 14.
-   The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`.)
+   The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`, the unit `enqueue` replaced.)
 
 **The campaign rule** (`--cluster <lead>`, repeatable: the supervisor's `-Cluster`, section 9.1) decides the lane of
 every wave-type choice, from rule 2 or rule 7: `campaign` when a lead's cluster has a ready note (`work.py`'s
@@ -190,7 +191,7 @@ alternate with fix-lane waves; otherwise `wave`. Among several ready leads the o
 oldest (never run counts as oldest; ties in `-Cluster` order) takes the turn, and the JSON names it in `cluster`. A
 wave-type choice also carries `campaign` for the lane as a whole: `run`, `between`, `waiting` (no lead has a ready
 note), `landed` (every lead's cluster is landed or retired) or `unknown`. A land the landing lease deferred (rule 6,
-or a handoff's `land` at rule 2) stays at the end of that choice's reason, and a deferred handoff `land` names no wave:
+or a handoff's `enqueue` at rule 2) stays at the end of that choice's reason, and a deferred handoff `enqueue` names no wave:
 the campaign rule then treats the wave as rule 7's (`next_unit.py#base_choice` returns the deferral beside the
 choice; `test_orchestrate_campaign.ps1` 8f). With `--cluster` EVERY choice but an owner
 question carries `campaigns` (`{lead: ready | waiting | landed | unknown}`; the supervisor ends a lead's lane at
@@ -443,14 +444,14 @@ keep running r1 repeatedly for zero gain".
   that stops before push-main runs `release --outcome …`; only the holder's worktree can release or renew.
 - **The directory must be absolute.** `coord.coord_dir()` refuses a relative coordination directory: the default is a
   Windows path, which on Linux is a relative name, and a lease created inside one checkout would bind no one else.
-- **The loop** (`next_unit.py`, section 3.2 rules 2 and 6) starts no `land` unit while a lease is live: the land is
+- **The loop** (`next_unit.py`, section 3.2 rules 2 and 6) starts no `enqueue` unit while a lease is live: the land is
   deferred, the reason names the holder, and the loop runs a wave or a campaign instead. `stop.ps1 -Status` prints
   the lease line (`landing lease: free`, `held by …`, or `DEAD (…)`), and `landing_lease.py status` is the same line.
 - **Tests.** `landing_lease.py --self-test` (asserted arm by arm by `LandingLeaseDriftTests` in every Unit run) plants
   two landers and shows the second waits and gates only after the first releases; takes over an expired lease and one
   whose worktree is gone; refuses a renew or release by a non-holder; re-takes a resuming holder's lease; admits exactly
   one of six parallel acquires; answers push-main's `check`; exits 2 on a file that is not a lease; and runs
-  next_unit's `choose` in process to show no `land` unit starts while a lease is live. The bash layer
+  next_unit's `choose` in process to show no `enqueue` unit starts while a lease is live. The bash layer
   (push-main's exit mapping, renewer and trap) has no automated test: it needs gh and a remote; it was exercised by
   hand on a harness of its own lines (held elsewhere, corrupt, released and taken over mid-run). `test_orchestrate_campaign.ps1` (8c) proves next_unit's deferral
   and the `stop.ps1 -Status` line.
@@ -647,7 +648,8 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    design question is open, or a note already appears in two reports while still open (a note that fails twice is a
    task-spec problem, PB1981); else Sonnet. Fable is never a value. The reason is printed per group.
 6. **Cost**: tokens per group = `per_group + per_note × notes` for its model, converted to points with
-   `tokens_per_point`; one lander per `train_size` groups at `lander_tokens` on Opus. Groups are taken in rank
+   `tokens_per_point`; each group's landing at `landing_tokens` on Opus (the enqueue unit's turns per branch, kb/Work
+   PB3023; seeded at the retired lander's cost over its five-group train). Groups are taken in rank
    order while they fit; a group that does not fit is skipped and a smaller later one may still fit; a successor
    only with its predecessor; at most `wave.max_groups` (8) groups.
 7. **Allocation** through `alloc.py`: three codes per group and one lead-id block of five per train. No DEVLOG number
@@ -849,7 +851,7 @@ wrapper around the claude.ai API would be a second author of the page. So the wo
   say to publish a new one. `gen_ledger.py` writes `<coord>\ledger.html` by default. In an attended session a unit's end arrives as a
   notification, and the publish is the first action after the landing report.
 The limit, stated plainly: in a fully unattended run the publish waits for the next attended session, and the log line and
-`stop.ps1 -Status` are how it is seen. `next_unit.py` no longer starts a `land` unit for a stale page.
+`stop.ps1 -Status` are how it is seen. `next_unit.py` no longer starts an `enqueue` unit for a stale page.
 
 ## 13. Watching agents
 

@@ -62,7 +62,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
    derived mechanically from the spec (the rule catalog → the traceability inventory → its generated burn-down)
    and `constructs.json`; those are GENERATED or CI-owned, never hand-maintained work lists.
 
-9. **⛔ NO DISPATCH WITHOUT THE `workstream` SKILL, AND AN AGENT FIXES WHAT IT FINDS.** Before ANY implementer, lander
+9. **⛔ NO DISPATCH WITHOUT THE `workstream` SKILL, AND AN AGENT FIXES WHAT IT FINDS.** Before ANY implementer, finisher
    or fleet dispatch, invoke the `workstream` skill and follow `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md`:
    render specs with `make_dispatch_specs.py`, get `check_practices.py` GREEN, read the quota meter first, dispatch
    through the Workflow rolling wave. `scripts/hooks/dispatch_guard.py` REFUSES the call otherwise (owner 2026-09-30,
@@ -128,7 +128,10 @@ tree-wide sweeps (`[Trait("Sweep", "tree")]`, tier 0c) and the cheapest reach �
 (batched gating, PB2515): GREEN|RED`; CI is the regression net and the ONLY whole-population run (owner 2026-10-11
 ~11:20: "local testing confirms the targeted change; CI/CD ensures no regression on the remaining codebase"). A
 self-test whose inputs are unchanged since a recorded PASS is reused, never re-run, by every gate (kb/Work PB2914,
-PB3022). A stale or missing impact map only
+PB3022). **A branch lands through ONE script, `python scripts/orchestrator/enqueue.py land <branch>`** (kb/Work
+PB3023): it merges origin/main in, runs the one gate and CI's Linux legs, stamps the DEVLOG entry, runs the landing
+checks and queues one pull request in GitHub's merge queue (push-main.sh while the queue is not ACTIVE); there is no
+lander and no train. A stale or missing impact map only
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
 Linux, so every landing runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732):
