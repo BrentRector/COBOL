@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/BrentRector/COBOL/scripts/orchestrator/handoff.schema.json",
+  "$id": "https://github.com/WiseOwlSoftware/COBOL/scripts/orchestrator/handoff.schema.json",
   "title": "Orchestrator unit handoff",
   "description": "What one orchestrator unit hands the supervisor and the next unit (docs/rearchitecture/DESIGN-orchestrator-loop.md section 5), or what the OPERATOR hands the next unit through steer.ps1 (unit `operator`, section 4.8). Pointers, not prose: the detail lives in the files it names.",
   "type": "object",

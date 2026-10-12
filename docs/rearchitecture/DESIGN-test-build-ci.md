@@ -1822,7 +1822,10 @@ demand and not committed.
   `pull_request`: a PR's cheap `ci-gate` is attached to the PR's HEAD commit — the sha a landing pushes — so a
   check-run lookup would have read it as a verdict on the matrix. `push.branches` keeps `ci/**` until `push-main.sh`
   is deleted (below). `ci-gate`'s `needs:` and its drift check (every job wired) are unchanged.
-- A **ruleset** on `main` (classic branch protection has no merge queue): require a pull request, require the merge
+- A **ruleset** on `main` (classic branch protection has no merge queue, and GitHub offers a merge queue only to an
+  ORGANIZATION-owned repository — the second apply, 2026-10-11 18:44, was refused with `Invalid rule 'merge_queue'` on
+  the personal account's repository, so the repository is `WiseOwlSoftware/COBOL`: owner decision 2026-10-11, kb/Work
+  PB3078): require a pull request, require the merge
   queue with merge method **merge commit** — the branch's commits stay ancestors of `main`, so the branch lifecycle
   (`prune_worktrees.py`'s landed test, `carried()`, `git cherry`) keeps working offline, and `git log --first-parent
   main` reads one merge commit per landing — GitHub's `Merge pull request #N from …` subject with the PR's one-line
@@ -1847,11 +1850,13 @@ demand and not committed.
   construction: `enqueue.py queue` refuses (exit 8) before any check, push or pull request unless `ruleset.py check`
   reports the queue ACTIVE (live ruleset equal to the committed one, the queue present, the classic protection gone);
   no other tracked file opens or queues a pull request (`LandingPipelineDriftTests`, §3.17.8); until the queue is
-  ACTIVE the lander keeps landing through `push-main.sh`. `push-main.sh`, its `.ps1` shim, `landing_lease.py` and its
-  drift tests, the `ci/**` trigger and MANDATORY-PRACTICES L3/L13 are deleted in the FIRST change landed THROUGH the
-  queue, not in phase 1. **The switch:** the moment phase 1 is on main the attended session asks the owner, one bare
-  question, for the go to run `python scripts/orchestrator/ruleset.py apply --owner-go "<the go>"` (it also sets the
-  repository's auto-merge and delete-branch settings); from that instant main accepts only queued pull requests.
+  ACTIVE the lander kept landing through `push-main.sh`. `push-main.sh`, `landing_lease.py` and their drift tests, the
+  `ci/**` trigger and MANDATORY-PRACTICES L3/L13 are deleted by PB3024's closing change, cut right after PB3023 lands —
+  not by the first queued landings (PB3077, PB3078), because PB3023 rewrites 39 of the 48 files that retirement touches
+  (kb/Work PB3078). **The switch happened 2026-10-11 19:14:** on the owner's go (16:27) the attended session ran
+  `python scripts/orchestrator/ruleset.py apply --owner-go "<the go>"` (it also set the repository's auto-merge and
+  delete-branch settings) — after the repository's transfer to the WiseOwlSoftware organization, the merge queue being
+  organization-only (PB3078); from that instant main accepts only queued pull requests.
   **Phase 2 = PB3023 (`enqueue.py` gains the rebase, the one local gate and the DEVLOG stamp) and PB3025 (the
   per-entry DEVLOG and its CI check)**, each through the queue.
 - `guard` (12.8 min) is the long pole of a merge-group run; sharding it is a follow-up measured after the queue lands.

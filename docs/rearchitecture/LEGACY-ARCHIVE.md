@@ -22,7 +22,7 @@ leaf (`src/Cobol.Net.Editions`) at the tag are the ones the engine builds agains
 ## How to run it (WSL or Linux)
 
 ```bash
-git clone https://github.com/BrentRector/COBOL.git cobol-legacy
+git clone https://github.com/WiseOwlSoftware/COBOL.git cobol-legacy
 cd cobol-legacy
 git checkout legacy-byte-engine-final
 dotnet build CobolSharp.sln
