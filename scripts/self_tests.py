@@ -896,7 +896,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         rec_a = json.loads(src.read_text(encoding="utf-8"))
         rec_a["schema"] = "another"
         odd._dir("scripts/test_a.py", plat).mkdir(parents=True, exist_ok=True)
-        (odd._dir("scripts/test_a.py", plat) / src.name).write_text(json.dumps(rec_a), encoding="utf-8")
+        (odd._dir("scripts/test_a.py", plat) / src.name).write_text(json.dumps(rec_a), encoding="utf-8", newline="\n")
         other = Runner(root, plat, lambda _: None, reuse=True, budget=Budget(budget_dir, _FLEET_CAP), store=odd,
                        by="fleet arm").run([found["test_a.py"]])
         check("arm: a self-test whose recorded PASSes are all unusable says so — never `first run` (train 1063 review)",

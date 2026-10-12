@@ -628,8 +628,8 @@ def self_test() -> int:
             '[Trait("Host", "ReFS")]', "/// <summary>x</summary>", "[Collection(\"c\")]",
             "public sealed class RaceA", "{", '    [Trait("Host", "ReFS")]', "    public void NotAClass() {}", "}",
             '[Trait("Sweep", "tree")]', "internal static partial class SweepB {}",
-            '[Trait("Host", "Elsewhere")]', "public class OtherHost {}"]), encoding="utf-8")
-        (src / "obj" / "G.cs").write_text('[Trait("Host", "ReFS")]\npublic class Generated {}', encoding="utf-8")
+            '[Trait("Host", "Elsewhere")]', "public class OtherHost {}"]), encoding="utf-8", newline="\n")
+        (src / "obj" / "G.cs").write_text('[Trait("Host", "ReFS")]\npublic class Generated {}', encoding="utf-8", newline="\n")
         tr = class_traits(src)
         host, sweep = trait_sets(tr)
         check("the trait scan reads class-level traits through attributes and doc comments, never a method's, never "

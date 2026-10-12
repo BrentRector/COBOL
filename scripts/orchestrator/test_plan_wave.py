@@ -178,10 +178,10 @@ RV_REPORTS = TMP / "reports-review"
 RV_REPORTS.mkdir()
 (RV_REPORTS / "w1062e-PB5-report.md").write_text(
     "# PB5 report\n**Status:** DONE · **branch:** `worktree-wf_rv-1` · **HEAD:** `6666666ff`\n"
-    "**Review:** FINDINGS 2 w1062e-review-r1 6666666ff E:/s/review-w1062-e.jsonl\n\n## Reproduced?\n", encoding="utf-8")
+    "**Review:** FINDINGS 2 w1062e-review-r1 6666666ff E:/s/review-w1062-e.jsonl\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
 (RV_REPORTS / "w1062f-PB7-report.md").write_text(
     "# PB7 report\n**Status:** DONE · **branch:** `worktree-wf_rv-2` · **HEAD:** `7777777aa`\n"
-    "**Review:** CLEAN w1062f-review-r1 7777777aa\n\n## Reproduced?\n", encoding="utf-8")
+    "**Review:** CLEAN w1062f-review-r1 7777777aa\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
 rv_reports = pw.load_reports(RV_REPORTS)
 check("the review stamps parse", [(r.review.verdict, r.review.findings) if r.review else None for r in rv_reports],
       [("FINDINGS", 2), ("CLEAN", 0)])

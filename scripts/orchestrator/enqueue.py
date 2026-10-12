@@ -185,16 +185,16 @@ def self_test() -> int:
         origin, wt = root / "origin.git", root / "wt"
         sh(root, "init", "--quiet", "--bare", "-b", "main", str(origin))
         sh(root, "init", "--quiet", "-b", "main", str(wt))
-        (wt / "a.txt").write_text("one", encoding="utf-8")
+        (wt / "a.txt").write_text("one", encoding="utf-8", newline="\n")
         sh(wt, "add", "a.txt")
         sh(wt, "commit", "--quiet", "-m", "base")
         sh(wt, "remote", "add", "origin", str(origin))
         sh(wt, "push", "--quiet", "origin", "main")
         sh(wt, "switch", "--quiet", "-c", "land-train")
-        (wt / "a.txt").write_text("two", encoding="utf-8")
+        (wt / "a.txt").write_text("two", encoding="utf-8", newline="\n")
         sh(wt, "commit", "--quiet", "-am", "the landing")
         body = root / "body.txt"
-        body.write_text("forensic message", encoding="utf-8")
+        body.write_text("forensic message", encoding="utf-8", newline="\n")
 
         def fake_gh(open_prs: list[str], log: list[list[str]], fail: str = "") -> Gh:
             def gh(args: list[str]) -> tuple[int, str, str]:
@@ -248,7 +248,7 @@ def self_test() -> int:
                and log[2] == ["pr", "merge", "17", "--auto"] and lines[-1].startswith("ENQUEUED pr=17 sha=" + head),
                f"rc={rc} pushed={pushed} log={log} last={lines[-1:]}")
 
-        (wt / "a.txt").write_text("three", encoding="utf-8")
+        (wt / "a.txt").write_text("three", encoding="utf-8", newline="\n")
         sh(wt, "commit", "--quiet", "--amend", "-am", "the landing, rebased")   # the branch moves: a forced push
         log = []
         rc = queue(wt, "Train 9: subject", str(body), gh=fake_gh(prs, log), state=active, checks=passing,
@@ -267,7 +267,7 @@ def self_test() -> int:
                fails9 == [EXIT_GITHUB] * 3, str(fails9))
 
         sh(wt, "switch", "--quiet", "main")
-        (wt / "b.txt").write_text("main moved", encoding="utf-8")
+        (wt / "b.txt").write_text("main moved", encoding="utf-8", newline="\n")
         sh(wt, "add", "b.txt")
         sh(wt, "commit", "--quiet", "-m", "main moves")
         sh(wt, "push", "--quiet", "origin", "main")
