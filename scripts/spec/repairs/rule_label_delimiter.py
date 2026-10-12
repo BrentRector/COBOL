@@ -144,7 +144,7 @@ def main() -> int:
     for i in fix:
         m = DOT_LABEL.match(lines[i])
         lines[i] = f"{m.group(1)}\\){m.group(2)}{m.group(3)}"
-    SPEC_MD.write_text("\n".join(lines), encoding="utf-8")
+    SPEC_MD.write_text("\n".join(lines), encoding="utf-8", newline="\n")
     print(f"applied: {len(fix)} labels in {SPEC_MD.relative_to(REPO)}")
     return 0
 

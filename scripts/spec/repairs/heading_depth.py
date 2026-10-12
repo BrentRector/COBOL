@@ -123,7 +123,7 @@ def main() -> int:
         print("\nDRY RUN — nothing written.")
         return 0
 
-    SPEC.write_text("".join(lines), encoding="utf-8")
+    SPEC.write_text("".join(lines), encoding="utf-8", newline="\n")
     print(f"\nwrote {SPEC.relative_to(REPO)}")
     return 0
 

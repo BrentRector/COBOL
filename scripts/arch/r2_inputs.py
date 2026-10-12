@@ -100,7 +100,7 @@ def cached(out: Path, step: str, key: dict, fn):
     data = fn()
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps({"key": key, "seconds": round(time.monotonic() - t0, 1), "data": data}, indent=1),
-                 encoding="utf-8")
+                 encoding="utf-8", newline="\n")
     return data
 
 
@@ -219,7 +219,7 @@ def write_modern_config(wt: Path, commit: str):
                              capture_output=True, text=True, check=True).stdout.strip()
     if tracked:
         raise SystemExit("the pin tracks its own .globalconfig: merge MODERN_RULES into it here before measuring")
-    (wt / ".globalconfig").write_text(modern_globalconfig(), encoding="utf-8")
+    (wt / ".globalconfig").write_text(modern_globalconfig(), encoding="utf-8", newline="\n")
 
 
 def run_analyzers(wt: Path, project: str, commit: str):
@@ -378,7 +378,7 @@ def build(pin: Path, out: Path, max_lines: int, projects=None):
         raise SystemExit("no census record for the pin %s: run `python scripts/arch/census.py --commit %s` first (B7)" % (
             commit[:12], commit[:12]))
     out.mkdir(parents=True, exist_ok=True)
-    (out / "shards.json").write_text(json.dumps(m, indent=1), encoding="utf-8")
+    (out / "shards.json").write_text(json.dumps(m, indent=1), encoding="utf-8", newline="\n")
     files = [p for s in m["shards"] for p, _ in s["files"]]
     head = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True,
                           check=True).stdout.strip()
@@ -419,11 +419,11 @@ def build(pin: Path, out: Path, max_lines: int, projects=None):
             pending.append("%s (%s)" % (s["id"], ", ".join(sorted(need - measured))))
             continue
         d = shard_input(s, m, mech, census, record, ns_of)
-        (out / "inputs" / ("in-%s.json" % s["id"])).write_text(json.dumps(d, indent=1), encoding="utf-8")
+        (out / "inputs" / ("in-%s.json" % s["id"])).write_text(json.dumps(d, indent=1), encoding="utf-8", newline="\n")
     for x in pending:
         print("r2_inputs: PENDING %s — analyzers not yet measured" % x)
-    (out / "inputs" / "in-duplication.json").write_text(json.dumps(duplication_input(m, census), indent=1), encoding="utf-8")
-    (out / "inputs" / "perf.json").write_text(json.dumps(perf_input(), indent=1), encoding="utf-8")
+    (out / "inputs" / "in-duplication.json").write_text(json.dumps(duplication_input(m, census), indent=1), encoding="utf-8", newline="\n")
+    (out / "inputs" / "perf.json").write_text(json.dumps(perf_input(), indent=1), encoding="utf-8", newline="\n")
     print("=== R2 INPUTS: WROTE %d shard inputs, %d pending, at %s (semgrep %d files, analyzers %d files, drift %d files) to %s ===" % (
         len(m["shards"]) - len(pending), len(pending), commit[:12], len(mech["semgrep"]), len(mech["analyzers"]), len(mech["drift"]), out))
     return 0
@@ -505,13 +505,13 @@ def self_test():
         out = Path(tmp)
         (out / "inputs").mkdir()
         (out / "shards.json").write_text(json.dumps({"commit": "c", "shards": [
-            {"id": "cli", "name": "CLI", "lines": 3, "files": [["a", 3]]}]}), encoding="utf-8")
+            {"id": "cli", "name": "CLI", "lines": 3, "files": [["a", 3]]}]}), encoding="utf-8", newline="\n")
         try:
             batch_args(out, ["cli"], ["architecture"], "P", False, 8, "S", "G")
             arm("batch args refuse a shard with no input file", False)
         except SystemExit:
             arm("batch args refuse a shard with no input file", True)
-        (out / "inputs" / "in-cli.json").write_text("{}", encoding="utf-8")
+        (out / "inputs" / "in-cli.json").write_text("{}", encoding="utf-8", newline="\n")
         a = batch_args(out, ["cli"], ["architecture", "code"], "P", True, 8, "S", "G", "7")
         arm("batch args carry the shard's files, input, stops, dimensions and the batch's own directory",
             a["shards"][0]["files"] == ["a"] and a["stopFile"] == "S" and a["globalStopFile"] == "G" and a["duplicationPass"]
@@ -600,7 +600,7 @@ def main():
             return r2_cost.REFUSED
         dest = Path(args["outDir"]) / "batch-args.json"
         dest.parent.mkdir(parents=True, exist_ok=True)
-        dest.write_text(json.dumps(args, indent=1), encoding="utf-8")
+        dest.write_text(json.dumps(args, indent=1), encoding="utf-8", newline="\n")
         print("=== R2 INPUTS: WROTE batch args %s (%d shards x %d dimensions%s, pin %s) ===" % (
             dest, len(args["shards"]), len(args["dimensions"]), " + duplication pass" if a.duplication else "",
             m["commit"][:12]))
@@ -608,7 +608,7 @@ def main():
     if not a.pin:
         ap.error("--pin is required to build the inputs")
     a.out.mkdir(parents=True, exist_ok=True)
-    (a.out / "pin.json").write_text(json.dumps({"pin": str(a.pin)}), encoding="utf-8")
+    (a.out / "pin.json").write_text(json.dumps({"pin": str(a.pin)}), encoding="utf-8", newline="\n")
     return build(a.pin, a.out, a.max_lines,
                  set(x.strip() for x in a.projects.split(",")) if a.projects else None)
 

@@ -1,15 +1,14 @@
-# Workflow scripts must stay LF-only. Git's autocrlf rewrites them to CRLF on checkout, and the Workflow tool's
-# permission layer refuses a script containing control characters — CR is one — so a CRLF'd script cannot be
-# launched at all. The failure message ("script contains control characters") does not name the cause.
-.claude/workflows/*.js text eol=lf
-.claude/skills/workstream/templates/*.js text eol=lf
-
-# Shell scripts must stay LF-only for the same reason bash needs it: a CRLF'd script dies at its first `set -u\r`
-# ("set: -: invalid option", then "$'\r': command not found"). Under core.autocrlf=true every FRESH Windows
-# checkout — each agent worktree — got CRLF scripts, so `wsl … bash scripts/linux-gate.sh` (MANDATORY-PRACTICES
-# I8, kb/Work PB1732) could not start in any worktree but the one the script was written in (measured 2026-09-29,
-# wave 72 group G). Git Bash on Windows runs LF scripts unchanged.
-*.sh text eol=lf
+# ⛔ ONE LINE ENDING: LF, IN THE OBJECT DATABASE AND IN EVERY CHECKOUT, ON EVERY OS (kb/Work PB3029; owner 2026-10-11:
+# "We should probably standardize on a single line-ending format. CRLF vs others keeps biting us"). Git stores a text
+# file LF and checks it out LF whatever `core.autocrlf` says (Git for Windows' system gitconfig sets it true), so a
+# Windows gate and a Linux gate read the SAME bytes from the same commit. Before this rule every Windows checkout was
+# CRLF, and two narrower rules here forced LF where a CR broke a tool outright: a CRLF'd shell script dies at its first
+# `set -u\r` (kb/Work PB1732, wave 72 group G), and the Workflow tool refuses a script holding a CR as "control
+# characters". A file git's heuristic calls binary (a NUL, or a lone CR) is stored as-is, so
+# `scripts/line_endings.py --check` (a gate audit, and CI's) refuses a CR in any tracked TEXT file, in the index or in
+# the checkout. A file that must keep its bytes is declared `-text` below, WITH ITS REASON. Nothing here must be CRLF
+# (no .bat or .cmd is tracked; one would be declared `eol=crlf` here, with its reason).
+* text=auto eol=lf
 
 # DEVLOG.md is the ONE tracked file stored with CRLF in the object database (every other text file normalizes to
 # LF under core.autocrlf). That was implicit — no attribute governed it — and the log's append discipline depends
@@ -36,3 +35,7 @@ tests/Cobol.Net.Tests.Unit/TestData/segmentation/*.txt -text
 # scripts/orchestrator/train_apply.py uses, honors it), and a stale line union keeps fails the build (RS0017), so the
 # gate still sees a wrong set (kb/Work PB2885).
 src/**/PublicAPI.*.txt merge=union
+
+# A conformance fixture whose BYTES are its subject: CR LF terminates a free-form line, and a CR not followed by a LINE
+# FEED is a character of the line (DOC-A.1-156, kb/Work PB1496), so it keeps its CR LF terminators and its lone CRs.
+tests/conformance/2023/pb1496_lone_cr_is_a_character.cob -text

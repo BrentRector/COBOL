@@ -21,14 +21,14 @@ REPO = TMP / "repo"
 (REPO / "src" / "Cobol.Net.Editions" / "Diagnostics").mkdir(parents=True)
 (REPO / "src" / "A" / "bin").mkdir(parents=True)
 (REPO / "DEVLOG.md").write_text("# DEVLOG\n\nordering note: newest first\n\n## Entry 41 — x\n\n## Entry 40 — y\n",
-                                encoding="utf-8")
+                                encoding="utf-8", newline="\n")
 for n in (7, 12, 9):
-    (REPO / "kb" / "Work" / f"PB{n}.md").write_text("---\nid: x\n---\n", encoding="utf-8")
-(REPO / "kb" / "Work" / "PB99-notes.txt").write_text("not a note", encoding="utf-8")
+    (REPO / "kb" / "Work" / f"PB{n}.md").write_text("---\nid: x\n---\n", encoding="utf-8", newline="\n")
+(REPO / "kb" / "Work" / "PB99-notes.txt").write_text("not a note", encoding="utf-8", newline="\n")
 (REPO / "src" / "Cobol.Net.Editions" / "Diagnostics" / "DiagnosticCatalog.cs").write_text(
-    'Add("COBOLNET0100", ...); Add("COBOLNET0105", ...);', encoding="utf-8")
-(REPO / "src" / "A" / "X.cs").write_text("// emits COBOLNET0103 and COBOLNET0101", encoding="utf-8")
-(REPO / "src" / "A" / "bin" / "Y.cs").write_text("// COBOLNET9999 lives in bin and is ignored", encoding="utf-8")
+    'Add("COBOLNET0100", ...); Add("COBOLNET0105", ...);', encoding="utf-8", newline="\n")
+(REPO / "src" / "A" / "X.cs").write_text("// emits COBOLNET0103 and COBOLNET0101", encoding="utf-8", newline="\n")
+(REPO / "src" / "A" / "bin" / "Y.cs").write_text("// COBOLNET9999 lives in bin and is ignored", encoding="utf-8", newline="\n")
 
 fails = []
 checked = []
@@ -66,7 +66,7 @@ rc, line = run(c1, "peek", "code", "--probe")
 check("probe line names the reserved mark", line.endswith("reserved max COBOLNET0109 → next free = COBOLNET0110"), True)
 
 # 3. truth wins over a stale reservation (a note landed past the reserved mark)
-(REPO / "kb" / "Work" / "PB50.md").write_text("---\n---\n", encoding="utf-8")
+(REPO / "kb" / "Work" / "PB50.md").write_text("---\n---\n", encoding="utf-8", newline="\n")
 check("truth wins", run(c1, "pb", "1"), (0, "PB51"))
 
 # 4. seed raises, never lowers
@@ -81,7 +81,7 @@ check("zero count refused", run(c1, "pb", "0")[0], 2)
 c2 = TMP / "c2"
 c2.mkdir()
 lock = c2 / "alloc.lock"
-lock.write_text("12345 0\n", encoding="utf-8")
+lock.write_text("12345 0\n", encoding="utf-8", newline="\n")
 old = time.time() - coord.LOCK_STALE_S - 5
 os.utime(lock, (old, old))
 t0 = time.monotonic()
@@ -100,7 +100,7 @@ WORKER.write_text(
     "for _ in range(6):\n"
     "    r = subprocess.run([sys.executable, sys.argv[2], 'code', '3', '--repo', sys.argv[3]], capture_output=True, text=True)\n"
     "    print(r.stdout.strip() if r.returncode == 0 else 'ERR ' + r.stderr.strip())\n",
-    encoding="utf-8")
+    encoding="utf-8", newline="\n")
 start = time.time() + 3
 env = dict(os.environ, COBOL_COORD_DIR=str(c3))
 procs = [subprocess.Popen([sys.executable, str(WORKER), str(start), str(ALLOC), str(REPO)], stdout=subprocess.PIPE,

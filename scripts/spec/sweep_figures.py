@@ -447,7 +447,7 @@ def main() -> int:
         out = list(lines)
         for a, b, repl in sorted(edits, reverse=True):
             out[a:b] = repl
-        SPEC_MD.write_text("\n".join(out) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied {len(edits)} figure(s) to {SPEC_MD}")
         return 0
     if args.check:

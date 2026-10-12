@@ -170,7 +170,7 @@ def main() -> int:
         for f in findings:
             print(f"  p{f['page']:<5} {', '.join(f['lost'])}")
     if args.json:
-        pathlib.Path(args.json).write_text(json.dumps(findings, indent=2), encoding="utf-8")
+        pathlib.Path(args.json).write_text(json.dumps(findings, indent=2), encoding="utf-8", newline="\n")
         print(f"\nwrote {args.json}")
     return 0
 

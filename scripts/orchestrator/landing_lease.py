@@ -155,7 +155,7 @@ def describe(lease: dict[str, Any], now: dt.datetime | None = None) -> str:
 
 
 def _log(cdir: pathlib.Path, event: dict[str, Any]) -> None:
-    with (cdir / LOG).open("a", encoding="utf-8") as f:
+    with (cdir / LOG).open("a", encoding="utf-8", newline="\n") as f:
         f.write(json.dumps(event) + "\n")
 
 
@@ -319,7 +319,7 @@ def _self_test(root: pathlib.Path) -> list[str]:
         "                    '--worktree', sys.argv[2], '--coord', sys.argv[3], '--wait-min', '30', '--poll-s', '0.2'])\n"
         "if r.returncode == 0:\n"
         "    pathlib.Path(sys.argv[4]).write_text('B gated', encoding='utf-8')\n"
-        "sys.exit(r.returncode)\n", encoding="utf-8")
+        "sys.exit(r.returncode)\n", encoding="utf-8", newline="\n")
     p = subprocess.Popen([sys.executable, str(lander_b), str(pathlib.Path(__file__).resolve()), b, str(cdir), str(gated)],
                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding="utf-8")
     try:
@@ -435,7 +435,7 @@ def _self_test(root: pathlib.Path) -> list[str]:
     # 8. a corrupt or foreign file is neither free nor held: every verb stops with a reason (push-main dies on it)
     arm = ARMS[7]
     for body, why in (("{ not json", "is not valid JSON"), ('{"holder": "x"}', "is not a landing lease")):
-        (cdir / FILE).write_text(body, encoding="utf-8")
+        (cdir / FILE).write_text(body, encoding="utf-8", newline="\n")
         for verb in (["acquire", "--holder", "z", "--reason", "z", "--worktree", a], ["check", "--worktree", a],
                      ["status"], ["renew", "--worktree", a], ["release", "--worktree", a]):
             r = _cli(cdir, *verb)

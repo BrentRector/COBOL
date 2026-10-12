@@ -122,7 +122,7 @@ def main() -> int:
     print(f"  left untagged      : {skipped}   (rulers, tables, PICTURE lists, general-format fragments)")
     print(f"  already tagged     : {already}")
     if args.apply:
-        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied to {SPEC_MD}")
     return 0
 

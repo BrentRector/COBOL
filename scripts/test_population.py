@@ -368,13 +368,13 @@ def synthetic_trx(path: Path, cases: list[tuple[str, list[str]]], stray_results:
     path.write_text("<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
                     "<TestRun xmlns=\"http://microsoft.com/schemas/VisualStudio/TeamTest/2010\">"
                     f"<Results>{''.join(results)}</Results><TestDefinitions>{''.join(defs)}</TestDefinitions>"
-                    "</TestRun>\n", encoding="utf-8")
+                    "</TestRun>\n", encoding="utf-8", newline="\n")
     return str(path)
 
 
 def synthetic_listing(path: Path, names: list[str]) -> str:
     path.write_text("Test run for X.dll (.NETCoreApp,Version=v10.0)\n" + LISTED_MARK + "\n"
-                    + "".join(f"    {n}\n" for n in names), encoding="utf-8")
+                    + "".join(f"    {n}\n" for n in names), encoding="utf-8", newline="\n")
     return str(path)
 
 
@@ -445,10 +445,10 @@ def self_test() -> int:
         arm("two listings that disagree are an ERROR", rc == RC_ERROR and "LISTINGS DISAGREE" in why, why)
         rc, why = rc_of(lambda: check("gone", listed, [str(d / "absent.trx")]).exact)
         arm("a missing trx is an ERROR, never a finding", rc == RC_ERROR, why)
-        (d / "bad.trx").write_text("<not-a-trx/>", encoding="utf-8")
+        (d / "bad.trx").write_text("<not-a-trx/>", encoding="utf-8", newline="\n")
         rc, why = rc_of(lambda: check("bad", listed, [str(d / "bad.trx")]).exact)
         arm("a file that is not a trx is an ERROR", rc == RC_ERROR, why)
-        (d / "nomark.txt").write_text("No test is available in X.dll\n", encoding="utf-8")
+        (d / "nomark.txt").write_text("No test is available in X.dll\n", encoding="utf-8", newline="\n")
         rc, why = rc_of(lambda: read_listings([str(d / "nomark.txt")]))
         arm("a listing without the vstest marker is an ERROR", rc == RC_ERROR, why)
         rc, why = rc_of(lambda: check("empty", read_listings([synthetic_listing(d / "e.txt", [])]),
@@ -496,7 +496,7 @@ def self_test() -> int:
         }
         for rel, text in files.items():
             (r / rel).parent.mkdir(parents=True, exist_ok=True)
-            (r / rel).write_text(text, encoding="utf-8")
+            (r / rel).write_text(text, encoding="utf-8", newline="\n")
         sites, offenders = audit_callers(r)
         flagged = {o.split(":", 1)[0] for o in offenders}
         want = {"scripts/bad.sh", "scripts/bad.ps1", "scripts/bad.py", "scripts/instruction.py",
@@ -556,7 +556,7 @@ def main(argv: list[str]) -> int:
     try:
         if args.cmd == "list":
             names, raw = list_population(args.project, args.configuration)
-            Path(args.out).write_text(raw, encoding="utf-8")
+            Path(args.out).write_text(raw, encoding="utf-8", newline="\n")
             print(f"test_population: {sum(names.values()):,} cases listed for {args.project} -> {args.out}")
             return RC_EXACT
         if args.cmd == "audit-callers":
@@ -574,7 +574,7 @@ def main(argv: list[str]) -> int:
         if args.project:
             listed, raw = list_population(args.project, args.configuration)
             if args.save_listing:
-                Path(args.save_listing).write_text(raw, encoding="utf-8")
+                Path(args.save_listing).write_text(raw, encoding="utf-8", newline="\n")
         else:
             if args.configuration or args.save_listing:
                 ap.error("--configuration and --save-listing go with --project")

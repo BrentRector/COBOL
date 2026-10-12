@@ -35,7 +35,7 @@ def acct(name, uuid):
     row = next(r for r in RULES["accounts"]["list"] if r["name"] == name)
     d = TMP / name
     d.mkdir(exist_ok=True)
-    (d / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": uuid}}), encoding="utf-8")
+    (d / ".claude.json").write_text(json.dumps({"oauthAccount": {"accountUuid": uuid}}), encoding="utf-8", newline="\n")
     return accounts.Account(name=name, config_dir=d, explicit=True, weekly_reset=row["weekly_reset"],
                             quota={**RULES["quota"], **row.get("quota", {})})
 

@@ -241,9 +241,9 @@ public sealed class CobolWordsDriftTests
 
         // §4.2.10: "Documentation … shall specify any reserved words added for nonstandard extensions."
         string conformance = File.ReadAllText(TestRepo.Docs("CONFORMANCE.md"));
-        var d = Regex.Match(conformance, @"\*\*D-RW1 .*?\r?\n\r?\n", RegexOptions.Singleline);   // CONFORMANCE.md is CRLF
+        var d = Regex.Match(conformance, @"\*\*D-RW1 .*?\r?\n\r?\n", RegexOptions.Singleline);   // a CR never hides the block
         Assert.True(d.Success, "docs/CONFORMANCE.md lost its D-RW1 determination (§4.2.10 documentation)");
-        // The bold list wraps across (CRLF) lines, so the separator is a comma plus ANY whitespace.
+        // The bold list wraps across lines, so the separator is a comma plus ANY whitespace.
         var documented = Regex.Matches(d.Value, @"\*\*([A-Z][A-Z0-9-]*(?:,\s+[A-Z][A-Z0-9-]*)+)\*\*")
             .SelectMany(m => Regex.Split(m.Groups[1].Value, @",\s+")).ToHashSet(StringComparer.Ordinal);
         Assert.True(documented.SetEquals(extension),

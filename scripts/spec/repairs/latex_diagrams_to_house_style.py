@@ -183,7 +183,7 @@ def main() -> int:
         return 0
 
     text = "\n".join(lines) + "\n"
-    SPEC.write_text(text, encoding="utf-8")
+    SPEC.write_text(text, encoding="utf-8", newline="\n")
 
     if "\\left" in text:
         n = sum(1 for l in text.splitlines() if "\\left" in l)

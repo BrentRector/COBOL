@@ -1547,8 +1547,9 @@ can never redirect it into the real repository. And the script snapshots the rea
 `core.worktree` before the legs and is RED (`repository-written`) when either changed. (Not the worktree list:
 other agents add and remove worktrees of the shared repository while it runs.)
 
-**Line endings.** `.gitattributes` keeps `*.sh` LF. Under `core.autocrlf=true` a fresh Windows worktree otherwise
-checks the script out CRLF, and bash dies at its first line (`set: -: invalid option`).
+**Line endings.** Every tracked text file is LF on every checkout (`.gitattributes` `* text=auto eol=lf`, kb/Work
+PB3029, §3.17.4). Before it, `core.autocrlf=true` checked a script out CRLF in every fresh Windows worktree, and bash
+died at its first line (`set: -: invalid option`).
 
 **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line naming the HEAD it tested. NOT RUN is never green.
 
@@ -1755,9 +1756,15 @@ demand and not committed.
   prints the descending narrative (`DEVLOG.rendered.md` is gitignored); `devlog.py check` is what `landing_devlog.py`
   becomes (exactly one new, stamped entry file in the PR, header well-formed, number unused on `main`; a `pending-`
   file in a PR is a red). **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
-  format"):** LF everywhere — `.gitattributes` `* text=auto eol=lf`, `merge.renormalize`, one normalization landing,
-  tools write LF, a drift check refuses a CR in any tracked text file; the index is already LF for 15,234 files, so the
-  change is what the WORKING TREE shows each OS, and the entry files below are written LF. A ONE-TIME migration script
+  format"):** LF everywhere. `.gitattributes` opens with `* text=auto eol=lf`, so git stores and checks out every text
+  file LF on every OS; a file that must keep its bytes is declared `-text` there with its reason. One normalization
+  landing made every blob LF (the index was already LF for 15,234 files: what changed is what each OS's WORKING TREE
+  shows). `scripts/line_endings.py --check` — a gate audit, CI's `audits` job and a `windows-build-test` step —
+  refuses a CR in a tracked text file's blob or checkout and a Python text-mode write that does not state `newline=`;
+  `--fix` rewrites a checkout made before the rule, `--fix-writers` adds `newline="\n"` to a new writer. The
+  PowerShell generators of tracked files write through `scripts/LfText.psm1` (`Set-LfContent`); the C# regeneration
+  modes already wrote `\n`. `merge.renormalize` is the documented per-clone setting (CONTRIBUTING.md). The entry
+  files below are written LF. A ONE-TIME migration script
   splits the 1,976 entries of the 7.1 MB CRLF `DEVLOG.md` into files content-faithfully with LF line endings (PB3029)
   and deletes `DEVLOG.md` and `prepend-devlog.py` in the same landing; CLAUDE.md rule 6, the `devlog` memory and skill, `session-probe`, the ledger
   and every brief that says "the TOP of DEVLOG.md" change in that landing. Rule 6's substance is untouched: one entry per

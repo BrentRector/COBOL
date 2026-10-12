@@ -220,7 +220,7 @@ def main(argv: list[str]) -> int:
     if a.out:
         a.out.parent.mkdir(parents=True, exist_ok=True)
         a.out.write_text(json.dumps({"batch": a.batch, "records": records}, indent=1, ensure_ascii=False),
-                         encoding="utf-8")
+                         encoding="utf-8", newline="\n")
         print(f"\nbatch -> {a.out}\n  next: python scripts/spec/record_verdicts.py --dry-run {a.out}")
     return 0
 

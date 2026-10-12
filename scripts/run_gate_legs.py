@@ -127,6 +127,7 @@ AUDITS = (
     ("WITNESS LOSS", ["scripts/spec/audit_witness_loss.py", "--check"]),
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
+    ("LINE ENDINGS", ["scripts/line_endings.py", "--check"]),
     ("SELF-TESTS", ["scripts/self_tests.py"]),
 )
 #: ⛔ EVERY GATE REUSES A SELF-TEST'S RECORDED PASS (kb/Work PB2914, generalized to the one gate by PB3022;
@@ -426,7 +427,7 @@ class Gate:
         out.line = f"{VERDICT}{verdict} — {detail} ==="
         if run is not None:
             (run / VERDICT_FILE).write_text(json.dumps(self._record(out, run), indent=1, sort_keys=True) + "\n",
-                                            encoding="utf-8")
+                                            encoding="utf-8", newline="\n")
         self.say(out.line)
         return out
 
@@ -548,14 +549,14 @@ class Gate:
         out.timings["build_s"] = round(time.monotonic() - t, 1)
         try:
             binaries = self.host.binaries()
-            (run / "binaries.json").write_text(json.dumps(binaries, indent=1, sort_keys=True), encoding="utf-8")
+            (run / "binaries.json").write_text(json.dumps(binaries, indent=1, sort_keys=True), encoding="utf-8", newline="\n")
             # The three listings run CONCURRENTLY, as the legs do: each is a separate `--list-tests` host (~2 s).
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(GATED_ASSEMBLIES)) as pool:
                 listed = dict(zip(GATED_ASSEMBLIES, pool.map(lambda a: self.host.listing(a, spawn), GATED_ASSEMBLIES)))
             listings = {}
             for asm, (names, raw) in listed.items():
                 listings[asm] = names
-                (run / f"listing-{asm}.txt").write_text(raw, encoding="utf-8")
+                (run / f"listing-{asm}.txt").write_text(raw, encoding="utf-8", newline="\n")
         except PopulationError as e:
             return self._finish(out, run, "NOT RUN", f"the population could not be listed: {e}", 2)
 
@@ -684,7 +685,7 @@ class Gate:
             if stopped:
                 named = [l for l in lines[1:] if l.lstrip().startswith("NOT RUN")]
                 out.not_run[asm] = sum(pop.never_ran.values())
-                (run / f"not-run-{asm}.txt").write_text("\n".join(named) + "\n", encoding="utf-8")
+                (run / f"not-run-{asm}.txt").write_text("\n".join(named) + "\n", encoding="utf-8", newline="\n")
                 lines = [lines[0], *[l for l in lines[1:] if l not in named], *named[:NOT_RUN_SHOWN]]
                 if len(named) > NOT_RUN_SHOWN:
                     lines.append(f"  … {len(named) - NOT_RUN_SHOWN:,} more NOT RUN, every one named in "
@@ -915,7 +916,7 @@ class FakeHost(Host):
         log = [f"  Failed {cases[0][0]} [1 s]", "  Error Message:", "   PLANTED-RED-MESSAGE"] if red else []
         log.append(f"{'Failed!' if red else 'Passed!'}  - Failed:     {failed}, Passed:     {passed}, Skipped:     0, "
                    f"Total:     {len(cases)}, Duration: 1 s - Cobol.Net.Tests.{asm}.dll (net10.0)")
-        (run / f"{stem}.log").write_text("\n".join(log) + "\n", encoding="utf-8")
+        (run / f"{stem}.log").write_text("\n".join(log) + "\n", encoding="utf-8", newline="\n")
         if planned:
             rec = {"schema": 1, "assembly": asm, "leg": leg, "plan_sha256": env["COBOLNET_GATE_PLAN_SHA256"],
                    "plan_content_sha256": self.plan_obj["sha256"],
@@ -926,7 +927,7 @@ class FakeHost(Host):
                 rec["plan_sha256"] = "f" * 64
             if "binary" in self.plant and asm == "Conformance" and leg == 2:
                 rec["product_assemblies"] = {"Cobol.Net.Compiler.dll": "rebuilt-between-legs"}
-            (run / f"{stem}.json").write_text(json.dumps(rec), encoding="utf-8")
+            (run / f"{stem}.json").write_text(json.dumps(rec), encoding="utf-8", newline="\n")
         return 1 if red else 0
 
 
@@ -1146,7 +1147,7 @@ def self_test() -> int:
         for i in range(7):
             p = d / "runs" / f"2026010{i}T000000Z-00000{i}"
             p.mkdir()
-            (p / VERDICT_FILE).write_text("{}", encoding="utf-8")
+            (p / VERDICT_FILE).write_text("{}", encoding="utf-8", newline="\n")
             synthetic_trx(p / "leg-1-Unit.trx", [("N.Unit.A", ["Passed"])])
         (d / "runs" / "20260109T000000Z-000009").mkdir()  # newest, but it never reached a verdict
         g = Gate(FakeHost(d, d / "gate.lock"), d / "runs", say=sink.append)

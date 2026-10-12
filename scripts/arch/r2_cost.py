@@ -342,7 +342,7 @@ def self_test() -> int:
                                                 "cache_read_input_tokens": 999}}},
             {"message": {"id": "m1", "usage": {"input_tokens": 1, "output_tokens": 50, "cache_creation_input_tokens": 10}}},
             {"message": {"id": "m2", "usage": {"input_tokens": 2, "output_tokens": 3, "cache_creation_input_tokens": 0}}},
-            {"type": "user"})) + "\n{broken\n", encoding="utf-8")
+            {"type": "user"})) + "\n{broken\n", encoding="utf-8", newline="\n")
         arm("a transcript's counted tokens: per message its largest usage, cache reads not counted",
             transcript_tokens(t) == 61 + 5)
     arm("agents are classed by their label", [agent_kind(x) for x in (

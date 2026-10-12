@@ -313,7 +313,7 @@ def private_git_config(scratch: Path) -> Path:
     PB1957). The system config (Git for Windows' core.autocrlf) is left as it is, as on every host."""
     cfg = scratch / "gitconfig"
     cfg.write_text("\n".join(["[user]", f"\tname = {GIT_IDENTITY[0]}", f"\temail = {GIT_IDENTITY[1]}", ""]),
-                   encoding="utf-8")
+                   encoding="utf-8", newline="\n")
     return cfg
 
 
@@ -705,12 +705,12 @@ def self_test() -> int:
             "import os, subprocess, sys\nprint('coord=' + os.environ.get('COBOL_COORD_DIR', ''))\n"
             "print('user=' + subprocess.run(['git', 'config', '--global', 'user.name'], capture_output=True,"
             " text=True).stdout.strip())\n"
-            "sys.exit(0 if os.environ.get('GIT_DIR') is None else 3)\n", encoding="utf-8")
+            "sys.exit(0 if os.environ.get('GIT_DIR') is None else 3)\n", encoding="utf-8", newline="\n")
         (root / "scripts" / "test_red.py").write_text("import sys\nprint('planted failure')\nsys.exit(1)\n",
-                                                      encoding="utf-8")
+                                                      encoding="utf-8", newline="\n")
         (root / "scripts" / "elsewhere.py").write_text(
             f"# SELF-TEST-PLATFORM: {other} — planted\nimport sys\nif '--self-test' in sys.argv: sys.exit(1)\n",
-            encoding="utf-8")
+            encoding="utf-8", newline="\n")
         env = _scrubbed_env(os.environ)
         for cmd in (["init", "-q"], ["add", "-A"]):
             subprocess.run(["git", *cmd], cwd=root, check=True, capture_output=True, env=env)
@@ -788,9 +788,9 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         root, spans_dir = Path(d), Path(s)
         (root / "scripts").mkdir()
         (root / "data").mkdir()
-        (root / "data" / "a.txt").write_text("a\n", encoding="utf-8")
-        (root / "data" / "c.txt").write_text("c\n", encoding="utf-8")
-        (root / "scripts" / "helper_b.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (root / "data" / "a.txt").write_text("a\n", encoding="utf-8", newline="\n")
+        (root / "data" / "c.txt").write_text("c\n", encoding="utf-8", newline="\n")
+        (root / "scripts" / "helper_b.py").write_text("VALUE = 1\n", encoding="utf-8", newline="\n")
         span = ("import os, sys, time\nt0 = time.time(); time.sleep({sleep}); t1 = time.time()\n"
                 f"open(os.path.join({str(spans_dir)!r}, '%s-%d-%s' % (os.path.basename(sys.argv[0]), os.getpid(),"
                 " os.urandom(4).hex())), 'w').write('%f %f' % (t0, t1))\n")
@@ -800,8 +800,8 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
             "test_c.py": "open('data/' + 'c' + '.txt').read()\n",          # a name built at run time: only the trace sees it
         }
         for name, body in bodies.items():
-            (root / "scripts" / name).write_text(body + span.format(sleep=_FLEET_SLEEP_S), encoding="utf-8")
-        (root / "scripts" / "test_hang.py").write_text("import time\ntime.sleep(60)\n", encoding="utf-8")
+            (root / "scripts" / name).write_text(body + span.format(sleep=_FLEET_SLEEP_S), encoding="utf-8", newline="\n")
+        (root / "scripts" / "test_hang.py").write_text("import time\ntime.sleep(60)\n", encoding="utf-8", newline="\n")
         env = _scrubbed_env(os.environ)
         for cmd in (["init", "-q"], ["add", "-A"]):
             subprocess.run(["git", *cmd], cwd=root, check=True, capture_output=True, env=env)
@@ -835,7 +835,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
               rec is not None and "data/c.txt" in rec["deps"]["files"], True)
         bad = PassStore(store_dir)._dir("scripts/test_a.py", plat) / "malformed.json"
         bad.write_text(json.dumps({"schema": PASS_SCHEMA, "test": "scripts/test_a.py", "python": _python(),
-                                   "deps": {"files": 5}}), encoding="utf-8")
+                                   "deps": {"files": 5}}), encoding="utf-8", newline="\n")
         try:
             found_a = PassStore(store_dir).find("scripts/test_a.py", plat, inputs.Tree.load(root)) is not None
         except Exception as e:  # noqa: BLE001 — the arm reports a raise as its failure
@@ -847,7 +847,7 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
         unchanged = fleet(True)
         check(f"arm: {_FLEET_GATES} concurrent gates on an unchanged tree re-run nothing (every one REUSED)",
               ({r.state for g in unchanged for r in g}, set(spans_dir.iterdir()) - before), ({REUSED}, set()))
-        (root / "data" / "c.txt").write_text("c changed\n", encoding="utf-8")
+        (root / "data" / "c.txt").write_text("c changed\n", encoding="utf-8", newline="\n")
         before = set(spans_dir.iterdir())
         changed = fleet(True)
         by_test = {t.path: {r.state for g in changed for r in g if r.test.path == t.path} for t in tests}
@@ -865,17 +865,17 @@ def fleet_arms(check: Callable[[str, object, object], None]) -> None:
               f"at a time, and none hangs",
               (len(new_runs("test_c.py", before)), _max_overlap(new_runs("test_c.py", before)) <= _FLEET_CAP,
                {r.state for g in crowd for r in g}), (_FLEET_GATES, True, {GREEN}))
-        (root / "scripts" / "helper_b.py").write_text("VALUE = 2\n", encoding="utf-8")
+        (root / "scripts" / "helper_b.py").write_text("VALUE = 2\n", encoding="utf-8", newline="\n")
         again = gate(True, [])
         check("arm: an edited import re-runs the self-test that imports it, and only that one",
               {r.test.path: r.state for r in again},
               {"scripts/test_a.py": REUSED, "scripts/test_b.py": GREEN, "scripts/test_c.py": REUSED})
         # An UNTRACKED helper (written, never `git add`ed) is keyed by its content like a tracked one: editing it
         # re-runs its importer (train 1052 review: it was keyed "-" whatever it held, a false REUSED).
-        (root / "scripts" / "helper_u.py").write_text("VALUE = 1\n", encoding="utf-8")
-        (root / "scripts" / "helper_b.py").write_text("import helper_u\nVALUE = 3\n", encoding="utf-8")
+        (root / "scripts" / "helper_u.py").write_text("VALUE = 1\n", encoding="utf-8", newline="\n")
+        (root / "scripts" / "helper_b.py").write_text("import helper_u\nVALUE = 3\n", encoding="utf-8", newline="\n")
         gate(True, [])
-        (root / "scripts" / "helper_u.py").write_text("VALUE = 2\n", encoding="utf-8")
+        (root / "scripts" / "helper_u.py").write_text("VALUE = 2\n", encoding="utf-8", newline="\n")
         again = gate(True, [])
         check("arm: an edited UNTRACKED import re-runs the self-test that imports it, and only that one",
               {r.test.path: r.state for r in again},

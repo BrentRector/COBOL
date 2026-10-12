@@ -890,5 +890,5 @@ def write_inventory(rows: list[dict[str, Any]]) -> None:
     """
     INVENTORY_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = INVENTORY_PATH.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+    tmp.write_text(json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     tmp.replace(INVENTORY_PATH)

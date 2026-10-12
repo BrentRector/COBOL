@@ -124,7 +124,7 @@ def main() -> int:
         print(f"\n{applied} edit(s) would be applied. DRY RUN — nothing written.")
         return 0
 
-    SPEC.write_text(text, encoding="utf-8")
+    SPEC.write_text(text, encoding="utf-8", newline="\n")
     banned = "underlined alternative marks the default"
     if banned in text:
         sys.exit(f"FATAL: the invented notation rule still appears in the file")
