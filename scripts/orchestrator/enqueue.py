@@ -963,20 +963,20 @@ def self_test() -> int:
                    f"class {gate_slot.LANDING}"), str(got))
         probe_log = (wt / "TestResults" / "enqueue" / "probe-gate.log").read_text(encoding="utf-8", errors="replace")
         took, ran_at = probe_log.find("gate-slot: took slot"), probe_log.find("=== PROBE GATE: ")
-        linux_argv = gate_argv(next(r for r in GATES_WINDOWS if r.host == "Linux"), wt, "enqueue b")
+        linux_row = next((r for r in GATES_WINDOWS if isinstance(r, GateRow) and r.host == "Linux"), None)
+        linux_argv = gate_argv(linux_row, wt, "enqueue b") if linux_row else []
         expect("gate rows: the Linux row runs under `gate_slot.py run` with the landing class, and the slot is taken "
                "before its command starts (kb/Work PB3104)",
-               0 <= took < ran_at and got and got[0][2].endswith(f"class {gate_slot.LANDING}")
+               0 <= took < ran_at and got and got[0][2].endswith(f"class {gate_slot.LANDING}") and "--" in linux_argv
                and linux_argv[1:3] == [str(HERE.parent / "gate_slot.py"), "run"]
                and linux_argv[linux_argv.index("--") + 1:] == ["bash", "scripts/linux-gate.sh", "--nice"],
                f"took={took} ran={ran_at} {linux_argv}")
 
         repo_root = HERE.parent.parent
+        every_row = unslotted(GATES_WINDOWS + GATES_LINUX, repo_root)
         expect("gate rows: every row of GATES_WINDOWS and GATES_LINUX takes the shared gate slot, build-local through "
-               "run_gate_legs.py and every other row under `gate_slot.py run` (kb/Work PB3104)",
-               not unslotted(GATES_WINDOWS + GATES_LINUX, repo_root)
-               and {r.slot for r in GATES_WINDOWS if r.host == "Linux"} == {SLOT_WRAP},
-               str(unslotted(GATES_WINDOWS + GATES_LINUX, repo_root)))
+               "run_gate_legs.py and every other row under `gate_slot.py run` (kb/Work PB3104)", not every_row,
+               str(every_row))
 
         linux_cmd = ("bash", "scripts/linux-gate.sh", "--nice")
         planted = [("Planted", list(linux_cmd), "=== LINUX GATE: "),          # the row as it stood before PB3104

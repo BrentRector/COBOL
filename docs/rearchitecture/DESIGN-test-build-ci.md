@@ -1733,7 +1733,10 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
    whole population, no waiting for CI. Until the targeted leg runs on both hosts (§3.17.3, PB3022 item 10) the
-   gate at enqueue adds CI's Linux legs under WSL (`linux-gate.sh --nice`); then that row goes.
+   gate at enqueue adds CI's Linux legs under WSL (`linux-gate.sh --nice`), run under `gate_slot.py run` as a
+   landing ticket of the same shared gate slot (§3.14.6; kb/Work PB3104: run bare, seven concurrent landings ran seven
+   uncapped WSL gates and load alone turned five RED); then that row goes. Every gate row declares how it takes its
+   slot and `enqueue.py` runs no row while one would run outside it.
 4. **The merge queue** (PB3024): GitHub builds the merge group (several queued PRs on top of `main`), the workflow runs on
    the `merge_group` event — the full matrix: Linux and Windows, the sharded conformance legs, unit + characterization,
    the population check (§3.14.4), audits, guard, INV-1 — `ci-gate` stays the one required check, and main advances in
