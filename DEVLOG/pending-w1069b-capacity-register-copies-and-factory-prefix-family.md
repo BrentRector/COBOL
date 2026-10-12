@@ -35,3 +35,14 @@ error. The same defect in another arm: the CS0542 rename of a METHOD-ID spelled 
 `CobolWordDerivedPrefixes`, so `SynthesizedNameFamilyDriftTests` holds every emitter literal out of them, and
 `IdentifierInjectivityTests` pins that no identifier begins with `__` and that the runtime's BASE factory type is the
 convention's name for BASE. Golden `2002/pb2921_factory_named_class`. All 244 OO positive goldens re-run on the build.
+
+Renaming the runtime's public `BASE__FACTORY` to `__FACTORY_BASE` is an incompatible change of the shipped surface, so
+the gate's `RuntimeAbiPinDriftTests` asked for the documented step (DESIGN-external-repository §15.4): the product
+version goes 2.0.0 → 3.0.0, the test pins major 3 beside the new surface hash, and the 14 characterization snapshots
+name the runtime `3.0.0.0`. A local harness that re-ran the 244 OO goldens in their own directories rewrote a tracked
+data file with CRLF and the gate's LINE ENDINGS audit caught it (`line_endings.py --fix`).
+
+PB3030 (the bit-bearing OCCURS DEPENDING member beside a runtime-length table) re-probed and still the COBOLNET1756
+stage; it is a third mechanism (the current-extent composer's ODO prefix in bit units, through the record layout) and
+was split to a finisher with its design written into the note. Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
+gating, PB2515): GREEN ===` (run 20261012T194921Z-2feabf).
