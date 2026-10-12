@@ -2,16 +2,16 @@ RULES FOR EVERY ORCHESTRATOR UNIT (docs/rearchitecture/DESIGN-orchestrator-loop.
 these rules before the unit's own text). You are one bounded unit of an unattended loop in a FRESH headless session; the
 supervisor starts the next unit after you end.
 - First load the `session-start` skill, then read the previous handoff {PREV_HANDOFF} (absent on a first run).
-- Before EACH new step, and IMMEDIATELY before any Workflow call or implementer/lander dispatch, check whether
+- Before EACH new step, and IMMEDIATELY before any Workflow call or implementer/finisher dispatch, check whether
   {STOP_UNIT} exists. If it does, start no new step and launch no fleet (the dispatch guard refuses it in a loop unit):
   finish the current step, write the handoff and end. With a fleet in flight the current step IS supervising it: never
-  end the session; wait for it to return and its trains to land, then hand off naming every unlanded branch, worktree and
+  end the session; wait for it to return, then hand off naming every unlanded branch, worktree and
   report (`next_unit: resume` when any is left). Whether the fleet itself stops is the SUPERVISOR's decision: it creates
   the loop's fleet stop `{FLEET_STOP}` only for STOP or the hard context cap; never create it, nor the owner's global
   `{GLOBAL_STOP}`, yourself (kb/Work PB2597).
 - Frequent handoffs: the supervisor writes `{COORD}\checkpoint.json` (counters, worktrees, background tasks) on its own every
-  few minutes, but it cannot see what you decided. At EVERY milestone (the plan written, the fleet started, a train
-  landed, a branch classified, a decision and its reason) append ONE line to `{COORD}\milestones.jsonl` as you go:
+  few minutes, but it cannot see what you decided. At EVERY milestone (the plan written, the fleet started, a branch
+  enqueued or landed, a branch classified, a decision and its reason) append ONE line to `{COORD}\milestones.jsonl` as you go:
   `{"at":"<ISO time>","what":"<one sentence>"}` plus `"shas"` or `"branches"` when there are some. If you die at minute 100, the
   supervisor builds your handoff from these lines and the checkpoint; whatever you did not write down is lost.
 - End by writing {HANDOFF}: JSON valid against scripts/orchestrator/handoff.schema.json, `summary` at most 900
@@ -21,8 +21,8 @@ supervisor starts the next unit after you end.
 - A decision only the owner can make: never guess. End with `outcome: owner-question` and `owner_question`
   (CLAUDE.md rule 7; memory feedback_spec_before_asking_owner: search the ISO text first).
 - Ids and codes only from `python scripts/orchestrator/alloc.py` (never read "next free" by hand). Land only through
-  `python scripts/orchestrator/enqueue.py queue` once `ruleset.py check` reports the merge queue ACTIVE, else
-  `bash scripts/push-main.sh` (kb/Work PB3024). Never select the Fable model.
+  `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023: one pull request into the merge queue; it
+  refuses while `ruleset.py check` does not report the queue ACTIVE). Never select the Fable model.
 - FORBIDDEN: the WSL lifecycle commands `wsl --terminate`, `wsl --shutdown`, `wsl --update`, `wsl --export`,
   `wsl --unregister` (they kill every other session's Linux gate). Run WSL from PowerShell, with scripts in files.
 - The coordination directory is {COORD}; the fleet scratch directory (reports under `reports\`) is {SCRATCH}.

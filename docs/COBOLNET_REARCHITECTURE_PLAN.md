@@ -5,15 +5,15 @@
 > JSON), and `PLAN-bindtime-gating-migration.md` — all deleted; their live content is IN this document (Part II
 > = live-phase execution detail; Part III = completed-phase records; §8 = the consolidated residue ledger).
 > **Every session: read §0 FIRST; update §0 + the affected worklists BEFORE ending.** History lives ONLY in
-> `DEVLOG.md`. Design SSOTs stay separate (`docs/COBOLNET_DESIGN.md` + the `DESIGN-*.md` deep-dives) — this doc
+> `DEVLOG/`. Design SSOTs stay separate (`docs/COBOLNET_DESIGN.md` + the `DESIGN-*.md` deep-dives) — this doc
 > plans work; those specify design. Evidence ledgers stay separate (the P13 review ledger, `PHASE-*-scout-notes`).
 
 ## §0 — LIVE RESUME STATE (the ONLY live-state SSOT; keep it current every session)
 
 **THE SINGLE-WRITE RULE:** live state is written ONLY here — every other section POINTS here, never duplicates.
 Two registers own their own tally and are likewise never restated here: **`kb/Work/`** (one note per item —
-its `status` and its `closes_rows` are the tally) and `DEVLOG.md`. If you find live state written twice, fixing that is part of the session. **§0 states WHERE WE ARE,
-never how we got here — narrative belongs in `DEVLOG.md`.**
+its `status` and its `closes_rows` are the tally) and `DEVLOG/`. If you find live state written twice, fixing that is part of the session. **§0 states WHERE WE ARE,
+never how we got here — narrative belongs in `DEVLOG/`.**
 
 **SESSION BOOTSTRAP (a new session does exactly this):** ① read `CLAUDE.md` (the non-negotiable rules) → ② this §0
 → ③ `git checkout phase-14` and run **`pwsh scripts/session-probe.ps1`** (the mechanical state check: branch ·
@@ -891,7 +891,7 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
   values"**, which is PRE-EXISTING (verified by running the extractor on the pre-change tree) and unowned.
 - **PRECEDING WAVES, for provenance only** — V59 (one byte representation at every byte boundary; the 46-finding
   audit CLOSED, DEVLOG 1095–1102) and DA1–DA7 (the discovered-during-implementation set, DEVLOG 1103–1112).
-  Narrative lives in `DEVLOG.md`; §0 states where we are, never how we got here.
+  Narrative lives in `DEVLOG/`; §0 states where we are, never how we got here.
 - **⚠ A MEASURED LIMIT ON THE GnuCOBOL DIFFERENTIAL, corrected once already.** It compares COMPILE-TIME
   accept/reject verdicts, so it is blind to a change in RUNTIME OUTPUT — but NOT to a runtime-shaped defect that
   stops the program COMPILING. Six of eight fixes in the pre-merge run were PB2, whose symptom was a Roslyn
@@ -910,10 +910,11 @@ whatever its checks). An administrator exemption was
 never on the table: every push to this repository is made with the owner's credentials, so a rule that spares
 administrators spares every actor there is — the orchestrator's own pushes obey it.
 
-**LAND WITH `python scripts/orchestrator/enqueue.py queue` (kb/Work PB3024: one pull request into GitHub's merge queue,
-whose merge group runs the matrix; the queue is ACTIVE since 2026-10-11 19:14). `bash scripts/push-main.sh` is a dead
-path the ruleset refuses; PB3024's closing change, cut right after PB3023 lands, deletes it with `landing_lease.py`, their
-drift tests and the `ci/**` trigger.** Until then its mechanics stay recorded here: push-main.sh pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
+**LAND WITH `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): it merges origin/main in, gates,
+stamps the DEVLOG entry and queues one pull request into GitHub's merge queue, whose merge group runs the matrix
+(kb/Work PB3024; the queue is ACTIVE since 2026-10-11 19:14, and `land` refuses with exit 8 while it is not).
+`bash scripts/push-main.sh` is a dead path the ruleset refuses; PB3024's closing change deletes it with
+`landing_lease.py`, their drift tests and the `ci/**` trigger.** Until then its mechanics stay recorded here: push-main.sh pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
 sha, and only on green fast-forwards main and deletes the landing branch; on a red it prints the failing jobs and
 exits non-zero with main untouched. A check run is attached to the COMMIT, not to a branch, which is why the
 verdict earned on `ci/<sha>` is the one the protection reads on main. ⭐ It is IDEMPOTENT — a full matrix is
@@ -1919,8 +1920,8 @@ result. Run the long legs ONE AT A TIME.
   too. `ci-gate` is the workflow's terminal job (`if: always()`, `needs:` every other job, PASS only when each is
   `success` or `skipped`); it is the only stable check name in the file, because every matrix job's check name
   carries its shard and its filter text and every one of them is skipped on a docs-only push.
-  **The landing command is `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE (kb/Work
-  PB3024), until then `bash scripts/push-main.sh`** — push-main.sh pushes HEAD to `ci/<short-sha>`, waits for `ci-gate`
+  **The landing command is `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): a pull request
+  into the merge queue once it is ACTIVE (kb/Work PB3024), until then `bash scripts/push-main.sh`, which it runs** — push-main.sh pushes HEAD to `ci/<short-sha>`, waits for `ci-gate`
   on that exact sha, and only then fast-forwards main and deletes the branch; a red prints the failing jobs and
   exits non-zero with main untouched. It is idempotent, so a caller cut off by a command timeout re-runs it.
   ⚠ `paths-ignore` is GONE from the workflow — it made the workflow decline to START, which a required per-commit
@@ -2806,7 +2807,7 @@ result. Run the long legs ONE AT A TIME.
   with a scheduled home — rescheduling a row is an §0 edit, never a silent drop) · §12 risk register.
 - **Standing rules:** the ⛔ NON-NEGOTIABLE PROCESS RULES live in `CLAUDE.md` (spec-first with cited §s · implement
   from the deep-dive design docs · complete, never test-scoped · docs current · root-cause, never a workaround).
-  Design SSOT = `docs/COBOLNET_DESIGN.md` + the `docs/rearchitecture/DESIGN-*.md` deep-dives. History = `DEVLOG.md`.
+  Design SSOT = `docs/COBOLNET_DESIGN.md` + the `docs/rearchitecture/DESIGN-*.md` deep-dives. History = `DEVLOG/` (one file per entry).
 
 
 ---
@@ -3255,7 +3256,7 @@ already-derivable coverage; none change the pipeline.
 
 ## §10 Document map (post-consolidation)
 
-- **THIS DOC** — the only plan. `DEVLOG.md` — the only history (descending). `docs/DOC_INDEX.md` — the doc
+- **THIS DOC** — the only plan. `DEVLOG/` — the only history (one file per entry, rendered descending by `scripts/devlog.py render`). `docs/DOC_INDEX.md` — the doc
   registry (keep in sync).
 - **Design SSOTs (unchanged):** `docs/COBOLNET_DESIGN.md` (+ §0.5 deep-dive list) · `docs/rearchitecture/
   DESIGN-*.md` (10) · the subsystem `COBOLNET_*_DESIGN.md` corpus.
@@ -4139,7 +4140,7 @@ Behavior-neutrality / byte-exact checks specific to P15:
   program output. The ONLY permitted diff is the emitted `.g.cs` `using` line (the P0 emit-snapshot gate re-baseline in
   step 9).
 - **Grep gate (exit criterion 1):** the legacy-name grep in the PB2111 verification (`kb/Work/PB2111.md`) stays empty
-  outside `DEVLOG.md`, `docs/rearchitecture/LEGACY-ARCHIVE.md` and the traceability inventory's adjudication notes.
+  outside `DEVLOG/`, `docs/rearchitecture/LEGACY-ARCHIVE.md` and the traceability inventory's adjudication notes.
 
 No equivalence proof was run before the Cut-2 delete: R69 (2026-10-06) dropped it as obsolete, because the one guard
 has driven `cobol` since PB750 (2026-09-06) and no second guard remained to prove it equivalent to.
@@ -4235,8 +4236,8 @@ claims cannot rot:
 ---
 
 ### 8. Commit / DEVLOG discipline (per project rules)
-Every landing on main above gets a DEVLOG entry (kb/Work PB2605) at the TOP of `DEVLOG.md` (descending; real `date "+%Y-%m-%d %H:%M %Z"`
-stamp; `## Entry NNN — … — Title`), referencing "P15 / G8". Commit messages are forensic and end with the mandated
+Every landing on main above gets a DEVLOG entry (kb/Work PB2605): one file, `DEVLOG/NNNN-<slug>.md` (kb/Work PB3025),
+numbered and stamped at the landing by `devlog.py stamp` (`## Entry NNNN — YYYY-MM-DD HH:MM TZ — Title`), referencing "P15 / G8". Commit messages are forensic and end with the mandated
 Co-Authored-By / Claude-Session trailers. Push every checkpoint (fully-autonomous rule). After the phase, update
 this plan's §0 + `CLAUDE.md` PIVOT STATE to "G8 COMPLETE".
 

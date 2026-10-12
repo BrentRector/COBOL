@@ -75,7 +75,7 @@ def global_stop(override: str | None = None) -> pathlib.Path:
 
 def reports_dir(override: str | None = None) -> pathlib.Path:
     """THE fix-lane reports directory, `<coord>\\scratch\\reports`, whatever scratch a wave uses (MANDATORY-PRACTICES
-    O11, kb/Work PB2980). The land unit, prune_worktrees.py and plan_wave.py read only this one, so every rendered
+    O11, kb/Work PB2980). The enqueue unit, prune_worktrees.py and plan_wave.py read only this one, so every rendered
     spec names it: wave 1055 was dispatched with its own scratch, its six DONE reports went to `<scratch>\\reports`, and
     the survey never saw them. Never creates the directory."""
     return coord_path(override) / "scratch" / "reports"
@@ -216,7 +216,7 @@ def process_table() -> list[dict[str, Any]]:
 
 
 # THE LOOP'S LOCK (orchestrate.ps1 Take-Lock): {"pid", "started_at", "host"}, held while the supervisor runs; a lock
-# whose PID is gone is stale, exactly as the supervisor itself judges it. While the loop runs, its land unit is the ONE
+# whose PID is gone is stale, exactly as the supervisor itself judges it. While the loop runs, its enqueue unit is the ONE
 # landing queue: the attended session dispatches no lander (MANDATORY-PRACTICES O11, kb/Work PB2602).
 LOOP_LOCK = "orchestrate.lock"
 

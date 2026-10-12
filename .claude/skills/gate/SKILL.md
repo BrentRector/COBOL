@@ -63,9 +63,11 @@ PB2526). Each leg runs the three assemblies concurrently.
   (`TestResults/build-local/<run>/not-run-*.txt`) and prints `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
   PB2515): GREEN — … ===` (or `…: RED`). That is the done-state of every gate. **A re-gate after a fix runs leg 1
   again, never the population** (the operator's proposal 3, kb/Work PB3022): the previous reds are tier 0a and the
-  fix's reach is tier 1, so verifying a bookkeeping fix costs seconds, not a 7–34 min population run. The whole
-  population runs once, in CI, on the pushed or queued head; a CI red is ALSO a local-gate defect to root-cause (the
-  CI invariant, kb/Work PB1957).
+  fix's reach is tier 1, so verifying a bookkeeping fix costs seconds, not a 7–34 min population run. The landing
+  (`python scripts/orchestrator/enqueue.py land <branch>`, kb/Work PB3023, MANDATORY-PRACTICES L1, L2) runs this same
+  gate on the branch merged with origin/main, plus CI's Linux legs under WSL; a red at the landing is the branch's own
+  (one branch per pull request) and goes to ONE `cobol-finisher` (L12). The whole population runs once, in CI, on the
+  pushed or queued head; a CI red is ALSO a local-gate defect to root-cause (the CI invariant, kb/Work PB1957).
 - **The owner's switch back is the shared implementer scope `whole`** (`python scripts/gate_slot.py
   set-implementer-scope whole [--until ISO] [--why TEXT]`; the coded default is `leg1`). Under `whole` the implementer
   gate runs both legs FAIL-FAST: a red in leg 1 stops it `RED/INCOMPLETE` and names the remainder, and it is GREEN only
@@ -115,15 +117,16 @@ operating systems before `main` moves.
 - ⛔ **AND IT IS NO LONGER OPTIONAL TO READ IT: `ci-gate` IS A REQUIRED STATUS CHECK ON `main`.** `ci-gate` is the
   workflow's terminal job — `if: always()`, `needs:` every other job, PASS only when each is `success` or
   `skipped` — and it is the ONE stable check name the protection can require (every matrix job's check name
-  carries its shard AND its filter text, and every one of them is skipped on a docs-only push). Protection is
-  `strict: false`, `enforce_admins: true`, force-pushes and deletions off. So the landing gate is a SCRIPT, not a
-  habit: **`bash scripts/push-main.sh`** pushes HEAD to `ci/<short-sha>`, waits for `ci-gate` on that sha, and only
-  then fast-forwards main — a bare `git push origin HEAD:main` of an unverified commit is refused by the server
-  (owner decision 2026-09-06, question 23; `kb/Work/PB796`). It is idempotent: re-run it after a timeout.
-  ⭐ Once `python scripts/orchestrator/ruleset.py check` reports GitHub's merge queue ACTIVE on main (the owner
-  applies it, kb/Work PB3024), the landing is `python scripts/orchestrator/enqueue.py queue`: the same landing
-  checks, one pull request into the queue, no CI wait; the merge group runs the matrix and is the CI verdict, and a
-  pull request's own run is the cheap jobs only. enqueue.py refuses (exit 8) while the queue is not ACTIVE.
+  carries its shard AND its filter text, and every one of them is skipped on a docs-only push). It is required ON THE
+  MERGE GROUP by the ruleset on main (`scripts/orchestrator/ruleset-main.json`, applied on the owner's go, kb/Work
+  PB3024): main takes only pull requests GitHub's merge queue has tested, administrators included, so a bare
+  `git push origin HEAD:main` is refused by the server (owner decision 2026-09-06, question 23; `kb/Work/PB796`). The
+  landing is therefore a SCRIPT, not a habit: **`python scripts/orchestrator/enqueue.py land <branch>`** (kb/Work
+  PB3023) merges main in, gates, stamps the DEVLOG entry and ends in one pull request into the queue: no CI wait; the
+  merge group runs the matrix and is the CI verdict, and a pull request's own run is the cheap jobs only. It refuses
+  (exit 8) before merging or gating anything while `ruleset.py check` does not report the queue ACTIVE. Never run its
+  inner `queue` verb by hand: `land` is what merges main in, gates and stamps the DEVLOG entry. `push-main.sh` is no
+  longer a landing path (kb/Work PB3024 deletes it).
 - ⚠ **A docs-only push runs `changes` + `ci-gate` and nothing else** — seconds, not a matrix. `paths-ignore` was
   removed because a workflow that declines to START leaves a required per-commit check unsatisfiable; the same
   path list now lives in the `changes` job, one layer down, where it decides whether the MATRIX runs.

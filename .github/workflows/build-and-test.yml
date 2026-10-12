@@ -116,7 +116,7 @@ jobs:
           # wire local hooks) and the `tools/claude-skills` submodule pin. The briefs ARE validated on every push, by
           # the audits job's fleet-practices check, which is not behind `run_matrix`. A skills-and-pin commit used to
           # run the full matrix (~11 min) for nothing.
-          IGNORE='^(DEVLOG\.md|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/|\.claude/|tools/claude-skills$)'
+          IGNORE='^(DEVLOG/|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/|\.claude/|tools/claude-skills$)'
           ZERO=0000000000000000000000000000000000000000
           code=true; verified=false; reason=""; BASE=""
           if [ "$EVENT" = "pull_request" ]; then
@@ -164,7 +164,7 @@ jobs:
                 reason="$(grep -c . code.txt) path(s) outside the doc-only list, e.g. $(head -1 code.txt)"
               else
                 code=false
-                reason="every changed path is DEVLOG.md / PROMPT.md / CLAUDE.md / README.md / docs/ / kb/ / .claude/ / the tools/claude-skills pin — the matrix is skipped"
+                reason="every changed path is DEVLOG/ / PROMPT.md / CLAUDE.md / README.md / docs/ / kb/ / .claude/ / the tools/claude-skills pin — the matrix is skipped"
               fi
             fi
           fi
@@ -295,6 +295,24 @@ jobs:
           else
             python3 scripts/spec/audit_witness_loss.py --check
           fi
+      - name: DEVLOG — the landing carries exactly one new, stamped entry file (devlog.py check)
+        # Every landing on main carries its one DEVLOG entry (CLAUDE.md rule 6; kb/Work PB2605, PB3025). Checked on what
+        # a landing PROPOSES — a pull request, a merge group, a `ci/<sha>` landing branch — against the main it would
+        # land on; a push to main itself was checked as one of those.
+        if: ${{ !cancelled() && !(github.event_name == 'push' && github.ref == 'refs/heads/main') && github.event_name != 'workflow_dispatch' }}
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          # a pull request checks out its merge with the CURRENT base, whose first parent is that base
+          case "$EVENT" in
+            pull_request) BASE="$(git rev-parse HEAD^1)" ;;
+            merge_group)  BASE="$MG_BASE" ;;
+            *)            BASE="$(git merge-base refs/remotes/origin/main HEAD)" ;;
+          esac
+          python3 scripts/devlog.py check --base "$BASE" --rev HEAD
       - name: Rule catalog — the unharvested-rule manifest agrees with the transcription (extract_rule_catalog.py --check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/extract_rule_catalog.py --check

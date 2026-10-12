@@ -61,7 +61,7 @@ param(
     [string]$PermissionMode = 'bypassPermissions',   # owner 2026-10-04 (D1): allowed for the COBOL work; the repo's hooks are the guard
     [double]$GraceMinutes = 30,
     [int]$BorrowDays = 0,
-    [ValidateSet('', 'wave', 'campaign', 'land', 'resume', 'meter')]
+    [ValidateSet('', 'wave', 'campaign', 'enqueue', 'resume', 'meter')]
     [string]$Unit = '',
     # The campaign lane: the kb/Work clusters (each a lead note's id, or a campaign name; several are comma-separated,
     # because `pwsh -File` passes `-Cluster A,B` as one string) whose waves run between fix-lane waves, in turn.
@@ -84,7 +84,7 @@ Set-StrictMode -Version Latest
 
 $Here = $PSScriptRoot
 $Schema = Join-Path $Here 'handoff.schema.json'
-$UnitModel = @{ wave = 'opus'; campaign = 'opus'; land = 'opus'; resume = 'opus'; meter = 'sonnet' }
+$UnitModel = @{ wave = 'opus'; campaign = 'opus'; enqueue = 'opus'; resume = 'opus'; meter = 'sonnet' }
 # A `campaign` unit is a `wave` unit whose plan_wave.py call carries --cluster: one prompt file, one placeholder.
 $PromptFile = @{ campaign = 'wave' }
 $Allowed = @('opus', 'sonnet')   # never Fable or Mythos: each needs the owner's approval per dispatch (owner 2026-10-02; kb/Work R69 2026-10-06)
@@ -615,6 +615,8 @@ try {
         try {
             $ls = Invoke-Py @((Join-Path $Here 'ledger_state.py'), 'owed', '--repo', $RepoDir)
             if ($ls -match '^owed') {
+                # $ls is read on origin/main, fetched (kb/Work PB2987); when it says the checkout is behind, the
+                # publisher fast-forwards it before rendering, and mark-published refuses until then.
                 Say "LEDGER PUBLISH OWED ($ls): render with gen_ledger.py (it writes $CoordDir\ledger.html and prints this account's artifact URL), publish it there, then ledger_state.py mark-published (--url the first time an account publishes)"
                 # The attended operator session is woken by its mailbox, not by this log (kb/Work PB2482): one open
                 # `publish` message per stamp (--unless-pending), pointing at this unit's log.

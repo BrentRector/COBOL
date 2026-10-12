@@ -128,6 +128,17 @@ AUDITS = (
     ("RULE CATALOG", ["scripts/spec/extract_rule_catalog.py", "--check"]),
     ("SPEC CORRECTIONS", ["scripts/spec/verify_publishable.py"]),
     ("SELF-TESTS", ["scripts/self_tests.py"]),
+    # kb/Work PB1957 row 44, the CI invariant: CI's `audits` job ran these two and the gate did not, so train 1067's
+    # PR 9 went RED in CI on a `blocked: true` the work register refuses, behind a GREEN gate.
+    ("WORK REGISTER", ["scripts/spec/work.py", "check"]),
+    ("FLEET PRACTICES", [".claude/skills/workstream/check_practices.py"]),
+)
+#: ⛔ WHAT AN AUDIT NEEDS IN THE TREE, made ready before any audit runs, exactly as CI's `audits` job makes it ready:
+#: FLEET PRACTICES reads the pinned public skills submodule, which a fresh worktree does not have. A prerequisite that
+#: fails is a RED and no audit runs. `SelfTestDiscoveryDriftTests` maps every command of CI's `audits` job to an AUDITS
+#: entry, to one of these, or to its recorded reason for running elsewhere, so the next audit CI gains reaches the gate.
+AUDIT_PREREQUISITES = (
+    ("PUBLIC SKILLS SUBMODULE", ["git", "submodule", "update", "--init", "tools/claude-skills"]),
 )
 #: ⛔ EVERY GATE REUSES A SELF-TEST'S RECORDED PASS (kb/Work PB2914, generalized to the one gate by PB3022;
 #: DESIGN-test-build-ci.md §3.14.10, §3.17.3): the gate's audits add this to SELF-TESTS, so a self-test whose inputs
@@ -250,13 +261,33 @@ class Host:
         """The audits this gate runs: AUDITS (the first-red arm of the self-test plants its own)."""
         return AUDITS
 
+    def audit_prerequisites(self) -> tuple[tuple[str, list[str]], ...]:
+        """What the audits need in the tree: AUDIT_PREREQUISITES (the self-test's arms plant their own)."""
+        return AUDIT_PREREQUISITES
+
+    def _prepared(self, spawn: Spawn, say: Callable[[str], None]) -> list[str]:
+        """Run every prerequisite (`audit_prerequisites`) in order; the first that fails is its RED reason."""
+        for name, cmd in self.audit_prerequisites():
+            p = subprocess.run(cmd, cwd=self.repo, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                               encoding="utf-8", errors="replace", **spawn())
+            if p.returncode != 0:
+                say(f"--- audit prerequisite {name} ({' '.join(cmd)}) ---")
+                for line in (p.stdout or "").rstrip().splitlines():
+                    say(line)
+                say(f"=== {name}: RED (exit {p.returncode}; no audit ran) ===")
+                return [f"{name} RED"]
+        return []
+
     def audits(self, spawn: Spawn, say: Callable[[str], None]) -> list[str]:
-        """The audits (`audit_commands`), every one of them, CONCURRENTLY; the self-tests reuse recorded PASSes
+        """The audits (`audit_commands`), every one of them, CONCURRENTLY, once their prerequisites
+        (`audit_prerequisites`, run first and in order) are ready; the self-tests reuse recorded PASSes
         (SELF_TESTS_REUSE). Each audit's whole output is printed as one block when it finishes, so no two interleave.
         ⛔ THE FIRST RED STOPS THE REST (kb/Work PB3061): the audits still running are stopped, process trees and all
         (`_Live.stop_all`), and reported STOPPED — never RED — so a red found in 23 s is the verdict in 23 s and not
         after the slowest audit (the self-tests: 5–9 min in every first gate of wave 1062). Returns the RED reasons in
         AUDITS order; a hung self-test is `SELF-TESTS HANG`, never RED (kb/Work PB2914)."""
+        if not_ready := self._prepared(spawn, say):
+            return not_ready
         reds: dict[str, str] = {}
         live = _Live()
         commands = [(name, [*cmd, SELF_TESTS_REUSE] if name == "SELF-TESTS" else cmd)
@@ -1089,9 +1120,22 @@ def self_test() -> int:
                 super().__init__(root)
                 self.commands: list[list[str]] = []
 
+            def audit_prerequisites(self):
+                return ()
+
             def _captured(self, cmd, spawn, live=None):
                 self.commands.append(cmd)
                 return (SELF_TESTS_HANG_EXIT if cmd[0] == "scripts/self_tests.py" else 0), "", 0.0
+
+        class PrerequisiteFails(HungSelfTests):  # a real prerequisite process that fails: no audit may start
+            def audit_prerequisites(self):
+                return (("PLANTED PREREQUISITE", [sys.executable, "-c", "print('not ready'); raise SystemExit(3)"]),)
+        unready, heard_unready = PrerequisiteFails(), []
+        reasons = unready.audits(_no_slot, heard_unready.append)
+        arm("a failed audit prerequisite (CI's `git submodule update --init tools/claude-skills`) is its RED, with its "
+            "output, and no audit runs (kb/Work PB1957 row 44)",
+            reasons == ["PLANTED PREREQUISITE RED"] and unready.commands == [] and "not ready" in heard_unready,
+            f"{reasons} {unready.commands} {heard_unready}")
         hung = HungSelfTests()
         reasons = hung.audits(_no_slot, lambda _: None)
         arm("a hung self-test is `SELF-TESTS HANG` in the gate's reasons, never RED, and every gate's self-tests run "
@@ -1103,6 +1147,9 @@ def self_test() -> int:
             def __init__(self, mark: Path):
                 super().__init__(root)
                 self.mark = mark
+
+            def audit_prerequisites(self):
+                return ()
 
             def audit_commands(self):
                 slow = ("import pathlib, subprocess, sys; "

@@ -10,7 +10,7 @@ against ONE committed baseline, docs/rearchitecture/evidence/arch-oracle/<commit
 after a train was a prose step (lander-train-brief 3c, MANDATORY-PRACTICES L11), and train 1049, an operator
 hand-landing, skipped it: six new conformance cases reached main with the baseline still at train 1047's commit, and
 train 1050's compare_oracle.py reported DIFFERENT for cases no change of its own touched. This makes the step a
-refusal at the one place every landing passes, the way landing_devlog.py made the DEVLOG entry one (kb/Work PB2605).
+refusal at the one place every landing passes, the way `devlog.py check` makes the DEVLOG entry one (kb/Work PB2605).
 
 THE RULE, on the landing's own trees (`git show <rev>:…`, never a working tree or an index):
   1. <rev> carries exactly ONE recorded baseline, of a clean tree, that records its `inputs` (a manifest recorded
@@ -39,9 +39,9 @@ import tempfile
 
 RECORDED = "docs/rearchitecture/evidence/arch-oracle"
 SHOW_PATHS = 12
-RECORD = ("python scripts/arch/compare_oracle.py   (explain every difference by cluster in the DEVLOG entry), then "
-          "python scripts/arch/capture_oracle.py --record   on the committed train, commit the new manifest, and run "
-          "the landing again (lander-train-brief step 3c, MANDATORY-PRACTICES L11)")
+RECORD = ("python scripts/arch/compare_oracle.py   (explain every difference by its class in the report and the "
+          "DEVLOG entry), then python scripts/arch/capture_oracle.py --record   on the committed branch, commit the new "
+          "manifest, and run the landing again (finisher-brief ORACLE stop, MANDATORY-PRACTICES L11)")
 
 
 class RangeError(Exception):
@@ -185,7 +185,7 @@ def self_test() -> int:
                 "base")
     base = commit(manifest(c0, inputs=inputs), "record the baseline")
     expect("the baseline as recorded -> PASS", 0)
-    commit({"docs/d.md": "2", "DEVLOG.md": "entry"}, "a docs-only landing")
+    commit({"docs/d.md": "2", "DEVLOG/0002-entry.md": "entry"}, "a docs-only landing")
     expect("a landing that changes no input keeps its inherited baseline -> PASS", 0)
     commit({"src/CompilerX/b.cs": "2"}, "a sibling directory whose name only STARTS with an input's")
     expect("a path that merely shares an input's prefix (src/CompilerX vs src/Compiler) is not an input -> PASS", 0)

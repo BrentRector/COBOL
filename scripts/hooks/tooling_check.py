@@ -27,7 +27,7 @@ import coord  # noqa: E402
 HOME = pathlib.Path.home()
 CONFIG = account.config_dir()   # THIS session's account: its user settings, skills and plugins live here
 CLOUD = os.environ.get("CLAUDE_CODE_REMOTE") == "true"
-ROLES = ["cobol-implementer", "cobol-lander", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator",
+ROLES = ["cobol-implementer", "cobol-finisher", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator",
          "cobol-reviewer"]
 
 

@@ -22,7 +22,7 @@ Every spec names TWO stop files (kb/Work PB2483): the owner's global stop (`coor
 `stop_file` (`coord.fleet_stop(scratch, scope)`; plan_wave.py writes it). A fleet stopped by its own file never stops
 another session's agents.
 
-Every spec's report path is in `coord.reports_dir()`, never under the wave's `scratch` (kb/Work PB2980): the land unit
+Every spec's report path is in `coord.reports_dir()`, never under the wave's `scratch` (kb/Work PB2980): the enqueue unit
 and the branch survey read that one directory, and a report anywhere else is never landed.
 """
 import json, pathlib, subprocess, sys

@@ -150,5 +150,9 @@ BenchmarkDotNet.Artifacts/
 # Lander/implementer checkpoint files — a worktree artifact, never part of a landing (DEVLOG 1441).
 STATUS.md
 
+# The DEVLOG's descending narrative, rendered on demand from DEVLOG/ (`python scripts/devlog.py render --out
+# DEVLOG.rendered.md`); the entry files are the source (kb/Work PB3025).
+DEVLOG.rendered.md
+
 # The harness's scheduled-tasks lock — a per-session artifact, committed by accident in 8abe9726 and untracked in train 23's record.
 .claude/scheduled_tasks.lock

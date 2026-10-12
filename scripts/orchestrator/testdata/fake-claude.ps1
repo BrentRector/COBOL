@@ -8,7 +8,7 @@
 #   wakes      ends a turn with a background task running, is woken when it finishes, then hands off done
 #   softcap    passes a small soft cap while its Workflow runs: records whether the fleet stop exists (it must not) and
 #              whether the dispatch guard refuses a second fleet launch from this loop unit, then its fleet finishes
-#   steersme   the operator steers the NEXT unit while this one runs (once per coordination dir); hands off naming land
+#   steersme   the operator steers the NEXT unit while this one runs (once per coordination dir); hands off naming enqueue
 #   silent     hung at start: emits nothing and sleeps 600 s (the startup watchdog must kill it)
 #   silentshort hung at start for 20 s, then exits 0 (with fake-python.ps1's slow first checkpoint, kb/Work PB2590)
 # Every mode records the previous handoff it was given (prev-handoff-seen.json), as a unit reads {PREV_HANDOFF}.
@@ -131,10 +131,10 @@ switch ($env:FAKE_CLAUDE_MODE) {
         Call 'msg_1' 5000
         $mark = Join-Path $coord 'steered.txt'
         if (-not (Test-Path $mark)) {
-            & pwsh -NoProfile -File (Join-Path $PSScriptRoot '../steer.ps1') -Unit resume -Reason 'operator: hold the land unit' -CoordDir $coord | Out-Null
+            & pwsh -NoProfile -File (Join-Path $PSScriptRoot '../steer.ps1') -Unit resume -Reason 'operator: hold the enqueue unit' -CoordDir $coord | Out-Null
             Set-Content -Path $mark -Value 'steered'
         }
-        Hand @{ schema_version = 1; unit = 'wave'; outcome = 'done'; summary = 'names land'; next_unit = 'land'; next_unit_reason = 'branches ready' }
+        Hand @{ schema_version = 1; unit = 'wave'; outcome = 'done'; summary = 'names enqueue'; next_unit = 'enqueue'; next_unit_reason = 'branches ready' }
         Emit @{ type = 'result'; subtype = 'success'; session_id = $sid }
         WaitEof
         exit 0

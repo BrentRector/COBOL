@@ -1,0 +1,15 @@
+## Entry 1828 — 2026-09-30 20:40 PDT — Why 43 branches and 19 worktrees piled up, what was actually stranded in them (one PB1210), and the content-based prune tool
+
+**Symptom.** After train w0930 landed the orchestrator removed only the worktrees whose heads were ancestors of main, left 19 older `wf_*` and `worktree-agent-*` worktrees "for review", and one directory (`agent-aad270c5c14b3bd4c`) that would not delete ("Invalid argument"). The owner: find out what is wrong; everything pertinent belongs in main and the cleanup must be total.
+
+**Causes.**
+1. The ancestor test cannot clear a landed cluster. A train merges, rebases and conflict-resolves each cluster's commits, so a branch whose work is entirely on main is still not an ancestor. 43 unmerged branch tips (19 with worktrees, the rest plain branches back to 2026-09-19) had accumulated across waves 65 to 73 and this session.
+2. The stuck directory held a compiler DLL that `csharp-ls`, the C# language server this session started, had loaded as an analyzer from the worktree (`Access is denied` on `Cobol.Net.Compiler.SourceGen.dll`; the same server produced the stream of "Xunit could not be found" diagnostics for that worktree). Stopping it let `rd /s /q` finish.
+3. Nobody owned the cleanup step: no practice named it, so it depended on a session remembering.
+
+**What was stranded.** Each branch was tested by content against origin/main: every file it added under src/ and tests/conformance, every C# type, method and test name it declared, and the status of the notes its commits name. 42 of the 43 were fully on main (a few differ only by names a later refactor changed: PB1494's `ConvertFixedToFreeMapped` landed as `KindOf`, the PB1683 derived test filter was replaced on 2026-09-28 by "order, don't skip"). One was not: `wf_bf025bee-c67-9`, preserved when wave 68 was stopped, holds PB1210's implementation and golden (note `open`, no pb1210 golden on main) and older PB1445 and PB1075 variants whose landed versions on main have different names. A finisher recovers PB1210 and reconciles the other two against main (Entry 1827). Everything else was archived into a verified 95 MB git bundle outside the repository (`stale-worktree-branches-2026-09-30.bundle` in the session scratchpad) and then removed.
+
+**Change.** `scripts/prune_worktrees.py` classifies every branch as MERGED, LANDED, CHECK or UNLANDED by that content test and, with `--apply`, archives and removes the first two (CHECK with `--include-check`), never UNLANDED, and skips locked, dirty or recently touched worktrees. The skip exists because its first dry run classified the running finisher's brand-new worktree as MERGED (it sits at main's tip). MANDATORY-PRACTICES O10 names the step and the csharp-ls trap; `check_practices.py` requires it; DOC_INDEX lists the script.
+
+**Misstep recorded.** The first cleanup used the ancestor test, deleted nothing it should not have, but declared the rest "unmerged work for the owner to review" without looking. Looking took four short scripts and settled it.
+

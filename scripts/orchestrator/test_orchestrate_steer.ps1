@@ -24,7 +24,7 @@ Check 'the operator handoff validates against handoff.schema.json' ($sh | Test-J
 Check 'stop.ps1 -Status shows the pending steer' ((& pwsh -NoProfile -File $StopPs -Status -CoordDir $st) -join ' ' -match "operator steer: next unit 'wave' \(run a wave; hold push-main\)") $true
 & pwsh -NoProfile -File $StopPs -Clear -CoordDir $st | Out-Null
 Check 'stop.ps1 -Clear leaves the steer' (Test-Path (Join-Path $st 'handoff.operator.json')) $true
-& pwsh -NoProfile -File $SteerPs -Unit land -Reason ('x' * 401) -CoordDir $st 2>$null | Out-Null
+& pwsh -NoProfile -File $SteerPs -Unit enqueue -Reason ('x' * 401) -CoordDir $st 2>$null | Out-Null
 Check 'an invalid steer is refused and the pending one kept' "$LASTEXITCODE $(((Get-Content (Join-Path $st 'handoff.operator.json') -Raw) | ConvertFrom-Json).next_unit)" '1 wave'
 & pwsh -NoProfile -File $SteerPs -Withdraw -CoordDir $st | Out-Null
 Check 'steer.ps1 -Withdraw removes it' (Test-Path (Join-Path $st 'handoff.operator.json')) $false
@@ -39,7 +39,7 @@ $r = Run-Orch 'steercampaign' 'good' @('-MaxUnits', '1', '-FastFailSeconds', '0'
 Check 'a campaign steer with no -Cluster runs a wave' $r.units[0].unit 'wave'
 Check 'and is still consumed (else rule 0 chooses it on every later iteration)' (Test-Path (Join-Path $r.coord 'handoff.operator.json')) $false
 $r = Run-Orch 'steerlater' 'steersme' @('-Unit', 'wave', '-MaxUnits', '2', '-FastFailSeconds', '0')
-Check 'a steer written while a unit runs beats that unit''s handoff (it named land)' "$($r.units.Count) $($r.units[1].unit) $($r.units[1].reason)" '2 resume the operator: operator: hold the land unit'
+Check 'a steer written while a unit runs beats that unit''s handoff (it named enqueue)' "$($r.units.Count) $($r.units[1].unit) $($r.units[1].reason)" '2 resume the operator: operator: hold the enqueue unit'
 $r = Run-Orch 'orphan' 'good' @('-MaxUnits', '1', '-FastFailSeconds', '0') {
     param($c) & $synth $c; Set-Content -Path (Join-Path $c 'handoff.json') -Value '{"schema_version":1,"unit":"wave","outcome":"done","summary":"operator by hand","next_unit":"wave"}' }
 Check 'a hand-written handoff.json steers nothing' $r.units[0].unit 'resume'
@@ -47,8 +47,8 @@ Check 'and is archived and said, not deleted in silence' "$($r.out -match 'no un
 $r = Run-Orch 'steerbad' 'good' @('-DryRun') { param($c) & $synth $c; Set-Content -Path (Join-Path $c 'handoff.operator.json') -Value '{"next_unit":"wave"}' }
 Check 'a hand-edited invalid steer is set aside loudly' "$($r.out -match 'operator steer does not validate') $(Test-Path (Join-Path $r.coord 'handoff.operator.json'))" 'True False'
 Check 'and the loop falls back to the last handoff' ($r.out -match "would run unit 'resume'") $true
-$r = Run-Orch 'unitdry' 'good' @('-DryRun', '-Unit', 'land')
-Check '-Unit is a steer through steer.ps1' ($r.out -match "would run unit 'land' \(the operator: named by orchestrate.ps1 -Unit at start\)") $true
+$r = Run-Orch 'unitdry' 'good' @('-DryRun', '-Unit', 'enqueue')
+Check '-Unit is a steer through steer.ps1' ($r.out -match "would run unit 'enqueue' \(the operator: named by orchestrate.ps1 -Unit at start\)") $true
 Check 'a dry run leaves no steer behind' "$(Test-Path (Join-Path $r.coord 'handoff.operator.json')) $(@(Get-ChildItem ([IO.Path]::GetTempPath()) -Filter 'orchestrate-dryrun-*.handoff.operator.json').Count)" 'False 0'
 $r = Run-Orch 'dryopen' 'good' @('-DryRun') { param($c) & $opJson $c 'meter' }
 Check 'a dry run shows a pending steer and does not consume it' "$($r.out -match "would run unit 'meter'") $(Test-Path (Join-Path $r.coord 'handoff.operator.json'))" 'True True'
@@ -57,11 +57,11 @@ Check 'a dry run shows a pending steer and does not consume it' "$($r.out -match
 $nc = Join-Path $Root 'nextunit'
 New-Item -ItemType Directory -Force -Path $nc | Out-Null
 $opFile = Join-Path $Root 'op.json'
-Set-Content -Path $opFile -Value '{"schema_version":1,"unit":"operator","outcome":"done","summary":"s","next_unit":"land","next_unit_reason":"r"}'
+Set-Content -Path $opFile -Value '{"schema_version":1,"unit":"operator","outcome":"done","summary":"s","next_unit":"enqueue","next_unit_reason":"r"}'
 $ownerQ = Join-Path $Root 'oq.json'
 Set-Content -Path $ownerQ -Value '{"schema_version":1,"unit":"resume","outcome":"owner-question","summary":"q","owner_question":{"question":"A or B?"}}'
 function Next-Unit([string]$coord, [string[]]$extra) { return (& python (Join-Path $Here 'next_unit.py') --repo $nc --coord $coord @extra) -join '' }
-Check 'next_unit.py: the steer outranks an owner question already answered' (((Next-Unit $nc @('--operator-handoff', $opFile, '--handoff', $ownerQ)) | ConvertFrom-Json).unit) 'land'
+Check 'next_unit.py: the steer outranks an owner question already answered' (((Next-Unit $nc @('--operator-handoff', $opFile, '--handoff', $ownerQ)) | ConvertFrom-Json).unit) 'enqueue'
 Check 'next_unit.py: without a steer the owner question still stops the loop' (((Next-Unit $nc @('--handoff', $ownerQ)) | ConvertFrom-Json).unit) 'owner-question'
 
 Complete-OrchTest 'steer'

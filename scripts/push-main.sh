@@ -38,8 +38,9 @@
 #             NOT touched; acquire it with `landing_lease.py acquire --wait-min 9`, rebase, re-gate, then re-run
 #         5 = the commit IS on main but its main-branch run's verdict could not be read (UNVERIFIED, kb/Work PB1639):
 #             read it by hand; never re-land it
-#         6 = the landing carries no new DEVLOG entry, or a malformed or misplaced one (scripts/orchestrator/
-#             landing_devlog.py, kb/Work PB2605): main NOT touched; write the entry at the TOP, commit, re-run
+#         6 = the landing carries no new DEVLOG entry, or a malformed, unstamped or stale one (scripts/devlog.py
+#             check, kb/Work PB2605, PB3025): main NOT touched; write DEVLOG/pending-<slug>.md, run
+#             `python scripts/devlog.py stamp <branch>`, re-run
 #         7 = the arch-oracle baseline is behind the landing (scripts/orchestrator/landing_oracle.py, kb/Work PB2885):
 #             main NOT touched; compare_oracle.py, then capture_oracle.py --record, commit the manifest, re-run
 
@@ -256,8 +257,8 @@ if ! git merge-base --is-ancestor "$BASE" "$SHA"; then
 fi
 
 # ── THE LANDING CHECKS, ONE SEQUENCE IN ONE PLACE (scripts/orchestrator/enqueue.py checks; kb/Work PB3024): the DEVLOG
-# entry (PB2605, exit 6), the arch-oracle baseline (PB2885, exit 7) and the R3 file-set partition (PB2118, exit 3),
-# each on this landing's own range and refused before a run is spent. The merge-queue landing (enqueue.py queue) runs
+# entry (scripts/devlog.py check: PB2605, PB3025, exit 6), the arch-oracle baseline (PB2885, exit 7) and the R3 file-set partition (PB2118, exit 3),
+# each on this landing's own range and refused before a run is spent. The merge-queue landing (enqueue.py land, through its queue step) runs
 # the same sequence, so the two landing paths cannot disagree while both exist. ──
 "$PY" scripts/orchestrator/enqueue.py checks --rev "$SHA" --base "$BASE"
 CHECKS_RC=$?
