@@ -670,30 +670,6 @@ public abstract class CobolParserCoreBase : Parser
         : base(input, output, errorOutput) { }
 
     /// <summary>
-    /// Returns true if the current token is the first non-whitespace token on its line.
-    /// Used to prevent stray identifiers (like LINES after WRITE ADVANCING)
-    /// from being misinterpreted as paragraph names.
-    /// </summary>
-    protected bool IsAtLineStart()
-    {
-        var token = CurrentToken;
-        if (token == null) return false;
-
-        // Check if this token's column is 0, or if the previous token
-        // is on a different line
-        int tokenLine = token.Line;
-        int tokenIndex = token.TokenIndex;
-
-        if (tokenIndex <= 0) return true;
-
-        var prevToken = TokenStream.Get(tokenIndex - 1);
-        // A debugging line that is source (kb/Work PB1705) begins with its hidden DEBUG_LINE marker, which stands on the
-        // line but is no program text: the token after it is the first token of the line, so a paragraph name written on a
-        // debugging line (DB101A's `DDEBUG-LINE-TEST-03-A.`) begins its paragraph.
-        return prevToken.Type == CobolLexer.DEBUG_LINE || prevToken.Line < tokenLine;
-    }
-
-    /// <summary>
     /// Predicate for the bare (adjective-less) INSPECT TALLYING count phrase. An ALL or
     /// LEADING adjective is transitive across the operands that follow it (ISO 1989:1985
     /// 14.9.22 GR 10), so "FOR LEADING ""S"" ""S"" ""T""" lists three operands under one

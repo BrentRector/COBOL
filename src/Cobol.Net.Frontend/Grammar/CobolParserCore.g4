@@ -873,9 +873,16 @@ paragraphDefinition
     : paragraphName DOT sentence*
     ;
 
+// ⛔ NO LINE-POSITION PREDICATE (kb/Work PB2720). §14.4.3: "A paragraph consists of a paragraph-name followed by a
+// separator period and by zero, one, or more successive sentences" — no rule places the name at the start of a line,
+// and §6.4.1 lets free-form text "be written anywhere on a line", so `STOP RUN. P2. DISPLAY "B".` on one line is a
+// paragraph header exactly as `STOP RUN. S2 SECTION.` is a section header (sectionName carries no predicate either).
+// The header can only follow a separator period here: `sentence : statement+ DOT` ends every sentence on its period,
+// so a word a statement left unconsumed is a syntax error, never a phantom paragraph — the reason an
+// IsAtLineStart() predicate once stood on both alternatives (DEVLOG 0063, the WRITE … LINES token the lexer now has).
 paragraphName
-    : {IsAtLineStart()}? procedureName
-    | {IsAtLineStart()}? reservedGatedWord
+    : procedureName
+    | reservedGatedWord
     ;
 
 procedureName
