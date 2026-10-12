@@ -15,7 +15,10 @@ mid-line after a period (`GOBACK.`, `COMMIT.` at 2023) still parses as a stateme
 line, and `COMMIT.` at 2014, where COMMIT is a user word, is a paragraph either way. Golden
 `2002/pb2720_paragraph_header_mid_line` covers free form and a fixed-form segment: section and paragraph headers
 mid-line, an empty paragraph followed by a header on the same line, and a qualified PERFORM THRU. There is no
-negative because no edition rejects the shape. COBOL-85's area-A rule is not enforced for any header (a header at
+negative because no edition rejects the shape. Two §14.2.2 SR12 negatives (`l1c22-format3-in-program`,
+`-in-method`) pinned the old parse-error text: `METHOD-ID. SHOWIT.` now parses as two headers, and the Format-3
+procedure division is refused one line later at its `PROCEDURE DIVISION` header. That is still a parse-level
+rejection at every reject-at edition, and their `.err` files now carry the new position. COBOL-85's area-A rule is not enforced for any header (a header at
 the start of a line in area B already compiled), so it is reported as a lead.
 
 ### PB374: the MCS module's remaining surfaces
