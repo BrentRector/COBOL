@@ -327,7 +327,7 @@ public static class CobolFloat
     /// <para>The three float→fixed landings are the SDIDI lane's three, one for one: <see cref="ToScaledUnchecked"/>
     /// (a MOVE (§14.6.8.2 r4: "truncation on either end"), the no-phrase store (§14.6.13.1.3 item 8, DOC-A.1-70),
     /// INVOKE BY CONTENT — the low-order digits), this one (a final transfer that RAISES), and
-    /// <see cref="ToScaledSaturating"/> (an INTERMEDIATE consumer — <c>CobolDec.ToUnscaledIntermediate</c>'s twin).
+    /// <see cref="ToScaledIntermediate"/> (an INTERMEDIATE consumer — <c>CobolDec.ToUnscaledIntermediate</c>'s twin).
     /// The forms differ ONLY in what they do with a value the carrier cannot hold: the VALUE itself is
     /// <see cref="TryExactScaled"/> for all three (kb/Work PB623).</para></summary>
     public static Int128 ToScaled(double v, int scale, CobolRounding mode)
@@ -346,17 +346,28 @@ public static class CobolFloat
         new("a float result is further from zero than any fixed-point receiver permits "
             + "(ISO §14.7.5 case 3 — EC-SIZE-TRUNCATION; the receiver is left unchanged)", "EC-SIZE-TRUNCATION");
 
-    /// <summary>The SATURATING landing of a binary64 for an INTERMEDIATE consumer — an alignment, an argument, a
-    /// subscript — that has no store and so no capacity check of its own to refuse a value (kb/Work PB77):
-    /// <see cref="ToScaled"/> without the raise. NaN → 0; ±Infinity and every magnitude beyond the carrier
-    /// SATURATE to <see cref="Int128.MaxValue"/>/<see cref="Int128.MinValue"/>, so a later range test reads a huge
-    /// value, never a plausible one. ⛔ NEVER the form for a STORE: a saturated sentinel is indistinguishable from a
-    /// legal value in a receiver whose capacity is the whole carrier (kb/Work PB2967).</summary>
-    public static Int128 ToScaledSaturating(double v, int scale, CobolRounding mode)
+    /// <summary>The INTERMEDIATE landing of a binary64 — for a consumer that has no store and so no capacity check of
+    /// its own to refuse a value: an alignment, an argument, a subscript, a count (kb/Work PB77, PB2967, PB3019).
+    /// <see cref="ToScaled"/> with the intermediate's disposition for a value the carrier cannot hold: EC-SIZE-OVERFLOW,
+    /// §14.7.5 case 5 (an operation on an intermediate data item whose value would be farther from zero than the
+    /// intermediate allows; checked because the implementor defines the intermediate's range to be checked,
+    /// DOC-A.1-179) — the twin of the SDIDI lane's <c>CobolDec.ToUnscaledIntermediate</c>, which raises the same
+    /// condition for the same fact. NaN → 0.
+    /// <para>⛔ NEVER A SATURATED SENTINEL (kb/Work PB3019). This landing used to clamp ±Infinity and every magnitude
+    /// beyond the carrier to <see cref="Int128.MaxValue"/>/<see cref="Int128.MinValue"/> "so a later range test reads
+    /// a huge value". A sentinel is an in-band signal about a value that no longer exists, and an intermediate that
+    /// COMPARES or SELECTS among values loses their order through it: 1E300 and 1E301 both landed as
+    /// <c>Int128.MaxValue</c>, equal. The SDIDI intermediate raised for the same pair, so the lane in force decided
+    /// the answer (the two-arm shape). A consumer that WANTS a membership answer for an out-of-range value (the date
+    /// functions' "out of the standard numeric time form") states its own screen before it lands
+    /// (<c>CobolDate.SecondsOfReal</c>); it does not get one from this landing.</para></summary>
+    public static Int128 ToScaledIntermediate(double v, int scale, CobolRounding mode)
     {
         if (double.IsNaN(v)) return Int128.Zero;
         if (TryExactScaled(v, scale, mode, out Int128 landed)) return landed;
-        return v > 0 ? Int128.MaxValue : Int128.MinValue;           // ±Infinity, and every magnitude past the carrier
+        throw new CobolSizeError("a float intermediate is further from zero than the native Int128 carrier holds at this scale "
+            + "(ISO §14.7.5 case 5 — the implementor-defined intermediate range is checked, A.1 item 179: EC-SIZE-OVERFLOW)",
+            "EC-SIZE-OVERFLOW");
     }
 
     /// <summary>The UNCHECKED landing of a binary64 into a fixed-point receiver (kb/Work PB77) — a MOVE (§14.6.8.2
