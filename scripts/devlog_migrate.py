@@ -12,10 +12,11 @@ normalizes the line
 endings to LF (kb/Work PB3029: one line-ending format), and splits it at every line that starts `## Entry`: what
 precedes the first is the front matter (written as DEVLOG/README.md only when that file does not exist yet, so a
 re-run keeps the README as edited), and each entry block (its header line through the line before the next header)
-is one file, `NNNN[x]-<slug>.md`, named by devlog.py's own rule. A kept README's history sentence, `(entries
-001–NNNN, split from …`, is rewritten to the range this run split (README_RANGE), so the README never names a range
-older than the history it introduces (kb/Work PB3025, review R1-2); a README without that sentence is refused. A number the monolith used twice gets a letter in the
-FILE NAME only (the first occurrence the highest letter), so the render order is the monolith's order.
+is one file, `NNNN[x]-<slug>.md`, named by devlog.py's own rule. A number the monolith used twice gets a letter in
+the FILE NAME only (the first occurrence the highest letter), so the render order is the monolith's order. A kept
+README's history sentence, `(entries 001–NNNN, split from …`, is rewritten to the range this run split
+(README_RANGE), so the README never names a range older than the history it introduces (kb/Work PB3025, review
+R1-2); a README without that sentence is refused.
 
 THE PROOF, before anything is written to the tree: `devlog.render` over the split (with the monolith's own front
 matter) must equal the normalized monolith byte for byte, every file must pass `devlog.entry_problems`, every name must

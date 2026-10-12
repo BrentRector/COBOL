@@ -18,8 +18,9 @@ merge queue bounces the second (owner 2026-10-11, kb/Work PB3015 Q2: "Yes, one f
 unchanged in substance — one entry per landing on main, newest first, the only history.
 
 THE HISTORY (every entry of the monolithic DEVLOG.md, migrated byte for byte on 2026-10-11; DEVLOG/README.md names
-the range, written by the migration itself) is looser than the rule for new entries: early headers carry no time, some a `:` after the date, twelve a double-encoded dash; 1191a-1191d
-carry a letter; and twenty numbers were used twice (008-014, 171-185). Each file keeps its header exactly; a number used
+the range, written by the migration itself) is looser than the rule for new entries: early headers carry no time,
+some a `:` after the date, twelve a double-encoded dash; 1191a-1191d carry a letter; and twenty numbers were used
+twice (008-014, 171-185). Each file keeps its header exactly; a number used
 twice is told apart by a letter in the FILE NAME (`0185b-…` renders above `0185a-…`, as the monolith ordered them), so
 the render order is the name order and needs no list. A NEW entry is held to the strict header and a plain number.
 
