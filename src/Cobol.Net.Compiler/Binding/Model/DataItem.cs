@@ -326,6 +326,19 @@ public sealed class DataItem
     [DescriptionCopy(DescriptionCopyKind.None, "the copy's provenance — identity, written by CloneItem itself")]
     public DataItem? ClonedFrom { get; set; }
 
+    /// <summary>The WRITTEN entry this item stands for: <see cref="ClonedFrom"/> followed to its end, or the item itself
+    /// when it is no copy. Two TYPE / SAME AS expansions of one written entry share it — one definition reproduced
+    /// twice, never two definitions (ISO §8.4.2.2.1 rule 4; kb/Work PB2988).</summary>
+    public DataItem WrittenDefinition
+    {
+        get
+        {
+            var item = this;
+            while (item.ClonedFrom is { } from) item = from;
+            return item;
+        }
+    }
+
     /// <summary>True when this TYPEDEF entry also carries the EXTERNAL clause (ISO §13.18.22 SR1 — a level-1
     /// type declaration may be external; §13.18.58.3 SR3). The type declaration itself has no storage
     /// (§13.18.58.4 GR2); the effect is on its REFERENCES: any record description containing that type is itself

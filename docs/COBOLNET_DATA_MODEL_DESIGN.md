@@ -1243,6 +1243,14 @@ remaining question is a syntax rule reported by `CapacityPlaceOf`, never a "not 
 - **Qualified** (`WS-CAP OF WS-TABLE`, `IN` likewise) resolves through the ONE §8.4.2.2 matcher,
   `DataBinder.QualifierChainMatches`, off that `Parent`. §8.4.2.2.3 SR2 permits qualifying a name that needs no
   qualification; a qualifier that names no context of the register is **COBOLNET2127**.
+- **One written definition, several copies (kb/Work PB2988).** SR30's "defined elsewhere" compares WRITTEN
+  definitions: a `CAPACITY IN` written once in a type declaration (or under a SAME AS operand) is reproduced by every
+  TYPE / SAME AS copy of its entry, so `DynamicResolve` lists each copy's register under the one name when every
+  table already listed is a copy of the same written entry (`DataItem.WrittenDefinition`, the `ClonedFrom` chain's
+  end); a register of a DIFFERENT written entry, or an explicit data-name of the spelling, stays **COBOLNET1523**.
+  The copies are told apart by SR30's second sentence — qualification through the implied level (`DC OF A`,
+  `DC OF B`) — and a reference the qualifiers leave reaching two registers of the nearest element is §8.4.2.2.3 SR1's
+  ambiguity, judged by the ONE verdict `DataBinder.UniqueOrReportAmbiguous` (**COBOLNET1639**).
 - **Subscripted** is **COBOLNET2125** — §13.18.38.3 SR31, "Data-name-3 shall not be subscripted."
 - **Reference-modified** goes to the ONE §8.4.3.3.3 SR1 screen (`RefModExclusion` → COBOLNET1647): the register is a
   numeric item of an implementor-chosen binary usage, and SR1 admits only usage DISPLAY or NATIONAL.

@@ -1814,6 +1814,10 @@ public sealed partial class ReferenceResolver(DataBinder data)
         /// <summary>§13.18.38.3 SR30 second sentence with §8.4.2.2.3 SR4 — the written OF/IN qualifiers do not name
         /// successively more inclusive context of the register's implied position.</summary>
         Qualifiers,
+        /// <summary>§8.4.2.2.3 SR1 — the written qualifiers reach more than one register of the nearest declaring
+        /// element: the TYPE / SAME AS copies of one written entry each carry the register (§13.18.38.3 SR30 second
+        /// sentence, kb/Work PB2988), so "uniqueness shall be established through a sequence of qualifiers".</summary>
+        Ambiguous,
         /// <summary>The register's table is itself subordinate to a table, so SR30 puts the register inside that
         /// outer table: §8.4.2.3.3 SR3/SR5 then REQUIRE a subscript that §13.18.38.3 SR31 FORBIDS, and no reference
         /// form is writable. ⚠ DETERMINATION — see the diagnostic's own note.</summary>
@@ -1822,9 +1826,13 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>A written reference matched against the source element's named CAPACITY registers: the owning
     /// dynamic-capacity <paramref name="Table"/>, the <paramref name="Register"/> view item, the
-    /// <paramref name="Place"/> when the reference is legal, and the <paramref name="Fault"/> otherwise.</summary>
+    /// <paramref name="Place"/> when the reference is legal, and the <paramref name="Fault"/> otherwise.
+    /// <paramref name="Reached"/> is every register of the nearest declaring element the written qualifiers reach
+    /// (more than one only under <see cref="CapacityRefFault.Ambiguous"/>, whose <paramref name="Place"/> is the first
+    /// declared one's: the reporting site's <c>--permissive</c> resolution).</summary>
     internal readonly record struct CapacityRef(
-        DataItem Table, DataItem Register, CapacityRegisterPlace? Place, CapacityRefFault Fault);
+        DataItem Table, DataItem Register, CapacityRegisterPlace? Place, CapacityRefFault Fault,
+        NameCandidates<DataItem> Reached);
 
     /// <summary>⛔ THE ONE MATCH OF A WRITTEN REFERENCE AGAINST THE NAMED OCCURS DYNAMIC CAPACITY REGISTERS
     /// (kb/Work PB457) — a PURE check over <see cref="DataBinder.CapacityRegisters"/> with NO side effects (unlike
@@ -1845,8 +1853,12 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <para>The qualifier test is the ONE §8.4.2.2 matcher (<see cref="DataBinder.QualifierChainMatches"/>), read
     /// off the register's real <see cref="DataItem.Parent"/> — SR30's "treated as though implicitly defined at the
     /// same level as the entry containing the OCCURS clause", set where the register is minted
-    /// (<c>DataBinder.Odo.cs</c>). Within ONE source element the candidate set has at most one member, by SR30's
-    /// first sentence, so there is no survivor count to take.</para>
+    /// (<c>DataBinder.Odo.cs</c>). Within ONE source element two registers share a spelling only when they are the
+    /// TYPE / SAME AS copies of one written entry (SR30's first sentence forbids every other duplicate; kb/Work
+    /// PB2988), and then SR30's second sentence makes them told apart by qualification: the registers the written
+    /// qualifiers reach in the nearest declaring element are counted, and more than one is §8.4.2.2.3 SR1's
+    /// ambiguity (<see cref="CapacityRefFault.Ambiguous"/>), judged by the ONE verdict
+    /// <see cref="DataBinder.UniqueOrReportAmbiguous{T}"/>.</para>
     /// <para>⛔ ACROSS SOURCE ELEMENTS IT IS §8.4.6.2.1 (kb/Work PB1674). A contained program also sees every
     /// container's GLOBAL record's registers, nearest container first after its own (<see cref="DataBinder.CapacityRegisters"/>),
     /// and rule 1 applies "the normal rules for qualification" over that whole set before rule 3 picks the nearest
@@ -1859,21 +1871,26 @@ public sealed partial class ReferenceResolver(DataBinder data)
         DataReferenceCst r = dref;
         if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var tables)) return null;
         var written = ReadWritten(dref);
-        DataItem table = tables.Find(t => t.OccursSpec?.CapacityRegister is { } cand
-                                          && data.QualifierChainMatches(cand, written.Qualifiers))
-            ?? tables[0];
+        var reached = tables.FindAll(t => t.OccursSpec?.CapacityRegister is { } cand
+                                          && data.QualifierChainMatches(cand, written.Qualifiers));
+        // The nearest declaring element's reached registers (the list is in nearest-element order, §8.4.6.2.1 3)), or
+        // the nearest register at all when the qualifiers reach none, so the qualifier fault is stated about it.
+        DataItem table = reached.Count > 0 ? reached[0] : tables[0];
+        int depth = data.DeclaringDepth(table);
+        reached.RemoveAll(t => data.DeclaringDepth(t) != depth);
         if (table.OccursSpec?.CapacityRegister is not { } reg
-            || data.Symbols.NearerDataNameHides(name, written.Qualifiers, data.DeclaringDepth(table))) return null;
+            || data.Symbols.NearerDataNameHides(name, written.Qualifiers, depth)) return null;
         var path = BuildTablePath(table);
         var fault =
               written.SubscriptGroup is not null                     ? CapacityRefFault.Subscripted
             : written.RefModCount > 0                                ? CapacityRefFault.RefModified
-            : !data.QualifierChainMatches(reg, written.Qualifiers)   ? CapacityRefFault.Qualifiers
+            : reached.Count == 0                                     ? CapacityRefFault.Qualifiers
+            : reached.Count > 1                                      ? CapacityRefFault.Ambiguous
             : path is null                                           ? CapacityRefFault.UnderATable
             : CapacityRefFault.None;
-        return fault is CapacityRefFault.None && path is not null
-            ? new CapacityRef(table, reg, new CapacityRegisterPlace(path, reg), CapacityRefFault.None)
-            : new CapacityRef(table, reg, null, fault);
+        var place = path is null || fault is not (CapacityRefFault.None or CapacityRefFault.Ambiguous)
+            ? null : new CapacityRegisterPlace(path, reg);
+        return new CapacityRef(table, reg, place, fault, new NameCandidates<DataItem>(reached));
     }
 
     /// <summary>⛔ <b>THE ONE TEST for "this written reference IS the predefined object reference
@@ -1915,7 +1932,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// its own <c>CobolDynTable</c> with its own capacity, so one SET cannot mean all of them.</para></summary>
     private Place? CapacityPlaceOf(Core.DataReferenceContext dref, CapacityRef cap)
     {
-        if (cap.Place is { } place) return place;
+        if (cap.Fault is CapacityRefFault.None) return cap.Place;
         if (_probing || !_diagnosed.Add(dref)) return null;   // R30 purity: a probe never diagnoses (kb/Work PB157)
         string text = DataBinder.WrittenText(dref);
         string subject = cap.Register.CobolName ?? cap.Register.CsName;
@@ -1944,6 +1961,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     + $"are the group names above it{innermost}. ISO §8.4.2.2.3 SR4 requires them \"in the order "
                     + "of successively more inclusive levels in the hierarchy\".");
                 return null;
+            case CapacityRefFault.Ambiguous:
+                // §8.4.2.2.3 SR1, through the ONE verdict every name class shares (its --permissive disposition
+                // resolves to the first declared register, whose place the match carries).
+                return data.UniqueOrReportAmbiguous(cap.Reached, "the CAPACITY register reference", text, out _)
+                    is not null ? cap.Place : null;
             case CapacityRefFault.UnderATable:
                 data.Edition.Error(DiagnosticCatalog.CapacityRegisterUnderTable,
                     $"'{text}': '{subject}' is the CAPACITY register of '{table}', which is itself subordinate to a "
