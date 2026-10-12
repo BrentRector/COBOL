@@ -900,8 +900,9 @@ deletions off. ⛔ **A bare `git push origin HEAD:main` of an unverified commit 
 never on the table: every push to this repository is made with the owner's credentials, so a rule that spares
 administrators spares every actor there is — the orchestrator's own pushes obey it.
 
-**LAND WITH `python scripts/orchestrator/enqueue.py queue` once `ruleset.py check` reports the merge queue ACTIVE
-(kb/Work PB3024: one pull request into GitHub's merge queue, whose merge group runs the matrix), and until then WITH
+**LAND WITH `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): it merges origin/main in, gates,
+stamps the DEVLOG entry and, once `ruleset.py check` reports the merge queue ACTIVE, queues one pull request into
+GitHub's merge queue, whose merge group runs the matrix (kb/Work PB3024); until then it lands through
 `bash scripts/push-main.sh`.** push-main.sh pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
 sha, and only on green fast-forwards main and deletes the landing branch; on a red it prints the failing jobs and
 exits non-zero with main untouched. A check run is attached to the COMMIT, not to a branch, which is why the
@@ -1908,8 +1909,8 @@ result. Run the long legs ONE AT A TIME.
   too. `ci-gate` is the workflow's terminal job (`if: always()`, `needs:` every other job, PASS only when each is
   `success` or `skipped`); it is the only stable check name in the file, because every matrix job's check name
   carries its shard and its filter text and every one of them is skipped on a docs-only push.
-  **The landing command is `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE (kb/Work
-  PB3024), until then `bash scripts/push-main.sh`** — push-main.sh pushes HEAD to `ci/<short-sha>`, waits for `ci-gate`
+  **The landing command is `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): a pull request
+  into the merge queue once it is ACTIVE (kb/Work PB3024), until then `bash scripts/push-main.sh`, which it runs** — push-main.sh pushes HEAD to `ci/<short-sha>`, waits for `ci-gate`
   on that exact sha, and only then fast-forwards main and deletes the branch; a red prints the failing jobs and
   exits non-zero with main untouched. It is idempotent, so a caller cut off by a command timeout re-runs it.
   ⚠ `paths-ignore` is GONE from the workflow — it made the workflow decline to START, which a required per-commit

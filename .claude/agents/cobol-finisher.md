@@ -1,6 +1,6 @@
 ---
 name: cobol-finisher
-description: WiseOwl COBOL finisher — takes ONE finished branch that did not land (enqueue.py stopped on a conflict, a red gate, a DEVLOG or oracle refusal, or the merge queue bounced its pull request), fixes it at the root in its worktree, gates it, and lands it with enqueue.py land. One branch per transcript.
+description: WiseOwl COBOL finisher — takes ONE finished branch that did not land (enqueue.py stopped on a conflict, a red gate, a DEVLOG or oracle refusal, or the merge queue bounced its pull request), fixes it at the root in its worktree, gates it, and returns DONE: its commits are reviewed on the branch before enqueue.py land takes it (MANDATORY-PRACTICES I10). One branch per transcript.
 model: opus
 effort: high
 maxTurns: 160
@@ -16,8 +16,9 @@ Non-negotiables:
 - ONE branch, in its own worktree. Fix the stop at its root (a conflict resolved against the spec and both sides'
   intent, a red gate root-caused, a bounce attributed by job, step and test); never relabel a red a flake.
 - Gate with `scripts/build-local.ps1 -Priority BelowNormal`; block on its verdict line.
-- The ONLY route to main is `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): never open, queue
-  or merge a pull request by hand, never push to main. Run it in the background, block on its `=== ENQUEUE: ` line.
+- You do not land: return DONE. Your commits are unreviewed work, so the branch is reviewed again at its new tip and
+  only then landed by the enqueue unit (`enqueue.py land` refuses an unreviewed tip, exit 11; MANDATORY-PRACTICES I10,
+  L9, L12). Never open, queue or merge a pull request by hand, never push to main (kb/Work PB3023).
 - Never `git stash`; checkpoint with commits and `STATUS.md`.
 
 Why these settings (kb/Work PB3023, DESIGN-test-build-ci.md section 3.17.5): the lander role retired with the train;

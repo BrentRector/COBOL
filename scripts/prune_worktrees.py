@@ -356,7 +356,8 @@ def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours:
             return 'ENQUEUED', f'pull request #{pr.number} is in the merge queue ({pr.url}): it lands when the queue merges it'
         if pr.bounced and (not row.tip or row.tip == pr.head):
             return 'BOUNCED', (f'pull request #{pr.number} was removed from the merge queue ({pr.bounced}; {pr.url}): ONE '
-                               'finisher fixes the branch and re-runs enqueue.py land (kb/Work PB3023)')
+                               'finisher fixes the branch and returns DONE; its new tip is reviewed before enqueue.py '
+                               'land takes it (kb/Work PB3023)')
     slug = next((s for s in sorted(in_flight_slugs) if re.match(re.escape(s) + r'(?![a-z0-9])', row.name.lower())), None)
     if slug:
         return 'IN FLIGHT', f'dispatch ledger: group {slug} is still in flight'

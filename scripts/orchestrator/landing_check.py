@@ -151,8 +151,8 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
     terminal = lambda n: status.get(n) in work.TERMINAL_STATUSES  # noqa: E731
     mine = {p for p in plan_wave.changed_files(git, f"{base}...{rev}") if inside(p)}
     notes = work_notes(git, base, rev)
-    # R3 work is attributed PER COMMIT (PB2703): a train is MIXED — one commit per cluster (lander-train-brief step 5),
-    # some clusters R3 notes, the rest fix lane or tooling — so the R3 work is the commits that work on an R3 note and
+    # R3 work is attributed PER COMMIT (PB2703): a landing can be MIXED — a branch that merged a predecessor, a train
+    # before kb/Work PB3023 — some commits R3 notes, the rest fix lane or tooling — so the R3 work is the commits that work on an R3 note and
     # the partition files THEY change, never the whole landing's diff. A squashed commit naming both kinds is R3 whole.
     r3_notes, mine_r3_files = set(), set()
     for sha in git("rev-list", "--reverse", f"{base}..{rev}").stdout.split():
@@ -190,7 +190,7 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
 
     def contained(their_rev: str, files: set[str]) -> set[str]:
         """The files whose version on `their_rev` IS this landing's: a lander that re-committed or patched a member's
-        work carries it by content, not by commit (lander-train-brief step 1)."""
+        work carries it by content, not by commit (the retired train_apply.py, kb/Work PB3023)."""
         return {f for f in files if git("rev-parse", "-q", "--verify", f"{rev}:{f}").stdout.strip()
                 == git("rev-parse", "-q", "--verify", f"{their_rev}:{f}").stdout.strip()}
 

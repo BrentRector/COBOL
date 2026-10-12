@@ -34,9 +34,9 @@ cannot take, no git worktree): never 0, 1 or 4, which push-main.sh acts on.
 Every read-modify-write runs under `coord.locked(cdir, "landing-lease.lock")`. Events (acquire, takeover, release) are
 appended to `<coord>/landing-lease.jsonl`, the record of how long landers waited and what was taken over.
 
-Callers: the lander briefs (.claude/skills/workstream/templates/lander-train-brief.md step 2b, lander-brief.md step 2b),
-`scripts/push-main.sh` (takes the lease itself when its caller holds none, refuses with exit 4 when another holds it,
-renews it while CI runs, releases it on exit), `next_unit.py` (no `enqueue` unit while a lease is live) and
+Callers: `scripts/push-main.sh` (takes the lease itself when its caller holds none, refuses with exit 4 when another
+holds it, renews it while CI runs, releases it on exit; `enqueue.py land` runs it while the merge queue is not ACTIVE,
+kb/Work PB3023), `next_unit.py` (no `enqueue` unit while a lease is live) and
 `stop.ps1 -Status`. Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 4.7.
 """
 from __future__ import annotations

@@ -1682,10 +1682,15 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    returns DONE), reviewed again, at most `review_fix_rounds` (2) times; after that the FINDINGS stamp stays and
    `plan_wave.py` plans a finisher for it. Only a branch stamped CLEAN at its tip is landable: the wave hands its
    trains only those, and `prune_worktrees.py` lists any other DONE branch WAITING FOR REVIEW (a land unit dispatches
-   the reviewer for one finished outside a wave). The landing step never reviews and never fixes; the lander's former
-   train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
+   the reviewer for one finished outside a wave). The landing step never reviews and never fixes, but it ENFORCES the
+   stamp: `enqueue.py land` refuses (exit 11, UNREVIEWED) a branch whose newest report's CLEAN stamp names no commit of
+   it, or after which it gained a commit that is not main's, a clean merge of main (its tree the auto-merge of its
+   parents) or DEVLOG-only — a finisher's fix, a hand-resolved conflict — so that work is reviewed at its new tip first;
+   the lanes I10 does not review (the registrar, the golden lane, the clerk: notes and spec-derived goldens) name
+   themselves with `--lane`. The lander's former train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
    `review_findings.py summary` measures findings per branch, the re-review rate and reviewer minutes.
-3. **Enqueue** (`scripts/orchestrator/enqueue.py land <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; MERGE
+3. **Enqueue** (`scripts/orchestrator/enqueue.py land <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch;
+   the review stamp (step 2; exit 11); MERGE
    `origin/main` into the branch — not a rebase, corrected at implementation: a branch that merged a same-file
    predecessor or a sibling carries conflict resolutions in its merge commits, which a rebase discards and asks for
    again, and the queue lands by merge commit anyway (a conflict stops it, exit 4: the merge is aborted, the branch's
@@ -1695,13 +1700,14 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    `push-main.sh` — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
-   whole population, no whole-leg WSL run (the targeted leg runs on both hosts, §3.17.3), no waiting for CI.
+   whole population, no waiting for CI. Until the targeted leg runs on both hosts (§3.17.3, PB3022 item 10) the
+   gate at enqueue adds CI's Linux legs under WSL (`linux-gate.sh --nice`); then that row goes.
 4. **The merge queue** (PB3024): GitHub builds the merge group (several queued PRs on top of `main`), the workflow runs on
    the `merge_group` event — the full matrix: Linux and Windows, the sharded conformance legs, unit + characterization,
    the population check (§3.14.4), audits, guard, INV-1 — `ci-gate` stays the one required check, and main advances in
    order. A red bounces only the PR that caused it (GitHub re-tests the rest); the loop sees the bounce
    (`gh pr view --json mergeQueueEntry,statusCheckRollup`), names the CI red in the branch's report and dispatches a
-   finisher; the fixed branch is enqueued again.
+   finisher; the fixed branch is reviewed again at its new tip (step 2), then enqueued again.
 5. **On `main`**: the merged commit is the tested merge-group tree. The `push` run keeps only `changes` + `ci-gate` (the
    record the probe reads); the matrix runs on `merge_group` and `workflow_dispatch`. On `pull_request` only the cheap
    jobs run (audits, the DEVLOG and work-register checks), so twenty PRs do not queue eighty matrix jobs behind the
@@ -1815,9 +1821,10 @@ demand and not committed.
   lander's retirement does not wait for the owner's ruleset go.
 - The **train, the lander role, `lander-train-brief.md`, `lander-brief.md` and `train_apply.py` are retired** (PB3023;
   CLAUDE.md rule 4: deleted, never wrapped); `golden-lander-brief.md` became `golden-lane-brief.md` (the lane-1
-  integrator, landing through `enqueue.py land`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing
+  integrator, landing through `enqueue.py land --lane golden`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing
   order is `--brief`'s); `dispatch_guard.py`'s lander rule went with the role. `cobol-lander` became `cobol-finisher`
-  (resolve a conflict, fix a red or a bounce, land with `enqueue.py land`; turn cap 160). `landing_lease.py`,
+  (resolve a conflict, fix a red or a bounce, gate and return DONE: its commits are reviewed on the branch before the
+  next enqueue unit lands the new tip; turn cap 160). `landing_lease.py`,
   `push-main.sh` and the `ci/**` branches retire with the first change landed through the queue (PB3024).
 - `wf_rolling_wave.js` **starts no lander** (PB3023): a wave produces DONE branches reviewed CLEAN; the enqueue unit
   lands them. This removed PB3016's policy question (may THIS wave land?) with the mechanism; `train_size`,

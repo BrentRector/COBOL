@@ -36,7 +36,7 @@
 - **What a script cannot decide goes to ONE finisher (L12).** A conflict (exit 4), a red gate (5), a DEVLOG or oracle
   refusal (6, 7), a push-main CI red (10), or a pull request the queue BOUNCED (`prune_worktrees.py` reads ENQUEUED and
   BOUNCED from one GraphQL read of the open pull requests; offline the states are git-only) is the branch's own: one
-  `cobol-finisher` with `templates/finisher-brief.md` fixes it at the root, gates, and lands it with `enqueue.py land`.
+  `cobol-finisher` with `templates/finisher-brief.md` fixes it at the root, gates and returns DONE; its commits are reviewed on the branch (I10) before `enqueue.py land` takes the new tip (an unreviewed tip is exit 11).
   Exit 3 (the landing check's STOP) is never retried as is. A permission refusal of `enqueue.py land` is handed off,
   never retried or routed around: `READY-TO-LAND <worktree> <branch>` (L13).
 - **The landing lease lives on the push-main path only (kb/Work PB2537).** `push-main.sh` takes

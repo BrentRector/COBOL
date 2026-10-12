@@ -258,7 +258,7 @@ fi
 
 # ── THE LANDING CHECKS, ONE SEQUENCE IN ONE PLACE (scripts/orchestrator/enqueue.py checks; kb/Work PB3024): the DEVLOG
 # entry (scripts/devlog.py check: PB2605, PB3025, exit 6), the arch-oracle baseline (PB2885, exit 7) and the R3 file-set partition (PB2118, exit 3),
-# each on this landing's own range and refused before a run is spent. The merge-queue landing (enqueue.py queue) runs
+# each on this landing's own range and refused before a run is spent. The merge-queue landing (enqueue.py land, through its queue step) runs
 # the same sequence, so the two landing paths cannot disagree while both exist. ──
 "$PY" scripts/orchestrator/enqueue.py checks --rev "$SHA" --base "$BASE"
 CHECKS_RC=$?

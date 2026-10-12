@@ -147,7 +147,7 @@ $queueOut = & python scripts/orchestrator/ruleset.py check 2>&1
 $queueRc = $LASTEXITCODE
 $queueLine = "$(@($queueOut)[0])"
 if ($queueRc -eq 0) {
-    Write-Host "gate   : $queueLine — land with: python scripts/orchestrator/enqueue.py queue"
+    Write-Host "gate   : $queueLine — land with: python scripts/orchestrator/enqueue.py land <branch> (it queues the pull request)"
 } elseif ($queueRc -eq 1) {
     Write-Host "gate   : ⛔ $queueLine — every landing is refused until it is fixed (python scripts/orchestrator/ruleset.py check)"
 } elseif ($queueRc -eq 4) {
@@ -171,7 +171,7 @@ if ($queueRc -eq 0) {
             $ctx = @($j.required_status_checks.contexts)
             $adm = [bool]$j.enforce_admins.enabled
             if (($ctx -contains 'ci-gate') -and $adm) {
-                Write-Host "gate   : main requires ci-gate (enforce_admins on); merge queue not applied (ruleset.py apply, on the owner's go) — land with: bash scripts/push-main.sh"
+                Write-Host "gate   : main requires ci-gate (enforce_admins on); merge queue not applied (ruleset.py apply, on the owner's go) — land with: python scripts/orchestrator/enqueue.py land <branch> (it lands through push-main.sh)"
             } else {
                 Write-Host "gate   : ⛔ main protection DRIFTED — contexts=[$($ctx -join ',')] enforce_admins=$adm (expected ci-gate + True)"
             }

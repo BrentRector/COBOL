@@ -32,12 +32,16 @@ BRIEFS = {
                                       r'LEG 1 ONLY \(batched gating, PB2515\)'],  # PB2515: the implementer's done-state
     'implementer-brief.md': [r'claude-skills', POINTER, r'BelowNormal', r'build-local\.ps1 -Priority BelowNormal', r'BUILD-LOCAL GATE: GREEN',
                              r'FIX WHAT YOU FIND', r'LEG 1 ONLY \(batched gating, PB2515\)'],  # I9; PB2515
-    # PB3023: a finisher takes ONE branch enqueue.py stopped on (or the queue bounced) and lands it the same way
+    # PB3023: a finisher takes ONE branch enqueue.py stopped on (or the queue bounced), fixes and gates it, and returns
+    # DONE: its commits are reviewed on the branch before the new tip lands (I10, L9: enqueue.py's exit 11)
     'finisher-brief.md': [r'claude-skills', POINTER, r'STOP', r'until grep -q', r'STATUS-AT:', r'build-local\.ps1 -Priority BelowNormal',
-                          r'BUILD-LOCAL GATE: ', r'FIX WHAT YOU FIND', r'=== ENQUEUE: ', *LANDS],
+                          r'BUILD-LOCAL GATE: ', r'FIX WHAT YOU FIND', r'=== ENQUEUE: ', r'DO NOT LAND IT YOURSELF',
+                          r'exit 11'],
+    # the lanes MANDATORY-PRACTICES I10 does not review name themselves at the landing (enqueue.py UNREVIEWED_LANES)
     'golden-lane-brief.md': [r'claude-skills', POINTER, r'build-local\.ps1 -Priority BelowNormal', *LANDS,
+                             r'enqueue\.py land <your branch> --lane golden',
                              r'compare_oracle', r'landing_oracle'],  # PB2885 (L11): goldens are oracle inputs
-    'registrar-brief.md': [r'claude-skills', POINTER, r'code site', *LANDS],
+    'registrar-brief.md': [r'claude-skills', POINTER, r'code site', *LANDS, r'enqueue\.py land <your branch> --lane registrar'],
     # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
     'wf_lane3_refute.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r"model: 'opus'", r"agentType: 'cobol-refuter'"],

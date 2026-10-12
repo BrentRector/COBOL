@@ -424,16 +424,15 @@ keep running r1 repeatedly for zero gain".
   no reader holds the file open while a writer replaces it (Windows refuses that). A file that is not a lease is never
   guessed free or held: every verb exits 2 with the reason, and push-main dies on it. The exit codes are the contract
   push-main acts on: 0 own/done, 1 (`check` only) free, 4 held by another worktree, 2 could not answer.
-- **Acquire before the final rebase and the gates** (lander-train-brief and lander-brief step 2b, golden-lander-brief
-  step 4): `acquire --holder … --reason … --wait-min 9` takes a free lease, re-takes the caller's own, or takes over a
-  DEAD one (its expiry passed, or its worktree no longer exists; logged as a `takeover`). While another worktree holds a
-  live one it polls, and after the wait it prints `WAIT` and exits 4; the lander re-issues it and neither rebases nor
-  gates meanwhile. Bringing the clusters in and verifying them happen before it, so they still overlap the previous
-  train's CI (the reason pipelining exists, MANDATORY-PRACTICES L3).
-- **Renew, expire.** The expiry is 30 minutes after the last heartbeat. A lander renews at every later step and before
-  every blocking wait (each under 10 minutes); push-main renews every minute in a background loop that ends with it,
-  because its CI wait is the longest step. A lander that died stops renewing, and its lease is taken over 30 minutes
-  later; a lander whose renew prints `LOST` was taken over, and acquires, rebases and re-gates again.
+- **Acquire** (`push-main.sh` itself, which `enqueue.py land` runs while the merge queue is not ACTIVE; the lander
+  briefs that acquired it before their final rebase retired with the lander, kb/Work PB3023): `acquire --holder …
+  --reason … --wait-min 9` takes a free lease, re-takes the caller's own, or takes over a DEAD one (its expiry passed,
+  or its worktree no longer exists; logged as a `takeover`). While another worktree holds a live one it polls, and
+  after the wait it prints `WAIT` and exits 4: push-main.sh refuses, `enqueue.py land` exits 10, and the enqueue unit
+  re-runs it once (MANDATORY-PRACTICES L3).
+- **Renew, expire.** The expiry is 30 minutes after the last heartbeat. push-main renews every minute in a background
+  loop that ends with it, because its CI wait is the longest step. A holder that died stops renewing, and its lease is
+  taken over 30 minutes later.
 - **push-main.sh is the backstop.** Before it spends a CI run it re-takes the lease (or takes it, when the caller
   took none: a registrar's docs landing, the operator's own push), and REFUSES the landing with exit 4 while another
   worktree holds it, so an unleased landing can no longer move main under a leased one. Its renewer retries through a
@@ -564,8 +563,8 @@ as `audit_witness_loss.py`, whose `rows_at` it reuses).
   excuse a future regression.
 - Exit 0 green, 1 with the offending row ids printed, 2 when the inventory does not exist at `base`.
 
-**Wiring (described, not done here):** the lander runs it after merging a train and before `push-main.sh`
-(a `lander-train-brief.md` step beside the witness-loss audit), and CI's `audits` job runs it with the `changes`
+**Wiring (described, not done here):** the landing runs it as one of `enqueue.py checks` (beside
+`landing_oracle.py`, before the pull request or push-main.sh), and CI's `audits` job runs it with the `changes`
 job's `BASE`, exactly as it runs `audit_witness_loss.py`. The orchestrator decides when to turn it on (open decision
 D5), because it changes the landing contract.
 

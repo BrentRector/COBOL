@@ -29,6 +29,8 @@ what a script cannot decide.
    - `LANDED` (push-main): on main.
    - `CONFLICT` (exit 4), `GATE RED` (exit 5), a DEVLOG refusal (exit 6), a stale arch-oracle baseline (exit 7) or a
      push-main CI red (exit 10): the reason is in the log and in the branch's report (`BLOCKED: enqueue …`): step 4.
+   - `UNREVIEWED` (exit 11): the branch's tip is not covered by its CLEAN review stamp (MANDATORY-PRACTICES I10): it
+     goes back to step 2's reviewer, never to a finisher and never landed another way.
    - exit 3 (the landing check's STOP: the branch shares a file with earlier-dispatched in-flight work): never retry
      as is; name it in the handoff with the check's lines.
    - exit 9 (GitHub refused the push, the PR or the queue) or exit 10 for a held landing lease: re-run once; if it
@@ -40,12 +42,15 @@ what a script cannot decide.
    of them in one message) with `.claude/skills/workstream/templates/finisher-brief.md`, its prompt naming the branch,
    its worktree, its report, the stop line verbatim (or the PR number and the bounce reason, with the merge group's
    failed run from `gh run list --event merge_group --limit 20`) and both stop files. The finisher fixes the branch at
-   its root and lands it with `enqueue.py land` itself; stay until every finisher returns.
+   its root, gates it and returns DONE; it never lands: its commits are unreviewed, so the branch reads WAITING FOR
+   REVIEW and the next enqueue unit's step 2 reviews the new tip before step 3 lands it (`enqueue.py land` refuses an
+   unreviewed tip with exit 11, UNREVIEWED: never a finisher's case to work around). Stay until every finisher
+   returns.
 5. LEADS. The reports this unit landed carry new defects as note-ready paragraphs (their "New defects" section, the
    implementers' `leads`). Dispatch ONE `cobol-clerk` with ids from `python scripts/orchestrator/alloc.py pb <n>`
    (one note per MECHANISM, grepped against kb/Work first, MANDATORY-PRACTICES R1-R3), in a worktree cut from
    origin/main, which commits the notes with a `DEVLOG/pending-<slug>.md` entry and lands its own branch with
-   `enqueue.py land`. Skip it when no report carries a lead.
+   `enqueue.py land <branch> --lane clerk` (a lane MANDATORY-PRACTICES I10 does not review). Skip it when no report carries a lead.
 6. `python scripts/prune_worktrees.py --apply` removes the branches that landed (O10).
 7. Render the ledger in the same turn: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html` (every figure on it
    is computed; its trend file gains a point when GAP or the register's series moved). You cannot PUBLISH it (a headless

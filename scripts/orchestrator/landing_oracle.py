@@ -39,9 +39,9 @@ import tempfile
 
 RECORDED = "docs/rearchitecture/evidence/arch-oracle"
 SHOW_PATHS = 12
-RECORD = ("python scripts/arch/compare_oracle.py   (explain every difference by cluster in the DEVLOG entry), then "
-          "python scripts/arch/capture_oracle.py --record   on the committed train, commit the new manifest, and run "
-          "the landing again (lander-train-brief step 3c, MANDATORY-PRACTICES L11)")
+RECORD = ("python scripts/arch/compare_oracle.py   (explain every difference by its class in the report and the "
+          "DEVLOG entry), then python scripts/arch/capture_oracle.py --record   on the committed branch, commit the new "
+          "manifest, and run the landing again (finisher-brief ORACLE stop, MANDATORY-PRACTICES L11)")
 
 
 class RangeError(Exception):

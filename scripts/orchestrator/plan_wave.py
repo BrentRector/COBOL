@@ -28,8 +28,9 @@ cost the orchestrator a hand-written groups.json; this computes it.
    that already failed twice; Sonnet otherwise; never Fable).
 6. COST per group from model_rules.json; groups are taken in rank order while they fit (a group that does not fit is
    skipped and a smaller later one may still fit; a successor only with its predecessor), plus each group's landing (kb/Work PB3023).
-7. Codes (three per group) and lead-id blocks (five per train) come from alloc.py; --dry-run peeks and reserves
-   nothing, and writes nothing.
+7. Codes (three per group) come from alloc.py; --dry-run peeks and reserves nothing, and writes nothing. The planner
+   allocates no lead ids: the enqueue unit's clerk takes them from `alloc.py pb <n>` when it files the landed reports'
+   leads (units/enqueue.md step 5; kb/Work PB3023 retired the train's lead-id blocks).
 8. A note whose body says it needs a frontier model under the owner's approval (model_rules.json
    routing.owner_approval_patterns) is never planned: it is listed as waiting (MANDATORY-PRACTICES P1).
 

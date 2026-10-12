@@ -4,13 +4,19 @@ checked, and handed to GitHub's merge queue as one pull request (kb/Work PB3023,
 sections 3.17.2 step 3, 3.17.5 and 3.17.6). No agent lands anything: the loop's `enqueue` unit runs this per WAITING TO LAND
 branch, and an agent is dispatched only for what a script cannot decide (a conflict, a red gate, a queue bounce).
 
-    python scripts/orchestrator/enqueue.py land <branch> [--worktree <path>] [--dry-run]     THE landing step
+    python scripts/orchestrator/enqueue.py land <branch> [--worktree <path>] [--lane L] [--dry-run]  THE landing step
     python scripts/orchestrator/enqueue.py queue --title "<one-line subject>" --body-file <forensic message> [--dry-run]
     python scripts/orchestrator/enqueue.py checks [--rev HEAD] [--base origin/main]
     python scripts/orchestrator/enqueue.py --self-test
 
 `land <branch>`, from any checkout (the branch's worktree is found by `git worktree list`, or named by --worktree):
   1. The worktree must be clean (STATUS.md and the harness's settings.local.json aside): a landing carries only commits.
+     THE REVIEW (MANDATORY-PRACTICES I10, L9; kb/Work PB3027): the branch's newest fix-lane report must carry
+     `**Review:** CLEAN <reviewer> <head>` naming a commit of the branch, and every later commit must be main's, a clean
+     merge of main (its tree the auto-merge of its parents) or DEVLOG-only; anything else (a finisher's fix, a
+     hand-resolved conflict) is unreviewed: exit 11, the report gains `BLOCKED: enqueue — not reviewed …`, and the new
+     tip goes to a reviewer. Only the lanes I10 does not review (UNREVIEWED_LANES: the registrar, the golden lane, the
+     clerk) skip it, naming themselves with `--lane`.
   2. `git fetch` origin's main and, when the branch does not already contain it, MERGE it into the branch (never a
      rebase: a branch that merged a same-file predecessor or a sibling carries conflict resolutions in its merge
      commits, which a rebase throws away and asks for again; the queue lands by merge commit anyway, so the branch's
@@ -55,7 +61,8 @@ Exit: 0 queued, landed (push-main) or nothing to land · 2 usage or state (a dir
 main, a check could not run) · 3/6/7 a landing check refused (above) · 4 bringing main in conflicted · 5 a gate is not
 GREEN · 8 the merge queue is not ACTIVE (`queue` only; `land` takes push-main then) · 9 GitHub refused the push, the
 pull request or the queue (main untouched; re-run after the cause is fixed — every step is idempotent) · 10 push-main.sh
-did not land it (its own exit code is printed: a CI red, the landing lease held).
+did not land it (its own exit code is printed: a CI red, the landing lease held) · 11 the branch is not reviewed at its
+tip (`land` only; above).
 """
 from __future__ import annotations
 
@@ -79,7 +86,12 @@ EXIT_GATE = 5
 EXIT_QUEUE_NOT_ACTIVE = 8
 EXIT_GITHUB = 9
 EXIT_PUSH_MAIN = 10
+EXIT_UNREVIEWED = 11
 VERDICT = "=== ENQUEUE: "
+# The lanes MANDATORY-PRACTICES I10 does not review: they write no fix-lane report, change no compiled program's source
+# (the registrar's and the clerk's notes; the golden lane's spec-derived goldens, which the gate runs), and their briefs
+# name themselves with `land --lane <lane>`. Every other branch lands only under a CLEAN review stamp (review_gate).
+UNREVIEWED_LANES = ("registrar", "golden", "clerk")
 # THE GATE AT ENQUEUE (DESIGN-test-build-ci.md §3.17.2 step 3, §3.17.3): (host, command run in the worktree, its verdict
 # line's prefix). THE ONE GATE (kb/Work PB3022: one shape, no mode; a landing's gate runs at Normal priority) on
 # Windows, then CI's Linux legs under WSL (the operator's steer 2026-10-11 12:37: the landing keeps the whole-leg WSL
@@ -270,6 +282,49 @@ def record_blocked(branch: str, wt: pathlib.Path, line: str, say: Say,
     say(f"enqueue: recorded in {rep.name}: {line}")
 
 
+def mechanical(wt: pathlib.Path, commit: str) -> bool:
+    """A commit that changes nothing a reviewer reads: a merge whose tree IS the clean merge of its two parents (no hand
+    resolution: what this script's own `git merge origin/main` makes), or a commit that changes only DEVLOG/ (an entry,
+    its stamp, a re-stamp)."""
+    parents = _git(wt, "rev-list", "--parents", "-n", "1", commit).stdout.split()[1:]
+    if len(parents) == 2:
+        clean = _git(wt, "merge-tree", "--write-tree", *parents)
+        return clean.returncode == 0 and clean.stdout.split()[:1] == [
+            _git(wt, "rev-parse", f"{commit}^{{tree}}").stdout.strip()]
+    if len(parents) == 1:
+        paths = _git(wt, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).stdout.split()
+        return bool(paths) and all(p.startswith("DEVLOG/") for p in paths)
+    return False
+
+
+def review_gate(branch: str, wt: pathlib.Path, base: str, reports_dir: pathlib.Path | None = None) -> str | None:
+    """THE REVIEW BEFORE THE LANDING (MANDATORY-PRACTICES I10, L9; kb/Work PB3027; DESIGN-test-build-ci.md section
+    3.17.2 step 2): None when the branch may land, else why not. Its newest fix-lane report (prune_worktrees' reader)
+    must carry `**Review:** CLEAN <reviewer> <head>` naming a commit of the branch, and every commit of the branch after
+    that head must be main's or mechanical (above): a finisher's fix, a hand-resolved conflict, any later commit is
+    unreviewed work, and the new tip is reviewed before it lands."""
+    import prune_worktrees  # noqa: PLC0415  (scripts/: it imports coord and plan_wave back)
+    import coord  # noqa: PLC0415
+    rdir = reports_dir or coord.reports_dir()
+    rep = prune_worktrees.newest_report(prune_worktrees.report_index(rdir, lambda n: False), branch, str(wt))
+    if rep is None:
+        return (f"no fix-lane report under {rdir} names {branch}, so no review stamp does (a lane I10 does not review "
+                f"names itself: --lane {'|'.join(UNREVIEWED_LANES)})")
+    rv = rep.review
+    if rv is None or rv.verdict != "CLEAN":
+        return (f"{rep.name} carries {'a FINDINGS' if rv else 'no'} review stamp: a cobol-reviewer reviews the branch "
+                "(and a finisher answers its findings) before it lands")
+    reviewed = _git(wt, "rev-parse", "--verify", "--quiet", f"{rv.sha}^{{commit}}").stdout.strip()
+    if not reviewed or _git(wt, "merge-base", "--is-ancestor", reviewed, "HEAD").returncode != 0:
+        return f"{rep.name}'s CLEAN stamp names {rv.sha}, which is not a commit of {branch}"
+    extra = [c for c in _git(wt, "rev-list", "HEAD", f"^{reviewed}", f"^{base}").stdout.split()
+             if not mechanical(wt, c)]
+    if extra:
+        return (f"{len(extra)} commit(s) after the CLEAN review at {rv.sha[:12]} (newest {extra[0][:12]}) are neither "
+                "main's nor a clean merge of it nor DEVLOG-only: the new tip is reviewed before it lands")
+    return None
+
+
 def pull_request_text(wt: pathlib.Path, base: str, branch: str) -> tuple[str, str]:
     """(title, body) of the branch's pull request: the title of the ONE DEVLOG entry the branch adds, and as the body
     (which the merge queue's merge commit carries, ruleset-main.json) that entry and the branch's commit list."""
@@ -289,7 +344,8 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
          state: Callable[[], tuple[str, str]], checks: Callable[[pathlib.Path, str, str], int],
          gates: Gate = run_gates, stamp: Callable[[pathlib.Path, str], int] | None = None,
          push_main: Callable[[pathlib.Path], int] | None = None, blocked: Callable[[str, pathlib.Path, str], None]
-         | None = None, dry_run: bool = False, say: Say = print) -> int:
+         | None = None, review: Callable[[str, pathlib.Path, str], str | None] = review_gate,
+         lane: str | None = None, dry_run: bool = False, say: Say = print) -> int:
     """THE landing step (module doc); the collaborators are parameters so the self-test drives every exit arm."""
     def end(rc: int, outcome: str) -> int:
         say(f"{VERDICT}{outcome} ({branch}) ===")
@@ -309,6 +365,12 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
     base = "refs/remotes/origin/main"
     if _git(wt, "rev-parse", "HEAD").stdout.strip() == _git(wt, "rev-parse", base).stdout.strip():
         return end(0, "NOTHING TO LAND — the branch is origin/main")
+    # 1b. The branch review (MANDATORY-PRACTICES I10): only a tip its CLEAN stamp covers lands.
+    if lane:
+        say(f"enqueue: the {lane} lane, which MANDATORY-PRACTICES I10 does not review; no review stamp read")
+    elif why := review(branch, wt, base):
+        blocked(branch, wt, f"BLOCKED: enqueue — not reviewed at its tip (kb/Work PB3027, MANDATORY-PRACTICES I10): {why}")
+        return end(EXIT_UNREVIEWED, f"UNREVIEWED — {why}")
     # 2. Main in, by merge.
     if _git(wt, "merge-base", "--is-ancestor", base, "HEAD").returncode != 0:
         if dry_run:
@@ -550,10 +612,11 @@ def self_test() -> int:
         absent = lambda: (ruleset.ABSENT, "no ruleset")   # noqa: E731
         notes: list[str] = []
         record = lambda b, w, line: notes.append(line)    # noqa: E731
+        reviewed = lambda b, w, base: None                # noqa: E731  (the review arms below drive review_gate)
 
         (lw / "stray.txt").write_text("uncommitted", encoding="utf-8")
         ran: list[int] = []
-        rc_dirty = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+        rc_dirty = land(root, "fix", lw, review=reviewed, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
                         gates=gates_of(green, ran), stamp=stamper([]), push_main=lambda w: 0, blocked=record,
                         say=lines.append)
         (lw / "stray.txt").unlink()
@@ -566,7 +629,7 @@ def self_test() -> int:
         sh(lw, "commit", "--quiet", "-m", "a clash")
         clash_tip = sh(lw, "rev-parse", "HEAD")
         ran = []
-        rc_conflict = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+        rc_conflict = land(root, "fix", lw, review=reviewed, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
                            gates=gates_of(green, ran), stamp=stamper([]), push_main=lambda w: 0, blocked=record,
                            say=lines.append)
         expect("land: a conflict bringing main in is exit 4: the merge is aborted, the branch unchanged, the report "
@@ -577,7 +640,7 @@ def self_test() -> int:
         sh(lw, "reset", "--quiet", "--hard", fix_tip)
 
         ran, stamped = [], []
-        rc_red = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+        rc_red = land(root, "fix", lw, review=reviewed, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
                       gates=gates_of([("Windows", True, "G"), ("Linux", False, "=== LINUX GATE: RED (x) ===")], ran),
                       stamp=stamper(stamped), push_main=lambda w: 0, blocked=record, say=lines.append)
         merged = sh(lw, "rev-parse", "HEAD")
@@ -588,7 +651,7 @@ def self_test() -> int:
                and _git(lw, "merge-base", "--is-ancestor", fix_tip, "HEAD").returncode == 0, f"{rc_red} {notes[-1:]}")
 
         ran, stamped, pushed = [], [], []
-        rc_pm = land(root, "fix", lw, gh=fake_gh([], log := []), state=absent, checks=lambda w, s, b: 0,
+        rc_pm = land(root, "fix", lw, review=reviewed, gh=fake_gh([], log := []), state=absent, checks=lambda w, s, b: 0,
                      gates=gates_of(green, ran), stamp=stamper(stamped), push_main=lambda w: pushed.append(w) or 0,
                      blocked=record, say=lines.append)
         expect("land: the queue not ACTIVE lands through push-main.sh after the gate and the stamp, opening no pull "
@@ -597,14 +660,14 @@ def self_test() -> int:
                and lines[-1].startswith(VERDICT + "LANDED"), f"{rc_pm} {log} {lines[-1:]}")
 
         ran, pushed = [], []
-        rc_again = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+        rc_again = land(root, "fix", lw, review=reviewed, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
                         gates=gates_of(green, ran), stamp=stamper([]), push_main=lambda w: pushed.append(w) or 6,
                         blocked=record, say=lines.append)
         ran_after_new_commit: list[int] = []
         (lw / "e.txt").write_text("a finisher's commit", encoding="utf-8")
         sh(lw, "add", "e.txt")
         sh(lw, "commit", "--quiet", "-m", "a finisher's commit")
-        land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+        land(root, "fix", lw, review=reviewed, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
              gates=gates_of(green, ran_after_new_commit), stamp=stamper([]), push_main=lambda w: 0, blocked=record,
              say=lines.append)
         expect("land: a re-run on the commit already gated GREEN does not gate again, a new commit does; push-main's "
@@ -613,7 +676,7 @@ def self_test() -> int:
 
         prs = []
         log = []
-        rc_q = land(root, "fix", lw, gh=fake_gh(prs, log), state=active, checks=lambda w, s, b: 0,
+        rc_q = land(root, "fix", lw, review=reviewed, gh=fake_gh(prs, log), state=active, checks=lambda w, s, b: 0,
                     gates=gates_of(green, []), stamp=stamper([]), push_main=lambda w: 1 / 0, blocked=record,
                     say=lines.append)
         create = next((a for a in log if a[:2] == ["pr", "create"]), [])
@@ -622,10 +685,81 @@ def self_test() -> int:
                rc_q == 0 and create and create[create.index("--title") + 1] == "DEVLOG 42: PB1: the fix"
                and "Why it was wrong." in pathlib.Path(create[create.index("--body-file") + 1]).read_text(encoding="utf-8")
                and lines[-1].startswith(VERDICT + "ENQUEUED"), f"{rc_q} {create} {lines[-3:]}")
-        rc_pm_red = land(root, "fix", lw, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
+        rc_pm_red = land(root, "fix", lw, review=reviewed, gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0,
                          gates=gates_of(green, []), stamp=stamper([]), push_main=lambda w: 1, blocked=record,
                          say=lines.append)
         expect("land: push-main.sh failing (a CI red) is exit 10, never 0", rc_pm_red == EXIT_PUSH_MAIN, str(rc_pm_red))
+
+        # ── the review before the landing (MANDATORY-PRACTICES I10; kb/Work PB3023 review R1-4) ───────────────────
+        sh(wt, "fetch", "--quiet", "origin")
+        rw = root / "rev-wt"
+        sh(wt, "worktree", "add", "--quiet", "-b", "rev", str(rw), "origin/main")
+        (rw / "r.txt").write_text("the reviewed work", encoding="utf-8")
+        sh(rw, "add", "r.txt")
+        sh(rw, "commit", "--quiet", "-m", "the reviewed work")
+        rdir = root / "reports"
+        rdir.mkdir()
+        report = rdir / "w9a-PB1-report.md"
+
+        def stamp_report(verdict: str) -> None:
+            tail = " 1 w9a-review-r1 {} f.jsonl" if verdict == "FINDINGS" else " w9a-review-r1 {}"
+            report.write_text(f"Status: DONE\n**Review:** {verdict}{tail.format(sh(rw, 'rev-parse', 'HEAD'))}\n"
+                              f"Branch: rev\n\n## Rows\n", encoding="utf-8")
+        stamp_report("CLEAN")
+        base_ref = "refs/remotes/origin/main"
+        at_review = review_gate("rev", rw, base_ref, rdir)
+        (wt / "m.txt").write_text("main moves after the review", encoding="utf-8")
+        sh(wt, "switch", "--quiet", "main")
+        sh(wt, "add", "m.txt")
+        sh(wt, "commit", "--quiet", "-m", "main moves after the review")
+        sh(wt, "push", "--quiet", "origin", "main")
+        sh(rw, "fetch", "--quiet", "origin")
+        sh(rw, "merge", "--quiet", "--no-edit", base_ref)
+        (rw / "DEVLOG").mkdir()
+        (rw / "DEVLOG" / "pending-rev.md").write_text("## PB1: rev\n\nWhy.\n", encoding="utf-8")
+        sh(rw, "add", "DEVLOG")
+        sh(rw, "commit", "--quiet", "-m", "the entry")
+        mechanical_only = review_gate("rev", rw, base_ref, rdir)
+        expect("review: a tip that moved after its CLEAN review only by main's commits, a clean merge of main and a "
+               "DEVLOG-only commit is still reviewed",
+               at_review is None and mechanical_only is None, f"{at_review} / {mechanical_only}")
+
+        (wt / "m2.txt").write_text("main moves again", encoding="utf-8")
+        sh(wt, "add", "m2.txt")
+        sh(wt, "commit", "--quiet", "-m", "main moves again")
+        sh(wt, "push", "--quiet", "origin", "main")
+        sh(rw, "fetch", "--quiet", "origin")
+        sh(rw, "merge", "--quiet", "--no-commit", base_ref)
+        (rw / "r.txt").write_text("a hand edit inside the merge", encoding="utf-8")
+        sh(rw, "add", "r.txt")
+        sh(rw, "commit", "--quiet", "--no-edit")
+        hand_merge = review_gate("rev", rw, base_ref, rdir) or ""
+        sh(rw, "reset", "--quiet", "--hard", "HEAD~1")
+        (rw / "fix.txt").write_text("a finisher's fix", encoding="utf-8")
+        sh(rw, "add", "fix.txt")
+        sh(rw, "commit", "--quiet", "-m", "a finisher's fix")
+        ran, notes[:] = [], []
+        rc_unreviewed = land(root, "rev", rw, review=lambda b, w, base: review_gate(b, w, base, rdir), gh=fake_gh([], []),
+                             state=absent, checks=lambda w, s, b: 0, gates=gates_of(green, ran), stamp=stamper([]),
+                             push_main=lambda w: 0, blocked=record, say=lines.append)
+        expect("review: a commit after the CLEAN review that is not mechanical (a finisher's fix, a hand-resolved "
+               "merge) is exit 11 before anything is merged or gated, the report told why",
+               "after the CLEAN review" in hand_merge and rc_unreviewed == EXIT_UNREVIEWED and not ran
+               and notes and notes[-1].startswith("BLOCKED:") and lines[-1].startswith(VERDICT + "UNREVIEWED"),
+               f"{hand_merge!r} {rc_unreviewed} {notes[-1:]} {lines[-1:]}")
+
+        stamp_report("FINDINGS")
+        findings = review_gate("rev", rw, base_ref, rdir) or ""
+        report.unlink()
+        no_report = review_gate("rev", rw, base_ref, rdir) or ""
+        ran = []
+        rc_lane = land(root, "rev", rw, review=lambda b, w, base: review_gate(b, w, base, rdir), lane="registrar",
+                       gh=fake_gh([], []), state=absent, checks=lambda w, s, b: 0, gates=gates_of(green, ran),
+                       stamp=stamper([]), push_main=lambda w: 0, blocked=record, say=lines.append)
+        expect("review: a FINDINGS stamp or no report is unreviewed; only a lane I10 does not review, named with "
+               "--lane, lands without a stamp",
+               "FINDINGS" in findings and "--lane" in no_report and rc_lane == 0 and ran,
+               f"{findings!r} {no_report!r} {rc_lane}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"=== enqueue.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")
@@ -650,6 +784,9 @@ def main(argv: list[str] | None = None) -> int:
     lnd = sub.add_parser("land", help="THE landing step: main in, the gate, the DEVLOG stamp, the checks, the queue")
     lnd.add_argument("branch")
     lnd.add_argument("--worktree", type=pathlib.Path, help="the branch's worktree (default: found by git worktree list)")
+    lnd.add_argument("--lane", choices=UNREVIEWED_LANES,
+                     help="a lane MANDATORY-PRACTICES I10 does not review (its brief says so); every other branch "
+                          "lands only under a CLEAN review stamp at its tip")
     lnd.add_argument("--dry-run", action="store_true", help="say what it would do; change nothing")
     a = ap.parse_args(argv)
     if a.self_test:
@@ -666,7 +803,8 @@ def main(argv: list[str] | None = None) -> int:
                      checks=lambda sha, base: run_checks(sha, base, _script_runner(cwd)), dry_run=a.dry_run)
     if a.verb == "land":
         return land(cwd, a.branch, a.worktree, gh=ruleset.real_gh, state=queue_state,
-                    checks=lambda wt, sha, base: run_checks(sha, base, _script_runner(wt)), dry_run=a.dry_run)
+                    checks=lambda wt, sha, base: run_checks(sha, base, _script_runner(wt)), lane=a.lane,
+                    dry_run=a.dry_run)
     ap.print_help()
     return 2
 

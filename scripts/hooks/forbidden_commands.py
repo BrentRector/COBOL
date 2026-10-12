@@ -6,9 +6,10 @@ fires inside subagents and Workflow agents too. Each rule below was written in a
 
   git stash / --autostash   the stash stack is SHARED by every linked worktree (common git dir); PB713's implementer
                             popped the registrar's stash. WIP goes into a commit (workstream skill, references/landing.md).
-  bare push to main         main requires the ci-gate check; the route is a pull request queued by
-                            `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE, and until
-                            then `bash scripts/push-main.sh` (owner decision Q23, 2026-09-06; kb/Work PB3024). A push
+  bare push to main         main requires the ci-gate check; the ONE route is
+                            `python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023: main merged in, the
+                            gate, the DEVLOG stamp, then a pull request into the merge queue once it is ACTIVE, until
+                            then `bash scripts/push-main.sh`; owner decision Q23, 2026-09-06; kb/Work PB3024). A push
                             to ci/<sha> or any other branch is fine.
   direct push in a unit     inside an orchestrator unit (COBOL_COORD_DIR set) ANY `git push`, any repository, any
                             flags: a unit lands through a landing script (enqueue.py, or push-main.sh while the merge
@@ -113,10 +114,10 @@ for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;
     args = m.group(1)
     if re.search(r"(?:^|\s|:)(?:refs/heads/)?main(?:\s|$)", args):
         block("a direct push to main is refused by the server (required `ci-gate` check). Land with "
-              "`python scripts/orchestrator/enqueue.py queue` (a pull request into the merge queue) once "
-              "`python scripts/orchestrator/ruleset.py check` reports the queue ACTIVE; until then with "
-              "`bash scripts/push-main.sh` — it pushes ci/<sha>, waits for green, then fast-forwards main. "
-              "Both are idempotent; run push-main.sh with run_in_background and block on its log.")
+              "`python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): it merges origin/main in, "
+              "runs the gate, stamps the DEVLOG entry and queues one pull request once `ruleset.py check` reports the "
+              "merge queue ACTIVE, else lands through `bash scripts/push-main.sh`. It is idempotent; run it with "
+              "run_in_background and block on its `=== ENQUEUE: ` line.")
 # 2b. ANY direct `git push`, in ANY repository, inside an orchestrator unit (owner 2026-10-05, kb/Work/PB2044).
 # Rule 2 guards THIS repo's main and deliberately leaves another repository to its own rules, so an attended session may
 # push the sites and the public skills repo. A unit has no such need and runs under `bypassPermissions`: on 2026-10-05 the
@@ -152,8 +153,8 @@ if os.environ.get("COBOL_COORD_DIR"):
     payloads = [m.group(2) for m in _SHELL_PAYLOAD.finditer(scan)]
     if any(_PUSH.search(t) for t in [_QUOTED.sub(" ", scan)] + payloads):
         block("a direct `git push` is refused inside an orchestrator unit (any repository, any flags). Land this "
-              "repository's work with `python scripts/orchestrator/enqueue.py queue` once the merge queue is ACTIVE "
-              "(`ruleset.py check`), else `bash scripts/push-main.sh`. A change to ANOTHER repository (the public skills "
+              "repository's work with `python scripts/orchestrator/enqueue.py land <branch>` (it queues a pull "
+              "request once the merge queue is ACTIVE, else lands through push-main.sh). A change to ANOTHER repository (the public skills "
               "repo, a site) is never published by a unit: hand it off as an owed push in the handoff and the "
               "attended session or the owner publishes it (kb/Work/PB2044).")
 # 3. backslash escapes inside a heredoc body

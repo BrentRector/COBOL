@@ -57,7 +57,7 @@ public sealed class LandingPipelineDriftTests
         Assert.True(offenders.Count == 0,
             "these files open or queue a pull request outside scripts/orchestrator/enqueue.py, whose guard refuses "
             + "unless `ruleset.py check` reports the merge queue ACTIVE (kb/Work PB3024): route the step through "
-            + $"`enqueue.py queue`:\n  {string.Join("\n  ", offenders)}");
+            + $"`enqueue.py land`:\n  {string.Join("\n  ", offenders)}");
     }
 
     /// <summary>⭐ The sweep's failure branch, fired: a planted brief with a hand PR step is found, by the same function.</summary>
@@ -156,6 +156,13 @@ public sealed class LandingPipelineDriftTests
             "land: an ACTIVE queue opens one pull request titled from the DEVLOG entry, whose body carries the entry "
                 + "and the commits, and queues it",
             "land: push-main.sh failing (a CI red) is exit 10, never 0",
+            // MANDATORY-PRACTICES I10, L9 (kb/Work PB3027): only a tip its CLEAN review stamp covers lands
+            "review: a tip that moved after its CLEAN review only by main's commits, a clean merge of main and a "
+                + "DEVLOG-only commit is still reviewed",
+            "review: a commit after the CLEAN review that is not mechanical (a finisher's fix, a hand-resolved "
+                + "merge) is exit 11 before anything is merged or gated, the report told why",
+            "review: a FINDINGS stamp or no report is unreviewed; only a lane I10 does not review, named with "
+                + "--lane, lands without a stamp",
         });
         SelfTestArmSource.AssertDeclares(TestRepo.Scripts("orchestrator", "ruleset.py"), new[]
         {
