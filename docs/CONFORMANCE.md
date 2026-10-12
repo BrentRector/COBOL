@@ -1800,11 +1800,16 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
   handling, A.4.2), **1705** (FORMAT / SELECT WHEN, A.4.8), **1706** (WRITE / REWRITE FILE, A.4.13) and
   **1708 / 1709 / 1710** (VALIDATE's data-division clauses, APPLY COMMIT, and every declined module's
   exception-names — the `declined-optional-element` suppress family). All of them emit through the ONE
-  declined-element seam, `EditionContext.Declined`, whose descriptor chooses the channel.
-  ⚠ **`--permissive` moves SOME of these and not others, and the axis is whether an inert compile could
-  change the ANSWER.** 1708/1709/1710 downgrade to warnings and bind to a no-op, because their sibling
-  STATEMENTS are already accept-inert (1579/1580) and a declined module's exception-names raise nothing
-  either way — nothing observable changes. 1560/1705/1706/1707 do **not** move in either direction: an
+  declined-element seam, `EditionContext.Declined`, whose refuse rule (`EditionContext.Refuses`) chooses the channel.
+  ⚠ **`--permissive` moves SOME of these and not others, and the axis is whether an accepted element could
+  change the ANSWER the source states.** 1708/1709/1710 downgrade to warnings. The VALIDATE clauses (1708) and
+  APPLY COMMIT (1709) bind to a no-op, because their sibling STATEMENTS are already accept-inert (1579/1580).
+  A declined module's exception-name (1710) is accepted as an ordinary exception-name and RESOLVES: no
+  statement of the declined facility ever sets its condition (§14.6.13.1.1 licenses raising nothing for it),
+  so `>>TURN … CHECKING ON` enables a check only a RAISE can trigger, and a `RAISE EXCEPTION` of the name
+  raises it exactly as written (§14.9.29.4 GR1): a USE declarative for it runs, a WHEN phrase matches it,
+  and execution continues per Table 13 — an observable result, but the one the source states
+  (`DocumentedNonSupportWitnessTests.DeclinedModuleExceptionName_Permissive_*`). 1560/1705/1706/1707 do **not** move in either direction: an
   inert screen `ACCEPT` is re-read as the device ACCEPT and moves the wrong data, an inert `FORMAT` clause
   changes which bytes reach the medium, an inert `WRITE FILE` writes the wrong record. The fact lives on
   the descriptor (`PermissiveInert`) and is read in the seam, never tested at an emit site.

@@ -69,3 +69,15 @@ only report), so `Advise` was the only binding site. New theory
 `DeclinedModuleExceptionName_Permissive_IsAcceptedAndResolves` reads the six strict negatives under `--permissive`,
 and `…_RaiseReachesTheDeclarative_ScreenStillRefused` runs the reviewer's scenario and the EC-SCREEN complement.
 R1-2: appending the PB374 note's Landed section had split its Code site line; the line is whole again.
+
+### Branch review round 2
+
+R2-1: the R1-1 fix made a COBOLNET1710 name under `--permissive` a live operand, but the §4 preface of
+docs/CONFORMANCE.md (the §4.2.7 user documentation) still told the user that 1708/1709/1710 bind to a no-op under
+`--permissive` and nothing observable changes. Rewritten: 1708 and 1709 bind to a no-op beside their accept-inert
+statements; a 1710 name resolves, no statement of the declined facility sets its condition (§14.6.13.1.1), and a
+RAISE of it raises it exactly as written (§14.9.29.4 GR1), so its declarative runs. That is an observable result, and
+it is the one the source states. The same stale sentence sat in three other places, all fixed: the
+`EditionContext.Declined` doc comment, the `DiagnosticDescriptor.PermissiveInert` parameter doc ("compiles to a
+no-op"), and the rearchitecture plan's declined-facility paragraph. The behavior is pinned by the round-1 witnesses
+`DeclinedModuleExceptionName_Permissive_*`, which the preface now names.
