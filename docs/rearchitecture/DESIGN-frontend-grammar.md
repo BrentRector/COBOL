@@ -519,6 +519,21 @@ context-sensitive keywords in a keyword-OR-name slot (ATTRIBUTE, RELATION, UCS-4
 `cobolWord`: §8.9 never reserves them, so the funnel is inert for them. The computer paragraphs' old word sink
 (`computerAttributes`) is gone (kb/Work PB830, §3.10): their residue is the `unrecognizedClause` error
 production, and their deleted '85 clauses are modelled rules.
+
+⛔ **A NAME SLOT IS `cobolWord`, NEVER A BARE `IDENTIFIER` — the converse of the rule above (kb/Work PB2721, PB2732).**
+A user-defined word is DECLARED through `cobolWord` (`dataName`, `programName`, the SELECT file-name), and §8.3.2.1 3)
+lets a §8.10 context-sensitive word be one outside its construct, so every slot that REFERENCES or DEFINES such a
+word admits the same set — `cobolWord`, whose keyword-token arms (CAPACITY, CYCLE, BYTES, …) IDENTIFIER does not
+reach. Two reference slots were bare IDENTIFIER: `typeClause` (type-name-1, so `01 CAPACITY TYPEDEF …` declared a
+type `TYPE CAPACITY` could not name) and `functionName` (function-prototype-name-1, so `FUNCTION-ID. CAPACITY.` could
+not be named in REPOSITORY or after FUNCTION). `functionName` is now `cobolWord | intrinsicKeywordName`, the second
+holding the reserved intrinsic-function-names with their own tokens; `TokenRetypes` reads `intrinsicKeywordName`
+for the keyword-omitted call's subscript trigger. And a DEFINING slot is a word, never a reference: the OCCURS
+INDEXED BY index-names were a `dataReferenceList`, so `INDEXED BY IX OF G` compiled and declared `IXOFG`; they are
+now `indexNameList : cobolWord (COMMA? cobolWord)*`, and a qualifier or subscript is the syntax error §13.18.38.2's
+`{ index-name-1 } …` makes it. `UserWordSlotDriftTests` reads every parser `.g4` and fails on a bare `IDENTIFIER`
+outside the argued keyword, system-name and word-run sites (`formatWord`, `enterOperand`, `genericClause`, a
+predicate-led keyword, the tokenless-keyword alternatives it names with their reason).
 **A REFERENCE to a gated word is answered by the parse-error path.** The gate leaves no name-slot alternative for
 `DISPLAY CONSTANT.` at `--std 2002`, and a source that fails to parse never reaches the bound-tree funnel. So
 `CobolErrorListener` asks the parser whether the offending token is reservation-gated (the generated
@@ -624,7 +639,7 @@ removes the "keep SUB_* in sync with DEFAULT" hazard without touching the mode-s
 is a user-defined word in SOME edition — so `TokenRetypes.PrimeLexer(lexer, edition)` hands the lexer the
 trigger tokens whose word the edition RESERVES (§8.9 at the edition's year, `--permissive` off) and the program
 has not DECLARED (`ReservedWordSet.AdmitsAsUserWord` for the strict edition, §8.3.2.1 rule 1), minus the parser's
-`functionName` first-set (a keyword-omitted intrinsic call keeps its capture, §8.4.3.2.3 SR2). A '(' after such
+`intrinsicKeywordName` first-set (the reserved intrinsic-function-name tokens; a keyword-omitted intrinsic call keeps its capture, §8.4.3.2.3 SR2). A '(' after such
 a word groups: `IF BZ B-OR (BW B-AND BW)` at 2002+ parses by §8.8.2 Table 4. Under `--permissive` the word's
 legacy reading is the PROGRAM's declaration of it (kb/Work PB1669): the parse finds declarations (the §8.9
 gate's `FreedReservedWords`, which `--permissive` also fills for a reserved word it admits), and when a found

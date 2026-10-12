@@ -48,7 +48,7 @@ description: Use BEFORE dispatching any fleet, finisher, implementer or adjudica
 > read each unit's handoff; decide every DECISION row `python scripts/prune_worktrees.py --brief` prints (land it via a
 > finisher, or abandon it in its kb/Work note; never carry it forward) and remove the LANDED ones with `--apply`
 > (MANDATORY-PRACTICES O10, PB2600); run the battery on its cadence. Hand-dispatching a Workflow stays legal for a
-> supervised one-off (the waves start no lander; the loop's enqueue unit is the one landing path while it runs: O11, PB3023),
+> supervised one-off (the waves start no lander; the loop's landing lane is the one landing path while it runs: O11, PB3023, PB3103),
 > and everything below still governs it. Do not edit the main checkout
 > while a unit runs: work in a worktree.
 
@@ -97,8 +97,9 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   the branch is reviewed again (`review_fix_rounds`, 2). Only a branch stamped `Review: CLEAN` at its head is ready;
   the landing never reviews. `review_findings.py summary <scratch>` measures it.
 - **No lander, no train (kb/Work PB3023).** The wave ends when its groups return; every branch reviewed CLEAN is the
-  loop's `enqueue` unit's, which lands each with `scripts/orchestrator/enqueue.py land` (main merged in, the gate on both
-  hosts under the gate slot, the DEVLOG stamp, the landing checks, one pull request into the merge queue).
+  loop's landing lane's (`land_lane.py`, kb/Work PB3103), which lands each with `scripts/orchestrator/enqueue.py land`
+  (main merged in, the gate on both hosts under the gate slot, the DEVLOG stamp, the landing checks, one pull request
+  into the merge queue); the `enqueue` unit handles the reviews, the finishers, the re-arms and the leads.
 - **Same-file successors.** A file with more open notes than the cluster cap (`fix_clusters.py` caps at 5) becomes
   two or more groups, and each later one declares `after: '<predecessor letter>'`. The successor waits for its
   predecessor, merges its branch, and orients from that report's "For the next implementer" section and STATUS.md

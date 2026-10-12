@@ -1,4 +1,4 @@
-## PB3103: the loop's landing lane — a reviewed branch lands the moment it is ready, beside whatever unit runs; landing gates first in the gate-slot queue
+## Entry 1979 — 2026-10-12 16:37 PDT — PB3103: the loop's landing lane — a reviewed branch lands the moment it is ready, beside whatever unit runs; landing gates first in the gate-slot queue
 
 **Why (owner-approved design, 2026-10-12, "Supervisor lane (Recommended)").** Wave 1069 measured the cost of landing
 through a unit: group D was stamped `Review: CLEAN` at 12:34 PDT and E and F by 13:05, and all three read WAITING TO
@@ -43,5 +43,30 @@ implementer gates.
    background from Invoke-Unit at least twice, and enqueue.md step 3 names `land_lane.py status` and runs no
    `enqueue.py land`, with a planted-step arm.
 
+**Branch review round 1 (two findings, both fixed).** R1-1: a stop resolved WITHOUT a new commit had no way back
+into the lane. `decide` never relaunches a STOPPED or queued attempt at the same head, `candidates` skipped BOUNCED
+rows, and step 3 may no longer run `enqueue.py land`, so a bounce its finisher attributed to infrastructure, a GATE RED
+that was main's own, or an UNREVIEWED exit 11 later stamped CLEAN would have stranded its branch silently. The fix is
+the enqueue unit's `land_lane.py rearm <branch> --why <cause>`: a `land-lane/rearm/<branch>.json` record at the
+worktree's tip that `candidates` and `decide` honour once (the launch consumes it, a moved tip drops it, a running
+attempt refuses it), and `agent_work` no longer counts a BOUNCED branch the lane is landing or re-armed to land.
+Self-test case 12 plants all three stops (8 checks). R1-2: the wording sweep had missed MANDATORY-PRACTICES O2 and L12,
+units/enqueue.md step 4, finisher-brief.md, wf_rolling_wave.js's meta, landing.md's exit-3 line, check_practices.py's
+comment, SKILL.md (two more) and DESIGN-orchestrator-loop.md's failure table; all now say the lane lands and the unit
+re-arms. `LandingLaneDriftTests` also requires step 3 to name `land_lane.py rearm`.
+
+**Branch review round 2 (R2-1).** Round 1's wording sweep missed four sentences its pattern could not match:
+prune_worktrees.py's BOUNCED row (a finisher "re-runs enqueue.py"), the cobol-finisher role definition ("landed by the
+enqueue unit"), a plan_wave.py comment ("its finished work is the enqueue unit's") and the BLOCKED line enqueue.py
+writes on a conflict ("re-runs enqueue.py"). All four now say the finisher returns DONE, the new tip is reviewed, the
+landing lane lands it, and a no-commit resolution is re-armed. Nothing guarded this wording but a hand grep, so
+`LandingLaneDriftTests.NoCurrentFile_SaysTheEnqueueUnitLands` now sweeps the tracked tree outside the history paths for
+the retired phrasings. Its planted-failure fact checks that each phrasing is found and that the current sentences
+("lands nothing itself", "its lane lands it", "the enqueue unit's `rearm`") are not. Reading the tracked tree makes
+the class a tree-wide sweep (`drift_rules.py --sweeps`), so it carries `[Trait("Sweep", "tree")]`: the landing's Linux
+gate found it without the trait (`HostWitnessTraitDriftTests.TheSweepTrait_IsExactlyDriftRulesTreeWideSweeps_AndThePlannerSeesEveryTrait`),
+a test the Windows leg 1 never runs because its recorded 7.2 s exceeds the planner's 2-second cheap-sweep bound.
+
 **Measure after it lands:** `landing_measure.py summary` (DONE → enqueued → merged per pull request) for the first waves
 after the lane against wave 1069's landings.
+

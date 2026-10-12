@@ -25,10 +25,30 @@ namespace CobolNet.Tests.Unit;
 /// <para>The lane's own decisions (which exit is retried, which waits for the enqueue unit, the halt, the stops) are
 /// <c>land_lane.py --self-test</c>'s, which the self-test runner discovers and runs in every gate and in CI.</para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class LandingLaneDriftTests
 {
     /// <summary>A command that lands a branch: <c>enqueue.py land</c>, however it is spelled out.</summary>
     private static readonly Regex LandCommand = new(@"enqueue\.py\s+land\b", RegexOptions.Compiled);
+
+    /// <summary>A sentence that still names the enqueue unit (or a finisher's re-run of <c>enqueue.py</c>) as the way a
+    /// branch lands: the wording the lane retired (review R2-1). "lands nothing" is the current pipeline's own sentence.</summary>
+    private static readonly Regex RetiredLandingWording = new(
+        @"\benqueue unit (?:then |only )?(?:lands|re-runs)\b(?! nothing)|landed by the enqueue unit|re-runs? enqueue\.py"
+        + @"|(?:finished|DONE) work is the enqueue unit's", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>Tracked paths that record history rather than describe the current pipeline (CLAUDE.md rule 6), and the
+    /// test sources (this file names the pattern).</summary>
+    private static readonly string[] History = ["DEVLOG/", "kb/", "adjudication/", "specs/", "tests/"];
+
+    /// <summary>The tracked files, outside <see cref="History"/>, with a line in the retired wording, as <c>path:line</c>.</summary>
+    internal static IReadOnlyList<string> RetiredWordingSites(string root, IEnumerable<string> tracked) =>
+        [.. tracked.Where(p => !History.Any(h => p.StartsWith(h, StringComparison.Ordinal)))
+                   .Where(p => File.Exists(Path.Combine(root, p)))
+                   .SelectMany(p => File.ReadLines(Path.Combine(root, p))
+                       .Select((line, i) => (line, i))
+                       .Where(x => RetiredLandingWording.IsMatch(x.line))
+                       .Select(x => $"{p}:{x.i + 1}"))];
 
     /// <summary>Step 3 of an enqueue unit prompt: from its <c>3.</c> line to the next top-level step.</summary>
     internal static string Step3(string unitPrompt)
@@ -73,6 +93,58 @@ public sealed class LandingLaneDriftTests
         Assert.True(step3.Length > 0, "scripts/orchestrator/units/enqueue.md has no step 3; re-point this test");
         Assert.Contains("land_lane.py status", step3, StringComparison.Ordinal);
         Assert.DoesNotMatch(LandCommand, step3);
+        // A stop resolved with no new commit leaves the head unchanged and the lane never relaunches it there by itself:
+        // step 3 must name the unit's way to land it again (review R1-1), or that branch waits forever.
+        Assert.Contains("land_lane.py rearm", step3, StringComparison.Ordinal);
+    }
+
+    /// <summary>No doc, role definition, brief or script comment still says the enqueue unit lands a branch or a finisher
+    /// re-runs <c>enqueue.py</c>: an agent that reads one waits for a landing nobody performs (review R2-1, whose sites
+    /// the round-1 sweep's narrower pattern could not match).</summary>
+    [Fact]
+    [Trait("Sweep", "tree")]
+    public void NoCurrentFile_SaysTheEnqueueUnitLands()
+    {
+        IReadOnlyList<string> tracked = TrackedTree.Files();
+        Assert.True(tracked.Count >= 1000, $"`git ls-files` reported only {tracked.Count} paths — the sweep would scan nothing");
+        IReadOnlyList<string> sites = RetiredWordingSites(TestRepo.Root, tracked);
+        Assert.True(sites.Count == 0,
+            "these lines still say the enqueue unit lands a branch or a finisher re-runs enqueue.py; the landing lane "
+            + "lands (land_lane.py, kb/Work PB3103) and the enqueue unit re-arms (`land_lane.py rearm`):\n  "
+            + string.Join("\n  ", sites));
+    }
+
+    /// <summary>⭐ The retired-wording sweep's failure branch, fired: each retired phrasing is found by the same
+    /// function, and the current pipeline's sentences and a history path are not.</summary>
+    [Fact]
+    public void TheRetiredWordingSweep_FindsEachPlantedPhrasing()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), "landing-lane-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(Path.Combine(dir, "brief"));
+        Directory.CreateDirectory(Path.Combine(dir, "kb"));
+        try
+        {
+            File.WriteAllLines(Path.Combine(dir, "brief", "stale.md"),
+            [
+                "the branch is only then landed by the enqueue unit.",
+                "which fixes the branch and re-runs enqueue.py.",
+                "its finished work is the enqueue unit's.",
+                "the enqueue unit lands it.",
+            ]);
+            File.WriteAllLines(Path.Combine(dir, "brief", "current.md"),
+            [
+                "the lane never relaunches it and the enqueue unit lands nothing itself.",
+                "its enqueue unit reviews it, its lane lands it.",
+                "the enqueue unit's `rearm` lands it again.",
+            ]);
+            File.WriteAllText(Path.Combine(dir, "kb", "note.md"), "before PB3103 the enqueue unit lands it.");
+            var sites = RetiredWordingSites(dir, ["brief/stale.md", "brief/current.md", "kb/note.md"]);
+            Assert.Equal(new[] { "brief/stale.md:1", "brief/stale.md:2", "brief/stale.md:3", "brief/stale.md:4" }, sites);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
     }
 
     /// <summary>⭐ The step-3 reader's failure branch, fired: a planted prompt whose step 3 lands is caught, and the

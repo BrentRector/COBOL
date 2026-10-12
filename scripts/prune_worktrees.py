@@ -40,8 +40,11 @@ who acts next:
                    in a merge group and lands it (kb/Work PB3024). Nobody touches it.
   BOUNCED          its pull request is open but the queue REMOVED it (a red merge group, a conflict, a timeout: the
                    reason is GitHub's) and its head is still the branch's tip: the enqueue unit dispatches ONE finisher
-                   with the reason named, which fixes the branch and re-runs enqueue.py. A tip that moved past the
-                   bounced head is the fix, and reads by its report again.
+                   with the reason named. A finisher that fixes the branch returns DONE and lands nothing: its new tip
+                   is reviewed again, then the landing lane lands it. A bounce resolved with no commit (infrastructure,
+                   a red already on main) is re-armed by the enqueue unit (`land_lane.py rearm`, kb/Work PB3103), and
+                   the lane lands it again at the same head. A tip that moved past the bounced head is the fix, and
+                   reads by its report again.
                    The pull-request states come from ONE GraphQL read (`pull_requests`); offline, unauthenticated or with
                    no gh it is empty and the lifecycle is git-only (a non-observation, never a claim that nothing is
                    queued).

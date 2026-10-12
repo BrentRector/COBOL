@@ -659,7 +659,7 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: the landing lane lands only DONE
         # branches (land_lane.py), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
         # finisher cherry-picks the branch's commits (finisher_pred's UNLANDED arm). A DONE report that names a
-        # note NOT started still lands first: its finished work is the enqueue unit's.
+        # note NOT started still lands first: the landing lane lands its finished work.
         # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the enqueue unit never fixes
         # a review finding, so its finisher answers them (finisher_pred's review arm).
         if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or \

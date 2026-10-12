@@ -40,7 +40,9 @@
   refusal (6, 7), or a pull request the queue BOUNCED (`prune_worktrees.py` reads ENQUEUED and
   BOUNCED from one GraphQL read of the open pull requests; offline the states are git-only) is the branch's own: one
   `cobol-finisher` with `templates/finisher-brief.md` fixes it at the root, gates and returns DONE; its commits are reviewed on the branch (I10) before `enqueue.py land` takes the new tip (an unreviewed tip is exit 11).
-  Exit 3 (the landing check's STOP) is never retried as is. A permission refusal of `enqueue.py land` is handed off,
+  Exit 3 (the landing check's STOP) is never retried as is: the landing lane retries it at the same head only once
+  `landing_check.py` passes on the branch. A stop resolved with no new commit is landed again only when the enqueue
+  unit re-arms it (`land_lane.py rearm <branch> --why ...`, kb/Work PB3103). A permission refusal of `enqueue.py land` is handed off,
   never retried or routed around: `READY-TO-LAND <worktree> <branch>` (L13).
 - **No landing takes a lease: the merge queue orders main (kb/Work PB2537, PB3023 review R1-1, PB3024).** Main
   refuses a direct push (the ruleset binds administrators), so every waiting branch is enqueued at once and main moving

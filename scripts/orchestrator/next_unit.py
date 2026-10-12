@@ -17,8 +17,8 @@ Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-l
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
   6. AGENT WORK for the enqueue unit                 -> enqueue: the landing lane's survey lists a branch WAITING FOR
-     REVIEW or BOUNCED, or a lane attempt STOPPED or ENQUEUED is not yet collected (its finisher or reviewer, its leads,
-     its landing record). The landing lane lands every branch WAITING TO LAND itself, beside whatever unit runs
+     REVIEW, or BOUNCED while the lane is neither landing it nor re-armed to, or a lane attempt STOPPED or ENQUEUED is
+     not yet collected (its finisher or reviewer, its leads, its landing record). The landing lane lands every branch WAITING TO LAND itself, beside whatever unit runs
      (land_lane.py, kb/Work PB3103), so a handoff's DONE branches alone start no enqueue unit, unless the lane has no
      current survey (it is not ticking: the enqueue unit's step 3 ticks it).
   7. otherwise                                       -> wave
