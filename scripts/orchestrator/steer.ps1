@@ -13,7 +13,7 @@
   handoff. `orchestrate.ps1 -Unit` writes its first unit through this script, so there is no second steering path.
   -Show prints the pending steer; -Withdraw removes it unconsumed.
 .EXAMPLE
-  pwsh scripts/orchestrator/steer.ps1 -Unit wave -Reason 'the operator wants a wave now' -Summary 'Run a wave; hold push-main until R2 has landed.'
+  pwsh scripts/orchestrator/steer.ps1 -Unit wave -Reason 'the operator wants a wave now' -Summary 'Run a wave; hold the enqueue until R2 has been reviewed.'
   pwsh scripts/orchestrator/steer.ps1 -Show
 #>
 [CmdletBinding(DefaultParameterSetName = 'Steer')]

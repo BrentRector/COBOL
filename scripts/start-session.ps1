@@ -26,8 +26,8 @@
     blocks forever (owner, 2026-09-20).
   - `--dangerously-skip-permissions` IS intentional on this path (owner decision 2026-09-20), so a boot start never waits on a
     permission prompt. It bypasses every permission check for the whole session; the gates that remain are structural: implementers
-    work in .claude/worktrees/, every push to main goes through scripts/push-main.sh, main requires the ci-gate check with
-    enforce_admins on, and the PreToolUse hook (scripts/hooks/forbidden_commands.py) still runs. `skipDangerousModePermissionPrompt`
+    work in .claude/worktrees/, every landing goes through `enqueue.py land` into GitHub's merge queue, main takes only
+    queued pull requests (the ruleset binds administrators, ci-gate required on the merge group), and the PreToolUse hook (scripts/hooks/forbidden_commands.py) still runs. `skipDangerousModePermissionPrompt`
     is already true in the user settings, so the flag raises no confirmation screen.
   - Do not put this file in the Windows Startup folder: Windows launches every file there by its file association, so a .ps1 there
     opens in Notepad. The Startup entry is a .cmd that calls this script.

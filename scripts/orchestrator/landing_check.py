@@ -190,7 +190,7 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
 
     def contained(their_rev: str, files: set[str]) -> set[str]:
         """The files whose version on `their_rev` IS this landing's: a lander that re-committed or patched a member's
-        work carries it by content, not by commit (the retired train_apply.py, kb/Work PB3023)."""
+        work carries it by content, not by commit (the retired train applier, kb/Work PB3023)."""
         return {f for f in files if git("rev-parse", "-q", "--verify", f"{rev}:{f}").stdout.strip()
                 == git("rev-parse", "-q", "--verify", f"{their_rev}:{f}").stdout.strip()}
 

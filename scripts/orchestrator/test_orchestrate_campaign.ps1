@@ -2,8 +2,9 @@
 # SELF-TEST-PLATFORM: windows — the orchestrator loop is Windows-hosted: these cases drive Windows Terminal (a fake wt.exe), Win32_Process, USERPROFILE and directory junctions
 # Self-test for orchestrate.ps1 (campaign), driven by a fake -ClaudeExe (testdata/fake-claude.ps1); no Pester, no real
 # session. Proves: the campaign lane (-Cluster); one campaign rule decides every wave-type choice, a handoff's `wave`
-# included, several leads take turns and a starved lead is reported and logged (kb/Work PB2522); one lander on main at
-# a time (the landing lease, kb/Work PB2537), whose deferral survives the campaign rule; open-watchers.ps1.
+# included, several leads take turns and a starved lead is reported and logged (kb/Work PB2522); finished branches and a
+# handoff naming `enqueue` start an enqueue unit (the merge queue orders main: no landing waits on another, kb/Work
+# PB3024); open-watchers.ps1.
 # One of the parallel parts of the orchestrate.ps1 self-test (testdata/orchestrate_test_lib.ps1 is their harness;
 # kb/Work PB2563). Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate_campaign.ps1, or every
 # self-test at once: python scripts/self_tests.py
@@ -139,35 +140,19 @@ Check 'a cluster that waited through one wave only is not starved' @($s2.starved
 Set-Content -Path (Join-Path $sv 'units.jsonl') -Encoding utf8 -Value '{"unit":"wave"}', '{"unit":"wave"}', '{"unit":"wave"}'
 Check 'unrecorded lines are not counted as waiting' @((Next-Unit $sv @('--handoff', $hs, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json).starved | Where-Object { $_ }).Count 0
 
-# 8f. ONE LANDER ON MAIN AT A TIME (kb/Work PB2537): while another lander holds the landing lease, finished branches
-# and a handoff naming `enqueue` do not start an enqueue unit; the enqueue waits and the reason names the holder. An expired
-# lease binds no one, and with no lease the enqueue runs as before.
-$lc = Join-Path $Root 'leaseunit'
+# 8f. THE ENQUEUE NEVER WAITS FOR ANOTHER LANDING (kb/Work PB3023, PB3024): GitHub's merge queue orders main, so
+# finished branches and a handoff naming `enqueue` start an enqueue unit, in the fix lane and in the campaign lane.
+$lc = Join-Path $Root 'enqueueunit'
 New-Item -ItemType Directory -Force -Path $lc | Out-Null
 & $fresh $lc
 $doneHandoff = Join-Path $lc 'handoff-done.json'
 Set-Content -Path $doneHandoff -Encoding utf8 -Value '{"outcome": "done", "branches_pending": [{"branch": "w9a", "status": "DONE"}]}'
 $landHandoff = Join-Path $lc 'handoff-land.json'
-Set-Content -Path $landHandoff -Encoding utf8 -Value '{"outcome": "done", "next_unit": "enqueue", "next_unit_reason": "train ready"}'
-Check 'no lease: finished branches start a enqueue unit' ((Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json).unit 'enqueue'
-$Lease = Join-Path $Here 'landing_lease.py'
-& python $Lease acquire --holder 'attended R1 lander' --reason 'R1' --worktree $fxRepo --coord $lc | Out-Null
+Set-Content -Path $landHandoff -Encoding utf8 -Value '{"outcome": "done", "next_unit": "enqueue", "next_unit_reason": "branches ready"}'
 $l1 = (Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json
-Check 'a held lease: finished branches wait, the loop runs a wave' $l1.unit 'wave'
-Check 'a held lease: the reason names the waiting branch and the holder' ($l1.reason -match '^nothing pending; enqueue deferred \(w9a\): the landing lease is held by attended R1 lander') $true
-$l2 = (Next-Unit $lc @('--handoff', $landHandoff)) | ConvertFrom-Json
-Check 'a held lease: a handoff naming enqueue waits too' "$($l2.unit) $($l2.reason -match 'enqueue deferred \(named by the last handoff\)')" 'wave True'
-$l3 = (Next-Unit $lc @('--handoff', $doneHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json
-Check 'a held lease in the campaign lane: the lane decides, the enqueue waits' "$($l3.unit) $($l3.reason -match 'enqueue deferred')" 'campaign True'
-$l5 = (Next-Unit $lc @('--handoff', $landHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json
-Check 'a held lease, a handoff naming enqueue, the campaign lane: the deferred enqueue named no wave' "$($l5.unit) $($l5.reason -match 'enqueue deferred \(named by the last handoff\)') $($l5.reason -match 'the handoff named wave')" 'campaign True False'
-Check 'stop.ps1 -Status names the lease holder' ((& pwsh -NoProfile -File (Join-Path $Here 'stop.ps1') -Status -CoordDir $lc) -join ' ' -match 'landing lease: held by attended R1 lander') $true
-$later = (Get-Date).ToUniversalTime().AddHours(2).ToString('o')
-$l4 = (Next-Unit $lc @('--handoff', $doneHandoff, '--now', $later)) | ConvertFrom-Json
-Check 'an expired lease binds no one: the enqueue runs' $l4.unit 'enqueue'
-& python $Lease release --worktree $fxRepo --coord $lc | Out-Null
-Check 'a released lease: the enqueue runs' ((Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json).unit 'enqueue'
-Check 'stop.ps1 -Status says the lease is free' ((& pwsh -NoProfile -File (Join-Path $Here 'stop.ps1') -Status -CoordDir $lc) -join ' ' -match 'landing lease: free') $true
+Check 'finished branches start an enqueue unit, named in the reason' "$($l1.unit) $($l1.reason -match '^finished branches waiting: w9a$')" 'enqueue True'
+Check 'a handoff naming enqueue starts one' ((Next-Unit $lc @('--handoff', $landHandoff)) | ConvertFrom-Json).unit 'enqueue'
+Check 'finished branches in the campaign lane: the enqueue runs first' ((Next-Unit $lc @('--handoff', $doneHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'enqueue'
 
 $camp = @('-RepoDir', $fxRepo, '-WorkDir', $fxWork)
 $r = Run-Orch 'campdry' 'good' (@('-DryRun', '-Cluster', 'CAMP') + $camp) $fresh

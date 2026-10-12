@@ -51,7 +51,7 @@ train is never held for it. The in-flight set never reads a branch CLASSIFICATIO
 classifies MERGED and one that edits only existing files classifies LANDED, so a classification-filtered set missed
 both (PB2118 Draft 7, the sixth refuter's partition lead). --no-branches skips the git half (a planning preview),
 never the dispatch ledger or the slice half. This set is the ADMISSION estimate; the GUARANTEE is the landing check
-(scripts/orchestrator/landing_check.py, run by push-main.sh): a landing whose ACTUAL diff leaves its declared set or
+(scripts/orchestrator/landing_check.py, run by `enqueue.py land`): a landing whose ACTUAL diff leaves its declared set or
 meets another in-flight branch's stops and re-plans (PB2118 Draft 9).
 
 Without --dry-run it writes <scratch>/groups.json (make_dispatch_specs.py's format), runs make_dispatch_specs.py

@@ -96,7 +96,7 @@ if (Test-Path 'tests/version-matrix/traceability-inventory.json') {
 # in plan §0.
 # Network-tolerant: any failure to reach GitHub is silent, so the probe still works offline.
 # The repository is read from the remote, never hard-coded (kb/Work PB3078: the repository moved from the personal
-# account to the WiseOwlSoftware organization; push-main.sh and ruleset.py read it the same way).
+# account to the WiseOwlSoftware organization; ruleset.py and enqueue.py read it the same way).
 try {
     $repo = & gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null
     $wf = if ($LASTEXITCODE -eq 0 -and $repo) { & gh api "repos/$repo/actions/workflows" --jq '.workflows[] | select(.state != "active") | "\(.name) [\(.state)]"' 2>$null } else { $null }

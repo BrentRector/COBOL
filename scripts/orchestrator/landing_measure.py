@@ -71,15 +71,15 @@ SCHEMA = 1
 CAUSES = ("cluster-defect", "load-timing", "conflict", "infrastructure")
 STAMPS = ("done", "review_clean", "enqueued", "merged")      # in the order a landing passes them
 UNMEASURED = "UNMEASURED"
-#: The line each cluster commit of a lander's train carries (`Report: <path>`), written by the retired train_apply.py
+#: The line each cluster commit of a lander's train carries (`Report: <path>`), written by the retired train applier
 #: and by the last trains' landers; the commits stay in main's history, so the measurement still reads them.
 TRAILER_REPORT = re.compile(r"^Report:[ \t]*(\S[^\r\n]*?)[ \t]*$", re.M)
 #: What each headline's minutes measure, said where the figure is made so no reader re-labels it (finding R1-3).
 MEASURES_AFTER = "DONE → on main, per change"
 MEASURES_TRAINS = "lander start → push per landed change: a floor for DONE → on main, without the wait for a lander"
 
-#: The 2026-10-10 evidence's figures that the train records cannot give (the lander minutes in gates and in push-main
-#: plus CI, the CI wall). Typed from the frozen evidence file; `self_test` re-reads that file and fails when a
+#: The 2026-10-10 evidence's figures that the train records cannot give (the lander minutes in gates and in the former
+#: direct-push landing plus CI, the CI wall; "push-main + CI" is the frozen evidence's own label). Typed from the frozen evidence file; `self_test` re-reads that file and fails when a
 #: figure here is not in its text, so none of them is remembered.
 EVIDENCE = {"lander_minutes": 567, "gate_minutes": 233, "gate_pct": 41, "push_ci_minutes": 94, "push_ci_pct": 16.5,
             "clusters_landed": 38, "ci_wall_min": 13}
@@ -355,7 +355,7 @@ def done_times(branch: str, reports_dir: pathlib.Path, not_after: str, git: Git,
     The changes are found from two seeds, each a DONE report (plan_wave.parse_report: its status, lead note and HEAD):
       - a report whose header names `branch` (the implementer's own branch, queued as it is);
       - a report a commit in `upstream..HEAD` names on its `Report:` line: each cluster commit of a lander's train
-        carries one (the retired train_apply.py wrote it), and no implementer report names that train's branch
+        carries one (the retired train applier wrote it), and no implementer report names that train's branch
         (review finding R1-2).
     A change is one LEAD note: its time is the earliest of every DONE report with that lead whose HEAD is an ancestor
     of the seed's HEAD — so a review finisher's branch, which merged its predecessor's (kb/Work PB3027, I10), keeps the
@@ -637,7 +637,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
             return 2, ""
         return run
     q = t("10:30")
-    trailers = chr(10).join(["Cluster A brought in by scripts/orchestrator/train_apply.py", "Notes: PB2",
+    trailers = chr(10).join(["Cluster A brought in by the train applier", "Notes: PB2",
                              "Report: E:" + chr(92) + "COBOL-coord" + chr(92) + "w1-PB2-report.md", "",
                              "Report: (none named)", "Report: /coord/scratch/reports/w2-PB1-report.md"])
     got = {"own": done_times("b17", rd, q, fake_git()),

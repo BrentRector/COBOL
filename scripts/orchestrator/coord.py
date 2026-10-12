@@ -88,7 +88,7 @@ def fleet_stop(scratch: pathlib.Path | str, scope: str) -> pathlib.Path:
     return pathlib.Path(scratch) / f"STOP-{scope}"
 
 
-# THE COORDINATION DIRECTORY'S ONE SHORT MUTEX (the allocator's `alloc.lock`, the landing lease's `landing-lease.lock`):
+# THE COORDINATION DIRECTORY'S ONE SHORT MUTEX (the allocator's `alloc.lock`):
 # held for the milliseconds of a read-modify-write of one JSON file, never across a wait. It is an atomic create
 # (os.open with O_CREAT|O_EXCL) holding the PID and time, because the coordination tools are short processes that share
 # no OS handle. A lock older than LOCK_STALE_S was left by a crashed holder and is broken by an atomic rename to a name

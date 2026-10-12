@@ -26,7 +26,7 @@ ProjectReferences reach, the files the toolchain probes for by walking up from e
 Directory.Build.props/.targets, Directory.Packages.props, global.json, NuGet.config — and every existing path an
 Include or Import of those files names outside the project directory, such as tests/_shared), and (b) the data the row
 sources read, which the host writes to `inputs.txt` from each row source's DataRoots (ArchOracle.DataInputs, bound to
-the same members its readers open). `scripts/orchestrator/landing_oracle.py` reads it at every landing (push-main.sh,
+the same members its readers open). `scripts/orchestrator/landing_oracle.py` reads it at every landing (`enqueue.py land`,
 exit 7): a landing whose inputs changed after the baseline's commit is refused until it is re-recorded.
 
 DETERMINISM. The same commit captures the same manifest run after run, and on Windows and on Linux but for the

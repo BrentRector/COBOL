@@ -79,9 +79,8 @@ BRIEFS = {
     'MANDATORY-PRACTICES.md': [r'stall_watch\.py', r'linux-gate\.sh', r'I9', r'dispatch_guard\.py', r'prune_worktrees\.py',  # O8; PB1732; I9, O9, O10
                                r'STOP-<scope>',  # P3, PB2483: the scoped stop
                                r'set-cap', r'set-implementer-scope',  # PB2514 (one shared cap)
-                               r'landing_lease\.py',  # PB2537 (L3): one lander on main at a time
                                # PB2600 (O10: the owner's branch rule; nothing archived, abandon by a recorded
-                               # decision); PB2602 (O11: one landing queue); PB2601 (L13: the push-main hand-off)
+                               # decision); PB2602 (O11: one landing queue); PB2601 (L13: the landing hand-off)
                                r'NO BRANCH IS LEFT UNDECIDED', r'--abandon', r'ONE LANDING PATH', r'coord\.py loop-state',
                                r'READY-TO-LAND <worktree> <branch>', r'enqueue\.py land',  # PB3023
                                r'I10', r'review_findings\.py', r'WAITING FOR REVIEW'],  # PB3027: review on the branch
