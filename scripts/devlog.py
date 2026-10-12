@@ -287,8 +287,9 @@ def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, st
     # it, must be the first line of an entry of rev, or the migrating landing has dropped an entry main had.
     dropped = collections.Counter(base_extra_headers) - collections.Counter(first_line(rev[n]) for _, n in entries(rev))
     reasons += [f"the base's {MONOLITH} holds `{h[:90]}`{f' ({c} times)' if c > 1 else ''} and the landing has no "
-                f"{DIR}/ entry with that header: the log is the only history (re-run `scripts/devlog_migrate.py` on "
-                f"main's {MONOLITH})" for h, c in sorted(dropped.items())]
+                f"{DIR}/ entry with that header: the log is the only history (re-split main's {MONOLITH} "
+                f"with the migrating branch's own scripts/devlog_migrate.py, which that landing deletes)"
+                for h, c in sorted(dropped.items())]
     return reasons, new
 
 

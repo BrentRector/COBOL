@@ -71,7 +71,8 @@ SCHEMA = 1
 CAUSES = ("cluster-defect", "load-timing", "conflict", "infrastructure")
 STAMPS = ("done", "review_clean", "enqueued", "merged")      # in the order a landing passes them
 UNMEASURED = "UNMEASURED"
-#: The line train_apply.py writes into each cluster commit it brings into a lander's train (`Report: <path>`).
+#: The line each cluster commit of a lander's train carries (`Report: <path>`), written by the retired train_apply.py
+#: and by the last trains' landers; the commits stay in main's history, so the measurement still reads them.
 TRAILER_REPORT = re.compile(r"^Report:[ \t]*(\S[^\r\n]*?)[ \t]*$", re.M)
 #: What each headline's minutes measure, said where the figure is made so no reader re-labels it (finding R1-3).
 MEASURES_AFTER = "DONE → on main, per change"
@@ -353,8 +354,9 @@ def done_times(branch: str, reports_dir: pathlib.Path, not_after: str, git: Git,
 
     The changes are found from two seeds, each a DONE report (plan_wave.parse_report: its status, lead note and HEAD):
       - a report whose header names `branch` (the implementer's own branch, queued as it is);
-      - a report a commit in `upstream..HEAD` names on its `Report:` line: train_apply.py writes one per cluster it
-        brings into a lander's train, whose branch no implementer report names (review finding R1-2).
+      - a report a commit in `upstream..HEAD` names on its `Report:` line: each cluster commit of a lander's train
+        carries one (the retired train_apply.py wrote it), and no implementer report names that train's branch
+        (review finding R1-2).
     A change is one LEAD note: its time is the earliest of every DONE report with that lead whose HEAD is an ancestor
     of the seed's HEAD — so a review finisher's branch, which merged its predecessor's (kb/Work PB3027, I10), keeps the
     first implementer's finish, and the review and finisher wait is inside DONE → on main. (A branch REBASED onto main
