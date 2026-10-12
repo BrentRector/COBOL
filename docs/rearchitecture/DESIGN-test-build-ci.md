@@ -1298,10 +1298,18 @@ ReadyToRun runtime for the programs the tests run.
   `ticket-<seq>.lock` and holds it with an exclusive OS lock for as long as it waits. A ticket is LIVE while its file
   is locked, so a waiter that dies drops out of the queue by itself; the next scan deletes its file. Scans run under
   `tickets.lock`, so a ticket is never probed between its creation and its lock. A waiter may take a free slot only
-  when no live ticket has a lower sequence number, and it drops its ticket only AFTER it holds the slot; so a gate
-  that finishes and re-gates at once queues BEHIND everyone already waiting, instead of winning every race by polling
-  first. `gate-slot: waiting, k ahead` counts the live tickets below one's own and is printed each time `k` changes;
-  `gate-slot: took slot k of N (ticket t, waited s)` is printed on acquisition.
+  when no live ticket is served before it, and it drops its ticket only AFTER it holds the slot; so a gate that
+  finishes and re-gates at once queues BEHIND everyone already waiting, instead of winning every race by polling
+  first. `gate-slot: waiting, k ahead (ticket t, cap N, <class>, …)` counts the live tickets served before one's own
+  and is printed each time `k` changes; `gate-slot: took slot k of N (ticket t, waited s)` is printed on acquisition.
+- **Two classes, landing first (kb/Work PB3103).** A ticket has a CLASS: `landing` (`ticket-<seq>-landing.lock`) for
+  the gate `enqueue.py land` starts, which sets `COBOL_GATE_CLASS=landing` in its gate's environment, and
+  `implementer` (`ticket-<seq>.lock`) for every other gate. THE SERVICE ORDER is every live landing ticket before
+  every implementer ticket, ticket order within each class, so a landing's gate takes the next free slot ahead of
+  the implementer gates already waiting instead of queueing behind up to the cap's worth of them (landing is the
+  measure; owner 2026-10-12, "Supervisor lane (Recommended)"). The cap is the same for both classes, so the
+  machine's total gate load does not change. An unknown class value stops the gate with the reason, as malformed
+  settings do; `status` lists the queue in service order with each ticket's class.
 - **What holds it.** A Python caller holds a slot with `GateSlots.for_repo().acquire(label)` (a `Slot`, released by
   its `with` block or by the holder's death); a shell caller wraps a command with `gate_slot.py run [--label TEXT] --
   <command>`, which exits with the command's code. `run_gate_legs.py` takes the slot after the worktree's gate lock
@@ -1343,7 +1351,7 @@ ReadyToRun runtime for the programs the tests run.
   populations. The verdict line prints the wait and the slot (`Slot.describe()`).
   `gate_slot.py status` prints the cap and the scope with who set them, EVERY held slot (one taken under an earlier,
   higher cap included) and the live tickets in queue order.
-- `gate_slot.py --self-test` proves ten arms against throwaway repositories, each with one linked worktree (the queue
+- `gate_slot.py --self-test` proves eleven arms against throwaway repositories, each with one linked worktree (the queue
   arms set cap 1 explicitly, so they prove FIFO, release and sharing on one slot whatever the default): the FIFO
   order (three waiters queued behind a holder are served in ticket order, and the holder re-gating the moment it
   releases is served LAST), the release on a killed holder, a dead waiter leaving the queue, the orphaned tree (on
@@ -1356,8 +1364,10 @@ ReadyToRun runtime for the programs the tests run.
   scope are refused; either scope is accepted with or without an expiry; a malformed settings file stops a gate);
   STATUS (a slot held above a lowered cap is shown); the CODED DEFAULTS (with no settings file the cap is 3 — three
   gates hold a slot at once and a fourth queues — and the scope is `leg1`, and `status` says both are the default);
-  and CLEAR (one setting or both back to the defaults, a malformed file repaired by clearing both and refused by
-  clearing one). Each arm was seen RED on a planted defect: no ticket check, a ticket file counted live unlocked, no
+  CLEAR (one setting or both back to the defaults, a malformed file repaired by clearing both and refused by
+  clearing one); and LANDING FIRST (two implementer and two landing gates queued interleaved behind one holder at cap
+  1 are served landing, landing, implementer, implementer, `status` lists them in that order, and an unknown class
+  value stops a gate). Each arm was seen RED on a planted defect: no ticket check, a ticket file counted live unlocked, no
   Job object, the descriptor withheld from Linux children, the per-worktree git dir, the cap read once per process
   (kb/Work PB2514's defect), `status` probing only the slots below the cap, and the defaults reverted to cap 1 and
   scope `whole` (the expiry, defaults and clear arms). It passes on
@@ -1704,7 +1714,9 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    the lanes I10 does not review (the registrar, the golden lane, the clerk: notes and spec-derived goldens) name
    themselves with `--lane`. The lander's former train review is retired. The role keeps the R2 design's 120-turn cap (one role, one cap; one branch's diff fits it).
    `review_findings.py summary` measures findings per branch, the re-review rate and reviewer minutes.
-3. **Enqueue** (`scripts/orchestrator/enqueue.py land <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch;
+3. **Enqueue** (`scripts/orchestrator/enqueue.py land <branch>`, PB3023 — a SCRIPT, deterministic, no agent, started
+   by the loop's landing lane the moment the branch is WAITING TO LAND, PB3103, DESIGN-orchestrator-loop.md §4.9;
+   its gate's slot is served ahead of waiting implementer gates, §3.14.6): fetch;
    the review stamp (step 2; exit 11); MERGE
    `origin/main` into the branch — not a rebase, corrected at implementation: a branch that merged a same-file
    predecessor or a sibling carries conflict resolutions in its merge commits, which a rebase discards and asks for
@@ -1841,9 +1853,12 @@ demand and not committed.
 
 #### 3.17.5 The loop's units and the fleet after this design (PB3023, PB3024, PB3027; DESIGN-orchestrator-loop.md §3, §4.7, §9)
 
-- `land` became **`enqueue`** (PB3023, `units/enqueue.md`): for every WAITING TO LAND branch (`prune_worktrees.py
-  --brief`, which lists them in harm order), run `enqueue.py land`; dispatch ONE `cobol-finisher` (`finisher-brief.md`)
-  for a conflict, a red gate, a DEVLOG or oracle refusal, or a queue bounce (`prune_worktrees.py` BOUNCED, from one
+- `land` became **`enqueue`** (PB3023, `units/enqueue.md`), and its landing step moved into the supervisor's
+  **landing lane** (PB3103, `land_lane.py`, DESIGN-orchestrator-loop.md §4.9): beside whatever unit runs, the lane
+  runs `enqueue.py land` for every WAITING TO LAND branch (`prune_worktrees.py`'s survey, in harm order) the moment
+  it is ready and retries what a script can see end; the unit reads `land_lane.py status` and dispatches ONE
+  `cobol-finisher` (`finisher-brief.md`) for a lane attempt stopped on a conflict, a red gate, a DEVLOG or oracle
+  refusal, or a queue bounce (`prune_worktrees.py` BOUNCED, from one
   GraphQL read of the open pull requests: in the merge queue → ENQUEUED, removed from it at the branch's tip → BOUNCED
   with GitHub's reason; offline the states are git-only); one `cobol-clerk` files the reports' leads; render the ledger;
   hand off. It is mostly a script run; its model turns are the review and finisher dispatches and the handoff. While
@@ -1856,10 +1871,10 @@ demand and not committed.
   integrator, landing through `enqueue.py land --lane golden`); `prune_worktrees.py --train` and `TRAIN_MAX` are gone (the landing
   order is `--brief`'s); `dispatch_guard.py`'s lander rule went with the role. `cobol-lander` became `cobol-finisher`
   (resolve a conflict, fix a red or a bounce, gate and return DONE: its commits are reviewed on the branch before the
-  next enqueue unit lands the new tip; turn cap 160). The landing lease, the direct-push landing script and its `ci/**`
+  landing lane lands the new tip; turn cap 160). The landing lease, the direct-push landing script and its `ci/**`
   branches are deleted (PB3024's closing change, the first branch cut after PB3023 landed).
-- `wf_rolling_wave.js` **starts no lander** (PB3023): a wave produces DONE branches reviewed CLEAN; the enqueue unit
-  lands them. This removed PB3016's policy question (may THIS wave land?) with the mechanism; `train_size`,
+- `wf_rolling_wave.js` **starts no lander** (PB3023): a wave produces DONE branches reviewed CLEAN; the landing lane
+  lands each as it comes back, while the wave runs (PB3103). This removed PB3016's policy question (may THIS wave land?) with the mechanism; `train_size`,
   `min_final_train`, `lead_ids_per_train` and the lead-id blocks are gone, and the planner prices each group's landing
   at `landing_tokens` (`model_rules.json`) instead of one lander per train.
 - **Measurement** (PB3028, landed): `landing_measure.py` replaced `train_measure.py`, which is deleted with its drift

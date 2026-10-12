@@ -21,8 +21,13 @@ THE MECHANISM — every piece is an OS file lock, so nothing is ever cleaned up 
   tickets  A waiter first takes a TICKET: under the exclusive lock of `tickets.lock` it increments the monotonic
            counter in `tickets.seq` and creates and locks `ticket-<seq>.lock`, which it holds while it waits. A ticket
            is LIVE while its file is locked, so a waiter that dies leaves the queue by itself. A waiter may take a free
-           slot only when no live ticket has a lower number: a gate that finishes and re-gates at once queues BEHIND
+           slot only when no live ticket is served before it: a gate that finishes and re-gates at once queues BEHIND
            everyone already waiting instead of winning every race by polling first.
+  classes  THE SERVICE ORDER (kb/Work PB3103): a ticket has a CLASS, `landing` (`ticket-<seq>-landing.lock`: a gate
+           `enqueue.py land` starts, which sets COBOL_GATE_CLASS=landing for it) or `implementer` (`ticket-<seq>.lock`,
+           every other gate). Every live landing ticket is served before every implementer ticket, and each class in
+           ticket order, so a landing's gate takes the next free slot ahead of the implementer gates already waiting
+           (landing is the measure). The cap is the same for both, so the machine's total gate load does not change.
   the tree The slot is held by the holder's whole PROCESS TREE. On Windows the holder puts itself into a Job object
            with JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE before it spawns anything, so every descendant is in the job and, if
            the holder dies, the OS kills them all as its handle closes — an orphaned build or test host can never run
@@ -98,6 +103,13 @@ _SLOT_FILE = re.compile(r"(\d+)\.lock")
 # gating (DEFAULT_SCOPE) each one runs leg 1 only; the owner chose the throughput.
 DEFAULT_SLOTS = 3
 DEFAULT_POLL_S = 1.0
+#: THE GATE CLASSES (kb/Work PB3103): a gate `enqueue.py land` starts is a LANDING gate (it sets CLASS_ENV=landing for
+#: its gate), every other gate an IMPLEMENTER gate. A landing ticket is served before every implementer ticket, ticket
+#: order within each class; the cap is the same for both, so the machine's total gate load does not change.
+CLASS_ENV = "COBOL_GATE_CLASS"
+LANDING = "landing"
+IMPLEMENTER = "implementer"
+GATE_CLASSES = (LANDING, IMPLEMENTER)
 #: What a slot holder's children run without (Slot.spawn_kwargs): the persistent build servers that would outlive them.
 BUILD_SERVERS_OFF = {"MSBUILDDISABLENODEREUSE": "1", "UseSharedCompilation": "false"}
 
@@ -383,7 +395,25 @@ class _Mutex:
         os.close(self._fd)
 
 
-_TICKET = re.compile(r"ticket-(\d+)\.lock")
+_TICKET = re.compile(r"ticket-(\d+)(?:-(" + LANDING + r"))?\.lock")
+
+
+def gate_class_from_env() -> str:
+    """The waiting gate's CLASS: `landing` when the process that started it says so in CLASS_ENV (`enqueue.py land`
+    does), else `implementer`. Any other value stops the gate with the reason, as malformed settings do."""
+    value = os.environ.get(CLASS_ENV, "").strip() or IMPLEMENTER
+    if value not in GATE_CLASSES:
+        raise ValueError(f"{CLASS_ENV}={value!r} is not a gate class ({', '.join(GATE_CLASSES)})")
+    return value
+
+
+def _ticket_name(seq: int, gate_class: str) -> str:
+    return f"ticket-{seq}-{LANDING}.lock" if gate_class == LANDING else f"ticket-{seq}.lock"
+
+
+def _service_key(seq: int, gate_class: str) -> tuple[int, int]:
+    """THE SERVICE ORDER: every landing ticket before every implementer ticket, ticket order within each class."""
+    return (0 if gate_class == LANDING else 1, seq)
 
 
 def _remove_ticket_file(path: Path) -> None:
@@ -440,17 +470,18 @@ class Slot:
 @dataclass(frozen=True)
 class SlotState:
     """What `status` reports: the settings, the cap in force, EVERY held slot (with its holder's label) — one taken
-    under an earlier, higher cap included — and the live tickets, in queue order."""
+    under an earlier, higher cap included — and the live tickets in SERVICE order (seq, class, label)."""
     directory: Path
     settings: GateSettings
     cap: int
     held: dict[int, str]
-    waiting: list[tuple[int, str]]
+    waiting: list[tuple[int, str, str]]
 
 
 class GateSlots:
-    """The repository's gate cap: N slots, served in ticket order. N is read from the shared settings on every
-    poll, never fixed per process (kb/Work PB2514)."""
+    """The repository's gate cap: N slots, served in SERVICE order (every landing ticket first, ticket order within
+    each class; kb/Work PB3103). N is read from the shared settings on every poll, never fixed per process (kb/Work
+    PB2514)."""
 
     def __init__(self, directory: Path, poll_s: float = DEFAULT_POLL_S):
         self.directory, self.poll_s = directory, poll_s
@@ -465,7 +496,7 @@ class GateSlots:
     def _slot_path(self, k: int) -> Path:
         return self.directory / f"{k}.lock"
 
-    def _take_ticket(self, label: str) -> tuple[int, int]:
+    def _take_ticket(self, label: str, gate_class: str) -> tuple[int, int]:
         self.directory.mkdir(parents=True, exist_ok=True)
         seq_file = self.directory / "tickets.seq"
         with _Mutex(self.directory / "tickets.lock", self.poll_s):
@@ -478,21 +509,21 @@ class GateSlots:
             tmp = seq_file.with_suffix(".tmp")
             tmp.write_text(str(seq), encoding="ascii", newline="\n")
             os.replace(tmp, seq_file)
-            fd = _open(self.directory / f"ticket-{seq}.lock")
+            fd = _open(self.directory / _ticket_name(seq, gate_class))
             if not _try_lock(fd):
                 os.close(fd)
                 raise RuntimeError(f"ticket {seq} is locked by another process — {seq_file} was rolled back by hand")
             _write_label(fd, label)
         return seq, fd
 
-    def _live_tickets_before(self, seq: int | None) -> list[tuple[int, str]]:
-        """The live tickets below `seq` (all of them when None), in order; dead ones are deleted on the way. Runs under
-        the tickets mutex, so a ticket is never probed between its creation and its lock."""
-        live: list[tuple[int, str]] = []
+    def _live_tickets(self) -> list[tuple[int, str, str]]:
+        """Every live ticket as (seq, class, label), in SERVICE order (`_service_key`); dead ones are deleted on the
+        way. Runs under the tickets mutex, so a ticket is never probed between its creation and its lock."""
+        live: list[tuple[int, str, str]] = []
         with _Mutex(self.directory / "tickets.lock", self.poll_s):
             for p in self.directory.glob("ticket-*.lock"):
                 m = _TICKET.fullmatch(p.name)
-                if not m or (seq is not None and int(m.group(1)) >= seq):
+                if not m:
                     continue
                 fd = _open(p)
                 try:
@@ -502,17 +533,23 @@ class GateSlots:
                         fd = -1
                         _remove_ticket_file(p)
                     else:
-                        live.append((int(m.group(1)), _read_label(p)))
+                        live.append((int(m.group(1)), m.group(2) or IMPLEMENTER, _read_label(p)))
                 finally:
                     if fd >= 0:
                         os.close(fd)
-        return sorted(live)
+        return sorted(live, key=lambda t: _service_key(t[0], t[1]))
 
-    def _drop_ticket(self, seq: int, fd: int) -> None:
+    def _ahead(self, seq: int, gate_class: str) -> int:
+        """How many live tickets are served before this one: every earlier ticket of its class, and for an
+        implementer ticket every landing ticket whatever its number."""
+        mine = _service_key(seq, gate_class)
+        return sum(1 for s, c, _ in self._live_tickets() if _service_key(s, c) < mine)
+
+    def _drop_ticket(self, seq: int, fd: int, gate_class: str) -> None:
         with _Mutex(self.directory / "tickets.lock", self.poll_s):
             _unlock(fd)
             os.close(fd)
-            _remove_ticket_file(self.directory / f"ticket-{seq}.lock")
+            _remove_ticket_file(self.directory / _ticket_name(seq, gate_class))
 
     def _try_slot(self, label: str, cap: int) -> tuple[int, int] | None:
         for k in range(cap):
@@ -523,33 +560,38 @@ class GateSlots:
             os.close(fd)
         return None
 
-    def acquire(self, label: str, say: Callable[[str], None] = print) -> Slot:
-        """Wait in ticket order for a slot, then bind this process's tree to it. Blocks until a slot below the cap
-        IN FORCE is free and every earlier live ticket has been served. The cap is re-read on every poll, so every
-        waiter applies the same cap at the same moment and a raise (or an expiry) reaches the queue at once."""
+    def acquire(self, label: str, say: Callable[[str], None] = print, gate_class: str | None = None) -> Slot:
+        """Wait in service order for a slot, then bind this process's tree to it. Blocks until a slot below the cap
+        IN FORCE is free and every live ticket served before this one (`_ahead`) has been served. The cap is re-read on
+        every poll, so every waiter applies the same cap at the same moment and a raise (or an expiry) reaches the
+        queue at once. `gate_class` defaults to the environment's (`gate_class_from_env`: `enqueue.py land` marks its
+        gate a landing one), so a landing gate takes the next free slot ahead of every waiting implementer gate."""
         self.settings()  # a malformed settings file stops the gate before it queues, with the reason
+        gate_class = gate_class or gate_class_from_env()
+        if gate_class not in GATE_CLASSES:
+            raise ValueError(f"{gate_class!r} is not a gate class ({', '.join(GATE_CLASSES)})")
         start = time.monotonic()
-        seq, ticket_fd = self._take_ticket(label)
+        seq, ticket_fd = self._take_ticket(label, gate_class)
         try:
             reported = None
             while True:
-                ahead = len(self._live_tickets_before(seq))
+                ahead = self._ahead(seq, gate_class)
                 cap = self.settings().effective_cap()
                 got = self._try_slot(label, cap) if ahead == 0 else None
                 if got is not None:
                     break
                 if (ahead, cap) != reported:
-                    say(f"gate-slot: waiting, {ahead} ahead (ticket {seq}, cap {cap}, {self.directory})")
+                    say(f"gate-slot: waiting, {ahead} ahead (ticket {seq}, cap {cap}, {gate_class}, {self.directory})")
                     reported = (ahead, cap)
                 time.sleep(self.poll_s)
         except BaseException:
-            self._drop_ticket(seq, ticket_fd)
+            self._drop_ticket(seq, ticket_fd, gate_class)
             raise
         # The slot is taken BEFORE the ticket is dropped, so no later waiter can slip in between.
         k, fd = got
         slot = Slot(k, cap, seq, time.monotonic() - start, fd)
         try:
-            self._drop_ticket(seq, ticket_fd)
+            self._drop_ticket(seq, ticket_fd, gate_class)
             bind_process_tree()
             if not IS_WINDOWS:
                 os.set_inheritable(fd, True)
@@ -577,7 +619,7 @@ class GateSlots:
                         held[int(m.group(1))] = _read_label(p)
                 finally:
                     os.close(fd)
-            waiting = self._live_tickets_before(None)
+            waiting = self._live_tickets()
         else:
             waiting = []
         return SlotState(self.directory, settings, settings.effective_cap(), held, waiting)
@@ -659,8 +701,8 @@ def _cmd_status(args: argparse.Namespace) -> int:
     for k in range(max([st.cap - 1, *st.held]) + 1):
         above = " (above the cap in force: taken under an earlier, higher cap)" if k >= st.cap else ""
         print(f"  slot {k + 1}: " + (f"HELD by {st.held[k] or '(no label)'}{above}" if k in st.held else "free"))
-    for seq, label in st.waiting:
-        print(f"  ticket {seq}: waiting — {label or '(no label)'}")
+    for seq, gate_class, label in st.waiting:
+        print(f"  ticket {seq} ({gate_class}): waiting — {label or '(no label)'}")
     return 0
 
 
@@ -700,10 +742,11 @@ class _Proc:
     """A child `gate_slot.py run` whose stdout lines are read on a thread, so the test can wait for one. On Linux it
     leads its own session, so `kill()` can take its whole tree (on Windows the tree is the holder's job)."""
 
-    def __init__(self, argv: list[str], cwd: Path):
+    def __init__(self, argv: list[str], cwd: Path, gate_class: str = IMPLEMENTER):
+        env = {k: v for k, v in os.environ.items() if k != CLASS_ENV}
+        env.update(PYTHONUNBUFFERED="1", **({CLASS_ENV: gate_class} if gate_class == LANDING else {}))
         self.p = subprocess.Popen(argv, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-                                  encoding="utf-8", env={**os.environ, "PYTHONUNBUFFERED": "1"},
-                                  start_new_session=not IS_WINDOWS)
+                                  encoding="utf-8", env=env, start_new_session=not IS_WINDOWS)
         self.lines: "queue.Queue[str]" = queue.Queue()
         self.seen: list[str] = []
         threading.Thread(target=self._pump, daemon=True).start()
@@ -799,9 +842,9 @@ def self_test() -> int:
     procs: list[_Proc] = []
     failures: list[str] = []
 
-    def gate(repo: Path, label: str, command: list[str]) -> _Proc:
+    def gate(repo: Path, label: str, command: list[str], gate_class: str = IMPLEMENTER) -> _Proc:
         pr = _Proc([py, me, "run", "--repo", str(repo), "--poll", "0.05", "--label", label, "--", *command],
-                   root.parent)  # a cwd inside `root` would pin it against deletion on Windows
+                   root.parent, gate_class)  # a cwd inside `root` would pin it against deletion on Windows
         procs.append(pr)
         return pr
 
@@ -885,6 +928,41 @@ def self_test() -> int:
                 assert pr.finish() == 0, f"a gate exited non-zero; saw {pr.seen}"
             order = log.read_text().split()
             assert order == ["W1", "W2", "W3", "H-again"], f"served out of ticket order: {order}"
+
+        def landing_first() -> None:
+            # Two implementer gates and two landing gates queue, interleaved, behind one holder at cap 1; the landing
+            # gates (marked as enqueue.py marks its gate: CLASS_ENV=landing) are served first, each class in ticket
+            # order, and `status` lists the queue in that service order. A bad class value stops a gate.
+            go, log = root / "landing.go", root / "landing.order"
+            h = gate(main_repo, "H", hold(go))
+            h.expect(r"^held pid=")
+            waiters = []
+            for name, cls in (("W1", IMPLEMENTER), ("L1", LANDING), ("W2", IMPLEMENTER), ("L2", LANDING)):
+                w = gate(main_repo, name, append(log, name), cls)
+                w.expect(rf"gate-slot: waiting, \d+ ahead \(ticket \d+, cap 1, {cls},")
+                waiters.append(w)
+            listed = [ln.split(":")[0].strip() for ln in inproc(main_repo, "status").stdout.splitlines()
+                      if ln.strip().startswith("ticket ")]
+            assert [x.split("(")[1].rstrip(")") for x in listed] == [LANDING, LANDING, IMPLEMENTER, IMPLEMENTER], \
+                f"status does not list the queue in service order: {listed}"
+            go.touch()
+            for pr in (h, *waiters):
+                assert pr.finish() == 0, f"a gate exited non-zero; saw {pr.seen}"
+            order = log.read_text().split()
+            assert order == ["L1", "L2", "W1", "W2"], f"not served landing first, FIFO within each class: {order}"
+            saved = os.environ.get(CLASS_ENV)
+            os.environ[CLASS_ENV] = "lander"
+            err = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(err):
+                    rc = main(["run", "--repo", str(main_repo), "--", py, "-c", "print('ran')"])
+            finally:
+                if saved is None:
+                    os.environ.pop(CLASS_ENV, None)
+                else:
+                    os.environ[CLASS_ENV] = saved
+            assert rc == 2 and "not a gate class" in err.getvalue(), \
+                f"an unknown class did not stop the gate: rc {rc} {err.getvalue()!r}"
 
         def killed_holder() -> None:
             go = root / "killed.never"
@@ -1090,6 +1168,8 @@ def self_test() -> int:
         arm("the coded defaults, with no setting: cap 3 (three gates at once, a fourth queues) and scope leg1",
             coded_defaults)
         arm("clear returns one setting or both to the coded defaults, and repairs a malformed file", clear_settings)
+        arm("landing gates first: a landing ticket is served before every implementer ticket, FIFO within each class",
+            landing_first)
     finally:
         alive.unlink(missing_ok=True)
         for pr in procs:
@@ -1102,7 +1182,7 @@ def self_test() -> int:
     if failures:
         print(f"gate_slot.py --self-test: RED — {len(failures)} arm(s) failed")
         return 1
-    print("gate_slot.py --self-test: ALL GREEN — 10 arms")
+    print("gate_slot.py --self-test: ALL GREEN — 11 arms")
     return 0
 
 

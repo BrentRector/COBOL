@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """enqueue.py — THE LANDING STEP, A SCRIPT: one finished branch, brought up to main, gated, its DEVLOG entry stamped,
 checked, and handed to GitHub's merge queue as one pull request (kb/Work PB3023, PB3024; DESIGN-test-build-ci.md
-sections 3.17.2 step 3, 3.17.5 and 3.17.6). No agent lands anything: the loop's `enqueue` unit runs this per WAITING TO LAND
-branch, and an agent is dispatched only for what a script cannot decide (a conflict, a red gate, a queue bounce).
+sections 3.17.2 step 3, 3.17.5 and 3.17.6). No agent lands anything: the loop's landing lane (land_lane.py, kb/Work PB3103) runs
+this per WAITING TO LAND branch, and an agent is dispatched only for what a script cannot decide (a conflict, a red gate, a queue bounce).
 
     python scripts/orchestrator/enqueue.py land <branch> [--worktree <path>] [--lane L] [--dry-run]  THE landing step
     python scripts/orchestrator/enqueue.py queue --title "<one-line subject>" --body-file <forensic message> [--dry-run]
@@ -91,6 +91,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent))
 import coord  # noqa: E402
+import gate_slot  # noqa: E402  (the landing gate's class: CLASS_ENV, LANDING)
 import landing_measure  # noqa: E402
 import ruleset  # noqa: E402
 
@@ -282,11 +283,14 @@ def run_gates(wt: pathlib.Path, gates=None) -> list[tuple[str, bool, str]]:
     gates = gates if gates is not None else (GATES_WINDOWS if os.name == "nt" else GATES_LINUX)
     logs = wt / "TestResults" / "enqueue"
     logs.mkdir(parents=True, exist_ok=True)
+    # A LANDING gate (kb/Work PB3103): its gate slot is served before every waiting implementer gate's (gate_slot.py
+    # CLASS_ENV), so a landing never queues behind up to the cap's worth of implementer gates.
+    env = {**os.environ, gate_slot.CLASS_ENV: gate_slot.LANDING}
     out: list[tuple[str, bool, str]] = []
     for host, cmd, prefix in gates:
         log = logs / f"{host.lower()}-gate.log"
         with log.open("wb") as f:
-            rc = subprocess.run(cmd, cwd=wt, stdout=f, stderr=subprocess.STDOUT).returncode
+            rc = subprocess.run(cmd, cwd=wt, stdout=f, stderr=subprocess.STDOUT, env=env).returncode
         lines = [ln.strip() for ln in log.read_bytes().decode("utf-8", errors="replace").splitlines()
                  if ln.strip().startswith(prefix)]
         if not lines:
@@ -408,7 +412,8 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
 
     def conflicted(files: list[str], when: str) -> int:
         blocked(branch, wt, f"BLOCKED: enqueue — bringing origin/main in {when} conflicted in {', '.join(files)} "
-                            f"(kb/Work PB3023): a finisher merges origin/main, resolves, re-gates, re-runs enqueue.py")
+                            f"(kb/Work PB3023, PB3103): a finisher merges origin/main, resolves and re-gates; the new tip is "
+                            f"reviewed, then the landing lane lands it")
         return end(EXIT_CONFLICT, f"CONFLICT in {', '.join(files)} — merge aborted, branch unchanged")
     blocked = blocked or (lambda b, w, line: record_blocked(b, w, line, say))
     wt = worktree or worktree_of(repo, branch)
@@ -880,6 +885,12 @@ def self_test() -> int:
                "--lane, lands without a stamp",
                "FINDINGS" in findings and "--lane" in no_report and rc_lane == 0 and ran,
                f"{findings!r} {no_report!r} {rc_lane}")
+        probe = [sys.executable, "-c", "import os; print('=== PROBE GATE: GREEN — class '"
+                 f" + os.environ.get({gate_slot.CLASS_ENV!r}, 'none'))"]
+        got = run_gates(wt, gates=(("Probe", probe, "=== PROBE GATE: "),))
+        expect("the gate at enqueue is a LANDING gate: its slot is served before waiting implementer gates "
+               "(kb/Work PB3103, gate_slot.py CLASS_ENV)", got and got[0][1] and got[0][2].endswith(
+                   f"class {gate_slot.LANDING}"), str(got))
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"=== enqueue.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")

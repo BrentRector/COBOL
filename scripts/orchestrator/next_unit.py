@@ -16,8 +16,11 @@ Prints JSON {unit, reason}. The order (docs/rearchitecture/DESIGN-orchestrator-l
   4. the repository is dirty or has unpushed commits -> resume
   5. the last unit failed or ended split, or a branch classified UNLANDED got a commit after the last unit
      started (an agent of a unit that died)          -> resume
-  6. branches_pending with status DONE               -> enqueue (GitHub's merge queue orders main, so a landing never
-     waits for another one: kb/Work PB3023, PB3024)
+  6. AGENT WORK for the enqueue unit                 -> enqueue: the landing lane's survey lists a branch WAITING FOR
+     REVIEW, or BOUNCED while the lane is neither landing it nor re-armed to, or a lane attempt STOPPED or ENQUEUED is
+     not yet collected (its finisher or reviewer, its leads, its landing record). The landing lane lands every branch WAITING TO LAND itself, beside whatever unit runs
+     (land_lane.py, kb/Work PB3103), so a handoff's DONE branches alone start no enqueue unit, unless the lane has no
+     current survey (it is not ticking: the enqueue unit's step 3 ticks it).
   7. otherwise                                       -> wave
 THE CAMPAIGN RULE (--cluster LEAD, repeatable: the CAMPAIGN lane, kb/Work PB2120) decides every wave-type choice, from
 rule 2 or rule 7: `campaign` when a lead's cluster has a ready note and the last wave-type unit was not a campaign, so
@@ -214,10 +217,25 @@ def base_choice(h: dict, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetim
         fresh = fresh_unlanded(repo, last_started)
         if fresh:
             return {"unit": "resume", "reason": "unlanded branches from the last unit: " + ", ".join(fresh)}
-    done = [b["branch"] for b in h.get("branches_pending", []) if b.get("status") == "DONE"]
-    if done:
-        return {"unit": "enqueue", "reason": "finished branches waiting: " + ", ".join(done)}
+    if landing := enqueue_work(h, cdir):
+        return landing
     return {"unit": "wave", "reason": "nothing pending"}
+
+
+def enqueue_work(h: dict, cdir: pathlib.Path) -> dict[str, str] | None:
+    """Rule 6: an `enqueue` unit only for what its agents (or its clerk and records) must do — the landing lane lands
+    the branches WAITING TO LAND itself (land_lane.agent_work, kb/Work PB3103). DONE branches in a handoff start one
+    only while the lane has no survey younger than land_lane.SURVEY_MAX_AGE_MIN: the lane is not ticking, and the
+    enqueue unit's step 3 ticks it."""
+    import land_lane  # noqa: PLC0415  (it imports enqueue.py, gate_slot and ruleset: only rule 6 needs them)
+    work = land_lane.agent_work(cdir)
+    if work.reasons:
+        return {"unit": "enqueue", "reason": "agent work for the enqueue unit: " + "; ".join(work.reasons)}
+    done = [b["branch"] for b in h.get("branches_pending", []) if b.get("status") == "DONE"]
+    if done and (work.survey_age_min is None or work.survey_age_min > land_lane.SURVEY_MAX_AGE_MIN):
+        return {"unit": "enqueue", "reason": f"finished branches waiting: {', '.join(done)}; the landing lane has no "
+                                             f"survey in {land_lane.SURVEY_MAX_AGE_MIN} min (the enqueue unit ticks it)"}
+    return None
 
 
 def choose(handoff: dict | None, cdir: pathlib.Path, repo: pathlib.Path, now: dt.datetime, last_failed: bool,
