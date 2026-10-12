@@ -18,8 +18,12 @@
   4. Push HEAD to the branch of the same name on origin (forced: the branch is this landing's own and moves on a
      rebase), reuse the branch's open pull request or open one (`gh pr create`), and queue it (`gh pr merge --auto`; the
      merge method is the queue's own, MERGE, so the branch's commits stay ancestors of main).
-  5. Print `ENQUEUED pr=<n> sha=<sha> branch=<branch> url=<url>` and exit 0. It never waits for CI: the merge group
-     runs the matrix, and a red there bounces only this PR.
+  5. Print `ENQUEUED pr=<n> sha=<sha> branch=<branch> url=<url>`, write the landing's measurement record (kb/Work
+     PB3028, landing_measure.py: each carried change's DONE from git (landing_measure.done_times), enqueued now, the
+     worktree's local gate seconds;
+     a record that cannot be written is a loud warning, never a failed landing) and exit 0. It never waits for CI:
+     the merge group runs the matrix, and a red there bounces only this PR (`landing_measure.py complete` reads the
+     outcome from GitHub).
 
 `checks` — THE LANDING CHECKS, one sequence in one place (push-main.sh runs it too while it lives), each refusing on
 the landing's own range before a CI run is spent:
@@ -46,6 +50,8 @@ from typing import Callable
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import coord  # noqa: E402
+import landing_measure  # noqa: E402
 import ruleset  # noqa: E402
 
 EXIT_QUEUE_NOT_ACTIVE = 8
@@ -55,6 +61,7 @@ CHECKS = (("landing_devlog.py", 6, True), ("landing_oracle.py", 7, False), ("lan
 
 Say = Callable[[str], None]
 Gh = Callable[[list[str]], tuple[int, str, str]]
+Measure = Callable[[str, int], None]   # (branch, pull-request number): write the landing's record (kb/Work PB3028)
 
 
 def run_checks(rev: str, base: str, run: Callable[[str, list[str]], int], say: Say = print) -> int:
@@ -86,8 +93,18 @@ def queue_state() -> tuple[str, str]:
     return state, detail + "".join(f"; {d}" for d in diffs[:3])
 
 
+def measure_landing(cwd: pathlib.Path, branch: str, pr: int, changes: int | None, say: Say = print) -> None:
+    """Write the landing's record into the coordination directory (landing_measure.record_enqueued)."""
+    d = coord.coord_dir()
+    rec = landing_measure.record_enqueued(d / landing_measure.FILE, cwd, branch, pr, d / "scratch" / "reports", changes)
+    say(f"landing-measure: recorded PR #{pr} ({branch}): DONE {rec['done'] or 'UNMEASURED'}, enqueued {rec['enqueued']}, "
+        f"local gate {rec['local_gate_s'] if rec['local_gate_s'] is not None else 'UNMEASURED'} s "
+        f"in {rec['local_gate_runs'] or 0} run(s)")
+
+
 def queue(cwd: pathlib.Path, title: str, body_file: str, *, gh: Gh, state: Callable[[], tuple[str, str]],
-          checks: Callable[[str, str], int], dry_run: bool = False, say: Say = print) -> int:
+          checks: Callable[[str, str], int], measure: Measure | None = None, dry_run: bool = False,
+          say: Say = print) -> int:
     # 1. THE GUARD — before every other step, so a refusal has pushed and opened nothing.
     st, detail = state()
     if st != ruleset.ACTIVE:
@@ -162,6 +179,14 @@ def queue(cwd: pathlib.Path, title: str, body_file: str, *, gh: Gh, state: Calla
             "open but NOT queued; re-run once the cause is fixed.")
         return EXIT_GITHUB
     say(f"ENQUEUED pr={number} sha={sha} branch={branch} url={url}")
+    # 5. Measure it (kb/Work PB3028). The pull request IS queued: a record that cannot be written is a loud warning,
+    # never a failed landing and never silence.
+    if measure is not None:
+        try:
+            measure(branch, int(number))
+        except (OSError, ValueError, SystemExit) as e:
+            say(f"⚠ enqueue: PR #{number} is queued but its landing record was NOT written ({e}); record it with "
+                f"`python scripts/orchestrator/landing_measure.py record --pr {number} --branch {branch}`")
     return 0
 
 
@@ -266,6 +291,23 @@ def self_test() -> int:
         expect("GitHub's refusal of the pull request list, the pull request or the queue is exit 9, never 0",
                fails9 == [EXIT_GITHUB] * 3, str(fails9))
 
+        seen_m: list[tuple[str, int]] = []
+
+        def broken(branch: str, number: int) -> None:
+            raise OSError("disk full")
+        warn: list[str] = []
+        rc_ok = queue(wt, "T", str(body), gh=fake_gh([], []), state=active, checks=passing,
+                      measure=lambda b, n: seen_m.append((b, n)), say=lines.append)
+        rc_broken = queue(wt, "T", str(body), gh=fake_gh([], []), state=active, checks=passing, measure=broken,
+                          say=warn.append)
+        rc_refused = queue(wt, "T", str(body), gh=fake_gh([], []), state=lambda: (ruleset.ABSENT, "x"),
+                           checks=passing, measure=lambda b, n: seen_m.append(("refused", n)), say=lines.append)
+        expect("a queued pull request is measured once; a record that cannot be written warns loudly and the landing "
+               "still succeeds; a refused landing is never measured",
+               rc_ok == 0 and seen_m == [("land-train", 17)] and rc_broken == 0
+               and any("landing record was NOT written (disk full)" in w for w in warn)
+               and rc_refused == EXIT_QUEUE_NOT_ACTIVE, f"{rc_ok} {seen_m} {rc_broken} {warn} {rc_refused}")
+
         sh(wt, "switch", "--quiet", "main")
         (wt / "b.txt").write_text("main moved", encoding="utf-8")
         sh(wt, "add", "b.txt")
@@ -320,6 +362,8 @@ def main(argv: list[str] | None = None) -> int:
     q.add_argument("--title", required=True)
     q.add_argument("--body-file", required=True)
     q.add_argument("--dry-run", action="store_true")
+    q.add_argument("--changes", type=int, default=None,
+                   help="changes this pull request lands, for the measurement (a lander's train is several)")
     c = sub.add_parser("checks", help="the landing checks on base..rev")
     c.add_argument("--rev", default="HEAD")
     c.add_argument("--base", default="origin/main")
@@ -335,7 +379,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_checks(a.rev, a.base, _script_runner(cwd))
     if a.verb == "queue":
         return queue(cwd, a.title, a.body_file, gh=ruleset.real_gh, state=queue_state,
-                     checks=lambda sha, base: run_checks(sha, base, _script_runner(cwd)), dry_run=a.dry_run)
+                     checks=lambda sha, base: run_checks(sha, base, _script_runner(cwd)),
+                     measure=lambda branch, pr: measure_landing(cwd, branch, pr, a.changes), dry_run=a.dry_run)
     ap.print_help()
     return 2
 

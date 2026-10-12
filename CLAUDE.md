@@ -85,7 +85,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
 4. Before the session ends: update the `kb/Work/` notes you touched, update §0, add a DEVLOG entry.
 
 ## The project
-WiseOwl COBOL (repo `BrentRector/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
+WiseOwl COBOL (repo `WiseOwlSoftware/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
 COBOL record IS a .NET `record struct`, an elementary item IS a native field. **There is NO byte `ProgramState`
 substrate — never reintroduce one.** The legacy CobolSharp engine that had one is deleted from `main` (PHASE 15 Cut 2,
 kb/Work PB2110); `docs/rearchitecture/LEGACY-ARCHIVE.md` names the tag that preserves it.

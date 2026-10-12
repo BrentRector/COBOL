@@ -42,13 +42,13 @@ BRIEFS = {
                               r'linux-gate\.sh',  # PB1732 (L10): CI's Linux legs under WSL before push-main
                               # PB2515 (L12): a red train is attributed per cluster before it is fixed; every train
                               # is measured
-                              r'ATTRIBUTE BEFORE YOU FIX', r'filter_population\.py', r'train_measure\.py record',
+                              r'ATTRIBUTE BEFORE YOU FIX', r'filter_population\.py', r'landing_measure\.py',
                               # PB2537 (L3): one lander on main at a time — the lease before the final rebase and gates
                               r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',
                               *LANDER_HANDOFF],
     'lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'linux-gate\.sh', r'build-local\.ps1',
                         r'compare_oracle', r'landing_oracle', r'train_apply\.py',  # PB2885 (L11, L1)  # PB1732 (L10); PB1721 (L2)
-                        r'train_measure\.py record',  # PB2515 (L12)
+                        r'landing_measure\.py',  # PB3028 (L12)
                         r'landing_lease\.py acquire', r'landing_lease\.py renew', r'landing_lease\.py release',  # PB2537 (L3)
                         *LANDER_HANDOFF],
     'golden-lander-brief.md': [r'claude-skills', POINTER, r'push-main', r'build-local\.ps1',  # PB3022 (L2)

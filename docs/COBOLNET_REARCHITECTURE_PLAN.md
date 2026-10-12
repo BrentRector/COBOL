@@ -33,8 +33,8 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
 - **▶ GATE POLICY (owner 2026-10-10, kb/Work PB2514, PB2515): batched gating and an implementer gate cap of 3 are
   PERMANENT.** Every gate runs leg 1 only (`LEG 1 ONLY`) and has ONE shape since 2026-10-11 (kb/Work PB3015 Q1a,
   PB3022: no `-Mode`; tiers 0h and 0c in every leg 1); CI's whole-population run is the population check, a red is
-  attributed per cluster (MANDATORY-PRACTICES L12), and every train is recorded with
-  `scripts/orchestrator/train_measure.py`. The trial's measurement (15 batched trains 3.43 changes landed/h against 8
+  attributed per cluster (MANDATORY-PRACTICES L12), and every landing is recorded with
+  `scripts/orchestrator/landing_measure.py` (the trial's train records are its BEFORE column). The trial's measurement (15 batched trains 3.43 changes landed/h against 8
   whole-population trains 0.71/h, confounded by the cap; no CI red that batching let through) is in PB2515. They are
   `gate_slot.py`'s coded defaults (`DEFAULT_SCOPE`, `DEFAULT_SLOTS`; train 1052), and `gate_slot.py clear` drops the
   bridging settings that carried them before.
@@ -49,10 +49,16 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
   check|apply`, the lander queueing one PR per train through `enqueue.py queue`) lands FIRST and ALONE, as the last
   landing through `push-main.sh`; then the attended session asks the owner for the go to run `ruleset.py apply`.
   ⛔ Operator review 2026-10-11 13:39: `enqueue.py` refuses (exit 8) to open or queue a PR until `ruleset.py check`
-  reports the queue ACTIVE, so until the owner applies it the lander keeps landing through `push-main.sh`, which
-  (with `landing_lease.py` and the `ci/**` trigger) is deleted by the FIRST change landed through the queue. Phase 2
+  reports the queue ACTIVE, so until the owner applied it the lander kept landing through `push-main.sh`; `push-main.sh`
+  (with `landing_lease.py`, their drift tests and the `ci/**` trigger) is retired by PB3024's closing change, cut right
+  after PB3023 lands — PB3023 rewrites 39 of the 48 files that retirement touches. Phase 2
   is PB3023 (`enqueue.py` gains the rebase, the gate and the DEVLOG stamp) and PB3025 (per-entry DEVLOG). Train 1061
-  (DEVLOG 1960) recorded the fast track.
+  (DEVLOG 1960) recorded the fast track. **Owner 2026-10-11 ~18:50 (kb/Work PB3078):** the second `ruleset.py apply`
+  (main dfb0a611d) found that GitHub offers the merge queue only to organization-owned repositories, so the repository
+  moved from `BrentRector/COBOL` to `WiseOwlSoftware/COBOL` (transferred 19:11 PDT in an operator-granted landing-free
+  window; `origin` re-pointed, the old name redirects); `ruleset.py apply` on the 16:27 go then created ruleset 24904083
+  and deleted the classic protection, and `ruleset.py check` reads **ACTIVE** (19:14). **LANDING IS THE QUEUE PATH,
+  `python scripts/orchestrator/enqueue.py queue`; the ruleset refuses every direct push to `main`.**
 - **▶ LIVE STATE (2026-10-06 23:40 PDT) — THE COMPLETION PLAN IS DECIDED (kb/Work R69; DEVLOG 1901).** Main is train 1024 plus this plan commit; no compiler code changed. Three owner decisions of 2026-10-06, each recorded in R69 and never to be re-asked:
   - **The legacy `CobolSharp.*` engine is DELETED from main** (trains 1025 and 1027, 2026-10-07; the archive tag `legacy-byte-engine-final` marks `48a44548c`, the last commit holding it; `docs/rearchitecture/LEGACY-ARCHIVE.md` is the pointer). The decision supersedes DEVLOG 997's "keep engine" and amends D14. P15's Cut 2.5 (D10), the prose sweep, the solution rename and the grammar unification run as wave 1028 of the `PB2108` cluster (lead PB2108; the register's `cluster` and `blocked_by` fields carry the membership and order: Cut 1a and 1b in parallel → Cut 2 with the archive tag → the prose sweep, the solution rename, D10 and the grammar unification). v1.0 keeps Cut 3 (the runtime namespace flip) and the §4.2.16 conformance documentation. Evidence: R69 §1 (zero product defects caught since July; its one purpose dissolved when PB750 made the guard greenfield-driven; its costs measured).
   - **R2, the review fleet (2026-10-07 23:06 PDT, DEVLOG 1932):** rebuilt from the owner-approved adversarial review of its first brief (PB2558–PB2561: computed subsystems and shards, inputs once, per-decision checkpoints, three-lens skeptics, scripted filing into PB1754); DESIGN-architecture-review §3 R2 describes it as built. Batch 1 (the small shards: runtime values, editions and diagnostics, the CLI, plus the one whole-codebase clone pass) is ready for the operator; nothing of R2 has run yet.
@@ -893,16 +899,21 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
 
 ### ⛔ THE LANDING GATE — `main` REQUIRES `ci-gate`, AND THE LANDING COMMAND IS A SCRIPT (2026-09-06)
 
-Owner decision, question 23 ([[PB796]]). `main` carries a REQUIRED status check — **`ci-gate`**, the terminal job
-of `.github/workflows/build-and-test.yml` — with `enforce_admins: true`, `strict: false`, force-pushes and
-deletions off. ⛔ **A bare `git push origin HEAD:main` of an unverified commit is refused by the SERVER**
-(measured: `remote: error: GH006 … Required status check "ci-gate" is expected.`). An administrator exemption was
+Owner decision, question 23 ([[PB796]]); since 2026-10-11 19:14 the rule is the ruleset `main: merge queue` (id 24904083,
+kb/Work PB3024, PB3078; ACTIVE on `WiseOwlSoftware/COBOL`): a pull request is required, every merge goes through GitHub's
+merge queue as a merge commit, the REQUIRED status check is **`ci-gate`** — the terminal job of
+`.github/workflows/build-and-test.yml` — evaluated on the merge group, non-fast-forward pushes and deletions are blocked,
+and the bypass list is empty; the classic protection it replaced (`enforce_admins: true`, `strict: false`) is deleted.
+⛔ **A bare `git push origin HEAD:main` is refused by the SERVER** (measured under the classic protection:
+`remote: error: GH006 … Required status check "ci-gate" is expected.`; the ruleset refuses every direct push to `main`
+whatever its checks). An administrator exemption was
 never on the table: every push to this repository is made with the owner's credentials, so a rule that spares
 administrators spares every actor there is — the orchestrator's own pushes obey it.
 
-**LAND WITH `python scripts/orchestrator/enqueue.py queue` once `ruleset.py check` reports the merge queue ACTIVE
-(kb/Work PB3024: one pull request into GitHub's merge queue, whose merge group runs the matrix), and until then WITH
-`bash scripts/push-main.sh`.** push-main.sh pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
+**LAND WITH `python scripts/orchestrator/enqueue.py queue` (kb/Work PB3024: one pull request into GitHub's merge queue,
+whose merge group runs the matrix; the queue is ACTIVE since 2026-10-11 19:14). `bash scripts/push-main.sh` is a dead
+path the ruleset refuses; PB3024's closing change, cut right after PB3023 lands, deletes it with `landing_lease.py`, their
+drift tests and the `ci/**` trigger.** Until then its mechanics stay recorded here: push-main.sh pushes HEAD to `ci/<short-sha>`, waits for the run on that exact
 sha, and only on green fast-forwards main and deletes the landing branch; on a red it prints the failing jobs and
 exits non-zero with main untouched. A check run is attached to the COMMIT, not to a branch, which is why the
 verdict earned on `ci/<sha>` is the one the protection reads on main. ⭐ It is IDEMPOTENT — a full matrix is
@@ -3213,8 +3224,8 @@ already-derivable coverage; none change the pipeline.
   worktree shares, departs from them: `python scripts/gate_slot.py set-cap N [--until ISO] [--why TEXT]` and
   `set-implementer-scope leg1|whole [--until ISO]` (`whole` = both legs, the owner's switch back; an expired setting
   is its default again); `gate_slot.py clear [cap] [implementer-scope]` returns to the defaults; `gate_slot.py status`
-  shows both, every held slot and the queue. A lander records each train with `python
-  scripts/orchestrator/train_measure.py record`, and `train_measure.py summary` compares the gating modes.
+  shows both, every held slot and the queue. `enqueue.py queue` records each landing (`scripts/orchestrator/landing_measure.py`), and `landing_measure.py
+  summary` compares the merge queue with the retired trains' records.
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` ·
   FULL CLI-level NIST guard: `bash scripts/guard.sh` (fast: `guard-fast.sh`; gate on the VERDICT line). It drives

@@ -797,8 +797,8 @@ marked, owed again after an input-touching commit, not after an unrelated one; p
 against the schema's required and permitted keys), `test_plan_wave.py` (fixture notes, clusters and reports in a temp directory, rendered through the
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
 partial last line), `landing_lease.py --self-test` (two landers, takeover, holder-only renew and release, a race;
-section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `train_measure.py --self-test` (the gating
-policy's per-train record and summary, kb/Work PB2515; `TrainMeasureDriftTests` also pins its arms), `landing_check.py
+section 4.7; `LandingLeaseDriftTests` also pins its arms by name), `landing_measure.py --self-test` (the per-pull-request landing record, its completion from GitHub and the summary
+against the retired train records, kb/Work PB3028; `LandingMeasureDriftTests` also pins its arms), `landing_check.py
 --self-test` (section 4.7's file-set guarantee). The supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
 loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`

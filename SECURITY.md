@@ -5,7 +5,7 @@
 **Please do not report security vulnerabilities through public GitHub issues, discussions or pull requests.**
 
 Report them privately through GitHub's
-[private vulnerability reporting](https://github.com/BrentRector/COBOL/security/advisories/new)
+[private vulnerability reporting](https://github.com/WiseOwlSoftware/COBOL/security/advisories/new)
 (the **Security** tab → **Report a vulnerability**). Only the maintainer can see the report.
 
 Please include as much of the following as you can:

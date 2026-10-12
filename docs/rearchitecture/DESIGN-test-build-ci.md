@@ -802,11 +802,11 @@ acceptance (§3.14.9) records the time to the first red of every implementer gat
   `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN|RED — … ===` — never `GREEN`, so no reader takes
   it for a whole-population green. The owner's switch back is the shared scope `whole` (`gate_slot.py
   set-implementer-scope whole [--until ISO]`), under which the gate runs both legs and the fail-fast bullet above
-  applies as written. The trial's measurement (`train_measure.py summary`, 2026-10-10): batched 15 trains, 85 changes
+  applies as written. The trial's measurement (the retired train records, read by `landing_measure.py summary` as its BEFORE column, 2026-10-10): batched 15 trains, 85 changes
   in 24.8 h = 3.43 landed per hour, 2.7 whole-population runs per train, 0 interaction reds, 1 CI red (an environment
   difference, kb/Work PB2563); whole 8 trains, 25 changes in 35.3 h = 0.71 per hour (confounded by the cap of 3 during
   the trial). CI's whole-population run is then the population check for every change; a red there is attributed
-  per cluster (MANDATORY-PRACTICES L12) and every train is measured (`scripts/orchestrator/train_measure.py`). A gate
+  per cluster (MANDATORY-PRACTICES L12) and every landing is measured (`scripts/orchestrator/landing_measure.py`, §3.17.5). A gate
   with no plan runs its one leg, the whole population, and says GREEN.
 - **The verdict line counts the whole population, by discovered case:** `=== BUILD-LOCAL GATE: GREEN — Conformance
   9,317/9,317 · Unit 29,703/29,703 · Characterization 33/33 cases ran (skipped 0) in 2 legs (plan 3f1c…: map dbea124,
@@ -1798,9 +1798,19 @@ demand and not committed.
   `cobol-lander` becomes `cobol-finisher` (resolve a conflict, fix a bounce, re-enqueue; turn cap 160).
 - `wf_rolling_wave.js` **starts no lander**: a wave produces DONE branches; the enqueue unit lands them. This removes
   PB3016's policy question (may THIS wave land?) by removing the mechanism; `train_size` and `min_final_train` go.
-- **Measurement continues** (PB3028): `landing_measure.py` replaces `train_measure.py` — per PR: DONE → enqueued →
-  on main, bounces and their causes, CI wall; `summary` compares against the 2026-10-10 evidence. The design is judged
-  by changes landed per hour and by minutes and tokens per landing, before and after.
+- **Measurement** (PB3028, landed): `landing_measure.py` replaced `train_measure.py`, which is deleted with its drift
+  test. One record per pull request in `<coord>/landing-measurements.jsonl`, built up by patches because no tool sees
+  a whole landing: `enqueue.py queue` writes the enqueue time, each carried change's DONE (`done_times`: the committer time of the HEAD commit its DONE implementer report names, never the report file's time, which the branch review's stamp rewrites; the changes are the reports naming the branch plus those a train commit's `Report:` line names, one per lead note, each the earliest of its finisher chain; a report whose HEAD is already an ancestor of origin/main is a change that landed before this one and counts for nothing, because the queue's MERGE method makes every landed head an ancestor of every later branch) and the worktree's local gate seconds (the sum of its `verdict.json` `timings.wall_s`);
+  `record --review-clean` and `--bounce-causes` (cluster-defect · load-timing · conflict · infrastructure) are named by
+  whoever knows; `complete` reads `mergedAt`, the count of FAILED merge-group runs of the PR (a run GitHub cancelled
+  because an earlier entry failed is a ripple, not a bounce) and the successful run's wall from `gh`. A field never
+  observed stays null and prints UNMEASURED (a missing observation is not a zero); a bounce with no named cause prints
+  UNATTRIBUTED. `summary` prints changes landed per hour, median and p90 minutes DONE → on main per change, bounces per landing and
+  their causes, merge-group CI wall and local gate minutes as the AFTER column beside the BEFORE column from the retired
+  train records (batched gating) and the frozen 2026-10-10 evidence; `freeze` copies the train records and the first
+  after-summary under `evidence/fleet-optimization/` once a PR has landed. The completion ledger's landing rate and its
+  minutes per landing come from the same file (`landing_measure.landing_rate_input`: the queue's own from two landings,
+  else the trains', whose minutes are lander start → push, a floor; the headline names what its minutes measure and the ledger prints that label). The design is judged by changes landed per hour and minutes per landing, before and after.
 
 #### 3.17.6 CI and repository settings (PB3024)
 
@@ -1812,7 +1822,10 @@ demand and not committed.
   `pull_request`: a PR's cheap `ci-gate` is attached to the PR's HEAD commit — the sha a landing pushes — so a
   check-run lookup would have read it as a verdict on the matrix. `push.branches` keeps `ci/**` until `push-main.sh`
   is deleted (below). `ci-gate`'s `needs:` and its drift check (every job wired) are unchanged.
-- A **ruleset** on `main` (classic branch protection has no merge queue): require a pull request, require the merge
+- A **ruleset** on `main` (classic branch protection has no merge queue, and GitHub offers a merge queue only to an
+  ORGANIZATION-owned repository — the second apply, 2026-10-11 18:44, was refused with `Invalid rule 'merge_queue'` on
+  the personal account's repository, so the repository is `WiseOwlSoftware/COBOL`: owner decision 2026-10-11, kb/Work
+  PB3078): require a pull request, require the merge
   queue with merge method **merge commit** — the branch's commits stay ancestors of `main`, so the branch lifecycle
   (`prune_worktrees.py`'s landed test, `carried()`, `git cherry`) keeps working offline, and `git log --first-parent
   main` reads one merge commit per landing — GitHub's `Merge pull request #N from …` subject with the PR's one-line
@@ -1837,11 +1850,13 @@ demand and not committed.
   construction: `enqueue.py queue` refuses (exit 8) before any check, push or pull request unless `ruleset.py check`
   reports the queue ACTIVE (live ruleset equal to the committed one, the queue present, the classic protection gone);
   no other tracked file opens or queues a pull request (`LandingPipelineDriftTests`, §3.17.8); until the queue is
-  ACTIVE the lander keeps landing through `push-main.sh`. `push-main.sh`, its `.ps1` shim, `landing_lease.py` and its
-  drift tests, the `ci/**` trigger and MANDATORY-PRACTICES L3/L13 are deleted in the FIRST change landed THROUGH the
-  queue, not in phase 1. **The switch:** the moment phase 1 is on main the attended session asks the owner, one bare
-  question, for the go to run `python scripts/orchestrator/ruleset.py apply --owner-go "<the go>"` (it also sets the
-  repository's auto-merge and delete-branch settings); from that instant main accepts only queued pull requests.
+  ACTIVE the lander kept landing through `push-main.sh`. `push-main.sh`, `landing_lease.py` and their drift tests, the
+  `ci/**` trigger and MANDATORY-PRACTICES L3/L13 are deleted by PB3024's closing change, cut right after PB3023 lands —
+  not by the first queued landings (PB3077, PB3078), because PB3023 rewrites 39 of the 48 files that retirement touches
+  (kb/Work PB3078). **The switch happened 2026-10-11 19:14:** on the owner's go (16:27) the attended session ran
+  `python scripts/orchestrator/ruleset.py apply --owner-go "<the go>"` (it also set the repository's auto-merge and
+  delete-branch settings) — after the repository's transfer to the WiseOwlSoftware organization, the merge queue being
+  organization-only (PB3078); from that instant main accepts only queued pull requests.
   **Phase 2 = PB3023 (`enqueue.py` gains the rebase, the one local gate and the DEVLOG stamp) and PB3025 (the
   per-entry DEVLOG and its CI check)**, each through the queue.
 - `guard` (12.8 min) is the long pole of a merge-group run; sharding it is a follow-up measured after the queue lands.

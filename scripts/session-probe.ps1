@@ -95,8 +95,11 @@ if (Test-Path 'tests/version-matrix/traceability-inventory.json') {
 # decision; the re-entry sequence (dispatch, confirm all five jobs get RUNNERS, then land any workflow change) is
 # in plan §0.
 # Network-tolerant: any failure to reach GitHub is silent, so the probe still works offline.
+# The repository is read from the remote, never hard-coded (kb/Work PB3078: the repository moved from the personal
+# account to the WiseOwlSoftware organization; push-main.sh and ruleset.py read it the same way).
 try {
-    $wf = & gh api repos/BrentRector/COBOL/actions/workflows --jq '.workflows[] | select(.state != "active") | "\(.name) [\(.state)]"' 2>$null
+    $repo = & gh repo view --json nameWithOwner --jq .nameWithOwner 2>$null
+    $wf = if ($LASTEXITCODE -eq 0 -and $repo) { & gh api "repos/$repo/actions/workflows" --jq '.workflows[] | select(.state != "active") | "\(.name) [\(.state)]"' 2>$null } else { $null }
     if ($LASTEXITCODE -eq 0 -and $wf) {
         Write-Host "ci     : ⛔ DISABLED — $wf  (re-enable: gh workflow enable 'Build and Test')"
         Write-Host "         every gate is LOCAL until then: bash scripts/battery.sh"
