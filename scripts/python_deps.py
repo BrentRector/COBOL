@@ -449,7 +449,7 @@ def self_test() -> int:
     # THE LIVE TREE: every declaration parses, and every import is declared where it belongs.
     try:
         live = audit(REPO, GATE, TOOLS, discovered_self_tests(REPO)) + setup_env_drift()
-    except (OSError, ValueError, SyntaxError) as e:
+    except (OSError, ValueError, SyntaxError, subprocess.CalledProcessError) as e:
         live = [f"the audit could not run: {e}"]
     check("arm LIVE: this repository's third-party imports are all declared, and the self-tests' in the gate file",
           live, [])
