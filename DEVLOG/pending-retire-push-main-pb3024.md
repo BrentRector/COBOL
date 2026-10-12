@@ -27,9 +27,9 @@ exist, the push trigger is `[ main ]`, and no tracked file outside `DEVLOG/`, `d
 `kb/Work/` and `adjudication/` names any of them. A planted-name arm fires its failure branch. A past fact that must
 stay says "the former direct-push landing script" or "the retired train applier".
 
-**The docs.** `DOC_INDEX.md` lost the push-main row; plan §0's pipeline bullet and §9's landing paragraph describe the
-queue; `DESIGN-test-build-ci.md` §1.4, §3.17.6 and the §3.17.8 arm read as landed; `DESIGN-orchestrator-loop.md` §3.2
-rules 2 and 6 lost the deferral and §4.7 is now a dated past decision; the gate, land-a-fix, workstream and
+**The docs.** `DOC_INDEX.md` lost the push-main row; plan section 0's pipeline bullet and section 9's landing paragraph describe
+the queue; `DESIGN-test-build-ci.md` sections 1.4, 3.17.6 and 3.17.8's arm read as landed; `DESIGN-orchestrator-loop.md`
+section 3.2 rules 2 and 6 lost the deferral and section 4.7 is now a dated past decision; the gate, land-a-fix, workstream and
 architecture-review skills and MANDATORY-PRACTICES P2, P14, L1, L3 and L13 name `enqueue.py land`.
 
 ### PB3095: the guard hook now enforces P14(b)'s worst case
