@@ -33,8 +33,8 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
 - **▶ GATE POLICY (owner 2026-10-10, kb/Work PB2514, PB2515): batched gating and an implementer gate cap of 3 are
   PERMANENT.** Every gate runs leg 1 only (`LEG 1 ONLY`) and has ONE shape since 2026-10-11 (kb/Work PB3015 Q1a,
   PB3022: no `-Mode`; tiers 0h and 0c in every leg 1); CI's whole-population run is the population check, a red is
-  attributed per cluster (MANDATORY-PRACTICES L12), and every train is recorded with
-  `scripts/orchestrator/train_measure.py`. The trial's measurement (15 batched trains 3.43 changes landed/h against 8
+  attributed per cluster (MANDATORY-PRACTICES L12), and every landing is recorded with
+  `scripts/orchestrator/landing_measure.py` (the trial's train records are its BEFORE column). The trial's measurement (15 batched trains 3.43 changes landed/h against 8
   whole-population trains 0.71/h, confounded by the cap; no CI red that batching let through) is in PB2515. They are
   `gate_slot.py`'s coded defaults (`DEFAULT_SCOPE`, `DEFAULT_SLOTS`; train 1052), and `gate_slot.py clear` drops the
   bridging settings that carried them before.
@@ -3213,8 +3213,8 @@ already-derivable coverage; none change the pipeline.
   worktree shares, departs from them: `python scripts/gate_slot.py set-cap N [--until ISO] [--why TEXT]` and
   `set-implementer-scope leg1|whole [--until ISO]` (`whole` = both legs, the owner's switch back; an expired setting
   is its default again); `gate_slot.py clear [cap] [implementer-scope]` returns to the defaults; `gate_slot.py status`
-  shows both, every held slot and the queue. A lander records each train with `python
-  scripts/orchestrator/train_measure.py record`, and `train_measure.py summary` compares the gating modes.
+  shows both, every held slot and the queue. `enqueue.py queue` records each landing (`scripts/orchestrator/landing_measure.py`), and `landing_measure.py
+  summary` compares the merge queue with the retired trains' records.
 - Greenfield conformance: `dotnet test tests/Cobol.Net.Tests.Conformance` · unit: `tests/Cobol.Net.Tests.Unit` ·
   characterization: `tests/Cobol.Net.Tests.Characterization` ·
   FULL CLI-level NIST guard: `bash scripts/guard.sh` (fast: `guard-fast.sh`; gate on the VERDICT line). It drives

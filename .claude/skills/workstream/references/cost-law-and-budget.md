@@ -64,7 +64,7 @@ PB1708: "order, don't skip"), with ONE shape (owner 2026-10-11, kb/Work PB3022):
 setting, 3 by default, kb/Work PB2514) — and runs leg 1 only (batched gating, kb/Work PB2515); a landing's gate is the
 same command on the train head. The local whole-population run is gone: CI's merge-group run is the population check
 (kb/Work PB3015: on 2026-10-10 the lander's local population runs were 41 % of all lander minutes, 7–53 min each and
-8 of 15 RED under load), measured per landing by `scripts/orchestrator/train_measure.py`. (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
+8 of 15 RED under load), measured per landing by `scripts/orchestrator/landing_measure.py` (the retired train records are the BEFORE column of its `summary`). (2) Every implementer gate runs at `-Priority BelowNormal`, which Windows passes down to the build, the test
 hosts and every compiled program, so the lander's Normal-priority gate wins the cores. (3) PIPELINED
 LANDING UNDER ONE LANDING LEASE (kb/Work PB2537): the next train's lander is dispatched while the previous one is still
 in CI and brings its clusters in at once, then takes the landing lease (`scripts/orchestrator/landing_lease.py`), which
