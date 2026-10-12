@@ -175,7 +175,7 @@ def main(argv: list[str]) -> int:
         fixed = normalize(doc, p.name, log)
         total += len(fixed["records"])
         if a.in_place:
-            p.write_text(json.dumps(fixed, indent=1, ensure_ascii=False), encoding="utf-8")
+            p.write_text(json.dumps(fixed, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
     print(f"{len(paths)} file(s), {total} record(s); {len(log)} change(s)"
           + (" — WRITTEN" if a.in_place else " — dry run, nothing written"))
     for line in log:

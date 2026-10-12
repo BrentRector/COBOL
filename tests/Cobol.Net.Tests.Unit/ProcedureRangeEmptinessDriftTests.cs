@@ -280,4 +280,4 @@ public sealed class ProcedureRangeEmptinessDriftTests
             + "(kb/Work PB367). Route it through RunUseCall, or add it to ExemptRunUseCalls with the reason its "
             + "bounds are not a declarative section:\n  " + string.Join("\n  ", unexplained));
     }
-}
+}

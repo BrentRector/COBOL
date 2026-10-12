@@ -601,7 +601,7 @@ def low_priority() -> dict:
 
 
 def run_logged(cmd: list[str], cwd: Path, log: Path) -> None:
-    with open(log, "w", encoding="utf-8", errors="replace") as fh:
+    with open(log, "w", encoding="utf-8", errors="replace", newline="\n") as fh:
         rc = subprocess.run(cmd, cwd=cwd, stdout=fh, stderr=subprocess.STDOUT, **low_priority()).returncode
     if rc != 0:
         tail = log.read_text(encoding="utf-8", errors="replace").splitlines()[-15:]
@@ -638,7 +638,7 @@ def measure(commit: str, work: Path, out_dir: Path) -> Path:
                    logs / "host-build.log")
         print(f"census: built in {time.time() - t0:.0f}s", flush=True)
         scope_file = work / "scope.json"
-        scope_file.write_text(json.dumps(scope), encoding="utf-8")
+        scope_file.write_text(json.dumps(scope), encoding="utf-8", newline="\n")
         raw_file = work / "raw.json"
         t1 = time.time()
         run_logged(["dotnet", str(host / "ArchCensus.dll"), "--solution", str(wt / "Cobol.Net.sln"), "--scope",
@@ -668,11 +668,11 @@ def measure(commit: str, work: Path, out_dir: Path) -> Path:
     record = build_record(sha, date, scope, raw, population, gods, dead, counts)
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{sha}.json"
-    path.write_text(json.dumps(record, indent=None, separators=(",", ":"), ensure_ascii=False) + "\n", encoding="utf-8")
+    path.write_text(json.dumps(record, indent=None, separators=(",", ":"), ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     (out_dir / f"{sha}.findings.json").write_text(
         json.dumps({"_frozen": FROZEN_BANNER, "commit": sha, "schema": SCHEMA, "findings": found}, indent=1,
                    ensure_ascii=False) + "\n",
-        encoding="utf-8")
+        encoding="utf-8", newline="\n")
     print_summary(gods, counts)
     return path
 
@@ -745,7 +745,7 @@ def self_test() -> int:
         }
         for rel, text in files.items():
             (root / rel).parent.mkdir(parents=True, exist_ok=True)
-            (root / rel).write_text(text, encoding="utf-8")
+            (root / rel).write_text(text, encoding="utf-8", newline="\n")
         tracked = sorted(files)
         projects = {"tools/Probe"}
         corpus = build_corpus(root, tracked, {"with space.md"})

@@ -1015,7 +1015,7 @@ def self_test(subjects, own, universe, ordinals=None, tops=None, direct=None) ->
     def kinds(comment: str, decl: str, suffix: str = ".g4") -> set[str]:
         with tempfile.TemporaryDirectory() as d:
             p = pathlib.Path(d) / ("probe" + suffix)
-            p.write_text(comment + "\n" + decl + "\n", encoding="utf-8")
+            p.write_text(comment + "\n" + decl + "\n", encoding="utf-8", newline="\n")
             _, parts, ctx, win, label, head = next(blocks(p))
             return {k for k, _c, _m in _checks(parts, ctx, win, subjects, own, universe, phantom=True,
                                               label=label, head=head)}

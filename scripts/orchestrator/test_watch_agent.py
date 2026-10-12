@@ -39,7 +39,7 @@ lines = [
     asst("m2", [{"type": "text", "text": "word " * 100}], cr=172469, cw=264),
     asst("m3", [{"type": "tool_use", "name": "Bash", "input": {"command": "x" * 300, "description": "d"}}], cr=200000),
 ]
-T.write_text("\n".join(lines[:4]) + "\n" + lines[4][:40], encoding="utf-8")   # the last line is still being written
+T.write_text("\n".join(lines[:4]) + "\n" + lines[4][:40], encoding="utf-8", newline="\n")   # the last line is still being written
 out = list(w.feed(T, st))
 check("one line per rendered block", len(out), 2)
 check("tool line", out[0].split()[1:5], ["#1", "ctx", "54k", "Read"])
@@ -49,14 +49,14 @@ check("context of the latest call", st.context, 172471 + 264)
 check("text cut at 200", len(out[1].split("text", 1)[1].strip()), 200)
 check("partial line held", st.buf.startswith(lines[4][:40].encode()), True)
 
-with open(T, "a", encoding="utf-8") as f:
+with open(T, "a", encoding="utf-8", newline="\n") as f:
     f.write(lines[4][40:] + "\n")
 out = list(w.feed(T, st))
 check("completed line rendered once", len(out), 1)
 check("tool summary cut at 120", len(out[0].split("Bash", 1)[1].strip()), 120)
 check("third call", st.calls, 3)
 check("nothing new renders nothing", list(w.feed(T, st)), [])
-with open(T, "a", encoding="utf-8") as f:
+with open(T, "a", encoding="utf-8", newline="\n") as f:
     f.write("{not json\n")
 check("a corrupt line is skipped", list(w.feed(T, st)), [])
 

@@ -259,6 +259,12 @@ jobs:
           # fetched on demand — the same partial clone `changes` uses.
           fetch-depth: 0
           filter: blob:none
+      # tooling_check.py's self-test proves every agent role and skill definition LOADS by parsing its frontmatter with
+      # PyYAML (kb/Work PB3097: an unparseable role printed OK and was never loaded). The local hosts carry PyYAML 6.0.3
+      # (Windows pip; under WSL the uv-managed python3.14 that linux-gate.sh runs, installed by scripts/wsl/setup-wsl.sh,
+      # and linux-gate.sh is NOT RUN without it); the runner's system Python is not promised it, so it is pinned here.
+      - name: Python YAML parser for the tooling self-test (pyyaml, pinned)
+        run: python3 -m pip install --user --break-system-packages --disable-pip-version-check --no-input pyyaml==6.0.3
       - name: Code citations — the clause vs the construct it names (audit_code_citations.py --check)
         run: python3 scripts/spec/audit_code_citations.py --check
       - name: Doc citations — a quoted fragment vs the clause it is filed under (audit_doc_citations.py --check)
@@ -308,6 +314,12 @@ jobs:
       - name: Spec corrections — every flag, Addendum entry, printed form and page agree (verify_publishable.py)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/verify_publishable.py
+      # One line ending, LF (kb/Work PB3029): no tracked text file's blob or checkout holds a CR, and every Python writer
+      # states newline=. Here it guards the INDEX (a commit made outside git's attributes); windows-build-test runs it
+      # again over a Windows checkout, the bytes `core.autocrlf` used to turn CRLF.
+      - name: Line endings — LF in every tracked text file, index and checkout (line_endings.py --check)
+        if: ${{ !cancelled() }}
+        run: python3 scripts/line_endings.py --check
       # EVERY script self-test, DISCOVERED (kb/Work PB2563): each test_*.py / test_*.ps1 and each script handling
       # --self-test under scripts/ — the hook self-tests, cite.py, ledger_plan.py, landing_check.py and the orchestrator's,
       # which until PB2563 were named here one by one while eleven of them ran nowhere. The same runner is an audit of the
@@ -725,15 +737,22 @@ jobs:
       # After the test legs, so a red self-test never hides their results.
       # Windows has no system IANA time-zone database, so Python's zoneinfo (scripts/orchestrator/budget.py) needs the
       # tzdata package; the local hosts carry it (2026.4) and the runner's Python does not, so every orchestrator
-      # self-test went red here and green locally (train 1037t, run 37748130457). Pinned to the local version.
-      - name: Python time-zone data for the orchestrator self-tests (tzdata, pinned)
+      # self-test went red here and green locally (train 1037t, run 37748130457). Pinned to the local version. PyYAML
+      # likewise: tooling_check.py's self-test parses every agent role and skill frontmatter (kb/Work PB3097).
+      - name: Python packages for the script self-tests (tzdata, pyyaml, pinned)
         if: ${{ !cancelled() }}
         shell: pwsh
-        run: python -m pip install --disable-pip-version-check --no-input tzdata==2026.4
+        run: python -m pip install --disable-pip-version-check --no-input tzdata==2026.4 pyyaml==6.0.3
       - name: Script self-tests on Windows (self_tests.py)
         if: ${{ !cancelled() }}
         shell: pwsh
         run: python scripts/self_tests.py
+      # The one line ending over a WINDOWS checkout (kb/Work PB3029): `.gitattributes` makes it LF whatever the runner's
+      # `core.autocrlf`, so the bytes these legs compiled and compared are the bytes the Linux jobs read.
+      - name: Line endings on a Windows checkout (line_endings.py --check)
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: python scripts/line_endings.py --check
       - name: Upload test results (TRX)
         if: ${{ always() }}
         uses: actions/upload-artifact@v7

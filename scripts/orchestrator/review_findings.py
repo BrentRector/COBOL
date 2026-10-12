@@ -224,7 +224,7 @@ def self_test() -> int:
         f = tmp / "review-w9-a.jsonl"
         report = tmp / "w9a-PB1-report.md"
         report.write_text("# PB1 — implementer report\n\n**Status:** DONE · **branch:** `b`\n**diffstat:** x\n\n"
-                          "## Reproduced?\n**Review:** below the header binds nothing\n", encoding="utf-8")
+                          "## Reproduced?\n**Review:** below the header binds nothing\n", encoding="utf-8", newline="\n")
         check("arm: a finding before its round started is refused", refused(finding, f, 1, '{"file":"a"}'))
         start(f, 1, "b", "abc1234", "w9a-review-r1")
         check("arm: a second start of one round is refused", refused(start, f, 1, "b", "abc1234", "x"))
@@ -265,7 +265,7 @@ def self_test() -> int:
               plan_wave.parse_review("**Review:** FINDINGS 2 x abc1234") is None)
         check("arm: a placeholder does not parse", plan_wave.parse_review("**Review:** pending") is None)
         bad = tmp / "bad.jsonl"
-        bad.write_text('{"kind":"start","round":1}\nnot json\n', encoding="utf-8")
+        bad.write_text('{"kind":"start","round":1}\nnot json\n', encoding="utf-8", newline="\n")
         check("arm: a malformed line is an error, never skipped (a lost finding would read CLEAN)", refused(load, bad))
         bad.unlink()
         s = summary([tmp])

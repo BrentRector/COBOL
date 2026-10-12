@@ -278,7 +278,7 @@ def main() -> int:
 
     ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
     tmp = ARTIFACT.with_suffix(".json.tmp")
-    tmp.write_text(render(doc), encoding="utf-8")
+    tmp.write_text(render(doc), encoding="utf-8", newline="\n")
     tmp.replace(ARTIFACT)
     print(summary)
     print(f"\nwrote {ARTIFACT_REL}")

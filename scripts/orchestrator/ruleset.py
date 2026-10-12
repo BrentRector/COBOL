@@ -239,7 +239,7 @@ def apply(gh: Gh, committed: dict, owner_go: str, dry_run: bool, say: Callable[[
         if body is not None:
             fd, name = tempfile.mkstemp(suffix=".json", prefix="ruleset-apply-")
             tmp = pathlib.Path(name)
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as f:
                 json.dump(body, f)
             try:
                 rc, out, err = gh([*args, "--input", str(tmp)])

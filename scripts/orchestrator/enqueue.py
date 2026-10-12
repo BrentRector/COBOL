@@ -311,7 +311,7 @@ def record_blocked(branch: str, wt: pathlib.Path, line: str, say: Say,
     if rep is None:
         say(f"enqueue: no fix-lane report under {rdir} names {branch}; recorded nowhere but here: {line}")
         return
-    with (rdir / rep.name).open("a", encoding="utf-8") as f:
+    with (rdir / rep.name).open("a", encoding="utf-8", newline="\n") as f:
         f.write(f"\n{line}\n")
     say(f"enqueue: recorded in {rep.name}: {line}")
 
@@ -455,7 +455,7 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
         if bad:
             blocked(branch, wt, f"BLOCKED: enqueue — the {bad[0]} gate is not GREEN on {head[:12]}: {bad[1]}")
             return end(EXIT_GATE, f"GATE RED ({bad[0]}) on {head[:12]}")
-        mark.write_text(head + "\n", encoding="utf-8")
+        mark.write_text(head + "\n", encoding="utf-8", newline="\n")
     # 4. Main again (it moves while a branch gates: R1-2), the DEVLOG stamp, the queue.
     for attempt in range(1, CATCH_UP + 1):
         if failed := fetch_main(wt):
@@ -468,7 +468,7 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
         if not title:
             return end(6, "NO ENTRY — the branch adds no single stamped DEVLOG entry to title its pull request")
         body_file = pathlib.Path(_git(wt, "rev-parse", "--absolute-git-dir").stdout.strip()) / "enqueue-pr-body.md"
-        body_file.write_text(body, encoding="utf-8")
+        body_file.write_text(body, encoding="utf-8", newline="\n")
         rc = queue(wt, title, str(body_file), gh=gh, state=state,
                    checks=lambda sha, b: checks(wt, sha, b),
                    measure=(lambda b, n: measure(wt, b, n)) if measure else None, say=say)
@@ -509,16 +509,16 @@ def self_test() -> int:
         origin, wt = root / "origin.git", root / "wt"
         sh(root, "init", "--quiet", "--bare", "-b", "main", str(origin))
         sh(root, "init", "--quiet", "-b", "main", str(wt))
-        (wt / "a.txt").write_text("one", encoding="utf-8")
+        (wt / "a.txt").write_text("one", encoding="utf-8", newline="\n")
         sh(wt, "add", "a.txt")
         sh(wt, "commit", "--quiet", "-m", "base")
         sh(wt, "remote", "add", "origin", str(origin))
         sh(wt, "push", "--quiet", "origin", "main")
         sh(wt, "switch", "--quiet", "-c", "land-train")
-        (wt / "a.txt").write_text("two", encoding="utf-8")
+        (wt / "a.txt").write_text("two", encoding="utf-8", newline="\n")
         sh(wt, "commit", "--quiet", "-am", "the landing")
         body = root / "body.txt"
-        body.write_text("forensic message", encoding="utf-8")
+        body.write_text("forensic message", encoding="utf-8", newline="\n")
 
         def fake_gh(open_prs: list[str], log: list[list[str]], fail: str = "") -> Gh:
             def gh(args: list[str]) -> tuple[int, str, str]:
@@ -572,7 +572,7 @@ def self_test() -> int:
                and log[2] == ["pr", "merge", "17", "--auto"] and lines[-1].startswith("ENQUEUED pr=17 sha=" + head),
                f"rc={rc} pushed={pushed} log={log} last={lines[-1:]}")
 
-        (wt / "a.txt").write_text("three", encoding="utf-8")
+        (wt / "a.txt").write_text("three", encoding="utf-8", newline="\n")
         sh(wt, "commit", "--quiet", "--amend", "-am", "the landing, rebased")   # the branch moves: a forced push
         log = []
         rc = queue(wt, "Train 9: subject", str(body), gh=fake_gh(prs, log), state=active, checks=passing,
@@ -608,7 +608,7 @@ def self_test() -> int:
                and rc_refused == EXIT_QUEUE_NOT_ACTIVE, f"{rc_ok} {seen_m} {rc_broken} {warn} {rc_refused}")
 
         sh(wt, "switch", "--quiet", "main")
-        (wt / "b.txt").write_text("main moved", encoding="utf-8")
+        (wt / "b.txt").write_text("main moved", encoding="utf-8", newline="\n")
         sh(wt, "add", "b.txt")
         sh(wt, "commit", "--quiet", "-m", "main moves")
         sh(wt, "push", "--quiet", "origin", "main")
@@ -653,16 +653,16 @@ def self_test() -> int:
         mig = root / "mig"
         sh(root, "init", "--quiet", "-b", "main", str(mig))
         hist = {10: "## Entry 10 — 2026-03-01 — oldest\n\nold body\n\n", 11: "## Entry 11 — 2026-03-02 — older\n\nb\n\n"}
-        (mig / "DEVLOG.md").write_text("# Log\n\n" + hist[11] + hist[10], encoding="utf-8")
+        (mig / "DEVLOG.md").write_text("# Log\n\n" + hist[11] + hist[10], encoding="utf-8", newline="\n")
         sh(mig, "add", "DEVLOG.md")
         sh(mig, "commit", "--quiet", "-m", "the monolith")
         sh(mig, "switch", "--quiet", "-c", "migrating")
         sh(mig, "rm", "--quiet", "DEVLOG.md")
         (mig / "DEVLOG").mkdir()
-        (mig / "DEVLOG" / "0010-oldest.md").write_text(hist[10], encoding="utf-8")
-        (mig / "DEVLOG" / "0011-older.md").write_text(hist[11], encoding="utf-8")
+        (mig / "DEVLOG" / "0010-oldest.md").write_text(hist[10], encoding="utf-8", newline="\n")
+        (mig / "DEVLOG" / "0011-older.md").write_text(hist[11], encoding="utf-8", newline="\n")
         (mig / "DEVLOG" / "0012-pb7-the-migration.md").write_text(
-            "## Entry 12 — 2026-10-12 09:00 PDT — PB7: the migration\n\nWhy it moved.\n", encoding="utf-8")
+            "## Entry 12 — 2026-10-12 09:00 PDT — PB7: the migration\n\nWhy it moved.\n", encoding="utf-8", newline="\n")
         sh(mig, "add", "DEVLOG")
         sh(mig, "commit", "--quiet", "-m", "split the log")
         mig_title, mig_body = pull_request_text(mig, "main", "migrating")
@@ -675,10 +675,10 @@ def self_test() -> int:
         sh(wt, "reset", "--quiet", "--hard", "origin/main")
         lw = root / "fix-wt"
         sh(wt, "worktree", "add", "--quiet", "-b", "fix", str(lw), "main")
-        (lw / "c.txt").write_text("the fix", encoding="utf-8")
+        (lw / "c.txt").write_text("the fix", encoding="utf-8", newline="\n")
         sh(lw, "add", "c.txt")
         sh(lw, "commit", "--quiet", "-m", "the fix")
-        (wt / "d.txt").write_text("main moves again", encoding="utf-8")
+        (wt / "d.txt").write_text("main moves again", encoding="utf-8", newline="\n")
         sh(wt, "add", "d.txt")
         sh(wt, "commit", "--quiet", "-m", "main moves again")
         sh(wt, "push", "--quiet", "origin", "main")
@@ -692,7 +692,7 @@ def self_test() -> int:
                     for pending in (w / "DEVLOG").glob("pending-*.md"):
                         pending.unlink()
                     (w / "DEVLOG" / "0042-pb1-the-fix.md").write_text(
-                        "## Entry 42 — 2026-10-11 14:00 PDT — PB1: the fix\n\nWhy it was wrong.\n", encoding="utf-8")
+                        "## Entry 42 — 2026-10-11 14:00 PDT — PB1: the fix\n\nWhy it was wrong.\n", encoding="utf-8", newline="\n")
                     sh(w, "add", "DEVLOG")
                     sh(w, "commit", "--quiet", "-m", "DEVLOG 42: stamp the entry")
                 return 0
@@ -715,18 +715,18 @@ def self_test() -> int:
 
         def main_moves(name: str, text: str) -> None:
             """Another landing reaches main (the queue merged it): a commit on origin's main."""
-            (wt / name).write_text(text, encoding="utf-8")
+            (wt / name).write_text(text, encoding="utf-8", newline="\n")
             sh(wt, "add", name)
             sh(wt, "commit", "--quiet", "-m", f"main moves: {name}")
             sh(wt, "push", "--quiet", "origin", "main")
 
         def own_commit(name: str) -> str:
-            (lw / name).write_text(f"the branch's {name}", encoding="utf-8")
+            (lw / name).write_text(f"the branch's {name}", encoding="utf-8", newline="\n")
             sh(lw, "add", name)
             sh(lw, "commit", "--quiet", "-m", f"the branch's {name}")
             return sh(lw, "rev-parse", "HEAD")
 
-        (lw / "stray.txt").write_text("uncommitted", encoding="utf-8")
+        (lw / "stray.txt").write_text("uncommitted", encoding="utf-8", newline="\n")
         ran: list[int] = []
         rc_dirty = run_land(gates=gates_of(green, ran))
         (lw / "stray.txt").unlink()
@@ -734,7 +734,7 @@ def self_test() -> int:
                rc_dirty == 2 and not ran and sh(lw, "rev-parse", "HEAD") == fix_tip
                and lines[-1].startswith(VERDICT + "REFUSED"), f"{rc_dirty} {lines[-1:]}")
 
-        (lw / "d.txt").write_text("the branch's own d", encoding="utf-8")       # main added d.txt too: a conflict
+        (lw / "d.txt").write_text("the branch's own d", encoding="utf-8", newline="\n")       # main added d.txt too: a conflict
         sh(lw, "add", "d.txt")
         sh(lw, "commit", "--quiet", "-m", "a clash")
         clash_tip = sh(lw, "rev-parse", "HEAD")
@@ -816,7 +816,7 @@ def self_test() -> int:
         sh(wt, "fetch", "--quiet", "origin")
         rw = root / "rev-wt"
         sh(wt, "worktree", "add", "--quiet", "-b", "rev", str(rw), "origin/main")
-        (rw / "r.txt").write_text("the reviewed work", encoding="utf-8")
+        (rw / "r.txt").write_text("the reviewed work", encoding="utf-8", newline="\n")
         sh(rw, "add", "r.txt")
         sh(rw, "commit", "--quiet", "-m", "the reviewed work")
         rdir = root / "reports"
@@ -826,11 +826,11 @@ def self_test() -> int:
         def stamp_report(verdict: str) -> None:
             tail = " 1 w9a-review-r1 {} f.jsonl" if verdict == "FINDINGS" else " w9a-review-r1 {}"
             report.write_text(f"Status: DONE\n**Review:** {verdict}{tail.format(sh(rw, 'rev-parse', 'HEAD'))}\n"
-                              f"Branch: rev\n\n## Rows\n", encoding="utf-8")
+                              f"Branch: rev\n\n## Rows\n", encoding="utf-8", newline="\n")
         stamp_report("CLEAN")
         base_ref = "refs/remotes/origin/main"
         at_review = review_gate("rev", rw, base_ref, rdir)
-        (wt / "m.txt").write_text("main moves after the review", encoding="utf-8")
+        (wt / "m.txt").write_text("main moves after the review", encoding="utf-8", newline="\n")
         sh(wt, "switch", "--quiet", "main")
         sh(wt, "add", "m.txt")
         sh(wt, "commit", "--quiet", "-m", "main moves after the review")
@@ -838,7 +838,7 @@ def self_test() -> int:
         sh(rw, "fetch", "--quiet", "origin")
         sh(rw, "merge", "--quiet", "--no-edit", base_ref)
         (rw / "DEVLOG").mkdir()
-        (rw / "DEVLOG" / "pending-rev.md").write_text("## PB1: rev\n\nWhy.\n", encoding="utf-8")
+        (rw / "DEVLOG" / "pending-rev.md").write_text("## PB1: rev\n\nWhy.\n", encoding="utf-8", newline="\n")
         sh(rw, "add", "DEVLOG")
         sh(rw, "commit", "--quiet", "-m", "the entry")
         mechanical_only = review_gate("rev", rw, base_ref, rdir)
@@ -846,18 +846,18 @@ def self_test() -> int:
                "DEVLOG-only commit is still reviewed",
                at_review is None and mechanical_only is None, f"{at_review} / {mechanical_only}")
 
-        (wt / "m2.txt").write_text("main moves again", encoding="utf-8")
+        (wt / "m2.txt").write_text("main moves again", encoding="utf-8", newline="\n")
         sh(wt, "add", "m2.txt")
         sh(wt, "commit", "--quiet", "-m", "main moves again")
         sh(wt, "push", "--quiet", "origin", "main")
         sh(rw, "fetch", "--quiet", "origin")
         sh(rw, "merge", "--quiet", "--no-commit", base_ref)
-        (rw / "r.txt").write_text("a hand edit inside the merge", encoding="utf-8")
+        (rw / "r.txt").write_text("a hand edit inside the merge", encoding="utf-8", newline="\n")
         sh(rw, "add", "r.txt")
         sh(rw, "commit", "--quiet", "--no-edit")
         hand_merge = review_gate("rev", rw, base_ref, rdir) or ""
         sh(rw, "reset", "--quiet", "--hard", "HEAD~1")
-        (rw / "fix.txt").write_text("a finisher's fix", encoding="utf-8")
+        (rw / "fix.txt").write_text("a finisher's fix", encoding="utf-8", newline="\n")
         sh(rw, "add", "fix.txt")
         sh(rw, "commit", "--quiet", "-m", "a finisher's fix")
         ran, notes[:] = [], []

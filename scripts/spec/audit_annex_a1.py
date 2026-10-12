@@ -296,7 +296,7 @@ def self_test() -> int:
         fake = pathlib.Path(td) / 'Cobol.Net.Fake' / 'X.cs'
         fake.parent.mkdir(parents=True)
         fake.write_text('// precision (implementor item 999)\n// and the real one (implementor item 2)\n',
-                        encoding='utf-8')
+                        encoding='utf-8', newline="\n")
         sweep_cases = [
             ('a citation of a nonexistent A.1 item is caught',
              sweep_source_citations(register, {2: 'x'}, pathlib.Path(td)), 'no item 999'),

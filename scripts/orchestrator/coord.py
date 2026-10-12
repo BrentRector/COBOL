@@ -249,7 +249,7 @@ def _self_test() -> int:
             if content is None:
                 lock.unlink(missing_ok=True)
             else:
-                lock.write_text(content if isinstance(content, str) else json.dumps(content), encoding="utf-8")
+                lock.write_text(content if isinstance(content, str) else json.dumps(content), encoding="utf-8", newline="\n")
             got, why = loop_state(d)
             if got != want:
                 fails.append(f"lock {content!r}: want {want}, got {got} ({why})")

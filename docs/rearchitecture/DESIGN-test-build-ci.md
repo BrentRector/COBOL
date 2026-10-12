@@ -1558,8 +1558,9 @@ can never redirect it into the real repository. And the script snapshots the rea
 `core.worktree` before the legs and is RED (`repository-written`) when either changed. (Not the worktree list:
 other agents add and remove worktrees of the shared repository while it runs.)
 
-**Line endings.** `.gitattributes` keeps `*.sh` LF. Under `core.autocrlf=true` a fresh Windows worktree otherwise
-checks the script out CRLF, and bash dies at its first line (`set: -: invalid option`).
+**Line endings.** Every tracked text file is LF on every checkout (`.gitattributes` `* text=auto eol=lf`, kb/Work
+PB3029, §3.17.4). Before it, `core.autocrlf=true` checked a script out CRLF in every fresh Windows worktree, and bash
+died at its first line (`set: -: invalid option`).
 
 **Verdict.** One `=== LINUX GATE: GREEN|RED|NOT RUN ===` line naming the HEAD it tested. NOT RUN is never green.
 
@@ -1789,9 +1790,19 @@ demand and not committed.
   base's monolith too, header by header, so the one landing that migrates the log cannot drop an entry main has), run
   by the landing checks (`enqueue.py checks`, run by `enqueue.py land`) and by CI's `audits` job on every pull request and merge group. Its tree half (`lint`) also runs
   over the repository's own `DEVLOG/` in `devlog.py --self-test`, so every gate holds the whole log to it. **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
-  format"):** LF everywhere — `.gitattributes` `* text=auto eol=lf`, `merge.renormalize`, one normalization landing,
-  tools write LF, a drift check refuses a CR in any tracked text file; the index is already LF for 15,234 files, so the
-  change is what the WORKING TREE shows each OS, and the entry files below are written LF. A ONE-TIME migration script
+  format"):** LF everywhere. `.gitattributes` opens with `* text=auto eol=lf`, so git stores and checks out every text
+  file LF on every OS; a file that must keep its bytes is declared `-text` there with its reason. One normalization
+  landing made every blob LF (the index was already LF for 15,234 files: what changed is what each OS's WORKING TREE
+  shows). `scripts/line_endings.py --check` — a gate audit, CI's `audits` job and a `windows-build-test` step —
+  refuses a CR in a tracked text file's blob or checkout and a Python text-mode write that does not state `newline=`;
+  `--fix` rewrites a checkout made before the rule and then re-states the index entry of every file `git diff-files`
+  lists whose cleaned content (`git hash-object --stdin-paths`) IS the staged blob and whose working-tree mode IS the
+  staged mode, with a plain `git update-index` (`refresh_index`), so `git status` reads the rewritten tree clean while
+  a real edit or an unstaged mode change stays unstaged. Not `git update-index --refresh`: it trusts the stale
+  recorded size and answers "needs update" for exactly these files (git's `ie_modified`); `--fix-writers` adds `newline="\n"`
+  to a new writer. The PowerShell generators of tracked files write through `scripts/LfText.psm1` (`Set-LfContent`);
+  the C# regeneration modes already wrote `\n`. `merge.renormalize` is the documented per-clone setting
+  (CONTRIBUTING.md). The entry files below are written LF. A ONE-TIME migration script
   (`scripts/devlog_migrate.py`, deleted by the landing that runs it last, on main's `DEVLOG.md` after its final rebase,
   and which writes the history's range into `DEVLOG/README.md`) split every entry of the 7.1 MB
   mixed-CRLF `DEVLOG.md` into files with LF line endings (PB3029), PROVED by rendering them byte-identical to the

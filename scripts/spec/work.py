@@ -152,7 +152,7 @@ def migrate() -> int:
             **harm_fields(flags),
         }
         item["blocked"] = bool(item["blocked_by"])
-        (WORK / f'{item["id"]}.md').write_text(write_note(item, "\n" + body.strip() + "\n"), encoding="utf-8")
+        (WORK / f'{item["id"]}.md').write_text(write_note(item, "\n" + body.strip() + "\n"), encoding="utf-8", newline="\n")
         written += 1
 
     # ── 2. The 17 §11 analyses. ───────────────────────────────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ def migrate() -> int:
             **harm_fields(["process"]),
         }
         body = "\n" + "\n".join(f"- {c}" for c in [title] + cells if c) + "\n"
-        (WORK / f'{item["id"]}.md').write_text(write_note(item, body), encoding="utf-8")
+        (WORK / f'{item["id"]}.md').write_text(write_note(item, body), encoding="utf-8", newline="\n")
         written += 1
 
     # ── 3. The residue findings, finally itemised. ────────────────────────────────────────────────────────────
@@ -199,7 +199,7 @@ def migrate() -> int:
             }
             (WORK / f'{item["id"]}.md').write_text(
                 write_note(item, f"\n{p}\n\n> Migrated from the fix queue's RESIDUE block, which never itemised "
-                                 f"these — so no work list could see them.\n"), encoding="utf-8")
+                                 f"these — so no work list could see them.\n"), encoding="utf-8", newline="\n")
             written += 1
         declared = int(rm.group("n"))
         if declared != len(parts):
@@ -212,16 +212,16 @@ def migrate() -> int:
                 f"**{len(parts)}**. The missing {declared - len(parts)} were never written down, so they cannot be "
                 f"worked and cannot be verified as already fixed. Reconcile against the batch-4 evidence ledger "
                 f"(`docs/rearchitecture/evidence/PHASE-B-15.32-15.44-findings.md`) and either itemise or retire "
-                f"the count.\n"), encoding="utf-8")
+                f"the count.\n"), encoding="utf-8", newline="\n")
             written += 1
     print(f"migrated {written} work items into {WORK.relative_to(REPO)}")
     return 0
 
 
-#: The frontmatter block: everything between the opening `---` line and the closing one. `\r?\n` because every
-#: note in the register is CRLF in the working tree (`core.autocrlf`) and LF in the object store, and the C# twin
-#: reads the file's BYTES — a reader that hard-codes one of the two answers "this is not a note" for a whole
-#: register on the other checkout.
+#: The frontmatter block: everything between the opening `---` line and the closing one. The register is LF
+#: (kb/Work PB3029); `\r?\n` because a reader that hard-codes LF would answer "this is not a note" for a note a
+#: Windows tool wrote CRLF — SILENTLY — where the line-endings audit (scripts/line_endings.py) names it. The C#
+#: twin (tests/_shared/WorkRegister.cs) reads the same bytes the same way.
 FRONT = re.compile(r"\A---\r?\n(?P<body>.*?)\r?\n---[ \t]*(?:\r?\n|\Z)", re.S)
 #: A frontmatter key. Anything else on a line — a colon inside a title, a wrapped list's continuation — is not
 #: one. A VALUE is a list when it opens with `[`, whatever its key: list-ness is a property of the value, so a

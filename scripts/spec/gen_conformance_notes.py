@@ -173,7 +173,7 @@ def write_view(rows: list[dict], notes: dict[str, str], out: pathlib.Path) -> in
         shutil.rmtree(out)
     out.mkdir(parents=True)
     for name, text in notes.items():
-        (out / name).write_text(text, encoding="utf-8")
+        (out / name).write_text(text, encoding="utf-8", newline="\n")
 
     total = len(rows)
     gaps = sum(1 for r in rows if r["state"] == "GAP")

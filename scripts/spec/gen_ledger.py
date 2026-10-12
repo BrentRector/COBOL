@@ -523,7 +523,7 @@ def write_trend(series: list[dict]) -> None:
     doc = json.loads(TREND.read_text(encoding="utf-8")) if TREND.exists() else {}
     doc["points"] = series
     TREND.parent.mkdir(parents=True, exist_ok=True)
-    TREND.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    TREND.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
 
 
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -1292,7 +1292,7 @@ def self_test() -> int:
     try:
         TREND = tmp / "trend.json"
         TREND.write_text(json.dumps({"points": [{"sha": "0000000a", "date": "2026-10-09", "gap": 2, "closed": 1,
-                                                 "dns": 0, "label": "x", "battery": None}]}), encoding="utf-8")
+                                                 "dns": 0, "label": "x", "battery": None}]}), encoding="utf-8", newline="\n")
         inv = {"gap": 2, "closed": 1, "verdict": collections.Counter()}
         bat = {"n": "1", "sha": "ffffffff"}
         reg = ledger_plan.register_counts(items, {"R-1", "R-2"})
@@ -1311,12 +1311,12 @@ def self_test() -> int:
         REPO = tmp / "repo"
         (REPO / "kb" / "Work").mkdir(parents=True)
         (REPO / INVENTORY_REL).parent.mkdir(parents=True)
-        (REPO / INVENTORY_REL).write_text(json.dumps(rows), encoding="utf-8")
+        (REPO / INVENTORY_REL).write_text(json.dumps(rows), encoding="utf-8", newline="\n")
         fm = ("---\ntitle: \"{i} — x\"\nid: {i}\nkind: defect\nstatus: {s}\nwrong_answer: true\ncrashes: false\n"
               "process_only: false\ncluster: []\nblocked_by: []\ninventory_rows: [\"R-1\"]\n---\n\nbody\n")
-        (REPO / "kb" / "Work" / "PB1.md").write_text(fm.format(i="PB1", s="open"), encoding="utf-8")
-        (REPO / "kb" / "Work" / "PB2.md").write_text(fm.format(i="PB2", s="landed"), encoding="utf-8")
-        (REPO / "kb" / "Work" / "README.md").write_text("no frontmatter\n", encoding="utf-8")
+        (REPO / "kb" / "Work" / "PB1.md").write_text(fm.format(i="PB1", s="open"), encoding="utf-8", newline="\n")
+        (REPO / "kb" / "Work" / "PB2.md").write_text(fm.format(i="PB2", s="landed"), encoding="utf-8", newline="\n")
+        (REPO / "kb" / "Work" / "README.md").write_text("no frontmatter\n", encoding="utf-8", newline="\n")
         for args in (("init", "-q", "-b", "main"), ("add", "."), ("commit", "-q", "-m", "fixture")):
             subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=REPO, check=True,
                            capture_output=True)
@@ -1394,7 +1394,7 @@ def main() -> int:
     else:
         print(f"trend  : unchanged — {len(pts)} points, last {pts[-1]['sha'] if pts else '—'}")
     a.out.parent.mkdir(parents=True, exist_ok=True)
-    a.out.write_text(text, encoding="utf-8")
+    a.out.write_text(text, encoding="utf-8", newline="\n")
     print(f"wrote  : {a.out} ({len(text):,} bytes)")
     import account  # noqa: PLC0415
     import ledger_state  # noqa: PLC0415  (imports this module for STAMP_PATHS; loaded only here, after a render)

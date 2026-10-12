@@ -58,7 +58,7 @@ def replace_text(path: Path, text: str) -> None:
     The temp file is named by process AND thread, so two threads of one process replacing the same file never write
     one temp file (the self-test runner's workers record passes from threads, kb/Work PB2914)."""
     tmp = path.with_name(f"{path.name}.{os.getpid()}.{threading.get_ident()}.tmp")
-    tmp.write_text(text, encoding="utf-8")
+    tmp.write_text(text, encoding="utf-8", newline="\n")
     try:
         retry(lambda: os.replace(tmp, path))
     except BaseException:

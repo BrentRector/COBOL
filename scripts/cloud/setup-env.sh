@@ -70,7 +70,7 @@ wait "$APT_PID" 2>/dev/null || true
 #    → python3.11 sits AHEAD of /usr/bin on PATH (the first smoke session, 2026-09-24, failed 3 Unit tests on it: the
 #    scripts use PEP 701 f-strings). uv comes from PyPI (default allowlist) and installs a standalone CPython 3.14;
 #    fallback = the newest /usr/bin/python3.N with N >= 12. Both names in /usr/local/bin point at the result, and the
-#    repo's only third-party imports (PyMuPDF for the spec renderers, fontTools) go into it. ─────────────────────────
+#    repo's only third-party imports (PyMuPDF for the spec renderers, fontTools, PyYAML for tooling_check.py) go into it. ─────────────────────────
 PYVER=3.14
 PY=""
 if python3 -m pip install -q --break-system-packages --root-user-action=ignore uv >/tmp/uv-install.log 2>&1 \
@@ -86,8 +86,8 @@ fi
 if [ -n "$PY" ]; then
   ln -sf "$PY" /usr/local/bin/python && ln -sf "$PY" /usr/local/bin/python3 && log "python -> $PY"
   python -m pip install -q --break-system-packages --root-user-action=ignore --no-warn-script-location \
-      PyMuPDF fonttools >/tmp/pip-deps.log 2>&1 \
-    && log "PyMuPDF + fontTools ok" || { log "WARN: pip deps failed"; tail -5 /tmp/pip-deps.log; }
+      PyMuPDF fonttools pyyaml >/tmp/pip-deps.log 2>&1 \
+    && log "PyMuPDF + fontTools + PyYAML ok" || { log "WARN: pip deps failed"; tail -5 /tmp/pip-deps.log; }
 fi
 
 cat > /etc/profile.d/dotnet.sh <<EOF

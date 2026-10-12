@@ -130,6 +130,11 @@ py="$(command -v python3 || command -v python)"
 if [ -z "$py" ]; then
   echo "=== LINUX GATE: NOT RUN (no python in this Linux environment — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
 fi
+# tooling_check.py's self-test parses every agent and skill frontmatter with PyYAML (kb/Work PB3097, branch review R3-1):
+# an interpreter without it is NOT RUN with the setup command, never a RED self-test leg.
+if ! "$py" -c 'import yaml' >/dev/null 2>&1; then
+  echo "=== LINUX GATE: NOT RUN ($py has no PyYAML — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
+fi
 if [ ! -f Cobol.Net.sln ]; then
   echo "=== LINUX GATE: NOT RUN (not at a repository root: $(pwd)) ==="; exit 2
 fi

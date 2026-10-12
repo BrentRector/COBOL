@@ -157,7 +157,7 @@ def main() -> int:
     if not args.apply:
         print("\n(report only — pass --apply to write)")
         return 0
-    SPEC_MD.write_text("\n".join(out), encoding="utf-8")
+    SPEC_MD.write_text("\n".join(out), encoding="utf-8", newline="\n")
     print(f"applied to {SPEC_MD.relative_to(REPO)}")
     return 0
 

@@ -476,7 +476,7 @@ class GateSlots:
                 raise RuntimeError(f"{seq_file} holds {text!r}, not a ticket number; delete it when no gate is waiting")
             seq = int(text) + 1
             tmp = seq_file.with_suffix(".tmp")
-            tmp.write_text(str(seq), encoding="ascii")
+            tmp.write_text(str(seq), encoding="ascii", newline="\n")
             os.replace(tmp, seq_file)
             fd = _open(self.directory / f"ticket-{seq}.lock")
             if not _try_lock(fd):
@@ -822,7 +822,7 @@ def self_test() -> int:
         """A settings file written by hand — the shapes the one writer refuses to produce."""
         d = slot_dir(repo)
         d.mkdir(parents=True, exist_ok=True)
-        (d / SETTINGS_FILE).write_text(body, encoding="utf-8")
+        (d / SETTINGS_FILE).write_text(body, encoding="utf-8", newline="\n")
 
     def wait_for(tag: Path) -> str:
         return "\n".join([f"a=pathlib.Path({str(alive)!r}); t=pathlib.Path({str(tag)!r})",

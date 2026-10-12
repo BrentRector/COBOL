@@ -17,9 +17,9 @@ namespace CobolNet.Tests.Conformance;
 public sealed class OoSpineTests
 {
     /// <summary>A driver + one class with the given OBJECT-paragraph procedure division body.</summary>
-    // Raw-string source is CRLF on a Windows checkout (autocrlf) but LF on Linux — normalize to LF so the
-    // `.Replace("… \n …")` object-data injections used below match on BOTH CI platforms (the Windows job failed a
-    // load-bearing object-WS injection when this was CRLF; DEVLOG 641). The compiler reads LF source fine.
+    // The raw-string source is LF on every checkout (`.gitattributes` `* text=auto eol=lf`, kb/Work PB3029), so the
+    // `.Replace("… \n …")` object-data injections used below match on both CI platforms. (Before PB3029 a Windows
+    // checkout made it CRLF and the Windows job failed a load-bearing object-WS injection; DEVLOG 641.)
     private static string DriverAndClass(string pid, string cls, string driverBody, string classBody) => ($$"""
         IDENTIFICATION DIVISION.
         PROGRAM-ID. {{pid}}.
@@ -48,7 +48,7 @@ public sealed class OoSpineTests
         {{classBody}}
         END OBJECT.
         END CLASS {{cls}}.
-        """).Replace("\r\n", "\n");
+        """);
 
     private static (bool Ok, string Stdout, string Detail) CompileAndRun(string source, int edition = 2002)
     {
@@ -430,7 +430,7 @@ public sealed class OoSpineTests
             OBJECT.
             END OBJECT.
             END CLASS GFCLS.
-            """).Replace("\r\n", "\n")), "COBOLNET1520");
+            """)), "COBOLNET1520");
 
     /// <summary>M2-OO-1i — the GLOBAL clause is barred in an INSTANCE (object) definition too (ISO §13.18.27.3
     /// SR4). An OBJECT <c>FD … IS GLOBAL</c> is COBOLNET1520. (The OBJECT file itself is legal — inc 4, a
@@ -464,7 +464,7 @@ public sealed class OoSpineTests
             PROCEDURE DIVISION.
             END OBJECT.
             END CLASS GOCLS.
-            """).Replace("\r\n", "\n")), "COBOLNET1520");
+            """)), "COBOLNET1520");
 
     /// <summary>kb/Work PB369 — §13.18.27.3 SR4 bars GLOBAL on a REPORT description entry too (SR1 e) is the
     /// third entry kind it names). The RD GLOBAL staging used to answer this shape with "not yet implemented";
@@ -501,7 +501,7 @@ public sealed class OoSpineTests
             PROCEDURE DIVISION.
             END OBJECT.
             END CLASS GRCLS.
-            """).Replace("\r\n", "\n")), "COBOLNET1520");
+            """)), "COBOLNET1520");
 
     /// <summary>M2-OO-1i review — §13.18.27.3 SR4 bars GLOBAL on a DATA item too (not just an FD) in a factory /
     /// instance / method definition. A GLOBAL level-01 in an OBJECT WORKING-STORAGE is COBOLNET1520 (was silently
@@ -530,7 +530,7 @@ public sealed class OoSpineTests
             PROCEDURE DIVISION.
             END OBJECT.
             END CLASS GDCLS.
-            """).Replace("\r\n", "\n")), "COBOLNET1520");
+            """)), "COBOLNET1520");
 
     /// <summary>M2-OO-1i review — a GLOBAL data item in a METHOD (here LINKAGE) is COBOLNET1520, superseding the
     /// old mislabeled COBOLNET0899 "not yet implemented": §13.18.27.3 SR4 makes GLOBAL spec-FORBIDDEN in a method,
@@ -595,7 +595,7 @@ public sealed class OoSpineTests
             END METHOD M.
             END OBJECT.
             END CLASS GKCLS.
-            """).Replace("\r\n", "\n"));
+            """));
         foreach (var (name, line) in new[] { ("KP", 7), ("KF", 19), ("KO", 26), ("KM", 31) })
             Assert.Contains(errors, e => e.Contains("COBOLNET1520") && e.Contains($"constant entry '{name}'")
                                          && e.Contains($"({line},"));
@@ -623,7 +623,7 @@ public sealed class OoSpineTests
             PROCEDURE DIVISION.
             END OBJECT.
             END CLASS GFRCLS.
-            """).Replace("\r\n", "\n"));
+            """));
         Assert.Contains(errors, e => e.Contains("COBOLNET1520") && e.Contains("file description entry 'GFR'"));
         Assert.Contains(errors, e => e.Contains("COBOLNET1520") && e.Contains("data description entry 'GFR-REC'"));
     }

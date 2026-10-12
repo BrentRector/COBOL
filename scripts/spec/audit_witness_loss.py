@@ -186,7 +186,7 @@ def run_history(args, schema) -> int:
             records.append(rec)
         pathlib.Path(args.restore_batch).write_text(
             json.dumps({"batch": "PB959-restore-owed-witnesses", "records": records}, indent=1,
-                       ensure_ascii=False) + "\n", encoding="utf-8")
+                       ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
         print(f"wrote {len(records)} restore record(s) → {args.restore_batch}")
     return 0
 

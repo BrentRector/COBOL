@@ -143,7 +143,7 @@ def main() -> int:
         return 0
 
     text = "\n".join(lines) + "\n"
-    SPEC.write_text(text, encoding="utf-8")
+    SPEC.write_text(text, encoding="utf-8", newline="\n")
 
     # Post-write assertions: none of the broken shapes may survive anywhere in the file.
     for shape in ("⌈⌊", "⌉⌋", "⌐⌐", "¬¬", "⌊⌊", "┘┘"):

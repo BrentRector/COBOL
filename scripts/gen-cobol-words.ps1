@@ -33,6 +33,7 @@
 # inconsistency — never silently emit a partial or inconsistent artifact.
 
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'LfText.psm1') -Force   # every tracked output is written LF (kb/Work PB3029)
 $repo       = Split-Path -Parent $PSScriptRoot
 $jsonIn     = Join-Path $repo 'tests/version-matrix/cobol-words.json'
 $reservedIn = Join-Path $repo 'tests/version-matrix/reserved-words.json'
@@ -254,7 +255,7 @@ for ($i = 0; $i -lt $gatedTokens.Count; $i++) {
 }
 [void]$sb.AppendLine('      ) { gatedDeclaration(TokenStream.LT(-1)); }')
 [void]$sb.AppendLine('    ;')
-Set-Content -LiteralPath $g4Out -Value $sb.ToString().TrimEnd() -Encoding utf8
+Set-LfContent -LiteralPath $g4Out -Value $sb.ToString().TrimEnd()
 
 # ---- 6. Emit CobolLexerWordSet.g.cs (the generated `partial class CobolLexer` holding _dataNameTokens) ----
 $cs = [System.Text.StringBuilder]::new()
@@ -285,7 +286,7 @@ foreach ($t in $subTrigTokens) { [void]$cs.AppendLine("        $t,") }
 foreach ($t in $gatedTokens) { [void]$cs.AppendLine("        $t,") }
 [void]$cs.AppendLine('    };')
 [void]$cs.AppendLine('}')
-Set-Content -LiteralPath $csOut -Value $cs.ToString().TrimEnd() -Encoding utf8
+Set-LfContent -LiteralPath $csOut -Value $cs.ToString().TrimEnd()
 
 # ---- 7. Report COUNTS ONLY (content-filter rule) ----
 $stats = [ordered]@{

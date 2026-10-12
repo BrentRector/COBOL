@@ -80,7 +80,7 @@ def main() -> int:
     for p in pages:
         sl, at = slice_for(lines, p)
         md = out / f"page-{p}.md"
-        md.write_text("\n".join(sl) + "\n", encoding="utf-8")
+        md.write_text("\n".join(sl) + "\n", encoding="utf-8", newline="\n")
         # render-spec-page names its output spec_p<N>.png
         png = out / f"spec_p{p}.png"
         meta = {
@@ -92,7 +92,7 @@ def main() -> int:
             "has_figure": any("Figure" in x or "figure notes" in x.lower() for x in sl),
             "anchors": [x for x in sl if x.startswith("<a id=")],
         }
-        (out / f"page-{p}.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
+        (out / f"page-{p}.json").write_text(json.dumps(meta, indent=1), encoding="utf-8", newline="\n")
         made.append(meta)
         if not sl:
             print(f"  ⚠ page {p}: NO markdown slice — anchor page-{p} not found (a missing anchor is itself a finding)")

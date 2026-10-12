@@ -28,7 +28,7 @@ MARKER="CCVS-DEFECT"
 FAILS=0
 
 # The declared allowance, read from the ONE manifest. Columns: name suite status chain-preds golden note.
-# `tr -d '\r'` because corpus.tsv is CRLF.
+# `tr -d '\r'`: corpus.tsv is LF (kb/Work PB3029), and a stray CR must never ride into a field.
 DECLARED=""
 if [ -f "$MANIFEST" ]; then
     DECLARED=$(tr -d '\r' < "$MANIFEST" | awk -F'\t' -v m="$MARKER" \

@@ -644,7 +644,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     def report(name: str, status: str, branch: str, head: str) -> pathlib.Path:
         p = rd / name
         p.write_text(f"# {name}\n\n**Status:** {status} · **branch:** `{branch}` · **HEAD:** `{head}`\n"
-                     f"**Review:** CLEAN r {head}\n\n## Rule\n", encoding="utf-8")
+                     f"**Review:** CLEAN r {head}\n\n## Rule\n", encoding="utf-8", newline="\n")
         os.utime(p, (1_900_000_000, 1_900_000_000))        # stamped long after: a file time would be the stamp's
         return p
     report("w1-PB1-report.md", "DONE", "b17", "aaaaaaa1")          # the implementer
@@ -655,7 +655,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     report("w1-PB5-report.md", "DONE", "b170", "fffffff6")         # a longer branch name
     report("w0-PB1-report.md", "DONE", "b16", "1111111a")          # PB1's EARLIER landing, merged into main (R1-1)
     report("w0-PB6-report.md", "DONE", "b17", "2222222b")          # a landed change under a reused branch name
-    (rd / "t1-lander-report.md").write_text("Status: LANDED\nBranch: b17\nHEAD: aaaaaaa9\n", encoding="utf-8")
+    (rd / "t1-lander-report.md").write_text("Status: LANDED\nBranch: b17\nHEAD: aaaaaaa9\n", encoding="utf-8", newline="\n")
     commits = {"aaaaaaa1": t("09:00"), "bbbbbbb2": t("09:50"), "ccccccc3": t("08:00"), "ddddddd4": t("07:00"),
                "eeeeeee5": t("23:00"), "fffffff6": t("06:00"), "aaaaaaa9": t("05:00"), "1111111a": t("01:00"),
                "2222222b": t("02:00")}
@@ -693,10 +693,10 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     for i, w in enumerate((100.5, 200.0)):
         d = wt / "TestResults" / "build-local" / f"run{i}"
         d.mkdir(parents=True)
-        (d / "verdict.json").write_text(json.dumps({"timings": {"wall_s": w}}), encoding="utf-8")
+        (d / "verdict.json").write_text(json.dumps({"timings": {"wall_s": w}}), encoding="utf-8", newline="\n")
     bad = wt / "TestResults" / "build-local" / "runbad"
     bad.mkdir()
-    (bad / "verdict.json").write_text("{}", encoding="utf-8")
+    (bad / "verdict.json").write_text("{}", encoding="utf-8", newline="\n")
     if local_gate(wt) != (300.5, 2) or local_gate(tmp / "nowhere") is not None:
         fails.append(f"{gate_arm}: {local_gate(wt)}")
     # complete
@@ -791,7 +791,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     written = fa.read_text(encoding="utf-8") if fa.exists() else ""
     again = freeze(tmp, say=lines.append, frozen=fz, first_after=fa)            # the first after-summary exists
     fa.unlink()
-    (tmp / RETIRED_TRAINS).write_text("{}" + chr(10), encoding="utf-8")
+    (tmp / RETIRED_TRAINS).write_text("{}" + chr(10), encoding="utf-8", newline="\n")
     differs = freeze(tmp, say=lines.append, frozen=fz, first_after=fa)          # the frozen copy would change
     if not (waits == 2 and first == 0 and again == 2 and differs == 2 and not fa.exists() and not quotes_missing
             and bytes([13]) not in fz.read_bytes() and "AFTER (merge queue" in written):

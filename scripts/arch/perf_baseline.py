@@ -245,7 +245,7 @@ def measure_bdn(work: str) -> dict:
     artifacts = os.path.join(work, "bdn")
     exe = release_exe(BENCH, "Cobol.Net.Benchmarks")
     log = os.path.join(work, "bdn.log")
-    with open(log, "w", encoding="utf-8") as fh:
+    with open(log, "w", encoding="utf-8", newline="\n") as fh:
         rc = subprocess.run([exe, "--filter", "*CompileBenchmarks*", "*GeneratedProgramBenchmarks*",
                              "--exporters", "json", "--artifacts", artifacts], cwd=ROOT, stdout=fh,
                             stderr=subprocess.STDOUT).returncode
@@ -310,7 +310,7 @@ def stage_programs(work: str) -> str:
             text, n = scaled_source(name, k)
             with open(os.path.join(case, name + ".cob"), "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)
-            with open(os.path.join(case, "LOOP-COUNT"), "w") as fh:
+            with open(os.path.join(case, "LOOP-COUNT"), "w", newline="\n") as fh:
                 fh.write(str(n))
             run_cmd([cobol, name + ".cob"], cwd=case)
     shutil.copy(os.path.join(PROGRAMS, "witnesses.tsv"), stage)
@@ -779,7 +779,7 @@ def main(argv: list[str]) -> int:
                        else os.path.join(EVIDENCE, f"{cond['product_commit'][:12]}.md"))
     os.makedirs(os.path.dirname(os.path.abspath(out)), exist_ok=True)
     # The raw measurement first, so nothing a long run measured is lost to a rendering fault.
-    with open(os.path.join(SCRATCH, f"{stamp}.json"), "w", encoding="utf-8") as fh:
+    with open(os.path.join(SCRATCH, f"{stamp}.json"), "w", encoding="utf-8", newline="\n") as fh:
         json.dump(record, fh, indent=1, sort_keys=True)
     with open(out, "w", encoding="utf-8", newline="\n") as fh:
         fh.write(render(record))

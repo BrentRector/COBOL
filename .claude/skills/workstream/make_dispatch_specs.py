@@ -59,7 +59,7 @@ def main():
         # Keyed on the FULL letter, lower-cased: the workflow opens msg-w<wave>-<letter.toLowerCase()>.txt, and a
         # multi-character letter (a same-file successor such as "V2") must not collide with another group's file.
         p = scratch / f"msg-w{cfg['wave']}-{g['letter'].lower()}.txt"
-        p.write_text(body, encoding='utf-8')
+        p.write_text(body, encoding='utf-8', newline="\n")
         out.append(str(p))
         print('wrote', p)
     return subprocess.call([sys.executable, str(HERE / 'check_practices.py'), sys.argv[1], *out])
