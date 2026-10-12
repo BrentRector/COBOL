@@ -130,6 +130,17 @@ public sealed class BoundaryGroupCorrespondenceTests
     }
 
     [Fact]
+    public void TheOneRunShapeOfAWidth_IsOneArray_SoTheBoundarysCachesHitOnEveryCall()
+    {
+        // kb/Work PB2690 (performance): the pair plans and geometries are keyed by the atom array's REFERENCE, and the
+        // table-less fixed group's shape used to be built afresh on every CALL — a miss and a new entry each time.
+        Assert.Same(GroupCompatibility.FixedRun(7), GroupCompatibility.FixedRun(7));
+        Assert.NotSame(GroupCompatibility.FixedRun(7), GroupCompatibility.FixedRun(8));
+        Assert.Equal((GroupAtomKind.Fixed, 7, 7), (GroupCompatibility.FixedRun(7)[0].Kind, GroupCompatibility.FixedRun(7)[0].Bytes,
+            GroupCompatibility.FixedRun(7)[0].Chars));
+    }
+
+    [Fact]
     public void AFixedGroupArgument_ReachesADynamicTableOfVariableLengthElements_AndItsStoresComeBack()
     {
         var caller = ManagedPointer<string>.Cell("habcdef");
@@ -156,6 +167,8 @@ public sealed class BoundaryGroupCorrespondenceTests
         // element has one, so the fixed table's second occurrence is spaces (§14.6.9.2).
         Assert.Equal("habcef ", formal.Value);
         // A store reaches only the storage the formal overlays: the argument's IT keeps its three occurrences, so "d" survives.
+        // The store of "G" into the second element's second IF occurrence is a receiving reference past that element's IT
+        // capacity of one, so §8.5.1.9.3 creates the occurrence (kb/Work PB2690).
         formal.Value = "HABCEFG";
         var stored = vg.Value!.ElementCarriersAt(0);
         Assert.Equal("H", vg.Value.Fixed);
@@ -163,7 +176,40 @@ public sealed class BoundaryGroupCorrespondenceTests
         Assert.Equal("A", stored[0].Fixed);
         Assert.Equal(["BCd"], stored[0].Dynamic);
         Assert.Equal("E", stored[1].Fixed);
-        Assert.Equal(["F"], stored[1].Dynamic);
+        Assert.Equal(["FG"], stored[1].Dynamic);
+        // A store that leaves the second occurrence as the view showed it (spaces) creates nothing.
+        vg.Value = new CobolVarGroup("h", [""], [[new("a", ["bcd"]), new("e", ["f"])]]);
+        formal.Value = "HABCEF ";
+        Assert.Equal(["F"], vg.Value.ElementCarriersAt(0)[1].Dynamic);
+    }
+
+    /// <summary>kb/Work PB2690 — a FIXED table of the formal stored over a dynamic-capacity table of the argument, past the
+    /// argument's current capacity. §14.2.3 GR8 makes the formal occupy the argument's storage, so the store is a receiving
+    /// reference with a subscript that "exceeds the current capacity of the table" and §8.5.1.9.3 creates the element and
+    /// raises the capacity "to the value given by the subscript"; the boundary sees only the finished view, so a store is
+    /// recognised by its effect (anything but the space fill the view showed).</summary>
+    [Fact]
+    public void AFixedTableOfTheFormal_StoredPastTheArgumentsCapacity_CreatesTheOccurrences()
+    {
+        // The argument 05 L0 X(2) · 05 TD X OCCURS DYNAMIC (capacity 1, "T") · 05 L3 X(2) meets the fixed formal 05 S1 X(2) ·
+        // 05 ST X OCCURS 3 · 05 S3 X(2) (the 7-character image): the view shows "CDT  EF", occurrences 2 and 3 space filled.
+        var caller = ManagedPointer<CobolVarGroup>.Cell(new CobolVarGroup("CDEF", ["T"]));
+        var args = new[] { new CobolArg(CobolPassMode.Reference, caller, null, VarLGAtoms) };
+        var formal = CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms, static () => "");
+        Assert.Equal("CDT  EF", formal.Value);
+        // A store into occurrence 3 only creates occurrences 2 and 3 (the intermediate one space filled) ...
+        formal.Value = "CDT zEF";
+        Assert.Equal(["T z"], caller.Value!.Dynamic);
+        // ... one into occurrence 2 only raises the capacity to 2 over the argument's first ...
+        caller.Value = new CobolVarGroup("CDEF", ["T"]);
+        formal.Value = "CDTqzEF";
+        Assert.Equal(["Tqz"], caller.Value.Dynamic);
+        // ... and a callee that leaves the occurrences past the capacity as the view showed them creates nothing, the
+        // fixed material around the table still overlaying the argument's.
+        caller.Value = new CobolVarGroup("CDEF", ["T"]);
+        formal.Value = "ABT  GH";
+        Assert.Equal("ABGH", caller.Value.Fixed);
+        Assert.Equal(["T"], caller.Value.Dynamic);
     }
 
     [Fact]
@@ -255,10 +301,11 @@ public sealed class BoundaryGroupCorrespondenceTests
         // §8.5.1.12.3 sentence 3 + §14.6.9.2: the capacity-2 table fills a 3-occurrence view, the third spaces.
         Assert.Equal("ghkl ij", formal.Value);
         // §14.2.3 GR8 — the formal overlays the argument's storage: the fixed material and the occurrences the
-        // argument HAS are stored; ⚠ the capacity is the argument's own, so the third occurrence has nowhere to go.
+        // argument HAS are stored, and the store into the third, which it has not, is a receiving reference past the
+        // table's capacity that §8.5.1.9.3 creates (kb/Work PB2690).
         formal.Value = "qqmnoij";
         Assert.Equal("qqij", vg.Value!.Fixed);
-        Assert.Equal(["mn"], vg.Value.Dynamic);
+        Assert.Equal(["mno"], vg.Value.Dynamic);
     }
 
     [Fact]

@@ -599,10 +599,13 @@ prototype signature equality (§9.3.8.2.3) keeps strict equality. The admitted V
 the same correspondence: every group formal states its atoms to `CobolArgAdapt.Text` / `TextValue`
 (`ProgramEmitter.GroupFormalAtoms`; `System.Array.Empty<GroupAtom>()` for a table-less group, read as `FixedRun(width)`),
 whose variable-carrier arm reads the argument through `ToImage`; the typed INVOKE does the same at compile time
-(`OoEmitter.VarPlaceShapes`), including both mixed RETURNING directions. ⚠ DETERMINATION: a formal with a FIXED
-occurrence count cannot change the argument table's current capacity, so a BY REFERENCE store OVERLAYS the argument's
-storage (`CobolVarGroup.OverlayImage`, §14.2.3 GR8): the occurrences the argument has are written, one it lacks
-is not, one past the formal's count is untouched, and material past a prefix formal survives. Goldens
+(`OoEmitter.VarPlaceShapes`), including both mixed RETURNING directions. ⚠ DETERMINATION D-VGB
+(docs/CONFORMANCE.md §3; kb/Work PB2690): a BY REFERENCE store OVERLAYS the argument's storage
+(`CobolVarGroup.OverlayImage`, §14.2.3 GR8): the occurrences the argument has are written, one past its capacity that
+the callee STORED INTO is created (§8.5.1.9.3: a receiving reference "exceeds the current capacity", so "a new element is
+automatically created" and the capacity is raised to the subscript; `CobolVarGroup.OverlaidTable` / `GrownCount`
+recognise the store by its effect, an image that is not the space fill the view showed), one past the formal's count is
+untouched, and material past a prefix formal survives. Goldens
 `2014/pb965_vlg_into_fixed_boundary`, `2014/pb965_vlg_into_fixed_invoke`; negative
 `pb965-vlg-into-larger-fixed-formal`.
 
