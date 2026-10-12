@@ -21,8 +21,8 @@ What changed, and why each part is there:
 - **How work is done here** states the five rules a contributor meets first: the standard decides (with
   `cite.py --check`), the work register, tests and documents with every change, a DEVLOG entry per landing, one pull
   request per branch through the merge queue and the CLA.
-- **Status** carries the numbers of 2026-10-12 from the completion ledger and the session probe (4,347 rules, 103
-  open; 11,129 conformance, 32,658 unit and 36 characterization tests; NIST 362; the version matrix 262 × 4; the
-  GnuCOBOL differential 1,323 cases), replacing the 2026-09-26 figures.
+- **Status** no longer carries typed counts. The first draft held a snapshot dated 2026-10-12; the operator flagged
+  it as the thing a reviewer would object to (the 2026-09-26 block it replaced had gone stale the same way). The
+  section now names the inventory file and the commands that compute the numbers for the commit the reader is on.
 
 No code changed.

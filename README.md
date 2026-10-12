@@ -169,16 +169,15 @@ COBOL source
 
 ## Status
 
-As of 2026-10-12, measured, not estimated:
+Every normative rule of ISO/IEC 1989:2023 is a row of the traceability inventory,
+`tests/version-matrix/traceability-inventory.json`, and a row closes only when a test derived from the standard proves
+the compiler conforms. The open rows are the project's one progress number, and the checkout computes it:
+`pwsh scripts/session-probe.ps1` prints the rows, the open rows and the corpus sizes for the commit you are on, and
+the gate's verdict line prints the tests it ran.
 
-- **Traceability:** 4,347 normative rules, every one adjudicated against the standard; 4,244 closed (97.6 %) and
-  103 open.
-- **Tests on every change:** 11,129 conformance tests, 32,658 unit tests and 36 characterization tests; the NIST
-  CCVS suite (362 programs); the version matrix (262 programs at four editions); and the GnuCOBOL differential
-  (1,323 cases) once per batch. CI runs on Windows and Linux.
-- **Declined facilities**, each documented as non-support with a compile-time warning, as §4.2.6 permits: the
-  Message Control System, commit and rollback, the VALIDATE facility, and screen handling.
-  [docs/CONFORMANCE.md](docs/CONFORMANCE.md) dispositions every optional module and processor-dependent element.
+Four facilities are declined, each documented as non-support with a compile-time warning, as §4.2.6 permits: the
+Message Control System, commit and rollback, the VALIDATE facility, and screen handling.
+[docs/CONFORMANCE.md](docs/CONFORMANCE.md) dispositions every optional module and processor-dependent element.
 
 A NuGet distribution of the compiler as a .NET tool (`WiseOwl.COBOL`, the `cobol` command) and a documentation site
 are planned; see [docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md](docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md).
