@@ -22,3 +22,8 @@ at `(8,23)`, COPY ... REPLACING at `srepl.cpy(1,23)`) and the unit test
 computed from the position rule. No inventory row is claimed or closed. Docs: DESIGN-frontend-grammar.md and
 DESIGN-cc-in-copy.md describe the writer's rule.
 
+**Oracle.** The change touches the arch-oracle's inputs (the Frontend sources, and `DiagnosticPositionTests.cs` through
+the oracle host's MSBuild closure), so the landing refused the baseline `60d47c6d52a9` (exit 7). `compare_oracle.py`
+against it reports `IDENTICAL — 7780 cases`: no emitted C# and no diagnostic differs, because no corpus, NIST or
+version-matrix case writes a supplementary-plane character through REPLACE or COPY ... REPLACING (the new goldens are
+xunit tests, not oracle cases). The baseline is re-recorded at `b5237d034c28`.
