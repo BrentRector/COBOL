@@ -116,10 +116,15 @@ def scan_tree(root: Path) -> tuple[int, list[str], list[str]]:
 
 #: A mode string as `open` reads it (so a file NAME passed where a mode could be is never mistaken for one).
 MODE = re.compile(r"[rwxabt+U]{1,4}")
-#: `module.open(file, mode, …)` — the module-level openers whose `newline` is the sixth positional parameter.
-MODULE_OPENERS = frozenset({"io", "gzip", "bz2", "lzma"})
-#: `X.open(name, mode)` of these opens BYTES (an archive member, a raw descriptor): never a text writer.
-BINARY_OPENERS = frozenset({"os", "tarfile", "zipfile", "shelve", "dbm", "webbrowser"})
+#: `io.open(file, mode, …)` is the builtin `open`: a mode without `b` is TEXT, and `newline` is the sixth positional.
+TEXT_DEFAULT_OPENERS = frozenset({"io"})
+#: `gzip.open`/`bz2.open`/`lzma.open(file, mode, …)` default to BINARY: a bare `w`/`a`/`x` writes bytes, and only a
+#: mode carrying `t` is text (Python docs, each module's `open`). `newline` is never earlier than the sixth positional
+#: (gzip, bz2) or is keyword-only (lzma), and passing it in a binary mode raises `ValueError`.
+TEXT_ON_T_OPENERS = frozenset({"gzip", "bz2", "lzma"})
+#: `X.open(name, mode)` of these opens BYTES (an archive member, a raw descriptor) or never translates line endings
+#: (`codecs.open` always opens the file in binary mode): never a text writer, and `newline=` is not a parameter.
+BINARY_OPENERS = frozenset({"os", "tarfile", "zipfile", "shelve", "dbm", "webbrowser", "codecs"})
 TEMPFILES = frozenset({"NamedTemporaryFile", "TemporaryFile", "SpooledTemporaryFile"})
 
 
@@ -138,8 +143,12 @@ def _mode(node: ast.Call, position: int) -> str | None:
     return None
 
 
-def _writes_text(mode: str | None) -> bool:
-    return mode is not None and "b" not in mode and any(c in mode for c in "wax+")
+def _writes_text(mode: str | None, *, text_needs_t: bool = False) -> bool:
+    """Whether a literal `mode` writes TEXT: it writes (`w`, `a`, `x` or `+`) and is not binary — no `b`, and, for an
+    opener whose default is binary (`text_needs_t`), an explicit `t`."""
+    if mode is None or "b" in mode or not any(c in mode for c in "wax+"):
+        return False
+    return "t" in mode or not text_needs_t
 
 
 def unstated_newline(node: ast.Call) -> bool:
@@ -153,8 +162,10 @@ def unstated_newline(node: ast.Call) -> bool:
     owner = func.value.id if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) else None
     if name == "write_text" and isinstance(func, ast.Attribute):
         return len(node.args) < 4  # Path.write_text(data, encoding, errors, newline)
-    if name == "open" and (isinstance(func, ast.Name) or owner in MODULE_OPENERS):
+    if name == "open" and (isinstance(func, ast.Name) or owner in TEXT_DEFAULT_OPENERS):
         return _writes_text(_mode(node, 1)) and len(node.args) < 6  # open(file, mode, buffering, encoding, errors, newline)
+    if name == "open" and owner in TEXT_ON_T_OPENERS:
+        return _writes_text(_mode(node, 1), text_needs_t=True) and len(node.args) < 6  # (file, mode, level, enc, err, nl)
     if name == "fdopen" and owner == "os":
         return _writes_text(_mode(node, 1)) and len(node.args) < 6
     if name == "open" and isinstance(func, ast.Attribute) and owner not in BINARY_OPENERS:
@@ -371,13 +382,39 @@ def self_test() -> int:
         ")",                                                  # 19 finding (multi-line, trailing comma)
         "open('x', 'w',",
         "     encoding='utf-8')",                             # 23 finding
+        "import bz2, codecs, gzip, lzma",
+        "gzip.open('x.gz', 'w')",                             # ok: gzip's bare `w` is BINARY
+        "bz2.open('x.bz2', 'a')",                             # ok: so is bz2's bare `a`
+        "lzma.open('x.xz', mode='x')",                        # ok: and lzma's bare `x`
+        "gzip.open('y.gz', 'wt', encoding='utf-8')",          # 29 finding: `t` makes it text
+        "bz2.open('y.bz2', mode='at')",                       # 30 finding
+        "lzma.open('y.xz', 'wt')",                            # 31 finding
+        "codecs.open('x', 'w', 'utf-8')",                     # ok: always binary underneath; `'x'` is a NAME here
         "",
     ])
     lines = sorted(c.lineno for c in writer_calls(planted))
     expect("arm WRITERS: every unstated text-mode write is found, and nothing else", lines,
-           [4, 6, 10, 11, 12, 13, 14, 19, 23])
+           [4, 6, 10, 11, 12, 13, 14, 19, 23, 29, 30, 31])
     fixed, n = add_newline(planted)
-    expect("--fix-writers changes every finding", n, 9)
+    expect("--fix-writers changes every finding", n, 12)
+    compressed = planted.splitlines()[24:32]  # lines 25-32: the import, then the gzip/bz2/lzma/codecs opens
+    expect("--fix-writers leaves a binary-mode gzip/bz2/lzma/codecs open untouched",
+           [line for line in fixed.splitlines()[24:32] if line in compressed],
+           [compressed[k] for k in (0, 1, 2, 3, 7)])
+    # Python itself is the authority on what the rewrite may pass: run the fixed compressed and codecs calls.
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as d:
+        here = os.getcwd()
+        os.chdir(d)
+        try:
+            scope: dict = {}
+            for stmt in fixed.splitlines()[24:32]:
+                exec(f"with {stmt} as fh: pass" if "open(" in stmt else stmt, scope)
+            ran = "ok"
+        except (TypeError, ValueError) as e:
+            ran = f"{type(e).__name__}: {e}"
+        finally:
+            os.chdir(here)
+    expect("the --fix-writers output runs: no newline= reaches a binary-mode opener", ran, "ok")
     expect("--fix-writers leaves nothing to find", writer_calls(fixed), [])
     expect("--fix-writers is idempotent", add_newline(fixed), (fixed, 0))
     expect("--fix-writers keeps a single-line call on its line", fixed.splitlines()[3], "p.write_text('a', newline=\"\\n\")")
