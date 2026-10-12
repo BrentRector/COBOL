@@ -232,6 +232,29 @@ def lint(files: dict[str, str], monolith: bool) -> list[str]:
     return reasons
 
 
+def new_entries(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, str]) -> list[str]:
+    """THE NEW ENTRIES OF A LANDING, the ONE definition (kb/Work PB3023 review R1-3): `check` refuses on it, `stamp`
+    re-numbers by it and `enqueue.py` titles the pull request from it. The entry files of `rev`, newest first, whose
+    header line the base's history does not carry: its entry files and, on the landing that migrates the log, the
+    header lines of its monolithic DEVLOG.md (`base_extra_headers`). Never a file-name test: the migrating landing adds
+    every entry of the history as a new FILE."""
+    history = {first_line(base[n]) for _, n in entries(base)} | set(base_extra_headers)
+    return [n for _, n in entries(rev) if first_line(rev[n]) not in history]
+
+
+def floor_of(base: dict[str, str], base_extra_headers: list[str]) -> int:
+    """The base's newest entry number, its monolith's headers included: a new entry is numbered above it."""
+    return max([highest(base)] + [int(m.group("num")) for h in base_extra_headers if (m := HEADER.match(h))])
+
+
+def landing_entries(repo: pathlib.Path, base: str, rev: str) -> tuple[dict[str, str], list[str]]:
+    """(the DEVLOG/ files at commit `rev`, the landing's new entries by `new_entries`) for the committed range
+    base..rev. Raises RangeError when either end cannot be read."""
+    base_files, _ = commit_files(repo, base)
+    rev_files, _ = commit_files(repo, rev)
+    return rev_files, new_entries(base_files, monolith_headers(repo, base), rev_files)
+
+
 def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, str], rev_monolith: bool) -> tuple[
         list[str], list[str]]:
     """(refusal reasons, the new entries' names) for a landing from the tree `base` to the tree `rev`.
@@ -240,9 +263,8 @@ def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, st
     pending = sorted(n for n in rev if PENDING_NAME.match(n))
     for n in pending:
         reasons.append(f"{DIR}/{n} is an unstamped entry: run `python scripts/devlog.py stamp <branch>` before landing")
-    history = {first_line(base[n]) for _, n in entries(base)} | set(base_extra_headers)
-    new = [n for _, n in entries(rev) if first_line(rev[n]) not in history]
-    floor = max([highest(base)] + [int(m.group("num")) for h in base_extra_headers if (m := HEADER.match(h))])
+    new = new_entries(base, base_extra_headers, rev)
+    floor = floor_of(base, base_extra_headers)
     if not new and not pending:
         reasons.append("the landing carries no new DEVLOG entry. Every landing on main carries one (owner 2026-10-08, "
                        f"kb/Work PB2605): write {DIR}/pending-<slug>.md (first line `## <Title>`, then the body) and "
@@ -349,14 +371,17 @@ def unstamp_overtaken(wt: pathlib.Path, base: str) -> str | None:
     """The branch's ONE added entry, when <base> (main) has since reached its number, made pending again so the next
     stamp numbers it above main's (kb/Work PB3023: a branch waits after its stamp — a merge-queue bounce, a finisher —
     while other landings take higher numbers, and `check` then refuses the stale number). Returns the stale file's
-    name, or None when there is nothing to re-stamp (no added entry, more than one, or one still above main's)."""
+    name, or None when there is nothing to re-stamp (no added entry, more than one, or one still above main's). The
+    added entry is `new_entries`' (the landing rule's own definition), so on the migrating landing, which adds every
+    entry of the history as a file, it is still the one."""
     try:
         base_files, _ = commit_files(wt, base)
     except RangeError:
         return None
+    extra = monolith_headers(wt, base)
     files = worktree_files(wt)
-    added = [n for n in files if key_of(n) and n not in base_files]
-    if len(added) != 1 or key_of(added[0])[0] > highest(base_files):
+    added = new_entries(base_files, extra, files)
+    if len(added) != 1 or key_of(added[0])[0] > floor_of(base_files, extra):
         return None
     stale, text = added[0], files[added[0]]
     title = title_of(first_line(text))
@@ -494,6 +519,22 @@ def self_test() -> int:
     reasons, new = check(b, monolith_headers(repo, mono_base), r, mono)
     ok("the migrating landing: the monolith's headers are history, its one new entry passes",
        not reasons and new == ["0012-the-landing.md"], reasons)
+    files_at, landed = landing_entries(repo, mono_base, "HEAD")
+    ok("landing_entries on the migrating landing: every history file is added, ONE entry is new (the pull request's "
+       "title reads it; kb/Work PB3023 review R1-3)",
+       landed == ["0012-the-landing.md"] and len([n for n in files_at if key_of(n)]) == 3, landed)
+    # the same landing waits while main's monolith reaches 12: its 12 is overtaken and made pending again
+    mono_wt = root / "mono-wt"
+    sh("worktree", "add", "-q", "-b", "mono-impl", str(mono_wt), "HEAD")
+    sh("checkout", "-q", "-B", "mono-main", mono_base)
+    tree({MONOLITH: "# Log\n" + e("12", "main took twelve") + e("11", "older") + e("10", "oldest")})
+    sh("commit", "-qam", "main reaches 12")
+    stale = unstamp_overtaken(mono_wt, "mono-main")
+    ok("unstamp_overtaken on the migrating landing finds its one entry by the landing rule and makes it pending again",
+       stale == "0012-the-landing.md" and (mono_wt / DIR / "pending-the-landing.md").is_file()
+       and not (mono_wt / DIR / stale).exists(), f"{stale} {sorted(names_in(mono_wt))}")
+    sh("worktree", "remove", "--force", str(mono_wt))
+    sh("checkout", "-q", "mono")
     tree({f"{DIR}/0011-older.md": e("11", "older, retitled")})
     sh("commit", "-qam", "retitle")
     reasons, _ = check(b, monolith_headers(repo, mono_base), commit_files(repo, "HEAD")[0], False)
