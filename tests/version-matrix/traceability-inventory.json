@@ -4132,11 +4132,11 @@
   "subject": "COBOL words",
   "rule-digest": "b7d6e63ee3f6",
   "verdict": "CONFORMS",
-  "code-location": "tests/version-matrix/cobol-words.json; scripts/gen-cobol-words.ps1; src/Cobol.Net.Frontend/Parsing/ReservationGateRewriter.cs",
-  "test-ref": "conformance:85/pb655_context_sensitive_user_words; unit:CobolWordsDriftTests.LexerWordTokens_Cost_The_User_No_Word_Iso_Leaves_Free",
+  "code-location": "tests/version-matrix/cobol-words.json; scripts/gen-cobol-words.ps1; src/Cobol.Net.Frontend/Parsing/ReservationGateRewriter.cs; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#typeClause; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#functionName; src/Cobol.Net.Frontend/Grammar/Core/CobolData.g4#indexNameList",
+  "test-ref": "conformance:85/pb655_context_sensitive_user_words; unit:CobolWordsDriftTests.LexerWordTokens_Cost_The_User_No_Word_Iso_Leaves_Free; conformance:2002/pb2721_context_word_user_word_slots; unit:UserWordSlotDriftTests.NoNameSlot_IsABareIdentifier",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB655: every lexer token that spells a 8.10 context-sensitive word (SIGNED, RECURSIVE, CYCLE, PREVIOUS, YYYYMMDD, AWAY-FROM-ZERO, ...) has a cobol-words.json nameSlot row and is a plain cobolWord alternative, so it is a user-defined word outside its construct at every edition (8.3.2.1 3)); before PB655 the lexer token refused it everywhere with a raw COBOL0001. The drift test joins the COMPILED lexer vocabulary against the rows, so the next token the grammar adds is checked. Vendor words ISO reserves nowhere are reserved by the 4.2.10 latitude and documented as CONFORMANCE.md D-RW1.",
+  "notes": "kb/Work PB655: every lexer token that spells a 8.10 context-sensitive word (SIGNED, RECURSIVE, CYCLE, PREVIOUS, YYYYMMDD, AWAY-FROM-ZERO, ...) has a cobol-words.json nameSlot row and is a plain cobolWord alternative, so it is a user-defined word outside its construct at every edition (8.3.2.1 3)); before PB655 the lexer token refused it everywhere with a raw COBOL0001. The drift test joins the COMPILED lexer vocabulary against the rows, so the next token the grammar adds is checked. Vendor words ISO reserves nowhere are reserved by the 4.2.10 latitude and documented as CONFORMANCE.md D-RW1. kb/Work PB2721 (wave 1069 H): the claim held at the DECLARING slots only; two REFERENCE slots were bare IDENTIFIER, so a context-sensitive word with a token was declared and then refused: typeClause (01 CAPACITY TYPEDEF ... / TYPE CAPACITY -> COBOL0001) and functionName (FUNCTION-ID. CAPACITY. / REPOSITORY FUNCTION CAPACITY and FUNCTION CAPACITY(V) -> COBOL0001). Both now read cobolWord (functionName = cobolWord | intrinsicKeywordName), and the OCCURS INDEXED BY index-names are a cobolWord list (indexNameList, kb/Work PB2732). UserWordSlotDriftTests fails on any bare IDENTIFIER outside the argued keyword/system-name/word-run sites.",
   "state": "OK"
  },
  {
