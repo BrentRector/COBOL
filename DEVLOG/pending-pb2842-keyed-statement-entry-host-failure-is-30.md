@@ -28,14 +28,30 @@ no new refusal protocol is threaded through the 16 `BeginStatement` call sites: 
 verb already makes is the mechanism. A failure that is not the host's (anything else) still undoes the entry and
 escapes.
 
-Sibling sweep: the other reloads/persists (`Load`, `Persist`, `PersistIfChanged`) run at OPEN and CLOSE, which
-`FileConnector.Open`/`Close` already map; `CompleteStatement` already mapped `IOException` and
-`UnauthorizedAccessException` (it now shares the predicate and gains `OutOfMemoryException`, the one large allocation
-`ComposeStore` makes).
+Sibling sweep: the other reloads/persists (`Load`, `Persist`, `PersistIfChanged`) run at OPEN and CLOSE. OPEN already
+mapped `IOException`, `UnauthorizedAccessException` and `OutOfMemoryException`; `FileConnector.Close` mapped only the
+first two, so a CLOSE owing a persist (`ComposeStore`, the one large allocation) let an `OutOfMemoryException` out of
+the program - this entry first claimed Close mapped it, which was wrong (review round 1, R1-2); `Close` now maps it to
+'30' like OPEN. `CompleteStatement` already mapped `IOException` and `UnauthorizedAccessException` (it now shares the
+predicate and gains `OutOfMemoryException`).
+
+Review round 1 (R1-1): mapping the reload's `OutOfMemoryException` to '30' and carrying on is only safe if the
+reload leaves the shared store honest, and it did not. `ReadImage` stamped `store.Generation` before decoding, and
+`Fill` empties the store before refilling it, so a refusal in either left a store trusted as current (a second SELECT
+of the same file in the run unit skipped the reload and answered from stale records; its next WRITE persisted them
+over the other run unit's) or half-filled and owed to the file (a CLOSE wrote it over the file). `Reload` now reads
+and decodes first, touching nothing of the store (`ReadImage` returns the generation instead of stamping it), stamps
+the generation only after `Fill` has put the records in, and marks a store whose `Fill` failed as owing the file
+nothing (`PersistedVersion = Version`); because the generation is still the old one, every later coherent statement
+entry of the run unit reloads again. The refusal cannot be produced on demand, so `KeyedConnector.HostFaultObserver`
+(an `AsyncLocal` test seam, the `FileRegistry.PauseObserver` precedent) throws at `ReloadDecoded`, `ReloadFilling`
+(after `Fill`'s Clear, in both organizations) and `PersistComposing`.
 
 ### Witness
 
-`KeyedStoreReloadFailureDriftTests` (Unit, 22 cases): 2 organizations x 9 verbs (shared and plain entries of READ NEXT,
+`KeyedStoreReloadFailureDriftTests` (Unit, 22 cases, plus 8 for review round 1: the two reload
+refusals x 2 organizations, the persist refusal at the statement and at the CLOSE x 2 organizations; verified red against
+the old stamping order, the missing reset and the missing `Close` catch): 2 organizations x 9 verbs (shared and plain entries of READ NEXT,
 random READ, WRITE, REWRITE, DELETE, START FIRST, START key) on the process lock host, READ NEXT on the lock-file host,
 and the RETRY re-entry on both organizations. Each asserts '30', the connector's status, no record delivered, the
 replay on the next statement, and that the CLOSE ends the condition. Verified red before the fix, green after; the
