@@ -496,8 +496,14 @@ globalClause
 // OPTIONAL word. The rule used to read `TYPE IS? IDENTIFIER`, so the standard's own spelling `TYPE TO T` was rejected
 // (COBOL0001 "unexpected 'TO'") while a spelling no format prints was accepted. `TYPE IS` is Format 2's (the report
 // group TYPE clause, CobolReportWriter.g4), not this one's.
+// ⛔ type-name-1 IS A cobolWord, NEVER A BARE IDENTIFIER (kb/Work PB2721). A type-name is a user-defined word
+// (§8.3.2.2), declared through `dataName` — which is cobolWord — so its REFERENCE slot must admit the same word set.
+// The rule used to read `TYPE TO? IDENTIFIER`, and a type-name that is a §8.10 context-sensitive word (§8.3.2.1 3):
+// "Context-sensitive words may be used as user-defined words … in contexts other than the language construct in
+// which they are defined") was declared cleanly by `01 CAPACITY TYPEDEF …` and then refused by `TYPE CAPACITY`
+// (COBOL0001), because CAPACITY has a lexer token. UserWordSlotDriftTests holds every name slot to cobolWord.
 typeClause
-    : TYPE TO? IDENTIFIER   // introduction-gated post-bind by VersionConformancePass ParseArm.VisitTypeClause (rearch 14g.2)
+    : TYPE TO? cobolWord   // introduction-gated post-bind by VersionConformancePass ParseArm.VisitTypeClause (rearch 14g.2)
     ;
 
 // TYPEDEF clause (ISO §13.18.58, COBOL-2002; data-model D17) — marks this data description entry as a TYPE
@@ -733,7 +739,7 @@ occursClause
       (DEPENDING ON? dataReference)?
       occursStepPhrase?
       occursKeyClause*
-      (INDEXED BY? dataReferenceList)?
+      (INDEXED BY? indexNameList)?
     // Format 4 — a DYNAMIC-capacity table (ISO §13.18.38 Format 4, COBOL-2014; D9). LL-disjoint from Format 1/2
     // on the token after OCCURS (DYNAMIC is not an integerLiteral). occursDynamicPhrase* is a SUPERSET parse: the
     // printed once-each, CAPACITY-FROM-TO-INITIALIZED order (§13.18.38.2 with §5.2.1) is enforced at bind time
@@ -741,7 +747,17 @@ occursClause
     // The Format 1/2 alternative above is likewise the union of Formats 1, 2 and 3; the same binder site narrows a
     // data description entry to Formats 1 and 2, and DataBinder.Reports.cs#ReportOccursOf a report group entry to
     // Format 3. Edition-gated so a pre-2014 probe upgrades to COBOLNET0900.
-    | OCCURS DYNAMIC occursDynamicPhrase* occursKeyClause* (INDEXED BY? dataReferenceList)?   // introduction-gated post-bind by VersionConformancePass ParseArm.VisitOccursClause (rearch 14g.3)
+    | OCCURS DYNAMIC occursDynamicPhrase* occursKeyClause* (INDEXED BY? indexNameList)?   // introduction-gated post-bind by VersionConformancePass ParseArm.VisitOccursClause (rearch 14g.3)
+    ;
+
+// The INDEXED BY phrase's index-names (§13.18.38.2, every format: `[ INDEXED BY { index-name-1 } … ]`). Each is a
+// DEFINING occurrence of a user-defined word (§8.3.2.2.11 "An index-name identifies an index associated with a
+// specific table"), so the slot is a WORD, never a reference. ⛔ It used to be `dataReferenceList` (kb/Work PB2732):
+// a qualified or subscripted operand parsed, and the only reader took its GetText(), which glues the tokens — so
+// `INDEXED BY IX OF G` compiled clean and declared an index named IXOFG (the PB1281 REDEFINES glue, unswept). A
+// qualifier or subscript is now what the general format makes it, a syntax error. The comma is the §8.3.5 separator.
+indexNameList
+    : cobolWord (COMMA? cobolWord)*
     ;
 
 // OCCURS … STEP integer-3 — the REPORT-WRITER format's own phrase (ISO §13.18.38.2 Format 3:

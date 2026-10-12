@@ -88,8 +88,9 @@ public readonly struct DataDescriptionClauseCst(Core.DataDescriptionClauseContex
     /// <summary>The PICTURE string text, or <see langword="null"/> when this is not a picture clause.</summary>
     public string? PictureText => ctx.pictureClause()?.PIC_STRING()?.GetText();
 
-    /// <summary>The <c>TYPE IS type-name</c> referenced type-name text (§13.18.57; D17), or null.</summary>
-    public string? TypeRefName => ctx.typeClause()?.IDENTIFIER()?.GetText();
+    /// <summary>The <c>TYPE [TO] type-name-1</c> referenced type-name text (§13.18.57.2 Format 1; D17), or null. The
+    /// slot is a <c>cobolWord</c>, the word set of the TYPEDEF entry's own <c>dataName</c> (kb/Work PB2721).</summary>
+    public string? TypeRefName => ctx.typeClause()?.cobolWord()?.GetText();
 
     /// <summary>The <c>SAME AS data-name-1</c> target data-name text (ISO §13.18.49), or null. The first
     /// <c>cobolWord</c> is the target; any further ones are its OF/IN qualifiers (<see cref="SameAsQualifiers"/>).</summary>
@@ -124,17 +125,18 @@ public readonly struct DataDescriptionClauseCst(Core.DataDescriptionClauseContex
     // integer constant-name (ISO §13.10.3 SR2), and resolving the latter needs the binder's compile-time
     // constant table — so the max-occurrence read lives in DataBinder.Constants.IntegerOperandValue, not here.)
 
-    /// <summary>The OCCURS INDEXED BY index-name texts, in order (empty when absent). The caller keeps the
-    /// <c>INDEXED()</c> presence guard raw.</summary>
+    /// <summary>The OCCURS INDEXED BY index-names, in order (empty when absent) — §13.18.38.2's
+    /// <c>{ index-name-1 } …</c>, each a single word (<c>indexNameList</c>), so the text of one is exactly the name
+    /// declared. It was a <c>dataReference</c>'s glued text, and <c>IX OF G</c> declared <c>IXOFG</c> (kb/Work PB2732).
+    /// The caller keeps the <c>INDEXED()</c> presence guard raw.</summary>
     public IReadOnlyList<string> IndexNames
     {
         get
         {
-            var idxList = ctx.occursClause()?.dataReferenceList();
-            if (idxList is null) return [];
-            var refs = idxList.dataReference();
-            var names = new string[refs.Length];
-            for (int i = 0; i < refs.Length; i++) names[i] = refs[i].GetText();
+            var words = ctx.occursClause()?.indexNameList()?.cobolWord();
+            if (words is null) return [];
+            var names = new string[words.Length];
+            for (int i = 0; i < words.Length; i++) names[i] = words[i].GetText();
             return names;
         }
     }
