@@ -52,7 +52,23 @@ def init_cloud_submodules() -> str:
         except Exception as exc:  # noqa: BLE001 - a hook must never break the session
             status = f"FAILED: {exc}"
         out += f"cloud session: {' '.join(cmd[1:])} → {status}\n"
-    return out + fetch_cloud_corpus() + "\n"
+    return out + fetch_cloud_corpus() + cloud_python_packages() + "\n"
+
+
+def cloud_python_packages() -> str:
+    """The gates' pinned Python packages (scripts/requirements-gate.txt) are per CLONE too: setup-env.sh runs before the
+    repository exists, so it cannot read their declaration, and the snapshot it leaves outlives a change to it. The
+    one mechanism every gate runs, `python_deps.ensure` (kb/Work PB3097 review R3-1), provisions them here, so the
+    session's first TOOLING line (tooling_check.py parses with PyYAML) is about the tree, never a missing package."""
+    sys.path.insert(0, str(REPO / "scripts"))
+    lines: list[str] = []
+    try:
+        import python_deps
+        rc = python_deps.ensure(say=lines.append)
+        status = lines[-1] if lines else f"exit {rc}"
+    except Exception as exc:  # noqa: BLE001 - a hook must never break the session
+        status = f"FAILED: {exc}"
+    return f"cloud session: python packages → {status}\n"
 
 
 def local_skills_hint() -> str:

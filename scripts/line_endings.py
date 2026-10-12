@@ -265,17 +265,21 @@ def refresh_index(root: Path) -> int:
     status --porcelain` lists the file ` M` while `git diff` is empty, `git update-index --refresh` answers "needs
     update", and enqueue.py's dirty-tree check refuses the landing (kb/Work PB3029, 15,179 files on one worktree).
     Only an entry whose working-tree content, cleaned by its attributes (`git hash-object --stdin-paths`), IS the
-    staged blob is re-stated (`git update-index`, which re-hashes to the same blob): a file with a real edit stays
-    modified and is never staged."""
-    listed = git(root, "diff-files", "--name-only", "-z", binary=True).stdout.decode("utf-8").split("\0")
+    staged blob AND whose working-tree mode IS the staged mode is re-stated (`git update-index`, which re-hashes to the
+    same blob and records the file's current mode): a file with a real edit, or with an unstaged mode change (`chmod
+    +x` under `core.filemode`), stays modified and is never staged (branch review R3-2). Both sides come from ONE
+    `git diff-files --raw`: its source side is the index entry, its destination mode is the working tree's as git
+    itself reads it (so `core.filemode false` reports the index mode, and no mode is ever compared there)."""
+    raw = git(root, "diff-files", "--raw", "--no-abbrev", "-z", binary=True).stdout.decode("utf-8").split("\0")
     staged: dict[str, str] = {}
-    for record in git(root, "ls-files", "-s", "-z", binary=True).stdout.decode("utf-8").split("\0"):
-        info, _, path = record.partition("\t")
-        fields = info.split()
-        # stage 0 only (a conflicted path is not refreshed); never a symlink (120000) or a gitlink (160000)
-        if len(fields) == 3 and fields[2] == "0" and fields[0] not in ("120000", "160000"):
-            staged[path] = fields[1]
-    candidates = [p for p in listed if p in staged and "\n" not in p and (root / p).is_file()]
+    for info, path in zip(raw[0::2], raw[1::2]):
+        fields = info.lstrip(":").split()  # src mode, dst mode, src sha, dst sha, status
+        # a plain modification only (an unmerged path, `U`, is not refreshed), the same mode on both sides, and never
+        # a symlink (120000) or a gitlink (160000)
+        if (len(fields) == 5 and fields[4] == "M" and fields[0] == fields[1]
+                and fields[0] not in ("120000", "160000")):
+            staged[path] = fields[2]
+    candidates = [p for p in staged if "\n" not in p and (root / p).is_file()]
     if not candidates:
         return 0
     hashed = subprocess.run(["git", "-C", str(root), "hash-object", "--stdin-paths"], check=True, capture_output=True,
@@ -405,6 +409,19 @@ def self_test() -> int:
         status = git(root, "status", "--porcelain", binary=True).stdout.decode("utf-8")
         expect("after --fix git status lists only the real edit, unstaged", status, " M lf.txt\n")
         run("checkout", "--", "lf.txt")
+        # Branch review R3-2: `git update-index` records the working tree's MODE too, so re-stating an entry whose
+        # content is the staged blob but whose mode is not STAGED an unstaged `chmod +x` (Linux, core.filemode true).
+        # Planted portably: the index says 100755 and the checkout (no exec bit; Git for Windows reads every file so)
+        # says 100644 — the same mismatch from the other side; the index must come out of --fix untouched.
+        run("config", "core.filemode", "true")
+        (root / "mode.sh").write_bytes(b"echo" + LF)
+        run("add", "mode.sh")
+        run("commit", "-q", "-m", "a script")
+        run("update-index", "--chmod=+x", "mode.sh")
+        before = git(root, "ls-files", "-s", "mode.sh").stdout
+        expect("--fix never re-states an entry whose working-tree mode differs from the index's (no mode is staged)",
+               (refresh_index(root), git(root, "ls-files", "-s", "mode.sh").stdout), (0, before))
+        run("reset", "-q", "--", "mode.sh")
 
         accident = b"one" + CRLF + b"two" + CR + CRLF
         (root / "accident.md").write_bytes(accident)

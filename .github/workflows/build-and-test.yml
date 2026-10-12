@@ -259,11 +259,11 @@ jobs:
           # fetched on demand — the same partial clone `changes` uses.
           fetch-depth: 0
           filter: blob:none
-      # tooling_check.py's self-test proves every agent role and skill definition LOADS by parsing its frontmatter with
-      # PyYAML (kb/Work PB3097: an unparseable role printed OK and was never loaded). The local hosts carry PyYAML 6.0.3
-      # (Windows pip; WSL's python3-yaml); the runner's system Python is not promised it, so it is pinned here.
-      - name: Python YAML parser for the tooling self-test (pyyaml, pinned)
-        run: python3 -m pip install --user --break-system-packages --disable-pip-version-check --no-input pyyaml==6.0.3
+      # THE Python packages every gate runs with, from their ONE declaration (scripts/requirements-gate.txt, pinned;
+      # kb/Work PB3097 review R3-1): the local gate's audit prerequisite runs this same command, and the Linux gate builds
+      # a virtual environment holding exactly that set, so a package is missing here and there alike, never in one only.
+      - name: Python packages for the audits and self-tests (python_deps.py ensure)
+        run: python3 scripts/python_deps.py ensure
       - name: Code citations — the clause vs the construct it names (audit_code_citations.py --check)
         run: python3 scripts/spec/audit_code_citations.py --check
       - name: Doc citations — a quoted fragment vs the clause it is filed under (audit_doc_citations.py --check)
@@ -734,14 +734,14 @@ jobs:
       # Every script self-test on Windows, the Windows-only ones included (the orchestrator loop's
       # test_orchestrate_*.ps1 and test_autostart.ps1), which the Linux audits job reports NOT RUN (kb/Work PB2563).
       # After the test legs, so a red self-test never hides their results.
-      # Windows has no system IANA time-zone database, so Python's zoneinfo (scripts/orchestrator/budget.py) needs the
-      # tzdata package; the local hosts carry it (2026.4) and the runner's Python does not, so every orchestrator
-      # self-test went red here and green locally (train 1037t, run 37748130457). Pinned to the local version. PyYAML
-      # likewise: tooling_check.py's self-test parses every agent role and skill frontmatter (kb/Work PB3097).
-      - name: Python packages for the script self-tests (tzdata, pyyaml, pinned)
+      # The self-tests' Python packages, from their ONE declaration (scripts/requirements-gate.txt, pinned; kb/Work
+      # PB3097 review R3-1), as the audits job and every local gate provision them. Windows has no system IANA time-zone
+      # database, so zoneinfo (scripts/orchestrator/budget.py) needs tzdata there (train 1037t, run 37748130457), and
+      # tooling_check.py's self-test parses every agent role and skill frontmatter with PyYAML (kb/Work PB3097).
+      - name: Python packages for the script self-tests (python_deps.py ensure)
         if: ${{ !cancelled() }}
         shell: pwsh
-        run: python -m pip install --disable-pip-version-check --no-input tzdata==2026.4 pyyaml==6.0.3
+        run: python scripts/python_deps.py ensure
       - name: Script self-tests on Windows (self_tests.py)
         if: ${{ !cancelled() }}
         shell: pwsh

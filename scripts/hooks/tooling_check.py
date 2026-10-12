@@ -75,7 +75,8 @@ def definition_problems(claude_dir: pathlib.Path, roles: list[str]) -> list[str]
     try:
         import yaml  # noqa: F401
     except ImportError:
-        return ["PyYAML is not installed, so no definition can be proved to load (`python -m pip install pyyaml`)"]
+        return ["PyYAML is not installed, so no definition can be proved to load (`python scripts/python_deps.py "
+                "ensure` installs the gates' pinned set, scripts/requirements-gate.txt; every gate runs it first)"]
     out = [f"agents/{r}.md is missing" for r in roles if not (claude_dir / "agents" / f"{r}.md").exists()]
     for _, pattern, name_of in FRONTMATTER_KINDS:
         for path in sorted(claude_dir.glob(pattern)):

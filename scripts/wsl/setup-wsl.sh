@@ -25,17 +25,18 @@ fi
 uv self update > /dev/null 2>&1 || true
 uv python install 3.14 --default > /tmp/uv-python.log 2>&1 && log "cpython 3.14 ok" || { log "cpython FAILED"; tail -5 /tmp/uv-python.log; }
 
-# Python packages the scripts import, kept at parity with the Windows dev box (latest versions):
-# pymupdf (fitz: scripts/render-spec-page.py and the spec tools), scipy + numpy (statistics for process evaluations),
-# pyyaml (scripts/hooks/tooling_check.py proves every agent role and skill frontmatter parses, kb/Work PB3097).
-# The uv-managed interpreter is marked externally managed (PEP 668); it is user-space and ours, so install into it.
-PY_PACKAGES="pymupdf scipy numpy pyyaml"
-uv pip install --upgrade --system --break-system-packages --python "$(command -v python3.14)" $PY_PACKAGES \
-  > /tmp/uv-pip.log 2>&1 && log "python packages ok ($PY_PACKAGES)" || { log "python packages FAILED"; tail -5 /tmp/uv-pip.log; }
+# Python packages the scripts import, from their ONE declaration (kb/Work PB3097 review R3-1): the tools' packages at
+# their latest versions and the gates' pinned set (scripts/requirements-tools.txt includes scripts/requirements-gate.txt).
+# The gates need NONE of this run: linux-gate.sh builds its own environment from requirements-gate.txt, and the local
+# gate installs what its interpreter lacks (scripts/python_deps.py). The uv-managed interpreter is marked externally
+# managed (PEP 668); it is user-space and ours, so install into it.
+REQS="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/requirements-tools.txt"
+uv pip install --upgrade --system --break-system-packages --python "$(command -v python3.14)" -r "$REQS" \
+  > /tmp/uv-pip.log 2>&1 && log "python packages ok ($REQS)" || { log "python packages FAILED"; tail -5 /tmp/uv-pip.log; }
 
 log "dotnet: $(dotnet --version 2>&1)"
 log "python: $(python3.14 --version 2>&1) (python on PATH: $(command -v python) )"
-log "pypkgs: $(python3.14 -c 'import fitz, scipy, numpy, yaml; print("pymupdf", fitz.VersionBind, "scipy", scipy.__version__, "numpy", numpy.__version__, "pyyaml", yaml.__version__)' 2>&1 | tail -1)"
+log "pypkgs: $(python3.14 -m pip freeze 2>&1 | tr '\n' ' ')"
 log "pwsh:   $(pwsh -NoProfile -Command '$PSVersionTable.PSVersion.ToString()' 2>&1 | head -1)"
 log "git:    $(git --version)"
 log "DONE"

@@ -138,8 +138,11 @@ AUDITS = (
 #: FLEET PRACTICES reads the pinned public skills submodule, which a fresh worktree does not have. A prerequisite that
 #: fails is a RED and no audit runs. `SelfTestDiscoveryDriftTests` maps every command of CI's `audits` job to an AUDITS
 #: entry, to one of these, or to its recorded reason for running elsewhere, so the next audit CI gains reaches the gate.
+#: PYTHON PACKAGES: the self-tests' pinned packages (scripts/requirements-gate.txt), installed into this interpreter
+#: when it lacks one, as CI's jobs do (kb/Work PB3097 review R3-1) — a new dependency needs no hand step on any host.
 AUDIT_PREREQUISITES = (
     ("PUBLIC SKILLS SUBMODULE", ["git", "submodule", "update", "--init", "tools/claude-skills"]),
+    ("PYTHON PACKAGES", [sys.executable, "scripts/python_deps.py", "ensure"]),
 )
 #: ⛔ EVERY GATE REUSES A SELF-TEST'S RECORDED PASS (kb/Work PB2914, generalized to the one gate by PB3022;
 #: DESIGN-test-build-ci.md §3.14.10, §3.17.3): the gate's audits add this to SELF-TESTS, so a self-test whose inputs

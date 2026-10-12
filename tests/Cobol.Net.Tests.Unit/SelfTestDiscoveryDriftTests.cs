@@ -258,7 +258,8 @@ public sealed class SelfTestDiscoveryDriftTests
 
     /// <summary>
     /// ⛔ EVERY COMMAND OF CI's <c>audits</c> JOB RUNS IN THE GATE (the CI invariant; kb/Work PB1957 row 44): each
-    /// <c>python3 &lt;script&gt;</c> the job runs is an entry of <c>scripts/run_gate_legs.py</c> AUDITS, each
+    /// <c>python3 &lt;script&gt;</c> the job runs is an entry of <c>scripts/run_gate_legs.py</c> AUDITS or AUDIT_PREREQUISITES
+    /// (what makes the audits ready: <c>python_deps.py ensure</c>), each
     /// <c>git submodule update --init &lt;path&gt;</c> is one of its AUDIT_PREREQUISITES, or the script is recorded here with
     /// where it runs instead. The next audit CI gains is a red here until the gate runs it too.
     /// </summary>
@@ -296,8 +297,11 @@ public sealed class SelfTestDiscoveryDriftTests
             $"found only {scripts.Count} `python3 <script>` commands in CI's audits job: the net is broken");
         Assert.Contains("tools/claude-skills", submodules);
 
-        var notInGate = scripts.Where(s => !elsewhere.ContainsKey(s) && !audits.Groups[1].Value.Contains($"\"{s}\"",
-                                         StringComparison.Ordinal)).ToList();
+        // A script CI runs to make the audits READY (python_deps.py ensure, kb/Work PB3097 review R3-1) is a prerequisite.
+        var notInGate = scripts.Where(s => !elsewhere.ContainsKey(s)
+                                           && !audits.Groups[1].Value.Contains($"\"{s}\"", StringComparison.Ordinal)
+                                           && !prerequisites.Groups[1].Value.Contains($"\"{s}\"", StringComparison.Ordinal))
+                               .ToList();
         Assert.True(notInGate.Count == 0,
             "CI's audits job runs these and the local gate does not (a CI red no local gate shows first, kb/Work PB1957): "
             + string.Join(", ", notInGate) + ". Add each to scripts/run_gate_legs.py AUDITS, or record here where it runs.");
