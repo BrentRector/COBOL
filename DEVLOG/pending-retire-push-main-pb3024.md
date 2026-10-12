@@ -53,3 +53,5 @@ its own parser beside `_segments`, which splits on different separators for a di
 deleted mechanism found by the tree sweep, the arm itself, and `git grep` on lease, `READY-TO-PUSH` and `ci/<sha>`;
 the docstrings that now name `enqueue.py land` as `landing_check.py`'s caller were checked against the workflow (CI runs only its self-test).
 Performance: the new sweep reads the tracked tree once, as its sibling sweep does. Duplication: none added.
+
+**Gate.** The first gate stopped RED in its audits (a bare section sign naming a design-doc section in the PB3024 note read as an ISO clause; written as "section N"). The re-gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 6,524 · Unit 772 … Conformance 4,964/11,488 · Unit 32,680/33,452 · Characterization 36/36 cases ran (skipped 0) in 1 of 2 leg(s)` (run 20261012T055750Z-09d458); every `LandingPipelineDriftTests` and `LandingMeasureDriftTests` case passed in leg 1, and the self-tests audit re-ran the hook, campaign, steer, enqueue and prune self-tests GREEN. Semgrep: no rule up.
