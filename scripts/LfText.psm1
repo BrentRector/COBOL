@@ -2,7 +2,9 @@
 # LF, in every tracked text file). `Set-Content` and `Out-File` end lines with the PLATFORM newline, and a
 # `StringBuilder.AppendLine` writes `Environment.NewLine`, so on Windows every generator wrote CRLF; git stored LF, but
 # the checkout kept the CRLF bytes until the next checkout, and `scripts/line_endings.py --check` (a gate audit) refuses
-# a CR in a tracked text file's checkout. Import it and write through it:
+# a CR in a tracked text file's checkout. Writing LF over a CRLF checkout changes the file's SIZE, which git's index
+# trusts over content, so `git status` then lists it modified over an empty diff; `line_endings.py --fix` re-states every
+# such entry (refresh_index), so this writer stays a plain write. Import it and write through it:
 #     Import-Module (Join-Path $PSScriptRoot 'LfText.psm1') -Force
 #     Set-LfContent -LiteralPath $out -Value $sb.ToString()
 Set-StrictMode -Version Latest

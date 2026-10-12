@@ -19,7 +19,8 @@ the attributes — so this check holds the rule, in three arms:
                byte-exact (`-text` / `binary`, each with its reason there) or it holds a NUL (an encoding fixture, an
                archive): a lone CR in a file nobody declared is the accident this arm exists for.
   WORKING TREE the same rule over the checkout's bytes, which are what a Windows gate compiles and compares. A checkout
-               made before PB3029 is CRLF throughout: `--fix` rewrites it once (git sees every rewritten file clean).
+               made before PB3029 is CRLF throughout: `--fix` rewrites it once, then re-states the index entries the
+               rewrite made stale (`refresh_index`), so `git status` reads every rewritten file clean.
   WRITERS      every text-mode write in a live Python tool (scripts/, .claude/) states `newline=`: Python on Windows
                otherwise translates each "\\n" to CRLF, so a generator run on Windows leaves a CRLF working tree that
                the second arm then reports. `--fix-writers` adds `newline="\\n"` mechanically (re-run it after a rebase
@@ -254,11 +255,44 @@ def fix_writers(root: Path) -> int:
 
 # ── the working-tree fix ─────────────────────────────────────────────────────────────────────────────────────────
 
-def fix_tree(root: Path) -> tuple[int, list[str]]:
-    """Rewrite every TEXT file whose checkout holds CRLF to LF. Returns (files rewritten, files left). A file holding a
-    lone CR is LEFT UNTOUCHED, terminators included: whether that CR is an accident or the file's subject (a fixture of
-    the line-terminator rule) is a judgment no mechanical rule makes — it is removed by hand, or the file is declared
-    byte-exact in .gitattributes with its reason."""
+def refresh_index(root: Path) -> int:
+    """Re-state the index entry of every tracked file whose recorded stat data is stale but whose content is the staged
+    blob's, so `git status` reads it clean. Returns how many entries were re-stated.
+
+    WHY: the index caches each file's stat data, the CRLF checkout's SIZE among it. When the bytes are rewritten to LF
+    (by `--fix`, or a generator writing LF over a CRLF checkout) the size no longer matches, and git's `ie_modified`
+    trusts a size mismatch on an entry with a nonzero recorded size as DATA CHANGED without comparing content: `git
+    status --porcelain` lists the file ` M` while `git diff` is empty, `git update-index --refresh` answers "needs
+    update", and enqueue.py's dirty-tree check refuses the landing (kb/Work PB3029, 15,179 files on one worktree).
+    Only an entry whose working-tree content, cleaned by its attributes (`git hash-object --stdin-paths`), IS the
+    staged blob is re-stated (`git update-index`, which re-hashes to the same blob): a file with a real edit stays
+    modified and is never staged."""
+    listed = git(root, "diff-files", "--name-only", "-z", binary=True).stdout.decode("utf-8").split("\0")
+    staged: dict[str, str] = {}
+    for record in git(root, "ls-files", "-s", "-z", binary=True).stdout.decode("utf-8").split("\0"):
+        info, _, path = record.partition("\t")
+        fields = info.split()
+        # stage 0 only (a conflicted path is not refreshed); never a symlink (120000) or a gitlink (160000)
+        if len(fields) == 3 and fields[2] == "0" and fields[0] not in ("120000", "160000"):
+            staged[path] = fields[1]
+    candidates = [p for p in listed if p in staged and "\n" not in p and (root / p).is_file()]
+    if not candidates:
+        return 0
+    hashed = subprocess.run(["git", "-C", str(root), "hash-object", "--stdin-paths"], check=True, capture_output=True,
+                            input="".join(p + "\n" for p in candidates).encode("utf-8")).stdout.decode("ascii").split()
+    same = [p for p, sha in zip(candidates, hashed, strict=True) if staged[p] == sha]
+    if same:
+        subprocess.run(["git", "-C", str(root), "update-index", "-z", "--stdin"], check=True, capture_output=True,
+                       input="".join(p + "\0" for p in same).encode("utf-8"))
+    return len(same)
+
+
+def fix_tree(root: Path) -> tuple[int, int, list[str]]:
+    """Rewrite every TEXT file whose checkout holds CRLF to LF, then re-state the index entries the rewrite made stale
+    (`refresh_index`), so `git status` reads the rewritten tree clean. Returns (files rewritten, index entries
+    re-stated, files left). A file holding a lone CR is LEFT UNTOUCHED, terminators included: whether that CR is an
+    accident or the file's subject (a fixture of the line-terminator rule) is a judgment no mechanical rule makes — it
+    is removed by hand, or the file is declared byte-exact in .gitattributes with its reason."""
     rewritten, left = 0, []
     for e in entries(root):
         if e.byte_exact or not e.index or e.worktree not in ("crlf", "mixed", "-text"):
@@ -273,7 +307,7 @@ def fix_tree(root: Path) -> tuple[int, list[str]]:
             continue
         path.write_bytes(fixed)
         rewritten += 1
-    return rewritten, left
+    return rewritten, refresh_index(root), left
 
 
 # ── the check ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -357,12 +391,20 @@ def self_test() -> int:
         _, in_index, in_tree = scan_tree(root)
         expect("arm INDEX: renormalized under text=auto eol=lf, nothing is found", in_index, [])
         expect("arm WORKING TREE: the pre-normalization CRLF checkout is still found", in_tree, ["crlf.txt"])
-        rewritten, left = fix_tree(root)
-        expect("--fix rewrites the CRLF checkout to LF and leaves nothing", (rewritten, left), (1, []))
+        (root / "lf.txt").write_bytes(b"one" + LF + b"TWO" + LF)  # a real edit: --fix must neither hide nor stage it
+        rewritten, refreshed, left = fix_tree(root)
+        expect("--fix rewrites the CRLF checkout to LF, re-states its index entry and leaves nothing",
+               (rewritten, refreshed, left), (1, 1, []))
         expect("--fix leaves the bytes LF", (root / "crlf.txt").read_bytes(), b"one" + LF + b"two" + LF)
         expect("--fix never touches a declared -text file", (root / "pinned.xml").read_bytes(), b"<a/>" + CRLF)
         _, in_index, in_tree = scan_tree(root)
         expect("after --fix the tree is clean", (in_index, in_tree), ([], []))
+        # kb/Work PB3029 finisher: the rewrite changed crlf.txt's SIZE, and git trusts a size mismatch on a nonzero
+        # recorded size without comparing content, so without the re-stat `git status` listed it ` M` over an empty
+        # `git diff`, and enqueue.py's dirty-tree check refused the landing.
+        status = git(root, "status", "--porcelain", binary=True).stdout.decode("utf-8")
+        expect("after --fix git status lists only the real edit, unstaged", status, " M lf.txt\n")
+        run("checkout", "--", "lf.txt")
 
         accident = b"one" + CRLF + b"two" + CR + CRLF
         (root / "accident.md").write_bytes(accident)
@@ -372,7 +414,7 @@ def self_test() -> int:
         expect("arm INDEX + WORKING TREE: an undeclared lone CR is found although git stores the file as binary",
                (in_index, in_tree), (["accident.md"], ["accident.md"]))
         expect("--fix leaves a lone-CR file untouched, terminators included, and names it",
-               (fix_tree(root), (root / "accident.md").read_bytes()), ((0, ["accident.md"]), accident))
+               (fix_tree(root), (root / "accident.md").read_bytes()), ((0, 0, ["accident.md"]), accident))
 
     planted = "\n".join([
         "from pathlib import Path",
@@ -474,8 +516,9 @@ def main() -> int:
     if args.self_test:
         return self_test()
     if args.fix:
-        rewritten, left = fix_tree(args.root)
-        print(f"=== LINE ENDINGS FIX: {rewritten} working-tree file(s) rewritten CRLF -> LF ===")
+        rewritten, refreshed, left = fix_tree(args.root)
+        print(f"=== LINE ENDINGS FIX: {rewritten} working-tree file(s) rewritten CRLF -> LF; {refreshed} index "
+              "entr(ies) re-stated, so git status reads them clean ===")
         for p in left:
             print(f"    still holds a lone CR (remove it, or declare the file -text with its reason): {p}")
         return 1 if left else 0

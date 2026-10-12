@@ -67,7 +67,8 @@ a branch cut before it never conflicts on line endings alone:
 git config merge.renormalize true
 ```
 
-A checkout made before the rule is still CRLF on disk: `python scripts/line_endings.py --fix` rewrites it once.
+A checkout made before the rule is still CRLF on disk: `python scripts/line_endings.py --fix` rewrites it once and
+re-states the index entries the rewrite made stale, so `git status` reads the tree clean afterwards.
 
 The per-change gate builds the solution and runs EVERY Conformance, Unit and Characterization test, ordered so the
 tests your change is most likely to break run first:
