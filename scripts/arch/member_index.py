@@ -36,7 +36,7 @@ was walked from (`tree_key`: the tracked C#, project and solution files under sr
 sources). `current()` returns the index whose key is the checkout's: a committed record, or one regenerated into a
 cache directory (the coordination directory's `member-index/`), or, with regeneration off, a REFUSAL. The planner
 (`plan_wave.py --cluster`) plans only on a current index. The planner's set is still the ADMISSION estimate; the
-GUARANTEE is the landing check (`scripts/orchestrator/landing_check.py`, run by push-main.sh), which compares each
+GUARANTEE is the landing check (`scripts/orchestrator/landing_check.py`, run by `enqueue.py land`), which compares each
 landing's ACTUAL diff with its declared set and with every in-flight branch (DESIGN-architecture-review §8.7).
 
 Callers: `plan_wave.py --cluster` adds a note's callers to its sites before the collision check (`file_set_collisions`),

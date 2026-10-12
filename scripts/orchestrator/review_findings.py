@@ -11,7 +11,7 @@ decision in `<scratch>/review-w<wave>-<letter>.jsonl`, the verdict computed from
     python scripts/orchestrator/review_findings.py --self-test
 
 WHY A RECORD AND A TOOL. Until PB3027 the review of finished work ran inside the lander, between its gates: review
-shards were 23 % of the land units' subagent tokens on 2026-10-10 and sat on the landing's critical path, and every
+shards were 23 % of the enqueue units' subagent tokens on 2026-10-10 and sat on the landing's critical path, and every
 finding fixed in the train re-gated every cluster (kb/Work PB3015, its evidence table 6). The review now runs on the
 BRANCH when its implementer returns DONE: ONE read-only `cobol-reviewer` (the `review` skill's branch form), inside the
 rolling wave or dispatched by hand for an attended branch. The reviewer cannot write in a git tree (its hook), and a
@@ -41,11 +41,12 @@ import tempfile
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
+import plan_wave  # noqa: E402  (the one reader of the stamp, and the one definition of a stamp line: PB3077)
 
 KINDS = ("start", "finding", "verdict")
 FINDING_FIELDS = ("file", "line", "category", "summary", "failure_scenario")
 STATUS_LINE = re.compile(r"^\**Status:", re.I)
-REVIEW_LINE = re.compile(r"^\**Review:", re.I)
+REVIEW_LINE = plan_wave.REVIEW_LINE   # the planner skips these lines when it reads the branch (kb/Work PB3077)
 
 
 class RecordError(ValueError):
@@ -143,7 +144,6 @@ def stamp_line(v: dict, findings_file: pathlib.Path) -> str:
 def stamp(report: pathlib.Path, findings_file: pathlib.Path) -> str:
     """Write the newest verdict of `findings_file` into the report's header: replace its Review line, else insert one
     right under the Status line (the header is everything above the first `## ` heading, as plan_wave reads it)."""
-    import plan_wave  # noqa: PLC0415  (the one reader of the stamp: the line is written for it)
     verdicts = [r for r in load(findings_file) if r["kind"] == "verdict"]
     if not verdicts:
         raise RecordError(f"{findings_file} holds no verdict: run `verdict` first")
@@ -206,7 +206,6 @@ def summary(paths: list[pathlib.Path]) -> dict:
 
 # ── the self-test ────────────────────────────────────────────────────────────────────────────────────────────────────
 def self_test() -> int:
-    import plan_wave  # noqa: PLC0415
     fails: list[str] = []
 
     def check(what: str, ok: bool) -> None:

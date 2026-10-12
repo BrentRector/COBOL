@@ -13,18 +13,12 @@ on:
   push:
     # `main` — the branch the protection guards, and the branch every instrument already reads
     # (`scripts/session-probe.ps1`, `.claude/skills/gate/SKILL.md`, plan §9 all key on `--branch main`).
-    # `ci/**` — the LANDING branches `scripts/push-main.sh` pushes to: a commit is verified on `ci/<short-sha>`
-    # FIRST and only fast-forwarded onto main once its `ci-gate` check is green. A check run is attached to the
-    # COMMIT, not to a branch, so the verdict earned on `ci/<sha>` is exactly the one the protection reads when
-    # that same sha reaches main.
     # ⚠ Deliberately NOT `branches: '**'`: up to six implementer worktrees push WIP branches all day
     # (`worktree-agent-*`, `impl/*`), and a two-platform matrix per WIP push is precisely the cost this
-    # repository has already refused once (the 2026-08-08 owner flag).
-    # ⚠ `ci/**` RETIRES WITH `push-main.sh` (kb/Work PB3024, operator review 2026-10-11): until the merge queue is
-    # ACTIVE on main (`python scripts/orchestrator/ruleset.py check`), push-main.sh is still how a landing reaches
-    # main, so its landing branches still need their run; the first change landed THROUGH the queue deletes
-    # push-main.sh, landing_lease.py and this entry together.
-    branches: [ main, 'ci/**' ]
+    # repository has already refused once (the 2026-08-08 owner flag). Nothing else is pushed to land: main takes
+    # only queued pull requests (the ruleset binds administrators, kb/Work PB3024), so the one push this trigger sees
+    # is the merge-queue commit main advances to, which its `merge_group` run below already tested.
+    branches: [ main ]
   # ── THE MERGE QUEUE (kb/Work PB3024; DESIGN-test-build-ci.md §3.17.2 steps 4–5, §3.17.6). A pull request runs the
   # CHEAP jobs only (`changes`, `audits`, `ci-gate`), so twenty queued PRs never put eighty matrix jobs behind a public
   # repository's 20-concurrent-job limit; the MERGE GROUP (several queued PRs on top of main) runs the matrix and is the
@@ -43,8 +37,9 @@ on:
 # cancelled run leaves its sha permanently unlandable (`cancelled` is not `success`), and it is the failure mode
 # a human skim reads as "not a failure": PB796 counted SIX cancelled rows inside the 29-hour red window. A
 # `pull_request` run, by contrast, is superseded the moment its head moves, so cancelling it costs no coverage
-# and saves the minutes this group was added for. Landing branches are sha-named, so they never collide anyway;
-# this expression makes that safety explicit instead of incidental.
+# and saves the minutes this group was added for. A merge group's ref is unique to the group
+# (`gh-readonly-queue/main/pr-<n>-<sha>`), so two groups never collide anyway; this expression makes that safety
+# explicit instead of incidental.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -116,7 +111,7 @@ jobs:
           # wire local hooks) and the `tools/claude-skills` submodule pin. The briefs ARE validated on every push, by
           # the audits job's fleet-practices check, which is not behind `run_matrix`. A skills-and-pin commit used to
           # run the full matrix (~11 min) for nothing.
-          IGNORE='^(DEVLOG\.md|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/|\.claude/|tools/claude-skills$)'
+          IGNORE='^(DEVLOG/|PROMPT\.md|CLAUDE\.md|README\.md|docs/|kb/|\.claude/|tools/claude-skills$)'
           ZERO=0000000000000000000000000000000000000000
           code=true; verified=false; reason=""; BASE=""
           if [ "$EVENT" = "pull_request" ]; then
@@ -139,17 +134,11 @@ jobs:
             elif [ -n "${BEFORE:-}" ] && [ "$BEFORE" != "$ZERO" ] \
                && git cat-file -e "${BEFORE}^{commit}" 2>/dev/null \
                && git merge-base --is-ancestor "$BEFORE" "$SHA"; then
-              BASE="$BEFORE"          # the ordinary case: before..sha IS what this push added
-            elif [ "$REF" != "refs/heads/main" ]; then
-              # A NEW BRANCH — and EVERY `ci/<short-sha>` landing branch is one, so `before` is all zeros on
-              # every single landing — or a force push, or a `before` the runner cannot resolve.
-              # ⛔ The honest base is then main, not "unknown": what this push proposes to add to main is
-              # exactly `merge-base(origin/main, sha)..sha`. Calling a new branch unconditionally code would
-              # make EVERY landing run the matrix, docs-only ones included, and this job would buy nothing.
-              git rev-parse -q --verify refs/remotes/origin/main >/dev/null 2>&1 \
-                || git fetch --no-tags --filter=blob:none origin +refs/heads/main:refs/remotes/origin/main || true
-              BASE="$(git merge-base refs/remotes/origin/main "$SHA" 2>/dev/null || true)"
+              BASE="$BEFORE"          # the ordinary case: before..sha IS what this push to main added
             fi
+            # (A push is only ever to main — `push.branches` above — so there is no new-branch arm: a `before` the
+            # runner cannot resolve leaves BASE empty and the matrix runs, unless the short-circuit below finds the
+            # merge group's green run on this very sha.)
             if [ -z "$BASE" ]; then
               reason="no usable base (before=${BEFORE:-<unset>}, ref=$REF) — the matrix runs"
             else
@@ -164,19 +153,19 @@ jobs:
                 reason="$(grep -c . code.txt) path(s) outside the doc-only list, e.g. $(head -1 code.txt)"
               else
                 code=false
-                reason="every changed path is DEVLOG.md / PROMPT.md / CLAUDE.md / README.md / docs/ / kb/ / .claude/ / the tools/claude-skills pin — the matrix is skipped"
+                reason="every changed path is DEVLOG/ / PROMPT.md / CLAUDE.md / README.md / docs/ / kb/ / .claude/ / the tools/claude-skills pin — the matrix is skipped"
               fi
             fi
           fi
-          # ── THE ALREADY-VERIFIED SHORT-CIRCUIT. `scripts/push-main.sh` proves a commit on `ci/<sha>` and then
-          # fast-forwards THE SAME SHA onto main; without this, that identical tree would pay for the matrix
-          # TWICE per landing — the exact waste the owner flagged on 2026-08-08 over a single spent run. A check
-          # run is attached to the COMMIT, so a green `ci-gate` on this sha is a verdict on this exact tree
-          # whatever branch earned it. Any failure of the lookup leaves verified=false and the matrix runs.
-          # The merge queue's case is the same: main advances to the merge-group commit, whose `merge_group` run
-          # earned the verdict (kb/Work PB3024).
+          # ── THE ALREADY-VERIFIED SHORT-CIRCUIT. The merge queue tests the merge-group commit (`merge_group` run on
+          # `gh-readonly-queue/main/...`) and then advances main to THAT SAME SHA; without this, that identical tree
+          # would pay for the matrix TWICE per landing — the exact waste the owner flagged on 2026-08-08 over a single
+          # spent run. A workflow run is keyed by its head sha, so a green run on this sha is a verdict on this exact
+          # tree whatever ref earned it. Any failure of the lookup leaves verified=false and the matrix runs.
+          # Measured on the first three queued landings (kb/Work PB3024 item 3): PR 7 → 79d760ab6, PR 8 → 424e699ec,
+          # PR 9 → 9d18aa9ab each found its one `merge_group` run green and skipped the matrix on main's `push` run.
           # ⛔ ONLY A RUN THAT COULD HAVE RUN THE MATRIX COUNTS (kb/Work PB3024): a `pull_request` run is the cheap jobs
-          # only, and its green `ci-gate` is attached to the PR's head commit — the very sha a landing may push — so a
+          # only, and its green `ci-gate` is attached to the PR's head commit — a commit main itself may later point at — so a
           # check-run lookup would read it as a verdict on the matrix. A successful run of THIS workflow (whose
           # `ci-gate` is `if: always()`, so a success run is a green ci-gate) from any event but `pull_request` is.
           if [ "$code" = "true" ] && [ "$EVENT" = "push" ]; then
@@ -295,6 +284,24 @@ jobs:
           else
             python3 scripts/spec/audit_witness_loss.py --check
           fi
+      - name: DEVLOG — the landing carries exactly one new, stamped entry file (devlog.py check)
+        # Every landing on main carries its one DEVLOG entry (CLAUDE.md rule 6; kb/Work PB2605, PB3025). Checked on what
+        # a landing PROPOSES — a pull request or a merge group — against the main it would land on; a push to main
+        # (the merge-queue commit) was checked as its merge group, and a dispatch run proposes nothing.
+        if: ${{ !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'merge_group') }}
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          MG_BASE: ${{ github.event.merge_group.base_sha }}
+        run: |
+          set -euo pipefail
+          # a pull request checks out its merge with the CURRENT base, whose first parent is that base
+          case "$EVENT" in
+            pull_request) BASE="$(git rev-parse HEAD^1)" ;;
+            merge_group)  BASE="$MG_BASE" ;;
+            *)            echo "devlog step: unexpected event '$EVENT' (the step's if: admits only pull_request and merge_group)"; exit 2 ;;
+          esac
+          python3 scripts/devlog.py check --base "$BASE" --rev HEAD
       - name: Rule catalog — the unharvested-rule manifest agrees with the transcription (extract_rule_catalog.py --check)
         if: ${{ !cancelled() }}
         run: python3 scripts/spec/extract_rule_catalog.py --check

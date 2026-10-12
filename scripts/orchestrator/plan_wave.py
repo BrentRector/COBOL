@@ -9,13 +9,13 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 9 (kb/Work PB198
 cost the orchestrator a hand-written groups.json; this computes it.
 
 1. AWAITING LANDING: an open note whose newest report is DONE and whose branch is not on main yet is excluded (the
-   `land` unit lands it first; re-planning it would dispatch the same work twice).
+   `enqueue` unit lands it first; re-planning it would dispatch the same work twice).
    HELD BY A DISPATCH: an open note that a dispatch-ledger group names (a wave this loop or another session planned,
    launched or not, or a hand dispatch within HAND_TTL_SECONDS) and that no report written since that dispatch names
    is excluded too, and waits with the group named: its work is another agent's, or a planned wave's that has not
    launched yet (held_by_dispatch, kb/Work PB2806). An aborted dispatch is released with --release.
 2. FINISHERS FIRST: an open note whose newest report says SPLIT or NOT STARTED (its branch landed, gone, or still
-   unlanded: the finisher then cherry-picks the branch's commits, because a `land` unit lands only DONE branches;
+   unlanded: the finisher then cherry-picks the branch's commits, because an `enqueue` unit lands only DONE branches;
    kb/Work PB2575), a DONE report whose branch review stamped FINDINGS (kb/Work PB3027: the finisher answers each
    finding), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
    name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
@@ -27,9 +27,10 @@ cost the orchestrator a hand-written groups.json; this computes it.
 5. MODEL per group from model_rules.json (Opus for design-heavy files and areas, an open design question, or a note
    that already failed twice; Sonnet otherwise; never Fable).
 6. COST per group from model_rules.json; groups are taken in rank order while they fit (a group that does not fit is
-   skipped and a smaller later one may still fit; a successor only with its predecessor), plus one lander per train.
-7. Codes (three per group) and lead-id blocks (five per train) come from alloc.py; --dry-run peeks and reserves
-   nothing, and writes nothing.
+   skipped and a smaller later one may still fit; a successor only with its predecessor), plus each group's landing (kb/Work PB3023).
+7. Codes (three per group) come from alloc.py; --dry-run peeks and reserves nothing, and writes nothing. The planner
+   allocates no lead ids: the enqueue unit's clerk takes them from `alloc.py pb <n>` when it files the landed reports'
+   leads (units/enqueue.md step 5; kb/Work PB3023 retired the train's lead-id blocks).
 8. A note whose body says it needs a frontier model under the owner's approval (model_rules.json
    routing.owner_approval_patterns) is never planned: it is listed as waiting (MANDATORY-PRACTICES P1).
 
@@ -50,7 +51,7 @@ train is never held for it. The in-flight set never reads a branch CLASSIFICATIO
 classifies MERGED and one that edits only existing files classifies LANDED, so a classification-filtered set missed
 both (PB2118 Draft 7, the sixth refuter's partition lead). --no-branches skips the git half (a planning preview),
 never the dispatch ledger or the slice half. This set is the ADMISSION estimate; the GUARANTEE is the landing check
-(scripts/orchestrator/landing_check.py, run by push-main.sh): a landing whose ACTUAL diff leaves its declared set or
+(scripts/orchestrator/landing_check.py, run by `enqueue.py land`): a landing whose ACTUAL diff leaves its declared set or
 meets another in-flight branch's stops and re-plans (PB2118 Draft 9).
 
 Without --dry-run it writes <scratch>/groups.json (make_dispatch_specs.py's format), runs make_dispatch_specs.py
@@ -78,6 +79,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE.parent / "spec"))
 import alloc  # noqa: E402
 import coord  # noqa: E402
+import devlog  # noqa: E402  (the one reader of DEVLOG/)
 import work  # noqa: E402  (cluster_order: the ONE reader of cluster: and blocked_by:)
 from work import parse_frontmatter  # noqa: E402  (the ONE frontmatter reader, with its C# parity twin)
 
@@ -88,6 +90,16 @@ PB = re.compile(r"\bPB\d+\b")
 REPORT_NAME = re.compile(r"^w(?P<wave>\d+)(?P<letter>[a-z0-9]*)-(?P<lead>PB\d+)-report\.md$")
 STATUS_WORD = re.compile(r"^\**(?:Status:\**)?\s*\**\s*(?P<s>DONE|SPLIT|DISCHARGED|BLOCKED|NOT STARTED)\b", re.I)
 BRANCH = re.compile(r"\b(worktree-[A-Za-z0-9_][A-Za-z0-9_.\-]*[A-Za-z0-9_])")
+#: The header's own branch FIELD — `Branch: x` (the O11 header) or `**branch:** `x`` (the report template) — which
+#: names exactly the report's branch, read at a FIELD POSITION only: the start of a header line or right after the
+#: template's ` · ` separator. Mid-prose `branch:` is not a field — real reports say "this branch: every file …"
+#: (w1043x, w1055z), and an unanchored rule took `every` (review round 1 of PB3077). BRANCH, the first `worktree-…`
+#: word, is only the fallback for a header with no field (kb/Work PB3077; prune_worktrees.newest_report applies
+#: the same field-first rule).
+BRANCH_FIELD = re.compile(r"(?im)(?:^|·)[ \t]*\**branch:\**\s*`?([A-Za-z0-9_][A-Za-z0-9_.\-]*[A-Za-z0-9_])")
+#: A review stamp line (review_findings.py stamp, kb/Work PB3027), placeholder or not: its reviewer label
+#: `land-review-<branch>-r1` names the branch with a suffix, so the branch, worktree and head are read around it.
+REVIEW_LINE = re.compile(r"^\**Review:", re.I)
 WORKTREE = re.compile(r"([A-Za-z]:\\[^\s`*]*?\\worktrees\\[A-Za-z0-9_.\-]+)")
 HEAD = re.compile(r"\bHEAD\b[:*`\s]*([0-9a-f]{7,40})\b|\bhead ([0-9a-f]{7,40})\b")
 # THE BRANCH REVIEW'S STAMP (kb/Work PB3027; DESIGN-test-build-ci.md section 3.17.2 step 2). The read-only reviewer of a
@@ -187,8 +199,13 @@ def parse_report(p: pathlib.Path) -> Report | None:
     status = next((s.group("s").upper() for l in header[:6] if (s := STATUS_WORD.match(l.strip()))), "")
     if not status and re.search(r"\bSPLIT\b", text):
         status = "SPLIT"
-    h = HEAD.search(text)
-    b, w = BRANCH.search(text), WORKTREE.search(text)
+    # The branch is the header's own field, never a word of the review stamp (kb/Work PB3077): review_findings.py
+    # stamps the review one line under Status, ABOVE the Branch field of an O11 header, and its reviewer label
+    # `land-review-worktree-…-r1` was the header's first `worktree-…` word — a branch that does not exist, ABSENT,
+    # so every reviewed branch read as landed and wave 1064's finishers were told to merge `worktree-…-r1`.
+    unstamped = "\n".join(l for l in header if not REVIEW_LINE.match(l.strip()))
+    h = HEAD.search(unstamped)
+    b, w = BRANCH_FIELD.search(unstamped) or BRANCH.search(unstamped), WORKTREE.search(unstamped)
     ids = list(dict.fromkeys(PB.findall(text) + [m.group("lead")]))
     return Report(p, int(m.group("wave")), f"w{m.group('wave')}{m.group('letter')}", m.group("lead"), status, ids,
                   bool(re.search(r"(?i)not\s+started", text)), b.group(1) if b else None, w.group(1) if w else None,
@@ -571,9 +588,10 @@ def group_cost(model: str, n_notes: int, rules: dict[str, Any]) -> float:
     return (c["per_group_tokens"][model] + c["per_note_tokens"][model] * n_notes) / cal["tokens_per_point"][model]
 
 
-def lander_cost(rules: dict[str, Any]) -> float:
+def landing_cost(rules: dict[str, Any]) -> float:
+    """The points one group's landing costs: the enqueue unit's model turns for its branch (kb/Work PB3023)."""
     c = rules["cost"]
-    return c["lander_tokens"] / rules["calibration"]["tokens_per_point"][c["lander_model"]]
+    return c["landing_tokens"] / rules["calibration"]["tokens_per_point"][c["landing_model"]]
 
 
 def branch_resume(branch: str, nid_list: list[str]) -> str:
@@ -638,11 +656,11 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     finisher_by_rep: dict[pathlib.Path, list[str]] = {}
     for nid, r in newest.items():
         cls = classify(r.branch) if r.branch else "ABSENT"
-        # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: a `land` unit lands only DONE
-        # branches (units/land.md), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
+        # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: an `enqueue` unit lands only DONE
+        # branches (units/enqueue.md), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
         # finisher cherry-picks the branch's commits (finisher_pred's UNLANDED arm). A DONE report that names a
-        # note NOT started still lands first: its finished work is the land unit's.
-        # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the land unit never fixes
+        # note NOT started still lands first: its finished work is the enqueue unit's.
+        # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the enqueue unit never fixes
         # a review finding, so its finisher answers them (finisher_pred's review arm).
         if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or \
                 (cls not in LANDED_CLASSES and r.status == "DONE" and r.review and r.review.verdict == "FINDINGS"):
@@ -765,11 +783,10 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         placed.append(g)
     groups = placed
 
-    # Fill the budget in rank order (finishers first); one lander per train.
+    # Fill the budget in rank order (finishers first); every group pays for its own landing (kb/Work PB3023).
     chosen: list[Group] = []
     skipped: list[Group] = []
     spent = 0.0
-    train = wave_rules["train_size"]
     for g in groups:
         if max_groups is not None and len(chosen) >= max_groups:
             skipped.append(g)
@@ -777,15 +794,13 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         if g.after and g.after not in {c.letter for c in chosen}:
             skipped.append(g)
             continue
-        landers_after = math.ceil((len(chosen) + 1) / train) - math.ceil(len(chosen) / train)
-        need = g.cost + landers_after * lander_cost(rules)
+        need = g.cost + landing_cost(rules)
         if spent + need > budget_points + 1e-9:
             skipped.append(g)
             continue
         chosen.append(g)
         spent += need
     return {"groups": chosen, "skipped": skipped, "awaiting_landing": awaiting, "points": spent,
-            "trains": math.ceil(len(chosen) / train) if chosen else 0,
             "unlanded_without_note": sorted(b for b, ids in unlanded.items() if not ids), "waiting": waiting}
 
 
@@ -829,18 +844,15 @@ def as_group_json(g: Group, wave: str, notes: dict[str, Note], codes: str) -> di
     return out
 
 
-def previous_train(repo: pathlib.Path) -> str:
-    with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            m = re.match(r"^## Entry \d+ .*?\bTrain (\d+[a-z]?)", line)
-            if m:
-                return f"train {m.group(1)}"
-    return "the previous train (see DEVLOG.md)"
+#: How much of the newest DEVLOG the wave and train numbering reads (one file per entry, kb/Work PB3025): the newest
+#: RECENT_ENTRIES entries, and of those the first RECENT_LINES lines for wave and train labels.
+RECENT_ENTRIES = 20
+RECENT_LINES = 200
 
 
 def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path | None = None) -> int:
     """One past the highest wave OR train number in the reports directory, the dispatch ledger (`coord_dir`) or the
-    newest 200 DEVLOG lines. A wave's first train is labelled with the wave number, so a train label counts as taken
+    newest RECENT_LINES lines of the DEVLOG's newest entries. A wave's first train is labelled with the wave number, so a train label counts as taken
     too (kb/Work PB2562: trains 1035 and 1036 came from waves 1031 and 1032, the planner proposed wave 1035, and
     "Train 1034" had already landed twice). A wave planned but with no report yet (another session's, awaiting the
     operator's GO) is taken as well, or the next wave reuses its number and overwrites its specs (kb/Work PB2806)."""
@@ -848,9 +860,8 @@ def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path
     if coord_dir is not None:
         seen += [int(g["wave"]) for g in coord.read_json(coord_dir / DISPATCH_LEDGER, {"groups": []}).get("groups", [])
                  if str(g.get("wave", "")).isdigit()]
-    with open(repo / "DEVLOG.md", encoding="utf-8", errors="replace") as f:
-        for _, line in zip(range(200), f):
-            seen += [int(w) for w in re.findall(r"\b(?:[Ww]aves?|[Tt]rains?) (\d{3,})", line)]
+    for line in "".join(devlog.newest(repo, RECENT_ENTRIES)).split("\n")[:RECENT_LINES]:
+        seen += [int(w) for w in re.findall(r"\b(?:[Ww]aves?|[Tt]rains?) (\d{3,})", line)]
     return max(seen, default=0) + 1
 
 
@@ -991,23 +1002,17 @@ def main(argv: list[str] | None = None) -> int:
     waiting.update(p["waiting"])
 
     wave = str(next_wave(REPO, reports, cdir)) if a.wave == "next" else str(a.wave)
-    train = rules["wave"]["train_size"]
     peek_code = alloc.peek("code", REPO, cdir)
-    peek_pb = alloc.peek("pb", REPO, cdir)
     per = rules["wave"]["codes_per_group"]
-    gjson, blocks = [], []
+    gjson = []
     for k, g in enumerate(p["groups"]):
         if a.dry_run:
             first = peek_code + k * per
         else:
             first, _ = alloc.allocate("code", per, REPO, cdir)
         gjson.append(as_group_json(g, wave, notes, alloc.render("code", first, per)))
-    for t in range(p["trains"]):
-        n = rules["wave"]["lead_ids_per_train"]
-        first = peek_pb + t * n if a.dry_run else alloc.allocate("pb", n, REPO, cdir)[0]
-        blocks.append(alloc.render("pb", first, n))
 
-    print(f"=== WAVE {wave} PLAN{campaign}: {len(p['groups'])} groups, {p['trains']} train(s), {p['points']:.2f} of "
+    print(f"=== WAVE {wave} PLAN{campaign}: {len(p['groups'])} groups, {p['points']:.2f} of "
           f"{budget_points:.2f} weekly points{' (DRY RUN: nothing reserved or written)' if a.dry_run else ''} ===")
     for g, j in zip(p["groups"], gjson):
         print(f"  {j['letter']:>3} {g.model:6} {('after ' + g.after) if g.after else '':9} {g.kind:8} "
@@ -1015,7 +1020,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"      notes {j['notes']} (lead {j['lead']}); model: {g.why_model}"
               + (f"; blocked by {', '.join(g.blocked_by)} (planned before it)" if g.blocked_by else ""))
     if p["awaiting_landing"]:
-        print("  awaiting landing (excluded; a `land` unit first): " + "; ".join(
+        print("  awaiting landing (excluded; an `enqueue` unit first): " + "; ".join(
             f"{b}: {', '.join(ids)}" for b, ids in sorted(p["awaiting_landing"].items())))
     if waiting:
         print("  waiting (a later wave): " + "; ".join(f"{i}: {why}" for i, why in waiting.items()))
@@ -1023,8 +1028,6 @@ def main(argv: list[str] | None = None) -> int:
         print("  UNLANDED branches naming no open note (judgment): " + ", ".join(p["unlanded_without_note"]))
     print(f"  next {len(p['skipped'])} candidates skipped (budget, cap or predecessor): " +
           ", ".join(f"{g.letter}({'+'.join(g.notes[:2])}{'…' if len(g.notes) > 2 else ''})" for g in p["skipped"][:8]))
-    print(f"  lead-id blocks: {', '.join(blocks) or 'none'}; devlog_n {alloc.peek('devlog', REPO, cdir)}; "
-          f"previous {previous_train(REPO)}")
     if a.dry_run or not p["groups"]:
         return 0
 
@@ -1041,9 +1044,7 @@ def main(argv: list[str] | None = None) -> int:
                                  "stop_file": str(stop_file), "groups": gjson}, indent=1, ensure_ascii=False) + "\n",
                      encoding="utf-8", newline="\n")
     args = {"scratch": str(scratch), "wave": wave, "stop_file": str(stop_file), "global_stop": str(coord.global_stop(a.coord)),
-            "concurrency": rules["wave"]["concurrency"], "train_size": train,
-            "min_final_train": rules["wave"]["min_final_train"], "devlog_n": alloc.peek("devlog", REPO, cdir),
-            "previous_train": previous_train(REPO), "lead_id_blocks": blocks,
+            "concurrency": rules["wave"]["concurrency"],
             "implementer_model": rules["wave"]["implementer_model"], "authorization": a.authorization,
             "groups": [{k: j[k] for k in ("letter", "lead", "notes", "codes", "model", "after") if k in j}
                        for j in gjson]}

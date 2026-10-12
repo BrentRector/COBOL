@@ -12,7 +12,7 @@ and every gate stayed green. Two rules:
   1. the CLOSED set (state OK) at `base` is a subset of the closed set at `head`;
   2. when the GAP count rises, every row that is GAP at `head` and was not GAP at `base` is an offender.
 
-An offender is EXCUSED by a line ADDED in the range (DEVLOG.md or any kb/Work/*.md, committed or not) that reads
+An offender is EXCUSED by a line ADDED in the range (any DEVLOG/ entry or kb/Work/*.md, committed or not) that reads
 
     reopens-rows: <rule-id-or-glob>[, <rule-id-or-glob>...] — <reason>
 
@@ -39,7 +39,7 @@ CLOSED = "OK"
 GAP = "GAP"
 MARKER = re.compile(r"reopens-rows:\s*(?P<ids>[A-Za-z0-9.*?\[\]\-]+(?:\s*,\s*[A-Za-z0-9.*?\[\]\-]+)*)\s*"
                     r"(?:—|–|\s-\s|:)\s*(?P<reason>\S.*)$")
-EXCUSE_PATHS = ("DEVLOG.md", "kb/Work")
+EXCUSE_PATHS = ("DEVLOG", "kb/Work")
 
 
 def compare(before: list[dict[str, Any]], after: list[dict[str, Any]]) -> dict[str, Any]:
@@ -74,12 +74,12 @@ def _git(*args: str) -> str:
 
 
 def added_lines(base: str, head: str) -> list[str]:
-    """Every line added between base and head in DEVLOG.md and kb/Work (head WORKTREE adds untracked notes whole)."""
+    """Every line added between base and head in DEVLOG/ and kb/Work (head WORKTREE adds untracked files whole)."""
     rng = [base] if head == WORKTREE else [base, head]
     diff = _git("diff", "--unified=0", "--no-color", *rng, "--", *EXCUSE_PATHS)
     lines = [l[1:] for l in diff.splitlines() if l.startswith("+") and not l.startswith("+++")]
     if head == WORKTREE:
-        for rel in _git("ls-files", "--others", "--exclude-standard", "--", "kb/Work").split():
+        for rel in _git("ls-files", "--others", "--exclude-standard", "--", *EXCUSE_PATHS).split():
             lines += (REPO / rel).read_text(encoding="utf-8", errors="replace").splitlines()
     return lines
 

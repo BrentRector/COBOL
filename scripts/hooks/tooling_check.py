@@ -27,7 +27,7 @@ import coord  # noqa: E402
 HOME = pathlib.Path.home()
 CONFIG = account.config_dir()   # THIS session's account: its user settings, skills and plugins live here
 CLOUD = os.environ.get("CLAUDE_CODE_REMOTE") == "true"
-ROLES = ["cobol-implementer", "cobol-lander", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator",
+ROLES = ["cobol-implementer", "cobol-finisher", "cobol-refuter", "cobol-adjudicator", "cobol-clerk", "cobol-locator",
          "cobol-reviewer"]
 
 
@@ -41,7 +41,7 @@ def load(p):
 # The permission mode the owner decided for sessions in this repository (owner decision 2026-09-20): scripts/start-session.ps1
 # starts every session with --dangerously-skip-permissions, which Claude Code records as `bypassPermissions`. A session
 # started any other way runs in its account's `permissions.defaultMode` (account 2's is "auto"), where the classifier
-# can refuse push-main.sh (kb/Work PB2601). The self-test holds start-session.ps1 to the flag this constant stands for.
+# can refuse `enqueue.py land` (kb/Work PB2601). The self-test holds start-session.ps1 to the flag this constant stands for.
 OWNER_PERMISSION_MODE = "bypassPermissions"
 START_SESSION = REPO / "scripts" / "start-session.ps1"
 
@@ -77,7 +77,8 @@ def permission_mode_line(payload: dict | None, default_mode: str | None) -> tupl
     mode, source = session_permission_mode(payload)
     fix = (f"the owner decided `{OWNER_PERMISSION_MODE}` for this repository (2026-09-20): restart the session with "
            "`pwsh scripts/start-session.ps1` (it passes --dangerously-skip-permissions), or the auto-mode classifier "
-           "can refuse push-main.sh and a lander must then hand off READY-TO-PUSH (MANDATORY-PRACTICES L13)")
+           "can refuse `enqueue.py land` and the agent must then hand the branch off as READY-TO-LAND "
+           "(MANDATORY-PRACTICES L13)")
     if mode == OWNER_PERMISSION_MODE:
         return "OK", f"{mode} (read from {source})"
     if mode:

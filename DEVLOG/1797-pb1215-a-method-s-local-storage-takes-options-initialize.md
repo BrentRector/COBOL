@@ -1,0 +1,4 @@
+## Entry 1797 — 2026-09-29 19:43 PDT — PB1215: a method's LOCAL-STORAGE takes OPTIONS INITIALIZE
+
+`InitialStateBackground.FillFor` chose the fill from the class half's `Options` and `LocalStorageRoots`, neither of which knows a METHOD: its OPTIONS paragraph is `m.MethodOptions` and its LOCAL-STORAGE binds into `m.Binding.LocalRoots`, so `INITIALIZE LOCAL-STORAGE TO X"41"` on a method (or on its class, inherited per §11.9.4 GR1) was silently ignored and every activation started with spaces. `EmitContext.ActivationLocalRoots` plus a scoped swap of the method's options around its LOCAL-STORAGE initializers in `OoEmitter.EmitMethod`. Closes GR-13.6.4-2; GAP 795 to 794. Not measured here: object / factory / method WORKING-STORAGE under INITIALIZE WORKING-STORAGE (the note's outside-subject sibling).
+

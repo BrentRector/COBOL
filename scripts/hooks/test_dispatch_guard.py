@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-test for dispatch_guard.py — a fleet dispatch without the workstream skill, or an implementer/lander dispatch
+"""Self-test for dispatch_guard.py — a fleet dispatch without the workstream skill, or an implementer/finisher dispatch
 without a checked brief, is blocked; a compliant dispatch and every other role pass.
 Run: python scripts/hooks/test_dispatch_guard.py   (needs the tools/claude-skills submodule, like check_practices.py;
 CI's fleet-practices step runs it after `git submodule update --init tools/claude-skills`.)"""
@@ -13,7 +13,7 @@ import tempfile
 HOOK = pathlib.Path(__file__).with_name("dispatch_guard.py")
 REPO = pathlib.Path(__file__).resolve().parents[2]
 BRIEF = REPO / ".claude" / "skills" / "workstream" / "templates" / "fix-lane-implementer-brief.md"
-LANDER = REPO / ".claude" / "skills" / "workstream" / "templates" / "lander-train-brief.md"
+FINISHER = REPO / ".claude" / "skills" / "workstream" / "templates" / "finisher-brief.md"
 TMP = pathlib.Path(tempfile.mkdtemp())
 
 WITH_SKILL = TMP / "with.jsonl"
@@ -36,13 +36,10 @@ CASES = [
     ("implementer, inline brief", agent("cobol-implementer", "Fix PB1 and PB2 as follows ...", WITH_SKILL), True),
     ("implementer, unchecked rendered spec", agent("cobol-implementer", f"Follow {BAD_SPEC}", WITH_SKILL), True),
     ("implementer, template brief, skill loaded", agent("cobol-implementer", f"Follow {BRIEF}", WITH_SKILL), False),
-    ("lander, skill not loaded", agent("cobol-lander", f"Follow {BRIEF}", WITHOUT_SKILL), True),
-    # rule 4 (kb/Work PB2602): a lander dispatch names the loop's state, filled in
-    ("lander, no loop state", agent("cobol-lander", f"Follow {LANDER}", WITH_SKILL), True),
-    ("lander, placeholder loop state", agent("cobol-lander", f"Follow {LANDER}. LOOP STATE: {{LOOP_STATE}}", WITH_SKILL), True),
-    ("lander, loop state named", agent("cobol-lander", f"Follow {LANDER}. LOOP STATE: stopped (no orchestrate.lock)",
-                                       WITH_SKILL), False),
-    ("implementer needs no loop state", agent("cobol-implementer", f"Follow {BRIEF}", WITH_SKILL), False),
+    # kb/Work PB3023: the finisher is the judgment role that lands (the lander retired with the train)
+    ("finisher, skill not loaded", agent("cobol-finisher", f"Follow {FINISHER}", WITHOUT_SKILL), True),
+    ("finisher, inline brief", agent("cobol-finisher", "Resolve the conflict in x.cs and land it", WITH_SKILL), True),
+    ("finisher, template brief, skill loaded", agent("cobol-finisher", f"Follow {FINISHER}", WITH_SKILL), False),
     ("workflow, skill not loaded", {"tool_name": "Workflow", "tool_input": {}, "transcript_path": str(WITHOUT_SKILL)}, True),
     ("workflow, skill loaded", {"tool_name": "Workflow", "tool_input": {}, "transcript_path": str(WITH_SKILL)}, False),
     ("read-only role needs no spec", agent("cobol-refuter", "Try to overturn this verdict", WITHOUT_SKILL), False),
@@ -55,7 +52,7 @@ CASES = [
 COORD = TMP / "coord"   # rule 3 writes the dispatch ledger: never the real coordination directory from a test
 COORD.mkdir()
 # The cases choose the session kind themselves (UNIT_ENV adds COBOL_LOOP_UNIT), so the caller's own kind never leaks in:
-# a gate run inside a loop unit (a land unit's lander has COBOL_LOOP_UNIT=land) made the "attended session" case a loop
+# a gate run inside a loop unit (an enqueue unit's finisher has COBOL_LOOP_UNIT=enqueue) made the "attended session" case a loop
 # unit and turned this self-test red on a correct hook (kb/Work PB2702).
 ENV = {k: v for k, v in os.environ.items() if k != "COBOL_LOOP_UNIT"} | {"COBOL_COORD_DIR": str(COORD)}
 
@@ -90,7 +87,7 @@ if not recorded({"tool_name": "Workflow", "transcript_path": str(WITH_SKILL),
                  "tool_input": {"script": "wf_rolling_wave.js", "args": {"groups": [{"letter": "a", "notes": ["PB2296"]}]}}}):
     fails.append(("an admitted Workflow is recorded with the notes its args name", False))
 # rule 0 (kb/Work PB2597): in a LOOP UNIT (COBOL_LOOP_UNIT set by the supervisor) with STOP-UNIT present, no fleet
-# launch: a Workflow and an implementer or lander are refused even with the skill loaded and a checked brief; a read-only
+# launch: a Workflow and an implementer or finisher are refused even with the skill loaded and a checked brief; a read-only
 # role still passes; an attended session (no COBOL_LOOP_UNIT) sharing the coordination directory is never refused for it
 WF_OK = {"tool_name": "Workflow", "tool_input": {}, "transcript_path": str(WITH_SKILL)}
 
@@ -105,7 +102,7 @@ UNIT_ENV = dict(ENV, COBOL_LOOP_UNIT="wave")
 STOP_CASES = [
     ("loop unit after STOP-UNIT: Workflow refused", WF_OK, UNIT_ENV, True),
     ("loop unit after STOP-UNIT: implementer refused", agent("cobol-implementer", f"Follow {BRIEF}", WITH_SKILL), UNIT_ENV, True),
-    ("loop unit after STOP-UNIT: lander refused", agent("cobol-lander", f"Follow {BRIEF}", WITH_SKILL), UNIT_ENV, True),
+    ("loop unit after STOP-UNIT: finisher refused", agent("cobol-finisher", f"Follow {FINISHER}", WITH_SKILL), UNIT_ENV, True),
     ("loop unit after STOP-UNIT: a read-only role passes", agent("cobol-refuter", "Refute this", WITH_SKILL), UNIT_ENV, False),
     ("attended session, the loop's STOP-UNIT present: Workflow passes", WF_OK, ENV, False),
 ]

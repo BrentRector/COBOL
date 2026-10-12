@@ -92,7 +92,7 @@ RESPONSIBILITY_MIN_METHODS = 3  # a method-name subject names a responsibility w
 
 # ── THE DEAD-ARTIFACT POLICY ───────────────────────────────────────────────────────────────────────────────────
 # A reader is any tracked text file but the artifact itself. Two kinds of mention are NOT a caller or a reader:
-HISTORY = {"DEVLOG.md"}                        # the history narrative (CLAUDE.md rule 6)
+HISTORY = ("DEVLOG/",)                         # the history narrative, one file per entry (CLAUDE.md rule 6)
 # Census records list every artifact they measure. A tracked path is always `/`-separated, so the prefix is the POSIX
 # form: `str(RECORD_DIR)` is backslashed on Windows, matched nothing, and counted a record as a LIVE reader of every
 # artifact it found dead (kb/Work PB2234's sweep).
@@ -103,7 +103,7 @@ CLOSED_STATUSES = {"landed", "retired", "discharged", "closed", "superseded", "d
 CONVENTIONAL = {"README.md", "LICENSE", "LICENSE.md", "LICENSE.txt", "__init__.py", ".gitignore", ".gitattributes",
                 ".gitmodules", "CLAUDE.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md",
                 "CLA.md", "global.json", "nuget.config", "Directory.Build.props", "Directory.Packages.props",
-                "Directory.Build.targets", "Cobol.Net.sln", "PROMPT.md", "DEVLOG.md", ".agent-fleet.json",
+                "Directory.Build.targets", "Cobol.Net.sln", "PROMPT.md", ".agent-fleet.json",
                 "conftest.py"}
 # ...and any file whose name, or whose folder's name, says it is a notice for people (a README, a LICENSE, a NOTICE).
 NOTICE = re.compile(r"(?i)readme|license|notice")
@@ -280,7 +280,7 @@ def build_corpus(root: Path, files: list[str], phrases: set[str] = frozenset()) 
 
 
 def classify_reader(rel: str, corpus: Corpus) -> str:
-    if rel in HISTORY:
+    if rel.startswith(HISTORY):
         return "history"
     if rel.startswith(GENERATED_READERS):
         return "generated"
@@ -555,7 +555,7 @@ def build_record(sha: str, date: str, scope: dict, raw: dict, population: list[d
                            "string naming a path or file that exists nowhere",
                 "query": "a caller is a mention of the basename (the parent-qualified name when two tracked files "
                          "share it) or a Python import, in any tracked text file but the artifact itself",
-                "notCallers": "DEVLOG.md (history), closed kb/Work notes, and census records",
+                "notCallers": "DEVLOG/ (history), closed kb/Work notes, and census records",
                 "conventional": sorted(CONVENTIONAL),
             },
         },
@@ -739,7 +739,7 @@ def self_test() -> int:
             "scripts/with space.md": "x", "scripts/rr/rr-README.txt": "x", "scripts/rr/LICENSE/NOTES.txt": "x",
             "tools/Probe/Probe.csproj": "x", "tools/Probe/Program.cs": "x",
             "tools/runner.py": "subprocess.run(['dotnet', 'build', 'tools/Probe'])\nsee 'with space.md'\n",
-            "DEVLOG.md": "we once ran hist.py and a/run.sh, drive.ps1, runner.py", "README.md": "x",
+            "DEVLOG/0001-x.md": "we once ran hist.py and a/run.sh, drive.ps1, runner.py", "README.md": "x",
             "kb/Work/PB1.md": "---\nstatus: open\n---\nwill call planned.ps1\n",
             "kb/Work/PB2.md": "---\nstatus: landed\n---\nused hist.py\n",
         }

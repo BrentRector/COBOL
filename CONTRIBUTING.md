@@ -50,7 +50,7 @@ Prerequisites: the **.NET 10 SDK**, **PowerShell 7+** (`pwsh`, used for ANTLR pa
 scripts), **Python 3.14+** and **Java 21+** (for ANTLR).
 
 ```bash
-git clone https://github.com/BrentRector/COBOL.git
+git clone https://github.com/WiseOwlSoftware/COBOL.git
 cd COBOL
 dotnet build Cobol.Net.sln
 ```

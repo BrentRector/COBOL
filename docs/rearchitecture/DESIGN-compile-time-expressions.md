@@ -4,7 +4,7 @@
 > expression evaluator (frontend conditional-compilation stage + CONSTANT-entry binder), the ONE boolean
 > precedence resolver (compile-time + runtime), and the ANTLR grammar that parses every compiler-directive
 > expression. Design SSOT for review-ledger item **C2** (`PHASE-13-plan-vs-spec-review.md §24`). Keep CURRENT
-> (describes the compiler as built); do not narrate the doc's own revision history — that belongs in `DEVLOG.md`.
+> (describes the compiler as built); do not narrate the doc's own revision history — that belongs in `DEVLOG/`.
 
 ## 0. ⛔ THE MASTER CONSTRAINT — §7.3.3 SR10 (a directive is NOT a CONSTANT data entry)
 

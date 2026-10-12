@@ -17,9 +17,11 @@ following every location change the two shells accept:
                positional or as `-Path`/`-LiteralPath`/`-LP`/`-PSPath` (also `-Path:dir`); `cd -` the previous dir;
                `pwsh|powershell [-WorkingDirectory|-wd dir] -Command "…"` runs its payload in a child in that dir;
                any other command's `-WorkingDirectory dir` (Start-Process) runs that one command there.
-  Both         separators `&&`, `||`, `;`, `|` and newlines; Bash `&` (the left side runs in the background, so its
-               `cd` does not persist); quotes, escapes, `$( … )`, `{ … }`, heredoc bodies and PowerShell here-strings
-               never split a command; `~` is the home dir; a variable set earlier in the SAME call to a literal
+  Both         separators `&&`, `||`, `;`, `|` and newlines; a single `&` (Bash, and PowerShell 7's background
+               operator after a command) ends an and-or list and runs THE WHOLE LIST in a background subshell or job,
+               so no location change in that list persists: `cd X && a & b` runs `a` under X and `b` in the caller's
+               directory (kb/Work PB3095; the step after it carries the list's targets in `stranded`); quotes, escapes,
+               comments, `$( … )`, `{ … }`, heredoc bodies and PowerShell here-strings never split a command; `~` is the home dir; a variable set earlier in the SAME call to a literal
                (`WT=/e/x`, `$wt = 'E:\\x'`) is substituted.
 
 A directory the line does not determine (a target spelled with an unknown variable or a command substitution, `popd`
@@ -62,10 +64,14 @@ class Step:
     text: str                    # as written, with any heredoc body it introduces
     words: tuple[str, ...]       # its words, quotes removed, known variables substituted
     cwd: str | None              # the directory it runs in; None when the line does not determine it
-    sep: str                     # the separator that FOLLOWS it ("" at the end): && || ; | & or a newline
+    sep: str                     # the separator that FOLLOWS it ("" at the end): && || ; | & or a newline; the last
+                                 # step of a group or a `-c` payload carries the separator that follows the group
     depth: int                   # 0 = the tool call's own command line; >0 = inside a subshell, group or `-c` payload
     location: str | None = None  # a location change's target as written (after substitution); "" for one with no
                                  # argument (`cd` = home, `popd`); None when the step is not a location change
+    stranded: tuple[str, ...] = ()  # on the FIRST step after an and-or list a single `&` sent to the background: that
+                                 # list's own location changes (as `location` spells them), which moved only the
+                                 # background job and do NOT apply here (forbidden_commands.py rule 7, kb/Work PB3095)
 
 
 def shell_of(tool_name: str | None) -> str:
@@ -171,7 +177,10 @@ def _split(command: str, shell: str) -> list[tuple[str, str]]:
                 flush(";"); i += 1; continue
             if c == "|":
                 flush("|"); i += 1; continue
-            if c == "&" and shell == BASH and not (buf and buf[-1][-1:] in "<>") and command[i + 1:i + 2] != ">":
+            # A single `&` is the background operator, never in a redirection (`2>&1`, `*>&1`, `&>`); in PowerShell a
+            # `&` that STARTS a command is the call operator (`; & pwsh -File x.ps1`).
+            if (c == "&" and not (buf and buf[-1][-1:] in "<>") and command[i + 1:i + 2] != ">"
+                    and (shell == BASH or "".join(buf).strip())):
                 flush("&"); i += 1; continue
         buf.append(c)
         i += 1
@@ -249,44 +258,79 @@ class _State:
     previous: str | None
     stack: list[str | None]
     variables: dict[str, str]
+    moved: list[str] = dataclasses.field(default_factory=list)  # every location change that moved THIS shell, as
+                                                                 # `Step.location` spells it, in order
+
+    def copy(self) -> "_State":
+        return _State(self.cwd, self.previous, list(self.stack), dict(self.variables), list(self.moved))
+
+    def adopt(self, other: "_State") -> None:
+        self.cwd, self.previous, self.stack, self.variables, self.moved = (
+            other.cwd, other.previous, other.stack, other.variables, other.moved)
 
 
 def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) -> None:
+    began: _State | None = None        # the shell's state when the current and-or list began
+    stranded: tuple[str, ...] = ()     # a backgrounded list's location changes, for the next step
     for text, sep in _split(command, shell):
-        grouped = _group(text, shell)
-        if grouped is not None:
-            bracket, inner = grouped
-            # A Bash `( … )` is a subshell: its location changes end at the `)`. A `{ … }` group, and every PowerShell
-            # bracket (location is per runspace), runs in the current shell, so its changes persist.
-            child = _State(state.cwd, state.previous, list(state.stack), dict(state.variables))
-            _walk(inner, child, shell, depth + 1, out)
-            if not (shell == BASH and bracket == "("):
-                state.cwd, state.previous, state.stack, state.variables = child.cwd, child.previous, child.stack, child.variables
+        if began is None:
+            began = state.copy()
+        first = len(out)
+        _command(text, sep, state, shell, depth, out)
+        if stranded and len(out) > first:
+            out[first] = dataclasses.replace(out[first], stranded=stranded)
+            stranded = ()
+        if sep in ("&&", "||", "|"):
             continue
-        if shell == POWERSHELL and (m := _ASSIGN_PS.match(text)):
-            value = _words(m.group(2), shell)
-            if len(value) == 1:
-                state.variables[m.group(1)] = _substitute(value[0], state.variables)
-        raw = _words(text, shell)
-        words = tuple(_substitute(w, state.variables) for w in raw)
-        assigned = words[1:] if words and words[0] in _BASH_DECLARE else words
-        if shell == BASH and assigned and all(_ASSIGN_BASH.match(w) for w in assigned):
-            for w in assigned:
-                name, value = _ASSIGN_BASH.match(w).groups()
-                state.variables[name] = value
-        # a background Bash command (`… &`) and one side of a Bash pipeline run in subshells: changes do not persist
-        transient = shell == BASH and (sep in ("&", "|") or bool(out and out[-1].depth == depth and out[-1].sep == "|"))
-        if _shell_child(words, state, depth, sep, out):
-            continue
-        location = _location(words, shell)
-        if location is not None:
-            verb, target = location
-            out.append(Step(text, words, state.cwd, sep, depth, target if target is not None else ""))
-            if transient:
-                continue
+        if sep == "&":
+            # A single `&` ends the and-or list and runs ALL of it in a background subshell (Bash) or job (PowerShell
+            # 7): its location changes and variables never reach the calling shell (kb/Work PB3095).
+            # The moves it strands are the ones that would have reached the shell without the `&` (a `{ … }` group's
+            # too; a `( … )` subshell's, a pipeline side's or a `-c` payload's never would).
+            stranded = tuple(state.moved[len(began.moved):])
+            state.adopt(began)
+        began = None
+
+
+def _command(text: str, sep: str, state: _State, shell: str, depth: int, out: list[Step]) -> None:
+    """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`."""
+    grouped = _group(text, shell)
+    if grouped is not None:
+        bracket, inner = grouped
+        # A Bash `( … )` is a subshell: its location changes end at the `)`. A `{ … }` group, and every PowerShell
+        # bracket (location is per runspace), runs in the current shell, so its changes persist.
+        child = state.copy()
+        before = len(out)
+        _walk(inner, child, shell, depth + 1, out)
+        if len(out) > before:
+            out[-1] = dataclasses.replace(out[-1], sep=sep)
+        if not (shell == BASH and bracket == "("):
+            state.adopt(child)
+        return
+    if shell == POWERSHELL and (m := _ASSIGN_PS.match(text)):
+        value = _words(m.group(2), shell)
+        if len(value) == 1:
+            state.variables[m.group(1)] = _substitute(value[0], state.variables)
+    raw = _words(text, shell)
+    words = tuple(_substitute(w, state.variables) for w in raw)
+    assigned = words[1:] if words and words[0] in _BASH_DECLARE else words
+    if shell == BASH and assigned and all(_ASSIGN_BASH.match(w) for w in assigned):
+        for w in assigned:
+            name, value = _ASSIGN_BASH.match(w).groups()
+            state.variables[name] = value
+    # each side of a Bash pipeline runs in a subshell, so its changes do not persist (a background `&` is the whole
+    # list's, undone by `_walk`)
+    transient = shell == BASH and (sep == "|" or bool(out and out[-1].depth == depth and out[-1].sep == "|"))
+    if _shell_child(words, state, depth, sep, out):
+        return
+    location = _location(words, shell)
+    if location is not None:
+        verb, target = location
+        out.append(Step(text, words, state.cwd, sep, depth, target if target is not None else ""))
+        if not transient:
             _move(state, verb, target)
-            continue
-        out.append(Step(text, words, _workdir(words, state.cwd), sep, depth))
+        return
+    out.append(Step(text, words, _workdir(words, state.cwd), sep, depth))
 
 
 def _location(words: tuple[str, ...], shell: str) -> tuple[str, str | None] | None:
@@ -325,6 +369,7 @@ def _location(words: tuple[str, ...], shell: str) -> tuple[str, str | None] | No
 
 
 def _move(state: _State, verb: str, target: str | None) -> None:
+    state.moved.append(target or "")
     if verb in _POP:
         state.previous, state.cwd = state.cwd, (state.stack.pop() if state.stack else None)
         return

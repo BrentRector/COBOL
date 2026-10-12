@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Self-test for plan_wave.py on fabricated notes, clusters and reports: work awaiting landing is never re-planned,
 finishers come first and name their predecessor, clusters rank by rows claimed, a second group on a file is a
-same-file successor, the model routing rules, the budget fill (with landers and successors), and that the groups
+same-file successor, the model routing rules, the budget fill (with landings and successors), and that the groups
 render through the real dispatch-spec template and pass check_practices.py's same-file rule; that the fix lane's whole
 plan equals the golden the pre-campaign planner wrote; and the campaign lane (--cluster, kb/Work PB2120): cluster
 selection whatever the harm flags, the blocked_by order, site clustering per depth, the `after:` derivation, the
@@ -137,18 +137,18 @@ check("failed twice -> opus", (G[("PB10",)].model, "2 times" in G[("PB10",)].why
 check("never fable", {g.model for g in p["groups"]} <= set(RULES["routing"]["allowed"]), True)
 
 # 6. budget fill: a tight budget takes the first finisher only; its successor's predecessor rule holds
-one = pw.group_cost(G[("PB3", "PB6", "PB7", "PB12")].model, 4, RULES) + pw.lander_cost(RULES)
+one = pw.group_cost(G[("PB3", "PB6", "PB7", "PB12")].model, 4, RULES) + pw.landing_cost(RULES)
 p2 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=one + 0.01)
-check("tight budget: first group + its lander", ([g.notes for g in p2["groups"]], p2["trains"]), ([["PB3", "PB6", "PB7", "PB12"]], 1))
-check("points include the lander", round(p2["points"], 6), round(one, 6))
-small = pw.group_cost("sonnet", 1, RULES) + pw.lander_cost(RULES)
+check("tight budget: first group + its landing", [g.notes for g in p2["groups"]], [["PB3", "PB6", "PB7", "PB12"]])
+check("points include the landing", round(p2["points"], 6), round(one, 6))
+small = pw.group_cost("sonnet", 1, RULES) + pw.landing_cost(RULES)
 p3 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=small + 0.01)
 check("a group that does not fit is skipped, a smaller later one taken", [g.notes for g in p3["groups"]], [["PB4"]])
 check("successor never without predecessor", any(g.after for g in p3["groups"]), False)
 p4 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=100,
              max_groups=2)
 check("max groups", len(p4["groups"]), 2)
-check("trains", p["trains"], -(-len(p["groups"]) // RULES["wave"]["train_size"]))
+check("no train: the plan carries no train count (kb/Work PB3023)", "trains" in p, False)
 
 # 6b. A SPLIT REPORT ON AN UNLANDED BRANCH IS A FINISHER, NOT "AWAITING LANDING" (kb/Work PB2575): a `land` unit lands
 #     only DONE branches, so holding it stranded the work (waves 1020 D and 1032 A). Its pred cherry-picks the branch.
@@ -193,6 +193,43 @@ check("a FINDINGS stamp is a finisher whose pred names the findings file and the
       ("finisher", True))
 check("a CLEAN stamp awaits landing", p5r["awaiting_landing"].get("worktree-wf_rv-2"), ["PB7"])
 check("a placeholder Review line stamps nothing", pw.parse_review("**Review:** stamped by the branch reviewer"), None)
+# 6b''. THE BRANCH IS THE HEADER'S FIELD, NEVER A WORD OF THE REVIEW STAMP (kb/Work PB3077): review_findings.py
+#       stamps the review one line under the Status line, ABOVE the Branch field of an O11 header, and its reviewer
+#       label `land-review-<branch>-r1` carries the branch name with a suffix. The header's first `worktree-…` word
+#       was that label: a branch that does not exist, ABSENT, so every reviewed branch read as landed, and wave
+#       1064's review finishers (2026-10-11) were first told to merge `worktree-wf_aba5c7ac-b61-1-r1`.
+(RV_REPORTS / "w1062g-PB5-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 2 land-review-worktree-wf_rv-3-r1 8888888bb E:/s/review-worktree-wf_rv-3.jsonl\n"
+    "Worktree: E:\\COBOL\\.claude\\worktrees\\wf_rv-3\nBranch: worktree-wf_rv-3\nHEAD: 8888888bb\nBase: 1111111aa\n"
+    "# PB5 report\n\n## What landed\n", encoding="utf-8", newline="\n")
+(RV_REPORTS / "w1062h-PB7-report.md").write_text(
+    "# PB7 report\n**Status:** DONE · **branch:** `worktree-wf_rv-4` · **HEAD:** `9999999cc`\n"
+    "**Review:** FINDINGS 1 land-review-worktree-wf_rv-4-r1 9999999cc E:/s/review-worktree-wf_rv-4.jsonl\n\n## Reproduced?\n",
+    encoding="utf-8", newline="\n")
+(RV_REPORTS / "w1062i-PB12-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 land-review-worktree-wf_rv-5-r1 aaaaaaa11 E:/s/r.jsonl\n"
+    "# PB12 report — the work of branch worktree-wf_rv-5 (a header with no Branch field)\n\n## X\n", encoding="utf-8", newline="\n")
+rv2 = {r.slug: r for r in pw.load_reports(RV_REPORTS)}
+check("an O11 header's Branch field wins over the review stamp's reviewer label above it",
+      (rv2["w1062g"].branch, rv2["w1062g"].worktree, rv2["w1062g"].head),
+      ("worktree-wf_rv-3", "E:\\COBOL\\.claude\\worktrees\\wf_rv-3", "8888888bb"))
+check("a template header's **branch:** field wins over the label below it", rv2["w1062h"].branch, "worktree-wf_rv-4")
+check("with no field, the first branch word OUTSIDE the stamp is the branch", rv2["w1062i"].branch, "worktree-wf_rv-5")
+check("the stamp still parses beside the field", (rv2["w1062g"].review.verdict, rv2["w1062g"].review.findings),
+      ("FINDINGS", 2))
+# The field is read at a FIELD POSITION only (PB3077 review round 1, R1-1): header prose says "this branch: every …"
+# in real reports (w1043x-PB2806, w1055z-PB2426), and an unanchored `branch:` rule took `every` as the branch — ABSENT,
+# the same harm — in a header with no field or with that prose above the field.
+(RV_REPORTS / "w1062j-PB5-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 land-review-worktree-wf_rv-6-r1 bbbbbbb22 E:/s/r.jsonl\n"
+    "# PB5 report — the work of branch worktree-wf_rv-6; on this branch: every file is LF\n\n## X\n", encoding="utf-8", newline="\n")
+(RV_REPORTS / "w1062k-PB7-report.md").write_text(
+    "Status: DONE\n# PB7 report — on this branch: the reader takes the field\nBranch: worktree-wf_rv-7\nHEAD: ccccccc33\n"
+    "\n## X\n", encoding="utf-8", newline="\n")
+rv3 = {r.slug: r for r in pw.load_reports(RV_REPORTS)}
+check("mid-prose `branch:` is not a field: with no field the branch word wins, never the prose", rv3["w1062j"].branch,
+      "worktree-wf_rv-6")
+check("mid-prose `branch:` above the Branch field does not pre-empt it", rv3["w1062k"].branch, "worktree-wf_rv-7")
 
 # 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
 #     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.
@@ -278,7 +315,7 @@ def fingerprint(pl, letter_json):
                         "notes": g.notes, "file": g.file, "files": g.files, "pred": g.pred, "cost": round(g.cost, 9),
                         "json": letter_json.get(g.letter)} for g in pl["groups"]],
             "skipped": [[g.letter, g.after, g.notes] for g in pl["skipped"]],
-            "awaiting_landing": pl["awaiting_landing"], "points": round(pl["points"], 9), "trains": pl["trains"],
+            "awaiting_landing": pl["awaiting_landing"], "points": round(pl["points"], 9),
             "unlanded_without_note": pl["unlanded_without_note"]}
 
 
@@ -370,7 +407,7 @@ if fc:
     check("campaign groups pass check_practices' successor rule", check_practices.same_file_without_successor(cfile), [])
     for g in cg:
         mds.render(dict(CFG77, wave="78"), g)
-    only_b = pw.group_cost("opus", 1, RULES) + pw.lander_cost(RULES)
+    only_b = pw.group_cost("opus", 1, RULES) + pw.landing_cost(RULES)
     cp2 = pw.plan(cnotes, copen, chalf, [], lambda b: "ABSENT", {}, RULES, budget_points=only_b * 1.5, deps=cdeps)
     check("a dependent is never chosen without its blocker's group",
           all(g.after in {c.letter for c in cp2["groups"]} for g in cp2["groups"] if g.after), True)
@@ -651,8 +688,9 @@ check("an untracked path is missing even if a local file has that name",
 # PB2562: a train label is a taken wave number, because a wave's first train is labelled with the wave number.
 with tempfile.TemporaryDirectory() as td:
     tdir = pathlib.Path(td)
-    (tdir / "DEVLOG.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL + "## Entry 1 — wave 1034 dispatched" + NL,
-                                     encoding="utf-8", newline="\n")
+    (tdir / "DEVLOG").mkdir()                                    # one file per entry (kb/Work PB3025)
+    (tdir / "DEVLOG" / "0002-train-1036.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL, encoding="utf-8", newline="\n")
+    (tdir / "DEVLOG" / "0001-wave-1034.md").write_text("## Entry 1 — wave 1034 dispatched" + NL, encoding="utf-8", newline="\n")
     check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
     # PB2806: a wave recorded in the dispatch ledger with no report yet (another session's) is a taken number too
     pw.record_dispatch(tdir, "1045", [pw.Group(kind="cluster", notes=["PB5"], file="", files=["src/X.cs"], letter="a")],

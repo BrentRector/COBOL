@@ -1,7 +1,7 @@
 # The legacy byte engine — archive pointer
 
 The CobolSharp byte engine is not on `main`. Owner decision R69 (`kb/Work/R69.md`) deleted it in PHASE 15 Cut 2
-(`kb/Work/PB2110.md`). This page says where it is preserved and how to run it. History lives in `DEVLOG.md`.
+(`kb/Work/PB2110.md`). This page says where it is preserved and how to run it. History lives in `DEVLOG/`.
 
 ## Where it is
 
@@ -22,7 +22,7 @@ leaf (`src/Cobol.Net.Editions`) at the tag are the ones the engine builds agains
 ## How to run it (WSL or Linux)
 
 ```bash
-git clone https://github.com/BrentRector/COBOL.git cobol-legacy
+git clone https://github.com/WiseOwlSoftware/COBOL.git cobol-legacy
 cd cobol-legacy
 git checkout legacy-byte-engine-final
 dotnet build CobolSharp.sln

@@ -3,12 +3,12 @@
 
 Windows refuses to replace, remove or open a file that another process is opening, reading or replacing at that
 instant, because Python opens files without FILE_SHARE_DELETE: a reader can make a writer's `os.replace` fail with
-WinError 5 and an `unlink` fail with WinError 32 (measured by wave 1037 group P, kb/Work PB2537, on the landing lease).
+WinError 5 and an `unlink` fail with WinError 32 (measured by wave 1037 group P, kb/Work PB2537, on the coordination files).
 The refusal lasts milliseconds, so every read, replace and remove of a shared file retries a `PermissionError` briefly,
 and a refusal that outlasts the retries is raised, never swallowed.
 
 The callers: the orchestrator's coordination files (`scripts/orchestrator/coord.py`: `read_json`, `write_json`, the
-short mutex's release; `landing_lease.py`'s release) and the gate settings every gate polls each second
+short mutex's release) and the gate settings every gate polls each second
 (`scripts/gate_slot.py`, kb/Work PB2514). Both used to carry their own copy of this loop; one module now holds it, and
 `--self-test` fails on a second `PermissionError` retry loop around a file operation anywhere under `scripts/`.
 

@@ -242,7 +242,7 @@ Process: grammar change → regen both OSes, guard-fast after the grammar commit
 12. docs/COBOLNET_OO_DESIGN.md — D11/D12/D13 added; CORRECTION notes on Summary :37, D7 :115, edge case :232 (static-fields sketch superseded — cite §8.6.4/:8765, SR4f, §9.3.6); STATUS banner + Greenfield seams; same change set.
 13. tests/conformance/2002/ — oo_factory_basic|oo_factory_inherit|oo_factory_self .cob/.out + manifest.json enabled entries.
 14. tests/Cobol.Net.Tests.Conformance/ — OoFactoryTests (matrix rows 2-6, 9-10) + trap #11; version-matrix negative cases (rows 11-12).
-15. DEVLOG.md entry (top, real timestamp) + the plan §0 update; commit per feedback_commit_messages; full guard before commit.
+15. DEVLOG entry (`DEVLOG/pending-<slug>.md`, stamped at the landing by `devlog.py stamp`) + the plan §0 update; commit per feedback_commit_messages; full guard before commit.
 
 ## Sequencing note
 Lands AFTER slice 3b (SELF/SUPER instance dispatch — the roster-switch code extends :184-217, and __New's covariance rides the 3a base-chain emission). The remaining banner order after this slice: PROPERTY → INTERFACE-ID (adds IMPLEMENTS to FACTORY + OBJECT) → universal reference (FACTORY OF refs + §16.2.2 FactoryObject + __CobolInvoke) → EC-OO (EC-OO-RESOURCE on New per §16.2.1 GR2 :39187 belongs there; today allocation failure is a .NET OOM — document, don't fake).
@@ -426,7 +426,7 @@ These files are greenfield-only (2002 manifest); the legacy NIST guard never com
 | 9 | `tests/conformance/2002/oo_override_final.cob` + `.out` + `manifest.json` | new golden (below) |
 | 10 | `tests/Cobol.Net.Tests.Conformance/OoAttributeTests.cs` (new) | negative/positive suite (below) |
 | 11 | `docs/COBOLNET_OO_DESIGN.md` | same change set: D7 AS-BUILT note (attributes landed; SR4a strict + permissive inference); update the "Missing:" grammar-seam list (:301) and the Open-questions grammar bullet (:375) — OVERRIDE/IS FINAL no longer missing; edge-case list :237 now cites 0837/0838; record the SR2/SR8 forward obligation on the INTERFACE-ID question |
-| 12 | `DEVLOG.md` | new TOP entry, real `date "+%Y-%m-%d %H:%M %Z"` stamp |
+| 12 | `DEVLOG/` | a new entry file, `pending-<slug>.md`, stamped at the landing (`devlog.py stamp`) |
 
 ## 3. Diagnostics (band audit: 0813, 0820–0829 OO-used; 0830–0835 INITIALIZE; 0845–0847 INSPECT; **0836/0837/0838 verified FREE**)
 

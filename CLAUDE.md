@@ -34,11 +34,13 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
    structure belongs. **Prefer the shape that makes the NEXT case automatic over the one that makes this case
    small**, and pair it with a drift test so "automatic" stays true. Correcting the estimate is part of the work:
    update the design doc and say so. (Rule 3 forbids shrinking the FEATURE; this forbids shrinking the DESIGN.)
-6. **Keep the docs CURRENT in the same change set.** Every doc except `DEVLOG.md` describes the CURRENT compiler.
-   The historical narrative lives ONLY in `DEVLOG.md`, which is DESCENDING — add each new entry at the TOP, under
-   the ordering note, headed `## Entry NNN — YYYY-MM-DD HH:MM TZ — Title` (stamp from `date "+%Y-%m-%d %H:%M %Z"`).
-   **One entry per landing on main** (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits landing on
-   main"; a worktree's checkpoint commits carry none): the landing checks (`enqueue.py checks`, at every landing) refuse one that adds no entry.
+6. **Keep the docs CURRENT in the same change set.** Every doc except the DEVLOG describes the CURRENT compiler.
+   The historical narrative lives ONLY in `DEVLOG/`, one file per entry, read newest first (`python scripts/devlog.py
+   render`; kb/Work PB3025). Write the entry as `DEVLOG/pending-<slug>.md` (first line `## <Title>`); the landing
+   numbers and stamps it with `python scripts/devlog.py stamp <branch>`, as `## Entry NNNN — YYYY-MM-DD HH:MM TZ —
+   Title`. **One entry per landing on main** (owner 2026-10-08, kb/Work PB2605: the rule covers "Only commits landing
+   on main"; a worktree's checkpoint commits carry no stamped one): the landing checks (`enqueue.py checks`, at every
+   landing) run `devlog.py check`, which refuses a landing without it.
 7. **Work autonomously.** Commit AND push every checkpoint, with a forensic commit message; each landing on main
    carries its DEVLOG entry (rule 6).
    Grammar changes are pre-authorized. Prompt only for genuine owner decisions — one at a time, as a bare question.
@@ -60,7 +62,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
    derived mechanically from the spec (the rule catalog → the traceability inventory → its generated burn-down)
    and `constructs.json`; those are GENERATED or CI-owned, never hand-maintained work lists.
 
-9. **⛔ NO DISPATCH WITHOUT THE `workstream` SKILL, AND AN AGENT FIXES WHAT IT FINDS.** Before ANY implementer, lander
+9. **⛔ NO DISPATCH WITHOUT THE `workstream` SKILL, AND AN AGENT FIXES WHAT IT FINDS.** Before ANY implementer, finisher
    or fleet dispatch, invoke the `workstream` skill and follow `.claude/skills/workstream/templates/MANDATORY-PRACTICES.md`:
    render specs with `make_dispatch_specs.py`, get `check_practices.py` GREEN, read the quota meter first, dispatch
    through the Workflow rolling wave. `scripts/hooks/dispatch_guard.py` REFUSES the call otherwise (owner 2026-09-30,
@@ -85,7 +87,7 @@ Owner-emphasized, each earned by a correction. These nine are the SSOT; `PROMPT.
 4. Before the session ends: update the `kb/Work/` notes you touched, update §0, add a DEVLOG entry.
 
 ## The project
-WiseOwl COBOL (repo `BrentRector/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
+WiseOwl COBOL (repo `WiseOwlSoftware/COBOL`; code `src/Cobol.Net.*`, exe `cobol`, NuGet `WiseOwl.COBOL`) compiles COBOL into **idiomatic typed-native C# built by Roslyn**: a
 COBOL record IS a .NET `record struct`, an elementary item IS a native field. **There is NO byte `ProgramState`
 substrate — never reintroduce one.** The legacy CobolSharp engine that had one is deleted from `main` (PHASE 15 Cut 2,
 kb/Work PB2110); `docs/rearchitecture/LEGACY-ARCHIVE.md` names the tag that preserves it.
@@ -108,7 +110,7 @@ comprehensive pass once the design settles (`PROMPT.md` §4).
   on what a defect DOES to a user's program, not on its severity label. `python scripts/spec/work.py next`
   prints it and session-probe shows it every session. ⛔ It replaced FIVE overlapping registers, three of
   which each claimed to be canonical; `CONFORMANCE-FIX-QUEUE.md` is now a pointer.
-- **History:** `DEVLOG.md`, and nowhere else. **Doctrine:** `PROMPT.md`.
+- **History:** `DEVLOG/` (one file per entry), and nowhere else. **Doctrine:** `PROMPT.md`.
 - **Doc map:** `docs/DOC_INDEX.md` — consult it to find the right doc and keep it in sync. Exactly one canonical
   doc per subsystem: extend it, never fork a second.
 - **Spec:** `specs/ISO_COBOL.md` (tracked in this repo). The licensed PDF is the private submodule `specs-private`
@@ -126,7 +128,10 @@ tree-wide sweeps (`[Trait("Sweep", "tree")]`, tier 0c) and the cheapest reach �
 (batched gating, PB2515): GREEN|RED`; CI is the regression net and the ONLY whole-population run (owner 2026-10-11
 ~11:20: "local testing confirms the targeted change; CI/CD ensures no regression on the remaining codebase"). A
 self-test whose inputs are unchanged since a recorded PASS is reused, never re-run, by every gate (kb/Work PB2914,
-PB3022). A stale or missing impact map only
+PB3022). **A branch lands through ONE script, `python scripts/orchestrator/enqueue.py land <branch>`** (kb/Work
+PB3023): it merges origin/main in, runs the one gate and CI's Linux legs, stamps the DEVLOG entry, runs the landing
+checks and queues one pull request in GitHub's merge queue (it refuses while the queue is not ACTIVE); there is no
+lander and no train. A stale or missing impact map only
 changes the order, never what runs, and impact maps are recorded on demand, never per commit. Run the comprehensive
 battery plus the GnuCOBOL differential once per accumulated batch, pre-merge, in its own worktree. **CI also runs on
 Linux, so every landing runs CI's Linux legs under WSL before a push** (`scripts/linux-gate.sh`, kb/Work PB1732):

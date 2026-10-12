@@ -11,7 +11,7 @@ implementor is documented, with its rationale, in [docs/CONFORMANCE.md](docs/CON
 ## Quick start
 
 ```bash
-git clone https://github.com/BrentRector/COBOL.git
+git clone https://github.com/WiseOwlSoftware/COBOL.git
 cd COBOL
 dotnet build Cobol.Net.sln
 

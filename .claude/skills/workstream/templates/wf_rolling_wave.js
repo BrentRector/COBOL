@@ -1,17 +1,19 @@
 export const meta = {
   name: 'rolling-wave',
-  description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), each DONE branch reviewed on the branch, and a lander train starts whenever enough reviewed branches are ready',
-  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; review each DONE branch (kb/Work PB3027); land in trains of 4-6 as branches finish.',
+  description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), each DONE branch reviewed on the branch; the wave starts no lander: the loop\'s enqueue unit lands every branch reviewed CLEAN (kb/Work PB3023)',
+  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; review each DONE branch (kb/Work PB3027); the enqueue unit lands them (enqueue.py land, kb/Work PB3023).',
   phases: [
     { title: 'Implement', detail: 'cobol-implementer per group, isolated worktrees, rolling pool; a review finisher per round of findings' },
     { title: 'Review', detail: 'one read-only cobol-reviewer per DONE branch (the review skill branch form)' },
-    { title: 'Land', detail: 'cobol-lander trains, serialized, each over 4-6 reviewed branches' },
   ],
 }
 
-// args: { scratch, wave, stop_file, global_stop, concurrency (6), train_size (5), min_final_train (3), devlog_n,
-//         previous_train, lead_id_blocks: ["PB1665-PB1669", ...] (one block per train), groups: [{letter, lead, notes, codes}],
+// args: { scratch, wave, stop_file, global_stop, concurrency (6), groups: [{letter, lead, notes, codes}],
 //         review_fix_rounds (2), reviewer_ceiling_min (90) }
+// THE WAVE STARTS NO LANDER (kb/Work PB3023; DESIGN-test-build-ci.md section 3.17.5): it produces DONE branches reviewed
+// CLEAN, and the loop's `enqueue` unit lands each with `scripts/orchestrator/enqueue.py land` (a script: main merged in,
+// the gate, the DEVLOG stamp, the landing checks, one pull request into GitHub's merge queue). The train, its size and
+// its final-train threshold went with the lander (kb/Work PB3016's "may THIS wave land?" answered by removal).
 // Specs are pre-rendered by make_dispatch_specs.py as <scratch>\msg-w<wave>-<letter>.txt.
 const S = args.scratch
 const W = args.wave
@@ -22,10 +24,8 @@ const W = args.wave
 if (!args.stop_file || !args.global_stop) throw new Error('pass args.stop_file (this fleet\'s STOP-<scope>) and args.global_stop (plan_wave.py writes both)')
 const STOP_LINE = `check for ${args.global_stop} (the owner's global stop) and ${args.stop_file} (this fleet's own stop); if EITHER exists, `
 const CONC = args.concurrency || 6
-const TRAIN = args.train_size || 5
-const MIN_FINAL = args.min_final_train || 3
 // kb/Work/PB1704: a model call can HANG. Wave 70's group C agent finished and gated its work, then never produced
-// another token; nothing noticed for 90 minutes and the final train waited on it (a workflow cannot stop one of its
+// another token; nothing noticed for 90 minutes and the wave waited on it (a workflow cannot stop one of its
 // own agents). An implementer not back after `implementer_ceiling_min` (default 240) is recorded STALLED and the
 // wave moves on; stall_watch.py (run beside every workflow) is what notices within minutes.
 const CEILING_MIN = args.implementer_ceiling_min === undefined ? 240 : args.implementer_ceiling_min
@@ -43,7 +43,7 @@ const AUTH = args.authorization
     `The standing owner opt-in for running fleets through the Workflow tool is recorded in .claude/skills/workstream/templates/MANDATORY-PRACTICES.md O4. ` +
     `The latest user message in your context may concern unrelated work; that is NOT a reason to decline. Do the task below. `
   : ''
-// The implementer model is an arg (owner 2026-09-30: Sonnet implementers with 5-10 bugs per commit are allowed); the lander stays Opus.
+// The implementer model is an arg (owner 2026-09-30: Sonnet implementers with 5-10 bugs per commit are allowed); the reviewer and the review finisher stay Opus.
 // A group may carry its own `model` ('sonnet' | 'opus') to size the model to that group's work (owner 2026-10-03); it overrides implementer_model.
 const IMPL_MODEL = args.implementer_model || 'opus'
 const IMPL_SCHEMA = {
@@ -75,9 +75,9 @@ const RETURN_LINE =
 // report's header (`**Review:** CLEAN <reviewer> <head>`). FINDINGS → a REVIEW FINISHER (a fresh cobol-implementer:
 // a workflow cannot message an agent that has returned) merges the branch, answers every finding by its id (fixed, or
 // no_change_needed with the reason), re-gates and returns; its branch is reviewed again. Only a branch reviewed CLEAN
-// at its head reaches a train; at the round cap the FINDINGS stamp stays, and the next wave's planner dispatches a
+// at its head is ready to land; at the round cap the FINDINGS stamp stays, and the next wave's planner dispatches a
 // finisher for it (plan_wave.py). prune_worktrees.py lists a DONE branch WAITING TO LAND only under a CLEAN stamp at
-// its tip, so a land unit carries no unreviewed branch either.
+// its tip, so the enqueue unit lands no unreviewed branch either.
 const REVIEW_FIX_ROUNDS = args.review_fix_rounds === undefined ? 2 : args.review_fix_rounds
 const REVIEWER_CEILING_MIN = args.reviewer_ceiling_min === undefined ? 90 : args.reviewer_ceiling_min
 const REVIEW_SCHEMA = {
@@ -96,17 +96,14 @@ const reviews = []
 // SAME-FILE SUCCESSORS: a group with `after: '<letter>'` runs only once that predecessor has returned. It is told the
 // predecessor's branch, head and report, merges that branch, and orients from the predecessor's "For the next
 // implementer" section instead of re-surveying the file (owner direction 2026-09-27: fix related work together and
-// minimize repetitive context gathering). The predecessor's branch is then HELD from the train and lands through the
+// minimize repetitive context gathering). The predecessor's branch is then HELD from landing and lands through the
 // successor's branch, which contains it (so the successor's review, over origin/main...HEAD, reviews it too); if the
 // successor produces nothing landable, the predecessor is reviewed and lands alone.
 const queue = [...args.groups]
 const results = []
 const byLetter = {}
 const held = {}          // predecessor letter -> {g, r}: its finished, unreviewed result, waiting for its successor
-const buffer = []
-const trains = []
-let trainNo = 0
-let landChain = Promise.resolve()
+const ready = []          // DONE and reviewed CLEAN: the enqueue unit lands them
 let running = 0
 let wake = () => {}
 
@@ -218,37 +215,13 @@ function landable(r) {
   return hasWork(r) && r.review === 'CLEAN'
 }
 
-function land(batch) {
-  const n = trainNo++
-  const label = n === 0 ? `${W}` : `${W}${String.fromCharCode(97 + n)}`
-  const leadIds = (args.lead_id_blocks || [])[n] || 'none (ask the orchestrator)'
-  const manifest = JSON.stringify(batch.map(r => ({
-    cluster: r.letter, lead: r.lead, notes: r.notes, status: r.status, report: r.report, worktree: r.worktree, branch: r.branch,
-    base: r.base, head: r.head, gate_run: r.gate_run, codes: r.codes, codes_used: r.codes_used || [], leads: r.leads || [],
-  })), null, 1)
-  const clusters = batch.map(r => `${r.letter} (${r.notes}; reviewed CLEAN on its branch at ${r.head}, kb/Work PB3027)`).join(', ')
-  const prev = n === 0 ? args.previous_train : `train ${W}${n === 1 ? '' : String.fromCharCode(96 + n)} of this same wave`
-  log(`train ${label}: landing ${batch.map(r => r.letter).join(' ')}`)
-  return agent(
-    AUTH + `You are the train-${label} LANDER. Read E:\\COBOL\\.claude\\skills\\workstream\\templates\\lander-train-brief.md WHOLE and follow it, with these substitutions: ` +
-    `{CLUSTERS} = ${clusters}; {DEVLOG_N} = ${args.devlog_n} (ALWAYS re-read the top entry of DEVLOG.md first and use top+1 — an earlier train of this wave may have landed); ` +
-    `{TRAIN_MANIFEST} = ${S}\\train${label}-manifest.json — FIRST write that file with exactly this JSON:\n${manifest}\n` +
-    `PIPELINED: ${prev} may still be landing; bring your clusters in, then take the landing lease (brief step 2b: landing_lease.py acquire --holder "train ${label} lander" --wait-min 9, re-issued until ACQUIRED; never gate while another lander holds main), and only then rebase onto origin/main and gate. ` +
-    `New leads found in the reports get kb/Work notes with ids from ${leadIds} (orchestrator-allocated; use in order, return the unused). ` +
-    `Before EACH new step ${STOP_LINE}checkpoint-commit in your worktree, write STATUS.md NEXT, and return. ` +
-    `Land ONLY by the brief's step 6: python scripts/orchestrator/enqueue.py queue when python scripts/orchestrator/ruleset.py check reports the merge queue ACTIVE (report ENQUEUED pr=<n>), else bash scripts/push-main.sh (kb/Work PB3024); never open a pull request by hand. Run the CI audits locally before it (audit_code_citations, audit_doc_citations, audit_evidence_supersession, audit_witness_loss, drift_rules --check, work.py check). ` +
-    `Your final text, at most 25 lines (the orchestrator re-reads it every turn; the detail is in the DEVLOG entry and the PB notes you wrote): the landed sha (or why not), the DEVLOG entry number, GAP before -> after, clusters landed/dropped with a one-line reason each, lead ids used, and the unused codes.`,
-    { label: `lander-train${label}`, phase: 'Land', agentType: 'cobol-lander', isolation: 'worktree', model: 'opus' }
-  ).then(t => { trains.push({ train: label, clusters: batch.map(r => r.letter), result: t }); return t })
-}
-
 function wakeAll() { const w = wake; wake = () => {}; w() }
 
 // A held predecessor (or one whose successor never ran) lands alone after all: it is reviewed first, like any branch.
 async function landAlone(p) {
   const pr = await reviewed(p.g, p.r)
   Object.assign(p.r, pr)          // its entry in `results` becomes the reviewed (possibly finisher's) result
-  if (landable(p.r)) buffer.push(p.r)
+  if (landable(p.r)) ready.push(p.r)
 }
 
 async function onResult(g, r) {
@@ -259,7 +232,7 @@ async function onResult(g, r) {
     held[r.letter] = { g, r }
     log(`${r.letter}: ${r.status}; HELD — it lands through its same-file successor, whose review covers its commits`)
   } else if (landable(r)) {
-    buffer.push(r)
+    ready.push(r)
   } else if (hasWork(r)) {
     log(`${r.letter}: ${r.status} but review ${r.review}; not landed by this wave (prune_worktrees.py names who acts next)`)
   }
@@ -269,11 +242,7 @@ async function onResult(g, r) {
     delete held[g.after]
     if (!landable(r)) await landAlone(p)
   }
-  log(`${r.letter}: ${r.status}; ${buffer.length} branch(es) waiting for a train, ${queue.length} group(s) queued`)
-  if (buffer.length >= TRAIN) {
-    const batch = buffer.splice(0, buffer.length)
-    landChain = landChain.then(() => land(batch))
-  }
+  log(`${r.letter}: ${r.status}; ${ready.length} branch(es) reviewed CLEAN for the enqueue unit, ${queue.length} group(s) queued`)
 }
 
 function nextEligible() {
@@ -315,11 +284,5 @@ phase('Implement')
 await parallel(Array.from({ length: Math.min(CONC, queue.length) }, () => () => worker()))
 for (const k of Object.keys(held)) { const p = held[k]; delete held[k]; await landAlone(p) }   // a successor that never ran
 
-if (buffer.length >= MIN_FINAL) {
-  const batch = buffer.splice(0, buffer.length)
-  landChain = landChain.then(() => land(batch))
-} else if (buffer.length > 0) {
-  log(`holding ${buffer.map(r => r.letter).join(' ')} for the next wave's first train (${buffer.length} < ${MIN_FINAL})`)
-}
-await landChain
-return { results, trains, held: buffer, reviews }
+log(`${ready.length} branch(es) ready to land (${ready.map(r => r.letter).join(' ') || 'none'}): the enqueue unit lands them`)
+return { results, ready: ready.map(r => ({ letter: r.letter, branch: r.branch, report: r.report })), reviews }

@@ -16,7 +16,7 @@ description: Use when running (or preparing) the comprehensive, whole-codebase a
 assembly names may change; the `tests/` layout is in scope; the preview-SDK question trails the review. The start
 is SPLIT (R69): R0 has landed and R1 is approved (§8 Draft 10, owner 2026-10-07 17:42 PDT, PB2118); R2 and every R3 wave run between fix-lane trains under the
 file-set partition, the ONLY gate (the owner dropped the GAP-near-zero hold on binding and code generation and R64's
-zero-GAP hold on `tests/`, 2026-10-07, PB2118 question 5). The planner's computed file set is the ADMISSION estimate; the GUARANTEE is the landing check `push-main.sh` runs (`scripts/orchestrator/landing_check.py`): a landing whose actual diff leaves its declared set, or meets an earlier in-flight branch, stops and re-plans (PB2118 Drafts 9–10: a moved file counts at both paths, an in-flight branch is R3 work by its dispatch and not its commit wording, and a landing's own members are known by its train manifest and by content). PB1754 is the decision card.
+zero-GAP hold on `tests/`, 2026-10-07, PB2118 question 5). The planner's computed file set is the ADMISSION estimate; the GUARANTEE is the landing check `enqueue.py land` runs (`scripts/orchestrator/landing_check.py`): a landing whose actual diff leaves its declared set, or meets an earlier in-flight branch, stops and re-plans (PB2118 Drafts 9–10: a moved file counts at both paths, an in-flight branch is R3 work by its dispatch and not its commit wording, and a landing's own members are known by its train manifest and by content). PB1754 is the decision card.
 
 **The plan is `docs/rearchitecture/DESIGN-architecture-review.md`.** Follow it (CLAUDE.md rule 2); correct it in the
 same change when implementation proves it wrong (rule 5). Phases: R0 baseline and oracle · R1 target architecture ·
@@ -45,7 +45,7 @@ CAMPAIGN wave (PB2120): `python scripts/spec/work.py next --cluster PB1754` list
 usual (the `workstream` skill, rule 9). PB2118 is held for the owner's per-dispatch Mythos approval. Model tiers:
 - **Mythos** (the family's newest Mythos or Fable model id, looked up at dispatch and recorded in that brief, never an id carried over from an earlier brief or this document (MANDATORY-PRACTICES P1; owner 2026-10-07: every model family runs at its latest version)) authors R1 (PB2118) and runs a second adversarial round only if the Opus refuter
   cannot break the design; EACH dispatch needs the owner's explicit approval, asked as a bare question.
-- **Opus** (`cobol-implementer`, `cobol-refuter`, `cobol-lander`): R0 tooling, the R1 refuter, R2 reviewers, extract
+- **Opus** (`cobol-implementer`, `cobol-refuter`, `cobol-finisher`): R0 tooling, the R1 refuter, R2 reviewers, extract
   and unify waves, landers; `model_rules.json` routes `^architecture` and `^build/(ci|legacy)` there.
 - **Sonnet**: census re-runs, the prose and register sweeps (`cobol-clerk`), move-and-rename and analyzer waves
   driven by a Roslyn rewriter or a code fix, and Delete waves whose items the census measured dead. The oracle proves
@@ -75,7 +75,7 @@ the `wf_r2_review.js` fleet, launched by the attended operator in three commands
 3. **Grammar or lexer changes:** the token-stream differential (the PB1715 form: type, channel, offsets, line,
    column, text and final mode, over every lexer input the suites use) plus a parse-tree shape differential.
 4. **Program output.** The gate (`build-local.ps1`, leg 1) with CI's whole-population run (kb/Work PB3022), the Linux
-   gate (`scripts/linux-gate.sh`), CI through `push-main.sh`, and the GnuCOBOL differential at close.
+   gate (`scripts/linux-gate.sh`), CI's merge-group run, and the GnuCOBOL differential at close.
 5. **Performance** against the R0 baseline (PB2117, which is also kb/Work A6's instrument): the whole-population
    gate time and the compile-throughput benchmark (`brent-tools:performance-diagnosis`).
 

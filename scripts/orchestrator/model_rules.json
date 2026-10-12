@@ -3,8 +3,18 @@
   "calibration": {
     "measured": "2026-10-07",
     "source": "REFIT 2026-10-07 from the first two meter readings of ONE account inside ONE session window (kb/Work PB2478; design D6/D7): account 2 read week 0 % / session 0 % at 13:26-13:34 PDT and week 6 % / session 24 % at 14:54 PDT (session window 10:09-15:09); its OWN telemetry between them (user.account_uuid filtered) counted 9,481,140 Opus, 108,118 Sonnet and 646,023 Haiku tokens of the counted kinds ($177 of Opus). The 2026-10-04 constants (Opus 400,000 per point, fitted to the Workflow tool's subagent token counts, not to telemetry) made that 25.4 points and a 127 % session, and held the loop while the meter read 6 % and 24 %. The refit is the old rates times 4 (Opus 1.6 M; 9.48 M / 1.6 M + the rest = 6.0 points), every ratio between families kept; the per-group and lander token costs below are scaled by the same 4 so a planned wave costs the same points as before. Refit again whenever two readings of one account bracket a measured spend.",
-    "counted_token_kinds": ["input_tokens", "output_tokens", "cache_creation_tokens"],
-    "tokens_per_point": {"haiku": 12000000, "sonnet": 4000000, "opus": 1600000, "fable": 640000, "mythos": 640000},
+    "counted_token_kinds": [
+      "input_tokens",
+      "output_tokens",
+      "cache_creation_tokens"
+    ],
+    "tokens_per_point": {
+      "haiku": 12000000,
+      "sonnet": 4000000,
+      "opus": 1600000,
+      "fable": 640000,
+      "mythos": 640000
+    },
     "tokens_per_point_frontier_source": "fable and mythos: 2.5x the Opus rate, the published price ratio ($10/$50 against $4/$20 per MTok; kb/Work R69, 2026-10-06), until a meter reading refits it; haiku: a third of the Sonnet rate's cost, the published price ratio ($1/$5 against $3/$15 per MTok; 2026-10-07), where it was priced at the Opus fallback before",
     "unknown_model_rate": "opus",
     "session_pct_per_weekly_pct": 4.0,
@@ -13,17 +23,47 @@
   "accounts": {
     "_doc": "The Claude accounts the loop runs from (owner 2026-10-07 13:17 PDT: the OPERATOR session on a second Max 20x account, the Mythos work on the first; kb/Work PB2478). account.py resolves the running account from CLAUDE_CONFIG_DIR (unset = the row whose config_dir is null); a config dir no row names is an error. Each row: name, config_dir (~ expands; null = ~/.claude), weekly_reset (Python weekday(): Monday 0 ... Sunday 6), and optionally `quota` keys that differ from the shared quota below. budget.py stamps every reading with the account and reads only that account's readings and telemetry (user.account_uuid).",
     "list": [
-      {"name": "account1", "config_dir": null, "weekly_reset": {"weekday": 6, "hour": 3, "minute": 0, "tz": "America/Los_Angeles"},
-       "_source": "the default config dir; its week resets Sunday 03:00 America/Los_Angeles (the owner's meter since 2026-09)"},
-      {"name": "account2", "config_dir": "~/.claude-acct2", "weekly_reset": {"weekday": 5, "hour": 10, "minute": 0, "tz": "America/Los_Angeles"},
-       "_source": "owner 2026-10-07 13:36 PDT: 'your usage resets on Saturday at 10 AM'; its /usage at 13:34 read 'Resets Oct 10, 9:59am'"}
+      {
+        "name": "account1",
+        "config_dir": null,
+        "weekly_reset": {
+          "weekday": 6,
+          "hour": 3,
+          "minute": 0,
+          "tz": "America/Los_Angeles"
+        },
+        "_source": "the default config dir; its week resets Sunday 03:00 America/Los_Angeles (the owner's meter since 2026-09)"
+      },
+      {
+        "name": "account2",
+        "config_dir": "~/.claude-acct2",
+        "weekly_reset": {
+          "weekday": 5,
+          "hour": 10,
+          "minute": 0,
+          "tz": "America/Los_Angeles"
+        },
+        "_source": "owner 2026-10-07 13:36 PDT: 'your usage resets on Saturday at 10 AM'; its /usage at 13:34 read 'Resets Oct 10, 9:59am'"
+      }
     ],
     "seed": {
       "_doc": "What a named account's config dir carries (kb/Work PB2480): scripts/account-profile.ps1 makes it so, account.py --seed-check (and tooling_check.py at every session start) verifies it. `copy`: taken from the default account's dir when missing (a directory: each missing child); `junction`: the default account's folder, linked so both accounts share it ({repo_key} = the main checkout's projects key); `flags`: non-secret feature flags set in the account's .claude.json (Claude in Chrome on: the meter unit reads the usage page through it). `never`: credentials are never copied, the owner signs the account in (/login).",
-      "copy": ["settings.json", "config.json", "plugins", "skills"],
-      "junction": ["projects/{repo_key}/memory"],
-      "flags": {"claudeInChromeDefaultEnabled": true, "hasCompletedClaudeInChromeOnboarding": true},
-      "never": [".credentials.json"]
+      "copy": [
+        "settings.json",
+        "config.json",
+        "plugins",
+        "skills"
+      ],
+      "junction": [
+        "projects/{repo_key}/memory"
+      ],
+      "flags": {
+        "claudeInChromeDefaultEnabled": true,
+        "hasCompletedClaudeInChromeOnboarding": true
+      },
+      "never": [
+        ".credentials.json"
+      ]
     }
   },
   "quota": {
@@ -39,14 +79,34 @@
   },
   "routing": {
     "default": "sonnet",
-    "allowed": ["sonnet", "opus"],
+    "allowed": [
+      "sonnet",
+      "opus"
+    ],
     "opus_when": {
-      "file_patterns": ["/Oo/", ".g4", "Frontend/Grammar/"],
-      "area_patterns": ["^oo", "grammar", "frontend/grammar", "^build/(ci|legacy)", "^architecture"],
-      "body_patterns": ["(?i)design question (is )?open", "(?i)NEEDS-OPUS", "(?i)needs a (re)?design", "(?i)redesign beyond"],
+      "file_patterns": [
+        "/Oo/",
+        ".g4",
+        "Frontend/Grammar/"
+      ],
+      "area_patterns": [
+        "^oo",
+        "grammar",
+        "frontend/grammar",
+        "^build/(ci|legacy)",
+        "^architecture"
+      ],
+      "body_patterns": [
+        "(?i)design question (is )?open",
+        "(?i)NEEDS-OPUS",
+        "(?i)needs a (re)?design",
+        "(?i)redesign beyond"
+      ],
       "failed_attempts_at_least": 2
     },
-    "owner_approval_patterns": ["(?i)\\b(mythos|fable)\\b[\\s\\S]{0,160}?\\bapprov"],
+    "owner_approval_patterns": [
+      "(?i)\\b(mythos|fable)\\b[\\s\\S]{0,160}?\\bapprov"
+    ],
     "_owner_approval_why": "A note whose body says its work needs a frontier model (Fable, Mythos) under the owner's approval is never planned: that approval is per dispatch (MANDATORY-PRACTICES P1), which an unattended wave cannot obtain, so the planner lists the note as waiting and the attended session asks. First case: PB2118, R1's authorship (kb/Work R69 section 4, PB2120, 2026-10-07).",
     "_why": "Opus where the work is design-heavy (OO, grammar), where a note says a design question is open, or where a note has already failed twice (a note that fails twice is a task-spec problem, kb/Work PB1981). Opus also for the legacy-retirement cuts (CI and gate wiring carry the CI invariant) and the architecture review's R0/R1 items (kb/Work R69). Fable and Mythos are never values here: each needs explicit owner approval per dispatch (owner 2026-10-02; R69 2026-10-06)."
   },
@@ -54,31 +114,77 @@
     "r2": {
       "_doc": "The R2 review fleet's measured cost, per batch (kb/Work PB2707; DESIGN-architecture-review.md section 3 R2, Sizing a batch). Each record is `scripts/arch/r2_cost.py --measure <batch dir> <its Workflow runs' subagent dirs>` verbatim: the batch's work from its directory (shard lines x dimensions, findings, lens verdicts, examined nulls) and the counted tokens (calibration.counted_token_kinds) of every agent transcript by kind. r2_cost.py pools them into the rates it sizes every batch and launch with; append each finished batch's record.",
       "batches": [
-        {"batch": "1", "pin": "8be23006851a", "line_dimensions": 133865, "findings": 167, "verdicts": 501, "nulls": 0, "finder_tokens": 13175736, "skeptic_tokens": 15024151, "null_tokens": 0, "duplication_pass_tokens": 1151483, "workflow_runs": 1, "agents": 231, "measured": "2026-10-10", "source": "r2_cost.py --measure batch-1 over its one Workflow run wf_f0bdb4a4-f00 (operator session 7128ef77, 2026-10-08)"},
-        {"batch": "2", "pin": "8be23006851a", "line_dimensions": 262995, "findings": 343, "verdicts": 1029, "nulls": 0, "finder_tokens": 22641140, "skeptic_tokens": 29850763, "null_tokens": 0, "duplication_pass_tokens": null, "workflow_runs": 7, "agents": 425, "measured": "2026-10-10", "source": "r2_cost.py --measure batch-2 over its seven Workflow runs: wf_4c432e36-5b7 (the first launch, stopped at 52 of 65 pairs' finders) and the six hand-split relaunches wf_197c5609-ca5, wf_5bba5907-8be, wf_996b0c5b-192, wf_b15e9b16-1f5, wf_eecbb59e-80f, wf_fa8e3b6b-4f1 (kb/Work PB2707)"}
+        {
+          "batch": "1",
+          "pin": "8be23006851a",
+          "line_dimensions": 133865,
+          "findings": 167,
+          "verdicts": 501,
+          "nulls": 0,
+          "finder_tokens": 13175736,
+          "skeptic_tokens": 15024151,
+          "null_tokens": 0,
+          "duplication_pass_tokens": 1151483,
+          "workflow_runs": 1,
+          "agents": 231,
+          "measured": "2026-10-10",
+          "source": "r2_cost.py --measure batch-1 over its one Workflow run wf_f0bdb4a4-f00 (operator session 7128ef77, 2026-10-08)"
+        },
+        {
+          "batch": "2",
+          "pin": "8be23006851a",
+          "line_dimensions": 262995,
+          "findings": 343,
+          "verdicts": 1029,
+          "nulls": 0,
+          "finder_tokens": 22641140,
+          "skeptic_tokens": 29850763,
+          "null_tokens": 0,
+          "duplication_pass_tokens": null,
+          "workflow_runs": 7,
+          "agents": 425,
+          "measured": "2026-10-10",
+          "source": "r2_cost.py --measure batch-2 over its seven Workflow runs: wf_4c432e36-5b7 (the first launch, stopped at 52 of 65 pairs' finders) and the six hand-split relaunches wf_197c5609-ca5, wf_5bba5907-8be, wf_996b0c5b-192, wf_b15e9b16-1f5, wf_eecbb59e-80f, wf_fa8e3b6b-4f1 (kb/Work PB2707)"
+        }
       ]
     },
-    "per_group_tokens": {"sonnet": 400000, "opus": 160000},
-    "per_note_tokens": {"sonnet": 240000, "opus": 96000},
-    "lander_tokens": 480000,
-    "lander_model": "opus",
-    "source": "seeded 2026-10-04 so that a five-note group costs about 0.4 weekly points on either model, a lander about 0.3, and a six-group wave of five-note groups about 3 points with its landers, matching waves 1011-1015 (kb/Work PB1981: a six-group wave already costs about 3 weekly points); refit from units.jsonl. Scaled x4 on 2026-10-07 with tokens_per_point (kb/Work PB2478), so the points a group costs are unchanged"
+    "per_group_tokens": {
+      "sonnet": 400000,
+      "opus": 160000
+    },
+    "per_note_tokens": {
+      "sonnet": 240000,
+      "opus": 96000
+    },
+    "landing_tokens": 96000,
+    "landing_model": "opus",
+    "source": "seeded 2026-10-04 so that a five-note group costs about 0.4 weekly points on either model, a lander about 0.3, and a six-group wave of five-note groups about 3 points with its landers, matching waves 1011-1015 (kb/Work PB1981: a six-group wave already costs about 3 weekly points); refit from units.jsonl. Scaled x4 on 2026-10-07 with tokens_per_point (kb/Work PB2478), so the points a group costs are unchanged",
+    "landing_source": "kb/Work PB3023 (2026-10-11): the lander and its train retired; a branch lands through enqueue.py (a script) run by the loop's enqueue unit, which spends model turns per branch on the run, the review step and, now and then, a finisher. Seeded at the old lander's 480,000 tokens over its five-group train (96,000 per group), so a planned wave costs the points it did; refit from the landing measurements (kb/Work PB3028) once they exist."
   },
   "campaign": {
-    "src": ["src", "tests", "scripts", ".github", "docs"],
+    "src": [
+      "src",
+      "tests",
+      "scripts",
+      ".github",
+      "docs"
+    ],
     "ext": ".cs,.g4,.py,.ps1,.sh,.js,.yml,.md",
-    "exclude_dir": ["Generated", "external", "TestResults", "conformance", "evidence"],
+    "exclude_dir": [
+      "Generated",
+      "external",
+      "TestResults",
+      "conformance",
+      "evidence"
+    ],
     "_why": "plan_wave.py --cluster (kb/Work PB2120): a campaign note's code sites are whatever it names, so its notes are clustered over the whole tree, not .agent-fleet.json's src/Cobol.Net.* (which the fix lane keeps). Project files (.csproj, .props, .targets) are not sites: their dotted names (Cobol.Net.Cli.csproj) make fix_clusters read every `Cobol.Net` in a note as a Type.Member reference to the first one indexed (measured on PB2108, 2026-10-07). exclude_dir names directories that hold corpora or generated output, never a fix site: the GnuCOBOL corpus (tests/external), the conformance programs and goldens, gate run output, and the frozen evidence records under docs/."
   },
   "wave": {
     "max_notes_per_group": 5,
     "max_groups": 8,
-    "max_groups_source": "waves 1011-1015 ran 5 to 7 groups; the budget is the governor, this bounds the train count",
+    "max_groups_source": "waves 1011-1015 ran 5 to 7 groups; the budget is the governor, this bounds one wave's groups",
     "codes_per_group": 3,
-    "lead_ids_per_train": 5,
     "concurrency": 6,
-    "train_size": 5,
-    "min_final_train": 3,
     "implementer_model": "sonnet",
     "orchestrator_model": "opus"
   }

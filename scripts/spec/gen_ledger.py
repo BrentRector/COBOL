@@ -56,8 +56,8 @@ account in the coordination directory, and this script prints it after a render 
                                                        owner's decision PB2911), the external repository's slices
                                                        and v1.0's gates
     <coord>/readings.json + model_rules.json          pacing and the estimate: the newest meter reading against the
-    + <coord>/train-measurements.jsonl                 owner's caps, the burn since the week's first reading, the
-    + fix_clusters.py                                  batched trains' landing rate and the fix lane's own groups;
+    + <coord>/landing-measurements.jsonl               owner's caps, the burn since the week's first reading, the
+    + fix_clusters.py                                  landing rate (landing_measure.py) and the fix lane's own groups;
                                                        "not available" / UNMEASURED where this machine has no
                                                        coordination directory or submodule (so a page rendered in CI
                                                        says so; NOT stamp inputs — a new reading makes --check report
@@ -788,17 +788,22 @@ def inputs_text(inputs: dict) -> str:
         items.append(f'the planner (<span class="mono">model_rules.json</span> <span class="mono">wave</span>): '
                      f'{n(w["max_notes_per_group"])} notes per group (a campaign\'s and a held cluster\'s groups are counted '
                      f'at this cap, a lower bound: a campaign clusters by the sites its notes name), {n(w["max_groups"])} groups '
-                     f'per wave, {n(w["train_size"])} groups per train, implementers on {e(m)}')
+                     f'per wave, implementers on {e(m)}')
         items.append(f'the cost constants (<span class="mono">cost</span>, <span class="mono">calibration</span>): a group '
                      f'{n(c["per_group_tokens"][m])} + {n(c["per_note_tokens"][m])} tokens per note at {n(cal[m])} {e(m)} '
-                     f'tokens per weekly point; a lander {n(c["lander_tokens"])} at {n(cal[c["lander_model"]])} '
-                     f'{e(c["lander_model"])} tokens per point, one per train')
+                     f'tokens per weekly point; a landing {n(c["landing_tokens"])} at {n(cal[c["landing_model"]])} '
+                     f'{e(c["landing_model"])} tokens per point, one per group (enqueue.py, kb/Work PB3023)')
     if rate:
-        items.append(f'the landing rate (<span class="mono">train_measure.py</span>, {e(rate["gating"])} gating): '
-                     f'<span class="num">{rate["per_h"]:.2f}</span> changes per hour, {n(rate["landed"])} changes in '
-                     f'{rate["window_h"]:.1f} h over {n(rate["trains"])} trains')
+        # What the minutes measure is the headline's to say (landing_measure.headline): DONE → on main for the merge
+        # queue, a floor (lander start → push) for the retired trains. Never a label of this page's own.
+        per = (f', median <span class="num">{rate["median_min"]:.0f}</span> minutes ({e(rate["median_measures"])})'
+               if rate.get("median_min") is not None else "")
+        items.append(f'the landing rate (<span class="mono">landing_measure.py</span>, {e(rate["source"])}): '
+                     f'<span class="num">{rate["per_h"]:.2f}</span> changes per hour{per}, {n(rate["changes"])} changes in '
+                     f'{rate["window_h"]:.1f} h over {n(rate["landings"])} landings')
     else:
-        items.append(f'the landing rate: {UNMEASURED} (no <span class="mono">train-measurements.jsonl</span> on this machine)')
+        items.append(f'the landing rate: {UNMEASURED} (no <span class="mono">landing-measurements.jsonl</span> or '
+                     f'<span class="mono">train-measurements.jsonl</span> on this machine)')
     if burn:
         items.append(f'the measured burn (<span class="mono">readings.json</span>, {e(burn["account"])}): '
                      f'<span class="num">{burn["per_h"]:.1f}</span> weekly points per hour, {burn["from_pct"]:g} % → '
@@ -1183,7 +1188,7 @@ TEMPLATE = """<title>{title}</title>
 
 
 <footer>
-  <p><strong>Every number on this page is computed — none is remembered, none is hand-written.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicates, what remains and its lanes through <span class="mono">ledger_plan.py</span> (the fix lane's population from <span class="mono">.agent-fleet.json</span>, the campaign and held clusters from the owner's decision PB2911), the estimate from <span class="mono">fix_clusters.py</span>, <span class="mono">model_rules.json</span>, <span class="mono">train_measure.py</span> and the orchestrator's meter readings, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
+  <p><strong>Every number on this page is computed — none is remembered, none is hand-written.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicates, what remains and its lanes through <span class="mono">ledger_plan.py</span> (the fix lane's population from <span class="mono">.agent-fleet.json</span>, the campaign and held clusters from the owner's decision PB2911), the estimate from <span class="mono">fix_clusters.py</span>, <span class="mono">model_rules.json</span>, <span class="mono">landing_measure.py</span> and the orchestrator's meter readings, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
   <p class="mono">Snapshot: {head_date} · measured tree {head_sha} — the last commit that touched an input this page reports, so an unrelated commit cannot make a correct page look stale · {rows} rows · {closed} closed · {gap} GAP · {adjudicated} adjudicated · battery #{bat_n} on {bat_sha} · A.1 {a1_discharged}/{a1_scope} · register {work_items} notes, {work_open} open, {work_actionable} actionable · {comp_n} known compiler notes.</p>
 </footer>
 
@@ -1242,14 +1247,25 @@ def self_test() -> int:
     cells = re.findall(r'<td class="r">(.*?)</td>', est)
     check("a missing input renders UNMEASURED, never a number",
           bool(cells) and all(c == UNMEASURED for c in cells), str(cells)[:300])
-    rules = {"wave": {"max_notes_per_group": 5, "max_groups": 8, "train_size": 5, "implementer_model": "sonnet"},
+    rules = {"wave": {"max_notes_per_group": 5, "max_groups": 8, "implementer_model": "sonnet"},
              "cost": {"per_group_tokens": {"sonnet": 400000}, "per_note_tokens": {"sonnet": 240000},
-                      "lander_tokens": 480000, "lander_model": "opus"},
+                      "landing_tokens": 96000, "landing_model": "opus"},
              "calibration": {"tokens_per_point": {"sonnet": 4000000, "opus": 1600000}}}
     full = {"rules": rules, "fix_groups": {"clusters": [{"notes": [{"id": "PB9001"}]}], "unsited": []},
-            "rate": {"per_h": 2.0, "landed": 4, "window_h": 2.0, "trains": 1, "gating": "batched"},
+            "rate": {"per_h": 2.0, "changes": 4, "window_h": 2.0, "landings": 1, "median_min": 30.0,
+                     "source": "pull requests through the merge queue", "median_measures": "DONE → on main, per change"},
             "burn": {"per_h": 3.0, "from_pct": 0.0, "to_pct": 3.0, "hours": 1.0, "account": "t"}}
     page = render_remaining(rem, ledger_plan.bucket_estimates(rem, full), cp, full)
+    check("the landing rate input names its source, changes per hour and minutes per landing",
+          all(t in inputs_text(full) for t in ("landing_measure.py", "pull requests through the merge queue",
+                                               '<span class="num">2.00</span> changes per hour',
+                                               '<span class="num">30</span> minutes (DONE → on main, per change)')),
+          inputs_text(full)[-300:])
+    floor = {**full, "rate": {**full["rate"], "source": "the retired trains, batched gating",
+                              "median_measures": "lander start → push per landed change: a floor for DONE → on main"}}
+    check("the retired trains' minutes are labelled the floor they are, never DONE to main",
+          "a floor for DONE → on main" in inputs_text(floor) and "DONE to main" not in inputs_text(floor),
+          inputs_text(floor)[-300:])
     first = re.search(r"Known compiler defects and analyses</td>(.*?)</tr>", page[page.index("Estimate, from"):], re.S)
     check("measured inputs render numbers: 1 group, 1 wave, 0.5 h, 1.5 points at the burn",
           bool(first) and all(f'<span class="num">{v}</span>' in first.group(1) for v in ("1", "0.5 h", "1.5")),
@@ -1320,6 +1336,13 @@ def self_test() -> int:
 
 
 def main() -> int:
+    # Both streams in UTF-8 BEFORE argparse can print (its --help and usage errors carry the docstring's non-ASCII):
+    # a redirected stream is the host's code page on Windows otherwise (kb/Work PB2615's class).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except AttributeError:   # a replaced stream (a test harness's) has no reconfigure
+            pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--out", type=pathlib.Path, default=DEFAULT_OUT,
                     help=f"HTML to write (default {DEFAULT_OUT})")
@@ -1332,11 +1355,6 @@ def main() -> int:
                     help="add the register's series to the trend points recorded before it existed, each measured "
                          "from its own sha's tree, write the trend file and stop (kb/Work PB2912)")
     a = ap.parse_args()
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
-
     if a.self_test:
         return self_test()
     if a.backfill_register:
@@ -1381,6 +1399,14 @@ def main() -> int:
     import account  # noqa: PLC0415
     import ledger_state  # noqa: PLC0415  (imports this module for STAMP_PATHS; loaded only here, after a render)
     print(ledger_state.publish_hint(COORD_DIR, account.current().name))
+    # The page describes THIS checkout; a checkout behind main (every landing is pushed from a lander's worktree) renders
+    # a page mark-published will refuse, so say so here, before the publish (kb/Work PB2987).
+    try:
+        stale = ledger_state.stale_checkout_line(REPO, ledger_state.state(REPO, COORD_DIR, account.current().name))
+    except ledger_state.NoMain as e:
+        stale = f"main's stamp not read ({e})"
+    if stale:
+        print(f"⛔ NOT MAIN'S PAGE: {stale}")
     return 0
 
 

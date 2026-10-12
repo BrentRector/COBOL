@@ -83,7 +83,7 @@ SETTINGS_SCHEMA = 1
 #: The implementer gate's population: `leg1` (batched gating, kb/Work PB2515 — leg 1 only; the lander's
 #: whole-population train gate is the population check) or `whole` (kb/Work PB1708 — both legs).
 #: ⛔ THE OWNER'S DECISION (2026-10-10 10:19 PDT, kb/Work PB2515): batched gating is the rule, "Yes, permanently".
-#: Tried from 2026-10-07 and measured by `train_measure.py summary` (3.43 changes landed per hour batched against 0.71
+#: Tried from 2026-10-07 and measured on the train records (`landing_measure.py summary`'s BEFORE column; 3.43 changes landed per hour batched against 0.71
 #: whole, 0 interaction reds, 1 CI red from an environment difference), it was kept.
 SCOPES = ("leg1", "whole")
 DEFAULT_SCOPE = "leg1"

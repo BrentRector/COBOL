@@ -4,7 +4,7 @@ Base: your worktree is cut from current main ({base}). CLAUDE.md rule 1 carries 
 precedence for implementation options; obey it.
 
 Codes allocated: {codes}, in order; list the ones you use and RETURN the ones you do not.
-Report: {reports}\{slug}-{lead}-report.md   (the ONE reports directory the land unit reads, whatever this wave's scratch: kb/Work PB2980; wave-prefixed, so a later agent never overwrites an earlier report)
+Report: {reports}\{slug}-{lead}-report.md   (the ONE reports directory the enqueue unit reads, whatever this wave's scratch: kb/Work PB2980; wave-prefixed, so a later agent never overwrites an earlier report)
 Scratch:  {S}\{slug}\
 Report your ACTUAL branch (`git branch --show-current`).
 {pred}
@@ -62,8 +62,8 @@ legs — your added tests, your previous gate's reds, the host-only witnesses (t
 re-gate after a fix runs leg 1 again, never the population.
 ⭐ BATCHED GATING (owner 2026-10-10, kb/Work PB2515, MANDATORY-PRACTICES I1): the gate runs LEG 1 ONLY, names every
 leg-2 case NOT RUN, and is done on `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — …`; a red
-is `…: RED` — fix it and re-gate. CI's whole-population run checks the population; a CI red attributed to your
-branch is fixed on it. (Only while the owner has set the shared implementer scope to `whole`, as `python
+is `…: RED` — fix it and re-gate. CI's merge-group run checks the population, and `enqueue.py land` gates your branch again on both hosts; it attributes any
+red to your branch. (Only while the owner has set the shared implementer scope to `whole`, as `python
 scripts/gate_slot.py status` shows, does it run both legs, stop `RED/INCOMPLETE` on a leg-1 red, and finish on
 `=== BUILD-LOCAL GATE: GREEN — …`.) ALWAYS `-Priority BelowNormal`; one gate per worktree.
 ⛔ `python scripts/semgrep/verify.py` must not increase any rule's count (train 57 dropped a cluster for +20 BigInteger).
@@ -71,11 +71,11 @@ Print a real verdict line; never leave a placeholder in the report.
 
 GOLDENS: one positive at the introducing edition + one negative below it, a copy per edition only where behaviour differs.
 Every golden/negative you ADD runs in leg 1 of your gate — quote its `UnitTestResult` from `TestResults/build-local/<run>/leg-1-Conformance.trx` (MANDATORY-PRACTICES I7).
-LINUX GATE (I8, PB1732): with a `LEG 1 ONLY` verdict (batched gating, the default) the Linux gate is the lander's: skip it and report `LINUX GATE: the lander's (batched gating)`. Only with a plain `GREEN` verdict (the owner set the scope to `whole`): after the Windows gate is green and COMMITTED, run `bash scripts/linux-gate.sh --nice` at your worktree's root, from any shell (on a host that is not Linux it runs itself under WSL, kb/Work PB2999) (all four of CI's Linux legs, ~6 min) and quote its `=== LINUX GATE:` line in your report.
+LINUX GATE (I8, PB1732): with a `LEG 1 ONLY` verdict (batched gating, the default) the Linux gate is the landing's (`enqueue.py land`): skip it and report `LINUX GATE: the lander's (batched gating)`. Only with a plain `GREEN` verdict (the owner set the scope to `whole`): after the Windows gate is green and COMMITTED, run `bash scripts/linux-gate.sh --nice` at your worktree's root, from any shell (on a host that is not Linux it runs itself under WSL, kb/Work PB2999) (all four of CI's Linux legs, ~6 min) and quote its `=== LINUX GATE:` line in your report.
 Parser + emitter + golden + manifest entry in ONE commit.
 
 REGISTER: flip each note's `status` and write its `closes_rows` IN THE COMMIT THAT LANDS IT (with `closes_rows_reason:`
-when it closes none). Run `python scripts/spec/work.py check`. Do NOT open a list anywhere. FIX WHAT YOU FIND (I9, owner 2026-09-30): an issue you find in a file you have already read and understood is FIXED in this same change, with its golden and its sibling sweep, unless the effort is so excessive that it needs a redesign beyond your slice or would blow your turn budget. Only then file a kb/Work note (id from the orchestrator's allocation) carrying its repro path and code site (file:line) and why it was too large to fix now, and list it in the report. A found issue left only in prose or the DEVLOG is a defect in your work.
+when it closes none). Run `python scripts/spec/work.py check`. Do NOT open a list anywhere. DEVLOG ENTRY (kb/Work PB3025; CLAUDE.md rule 6): write your branch's entry, UNNUMBERED, as `DEVLOG/pending-<slug>.md` — first line `## <Title>` (no number, no stamp), then the narrative: each mechanism, what the re-probe showed, the fix shape, the goldens, the rows re-verdicted, what the self-review found, the gate's verdict line — and commit it with your work; the landing numbers and stamps it (`python scripts/devlog.py stamp <branch>`), never you. FIX WHAT YOU FIND (I9, owner 2026-09-30): an issue you find in a file you have already read and understood is FIXED in this same change, with its golden and its sibling sweep, unless the effort is so excessive that it needs a redesign beyond your slice or would blow your turn budget. Only then file a kb/Work note (id from the orchestrator's allocation) carrying its repro path and code site (file:line) and why it was too large to fix now, and list it in the report. A found issue left only in prose or the DEVLOG is a defect in your work.
 
 CHECKPOINT: `git commit -m "WIP checkpoint: …"` after every mechanism and every gate, and after EVERY commit (the small
 trailing ones too: a gate-red fix, a regenerated index) rewrite `STATUS.md` (DONE / NEXT / BLOCKED / GATE / batch

@@ -24,14 +24,16 @@ says whether the live repository still matches it.
                would land it with no whole-population run). ACTIVE also prints the queue's depth.
     1 DRIFT    a ruleset of this name exists but differs (each difference named), or the classic protection is still
                on main beside it, or a repository setting differs.
-    3 ABSENT   no ruleset of this name on main: the queue is not applied yet (landings go through push-main.sh).
-    4 SKIPPED  the live state could not be read (no gh, not authenticated, no network, a timeout): NOT RUN, never a pass.
+    3 ABSENT   no ruleset of this name on main: the queue is not applied. Landing is BLOCKED until the owner re-applies
+               it (`apply`): the queue is the only landing path, and main refuses a direct push.
+    4 SKIPPED  the live state could not be read (no gh, not authenticated, no network, a timeout): NOT RUN, never a pass,
+               and landing is BLOCKED until `check` reads ACTIVE.
     2          usage, or the committed file is unreadable.
 Only the keys the committed file names are compared (GitHub adds ids, timestamps and defaults to the live ruleset);
 keys starting with `$` are notes.
 
 `apply` — run ONLY on the owner's explicit go (the attended session asks, one bare question: from that instant main
-accepts only queued pull requests and `push-main.sh` can no longer push it). It sets the repository settings, creates
+accepts only queued pull requests and nothing can push it directly). It sets the repository settings, creates
 the ruleset or updates the one of the same name, deletes the classic protection (a 404 is "already gone"), then runs
 `check` and exits with its code. `--owner-go` is required and printed with the result, so the transcript names the go.
 `--dry-run` prints the calls and makes none.
@@ -199,7 +201,8 @@ def check(gh: Gh, committed: dict) -> tuple[str, str, list[str]]:
         live = find_ruleset(gh, repo, want["ruleset"]["name"])
         if live is None:
             return ABSENT, (f"no ruleset '{want['ruleset']['name']}' on {repo}:{BRANCH} — the merge queue is NOT "
-                            "applied; landings go through bash scripts/push-main.sh"), []
+                            "applied; landing is BLOCKED until the owner re-applies it (ruleset.py apply): the queue "
+                            "is the only landing path"), []
         diffs = differences(want["ruleset"], live, "ruleset")
         code, settings = _api(gh, f"repos/{repo}")
         diffs += differences(want["repository"], settings if code == 200 else {}, "repository")
@@ -210,7 +213,8 @@ def check(gh: Gh, committed: dict) -> tuple[str, str, list[str]]:
         if depth is None:
             diffs.append(f"merge queue: GitHub reports no merge queue on {BRANCH}")
     except Unobserved as e:
-        return SKIPPED, f"the live state was not read ({e}) — NOT RUN, never a pass", []
+        return SKIPPED, (f"the live state was not read ({e}) — NOT RUN, never a pass; landing is BLOCKED until "
+                         "check reads ACTIVE"), []
     if diffs:
         return DRIFT, f"the live ruleset on {repo}:{BRANCH} differs from {COMMITTED.name} ({len(diffs)})", diffs
     return ACTIVE, f"the merge queue is live on {repo}:{BRANCH} as committed; queue depth {depth}", []
@@ -330,7 +334,8 @@ def self_test() -> int:
 
     absent = {**base, f"api repos/{repo}/rulesets": (0, "[]")}
     state, detail, _ = check(_fake(absent), committed)
-    expect("no ruleset on main is ABSENT, never ACTIVE", state == ABSENT and "push-main.sh" in detail, state)
+    expect("no ruleset on main is ABSENT, never ACTIVE",
+           state == ABSENT and "landing is BLOCKED" in detail and "only landing path" in detail, f"{state} {detail}")
 
     drifted = copy.deepcopy(live_rs)
     for r in drifted["rules"]:
@@ -363,7 +368,8 @@ def self_test() -> int:
     partial = {**base, f"api repos/{repo}/rulesets": (1, "HTTP 502: bad gateway")}
     state3, _, _ = check(_fake(partial), committed)
     expect("no gh, no network or a server error is SKIPPED, never ACTIVE",
-           state == SKIPPED and state2 == SKIPPED and state3 == SKIPPED and "never a pass" in detail,
+           state == SKIPPED and state2 == SKIPPED and state3 == SKIPPED and "never a pass" in detail
+           and "landing is BLOCKED" in detail,
            f"{state} {state2} {state3}")
 
     log: list[list[str]] = []

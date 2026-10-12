@@ -75,7 +75,7 @@ def global_stop(override: str | None = None) -> pathlib.Path:
 
 def reports_dir(override: str | None = None) -> pathlib.Path:
     """THE fix-lane reports directory, `<coord>\\scratch\\reports`, whatever scratch a wave uses (MANDATORY-PRACTICES
-    O11, kb/Work PB2980). The land unit, prune_worktrees.py and plan_wave.py read only this one, so every rendered
+    O11, kb/Work PB2980). The enqueue unit, prune_worktrees.py and plan_wave.py read only this one, so every rendered
     spec names it: wave 1055 was dispatched with its own scratch, its six DONE reports went to `<scratch>\\reports`, and
     the survey never saw them. Never creates the directory."""
     return coord_path(override) / "scratch" / "reports"
@@ -88,7 +88,7 @@ def fleet_stop(scratch: pathlib.Path | str, scope: str) -> pathlib.Path:
     return pathlib.Path(scratch) / f"STOP-{scope}"
 
 
-# THE COORDINATION DIRECTORY'S ONE SHORT MUTEX (the allocator's `alloc.lock`, the landing lease's `landing-lease.lock`):
+# THE COORDINATION DIRECTORY'S ONE SHORT MUTEX (the allocator's `alloc.lock`):
 # held for the milliseconds of a read-modify-write of one JSON file, never across a wait. It is an atomic create
 # (os.open with O_CREAT|O_EXCL) holding the PID and time, because the coordination tools are short processes that share
 # no OS handle. A lock older than LOCK_STALE_S was left by a crashed holder and is broken by an atomic rename to a name
@@ -216,7 +216,7 @@ def process_table() -> list[dict[str, Any]]:
 
 
 # THE LOOP'S LOCK (orchestrate.ps1 Take-Lock): {"pid", "started_at", "host"}, held while the supervisor runs; a lock
-# whose PID is gone is stale, exactly as the supervisor itself judges it. While the loop runs, its land unit is the ONE
+# whose PID is gone is stale, exactly as the supervisor itself judges it. While the loop runs, its enqueue unit is the ONE
 # landing queue: the attended session dispatches no lander (MANDATORY-PRACTICES O11, kb/Work PB2602).
 LOOP_LOCK = "orchestrate.lock"
 

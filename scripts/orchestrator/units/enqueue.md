@@ -1,0 +1,66 @@
+UNIT: enqueue.
+
+Finished branches are waiting to land. Landing is a SCRIPT, `python scripts/orchestrator/enqueue.py land <branch>`
+(kb/Work PB3023; DESIGN-test-build-ci.md section 3.17.2 step 3): it merges origin/main into the branch, runs the gate on
+both hosts under the shared gate slot, merges main in again if it moved meanwhile (no second gate: the merge group
+runs the whole population), stamps the branch's DEVLOG entry, runs the landing checks and hands the branch to GitHub's
+merge queue as one pull request. Main takes only queued pull requests, so while `ruleset.py check` does not report the
+queue ACTIVE the script refuses before it merges or gates anything (exit 8). There is no train and no lander: this unit
+runs the script and dispatches an agent only for what a script cannot decide.
+1. Load the `workstream` skill (the dispatch guard refuses a finisher or reviewer otherwise); read
+   .claude/skills/workstream/references/landing.md.
+2. REVIEW FIRST (MANDATORY-PRACTICES I10; kb/Work PB3027): for each row `python scripts/prune_worktrees.py --brief`
+   lists WAITING FOR REVIEW (a DONE branch whose report carries no `Review: CLEAN` stamp at its tip: a branch finished
+   outside a rolling wave, or one whose wave stopped before its review), dispatch ONE read-only `cobol-reviewer` (Agent
+   tool, model opus; all of them in one message) whose prompt gives the branch, its worktree, its tip, its report, the
+   findings file `{COORD}\scratch\review-<branch>.jsonl`, the reviewer label `enqueue-review-<branch>-r1`, round 1, both
+   stop files, and says: follow "The branch form" of `.claude/skills/review/SKILL.md`. A CLEAN stamp makes the row
+   WAITING TO LAND for step 3; a FINDINGS stamp makes it a DECISION row whose finisher the next wave plans
+   (plan_wave.py). Never fix a finding here.
+3. LAND. The candidates are the rows `python scripts/prune_worktrees.py --brief` lists WAITING TO LAND, in the order it
+   lists them (the most harmful lead first, kb/Work PB2981's ranking); an operator steer that names branches
+   (`handoff.last.json`) wins. For each, `python scripts/orchestrator/enqueue.py land <branch>` with `run_in_background`
+   to its own log, then BLOCK on the log's `=== ENQUEUE: ` line (`timeout 580 bash -c 'until grep -q "=== ENQUEUE: "
+   <log>; do sleep 5; done'`, re-issued until it prints; never end a turn while one runs). Start them all at once:
+   each gate takes the shared gate slot, so at most the cap gate together and the rest wait there, and main moving under
+   a gate is merged in by the script itself. Read each verdict:
+   - `ENQUEUED`: the pull request is in the queue; GitHub tests it in a merge group and merges it. The branch is ON
+     MAIN only once the PR has merged (`gh pr view <n> --json state,mergedAt`); until then it reads ENQUEUED.
+   - `QUEUE NOT ACTIVE` (exit 8): nothing was merged or gated; `ruleset.py check` names why (DRIFT, ABSENT, SKIPPED).
+     Land nothing another way: name it in the handoff for the attended session.
+   - `CONFLICT` (exit 4, before or after the gate), `GATE RED` (exit 5), a DEVLOG refusal (exit 6) or a stale
+     arch-oracle baseline (exit 7): the reason is in the log and in the branch's report (`BLOCKED: enqueue …`): step 4.
+   - `UNREVIEWED` (exit 11): the branch's tip is not covered by its CLEAN review stamp (MANDATORY-PRACTICES I10): it
+     goes back to step 2's reviewer, never to a finisher and never landed another way.
+   - exit 3 (the landing check's STOP: the branch shares a file with earlier-dispatched in-flight work): never retry
+     as is; name it in the handoff with the check's lines.
+   - exit 9 (GitHub refused the push, the PR or the queue) or exit 2 `NOT QUEUED — main moved under every one of …`:
+     re-run once (the gated head is not gated again); if it repeats, name it in the handoff.
+   - A permission refusal of `enqueue.py land` (the auto-mode classifier, a denied prompt): never retry it, rephrase it
+     or land another way (MANDATORY-PRACTICES L13); hand off `READY-TO-LAND <worktree> <branch>` in `summary`.
+4. FINISHERS. For each branch that stopped in step 3, and each row `prune_worktrees.py --brief` lists BOUNCED (the merge
+   queue removed its pull request; GitHub's reason named), dispatch ONE `cobol-finisher` (Agent tool, model opus; all
+   of them in one message) with `.claude/skills/workstream/templates/finisher-brief.md`, its prompt naming the branch,
+   its worktree, its report, the stop line verbatim (or the PR number and the bounce reason, with the merge group's
+   failed run from `gh run list --event merge_group --limit 20`) and both stop files. The finisher fixes the branch at
+   its root, gates it and returns DONE; it never lands: its commits are unreviewed, so the branch reads WAITING FOR
+   REVIEW and the next enqueue unit's step 2 reviews the new tip before step 3 lands it (`enqueue.py land` refuses an
+   unreviewed tip with exit 11, UNREVIEWED: never a finisher's case to work around). Stay until every finisher
+   returns.
+5. LEADS. The reports this unit landed carry new defects as note-ready paragraphs (their "New defects" section, the
+   implementers' `leads`). Dispatch ONE `cobol-clerk` with ids from `python scripts/orchestrator/alloc.py pb <n>`
+   (one note per MECHANISM, grepped against kb/Work first, MANDATORY-PRACTICES R1-R3), in a worktree cut from
+   origin/main, which commits the notes with a `DEVLOG/pending-<slug>.md` entry and lands its own branch with
+   `enqueue.py land <branch> --lane clerk` (a lane MANDATORY-PRACTICES I10 does not review). Skip it when no report carries a lead.
+6. `python scripts/prune_worktrees.py --apply` removes the branches that landed (O10).
+6b. Complete the landing records (kb/Work PB3028): `enqueue.py` wrote each queued pull request's record;
+   `python scripts/orchestrator/landing_measure.py complete` reads the merge time, the failed merge-group runs (bounces)
+   and the CI wall from GitHub for every queued pull request that has no merge time yet; name a bounce's cause when its
+   finisher knows it (`landing_measure.py record --pr <n> --bounces <k> --bounce-causes
+   cluster-defect|load-timing|conflict|infrastructure`).
+7. Render the ledger in the same turn: `python scripts/spec/gen_ledger.py --out {COORD}\ledger.html` (every figure on it
+   is computed; its trend file gains a point when GAP or the register's series moved). You cannot PUBLISH it (a headless
+   session has no Artifact tool): the supervisor announces the owed publish after you end, and the attended session
+   publishes `{COORD}\ledger.html` to the owner's artifact. Do not look for a way around that.
+8. Write the handoff (`landed`; the branches still pending, an ENQUEUED one with its PR number; `next_unit` null unless
+   you know better).
