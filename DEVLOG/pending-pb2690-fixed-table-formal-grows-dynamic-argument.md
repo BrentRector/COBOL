@@ -66,3 +66,16 @@ invocation each create the third occurrence (`G2=hh/AABBZZ/xyz C2=3`). Sweep: al
 a dynamic-capacity table and cross a CALL, INVOKE or RETURNING were run on the branch build against their goldens: 27
 identical, one (`pb1042_dyn_table_agreement`) differing only by trailing spaces the corpus runner trims. A unit-test comment
 that still said a fixed formal table never re-sizes the argument's now says it never shrinks it.
+
+**Landing stop (finisher, oracle).** `landing_oracle.py` refused the landing: the arch-oracle baseline `60d47c6d52a9`
+was behind 19 changed inputs. Main had meanwhile recorded `69e756b0880b` (PB2721); after merging origin/main
+`241c6de2d` cleanly, `compare_oracle.py` against it printed `=== ARCH-ORACLE: DIFFERENT — 7 of 7786 cases differ
+(baseline 69e756b0880b, new 4dfb26c315bf) ===`. Every case is this branch's own, by class: ADDED 4, the new goldens
+`2014/pb2690_fixed_table_formal_grows_dynamic_argument_call`, `..._dynamic_argument_invoke`,
+`..._vlg_element_table_call` and the negative `pb2690-fixed-table-formal-grows-dynamic-argument-below-2014`; CSHARP 3,
+`2014/pb2087_vlg_returning_cell_receiver`, `2014/pb480_universal_variable_length_shapes` and
+`2014/pb965_vlg_into_fixed_invoke`, whose COBOL sources the branch edited (each now displays the third occurrence, and
+pb480 adds `SET C2 TO 2` before each lane). No other case differs: the fix is in the runtime
+(`CobolVarGroup`, `GroupCompatibility`), so the emitted C# and the diagnostics of every unedited program are unchanged,
+including `pb965_vlg_into_fixed_boundary`, whose edit touched comments only. The baseline was re-recorded on the merged
+head and replaces `69e756b0880b`.
