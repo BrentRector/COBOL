@@ -34,7 +34,8 @@ empty, and enqueue.py's dirty-tree check refused the landing. `refresh_index` no
 content (`git hash-object --stdin-paths`) is already the staged blob. A real edit stays modified and unstaged. This
 also covers a generator that writes LF over a CRLF checkout (`LfText.psm1`). The self-test pins it: without the re-stat,
 the rewritten file is listed and two checks fail. Branch review R3-2: an entry whose working-tree mode differs from the
-staged mode is never re-stated either, so an unstaged `chmod +x` is never staged.
+staged mode is never re-stated either, so an unstaged `chmod +x` is never staged. Branch review R5-1: neither is a path
+in a merge conflict, so `--fix` run mid-merge can no longer resolve a modify/delete conflict as ours.
 
 **Scope kept to the plan (owner, 2026-10-12 ~01:40: "I never asked for F to be widened").** Review round 3 found that
 the Linux gate's interpreter (the uv-managed python3.14) lacked PyYAML. A later finisher answered that with a new

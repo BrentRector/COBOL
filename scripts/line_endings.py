@@ -271,12 +271,14 @@ def refresh_index(root: Path) -> int:
     `git diff-files --raw`: its source side is the index entry, its destination mode is the working tree's as git
     itself reads it (so `core.filemode false` reports the index mode, and no mode is ever compared there)."""
     raw = git(root, "diff-files", "--raw", "--no-abbrev", "-z", binary=True).stdout.decode("utf-8").split("\0")
+    records = [(info.lstrip(":").split(), path) for info, path in zip(raw[0::2], raw[1::2])]
+    # mid-merge a conflicted path has a `U` record AND an `M` record against ours: re-stating it would put ours at
+    # stage 0 and silently resolve the conflict (branch review R5-1), so every path with a `U` record is skipped
+    unmerged = {path for fields, path in records if fields[-1:] == ["U"]}
     staged: dict[str, str] = {}
-    for info, path in zip(raw[0::2], raw[1::2]):
-        fields = info.lstrip(":").split()  # src mode, dst mode, src sha, dst sha, status
-        # a plain modification only (an unmerged path, `U`, is not refreshed), the same mode on both sides, and never
-        # a symlink (120000) or a gitlink (160000)
-        if (len(fields) == 5 and fields[4] == "M" and fields[0] == fields[1]
+    for fields, path in records:  # fields: src mode, dst mode, src sha, dst sha, status
+        # a plain modification only, the same mode on both sides, and never a symlink (120000) or a gitlink (160000)
+        if (path not in unmerged and len(fields) == 5 and fields[4] == "M" and fields[0] == fields[1]
                 and fields[0] not in ("120000", "160000")):
             staged[path] = fields[2]
     candidates = [p for p in staged if "\n" not in p and (root / p).is_file()]
@@ -422,6 +424,22 @@ def self_test() -> int:
         expect("--fix never re-states an entry whose working-tree mode differs from the index's (no mode is staged)",
                (refresh_index(root), git(root, "ls-files", "-s", "mode.sh").stdout), (0, before))
         run("reset", "-q", "--", "mode.sh")
+        # Branch review R5-1: mid-merge, `git diff-files --raw` gives a conflicted path a `U` record AND an `M` record
+        # against ours, so re-stating it would put ours at stage 0 and silently resolve the conflict. Planted as a
+        # modify/delete conflict; --fix must leave both of its stages.
+        (root / "conflict.txt").write_bytes(b"base" + LF)
+        run("add", "conflict.txt")
+        run("commit", "-q", "-m", "base")
+        run("checkout", "-q", "-b", "side")
+        run("rm", "-q", "conflict.txt")
+        run("commit", "-q", "-m", "side deletes")
+        run("checkout", "-q", "-")
+        (root / "conflict.txt").write_bytes(b"ours" + LF)
+        run("commit", "-q", "-am", "ours modifies")
+        subprocess.run(["git", "-C", d, "-c", "core.autocrlf=false", "merge", "-q", "side"], capture_output=True)  # conflicts
+        expect("--fix never re-states a conflicted path (a modify/delete conflict keeps its two stages)",
+               (refresh_index(root), len(git(root, "ls-files", "-u", "--", "conflict.txt").stdout.splitlines())), (0, 2))
+        run("merge", "--abort")
 
         accident = b"one" + CRLF + b"two" + CR + CRLF
         (root / "accident.md").write_bytes(accident)
