@@ -70,8 +70,8 @@ The options you will use most:
 | Option | Effect |
 |---|---|
 | `--run` | runs the program after a successful compile |
-| `--std 85`, `2002`, `2014` or `2023` | selects the edition (default 2023); a construct the edition lacks is rejected |
-| `--permissive` | turns those rejections into warnings, for migration work |
+| `--std 85`, `2002`, `2014` or `2023` | selects the edition (default 2023); a construct newer than the edition is rejected, and so is one the edition removed |
+| `--permissive` | accepts a construct the targeted edition removed, with a warning in place of the rejection, for migration work; a construct newer than the edition is still rejected |
 | `--source-format fixed`, `free` or `auto` | the reference format the source starts in (default fixed) |
 | `--copy DIR` | a COPY library directory; repeat it for several |
 | `--sign-encoding ibm` or `ascii` | the overpunched-sign convention for DISPLAY numerics (default ibm) |
@@ -113,8 +113,9 @@ The test populations:
 - `tests/Cobol.Net.Tests.Unit`: the runtime and compiler units, and the drift tests that keep two copies of one rule
   from diverging.
 - `tests/Cobol.Net.Tests.Characterization`: snapshots of diagnostics and emitted C# over a fixed corpus.
-- `tests/differential/` and `tests/external/`: the GnuCOBOL differential, run once per batch against the pinned
-  GnuCOBOL 3.2 test corpus.
+- `tests/differential/`: the committed goldens of the Conformance project's `*DifferentialTests` classes, compared on
+  every gate and CI run (recorded once, from an oracle since retired).
+- `tests/external/`: the GnuCOBOL differential, run once per batch against the pinned GnuCOBOL 3.2 test corpus.
 
 ## Find your way around
 
@@ -175,9 +176,11 @@ the compiler conforms. The open rows are the project's one progress number, and 
 `pwsh scripts/session-probe.ps1` prints the rows, the open rows and the corpus sizes for the commit you are on, and
 the gate's verdict line prints the tests it ran.
 
-Four facilities are declined, each documented as non-support with a compile-time warning, as §4.2.6 permits: the
-Message Control System, commit and rollback, the VALIDATE facility, and screen handling.
-[docs/CONFORMANCE.md](docs/CONFORMANCE.md) dispositions every optional module and processor-dependent element.
+Four facilities are declined and documented as non-support. The Message Control System and commit and rollback compile
+with the warning §4.2.6 requires for a processor-dependent element (COBOLNET1578, COBOLNET1579). VALIDATE compiles
+with a warning by documented choice under §4.2.7 (COBOLNET1580). Screen handling is refused with errors under §4.2.7
+and Annex A.4.1 (COBOLNET1560, COBOLNET1707). [docs/CONFORMANCE.md](docs/CONFORMANCE.md) dispositions every optional
+module and processor-dependent element.
 
 A NuGet distribution of the compiler as a .NET tool (`WiseOwl.COBOL`, the `cobol` command) and a documentation site
 are planned; see [docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md](docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md).
