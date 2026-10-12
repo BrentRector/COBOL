@@ -138,7 +138,9 @@ def main() -> int:
     if devlog.render(devlog.worktree_files(repo), since=0) != text[len(pre):]:
         print("=== DEVLOG MIGRATION: REFUSED (the files as written do not render the monolith) ===")
         return 1
-    subprocess.run(["git", "-C", str(repo), "rm", "-q", devlog.MONOLITH], check=True)
+    # --force: in the re-run the landing makes, the index holds main's DEVLOG.md (taken in the modify/delete conflict)
+    # and HEAD has none, which a plain `git rm` refuses; the file was proven rendered by DEVLOG/ just above.
+    subprocess.run(["git", "-C", str(repo), "rm", "-q", "--force", devlog.MONOLITH], check=True)
     subprocess.run(["git", "-C", str(repo), "add", "--", devlog.DIR], check=True)
     print(f"=== DEVLOG MIGRATION: DONE ({len(blocks):,} entries; the written files re-render byte-identical) ===")
     return 0

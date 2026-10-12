@@ -17,7 +17,7 @@ and lessons learned — intended as source material for a series of articles.
 > completes the header as `## Entry NNNN — YYYY-MM-DD HH:MM TZ — Title` (24-hour local time). `devlog.py check`
 > refuses a landing without exactly one new stamped entry numbered above main's.
 >
-> **The history** (entries 001–1963, split from the single `DEVLOG.md` on 2026-10-11, byte for byte) keeps its
+> **The history** (entries 001–1964, split from the single `DEVLOG.md` on 2026-10-11, byte for byte) keeps its
 > headers as written: entries 001–511 are undated or carry no time, 1191a–1191d carry a letter, and twenty numbers
 > were used twice (008–014, 171–185); a letter in the FILE name keeps each pair in its original order.
 

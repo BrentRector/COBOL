@@ -1676,7 +1676,10 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    DONE, inside the wave's slot for that group (`wf_rolling_wave.js` `reviewed()`). Every decision is a line in
    `<scratch>/review-w<wave>-<letter>.jsonl`, appended through `scripts/orchestrator/review_findings.py`, which computes
    the verdict from the file and stamps it into the report's header — `**Review:** CLEAN <reviewer> <head>` or
-   `FINDINGS <n> <reviewer> <head> <file>` — read back through `plan_wave.parse_review`, the one reader. FINDINGS → a
+   `FINDINGS <n> <reviewer> <head> <file>` — read back through `plan_wave.parse_review`, the one reader. The stamp sits
+   one line under the Status line, above an O11 header's `Branch:` line, and its reviewer label
+   (`land-review-<branch>-r<k>`) carries the branch name, so `plan_wave.parse_report` reads the branch, worktree and
+   head from the header's own fields with the stamp lines skipped (kb/Work PB3077). FINDINGS → a
    REVIEW FINISHER (a fresh implementer, because a workflow cannot message an agent that has returned: it merges the
    branch, answers every finding by its id — fixed at its root, or `no_change_needed` with the reason — re-gates and
    returns DONE), reviewed again, at most `review_fix_rounds` (2) times; after that the FINDINGS stamp stays and
