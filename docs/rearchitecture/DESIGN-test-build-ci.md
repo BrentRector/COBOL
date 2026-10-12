@@ -1855,10 +1855,12 @@ demand and not committed.
   a whole landing: `enqueue.py queue` writes the enqueue time, each carried change's DONE (`done_times`: the committer time of the HEAD commit its DONE implementer report names, never the report file's time, which the branch review's stamp rewrites; the changes are the reports naming the branch plus those a train commit's `Report:` line names, one per lead note, each the earliest of its finisher chain; a report whose HEAD is already an ancestor of origin/main is a change that landed before this one and counts for nothing, because the queue's MERGE method makes every landed head an ancestor of every later branch) and the worktree's local gate seconds (the sum of its `verdict.json` `timings.wall_s`);
   `record --review-clean` and `--bounce-causes` (cluster-defect · load-timing · conflict · infrastructure) are named by
   whoever knows; `complete` reads `mergedAt`, the count of FAILED merge-group runs of the PR (a run GitHub cancelled
-  because an earlier entry failed is a ripple, not a bounce) and the successful run's wall from `gh`. A field never
+  because an earlier entry failed is a ripple, not a bounce), the count of FAILED `pull_request` runs on the PR's head
+  branch (`pre_queue_reds`, kb/Work PB3096: a PR red before the queue never reaches a merge group, so `bounces` cannot
+  see it; a branch with no pull-request run at all stays null) and the successful run's wall from `gh`. A field never
   observed stays null and prints UNMEASURED (a missing observation is not a zero); a bounce with no named cause prints
   UNATTRIBUTED. `summary` prints changes landed per hour, median and p90 minutes DONE → on main per change, bounces per landing and
-  their causes, merge-group CI wall and local gate minutes as the AFTER column beside the BEFORE column from the retired
+  their causes, pull-request reds before the queue per landing, merge-group CI wall and local gate minutes as the AFTER column beside the BEFORE column from the retired
   train records (batched gating) and the frozen 2026-10-10 evidence; `freeze` copies the train records and the first
   after-summary under `evidence/fleet-optimization/` once a PR has landed. The completion ledger's landing rate and its
   minutes per landing come from the same file (`landing_measure.landing_rate_input`: the queue's own from two landings,

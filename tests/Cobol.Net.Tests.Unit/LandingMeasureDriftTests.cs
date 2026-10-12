@@ -40,6 +40,9 @@ public sealed class LandingMeasureDriftTests
             "the headline is the merge queue's rate from two landings and the retired trains' rate before that, each "
                 + "saying what its minutes measure",
             "freeze waits for a landing, refuses to rewrite the frozen copy, and the evidence figures are in the evidence file",
+            // kb/Work PB3096: a pull request's own red before the queue is measured, never a silent 0
+            "complete counts the pull request's own failed runs before the queue on its head branch (pre_queue_reds), and a "
+                + "branch with no pull-request run stays UNMEASURED, never 0",
         });
     }
 

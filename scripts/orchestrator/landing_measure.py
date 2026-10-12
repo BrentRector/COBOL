@@ -3,7 +3,7 @@
 
     python scripts/orchestrator/landing_measure.py record --pr 17 [--branch B] [--changes N] [--done ISO] \
         [--review-clean ISO] [--enqueued ISO] [--merged ISO] [--bounces N] [--bounce-causes CAUSE[,CAUSE...]] \
-        [--ci-wall-s S] [--local-gate-s S] [--local-gate-runs N] [--note TEXT]
+        [--pre-queue-reds N] [--ci-wall-s S] [--local-gate-s S] [--local-gate-runs N] [--note TEXT]
     python scripts/orchestrator/landing_measure.py complete [--pr N]
     python scripts/orchestrator/landing_measure.py summary [--since ISO] [--before PATH]
     python scripts/orchestrator/landing_measure.py freeze
@@ -30,13 +30,16 @@ stay as an earlier call left them, because no single tool sees the whole life of
                 failed is a ripple, not this pull request's bounce); `complete` counts them
   bounce_causes one of CAUSES per bounce, named by the finisher that fixed it; a bounce with no cause is counted
                 UNATTRIBUTED, never guessed
+  pre_queue_reds the pull request's OWN runs (event `pull_request`, its head branch) that FAILED before the queue took
+                it (kb/Work PB3096): a red there never reaches a merge group, so `bounces` cannot see it; `complete`
+                counts them, and a branch with no pull-request run at all stays null (UNMEASURED), never 0
   ci_wall_s     the successful merge-group run's wall time (`complete`)
   local_gate_s  the seconds of every local gate the landing worktree ran (the sum of its verdict.json `timings.wall_s`)
 A field never observed stays null and `summary` says how many landings lack it: a MISSING observation is not a zero.
 
 `summary` prints the after column (this file) beside the before column (the retired train records, then the frozen
 2026-10-10 evidence): changes landed per hour, median and p90 minutes DONE → on main per change, bounces per landing
-and their causes, merge-group CI wall, local gate minutes. `freeze` copies the retired train file under
+and their causes, pull-request reds before the queue per landing, merge-group CI wall, local gate minutes. `freeze` copies the retired train file under
 docs/rearchitecture/evidence/fleet-optimization/ together with the first after-summary (it refuses until a pull request
 has landed), after which `summary` reads the tracked copy and the coordination directory's file is no longer needed.
 """
@@ -140,7 +143,7 @@ def validate(rec: dict) -> dict:
         if tb < ta:
             raise ValueError(f"pull request {rec['pr']}: {kb} {rec[kb]} is before {ka} {rec[ka]} "
                              f"(a landing passes {' → '.join(STAMPS)})")
-    for k in ("bounces", "local_gate_runs"):
+    for k in ("bounces", "pre_queue_reds", "local_gate_runs"):
         if rec.get(k) is not None and rec[k] < 0:
             raise ValueError(f"--{k.replace('_', '-')} {rec[k]} is negative")
     for k in ("ci_wall_s", "local_gate_s"):
@@ -160,7 +163,8 @@ def patch_record(existing: dict | None, patch: dict) -> dict:
     """`existing` with every non-None field of `patch` laid over it, validated. The FIRST `enqueued` and `done_each`
     are kept and `done` only moves earlier: a re-enqueue after a bounce is the same landing, still waiting."""
     rec = {"schema": SCHEMA, "pr": patch["pr"], "branch": None, "changes": 1, "done": None, "review_clean": None,
-           "enqueued": None, "merged": None, "bounces": None, "bounce_causes": [], "done_each": [], "ci_wall_s": None,
+           "enqueued": None, "merged": None, "bounces": None, "bounce_causes": [], "pre_queue_reds": None,
+           "done_each": [], "ci_wall_s": None,
            "local_gate_s": None, "local_gate_runs": None, "note": "", **(existing or {})}
     for k, v in patch.items():
         if v is None or (k in ("bounce_causes", "done_each") and not v):
@@ -220,6 +224,8 @@ def after_figures(recs: list[dict]) -> dict:
     causes = {c: sum(r["bounce_causes"].count(c) for r in counted) for c in CAUSES}
     out["bounces"] = {"n": len(counted), "total": sum(r["bounces"] for r in counted), "causes": causes,
                       "unattributed": sum(r["bounces"] - len(r["bounce_causes"]) for r in counted)}
+    seen = [r["pre_queue_reds"] for r in landed if r.get("pre_queue_reds") is not None]
+    out["pre_queue_reds"] = {"n": len(seen), "total": sum(seen)}
     ci = [r["ci_wall_s"] / 60 for r in landed if r.get("ci_wall_s") is not None]
     out["ci_wall"] = {"n": len(ci), "median": median(ci), "p90": percentile(ci, 90)} if ci else None
     gate = [r["local_gate_s"] / 60 for r in landed if r.get("local_gate_s") is not None]
@@ -292,6 +298,11 @@ def summarize(recs: list[dict], trains: list[dict], since: dt.datetime | None = 
                   + ")") if bo["n"] else UNMEASURED,
                  f"{b['ejected'] / b['changes']:.2f} ejected to a finisher per landed change; {b['ci_reds']} CI red(s); "
                  "causes UNMEASURED" if b else UNMEASURED))
+    pq = a["pre_queue_reds"]
+    rows.append(("pull-request reds before the queue per landing",
+                 (f"{pq['total'] / pq['n']:.2f} ({pq['total']} in {pq['n']} landing(s))" if pq["n"] else UNMEASURED)
+                 + (f"; {a['landings'] - pq['n']} landing(s) UNMEASURED" if pq["n"] and a["landings"] > pq["n"] else ""),
+                 f"{UNMEASURED} (a train opened no pull request)"))
     ci = a["ci_wall"]
     rows.append(("merge-group CI wall, minutes",
                  (f"median {ci['median']:.1f}, p90 {ci['p90']:.1f} ({ci['n']} landing(s))" if ci else UNMEASURED),
@@ -430,8 +441,9 @@ def record_enqueued(path: pathlib.Path, worktree: pathlib.Path, branch: str, pr:
 
 def complete(path: pathlib.Path, gh: Gh, only: int | None = None, say: Say = print) -> int:
     """Complete every record with no `merged` time (or the one pull request `only`) from GitHub: `mergedAt`, the count
-    of failed merge-group runs of the pull request (bounces) and the successful run's wall (CI wall). Returns 0 when
-    every record asked about was read, 2 when GitHub could not be asked."""
+    of failed merge-group runs of the pull request (bounces), the count of its own failed `pull_request` runs on its head
+    branch (pre_queue_reds, kb/Work PB3096) and the successful merge-group run's wall (CI wall). Returns 0 when every
+    record asked about was read, 2 when GitHub could not be asked."""
     recs = [r for r in read_all(path) if (only is None and not r.get("merged")) or r["pr"] == only]
     if only is not None and not recs:
         say(f"landing-measure: no record for pull request {only}")
@@ -456,10 +468,26 @@ def complete(path: pathlib.Path, gh: Gh, only: int | None = None, say: Say = pri
         if not pr.get("mergedAt"):
             say(f"landing-measure: PR #{r['pr']} is {pr.get('state', '?')} and not merged — left open")
             continue
+        # The pull request's own runs (the cheap jobs, before the queue): a red there never reaches a merge group, so
+        # `bounces` cannot count it (kb/Work PB3096). Every pull request has at least one such run, so none at all is
+        # an observation missed (an expired or truncated listing), recorded as null, never as 0.
+        rc, out, err = gh(["run", "list", "--workflow", WORKFLOW, "--event", "pull_request", "--branch", r["branch"],
+                           "--limit", "100", "--json", "conclusion"])
+        if rc != 0:
+            say(f"⛔ landing-measure: gh run list --event pull_request --branch {r['branch']} failed (exit {rc}): "
+                f"{(out + err).strip()}")
+            bad += 1
+            continue
+        own = json.loads(out or "[]")
         mine = [x for x in runs if re.search(rf"/pr-{r['pr']}-", x.get("headBranch") or "")]
         ok = [x for x in mine if x.get("conclusion") == "success"]
         patch: dict = {"pr": r["pr"], "merged": pr["mergedAt"],
                        "bounces": sum(x.get("conclusion") in ("failure", "timed_out") for x in mine)}
+        if own:
+            patch["pre_queue_reds"] = sum(x.get("conclusion") in ("failure", "timed_out") for x in own)
+        else:
+            say(f"⚠ landing-measure: PR #{r['pr']}: no pull_request run of {WORKFLOW} on branch {r['branch']} — "
+                "pre-queue reds UNMEASURED")
         if ok:
             x = max(ok, key=lambda y: y["updatedAt"])
             patch["ci_wall_s"] = round((_when(x["updatedAt"]) - _when(x["startedAt"])).total_seconds(), 1)
@@ -473,7 +501,7 @@ def complete(path: pathlib.Path, gh: Gh, only: int | None = None, say: Say = pri
             bad += 1
             continue
         say(f"landing-measure: completed PR #{new['pr']}: merged {new['merged']}, {new['bounces']} bounce(s), "
-            f"CI wall {_cell(new['ci_wall_s'] and new['ci_wall_s'] / 60)} min")
+            f"{_cell(new['pre_queue_reds'], '{}')} pre-queue red(s), CI wall {_cell(new['ci_wall_s'] and new['ci_wall_s'] / 60)} min")
     return 2 if bad else 0
 
 
@@ -523,11 +551,13 @@ def parser() -> argparse.ArgumentParser:
         r.add_argument("--" + k.replace("_", "-"), help=f"ISO time with offset: {k.replace('_', ' ')}")
     r.add_argument("--bounces", type=int)
     r.add_argument("--bounce-causes", help=f"comma-separated, one per bounce, of: {', '.join(CAUSES)}")
+    r.add_argument("--pre-queue-reds", type=int, help="the pull request's own failed runs before the queue took it")
     r.add_argument("--ci-wall-s", type=float)
     r.add_argument("--local-gate-s", type=float)
     r.add_argument("--local-gate-runs", type=int)
     r.add_argument("--note")
-    c = sub.add_parser("complete", help="read merge time, bounces and CI wall from GitHub for unmerged records")
+    c = sub.add_parser("complete", help="read merge time, bounces, pre-queue reds and CI wall from GitHub for unmerged "
+                                        "records")
     c.add_argument("--pr", type=int, help="only this pull request (merged ones too)")
     s = sub.add_parser("summary", help="the after column beside the before column")
     s.add_argument("--since", help="only landings enqueued at or after this ISO time")
@@ -538,7 +568,8 @@ def parser() -> argparse.ArgumentParser:
 
 
 def patch_from_args(a: argparse.Namespace) -> dict:
-    p = {"pr": a.pr, "branch": a.branch, "changes": a.changes, "bounces": a.bounces, "ci_wall_s": a.ci_wall_s,
+    p = {"pr": a.pr, "branch": a.branch, "changes": a.changes, "bounces": a.bounces,
+         "pre_queue_reds": a.pre_queue_reds, "ci_wall_s": a.ci_wall_s,
          "local_gate_s": a.local_gate_s, "local_gate_runs": a.local_gate_runs, "note": a.note,
          "bounce_causes": [c.strip() for c in a.bounce_causes.split(",") if c.strip()] if a.bounce_causes else []}
     for k in STAMPS:
@@ -560,12 +591,14 @@ ARMS = ("a record is a patch: later calls fill fields, the first enqueue time st
         "figure it never saw",
         "the headline is the merge queue's rate from two landings and the retired trains' rate before that, each "
         "saying what its minutes measure",
-        "freeze waits for a landing, refuses to rewrite the frozen copy, and the evidence figures are in the evidence file")
+        "freeze waits for a landing, refuses to rewrite the frozen copy, and the evidence figures are in the evidence file",
+        "complete counts the pull request's own failed runs before the queue on its head branch (pre_queue_reds), and a "
+        "branch with no pull-request run stays UNMEASURED, never 0")
 
 
 def _self_test(tmp: pathlib.Path) -> list[str]:
     fails: list[str] = []
-    patch_arm, refuse_arm, done_arm, gate_arm, complete_arm, summary_arm, headline_arm, freeze_arm = ARMS
+    patch_arm, refuse_arm, done_arm, gate_arm, complete_arm, summary_arm, headline_arm, freeze_arm, prequeue_arm = ARMS
     path = tmp / FILE
     z = "2026-10-12T"
 
@@ -582,9 +615,11 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     if read_all(path)[0]["done"] != t("09:00"):
         fails.append(f"{patch_arm}: a later done moved the earliest: {read_all(path)[0]}")
     cli = patch_from_args(parser().parse_args(["record", "--pr", "5", "--branch", "b5", "--changes", "3", "--enqueued",
-                                               t("10:00"), "--bounces", "2", "--bounce-causes", "conflict, load-timing"]))
+                                               t("10:00"), "--bounces", "2", "--bounce-causes", "conflict, load-timing",
+                                               "--pre-queue-reds", "1"]))
     made = patch_record(None, cli)
-    if (made["changes"], made["bounces"], made["bounce_causes"], made["branch"]) != (3, 2, ["conflict", "load-timing"], "b5"):
+    if (made["changes"], made["bounces"], made["bounce_causes"], made["branch"], made["pre_queue_reds"]) \
+            != (3, 2, ["conflict", "load-timing"], "b5", 1):
         fails.append(f"{patch_arm}: the command line's mapping: {made}")
     # refusals
     for name, p in (("merged before enqueued", {"pr": 17, "merged": t("09:50")}),
@@ -592,6 +627,7 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
                     ("causes with no bounces", {"pr": 17, "bounce_causes": ["conflict"]}),
                     ("more causes than bounces", {"pr": 17, "bounces": 1, "bounce_causes": ["conflict", "conflict"]}),
                     ("a negative gate", {"pr": 17, "local_gate_s": -1.0}),
+                    ("negative pre-queue reds", {"pr": 17, "pre_queue_reds": -1}),
                     ("no branch on a first record", {"pr": 18, "enqueued": t("10:00")}),
                     ("a time with no offset", {"pr": 17, "merged": "2026-10-12T11:00:00"})):
         try:
@@ -673,8 +709,15 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
             {"headBranch": "gh-readonly-queue/main/pr-170-ddd", "conclusion": "failure", "startedAt": "2026-10-12T18:10:00Z",
              "updatedAt": "2026-10-12T18:11:00Z"}]
 
+    # the pull request's own runs, per head branch: two reds before the queue (a failure, a timeout), a green re-run, and
+    # a run cancelled because its head moved (superseded, not a red); branch b19 has none at all
+    pr_runs = {"b17": [{"conclusion": "failure"}, {"conclusion": "timed_out"}, {"conclusion": "cancelled"},
+                       {"conclusion": "success"}]}
+
     def gh(args: list[str]) -> tuple[int, str, str]:
         if args[:2] == ["run", "list"]:
+            if args[args.index("--event") + 1] == "pull_request":
+                return 0, json.dumps(pr_runs.get(args[args.index("--branch") + 1], [])), ""
             return 0, json.dumps(runs), ""
         if args[:2] == ["pr", "view"]:
             return 0, json.dumps({"state": "MERGED", "mergedAt": "2026-10-12T18:26:00Z"}), ""
@@ -684,6 +727,23 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     r = read_all(path)[0]
     if rc != 0 or r["bounces"] != 1 or r["ci_wall_s"] != 930.0 or not r["merged"].startswith("2026-10-12T18:26"):
         fails.append(f"{complete_arm}: rc={rc} {r} {lines}")
+    if r["pre_queue_reds"] != 2:
+        fails.append(f"{prequeue_arm}: {r['pre_queue_reds']} pre-queue red(s), not 2: {lines}")
+    unseen = tmp / "unseen.jsonl"
+    record(unseen, {"pr": 19, "branch": "b19", "enqueued": t("10:00")})
+    seen_lines: list[str] = []
+    rc19 = complete(unseen, gh, say=seen_lines.append)
+    if rc19 != 0 or read_all(unseen)[0]["pre_queue_reds"] is not None \
+            or not any("pre-queue reds UNMEASURED" in x for x in seen_lines):
+        fails.append(f"{prequeue_arm}: an unobserved branch: rc={rc19} {read_all(unseen)[0]} {seen_lines}")
+    def gh_down(args: list[str]) -> tuple[int, str, str]:
+        if args[:2] == ["run", "list"] and "pull_request" in args:
+            return 1, "", "HTTP 502"
+        return gh(args)
+    down = tmp / "down.jsonl"
+    record(down, {"pr": 20, "branch": "b20", "enqueued": t("10:00")})
+    if complete(down, gh_down, say=seen_lines.append) != 2 or read_all(down)[0]["merged"] is not None:
+        fails.append(f"{prequeue_arm}: a failed pull-request listing completed the record: {read_all(down)[0]}")
     # summary / headline
     record(path, {"pr": 17, "bounce_causes": ["cluster-defect"], "bounces": 1})
     trains = [{"gating": "batched", "started": "2026-10-10T10:00:00-07:00", "pushed": "2026-10-10T12:00:00-07:00",
@@ -696,7 +756,8 @@ def _self_test(tmp: pathlib.Path) -> list[str]:
     text = "\n".join(one)
     want = ["0.41 (1 change(s), 1 pull request(s), 2.4 h)", "2.00 (8 changes, 2 trains, 4.0 h)", "146 / 146 (1 change(s))",
             "0.12 ejected to a finisher per landed change; 1 CI red(s); causes UNMEASURED",
-            "1.00 (1 in 1 landing(s); cluster-defect 1)", "median 15.5, p90 15.5 (1 landing(s))",
+            "1.00 (1 in 1 landing(s); cluster-defect 1)", "2.00 (2 in 1 landing(s))",
+            "UNMEASURED (a train opened no pull request)", "median 15.5, p90 15.5 (1 landing(s))",
             "median 5.0, total 5 (1 landing(s))"]
     missing = [w for w in want if w not in text]
     if missing:
