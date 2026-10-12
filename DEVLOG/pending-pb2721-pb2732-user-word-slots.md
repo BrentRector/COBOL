@@ -36,3 +36,8 @@ CAPACITY, `INDEXED BY FOREVER, I2`) prints `007 WXYZ`, `6`, `ZQZ` at 2002, 2014 
 `conformance:negative/pb2732-qualified-index-name` rejects at 85 through 2023. SR-8.3.2.1-3 was already CONFORMS (PB655,
 which made those tokens cobolWord alternatives); it gains the golden and the drift test as witnesses. Found on the way
 (I9): the `type-clause-2002` construct cited §13.18.58 (TYPEDEF) for the TYPE clause; it cites §13.18.57 now.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261012T200914Z-430ece; Conformance
+4,777/11,490, Unit 32,629/33,455, Characterization 36/36 in leg 1), with the new golden, negative and drift test among
+the passes; the inventory and register drift tests leg 1 left out pass in a targeted run (22/22). Semgrep counts are
+unchanged.
