@@ -76,7 +76,7 @@ of an unsupported facility.
 | 1 | Significand/exponent >31/>3 digits in float literal / numeric-edited PICTURE | 8.3.3.3.3 / 13.18.40 | **Claimed** (all four) | WiseOwl COBOL supports the standard floating-point usages and STANDARD-DECIMAL arithmetic, so item 1's latitude is unavailable and the FULL forms are provided: a floating-point literal's significand of up to 36 digits and exponent of up to 4 digits (kb/Work PB99 — the value range is A.1 item 82's determination), a floating-point numeric-edited PICTURE with a 36-digit significand and a 4-digit exponent (kb/Work PB66, D21) |
 | 2 | ARITHMETIC IS STANDARD-BINARY | 11.9.5 / 8.8.1.4 | **Not claimed — REVISITABLE** | ⛔ **The ground is PROCESSOR-DEPENDENCE, not obsolescence** (this row said "Obsolete feature" until 2026-08-31, which names a fact that grants nothing). **A.3 item 2**: "The ARITHMETIC IS STANDARD-BINARY clause in the OPTIONS paragraph is dependent on the capabilities of the processor" — and **§4.2.6** is what makes declining it conforming: the decision to claim support "is within an implementor's discretion", the absence "shall be specified in the implementor's user documentation" (this row), and a compile-time warning mechanism is required (COBOLNET0806 — see §1 on why an error). Obsolescence is *not* a licence: Annex **F.2**'s preamble reads "A conforming implementation shall support obsolete language elements **except** for elements that are also optional or processor-dependent" — so the exception is doing the work, and the obsolescence only corroborates. **REVISITABLE by the standard's own words**: F.2 item 3 ("STANDARD-BINARY arithmetic and STANDARD BINARY Intermediate Data Item. These features have not been implemented as of the writing of this revision by any COBOL provider") adds "Unlike other obsolete features, it is intended that interest in these facilities will be **reevaluated** during the next revision". Every rule conditioned solely on the mode carries this ONE determination (a derived verdict — `inventory-schema.json` `derived-verdicts.standard-binary-only`); NATIVE and STANDARD-DECIMAL are provided. Decision: kb/Work PB198. |
 | 3 | ARITHMETIC IS STANDARD-DECIMAL | 11.9.5 | **Claimed** | Full SDIDI consumption (P10): `CobolDec` engine, decimal128 range ECs |
-| 4 | Asynchronous messaging (MCS) facility | E.3.2 | **Not claimed** | Documented non-support (§4) — inter-run-unit communication not provided. SEND and RECEIVE are accepted inert with the §4.2.6 warning COBOLNET1578 at every statement; USAGE MESSAGE-TAG is refused (COBOLNET1943). Every rule conditioned solely on the facility carries this ONE determination, by owner decision R43 (a derived verdict — `inventory-schema.json` `derived-verdicts.mcs-only`); witness `conformance:2023/w59_mcs_facility_witness` |
+| 4 | Asynchronous messaging (MCS) facility | E.3.2 | **Not claimed** | Documented non-support (§4) — inter-run-unit communication not provided. SEND and RECEIVE are accepted inert with the §4.2.6 warning COBOLNET1578 at every statement, and every EC-MCS exception-name with the same warning wherever it is written (kb/Work PB374); USAGE MESSAGE-TAG is refused (COBOLNET1943). Every rule conditioned solely on the facility carries this ONE determination, by owner decision R43 (a derived verdict — `inventory-schema.json` `derived-verdicts.mcs-only`); witnesses `conformance:2023/w59_mcs_facility_witness`, `conformance:2023/pb374_ec_mcs_names_accept_inert` |
 | 5 | BLOCK CONTAINS clause | 13.18.10 | **Claimed** (inert) | Accepted; no effect on the managed I-O model (A.3 item 5 sanctions this) |
 | 6–7 | Commit and rollback facility / its devices | E.3.2 | **Not claimed** | Documented non-support (§4) — no transaction manager |
 | 8 | CONTINUE AFTER precision greater than .99 | 14.9.9 | Not claimed | Implementor m = 0 (integer seconds); a fractional interval truncates (§14.9.9.4 GR1) |
@@ -1828,8 +1828,15 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
    class object that is permitted as a receiving item") and `SET MT TO MT2` drew the §8.8.1.1 screen
    (COBOLNET0844, *"item 'MT2' of category alphanumeric is not a numeric operand"*), neither of them true of the
    program. Pinned by `conformance:negative/pb453-set-message-tag-format17`.
-   ⚠ The EC-MCS-\* exception-names are still ACCEPTED against a facility with no setting sites — the same shape
-   items 2 and 3 close below; owed with this module's own witnesses.
+   The **EC-MCS exception-names** (the level-2 EC-MCS and every level-3 name under it, §14.6.13.1.6 Table 13) are
+   accepted with **COBOLNET1578** wherever an exception-name may be written — the TURN directive, a USE statement,
+   a PERFORM WHEN phrase, RAISE and the RAISING phrases — through the one exception-name funnel
+   (`EcNameResolution`, whose declined-facility table carries the module as a Warning row; kb/Work PB374). Accepted,
+   not refused as items 2–4's names are, because §4.2.6 governs a processor-dependent element and an inert reading
+   exists: no SEND or RECEIVE sets an EC-MCS condition here (§14.6.13.1.1 licenses raising none), while a RAISE
+   raises the named condition like any level-3 name, so a USE declarative or a WHEN phrase for it still runs.
+   Below `--std 2023` the names draw the introduction gate COBOLNET0878 instead. Pinned by
+   `conformance:2023/pb374_ec_mcs_names_accept_inert` and `conformance:negative/pb374-ec-mcs-name-below-2023`.
 2. **Commit and rollback** (E.3.2 item 2 / A.3 items 6–7 / **Annex A.4.3**), in full — the facility's surface is
    three elements, not one, and each has its own posture:
    * the `COMMIT` and `ROLLBACK` **statements** (§14.9.7, §14.9.36 — A.4.3 items 4 and 5): accepted-inert with
@@ -1868,9 +1875,9 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
    own; they are general rules about what a supported clause does *inside* a VALIDATE statement, so the
    statement's own COBOLNET1580 is their witness.
 4. **Screen handling** (§13.9, optional §4.2.7 / Annex A.4.2): the SCREEN SECTION, ACCEPT/DISPLAY format-3
-   (screen), and the EC-SCREEN family. Not provided; the section draws **COBOLNET1560**. ⚠ The EC-SCREEN-\*
-   names are still ACCEPTED against a facility with no setting sites (`kb/Work PB260`) — owed with this module's
-   own witnesses, one row in the `EcNameResolution` declined-family table.
+   (screen), and the EC-SCREEN family. Not provided; the section draws **COBOLNET1560**, and the EC-SCREEN
+   names are refused with **COBOLNET1707** wherever they are written — one Error row of the `EcNameResolution`
+   declined-facility table (`kb/Work PB260`).
 
 Beyond these four whole facilities, three **optional items of an otherwise-claimed module** are likewise refused
 by name (Annex **A.4.10**, "Object orientation" — the OO core itself is mandatory surface and is implemented):
@@ -1884,8 +1891,8 @@ resolution signature), **COBOLNET0822**. Item 2, the `INTERFACE-ID … INHERITS`
 needs assertions the corpora structurally cannot make: the negative corpus matches ERROR codes only and the
 `.out` goldens capture stdout, while a warning rides the non-failing compile channel.
 `DocumentedNonSupportWitnessTests` is where those assertions live — it pins COBOLNET1579 (item 2) and
-COBOLNET1580 (item 3) on the same sources the positive corpus runs. **COBOLNET1578 (item 1, MCS) is still
-unasserted** and could lose its diagnostic without a gate going red. Item 4 is no longer exposed to this at
+COBOLNET1580 (item 3) on the same sources the positive corpus runs, and COBOLNET1578 (item 1, MCS) at both of its
+statements and at every exception-name site (kb/Work PB1198, PB374). Item 4 is no longer exposed to this at
 all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corpus entries
 (`tests/conformance/negative/a42-*`), each `.err` naming the construct as well as the code.
 

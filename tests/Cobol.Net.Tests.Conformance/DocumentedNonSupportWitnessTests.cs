@@ -187,6 +187,26 @@ public sealed class DocumentedNonSupportWitnessTests
         Assert.Equal(2, warnings.Count(w => w.Contains(McsNonSupport, StringComparison.Ordinal)));
     }
 
+    /// <summary>THE SAME FACILITY'S EXCEPTION-NAMES → COBOLNET1578, ONCE PER WRITTEN NAME, AND STILL ACCEPTED (kb/Work
+    /// PB374). The EC-MCS names compiled in SILENCE against a facility with no setting site; asynchronous messaging is
+    /// Annex A.3 item 4, processor-dependent, so §4.2.6's warning mechanism is owed for them as for SEND and RECEIVE,
+    /// and the posture is accept-inert, never the refusal the optional modules' names get. The golden writes the names
+    /// at four of the six sites one funnel serves (TURN, USE, RAISE twice, a PERFORM WHEN), so the count is the
+    /// assertion: a site that bypassed the funnel would drop one (feedback_two_arm_dispatch). Every warning names the
+    /// exception-name it is about, and the golden's <c>.out</c> pins that the accepted names still work: the RAISE
+    /// reaches the USE declarative and the WHEN phrase (§14.9.29.4 GR1).</summary>
+    [Fact]
+    public void McsExceptionNames_NamedNonSupportWarning_AtEverySite_AndAccepted()
+    {
+        string source = Golden("2023", "pb374_ec_mcs_names_accept_inert");
+        var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023);
+        Assert.True(ok, $"an accept-inert facility's exception-names must still COMPILE: {string.Join("\n", errors)}");
+        var mcs = warnings.Where(w => w.Contains(McsNonSupport, StringComparison.Ordinal)).ToList();
+        Assert.Equal(5, mcs.Count);
+        Assert.Equal(3, mcs.Count(w => w.Contains("EC-MCS-INVALID-TAG", StringComparison.Ordinal)));
+        Assert.Equal(2, mcs.Count(w => w.Contains("EC-MCS-MESSAGE-LENGTH", StringComparison.Ordinal)));
+    }
+
     /// <summary>The OPTIONS FLOAT-DECIMAL clause → COBOLNET2424 (kb/Work R43 / PB579). Annex A.3 item 13 makes
     /// the clause processor-dependent and dependent on the standard decimal floating-point usages, which are not
     /// provided (item 19); §4.2.6 ¶3 compels the warning. It is the decline that LEAKED — the clause compiled

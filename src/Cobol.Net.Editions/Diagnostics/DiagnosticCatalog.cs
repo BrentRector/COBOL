@@ -3233,8 +3233,9 @@ public static class DiagnosticCatalog
     public static readonly DiagnosticDescriptor McsFacilityUnsupported = new(
         "COBOLNET1578", "mcs-facility-unsupported", EditionSeverity.Warning,
         "The asynchronous messaging facility (SEND/RECEIVE, ISO §14.9.31/§14.9.38) is a processor-dependent "
-        + "element (§4.2.6; Annex A.3 item 4) that is not supported — the statement is accepted but performs no "
-        + "message I-O, and no EC-MCS-* condition is raised (§14.6.13.1.1). See docs/CONFORMANCE.md §4.",
+        + "element (§4.2.6; Annex A.3 item 4) that is not supported — a SEND or RECEIVE statement is accepted but "
+        + "performs no message I-O, and the facility raises no EC-MCS-* condition (§14.6.13.1.1); an EC-MCS "
+        + "exception-name is accepted. See docs/CONFORMANCE.md §4.",
         "ISO §4.2.6 ¶3 / Annex A.3 item 4 / §14.9.31 / §14.9.38", RecognizedNotImplemented,
         Annex: DeclinedAnnex.A3);
     public static readonly DiagnosticDescriptor CommitRollbackUnsupported = new(

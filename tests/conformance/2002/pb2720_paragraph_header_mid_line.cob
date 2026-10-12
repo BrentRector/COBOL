@@ -1,4 +1,4 @@
->>SOURCE FORMAT FREE
+       >>SOURCE FORMAT FREE
 *> kb/Work PB2720 - a paragraph header written after a sentence on the
 *> same line. ISO 14.4.3: "A paragraph consists of a paragraph-name
 *> followed by a separator period and by zero, one, or more successive
