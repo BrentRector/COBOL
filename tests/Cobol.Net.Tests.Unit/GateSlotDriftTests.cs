@@ -8,14 +8,16 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ THE GATE CAP IS FIFO AND NEVER LEAKS A SLOT (kb/Work PB1720; DESIGN-test-build-ci.md §3.14.6):
-/// <c>scripts/gate_slot.py --self-test</c> declares all ten arms — FIFO order (a later waiter never overtakes a live
+/// <c>scripts/gate_slot.py --self-test</c> declares all eleven arms — FIFO order (a later waiter never overtakes a live
 /// earlier ticket, and a re-gate queues last), a killed holder releases its slot, a dead waiter leaves the queue, an
 /// orphaned tree is killed on Windows or keeps its slot until it exits on Linux, the slots are shared across
 /// worktrees, ⛔ ONE SHARED CAP (kb/Work PB2514: a raise written by <c>gate_slot.py set-cap</c> in one worktree reaches
 /// gates already queued in another at once, an expired setting is the default again, malformed settings stop a gate,
 /// <c>status</c> shows every held slot), ⛔ THE OWNER'S CODED DEFAULTS (2026-10-10, kb/Work PB2514, PB2515: with no
-/// setting the cap is 3 and the implementer scope is <c>leg1</c>) and <c>gate_slot.py clear</c> returning to them —
-/// and its ALL GREEN line counts exactly the arms it declares; the self-test runner runs it.
+/// setting the cap is 3 and the implementer scope is <c>leg1</c>), <c>gate_slot.py clear</c> returning to them, and
+/// ⛔ LANDING GATES FIRST (kb/Work PB3103: a gate <c>enqueue.py land</c> starts is served before every waiting
+/// implementer gate, FIFO within each class, the cap unchanged) — and its ALL GREEN line counts exactly the arms it
+/// declares; the self-test runner runs it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -54,6 +56,7 @@ public sealed class GateSlotDriftTests
         "status shows every held slot, one above the cap in force included",
         "the coded defaults, with no setting: cap 3 (three gates at once, a fourth queues) and scope leg1",
         "clear returns one setting or both to the coded defaults, and repairs a malformed file",
+        "landing gates first: a landing ticket is served before every implementer ticket, FIFO within each class",
     ];
 
     private static readonly Regex ArmCall = new(@"^\s*arm\(""(?<label>[^""]+)""", RegexOptions.Multiline);
