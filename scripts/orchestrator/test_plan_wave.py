@@ -193,6 +193,43 @@ check("a FINDINGS stamp is a finisher whose pred names the findings file and the
       ("finisher", True))
 check("a CLEAN stamp awaits landing", p5r["awaiting_landing"].get("worktree-wf_rv-2"), ["PB7"])
 check("a placeholder Review line stamps nothing", pw.parse_review("**Review:** stamped by the branch reviewer"), None)
+# 6b''. THE BRANCH IS THE HEADER'S FIELD, NEVER A WORD OF THE REVIEW STAMP (kb/Work PB3077): review_findings.py
+#       stamps the review one line under the Status line, ABOVE the Branch field of an O11 header, and its reviewer
+#       label `land-review-<branch>-r1` carries the branch name with a suffix. The header's first `worktree-…` word
+#       was that label: a branch that does not exist, ABSENT, so every reviewed branch read as landed, and wave
+#       1064's review finishers (2026-10-11) were first told to merge `worktree-wf_aba5c7ac-b61-1-r1`.
+(RV_REPORTS / "w1062g-PB5-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 2 land-review-worktree-wf_rv-3-r1 8888888bb E:/s/review-worktree-wf_rv-3.jsonl\n"
+    "Worktree: E:\\COBOL\\.claude\\worktrees\\wf_rv-3\nBranch: worktree-wf_rv-3\nHEAD: 8888888bb\nBase: 1111111aa\n"
+    "# PB5 report\n\n## What landed\n", encoding="utf-8")
+(RV_REPORTS / "w1062h-PB7-report.md").write_text(
+    "# PB7 report\n**Status:** DONE · **branch:** `worktree-wf_rv-4` · **HEAD:** `9999999cc`\n"
+    "**Review:** FINDINGS 1 land-review-worktree-wf_rv-4-r1 9999999cc E:/s/review-worktree-wf_rv-4.jsonl\n\n## Reproduced?\n",
+    encoding="utf-8")
+(RV_REPORTS / "w1062i-PB12-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 land-review-worktree-wf_rv-5-r1 aaaaaaa11 E:/s/r.jsonl\n"
+    "# PB12 report — the work of branch worktree-wf_rv-5 (a header with no Branch field)\n\n## X\n", encoding="utf-8")
+rv2 = {r.slug: r for r in pw.load_reports(RV_REPORTS)}
+check("an O11 header's Branch field wins over the review stamp's reviewer label above it",
+      (rv2["w1062g"].branch, rv2["w1062g"].worktree, rv2["w1062g"].head),
+      ("worktree-wf_rv-3", "E:\\COBOL\\.claude\\worktrees\\wf_rv-3", "8888888bb"))
+check("a template header's **branch:** field wins over the label below it", rv2["w1062h"].branch, "worktree-wf_rv-4")
+check("with no field, the first branch word OUTSIDE the stamp is the branch", rv2["w1062i"].branch, "worktree-wf_rv-5")
+check("the stamp still parses beside the field", (rv2["w1062g"].review.verdict, rv2["w1062g"].review.findings),
+      ("FINDINGS", 2))
+# The field is read at a FIELD POSITION only (PB3077 review round 1, R1-1): header prose says "this branch: every …"
+# in real reports (w1043x-PB2806, w1055z-PB2426), and an unanchored `branch:` rule took `every` as the branch — ABSENT,
+# the same harm — in a header with no field or with that prose above the field.
+(RV_REPORTS / "w1062j-PB5-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 land-review-worktree-wf_rv-6-r1 bbbbbbb22 E:/s/r.jsonl\n"
+    "# PB5 report — the work of branch worktree-wf_rv-6; on this branch: every file is LF\n\n## X\n", encoding="utf-8")
+(RV_REPORTS / "w1062k-PB7-report.md").write_text(
+    "Status: DONE\n# PB7 report — on this branch: the reader takes the field\nBranch: worktree-wf_rv-7\nHEAD: ccccccc33\n"
+    "\n## X\n", encoding="utf-8")
+rv3 = {r.slug: r for r in pw.load_reports(RV_REPORTS)}
+check("mid-prose `branch:` is not a field: with no field the branch word wins, never the prose", rv3["w1062j"].branch,
+      "worktree-wf_rv-6")
+check("mid-prose `branch:` above the Branch field does not pre-empt it", rv3["w1062k"].branch, "worktree-wf_rv-7")
 
 # 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
 #     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.

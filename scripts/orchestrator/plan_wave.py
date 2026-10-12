@@ -88,6 +88,16 @@ PB = re.compile(r"\bPB\d+\b")
 REPORT_NAME = re.compile(r"^w(?P<wave>\d+)(?P<letter>[a-z0-9]*)-(?P<lead>PB\d+)-report\.md$")
 STATUS_WORD = re.compile(r"^\**(?:Status:\**)?\s*\**\s*(?P<s>DONE|SPLIT|DISCHARGED|BLOCKED|NOT STARTED)\b", re.I)
 BRANCH = re.compile(r"\b(worktree-[A-Za-z0-9_][A-Za-z0-9_.\-]*[A-Za-z0-9_])")
+#: The header's own branch FIELD — `Branch: x` (the O11 header) or `**branch:** `x`` (the report template) — which
+#: names exactly the report's branch, read at a FIELD POSITION only: the start of a header line or right after the
+#: template's ` · ` separator. Mid-prose `branch:` is not a field — real reports say "this branch: every file …"
+#: (w1043x, w1055z), and an unanchored rule took `every` (review round 1 of PB3077). BRANCH, the first `worktree-…`
+#: word, is only the fallback for a header with no field (kb/Work PB3077; prune_worktrees.newest_report applies
+#: the same field-first rule).
+BRANCH_FIELD = re.compile(r"(?im)(?:^|·)[ \t]*\**branch:\**\s*`?([A-Za-z0-9_][A-Za-z0-9_.\-]*[A-Za-z0-9_])")
+#: A review stamp line (review_findings.py stamp, kb/Work PB3027), placeholder or not: its reviewer label
+#: `land-review-<branch>-r1` names the branch with a suffix, so the branch, worktree and head are read around it.
+REVIEW_LINE = re.compile(r"^\**Review:", re.I)
 WORKTREE = re.compile(r"([A-Za-z]:\\[^\s`*]*?\\worktrees\\[A-Za-z0-9_.\-]+)")
 HEAD = re.compile(r"\bHEAD\b[:*`\s]*([0-9a-f]{7,40})\b|\bhead ([0-9a-f]{7,40})\b")
 # THE BRANCH REVIEW'S STAMP (kb/Work PB3027; DESIGN-test-build-ci.md section 3.17.2 step 2). The read-only reviewer of a
@@ -187,8 +197,13 @@ def parse_report(p: pathlib.Path) -> Report | None:
     status = next((s.group("s").upper() for l in header[:6] if (s := STATUS_WORD.match(l.strip()))), "")
     if not status and re.search(r"\bSPLIT\b", text):
         status = "SPLIT"
-    h = HEAD.search(text)
-    b, w = BRANCH.search(text), WORKTREE.search(text)
+    # The branch is the header's own field, never a word of the review stamp (kb/Work PB3077): review_findings.py
+    # stamps the review one line under Status, ABOVE the Branch field of an O11 header, and its reviewer label
+    # `land-review-worktree-…-r1` was the header's first `worktree-…` word — a branch that does not exist, ABSENT,
+    # so every reviewed branch read as landed and wave 1064's finishers were told to merge `worktree-…-r1`.
+    unstamped = "\n".join(l for l in header if not REVIEW_LINE.match(l.strip()))
+    h = HEAD.search(unstamped)
+    b, w = BRANCH_FIELD.search(unstamped) or BRANCH.search(unstamped), WORKTREE.search(unstamped)
     ids = list(dict.fromkeys(PB.findall(text) + [m.group("lead")]))
     return Report(p, int(m.group("wave")), f"w{m.group('wave')}{m.group('letter')}", m.group("lead"), status, ids,
                   bool(re.search(r"(?i)not\s+started", text)), b.group(1) if b else None, w.group(1) if w else None,
