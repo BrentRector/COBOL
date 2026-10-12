@@ -1,4 +1,4 @@
-## PB2842: a coherent keyed statement whose store reload meets a host failure answers '30' instead of killing the run unit
+## Entry 1975 — 2026-10-12 15:54 PDT — PB2842: a coherent keyed statement whose store reload meets a host failure answers '30' instead of killing the run unit
 
 ### The defect
 
@@ -62,3 +62,4 @@ statement entry bullet. Semgrep counts unchanged. No diagnostic codes used (COBO
 
 Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 5,129/11,488 - Unit 32,741/33,474 -
 Characterization 36/36 cases in leg 1).
+
