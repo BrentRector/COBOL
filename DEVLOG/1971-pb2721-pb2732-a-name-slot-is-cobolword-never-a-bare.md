@@ -42,3 +42,13 @@ which made those tokens cobolWord alternatives); it gains the golden and the dri
 the passes; the inventory and register drift tests leg 1 left out pass in a targeted run (22/22). Semgrep counts are
 unchanged.
 
+**Oracle.** The landing oracle refused the first enqueue (exit 7): the grammar, the CST and the construct registry are
+inputs of baseline 60d47c6d52a9. `compare_oracle.py` against it: `DIFFERENT — 15 of 7782 cases`, in two classes, both
+the intended effect of this change. ADDED (2): the new golden `corpus/2002/pb2721_context_word_user_word_slots` and the
+new negative `negative/pb2732-qualified-index-name`. DIAGNOSTICS (13), every one the same single line: the COBOLNET0900
+edition-gate message for the TYPE clause now names `ISO §13.18.57 (the TYPEDEF family, §13.18.58)` where it named
+`§13.18.58`, the I9 citation fix above, reaching every program that writes a TYPE clause below 2002 (the matrix cases
+`type-clause-2002`, `typedef-def-2002` and `external-type-declaration-2023` at 85, strict and permissive, and the
+negatives pb1071, pb1569, pb1951, pb244, pb2464, pb427 and pb522). No case differs in its emitted C#, and no other
+diagnostic line moved. The baseline is re-recorded at this branch's head.
+
