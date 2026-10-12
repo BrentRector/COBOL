@@ -1,4 +1,4 @@
-## PB3029: one line ending, LF, in every tracked text file and every checkout; PB3097: the finisher role loads again
+## Entry 1968 — 2026-10-12 02:19 PDT — PB3029: one line ending, LF, in every tracked text file and every checkout; PB3097: the finisher role loads again
 
 ### PB3029: LF everywhere, enforced
 
@@ -53,3 +53,4 @@ description is now valid YAML. The readiness check now parses every agent, skill
 It requires a mapping that names its own file or directory and has a non-empty description, and it reports a failure
 as ASK-OWNER, never OK. Its self-test plants the exact defect and also runs over the live `.claude/`. PyYAML is pinned
 in CI's `audits` and `windows-build-test` jobs and listed in the WSL and cloud setups.
+
