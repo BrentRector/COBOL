@@ -28,10 +28,10 @@ this per WAITING TO LAND branch, and an agent is dispatched only for what a scri
      the exit is 4: a finisher resolves it.
   3. THE GATE on the merged head, every host in GATES, each under the shared gate slot (the cap of 3, so concurrent
      enqueues queue there and never beyond it; build-local takes its own, every other row runs under `gate_slot.py
-     run`, and no row runs while one would run outside it, kb/Work PB3104): a verdict that is not GREEN (or no verdict line) is
-     exit 5, the report gains `BLOCKED: <host> gate … at enqueue — <verdict>`. A green head is recorded in the worktree's
-     git directory (`enqueue-gated`); a later run whose head differs from it only by commits that are main's, clean
-     merges or DEVLOG-only (`prune_worktrees.unreviewed_since`, the review's coverage rule) is not gated again.
+     run`, and no row runs while one would run outside it, kb/Work PB3104): a verdict that is not GREEN (or no verdict
+     line) is exit 5, the report gains `BLOCKED: <host> gate … at enqueue — <verdict>`. A green head is recorded in
+     the worktree's git directory (`enqueue-gated`); a later run whose head differs from it only by commits that are
+     main's, clean merges or DEVLOG-only (`prune_worktrees.unreviewed_since`, the review's coverage rule) is not gated again.
   4. MAIN AGAIN, then the stamp, then `queue` (below). Main moves while a branch gates (the queue merges other pull
      requests), and `queue` takes only a head that descends from main; so origin/main is fetched again and, when it
      moved, MERGED in once more, without a second gate (kb/Work PB3023 review R1-2): the local gate confirms the change
