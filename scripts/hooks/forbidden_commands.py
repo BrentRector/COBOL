@@ -194,31 +194,35 @@ VERDICT = re.compile(r"^(?:\w+=\S*\s+)*(?:dotnet\s+(?:test|build)\b|"
 READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-String|Get-Content|findstr|type)\b")
 
 
-def _segments(text: str):
-    """Split a command line on top-level `&&`, `||` and `;`, ignoring quoted text (a separator inside a quoted
-    string or a `bash -c '…'` argument is not a separator of THIS command line)."""
-    out, cur, q, i = [], [], None, 0
-    while i < len(text):
-        ch = text[i]
-        if q:
-            cur.append(ch)
-            if ch == q:
-                q = None
-        elif ch in "'\"":
-            q = ch
-            cur.append(ch)
-        elif text.startswith("&&", i) or text.startswith("||", i):
-            out.append("".join(cur)); cur = []; i += 2; continue
-        elif ch == ";" or ch == "\n":
-            out.append("".join(cur)); cur = []
-        else:
-            cur.append(ch)
-        i += 1
-    out.append("".join(cur))
-    return [s.strip() for s in out if s.strip()]
+# Rules 5-7 read the command line through the ONE shared parser (`shell_location.steps`, kb/Work PB2599): quotes,
+# escapes, comments, heredoc bodies, here-strings, `( … )`/`{ … }` groups and `bash -c` payloads are its to know, never
+# a private scanner's (the branch review of PB3024, R1-1: a private splitter opened a quote on a comment's apostrophe and
+# failed open). The whole command goes to it, heredoc included; a parse failure leaves these rules nothing to judge.
+try:
+    _steps = shell_location.steps(cmd, None, shell_location.shell_of(data.get("tool_name")))
+except Exception:  # noqa: BLE001
+    _steps = []
 
 
-segs = _segments(commands)
+def _segments(steps) -> list[str]:
+    """The command line's segments: each a command or pipeline ended by `&&`, `||`, `;` or a newline (a pipe or a
+    background `&` keeps what follows in the same segment). A group or a `-c` payload is one opaque part, `( … )`: a
+    verdict command inside one is not this command line's chain."""
+    out: list[str] = []
+    cur: list[str] = []
+    for st in steps:
+        part = st.text if st.depth == 0 else "( … )"
+        if not (part == "( … )" and cur and cur[-1] == part):
+            cur.append(part)
+        if st.sep not in ("|", "&"):
+            out.append(" | ".join(cur))
+            cur = []
+    if cur:
+        out.append(" | ".join(cur))
+    return out
+
+
+segs = _segments(_steps)
 
 # 6. WSL lifecycle commands (owner 2026-10-04): `wsl --terminate/--shutdown/--update/--export/--import/--unregister/--install`
 # can end the owner's open session, race a procedure they run by hand, or burn tens of GB of disk, so NO agent or unattended
@@ -226,8 +230,8 @@ segs = _segments(commands)
 # whose command IS wsl is checked, so a commit message or a grep pattern that mentions the flags passes.
 WSL_LIFECYCLE = re.compile(r"^(?:\w+=\S*\s+)*(?:&\s+)?(?:\S*[\\/])?wsl(?:\.exe)?\s+(?:[^|;&]*\s)?"
                            r"(?:--terminate|-t|--shutdown|--update|--export|--import|--unregister|--install)\b")
-for seg in segs:
-    if WSL_LIFECYCLE.match(seg):
+for _st in _steps:   # every simple command, a `-c` payload's and a pipeline's later sides too
+    if WSL_LIFECYCLE.match(_st.text):
         block("WSL lifecycle commands (`--terminate`, `--shutdown`, `--update`, `--export`, `--import`, `--unregister`, "
               "`--install`) are the OWNER's to run (owner 2026-10-04: they can end an open session or burn disk). Give the "
               "owner the exact command and wait; commands inside a distro (`wsl -d Ubuntu -e ...`) are fine.")
@@ -254,58 +258,17 @@ for i, seg in enumerate(segs[:-1]):
 # (PowerShell 7), so a `cd` joined to it by `&&`/`||` moves only that subshell: `cd X && a & b &` runs `a` under X and
 # `b` in the caller's directory. On 2026-10-11 a landing audit written that way reported a false OK into the queue. A
 # `cd` in its OWN list (`cd X; a & b`) moves the calling shell and stays allowed, as do `cd X && a` and `cd X && a &`
-# with nothing after the `&`.
-_CD_SEGMENT = re.compile(r"^(?:cd|pushd|chdir|Set-Location|sl|Push-Location)(?:\s|$)", re.I)
-
-
-def _and_or_lists(text: str) -> list[tuple[list[str], str]]:
-    """The command line's and-or lists, each (its commands joined by `&&`/`||`, its terminator: `;`, a newline, `&` or
-    '' at the end), quoted text never split. A `&` ends a list only as the background operator: never inside `&&`, never
-    in a redirection (`2>&1`, `>&2`, `&>`, `|&`), and never as PowerShell's call operator (a `&` that starts a command)."""
-    lists: list[tuple[list[str], str]] = []
-    segs: list[str] = []
-    cur: list[str] = []
-    q = None
-    i = 0
-
-    def close_segment() -> None:
-        segs.append("".join(cur).strip())
-        cur.clear()
-
-    while i < len(text):
-        ch = text[i]
-        if q:
-            cur.append(ch)
-            if ch == q:
-                q = None
-        elif ch in "'\"":
-            q = ch
-            cur.append(ch)
-        elif text.startswith("&&", i) or text.startswith("||", i):
-            close_segment()
-            i += 2
-            continue
-        elif ch in ";\n" or (ch == "&" and "".join(cur).strip() and text[i - 1] not in "<>|"
-                              and not text.startswith("&>", i)):
-            close_segment()
-            lists.append(([s for s in segs if s], ch))
-            segs.clear()
-        else:
-            cur.append(ch)
-        i += 1
-    close_segment()
-    lists.append(([s for s in segs if s], ""))
-    return [(s, t) for s, t in lists if s]
-
-
-_lists = _and_or_lists(commands)
-for n, (cmds, term) in enumerate(_lists):
-    if term == "&" and n + 1 < len(_lists) and any(_CD_SEGMENT.match(c) for c in cmds):
-        block(f"`{' && '.join(cmds)[:70]} &` moves into a directory inside a BACKGROUNDED list, and "
-              f"`{' '.join(_lists[n + 1][0])[:50]}` follows it: the backgrounded list ends at the `&`, so the location "
-              "change binds only that background subshell and every command after the `&` runs in the CALLER's "
-              "directory (2026-10-11: a landing audit written this way reported a false OK). Use absolute paths or "
-              "`git -C <dir>` instead of `cd` (MANDATORY-PRACTICES P14(b), kb/Work PB3095); independent commands go "
-              "as parallel tool calls in one turn.")
+# with nothing after the `&`. The list structure is the shared parser's (`shell_location.steps`, kb/Work PB2599): it
+# knows quotes, escapes, comments, heredocs, redirections and PowerShell's call operator, and it marks the first step
+# after such a list with the list's location changes (`Step.stranded`).
+for _n, _after in enumerate(_steps):
+    if _after.stranded:
+        _moves = " ".join(t or "(home)" for t in _after.stranded)
+        block(f"a location change to `{_moves[:60]}` sits in an and-or list that a single `&` sends to the background, "
+              f"and `{_after.text[:50]}` follows the `&`: the backgrounded list ends there, so the location change "
+              "binds only that background subshell and every command after the `&` runs in the CALLER's directory "
+              "(2026-10-11: a landing audit written this way reported a false OK). Use absolute paths or `git -C <dir>` "
+              "instead of `cd` (MANDATORY-PRACTICES P14(b), kb/Work PB3095); independent commands go as parallel tool "
+              "calls in one turn.")
 
 sys.exit(0)

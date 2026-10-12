@@ -65,6 +65,12 @@ CASES = [
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
     ("pwsh -NoProfile -File scripts/build-local.ps1 > b.log 2>&1; git status", True),
     ("python scripts/orchestrator/enqueue.py land b > l.log 2>&1 && git log -1", True),
+    # 5b'. the chain is read by the SHARED parser (review R1-1's sibling): a comment's apostrophe, an escaped quote or a
+    # heredoc before the chain no longer hides it
+    ("git status  # don't" + chr(10) + "dotnet build x.sln > b.log 2>&1 && git commit -m x", True),
+    ("echo it" + BS + "'s here && dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
+    ("cat > m.txt <<'EOF'" + chr(10) + "x" + chr(10) + "EOF" + chr(10) + "dotnet test x.csproj > t.log 2>&1 && git commit -m x", True),
+    ("dotnet test x.csproj > t.log 2>&1 & git status", False),           # a background `&` is not a chain (as before)
     # 5c. the merge-queue landing is a verdict command too (kb/Work PB3024)
     ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt > q.log 2>&1 && git log -1", True),
     ("python scripts/orchestrator/enqueue.py queue --title T --body-file m.txt > q.log 2>&1; echo \"rc=$?\"", False),
@@ -83,6 +89,8 @@ CASES = [
     ("wsl -l -v", False),
     ("git commit -q -m 'document wsl --terminate and wsl --export for the owner'", False),
     ("grep -n 'wsl --export' docs/x.md", False),
+    ("bash -c 'wsl --shutdown'", True),                                  # a -c payload's command is a command
+    ("echo y | wsl --terminate Ubuntu", True),                           # so is a pipeline's later side
     # 7. a `cd` inside a BACKGROUNDED list with another command after its `&` (MANDATORY-PRACTICES P14(b), kb/Work PB3095)
     ("cd /e/x && git log -1 > a.txt & git status > b.txt &", True),     # the 2026-10-11 shape: b ran in the caller's dir
     ("cd /e/x && a & b", True),
@@ -96,6 +104,13 @@ CASES = [
     ("cd /e/x && a &> l.log", False),                                    # `&>` too
     ("cd /e/x && a |& tee l.log", False),                                # and `|&`
     ("echo 'cd /e/x && a & b'", False),                                  # quoted text is text
+    # review R1-1: the rule reads the SHARED parser, so a comment's apostrophe or an escaped quote cannot hide the list
+    ("git status  # don't worry" + chr(10) + "cd /e/x && a & b", True),
+    ("echo it" + BS + "'s here && cd /e/x && a & b", True),
+    ("cat > m.txt <<'EOF'" + chr(10) + "cd /e/x && a & b" + chr(10) + "EOF" + chr(10) + "git status", False),   # heredoc body
+    ("bash -c 'cd /e/x && a & b'", True),                                # a -c payload is a command line
+    ("(cd /e/x && a) & b", False),                                       # the subshell already scopes the cd
+    ("{ cd /e/x; a; } & b", True),                                       # a { } group is in the backgrounded list
 ]
 
 

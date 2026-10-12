@@ -134,10 +134,11 @@ replace — the guard that exists because ~6 rebuilds under a running 60-agent f
 agent works in the caller's own tree, and both trees are derived, never listed: the caller's tree is the nearest
 ancestor holding a `.git` entry (a directory in the main checkout, a file in a worktree) of WHERE THE BUILD RUNS —
 the project a `dotnet` command names, else the directory the shell is in when it runs it. That directory comes from
-`scripts/hooks/shell_location.py`, the ONE parser of both shells' location changes (`cd`, `pushd`/`popd`, a
-subshell, `bash -c`; `Set-Location`/`sl`/`chdir`/`Push-Location` with `-Path`/`-LiteralPath`, `pwsh
--WorkingDirectory`, `Start-Process -WorkingDirectory`), which `worktree_rm_allow.py`, `forbidden_commands.py` and
-`status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
+`scripts/hooks/shell_location.py`, the ONE parser of both shells' command lines and location changes (`cd`,
+`pushd`/`popd`, a subshell, an and-or list a single `&` backgrounds, `bash -c`; `Set-Location`/`sl`/`chdir`/
+`Push-Location` with `-Path`/`-LiteralPath`, `pwsh -WorkingDirectory`, `Start-Process -WorkingDirectory`), which
+`worktree_rm_allow.py`, `forbidden_commands.py` (its push, verdict-chaining, WSL and backgrounded-`cd` rules; kb/Work
+PB3095) and `status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
 <worktree>; dotnet build` was judged to build in the main checkout);
 the main checkout is that root, or the `gitdir:` target parsed out of the worktree's `.git` file (parsed, not
 shelled out — this runs before every `dotnet` call); and a foreign agent's tree is

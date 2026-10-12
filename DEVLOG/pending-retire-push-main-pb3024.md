@@ -36,10 +36,19 @@ architecture-review skills and MANDATORY-PRACTICES P2, P14, L1, L3 and L13 name 
 
 The operator's train-1067 land unit ran its audits as `cd X && a & b &`. A single `&` backgrounds the whole and-or
 list, so the `cd` moved only that subshell: `b` read the caller's tree and reported a false OK into the queue.
-`forbidden_commands.py` rule 7 splits a command line into and-or lists (quotes respected; `2>&1`, `&>`, `|&` and
-PowerShell's `&` call operator are not background operators) and blocks a list that holds a location change, ends in
-`&` and has another command after it. `cd X; a & b`, `cd X && a` and `cd X && a &` alone still pass; 105/105 hook
-cases green.
+The shared parser `shell_location.py` now models it: a list that ends in `&` has its state restored at the `&`
+(Bash subshell or PowerShell 7 job), and the first step after it carries that list's location changes in
+`Step.stranded`. `forbidden_commands.py` rule 7 blocks such a step. `cd X; a & b`, `cd X && a`, `cd X && a &` alone
+and `(cd X && a) & b` still pass.
+
+The branch review (R1-1) found the first version's rule 7 in a private splitter that knew neither comments nor
+escapes: `git status  # don't worry` on one line and `cd /e/x && a & b` on the next passed, and so did an escaped
+quote before the chain. The shared parser already handled both but made only the single command before a `&` transient,
+so it gave the command after `cd X && a &` the cwd X, and the build guard and `status_guard.py` judged it that way. The
+fix moved the and-or list into the parser and deleted the private splitter. Rules 5 and 6 had the same splitter
+(`_segments`), so they now group the parser's steps too: a comment, an escaped quote or a heredoc before
+`dotnet test … && git commit` no longer hides the chain, and a `bash -c 'wsl --shutdown'` or `echo y | wsl
+--terminate` is seen. Every new case was RED against the reviewed head: hook 117/117, parser 73/73.
 
 ### PB3096: a pull request's red before the queue is measured
 
@@ -49,7 +58,7 @@ branch; a branch with no such run stays UNMEASURED, never 0, and `summary` print
 arm 9, pinned by `LandingMeasureDriftTests`; a mutation that always records the count fails it.
 
 **Self-review.** Architecture: one landing path, one deferral rule removed rather than wrapped; the hook's new rule is
-its own parser beside `_segments`, which splits on different separators for a different rule. Code: every arm of the
+read through the shared parser, as rules 5 and 6 now are (no hook splits a command line itself). Code: every arm of the
 deleted mechanism found by the tree sweep, the arm itself, and `git grep` on lease, `READY-TO-PUSH` and `ci/<sha>`;
 the docstrings that now name `enqueue.py land` as `landing_check.py`'s caller were checked against the workflow (CI runs only its self-test).
 Performance: the new sweep reads the tracked tree once, as its sibling sweep does. Duplication: none added.
