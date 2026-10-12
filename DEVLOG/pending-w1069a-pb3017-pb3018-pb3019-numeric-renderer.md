@@ -34,7 +34,9 @@ rounding twin. DOC-A.1-82 records the determination.
 
 **Goldens** (all 2023, values derived by hand in the headers): `pb3017_sdidi_divide_remainder_beyond_the_int128_carrier`
 (2^128 - 1 over 7, which the SDIDI quotient multiplies back exactly, so R = 0; over 10^10, R = 1768200000; 1E30 over 3,
-R = 1; 1E40 over 7, the quotient's size error with Q and R unchanged),
+R = 1; 1E40 over 7, the quotient's size error with Q and R unchanged; and the small ROUNDED, negative and scaled legs
+that pin the subsidiary quotient as the TRUNCATED quotient: 7/2 ROUNDED Q 4 R 1, -7/2 ROUNDED Q -4 R -1, 10/3 into
+`S9(5)V9` Q 3.3 R 0.1),
 `pb3019_native_float_intermediate_past_the_carrier_is_a_size_error` (1E40 and -1E40 size errors, the in-range control, and
 the binary-capacity cap legs R = 4 and R = 2) and
 `pb3018_native_dec_lane_wide_binary_operand_signed_and_unsigned_agree`. Unit: `CarrierLandingFormTests` now expects the raise,

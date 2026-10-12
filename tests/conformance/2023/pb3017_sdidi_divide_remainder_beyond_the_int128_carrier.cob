@@ -49,6 +49,15 @@
       *>   past 2**128 - 1 (about 3.4E+38): the quotient's size error, Q
       *>   and R unchanged (14.7.5 rule 1 - the resultants keep their
       *>   values).
+      *>   Small operands on the same lane: the subsidiary quotient is the
+      *>   TRUNCATED quotient even when the stored quotient is ROUNDED
+      *>   (6) c) "derived from the quotient by truncation of digits at the
+      *>   least significant end").  7 / 2 = 3.5: Q ROUNDED = 4, the
+      *>   subsidiary quotient 3, R = 7 - 3 * 2 = 1.  -7 / 2 = -3.5: Q
+      *>   ROUNDED = -4 (nearest away from zero), the subsidiary quotient
+      *>   -3 (toward zero), R = -7 - (-3 * 2) = -1; without ROUNDED Q =
+      *>   -3, R = -1.  10 / 3 into PIC S9(5)V9: Q = 3.3, subsidiary
+      *>   quotient 3.3, R = 10 - 3.3 * 3 = 0.1.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB3017A.
        OPTIONS.
@@ -65,6 +74,11 @@
        01 R PIC S9(19) COMP-5 VALUE 7.
        01 QS PIC S9(31) COMP-5 VALUE 7.
        01 QDD PIC 9(27).
+       01 NEG PIC S9(5) SIGN IS LEADING SEPARATE VALUE -7.
+       01 QI PIC S9(5) SIGN IS LEADING SEPARATE VALUE 0.
+       01 RI PIC S9(5) SIGN IS LEADING SEPARATE VALUE 0.
+       01 QFR PIC S9(5)V9 SIGN IS LEADING SEPARATE VALUE 0.
+       01 RFR PIC S9(5)V9 SIGN IS LEADING SEPARATE VALUE 0.
        PROCEDURE DIVISION.
        MAIN.
            MOVE X"FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF" TO VX.
@@ -92,6 +106,14 @@
                NOT ON SIZE ERROR DISPLAY "1E40/7 ok"
            END-DIVIDE.
            PERFORM SHOWQ.
+           DIVIDE 7 BY 2 GIVING QI ROUNDED REMAINDER RI.
+           DISPLAY "7/2 rounded: Q " QI " R " RI.
+           DIVIDE NEG BY 2 GIVING QI ROUNDED REMAINDER RI.
+           DISPLAY "-7/2 rounded: Q " QI " R " RI.
+           DIVIDE NEG BY 2 GIVING QI REMAINDER RI.
+           DISPLAY "-7/2 truncated: Q " QI " R " RI.
+           DIVIDE 10 BY 3 GIVING QFR REMAINDER RFR.
+           DISPLAY "10/3 scale 1: Q " QFR " R " RFR.
            STOP RUN.
        SHOWQ.
            COMPUTE QDD = Q / 100000000000.
