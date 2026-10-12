@@ -54,3 +54,15 @@ with a REMAINING section naming the sites, and D-VGB records the departure.
 `leg-1-Conformance.trx`). The Linux gate is the landing's.
 
 **Branch review round 2.** The reviewer found that the half-status note still carried a title and heading that read as finished work; the title now leads with the REMAINING INITIALIZED-default item, the heading says HALF, and spec_refs gains 8.5.1.9.3 and 8.5.1.9.5, so `work.py next` and the planners see what is open. Register-only change.
+
+**Landing stop (finisher).** The landing's Linux gate went RED on two existing goldens that pinned the old reading and
+that the branch's sweep had missed (the Windows leg 1 never selected them): `2014/pb2087_vlg_returning_cell_receiver`, a
+copy of `pb965_vlg_into_fixed_invoke` plus a TOUCH, still expected `VCAP=0000000002`, and
+`2014/pb480_universal_variable_length_shapes` still expected the callee's `MOVE "ZZ" TO BT(3)` past capacity 2 to be lost
+(`C2=2`). Both expectations are wrong answers under section 14.2.3 GR8 with section 8.5.1.9.3 (cite.py OK), the text the
+branch was decided on, so the goldens were re-derived and the mechanism kept: pb2087 now displays `VT(3)` and expects
+`VG=[qq][mno][ij] VCAP=0000000003`; pb480 sets the capacity back to 2 before each lane, so the universal and the typed
+invocation each create the third occurrence (`G2=hh/AABBZZ/xyz C2=3`). Sweep: all 28 corpus programs (2014, 2023) that hold
+a dynamic-capacity table and cross a CALL, INVOKE or RETURNING were run on the branch build against their goldens: 27
+identical, one (`pb1042_dyn_table_agreement`) differing only by trailing spaces the corpus runner trims. A unit-test comment
+that still said a fixed formal table never re-sizes the argument's now says it never shrinks it.
