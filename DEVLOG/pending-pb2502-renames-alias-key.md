@@ -36,5 +36,9 @@ corpus cases Passed in `leg-1-Conformance.trx`). `scripts/semgrep/verify.py` PAS
 `OperandPic` null (its own `GroupUsage` is None and `Pic` is only copied for an elementary data-name-2), so `ItemCategory.IsAlphanumericOrNational` refused it as COBOLNET0863 "a national group
 item" while `RECORD KEY IS G` on the group itself compiled and ran: legal source rejected (12.4.5.12.3 SR2, 13.18.45.4 GR1, 13.18.29.4 GR2 b). Fixed at the reader: `DataItem.AsIfPic` and
 `IsAsIfElementary` forward a no-THROUGH alias to the group it renames (the same rule as `ByteWidth` and `GroupKindsOf`), so every operand-category question about the alias is answered as
-data-name-2. Golden `2023/pb2502_renames_record_key_national_group` (WRITE, duplicate 22, READ KEY IS, START, READ NEXT, end 10 over a national-group alias key; GROUP-USAGE NATIONAL is 2023-only so there
-is no lower-edition twin). Sibling sweep: the other readers of an alias DataItem (`Pic`, `ByteWidth`, `GroupKindsOf`, `AsIfPic`, `IsAsIfElementary`) now all forward; ReferenceResolver already forwarded place references.
+data-name-2. Golden `2002/pb2502_renames_record_key_national_group` (WRITE, duplicate 22, READ KEY IS, START, READ NEXT, end 10 over a national-group alias key; at the introducing edition, GROUP-USAGE being a 2002
+clause, `constructs.json` group-usage-clause-2002; the rule is the same at 2014 and 2023, and below 2002 the GROUP-USAGE clause itself is refused by `negative/pb1653-national-group-view-below-2002`).
+Sibling sweep: the other readers of an alias DataItem (`Pic`, `ByteWidth`, `GroupKindsOf`, `AsIfPic`, `IsAsIfElementary`) now all forward; ReferenceResolver already forwarded place references.
+
+**Review round 2 (R2-1).** The round-1 golden sat in the 2023 corpus on the false premise that GROUP-USAGE is 2023-only; it was introduced in 2002, so a 2002 or 2014 regression of the national-group alias
+path was invisible to the per-edition compilers. The golden moved to the introducing edition's corpus (`2002/`, both manifests updated); the reviewer verified the same output at 2014 and 2023.

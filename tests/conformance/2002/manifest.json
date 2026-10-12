@@ -197,6 +197,7 @@
   "pb1569_type_subject_level1_bit_alignment",
   "pb1572_bit_group_redefines_offsets",
   "pb1653_national_group_view",
+  "pb2502_renames_record_key_national_group",
   "pb1781_universal_group_crossing",
   "pb480_universal_match_relations",
   "pb480_universal_any_length_omitted",
