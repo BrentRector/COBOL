@@ -1,4 +1,4 @@
-## PB3031 - a diagnostic column inside written text counts character positions, not UTF-16 units
+## Entry 1973 — 2026-10-12 15:31 PDT — PB3031 - a diagnostic column inside written text counts character positions, not UTF-16 units
 
 Wave 1069 group D. A diagnostic's column is a CHARACTER POSITION of the physical line (ISO 6.1 1) a), 6.3.1; DOC-A.1-157),
 and PB2983 made the reference-format stage split an origin span at each tab and each supplementary-plane character so
@@ -21,3 +21,4 @@ at `(8,23)`, COPY ... REPLACING at `srepl.cpy(1,23)`) and the unit test
 `SourceLineMapTests.OriginWriter_WrittenTextWithSupplementaryCharacters_CountsOnePositionPerCharacter`, expectations
 computed from the position rule. No inventory row is claimed or closed. Docs: DESIGN-frontend-grammar.md and
 DESIGN-cc-in-copy.md describe the writer's rule.
+
