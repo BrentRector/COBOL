@@ -845,15 +845,18 @@ homes, each read mechanically, never from a hand list:
 `EcBinder.DeclaredRaisableNames(BoundStatement)` is the union, and `EcWrap`'s query is that enumeration filtered by
 `TurnState.Enabled`; the three sources are also exposed by name (`NodeKindNames`, `OperandRaises`, `AmbientNames`) so a
 test reads them without parsing C#. The universe is CLOSED: `ExceptionCatalog.TryGet` answers only catalogued names
-and the user-defined `EC-USER-*` family (kb/Work PB1531; the thirteen `EC-<family>-IMP` names are catalogued and never
-set, DOC-A.1-100). **`EcRaiseSiteRegistryDriftTests`** holds the three together: for every catalogued level-3 name,
+and the user-defined `EC-USER-*` family (kb/Work PB1531; the 22 `EC-<family>-IMP` names, Table 13's implementor-defined
+level-2 name per family, are catalogued, and the implementation sets only EC-PROGRAM-IMP, DOC-A.1-100). **`EcRaiseSiteRegistryDriftTests`** holds the three together: for every catalogued level-3 name,
 the binder declares it AND the runtime raises it (its `ExceptionState.Set` / `Raise…` literals, collected by a Roslyn
 walk of `src/Cobol.Net.Runtime`; the I-O status map through `IoMaskNames`), OR the name is on `DeclinedRaiseSites`, a
 table whose every entry cites the `kb/Work` note or the `docs/CONFORMANCE.md` anchor that says why it is never raised
-(the declined MCS, screen and VALIDATE facilities of CONFORMANCE.md §4; the `EC-*-IMP` family). Declared-but-never-raised
+(the declined MCS, screen and VALIDATE facilities of CONFORMANCE.md §4; the `EC-*-IMP` names DOC-A.1-100 says the
+implementation never sets; EC-PROGRAM-IMP, which `ProgramRegistry` raises, is declared and raised like any other name).
+Declared-but-never-raised
 is a dead guard; raised-but-never-declared is the PB452 / PB1453 shape (`>>TURN … CHECKING ON` wrapping nothing); each
 fails with its shape named. The test is proven to fail once by deleting one declaration. Measured before PB3102
-(2026-10-12): 35 of 135 catalogued names occurred nowhere outside the catalog, five earlier instances of the
+(2026-10-12): 35 of 135 catalogued names occurred nowhere outside the catalog (18 of the 22 `EC-*-IMP`, seven MCS, four
+screen and three VALIDATE names, `EC-BOUND-FUNC-RET-VALUE`, and two I-O names the status map raises), five earlier instances of the
 raised-but-never-declared shape are recorded in `QueryFor`'s own comments (PB452, PB409, PB326, PB349/PB1036, PB233),
 and PB1036's four sort-merge names sat unraised for months behind a green suite.
 

@@ -23,14 +23,15 @@ and asking the relations; pair mode (override, implements, interface, prototype,
 asks `SameSignature`; the comparator family, the two GR8 reductions and `StrongTypeModel.SameElementaryLayout` are
 deleted; PB613 and PB1576 close inside it. The owner's rule of the day — a decade-long production compiler,
 rearchitecture allowed where the principle needs it, cost against time — is why the note asks for one Opus slot and a
-review round rather than a sixth comparator correction.
+review round rather than a sixth comparator correction. D6 item 6, written by w1069y, is item 7's INVOKE step: PB2077
+lands inside PB3101, or first with its pair-mode allowance transitional, so the comparator has one fate.
 
 ### PB1762 — the exception-names a statement can raise (defect PB3102)
 
 Two of its three tasks landed on 2026-09-30 (PB1453: the operand walker with EC-PROGRAM-NOT-FOUND; PB1531: the closed
-catalog). Re-measured: 35 of the catalog's 135 level-3 names occur nowhere outside it (down from 64 of 130) — the
-thirteen `EC-*-IMP`, the declined MCS, screen and VALIDATE families, `EC-BOUND-FUNC-RET-VALUE`, and two I-O names the
-status map raises; the four intrinsic-family gates still sit beside the walker. PB3102's shape, in
+catalog). Re-measured: 35 of the catalog's 135 level-3 names occur nowhere outside it (down from 64 of 130) — 18 of
+the 22 `EC-*-IMP` (the implementation sets only EC-PROGRAM-IMP), the declined MCS, screen and VALIDATE families (seven,
+four and three names), `EC-BOUND-FUNC-RET-VALUE`, and two I-O names the status map raises; the four intrinsic-family gates still sit beside the walker. PB3102's shape, in
 COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN D13: one enumeration `EcBinder.DeclaredRaisableNames` (node-kind arms ∪ operand
 declarations ∪ ambient), the intrinsic families as operand declarations, the runtime's raise literals collected by a
 Roslyn walk, and `EcRaiseSiteRegistryDriftTests` over the closed catalog with a `DeclinedRaiseSites` table whose every

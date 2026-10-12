@@ -281,8 +281,9 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    (the match's description half — rules 3 a)-c), 3 d) 1.-3., 3 e); `Matches` adds the ACTIVE-CLASS value half, which
    the typed lane answers statically by §14.8.2.3.2 rule 4 with `invokedWith`) and
    `ActivationRelations.ParameterViolation(…, universalReceiver)` (GR7 c)'s ANY LENGTH ban is the one universal-only
-   arm). A BY REFERENCE INVOKE argument has NO second comparator: `OoConformance.DescriptionMismatch` is the PAIR-mode
-   comparator (override, implements, property, RETURNING) and nothing else. What the one relation settles by
+   arm). A BY REFERENCE INVOKE argument has NO second comparator. This item is the INVOKE step of item 7: pair mode
+   (override, implements, property, RETURNING) asks `OoConformance.DescriptionMismatch` only until PB3101 deletes the
+   comparator and sends pair mode to `SameSignature`. What the one relation settles by
    construction: a reference-modified argument is §8.4.3.3.4 GR6's PICTURE-less elementary item
    (`OfReferenceModification`), so BY REFERENCE it matches an alphanumeric group formal of no more bytes and never an
    elementary one (3 e)) — the typed lane used to accept `X(1:5)` into `PIC X(5)` and refuse the group; a whole
