@@ -295,6 +295,21 @@ public abstract class KeyedConnector : FileConnector
         return new StoreStatement(this);
     }
 
+    /// <summary>⛔ A HOST FAILURE OF A STATEMENT'S OWN ENTRY IS A PERMANENT ERROR, NOT AN EXCEPTION (kb/Work PB2842).
+    /// Taking the mutex, reading the generation stamp and reloading the store are all host I/O, and §9.1.13.6 1)'s
+    /// <i>"A permanent error exists and no further information is available concerning the input-output
+    /// operation"</i> ('30') is what the standard gives such a failure — the answer OPEN's catch already gives the
+    /// same reload (a file longer than <see cref="RecordFraming.MaxStoreBytes"/>, <see cref="ReadImage"/>) and
+    /// <see cref="CompleteStatement"/> gives the same statement's persist. The statement is entered all the same,
+    /// holding what it took: the status is recorded (<see cref="FileConnector.SetStatus"/>, which starts the permanent
+    /// error of §9.1.13.1, <i>"The permanent error condition remains in effect for all subsequent input-output
+    /// operations on the file"</i>) and the statement's own body ends at the replay every verb makes first
+    /// (<see cref="FileConnector.PermanentErrorReplay"/>) — so READ and START invalidate the file position indicator as
+    /// they do for any permanent error, and nothing reads the stale store. A failure that is not the host's is not
+    /// the file's and escapes as before, with the entry undone.</summary>
+    private static bool IsHostStoreFailure(Exception failure) =>
+        failure is IOException or UnauthorizedAccessException or OutOfMemoryException;
+
     private void Enter(KeyedStore store)
     {
         if (store.StatementDepth++ > 0) return;   // the run unit is already inside the mutex
@@ -303,6 +318,11 @@ public abstract class KeyedConnector : FileConnector
             store.MutexHolder = HoldStoreMutex(exclusive: _regions!.Writable);
             if (ReadGeneration() is { } stamped && stamped != store.Generation) Reload(store);
             store.VersionAtEntry = store.Version;
+        }
+        catch (Exception failure) when (IsHostStoreFailure(failure))
+        {
+            store.VersionAtEntry = store.Version;   // nothing of this statement can have changed the store
+            SetStatus(FileStatusCode.PermanentError);
         }
         catch
         {
@@ -324,7 +344,7 @@ public abstract class KeyedConnector : FileConnector
             Persist(store);
             return status;
         }
-        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+        catch (Exception failure) when (IsHostStoreFailure(failure))
         {
             SetStatus(FileStatusCode.PermanentError);
             return FileStatusCode.PermanentError;
@@ -444,7 +464,7 @@ public abstract class KeyedConnector : FileConnector
         // refuses the record that would take it there), so the bytes beyond are not records. It is §9.1.13.6 1)'s
         // permanent error, "no further information is available", answered '30' through OPEN's IOException mapping — a
         // checked cast used to kill the run unit with an OverflowException instead. A reload inside a later statement
-        // (Enter) has no such mapping yet: kb/Work PB2842.
+        // (Enter) maps it to the same '30' (kb/Work PB2842).
         long length = RandomAccess.GetLength(handle);
         if (length > RecordFraming.MaxStoreBytes)
             throw new IOException($"'{HostPath}' is {length} bytes, longer than any store this format describes "
