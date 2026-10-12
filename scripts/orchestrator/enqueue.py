@@ -282,27 +282,13 @@ def record_blocked(branch: str, wt: pathlib.Path, line: str, say: Say,
     say(f"enqueue: recorded in {rep.name}: {line}")
 
 
-def mechanical(wt: pathlib.Path, commit: str) -> bool:
-    """A commit that changes nothing a reviewer reads: a merge whose tree IS the clean merge of its two parents (no hand
-    resolution: what this script's own `git merge origin/main` makes), or a commit that changes only DEVLOG/ (an entry,
-    its stamp, a re-stamp)."""
-    parents = _git(wt, "rev-list", "--parents", "-n", "1", commit).stdout.split()[1:]
-    if len(parents) == 2:
-        clean = _git(wt, "merge-tree", "--write-tree", *parents)
-        return clean.returncode == 0 and clean.stdout.split()[:1] == [
-            _git(wt, "rev-parse", f"{commit}^{{tree}}").stdout.strip()]
-    if len(parents) == 1:
-        paths = _git(wt, "diff-tree", "--no-commit-id", "--name-only", "-r", commit).stdout.split()
-        return bool(paths) and all(p.startswith("DEVLOG/") for p in paths)
-    return False
-
-
 def review_gate(branch: str, wt: pathlib.Path, base: str, reports_dir: pathlib.Path | None = None) -> str | None:
     """THE REVIEW BEFORE THE LANDING (MANDATORY-PRACTICES I10, L9; kb/Work PB3027; DESIGN-test-build-ci.md section
     3.17.2 step 2): None when the branch may land, else why not. Its newest fix-lane report (prune_worktrees' reader)
     must carry `**Review:** CLEAN <reviewer> <head>` naming a commit of the branch, and every commit of the branch after
-    that head must be main's or mechanical (above): a finisher's fix, a hand-resolved conflict, any later commit is
-    unreviewed work, and the new tip is reviewed before it lands."""
+    that head must be main's or mechanical (`prune_worktrees.unreviewed_since`, the one coverage rule the survey's
+    WAITING TO LAND reads too): a finisher's fix, a hand-resolved conflict, any later commit is unreviewed work, and the
+    new tip is reviewed before it lands."""
     import prune_worktrees  # noqa: PLC0415  (scripts/: it imports coord and plan_wave back)
     import coord  # noqa: PLC0415
     rdir = reports_dir or coord.reports_dir()
@@ -314,11 +300,9 @@ def review_gate(branch: str, wt: pathlib.Path, base: str, reports_dir: pathlib.P
     if rv is None or rv.verdict != "CLEAN":
         return (f"{rep.name} carries {'a FINDINGS' if rv else 'no'} review stamp: a cobol-reviewer reviews the branch "
                 "(and a finisher answers its findings) before it lands")
-    reviewed = _git(wt, "rev-parse", "--verify", "--quiet", f"{rv.sha}^{{commit}}").stdout.strip()
-    if not reviewed or _git(wt, "merge-base", "--is-ancestor", reviewed, "HEAD").returncode != 0:
+    extra = prune_worktrees.unreviewed_since(rv.sha, _git(wt, "rev-parse", "HEAD").stdout.strip(), repo=wt, base=base)
+    if extra is None:
         return f"{rep.name}'s CLEAN stamp names {rv.sha}, which is not a commit of {branch}"
-    extra = [c for c in _git(wt, "rev-list", "HEAD", f"^{reviewed}", f"^{base}").stdout.split()
-             if not mechanical(wt, c)]
     if extra:
         return (f"{len(extra)} commit(s) after the CLEAN review at {rv.sha[:12]} (newest {extra[0][:12]}) are neither "
                 "main's nor a clean merge of it nor DEVLOG-only: the new tip is reviewed before it lands")
