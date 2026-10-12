@@ -116,8 +116,9 @@ public sealed class CapacityRegisterReferenceDriftTests
     /// <summary>The source text of a method, from its signature to the closing brace at its own indentation.</summary>
     private static string MethodBody(string text, string name)
     {
-        // ⛔ The sources are CRLF: `[^\r\n]*$` can never match, because .NET's multiline `$` sits BEFORE the `\n`
-        // with the `\r` still unconsumed. The optional `\r?` is what makes this walk work on this repo at all.
+        // ⛔ `\r?`: on a CRLF source `[^\r\n]*$` can never match, because .NET's multiline `$` sits BEFORE the `\n`
+        // with the `\r` still unconsumed. The sources are LF (kb/Work PB3029); the `\r?` keeps a CR from turning this
+        // walk into a silent no-match, which the line-endings audit then reports by name.
         // The DECLARATION, not the first call: the accessibility modifier is what tells them apart (both hooks
         // are also CALLED from ResolveImplCore, at the same indentation, a few hundred lines above).
         var m = Regex.Match(text,

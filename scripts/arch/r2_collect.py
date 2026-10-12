@@ -419,8 +419,8 @@ def collect(out: Path, tracked: set[str] | None = None):
             {"pair": report["pairs"][name], "findings": [r for b in ("upheld", "refuted", "unverified", "leads", "invalid",
                                                                      "already_tracked")
                                                          for r in report[b] if r["pair"] == name]}, indent=1),
-            encoding="utf-8")
-    (out / "collected.json").write_text(json.dumps(report, indent=1), encoding="utf-8")
+            encoding="utf-8", newline="\n")
+    (out / "collected.json").write_text(json.dumps(report, indent=1), encoding="utf-8", newline="\n")
     return report
 
 
@@ -588,7 +588,7 @@ def self_test():
         return r
 
     def write(p: Path, rows, broken=True):
-        p.write_text("".join(json.dumps(r) + "\n" for r in rows) + ("{broken\n" if broken else ""), encoding="utf-8")
+        p.write_text("".join(json.dumps(r) + "\n" for r in rows) + ("{broken\n" if broken else ""), encoding="utf-8", newline="\n")
 
     def vote(fid, lens, refuted, corrected=None):
         return {"type": "verdict", "finding": fid, "lens": lens, "refuted": refuted, "why": "w", "corrected": corrected}
@@ -612,10 +612,10 @@ def self_test():
         out = Path(tmp)
         (out / "shards.json").write_text(json.dumps({"commit": "c", "shards": [
             {"id": "s1", "files": [["src/A.cs", 9], ["src/B.cs", 9]]}, {"id": "s2", "files": [["src/C.cs", 9]]}]}),
-            encoding="utf-8")
+            encoding="utf-8", newline="\n")
         (out / "batch-args.json").write_text(json.dumps(batch_fixture(out, {"s1": ["src/A.cs", "src/B.cs"], "s2": ["src/C.cs"]},
                                                                       ["architecture", "performance", "duplication"])),
-                                             encoding="utf-8")
+                                             encoding="utf-8", newline="\n")
         f = "s1--architecture--f1#%d"
         write(out / "review-s1--architecture--f1.jsonl", [
             {"type": "read", "file": "src/A.cs"}, rec(1), rec(2), rec(3), rec(4, files=["src/Nope.cs"]),
@@ -688,7 +688,7 @@ def self_test():
         arm("one file per pair is written", (out / "s1--architecture.json").exists())
         arm("an incomplete batch says RELAUNCH, naming why",
             not rep["complete"] and "LAUNCH NEEDED" in summary(rep) and any("unverified" in x for x in rep["relaunch"]))
-        (out / "review-s1--architecture.jsonl").write_text(json.dumps(rec(11)) + "\n", encoding="utf-8")
+        (out / "review-s1--architecture.jsonl").write_text(json.dumps(rec(11)) + "\n", encoding="utf-8", newline="\n")
         rep3 = collect(out, tracked)
         arm("a .jsonl the format does not name is reported and holds the batch open, never silently skipped",
             rep3["ignored_files"] == ["review-s1--architecture.jsonl"] and any("not named" in x for x in rep3["relaunch"]))
@@ -724,7 +724,7 @@ def self_test():
         arm("an over-budget launch is REFUSED with its estimate and split, and the earlier launch.js is removed",
             not est["fits"] and est["parts"] and est["session_points"] > 0 and not js.exists())
         (out / "batch-args.json").write_text(json.dumps(dict(json.loads((out / "batch-args.json").read_text(
-            encoding="utf-8")), outDir=str(out / "elsewhere"))), encoding="utf-8")
+            encoding="utf-8")), outDir=str(out / "elsewhere"))), encoding="utf-8", newline="\n")
         arm("the plan of a batch whose args name another directory is refused", refuses(lambda: plan(out)))
         ck = out / "review-s2--code--f1.jsonl"
         good = json.dumps(rec(1, id="s2--code--f1#1", files=["src/C.cs"], sites=["src/C.cs:1-4 (C.F)"]))
@@ -753,7 +753,7 @@ def self_test():
             files = {"open": ["src/Open.cs"]}
             files.update({"done%d" % i: ["src/Some/Long/Directory/Path/File%d_%d.cs" % (i, j) for j in range(5)]
                           for i in range(n)})
-            (out / "batch-args.json").write_text(json.dumps(batch_fixture(out, files, ["code"])), encoding="utf-8")
+            (out / "batch-args.json").write_text(json.dumps(batch_fixture(out, files, ["code"])), encoding="utf-8", newline="\n")
             for i in range(n):
                 write(out / ("review-done%d--code--f1.jsonl" % i), [{"type": "read", "file": x} for x in files["done%d" % i]]
                       + [{"type": "done"}], broken=False)

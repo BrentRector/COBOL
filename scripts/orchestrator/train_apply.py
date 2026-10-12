@@ -141,7 +141,7 @@ def stamp_status(repo: pathlib.Path, line: str) -> None:
     if "## train_apply" not in lines:
         lines += ["", "## train_apply"]
     lines.append(f"- {line}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def apply_member(repo: pathlib.Path, member: dict, scratch: pathlib.Path, trailers: list[str]) -> str:
@@ -169,7 +169,7 @@ def apply_member(repo: pathlib.Path, member: dict, scratch: pathlib.Path, traile
                           binary=True).stdout)
     before = git(repo, "rev-parse", "HEAD").stdout.strip()
     msg = scratch / f"{cluster}.msg"
-    msg.write_text(message(repo, member, tip, base, trailers), encoding="utf-8")
+    msg.write_text(message(repo, member, tip, base, trailers), encoding="utf-8", newline="\n")
     r = git(repo, "apply", "-3", "--whitespace=nowarn", str(patch), check=False)
     unmerged = sorted(set(git(repo, "diff", "--name-only", "--diff-filter=U").stdout.split()))
     if r.returncode != 0 or unmerged:
@@ -301,7 +301,7 @@ def self_test() -> int:
 
     def member(cluster: str, br: str, base: str, head: str, lead: str = "PB1", title: str = "") -> dict:
         report = root / f"{cluster}-report.md"
-        report.write_text(f"Status: DONE\n\n# {title or lead + ' (+ PB9)'}: implementer report\n", encoding="utf-8")
+        report.write_text(f"Status: DONE\n\n# {title or lead + ' (+ PB9)'}: implementer report\n", encoding="utf-8", newline="\n")
         return {"cluster": cluster, "lead": lead, "notes": lead, "report": str(report), "branch": br, "base": base,
                 "head": head}
 
@@ -310,7 +310,7 @@ def self_test() -> int:
         if fresh:
             sh("checkout", "-q", "-B", f"train-{label}", "main")
         path = root / f"{label}.json"
-        path.write_text(json.dumps(members), encoding="utf-8")
+        path.write_text(json.dumps(members), encoding="utf-8", newline="\n")
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf):
             rc = run(repo, path, ["Co-Authored-By: t <t@t>"], audits=False, upstream="main")
@@ -332,9 +332,9 @@ def self_test() -> int:
     y = branch("y", base, {"b.txt": "b1\nB2\nb3\n", "a.txt": six(a5="A5")})   # a.txt: a hunk apart from x's
     z = branch("z", base, {"a.txt": six(a2="Z2")})                            # a.txt: the SAME line as x
     sh("checkout", "-q", "main")
-    (repo / "STATUS.md").write_text("STATUS-AT: x\nlander notes\n", encoding="utf-8")
+    (repo / "STATUS.md").write_text("STATUS-AT: x\nlander notes\n", encoding="utf-8", newline="\n")
     sh("config", "core.excludesFile", str(root / "ignore"))
-    (root / "ignore").write_text("STATUS.md\n", encoding="utf-8")
+    (root / "ignore").write_text("STATUS.md\n", encoding="utf-8", newline="\n")
 
     long_title = "PB2 group (PB2, PB3, PB4, PB5) — a report title far longer than any commit subject may be"
     clean = [member("X", "x", base, x), member("Y", "y", base, y, lead="PB2", title=long_title)]

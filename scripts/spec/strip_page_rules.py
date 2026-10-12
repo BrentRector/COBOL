@@ -88,7 +88,7 @@ def main() -> int:
     print("  ✓ only `---` lines removed; every word and every heading survived")
 
     if args.apply:
-        SPEC_MD.write_text("\n".join(kept) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(kept) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied to {SPEC_MD.relative_to(REPO)}")
     return 0
 

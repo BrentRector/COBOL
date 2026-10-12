@@ -32,7 +32,7 @@ Drop **two files** in the edition directory and add the name to that directory's
 - `<name>.out` — the exact expected stdout. Compared through `CutRunner.Normalize`: LF line endings, per-line
   trailing-space trim, no trailing newline. A `.cob` with no sibling `.out` is a COMPILE-ONLY entry.
 
-Both files are CRLF, UTF-8, no BOM. `PROGRAM-ID`s must be unique across the whole corpus (.NET otherwise serves a
+Both files are LF (`.gitattributes`, kb/Work PB3029), UTF-8, no BOM. `PROGRAM-ID`s must be unique across the whole corpus (.NET otherwise serves a
 stale same-named assembly).
 
 ## Adding a negative test

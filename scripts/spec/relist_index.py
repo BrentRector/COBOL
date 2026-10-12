@@ -188,7 +188,7 @@ def main() -> int:
 
     if args.apply:
         lines[a:b] = new
-        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied to {SPEC_MD.relative_to(REPO)}")
     return 0
 

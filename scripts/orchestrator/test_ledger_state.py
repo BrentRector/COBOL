@@ -37,7 +37,7 @@ def run(cmd, *extra, acct="account1", want=0):
 
 URL1, URL2 = "https://claude.ai/code/artifact/one", "https://claude.ai/artifact/two"
 COORD.mkdir(parents=True)
-(COORD / "ledger-published.json").write_text(json.dumps({"stamp": "legacy", "published_at": "2026-10-07"}), encoding="utf-8")
+(COORD / "ledger-published.json").write_text(json.dumps({"stamp": "legacy", "published_at": "2026-10-07"}), encoding="utf-8", newline="\n")
 
 
 REPO.mkdir(parents=True)
@@ -45,7 +45,7 @@ git("init", "-q", "-b", "main")
 input_file = REPO / "kb" / "Work" / "PB1.md"                     # kb/Work is one of gen_ledger.STAMP_PATHS
 check("kb/Work is an input of the page", "kb/Work" in gen_ledger.STAMP_PATHS, True)
 input_file.parent.mkdir(parents=True)
-input_file.write_text("a", encoding="utf-8")
+input_file.write_text("a", encoding="utf-8", newline="\n")
 git("add", "."); git("commit", "-q", "-m", "input")
 
 s = run("owed")
@@ -64,11 +64,11 @@ check("account 1's record kept", run("owed")["url"], URL1)
 saved = json.loads((COORD / "ledger-published.json").read_text(encoding="utf-8"))
 check("the file is keyed by account, the legacy record gone", sorted(saved), ["accounts"])
 
-(REPO / "unrelated.txt").write_text("x", encoding="utf-8")        # touches no input
+(REPO / "unrelated.txt").write_text("x", encoding="utf-8", newline="\n")        # touches no input
 git("add", "."); git("commit", "-q", "-m", "unrelated")
 check("an unrelated commit does not make it owed", run("owed")["state"], "current")
 
-input_file.write_text("b", encoding="utf-8")                     # touches an input
+input_file.write_text("b", encoding="utf-8", newline="\n")                     # touches an input
 git("add", "."); git("commit", "-q", "-m", "input again")
 s = run("owed")
 check("an input-touching commit makes it owed", s["state"], "owed")
@@ -77,13 +77,13 @@ run("mark-published")
 check("a later mark keeps the recorded url", (run("owed")["state"], run("owed")["url"]), ("current", URL1))
 
 # the fix lane's population is an input of the page's WHAT REMAINS block (kb/Work PB2912): changing it is owed
-(REPO / ".agent-fleet.json").write_text('{"kind": "defect"}', encoding="utf-8")
+(REPO / ".agent-fleet.json").write_text('{"kind": "defect"}', encoding="utf-8", newline="\n")
 git("add", "."); git("commit", "-q", "-m", "the fix lane's population")
 check("a commit to .agent-fleet.json makes it owed", run("owed")["state"], "owed")
 run("mark-published")
 # the held architecture review's evidence is no longer on the page: its folders are not inputs
 (REPO / "docs" / "rearchitecture" / "evidence" / "arch-census").mkdir(parents=True)
-(REPO / "docs" / "rearchitecture" / "evidence" / "arch-census" / "x.json").write_text("{}", encoding="utf-8")
+(REPO / "docs" / "rearchitecture" / "evidence" / "arch-census" / "x.json").write_text("{}", encoding="utf-8", newline="\n")
 git("add", "."); git("commit", "-q", "-m", "a census record")
 check("a census record no longer makes it owed", run("owed")["state"], "current")
 

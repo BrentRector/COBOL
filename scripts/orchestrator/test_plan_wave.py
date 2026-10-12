@@ -43,12 +43,12 @@ def note(nid, status="open", area="runtime", rows=0, body="", wrapped=False):
     inv = f"inventory_rows: [{rl}]" if not wrapped else f"inventory_rows: [{rl},\n  \"SR-{nid}-x\"]"
     (WORK / f"{nid}.md").write_text(
         f'---\ntitle: "{nid} — a defect in {area}"\nid: {nid}\nkind: defect\nstatus: {status}\narea: {area}\n'
-        f"wrong_answer: true\n{inv}\n---\n\n# {nid}\n\n{body}\n", encoding="utf-8")
+        f"wrong_answer: true\n{inv}\n---\n\n# {nid}\n\n{body}\n", encoding="utf-8", newline="\n")
 
 
 def report(name, first_line, header):
     (REPORTS / name).write_text(f"{first_line}\n{header}\n\n## Reproduced?\nPB9999 is mentioned only below the header.\n",
-                                encoding="utf-8")
+                                encoding="utf-8", newline="\n")
 
 
 # Notes. PB1/PB2 sit on an unlanded branch; PB3 was split by a landed predecessor; PB4 is half; PB5..PB12 open.
@@ -157,10 +157,10 @@ SPLIT_REPORTS = TMP / "reports-split"
 SPLIT_REPORTS.mkdir()
 (SPLIT_REPORTS / "w1020d-PB5-report.md").write_text(
     "SPLIT\n# PB5 group\n**Status:** SPLIT at the turn cap · **worktree:** `E:\\COBOL\\.claude\\worktrees\\wf_ggg-4` · "
-    "**branch:** `worktree-wf_ggg-4` · **HEAD:** `3333333cc`\n\n## Reproduced?\n", encoding="utf-8")
+    "**branch:** `worktree-wf_ggg-4` · **HEAD:** `3333333cc`\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
 (SPLIT_REPORTS / "w1020e-PB7-report.md").write_text(
     "DONE\n# PB7 group (PB12 NOT started)\n**branch:** `worktree-wf_hhh-5` · **HEAD:** `4444444dd`\n\n## Reproduced?\n",
-    encoding="utf-8")
+    encoding="utf-8", newline="\n")
 SPLIT_CLASS = {"worktree-wf_ggg-4": "UNLANDED", "worktree-wf_hhh-5": "UNLANDED"}
 p5 = pw.plan(notes, CLUSTERS, HALF, pw.load_reports(SPLIT_REPORTS), lambda b: SPLIT_CLASS.get(b, "ABSENT"), {}, RULES,
              budget_points=100)
@@ -178,10 +178,10 @@ RV_REPORTS = TMP / "reports-review"
 RV_REPORTS.mkdir()
 (RV_REPORTS / "w1062e-PB5-report.md").write_text(
     "# PB5 report\n**Status:** DONE · **branch:** `worktree-wf_rv-1` · **HEAD:** `6666666ff`\n"
-    "**Review:** FINDINGS 2 w1062e-review-r1 6666666ff E:/s/review-w1062-e.jsonl\n\n## Reproduced?\n", encoding="utf-8")
+    "**Review:** FINDINGS 2 w1062e-review-r1 6666666ff E:/s/review-w1062-e.jsonl\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
 (RV_REPORTS / "w1062f-PB7-report.md").write_text(
     "# PB7 report\n**Status:** DONE · **branch:** `worktree-wf_rv-2` · **HEAD:** `7777777aa`\n"
-    "**Review:** CLEAN w1062f-review-r1 7777777aa\n\n## Reproduced?\n", encoding="utf-8")
+    "**Review:** CLEAN w1062f-review-r1 7777777aa\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
 rv_reports = pw.load_reports(RV_REPORTS)
 check("the review stamps parse", [(r.review.verdict, r.review.findings) if r.review else None for r in rv_reports],
       [("FINDINGS", 2), ("CLEAN", 0)])
@@ -208,7 +208,7 @@ pw.record_dispatch(HD, "1045", [pw.Group(kind="cluster", notes=["PB5", "PB2"], f
 HD_AT = {g["letter"]: g["at"] for g in coord.read_json(HD / pw.DISPATCH_LEDGER, {})["groups"]}
 for name, nid, when in (("w1045b-PB8-report.md", "PB8", HD_AT["b"] + 60), ("w1031c-PB9-report.md", "PB9", HD_AT["c"] - 3600)):
     (HD_REPORTS / name).write_text(f"DONE\n# {nid} group\n**branch:** `worktree-wf_held-{nid}` · **HEAD:** `5555555ee`\n\n"
-                                   "## Reproduced?\n", encoding="utf-8")
+                                   "## Reproduced?\n", encoding="utf-8", newline="\n")
     __import__("os").utime(HD_REPORTS / name, (when, when))
 LEDGER_DOC = coord.read_json(HD / pw.DISPATCH_LEDGER, {})
 LEDGER_DOC["groups"].append({"wave": "hand", "letter": "", "notes": ["PB10"], "files": ["src/W.cs"], "hand": True,
@@ -235,7 +235,7 @@ check("renders through the template", rendered, True)
 # 7b. THE STOP IS SCOPED (kb/Work PB2483): every spec names the owner's global stop and this fleet's own, and passes
 #     check_practices' rendered-spec rule; a groups file without a fleet stop renders nothing
 spec_file = TMP / "msg-w77-x.txt"
-spec_file.write_text(specs[0] if specs else "", encoding="utf-8")
+spec_file.write_text(specs[0] if specs else "", encoding="utf-8", newline="\n")
 check("a rendered spec names the global stop", str(coord.global_stop()) in (specs or [""])[0], True)
 check("a rendered spec names the fleet's own stop", str(coord.fleet_stop(TMP, "w77")) in (specs or [""])[0], True)
 check("a rendered spec passes check_practices", [m for m in check_practices.check(spec_file, check_practices.SPEC)
@@ -263,7 +263,7 @@ except ValueError:
 check("lead is the note with most rows", next(j["lead"] for j in gjson if j["letter"] == G[("PB3", "PB6", "PB7", "PB12")].letter), "PB6")
 gfile = TMP / "groups.json"
 gfile.write_text(__import__("json").dumps({"wave": "77", "scratch": "X", "base": "abc", "stop_file": CFG77["stop_file"],
-                                          "groups": gjson}), encoding="utf-8")
+                                          "groups": gjson}), encoding="utf-8", newline="\n")
 check("check_practices O2 same-file rule", check_practices.same_file_without_successor(gfile), [])
 
 # 8. THE FIX LANE WITHOUT --cluster IS UNCHANGED (kb/Work PB2120): the whole plan of this fixture, every group's
@@ -290,7 +290,7 @@ fp = {"full": fingerprint(p, {j["letter"]: j for j in gjson}), "tight": fingerpr
 fp_text = (JSON.dumps(fp, indent=1, ensure_ascii=False).replace(JSON.dumps(str(TMP))[1:-1], "<TMP>")
            .replace("\\\\", "/") + "\n")
 if "--write-golden" in sys.argv:
-    GOLDEN.write_text(fp_text, encoding="utf-8")
+    GOLDEN.write_text(fp_text, encoding="utf-8", newline="\n")
     print(f"wrote {GOLDEN}")
 check("default plan equals the pre-campaign golden", fp_text == GOLDEN.read_text(encoding="utf-8"), True)
 
@@ -304,7 +304,7 @@ CW = TMP / "campaign" / "kb" / "Work"
 CW.mkdir(parents=True)
 for rel in ("src/Lib/Alpha.cs", "src/Lib/Beta.cs", "scripts/gamma.py", "tests/Delta.Tests/DeltaTests.cs"):
     (TMP / "campaign" / rel).parent.mkdir(parents=True, exist_ok=True)
-    (TMP / "campaign" / rel).write_text("// fixture\n", encoding="utf-8")
+    (TMP / "campaign" / rel).write_text("// fixture\n", encoding="utf-8", newline="\n")
 
 
 def cnote(nid, cluster=("PB901",), blocked_by=(), body="", status="open", kind="defect"):
@@ -312,7 +312,7 @@ def cnote(nid, cluster=("PB901",), blocked_by=(), body="", status="open", kind="
     (CW / f"{nid}.md").write_text(
         f'---\ntitle: "{nid} — campaign step"\nid: {nid}\nkind: {kind}\nstatus: {status}\narea: build/ci\n'
         f"wrong_answer: false\nprocess_only: true\nblocked: {'true' if blocked_by and status != 'landed' else 'false'}\n"
-        f"blocked_by: [{bb}]\ncluster: [{', '.join(cluster)}]\n---\n\n# {nid}\n\n{body}\n", encoding="utf-8")
+        f"blocked_by: [{bb}]\ncluster: [{', '.join(cluster)}]\n---\n\n# {nid}\n\n{body}\n", encoding="utf-8", newline="\n")
 
 
 cnote("PB901", body="Sever `src/Lib/Alpha.cs` from the old engine.")
@@ -366,7 +366,7 @@ if fc:
     check("a fix-lane body never says it", any("DEPENDENCY SUCCESSOR" in pw.body_of(g, notes) for g in p["groups"]), False)
     cg = [pw.as_group_json(g, "78", cnotes, "COBOLNET0001-COBOLNET0003") for g in cp["groups"]]
     cfile = TMP / "campaign-groups.json"
-    cfile.write_text(JSON.dumps({"wave": "78", "scratch": "X", "base": "abc", "groups": cg}), encoding="utf-8")
+    cfile.write_text(JSON.dumps({"wave": "78", "scratch": "X", "base": "abc", "groups": cg}), encoding="utf-8", newline="\n")
     check("campaign groups pass check_practices' successor rule", check_practices.same_file_without_successor(cfile), [])
     for g in cg:
         mds.render(dict(CFG77, wave="78"), g)
@@ -478,7 +478,7 @@ if fc:
     C2 = TMP / "campaign2"
     for rel in ("src/Lib/Alpha.cs", "src/Lib/GammaState.cs", "src/Lib/Beta.cs", "src/Lib/Caller.cs"):
         (C2 / rel).parent.mkdir(parents=True, exist_ok=True)
-        (C2 / rel).write_text("// fixture" + NL, encoding="utf-8")
+        (C2 / rel).write_text("// fixture" + NL, encoding="utf-8", newline="\n")
     W2 = C2 / "kb" / "Work"
     W2.mkdir(parents=True)
     for nid, body in (("PB950", "Fold GammaState's flags into `src/Lib/Alpha.cs`."),
@@ -486,7 +486,7 @@ if fc:
         (W2 / f"{nid}.md").write_text(
             f'---{NL}title: "{nid} — step"{NL}id: {nid}{NL}kind: analysis{NL}status: open{NL}area: architecture{NL}'
             f"wrong_answer: false{NL}process_only: true{NL}blocked: false{NL}blocked_by: []{NL}cluster: [PB950]{NL}---"
-            f"{NL}{NL}# {nid}{NL}{NL}{body}{NL}", encoding="utf-8")
+            f"{NL}{NL}# {nid}{NL}{NL}{body}{NL}", encoding="utf-8", newline="\n")
     items2 = [dict(work.parse_frontmatter(q.read_text(encoding="utf-8")), _file=q.name) for q in sorted(W2.glob("*.md"))]
     view2 = work.cluster_order(items2, "PB950")
     notes2 = pw.load_notes(W2, {"wrong_answer": 8})
@@ -519,7 +519,7 @@ check("meta carries a dispatch entry's notes and time", [(m["notes"], m["at"]) f
       [(["PB960"], 1000.0)])
 STALE = TMP / "stale-repo"
 (STALE / "src").mkdir(parents=True)
-(STALE / "src" / "A.cs").write_text("// a" + NL, encoding="utf-8")
+(STALE / "src" / "A.cs").write_text("// a" + NL, encoding="utf-8", newline="\n")
 for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
     subprocess.run(["git", *args], cwd=STALE, check=True, capture_output=True)
 try:
@@ -583,7 +583,7 @@ SR = TMP / "slicerepo"
     "| `Rec(Kind, Name)` | `+ Target` | `Target` |",
     "| `OldThing` | **landed (kb/Work PB1):** done | `LandedCaller` |",
     "| tests (`tests/T/HostTests.cs`) | rewritten | `docs/NOTES.md` |",
-    "", "## 13. Next", ""]), encoding="utf-8")
+    "", "## 13. Next", ""]), encoding="utf-8", newline="\n")
 for rel, text in {"src/B/Session.cs": "public sealed class Session { public GroupRepo Repo { get; } }",
                   "src/B/GroupRepo.cs": "internal sealed class GroupRepo { }",
                   "src/B/DriverX.cs": "public static class DriverX { public static void Bind() { } }",
@@ -594,13 +594,13 @@ for rel, text in {"src/B/Session.cs": "public sealed class Session { public Grou
                   "src/B/LandedCaller.cs": "class LandedCaller { }",
                   "tests/T/HostTests.cs": "public class HostTests { }",
                   "docs/NOTES.md": "notes"}.items():
-    (SR / rel).write_text(text, encoding="utf-8")
+    (SR / rel).write_text(text, encoding="utf-8", newline="\n")
 # a build output and a stray file name the same type: the slice set reads the COMMITTED tree (PB1957, 2026-10-07)
 (SR / "src" / "B" / "Generated").mkdir(parents=True)
-(SR / "src" / "B" / "Generated" / "SessionParser.cs").write_text("class Session { }", encoding="utf-8")
+(SR / "src" / "B" / "Generated" / "SessionParser.cs").write_text("class Session { }", encoding="utf-8", newline="\n")
 subprocess.run(["git", "-C", str(SR), "init", "-q"], check=True)
 subprocess.run(["git", "-C", str(SR), "add", "-A", "--", ":!src/B/Generated"], check=True)
-(SR / "src" / "B" / "Stray.cs").write_text("class GroupRepo { }", encoding="utf-8")
+(SR / "src" / "B" / "Stray.cs").write_text("class GroupRepo { }", encoding="utf-8", newline="\n")
 um = []
 sset = work.slice_file_set(SR, unmapped=um)
 check("an untracked file declaring a slice name is not in the slice set", "src/B/Stray.cs" in sset, False)
@@ -652,7 +652,7 @@ check("an untracked path is missing even if a local file has that name",
 with tempfile.TemporaryDirectory() as td:
     tdir = pathlib.Path(td)
     (tdir / "DEVLOG.md").write_text("## Entry 2 — Train 1036 (wave 1032: D, E)" + NL + "## Entry 1 — wave 1034 dispatched" + NL,
-                                     encoding="utf-8")
+                                     encoding="utf-8", newline="\n")
     check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
     # PB2806: a wave recorded in the dispatch ledger with no report yet (another session's) is a taken number too
     pw.record_dispatch(tdir, "1045", [pw.Group(kind="cluster", notes=["PB5"], file="", files=["src/X.cs"], letter="a")],

@@ -58,6 +58,17 @@ dotnet build Cobol.Net.sln
 Always build the **solution**, not a single project, before running tests with `--no-build`; otherwise you test a
 stale compiler.
 
+**Line endings are LF, everywhere.** `.gitattributes` (`* text=auto eol=lf`) checks every text file out LF on
+Windows too, whatever your `core.autocrlf`, and `python scripts/line_endings.py --check` (part of the gate) refuses
+a CR in any tracked text file. Once per clone, let a merge or rebase compare branches after that normalization, so
+a branch cut before it never conflicts on line endings alone:
+
+```bash
+git config merge.renormalize true
+```
+
+A checkout made before the rule is still CRLF on disk: `python scripts/line_endings.py --fix` rewrites it once.
+
 The per-change gate builds the solution and runs EVERY Conformance, Unit and Characterization test, ordered so the
 tests your change is most likely to break run first:
 

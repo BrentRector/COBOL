@@ -103,7 +103,7 @@ def main() -> int:
     if args.apply:
         lines[fs + 1:fe] = fig                      # figures first: it is later in the file
         lines[ts + 1:te] = tbl
-        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        SPEC_MD.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         print(f"\napplied to {SPEC_MD.relative_to(REPO)}")
     return 0
 

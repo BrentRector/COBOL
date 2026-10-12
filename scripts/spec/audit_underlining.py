@@ -187,7 +187,7 @@ def main() -> int:
                 print(f"  … and {len(rows) - 60} more pages")
 
     if args.json:
-        pathlib.Path(args.json).write_text(json.dumps(findings, indent=2), encoding="utf-8")
+        pathlib.Path(args.json).write_text(json.dumps(findings, indent=2), encoding="utf-8", newline="\n")
         print(f"\nwrote {args.json}")
     return 0
 

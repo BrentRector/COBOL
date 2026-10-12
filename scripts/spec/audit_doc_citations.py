@@ -324,9 +324,9 @@ def self_test() -> int:
     with tempfile.TemporaryDirectory() as d:
         p = pathlib.Path(d) / "note.md"
         defect = SELF_TEST[0][2]
-        p.write_text(defect + "\n", encoding="utf-8")
+        p.write_text(defect + "\n", encoding="utf-8", newline="\n")
         fires = bool(scan([p])[0])
-        p.write_text(f"<!-- {MARKER} -->\n{defect}\n", encoding="utf-8")
+        p.write_text(f"<!-- {MARKER} -->\n{defect}\n", encoding="utf-8", newline="\n")
         silent = not scan([p])[0]
     print(f"  {'ok  ' if fires else 'FAIL'} fires   on a file WITHOUT the {MARKER!r} marker")
     print(f"  {'ok  ' if silent else 'FAIL'} silent  on the same file WITH it")

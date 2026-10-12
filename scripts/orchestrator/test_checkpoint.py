@@ -32,20 +32,20 @@ def run(*a):
 
 REPO.mkdir(parents=True)
 git(REPO, "init", "-q", "-b", "main")
-(REPO / "a.txt").write_text("a", encoding="utf-8")
+(REPO / "a.txt").write_text("a", encoding="utf-8", newline="\n")
 git(REPO, "add", "."); git(REPO, "commit", "-q", "-m", "base")
 git(REPO, "update-ref", "refs/remotes/origin/main", "HEAD")           # the base the worktrees are measured against
 git(REPO, "worktree", "add", "-q", "-b", "committed", str(TMP / "wt-committed"))
 git(REPO, "worktree", "add", "-q", "-b", "dirty", str(TMP / "wt-dirty"))
 git(REPO, "worktree", "add", "-q", "-b", "clean", str(TMP / "wt-clean"))
-(TMP / "wt-committed" / "b.txt").write_text("b", encoding="utf-8")
+(TMP / "wt-committed" / "b.txt").write_text("b", encoding="utf-8", newline="\n")
 git(TMP / "wt-committed", "add", "."); git(TMP / "wt-committed", "commit", "-q", "-m", "wip")
-(TMP / "wt-committed" / "STATUS.md").write_text("STATUS-AT: abc\nDONE: x\n", encoding="utf-8")
-(TMP / "wt-dirty" / "c.txt").write_text("c", encoding="utf-8")                      # uncommitted
-(TMP / "wt-dirty" / "STATUS.md").write_text("ignored in the dirty count", encoding="utf-8")
+(TMP / "wt-committed" / "STATUS.md").write_text("STATUS-AT: abc\nDONE: x\n", encoding="utf-8", newline="\n")
+(TMP / "wt-dirty" / "c.txt").write_text("c", encoding="utf-8", newline="\n")                      # uncommitted
+(TMP / "wt-dirty" / "STATUS.md").write_text("ignored in the dirty count", encoding="utf-8", newline="\n")
 COORD.mkdir()
 (COORD / "milestones.jsonl").write_text('{"at":"t1","what":"plan written"}\nnot json\n{"at":"t2","what":"train 1 landed"}\n',
-                                        encoding="utf-8")
+                                        encoding="utf-8", newline="\n")
 
 run("write", "--unit", "wave", "--session", "s1", "--started", "2026-10-04T18:00:00-07:00", "--calls", "40",
     "--context", "90000", "--cost", "3.5", "--bg-tasks", "1")

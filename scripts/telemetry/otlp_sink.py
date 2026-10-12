@@ -49,7 +49,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         OUT_DIR.mkdir(parents=True, exist_ok=True)
         now = datetime.datetime.now(datetime.timezone.utc)
         rec = {"received": now.isoformat(timespec="seconds"), "path": self.path, "body": payload}
-        with open(OUT_DIR / f"{now:%Y-%m-%d}.jsonl", "a", encoding="utf-8") as f:
+        with open(OUT_DIR / f"{now:%Y-%m-%d}.jsonl", "a", encoding="utf-8", newline="\n") as f:
             f.write(json.dumps(rec, separators=(",", ":")) + "\n")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

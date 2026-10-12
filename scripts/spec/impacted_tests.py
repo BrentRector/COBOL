@@ -742,7 +742,7 @@ def self_test() -> int:
     global ancestor_distance, non_doc_drift
     real = (ancestor_distance, non_doc_drift)
     with tempfile.TemporaryDirectory() as store:
-        with gzip.open(Path(store) / f"{'a' * 40}.json.gz", "wt", encoding="utf-8") as fh:
+        with gzip.open(Path(store) / f"{'a' * 40}.json.gz", "wt", encoding="utf-8", newline="\n") as fh:
             json.dump(synthetic_map(), fh)
         try:
             ancestor_distance = lambda sha, base: 1  # noqa: E731
@@ -787,7 +787,7 @@ def main() -> int:
     HEAD = git("rev-parse", args.head) if args.head else None
     a = analyse(args.base, args.files, args.map, args.store)
     if args.plan:
-        args.plan.write_text(json.dumps(plan_json(a), indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        args.plan.write_text(json.dumps(plan_json(a), indent=1, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
     err = sys.stderr
     for why in a.reach.every_tier1:
         print(f"  every test tier 1: {why}", file=err)

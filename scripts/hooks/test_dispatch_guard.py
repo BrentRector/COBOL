@@ -18,12 +18,12 @@ TMP = pathlib.Path(tempfile.mkdtemp())
 
 WITH_SKILL = TMP / "with.jsonl"
 WITH_SKILL.write_text(json.dumps({"type": "tool_use", "name": "Skill", "input": {"skill": "workstream"}}) + "\n",
-                      encoding="utf-8")
+                      encoding="utf-8", newline="\n")
 WITHOUT_SKILL = TMP / "without.jsonl"
 WITHOUT_SKILL.write_text(json.dumps({"type": "tool_use", "name": "Skill", "input": {"skill": "gate"}}) + "\n",
-                         encoding="utf-8")
+                         encoding="utf-8", newline="\n")
 BAD_SPEC = TMP / "msg-w1-a.txt"
-BAD_SPEC.write_text("a hand-written brief that drops every mandatory practice\n", encoding="utf-8")
+BAD_SPEC.write_text("a hand-written brief that drops every mandatory practice\n", encoding="utf-8", newline="\n")
 
 
 def agent(role: str, prompt: str, transcript: pathlib.Path) -> dict:
@@ -110,12 +110,12 @@ STOP_CASES = [
     ("attended session, the loop's STOP-UNIT present: Workflow passes", WF_OK, ENV, False),
 ]
 STOP_CASES_AFTER = [("loop unit, no STOP-UNIT: Workflow passes", WF_OK, UNIT_ENV, False)]
-(COORD / "STOP-UNIT").write_text("", encoding="utf-8")
+(COORD / "STOP-UNIT").write_text("", encoding="utf-8", newline="\n")
 fails += [(n, e) for n, p, env, e in STOP_CASES if blocked_env(p, env) != e]
 (COORD / "STOP-UNIT").unlink()
 fails += [(n, e) for n, p, env, e in STOP_CASES_AFTER if blocked_env(p, env) != e]
 HAND_BRIEF = TMP / "hand-brief.md"
-HAND_BRIEF.write_text("# Brief\nAuthor kb/Work PB2296 step 1.\n", encoding="utf-8")
+HAND_BRIEF.write_text("# Brief\nAuthor kb/Work PB2296 step 1.\n", encoding="utf-8", newline="\n")
 if not recorded(agent("general-purpose", f"Your brief is {HAND_BRIEF}. Read it first.", WITH_SKILL)):
     fails.append(("a dispatch naming only its brief file is recorded with the brief's notes", False))
 for n, e in fails:

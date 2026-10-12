@@ -67,7 +67,7 @@ def strip_paths(config: pathlib.Path) -> pathlib.Path:
             continue
         out.append(line)
     tmp = pathlib.Path(tempfile.gettempdir()) / "cobolnet-invariants-nopaths.yml"
-    tmp.write_text("\n".join(out) + "\n", encoding="utf-8")
+    tmp.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
     return tmp
 
 
@@ -98,7 +98,7 @@ def main() -> int:
         counts[rid] = counts.get(rid, 0) + 1
 
     if args.update_baseline:
-        BASELINE.write_text(json.dumps(counts, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        BASELINE.write_text(json.dumps(counts, indent=2, sort_keys=True) + "\n", encoding="utf-8", newline="\n")
         print(f"\nBaseline written: {counts}")
         return 0
 

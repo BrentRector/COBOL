@@ -146,7 +146,7 @@ def self_test() -> int:
 
     def write(rel: str, text: str) -> None:
         (repo / rel).parent.mkdir(parents=True, exist_ok=True)
-        (repo / rel).write_text(text, encoding="utf-8")
+        (repo / rel).write_text(text, encoding="utf-8", newline="\n")
 
     def commit(edits: dict[str, str | None], msg: str) -> str:
         for rel, text in edits.items():

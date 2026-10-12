@@ -102,8 +102,8 @@ for f in sorted(out.glob("out-*.json")) + sorted(out.glob("adjudicate-*.jsonl"))
         digest[(slug, fd["mechanism"])] = fd
 
 batch = {"batch": label, "records": [{k: v for k, v in r.items() if not k.startswith("_")} for r in records]}
-(out / f"batch-{label}.json").write_text(json.dumps(batch, indent=1, ensure_ascii=False), encoding="utf-8")
-(out / f"findings-{label}.json").write_text(json.dumps([{"slug": s, **fd} for (s, _), fd in digest.items()], indent=1, ensure_ascii=False), encoding="utf-8")
+(out / f"batch-{label}.json").write_text(json.dumps(batch, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
+(out / f"findings-{label}.json").write_text(json.dumps([{"slug": s, **fd} for (s, _), fd in digest.items()], indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
 c = collections.Counter(r["verdict"] for r in records)
 print(f"{label}: {len(records)} records -> batch-{label}.json  {dict(c)}")
 print(f"  CONFORMS with test-ref (would close): {sum(1 for r in records if r['verdict']=='CONFORMS' and r.get('test-ref'))}")

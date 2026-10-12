@@ -132,7 +132,7 @@ def record(repo: Path = REPO, out_dir: Path | None = None) -> Path:
     date = git("show", "-s", "--format=%cI", sha, cwd=repo).strip()
     work = Path(tempfile.mkdtemp(prefix="member-index-"))
     scope = census.scope_of(census.solution_projects((repo / "Cobol.Net.sln").read_text(encoding="utf-8-sig")))
-    (work / "scope.json").write_text(json.dumps(scope), encoding="utf-8")
+    (work / "scope.json").write_text(json.dumps(scope), encoding="utf-8", newline="\n")
     census.run_logged(["dotnet", "build", "Cobol.Net.sln", "-c", "Debug", "-v", "quiet"], repo, work / "build.log")
     census.run_logged(["dotnet", "build", str(repo / HOST), "-c", "Release", "-o", str(work / "host"), "-v", "quiet"],
                       repo, work / "host-build.log")
@@ -337,7 +337,7 @@ def self_test() -> int:
     root = Path(tempfile.mkdtemp(prefix="member-index-test-"))
     for f in ("src/A/Binder.cs", "src/A/Binder.Oo.cs", "src/A/Use.cs", "src/B/Emit.cs", "tests/T.cs", "src/A/Sym.cs"):
         (root / f).parent.mkdir(parents=True, exist_ok=True)
-        (root / f).write_text("// " + f, encoding="utf-8")
+        (root / f).write_text("// " + f, encoding="utf-8", newline="\n")
     idx = {"commit": "c0", "blobs": {}, "files": ["src/A/Binder.cs", "src/A/Binder.Oo.cs", "src/A/Use.cs",
                                                     "src/B/Emit.cs", "tests/T.cs", "src/A/Sym.cs", "src/A/Gone.cs"],
            "uses": {"N.Binder": [0, 1, 2, 3, 4], "N.Binder.Pending": [1, 2], "N.Binder.Inner": [3],
@@ -386,7 +386,7 @@ def self_test() -> int:
             "stays; Pending is another type's" + chr(10) + "**Moves or changes:** `N.Sym.Go`")
     check("target", note_names(text, idx), (["N.Sym.Flag", "N.Sym.Go", "N.Sym.Unused"], "declared and its target"))
     # folder sites expand on the current tree (K1 (3)): a file added under a site folder after the index joins
-    (root / "src/A/Added.cs").write_text("// new", encoding="utf-8")
+    (root / "src/A/Added.cs").write_text("// new", encoding="utf-8", newline="\n")
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     subprocess.run(["git", "add", "-A"], cwd=root, check=True)
     check("folder", "src/A/Added.cs" in folder_files("- folder `src/A`", root), True)
@@ -409,7 +409,7 @@ def self_test() -> int:
         check("stale-refused", True, True)
     check("regenerated", current(root, cache, regenerate=True, recorder=recorder)["treeKey"], key)
     check("cached", current(root, cache, regenerate=False)["treeKey"], key)
-    (root / "src/A/Added.cs").write_text("// changed", encoding="utf-8")
+    (root / "src/A/Added.cs").write_text("// changed", encoding="utf-8", newline="\n")
     check("dirty-no-key", tree_key(root), None)
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qam", "c1"], cwd=root, check=True)
     try:

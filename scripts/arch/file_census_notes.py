@@ -834,7 +834,7 @@ def self_test_r2():
     with tempfile.TemporaryDirectory() as tmp:
         os.makedirs(os.path.join(tmp, "src"))
         for f in ("T.cs", "D.cs", "U.cs"):
-            open(os.path.join(tmp, "src", f), "w").close()
+            open(os.path.join(tmp, "src", f), "w", newline="\n").close()
         stage(tmp)
         nd = os.path.join(tmp, "Work")
         os.mkdir(nd)
@@ -847,14 +847,14 @@ def self_test_r2():
         batch = {"pin": "abcdef0123456789", "complete": True, "relaunch": [], "upheld": upheld,
                  "mechanisms": [mech(rec(1)["id"], dup["id"]), mech(d["id"]), mech(rec(3)["id"])],
                  "refuted": [rec(9)], "leads": [rec(8)]}
-        with open(cp, "w", encoding="utf-8") as fh:
+        with open(cp, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(dict(batch, complete=False, relaunch=["1 finding(s) unverified"]), fh)
         try:
             file_r2(cp, ["PB9100"], nd, False, tmp, {"s1": "binding"})
             raise AssertionError("an incomplete batch was filed")
         except SystemExit as e:
             assert "not COMPLETE" in str(e) and "unverified" in str(e), e
-        with open(cp, "w", encoding="utf-8") as fh:
+        with open(cp, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(batch, fh)
         areas = {"s1": "binding"}
         w, s, tail = file_r2(cp, ["PB9101", "PB9102", "PB9103"], nd, False, tmp, areas)
@@ -881,7 +881,7 @@ def self_test_r2():
         assert not w2 and sorted(s2["already-filed"]) == sorted([rec(1)["id"], dup["id"], d["id"]]), (w2, s2)
         # a LATER batch finds the same mechanism: its id joins the existing note, no second note
         later = rec(7, id="s9--duplication--f1#7", pair="s9--duplication", sites=["src/T.cs:50-60 (N.T.F)"])
-        with open(cp, "w", encoding="utf-8") as fh:
+        with open(cp, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(dict(batch, upheld=[later], mechanisms=[mech(later["id"])], refuted=[], leads=[]), fh)
         w3, s3, tail3 = file_r2(cp, ["PB9106"], nd, False, tmp, areas)
         with open(os.path.join(nd, "PB9101.md"), encoding="utf-8") as fh:
@@ -914,7 +914,7 @@ def self_test():
          "scenario": "s", "target": "delete it", "id": "R0-9005"}]}
     with tempfile.TemporaryDirectory() as tmp:
         fp = os.path.join(tmp, "abcdef0123456.findings.json")
-        with open(fp, "w", encoding="utf-8") as fh:
+        with open(fp, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(fixture, fh)
         nd = os.path.join(tmp, "Work")
         os.mkdir(nd)
@@ -956,11 +956,11 @@ def self_test():
         fixture["findings"].append({"kind": "dead-artifact", "wave": "delete", "class": "src-file",
                                     "site": "src/Claimed2.cs", "rule": "r", "scenario": "s", "target": "t",
                                     "id": "R0-9006"})
-        with open(fp, "w", encoding="utf-8") as fh:
+        with open(fp, "w", encoding="utf-8", newline="\n") as fh:
             json.dump(fixture, fh)
         for rel in ("src/U.cs", "src/U.X.cs", "src/W.cs"):   # the targets file's paths exist, or nothing files
             os.makedirs(os.path.join(tmp, "src"), exist_ok=True)
-            open(os.path.join(tmp, rel), "w").close()
+            open(os.path.join(tmp, rel), "w", newline="\n").close()
         os.remove(os.path.join(tmp, "src/W.cs"))
         stage(tmp)   # the existence rule reads the committed tree (work.tracked_paths), never the filesystem
         try:
@@ -968,7 +968,7 @@ def self_test():
             raise AssertionError("a targets file naming a missing path filed")
         except SystemExit as e:
             assert "src/W.cs" in str(e), e
-        open(os.path.join(tmp, "src/W.cs"), "w").close()
+        open(os.path.join(tmp, "src/W.cs"), "w", newline="\n").close()
         stage(tmp)
         pool3 = ["PB9004", "PB9005", "PB9006", "PB9007", "PB9008", "PB9009", "PB9010"]
         w3, s3, tail3, r3 = file_notes(fp, pool3, nd, False, gt, path_root=tmp)

@@ -375,9 +375,9 @@ def main():
         print("=== R2 SUBSYSTEMS: FAIL (not a partition; no shards written) ===")
         return 1
     a.out.mkdir(parents=True, exist_ok=True)
-    (a.out / "shards.json").write_text(json.dumps(m, indent=1), encoding="utf-8")
+    (a.out / "shards.json").write_text(json.dumps(m, indent=1), encoding="utf-8", newline="\n")
     for s in m["shards"]:
-        (a.out / ("files-%s.txt" % s["id"])).write_text("".join(p + "\n" for p, _ in s["files"]), encoding="utf-8")
+        (a.out / ("files-%s.txt" % s["id"])).write_text("".join(p + "\n" for p, _ in s["files"]), encoding="utf-8", newline="\n")
     print("=== R2 SUBSYSTEMS: WROTE %d shards over %d files to %s ===" % (len(m["shards"]), m["domain_files"], a.out))
     return 0
 

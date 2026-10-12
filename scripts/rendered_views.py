@@ -219,9 +219,9 @@ def self_test() -> int:
         git(root, "init", "-q")
         (root / "docs").mkdir()
         (root / "kb" / "Conformance").mkdir(parents=True)
-        (root / ".gitignore").write_text("kb/Conformance/\ndocs/OK.md\n", encoding="utf-8")
-        (root / "docs" / "TRACKED.md").write_text("x", encoding="utf-8")
-        (root / "kb" / "Conformance" / "a.md").write_text("x", encoding="utf-8")
+        (root / ".gitignore").write_text("kb/Conformance/\ndocs/OK.md\n", encoding="utf-8", newline="\n")
+        (root / "docs" / "TRACKED.md").write_text("x", encoding="utf-8", newline="\n")
+        (root / "kb" / "Conformance" / "a.md").write_text("x", encoding="utf-8", newline="\n")
         git(root, "add", "-f", "docs/TRACKED.md", "kb/Conformance/a.md")
         views = (View("ok", "docs/OK.md", ("x",), None),
                  View("tracked", "docs/TRACKED.md", ("x",), None),
@@ -238,9 +238,9 @@ def self_test() -> int:
         check("an output outside the tree is never an in-tree finding", not any(p.startswith("outside:") for p in found), text)
 
         (root / "kb" / "Work").mkdir()
-        (root / "docs" / "GEN.md").write_text("# T\n\n> **Generated** from X - do not edit by hand.\n", encoding="utf-8")
-        (root / "docs" / "HAND.md").write_text("# T\n\nAn index someone wrote; see the generated ones.\n", encoding="utf-8")
-        (root / "kb" / "Work" / "PB1.md").write_text("Generated indexes - do not hand-edit them.\n", encoding="utf-8")
+        (root / "docs" / "GEN.md").write_text("# T\n\n> **Generated** from X - do not edit by hand.\n", encoding="utf-8", newline="\n")
+        (root / "docs" / "HAND.md").write_text("# T\n\nAn index someone wrote; see the generated ones.\n", encoding="utf-8", newline="\n")
+        (root / "kb" / "Work" / "PB1.md").write_text("Generated indexes - do not hand-edit them.\n", encoding="utf-8", newline="\n")
         git(root, "add", "docs/GEN.md", "docs/HAND.md", "kb/Work/PB1.md")
         swept = unregistered_problems(views, root)
         text = "\n".join(swept)

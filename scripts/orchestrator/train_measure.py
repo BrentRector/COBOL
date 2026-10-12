@@ -99,7 +99,7 @@ def record(path: pathlib.Path, rec: dict, replace: bool) -> None:
         existing = [r for r in existing if r.get("train") != rec["train"]]
     lines = [json.dumps(r, sort_keys=True) for r in [*existing, rec]]
     tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    tmp.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
     os.replace(tmp, path)
 
 

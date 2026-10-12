@@ -20,6 +20,7 @@
 #   src/Cobol.Net.Editions/Constructs.g.cs         — one `public const string <PascalId> = "<id>";` per row.
 
 $ErrorActionPreference = 'Stop'
+Import-Module (Join-Path $PSScriptRoot 'LfText.psm1') -Force   # every tracked output is written LF (kb/Work PB3029)
 $repo = Split-Path -Parent $PSScriptRoot
 $jsonIn   = Join-Path $repo 'tests/version-matrix/constructs.json'
 $regOut   = Join-Path $repo 'src/Cobol.Net.Editions/ConstructRegistry.g.cs'
@@ -131,7 +132,7 @@ foreach ($r in $rows) {
 }
 [void]$sb.AppendLine('    ];')
 [void]$sb.AppendLine('}')
-Set-Content -LiteralPath $regOut -Value ($sb.ToString().TrimEnd() + "`n") -NoNewline -Encoding utf8
+Set-LfContent -LiteralPath $regOut -Value $sb.ToString().TrimEnd()
 
 # ---- 2. Constants.g.cs (compile-checked ids) ----
 $sb = [System.Text.StringBuilder]::new()
@@ -146,7 +147,7 @@ foreach ($r in $rows) {
     [void]$sb.AppendLine(('    public const string {0} = "{1}";' -f (To-Pascal $r.id), (Esc $r.id)))
 }
 [void]$sb.AppendLine('}')
-Set-Content -LiteralPath $idsOut -Value ($sb.ToString().TrimEnd() + "`n") -NoNewline -Encoding utf8
+Set-LfContent -LiteralPath $idsOut -Value $sb.ToString().TrimEnd()
 
 # (The former section 3 — Gating/GateId.cs — was DELETED at Exec Step E: the P2.7 forward-stamping
 # consumer was abandoned (DEVLOG 679) and the enum had ZERO production consumers; the registry rows +

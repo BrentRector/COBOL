@@ -180,7 +180,7 @@ def main() -> int:
     for f in found:
         print(f"{f['page']:>5} {f['y']:>8.1f}  {f['bars']:>4} {f['brackets']:>4}  {f['signature']}")
     if args.json:
-        pathlib.Path(args.json).write_text(json.dumps(found, indent=2), encoding="utf-8")
+        pathlib.Path(args.json).write_text(json.dumps(found, indent=2), encoding="utf-8", newline="\n")
         print(f"\nwrote {args.json}")
     return 0
 

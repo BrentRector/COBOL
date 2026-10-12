@@ -290,7 +290,8 @@ def self_test() -> int:
           and read_back(after).get("closes_rows") == ["AR-1-1"], after)
     crlf = note.replace("\n", "\r\n")
     out_crlf = insert_field(crlf, field_lines(["AR-1-1"]))
-    check("CRLF in, CRLF out — the register is CRLF in the working tree",
+    check("CRLF in, CRLF out — a note a Windows tool wrote CRLF keeps its own line endings (the line-endings "
+          "audit, kb/Work PB3029, is what reports the CR)",
           "\r\n" in out_crlf and "\r\r" not in out_crlf and "\n" not in out_crlf.replace("\r\n", "")
           and read_back(out_crlf).get("closes_rows") == ["AR-1-1"], repr(out_crlf[:120]))
     many = [f"GR-13.18.62.4-{i}" for i in range(1, 30)]

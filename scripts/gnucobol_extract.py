@@ -329,7 +329,7 @@ def main() -> int:
                 print(f'!! {g["id"]}: a member would land outside its case directory; skipped', file=sys.stderr)
                 continue
             idx.append({**g, 'dir': d})
-        with open(os.path.join(a.out, '_index.json'), 'w', encoding='utf-8') as fh:
+        with open(os.path.join(a.out, '_index.json'), 'w', encoding='utf-8', newline="\n") as fh:
             json.dump(idx, fh, indent=1)
         print(f'materialized {len(idx)} groups into {a.out} (ignored tree)')
     return 0

@@ -430,7 +430,7 @@ def _build_fixture(root: pathlib.Path) -> dict:
     def worktree(name: str, gitdir_text: str) -> pathlib.Path:
         wt = main / ".claude" / "worktrees" / name
         wt.mkdir(parents=True)
-        (wt / ".git").write_text(gitdir_text, encoding="utf-8")
+        (wt / ".git").write_text(gitdir_text, encoding="utf-8", newline="\n")
         return wt.resolve()
 
     return {
@@ -594,7 +594,7 @@ def self_test() -> int:
 
         def transcript(name: str, records: list, age: float) -> pathlib.Path:
             p = base / f"agent-{name}.jsonl"
-            p.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8")
+            p.write_text("\n".join(json.dumps(r) for r in records) + "\n", encoding="utf-8", newline="\n")
             os.utime(p, (now - age, now - age))
             return p
 
@@ -610,7 +610,7 @@ def self_test() -> int:
         ]:
             p = transcript(name.split()[0] + str(age), records, age)
             if not records:
-                p.write_text("{not json\n", encoding="utf-8")
+                p.write_text("{not json\n", encoding="utf-8", newline="\n")
                 os.utime(p, (now - age, now - age))
             check(f"liveness: {name}", is_live(p, now), expected)
 
