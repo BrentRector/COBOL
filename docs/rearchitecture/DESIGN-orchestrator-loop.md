@@ -23,6 +23,7 @@ closed per weekly-quota point.
 |---|---|
 | `scripts/orchestrator/orchestrate.ps1` | the supervisor loop (section 4); PowerShell 7 |
 | `scripts/orchestrator/next_unit.py` | the deterministic choice of the next unit (section 3.2) |
+| `scripts/orchestrator/land_lane.py` | the LANDING LANE: the supervisor ticks it beside every unit, and it starts `enqueue.py land` for every branch WAITING TO LAND the moment it is ready (section 4.9) |
 | `scripts/orchestrator/steer.ps1` | the OPERATOR's one way to name the loop's next unit: a validated `handoff.operator.json` (section 4.8) |
 | `scripts/orchestrator/units/*.md` | `common.md` (the rules every unit obeys) plus one short prompt per unit type; they reference files, never paste them |
 | `scripts/orchestrator/handoff.schema.json` | the contract between a unit and the supervisor (section 5) |
@@ -58,6 +59,7 @@ the tools it runs). Contents:
 | `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from: a unit's own, one the supervisor synthesized for a dead unit (section 5.1), or the operator's steer once its unit starts (section 4.8) |
 | `handoff.operator.json` | the operator (`steer.ps1`) | the operator's pending steer (section 4.8): validated against `handoff.schema.json`, it wins the next choice over every other handoff and is consumed (archived beside the unit's log, copied to `handoff.last.json`) when its unit starts |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
+| `land-lane\` | `land_lane.py` (the supervisor's tick, its detached runners, the enqueue unit's `collect`, the operator's `clear-halt`) | the landing lane's state (section 4.9): `attempts\<id>.json` (one per `enqueue.py land` run: branch, head, log, runner pid, exit code, verdict, end head, collected), `survey.json` (the last tick's branch survey, which `next_unit.py` reads), `HALT` (a run ended QUEUE NOT ACTIVE) and `tick.lock` |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
 | `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
 | `inflight-groups.json` | `plan_wave.py` (without `--dry-run`), and `scripts/hooks/dispatch_guard.py` for every write-capable Agent call and every Workflow call it admits | the dispatch ledger: every group planned or dispatched by hand whose notes are not all landed or retired, with the files it was planned on and when (`at`); the campaign lane's file-set partition reads it, so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `enqueue.py land`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the groups whose declared files its diff meets); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>` (section 9.1; kb/Work PB2118 Drafts 7–10) |
@@ -102,9 +104,9 @@ one session.
 
 | Unit | Model | Starts when | Ends when |
 |---|---|---|---|
-| `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned (it starts no lander: its DONE branches are the next `enqueue` unit's), the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
+| `wave` | Opus (the orchestrator's judgment; the implementers are routed per group by `model_rules.json`) | nothing pending to land or resume and the budget says `go` | its Workflow returned (it starts no lander: the landing lane lands each DONE branch reviewed CLEAN while the wave runs, section 4.9), the ledger refreshed (`python scripts/spec/gen_ledger.py`, `references/landing.md`) and the handoff written |
 | `campaign` | Opus | only with `-Cluster <lead>[,<lead>...]`: a wave-type unit is due (a handoff named `wave` or `campaign`, or nothing else fired), a lead's cluster has a ready note and the last wave-type unit was not a `campaign`; the ready leads take turns (section 3.2, section 9.1) | as `wave`; its prompt is `units/wave.md` with `--cluster <lead>` on the `plan_wave.py` call |
-| `enqueue` | Opus | finished branches exist (`branches_pending` DONE, `prune_worktrees.py` WAITING TO LAND or BOUNCED), or a handoff says `next_unit: enqueue` | every WAITING TO LAND branch went through `enqueue.py land` (ENQUEUED, LANDED, or stopped with its finisher dispatched), the leads filed, `prune_worktrees.py --apply` run and the ledger rendered to `{COORD}\ledger.html` (section 14). First it dispatches one read-only `cobol-reviewer` for each branch `prune_worktrees.py` lists WAITING FOR REVIEW (kb/Work PB3027); its prompt is `units/enqueue.md` (kb/Work PB3023) |
+| `enqueue` | Opus | there is agent work (section 3.2 rule 6: a branch WAITING FOR REVIEW or BOUNCED, a landing lane attempt STOPPED or ENQUEUED and not yet collected), finished branches while the lane has no current survey, or a handoff says `next_unit: enqueue` | every STOPPED lane attempt has its finisher or reviewer dispatched and every ENQUEUED one its leads filed, both collected (`land_lane.py collect`), the leads filed, `prune_worktrees.py --apply` run and the ledger rendered to `{COORD}\ledger.html` (section 14). First it dispatches one read-only `cobol-reviewer` for each branch `prune_worktrees.py` lists WAITING FOR REVIEW (kb/Work PB3027); its prompt is `units/enqueue.md` (kb/Work PB3023) |
 | `resume` | Opus | the previous unit died, timed out, was stopped with a Workflow in flight, or handed off `split` | it has classified every pending branch and report (finish, land, re-plan) and handed off the next unit |
 | `meter` | Sonnet, with `--chrome` | the newest reading in `readings.json` is older than 3 hours | the reading is appended (`budget.py --record`) and the handoff written |
 | `owner-question` | none | a handoff carries `owner_question` | immediately: the supervisor appends the question to `OWNER-QUESTIONS.md` and STOPS; it never guesses and never starts a session for it |
@@ -113,14 +115,14 @@ Fable is never selected: the supervisor refuses any model name other than `opus`
 Fable only with explicit approval per dispatch, which an unattended loop cannot obtain).
 
 > ⛔ **The landing is a script (owner 2026-10-11, kb/Work PB3015, PB3023; the design is `DESIGN-test-build-ci.md`
-> §3.17, the SSOT for it).** The `enqueue` unit (`units/enqueue.md`) runs `scripts/orchestrator/enqueue.py land` for
-> every WAITING TO LAND branch, in harm order: it merges `origin/main` into the branch, runs the gate on both hosts under
+> §3.17, the SSOT for it).** The supervisor's LANDING LANE (`land_lane.py`, section 4.9; kb/Work PB3103) runs
+> `scripts/orchestrator/enqueue.py land` for every WAITING TO LAND branch, in harm order, beside whatever unit runs: it merges `origin/main` into the branch, runs the gate on both hosts under
 > the shared gate slot, stamps the DEVLOG entry, runs the DEVLOG-entry, oracle and R3 partition checks, opens the
 > branch's pull request and adds it to GitHub's merge queue (main moving during the gate is merged in again, without a
 > second gate; while `ruleset.py check` does not report the queue ACTIVE it refuses before merging or gating anything,
-> and there is no other path onto main, §4.7). The unit's own
-> turns are the review dispatches, the `cobol-finisher` dispatches (a conflict, a red gate, a queue bounce) and the
-> handoff. A `wave` unit ends when its Workflow returned: it starts no lander and lands no train (`wf_rolling_wave.js`
+> and there is no other path onto main, §4.7). The `enqueue` unit (`units/enqueue.md`) keeps the
+> judgment: its turns are the review dispatches, the `cobol-finisher` dispatches for the lane's STOPPED attempts and
+> the queue's bounces, the leads, the landing records and the handoff. A `wave` unit ends when its Workflow returned: it starts no lander and lands no train (`wf_rolling_wave.js`
 > lost its trains, PB3016 by removal).
 
 ### 3.1 How a Workflow in flight constrains unit boundaries
@@ -174,8 +176,12 @@ lost agent work exceeds that cost. Open decision D3.
    calls `UNLANDED` received a commit after the last unit started (an agent of a unit that died) → `resume`.
    Older unlanded branches do not trigger it, so an abandoned branch cannot cause a `resume` loop; `plan_wave.py`
    still sees them.
-6. The handoff lists `branches_pending` with status `DONE` → `enqueue`. No landing waits for another: GitHub's merge
-   queue orders main (section 4.7), so nothing defers it (`test_orchestrate_campaign.ps1` 8f).
+6. AGENT WORK for the enqueue unit → `enqueue` (`land_lane.agent_work`, kb/Work PB3103): the landing lane's survey
+   (younger than `land_lane.SURVEY_MAX_AGE_MIN`, 30 min) lists a branch WAITING FOR REVIEW or BOUNCED, or a lane
+   attempt STOPPED or ENQUEUED is not yet collected (its finisher or reviewer, its leads, its landing record). The
+   lane lands every WAITING TO LAND branch itself (section 4.9), so a handoff's `DONE` branches alone start no enqueue
+   unit, unless the lane has no current survey (it is not ticking; the enqueue unit's step 3 ticks it)
+   (`test_orchestrate_campaign.ps1` 8f). No landing waits for another: GitHub's merge queue orders main (section 4.7).
 7. Otherwise → `wave`. (A stale ledger page is not a reason for a unit: a headless unit cannot publish it, section 14.
    The earlier rule 7 compared a repo file that never existed, so it sent every idle loop to `land`, the unit `enqueue` replaced.)
 
@@ -205,7 +211,7 @@ shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), 
 context cap, default 200000) and `-HardContextTokens` (the HARD cap, default 500000; section 4.3), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
 `budget.py`), `-Unit` (the first unit: written as the operator's steer through `steer.ps1`, section 4.8; a dry run writes it to a temporary file it removes), `-Cluster <lead>[,<lead>...]` (the campaign lanes, section 9.1: comma-separated because `pwsh -File` passes `-Cluster A,B` as one string; each validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
-test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
+test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1), `-LandLaneSeconds` (default 300; 0 runs no landing lane, section 4.9) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting, 2 `-Cluster` names no cluster any kb/Work note names (or `-Unit campaign` without `-Cluster`).
 
@@ -280,7 +286,7 @@ Each iteration, in this order:
   never guess (CLAUDE.md rule 7, the owner-decision protocol).
 - Forbidden to every unit: the WSL lifecycle commands `wsl --terminate`, `--shutdown`, `--update`, `--export`,
   `--unregister` (they kill every other session's Linux gate). Land only through
-  `python scripts/orchestrator/enqueue.py land <branch>` (the enqueue unit; main refuses a direct push).
+  `python scripts/orchestrator/enqueue.py land <branch>` (the landing lane, section 4.9; main refuses a direct push).
 - A `wave` unit loads the `workstream` skill before the Workflow call (`dispatch_guard.py` refuses it otherwise),
   runs `plan_wave.py`, which renders the specs with `make_dispatch_specs.py` and runs `check_practices.py`, then
   starts `wf_rolling_wave.js` with the args file `plan_wave.py` wrote.
@@ -402,7 +408,7 @@ split with a claim undecided. One session's stop must never abort another sessio
 Main takes only pull requests the merge queue tested (the ruleset binds administrators; `DESIGN-test-build-ci.md`
 §3.17), so landings never race for it: `enqueue.py land` merges `origin/main` in, gates, merges main in again when it
 moved during the gate (no second gate: the merge group runs the whole population on the current main), and queues one
-pull request; every branch waiting to land is enqueued at once (section 3.2 rule 6). **A past decision, kept for its
+pull request; every branch waiting to land is enqueued the moment it is ready (the landing lane, section 4.9). **A past decision, kept for its
 reason:** under the direct-push landing (before 2026-10-11) the push itself was serialized but a landing's ~50 minutes
 of rebase, gates and CI were not, and every train landed inside that window made a waiting lander rebase, renumber its
 DEVLOG entry and re-gate; on 2026-10-07 the R1 lander lost to trains 1034 and 1034b three times and ended SPLIT with
@@ -432,6 +438,59 @@ a `land` unit that would have raced the operator's R2 lander for main. There is 
   set aside as `logs\<time>-handoff.operator.invalid.json` with a log line; a `handoff.json` found when a unit starts
   is archived as `.handoff.orphan.json` with a log line. Writing `handoff.last.json` by hand is not a path: the next
   unit to end overwrites it.
+
+### 4.9 The landing lane beside the unit (`land_lane.py`, kb/Work PB3103)
+
+**Why.** Before the lane a branch reviewed CLEAN landed only when the loop's NEXT `enqueue` unit started, after the
+whole wave that made it ended: wave 1069's group D was stamped `Review: CLEAN` at 12:34 PDT and groups E and F by
+13:05, and all three read WAITING TO LAND while groups G and H ran on; then, while the enqueue unit gated and waited on
+the merge queue, no implementer ran. The machine alternated between two half-idle phases. The owner chose (2026-10-12,
+"Supervisor lane (Recommended)") a deterministic landing lane in the supervisor over the wave unit's model running
+`enqueue.py land` as branches came back CLEAN, which would have put every landing log into a long Opus transcript.
+
+**What runs.** While any unit runs, the supervisor starts `python scripts/orchestrator/land_lane.py --coord <coord>
+tick --repo <repo>` as a BACKGROUND process as the unit starts and every `-LandLaneSeconds` (300 by default; 0 runs no
+lane), never on its event loop and never fatal (the checkpoint's pattern, section 5.1, kb/Work PB2590): one tick at a
+time (a tick due while one runs is skipped, and `tick.lock`, an OS lock, refuses a second from anywhere), its lines
+said in the supervisor's log, a failure said and the unit continuing. A tick:
+
+1. REAPS: an attempt whose detached runner is gone without an exit code is DIED; a run that ended QUEUE NOT ACTIVE
+   (exit 8) writes `land-lane\HALT` and names it in the operator's mailbox.
+2. SURVEYS: `git fetch`, then `prune_worktrees.survey` and its landing order (imported, never re-parsed from text),
+   written to `land-lane\survey.json`.
+3. LAUNCHES, unless `HALT`, the loop's `STOP-UNIT` or `STOP`, or the owner's global `scratch\STOP` exists (a running
+   `enqueue.py land` finishes either way; it is idempotent): for every WAITING TO LAND row in survey order, and every
+   branch whose last attempt the lane may retry with its tip still that attempt's end head, `land_lane.decide` says
+   whether to start `enqueue.py land <branch> --worktree <wt>`, DETACHED (its own process group, out of the
+   supervisor's job where Windows allows it), its output in `logs\land-lane-<branch>-<stamp>.log`:
+
+| The branch's last attempt | The lane |
+|---|---|
+| none, or at another head (a finisher's commit, reviewed CLEAN) | launches |
+| running | waits |
+| `ENQUEUED` or `NOTHING TO LAND` (exit 0) at this head | nothing: the queue has it |
+| exit 3, the landing check's STOP (the branch shares a file with earlier-dispatched in-flight work, kb/Work PB2701) | retries at this head once `landing_check.py` passes on the branch's own range |
+| exit 2 (main moved under every catch-up merge), exit 9 (GitHub refused), or a DIED runner | retries ONCE at this head |
+| exit 8, QUEUE NOT ACTIVE | HALT; relaunches once the operator runs `land_lane.py clear-halt` |
+| exit 4, 5, 6, 7, 11, or a second exit 2 or 9 at this head | STOPPED: never relaunched at this head; the enqueue unit's |
+
+A run that commits (main merged in, the DEVLOG stamp) makes the survey read the branch IN FLIGHT, so a retry is driven
+by the lane's own attempt record, never by the survey. Mid-wave landing meets exit 3 more often than the enqueue unit
+did, because a wave's other groups are still in flight; the lane waits them out instead of handing the stop to the
+attended session.
+
+**What the enqueue unit keeps.** The judgment (units/enqueue.md): step 2's reviews, step 3 reads `land_lane.py status`
+(one line per branch: its latest attempt, its verdict, its log, who acts next) and sends each STOPPED attempt to a
+finisher (step 4) or a reviewer (exit 11), files the leads of each ENQUEUED one (step 5), completes the landing records
+(step 6b) and then `land_lane.py collect`s them. When `status` says the survey is stale, the unit runs one
+`land_lane.py tick` itself. `next_unit.py` starts an enqueue unit only for that agent work (section 3.2 rule 6).
+
+**Landing gates first.** The gate a landing starts is served before every waiting implementer gate
+(`DESIGN-test-build-ci.md` section 3.14.6, `gate_slot.py`'s landing class); the cap is unchanged, so the machine's
+total gate load is the same.
+
+**Measured** after it lands by `landing_measure.py summary`: DONE -> enqueued -> merged per pull request for the first
+waves after the lane, against wave 1069's landings, which went through the enqueue unit.
 
 ## 5. The handoff (`handoff.schema.json`)
 
@@ -755,7 +814,12 @@ against the schema's required and permitted keys), `test_plan_wave.py` (fixture 
 real dispatch-spec template and `check_practices.py`'s same-file rule; the fix lane's whole plan against a golden the pre-campaign planner wrote; the campaign lane's selection, `blocked_by` order, `after:` derivation and waits, and `work.py check`'s topology rules, section 9.1), `test_watch_agent.py` (a transcript with a
 partial last line), `landing_measure.py --self-test` (the per-pull-request landing record, its completion from GitHub and the summary
 against the retired train records, kb/Work PB3028; `LandingMeasureDriftTests` also pins its arms), `landing_check.py
---self-test` (section 4.7's file-set guarantee). The supervisor's self-test is twelve parallel parts,
+--self-test` (section 4.7's file-set guarantee), `land_lane.py --self-test` (section 4.9: planted survey rows start
+in survey order and only once; a planted exit 3 is retried at its head only once the overlap is gone; an exit 5 is
+never relaunched at its head and a new head is eligible again; an exit 2 or 9 is retried once; a DIED runner is reaped
+and retried once; an exit 8 stops every attempt and names the operator until `clear-halt`; STOP-UNIT, STOP and the
+global stop start nothing; the agent work `next_unit.py` reads; a real detached runner records its outcome). The
+supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
 loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`
 (`testdata/fake-wt.ps1`), and also cover `start-session.ps1 -ConfigDir`, `stop.ps1`, `steer.ps1` (section 4.8: validation,

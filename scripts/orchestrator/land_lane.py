@@ -230,6 +230,15 @@ def decide(tip: str, atts: list[dict[str, Any]], overlap_free: Callable[[], tupl
                            f"{last.get('verdict') or 'no verdict line'}): the enqueue unit's; a new head re-arms it")
 
 
+def tip_of(worktree: str | None) -> str | None:
+    """The worktree's HEAD commit, or None when there is no worktree or git cannot read it."""
+    if not worktree:
+        return None
+    tip = subprocess.run(["git", "-C", worktree, "rev-parse", "HEAD"], capture_output=True, text=True,
+                         encoding="utf-8", errors="replace")
+    return tip.stdout.strip() if tip.returncode == 0 else None
+
+
 # ── the collaborators (the self-test replaces each) ────────────────────────────────────────────────────────────────
 def pid_alive(pid: int | None) -> bool:
     """The runner is alive: a live process with that id whose image is a Python (a reused id is another program)."""
@@ -319,8 +328,10 @@ def reap(cdir: pathlib.Path, atts: list[dict[str, Any]], alive: Callable[[int | 
         if "rc" in fresh:
             a.update(fresh)
             continue
+        # Its tip now is its end head: a runner that died after `enqueue.py land` committed (main merged in, the stamp)
+        # leaves the branch IN FLIGHT in the survey, and only this record lets the lane retry it.
         a.update(outcome="DIED", ended=_now().isoformat(timespec="seconds"),
-                 verdict=last_verdict(pathlib.Path(a["log"])))
+                 verdict=last_verdict(pathlib.Path(a["log"])), end_head=tip_of(a.get("worktree")))
         save(a)
         say(f"land lane: {a['branch']}: the runner of attempt {a['id']} is gone with no exit code (DIED; {a['log']})")
     for a in atts:
@@ -439,13 +450,8 @@ def run_attempt(path: pathlib.Path) -> int:
     with open(rec["log"], "ab") as log:
         rc = subprocess.run(rec["argv"], cwd=rec.get("cwd") or None, stdin=subprocess.DEVNULL, stdout=log,
                             stderr=subprocess.STDOUT).returncode
-    end = None
-    if rec.get("worktree"):
-        tip = subprocess.run(["git", "-C", rec["worktree"], "rev-parse", "HEAD"], capture_output=True, text=True,
-                             encoding="utf-8", errors="replace")
-        end = tip.stdout.strip() if tip.returncode == 0 else None
     current = coord.read_json(path, rec)
-    current.update(rc=rc, ended=_now().isoformat(timespec="seconds"), end_head=end,
+    current.update(rc=rc, ended=_now().isoformat(timespec="seconds"), end_head=tip_of(rec.get("worktree")),
                    verdict=last_verdict(pathlib.Path(rec["log"])))
     coord.write_json(path, current)
     print(f"land lane: attempt {rec['id']} ended exit {rc}: {current['verdict'] or 'no verdict line'}", flush=True)
@@ -755,6 +761,18 @@ def self_test() -> int:
         expect("a detached runner runs the attempt and records rc 5, the verdict and the end head",
                a.get("rc") == 5 and a.get("verdict") == "GATE RED (Windows) on x" and a.get("end_head") == head,
                f"{a} {out}")
+
+        # 11. a runner that died AFTER enqueue.py committed: the survey reads the branch IN FLIGHT at its new tip, and
+        #     the lane retries it from its own record (the DIED attempt's end head is the worktree's tip at the reap).
+        c11 = fresh("died-after-commit")
+        f11 = Fake([{"name": "w9b", "state": "WAITING TO LAND", "tip": "before-merge", "worktree": str(wt), "why": "",
+                     "lead": None}])
+        f11.tick(c11)
+        f11.live.clear()
+        f11.rows[0] = {**f11.rows[0], "state": "IN FLIGHT", "tip": head}
+        expect("a runner that died after committing is retried from its record at the branch's new tip",
+               f11.tick(c11) == ["w9b"] and attempts(c11)[0].get("end_head") == head,
+               f"{f11.started} {attempts(c11)[0]}")
     finally:
         for dirpath, _, files in os.walk(root):  # git writes read-only objects, which rmtree cannot delete on Windows
             for name in files:

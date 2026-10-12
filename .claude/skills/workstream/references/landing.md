@@ -18,9 +18,10 @@
   the former direct-push landing holding main while CI ran the same population, 10 landers for 6 trains, the first commit on main 6 h
   49 min into the day (kb/Work PB3015).
 - **Who runs it.** While the orchestrator loop runs (`python scripts/orchestrator/coord.py loop-state` prints `LOOP
-  STATE: running`), its `enqueue` unit (`scripts/orchestrator/units/enqueue.md`) runs it for every branch `python
-  scripts/prune_worktrees.py --brief` lists WAITING TO LAND, in the order it lists them (the most harmful lead first,
-  kb/Work PB2981's ranking): the attended session lands nothing itself and writes each finished attended branch's report
+  STATE: running`), its LANDING LANE (`scripts/orchestrator/land_lane.py`, ticked by the supervisor beside every
+  unit, kb/Work PB3103) runs it for every branch `python scripts/prune_worktrees.py --brief` lists WAITING TO LAND,
+  in the order it lists them (the most harmful lead first, kb/Work PB2981's ranking), the moment it is ready; the
+  `enqueue` unit (`scripts/orchestrator/units/enqueue.md`) reviews, dispatches finishers and files the leads: the attended session lands nothing itself and writes each finished attended branch's report
   where the unit collects it — the file name EXACTLY `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md`
   (plan_wave.py `REPORT_NAME`), its header:
 

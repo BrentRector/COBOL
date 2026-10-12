@@ -2,9 +2,10 @@
 # SELF-TEST-PLATFORM: windows — the orchestrator loop is Windows-hosted: these cases drive Windows Terminal (a fake wt.exe), Win32_Process, USERPROFILE and directory junctions
 # Self-test for orchestrate.ps1 (campaign), driven by a fake -ClaudeExe (testdata/fake-claude.ps1); no Pester, no real
 # session. Proves: the campaign lane (-Cluster); one campaign rule decides every wave-type choice, a handoff's `wave`
-# included, several leads take turns and a starved lead is reported and logged (kb/Work PB2522); finished branches and a
-# handoff naming `enqueue` start an enqueue unit (the merge queue orders main: no landing waits on another, kb/Work
-# PB3024); open-watchers.ps1.
+# included, several leads take turns and a starved lead is reported and logged (kb/Work PB2522); an enqueue unit starts
+# for agent work (a branch waiting for review, a stopped landing) or a handoff naming `enqueue`, and finished branches
+# alone start one only while the landing lane has no current survey (the lane lands them, kb/Work PB3103);
+# open-watchers.ps1.
 # One of the parallel parts of the orchestrate.ps1 self-test (testdata/orchestrate_test_lib.ps1 is their harness;
 # kb/Work PB2563). Run: pwsh -NoProfile -File scripts/orchestrator/test_orchestrate_campaign.ps1, or every
 # self-test at once: python scripts/self_tests.py
@@ -140,8 +141,10 @@ Check 'a cluster that waited through one wave only is not starved' @($s2.starved
 Set-Content -Path (Join-Path $sv 'units.jsonl') -Encoding utf8 -Value '{"unit":"wave"}', '{"unit":"wave"}', '{"unit":"wave"}'
 Check 'unrecorded lines are not counted as waiting' @((Next-Unit $sv @('--handoff', $hs, '--cluster', 'CAMP', '--work', $fxWork) | ConvertFrom-Json).starved | Where-Object { $_ }).Count 0
 
-# 8f. THE ENQUEUE NEVER WAITS FOR ANOTHER LANDING (kb/Work PB3023, PB3024): GitHub's merge queue orders main, so
-# finished branches and a handoff naming `enqueue` start an enqueue unit, in the fix lane and in the campaign lane.
+# 8f. THE ENQUEUE UNIT IS FOR AGENT WORK; THE LANDING LANE LANDS (kb/Work PB3103; PB3023, PB3024). The supervisor's
+# landing lane (land_lane.py) lands every branch WAITING TO LAND beside whatever unit runs, so finished branches alone
+# start no enqueue unit while the lane has a current survey; review, a stopped landing or an ENQUEUED one to collect
+# does, and so do finished branches while the lane has no survey (it is not ticking: the enqueue unit ticks it).
 $lc = Join-Path $Root 'enqueueunit'
 New-Item -ItemType Directory -Force -Path $lc | Out-Null
 & $fresh $lc
@@ -150,9 +153,24 @@ Set-Content -Path $doneHandoff -Encoding utf8 -Value '{"outcome": "done", "branc
 $landHandoff = Join-Path $lc 'handoff-land.json'
 Set-Content -Path $landHandoff -Encoding utf8 -Value '{"outcome": "done", "next_unit": "enqueue", "next_unit_reason": "branches ready"}'
 $l1 = (Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json
-Check 'finished branches start an enqueue unit, named in the reason' "$($l1.unit) $($l1.reason -match '^finished branches waiting: w9a$')" 'enqueue True'
+Check 'finished branches and no lane survey: an enqueue unit, which ticks the lane' "$($l1.unit) $($l1.reason -match '^finished branches waiting: w9a; the landing lane has no survey')" 'enqueue True'
 Check 'a handoff naming enqueue starts one' ((Next-Unit $lc @('--handoff', $landHandoff)) | ConvertFrom-Json).unit 'enqueue'
-Check 'finished branches in the campaign lane: the enqueue runs first' ((Next-Unit $lc @('--handoff', $doneHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'enqueue'
+Check 'finished branches in the campaign lane, no lane survey: the enqueue runs first' ((Next-Unit $lc @('--handoff', $doneHandoff, '--cluster', 'CAMP', '--work', $fxWork)) | ConvertFrom-Json).unit 'enqueue'
+$laneDir = Join-Path $lc 'land-lane'
+New-Item -ItemType Directory -Force -Path (Join-Path $laneDir 'attempts') | Out-Null
+function Set-LaneSurvey([object[]]$rows) {
+    Set-Content -Path (Join-Path $laneDir 'survey.json') -Encoding utf8 -Value (@{ at = (Get-Date).ToUniversalTime().ToString('o'); rows = @($rows); landing_order = @() } | ConvertTo-Json -Depth 5 -Compress)
+}
+Set-LaneSurvey @(@{ name = 'w9a'; state = 'WAITING TO LAND'; tip = 'a1'; worktree = 'x' })
+$l2 = (Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json
+Check 'finished branches with a current lane survey: no enqueue unit (the lane lands them)' "$($l2.unit) $($l2.reason)" 'wave nothing pending'
+Set-LaneSurvey @(@{ name = 'w9a'; state = 'WAITING TO LAND'; tip = 'a1'; worktree = 'x' }, @{ name = 'w9b'; state = 'WAITING FOR REVIEW'; tip = 'b1'; worktree = 'y' })
+$l3 = (Next-Unit $lc @('--handoff', $doneHandoff)) | ConvertFrom-Json
+Check 'a branch WAITING FOR REVIEW is agent work: an enqueue unit' "$($l3.unit) $($l3.reason -match 'waiting for review: w9b')" 'enqueue True'
+Set-LaneSurvey @()
+Set-Content -Path (Join-Path $laneDir 'attempts/20261012T120000000000Z-w9c.json') -Encoding utf8 -Value (@{ id = '20261012T120000000000Z-w9c'; branch = 'w9c'; head = 'c1'; end_head = 'c2'; log = 'x.log'; rc = 5; verdict = 'GATE RED (Windows) on c2'; collected = $false } | ConvertTo-Json -Compress)
+$l4 = (Next-Unit $lc @()) | ConvertFrom-Json
+Check 'a stopped landing not yet collected is agent work: an enqueue unit (its finisher)' "$($l4.unit) $($l4.reason -match 'stopped landings: w9c \(exit 5\)')" 'enqueue True'
 
 $camp = @('-RepoDir', $fxRepo, '-WorkDir', $fxWork)
 $r = Run-Orch 'campdry' 'good' (@('-DryRun', '-Cluster', 'CAMP') + $camp) $fresh
