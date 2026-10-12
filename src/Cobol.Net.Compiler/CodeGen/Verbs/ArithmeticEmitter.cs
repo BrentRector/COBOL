@@ -164,7 +164,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     /// <summary>The native lane of <see cref="EmitDivideRemainder"/>: both senders land in the exact Int128 lane the
     /// kernel computes in (kb/Work PB85 — a FLOAT-LONG dividend or divisor lands TRUNCATED at the quotient receiver's
     /// float working scale, §14.9.12.4 GR7's subsidiary quotient then being the fixed kernel's, an implementor
-    /// approximation §15.4.1 permits for a float sender; an unsigned-wide read funnels through Widen) and the
+    /// approximation §8.8.1.3 leaves to the implementor for a float sender; an unsigned-wide read funnels through Widen) and the
     /// subsidiary quotient is a DIRECT kernel call at EXACTLY the receiver scale — not the renderer's working-scale
     /// promotion, which yields the quotient at the dividend's higher scale and poisons the remainder multiply.
     /// Both senders are materialized (§14.9.12.4 GR5 — one item identification/evaluation): each appears in SEVERAL

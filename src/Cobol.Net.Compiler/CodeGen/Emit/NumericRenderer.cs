@@ -766,7 +766,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// conversion (the shortest round-trip decimal, ≤17 digits, always exact in the 34-digit significand).</summary>
     // ⛔ THE LIFT OF AN OPERAND THAT MAY OUTGROW THE LANE IS THE ROUNDING ONE, IN EVERY MODE (kb/Work PB2918).
     // §8.8.1.5.2 r1: "If the operand value cannot be expressed exactly in an SDIDI, the value is rounded according to
-    // the rules in 11.9.11" — and a 16-byte binary container (COMP-5, BINARY-DOUBLE, …) owns 39 digits, so its
+    // the rules in 11.9.11" — and a 16-byte binary container (a COMP-5 of 19 or more digits; BINARY-DOUBLE is 8 bytes and lifts exactly) owns 39 digits, so its
     // NumX.Digits bound is past the SDIDI's 34 (and an operand of unknown bound, Digits 0, may be anything). The exact
     // `CobolDec.From` put such a significand INTO the intermediate unrounded, past the 34-digit invariant every
     // CobolDec operation assumes, and the next operation took Int128.MinValue's magnitude and raised a size error for
