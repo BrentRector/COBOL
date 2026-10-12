@@ -14,7 +14,8 @@ This module measures the plan's part of it and writes nothing:
   * AN ESTIMATE PER BUCKET from measured inputs only: groups from the fix lane's own clustering (`fix_clusters.py`,
     through `plan_wave.run_fix_clusters`) and the planner's group cap, waves from the planner's groups per wave,
     weekly points from `model_rules.json`'s cost constants (`plan_wave.group_cost` / `lander_cost`, imported) and from
-    the newest meter-measured burn, hours from the batched trains' landing rate (`train_measure.landing_rate`). A
+    the newest meter-measured burn, hours from the landing rate (`landing_measure.landing_rate_input`: the merge
+    queue's own once two pull requests have landed, else the retired trains' batched rate; kb/Work PB3028). A
     missing input makes its figure UNMEASURED (None), never a guessed number.
   * THE REGISTER SERIES the trend file tracks beside GAP (`register_counts`): open compiler notes, defects, wrong
     answers, crashes and GAP-holder notes, one function for the current tree and for any commit's own tree.
@@ -284,18 +285,14 @@ def estimate_inputs() -> dict:
     import budget  # noqa: PLC0415
     import coord  # noqa: PLC0415
     import plan_wave  # noqa: PLC0415
-    import train_measure  # noqa: PLC0415
+    import landing_measure  # noqa: PLC0415
     rules = coord.rules()
     fix_groups = None
     if plan_wave.FIX_CLUSTERS.exists():
         with tempfile.TemporaryDirectory(prefix="ledger-fc-") as d:
             fix_groups = plan_wave.run_fix_clusters("open", pathlib.Path(d) / "clusters-open.json", rules)
     d = coord.coord_path()
-    rate = None
-    recs = [r for r in train_measure.read_all(d / train_measure.FILE) if r.get("gating") == "batched"] if d.is_dir() else []
-    if recs:
-        landed, window_h, per_h = train_measure.landing_rate(recs)
-        rate = {"per_h": per_h, "landed": landed, "window_h": window_h, "trains": len(recs), "gating": "batched"}
+    rate = landing_measure.landing_rate_input(d)
     acct = account.current()
     readings = [r for r in (coord.read_json(d / "readings.json", []) if d.is_dir() else []) if r.get("account") == acct.name]
     now = datetime.datetime.now(datetime.timezone.utc)
@@ -498,13 +495,16 @@ def self_test() -> int:
 
 
 def main() -> int:
+    # Both streams in UTF-8 BEFORE argparse can print (its --help carries the docstring's non-ASCII): a redirected
+    # stream is the host's code page on Windows otherwise (kb/Work PB2615's class).
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8")
+        except AttributeError:   # a replaced stream (a test harness's) has no reconfigure
+            pass
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--self-test", action="store_true", help="fire every arm on planted registers, then the real one")
     a = ap.parse_args()
-    try:
-        sys.stdout.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001
-        pass
     if a.self_test:
         return self_test()
     bad = live_problems()
