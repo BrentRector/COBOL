@@ -1,0 +1,4 @@
+## Entry 1819 — 2026-09-30 12:20 PDT — Implementer turn cap raised to 400 (owner, R67); batches scoped to 6-8 bugs
+
+Six Sonnet batch implementers dispatched to the 10-20-bug workflow each stopped at the 220-turn cap (`maxTurns` in `.claude/agents/cobol-implementer.md`, adopted by PB468 for ONE rendered kb/Work group per agent) with uncommitted work and no report; they were resumed and told to finish or revert, gate and commit. The owner raised the cap to 400 and asked for smaller scopes (R67): `maxTurns: 400`; MANDATORY-PRACTICES P5 and the workstream SKILL table updated (the old "never extend" is superseded for the implementer cap); dispatch rules from now on — 6-8 bugs per implementer, a checkpoint commit every 3-4 verified bugs, per-bug targeted verification with ONE full gate at the end, no gate polling, stop and report at about 350 turns. The read-only cap stays 160 and the lander 220.
+

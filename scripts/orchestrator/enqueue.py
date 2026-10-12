@@ -23,7 +23,7 @@
 
 `checks` — THE LANDING CHECKS, one sequence in one place (push-main.sh runs it too while it lives), each refusing on
 the landing's own range before a CI run is spent:
-  landing_devlog.py (a new, stamped, top-placed DEVLOG entry; kb/Work PB2605) → exit 6
+  devlog.py check   (exactly one new, stamped DEVLOG/ entry, numbered above main's; kb/Work PB2605, PB3025) → exit 6
   landing_oracle.py (the arch-oracle baseline describes the landed tree; kb/Work PB2885) → exit 7
   landing_check.py  (the R3 file-set partition and in-flight overlap; kb/Work PB2118) → exit 3 (STOP: re-plan, never
                     retry as is)
@@ -50,30 +50,35 @@ import ruleset  # noqa: E402
 
 EXIT_QUEUE_NOT_ACTIVE = 8
 EXIT_GITHUB = 9
-# (script, its refusal's exit code here). A refusal is the script's exit 1; any other non-zero is "could not run".
-CHECKS = (("landing_devlog.py", 6, True), ("landing_oracle.py", 7, False), ("landing_check.py", 3, True))
+# (the check's name, its command under scripts/, its refusal's exit code here, whether it takes --base, whether its
+# every non-zero is a refusal). A refusal is the script's exit 1; any other non-zero is "could not run", except for
+# landing_check.py, whose every non-zero is a STOP (push-main's rule).
+CHECKS = (("devlog.py check", ("devlog.py", "check"), 6, True, False),
+          ("landing_oracle.py", ("orchestrator/landing_oracle.py",), 7, False, False),
+          ("landing_check.py", ("orchestrator/landing_check.py",), 3, True, True))
 
 Say = Callable[[str], None]
 Gh = Callable[[list[str]], tuple[int, str, str]]
 
 
-def run_checks(rev: str, base: str, run: Callable[[str, list[str]], int], say: Say = print) -> int:
-    """The landing checks in order; the first refusal's code, else 0. `run(script, args)` returns the script's exit."""
-    for script, refused, takes_base in CHECKS:
-        rc = run(script, ["--rev", rev, *(["--base", base] if takes_base else [])])
+def run_checks(rev: str, base: str, run: Callable[[tuple[str, ...], list[str]], int], say: Say = print) -> int:
+    """The landing checks in order; the first refusal's code, else 0. `run(command, args)` returns the exit of the
+    script `command[0]` (a path under scripts/) run with `command[1:]` and then `args`."""
+    for name, command, refused, takes_base, every_nonzero_refuses in CHECKS:
+        rc = run(command, ["--rev", rev, *(["--base", base] if takes_base else [])])
         if rc == 0:
             continue
-        if rc == 1 or script == "landing_check.py":   # landing_check's every non-zero is a STOP (push-main's rule)
-            say(f"⛔ enqueue: {script} refused this landing (above) — nothing pushed, nothing opened.")
+        if rc == 1 or every_nonzero_refuses:
+            say(f"⛔ enqueue: {name} refused this landing (above) — nothing pushed, nothing opened.")
             return refused
-        say(f"⛔ enqueue: {script} could not read the range (exit {rc}, above) — NOT RUN, never a pass.")
+        say(f"⛔ enqueue: {name} could not read the range (exit {rc}, above) — NOT RUN, never a pass.")
         return 2
     return 0
 
 
-def _script_runner(cwd: pathlib.Path) -> Callable[[str, list[str]], int]:
-    def run(script: str, args: list[str]) -> int:
-        return subprocess.run([sys.executable, str(HERE / script), *args], cwd=cwd).returncode
+def _script_runner(cwd: pathlib.Path) -> Callable[[tuple[str, ...], list[str]], int]:
+    def run(command: tuple[str, ...], args: list[str]) -> int:
+        return subprocess.run([sys.executable, str(HERE.parent / command[0]), *command[1:], *args], cwd=cwd).returncode
     return run
 
 
@@ -285,23 +290,26 @@ def self_test() -> int:
                rc_nothing == 0 and any("nothing to land" in ln for ln in lines) and rc_title == 2,
                f"{rc_nothing} {rc_title}")
 
-        def runner(results: dict[str, int], seen: list[tuple[str, list[str]]]):
-            def run(script: str, args: list[str]) -> int:
-                seen.append((script, args))
-                return results.get(script, 0)
+        devlog_check, oracle, partition = ("devlog.py", "check"), ("orchestrator/landing_oracle.py",), \
+            ("orchestrator/landing_check.py",)
+
+        def runner(results: dict[tuple[str, ...], int], seen: list[tuple[tuple[str, ...], list[str]]]):
+            def run(command: tuple[str, ...], args: list[str]) -> int:
+                seen.append((command, args))
+                return results.get(command, 0)
             return run
         mapped = []
-        for results in ({"landing_devlog.py": 1}, {"landing_oracle.py": 1}, {"landing_check.py": 1},
-                        {"landing_devlog.py": 2}, {"landing_check.py": 2}, {}):
-            seen: list[tuple[str, list[str]]] = []
+        for results in ({devlog_check: 1}, {oracle: 1}, {partition: 1}, {devlog_check: 2}, {partition: 2}, {}):
+            seen: list[tuple[tuple[str, ...], list[str]]] = []
             mapped.append(run_checks("S", "B", runner(results, seen), say=lines.append))
         seen = []
         run_checks("S", "B", runner({}, seen), say=lines.append)
+        missing = [c[0] for _, c, *_ in CHECKS if not (HERE.parent / c[0]).is_file()]
         expect("checks runs the three landing scripts on the range in order and maps each refusal to its own code: "
                "DEVLOG 6, oracle 7, landing check 3, unreadable 2",
-               mapped == [6, 7, 3, 2, 3, 0]
-               and seen == [("landing_devlog.py", ["--rev", "S", "--base", "B"]), ("landing_oracle.py", ["--rev", "S"]),
-                            ("landing_check.py", ["--rev", "S", "--base", "B"])], f"{mapped} {seen}")
+               mapped == [6, 7, 3, 2, 3, 0] and not missing
+               and seen == [(devlog_check, ["--rev", "S", "--base", "B"]), (oracle, ["--rev", "S"]),
+                            (partition, ["--rev", "S", "--base", "B"])], f"{mapped} {seen} missing={missing}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"=== enqueue.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")

@@ -97,7 +97,7 @@ measured on `5bf5a7f1`), so any shard edit renames the context, and every matrix
 push, which a required check reads as "never reported".
 
 **The doc-only skip moved one layer down.** `paths-ignore` used to make the workflow decline to START for a
-`DEVLOG.md` / `docs/**` / `kb/**` / `PROMPT.md` / `CLAUDE.md` / `README.md` push — incompatible with a per-commit
+`DEVLOG/**` / `docs/**` / `kb/**` / `PROMPT.md` / `CLAUDE.md` / `README.md` push — incompatible with a per-commit
 required check, which has nothing to satisfy when no run exists. The identical list now lives in `changes` (one
 copy, no trigger-side twin to drift against), which diffs `github.event.before .. github.sha` and outputs
 `run_matrix`; every other job carries `needs: changes` + `if: needs.changes.outputs.run_matrix == 'true'`. When
@@ -401,8 +401,8 @@ checkout (a failed regen fails the build — keep).
   reviewed-re-baselined in this change set"), a top STATE banner naming the current phase, and the owner-decisions
   table. This is what a future engineer resumes the REARCH from; the plan §0 banner is the feature-drive live
   state and cross-links to it.
-- **DEVLOG.md** — unchanged discipline (descending, real timestamp, one entry per landing on main, checked by `push-main.sh` through
-  `scripts/orchestrator/landing_devlog.py`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
+- **DEVLOG/** — one file per entry (§3.17.4, kb/Work PB3025), rendered descending; a real timestamp; one entry per
+  landing on main, checked by `push-main.sh` and CI through `python scripts/devlog.py check`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
   `feedback_devlog*` memories. Each rearch phase commit references its ROADMAP phase id.
 - **`docs/DOC_INDEX.md`** — add rows for `COBOLNET_REARCHITECTURE_PLAN.md` (the migration SSOT / ROADMAP),
   `DIAGNOSTICS.md`, this doc, and the sibling `DESIGN-*` / `PHASE-*` docs; keep the "one canonical doc per subsystem" rule.
@@ -1688,7 +1688,7 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
 3. **Enqueue** (`scripts/orchestrator/enqueue.py <branch>`, PB3023 — a SCRIPT, deterministic, no agent): fetch; rebase the
    branch onto `origin/main` (a conflict stops it: the branch returns to WAITING with the conflict named, a finisher
    resolves); run the ONE local gate on the rebased head (§3.17.3); run the landing checks that used to live in
-   `push-main.sh` — `landing_devlog.py` (exactly one new entry file, well-formed) and `landing_check.py` (the R3 file-set
+   `push-main.sh` — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
    whole population, no whole-leg WSL run (the targeted leg runs on both hosts, §3.17.3), no waiting for CI.
@@ -1752,15 +1752,27 @@ demand and not committed.
   is renamed and its header completed, one commit on the branch before the pull request opens), so number order IS
   enqueue order IS queue order IS landing order, and "newest first" by number is newest first on main (operator review
   item 2; a bounced PR keeps its number, gaps are fine). `python scripts/devlog.py render [--since NNNN] [--out <file>]`
-  prints the descending narrative (`DEVLOG.rendered.md` is gitignored); `devlog.py check` is what `landing_devlog.py`
-  becomes (exactly one new, stamped entry file in the PR, header well-formed, number unused on `main`; a `pending-`
-  file in a PR is a red). **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
+  prints the descending narrative (`DEVLOG/README.md` first, then the entries newest first, the files concatenated
+  byte for byte; `DEVLOG.rendered.md` is gitignored); `devlog.py check` is the landing rule `landing_devlog.py` was
+  (exactly one new, stamped entry file in the PR — new meaning a header the base's history lacks — numbered above
+  every number on the base, header well-formed; a `pending-` file, a stray file, an entry whose header disagrees with
+  its name, two files with one number, the monolith back, or a deleted entry is a red — a deleted entry counts the
+  base's monolith too, header by header, so the one landing that migrates the log cannot drop an entry main has), run
+  by the landing checks (`enqueue.py checks`, which push-main.sh runs too) and by CI's `audits` job on every pull request, merge group and `ci/**` landing branch. Its tree half (`lint`) also runs
+  over the repository's own `DEVLOG/` in `devlog.py --self-test`, so every gate holds the whole log to it. **Line endings (PB3029; owner 2026-10-11 ~12:35: "standardize on a single line-ending
   format"):** LF everywhere — `.gitattributes` `* text=auto eol=lf`, `merge.renormalize`, one normalization landing,
   tools write LF, a drift check refuses a CR in any tracked text file; the index is already LF for 15,234 files, so the
   change is what the WORKING TREE shows each OS, and the entry files below are written LF. A ONE-TIME migration script
-  splits the 1,976 entries of the 7.1 MB CRLF `DEVLOG.md` into files content-faithfully with LF line endings (PB3029)
-  and deletes `DEVLOG.md` and `prepend-devlog.py` in the same landing; CLAUDE.md rule 6, the `devlog` memory and skill, `session-probe`, the ledger
-  and every brief that says "the TOP of DEVLOG.md" change in that landing. Rule 6's substance is untouched: one entry per
+  (`scripts/devlog_migrate.py`, deleted by the landing that runs it last, on main's `DEVLOG.md` after its final rebase,
+  and which writes the history's range into `DEVLOG/README.md`) split every entry of the 7.1 MB
+  mixed-CRLF `DEVLOG.md` into files with LF line endings (PB3029), PROVED by rendering them byte-identical to the
+  LF-normalized monolith, and deleted `DEVLOG.md`, `prepend-devlog.py` and `landing_devlog.py`. The history keeps
+  every header as written; the twenty numbers the monolith used twice (008-014, 171-185) and 1191a-1191d carry a
+  letter in the FILE name (`0185b-…` above `0185a-…`) so the render keeps the monolith's order; CLAUDE.md rule 6, the skills and every brief that said "the TOP of
+  DEVLOG.md" changed in that landing (`session-probe` and the ledger read no DEVLOG; the `devlog` memory and the public
+  `brent-tools:devlog` skill live outside this repository and are the attended session's to update). Until
+  `enqueue.py` (PB3023) lands, the LANDER stamps: a train folds its clusters' pending files into its one entry and runs
+  `devlog.py stamp` after its final rebase (MANDATORY-PRACTICES L1). Rule 6's substance is untouched: one entry per
   landing on main, newest first, the only history.
 - **Generated indexes leave the tree (PB3026, landed):** a derived index is a RENDERED VIEW: gitignored, rendered on demand
   by its generator, never committed. `scripts/rendered_views.py` holds the ONE registry (`VIEWS`): `docs/DRIFT_RULES.md`
@@ -1863,11 +1875,12 @@ queues a pull request except `enqueue.py`, and its queue guard precedes its chec
 self-test arms of `enqueue.py` and `ruleset.py` are declared. The live ruleset is compared by `ruleset.py check`, whose
 consumers are the landing (exit 8 on anything but ACTIVE) and the session probe's `gate :` line, not an xUnit arm (the
 suite has no dynamic skip, and an offline comparison must read SKIPPED, never green). Later arms, with the change that
-retires each: no file in the tree references `push-main.sh`, `landing_lease.py` or `train_apply.py`; `DEVLOG.md` does
-not exist and every `DEVLOG/*.md` has a well-formed header and a unique number; no generated index is tracked
+retires each: no file in the tree references `push-main.sh`, `landing_lease.py` or `train_apply.py`; no generated index is tracked
 (`git ls-files` ∩ the generators' outputs is empty). Landed with kb/Work PB3022's first part: `GateLegDriftTests` (no
 caller names a gate mode) and `HostWitnessTraitDriftTests` (`TIER_ORDER` contains `0h` and every race-witness class
-carries the `Host` trait).
+carries the `Host` trait). Landed with kb/Work PB3025: `DEVLOG.md` does not exist and every `DEVLOG/*.md` has a
+well-formed header and a unique number (`devlog.py --self-test`'s `lint` arm over the repository's own `DEVLOG/`, run
+by every gate's self-tests and CI's `audits` job).
 
 ---
 

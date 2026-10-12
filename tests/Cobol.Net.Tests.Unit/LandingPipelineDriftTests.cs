@@ -37,7 +37,7 @@ public sealed class LandingPipelineDriftTests
 
     /// <summary>Tracked paths that DESCRIBE the landing rather than perform it: design docs, the work register, the
     /// history, frozen evidence and adjudication records, the spec, and the test sources (this file names the patterns).</summary>
-    private static readonly string[] Narrative = ["docs/", "kb/", "adjudication/", "specs/", "tests/", "DEVLOG.md"];
+    private static readonly string[] Narrative = ["docs/", "kb/", "adjudication/", "specs/", "tests/", "DEVLOG/"];
 
     private const string TheGuardedStep = "scripts/orchestrator/enqueue.py";
 

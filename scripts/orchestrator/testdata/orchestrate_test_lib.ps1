@@ -11,10 +11,10 @@ New-Item -ItemType Directory -Force -Path $Tele | Out-Null
 # The repository the supervisor under test reads (-RepoDir; kb/Work PB2590): a scratch directory that is not a git tree
 # (clean, nothing unpushed, no worktrees, as the campaign part's), so no case's timing or unit choice depends on this
 # machine's real repository. Its 30-odd worktrees made every checkpoint probe take minutes on a loaded host, and the
-# startup watchdog's case went red. A case that needs the real repository (the ledger stamp) passes -RepoDir $RealRepo.
+# startup watchdog's case went red. A case that needs a git history (the ledger stamp) builds its own scratch repository
+# and passes it as -RepoDir (test_orchestrate_ledger.ps1).
 $FxRepo = Join-Path $Root 'repo'
 New-Item -ItemType Directory -Force -Path $FxRepo | Out-Null
-$RealRepo = Split-Path (Split-Path $Here -Parent) -Parent
 $FakePython = Join-Path $Here 'testdata/fake-python.ps1'
 $script:fails = @()
 $script:checked = 0

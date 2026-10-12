@@ -1,0 +1,4 @@
+## Entry 1801 — 2026-09-29 21:58 PDT — PB1689: REMARKS is not a special word (D-RW1 overturned for REMARKS)
+
+Batch 8 backed PB1689 out because D-RW1 reserved REMARKS "following GnuCOBOL". Read in GnuCOBOL 3.2 (`cobc/reserved.c`), REMARKS is context-sensitive on `CB_CS_DAY` — "we only want it to normally be not usable" — so it lexes as a user word; ISO §8.9 does not reserve it and §4.2.10 does not require reserving it. The owner overturned the determination for REMARKS: it moved from `extensionReserved` to a `nameSlot` row of `cobol-words.json` (generator re-run), D-RW1 lost the word, and `PERFORM REMARKS` / a paragraph named REMARKS compile. The 85 comment-entry paragraph still parses. The other D-RW1 words (COMP-1..5, JSON, XML, ENTRY, GENERIC, PACKED, CHANNEL, END-*) were not re-checked against GnuCOBOL and remain as documented.
+

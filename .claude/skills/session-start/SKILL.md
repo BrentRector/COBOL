@@ -68,7 +68,7 @@ building on it — see the `gate` skill.
 
 ## Before the session ends
 
-Update the `kb/Work/` notes you touched, update §0 (live state only), and add a `DEVLOG.md` entry per landing on main (owner 2026-10-08, kb/Work PB2605; the landing checks, `enqueue.py checks`, refuse a
+Update the `kb/Work/` notes you touched, update §0 (live state only), and add a `DEVLOG/` entry per landing on main (owner 2026-10-08, kb/Work PB2605, PB3025; `devlog.py check`, one of the landing checks (`enqueue.py checks`), refuses a
 landing without one). Commit and push
 every checkpoint.
 
