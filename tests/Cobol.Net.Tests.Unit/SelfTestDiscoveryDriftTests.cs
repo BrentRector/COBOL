@@ -256,6 +256,61 @@ public sealed class SelfTestDiscoveryDriftTests
         Assert.Empty(SelfTestArmSource.Missing(planted, arms[..3]));
     }
 
+    /// <summary>
+    /// ⛔ EVERY COMMAND OF CI's <c>audits</c> JOB RUNS IN THE GATE (the CI invariant; kb/Work PB1957 row 44): each
+    /// <c>python3 &lt;script&gt;</c> the job runs is an entry of <c>scripts/run_gate_legs.py</c> AUDITS, each
+    /// <c>git submodule update --init &lt;path&gt;</c> is one of its AUDIT_PREREQUISITES, or the script is recorded here with
+    /// where it runs instead. The next audit CI gains is a red here until the gate runs it too.
+    /// </summary>
+    /// <remarks>
+    /// Train 1067's PR 9 went RED in CI's <c>audits</c> job on <c>work.py check</c> (a <c>blocked: true</c> whose blocker
+    /// landed in the same train) behind a GREEN gate: CI ran <c>work.py check</c> and <c>check_practices.py</c>, the gate
+    /// ran neither, and nothing compared the two lists.
+    /// </remarks>
+    [Fact]
+    public void EveryCommandOfCisAuditsJob_IsAGateAudit_OrSaysWhereItRuns()
+    {
+        string driver = File.ReadAllText(TestRepo.Scripts("run_gate_legs.py"));
+        string workflow = File.ReadAllText(TestRepo.At(".github", "workflows", "build-and-test.yml"));
+        Match audits = Regex.Match(driver, @"^AUDITS = \((.*?)^\)", RegexOptions.Multiline | RegexOptions.Singleline);
+        Match prerequisites = Regex.Match(driver, @"^AUDIT_PREREQUISITES = \((.*?)^\)",
+            RegexOptions.Multiline | RegexOptions.Singleline);
+        Assert.True(audits.Success && prerequisites.Success,
+            "scripts/run_gate_legs.py no longer declares `AUDITS = (…)` and `AUDIT_PREREQUISITES = (…)`");
+
+        // A CI audit that is NOT a tree audit, and where it runs instead.
+        var elsewhere = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["scripts/devlog.py"] = "a LANDING check, not a tree audit: an implementer's entry stays DEVLOG/pending-*.md "
+                + "until enqueue.py stamps it, and `devlog.py check` refuses a pending entry, so it runs where every landing "
+                + "passes (`enqueue.py checks`, exit 6) and in CI on a pull request or merge group",
+        };
+
+        var lines = Jobs(workflow)["audits"].Split('\n').Select(l => l.Trim()).Where(l => !l.StartsWith('#')).ToList();
+        var scripts = lines.SelectMany(l => Regex.Matches(l, @"\bpython3?\s+(\S+\.py)\b").Select(m => m.Groups[1].Value))
+                           .Distinct(StringComparer.Ordinal).ToList();
+        var submodules = lines.SelectMany(l => Regex.Matches(l, @"\bgit submodule update --init (\S+)")
+                                                    .Select(m => m.Groups[1].Value))
+                              .Distinct(StringComparer.Ordinal).ToList();
+        Assert.True(scripts.Count >= 10,
+            $"found only {scripts.Count} `python3 <script>` commands in CI's audits job: the net is broken");
+        Assert.Contains("tools/claude-skills", submodules);
+
+        var notInGate = scripts.Where(s => !elsewhere.ContainsKey(s) && !audits.Groups[1].Value.Contains($"\"{s}\"",
+                                         StringComparison.Ordinal)).ToList();
+        Assert.True(notInGate.Count == 0,
+            "CI's audits job runs these and the local gate does not (a CI red no local gate shows first, kb/Work PB1957): "
+            + string.Join(", ", notInGate) + ". Add each to scripts/run_gate_legs.py AUDITS, or record here where it runs.");
+        var notPrepared = submodules.Where(p => !prerequisites.Groups[1].Value.Contains($"\"--init\", \"{p}\"",
+                                                StringComparison.Ordinal)).ToList();
+        Assert.True(notPrepared.Count == 0,
+            "CI's audits job makes these submodules ready and the gate does not: " + string.Join(", ", notPrepared)
+            + ". Add each to scripts/run_gate_legs.py AUDIT_PREREQUISITES.");
+        var stale = elsewhere.Keys.Where(s => !scripts.Contains(s)).ToList();
+        Assert.True(stale.Count == 0, "recorded as running elsewhere but no longer in CI's audits job: "
+            + string.Join(", ", stale));
+    }
+
     /// <summary>The workflow's jobs, by id: each job's text up to the next job.</summary>
     private static Dictionary<string, string> Jobs(string workflow)
     {

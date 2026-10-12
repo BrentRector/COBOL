@@ -127,6 +127,7 @@ public sealed class GateLegDriftTests
                      "every gate that ran a leg publishes its measured durations to the shared timings store",
                      "a failed publish to the timings store is reported and recorded, and the verdict is unaffected",
                      "a hung self-test is `SELF-TESTS HANG` in the gate's reasons, never RED, and every gate's self-tests run with --reuse",
+                     "a failed audit prerequisite (CI's `git submodule update --init tools/claude-skills`) is its RED, with its output, and no audit runs",
                      "a defect in work beside the critical path is a named RED with its traceback",
                      "ONE SHAPE (kb/Work PB3022): every gate takes a slot, runs its audits before it and stops at a red in",
                      "a second gate in the same worktree is REFUSED",

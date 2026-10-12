@@ -1015,7 +1015,15 @@ so the props file sees the targets' constant).
 mode since kb/Work PB3022) only set the process priority and call it; their `Leg` functions and their `filter_population.py` call are
 gone (a gate without a vstest filter has no term to prove live; `filter_population.py` stays for CI's shards, the
 generators and `record_verdicts.py`, which still filter), and so are their two copies of the audit list: the driver's
-`AUDITS` is the gate's one list (battery PHASE -1 and CI's `audits` job run the same scripts). They run CONCURRENTLY
+`AUDITS` is the gate's one list (battery PHASE -1 and CI's `audits` job run the same scripts): the citation,
+evidence-supersession, rendered-view, witness-loss, rule-catalog and spec-correction audits, `SELF-TESTS`, the
+`WORK REGISTER` (`work.py check`) and `FLEET PRACTICES` (`check_practices.py`), the last two added after train 1067's
+PR 9 went red in CI on a work-register finding behind a green gate (kb/Work PB1957 row 44). `AUDIT_PREREQUISITES`
+makes the tree ready first exactly as the CI job does (`git submodule update --init tools/claude-skills`, which
+`check_practices.py` reads); a failed prerequisite is RED and no audit runs. `SelfTestDiscoveryDriftTests` maps every
+command of CI's `audits` job to an AUDITS entry, a prerequisite, or its recorded reason to run elsewhere: the one is
+`devlog.py check`, a LANDING check (an implementer's entry stays `DEVLOG/pending-*.md` until `enqueue.py` stamps it,
+and the check refuses a pending entry), run by `enqueue.py checks` and by CI on pull requests and merge groups. They run CONCURRENTLY
 before the slot, each audit's output printed as one block. One entry, `SELF-TESTS`, is every script self-test under
 `scripts/`: `scripts/self_tests.py` DISCOVERS them (a script that handles `--self-test`, read from its syntax tree, or a
 file named `test_*.py`/`test_*.ps1`), runs them in parallel, each with a private `COBOL_COORD_DIR` and a private git
