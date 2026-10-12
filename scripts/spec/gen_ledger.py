@@ -1198,8 +1198,10 @@ TEMPLATE = """<title>{title}</title>
 
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def build() -> tuple[str, dict]:
-    """The page, and the trend file's series with whether it gained its current point."""
+def build(live: bool = True) -> tuple[str, dict]:
+    """The page, and the trend file's series with whether it gained its current point. With `live` False (`--check`)
+    the page renders from the repository alone: no machine-measured input (`ledger_plan.estimate_inputs`) and no
+    pacing, so the check's verdict is the same on every checkout."""
     import work  # noqa: PLC0415
     inv = measure_inventory()
     head = measure_head()
@@ -1208,11 +1210,11 @@ def build() -> tuple[str, dict]:
     rem = ledger_plan.remaining(items, rows, inv["gap"], ledger_plan.fleet_population())
     pts, is_new = trend_series(inv, head, bat, rem["counts"])
     plan = ledger_plan.measure(items, inv["gap"])
-    inputs = ledger_plan.estimate_inputs()
+    inputs = ledger_plan.estimate_inputs(live)
     ctx = {"inv": inv, "work": measure_work(), "a1": measure_annex_a1(), "conf": measure_conformance(),
            "battery": bat, "corpus": measure_corpus(), "head": head, "trend": pts, "plan": plan,
            "remaining": rem, "estimate": ledger_plan.bucket_estimates(rem, inputs), "inputs": inputs,
-           "pacing": ledger_plan.measure_pacing()}
+           "pacing": ledger_plan.measure_pacing() if live else None}
     return render(ctx), {"points": pts, "is_new": is_new}
 
 
@@ -1328,6 +1330,24 @@ def self_test() -> int:
         import shutil  # noqa: PLC0415
         shutil.rmtree(tmp, ignore_errors=True)
 
+    # `--check` reads the repository alone (branch review R4-1's sibling sweep): under an account no table row names
+    # (the live read raises) its inputs are model_rules.json and nothing measured on this machine — no fix-lane run
+    # (present only where the public-skills submodule is initialized), no landing rate, no meter burn.
+    import os  # noqa: PLC0415
+    saved_cfg = os.environ.get("CLAUDE_CONFIG_DIR")
+    os.environ["CLAUDE_CONFIG_DIR"] = str(pathlib.Path(tempfile.gettempdir()) / "no-such-claude-account-r4-1")
+    try:
+        got = ledger_plan.estimate_inputs(live=False)
+    except Exception as e:  # noqa: BLE001  (any failure is this check's FAIL, named)
+        got = repr(e)
+    finally:
+        if saved_cfg is None:
+            os.environ.pop("CLAUDE_CONFIG_DIR", None)
+        else:
+            os.environ["CLAUDE_CONFIG_DIR"] = saved_cfg
+    check("--check's inputs are the repository's alone, whatever the machine (account, coordination dir, submodule)",
+          got == {"rules": coord.rules(), "fix_groups": None, "rate": None, "burn": None}, str(got)[:300])
+
     for name, ok, detail in results:
         print(f"  {'PASS' if ok else 'FAIL'}  {name}" + ("" if ok else f"\n        {detail}"))
     bad = sum(1 for _, ok, _ in results if not ok)
@@ -1347,7 +1367,8 @@ def main() -> int:
     ap.add_argument("--out", type=pathlib.Path, default=DEFAULT_OUT,
                     help=f"HTML to write (default {DEFAULT_OUT})")
     ap.add_argument("--check", action="store_true",
-                    help="render in memory, write nothing; exit non-zero if the page cannot be rendered or the plan "
+                    help="render in memory from the repository alone (no machine-measured input, so the verdict is the "
+                         "same on every checkout), write nothing; exit non-zero if the page cannot be rendered or the plan "
                          "does not read cleanly off the register (ledger_plan.problems)")
     ap.add_argument("--self-test", action="store_true",
                     help="the loud flags, UNMEASURED, the trend append and the register at a commit, on planted inputs")
@@ -1372,7 +1393,7 @@ def main() -> int:
             print(f"   {b}")
         return 1
 
-    text, tr = build()
+    text, tr = build(live=not a.check)
     pts, is_new = tr["points"], tr["is_new"]
 
     if a.check:

@@ -279,14 +279,23 @@ def measure_burn(readings: list[dict], week_start: datetime.datetime) -> dict | 
             "from": a["noted_at"], "to": b["noted_at"]}
 
 
-def estimate_inputs() -> dict:
-    """The estimate's measured inputs on this machine; each None when it cannot be read here (CI, a fresh clone)."""
+def estimate_inputs(live: bool = True) -> dict:
+    """The estimate's measured inputs on this machine; each None when it cannot be read here (CI, a fresh clone).
+
+    With `live` False, only the repository's own (`model_rules.json`) and every measured one None: the shape CI's
+    checkout gets, on every checkout. `gen_ledger.py --check` — an audit every gate and CI's `audits` job run — reads
+    it so, because a live read made its verdict a property of the machine: the fix lane's run only where the
+    tools/claude-skills submodule happened to be initialized (CI's audit runs before any step fetches it), the
+    coordination directory's readings and landings, and the account this process runs as (`account.current()` raises
+    for an unknown config directory). Branch review R4-1's sibling sweep, 2026-10-12."""
+    import coord  # noqa: PLC0415
+    rules = coord.rules()
+    if not live:
+        return {"rules": rules, "fix_groups": None, "rate": None, "burn": None}
     import account  # noqa: PLC0415
     import budget  # noqa: PLC0415
-    import coord  # noqa: PLC0415
     import plan_wave  # noqa: PLC0415
     import landing_measure  # noqa: PLC0415
-    rules = coord.rules()
     fix_groups = None
     if plan_wave.FIX_CLUSTERS.exists():
         with tempfile.TemporaryDirectory(prefix="ledger-fc-") as d:
