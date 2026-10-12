@@ -237,12 +237,47 @@ def venv(parent: Path, base: str = sys.executable, reqs: list[Requirement] | Non
 
 # ── the declaration audit ────────────────────────────────────────────────────────────────────────────────────────────
 
-def tracked(repo: Path) -> list[str]:
-    """Every tracked file, the initialized submodules' included (`--recurse-submodules`): the public skills' modules
-    (`fleet_config`) are local to the repository, never third-party."""
-    out = subprocess.run(["git", "-C", str(repo), "ls-files", "-z", "--recurse-submodules"], check=True,
-                         capture_output=True).stdout.decode("utf-8")
-    return [p for p in out.split("\0") if p]
+def _self_tests():
+    sys.path.insert(0, str(SCRIPTS))
+    import self_tests  # the ONE discovery rule (kb/Work PB2563) and the ONE submodule fetch
+    return self_tests
+
+
+def ls_files(repo: Path) -> list[str]:
+    out = subprocess.run(["git", "-C", str(repo), "ls-files", "-z"], check=True, capture_output=True).stdout
+    return [p for p in out.decode("utf-8").split("\0") if p]
+
+
+def registered_submodules(repo: Path) -> set[str]:
+    """The submodule paths `repo`'s .gitmodules registers (none without the file)."""
+    if not (repo / ".gitmodules").is_file():
+        return set()
+    p = subprocess.run(["git", "-C", str(repo), "config", "-f", ".gitmodules", "--get-regexp", r"^submodule\..*\.path$"],
+                       capture_output=True, text=True, encoding="utf-8")
+    return {line.split(None, 1)[1].strip() for line in p.stdout.splitlines() if " " in line}
+
+
+def tracked(repo: Path, submodules: tuple[str, ...] | None = None, say=print) -> list[str]:
+    """Every tracked file of the repository, and of EXACTLY the submodules in `submodules` it registers (default: the
+    public-skills one, `self_tests.SUBMODULE`, whose modules — `fleet_config` — are local, never third-party), each
+    FETCHED first when this checkout has not initialized it (`self_tests.ensure_submodule`), and of no other.
+
+    ⛔ WHY (branch review R4-1, 2026-10-12): `git ls-files --recurse-submodules` read whatever submodules the checkout
+    HAPPENED to have initialized, so `fleet_config` was local in a developer's checkout and an undeclared third-party
+    import in a fresh clone (CI's `submodules: false` checkout; a new worktree), and a module only the private
+    `specs-private` held would be local on the owner's box and third-party on every CI runner, which can never fetch it.
+    The set read is now a property of the repository, never of the checkout. Raises OSError when the fetch fails."""
+    submodules = (_self_tests().SUBMODULE,) if submodules is None else submodules
+    files = ls_files(repo)
+    registered = registered_submodules(repo)
+    for sub in submodules:
+        if sub not in registered:
+            continue
+        failure = _self_tests().ensure_submodule(repo, say, sub)
+        if failure:
+            raise OSError(failure)
+        files += [f"{sub}/{p}" for p in ls_files(repo / sub)]
+    return files
 
 
 def imported(source: str) -> set[str]:
@@ -257,14 +292,15 @@ def imported(source: str) -> set[str]:
     return names
 
 
-def audit(repo: Path, gate: Path, tools: Path, self_tests: list[str]) -> list[str]:
+def audit(repo: Path, gate: Path, tools: Path, self_tests: list[str], submodules: tuple[str, ...] | None = None,
+          say=print) -> list[str]:
     """The findings (empty when clean): a third-party import under SCANNED declared in neither file, and one a
     self-test in `self_tests` reaches declared only in the tools file. Reaching follows a local module the file imports
     (every tracked `<name>.py` that one of the import's components names) and, from a shell or PowerShell self-test, a
     `scripts/…py` or `.claude/…py` path its text names (it runs scripts by path). A Python file's mere MENTION of a
     path (a docstring, a message) is not followed: the Linux gate's exact environment and CI's runner catch a script
     run by path whose import is not provisioned, both alike (module docstring)."""
-    files = tracked(repo)
+    files = tracked(repo, submodules, say)
     py = [f for f in files if f.endswith(".py")]
     local = {Path(f).stem for f in py} | {part for f in py for part in Path(f).parts[:-1]}
     by_stem: dict[str, list[str]] = {}
@@ -330,9 +366,7 @@ def setup_env_drift(setup_env: Path = SETUP_ENV, tools: Path = TOOLS) -> list[st
 
 
 def discovered_self_tests(repo: Path) -> list[str]:
-    sys.path.insert(0, str(SCRIPTS))
-    import self_tests  # the ONE discovery rule (kb/Work PB2563)
-    return [t.path for t in self_tests.discover(repo)]
+    return [t.path for t in _self_tests().discover(repo)]
 
 
 # ── the self-test ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -441,6 +475,51 @@ def self_test() -> int:
               sorted(f.split(":")[0] for f in found if "self-test reaches" in f), ["scripts/helper.py", "scripts/render.py"])
         check("arm AUDIT: a tools-only import no self-test reaches, and a gate-declared one, are not findings",
               [f for f in found if f.startswith(("scripts/uses_widget.py", "scripts/tool.py: imports `bigpdf`"))], [])
+        # R4-1: what counts as local is the REPOSITORY's, never the checkout's. `sup` registers two submodules: `pub`
+        # (the audited set, like the public skills) and `priv` (registered, never read, like specs-private, which no CI
+        # runner can fetch). `sup` has both initialized (a developer's checkout); `fresh` is a clone with neither (CI's
+        # `submodules: false`, a new worktree). Both must give the same findings: only `privmod`.
+        saved = os.environ.get("GIT_CONFIG_GLOBAL")
+        os.environ["GIT_CONFIG_GLOBAL"] = str(plant("gitconfig", "[protocol \"file\"]\n\tallow = always\n"
+                                                                 "[user]\n\tname = self-test\n\temail = t@example.invalid\n"
+                                                                 "[core]\n\tautocrlf = false\n"))
+        try:
+            def repo(name: str, files: dict[str, str]) -> Path:
+                for rel, text in files.items():
+                    plant(f"{name}/{rel}", text)
+                subprocess.run(["git", "-C", str(root / name), "init", "-q"], check=True)
+                subprocess.run(["git", "-C", str(root / name), "add", "-A"], check=True)
+                return root / name
+
+            def commit(r: Path) -> None:
+                subprocess.run(["git", "-C", str(r), "commit", "-qm", "planted"], check=True, capture_output=True)
+
+            for name, mod in (("pub", "pubmod"), ("priv", "privmod")):
+                commit(repo(name, {f"lib/{mod}.py": "X = 1\n"}))
+            sup = repo("sup", {"scripts/uses.py": "import pubmod\nimport privmod\n"})
+            for name in ("pub", "priv"):
+                subprocess.run(["git", "-C", str(sup), "submodule", "add", "-q", (root / name).as_posix(),
+                                f"tools/{name}"], check=True, capture_output=True)
+            commit(sup)
+            fresh = root / "fresh"
+            subprocess.run(["git", "clone", "-q", "--no-recurse-submodules", str(sup), str(fresh)], check=True,
+                           capture_output=True)
+            before = (fresh / "tools" / "pub" / ".git").exists()
+            got_fresh = audit(fresh, gate, tools, [], ("tools/pub",), heard.append)
+            got_sup = audit(sup, gate, tools, [], ("tools/pub",), heard.append)
+            want = ["scripts/uses.py: imports `privmod`, declared in neither scripts/requirements-gate.txt nor "
+                    "scripts/requirements-tools.txt"]
+            check("arm SUBMODULES: a clone without submodules fetches the audited one, so its module is local there "
+                  "too (R4-1: it read as an undeclared third-party import)",
+                  (before, got_fresh, (fresh / "tools" / "pub" / ".git").exists()), (False, want, True))
+            check("arm SUBMODULES: an initialized submodule outside the audited set is never read, so a module only it "
+                  "holds is third-party in every checkout (R4-1: local only where it happened to be initialized)",
+                  got_sup, want)
+        finally:
+            if saved is None:
+                os.environ.pop("GIT_CONFIG_GLOBAL", None)
+            else:
+                os.environ["GIT_CONFIG_GLOBAL"] = saved
         setup = plant("scripts/cloud/setup-env.sh", "  python -m pip install -q --no-warn-script-location \\\n"
                                                     "      BigPDF stray >/tmp/pip-deps.log 2>&1 \\\n")
         check("arm SETUP-ENV: the cloud setup's pip line is held to the tools file's own packages (case folded)",
@@ -474,7 +553,11 @@ def main(argv: list[str]) -> int:
             print(f"python_deps: the gate's environment could not be built: {e}", file=sys.stderr)
             return 1
     if argv[:1] == ["audit"] and len(argv) == 1:
-        findings = audit(REPO, GATE, TOOLS, discovered_self_tests(REPO))
+        try:
+            findings = audit(REPO, GATE, TOOLS, discovered_self_tests(REPO))
+        except (OSError, ValueError, SyntaxError, subprocess.CalledProcessError) as e:
+            print(f"=== PYTHON IMPORTS: NOT RUN — the audit could not run: {e} ===")
+            return 2
         for f in findings:
             print(f"  {f}")
         print(f"=== PYTHON IMPORTS: {'RED (' + str(len(findings)) + ')' if findings else 'GREEN'} ===")
