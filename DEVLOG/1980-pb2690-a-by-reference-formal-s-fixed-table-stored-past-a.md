@@ -1,4 +1,4 @@
-## PB2690: a BY REFERENCE formal's fixed table stored past a dynamic argument's capacity now creates the occurrences
+## Entry 1980 — 2026-10-12 16:43 PDT — PB2690: a BY REFERENCE formal's fixed table stored past a dynamic argument's capacity now creates the occurrences
 
 The note's last open arm asked for an adjudication: a Format 2 CALL BY REFERENCE of a group holding a dynamic-capacity
 table, opposite a formal whose corresponding table is FIXED, lost the callee's store to an occurrence past the argument's
@@ -79,3 +79,4 @@ pb480 adds `SET C2 TO 2` before each lane). No other case differs: the fix is in
 (`CobolVarGroup`, `GroupCompatibility`), so the emitted C# and the diagnostics of every unedited program are unchanged,
 including `pb965_vlg_into_fixed_boundary`, whose edit touched comments only. The baseline was re-recorded on the merged
 head and replaces `69e756b0880b`.
+
