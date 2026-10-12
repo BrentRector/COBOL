@@ -1261,6 +1261,11 @@ public sealed class DataItem
     /// implicit-filler bytes (§15.14.4 r3 is satisfied vacuously).</summary>
     public int ByteWidth =>
         IsElementary ? ElementaryByteWidth
+        // A no-THROUGH level-66 alias of a GROUP item has no PICTURE and no children of its own — "all of the data
+        // attributes of data-name-2 become the data attributes of data-name-1 and the storage area occupied by
+        // data-name-2 becomes the storage area occupied by data-name-1" (§13.18.45.4 GR1) — so it is as wide as
+        // the group it renames. (A THROUGH alias carries a synthesized alphanumeric PICTURE: the arm above.)
+        : Renames is { IsAlias: true, From: { } renamed } ? renamed.ByteWidth
         // D19/PB43 — same reason as ImageWidth: a bit-bearing subtree is LAID OUT, not summed.
         : HasBitDescendant ? BitLayout.Characters(BitLayout.ExtentBits(this))
         : Children.Where(c => c.RedefinesTargetName is null).Sum(c => c.ByteWidth * (c.Occurs ?? 1));

@@ -144,6 +144,12 @@ internal static class RecordLayout
     /// PB1261). Null when an ANCESTOR carries OCCURS.</summary>
     public static int? FirstOccurrenceOffsetOf(DataItem item)
     {
+        // ⛔ A LEVEL-66 ALIAS HAS NO PLACE IN THE CHILD WALK BELOW — it rides its record's Renames66 list, not Children
+        // (kb/Work PB2502) — but it OCCUPIES storage: without THROUGH it is data-name-2's own storage area
+        // (§13.18.45.4 GR1), and with THROUGH it is the area that begins where data-name-2 begins (GR2; SR11 puts
+        // data-name-3 at or after it). So its offset is data-name-2's, which this walk answers. A RECORD KEY naming
+        // an alias used to find no offset and abort the run unit at registration.
+        if (item.Renames is { From: { } renamed }) return FirstOccurrenceOffsetOf(renamed);
         for (var p = item.Parent; p is not null; p = p.Parent)
             if (p.Occurs is not null) return null;   // subject to OCCURS ⇒ no single fixed position
         DataItem root = item;
@@ -207,6 +213,9 @@ internal static class RecordLayout
         // for an item under OCCURS and a key under a table was accepted with its occurrence discarded. An item
         // subject to OCCURS has no one position in the record whatever its storage form.
         if (target.IsTableElement) return null;   // §8.4.2.3.3 SR2's own-or-ancestor question, asked of DataItem (PB877)
+        // A level-66 alias is positioned where its data-name-2 is (§13.18.45.4 GR1/GR2; see FirstOccurrenceOffsetOf),
+        // and data-name-2 may itself be a member of a REDEFINES class, which the branch below places.
+        if (target.Renames is { From: { } renamed }) return OffsetInRecord(root, renamed);
         if (target.Class is { } cls)
         {
             if (ReferenceEquals(cls.Canonical, root)) return target.ClassOffset;
@@ -277,6 +286,8 @@ internal static class RecordLayout
     /// layout's take step starts from.</summary>
     private static (int FixedOffset, int Preceding, long PrecedingMaxBytes)? ContiguousPlaceOf(DataItem root, DataItem key)
     {
+        // A level-66 alias is no child of the walk; its storage begins where data-name-2's does (§13.18.45.4).
+        if (key.Renames is { From: { } renamed }) key = renamed;
         int preceding = 0;
         long maxBytes = 0;
         int? found = null;
