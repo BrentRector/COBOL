@@ -70,7 +70,7 @@ wait "$APT_PID" 2>/dev/null || true
 #    → python3.11 sits AHEAD of /usr/bin on PATH (the first smoke session, 2026-09-24, failed 3 Unit tests on it: the
 #    scripts use PEP 701 f-strings). uv comes from PyPI (default allowlist) and installs a standalone CPython 3.14;
 #    fallback = the newest /usr/bin/python3.N with N >= 12. Both names in /usr/local/bin point at the result, and the
-#    tools' third-party packages (scripts/requirements-tools.txt) go into it; the gates' pinned set is per clone. ─────────
+#    repo's only third-party imports (PyMuPDF for the spec renderers, fontTools, PyYAML for tooling_check.py) go into it. ─────────────────────────
 PYVER=3.14
 PY=""
 if python3 -m pip install -q --break-system-packages --root-user-action=ignore uv >/tmp/uv-install.log 2>&1 \
@@ -85,12 +85,9 @@ if [ -z "$PY" ]; then
 fi
 if [ -n "$PY" ]; then
   ln -sf "$PY" /usr/local/bin/python && ln -sf "$PY" /usr/local/bin/python3 && log "python -> $PY"
-  # The tools' packages, as scripts/requirements-tools.txt declares them (this script runs before the clone, so it
-  # cannot read that file; python_deps.py --self-test holds this line to it). The gates' pinned set
-  # (scripts/requirements-gate.txt) is per CLONE: the SessionStart hook and every gate provision it (python_deps.py).
   python -m pip install -q --break-system-packages --root-user-action=ignore --no-warn-script-location \
-      pymupdf fonttools numpy scipy >/tmp/pip-deps.log 2>&1 \
-    && log "python tools' packages ok" || { log "WARN: pip deps failed"; tail -5 /tmp/pip-deps.log; }
+      PyMuPDF fonttools pyyaml >/tmp/pip-deps.log 2>&1 \
+    && log "PyMuPDF + fontTools + PyYAML ok" || { log "WARN: pip deps failed"; tail -5 /tmp/pip-deps.log; }
 fi
 
 cat > /etc/profile.d/dotnet.sh <<EOF

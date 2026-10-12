@@ -130,6 +130,11 @@ py="$(command -v python3 || command -v python)"
 if [ -z "$py" ]; then
   echo "=== LINUX GATE: NOT RUN (no python in this Linux environment — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
 fi
+# tooling_check.py's self-test parses every agent and skill frontmatter with PyYAML (kb/Work PB3097, branch review R3-1):
+# an interpreter without it is NOT RUN with the setup command, never a RED self-test leg.
+if ! "$py" -c 'import yaml' >/dev/null 2>&1; then
+  echo "=== LINUX GATE: NOT RUN ($py has no PyYAML — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
+fi
 if [ ! -f Cobol.Net.sln ]; then
   echo "=== LINUX GATE: NOT RUN (not at a repository root: $(pwd)) ==="; exit 2
 fi
@@ -190,23 +195,6 @@ if ! "$py" "$snap/scripts/external_corpus.py" ensure --repo "$snap" > "$out/corp
   echo "linux-gate: EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED (TestResults/linux-gate/corpus-fetch.log); the two ExternalCorpusPopulationDriftTests reds in the unit leg are attributable to it"
   corpus_red=" corpus-fetch"
 fi
-# ⛔ THE GATE'S OWN PYTHON (kb/Work PB3097, branch review R3-1): every leg runs with a virtual environment holding
-# EXACTLY the clone's scripts/requirements-gate.txt, first on PATH (the self-tests, the guard and every Python
-# instrument a test runs). PB3097 added PyYAML to CI and to setup-wsl.sh, a script run by hand, and this host's
-# interpreter never got it: tooling_check.py's self-test went RED (6) here and would have reddened every landing.
-# python_deps.py builds the environment the first time the declaration (or the base interpreter) changes and reuses it
-# after, so a new dependency is provisioned by the commit that declares it, with no hand step; and EXACTLY, so a package
-# only the developer's interpreter carries (PyMuPDF, SciPy) cannot pass here and fail in CI. A build that fails is
-# NOT RUN, with pip's output, never a run over a missing package.
-if ! vpy="$("$py" "$snap/scripts/python_deps.py" venv "$HOME/linux-gate/.python-env" 2> "$out/python-deps.log")" \
-   || [ ! -x "$vpy" ]; then
-  sed 's/^/    /' "$out/python-deps.log"
-  echo "=== LINUX GATE: NOT RUN (could not build the gate's Python environment from scripts/requirements-gate.txt;" \
-       "see TestResults/linux-gate/python-deps.log) ==="; exit 2
-fi
-py="$vpy"
-export PATH="$(dirname "$vpy"):$PATH"
-echo "linux-gate: $("$py" --version 2>&1) holding exactly scripts/requirements-gate.txt ($vpy)"
 echo "linux-gate: Linux clone of HEAD ${head:0:9} at $snap"
 [ "$dirty" -gt 0 ] && echo "linux-gate: NOTE — $dirty uncommitted tracked change(s) are NOT tested (the clone is HEAD)"
 

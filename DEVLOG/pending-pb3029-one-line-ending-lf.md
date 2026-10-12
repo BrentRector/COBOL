@@ -31,11 +31,17 @@ Python conflicts the finisher took main's text and re-ran `--fix-writers`, so no
 data, which still held the CRLF sizes. Git's `ie_modified` treats a size mismatch on a nonzero recorded size as a
 change without comparing content. As a result, `git status --porcelain` listed 15,179 files ` M` while `git diff` was
 empty, and enqueue.py's dirty-tree check refused the landing. `refresh_index` now re-states every entry whose cleaned
-content (`git hash-object --stdin-paths`) is already the staged blob and whose working-tree mode is the staged mode
-(branch review R3-2: `git update-index` records the mode, so an unstaged `chmod +x` was being staged). A real edit and
-a mode change stay modified and unstaged. This
+content (`git hash-object --stdin-paths`) is already the staged blob. A real edit stays modified and unstaged. This
 also covers a generator that writes LF over a CRLF checkout (`LfText.psm1`). The self-test pins it: without the re-stat,
-the rewritten file is listed and two checks fail.
+the rewritten file is listed and two checks fail. Branch review R3-2: an entry whose working-tree mode differs from the
+staged mode is never re-stated either, so an unstaged `chmod +x` is never staged.
+
+**Scope kept to the plan (owner, 2026-10-12 ~01:40: "I never asked for F to be widened").** Review round 3 found that
+the Linux gate's interpreter (the uv-managed python3.14) lacked PyYAML. A later finisher answered that with a new
+Python-dependency system. It was taken back out of this landing and preserved on the branch
+`python-deps-carveout-PB3097`. What lands instead: `linux-gate.sh` refuses to run without PyYAML and prints the setup
+command (NOT RUN, never a red leg). The owner installed PyYAML into that interpreter by hand. CI keeps its pinned
+`pyyaml==6.0.3` installs.
 
 ### PB3097: `cobol-finisher` never loaded
 
@@ -44,35 +50,5 @@ Claude Code never loaded the role, so `Agent(subagent_type: "cobol-finisher")` a
 unit's finisher dispatch failed. `tooling_check.py` printed `OK` because it only tested that the file existed. The
 description is now valid YAML. The readiness check now parses every agent, skill and command frontmatter with PyYAML.
 It requires a mapping that names its own file or directory and has a non-empty description, and it reports a failure
-as ASK-OWNER, never OK. Its self-test plants the exact defect and also runs over the live `.claude/`.
-
-**The gates' Python packages: one declaration, provisioned where every gate runs (branch review R3-1).** PyYAML was
-first pinned by an inline `pip install` in two CI jobs and added to `setup-wsl.sh`, which someone runs by hand. The
-Linux gate's interpreter is WSL's uv CPython, not `/usr/bin/python3` with python3-yaml, so `tooling_check.py
---self-test` went RED (6) under `linux-gate.sh`, and every landing on this host would have gone GATE RED. Now
-`scripts/requirements-gate.txt` declares the gates' packages once, pinned (PyYAML, tzdata), and `scripts/python_deps.py`
-provisions them. `ensure` installs what an interpreter lacks: it is the local gate's audit prerequisite, the first step
-of CI's `audits` and `windows-build-test` jobs, and part of a cloud session's hook. `venv` builds the Linux gate's own
-environment holding exactly that set. It is built once per declaration and reused, and a failed build is `NOT RUN`.
-`scripts/requirements-tools.txt` declares the tools no gate runs (PyMuPDF, fontTools, NumPy, SciPy); `setup-wsl.sh`
-installs from it, and `setup-env.sh`'s inline list is held to it. The self-test is RED while a third-party import under
-`scripts/` or `.claude/` is undeclared, or while a self-test reaches one declared only as a tool. The sweep found no
-other module the Linux legs import that the gate's interpreter lacks: the only third-party imports under `scripts/` and
-`.claude/` are `yaml` (a self-test), `fitz` and `fontTools` (spec tools no gate runs). It also found that the setups
-disagreed: WSL lacked fontTools.
-
-**What counts as a local module is the repository's, never the checkout's (branch review R4-1).** The import audit
-listed `git ls-files --recurse-submodules`, so `fleet_config` (the public skills' module, which `check_practices.py`
-imports) was local only where `tools/claude-skills` happened to be initialized. In a clone without submodules,
-`python_deps.py --self-test` went RED (1) and named it an undeclared third-party import. CI did not go red, as measured
-in such a clone: `self_tests.py` fetches the submodule before any self-test runs, and the Linux gate's fresh clone
-takes the same path. The verdict leaned on that ordering, though, and a module that only the private `specs-private`
-held would have counted as local on the owner's machine and as third-party on every CI runner. The audit now reads the
-superproject's files plus exactly the submodules in its audited set (the public skills). It fetches each one when the
-checkout lacks it, through `self_tests.ensure_submodule`, the one fetch, and it never reads any other submodule. Two
-self-test arms plant a superproject with an audited and an unaudited submodule, once initialized and once absent; both
-fail on the old code. The sibling sweep covered every self-test and audit for a verdict that depends on a submodule, an
-ignored file or a local path, and found one more: `gen_ledger.py --check`, the RENDERED VIEWS audit that every gate and
-CI's `audits` job run, read the machine's live inputs. It ran the fix lane only where the submodule was initialized,
-read the coordination directory, and called `account.current()`, which raised for an unknown `CLAUDE_CONFIG_DIR`. It
-now renders from the repository alone (`estimate_inputs(live=False)`, no pacing).
+as ASK-OWNER, never OK. Its self-test plants the exact defect and also runs over the live `.claude/`. PyYAML is pinned
+in CI's `audits` and `windows-build-test` jobs and listed in the WSL and cloud setups.

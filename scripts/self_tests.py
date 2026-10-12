@@ -45,8 +45,7 @@ never acts on the caller's (kb/Work PB1719), and with `GIT_CONFIG_GLOBAL` naming
 git identity, so a self-test that commits behaves the same on a developer's machine and on a CI runner with no global
 config. On Windows `bash` is Git for Windows' own (from `git --exec-path`), never System32's WSL launcher, which a
 PATH lookup can find first. The public-skills submodule some of them import (`tools/claude-skills`:
-`check_practices.py`) is fetched once when absent, as CI's fleet-practices step does (`ensure_submodule`, the one fetch;
-python_deps.py's import audit calls it too, so its verdict never depends on this runner having run first).
+`check_practices.py`) is fetched once when absent, as CI's fleet-practices step does.
 
 REUSE (kb/Work PB2914; DESIGN-test-build-ci.md §3.14.10): every run of a self-test is TRACED, and each PASS is recorded
 with the content of everything it read (scripts/self_test_inputs.py: the files and directory listings its Python
@@ -275,16 +274,15 @@ def _scrubbed_env(base: dict[str, str]) -> dict[str, str]:
     return {k: v for k, v in base.items() if k not in drop}
 
 
-def ensure_submodule(repo: Path, say, path: str = SUBMODULE) -> str | None:
-    """Fetch the submodule at `path` (the public-skills one by default) when this checkout has not initialized it: the
-    ONE fetch every reader of it shares (this runner, python_deps.py's import audit). Returns the failure, if any."""
-    if (repo / path / ".git").exists():
+def ensure_submodule(repo: Path, say) -> str | None:
+    """Fetch the public-skills submodule when this checkout lacks it. Returns the failure, if any."""
+    if (repo / SUBMODULE / "skills").is_dir():
         return None
-    say(f"fetching the {path} submodule (absent in this checkout)")
-    r = subprocess.run(["git", "submodule", "update", "--init", "--", path], cwd=repo, capture_output=True, text=True,
+    say(f"self-tests: fetching the {SUBMODULE} submodule (absent in this checkout)")
+    r = subprocess.run(["git", "submodule", "update", "--init", SUBMODULE], cwd=repo, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", env=_scrubbed_env(os.environ))
-    if r.returncode != 0 or not (repo / path / ".git").exists():
-        return f"`git submodule update --init {path}` failed (exit {r.returncode}): {r.stderr.strip()}"
+    if r.returncode != 0 or not (repo / SUBMODULE / "skills").is_dir():
+        return f"`git submodule update --init {SUBMODULE}` failed (exit {r.returncode}): {r.stderr.strip()}"
     return None
 
 
