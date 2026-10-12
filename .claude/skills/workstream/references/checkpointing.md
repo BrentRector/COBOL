@@ -22,7 +22,7 @@ WIP-commits their worktrees — so a quota kill never lands mid-step. Delete tha
 background gate is KILLED — five implementers and the train-46 lander all came back "gate PENDING" with logs that stop
 mid-leg. Every dispatch prompt says: start the job in the background to a log, then BLOCK in the foreground on
 `timeout 580 bash -c 'until grep -qE "<verdict pattern>" <log>; do sleep 5; done'`, re-issued until the verdict prints (for
-push-main, append `echo "PUSH-MAIN-EXIT=$?"` to its log and block on that).
+`enqueue.py land`, block on its `=== ENQUEUE: ` line).
 
 **A killed agent is replaced by a FRESH agent that reads the checkpoint** (`STATUS.md` + `git log`, or the `.jsonl`).
 ⭐ **EVERY FLEET-OPTIMIZATION EXPERIMENT IS RECORDED (owner 2026-09-28, for a later research report).** When an

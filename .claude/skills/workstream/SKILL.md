@@ -6,7 +6,7 @@ description: Use BEFORE dispatching any fleet, finisher, implementer or adjudica
 > ⛔ **BASE SKILL FIRST.** Invoke `brent-tools:agent-fleet` (Skill tool) before reading on. If the plugin is not loaded
 > (a cloud session receives no project marketplace), Read `tools/claude-skills/skills/agent-fleet/SKILL.md` instead
 > (`git submodule update --init tools/claude-skills` if the path is missing). THEN apply this overlay: it carries only
-> what is specific to WiseOwl COBOL — commands, paths, kb/Work, push-main, the owner's dated decisions and
+> what is specific to WiseOwl COBOL — commands, paths, kb/Work, the merge queue, the owner's dated decisions and
 > measurements — and wins on conflict. Pinned: **brent-tools 1.20.0** (`tools/claude-skills`, kb/Work/PB1699). A
 > practice improved here is written into the public base first, then consumed by moving the pin.
 
@@ -131,7 +131,7 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   the same primary `src/` file unless one declares `after:` the other.
 
 ⭐ **COMMAND CHAINING — MANDATORY-PRACTICES P14, enforced by the guard hook.** Never chain anything after a verdict
-command (build, test, gate, push-main, battery); capture its status with `; echo "EXIT=$?"` if needed. Independent
+command (build, test, gate, `enqueue.py land`, battery); capture its status with `; echo "EXIT=$?"` if needed. Independent
 commands go as PARALLEL tool calls in ONE turn. A blanket no-chaining ban (carlymr/carlys-claude-skills) was
 considered and rejected in that form: split chains become extra turns, and turns are the quadratic cost.
 
@@ -139,7 +139,7 @@ considered and rejected in that form: split chains become extra turns, and turns
 
 - ⛔ **ONE LANDING PATH, AND ONE QUEUE WHILE THE LOOP RUNS** (MANDATORY-PRACTICES L1, O11, kb/Work PB2602, PB3023; `python scripts/orchestrator/coord.py loop-state`): a branch lands only through `python scripts/orchestrator/enqueue.py land <branch>`. While the loop runs, its `enqueue` unit runs it for every WAITING TO LAND branch and the attended session runs no rolling wave and lands nothing itself: it writes each finished attended branch's report as `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (header `Status: DONE` · `Worktree:` · `Branch:` · `HEAD:` · `Base:`) for the enqueue unit to collect. With the loop stopped it runs `enqueue.py land` by hand for its own branch.
 - ⛔ **No branch is left undecided** (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600): `python scripts/prune_worktrees.py` gives every branch a lifecycle state (IN FLIGHT · WAITING FOR REVIEW · WAITING TO LAND · LANDED · DECISION); a branch ends LANDED then deleted (`--apply`), or ABANDONED by a decision recorded in its kb/Work note then deleted (`--apply --abandon <branch>`). Nothing is archived. An agent refused `enqueue.py land` by the permission layer ends `READY-TO-LAND <worktree> <branch>`; the dispatching session runs it (MANDATORY-PRACTICES L13).
-- Land finished work first, ONE BRANCH PER PULL REQUEST (MANDATORY-PRACTICES L1, L12): `enqueue.py land` gates each branch under the shared gate slot and queues it; a conflict, a red gate or a queue bounce goes to ONE `cobol-finisher` (`templates/finisher-brief.md`), which returns DONE: its commits are reviewed on the branch before the new tip lands (`enqueue.py land` refuses an unreviewed tip, exit 11; the registrar, golden and clerk lanes pass `--lane`). While the queue is not ACTIVE, `enqueue.py land` lands through `push-main.sh`, which takes the landing lease (`scripts/orchestrator/landing_lease.py`, kb/Work PB2537), so those landings go one at a time.
+- Land finished work first, ONE BRANCH PER PULL REQUEST (MANDATORY-PRACTICES L1, L12): `enqueue.py land` gates each branch under the shared gate slot and queues it; a conflict, a red gate or a queue bounce goes to ONE `cobol-finisher` (`templates/finisher-brief.md`), which returns DONE: its commits are reviewed on the branch before the new tip lands (`enqueue.py land` refuses an unreviewed tip, exit 11; the registrar, golden and clerk lanes pass `--lane`). While the queue is not ACTIVE, `enqueue.py land` refuses (exit 8): the queue is the only landing path, and GitHub's queue orders main, so no landing waits for another (kb/Work PB3024).
 - The only way a commit reaches `main` is `python scripts/orchestrator/enqueue.py land <branch>` (MANDATORY-PRACTICES L5, kb/Work PB3023, PB3024): a pull request into GitHub's merge queue (`enqueue.py queue`); it refuses while `ruleset.py check` does not report the queue ACTIVE (the `ci-gate` check is required on the merge group; it is idempotent; a red is a blocking finding). Never open or queue a pull request by hand. A docs-only landing still runs and still has to be green.
 - Verdict batches are re-applied on the merged tree with `record_verdicts.py`, never merged as JSON hunks.
 - A checkpoint file never enters a landing: `git add -A -- . ":!.claude/settings.local.json"` then `git reset -q -- STATUS.md`.

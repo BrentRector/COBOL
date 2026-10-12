@@ -15,7 +15,7 @@
   not report the queue ACTIVE it refuses before merging or gating anything. Every run ends on one `=== ENQUEUE: ` line:
   run it in the background and block on that line. Exits: 4 conflict (before or after the gate) · 5 a gate not GREEN ·
   3/6/7 a landing check · 8 the queue not ACTIVE · 9 GitHub refused · 11 unreviewed. ⓜ 2026-10-10 under the trains: 233 of 567 lander minutes (41 %) were local whole-population gates, 94 more
-  push-main holding the lease while CI ran the same population, 10 landers for 6 trains, the first commit on main 6 h
+  the former direct-push landing holding main while CI ran the same population, 10 landers for 6 trains, the first commit on main 6 h
   49 min into the day (kb/Work PB3015).
 - **Who runs it.** While the orchestrator loop runs (`python scripts/orchestrator/coord.py loop-state` prints `LOOP
   STATE: running`), its `enqueue` unit (`scripts/orchestrator/units/enqueue.md`) runs it for every branch `python
@@ -41,11 +41,10 @@
   `cobol-finisher` with `templates/finisher-brief.md` fixes it at the root, gates and returns DONE; its commits are reviewed on the branch (I10) before `enqueue.py land` takes the new tip (an unreviewed tip is exit 11).
   Exit 3 (the landing check's STOP) is never retried as is. A permission refusal of `enqueue.py land` is handed off,
   never retried or routed around: `READY-TO-LAND <worktree> <branch>` (L13).
-- **No landing takes a lease: the merge queue orders main (kb/Work PB2537, PB3023 review R1-1).** `enqueue.py land`
-  never runs `push-main.sh` (main refuses a direct push since the ruleset went ACTIVE), so every waiting branch is
-  enqueued at once and main moving under a gate is merged in by the script. `push-main.sh`,
-  `scripts/orchestrator/landing_lease.py` and the `ci/**` branches are no longer a landing path; kb/Work PB3024's
-  remaining step deletes them.
+- **No landing takes a lease: the merge queue orders main (kb/Work PB2537, PB3023 review R1-1, PB3024).** Main
+  refuses a direct push (the ruleset binds administrators), so every waiting branch is enqueued at once and main moving
+  under a gate is merged in by the script. The direct-push landing script, the landing lease that serialized it and its
+  `ci/` landing branches are deleted (kb/Work PB3024's closing change; `LandingPipelineDriftTests` keeps them out).
 - ⛔ **No branch is left undecided (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600).** After every landing,
   `python scripts/prune_worktrees.py` (the lifecycle survey) then `--apply`, which deletes the LANDED branches; a branch
   that will not land is ABANDONED by a line in its kb/Work note (naming the branch, the word ABANDONED, the reason) and
@@ -62,8 +61,8 @@
 - ⛔ **NOTHING REACHES `main` BUT A TESTED TREE, AND THE SERVER ENFORCES IT.** `main` carries a REQUIRED status check —
   `ci-gate`, the terminal job of the workflow — enforced for administrators (every push here is made with the owner's
   credentials, so a rule that spares administrators spares everyone; owner decision 2026-09-06, question 23). Through the
-  merge queue, `ci-gate` runs on the merge group, and a red bounces only the pull request that caused it; through
-  push-main.sh, on `ci/<short-sha>` before main fast-forwards. A red is a BLOCKING finding attributed by job / step /
+  merge queue, `ci-gate` runs on the merge group, and a red bounces only the pull request that caused it (the merged
+  commit's own `push` run then finds that green run on its sha and skips the matrix). A red is a BLOCKING finding attributed by job / step /
   failing test, fixed on its branch. **The local gate runs on ONE Windows host plus WSL; CI's runners are the other
   hosts — a test that depends on host ACL or file-lock semantics is not proven until CI is green.** ⓜ main was red for
   29 h across 16 consecutive completed runs (2026-09-05/06) while every landing in that window reported a green
