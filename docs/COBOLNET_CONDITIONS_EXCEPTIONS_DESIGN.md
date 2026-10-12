@@ -820,6 +820,43 @@ rather than assuming it.
 
 **Rejected alternatives.** Model every EC via C# exceptions/try-catch globally — exceptions are for RESUME's declarative unwind (`ResumeSignal`); the common inline phrases and declaratives use status-flag/branch control flow for correctness (resume-after-statement) and zero default cost.
 
+### D13. ⛔ The exception-names a statement can raise are ONE STRUCTURE — node-kind arms ∪ operand declarations ∪ ambient — read by one enumeration, closed by the catalog, and tied to the runtime's raise sites by a registry drift test (kb/Work PB1762 → PB3102, 2026-10-12; PB1453 and PB1531 landed its first two parts).
+
+§14.6.13.1.1 attaches a raise to the DETECTION: "If checking for an exception condition is enabled and an exception
+status indicator is set as a result of an exception detected during the execution of a statement, the associated
+exception condition is raised" — and "when the general rules for a statement indicate that a specific exception
+condition exists, it is raised only if checking for that exception condition is enabled". So the enabled set a
+`>>TURN` region gives a statement must carry every name its detections can set, and a detection has one of three
+homes, each read mechanically, never from a hand list:
+
+- **A statement SHAPE** raises through its own node kind — a READ's I-O status, a CALL's program lookup, a SET … TO
+  ENTRY, GOBACK's GR6 — and `EcBinder`'s `QueryFor` switch is the structure for those: one arm per kind naming a family
+  array (`IoNames` is `ExceptionCatalog.IoMaskNames`, the status map's own declaration).
+- **An OPERAND** raises wherever it is written: a program-address-identifier (§8.4.3.13.4 GR4) in a relation, a CALL
+  or an INVOKE argument alike; a function reference's argument check (§15.3 item 14: EC-ARGUMENT-FUNCTION, and the
+  families that ride the same intrinsic call — EC-ORDER-NOT-SUPPORTED, EC-DATA-CONVERSION, EC-LOCALE-INVALID).
+  `EcBinder.OperandRaises` declares each over the GENERATED value parts (`BoundStatementTree.OwnValueParts`), so a
+  statement kind added tomorrow is covered without an edit; `OperandRaisableNames` is the one walker, and the
+  intrinsic families are its declarations — `ContainsIntrinsic` and its nested-statement recursion are gone, because a
+  nested statement is its own EC region (kb/Work PB441) and wraps itself.
+- **An AMBIENT site** no bound node identifies — a named collating sequence at use, a dynamic table's growth, a
+  locale-edited store — rides every statement of a checking-on region (a guard that never fires is harmless).
+
+`EcBinder.DeclaredRaisableNames(BoundStatement)` is the union, and `EcWrap`'s query is that enumeration filtered by
+`TurnState.Enabled`; the three sources are also exposed by name (`NodeKindNames`, `OperandRaises`, `AmbientNames`) so a
+test reads them without parsing C#. The universe is CLOSED: `ExceptionCatalog.TryGet` answers only catalogued names
+and the user-defined `EC-USER-*` family (kb/Work PB1531; the thirteen `EC-<family>-IMP` names are catalogued and never
+set, DOC-A.1-100). **`EcRaiseSiteRegistryDriftTests`** holds the three together: for every catalogued level-3 name,
+the binder declares it AND the runtime raises it (its `ExceptionState.Set` / `Raise…` literals, collected by a Roslyn
+walk of `src/Cobol.Net.Runtime`; the I-O status map through `IoMaskNames`), OR the name is on `DeclinedRaiseSites`, a
+table whose every entry cites the `kb/Work` note or the `docs/CONFORMANCE.md` anchor that says why it is never raised
+(the declined MCS, screen and VALIDATE facilities of CONFORMANCE.md §4; the `EC-*-IMP` family). Declared-but-never-raised
+is a dead guard; raised-but-never-declared is the PB452 / PB1453 shape (`>>TURN … CHECKING ON` wrapping nothing); each
+fails with its shape named. The test is proven to fail once by deleting one declaration. Measured before PB3102
+(2026-10-12): 35 of 135 catalogued names occurred nowhere outside the catalog, five earlier instances of the
+raised-but-never-declared shape are recorded in `QueryFor`'s own comments (PB452, PB409, PB326, PB349/PB1036, PB233),
+and PB1036's four sort-merge names sat unraised for months behind a green suite.
+
 ## C# mapping
 
 IF: `IF c [THEN] s1 [ELSE s2] END-IF` → `if (<RenderCondition(c)>) { s1 } else { s2 }`. CONTINUE→empty block. NEXT SENTENCE→lower the sentence as a labeled block + `goto <after_sentence>;` (COBOLNET0701). Nested IF: each branch is fully braced so C# dangling-else is structurally impossible.

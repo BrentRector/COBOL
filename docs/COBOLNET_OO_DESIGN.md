@@ -293,6 +293,33 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    holds no conformance arm of its own) and behavioral (the binder's entry and the relation agree over a table of
    argument × formal descriptions).
 
+7. **The relation family is the ONLY conformance comparator, at bind time as at run time (kb/Work PB1780 → PB3101,
+   2026-10-12).** The standard writes the description identity once — §9.3.5.3's eight clauses — and asks it from five
+   places: the method match (§9.3.6 3 e)), prototyped activations (§14.8.2.3.2 rule 2, imported by §14.9.4.3 SR25,
+   §8.4.3.2.3 SR13 and §14.9.23.3 SR5 c)), interface conformance (§9.3.8.2.3 rule 3), OVERRIDE (§11.7.3 SR3) and a
+   prototype against its definition (§13.7.3 SR2). The compiler writes it ONCE too: `ActivationDescriptions` builds the
+   description (the `Clauses` key through `PictureClauseIdentity`, the ONE builder of that key; a `GroupAtom` carries
+   each leaf's category and clauses, so a group's subordinate layout is part of the description), and
+   `Runtime/Control/ActivationRelations` holds every relation over it — `Matches` / `DescriptionMatches` /
+   `ReturningMatches` (§9.3.6), `ParameterViolation` / `ReturningViolation` (§14.8.2 / §14.8.3 for a method),
+   `CallArgumentViolation` / `CallReturningViolation` (a program or function: rule 1's length or rule 2's identity,
+   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MayMove` / `MaySet`, §14.8.2.2) and `SameSignature` (the
+   symmetric identity of §9.3.8.2.3 rules 1-6, §11.7.3 SR3/SR4 and §13.7.3 SR2). `ParameterConformance.CheckArgument`
+   is the ONE bind-time entry: CALL Format 2, a function reference and INVOKE build the argument's description
+   (`OfCallArgument` / `OfPlace` / `OfValue`, the §14.9.4.4 GR8 reduction written once) and the formal's, and ask
+   `CallArgumentViolation` (program, function) or `DescriptionMatches` then `ParameterViolation(universalReceiver:
+   false)` (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
+   `MethodConformanceMismatches` (override, implements, interface), the property accessor check,
+   `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SameSignature`. There is NO
+   `DataItem` comparator: `OoConformance.DescriptionMismatch`, `ContentMismatch`, `ContentValueMismatch`, the literal
+   arms, `CallBinder.Gr8Classify`, `OoBinder`'s GR8 block and `StrongTypeModel.SameElementaryLayout` are deleted with
+   PB3101 (CLAUDE.md rule 4: no shim survives). Drift: `ActivationConformanceDriftTests` (every activation lane asks
+   `CheckArgument`), `ActivationDescriptionFieldDriftTests` (every description field is read by a relation) and
+   `OneRelationDriftTests` (a Roslyn walk: no member outside the builder reads two `DataItem`s' picture, usage, ANY
+   LENGTH or category against each other). Measured before PB3101 (2026-10-12): a reference-modified argument BY
+   REFERENCE ran into a prototyped CALL's, a function's and a typed INVOKE's `PIC X(5)` formal, and a whole `PIC X(4)`
+   ran into a typed INVOKE group formal, while the universal lane refused each — one rule in two currencies.
+
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
 
 **Rationale.** §9.3.6 dispatch is always on the runtime class → virtual by default. §11.7 SR4a makes redefining a base signature WITHOUT OVERRIDE a compile error, so COBOL never expresses C# hiding — the mapping stays clean and total.
