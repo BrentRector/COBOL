@@ -1,4 +1,4 @@
-## Entry 1986 — 2026-10-12 20:52 PDT — PB2495: prototype signatures compare as the greatest fixed point; signature checks run after pointer types exist
+## Entry 1991 — 2026-10-12 23:08 PDT — PB2495: prototype signatures compare as the greatest fixed point; signature checks run after pointer types exist
 
 Wave 1070, group F (kb/Work PB2495), one note and the sibling its re-probe found.
 
@@ -47,3 +47,4 @@ which includes the prototype NAME) and the self-name scope disagreement between 
 **Branch review, round 1.** R1-1: the order pin compared TEXT offsets in `BinderDriver.cs`, so its `CheckPrototypeSignaturePairs` row passed on the very defect it named (on main that call sat in `BuildGroupRepository`, written below `Bind` but run before `ResolvePointerRestrictions`). It now parses the compiler with Roslyn and requires each check to be invoked once, as a top-level statement of `Bind` after the resolver's; `TheOrderPin_FiresOnThePB2495Defect` feeds it main's shape and catches both arms, and moving the call back into `BuildGroupRepository` in the tree turned the theory red. R1-2: the comment at the call site (and the test's summary) blamed the DATA phase; both now say the cause is running before `ResolvePointerRestrictions`, which a check after the DATA phase can still do.
 
 **Arch-oracle.** `compare_oracle.py` against c41f1b82af2c (main's baseline after PB2623) at the merged head f34b1aea29f0: 3 of 7795 cases differ, all ADDED (this branch's goldens `corpus/2002/pb2495_pointer_type_in_signature_checks`, `corpus/2002/pb2495_recursive_prototype_signature` and `negative/pb2495-recursive-prototype-signature-mismatch`); no existing case changed its emitted C#, diagnostics or output. Baseline re-recorded at f34b1aea29f0.
+
