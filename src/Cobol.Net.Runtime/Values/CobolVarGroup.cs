@@ -204,10 +204,10 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// of a fixed-length group FORMAL whose argument is the variable-length group <paramref name="current"/> (of shape
     /// <paramref name="currentShape"/>). §14.2.3 GR8: "the activated runtime element operates as if the formal parameter
     /// occupies the same storage area as the argument", so the store reaches only the storage the formal overlays
-    /// (<see cref="Overlay"/>): each of its tables is written OVER the argument's current occurrences, never re-sizing
-    /// them, and the argument's material past the formal's last character survives. ⚠ DETERMINATION (§8.5.1.12 and §14.2.3
-    /// are silent): a formal whose table has a FIXED occurrence count cannot change the argument table's capacity — that
-    /// description has no capacity to state.</summary>
+    /// (<see cref="Overlay"/>): each of its tables is written OVER the argument's current occurrences, and the argument's
+    /// material past the formal's last character survives. A formal whose table has a FIXED occurrence count states no
+    /// capacity of its own, so a store reaching the argument's dynamic-capacity table past its capacity creates the
+    /// occurrence (§8.5.1.9.3, <see cref="OverlaidTable"/>) and one that does not leaves the capacity as it was.</summary>
     public static CobolVarGroup OverlayImage(CobolVarGroup current, GroupAtom[] currentShape, string image,
         GroupAtom[] imageShape) => Overlay(current, OfImage(image), currentShape, imageShape);
 
@@ -308,8 +308,9 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     ///   <item>a corresponding pair of components replaces the argument's component whole — both are variable, so the
     ///     formal's length or capacity IS the argument's;</item>
     ///   <item>a FIXED table of the formal opposite the argument's dynamic-capacity table is written OVER the argument's
-    ///     current occurrences, never re-sizing them, and a component of the formal opposite the argument's fixed table is
-    ///     fitted to it — the same ⚠ DETERMINATION <see cref="OverlayImage"/> records;</item>
+    ///     current occurrences and creates the ones past its capacity that the callee stored into
+    ///     (<see cref="OverlaidTable"/>, §8.5.1.9.3), and a component of the formal opposite the argument's fixed table is
+    ///     fitted to it — it cannot grow;</item>
     ///   <item>a pair of tables at least one of which holds VARIABLE-LENGTH ELEMENTS (kb/Work PB2496) takes the same rules
     ///     one level down: each occurrence of the view overlays the argument's occurrence of the same number, because the
     ///     formal's element occupies that element's storage; an occurrence the argument did not have is the view's element
@@ -356,7 +357,7 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
                 if (!a.IsComponent)
                     fixedRun.Append(CobolString.Store(now ?? arg.Content(current, pa) ?? "", a.Chars));
                 else if (ord < dyn.Length && now is not null)
-                    dyn[ord] = b.IsComponent ? now : Overlaid(dyn[ord], now);
+                    dyn[ord] = b.IsComponent ? now : OverlaidTable(dyn[ord], now, a.ElementChars);
             }
             (prevA, prevB) = (pa + 1, pb + 1);
         }
@@ -367,11 +368,12 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// argument's element shape <paramref name="wasShape"/>): each of the view's occurrences overlays the argument's of
     /// the same number. <paramref name="resize"/> — the view's table is variable too — makes its capacity the argument's
     /// (an occurrence the argument lacked is the view's, reshaped); otherwise the view is a FIXED table written over the
-    /// argument's current occurrences, never re-sizing them (<see cref="Overlay"/>'s determination).</summary>
+    /// argument's current occurrences, creating those past its capacity that it stored into
+    /// (<see cref="GrownCount"/>, <see cref="OverlaidTable"/>'s determination).</summary>
     private static CobolVarGroup[] OverlaidOccurrences(CobolVarGroup[] was, CobolVarGroup[] seen, bool resize,
         GroupAtom[] wasShape, GroupAtom[] seenShape)
     {
-        var now = new CobolVarGroup[resize ? seen.Length : was.Length];
+        var now = new CobolVarGroup[resize ? seen.Length : GrownCount(was.Length, seen)];
         for (int i = 0; i < now.Length; i++)
             now[i] = i >= seen.Length ? was[i]
                 : i < was.Length ? Overlay(was[i], seen[i], wasShape, seenShape)
@@ -383,6 +385,46 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// kept — a store through a view of the leading positions.</summary>
     private static string Overlaid(string was, string now) =>
         now.Length >= was.Length ? now[..was.Length] : now + was[now.Length..];
+
+    /// <summary>⛔ A FIXED TABLE OF THE FORMAL STORED OVER THE ARGUMENT'S DYNAMIC-CAPACITY TABLE (kb/Work PB2690):
+    /// <paramref name="now"/> is the formal's table (a whole number of <paramref name="elementChars"/>-wide occurrences),
+    /// <paramref name="was"/> the argument's current occurrences. Its leading occurrences overlay the argument's
+    /// (<see cref="Overlaid"/>); an occurrence PAST the argument's capacity that the callee stored into is created —
+    /// §14.2.3 GR8 makes the formal occupy the argument's storage, so the store is a receiving reference to the dynamic
+    /// table with a subscript that "exceeds the current capacity of the table", and §8.5.1.9.3 then creates "a new
+    /// element" and raises the capacity "to the value given by the subscript" (intermediate occurrences too, space
+    /// filled). ⚠ DETERMINATION (the rest is §8.5.1.12.3 sentence 3, which makes the pair the same length only "for
+    /// purposes of determining compatibility"): the boundary hands a copy of the occurrences the argument lacks as
+    /// space-filled occurrences (<see cref="Reshape"/>) and sees only the finished view, so a store is recognised by its
+    /// effect — the capacity becomes the highest occurrence whose image is not all spaces. A callee that only READS the
+    /// occurrences past the capacity leaves it alone, and one that stores spaces there leaves the table as it was
+    /// (the stored image and the absent occurrence are the same characters). ⚠ KNOWN DEPARTURE (kb/Work PB2690,
+    /// REMAINING): the created occurrences' items the callee did not store, and the intermediate occurrences, are the
+    /// space fill, where §8.5.1.9.5 initializes them from the INITIALIZED default; the carrier does not yet carry the table's
+    /// default element, which only the argument's own description knows.</summary>
+    private static string OverlaidTable(string was, string now, int elementChars)
+    {
+        if (elementChars <= 0 || now.Length <= was.Length) return Overlaid(was, now);
+        int kept = was.Length;
+        for (int end = now.Length / elementChars * elementChars; end > kept; end -= elementChars)
+            if (now.AsSpan(end - elementChars, elementChars).IndexOfAnyExcept(' ') >= 0)
+            {
+                kept = end;
+                break;
+            }
+        return kept == was.Length ? Overlaid(was, now) : now[..kept];
+    }
+
+    /// <summary>The occurrence count a FIXED table of the formal leaves the argument's dynamic-capacity table of
+    /// variable-length elements with (<see cref="OverlaidTable"/>'s rule one level up): the argument's
+    /// <paramref name="current"/> count, or the highest occurrence of <paramref name="seen"/> past it that holds
+    /// anything but the space fill — a fixed-length element's carrier with a blank fixed run and no components.</summary>
+    private static int GrownCount(int current, CobolVarGroup[] seen)
+    {
+        for (int end = seen.Length; end > current; end--)
+            if (seen[end - 1].Dynamic.Length > 0 || seen[end - 1].Fixed.AsSpan().IndexOfAnyExcept(' ') >= 0) return end;
+        return current;
+    }
 
     /// <summary>The pair plans already worked out, keyed by the two atom arrays' REFERENCES (weakly: a plan lives as long as
     /// both arrays do). The compiler states each distinct array once, as a static field (<c>GroupAtomTable</c>, kb/Work

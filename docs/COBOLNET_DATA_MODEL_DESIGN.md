@@ -422,6 +422,26 @@ content-validation half is separately answered by the declined A.4.14 facility (
   every consumer of a group's image (MOVE, comparison, boundary windows, ref-mod positions, RENAMES) sizes by
   it. A site counting what an elementary item OCCUPIES reads `ByteWidth`; a site counting an elementary
   carrier's positions reads `ImageWidth`.
+  **The ONE unit reader (kb/Work PB546; decision PB3099, 2026-10-12).** How many bytes a position occupies is a
+  function of USAGE alone — §13.18.60.4 GR8 speaks of usage, and §13.18.60.3 SR12 lists the five picture shapes a
+  usage-national item takes (boolean, national, national-edited, numeric, numeric-edited) — and it is spelled once:
+  `PicInfo.BytesPerPosition` (`Usage.National` → `CobolBits.BytesPerNational`, else 1; a usage-bit position is
+  `RefModPlace.PositionBits`' bit). `ElementaryByteWidth`, `PositionBits`, `RecordLayout.ImageContribution`,
+  `ItemLength`, `FileModel.RecordImageUnit` and every `NatBytes` / `NatReadWindow` emission read it. A byte count keyed
+  on `PicCategory.National` is the defect shape PB546 measured twice — a boolean slice of usage national serialized
+  one byte per position; a dynamic national receiver converting where GR4 copies — because a usage-national item of
+  category boolean, numeric or numeric-edited falls into the one-byte arm. `NationalUnitDriftTests` keeps the reader
+  the only place: every national-unit call in the compiler is guarded by a usage test or reached through the reader,
+  never by the category alone. The alphanumeric-group reading itself (a national position is two alphanumeric
+  positions in LENGTH, reference modification, a group MOVE, a BY REFERENCE group formal and DISPLAY) is spec-derived —
+  §15.50.4 r3, §8.4.3.3.4 GR1/GR5 a), §14.9.25.4 GR4, §14.8.2.2 rule 1, §14.9.11.4 GR1 under GR8 — and GnuCOBOL 3.2
+  measures the same unit; PB3099 records it, so DOC-A.1-57 is a derivation, not an owner determination.
+- **D-N8 a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; PB3099). §14.9.25.4 GR4 makes the
+  move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's; an odd byte count cannot be
+  national content, so the last position is completed with the alphanumeric space GR4's elementary-move fill supplies,
+  exactly as the fixed national receiver already does (`CobolBits.NatReadWindow` over the bytes). `MOVE G3 TO DN` with
+  a three-byte `G3` leaves `DN` two positions long and `LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). Recorded in
+  CONFORMANCE.md §3 D-N8.
 - **D-N6 national-edited IS category National carrying an `EditMask`** (kb/Work PB492, 2026-09-12). §8.5.2.11's
   category has no `PicCategory` member of its own, exactly as alphanumeric-edited has none: an item is
   national-edited iff `{ Category: National, EditMask: not null }` and alphanumeric-edited iff

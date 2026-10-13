@@ -15,7 +15,9 @@
       *>   -> OK 14.2.3 8)
       *> The values are pb965_vlg_into_fixed_invoke's (the same program
       *> plus the TOUCH that puts SG in a cell): LF=[ghkl ij],
-      *> SG=[tuvwxyz], VG=[qq][mn][ij] VCAP=0000000002,
+      *> SG=[tuvwxyz], VG=[qq][mno][ij] VCAP=0000000003 (the method's
+      *> LT(3) is a receiving reference to VT past its capacity, so
+      *> 8.5.1.9.3 creates the third occurrence, kb/Work PB2690),
       *> VG2=[mn][opq][rs] VCAP=0000000003, and TOUCH sees SG's 7
       *> characters. Before the fix the RETURNING delivery into the cell
       *> view of SG stopped at a run-time "not yet implemented" loud.
@@ -43,7 +45,8 @@
            INVOKE P2087VK "NEW" RETURNING O
            INVOKE O "XFER" USING VG RETURNING SG
            DISPLAY "SG=[" SG "]"
-           DISPLAY "VG=[" V1 "][" VT(1) VT(2) "][" V3 "] VCAP=" VCAP
+           DISPLAY "VG=[" V1 "][" VT(1) VT(2) VT(3) "][" V3 "] VCAP="
+               VCAP
            INVOKE O "FIXR" RETURNING VG
            DISPLAY "VG2=[" V1 "][" VT(1) VT(2) VT(3) "][" V3 "] VCAP="
                VCAP

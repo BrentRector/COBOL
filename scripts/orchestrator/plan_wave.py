@@ -9,13 +9,13 @@ Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 9 (kb/Work PB198
 cost the orchestrator a hand-written groups.json; this computes it.
 
 1. AWAITING LANDING: an open note whose newest report is DONE and whose branch is not on main yet is excluded (the
-   `enqueue` unit lands it first; re-planning it would dispatch the same work twice).
+   landing lane, land_lane.py, lands it first; re-planning it would dispatch the same work twice).
    HELD BY A DISPATCH: an open note that a dispatch-ledger group names (a wave this loop or another session planned,
    launched or not, or a hand dispatch within HAND_TTL_SECONDS) and that no report written since that dispatch names
    is excluded too, and waits with the group named: its work is another agent's, or a planned wave's that has not
    launched yet (held_by_dispatch, kb/Work PB2806). An aborted dispatch is released with --release.
 2. FINISHERS FIRST: an open note whose newest report says SPLIT or NOT STARTED (its branch landed, gone, or still
-   unlanded: the finisher then cherry-picks the branch's commits, because an `enqueue` unit lands only DONE branches;
+   unlanded: the finisher then cherry-picks the branch's commits, because the landing lane lands only DONE branches;
    kb/Work PB2575), a DONE report whose branch review stamped FINDINGS (kb/Work PB3027: the finisher answers each
    finding), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
    name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
@@ -656,10 +656,10 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     finisher_by_rep: dict[pathlib.Path, list[str]] = {}
     for nid, r in newest.items():
         cls = classify(r.branch) if r.branch else "ABSENT"
-        # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: an `enqueue` unit lands only DONE
-        # branches (units/enqueue.md), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
+        # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: the landing lane lands only DONE
+        # branches (land_lane.py), so holding an unlanded SPLIT branch for one stranded it (kb/Work PB2575). Its
         # finisher cherry-picks the branch's commits (finisher_pred's UNLANDED arm). A DONE report that names a
-        # note NOT started still lands first: its finished work is the enqueue unit's.
+        # note NOT started still lands first: the landing lane lands its finished work.
         # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the enqueue unit never fixes
         # a review finding, so its finisher answers them (finisher_pred's review arm).
         if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or \

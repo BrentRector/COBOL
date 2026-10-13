@@ -70,7 +70,7 @@ BRIEFS = {
     # PB1703 / PB1704: a dead agent (rejection) and a hung agent (ceiling) must not hold the wave.
     'wf_rolling_wave.js': [r'args\.stop_file', r'args\.global_stop', r"agentType: 'cobol-implementer'", r'StructuredOutput',
                            r'g\.after', r'held\[', r'status_delta\.py', r'withCeiling\(',
-                           r"status: 'NO-RESULT', error", r'starts no lander',  # PB3023: the enqueue unit lands
+                           r"status: 'NO-RESULT', error", r'starts no lander',  # PB3023, PB3103: the landing lane lands
                            # PB3027 (I10): a DONE branch is reviewed on the branch by one read-only reviewer, findings go
                            # to a review finisher, and only a branch reviewed CLEAN reaches a train
                            r"agentType: 'cobol-reviewer'", r'review_findings\.py', r"r\.review === 'CLEAN'",
