@@ -45,7 +45,12 @@ namespace CobolNet.Runtime.IO;
 /// <para><b>The CLOSE.</b> The holder's file loses its name BEFORE its descriptor closes (a <c>fork</c> for
 /// <c>CALL "SYSTEM"</c> holds a copy of the description until its <c>exec</c>, and a name nobody can see cannot refuse a
 /// successor for those milliseconds, the window <see cref="OfdRegionLocks.Release"/> closes on Linux), and the directory
-/// goes with its last file. <b>What it is NOT:</b> a lock on the file's inode — two spellings that reach one file through
+/// goes with its last file — by the same rule as the files: <b>the lock directory is never deleted in place either</b>
+/// (<see cref="RetireDirectory"/>, kb/Work PB3109). Where share modes are mandatory it passes through DELETE-PENDING under
+/// its own name for as long as any other handle on it is open, and a publisher's <c>CreateNew</c> inside it and a tester's
+/// listing of it are then "access denied" — read as a directory this user may not write, so a waiting hold answered
+/// <see cref="RunUnitFileLock.Outcome.Unavailable"/> and an OPEN a spurious '61'. So it is renamed away first.
+/// <b>What it is NOT:</b> a lock on the file's inode — two spellings that reach one file through
 /// a symbolic or hard link name two lock directories, the identity every table here uses
 /// (<see cref="HostFile.PhysicalFileComparer"/>); and a program that takes no part in the protocol is not seen.</para>
 /// </summary>
@@ -59,7 +64,8 @@ internal static class SidecarLockFiles
     private const string PendingPrefix = "pending-";
 
     /// <summary>⛔ A WIRE VALUE: a lock file renamed away before its deletion (<see cref="Retire"/>). No tester probes
-    /// one; a tester that lists the whole directory deletes one a crash left behind.</summary>
+    /// one; a tester that lists the whole directory deletes one a crash left behind. After <see cref="DirectoryPrefix"/> it
+    /// also names a lock DIRECTORY renamed away before its deletion (<see cref="RetireDirectory"/>).</summary>
     private const string RetiredPrefix = "gone-";
 
     /// <summary>How often a publication retries when a tester or a closing sibling removed what it was standing on.
@@ -152,6 +158,34 @@ internal static class SidecarLockFiles
         catch (UnauthorizedAccessException) { }    // not ours to delete: left for its owner's CLOSE
     }
 
+    /// <summary>Remove the EMPTY lock directory <paramref name="directory"/> so that no publisher or tester ever meets
+    /// it DELETE-PENDING (class remarks, kb/Work PB3109): where share modes are mandatory it is renamed to
+    /// <c>.wolk-gone-&lt;guid&gt;</c> first, a name no one enters, and the retired name is then deleted; elsewhere it is
+    /// deleted, an unlink being atomic. A directory with any entry is another holder's and is left standing, and so is
+    /// one the host will not rename (a holder published into it in the meantime, which the host refuses to move while the
+    /// holder's file is open): the next holder's CLOSE removes it. A publisher that resolved the old name before the
+    /// rename finds it gone and publishes again (<see cref="Publish"/>).</summary>
+    internal static void RetireDirectory(string directory)
+    {
+        if (!HostFile.ShareModesAreMandatory) { TryDeleteDirectory(directory); return; }
+        string retired = Path.Combine(Path.GetDirectoryName(directory)!, DirectoryPrefix + RetiredPrefix + Guid.NewGuid().ToString("N"));
+        try
+        {
+            if (Directory.EnumerateFileSystemEntries(directory).Any()) return;   // another holder's files
+            Directory.Move(directory, retired);
+        }
+        catch (IOException) { return; }                    // gone already (a sibling's CLOSE won), or a holder is publishing into it
+        catch (UnauthorizedAccessException) { return; }    // not ours to rename: left for the last holder's CLOSE
+        TryDeleteDirectory(retired);                       // delete-pending while a handle lives, under a name nobody enters
+    }
+
+    private static void TryDeleteDirectory(string directory)
+    {
+        try { Directory.Delete(directory); }
+        catch (IOException) { }                  // not empty: another holder's files, or a sibling's CLOSE won the race
+        catch (UnauthorizedAccessException) { }
+    }
+
     /// <summary>The published holder: closing it deletes the holder's file and, if it was the last, the directory.</summary>
     internal sealed class LockFileHolder(FileStream stream, string path, string directory) : IDisposable
     {
@@ -167,9 +201,7 @@ internal static class SidecarLockFiles
             Retire(path);    // the name goes first: see the class remarks
             held.Dispose();
             Retire(path);    // a name the first Retire could not take (the host refused the rename) goes once nothing holds it
-            try { Directory.Delete(directory); }
-            catch (IOException) { }                  // not empty: another holder's files, or a sibling's CLOSE won the race
-            catch (UnauthorizedAccessException) { }
+            RetireDirectory(directory);
         }
     }
 }
