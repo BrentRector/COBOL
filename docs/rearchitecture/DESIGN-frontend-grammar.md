@@ -1267,7 +1267,15 @@ joined the table the same way, which is the table doing its job: a tenth format 
   the figure prints later as COBOLNET2987, at the misplaced element; a repeat stays COBOLNET2423, whose message no
   longer grants an order licence to a fixed-sequence list. The grammar keeps the order-free superset (a named
   diagnostic, never a raw COBOL0307 at the second clause), and `ClauseCardinalityDriftTests` requires a sequence to rank
-  exactly its list's once-only alternatives, so a clause added to such a list cannot arrive unranked. The OPTIONS
+  exactly its list's once-only alternatives, so a clause added to such a list cannot arrive unranked. A list an
+  EARLIER edition printed differently carries that figure as well (`ClauseList.Earlier`, kb/Work PB2532), and the pass
+  screens the figure of the targeted edition (`ClauseList.At`): below 2002 the identification division is the COBOL-85
+  figure, which ranks AUTHOR, INSTALLATION, DATE-WRITTEN, DATE-COMPILED and SECURITY once each in that sequence
+  (derived, not quoted: the repository holds no ANSI X3.23-1985 text, `docs/VERSION_CHANGE_REFERENCE.md` row 7.10)
+  and leaves OPTIONS (a 2002 introduction) and REMARKS (the COBOL-74 carryover) uncounted; from 2002 the §11.2.1
+  figure ranks OPTIONS alone and the removed comment paragraphs are the removal gate's. A diagnostic names the
+  figure's authority (`ClauseList.Format`: "ISO §11.2.1" or "ANSI X3.23-1985"), and the drift test holds every
+  figure of the chain to the row's obligations. The OPTIONS
   paragraph's independent `[.]` is its own grammar alternative: `OPTIONS DOT (optionsClause+ DOT | DOT)?` is §11.9.2's
   bracket plus §11.9.3 SR1 (a period is required once a clause is written), so `OPTIONS. .` is accepted.
 - **Its second error production — a KNOWN phrase in the WRONG position.** `misplacedSpecialNamesForPhrase`
