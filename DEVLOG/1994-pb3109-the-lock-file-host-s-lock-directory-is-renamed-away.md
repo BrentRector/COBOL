@@ -10,5 +10,7 @@ PB3109 (runtime/io-sharing, MAJOR, wrong answer and silent) bounced PR 19 out of
 
 **Docs.** `SidecarLockFiles` class remarks and `docs/rearchitecture/DESIGN-runtime-library.md` (the lock-file primitive paragraph) state the rule for the directory beside the one for files. No inventory row is claimed or closed (`closes_rows_reason` says why).
 
+**Arch oracle.** The second landing attempt was refused by `landing_oracle.py` (exit 7): the baseline `c41f1b82af2c` predates the branch's change to `SidecarLockFiles.cs`, one of the oracle's inputs (the runtime is in the oracle host's MSBuild closure). `scripts/arch/compare_oracle.py` read `IDENTICAL — 7792 cases (baseline c41f1b82af2c, new 0f14cbe922bd)`: no differing case in either class (emitted C#, diagnostic stream), as expected of a change confined to the runtime's lock-file host, on which no compile's output depends. The baseline is re-recorded at `0f14cbe922bd` (`capture_oracle.py --record`).
+
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `TestResults/build-local/20261013T021809Z-b92cd4`: Conformance 4,719/11,494 · Unit 32,522/33,464 · Characterization 6/36 in leg 1); both new tests `outcome="Passed"` in `leg-1-Unit.trx`. `scripts/semgrep/verify.py` PASS with no count raised.
 
