@@ -1,4 +1,4 @@
-## Entry 1988 — 2026-10-12 21:48 PDT — PB2077: a reference-modified INVOKE argument gets one verdict on the typed and the universal lane
+## Entry 2006 — 2026-10-13 14:51 PDT — PB2077: a reference-modified INVOKE argument gets one verdict on the typed and the universal lane
 
 The typed and the universal INVOKE lanes answered one §9.3.6 / §14.8.2 question with two mechanisms and gave opposite
 verdicts on a reference-modified argument. Re-probed on this build: the typed lane ran `X(1:5)` into a `PIC X(5)`
