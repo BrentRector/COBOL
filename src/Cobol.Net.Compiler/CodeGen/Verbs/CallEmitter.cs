@@ -669,15 +669,23 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// parameter; a whole formal of the current source element answers through <see cref="ArgumentArea"/>.</summary>
     internal static string? AreaOf(Place p, GroupAtomTable table)
     {
-        string? start = null;
+        string? start = null, extent = null;
         if (p is RefModPlace rm)
         {
-            // ⛔ A SLICE WHOSE LENGTH IS A RUN-TIME VALUE STATES NO AREA (kb/Work PB2077; docs/CONFORMANCE.md D-RM1 a)):
-            // §14.8.2.2 rule 1 was proved on its MAXIMUM extent, so the evaluated slice can be shorter than a group formal,
-            // and a formal laid over identifier-1 would read and write the positions past the slice. With no area the
-            // formal holds the carrier's copy — the slice, padded to the formal's width — and the write-back splices it
-            // through the slice's own receiving store, truncated to the slice.
-            if (rm.Inner is not RedefViewPlace || rm.StaticLength(rm.StaticInnerPositions) is null) return null;
+            if (rm.Inner is not RedefViewPlace) return null;
+            // ⛔ A SLICE WHOSE LENGTH IS A RUN-TIME VALUE STATES ITS EVALUATED EXTENT (kb/Work PB2077 review round 3;
+            // docs/CONFORMANCE.md D-RM1 a)). §14.8.2.2 rule 1 was proved on its MAXIMUM extent, so the evaluated slice
+            // can be shorter than a group formal, and a formal laid over identifier-1 would then read and write the
+            // positions past the slice. The area still states the slice (GR8 — every slice at least as long as the formal
+            // is shared storage, so a second argument over the same positions sees the formal's stores), and its extent
+            // lets the boundary (CobolArgAdapt.Area) give a SHORTER slice a fresh copy instead: the slice padded to the
+            // formal's width, written back through the slice's own receiving store, truncated to it. A slice that states
+            // no area at all broke GR8 for every run-time-length argument on the CALL and the INVOKE lanes alike.
+            if (rm.StaticLength(rm.StaticInnerPositions) is null)
+            {
+                if (SliceExtent(rm) is not { } e) return null;
+                extent = e;
+            }
             start = PositionRenderer.Render(rm.Start);
             p = rm.Inner;
         }
@@ -704,8 +712,19 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             return view.DenotedItem is { } group && VariableLengthCompatibility.GroupAtoms(group) is { } atoms
                 ? RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, PositionRenderer.Render(g.DynBase), table.Ref(atoms))
                 : null;
-        return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset);
+        return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, extent: extent);
     }
+
+    /// <summary>The C# <c>int</c> expression of a run-time-length slice's EVALUATED length (§8.4.3.3.4 GR5 c)): the
+    /// specified length, or for the omitted "to the end" form identifier-1's positions from the leftmost one on (floored
+    /// at zero; the slice's own read raises EC-BOUND-REF-MOD for a leftmost position out of range). Null when the
+    /// omitted form runs to the end of an identifier-1 whose length is itself a run-time value, which no expression
+    /// here can state: that slice states no area and its formal holds a copy.</summary>
+    private static string? SliceExtent(RefModPlace rm) =>
+        rm.Length is { } length ? RuntimeApi.HostInt32(RuntimeApi.RefModLength(length))
+        : rm.StaticInnerPositions is { } size
+            ? $"(int)global::System.Math.Max(0L, {size} - (long)({RuntimeApi.RefModStart(rm.Start)}) + 1)"
+            : null;
 
     /// <summary>The area expression of a BY REFERENCE argument for any activation lane: a whole formal of the current
     /// source element passes on the area it occupies (<c>CallUnitState.WholeFormalArea</c>), any other operand its own

@@ -1512,8 +1512,10 @@ of an unsupported facility.
   model §14.8.2.2 gives an occurs-depending group ("the maximum length is used"): identifier-1's positions from a
   static leftmost position on, or all of them — and by its evaluated length at the boundary: the universal lane raises
   EC-OO-UNIVERSAL when it is shorter than the group formal; the typed lane's formal holds the slice padded to the
-  formal's width and writes back through the slice, truncated to it (such a slice states no storage area, so the formal
-  never reads or writes past it); **(b)** the ANY LENGTH item of match rule 3 e) is read through §14.8.2.3.2
+  formal's width and writes back through the slice, truncated to it. Such a slice states its storage area WITH its
+  evaluated length (`CellPointer.Extent`), so a formal is laid over a slice at least as long as itself (§14.2.3 GR8: a
+  second argument over the same positions sees its stores, on the CALL lane too) and never reads or writes past a
+  shorter one; **(b)** the ANY LENGTH item of match rule 3 e) is read through §14.8.2.3.2
   "Additionally" d)/e) (a formal's ANY LENGTH matches any argument length, every other clause still compared; an ANY
   LENGTH argument needs an ANY LENGTH formal), because the literal reading empties §13.18.2 for methods. One relation
   serves both lanes, so through a universal receiver a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal and the

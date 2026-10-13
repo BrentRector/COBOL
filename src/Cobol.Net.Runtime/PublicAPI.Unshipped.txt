@@ -1,4 +1,6 @@
 #nullable enable
+CobolNet.Runtime.CellPointer.Extent.get -> int?
+CobolNet.Runtime.CellPointer.Extent.init -> void
 CobolNet.Runtime.Collation.LocaleCollationException
 CobolNet.Runtime.Collation.LocaleCollationException.DataSource.get -> string!
 CobolNet.Runtime.Collation.LocaleCollationException.Line.get -> int?
