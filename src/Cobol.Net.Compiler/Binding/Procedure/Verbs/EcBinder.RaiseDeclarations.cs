@@ -157,7 +157,7 @@ internal sealed partial class EcBinder
     // ── Source 1: the statement SHAPE ────────────────────────────────────────────────────────────────────────
 
     /// <summary>The files an I-O statement touches (§9.1.13.1 — every I-O verb is an I-O operation, including UNLOCK
-    /// (§14.9.47) and DELETE FILE (§14.9.10 F2), the one verb once missing from this list: kb/Work PB141). The SORT and
+    /// (§14.9.47) and the DELETE statement's FILE format (§14.9.10 Format 2), the one verb once missing from this list: kb/Work PB141). The SORT and
     /// MERGE statements' USING / GIVING transfers perform as-if OPEN / READ / WRITE / CLOSE "such that any applicable USE
     /// procedures are executed" (§14.9.40.4 GR12 / GR15, §14.9.24.4 GR7 / GR12), each rendering
     /// <c>SequentialIoEmitter.EmitUseHook</c>, whose EC-I-O raise reads THIS statement's per-file mask — with no entry
