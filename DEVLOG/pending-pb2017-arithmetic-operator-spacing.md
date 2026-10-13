@@ -32,6 +32,15 @@ every NIST program and the 25 others found three genuine violations in test sour
 the same precedent as the PB528 edits to IX109A and IX110A). D-ARGEXPR's `USING N -1` is still the expression `N - 1` and is
 now refused for its missing space (docs/CONFORMANCE.md updated).
 
+**The sweep's hole, found at the landing.** The compiled sweep covered the corpus, not the COBOL embedded in xUnit
+sources, and the implementer's leg-1 gate did not reach `WideRefModDiagnosticTests`; the landing's Linux whole-population
+conformance leg did (2 of 11,554 red, deterministic, red on Windows too). Its rows E4 `X(-A:1)` (a unary operator touching
+its operand) and K5 `X(1:-(N))` (one touching the reference modifier's colon, a separator under 8.3.5 7) but not the space
+8.7.1 requires before the operator) are non-conforming, so they are respelled `X(- A:1)` and `X(1: -(N))`, which keeps each
+row's arm. The colon case had no witness: `OperatorSpacingDiagnosticTests` now pins the reference modifier's three unary
+violations (before, after, both) and its four conforming spellings. The whole Linux population (unit, conformance,
+characterization) was otherwise green, so no other embedded source is affected.
+
 **Goldens.** Positive `85/pb2017_arithmetic_operator_spacing` (every conforming spelling; the expected values were computed
 from 8.8.1.2 by hand before the run). Negatives `pb2017-binary-operator-no-spaces`, `-no-space-after`,
 `pb2017-unary-operator-no-space-after`, `-operator-in-subscript` and `-operator-touches-comma-decimal-point`, each at

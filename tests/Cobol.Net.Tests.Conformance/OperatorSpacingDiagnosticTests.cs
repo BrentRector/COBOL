@@ -21,6 +21,9 @@ public sealed class OperatorSpacingDiagnosticTests
         + "       DATA DIVISION.\n"
         + "       WORKING-STORAGE SECTION.\n"
         + "       01 R PIC S9(4)V99.\n"
+        + "       01 A PIC S9(4) VALUE -1.\n"
+        + "       01 X PIC X(10) VALUE \"ABCDEFGHIJ\".\n"
+        + "       01 Y PIC X(10).\n"
         + "       PROCEDURE DIVISION.\n"
         + "       MAIN.\n"
         + $"           {statement}\n"
@@ -38,7 +41,7 @@ public sealed class OperatorSpacingDiagnosticTests
         string error = Assert.Single(errors);
         Assert.Contains("COBOLNET2993", error);
         Assert.Contains("§8.7.1", error);
-        Assert.Contains("(8,", error);   // sited at the operator's own line
+        Assert.Contains("(11,", error);  // sited at the operator's own line
     }
 
     [Fact] // the misleading advice (kb/Work PB2017): under DECIMAL-POINT IS COMMA the comma of *,1 is the literal's decimal
@@ -51,6 +54,32 @@ public sealed class OperatorSpacingDiagnosticTests
         Assert.Contains("COBOLNET2993", error);
         Assert.DoesNotContain("COBOLNET2631", error);
         Assert.Contains("write a space after it", error);
+    }
+
+    [Theory] // a reference modifier's unary operator (kb/Work PB2017 finisher): its colon is a separator (§8.3.5 7)) but not the
+             // space §8.7.1 requires, and its left parenthesis exempts only the side of the operator it touches
+    [InlineData("MOVE X(1:-(A)) TO Y.", "preceded", "write a space before it")]
+    [InlineData("MOVE X(-A:1) TO Y.", "followed", "write a space after it")]
+    [InlineData("MOVE X(1:-A) TO Y.", "preceded or followed", "write a space on both sides of it")]
+    public void UnaryOperatorInAReferenceModifier_IsOneDiagnostic(string statement, string side, string fix)
+    {
+        var (ok, errors, _) = EditionHarness.CompileFull(Program(statement), 2023);
+        Assert.False(ok);
+        string error = Assert.Single(errors);
+        Assert.Contains("COBOLNET2993", error);
+        Assert.Contains($"unary arithmetic operator '-' is not immediately {side} by", error);
+        Assert.Contains(fix, error);
+    }
+
+    [Theory] // the conforming spellings of the same reference modifiers
+    [InlineData("MOVE X(1: -(A)) TO Y.")]
+    [InlineData("MOVE X(- A:1) TO Y.")]
+    [InlineData("MOVE X(-(A):1) TO Y.")]
+    [InlineData("MOVE X(1: - A) TO Y.")]
+    public void ConformingReferenceModifierUnarySpellings_Compile(string statement)
+    {
+        var (ok, errors, _) = EditionHarness.CompileFull(Program(statement), 2023);
+        Assert.True(ok, string.Join("; ", errors));
     }
 
     [Theory] // the conforming spellings the diagnostic's advice leads to
