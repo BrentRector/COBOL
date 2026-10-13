@@ -1,4 +1,4 @@
-## Enqueue leads filed: PB3119-PB3122, and a PB175 line
+## Entry 1996 — 2026-10-12 23:44 PDT — Enqueue leads filed: PB3119-PB3122, and a PB175 line
 
 Clerk pass over four implementer reports' "New defects" sections.
 - PB3119 (new): a failed `>>DEFINE` leaves a later `>>IF` reporting an undefined compilation variable; from the PB1616 report. Names landed PB1367.
@@ -8,3 +8,4 @@ Clerk pass over four implementer reports' "New defects" sections.
 - PB175 (extended): one dated line, the raw-diagnostic-code-literal baseline lockable at 198, from the PB1616 report.
 
 No code changed. The PB3031 report's "possible sibling" had no repro and was skipped.
+
