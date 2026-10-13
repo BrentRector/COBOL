@@ -1,4 +1,4 @@
-## PB3120 - a group formal's restricted pointer member is compared by its TYPE, not by the name it was written with
+## Entry 2007 — 2026-10-13 15:00 PDT — PB3120 - a group formal's restricted pointer member is compared by its TYPE, not by the name it was written with
 
 **What the note said, and what the re-probe showed.** PB3120 (filed from the PB2495 report) said the group-formal arm of
 type-declaration equivalence compares the restricted prototype NAME: `StrongTypeModel.SameAnalyzedProfile` used
@@ -64,3 +64,4 @@ in length: EC-OO-METHOD), `2002/pb3120_group_formal_template_pointer_signature` 
 is 8.3.2.2 (a user-defined word may be only one type of user-defined word within a source element; `--check` OK). The same
 inherited wording sat at four sibling sites (DataBinder.cs, PicInfo.cs, StrongTypeModel.cs, DESIGN-data-model.md); all five now
 cite 8.3.2.2. Comment and doc text only; no behavior change.
+
