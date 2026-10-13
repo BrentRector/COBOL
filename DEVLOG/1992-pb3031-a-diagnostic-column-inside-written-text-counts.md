@@ -1,4 +1,4 @@
-## Entry 1973 — 2026-10-12 15:31 PDT — PB3031 - a diagnostic column inside written text counts character positions, not UTF-16 units
+## Entry 1992 — 2026-10-12 23:19 PDT — PB3031 - a diagnostic column inside written text counts character positions, not UTF-16 units
 
 Wave 1069 group D. A diagnostic's column is a CHARACTER POSITION of the physical line (ISO 6.1 1) a), 6.3.1; DOC-A.1-157),
 and PB2983 made the reference-format stage split an origin span at each tab and each supplementary-plane character so
@@ -29,3 +29,4 @@ version-matrix case writes a supplementary-plane character through REPLACE or CO
 xunit tests, not oracle cases). Main meanwhile re-recorded its own baseline (`c41f1b82af2c`, PB2623), so the merge of
 main conflicted on the manifest; the merged head compares `IDENTICAL — 7792 cases` against main's `c41f1b82af2c`, and
 the baseline is re-recorded on the merged head at `88213eb8a08b`.
+
