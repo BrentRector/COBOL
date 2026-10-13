@@ -1,4 +1,4 @@
-## PB3125 filed (the branch survey cannot see a stopped landing-lane attempt); db5-2 abandoned as superseded
+## Entry 2001 — 2026-10-13 11:24 PDT — PB3125 filed (the branch survey cannot see a stopped landing-lane attempt); db5-2 abandoned as superseded
 
 Filed kb/Work/PB3125. A branch whose landing-lane attempt stopped before a pull request reads DECISION in
 `prune_worktrees.py`, and so does every predecessor it carries. The cause is that enqueue.py's catch-up merge and
@@ -17,3 +17,4 @@ The same resume unit decided the other DECISION rows outside git, in the fix-lan
   parts. PB3030's bit arm, PB3101 and PB2099 stay open for fresh groups.
 - db5-11 (PB2842) is DONE now that PB3109 has landed.
 - 104-18 (PB2077) goes to the next wave's finisher for its review finding.
+
