@@ -617,7 +617,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// invoked method shall be described with the ANY LENGTH clause, and the rules for conformance specified in 14.8.2 …
     /// and 14.8.3 … apply" — <see cref="ActivationRelations.ParameterViolation"/> and
     /// <see cref="ActivationRelations.ReturningViolation"/>, raised as EC-OO-UNIVERSAL through
-    /// <see cref="OoUnivStop"/>.</para>
+    /// <see cref="OoUnivStop"/>; the ANY LENGTH ban, a ban on the METHOD's description rather than a relation of a pair,
+    /// is this arm's unconditional stop for such a method (the typed lane asks the same two relations at compile time,
+    /// kb/Work PB2077, and the ban does not govern it).</para>
     ///
     /// <para>A GROUP formal whose argument has another shape the relations admitted — a smaller formal (§14.8.2.2 rule
     /// 1's prefix) or a fixed / variable-length pair (§8.5.1.12) — is carried by <see cref="UniversalGroupCarrier"/>,

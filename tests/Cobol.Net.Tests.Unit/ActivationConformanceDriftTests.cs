@@ -96,8 +96,9 @@ public sealed class ActivationConformanceDriftTests
     [Fact]
     public void NoOtherVerbBinder_ReachesTheArgumentComparatorsDirectly()
     {
-        // OoBinder is INVOKE's lane over the same comparators (§14.9.23.3); ParameterConformance is the shared one.
-        // The ARGUMENT use of DescriptionMismatch is the one carrying §14.8.2.2 rule 1's byRefGroupPrefix; the
+        // OoBinder is INVOKE's lane over the BY CONTENT comparators (§14.9.23.3); its BY REFERENCE arguments ask the
+        // ActivationRelations (kb/Work PB2077, TypedAndUniversalInvokeVerdictsAgreeDriftTests). ParameterConformance is
+        // the shared one. The ARGUMENT use of DescriptionMismatch is the one carrying §14.8.2.2 rule 1's byRefGroupPrefix; the
         // RETURNING use (§14.8.3.2 — "the same length", no prefix latitude) is a different rule and stays where
         // the CALL statement's RETURNING phrase binds.
         string[] allowed = ["ParameterConformance.cs", "OoBinder.cs"];
