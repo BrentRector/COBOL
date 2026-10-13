@@ -1,4 +1,4 @@
-## PB2623: METHOD is not a COBOL-2023 reserved word, and the END METHOD marker still reads
+## Entry 1987 — 2026-10-12 21:12 PDT — PB2623: METHOD is not a COBOL-2023 reserved word, and the END METHOD marker still reads
 
 **Defect.** `ReservedWords.Table.cs` reserved METHOD at COBOL-2023 on a generator line (`iso2023.Add('METHOD') # OCR omission (DEVLOG 578)`) whose claim is false: PDF printed page 206 reads MERGE, MESSAGE-TAG, METHOD-ID, MINUS, MODE, MOVE, MULTIPLY. `01 METHOD PIC X.` was refused with COBOLNET0901 at 2023 (re-probed on this build: 0901 at 2002, 2014 and 2023), citing a clause that does not reserve the word.
 
@@ -13,3 +13,4 @@
 **Arch-oracle.** `compare_oracle.py` against 00435d6e90c0: 4 of 7792 cases differ. Two are ADDED (this branch's two goldens). Two are DIAGNOSTICS on `negative/l1c22-format3-in-method` and `negative/l1c22-format3-in-program`, both already-rejected nested-method programs whose first error (COBOL0001 at the inner method) is unchanged and is the `.err` the corpus pins: the cascade at the stray `END METHOD` that followed used to read `COBOLNET0901: 'METHOD' is a reserved word in COBOL-2023` (the false claim this note removes) and now reads a plain COBOL0001 syntax error. Baseline re-recorded at c41f1b82af2c.
 
 **Gate.** `LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261013T031258Z-099e52). Semgrep verify PASS, no count moved.
+
