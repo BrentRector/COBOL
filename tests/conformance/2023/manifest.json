@@ -846,7 +846,8 @@
   "pb434_until_exit_unbarred",
   "pb2079_baseconvert_data_item_bases",
   "pb1508_options_printed_sequence",
-  "pb2497_vlg_record_odo_count_after_dynamic"
+  "pb2497_vlg_record_odo_count_after_dynamic",
+  "pb2623_method_is_a_user_word_at_2023"
   ],
  "pending": [
   "pb485_value_only_format1"

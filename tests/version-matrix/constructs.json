@@ -1045,7 +1045,7 @@
    "description": "TYPE [TO] clause referencing a type declaration, ISO §13.18.57 Format 1 (TO is the optional word, kb/Work PB889) / §13.18.58 (TYPEDEF family) — PROVISIONAL 2002 edge (ISO-validation, DEVLOG 582: zero Annex E 2014→2023 rows ⇒ predates 2023, so the old 2023 seed was provably wrong; the 2002-vs-2014 refinement is blocked on the older standards per decision 1). LIVE (data-model D17, weak-TYPE spine).",
    "display": "TYPE clause (TYPEDEF family)",
    "diagnosticCode": "COBOLNET0900",
-   "citation": "ISO §13.18.58; PROVISIONAL 2002 edge (ISO-validation DEVLOG 582; decision-1 policy)",
+   "citation": "ISO §13.18.57 (the TYPEDEF family, §13.18.58); PROVISIONAL 2002 edge (ISO-validation DEVLOG 582; decision-1 policy)",
    "introducedIn": 2002,
    "removedIn": null,
    "expectDiagnostic": "COBOLNET0900",

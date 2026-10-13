@@ -1,7 +1,7 @@
 export const meta = {
   name: 'rolling-wave',
-  description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), each DONE branch reviewed on the branch; the wave starts no lander: the loop\'s enqueue unit lands every branch reviewed CLEAN (kb/Work PB3023)',
-  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; review each DONE branch (kb/Work PB3027); the enqueue unit lands them (enqueue.py land, kb/Work PB3023).',
+  description: 'Rolling fix lane: a queue of implementer groups run N at a time (a freed slot is refilled at once), each DONE branch reviewed on the branch; the wave starts no lander: the loop\'s landing lane lands every branch reviewed CLEAN (kb/Work PB3023, PB3103)',
+  whenToUse: 'The standard fix-lane dispatch (workstream SKILL §2, references/landing.md): fill a freed slot the moment it frees; review each DONE branch (kb/Work PB3027); the loop\'s landing lane lands them (land_lane.py runs enqueue.py land, kb/Work PB3023, PB3103).',
   phases: [
     { title: 'Implement', detail: 'cobol-implementer per group, isolated worktrees, rolling pool; a review finisher per round of findings' },
     { title: 'Review', detail: 'one read-only cobol-reviewer per DONE branch (the review skill branch form)' },
@@ -11,7 +11,8 @@ export const meta = {
 // args: { scratch, wave, stop_file, global_stop, concurrency (6), groups: [{letter, lead, notes, codes}],
 //         review_fix_rounds (2), reviewer_ceiling_min (90) }
 // THE WAVE STARTS NO LANDER (kb/Work PB3023; DESIGN-test-build-ci.md section 3.17.5): it produces DONE branches reviewed
-// CLEAN, and the loop's `enqueue` unit lands each with `scripts/orchestrator/enqueue.py land` (a script: main merged in,
+// CLEAN, and the loop's landing lane (land_lane.py, kb/Work PB3103) lands each with `scripts/orchestrator/enqueue.py
+// land` as it comes back, beside this wave (a script: main merged in,
 // the gate, the DEVLOG stamp, the landing checks, one pull request into GitHub's merge queue). The train, its size and
 // its final-train threshold went with the lander (kb/Work PB3016's "may THIS wave land?" answered by removal).
 // Specs are pre-rendered by make_dispatch_specs.py as <scratch>\msg-w<wave>-<letter>.txt.
@@ -77,7 +78,7 @@ const RETURN_LINE =
 // no_change_needed with the reason), re-gates and returns; its branch is reviewed again. Only a branch reviewed CLEAN
 // at its head is ready to land; at the round cap the FINDINGS stamp stays, and the next wave's planner dispatches a
 // finisher for it (plan_wave.py). prune_worktrees.py lists a DONE branch WAITING TO LAND only under a CLEAN stamp at
-// its tip, so the enqueue unit lands no unreviewed branch either.
+// its tip, so the landing lane lands no unreviewed branch either.
 const REVIEW_FIX_ROUNDS = args.review_fix_rounds === undefined ? 2 : args.review_fix_rounds
 const REVIEWER_CEILING_MIN = args.reviewer_ceiling_min === undefined ? 90 : args.reviewer_ceiling_min
 const REVIEW_SCHEMA = {
@@ -103,7 +104,7 @@ const queue = [...args.groups]
 const results = []
 const byLetter = {}
 const held = {}          // predecessor letter -> {g, r}: its finished, unreviewed result, waiting for its successor
-const ready = []          // DONE and reviewed CLEAN: the enqueue unit lands them
+const ready = []          // DONE and reviewed CLEAN: the landing lane lands them
 let running = 0
 let wake = () => {}
 
@@ -284,5 +285,5 @@ phase('Implement')
 await parallel(Array.from({ length: Math.min(CONC, queue.length) }, () => () => worker()))
 for (const k of Object.keys(held)) { const p = held[k]; delete held[k]; await landAlone(p) }   // a successor that never ran
 
-log(`${ready.length} branch(es) ready to land (${ready.map(r => r.letter).join(' ') || 'none'}): the enqueue unit lands them`)
+log(`${ready.length} branch(es) ready to land (${ready.map(r => r.letter).join(' ') || 'none'}): the landing lane lands them`)
 return { results, ready: ready.map(r => ({ letter: r.letter, branch: r.branch, report: r.report })), reviews }

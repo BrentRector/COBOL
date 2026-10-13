@@ -342,7 +342,15 @@ public static class GroupCompatibility
     /// <summary>The atoms of a group that states no layout of its own — one run of plain material of
     /// <paramref name="positions"/> character positions (a group whose description carries no atoms: one with a USAGE
     /// BIT leaf, whose shared-byte runs make a character position non-positional, §8.5.1.6.3).</summary>
-    public static GroupAtom[] FixedRun(int positions) => [new GroupAtom(GroupAtomKind.Fixed, positions, positions)];
+    public static GroupAtom[] FixedRun(int positions) =>
+        s_fixedRuns.GetOrAdd(positions, static n => [new GroupAtom(GroupAtomKind.Fixed, n, n)]);
+
+    /// <summary>⛔ ONE ARRAY PER WIDTH (kb/Work PB2690, performance): the memoized pair plans and geometries
+    /// (<c>CobolVarGroup.Correspondence</c>, <c>GeometryOf</c>) are keyed by the atom array's REFERENCE, so a boundary that
+    /// built a fresh <see cref="FixedRun"/> on every call missed both caches and added an entry each time. The keys here
+    /// are the distinct widths of the fixed groups a program describes (a group's image length is a property of its
+    /// description), so the set is as small as the program text; the arrays are never mutated.</summary>
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, GroupAtom[]> s_fixedRuns = new();
 
     /// <summary>⛔ True when a description with atoms <paramref name="formal"/> can be LAID OVER storage described by
     /// <paramref name="area"/> (kb/Work PB2094): the formal's <see cref="Layout"/> is the area's, or a prefix of it whose

@@ -725,7 +725,7 @@
    "token": "METHOD",
    "nameSlot": true,
    "subscriptTrigger": true,
-   "note": "ISO 8.9 reserves it at 2002/2014/2023 only, so it is a legal user-defined word at 85; the lexer token refused it there as a raw parse error until kb/Work PB655. RESERVATION-GATED by the derived gate (gen-cobol-words.ps1 step 4b) where 8.9 reserves it."
+   "note": "ISO 8.9 reserves it at 2002/2014 only (the 2023 list does not contain it, kb/Work PB2623; the END METHOD marker, 10.7.2, spells it as a keyword in that position), so it is a legal user-defined word at 85 and 2023; the lexer token refused it at 85 as a raw parse error until kb/Work PB655. RESERVATION-GATED by the derived gate (gen-cobol-words.ps1 step 4b) where 8.9 reserves it."
   },
   {
    "token": "METHOD_ID",
