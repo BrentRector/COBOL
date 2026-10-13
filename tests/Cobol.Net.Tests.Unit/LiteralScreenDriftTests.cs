@@ -99,7 +99,7 @@ public sealed class LiteralScreenDriftTests
             Assert.True(funnels.Contains(enclosing.Name),
                 $"'{call.Value}' is called inside {enclosing.Name}, not one of the screening funnels [{string.Join(", ", funnels)}]");
             int end = decls.Where(d => d.Index > call.Index).Select(d => d.Index).DefaultIfEmpty(text.Length).First();
-            Assert.Contains("ScreenLiterals(", text.Substring(call.Index, end - call.Index), StringComparison.Ordinal);
+            Assert.Contains("ScreenFragment(", text.Substring(call.Index, end - call.Index), StringComparison.Ordinal);
         }
     }
 }
