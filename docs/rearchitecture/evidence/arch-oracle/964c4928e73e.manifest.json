@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "commit": "4dfb26c315bf7e075fdfe3a0292f8967490fa5cf",
+  "commit": "964c4928e73e14b10bb76714190680512f1320a7",
   "dirty": false,
   "platform": "windows",
   "inputs": ["Directory.Build.props", "Directory.Packages.props", "global.json", "nuget.config", "src/Cobol.Net.Compiler", "src/Cobol.Net.Compiler.SourceGen", "src/Cobol.Net.Editions", "src/Cobol.Net.Frontend", "src/Cobol.Net.Runtime", "tests/Cobol.Net.ArchOracle", "tests/Cobol.Net.Tests.Conformance", "tests/Directory.Build.props", "tests/_shared", "tests/conformance", "tests/nist", "tests/version-matrix/constructs.json"],
