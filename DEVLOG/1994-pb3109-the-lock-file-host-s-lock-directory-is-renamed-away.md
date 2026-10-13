@@ -1,4 +1,4 @@
-## PB3109: the lock-file host's lock directory is renamed away before it is deleted, so a waiting region-lock hold no longer answers Unavailable on Windows
+## Entry 1994 — 2026-10-12 23:19 PDT — PB3109: the lock-file host's lock directory is renamed away before it is deleted, so a waiting region-lock hold no longer answers Unavailable on Windows
 
 PB3109 (runtime/io-sharing, MAJOR, wrong answer and silent) bounced PR 19 out of the merge queue: `RegionLocksDriftTests.TwoWaitingHoldsBothGetTheByteInTurn(kind: LockFiles)` read `Expected [Ok, Ok] Actual [Unavailable, Ok]`.
 
@@ -11,3 +11,4 @@ PB3109 (runtime/io-sharing, MAJOR, wrong answer and silent) bounced PR 19 out of
 **Docs.** `SidecarLockFiles` class remarks and `docs/rearchitecture/DESIGN-runtime-library.md` (the lock-file primitive paragraph) state the rule for the directory beside the one for files. No inventory row is claimed or closed (`closes_rows_reason` says why).
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `TestResults/build-local/20261013T021809Z-b92cd4`: Conformance 4,719/11,494 · Unit 32,522/33,464 · Characterization 6/36 in leg 1); both new tests `outcome="Passed"` in `leg-1-Unit.trx`. `scripts/semgrep/verify.py` PASS with no count raised.
+
