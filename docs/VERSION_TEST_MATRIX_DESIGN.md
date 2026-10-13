@@ -279,7 +279,7 @@ GO TO), 0882 (CALL ON OVERFLOW).
 - **Tables:** per-word 4-edition flags `(r85, r2002, r2014, r2023)` + confidence + provenance. Generation is
   scripted (`scripts/gen-reserved-words.ps1`): parse the in-repo spec §8.9 (`specs/ISO_COBOL.md` lines
   10306–10788; strip the 15 symbol entries; OCR fixes: EMD-START→END-START, `i-O`→I-O, I-OICONTROL→I-O-CONTROL,
-  en-dash minus; ADD the OCR-omitted METHOD) ⊕ a small authored delta file
+  en-dash minus; METHOD is NOT added: the printed 2023 list does not contain it, kb/Work PB2623) ⊕ a small authored delta file
   (`tests/version-matrix/reserved-word-deltas.json`: the authoritative 16-word 2023 additions = VCR row 32; the
   hand-authored X3.23-1985 list; a medium-confidence 2014 IEEE-754 family). Derivation: ∈2023 ∧ ∈85 ∧ ∉added2023
   ⇒ continuous; ∈added2023 ⇒ 2023-only EXCEPT RECEIVE/SEND (85-reserved → unreserved 2002/2014 → re-reserved

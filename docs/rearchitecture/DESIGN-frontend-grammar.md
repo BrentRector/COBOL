@@ -414,6 +414,17 @@ as the keyword again. `TokenRetypes` (the `>>COBOL-WORDS` map plus the freed wor
 `FragmentParse` exactly as `LexAndParse` applies it — which also gives the fragments the `>>COBOL-WORDS` retype
 they lacked.
 
+⛔ **A GATED WORD A FORMAT STILL SPELLS AS A KEYWORD, WHILE §8.9 LEAVES IT FREE, READS ITS KEYWORD POSITION THROUGH A
+RULE THAT ACCEPTS THE RETYPED SPELLING (kb/Work PB2623).** The retype is by WORD, so a program that declares the word
+also turns the keyword occurrences of that word into `IDENTIFIER`. The one live case is METHOD at COBOL-2023: the
+printed §8.9 list does not contain it (it names METHOD-ID; the generator's old "OCR omission" line was a false
+claim, PDF printed page 206), so `01 METHOD PIC X.` is legal there, yet the END METHOD marker (§10.7.2) and the
+EXIT METHOD statement (the 2002 and 2014 statement, removed at 2023 by Annex E.2 item 1, read under `--permissive`) still spell the word. Both go through
+`methodKeyword : METHOD | {wordAhead("METHOD")}? IDENTIFIER` (`CobolOO.g4`), the keyword position being where the
+format spells the word, through the one `wordAhead` comparison. A word dropped by 2023 §8.9 that no 2023 format
+spells (CLOCK-UNITS, EVERY, POSITION, PROCEDURES, PROCEED, REFERENCES: their constructs are 1985-only) needs no such
+rule.
+
 ⛔ **NO LEXER TOKEN MAY COST THE USER A WORD ISO LEAVES FREE (kb/Work PB655).** A word the lexer tokenizes never
 reaches `IDENTIFIER` by itself, so without a `nameSlot` row it is refused as a user-defined word at every edition.
 `CobolWordsDriftTests.LexerWordTokens_Cost_The_User_No_Word_Iso_Leaves_Free` joins the COMPILED lexer vocabulary

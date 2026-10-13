@@ -118,11 +118,21 @@ methodDefinition
       environmentDivision?
       dataDivision?
       procedureDivision?
-      END METHOD methodName? DOT
+      END methodKeyword methodName? DOT
     ;   // the ONLY ISO method attributes: [OVERRIDE] [IS FINAL] (§10.6 :12798-12821; Spec corrections #4 — ABSTRACT is NOT ISO); SR4a/SR3/FINAL enforced at bind (0837/0838/0839)
 
 methodName
     : cobolWord
+    ;
+
+// The word METHOD of the END METHOD marker (§10.7.2) and of EXIT METHOD (removed at 2023 by Annex E.2 item 1; read under --permissive). ISO §8.9 reserves METHOD at
+// 2002/2014 but NOT at 2023 (kb/Work PB2623), so a 2023 program may declare a data item METHOD, and the §8.9
+// reservation gate (ReservationGateRewriter) then retypes EVERY METHOD token of the group to IDENTIFIER —
+// including the keyword of the marker. The keyword position is where the format spells the word, so it accepts
+// the retyped spelling through the ONE word-text predicate (wordAhead, so a >>COBOL-WORDS synonym steers it too).
+methodKeyword
+    : METHOD
+    | {wordAhead("METHOD")}? IDENTIFIER
     ;
 
 // METHOD-ID. GET|SET PROPERTY prop-name — the explicit property-accessor selector (§10.6 :12810-12814;
