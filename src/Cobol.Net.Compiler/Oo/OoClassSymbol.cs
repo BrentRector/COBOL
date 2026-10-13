@@ -67,11 +67,11 @@ public sealed class OoClassSymbol(string name, string csName, CobolParserCore.Cl
     private readonly List<OoMethodSymbol> _methodList = [];
 
     /// <summary>The emitted C# type of this class's FACTORY OBJECT (brief D11 — a REAL sibling singleton
-    /// class, `FOO__FACTORY : BASE__FACTORY | CobolObject`, NEVER statics: §8.6.4 gives every class its OWN
+    /// class, `__FACTORY_FOO : __FACTORY_BASE | CobolObject`, NEVER statics: §8.6.4 gives every class its OWN
     /// copy of inherited factory data; SELF in a factory method is polymorphic §14.9.23.3 SR4f + §8.4.3.8
-    /// GR2; factory resolution walks INHERITS §9.3.6. `__` cannot appear in a COBOL-derived name — no
-    /// collision).</summary>
-    public string FactoryCsName => CsName + NamingConvention.FactorySuffix;
+    /// GR2; factory resolution walks INHERITS §9.3.6. A <see cref="NamingConvention.FactoryClassName"/> prefix
+    /// family, which no class-name spells — kb/Work PB2921).</summary>
+    public string FactoryCsName => NamingConvention.FactoryClassName(CsName);
 
     /// <summary>⛔ THE root of every RUN-UNIT key this class owns — its factory and object file connectors and its
     /// SORT stores (<c>BinderDriver.QualifyClassFiles</c>) — formed by the run-time table's own former

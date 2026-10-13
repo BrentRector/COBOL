@@ -655,7 +655,16 @@ public sealed partial class DataBinder
             // data-name (a duplicate definition) nor the CAPACITY register of another dynamic table.
             // (This pass runs inside Bind, before a contained program inherits its containers' globals, so the
             // map holds only this element's own registers here — the "elsewhere in the source element" SR30 means.)
-            if (ByName.ContainsKey(capName) || _capacityRegisters.ContainsKey(capName))
+            // ⛔ "DEFINED ELSEWHERE" COMPARES DEFINITIONS, NOT EXPANSIONS (kb/Work PB2988): data-name-3 written once in a
+            // type declaration (or under a SAME AS operand) is reproduced by every TYPE / SAME AS copy of its entry,
+            // exactly as the table's own data-name is, and SR30's second sentence — "If qualifiers are required for
+            // uniqueness, it shall be treated as though implicitly defined at the same level as the entry containing
+            // the OCCURS clause" — is how those copies are told apart (`DC OF A`, `DC OF B`). So a register whose
+            // table is a copy of the same written entry as every table already listed under the name joins them; only
+            // a register of a DIFFERENT written entry, or an explicit data-name, is the duplicate SR30 forbids.
+            if (ByName.ContainsKey(capName)
+                || (_capacityRegisters.TryGetValue(capName, out var sameName)
+                    && !sameName.TrueForAll(t => ReferenceEquals(t.WrittenDefinition, item.WrittenDefinition))))
             {
                 Edition.Error("COBOLNET1523", $"CAPACITY IN '{capName}' on '{subject}': data-name-3 is implicitly "
                     + "defined by the OCCURS DYNAMIC entry and shall not duplicate another data-name or "

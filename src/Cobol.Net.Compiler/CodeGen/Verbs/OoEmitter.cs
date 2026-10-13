@@ -402,7 +402,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // formal's question of either (CobolObject.__FactoryClassType / __InstanceClassType; kb/Work PB1112).
         instExtras.Add($"protected override global::System.Type? __FactoryClassType => typeof({cls.Symbol.FactoryCsName});");
         if (lifeCycle)
-            instExtras.Add($"protected override BASE__FACTORY __FactoryOfClass => {cls.Symbol.FactoryCsName}."
+            instExtras.Add($"protected override {OoStandardClasses.BaseFactoryCsName} __FactoryOfClass => {cls.Symbol.FactoryCsName}."
                 + $"{NamingConvention.FactoryInstanceField};   // FactoryObject (ISO §16.2.2.2 GR1)");
         EmitTypeHalf(cls.Name, cls.CsName, cls.Symbol.HalfPath(factory: false), instBase,
             cls.Data, cls.Refs, cls.Bound, cls.Symbol.Methods, w,
@@ -421,16 +421,16 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // after it is last referenced by a run unit") is the CURRENT RUN UNIT's, created on first reference
             // (RunUnit.FactoryObject) — never a process-lifetime static, which outlived the run unit with all its
             // factory data (kb/Work PB1069). A factory with ANY superclass hides that superclass's accessor — a COBOL
-            // class's, or the runtime BASE__FACTORY's, which declares the same singleton so that BASE's own factory is
+            // class's, or the runtime __FACTORY_BASE's, which declares the same singleton so that BASE's own factory is
             // reached as every other is (kb/Work PB2489).
             $"public {(cls.Symbol.Base is not null ? "new " : "")}static {cls.Symbol.FactoryCsName} "
                 + $"{NamingConvention.FactoryInstanceField} => {RuntimeApi.FactoryObject(cls.Symbol.FactoryCsName)};",
             $"protected override global::System.Type? __InstanceClassType => typeof({cls.CsName});",
         };
         // New's creation step (§16.2.1.2 GR1), exactly when the class has BaseFactoryInterface through INHERITS
-        // (§16.2; §9.3.9): a covariant override of BASE__FACTORY.__Create, so New invoked on a subclass's factory —
+        // (§16.2; §9.3.9): a covariant override of __FACTORY_BASE.__Create, so New invoked on a subclass's factory —
         // or through SELF in an inherited factory method — creates the RUNTIME factory's class. The generated
-        // constructor IS the initialization (deep-dive D4); BASE__FACTORY.__New wraps it with GR2's
+        // constructor IS the initialization (deep-dive D4); __FACTORY_BASE.__New wraps it with GR2's
         // resource-failure leg. A class that does not inherit BASE has no New at all (kb/Work PB1548).
         if (lifeCycle)
             extras.Add($"protected override {cls.CsName} __Create() => new {cls.CsName}();   // New (ISO §16.2.1.2 GR1)");
@@ -525,6 +525,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         }
         w.Line();
     }
+
+    /// <summary>The factory singleton class of the class an INVOKE names by class-name (the New and Factory forms): the
+    /// binder sets that form's class C# name, so a null here is a binder defect, never a name to emit.</summary>
+    private static string FactoryClassOf(string? classCsName) =>
+        NamingConvention.FactoryClassName(classCsName
+            ?? throw new InvalidOperationException("a class-name INVOKE form carries no class C# name"));
 
     /// <summary>Render the §14.9.23.4 GR7c two-arm stop for one <c>__CobolInvoke</c> conformance check.
     ///
@@ -1528,7 +1534,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
 
     /// <summary>Every invocation of the standard class BASE's New (ISO §16.2.1) — through a class-name (§14.9.23.3
     /// SR3), a FACTORY OF reference (§14.9.23.3 SR4 a/c) or SELF/SUPER in a factory method (§14.9.23.3 SR4 f/h) —
-    /// reaches the ONE body <c>BASE__FACTORY.__New</c> on the factory object the form names, so
+    /// reaches the ONE body <c>__FACTORY_BASE.__New</c> on the factory object the form names, so
     /// §16.2.1.2 GR1 (creation of the factory's RUNTIME class through its covariant <c>__Create</c>) and GR2 (NULL +
     /// EC-OO-RESOURCE when the object cannot be created) hold identically for all of them. The receiving item is
     /// set to NULL before the call because GR2 says "the returned object reference is set to NULL" and
@@ -1552,7 +1558,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             w.Line($"var {factory} = {RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(recv))};   // §14.9.23.4 GR5");
         }
         else
-            factory = $"{inv.ClassCsName}{NamingConvention.FactorySuffix}.{NamingConvention.FactoryInstanceField}";
+            factory = $"{FactoryClassOf(inv.ClassCsName)}.{NamingConvention.FactoryInstanceField}";
         w.Line(PlaceRenderer.Write(ret, "null") + "   // §16.2.1.2 GR2 — NULL unless New creates the object");
         w.Line(PlaceRenderer.Write(ret, $"({ret.Item.Pic!.ClrType}){factory}.{OoStandardClasses.NewCsName}()")
             + "   // INVOKE … \"New\" (ISO §16.2.1.2)");
@@ -1580,7 +1586,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             var a = args[i];
             bool stringCarried = OoStringCarried(a.Formal);
             string qualProfile = a.Formal.Pic is { Category: PicCategory.Numeric }
-                ? $"{inv.OwnerCsName}{(inv.Form is InvokeForm.Factory ? NamingConvention.FactorySuffix : "")}.{a.Formal.ProfileName}" : "";
+                ? $"{(inv.Form is InvokeForm.Factory ? FactoryClassOf(inv.OwnerCsName) : inv.OwnerCsName)}.{a.Formal.ProfileName}" : "";
 
             string crossing = OoFormalCrossingType(a.Formal);
             // ⛔ THE OMITTED ARGUMENT (kb/Work PB757) — spelled, or trailing-omitted: its carrier is a placeholder cell of
@@ -1813,7 +1819,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             InvokeForm.Super => "base",
             // The factory singleton is never null — no GR5 guard (brief D11); virtual dispatch through the
             // factory hierarchy realizes §9.3.6 factory resolution.
-            InvokeForm.Factory => $"{inv.ClassCsName}{NamingConvention.FactorySuffix}.{NamingConvention.FactoryInstanceField}",
+            InvokeForm.Factory => $"{FactoryClassOf(inv.ClassCsName)}.{NamingConvention.FactoryInstanceField}",
             _ => RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(inv.Receiver!)),
         };
         string call = $"{target}.{inv.MethodCsName}(" + string.Join(", ", argExprs) + ")";

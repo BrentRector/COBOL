@@ -171,8 +171,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// table in a GLOBAL record is subordinate to a global name — SR30 places it "at the same level as the entry
     /// containing the OCCURS clause" — so it is a global name too (§8.4.6.2.2: "All data-names and screen-names
     /// subordinate to a global name are global names"), and a contained program inherits it with the rest of the
-    /// record (<see cref="InheritGlobalSubtree"/>). This element's own register (at most one per spelling: SR30's
-    /// "shall not be defined elsewhere in the source element") comes first, then each container's, so
+    /// record (<see cref="InheritGlobalSubtree"/>). This element's own registers come first (one written definition
+    /// per spelling: SR30's "shall not be defined elsewhere in the source element", reproduced once per TYPE / SAME AS
+    /// copy of its entry, kb/Work PB2988), then each container's, so
     /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The OWN registers alone are
     /// <see cref="DeclaredCapacityRegisterTables"/>.</para></summary>
     public IReadOnlyDictionary<string, List<DataItem>> CapacityRegisters
@@ -2552,7 +2553,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (operand is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;
         bool national = !ItemCategory.IsAlphanumeric(key);
-        int positions = national ? key.ByteWidth / CobolNet.Runtime.CobolBits.BytesPerNational : key.ByteWidth;
+        int positions = key.ByteWidth / (key.OperandPic?.BytesPerPosition ?? 1);   // the ONE unit reader (kb/Work PB546)
         var category = national ? PicCategory.National : PicCategory.Alphanumeric;
         string value = operand.Form switch
         {

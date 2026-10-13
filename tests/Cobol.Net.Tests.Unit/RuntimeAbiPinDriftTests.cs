@@ -45,8 +45,8 @@ namespace CobolNet.Tests.Unit;
 public sealed class RuntimeAbiPinDriftTests
 {
     // ── The pins. Change a hash only with the decision the class summary describes. ──
-    private const int PinnedMajor = 2;
-    private const string PinnedRuntimeHash = "DCEBF2032624C3FB";
+    private const int PinnedMajor = 3;
+    private const string PinnedRuntimeHash = "D6A932ED23BEF476";
     private const int PinnedCallAbi = 1;
     private const string PinnedBoundaryHash = "304F0F7F986F680F";
 

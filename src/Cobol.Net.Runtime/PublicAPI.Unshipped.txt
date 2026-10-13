@@ -70,3 +70,4 @@ static CobolNet.Runtime.ObjectReferenceSet.Refusal(CobolNet.Runtime.ObjectRefere
 static CobolNet.Runtime.CobolFloat.ToScaledSaturating(double v, int scale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
 static CobolNet.Runtime.ExternalizedNames.FormInEdition(string? value, int dialectLevel) -> string!
 static CobolNet.Runtime.CobolNames.HasEditionSpelling(int dialectLevel) -> bool
+static CobolNet.Runtime.CobolBits.NatFromStorage(string! image) -> string!

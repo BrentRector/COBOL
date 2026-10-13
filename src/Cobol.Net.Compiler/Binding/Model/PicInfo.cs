@@ -997,6 +997,22 @@ public sealed record PicInfo(
         _ => NumericTruncation.DigitCount,
     };
 
+    /// <summary>⛔ THE ONE UNIT READER (kb/Work PB546; docs/COBOLNET_DATA_MODEL_DESIGN.md D-N1): how many bytes one
+    /// character position of this item occupies. It is a function of the USAGE alone — ISO §13.18.60.4 GR8 ("The
+    /// implicit or explicit USAGE NATIONAL clause specifies that a national coded character set shall be used to
+    /// represent a data item in the storage of the computer") speaks of usage, and a usage-national item may be of
+    /// category boolean, national, national-edited, numeric or numeric-edited — so a usage-national position is
+    /// <c>CobolBits.BytesPerNational</c> bytes (D-N1: UTF-16) and every other character position one. A byte count
+    /// keyed on <c>PicCategory.National</c> sent a boolean usage-national slice one byte per position
+    /// (<c>BYTE-LENGTH(BN(1:2))</c> = 2); <c>NationalUnitDriftTests</c> keeps this the only spelling. A usage-bit
+    /// position is a BIT, not a byte fraction: <see cref="RefModPlace.PositionBits"/> owns that unit.</summary>
+    public int BytesPerPosition => BytesPerPositionOf(Usage);
+
+    /// <summary><see cref="BytesPerPosition"/> for a usage that is known without a picture — a national GROUP's
+    /// as-if usage (§13.18.29.4 GR2b), which <c>RecordLayout</c> asks before usage propagation has run.</summary>
+    public static int BytesPerPositionOf(Usage usage) =>
+        usage is Usage.National ? CobolNet.Runtime.CobolBits.BytesPerNational : 1;
+
     /// <summary>The item's storage width in BYTES for every usage that has one of its own — the width its
     /// <see cref="ByteForm"/> lays out, the width <c>FUNCTION BYTE-LENGTH</c> reports, and the width it
     /// occupies in a record image (0 for the usages whose bytes ARE their character positions).</summary>
