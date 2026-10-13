@@ -26,11 +26,12 @@ this per WAITING TO LAND branch, and an agent is dispatched only for what a scri
      commits, which a rebase throws away and asks for again; the queue lands by merge commit anyway, so the branch's
      history stays as written). A conflict is aborted, the branch's report gains `BLOCKED: … conflict in <files>`, and
      the exit is 4: a finisher resolves it.
-  3. THE GATE on the merged head, every host in GATES, each under the shared gate slot `build-local.ps1` takes (the cap
-     of 3, so concurrent enqueues queue there and never beyond it): a verdict that is not GREEN (or no verdict line) is
-     exit 5, the report gains `BLOCKED: <host> gate … at enqueue — <verdict>`. A green head is recorded in the worktree's
-     git directory (`enqueue-gated`); a later run whose head differs from it only by commits that are main's, clean
-     merges or DEVLOG-only (`prune_worktrees.unreviewed_since`, the review's coverage rule) is not gated again.
+  3. THE GATE on the merged head, every host in GATES, each under the shared gate slot (the cap of 3, so concurrent
+     enqueues queue there and never beyond it; build-local takes its own, every other row runs under `gate_slot.py
+     run`, and no row runs while one would run outside it, kb/Work PB3104): a verdict that is not GREEN (or no verdict
+     line) is exit 5, the report gains `BLOCKED: <host> gate … at enqueue — <verdict>`. A green head is recorded in
+     the worktree's git directory (`enqueue-gated`); a later run whose head differs from it only by commits that are
+     main's, clean merges or DEVLOG-only (`prune_worktrees.unreviewed_since`, the review's coverage rule) is not gated again.
   4. MAIN AGAIN, then the stamp, then `queue` (below). Main moves while a branch gates (the queue merges other pull
      requests), and `queue` takes only a head that descends from main; so origin/main is fetched again and, when it
      moved, MERGED in once more, without a second gate (kb/Work PB3023 review R1-2): the local gate confirms the change
@@ -85,7 +86,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
-from typing import Callable
+from typing import Callable, NamedTuple
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -108,14 +109,38 @@ VERDICT = "=== ENQUEUE: "
 # (the registrar's and the clerk's notes; the golden lane's spec-derived goldens, which the gate runs), and their briefs
 # name themselves with `land --lane <lane>`. Every other branch lands only under a CLEAN review stamp (review_gate).
 UNREVIEWED_LANES = ("registrar", "golden", "clerk")
-# THE GATE AT ENQUEUE (DESIGN-test-build-ci.md §3.17.2 step 3, §3.17.3): (host, command run in the worktree, its verdict
-# line's prefix). THE ONE GATE (kb/Work PB3022: one shape, no mode; a landing's gate runs at Normal priority) on
-# Windows, then CI's Linux legs under WSL (the operator's steer 2026-10-11 12:37: the landing keeps the whole-leg WSL
-# gate until PB3022 item 10 makes the one gate run leg 1 on both hosts; then the Linux row goes and build-local's own
-# verdict covers both). On a Linux host only the Linux twin of the one gate runs.
-GATES_WINDOWS = (("Windows", ["pwsh", "-NoProfile", "-File", "scripts/build-local.ps1"], "=== BUILD-LOCAL GATE: "),
-                 ("Linux", ["bash", "scripts/linux-gate.sh", "--nice"], "=== LINUX GATE: "))
-GATES_LINUX = (("Linux", ["bash", "scripts/build-local.sh"], "=== BUILD-LOCAL GATE: "),)
+# THE GATE AT ENQUEUE (DESIGN-test-build-ci.md §3.17.2 step 3, §3.17.3): one GateRow per host, in order. THE ONE GATE
+# (kb/Work PB3022: one shape, no mode; a landing's gate runs at Normal priority) on Windows, then CI's Linux legs under
+# WSL (the operator's steer 2026-10-11 12:37: the landing keeps the whole-leg WSL gate until PB3022 item 10 makes the one
+# gate run leg 1 on both hosts; then the Linux row goes and build-local's own verdict covers both). On a Linux host only
+# the Linux twin of the one gate runs.
+# ⛔ EVERY ROW RUNS UNDER THE SHARED GATE SLOT (kb/Work PB3104; gate_slot.py, DESIGN-test-build-ci.md §3.14.6): the cap
+# of 3, a landing's ticket served first. Until 2026-10-12 the Linux row ran `linux-gate.sh` bare, so seven concurrent
+# landings ran seven uncapped WSL gates side by side, and load alone turned five of them RED. Each row says HOW it takes
+# its slot (GateRow.slot), `unslotted` checks the claim, and run_gates runs no row while any row is unslotted.
+SLOT_OWN = "own"     # the command takes the slot itself: build-local hands the gate to SLOT_DRIVER, which acquires it
+SLOT_WRAP = "wrap"   # run_gates runs the command under `gate_slot.py run` (gate_argv)
+SLOT_DRIVER = "scripts/run_gate_legs.py"
+_DRIVER_ACQUIRES = re.compile(r"GateSlots\.for_repo\([^)]*\)\.acquire\(")
+
+
+class GateRow(NamedTuple):
+    """One host's gate at enqueue: the host, the command run in the worktree, its verdict line's prefix, and how it
+    takes the shared gate slot (SLOT_OWN or SLOT_WRAP, above)."""
+    host: str
+    command: tuple[str, ...]
+    prefix: str
+    slot: str
+
+
+# Per row, not ONE acquisition held across both rows: build-local takes its slot inside SLOT_DRIVER (after its audits,
+# kb/Work PB2524), so an outer slot held around it would make that a SECOND slot of the same cap, and three concurrent
+# landings each holding an outer slot at cap 3 would wait on their inner acquisitions forever. The Linux row takes its
+# own landing ticket when the Windows row ends, and is served ahead of every waiting implementer gate.
+GATES_WINDOWS = (GateRow("Windows", ("pwsh", "-NoProfile", "-File", "scripts/build-local.ps1"), "=== BUILD-LOCAL GATE: ",
+                         SLOT_OWN),
+                 GateRow("Linux", ("bash", "scripts/linux-gate.sh", "--nice"), "=== LINUX GATE: ", SLOT_WRAP))
+GATES_LINUX = (GateRow("Linux", ("bash", "scripts/build-local.sh"), "=== BUILD-LOCAL GATE: ", SLOT_OWN),)
 GREEN = re.compile(r"^(?:LEG 1 ONLY \([^)]*\): )?GREEN\b")
 GATED_MARK = "enqueue-gated"     # in the worktree's git directory: the head this script last gated GREEN
 # (the check's name, its command under scripts/, its refusal's exit code here, whether it takes --base, whether its
@@ -277,20 +302,63 @@ def dirty_paths(wt: pathlib.Path) -> list[str]:
             if not ln.endswith((".claude/settings.local.json", " STATUS.md"))]
 
 
+def unslotted(rows, tree: pathlib.Path) -> list[tuple[str, str]]:
+    """THE SLOT RULE, in one place (kb/Work PB3104): [(host, why)] for each row of `rows` that would run outside the
+    shared gate slot; [] when every row takes one. A SLOT_WRAP row takes it through gate_argv. A SLOT_OWN row's claim is
+    checked, never trusted: its script (read under `tree`, the worktree whose scripts run) must hand the gate to
+    SLOT_DRIVER, and SLOT_DRIVER must acquire the slot. run_gates runs no row while this is not empty, and the self-test
+    holds GATES_WINDOWS and GATES_LINUX to it on every host."""
+    out: list[tuple[str, str]] = []
+    for row in rows:
+        if not isinstance(row, GateRow):
+            out.append((str(row[0]) if row else "?", f"a bare row {row!r}, not a GateRow: it names no slot"))
+        elif row.slot == SLOT_WRAP:
+            continue
+        elif row.slot != SLOT_OWN:
+            out.append((row.host, f"slot {row.slot!r} is neither {SLOT_OWN!r} nor {SLOT_WRAP!r}"))
+        else:
+            script = next((a for a in row.command if a.startswith("scripts/")), "")
+            path = tree / script if script else None
+            driver = tree / SLOT_DRIVER
+            if path is None or not path.is_file() or SLOT_DRIVER not in path.read_text(encoding="utf-8"):
+                out.append((row.host, f"{script or ' '.join(row.command)} claims its own slot but does not hand the "
+                                      f"gate to {SLOT_DRIVER}"))
+            elif not driver.is_file() or not _DRIVER_ACQUIRES.search(driver.read_text(encoding="utf-8")):
+                out.append((row.host, f"{SLOT_DRIVER} no longer acquires a gate slot (GateSlots.for_repo(...).acquire)"))
+    return out
+
+
+def gate_argv(row: GateRow, wt: pathlib.Path, label: str) -> list[str]:
+    """The command run_gates starts for `row`: its own for SLOT_OWN, else the same under `gate_slot.py run` on the
+    worktree's repository (one slot directory per repository: the git common dir every worktree shares)."""
+    if row.slot == SLOT_OWN:
+        return list(row.command)
+    return [sys.executable, str(HERE.parent / "gate_slot.py"), "run", "--repo", str(wt),
+            "--label", f"{label}: {row.host} gate", "--", *row.command]
+
+
 def run_gates(wt: pathlib.Path, gates=None) -> list[tuple[str, bool, str]]:
     """Each host's gate in order, fail-fast: [(host, green, its verdict line or why there is none)]. The output goes to
-    `<worktree>/TestResults/enqueue/<host>-gate.log`; only the verdict line decides (never the exit code alone)."""
+    `<worktree>/TestResults/enqueue/<host>-gate.log`; only the verdict line decides (never the exit code alone). No row
+    runs while any row of `gates` would run outside the shared gate slot (`unslotted`, kb/Work PB3104)."""
     gates = gates if gates is not None else (GATES_WINDOWS if os.name == "nt" else GATES_LINUX)
+    if refused := unslotted(gates, wt):
+        return [(refused[0][0], False, "REFUSED — no gate ran: a gate row would run outside the shared gate slot "
+                                       "(kb/Work PB3104): " + "; ".join(f"{h}: {why}" for h, why in refused))]
     logs = wt / "TestResults" / "enqueue"
     logs.mkdir(parents=True, exist_ok=True)
     # A LANDING gate (kb/Work PB3103): its gate slot is served before every waiting implementer gate's (gate_slot.py
-    # CLASS_ENV), so a landing never queues behind up to the cap's worth of implementer gates.
+    # CLASS_ENV), so a landing never queues behind up to the cap's worth of implementer gates. Every row inherits it:
+    # build-local's driver and `gate_slot.py run` both read the class from this environment.
     env = {**os.environ, gate_slot.CLASS_ENV: gate_slot.LANDING}
+    label = f"enqueue {_git(wt, 'branch', '--show-current').stdout.strip() or wt.name}"
     out: list[tuple[str, bool, str]] = []
-    for host, cmd, prefix in gates:
+    for row in gates:
+        host, prefix = row.host, row.prefix
         log = logs / f"{host.lower()}-gate.log"
         with log.open("wb") as f:
-            rc = subprocess.run(cmd, cwd=wt, stdout=f, stderr=subprocess.STDOUT, env=env).returncode
+            rc = subprocess.run(gate_argv(row, wt, label), cwd=wt, stdout=f, stderr=subprocess.STDOUT,
+                                env=env).returncode
         lines = [ln.strip() for ln in log.read_bytes().decode("utf-8", errors="replace").splitlines()
                  if ln.strip().startswith(prefix)]
         if not lines:
@@ -885,12 +953,56 @@ def self_test() -> int:
                "--lane, lands without a stamp",
                "FINDINGS" in findings and "--lane" in no_report and rc_lane == 0 and ran,
                f"{findings!r} {no_report!r} {rc_lane}")
-        probe = [sys.executable, "-c", "import os; print('=== PROBE GATE: GREEN — class '"
-                 f" + os.environ.get({gate_slot.CLASS_ENV!r}, 'none'))"]
-        got = run_gates(wt, gates=(("Probe", probe, "=== PROBE GATE: "),))
+        # ── the gate rows and the shared gate slot (kb/Work PB3104) ─────────────────────────────────────────────────
+        # The probe is a SLOT_WRAP row, as the Linux row is: run_gates starts it under `gate_slot.py run` on this
+        # scratch repository's own slot directory (never the real one).
+        probe = GateRow("Probe", (sys.executable, "-c", "import os; print('=== PROBE GATE: GREEN — class '"
+                                  f" + os.environ.get({gate_slot.CLASS_ENV!r}, 'none'))"), "=== PROBE GATE: ", SLOT_WRAP)
+        got = run_gates(wt, gates=(probe,))
         expect("the gate at enqueue is a LANDING gate: its slot is served before waiting implementer gates "
                "(kb/Work PB3103, gate_slot.py CLASS_ENV)", got and got[0][1] and got[0][2].endswith(
                    f"class {gate_slot.LANDING}"), str(got))
+        probe_log = (wt / "TestResults" / "enqueue" / "probe-gate.log").read_text(encoding="utf-8", errors="replace")
+        took, ran_at = probe_log.find("gate-slot: took slot"), probe_log.find("=== PROBE GATE: ")
+        linux_row = next((r for r in GATES_WINDOWS if isinstance(r, GateRow) and r.host == "Linux"), None)
+        linux_argv = gate_argv(linux_row, wt, "enqueue b") if linux_row else []
+        expect("gate rows: the Linux row runs under `gate_slot.py run` with the landing class, and the slot is taken "
+               "before its command starts (kb/Work PB3104)",
+               0 <= took < ran_at and got and got[0][2].endswith(f"class {gate_slot.LANDING}") and "--" in linux_argv
+               and linux_argv[1:3] == [str(HERE.parent / "gate_slot.py"), "run"]
+               and linux_argv[linux_argv.index("--") + 1:] == ["bash", "scripts/linux-gate.sh", "--nice"],
+               f"took={took} ran={ran_at} {linux_argv}")
+
+        repo_root = HERE.parent.parent
+        every_row = unslotted(GATES_WINDOWS + GATES_LINUX, repo_root)
+        expect("gate rows: every row of GATES_WINDOWS and GATES_LINUX takes the shared gate slot, build-local through "
+               "run_gate_legs.py and every other row under `gate_slot.py run` (kb/Work PB3104)", not every_row,
+               str(every_row))
+
+        linux_cmd = ("bash", "scripts/linux-gate.sh", "--nice")
+        planted = [("Planted", list(linux_cmd), "=== LINUX GATE: "),          # the row as it stood before PB3104
+                   GateRow("Planted", linux_cmd, "=== LINUX GATE: ", "none"),
+                   GateRow("Planted", linux_cmd, "=== LINUX GATE: ", SLOT_OWN)]  # a claim its script does not keep
+        refused = [bool(unslotted([row], repo_root)) for row in planted]
+        tree = root / "tree"
+        (tree / "scripts").mkdir(parents=True)
+        (tree / "scripts" / "build-local.sh").write_text(f"python {SLOT_DRIVER}\n", encoding="utf-8", newline="\n")
+        own = GateRow("Own", ("bash", "scripts/build-local.sh"), "=== BUILD-LOCAL GATE: ", SLOT_OWN)
+        (tree / SLOT_DRIVER).write_text("def main():\n    return 0\n", encoding="utf-8", newline="\n")
+        no_acquire = bool(unslotted([own], tree))
+        (tree / SLOT_DRIVER).write_text("slot = GateSlots.for_repo(repo).acquire(label)\n", encoding="utf-8",
+                                        newline="\n")
+        acquires = unslotted([own], tree)
+        marker = root / "unslotted-ran.txt"
+        marking = GateRow("Marker", (sys.executable, "-c", f"import pathlib; pathlib.Path({str(marker)!r})"
+                                                           ".write_text('ran')"), "=== MARKER GATE: ", SLOT_WRAP)
+        blocked_run = run_gates(wt, gates=(marking, planted[0]))
+        expect("gate rows: a planted unslotted row (a bare row, an unknown slot, a script claiming its own slot without "
+               "the driver, a driver that no longer acquires) is refused, and run_gates runs no row (kb/Work PB3104)",
+               refused == [True, True, True] and no_acquire and not acquires and not marker.exists()
+               and len(blocked_run) == 1 and blocked_run[0][:2] == ("Planted", False)
+               and blocked_run[0][2].startswith("REFUSED"),
+               f"{refused} no_acquire={no_acquire} acquires={acquires} marker={marker.exists()} {blocked_run}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"=== enqueue.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")

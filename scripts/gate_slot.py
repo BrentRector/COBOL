@@ -12,8 +12,9 @@ and THE SHARED GATE SETTINGS that every gate reads from the same place (kb/Work 
 ⛔ WHY. Concurrent gates starve each other: train 48's lander leg took 30.6 min against 9.6 quiet. Every gate (and the
 impact recorder) therefore takes a SLOT before it builds and holds it through its last leg, so at most N of them build
 or test at once, repository-wide; the gate has one shape, a landing's included (kb/Work PB3022). The battery and CI
-never take a slot (DESIGN-test-build-ci.md §3.14.6). Its callers are the gate driver `scripts/run_gate_legs.py` and
-`scripts/spec/record_impact_map.py` (kb/Work PB1721).
+never take a slot (DESIGN-test-build-ci.md §3.14.6). Its callers are the gate driver `scripts/run_gate_legs.py`,
+`scripts/spec/record_impact_map.py` (kb/Work PB1721) and `scripts/orchestrator/enqueue.py`, which runs the landing's
+Linux gate row under `run` (kb/Work PB3104).
 
 THE MECHANISM — every piece is an OS file lock, so nothing is ever cleaned up by guessing whether a pid is alive:
   slots    N lock files `<git common dir>/cobol-gate-slots/<k>.lock`, each held by an exclusive OS lock (LockFile on
