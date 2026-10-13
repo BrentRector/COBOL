@@ -67,13 +67,16 @@ Every outcome ends on ONE line `=== ENQUEUE: <OUTCOME> … ===` for a caller to 
 refusing on the landing's own range before a CI run is spent:
   devlog.py check   (exactly one new, stamped DEVLOG/ entry, numbered above the tree it was stamped on and unique;
                     kb/Work PB2605, PB3025, PB3123) → exit 6
-  landing_oracle.py (the arch-oracle baseline describes the landed tree; kb/Work PB2885) → exit 7
   landing_check.py  (the R3 file-set partition and in-flight overlap; kb/Work PB2118) → exit 3 (STOP: re-plan, never
                     retry as is)
-A check that cannot read its range is exit 2 (NOT RUN, never a pass).
+A check that cannot read its range is exit 2 (NOT RUN, never a pass). No landing check reads a record of one tree
+(kb/Work PB3107): a merge group is built on every group queued ahead of it, so a committed record of the branch's own
+tree (the arch-oracle baseline the retired landing oracle held it to, exit 7 until PB3107) cannot describe the tree that
+lands, and two such landings queued together bounced each other; the oracle's baseline is now the capture of a
+change's base commit, made on demand by scripts/arch/compare_oracle.py, and nothing is committed.
 
 Exit: 0 queued or nothing to land · 2 usage or state (a dirty worktree, no branch, HEAD behind main, a check could not
-run, main still moving after CATCH_UP merges) · 3/6/7 a landing check refused (above) · 4 bringing main in conflicted ·
+run, main still moving after CATCH_UP merges) · 3/6 a landing check refused (above) · 4 bringing main in conflicted ·
 5 a gate is not GREEN · 8 the merge queue is not ACTIVE (nothing merged, gated, pushed or opened) · 9 GitHub refused
 the push, the pull request or the queue (main untouched; re-run after the cause is fixed — every step is idempotent) ·
 11 the branch is not reviewed at its tip (`land` only; above).
@@ -149,7 +152,6 @@ GATED_MARK = "enqueue-gated"     # in the worktree's git directory: the head thi
 # every non-zero is a refusal). A refusal is the script's exit 1; any other non-zero is "could not run", except for
 # landing_check.py, whose every non-zero is a STOP (its own contract: re-plan, never retry as is).
 CHECKS = (("devlog.py check", ("devlog.py", "check"), 6, True, False),
-          ("landing_oracle.py", ("orchestrator/landing_oracle.py",), 7, False, False),
           ("landing_check.py", ("orchestrator/landing_check.py",), 3, True, True))
 
 Say = Callable[[str], None]
@@ -702,8 +704,7 @@ def self_test() -> int:
                rc_nothing == 0 and any("nothing to land" in ln for ln in lines) and rc_title == 2,
                f"{rc_nothing} {rc_title}")
 
-        devlog_check, oracle, partition = ("devlog.py", "check"), ("orchestrator/landing_oracle.py",), \
-            ("orchestrator/landing_check.py",)
+        devlog_check, partition = ("devlog.py", "check"), ("orchestrator/landing_check.py",)
 
         def runner(results: dict[tuple[str, ...], int], seen: list[tuple[tuple[str, ...], list[str]]]):
             def run(command: tuple[str, ...], args: list[str]) -> int:
@@ -711,17 +712,17 @@ def self_test() -> int:
                 return results.get(command, 0)
             return run
         mapped = []
-        for results in ({devlog_check: 1}, {oracle: 1}, {partition: 1}, {devlog_check: 2}, {partition: 2}, {}):
+        for results in ({devlog_check: 1}, {partition: 1}, {devlog_check: 2}, {partition: 2}, {}):
             seen: list[tuple[tuple[str, ...], list[str]]] = []
             mapped.append(run_checks("S", "B", runner(results, seen), say=lines.append))
         seen = []
         run_checks("S", "B", runner({}, seen), say=lines.append)
         missing = [c[0] for _, c, *_ in CHECKS if not (HERE.parent / c[0]).is_file()]
-        expect("checks runs the three landing scripts on the range in order and maps each refusal to its own code: "
-               "DEVLOG 6, oracle 7, landing check 3, unreadable 2",
-               mapped == [6, 7, 3, 2, 3, 0] and not missing
-               and seen == [(devlog_check, ["--rev", "S", "--base", "B"]), (oracle, ["--rev", "S"]),
-                            (partition, ["--rev", "S", "--base", "B"])], f"{mapped} {seen} missing={missing}")
+        expect("checks runs the two landing scripts on the range in order and maps each refusal to its own code: "
+               "DEVLOG 6, landing check 3, unreadable 2",
+               mapped == [6, 3, 2, 3, 0] and not missing
+               and seen == [(devlog_check, ["--rev", "S", "--base", "B"]), (partition, ["--rev", "S", "--base", "B"])],
+               f"{mapped} {seen} missing={missing}")
 
         # The migrating landing (kb/Work PB3023 review R1-3): the base holds the monolithic DEVLOG.md, the branch adds
         # the whole history as files plus its own one entry; the pull request is titled from that one (devlog.check's).

@@ -341,7 +341,7 @@ class Row:
 def mechanical(commit: str, repo=REPO) -> bool:
     """A commit that changes nothing a reviewer reads: a merge whose tree IS the clean merge of its two parents (no hand
     resolution: what `enqueue.py land`'s own `git merge origin/main` makes), or a commit that changes only DEVLOG/ (an
-    entry, its stamp, a re-stamp)."""
+    entry, its stamp)."""
     parents = git('rev-list', '--parents', '-n', '1', commit, cwd=repo).stdout.split()[1:]
     if len(parents) == 2:
         clean = git('merge-tree', '--write-tree', *parents, cwd=repo)

@@ -404,7 +404,7 @@ checkout (a failed regen fails the build — keep).
   table. This is what a future engineer resumes the REARCH from; the plan §0 banner is the feature-drive live
   state and cross-links to it.
 - **DEVLOG/** — one file per entry (§3.17.4, kb/Work PB3025), rendered descending; a real timestamp; one entry per
-  landing on main, checked by `enqueue.py land` and CI through `python scripts/devlog.py check`, kb/Work PB2605; the arch-oracle baseline likewise, through `scripts/orchestrator/landing_oracle.py`, exit 7, kb/Work PB2885) per the existing
+  landing on main, checked by `enqueue.py land` and CI through `python scripts/devlog.py check`, kb/Work PB2605) per the existing
   `feedback_devlog*` memories. Each rearch phase commit references its ROADMAP phase id.
 - **`docs/DOC_INDEX.md`** — add rows for `COBOLNET_REARCHITECTURE_PLAN.md` (the migration SSOT / ROADMAP),
   `DIAGNOSTICS.md`, this doc, and the sibling `DESIGN-*` / `PHASE-*` docs; keep the "one canonical doc per subsystem" rule.
@@ -1728,7 +1728,7 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    (review R1-2, corrected at implementation: the queue merges other pull requests while a branch gates, `queue` takes
    only a head that descends from main, and re-gating every such head would race the queue forever; the merge group
    below integrates the branch on the current main and runs the whole population; a conflict here is exit 4 too);
-   `devlog.py stamp` numbers the entry (re-stamping one main has overtaken); run the landing checks that used to live in
+   `devlog.py stamp` numbers the entry (once: a stamped entry keeps its number, PB3123); run the landing checks that used to live in
    the former direct-push landing script — `devlog.py check` (exactly one new entry file, stamped and well-formed) and `landing_check.py` (the R3 file-set
    partition, PB2118) — then `gh pr create` (title = the branch's one-line subject, body = the forensic message) and
    `gh pr merge --merge-queue`-equivalent (`gh pr merge --auto`) so the PR joins the queue. Done. No lease, no local
@@ -1743,6 +1743,31 @@ locally at every enqueue and PB1957's local-vs-CI survey lists the filesystem.
    order. A red bounces only the PR that caused it (GitHub re-tests the rest); the loop sees the bounce
    (`gh pr view --json mergeQueueEntry,statusCheckRollup`), names the CI red in the branch's report and dispatches a
    finisher; the fixed branch is reviewed again at its new tip (step 2), then enqueued again.
+   **What the queue stacks (kb/Work PB3107, PB3123; owner 2026-10-13: "Why are many, many github runs failing? Due
+   to our local testing, we should rarely see failures", then "Fix them now").** A merge group is built ON TOP of every
+   group queued ahead of it, in the order GitHub picks when each pull request's own checks finish, so the tree a
+   group tests is one no branch ever checked: main, then each pull request ahead, then this one. Measured
+   2026-10-12 23:46Z to 2026-10-13 07:06Z: 12 of 39 merge-group runs failed, nine on the arch-oracle baseline (two or
+   three manifests in the stacked tree: each branch had re-recorded its own on one main, and PR 29, which changed no
+   oracle input, failed only for being queued behind two that did) and two on the DEVLOG number (an entry stamped 1990
+   queued behind one stamped 1991). THE RULE that follows, for every check a landing or a merge group runs: **a
+   check's verdict on a pull request may not depend on what else is queued.** A check that holds a branch to a
+   committed record of its own tree fails it, because no such record describes the stacked tree; so does one that
+   orders landings by a value fixed before the queue orders them. The two such checks were redesigned, never relaxed
+   into a retry: (a) the oracle commits nothing: its baseline is the capture of a change's own base commit, made on
+   demand by `compare_oracle.py` (a capture is a pure function of its commit, DESIGN-architecture-review.md §4.1), and
+   the landing oracle and its exit 7 are retired with the committed manifest; recording on the merged head at enqueue
+   (the note's candidate) was rejected because two pull requests queued together still stack two such records;
+   (b) the DEVLOG number is STAMP order, not merge order: `devlog.py check` holds a new entry above every entry of the
+   tree it was STAMPED on (the first parent of the commit that added its file) and unique on the landing's tree,
+   never above the group's base; serializing the auto-merge so queue order equals stamp order was rejected because a
+   bounced pull request re-enters behind later ones. Proof: `devlog.py --self-test` builds the stacked trees as the
+   queue does (a merge commit of each branch onto the group ahead) in both orders, and `LandingPipelineDriftTests`
+   keeps the oracle's record and the landing oracle out of the tree. The checks swept for the same dependence and
+   found free of it: the witness-loss audit and the `changes` job's docs-only decision both read base..head, and a
+   group's `base_sha` is the head of the group queued ahead of it (run 38360587401's base held entry 1996 before that
+   pull request reached main), so the range is this pull request's own change whatever is queued with it.
+   `landing_check.py` reads the in-flight branches on purpose, and only locally.
 5. **On `main`**: the merged commit is the tested merge-group tree. The `push` run keeps only `changes` + `ci-gate` (the
    record the probe reads); the matrix runs on `merge_group` and `workflow_dispatch`. On `pull_request` only the cheap
    jobs run (audits, the DEVLOG and work-register checks), so twenty PRs do not queue eighty matrix jobs behind the
@@ -1795,12 +1820,14 @@ demand and not committed.
   YYYY-MM-DD HH:MM TZ — Title`). The implementer writes the entry WITHOUT a number, as `DEVLOG/pending-<slug>.md`; the
   number is stamped AT ENQUEUE (`devlog.py stamp`, called by `enqueue.py`: `alloc.py devlog` allocates `NNNN`, the file
   is renamed and its header completed, one commit on the branch before the pull request opens), so number order IS
-  enqueue order IS queue order IS landing order, and "newest first" by number is newest first on main (operator review
-  item 2; a bounced PR keeps its number, gaps are fine). `python scripts/devlog.py render [--since NNNN] [--out <file>]`
+  STAMP order (operator review item 2; gaps are fine). It is not merge order, and the check never asks it to be
+  (kb/Work PB3123, §3.17.2 step 4): GitHub orders the queue after the stamps, so two landings stamped minutes apart
+  can reach main in the other order, and a bounced pull request keeps its number when it lands later; "newest first"
+  by number is newest first by stamp. `python scripts/devlog.py render [--since NNNN] [--out <file>]`
   prints the descending narrative (`DEVLOG/README.md` first, then the entries newest first, the files concatenated
   byte for byte; `DEVLOG.rendered.md` is gitignored); `devlog.py check` is the landing rule `landing_devlog.py` was
   (exactly one new, stamped entry file in the PR — new meaning a header the base's history lacks — numbered above
-  every number on the base, header well-formed; a `pending-` file, a stray file, an entry whose header disagrees with
+  every number of the tree it was stamped on, header well-formed; a `pending-` file, a stray file, an entry whose header disagrees with
   its name, two files with one number, the monolith back, or a deleted entry is a red — a deleted entry counts the
   base's monolith too, header by header, so the one landing that migrates the log cannot drop an entry main has), run
   by the landing checks (`enqueue.py checks`, run by `enqueue.py land`) and by CI's `audits` job on every pull request and merge group. Its tree half (`lint`) also runs
@@ -1967,14 +1994,17 @@ self-test arms of `enqueue.py` and `ruleset.py` are declared. The live ruleset i
 consumers are the landing (exit 8 on anything but ACTIVE) and the session probe's `gate :` line, not an xUnit arm (the
 suite has no dynamic skip, and an offline comparison must read SKIPPED, never green). Landed with PB3024's closing
 change (`TheDirectPushLanding_IsRetired_AndNothingNamesIt`, with its planted-name arm): the direct-push landing
-script (both forms), the landing lease and the train applier do not exist, the push trigger is `[ main ]` with no
+script (both forms), the landing lease, the train applier and the landing oracle (kb/Work PB3107) do not exist, the
+push trigger is `[ main ]` with no
 `ci/**`, and no tracked file outside the history paths (`DEVLOG/`, `docs/rearchitecture/evidence/`, `kb/Work/`,
 `adjudication/`) names any of them by file name. A later arm, with the change that retires it: no generated index is tracked
 (`git ls-files` ∩ the generators' outputs is empty). Landed with kb/Work PB3022's first part: `GateLegDriftTests` (no
 caller names a gate mode) and `HostWitnessTraitDriftTests` (`TIER_ORDER` contains `0h` and every race-witness class
 carries the `Host` trait). Landed with kb/Work PB3025: `DEVLOG.md` does not exist and every `DEVLOG/*.md` has a
 well-formed header and a unique number (`devlog.py --self-test`'s `lint` arm over the repository's own `DEVLOG/`, run
-by every gate's self-tests and CI's `audits` job).
+by every gate's self-tests and CI's `audits` job). Landed with kb/Work PB3107: `NoTrackedRecord_DescribesOneBranchsTree`
+(no committed arch-oracle baseline, and `capture_oracle.py` has no `--record`), the rule of §3.17.2 step 4 that no
+landing is held to a record of its own tree.
 
 ---
 
