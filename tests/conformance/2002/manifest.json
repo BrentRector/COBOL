@@ -33,6 +33,8 @@
   "pb2463_universal_returning_set_match",
   "pb2463_call_object_reference_set_conformance",
   "pb2464_prototype_pointer_signature_type",
+  "pb2495_recursive_prototype_signature",
+  "pb2495_pointer_type_in_signature_checks",
   "pb1670_replacing_partial_word_copy_replace",
   "pb1042_redefines_national_table_initialize",
   "pb643_report_file_connector_properties",
