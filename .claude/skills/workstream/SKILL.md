@@ -48,7 +48,7 @@ description: Use BEFORE dispatching any fleet, finisher, implementer or adjudica
 > read each unit's handoff; decide every DECISION row `python scripts/prune_worktrees.py --brief` prints (land it via a
 > finisher, or abandon it in its kb/Work note; never carry it forward) and remove the LANDED ones with `--apply`
 > (MANDATORY-PRACTICES O10, PB2600); run the battery on its cadence. Hand-dispatching a Workflow stays legal for a
-> supervised one-off (the waves start no lander; the loop's enqueue unit is the one landing path while it runs: O11, PB3023),
+> supervised one-off (the waves start no lander; the loop's landing lane is the one landing path while it runs: O11, PB3023, PB3103),
 > and everything below still governs it. Do not edit the main checkout
 > while a unit runs: work in a worktree.
 
@@ -97,8 +97,9 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   the branch is reviewed again (`review_fix_rounds`, 2). Only a branch stamped `Review: CLEAN` at its head is ready;
   the landing never reviews. `review_findings.py summary <scratch>` measures it.
 - **No lander, no train (kb/Work PB3023).** The wave ends when its groups return; every branch reviewed CLEAN is the
-  loop's `enqueue` unit's, which lands each with `scripts/orchestrator/enqueue.py land` (main merged in, the gate on both
-  hosts under the gate slot, the DEVLOG stamp, the landing checks, one pull request into the merge queue).
+  loop's landing lane's (`land_lane.py`, kb/Work PB3103), which lands each with `scripts/orchestrator/enqueue.py land`
+  (main merged in, the gate on both hosts under the gate slot, the DEVLOG stamp, the landing checks, one pull request
+  into the merge queue); the `enqueue` unit handles the reviews, the finishers, the re-arms and the leads.
 - **Same-file successors.** A file with more open notes than the cluster cap (`fix_clusters.py` caps at 5) becomes
   two or more groups, and each later one declares `after: '<predecessor letter>'`. The successor waits for its
   predecessor, merges its branch, and orients from that report's "For the next implementer" section and STATUS.md
@@ -137,7 +138,7 @@ considered and rejected in that form: split chains become extra turns, and turns
 
 ## 3. Landing order and mechanics
 
-- ⛔ **ONE LANDING PATH, AND ONE QUEUE WHILE THE LOOP RUNS** (MANDATORY-PRACTICES L1, O11, kb/Work PB2602, PB3023; `python scripts/orchestrator/coord.py loop-state`): a branch lands only through `python scripts/orchestrator/enqueue.py land <branch>`. While the loop runs, its `enqueue` unit runs it for every WAITING TO LAND branch and the attended session runs no rolling wave and lands nothing itself: it writes each finished attended branch's report as `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (header `Status: DONE` · `Worktree:` · `Branch:` · `HEAD:` · `Base:`) for the enqueue unit to collect. With the loop stopped it runs `enqueue.py land` by hand for its own branch.
+- ⛔ **ONE LANDING PATH, AND ONE QUEUE WHILE THE LOOP RUNS** (MANDATORY-PRACTICES L1, O11, kb/Work PB2602, PB3023; `python scripts/orchestrator/coord.py loop-state`): a branch lands only through `python scripts/orchestrator/enqueue.py land <branch>`. While the loop runs, its LANDING LANE (`land_lane.py`, ticked by the supervisor beside every unit, kb/Work PB3103) runs it for every WAITING TO LAND branch and the attended session runs no rolling wave and lands nothing itself: it writes each finished attended branch's report as `<coord>\scratch\reports\w<wave><letter>-PB<lead>-report.md` (header `Status: DONE` · `Worktree:` · `Branch:` · `HEAD:` · `Base:`) for the loop to collect (its enqueue unit reviews it, its lane lands it). With the loop stopped it runs `enqueue.py land` by hand for its own branch.
 - ⛔ **No branch is left undecided** (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600): `python scripts/prune_worktrees.py` gives every branch a lifecycle state (IN FLIGHT · WAITING FOR REVIEW · WAITING TO LAND · LANDED · DECISION); a branch ends LANDED then deleted (`--apply`), or ABANDONED by a decision recorded in its kb/Work note then deleted (`--apply --abandon <branch>`). Nothing is archived. An agent refused `enqueue.py land` by the permission layer ends `READY-TO-LAND <worktree> <branch>`; the dispatching session runs it (MANDATORY-PRACTICES L13).
 - Land finished work first, ONE BRANCH PER PULL REQUEST (MANDATORY-PRACTICES L1, L12): `enqueue.py land` gates each branch under the shared gate slot and queues it; a conflict, a red gate or a queue bounce goes to ONE `cobol-finisher` (`templates/finisher-brief.md`), which returns DONE: its commits are reviewed on the branch before the new tip lands (`enqueue.py land` refuses an unreviewed tip, exit 11; the registrar, golden and clerk lanes pass `--lane`). While the queue is not ACTIVE, `enqueue.py land` refuses (exit 8): the queue is the only landing path, and GitHub's queue orders main, so no landing waits for another (kb/Work PB3024).
 - The only way a commit reaches `main` is `python scripts/orchestrator/enqueue.py land <branch>` (MANDATORY-PRACTICES L5, kb/Work PB3023, PB3024): a pull request into GitHub's merge queue (`enqueue.py queue`); it refuses while `ruleset.py check` does not report the queue ACTIVE (the `ci-gate` check is required on the merge group; it is idempotent; a red is a blocking finding). Never open or queue a pull request by hand. A docs-only landing still runs and still has to be green.
