@@ -859,7 +859,7 @@ reference formats, and the only place source comments are recognized. Its model:
   resultant unit per physical position, and `TextSite.Spans` ends a span at each tab and at each supplementary-plane
   character, so `LineOrigin.Locate` needs no knowledge of the text. The indicator-column gates (`FixedFormLine.IndicatorColumn`)
   need no site: a tab written in positions 1–7 fills through position 8, so an indicator that is not a space is
-  always at position 7 (kb/Work PB2982).
+  always at position 7 (kb/Work PB2982). Text a later stage WRITES (a REPLACE replacement, COPY ... REPLACING text) gets the same conversion from `OriginWriter.Append`, which ends its span at each supplementary-plane character exactly as `TextSite.Spans` does, so a column the parser reports inside written text is a character position too (kb/Work PB3031; `CharacterPositions` lives in `Common` beside the writer, not in the preprocessor).
 - **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
   directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
   line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the
