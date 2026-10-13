@@ -1,4 +1,4 @@
-## Entry 1992 — 2026-10-12 23:19 PDT — PB3031 - a diagnostic column inside written text counts character positions, not UTF-16 units
+## Entry 2003 — 2026-10-13 12:44 PDT — PB3031 - a diagnostic column inside written text counts character positions, not UTF-16 units
 
 Wave 1069 group D. A diagnostic's column is a CHARACTER POSITION of the physical line (ISO 6.1 1) a), 6.3.1; DOC-A.1-157),
 and PB2983 made the reference-format stage split an origin span at each tab and each supplementary-plane character so
