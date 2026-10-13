@@ -7,7 +7,7 @@ namespace CobolNet.Frontend.Parsing;
 /// <summary>
 /// The token types that ARE a literal of class alphanumeric, boolean or national: the four DEFAULT-mode literal tokens
 /// and their SUBSCRIPT-mode twins. ONE set, read by both rules that are asked of every literal token — the literal's
-/// own §8.3.3 syntax rules (<c>LiteralScreenPass</c>) and its §8.3.5 5) delimiter separation
+/// own §8.3.3 syntax rules (<c>LiteralScreen</c>) and its §8.3.5 5) delimiter separation
 /// (<see cref="SeparatorRule"/>). Derived-and-pinned: <c>LiteralScreenDriftTests</c> reads the lexer grammar and
 /// requires this set to equal the tokens defined over a literal body fragment, so a new literal token joins both
 /// rules or fails there.

@@ -464,7 +464,9 @@ said in the supervisor's log, a failure said and the unit continuing. A tick:
    branch whose last attempt the lane may retry with its tip still that attempt's end head, and every branch the
    enqueue unit re-armed at its current tip (a BOUNCED one included), `land_lane.decide` says
    whether to start `enqueue.py land <branch> --worktree <wt>`, DETACHED (its own process group, out of the
-   supervisor's job where Windows allows it), its output in `logs\land-lane-<branch>-<stamp>.log`:
+   supervisor's job where Windows allows it, and on Windows its own console with no window, `CREATE_NO_WINDOW`,
+   which every program it starts inherits: under `DETACHED_PROCESS` each of them opened a window that took the
+   desktop's focus, kb/Work PB3117), its output in `logs\land-lane-<branch>-<stamp>.log`:
 
 | The branch's last attempt | The lane |
 |---|---|
@@ -824,7 +826,8 @@ against the retired train records, kb/Work PB3028; `LandingMeasureDriftTests` al
 in survey order and only once; a planted exit 3 is retried at its head only once the overlap is gone; an exit 5 is
 never relaunched at its head and a new head is eligible again; an exit 2 or 9 is retried once; a DIED runner is reaped
 and retried once; an exit 8 stops every attempt and names the operator until `clear-halt`; STOP-UNIT, STOP and the
-global stop start nothing; the agent work `next_unit.py` reads; a real detached runner records its outcome). The
+global stop start nothing; the agent work `next_unit.py` reads; a real detached runner records its outcome; on
+Windows a spawned runner owns a console with no visible window). The
 supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
 loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`

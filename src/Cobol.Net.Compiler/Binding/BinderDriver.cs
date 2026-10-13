@@ -152,10 +152,6 @@ internal sealed class BinderDriver
             cls.FactoryData.OdoReferenceChecking = odoReferenceChecking;
         }
 
-        OoConformance.ValidateInterfaceInheritance(table, edition);   // §11.6.3 SR5 — an inheriting interface conforms to all it inherits (kb/Work PB1502)
-        OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
-        OoConformance.ValidatePropertyAccessorPairs(table, edition);   // §8.4.3.9.3 SR7 — get RETURNING = set USING, over the formals just resolved
-        var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
         // TWO-PHASE binding (M2-UDF-1 key enabler): EVERY unit's DATA division binds before ANY procedure body
         // binds — a class's method bodies (below) as well as a program unit's (the ProcedureBinding group pass) —
         // so a function-identifier reference resolves the callee's RETURNING / USING signatures from a unit whose
@@ -171,6 +167,19 @@ internal sealed class BinderDriver
         // first, against no table, so every user-function reference in a method drew COBOLNET1505.
         session.Repository = BuildGroupRepository(units, classes, session);
         ResolvePointerRestrictions(units, classes, oo.InterfaceData, session);
+        // ⛔ EVERY SIGNATURE COMPARISON RUNS AFTER THE POINTER TYPES EXIST (kb/Work PB2495): a formal or returning item
+        // that is a restricted program- or function-pointer is typed by its prototype's signature class (ISO §13.18.60.4
+        // GR25 / GR26), which ResolvePointerRestrictions has just attached. A check that runs before it reads an
+        // unstamped pointer, whose identity is its prototype's NAME, and refuses an override, an implementation or a
+        // prototype / definition pair restricted to two differently named prototypes of one signature. Running after
+        // the DATA phase is NOT enough: CheckPrototypeSignaturePairs refused such pairs from inside BuildGroupRepository,
+        // after every BindUnitData. So each check is a top-level statement of Bind, after this call, and
+        // PrototypePointerTypeDriftTests pins that execution order.
+        CheckPrototypeSignaturePairs(units, session.Edition);   // §10.6.2 SR2 / SR3
+        OoConformance.ValidateInterfaceInheritance(table, edition);   // §11.6.3 SR5 — an inheriting interface conforms to all it inherits (kb/Work PB1502)
+        OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
+        OoConformance.ValidatePropertyAccessorPairs(table, edition);   // §8.4.3.9.3 SR7 — get RETURNING = set USING, over the formals just resolved
+        var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
         foreach (var cls in classes) oo.BindClassBody(cls);
 
         // The whole-group middle-end (P6 Steps 3–4): the DECLARED manifest — ProcedureBinding →
@@ -205,7 +214,7 @@ internal sealed class BinderDriver
         // position it is written in, so they are asked once per token of the raw tree rather than once per
         // consuming funnel (which is how VALUE / CONSTANT / ALL / concatenation-operand literals escaped them).
         // kb/Work PB1393.
-        global::CobolNet.Validation.LiteralScreenPass.Run(tree, edition);
+        global::CobolNet.Frontend.Parsing.LiteralScreen.Run(tree, edition.Edition, edition, gateFormats: true);
 
         // The declined-optional-element pass (ISO Annex A.4.1) — a THIRD sibling on the same footing: it answers
         // "does this implementation claim support for this optional module", which is orthogonal to both the
@@ -798,7 +807,6 @@ internal sealed class BinderDriver
         // is nonconforming source, and the search silently keeps the first definition and drops the
         // second — the shape §8.3.2.2 exists to forbid.
         CheckDefinitionNameUniqueness(units, classes, session.OoClasses, session.Edition);
-        CheckPrototypeSignaturePairs(units, session.Edition);
         CheckFunctionUnits(units, session.Edition);
         // kb/Work PB237 / PB894 / PB989 — the compilation group's program and function units, the search space
         // §12.3.8.4 GR10 / GR11 a) and b) name. Built once; each source element searches it AS OF ITS OWN POSITION.
@@ -807,26 +815,33 @@ internal sealed class BinderDriver
 
     /// <summary>⛔ Give every restricted program- or function-pointer in the group the TYPE its prototype's signature
     /// gives it (kb/Work PB2464; ISO §13.18.60.4 GR25 / GR26 — <see cref="DataBinder.ResolveRestrictedPrototypes"/>), once
-    /// the REPOSITORY tables exist and BEFORE any body binds or any description is built. It covers EVERY forest that
-    /// declares one — each program unit's, each class's OBJECT and FACTORY forests and each interface's prototype
-    /// formals — through the same per-forest tables the procedure binders read, so that two items compared by the
-    /// typed comparator or by a universal INVOKE's descriptions are never one stamped and one not (which would make
-    /// an item and its twin disagree when their prototype is not its own signature class's founder).</summary>
+    /// the REPOSITORY tables exist and BEFORE any signature is compared, any body binds or any description is built
+    /// (the §10.6.2 SR2 / SR3 prototype pairs and the §9.3.8.2.3 method conformance checks run after it, kb/Work PB2495).
+    /// It covers EVERY forest that declares one — each program unit's, each class's OBJECT and FACTORY forests and each
+    /// interface's prototype formals — through the same per-forest tables the procedure binders read, so that two items
+    /// compared by the typed comparator or by a universal INVOKE's descriptions are never one stamped and one not (which
+    /// would make an item and its twin disagree when their prototype is not its own signature class's founder).
+    /// <para>TWO passes over the forests (kb/Work PB2495): the first attaches each pointer's resolved prototype, the
+    /// second classifies it. Classifying a prototype compares its formals, and a formal that is itself a restricted
+    /// pointer is compared by the prototype IT names (<see cref="PrototypeSignatures.SameType"/>) — which may be declared
+    /// in a forest later in the group, so every forest is resolved before any is classified.</para></summary>
     private static void ResolvePointerRestrictions(IReadOnlyList<BoundUnit> units, IReadOnlyList<OoClassUnit> classes,
         IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> interfaces, BindSession session)
     {
         var repository = session.Repository;
-        void Resolve(DataBinder data, BoundUnit? unit, int position) => data.ResolveRestrictedPrototypes(
-            ProgramPrototypesOf(data, unit, repository, position), UserFunctionsOf(data, unit, repository, position),
-            session.SignatureClasses);
-        foreach (var unit in units) Resolve(unit.Data, unit, unit.SourcePosition);
+        var forests = new List<(DataBinder Data, BoundUnit? Unit, int Position)>();
+        foreach (var unit in units) forests.Add((unit.Data, unit, unit.SourcePosition));
         foreach (var cls in classes)
         {
             int position = cls.Symbol.Ctx.Start.StartIndex;   // the position OoDriver.BindClassBody searches the group at
-            Resolve(cls.Data, null, position);
-            Resolve(cls.FactoryData, null, position);
+            forests.Add((cls.Data, null, position));
+            forests.Add((cls.FactoryData, null, position));
         }
-        foreach (var (iface, data) in interfaces) Resolve(data, null, iface.Ctx.Start.StartIndex);
+        foreach (var (iface, data) in interfaces) forests.Add((data, null, iface.Ctx.Start.StartIndex));
+        foreach (var (data, unit, position) in forests)
+            data.ResolveRestrictedPrototypes(
+                ProgramPrototypesOf(data, unit, repository, position), UserFunctionsOf(data, unit, repository, position));
+        foreach (var (data, _, _) in forests) data.ClassifyRestrictedPrototypes(session.SignatureClasses);
     }
 
     /// <summary>The PROCEDURE half of unit binding (phase 2): every unit's DATA is already bound

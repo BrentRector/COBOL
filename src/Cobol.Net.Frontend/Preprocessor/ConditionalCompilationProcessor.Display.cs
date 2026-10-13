@@ -25,7 +25,7 @@ public static partial class ConditionalCompilationProcessor
         CompilationInputs inputs, DiagnosticBag? bag)
     {
         if (rest.Length == 0) return;   // §7.3.12.2 writes at least one operand: that PRESENCE is the central check's (COBOLNET1911)
-        if (DirectiveExpressionFragment.ParseDisplay(rest) is not { } fragment) { diag.Malformed(">>DISPLAY", rest); return; }
+        if (ParseDisplayFragment(rest, diag, ">>DISPLAY", compiled: true) is not { } fragment) return;
 
         var images = new List<string>();
         bool valid = true, available = true;

@@ -189,7 +189,7 @@ public static class ArithmeticFormationRules
     /// on the input stream (a space, and equally a line break, is a separator — §8.3.5). Measured on the TOKENS'
     /// stream indices, never on <c>GetText()</c>, which concatenates a node's tokens with the whitespace stripped
     /// so <c>- 5</c> and <c>-5</c> read back alike. <see cref="SignIsPartOfLiteral"/> asks it of an arithmetic
-    /// operand; <c>LiteralScreenPass</c> asks it of every signed literal slot (<c>signedNumericLiteral</c>,
+    /// operand; <c>LiteralScreen</c> asks it of every signed literal slot (<c>signedNumericLiteral</c>,
     /// <c>signedIntegerLiteral</c>) and <c>SignedIntegerLiteral.Read</c> of the one it reads (kb/Work PB1445).</summary>
     public static bool SignAbuts(IToken sign, IToken first) =>
         first.Line == sign.Line && first.StartIndex == sign.StopIndex + 1;

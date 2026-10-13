@@ -17,7 +17,7 @@ using Core = CobolParserCore;
 /// more than one sign character. If a sign is used, it shall appear as the leftmost character of the
 /// literal."</i> — and a literal is ONE character-string, so a space between the sign and its digits makes the
 /// two things two things. The violation is REPORTED once, for this rule and <c>signedNumericLiteral</c> alike, by
-/// <c>LiteralScreenPass</c> (COBOLNET2155; kb/Work PB1445); this reader only declines to read the separated sign
+/// <c>LiteralScreen</c> (COBOLNET2155; kb/Work PB1445); this reader only declines to read the separated sign
 /// as part of the value.</para>
 ///
 /// <para>⛔ THE VALUE IS NOT WHAT <c>GetText()</c> RETURNS, and the difference is not cosmetic: ANTLR's
@@ -29,7 +29,7 @@ internal static class SignedIntegerLiteral
 {
     /// <summary>The literal's text with its sign (e.g. <c>"+1"</c>, <c>"-3"</c>, <c>"12"</c>). When the sign does
     /// not abut the digits (<see cref="ArithmeticFormationRules.SignAbuts"/>) the source is already refused by
-    /// <c>LiteralScreenPass</c>, and the UNSIGNED digits are returned so the caller's own range screens still run on
+    /// <c>LiteralScreen</c>, and the UNSIGNED digits are returned so the caller's own range screens still run on
     /// a recovered value rather than cascading.</summary>
     /// <param name="ctx">The <c>signedIntegerLiteral</c> node.</param>
     public static string Read(Core.SignedIntegerLiteralContext ctx)

@@ -2417,7 +2417,7 @@ internal sealed class VersionConformancePass
             if ((nat || ctx.BOOLLIT() is not null) && InStatement(ctx))
                 _p.Check(nat ? Constructs.NationalData2002 : Constructs.BooleanData2002,
                     nat ? "national literal N\"…\"" : "boolean literal B\"…\"");
-            // The literal's OWN syntax rules — the §8.3.3 length and hexadecimal-grouping rules — are LiteralScreenPass's,
+            // The literal's OWN syntax rules — the §8.3.3 length and hexadecimal-grouping rules — are LiteralScreen's,
             // asked of every literal TOKEN wherever it is written (kb/Work PB1393). The grouping rule used to be asked
             // here and in the ALL arm below, and a concatenation operand and a keyword-omitted intrinsic argument
             // slipped past both.

@@ -2,15 +2,13 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
-using CobolNet.Binding;              // EditionContext, DiagnosticCursorAt
-using CobolNet.Common;               // CobolLiteral — the ONE literal codec and its shape rules
+using CobolNet.Common;              // CobolLiteral — the ONE literal codec and its shape rules
 using CobolNet.Editions;             // Constructs, ConstructRegistry — the literal-format edition gates
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog
 using CobolNet.Frontend.Expressions; // ArithmeticFormationRules — the ONE §8.3.3.3.2 rule-2 contiguity test
 using CobolNet.Frontend.Generated;   // CobolParserCore contexts of the signed literal slots
-using CobolNet.Frontend.Parsing;     // LiteralTokens — the ONE literal token set; WrittenSource — a node's text as written
 
-namespace CobolNet.Validation;
+namespace CobolNet.Frontend.Parsing;
 
 /// <summary>
 /// THE ONE PLACE A LITERAL'S OWN SYNTAX RULES ARE ASKED (kb/Work PB1393) — the §8.3.3 rules that are a property of
@@ -40,8 +38,16 @@ namespace CobolNet.Validation;
 /// <c>concatOperand</c>, not a <c>nonNumericLiteral</c> — and the keyword-omitted intrinsic argument, re-parsed
 /// from text the version pass never walks, decoded a malformed <c>X"4"</c> to the empty string in silence). A
 /// literal is ONE TOKEN whichever rule consumes it, so the check sits on the token: every literal the lexer
-/// produced from the unit is screened here exactly once, and a new grammar position that admits a literal needs no
-/// arm.</para>
+/// produced is screened here exactly once, and a new grammar position that admits a literal needs no arm.</para>
+/// <para>⛔ TWO LEXINGS, ONE BODY (kb/Work PB1616). A compiler-directive operand (<c>&gt;&gt;DEFINE X AS …</c>,
+/// <c>&gt;&gt;IF</c>, <c>&gt;&gt;EVALUATE</c>, <c>&gt;&gt;WHEN</c>, <c>&gt;&gt;DISPLAY</c>) is lexed APART from the unit
+/// (<see cref="DirectiveExpressionFragment"/>), so the unit-tree walk never reaches its literals. The screen therefore
+/// lives HERE, in the frontend, below both lanes — the compiler's <c>BinderDriver</c> calls <see cref="Run"/> on the
+/// unit's tree, the conditional-compilation stage on each directive fragment's tree — the same arrangement as
+/// <see cref="CobolNet.Frontend.Expressions.BooleanOperatorGate"/> (kb/Work PB1370), and for the same reason. The
+/// directive lane reported these literals as the evaluator's COBOLNET1619 only along the path it evaluated, so an
+/// omitted branch, a short-circuited operand and the edition gates of the literal's format escaped; one walk of every
+/// parsed fragment closes all three.</para>
 /// <para>⚠ A SUBSCRIPT LIST AND A KEYWORD-OMITTED ARGUMENT LIST ARE PART OF THIS TREE. Since kb/Work PB2113 the tokens
 /// between a reference's parentheses are the ordinary literal tokens, parsed in place, so they are screened here like
 /// any other — and a subscript the binder materializes into a temporary is bound from this same tree's node (kb/Work
@@ -49,17 +55,24 @@ namespace CobolNet.Validation;
 /// (every token whose body is a literal fragment), so a new literal token cannot escape the screen.</para>
 /// <para>The syntax rules are edition-invariant: they carry no edition qualifier in the text the repository holds, and
 /// the checks they replace ran at every <c>--std</c>. The one edition question asked here is which literal FORMATS the
-/// targeted edition HAS (<see cref="GateFormat"/>) — the same property of the token as written, so the same walk. It is
-/// a sibling of <see cref="ExpressionFormationPass"/> on the same
-/// "orthogonal axis ⇒ separate pass" footing (<c>BinderDriver</c>), and — unlike a <see cref="CursorFollowingVisitor"/>
-/// — a plain walk, so no visitor override that declines to descend can hide a literal from it.</para>
+/// targeted edition HAS (<see cref="GateFormat"/>) — the same property of the token as written, so the same walk. The
+/// compiler runs it as a sibling of <c>ExpressionFormationPass</c> on the same "orthogonal axis ⇒ separate pass"
+/// footing (<c>BinderDriver</c>), and — unlike a visitor that follows the diagnostic cursor — it is a plain walk, so
+/// no visitor override that declines to descend can hide a literal from it.</para>
 /// </remarks>
-internal static class LiteralScreenPass
+public static class LiteralScreen
 {
-    /// <summary>Screen every literal token of <paramref name="tree"/>, reporting to <paramref name="edition"/> at the
-    /// token's own position.</summary>
-    public static void Run(IParseTree tree, EditionContext edition)
+    /// <summary>Screen every literal token of <paramref name="tree"/> against the targeted <paramref name="edition"/>,
+    /// reporting to <paramref name="sink"/> at the token's own position (the sink's cursor; a sink that keeps none
+    /// carries its own fixed position, like the directive stage's). True when no literal broke one of its own
+    /// §8.3.3 rules or the sign rule — a literal that did has no value, and a caller that would evaluate the tree
+    /// must not (the format-edition gates report too but leave the literal's value intact, so they do not count).
+    /// <paramref name="gateFormats"/> asks the edition question (<see cref="GateFormat"/>) too — false for a directive
+    /// in an OMITTED branch, whose text is held to the syntax of §7.2.1 but is not compiled, so no construct it uses is
+    /// introduced by it (the same posture as the directive's own gate and the boolean-operator gate).</summary>
+    public static bool Run(IParseTree tree, EditionInfo edition, IDiagnosticSink sink, bool gateFormats)
     {
+        bool clean = true;
         var pending = new Stack<IParseTree>();
         pending.Push(tree);
         while (pending.Count > 0)
@@ -67,12 +80,13 @@ internal static class LiteralScreenPass
             var node = pending.Pop();
             if (node is ITerminalNode t)
             {
-                if (LiteralTokens.Types.Contains(t.Symbol.Type)) Screen(t, edition);
+                if (LiteralTokens.Types.Contains(t.Symbol.Type)) clean &= Screen(t, edition, sink, gateFormats);
                 continue;
             }
-            if (SignedSlot(node) is ({ } sign, { } first)) ScreenSign(node, sign, first, edition);
+            if (SignedSlot(node) is ({ } sign, { } first)) clean &= ScreenSign(node, sign, first, sink);
             for (int i = node.ChildCount - 1; i >= 0; i--) pending.Push(node.GetChild(i));
         }
+        return clean;
     }
 
     /// <summary>The sign token and the literal's first token of a SIGNED LITERAL SLOT — the two grammar rules that
@@ -95,31 +109,38 @@ internal static class LiteralScreenPass
     /// <see cref="ArithmeticFormationRules.SignAbuts"/>. A separated sign makes two things of one: <c>MOVE - 5 TO A</c>
     /// is refused, where <c>-5</c> is the literal. (<c>IF A = - 5</c> never reaches here: a relation operand is an
     /// arithmetic expression, whose unary-operator alternative the parser takes first.)</summary>
-    private static void ScreenSign(IParseTree node, IToken sign, IToken first, EditionContext edition)
+    private static bool ScreenSign(IParseTree node, IToken sign, IToken first, IDiagnosticSink sink)
     {
-        if (ArithmeticFormationRules.SignAbuts(sign, first)) return;
-        using var _ = edition.At(sign);
+        if (ArithmeticFormationRules.SignAbuts(sign, first)) return true;
+        using var _ = sink.At(sign.Line, sign.Column);
         string written = WrittenSource.Of((ParserRuleContext)node);
-        edition.Error(DiagnosticCatalog.SignedLiteralSignNotAdjacent, $"the numeric literal `{written}` has its sign "
+        Error(sink, DiagnosticCatalog.SignedLiteralSignNotAdjacent, $"the numeric literal `{written}` has its sign "
             + $"separated from its digits — {ArithmeticFormationRules.SignRuleQuote}, and a space or line break is a "
             + $"separator (ISO §8.3.5). Write `{sign.Text}{first.Text}` if the sign belongs to the literal.");
+        return false;
     }
 
     /// <summary>The edition gates of the literal's FORMAT, then the first of the three rules the literal violates, in
     /// <see cref="CobolLiteral.SyntaxViolation"/>'s one order, reported at the token under the rule's own descriptor.</summary>
-    private static void Screen(ITerminalNode t, EditionContext edition)
+    private static bool Screen(ITerminalNode t, EditionInfo edition, IDiagnosticSink sink, bool gateFormats)
     {
         string raw = t.GetText();
-        using var _ = edition.At(t.Symbol);
-        GateFormat(raw, edition);
-        if (CobolLiteral.SyntaxViolation(raw) is not { } v) return;
-        edition.Error(v.Rule switch
+        using var _ = sink.At(t.Symbol.Line, t.Symbol.Column);
+        if (gateFormats) GateFormat(raw, edition, sink);
+        if (CobolLiteral.SyntaxViolation(raw) is not { } v) return true;
+        Error(sink, v.Rule switch
         {
             LiteralRule.Repertoire => DiagnosticCatalog.LiteralContentRepertoire,
             LiteralRule.HexGrouping => DiagnosticCatalog.HexLiteralDigitGrouping,
             _ => DiagnosticCatalog.LiteralTooLong,
         }, $"the literal {CobolLiteral.Abbreviated(raw)} {v.Message}");
+        return false;
     }
+
+    /// <summary>Report an ERROR under <paramref name="descriptor"/>'s code through the layer-neutral sink — the
+    /// structured form of the compiler's <c>EditionContext.Error(descriptor, message)</c>, which renders it the same.</summary>
+    private static void Error(IDiagnosticSink sink, DiagnosticDescriptor descriptor, string message) =>
+        sink.Report(new EditionDiagnostic(descriptor.Code, EditionSeverity.Error, descriptor.Id, message, "", ""));
 
     /// <summary>⛔ THE LITERAL FORMATS A LATER EDITION INTRODUCED — asked of the token, position-blind, because a format is
     /// a property of the literal as WRITTEN whatever consumes it (a VALUE clause of an alphanumeric item has no data
@@ -135,13 +156,13 @@ internal static class LiteralScreenPass
     /// VCR row 7.30, kb/Work PB895).</item>
     /// </list>
     /// Both edges are DERIVED, the repository holding no 1985, 2002 or 2014 text; the derivation is the VCR row's.</summary>
-    private static void GateFormat(string raw, EditionContext edition)
+    private static void GateFormat(string raw, EditionInfo edition, IDiagnosticSink sink)
     {
         if (CobolLiteral.IsHexadecimalFormat(raw) && CobolLiteral.ClassOf(raw) is LiteralClass.Alphanumeric)
-            ConstructRegistry.Check(edition.Edition, edition, Constructs.HexAlphanumericLiteral2002,
+            ConstructRegistry.Check(edition, sink, Constructs.HexAlphanumericLiteral2002,
                 $"the hexadecimal alphanumeric literal {CobolLiteral.Abbreviated(raw)}");
         if (CobolLiteral.IsZeroLength(raw))
-            ConstructRegistry.Check(edition.Edition, edition, Constructs.ZeroLengthLiteral2014,
+            ConstructRegistry.Check(edition, sink, Constructs.ZeroLengthLiteral2014,
                 $"the zero-length literal {raw}");
     }
 }

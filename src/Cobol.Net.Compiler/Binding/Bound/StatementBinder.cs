@@ -136,7 +136,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     /// with. A name the unit's table does not hold has its own name for identity.</summary>
     internal string ProgramRestrictionIdentityOf(string prototypeName) =>
         ProgramPrototypes?.TryGetValue(prototypeName, out var p) == true && SignatureClasses is { } classes
-            ? classes.ProgramIdentity(p)
+            ? classes.Identity(RestrictedPrototype.Of(p))
             : PrototypeSignatures.OwnIdentity(prototypeName);
 
     /// <summary>A program-prototype-name's bound signature, through the §8.4.6.8 scope table
