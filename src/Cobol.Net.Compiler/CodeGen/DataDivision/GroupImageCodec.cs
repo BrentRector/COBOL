@@ -537,8 +537,22 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// without one.</summary>
     private OdoTail RecordOdo(DataItem group) =>
         OdoModel.TableUnder(group) is not { } t ? default
-        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t) ? new OdoTail(OdoModel.GeometryOf(group, t).ElemUnits, t.Occurs ?? 1)
+        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t)
+            ? new OdoTail(OdoModel.GeometryOf(OdoHolder(group, t), t).ElemUnits, t.Occurs ?? 1)
         : new OdoTail(VarFixedWidth(t), t.Occurs ?? 1, VarComponentCount(t));
+
+    /// <summary>The member whose image holds <paramref name="table"/> as its trailing storage — the
+    /// <see cref="VarPartKind.OdoFixed"/> part <see cref="VarParts"/> classifies: the outermost image-capable item on the
+    /// table's chain below <paramref name="group"/> (the table itself when it is a direct member). The table's geometry
+    /// is measured in THAT member's unit, the one <see cref="OdoGeometry"/> reads for the same part, never the whole
+    /// group's: a USAGE BIT leaf elsewhere in the group would count it in bits.</summary>
+    private static DataItem OdoHolder(DataItem group, DataItem table)
+    {
+        var holder = table;
+        for (var a = table.Parent; a is not null && !ReferenceEquals(a, group); a = a.Parent)
+            if (a.IsImageCapable) holder = a;
+        return holder;
+    }
 
     /// <summary>The character width of a variable-length group's FIXED run — its image with every
     /// variable-length component collapsed to nothing. This is the §8.5.1.12.3 accounting the compatibility
