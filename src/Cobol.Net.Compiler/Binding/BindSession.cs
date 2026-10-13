@@ -70,8 +70,9 @@ internal sealed class BindSession
     private GroupRepository? _repository;
 
     /// <summary>The group's prototype signature classes (kb/Work PB2464) — the TYPE of every restricted program- or
-    /// function-pointer, resolved per unit by <c>DataBinder.ResolveRestrictedPrototypes</c> as each unit's prototype
-    /// tables are built.</summary>
+    /// function-pointer, assigned by <c>DataBinder.ClassifyRestrictedPrototypes</c> once
+    /// <c>DataBinder.ResolveRestrictedPrototypes</c> has resolved every forest's pointers through its prototype tables
+    /// (<c>BinderDriver.ResolvePointerRestrictions</c>, kb/Work PB2495).</summary>
     public PrototypeSignatureClasses SignatureClasses { get; } = new();
 
     private int _uidBand;

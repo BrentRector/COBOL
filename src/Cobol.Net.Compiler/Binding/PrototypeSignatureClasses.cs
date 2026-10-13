@@ -36,13 +36,11 @@ internal sealed class PrototypeSignatureClasses
     private readonly Namespace _programs = new();
     private readonly Namespace _functions = new();
 
-    /// <summary>The identity of a program prototype's signature class (<c>TO name</c>).</summary>
-    public string ProgramIdentity(ProgramPrototype prototype) =>
-        _programs.Identity(prototype.ExternalizedName, prototype.Signature);
-
-    /// <summary>The identity of a function prototype's signature class (<c>TO name</c>).</summary>
-    public string FunctionIdentity(UserFunctionSignature prototype) =>
-        _functions.Identity(prototype.Externalized, new CalleeSignature(prototype.Formals, prototype.Returning));
+    /// <summary>The identity of a prototype's signature class (<c>TO name</c>). A formal that is itself a restricted
+    /// pointer is compared by the signature it names (<see cref="PrototypeBisimulation"/>, kb/Work PB2495), never by the
+    /// identity this is computing, so the classification does not depend on the order prototypes are presented in.</summary>
+    public string Identity(RestrictedPrototype prototype) =>
+        (prototype.Function ? _functions : _programs).Identity(prototype.ExternalizedName, prototype.Signature);
 
     /// <summary>One namespace's classes (a program prototype and a function prototype of one name are two prototypes,
     /// §9.4): the founders in the order presented, and every name already classified.</summary>
@@ -65,4 +63,23 @@ internal sealed class PrototypeSignatureClasses
             return _classified[externalizedName] = own;
         }
     }
+}
+
+/// <summary>The prototype a restricted program- or function-pointer's <c>TO prototype-name-1</c> phrase resolves to
+/// through its unit's prototype tables (<c>BinderDriver.ProgramPrototypesOf</c> / <c>UserFunctionsOf</c>, ISO §8.4.6.8 /
+/// §8.4.6.6 and §12.3.8.4 GR10 / GR11): its namespace, its externalized name, and its signature — null when GR10 c) /
+/// GR11 c) take the details from the external repository, so there is nothing to compare at compile time. Attached to
+/// the pointer as <see cref="Model.DataItem.RestrictedPrototype"/> (kb/Work PB2495) so that a signature comparison
+/// can follow a formal's restriction to the signature it names (<see cref="PrototypeSignatures.SameType"/>).</summary>
+internal sealed record RestrictedPrototype(bool Function, string ExternalizedName, CalleeSignature? Signature)
+{
+    public static RestrictedPrototype Of(ProgramPrototype program) =>
+        new(Function: false, program.ExternalizedName, program.Signature);
+
+    public static RestrictedPrototype Of(UserFunctionSignature function) =>
+        new(Function: true, function.Externalized, new CalleeSignature(function.Formals, function.Returning));
+
+    /// <summary>The prototype's identity in a run unit: its namespace and its folded externalized name (§8.3.2.2
+    /// rule 2), the key <see cref="PrototypeBisimulation"/> assumes pairs under.</summary>
+    public (bool Function, string Name) Key => (Function, CobolNames.Fold(ExternalizedName));
 }
