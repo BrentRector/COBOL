@@ -26,8 +26,11 @@ DESIGN-cc-in-copy.md describe the writer's rule.
 the oracle host's MSBuild closure), so the landing refused the baseline `60d47c6d52a9` (exit 7). `compare_oracle.py`
 against it reports `IDENTICAL — 7780 cases`: no emitted C# and no diagnostic differs, because no corpus, NIST or
 version-matrix case writes a supplementary-plane character through REPLACE or COPY ... REPLACING (the new goldens are
-xunit tests, not oracle cases). Main re-recorded its own baseline twice meanwhile, and the first queued attempt (PR #27)
-bounced in the merge queue because a group holding it and PR #25 carried two baselines (the kb/Work PB3107 race,
-`ArchOracleDriftTests.TheRecordedBaseline_IsOneWellFormedManifest`). After PR #25 merged, the merged head compares
+xunit tests, not oracle cases). The branch recorded `88213eb8a08b` over main's interim `c41f1b82af2c`; main then
+re-recorded its own baseline three times (`f34b1aea29f0` with PR #26, `dd3d1d4bb002` with PR #31, `c8668abfeda9` with
+PR #25). The first queued attempt (PR #27) bounced in the merge queue: its merge group (base 53788e78c, the PR #26
+merge) held PR #26's `f34b1aea29f0` and the branch's `88213eb8a08b`, two baseline manifests, so
+`ArchOracleDriftTests.TheRecordedBaseline_IsOneWellFormedManifest` failed (the kb/Work PB3107 race; PR #25 was not in
+that group). After PR #25 merged, the merged head compares
 `IDENTICAL — 7799 cases` against main's `c8668abfeda9`, and the baseline is re-recorded on it at `16b7de18c926`.
 
