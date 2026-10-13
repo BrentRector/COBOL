@@ -1,4 +1,4 @@
-## Entry 1980 — 2026-10-12 16:43 PDT — PB2690: a BY REFERENCE formal's fixed table stored past a dynamic argument's capacity now creates the occurrences
+## Entry 1982 — 2026-10-12 17:17 PDT — PB2690: a BY REFERENCE formal's fixed table stored past a dynamic argument's capacity now creates the occurrences
 
 The note's last open arm asked for an adjudication: a Format 2 CALL BY REFERENCE of a group holding a dynamic-capacity
 table, opposite a formal whose corresponding table is FIXED, lost the callee's store to an occurrence past the argument's
