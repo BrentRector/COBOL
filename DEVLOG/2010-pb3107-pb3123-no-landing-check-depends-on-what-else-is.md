@@ -1,4 +1,4 @@
-## PB3107 + PB3123: no landing check depends on what else is queued (the oracle commits nothing; a DEVLOG number is held to the tree it was stamped on)
+## Entry 2010 — 2026-10-13 16:50 PDT — PB3107 + PB3123: no landing check depends on what else is queued (the oracle commits nothing; a DEVLOG number is held to the tree it was stamped on)
 
 The owner asked on 2026-10-13: "Why are many, many github runs failing? Due to our local testing, we should rarely see
 failures." Measured with `gh run list` from 2026-10-12 23:46Z to 2026-10-13 07:06Z: 12 of 39 merge-group runs failed.
@@ -52,3 +52,4 @@ clean; the leg-2 `LandingPipelineDriftTests` and `SelfTestDiscoveryDriftTests` r
 RED on the citations audit (a phantom bare `§3.17.4` in PB3123's note, fixed); the second: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — … Conformance 5,703/11,536 · Unit 32,649/33,474 · Characterization 7/36 cases ran (skipped 0) in 1 of 2 leg(s) … run 20261013T212112Z-029494 ===`.
 
 **Review round 1 (R1-1).** The reviewer found the deleted re-stamp still described as current in two places: the `enqueue.py` row of `docs/DOC_INDEX.md` ("re-stamping one main overtook") and `devlog.new_entries`' docstring ("`stamp` re-numbers by it"). Both now state the current rule (an entry keeps its number; `new_entries` serves `check`, `range_check` through `stamp_floor`, and `landing_entries`). A new `enqueue.py` self-test arm pins `_stamp` leaving a bounced branch's stamped entry alone; it fails with the pending guard mutated away. The sweep for other stale re-stamp claims found none.
+
