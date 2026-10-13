@@ -303,17 +303,20 @@ public static class StrongTypeModel
     /// <para>⛔ <see cref="PicInfo.EditingRules"/> is an <c>IReadOnlyList</c>, for which the record's synthesized
     /// equality uses the DEFAULT comparer — reference equality — so two separately-analyzed items with identical
     /// PICTURE EDITING phrases would compare unequal and legal source would be refused. It is elided from the
-    /// record compare and compared element-wise. <see cref="PicInfo.RestrictedTypeDecl"/> is elided too: it is
-    /// the RESOLUTION of <see cref="PicInfo.RestrictedTypeName"/>, which the record compare already covers, and
-    /// recursing into it would not terminate for a type whose pointer member is restricted back to it.</para>
-    /// <para>⛔ <see cref="PicInfo.RestrictedPrototypeName"/> is elided from the record compare as well, and
-    /// the pair is asked <see cref="PrototypeSignatures.SameType"/> instead (kb/Work PB3120): a restricted program- or
-    /// function-pointer is typed by its prototype's SIGNATURE (§13.18.60.4 GR25 / GR26), so two pointers restricted
-    /// to differently named prototypes of one signature are of the same type — exactly as the elementary
-    /// §14.8.2.3.2 arm reads them (<c>OoConformance.CategoryArmMismatch</c>) — and the NAME the record equality
-    /// would compare refused a group that holds such a pointer. <paramref name="prototypes"/> is the signature
-    /// comparison this one runs inside (null outside any), threaded from <c>PrototypeSignatures.Same</c> so a
-    /// pointer restricted to the prototype being compared resolves as the greatest fixed point and terminates.</para>
+    /// record compare and compared element-wise.</para>
+    /// <para>⛔ THE RESTRICTED-POINTER MEMBERS ARE ELIDED TOO, AND ASKED THEIR TYPE (kb/Work PB3120). A restricted
+    /// program- or function-pointer is typed by its prototype's SIGNATURE (§13.18.60.4 GR25 / GR26), so
+    /// <see cref="PicInfo.RestrictedPrototypeName"/> leaves the record compare and the pair is asked
+    /// <see cref="PrototypeSignatures.SameType"/> — two pointers restricted to differently named prototypes of one
+    /// signature are of the same type, exactly as the elementary §14.8.2.3.2 arm reads them
+    /// (<c>OoConformance.CategoryArmMismatch</c>). A restricted data-pointer is typed by the DECLARATION its type-name
+    /// resolves to (GR23), so <see cref="PicInfo.RestrictedTypeName"/> and its resolution
+    /// <see cref="PicInfo.RestrictedTypeDecl"/> leave the record compare and the pair is asked
+    /// <see cref="SameRestriction(TypeRestriction, TypeRestriction)"/>, the relation the elementary arm spends. Neither
+    /// can stay in the record compare: the name decided what only the type may, and recursing into the declaration
+    /// would not terminate for a type whose pointer member is restricted back to it — which
+    /// <paramref name="within"/> settles by assuming the declaration pairs under comparison equivalent and carrying the
+    /// enclosing signature comparison's <see cref="PrototypeBisimulation"/>.</para>
     /// </summary>
     private static bool SameAnalyzedProfile(DataItem a, DataItem b, Comparison within)
     {
