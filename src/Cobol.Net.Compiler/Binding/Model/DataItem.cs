@@ -115,7 +115,8 @@ public sealed class DataItem
     /// whose NOTE excludes "a record that is entirely a bit group") or its national positions (<see cref="ImageWidth"/>
     /// of a national group counts national POSITIONS — only an enclosing ALPHANUMERIC group doubles them to the
     /// storage characters they occupy). A pure function of the children, exactly as the width members are.</summary>
-    public PicInfo? AsIfPic => GroupUsage switch
+    public PicInfo? AsIfPic => Renames is { IsAlias: true, From: { } renamed } ? renamed.AsIfPic   // §13.18.45.4 GR1: ALL of data-name-2's attributes (kb/Work PB2502)
+        : GroupUsage switch
     {
         GroupUsage.Bit => new PicInfo(PicCategory.Boolean, Usage.Bit, BitLayout.ExtentBits(this), Digits: 0, Scale: 0, Signed: false),
         GroupUsage.National => new PicInfo(PicCategory.National, Usage.National, ImageWidth, Digits: 0, Scale: 0, Signed: false),
@@ -134,7 +135,8 @@ public sealed class DataItem
     /// <summary>A group that OPERATES as an elementary boolean / national item — GR1b/GR2b (a bit / national group);
     /// false for an alphanumeric group and for every elementary item. The MOVE classifier's, the emitter's and the
     /// comparison's "is this a group operation?" test is <c>IsGroup &amp;&amp; !IsAsIfElementary</c>.</summary>
-    public bool IsAsIfElementary => Pic is null && GroupUsage is not GroupUsage.None;
+    public bool IsAsIfElementary => Renames is { IsAlias: true, From: { } renamed } ? renamed.IsAsIfElementary   // GR1: the no-THROUGH alias of a bit / national group is one (kb/Work PB2502)
+        : Pic is null && GroupUsage is not GroupUsage.None;
 
     /// <summary>The DEFERRED adjudication mark of a PICTURE-less <c>USAGE NATIONAL</c>/<c>BIT</c> entry
     /// (ISO §13.18.60.4): whether it is a legal GROUP header (the usage sheds to subordinates, GR1) or an illegal
@@ -1261,6 +1263,11 @@ public sealed class DataItem
     /// implicit-filler bytes (§15.14.4 r3 is satisfied vacuously).</summary>
     public int ByteWidth =>
         IsElementary ? ElementaryByteWidth
+        // A no-THROUGH level-66 alias of a GROUP item has no PICTURE and no children of its own — "all of the data
+        // attributes of data-name-2 become the data attributes of data-name-1 and the storage area occupied by
+        // data-name-2 becomes the storage area occupied by data-name-1" (§13.18.45.4 GR1) — so it is as wide as
+        // the group it renames. (A THROUGH alias carries a synthesized alphanumeric PICTURE: the arm above.)
+        : Renames is { IsAlias: true, From: { } renamed } ? renamed.ByteWidth
         // D19/PB43 — same reason as ImageWidth: a bit-bearing subtree is LAID OUT, not summed.
         : HasBitDescendant ? BitLayout.Characters(BitLayout.ExtentBits(this))
         : Children.Where(c => c.RedefinesTargetName is null).Sum(c => c.ByteWidth * (c.Occurs ?? 1));

@@ -1,0 +1,7 @@
+W1=00
+W2=00
+W3=22
+KA AAdd->zz
+NEXT zz
+NEXT aa
+END 10
