@@ -66,26 +66,10 @@ internal sealed class OoDriver(BindSession session)
         if (iface.Ctx.environmentDivision() is { } env) synthetic.AddChild(env);
         data.BindDeclarations(synthetic);
         using (session.Edition.At(iface.Ctx)) data.DeclareUserWord(iface.Name, UserWordKind.InterfaceName);
-        DeclareMethodWords(data, iface.Prototypes, session.Edition);
         foreach (var proto in iface.Prototypes)
             data.OoBindMethodData(proto);
         data.BindResolve(synthetic);
         return data;
-    }
-
-    /// <summary>Declare each written METHOD-ID's name through the one user-defined-word funnel (§8.3.2.2; kb/Work
-    /// PB1083): a method-name, or for a GET/SET PROPERTY method the property-name it names. The accessors a PROPERTY
-    /// clause synthesizes carry no METHOD-ID (their word is declared by <c>OoBindPropertyClauses</c>).</summary>
-    private static void DeclareMethodWords(DataBinder data, IEnumerable<OoMethodSymbol> methods,
-                                           EditionContext edition)
-    {
-        foreach (var m in methods)
-        {
-            if (m.Ctx is null) continue;   // a synthesized PROPERTY-clause accessor
-            using (edition.At(m.Ctx))
-                data.DeclareUserWord(m.PropertyName ?? m.Name,
-                    m.PropertyName is null ? UserWordKind.MethodName : UserWordKind.PropertyName);
-        }
     }
 
     /// <summary>Phase A of class binding — the DATA + SIGNATURES: the OBJECT paragraph's data division binds
@@ -124,7 +108,6 @@ internal sealed class OoDriver(BindSession session)
         var synthetic = OoReparentClassData(cls.Symbol.Ctx);
         data.BindDeclarations(synthetic);
         using (edition.At(cls.Symbol.Ctx)) data.DeclareUserWord(cls.Name, UserWordKind.ObjectClassName);
-        DeclareMethodWords(data, cls.Symbol.Methods, edition);
         foreach (var m in cls.Symbol.Methods.ToList())   // snapshot — property synthesis appends accessors
             data.OoBindMethodData(m);
         data.OoBindPropertyClauses(cls.Symbol, factory: false);
@@ -142,7 +125,6 @@ internal sealed class OoDriver(BindSession session)
             cls.Symbol.Ctx.factoryParagraph()?.optionsParagraph(), edition, clsOptions));   // §11.9.4 GR1 (kb/Work PB135)
         var fsynthetic = OoReparentFactoryData(cls.Symbol.Ctx);
         fdata.BindDeclarations(fsynthetic);
-        DeclareMethodWords(fdata, cls.Symbol.FactoryMethods, edition);
         foreach (var m in cls.Symbol.FactoryMethods.ToList())
             fdata.OoBindMethodData(m);
         fdata.OoBindPropertyClauses(cls.Symbol, factory: true);

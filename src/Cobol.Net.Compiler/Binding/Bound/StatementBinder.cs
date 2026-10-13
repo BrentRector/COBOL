@@ -319,6 +319,9 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
             var scope = new OoMethodScope { Data = m.DataScope, MethodName = m.Name, Formals = m.Binding!.Formals };
             scopeToMethod[scope] = m;         // §9.10 — handler pc-ranges map back to this method via its scope
             Ctx.CurrentMethodScope = scope;   // the COLLECTION cursor (AddParagraph registers method-locally)
+            // …and its procedure-names are words of the METHOD's source element, declared in its own §8.3.2.2 census
+            // (kb/Work PB2921) — released at the end of this iteration.
+            using var declaring = Ctx.Data.EnterMethodDeclarations(m.DataScope);
             m.Binding!.DeclStartPc = table.Paragraphs.Count;
             m.Binding!.EntryPc = table.Paragraphs.Count;
             if (m.Ctx.procedureDivision() is { } pd)
@@ -328,25 +331,10 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
                 // (§14.9.49.3 SR4) — the program layout, one method at a time (kb/Work PB1010).
                 m.Binding!.Declaratives = table.CollectMethodDeclaratives(pd, used);
                 m.Binding!.EntryPc = table.Paragraphs.Count;
-                // §14.4.3 — a method's procedure division may also open with unnamed sentences (same rule as a
-                // program's; the header form is shared). They take the method's ENTRY pc, set just above.
-                table.AddAnonymousParagraph(pd.sentence(), null, used);
-                foreach (var unit in pd.procedureUnit())
-                {
-                    if (unit.paragraphDefinition() is { } para)
-                        table.AddParagraph(para.paragraphName().GetText(), para.sentence(), null, used);
-                    else if (unit.sectionDefinition() is { } section)
-                    {
-                        // A section inside a method is a method-local pc range (the legacy COBOL0116 reject is
-                        // superseded: with per-method scopes the range cannot truncate or leak — trap #5).
-                        var info = new SectionInfo(section.sectionName().GetText(), table.Paragraphs.Count);
-                        table.AddAnonymousParagraph(section.sentence(), info, used);
-                        foreach (var p in section.paragraphDefinition())
-                            table.AddParagraph(p.paragraphName().GetText(), p.sentence(), info, used);
-                        info.CloseAt(table.Paragraphs.Count - 1);   // zero paragraphs ⇒ EMPTY (§14.4.2)
-                        scope.Sections.Declare(info.Name, info);
-                    }
-                }
+                // The program's walk, at the method's ENTRY pc set just above: unnamed lead sentences (§14.4.3), then
+                // paragraphs and sections, each a method-local name and a section a method-local pc range (with
+                // per-method scopes the range cannot truncate or leak — trap #5).
+                table.CollectNondeclaratives(pd, used);
             }
             m.Binding!.EndPc = table.Paragraphs.Count - 1;
             methods.Add(new BoundMethod(m.Name, m.CsName, m.Binding!.EntryPc, m.Binding!.EndPc));

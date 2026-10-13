@@ -46,3 +46,15 @@ PB3030 (the bit-bearing OCCURS DEPENDING member beside a runtime-length table) r
 stage; it is a third mechanism (the current-extent composer's ODO prefix in bit units, through the record layout) and
 was split to a finisher with its design written into the note. Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
 gating, PB2515): GREEN ===` (run 20261012T194921Z-2feabf).
+
+**The branch review's second finding (w1071 B, round 2).** Review R1-1: the OO deep-dive's "Emitted-name safety" item still
+described the `_M` suffix that PB2921 replaced. The golden written to pin the prefix family (`2002/pb2921_class_named_method`,
+METHOD-ID `PB2921C` in CLASS-ID `PB2921C` beside METHOD-ID `PB2921C-M`) failed before code generation: COBOLNET2692, because
+the class binder kept ONE §8.3.2.2 census for the class and every method in it, so the rename it was meant to pin was
+unreachable. A method is a source element of its own (§10.5, §8.4.6.5), so each method now carries its own census
+(`UserWordCensus` on `OoMethodDataScope.Words`, selected by `DataBinder.EnterMethodDeclarations` for its data entries, its
+METHOD-ID and its procedure-names). The same change admits a condition-name in one method spelled like a data-name in a
+sibling method. The sibling arm: the method copy of the procedure-name walk declared no section-name and reported without a
+position; program and method now share `ProcedureTableBuilder.CollectNondeclaratives` (negative
+`pb2921-method-section-named-like-its-data`). The deep-dive item now describes the per-method census and the prefix families,
+and plan §0 names the runtime base factory `__FACTORY_BASE`.
