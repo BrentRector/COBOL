@@ -431,7 +431,7 @@ internal sealed partial class EcBinder
             Core.GoToStatementContext or Core.GobackStatementContext or Core.NextSentenceStatementContext => true,
             Core.StopStatementContext stop => stop.RUN() is not null,
             Core.ExitStatementContext e => e.PARAGRAPH() is not null || e.SECTION() is not null
-                || e.PROGRAM() is not null || e.METHOD() is not null || e.FUNCTION() is not null,
+                || e.PROGRAM() is not null || e.methodKeyword() is not null || e.FUNCTION() is not null,
             _ => false,
         });
 
