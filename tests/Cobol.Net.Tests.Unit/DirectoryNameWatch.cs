@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Runtime.IO;
+using CobolNet.Tests.Shared;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -20,6 +21,7 @@ internal sealed class DirectoryNameWatch : IDisposable
     private readonly FileSystemWatcher _watcher;
     private readonly List<string> _events = [];
     private readonly ManualResetEventSlim _deletion = new();
+    private Exception? _lost;
 
     /// <summary>Watch the subdirectory names of <paramref name="parent"/> from now on.</summary>
     internal DirectoryNameWatch(string parent)
@@ -27,6 +29,13 @@ internal sealed class DirectoryNameWatch : IDisposable
         _watcher = new FileSystemWatcher(parent) { NotifyFilter = NotifyFilters.DirectoryName, InternalBufferSize = 64 * 1024 };
         _watcher.Renamed += (_, e) => Record($"renamed {e.OldName} -> {e.Name}", deletion: false);
         _watcher.Deleted += (_, e) => Record($"deleted {e.Name}", deletion: true);
+        // A watcher whose buffer overflowed has DROPPED reports, so the order it holds is no observation at all: an absent
+        // "deleted <name>" would pass vacuously. It ends the wait and is raised as a non-observation below.
+        _watcher.Error += (_, e) =>
+        {
+            lock (_events) _lost ??= e.GetException();
+            _deletion.Set();
+        };
         _watcher.EnableRaisingEvents = true;
     }
 
@@ -40,14 +49,21 @@ internal sealed class DirectoryNameWatch : IDisposable
     /// state, <see cref="HostFile.ShareModesAreMandatory"/>) the lock directory <paramref name="name"/> must have gone by a
     /// RENAME to a retired name and never by a deletion under its own; elsewhere an unlink is atomic and there is nothing
     /// to see. The wait is for the operating environment's report of the retired name's deletion to arrive, never a
-    /// measure of time: it ends the moment the report does, and the bound only turns a report that never comes into a
-    /// failure.</summary>
+    /// measure of time: it ends the moment the report does, and it is bounded only by the harness's ONE budget
+    /// (<see cref="ProcessObserver.TimeoutMs"/>, kb/Work PB3022 — a test sets no literal time limit). A report that never
+    /// comes, or a watcher that lost reports, is a NON-OBSERVATION (<see cref="HarnessNonObservationException"/>), never a
+    /// verdict on the order.</summary>
     internal void AssertRenamedAwayRatherThanDeletedInPlace(string name)
     {
         if (!HostFile.ShareModesAreMandatory) return;
-        Assert.True(_deletion.Wait(TimeSpan.FromMinutes(2)), "The host reported no subdirectory deletion.");
+        if (!_deletion.Wait(ProcessObserver.TimeoutMs))
+            throw new HarnessNonObservationException(
+                $"NON-OBSERVATION: the host reported no subdirectory deletion within the harness budget ({ProcessObserver.TimeoutMs} ms).");
         string[] seen;
-        lock (_events) seen = [.. _events];
+        Exception? lost;
+        lock (_events) (seen, lost) = ([.. _events], _lost);
+        if (lost is not null)
+            throw new HarnessNonObservationException($"NON-OBSERVATION: the directory watcher lost reports ({lost.Message}).");
         Assert.DoesNotContain($"deleted {name}", seen);
         Assert.Contains(seen, e => e.StartsWith($"renamed {name} -> .wolk-gone-", StringComparison.Ordinal));
     }
