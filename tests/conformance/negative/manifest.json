@@ -2630,7 +2630,8 @@
   "pb1616-define-zero-length-below-2014",
   "pb3120-group-formal-pointer-type-below-2002",
   "pb3120-group-formal-pointer-signature-mismatch",
-  "pb3120-group-formal-data-pointer-declaration-mismatch"
+  "pb3120-group-formal-data-pointer-declaration-mismatch",
+  "pb3120-group-formal-template-pointer-signature-mismatch"
  ],
  "pending": []
 }

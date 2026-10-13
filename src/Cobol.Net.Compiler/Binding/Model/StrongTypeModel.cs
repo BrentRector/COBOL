@@ -209,6 +209,16 @@ public static class StrongTypeModel
         return key.ToString();
     }
 
+    /// <summary>True when <paramref name="decl"/>, the TYPEDEF template a restricted data-pointer member resolved to
+    /// (<c>DataBinder.ResolveRestrictedTypes</c>), is the declaration <paramref name="open"/> is the key of: the
+    /// template itself, or a TYPE SUBJECT of it. A subject's subtree is a clone of its template, so the two are one
+    /// type declaration (§8.5.3.1: the type of an item described with a TYPE clause is the declaration that clause
+    /// references) held by the model in two forms, and a key built from either form must be the same string. The
+    /// back-reference is therefore recognized across the forms by the type-name, which §13.18.58 makes unique within
+    /// a source element and which is what the member's declaration was resolved by (kb/Work PB3120).</summary>
+    private static bool IsOpenDeclaration(DataItem open, DataItem decl) =>
+        ReferenceEquals(open, decl) || (decl.IsTypedef && !open.IsTypedef && CobolNames.Same(open.TypeName, decl.CobolName));
+
     /// <summary><see cref="SameEssentialCharacteristics"/> as a key: the entry clauses, then the analyzed profile
     /// (<see cref="PicInfo"/>'s own record text, every axis by construction, with the members
     /// <see cref="SameAnalyzedProfile"/> handles apart rendered apart — a restricted prototype-pointer by the TYPE it
@@ -227,7 +237,7 @@ public static class StrongTypeModel
         string restricted = p.RestrictedTypeName is null ? ""
             : CobolNames.Fold(p.RestrictedTypeName)
               + (p.RestrictedTypeDecl is not { } decl ? ""
-                 : open.IndexOf(decl) is var at and >= 0 ? $"@{open.Count - at}" : $"[{TypeIdentityKey(decl, open)}]");
+                 : open.FindIndex(o => IsOpenDeclaration(o, decl)) is var at and >= 0 ? $"@{open.Count - at}" : $"[{TypeIdentityKey(decl, open)}]");
         return $"{entry}|{p with { EditingRules = null, RestrictedTypeName = null, RestrictedTypeDecl = null, RestrictedPrototypeName = null, LocaleEdit = null }}"
             + $"|{rules}|{locale}|{PrototypeSignatures.RestrictionIdentity(x)}|{restricted}";
     }

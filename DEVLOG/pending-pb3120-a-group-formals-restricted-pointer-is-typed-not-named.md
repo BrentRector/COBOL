@@ -43,3 +43,18 @@ GS2 mutual recursion, a self-referential `T-NODE` pair; output `PX NULL`, `set o
 **Found in passing, not fixed.** A group with a pointer leaf that is NOT strongly typed is still refused at a CALL and in
 a signature pair (the Tier-C island, COBOLNET1688 / 1513): a different mechanism (the group has no boundary character
 image), reported as a lead and not widened into this change.
+
+**Review round 1 (R1-1).** `TypeIdentityKey` of a TYPE subject (`ADDRESS OF S`) and of its TYPEDEF template (a method's
+`LP TYPE PT`) must be one string, and they were not. Measured: the pointer member inside the TEMPLATE carried no
+`RestrictedTypeDecl`, because `DataBinder.ResolveRestrictedTypes` walked `AllItems()`, the storage roots, and a template is
+kept off them; the subject's clone was resolved. The subject therefore keyed the member as `t-rec@1` and the template as
+`t-rec`, so `INVOKE U "TR" USING ADDRESS OF S` raised EC-OO-METHOD where main selected the method (ISO 8.4.3.11.4 GR2 types
+the address by the type of S, 14.8.2.3.2 matches it to a formal restricted to that type). Root fix: the three pointer
+resolvers (`ResolveRestrictedTypes`, `ResolveRestrictedPrototypes`, `ClassifyRestrictedPrototypes`) walk
+`ClauseResolutionForest()`, the templates too, and `TemplateClauseResolutionDriftTests` pins all three. A back-reference to
+an open declaration is also recognized across the two forms of one declaration (`IsOpenDeclaration`: the template, or a
+TYPE subject of that type-name). The prototype twin was the same hole with a visible symptom: a data-pointer restricted to
+a record whose member is a program-pointer was compared through the template, where `QA` against `QB` (one signature)
+drew COBOLNET1513; goldens `2002/pb3120_universal_type_subject_key` (equivalent: TR:REACHED; a class whose T-REC differs
+in length: EC-OO-METHOD), `2002/pb3120_group_formal_template_pointer_signature` and negative
+`pb3120-group-formal-template-pointer-signature-mismatch` (QA 9(4) against QB X(4): still COBOLNET1513).

@@ -3578,10 +3578,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// declare a non-equivalent type under one name, and §8.5.3.1 makes equivalence — not the spelling — the
     /// test §14.9.39.3 SR19, §14.9.3.3 SR4/SR5 and §14.8.2.3.2 spend (kb/Work PB427). No diagnostic is
     /// raised for an unresolved name: §13.18.60.3 SR18 already requires such an entry to be a TYPEDEF, and a
-    /// restriction whose declaration is not in hand falls back to the name comparison rather than rejecting.</para></summary>
+    /// restriction whose declaration is not in hand falls back to the name comparison rather than rejecting.</para>
+    /// <para>⛔ It walks <see cref="ClauseResolutionForest"/>, the TYPEDEF templates too (kb/Work PB3120): a template is
+    /// itself a form of the type declaration the model compares and keys (<c>StrongTypeModel.EquivalentTypeDeclarations</c>,
+    /// <c>TypeIdentityKey</c>), so a pointer member restricted to a type must resolve in the template exactly as in the
+    /// TYPE subject cloned from it, or the two forms of one declaration key apart.</para></summary>
     private void ResolveRestrictedTypes()
     {
-        foreach (var item in AllItems())
+        foreach (var item in ClauseResolutionForest())
             if (item.Pic is { Category: PicCategory.Pointer, RestrictedTypeName: { } tn, RestrictedTypeDecl: null }
                 && TryFindTypeDecl(tn, out var decl))
                 item.Pic = item.Pic with { RestrictedTypeDecl = decl };
@@ -3596,11 +3600,14 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// (a method's LINKAGE roots are on its class's). A name the table does not hold resolves to nothing, and the pointer
     /// keeps its own name as its identity (<see cref="PrototypeSignatures.RestrictionIdentity"/>). The first of two
     /// passes: <see cref="ClassifyRestrictedPrototypes"/> runs only once EVERY forest has been through this one, because
-    /// classifying a prototype follows its formals' restrictions into other forests.</summary>
+    /// classifying a prototype follows its formals' restrictions into other forests. Both passes walk
+    /// <see cref="ClauseResolutionForest"/>, the TYPEDEF templates too: a data-pointer restricted to a type is compared
+    /// through that type's TEMPLATE, whose own program-pointer members must be typed by their prototype's signature
+    /// exactly as the TYPE subjects cloned from it are (kb/Work PB3120).</summary>
     internal void ResolveRestrictedPrototypes(
         IReadOnlyDictionary<string, ProgramPrototype> programs, IReadOnlyDictionary<string, UserFunctionSignature> functions)
     {
-        foreach (var item in AllItems())
+        foreach (var item in ClauseResolutionForest())
             if (item.Pic is { RestrictedPrototypeName: { } name } pic)
                 item.RestrictedPrototype = pic.Category switch
                 {
@@ -3616,7 +3623,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// after <see cref="ResolveRestrictedPrototypes"/> has run over every forest.</summary>
     internal void ClassifyRestrictedPrototypes(PrototypeSignatureClasses classes)
     {
-        foreach (var item in AllItems())
+        foreach (var item in ClauseResolutionForest())
             if (item.RestrictedPrototype is { } prototype)
                 item.PointerRestrictionIdentity = classes.Identity(prototype);
     }
