@@ -31,24 +31,42 @@ internal sealed class OoDriver(BindSession session)
     /// prototypes reuse the whole OoBindMethodData machinery with no bodies).</summary>
     public void BindInterfaceData(OoInterfaceSymbol iface) => _ifaceData[iface] = BindInterface(iface);
 
-    /// <summary>⛔ A PARAMETERIZED definition binds AS ITSELF, for its own rules, and nothing reads the result
-    /// (kb/Work PB2051; OO deep-dive D12). §9.3.12 makes it a skeleton whose expansions are the classes, but it is a
-    /// class definition all the same: every syntax rule of its data, environment and method headers — a BASED entry's
-    /// level (§13.16.3 SR16), a data-division section's placement (§13.7.3 SR1), a duplicate METHOD-ID — governs its
-    /// text whether or not anything expands it, and until this bind those rules were asked of an expansion only, so an
-    /// unexpanded definition compiled whatever its body held. Its parameter-names resolve through the one funnel as
-    /// formals (<c>OoNameResolution.Result.IsFormal</c>), and a reference typed by a formal takes the universal
-    /// description: what the formal names is known only in an expansion, where §9.3.8.2.4 asks every conformance
-    /// question "as if the actual parameter classes or interfaces were substituted". The uid band it draws is its
-    /// own and comes after every emitted class's, so emission is unchanged. Its method BODIES bind only in each
-    /// expansion: a statement through a formal-typed reference obeys rules that differ between the universal
-    /// description and the typed one an expansion binds (a literal INVOKE argument, SUPER over a formal base), so
-    /// they wait on a formal description kind of their own (D12 determination 6).</summary>
-    public void BindParameterized(OoClassSymbol skeleton) => BindClassData(new OoClassUnit { Symbol = skeleton });
+    /// <summary>⛔ A PARAMETERIZED definition binds AS ITSELF, for its own rules, and nothing emits the result
+    /// (kb/Work PB2051, PB2937; OO deep-dive D12). §9.3.12 makes it a skeleton whose expansions are the classes, but it
+    /// is a class definition all the same: every syntax rule of its data, environment and method headers — a BASED
+    /// entry's level (§13.16.3 SR16), a data-division section's placement (§13.7.3 SR1), a duplicate METHOD-ID, a USAGE
+    /// the targeted edition does not have — governs its text whether or not anything expands it, and until this bind
+    /// those rules were asked of an expansion only, so an unexpanded definition compiled whatever its body held. Its
+    /// parameter-names resolve through the one funnel as formals (<c>OoNameResolution.Result.IsFormal</c>), and a
+    /// reference typed by a formal takes the universal description: what the formal names is known only in an
+    /// expansion, where §9.3.8.2.4 asks every conformance question "as if the actual parameter classes or interfaces
+    /// were substituted". The uid band it draws is its own and comes after every emitted class's, so emission is
+    /// unchanged. The bound forests are KEPT (<see cref="SkeletonClasses"/>, <see cref="SkeletonInterfaceData"/>) for the
+    /// one later pass that judges data rules over every forest, the edition pass's data gates; no pass that produces
+    /// code sees them. Its method BODIES bind only in each expansion: a statement through a formal-typed reference
+    /// obeys rules that differ between the universal description and the typed one an expansion binds (a literal INVOKE
+    /// argument, SUPER over a formal base, a formal as INVOKE's class-name), so they wait on a formal description kind
+    /// of their own (D12 determination 6; kb/Work PB2937's open half).</summary>
+    public void BindParameterized(OoClassSymbol skeleton)
+    {
+        var unit = new OoClassUnit { Symbol = skeleton };
+        BindClassData(unit);
+        _skeletonClasses.Add(unit);
+    }
 
-    /// <summary>The interface twin of <see cref="BindParameterized(OoClassSymbol)"/>: the prototypes' formals bind
-    /// and the forest is dropped (nothing renders an interface skeleton).</summary>
-    public void BindParameterized(OoInterfaceSymbol skeleton) => _ = BindInterface(skeleton);
+    /// <summary>The interface twin of <see cref="BindParameterized(OoClassSymbol)"/>: the prototypes' formals bind and
+    /// the forest is kept for the data gates (nothing renders an interface skeleton).</summary>
+    public void BindParameterized(OoInterfaceSymbol skeleton) => _skeletonInterfaceData[skeleton] = BindInterface(skeleton);
+
+    /// <summary>The unexpanded parameterized CLASS definitions, their data and method headers bound as themselves
+    /// (<see cref="BindParameterized(OoClassSymbol)"/>); <c>Bound</c> / <c>FactoryBound</c> stay unset.</summary>
+    public IReadOnlyList<OoClassUnit> SkeletonClasses => _skeletonClasses;
+    private readonly List<OoClassUnit> _skeletonClasses = [];
+
+    /// <summary>The unexpanded parameterized INTERFACE definitions' prototype forests
+    /// (<see cref="BindParameterized(OoInterfaceSymbol)"/>).</summary>
+    public IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> SkeletonInterfaceData => _skeletonInterfaceData;
+    private readonly Dictionary<OoInterfaceSymbol, DataBinder> _skeletonInterfaceData = [];
 
     private DataBinder BindInterface(OoInterfaceSymbol iface)
     {

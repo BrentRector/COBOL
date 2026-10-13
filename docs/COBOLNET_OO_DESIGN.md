@@ -693,7 +693,12 @@ through the same `NewClassSymbol` / `NewInterfaceSymbol` and roster collection t
 `ParameterizedClasses` / `ParameterizedInterfaces` and out of every name lookup, and asks it the header rules every
 definition is asked (CLASS-ID / INTERFACE-ID / METHOD-ID AS literal, duplicate METHOD-ID, the INHERITS and IMPLEMENTS
 REPOSITORY rules). `OoDriver.BindParameterized` then binds its environment and data divisions and its method
-headers as itself, after every emitted class, and drops the result. A parameter-name resolves through the one
+headers as itself, after every emitted class, and KEEPS the forests (`OoDriver.SkeletonClasses` /
+`SkeletonInterfaceData`, carried on `GroupBindContext` outside `AllBinders`): no pass that produces code sees
+them, and the edition pass's data gates (`VersionConformancePass.GateData`) read them as they read every emitted
+class's, together with every INTERFACE's prototype forest, which no gate read either (kb/Work PB2937) — so a
+`USAGE FLOAT-BINARY-64` in an unexpanded skeleton, or on an interface prototype's formal, is COBOLNET0900 below
+2014. A parameter-name resolves through the one
 funnel as a FORMAL (`OoNameResolution.Result.IsFormal`, from the scope's own USING clause, asked before any group
 class of the same spelling), and a reference typed by a formal takes the universal description: what it names is
 known only in an expansion, where §9.3.8.2.4 asks every conformance question "as if the actual parameter classes or

@@ -15,12 +15,17 @@ namespace CobolNet.Binding.Passes;
 /// on any bound NODE), the collected units + class units, and the group-bind session (turn state, class table,
 /// edition, uid bands). Deliberately does NOT carry the OO bind driver — no group pass needs the
 /// emitter-hosted OO bind bodies (they all run BEFORE the tail), so a pass reaching for emit state is a compile
-/// error by construction.</summary>
+/// error by construction. <see cref="SkeletonClasses"/> / <see cref="SkeletonInterfaceData"/> are the unexpanded
+/// PARAMETERIZED definitions' forests (OO deep-dive D12 determination 6): bound for their own rules, never emitted, so
+/// they are deliberately OUTSIDE <see cref="AllBinders"/> (no producing pass runs over them) and are read only by the
+/// edition pass's data gates (kb/Work PB2937).</summary>
 internal sealed record GroupBindContext(
     CobolParserCore.CompilationUnitContext Tree,
     IReadOnlyList<BoundUnit> Units,
     IReadOnlyList<OoClassUnit> Classes,
     IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> InterfaceData,
+    IReadOnlyList<OoClassUnit> SkeletonClasses,
+    IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> SkeletonInterfaceData,
     BindSession Session)
 {
     /// <summary>Every DataBinder of the group, in the fused pipeline's order: class OBJECT + FACTORY forests,

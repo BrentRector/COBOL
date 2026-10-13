@@ -187,7 +187,7 @@ internal sealed class BinderDriver
         // edition gate; each pass's doc lives with its body; the ORDER lives in BindPipeline.GroupTail,
         // DAG-validated against the resolve prefix above). Once the tail completes, the edition sink carries
         // EVERY edition diagnostic — the driver's CheckOnly verdict needs nothing beyond this Bind.
-        var ctx = new GroupBindContext(tree, units, classes, oo.InterfaceData, session);
+        var ctx = new GroupBindContext(tree, units, classes, oo.InterfaceData, oo.SkeletonClasses, oo.SkeletonInterfaceData, session);
         foreach (var pass in BindPipeline.GroupTail())
         {
             RequireAll(ctx, pass);      // watermark gate: the prerequisite RAN on every binder (P6 Step 6)
