@@ -122,8 +122,11 @@ public static class ItemCategory
         // a composed alphanumeric PICTURE for its carrier). It is ALWAYS the alphanumeric kind: §13.18.45.3
         // SR8 bars "a strongly-typed group item … a variable-length data item, or an occurs-depending table"
         // from the range, and a level-66 entry writes no GROUP-USAGE clause. The no-THROUGH alias (GR1) takes
-        // data-name-2's own attributes and is never asked here — ReferenceResolver forwards it to that item.
+        // data-name-2's own attributes: a place reference to it is forwarded to that item by ReferenceResolver, and
+        // a rule that asks the DataItem itself — a RECORD KEY naming an alias of a group (§12.4.5.12.3 SR2; kb/Work
+        // PB2502) — is answered here, as that item.
         if (item.Renames is { IsAlias: false }) return GroupKinds.Alphanumeric;
+        if (item.Renames is { IsAlias: true, From: { } renamed }) return GroupKindsOf(renamed);
         // The structural half no classifier carries. §8.5.1.3.1 — "The most basic subdivisions of a record,
         // that is, those not further subdivided, are called elementary items" — so an entry with NO subordinates
         // is not a group item whatever else it is, and here it is an error-recovery artifact (a refused
