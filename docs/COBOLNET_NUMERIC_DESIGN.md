@@ -702,6 +702,22 @@ Statement arithmetic (ADD/SUB/MUL/DIV with GIVING) enforces the 31-digit composi
 
 Mined from legacy ArithmeticLowerer.LowerDivide: it divides into a `decimal` accumulator (28-29 sig digits) then rescales to the receiver only on the final store. Reproduce with guardScale = max(receiver scales, operand scales) + DIV_GUARD_DIGITS(=14); RoundDiv at guardScale, then TryStore rounds once to the receiver scale per the ROUNDED mode. REMAINDER (DIVIDE…REMAINDER): quotient truncated to GIVING's fraction-digits (NOT rounded), remainder = dividend − quotient×divisor at the GIVING scale (legacy ComputeCobolRemainder / IrCobolRemainder uses givingFracDigits, no rounding).
 
+**DIVIDE ... GIVING ... REMAINDER has one kernel per lane (kb/Work PB3017; `ArithmeticEmitter.EmitDivideRemainder`).** §14.9.12.4
+GR1/GR7 define the quotient and the remainder as SDIDI expressions under standard-decimal arithmetic and GR6 c) derives the
+subsidiary quotient from that quotient by truncation, so the STANDARD / STANDARD-DECIMAL lane forms the quotient
+(`CobolDec.Div` over each operand's `DecOperand` lift), the subsidiary quotient (`CobolDec.SubsidiaryQuotient`: truncated
+toward zero at the GIVING receiver's scale, then reduced to its low-order digit count, the significand kept at the
+quotient's own exponent so no 38-digit significand enters a 34-digit carrier) and the remainder entirely on `CobolDec`;
+the stored quotient is the same SDIDI value, landed by the receiver's own rounding. An unsigned 16-byte dividend in
+[2^127, 2^128) or a float dividend past 1.7E+38 therefore reaches the lane exactly as in `COMPUTE`/`DIVIDE GIVING`. The NATIVE lane keeps the exact
+Int128 kernel (`CobolNum.Divide` at the receiver's scale, then `CapDigits`): its intermediate range is the checked
+Int128 (DOC-A.1-179), so an unsigned-wide dividend past 2^127 - 1 is the funnel's size error and a float dividend past the
+carrier raises EC-SIZE-OVERFLOW from `NumericRenderer.Align`. ⛔ The subsidiary quotient's DIGIT CAP is the digits the
+receiver's store KEEPS (kb/Work PB129): the PICTURE's digit positions for a PICTURE-truncating item, none for a
+BINARY-CAPACITY item (COMP-5, BINARY-CHAR ... BINARY-DOUBLE), which owns its whole container (§13.18.60.4 GR12, DOC-A.1-123) -
+the quotient such an item holds is the full quotient, and capping it at the PICTURE's digits made the remainder of
+`DIVIDE 123456 BY 7 GIVING Q REMAINDER R` into `Q PIC 9(4) COMP-5` 70004 instead of 4.
+
 ### Mixed float/fixed arithmetic and the COMP-1/COMP-2 capacity bypass.
 
 Type-classify each arithmetic sub-expression: if any operand is float-usage, the sub-expression evaluates in `double` (IEEE), and the final store to a fixed-point receiver converts double→CobolInt at the receiver scale with the ROUNDED mode (legacy StoreArithmeticResult guards `if Usage is Comp1/Comp2 skip scaling`). A pure-fixed sub-expression stays Int128. The 31-digit composite limit applies only to the non-float operands (rule 2b). COMP-5 stores in its exact native width and bounds by two's-complement (binary-wrap), not by digit count.
@@ -843,8 +859,9 @@ arithmetic store and the MOVE store each had the `Dec` arm, these did not. The r
 scale (`WorkingScale(SdidiLandingScaleFloor)`, checked — moved out of `IntrinsicRenderer`, which delegates; the
 constant was called `NumvalScaleFloor` until kb/Work PB251 showed the name was a fiction — §15.67 prescribes no
 working scale, so the floor is an implementor choice for THIS landing and nothing else); `FixedLane`
-is the same for a consumer with no float arm of its own (the DIVIDE … REMAINDER kernel — a FLOAT-LONG sender was
-snapshotted `Int128 t = double`, PB85 — a native float lands truncated at `FloatWorkingScale`); the sign condition
+is the same for a consumer with no float arm of its own (the NATIVE DIVIDE … REMAINDER kernel — a FLOAT-LONG sender was
+snapshotted `Int128 t = double`, PB85 — a native float lands truncated at `FloatWorkingScale`; the standard-decimal lane
+does not come through here, PB3017); the sign condition
 tests `Int128.Sign(dec.Sig)` (`RuntimeApi.DecSign` — exact at every exponent, never a landing);
 `NumericRenderer.StoreArgs`/`StoreExpr` are THE carrier switch at a fixed-point store, spelled once for the
 arithmetic store, the numeric MOVE and INVOKE BY CONTENT; `NumericRenderer.EditedLanding` is its sibling at a
@@ -875,8 +892,15 @@ kernel; `CobolIntrinsics.FromDouble(…, checkedLanding)` likewise). ⛔ THE CHE
 `CobolSizeError` EC-SIZE-TRUNCATION — the twin of `CobolDec.ToUnscaledChecked` — because the saturated
 `Int128.MaxValue` they used to return is a LEGAL value in a 16-byte COMP-5 receiver (its capacity is the whole
 carrier), which stored it and took NOT ON SIZE ERROR. An INTERMEDIATE consumer (no store: `NumericRenderer.Align` /
-`AlignRoundedUp`, the formatted-time seconds) takes the third form, `CobolFloat.ToScaledSaturating`, through
-`RuntimeApi.FloatToScaledIntermediate`. The emitter NAMES the landing at every site —
+`AlignRoundedUp`, which feed alignments, argument lists, subscripts, counts and the DIVIDE ... REMAINDER kernel) takes the
+third form, `CobolFloat.ToScaledIntermediate`, through `RuntimeApi.FloatToScaledIntermediate`, and ⛔ IT RAISES TOO
+(kb/Work PB3019): EC-SIZE-OVERFLOW, §14.7.5 5), the twin of `CobolDec.ToUnscaledIntermediate`. It used to saturate
+("no store follows to be fooled by the sentinel"), but an intermediate that compares or selects loses the order of two
+values past the carrier through a sentinel (1E300 and 1E301 both landed as `Int128.MaxValue`) and the SDIDI lane raised
+for the same pair, so the lane in force decided the answer. The one consumer that wants a membership answer, the
+formatted-time seconds (`CobolDate.SecondsOfReal`, "out of the standard numeric time form"), states its own screen
+(a magnitude of 10^19 or more saturates by sign, the bound `SecondsOfDec` uses) and lands the rest through the
+intermediate form. The emitter NAMES the landing at every site —
 `RuntimeApi.FloatToScaled(…, bool checkedLanding)` has no
 default; `NumericRenderer.StoreArgs(…, checkedLanding)` takes it from `ecState.SizeErrVar` (arithmetic) or `false`
 (`StoreExpr`: MOVE, INVOKE); the quantizer / NUMVAL-family renders carry the ONE `NumericRenderer.CheckedFlag`
