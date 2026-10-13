@@ -72,4 +72,6 @@ static CobolNet.Runtime.ExternalizedNames.FormInEdition(string? value, int diale
 static CobolNet.Runtime.CobolNames.HasEditionSpelling(int dialectLevel) -> bool
 CobolNet.Runtime.ActivationDescription.AnyLengthClauses.get -> string?
 CobolNet.Runtime.ActivationDescription.AnyLengthClauses.init -> void
+CobolNet.Runtime.ActivationDescription.ClausePhrases.get -> string![]?
+CobolNet.Runtime.ActivationDescription.ClausePhrases.init -> void
 static CobolNet.Runtime.ActivationRelations.MatchViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> string?

@@ -87,32 +87,44 @@ public static class ActivationRelations
             ? null
             : $"the argument ({argument}) and the formal parameter ({formal}) are not described with the same ALIGNED, "
               + "ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §9.3.6 "
-              + "match rule 3 e))" + FirstClauseDifference(argument, formal);
+              + "match rule 3 e))" + ClauseDifference(argument, formal);
     }
 
-    /// <summary>Where two clause identities first differ, for a refusal's reader: the first
-    /// <see cref="ActivationDescription.Clauses"/> segment (each names its clause — USAGE, SIGN, LENGTH, PICTURE, …) the
-    /// argument and the formal parameter spell differently, or the empty string when either has none. It diffs the
-    /// PAIR <see cref="SameClausesAtFormalLength"/> compared: opposite an ANY LENGTH formal the argument's
-    /// <see cref="ActivationDescription.AnyLengthClauses"/>, and never the LENGTH segment, which §14.8.2.3.2
-    /// "Additionally" d) considers to match — so the refusal names the clause that differs (JUSTIFIED, PICTURE, …) and
-    /// not the one length the rule relaxes (kb/Work PB2077 review R1-2).</summary>
-    private static string FirstClauseDifference(ActivationDescription argument, ActivationDescription formal)
+    /// <summary>Which clauses two elementary descriptions differ in, for a refusal's reader: the
+    /// <see cref="ActivationDescription.ClausePhrases"/> one side is described with and the other is not, spelled as
+    /// their entries spell them — never the <see cref="ActivationDescription.Clauses"/> identity key, whose segments
+    /// are a type declaration's layout or a PICTURE identity's packed fields (kb/Work PB2077 review). Opposite an ANY
+    /// LENGTH formal, whose "length is considered to match the length of the corresponding argument" (§14.8.2.3.2
+    /// "Additionally" d)), the PICTURE and ANY LENGTH phrases are named only when no other clause differs, so the
+    /// refusal names the clause that differs (JUSTIFIED, USAGE, …) and not the one length the rule relaxes. Two data-
+    /// pointers spelled alike are restricted to two type declarations of one type-name that are not equivalent
+    /// (§8.5.3.1). The empty string when the phrases name no difference.</summary>
+    private static string ClauseDifference(ActivationDescription argument, ActivationDescription formal)
     {
-        bool lengthMatches = formal.AnyLength && !argument.AnyLength;
-        string compared = lengthMatches ? argument.AnyLengthClauses ?? argument.Clauses : argument.Clauses;
-        if (compared.Length == 0 || formal.Clauses.Length == 0) return "";
-        string[] a = compared.Split('|'), f = formal.Clauses.Split('|');
-        for (int i = 0; i < Math.Min(a.Length, f.Length); i++)
-            if (!string.Equals(a[i], f[i], StringComparison.Ordinal)
-                && !(lengthMatches && a[i].StartsWith(LengthSegment, StringComparison.Ordinal)))
-                return $": the argument has '{a[i]}' where the formal parameter has '{f[i]}'";
-        return "";
+        string[] a = [.. (argument.ClausePhrases ?? []).Except(formal.ClausePhrases ?? [], StringComparer.Ordinal)];
+        string[] f = [.. (formal.ClausePhrases ?? []).Except(argument.ClausePhrases ?? [], StringComparer.Ordinal)];
+        if (formal.AnyLength && !argument.AnyLength)
+        {
+            string[] aOther = [.. a.Where(p => !IsLengthPhrase(p))], fOther = [.. f.Where(p => !IsLengthPhrase(p))];
+            if (aOther.Length + fOther.Length > 0) (a, f) = (aOther, fOther);
+        }
+        return (a.Length, f.Length) switch
+        {
+            ( > 0, > 0) => $": the argument is described with {string.Join(" ", a)} where the formal parameter is "
+                + $"described with {string.Join(" ", f)}",
+            ( > 0, 0) => $": the argument is described with {string.Join(" ", a)} and the formal parameter is not",
+            (0, > 0) => $": the formal parameter is described with {string.Join(" ", f)} and the argument is not",
+            _ when formal.Category == ActivationCategory.DataPointer && argument.Category == ActivationCategory.DataPointer
+                => ": the two are restricted to type declarations that are not equivalent (ISO §8.5.3.1, §14.8.2.3.2 rule 4)",
+            _ => "",
+        };
     }
 
-    /// <summary>The prefix of the LENGTH segment of a <see cref="ActivationDescription.Clauses"/> identity (the
-    /// compiler's <c>ActivationDescriptions.ClausesOf</c> spells it).</summary>
-    private const string LengthSegment = "LENGTH ";
+    /// <summary>A phrase §14.8.2.3.2 "Additionally" d) relaxes opposite an ANY LENGTH formal: the PICTURE clause, whose
+    /// length the formal's one-symbol picture does not state, and the ANY LENGTH clause itself (the compiler's
+    /// <c>ActivationDescriptions</c> spells both).</summary>
+    private static bool IsLengthPhrase(string phrase) =>
+        phrase.StartsWith("PICTURE ", StringComparison.Ordinal) || phrase == "ANY LENGTH";
 
     /// <summary>The clause identity of ISO §9.3.6 match rule 3 e), its ANY LENGTH item read through §14.8.2.3.2
     /// "Additionally" d) and e): "If the formal parameter is described with the ANY LENGTH clause, its length is
@@ -277,7 +289,7 @@ public static class ActivationRelations
                    && string.Equals(formal.Clauses, argument.Clauses, StringComparison.Ordinal)
                 ? null
                 : $"the formal parameter ({formal}) and the argument ({argument}) are not pointers of the same category and "
-                  + "restriction (ISO §14.8.2.3.2)";
+                  + "restriction (ISO §14.8.2.3.2)" + ClauseDifference(argument, formal);
         if (ReferenceGroupViolation(argument, formal) is { } groupWhy) return groupWhy;
         if (!IsElementaryData(argument) || !IsElementaryData(formal) || !specifiedProgram) return null;
         // Rule 2. "Additionally" b) / c): a bit group matches an elementary bit item, a national group an elementary
@@ -303,7 +315,8 @@ public static class ActivationRelations
                   + "(ISO §14.8.2.3.2 rule 2, \"Additionally\" d))";
         return SameElementaryClauses(argument, formal) ? null
             : $"the formal parameter ({formal}) and the argument ({argument}) are not described with the same ALIGN, "
-              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2)";
+              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2)"
+              + ClauseDifference(argument, formal);
     }
 
     /// <summary>§14.8.2.3.3, Elementary items passed by content or by value — and §14.8.2.2 rule 2 for a group.</summary>

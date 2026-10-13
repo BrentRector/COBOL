@@ -119,4 +119,33 @@ public sealed record PictureClauseIdentity(string CharacterString, string? Curre
     public string Key =>
         $"{CharacterString}|{CurrencyString?.Length ?? -1}:{CurrencyString}|"
         + $"{(DecimalPointIsComma is { } d ? (d ? "C" : "P") : "-")}|{Editing}";
+
+    /// <summary>The identity as a reader spells it, one phrase per fact (<c>ActivationDescription.ClausePhrases</c>,
+    /// never compared — <see cref="Key"/> is): the PICTURE clause, a run of four or more of one symbol written with
+    /// its repetition count (<c>9(6)</c>, <c>X(10)</c>); the currency string the source element's CURRENCY SIGN clause
+    /// gives its currency symbol; DECIMAL-POINT IS COMMA when the clause is in effect for it; and the EDITING phrase.
+    /// Equal keys have equal phrases, so a refusal never names a difference the identity does not hold.</summary>
+    public IEnumerable<string> Phrases()
+    {
+        yield return "PICTURE " + Spelled(CharacterString);
+        if (CurrencyString is not null) yield return $"CURRENCY SIGN IS \"{CurrencyString}\"";
+        if (DecimalPointIsComma is true) yield return "DECIMAL-POINT IS COMMA";
+        if (Editing is not null) yield return "EDITING";
+    }
+
+    /// <summary>An expanded character-string as it would be written: each run of four or more of one symbol as
+    /// <c>symbol(count)</c>, the character-string's repetition form, and every shorter run as its symbols.</summary>
+    private static string Spelled(string expanded)
+    {
+        var text = new System.Text.StringBuilder(expanded.Length);
+        for (int i = 0; i < expanded.Length;)
+        {
+            int run = 1;
+            while (i + run < expanded.Length && expanded[i + run] == expanded[i]) run++;
+            if (run >= 4) text.Append(expanded[i]).Append('(').Append(run).Append(')');
+            else text.Append(expanded, i, run);
+            i += run;
+        }
+        return text.ToString();
+    }
 }

@@ -302,11 +302,17 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    described with ANY LENGTH — only the length is relaxed), so a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal
    and, through a universal receiver, is then refused by GR7 c) (EC-OO-UNIVERSAL), while a slice matches no ANY LENGTH
    formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's run-time §14.8.2.3.2 rule 2 d) and §14.8.3.3 5) arms still compare
-   category and usage only (kb/Work PB2077's lead: reading the any-length form there moves the call ABI). Drift: `TypedAndUniversalInvokeVerdictsAgreeDriftTests` —
+   category and usage only (kb/Work PB2077's lead: reading the any-length form there moves the call ABI). Both lanes
+   quote the relation's refusal, so a refusal spells each description as its entry does and never as its identity key:
+   `ActivationDescription.Clauses` is the 3 e) identity (compared), `ClausePhrases` the same clauses as phrases
+   (`PICTURE 9(6)`, `USAGE POINTER TO T-REC`, `DECIMAL-POINT IS COMMA`; never compared), built beside it by
+   `ActivationDescriptions.ElementaryClauses`, and `ActivationRelations.ClauseDifference` names the phrases one side has
+   and the other lacks. Drift: `TypedAndUniversalInvokeVerdictsAgreeDriftTests` —
    structural (a Roslyn walk: `OoBinder` calls no `DescriptionMismatch`, its BY REFERENCE entry asks the two relations
    and names no `RefModPlace`, and no `if` of `OoBindInvocationArg` branches on one) and behavioral (the binder's entry
    and the relation agree over every elementary, reference-modified and ANY LENGTH pair; PB3098's rows compile to their
-   verdicts). Goldens: `conformance:2002/pb2077_refmod_argument_both_lanes` and the negatives
+   verdicts; a refusal carries no identity key, `ARefusal_SpellsItsClauses_NeverAnIdentityKey`). Goldens:
+   `conformance:2002/pb2077_refmod_argument_both_lanes` and the negatives
    `pb2077-refmod-into-elementary-by-reference`, `pb2077-refmod-shorter-than-group-formal`,
    `pb2077-elementary-into-group-formal`.
 

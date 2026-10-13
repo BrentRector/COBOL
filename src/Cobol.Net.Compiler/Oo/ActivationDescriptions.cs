@@ -54,14 +54,15 @@ public static class ActivationDescriptions
         {
             var asIf = item.AsIfPic!;
             string symbol = item.GroupUsage is GroupUsage.Bit ? "1" : "N";
-            string picture = PictureClauseIdentity.Of(string.Concat(Enumerable.Repeat(symbol, asIf.Length)), '$', "$",
-                decimalPointIsComma: false).Key;
+            var picture = PictureClauseIdentity.Of(string.Concat(Enumerable.Repeat(symbol, asIf.Length)), '$', "$",
+                decimalPointIsComma: false);
             return new ActivationDescription
             {
                 Shape = ActivationShape.AsIfElementaryGroup,
                 Category = item.GroupUsage is GroupUsage.Bit ? ActivationCategory.Boolean : ActivationCategory.National,
                 Usage = item.GroupUsage is GroupUsage.Bit ? nameof(Usage.Bit) : nameof(Usage.National),
-                Clauses = ClausesOf(item, asIf, picture, Invariant(asIf.Length)),
+                Clauses = ClausesOf(item, asIf, picture.Key, Invariant(asIf.Length)),
+                ClausePhrases = PhrasesOf(item, asIf, picture.Phrases()),
                 AnyLengthClauses = ClausesAtAnyLength(item, asIf, symbol),
                 Positions = asIf.Length,
                 Table16 = Table16Operand.Of(item).Heading,
@@ -108,6 +109,7 @@ public static class ActivationDescriptions
                 ObjectInterfaces = Folded(facts?.Interfaces),
             };
         }
+        var (clauses, phrases) = ElementaryClauses(item);
         return new ActivationDescription
         {
             Shape = ActivationShape.Elementary,
@@ -115,7 +117,8 @@ public static class ActivationDescriptions
             // ElementaryClauses separates every finer distinction), in the compiler's ONE spelling (kb/Work PB850).
             Category = ItemCategory.CategoryName(p),
             Usage = p.Usage.ToString(),
-            Clauses = ElementaryClauses(item),
+            Clauses = clauses,
+            ClausePhrases = phrases,
             AnyLength = item.IsAnyLength,
             AnyLengthClauses = AnyLengthClausesOf(item),
             Positions = p.Length,
@@ -242,14 +245,32 @@ public static class ActivationDescriptions
     /// (GR3). Described exactly as <see cref="Of"/> describes a pointer ITEM of the same restriction.
     /// <paramref name="programRestriction"/> is the program-address-identifier's prototype's signature class
     /// (<see cref="PrototypeSignatureClasses"/>, resolved by the invoking unit's prototype table), null when it names none.</summary>
-    public static ActivationDescription OfAddress(BoundAddressOperand address, string? programRestriction) => address.Data is { } data
-        ? Pointer(ActivationCategory.DataPointer, Restriction(StrongTypeModel.AddressOfRestriction(data.Item)))
-        : Pointer(ActivationCategory.ProgramPointer, programRestriction ?? ActivationDescription.Unrestricted);
+    public static ActivationDescription OfAddress(BoundAddressOperand address, string? programRestriction)
+    {
+        if (address.Data is { } data)
+        {
+            var type = StrongTypeModel.AddressOfRestriction(data.Item);
+            return Pointer(ActivationCategory.DataPointer, Restriction(type), PointerPhrase(Usage.Pointer, TypePhrase(type)));
+        }
+        return Pointer(ActivationCategory.ProgramPointer, programRestriction ?? ActivationDescription.Unrestricted,
+            PointerPhrase(Usage.ProgramPointer, programRestriction));
+    }
 
-    private static ActivationDescription Pointer(string category, string restriction) => new()
+    private static ActivationDescription Pointer(string category, string restriction, string phrase) => new()
     {
         Shape = ActivationShape.Elementary, Category = category, Usage = category, Clauses = restriction,
+        ClausePhrases = [phrase],
     };
+
+    /// <summary>A class pointer's USAGE clause as its entry spells it, with its TO phrase (<paramref name="to"/>, null
+    /// for an unrestricted pointer) — the reader's half of <see cref="Restriction"/> and
+    /// <see cref="PrototypeSignatures.RestrictionIdentity"/>, which are identities, not spellings.</summary>
+    private static string PointerPhrase(Usage usage, string? to) =>
+        $"USAGE {UsageFamilies.UsageWord(usage)}{(to is null ? "" : " " + to)}";
+
+    /// <summary>The TO phrase of a data-pointer restricted to <paramref name="type"/> as a reader spells it — the
+    /// type-name, and for a subordinate item of a type declaration that item — or null when it is unrestricted.</summary>
+    private static string? TypePhrase(StrongTypeModel.TypeRestriction type) => type.IsRestricted ? "TO " + type : null;
 
     /// <summary>A data-pointer's restriction (§14.8.2.3.2's class-pointer paragraph: "if either is a restricted
     /// pointer, both shall be restricted and of the same type"): the whole TYPE identity it is restricted to,
@@ -274,17 +295,22 @@ public static class ActivationDescriptions
     /// typed lane finds identical has equal clauses here — held by
     /// <c>PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair</c>. A
     /// class pointer's restriction is its USAGE clause's TO phrase.</summary>
-    public static string ElementaryClauses(DataItem item)
+    public static (string Clauses, string[] Phrases) ElementaryClauses(DataItem item)
     {
         var p = item.Pic!;
         if (p.Category is PicCategory.Pointer)
-            return Restriction(StrongTypeModel.PointerRestriction(item));
+        {
+            var type = StrongTypeModel.PointerRestriction(item);
+            return (Restriction(type), [PointerPhrase(p.Usage, TypePhrase(type))]);
+        }
         if (p.Category is PicCategory.ProgramPointer or PicCategory.FunctionPointer)
-            return PrototypeSignatures.RestrictionIdentity(item) ?? ActivationDescription.Unrestricted;
+            return (PrototypeSignatures.RestrictionIdentity(item) ?? ActivationDescription.Unrestricted,
+                [PointerPhrase(p.Usage, p.RestrictedPrototypeName is { } prototype ? "TO " + prototype : null)]);
+        string[] phrases = PhrasesOf(item, p, p.Clause?.Phrases() ?? []);
         // An ANY LENGTH item's one-symbol picture has no length of its own (§13.18.2.3 SR1).
         return item.IsAnyLength
-            ? ClausesAtAnyLength(item, p, p.Clause?.CharacterString ?? "")
-            : ClausesOf(item, p, p.Clause?.Key ?? "", Invariant(p.Length));
+            ? (ClausesAtAnyLength(item, p, p.Clause?.CharacterString ?? ""), phrases)
+            : (ClausesOf(item, p, p.Clause?.Key ?? "", Invariant(p.Length)), phrases);
     }
 
     private static string Invariant(int n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -316,4 +342,38 @@ public static class ActivationDescriptions
             + $"|{(item.BlankWhenZero ? "BLANK WHEN ZERO" : "-")}|{(item.Justified ? "JUSTIFIED" : "-")}"
             + $"|{(item.IsAligned ? "ALIGNED" : "-")}{dynamic}|PICTURE {picture}{locale}";
     }
+
+    /// <summary>⛔ The reader's spelling of the clauses <see cref="ClausesOf"/> keys, one phrase per clause
+    /// (<see cref="ActivationDescription.ClausePhrases"/>): the PICTURE clause's phrases (<paramref name="picture"/>,
+    /// <see cref="PictureClauseIdentity.Phrases"/>), then ANY LENGTH, USAGE, a SIGN clause that is not the default
+    /// trailing embedded sign, BLANK WHEN ZERO, JUSTIFIED, ALIGNED, DYNAMIC LENGTH and the PICTURE clause's LOCALE
+    /// phrase — each fact the key holds, so two descriptions whose keys differ name the clause they differ in. Built
+    /// beside the key from the same item, never parsed back out of it (kb/Work PB2077 review).</summary>
+    private static string[] PhrasesOf(DataItem item, PicInfo p, IEnumerable<string> picture)
+    {
+        List<string> phrases = [.. picture];
+        if (item.IsAnyLength) phrases.Add("ANY LENGTH");
+        phrases.Add("USAGE " + UsageFamilies.UsageWord(p.Usage));
+        if (p.Signed && SignPhrase(p.SignKind) is { } sign) phrases.Add(sign);
+        if (item.BlankWhenZero) phrases.Add("BLANK WHEN ZERO");
+        if (item.Justified) phrases.Add("JUSTIFIED");
+        if (item.IsAligned) phrases.Add("ALIGNED");
+        if (item.IsDynamicLength)
+            phrases.Add("DYNAMIC LENGTH" + (item.DynStructure?.Name is { } structure ? " " + structure : "")
+                + (item.DynMaxSize != CobolDynString.MaxLength ? " LIMIT " + Invariant(item.DynMaxSize) : ""));
+        if (p.LocaleEdit is { } le)
+            phrases.Add($"LOCALE{(le.Locale.Named is { } named ? " " + named.External : "")} SIZE {le.Size}");
+        return [.. phrases];
+    }
+
+    /// <summary>The SIGN clause a signed item's <see cref="PicInfo.SignKind"/> was analyzed from
+    /// (<see cref="PicInfo.SignKindFor"/>), or null for the default trailing embedded sign and a binary or
+    /// packed sign, which no SIGN clause states.</summary>
+    private static string? SignPhrase(string signKind) => signKind switch
+    {
+        "LeadingSeparate" => "SIGN LEADING SEPARATE",
+        "TrailingSeparate" => "SIGN TRAILING SEPARATE",
+        "LeadingOverpunch" => "SIGN LEADING",
+        _ => null,
+    };
 }

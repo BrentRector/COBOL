@@ -226,7 +226,41 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
     public void AnAnyLengthFormalsRefusal_NamesTheClauseThatDiffers_NotTheLength()
     {
         string error = Assert.Single(TypedLaneErrors("       01 LF PIC X ANY LENGTH.", "J"));
-        Assert.Contains("the argument has 'JUSTIFIED' where the formal parameter has '-'", error);
-        Assert.DoesNotContain("has 'LENGTH ", error);
+        string difference = error[error.IndexOf("match rule 3 e)):", StringComparison.Ordinal)..];
+        Assert.Contains("the argument is described with JUSTIFIED and the formal parameter is not", difference);
+        Assert.DoesNotContain("PICTURE", difference);
+    }
+
+    /// <summary>⛔ A REFUSAL SPELLS ITS DESCRIPTIONS AS THEIR ENTRIES DO, NEVER AS AN IDENTITY KEY (kb/Work PB2077 review
+    /// round 2). The typed lane quotes the relation's text, which renders each description
+    /// (<see cref="ActivationDescription.ToString"/>) and the clause the pair differs in from
+    /// <see cref="ActivationDescription.ClausePhrases"/>; the <see cref="ActivationDescription.Clauses"/> key — a
+    /// restricted pointer's type layout with its leaves' analyzed profiles, a PICTURE identity's packed fields — is an
+    /// identity, and printing it put <c>PicInfo { … }</c> dumps into COBOLNET0828. Each row is a negative program whose
+    /// refusal names the difference §9.3.6 match rule 3 e) / §14.8.2.3.2 rule 4 found, and contains no key separator.</summary>
+    [Theory]
+    [InlineData("pb480-typed-restricted-pointer-type.cob",
+        "(an elementary data-pointer item described with USAGE POINTER TO T-REC)",
+        "the two are restricted to type declarations that are not equivalent")]
+    [InlineData("w61b-pb1166-invoke-currency-dpc.cob",
+        "(an elementary numeric-edited item described with PICTURE Z9.99 USAGE DISPLAY)",
+        "the formal parameter is described with DECIMAL-POINT IS COMMA and the argument is not")]
+    [InlineData("oo-interface-arg-mismatch.cob",
+        "(an elementary numeric item described with PICTURE 9(6) USAGE DISPLAY)",
+        "the argument is described with PICTURE 9(6) where the formal parameter is described with PICTURE 9(4)")]
+    public void ARefusal_SpellsItsClauses_NeverAnIdentityKey(string negative, string argument, string difference)
+    {
+        var r = CompilerDriver.Compile(new CompilerDriver.Options(TestRepo.Tests("conformance", "negative", negative),
+            Path.Combine(Path.GetTempPath(), "CobolNet_PB2077_" + Guid.NewGuid().ToString("N")[..8] + ".dll"),
+            DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
+        var refusals = r.Errors.Where(e => e.Contains("COBOLNET0828", StringComparison.Ordinal)
+            && e.Contains("BY REFERENCE", StringComparison.Ordinal)).ToArray();
+        Assert.Contains(refusals, e => e.Contains(argument, StringComparison.Ordinal)
+            && e.Contains(difference, StringComparison.Ordinal));
+        Assert.All(refusals, e =>
+        {
+            Assert.DoesNotContain("|", e);
+            Assert.DoesNotContain("PicInfo", e);
+        });
     }
 }

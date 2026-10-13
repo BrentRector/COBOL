@@ -140,6 +140,16 @@ public sealed record ActivationDescription
     /// identity (<see cref="LocaleExternal"/>).</summary>
     public string Clauses { get; init; } = "";
 
+    /// <summary>The <see cref="Clauses"/> as a reader spells them: one phrase per clause the item is described with,
+    /// in the words of its data description entry (<c>PICTURE 9(6)</c>, <c>USAGE PACKED-DECIMAL</c>, <c>JUSTIFIED</c>,
+    /// <c>USAGE POINTER TO T-REC</c>, …), the source element's <c>DECIMAL-POINT IS COMMA</c> and currency string
+    /// among them (§9.3.6 match rule 3 e) 1. / 2.). Never compared — <see cref="Clauses"/> is the identity. A refusal
+    /// quotes the description (<see cref="ToString"/>) and names the clause that differs
+    /// (<see cref="ActivationRelations.MatchViolation"/>) with these, so no identity key — a type declaration's
+    /// layout, a PICTURE identity's packed fields — reaches a user's diagnostic (kb/Work PB2077 review). Null for a
+    /// shape that is described by no clause.</summary>
+    public string[]? ClausePhrases { get; init; }
+
     /// <summary>ISO §9.3.6 match rule 3 e) 3. b.: the external identification of the PICTURE clause's LOCALE phrase —
     /// the external-locale-name or literal value as written — or null for a LOCALE phrase without a locale-name and
     /// for a picture with no LOCALE phrase (the presence and SIZE of the phrase are in <see cref="Clauses"/>).</summary>
@@ -232,7 +242,8 @@ public sealed record ActivationDescription
     /// which is BY REFERENCE (§14.9.23.3 SR6; §9.3.6 match rule 3 a)).</summary>
     public bool ByValue { get; init; }
 
-    /// <summary>How the description reads in an EC-OO-UNIVERSAL message.</summary>
+    /// <summary>How the description reads in a refusal — an EC-OO-UNIVERSAL or CALL-lane message at run time and the
+    /// typed INVOKE's compile-time COBOLNET0828, which quote one relation's text (kb/Work PB2077).</summary>
     public override string ToString() => Shape switch
     {
         ActivationShape.Omitted => "OMITTED",
@@ -250,7 +261,10 @@ public sealed record ActivationDescription
         ActivationShape.Literal => $"a {Category} literal",
         ActivationShape.Expression => "an arithmetic expression",
         ActivationShape.PredefinedNull => "NULL",
-        // A reference-modified operand (§8.4.3.3.4 GR6) is elementary and described by no clause at all.
-        _ => Clauses.Length == 0 ? $"an elementary {Category} item described by no PICTURE clause" : $"{Category} {Clauses}",
+        // A reference-modified operand (§8.4.3.3.4 GR6) is elementary and described by no clause at all. The clauses are
+        // spelled as the entry spells them, never as their identity key.
+        _ => Clauses.Length == 0 ? $"an elementary {Category} item described by no PICTURE clause"
+            : ClausePhrases is not { Length: > 0 } phrases ? $"an elementary {Category} item"
+            : $"an elementary {Category} item described with {string.Join(" ", phrases)}",
     };
 }
