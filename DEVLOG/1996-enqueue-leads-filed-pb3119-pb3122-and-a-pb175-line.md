@@ -9,3 +9,6 @@ Clerk pass over four implementer reports' "New defects" sections.
 
 No code changed. The PB3031 report's "possible sibling" had no repro and was skipped.
 
+- PB3123 (new): the DEVLOG number is stamped before GitHub orders the merge queue, so the lower number bounces (PR #25 behind #26, 2026-10-13). Cluster PB3025, PB3023, PB3107.
+- PB3108 (extended): the 1000-leaf relation test went RED again under the working PB3104 gate cap.
+- PB3107 (extended): a "Measured 2026-10-13" paragraph, the oracle-baseline race also bounces in the merge queue.
