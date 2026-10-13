@@ -304,9 +304,13 @@ def self_test() -> int:
          {70: ['unit:CarrierLandingFormTests.ToScaled_PastTheCarrier_RaisesChecked_SaturatesIntermediate_X']},
          'declares no method'),
         ('a bare class pin (the whole family) resolves', {70: ['unit:CarrierLandingFormTests']}, None),
-        ('a gloss outside the backticks is not part of the ref',
-         {70: pins_of('`unit:CarrierLandingFormTests` (the family); `conformance:2023/no_such_case_at_all`')},
-         'no_such_case_at_all'),
+        # Each gloss case is ONE real ref plus a gloss: with the gloss kept in the ref (the origin/main pins_of)
+        # the ref names no file, so the case fails and nothing else can make it pass.
+        ('a gloss outside the backticks after an xUnit class pin is not part of the ref',
+         {70: pins_of('`unit:CarrierLandingFormTests` (the family)')}, None),
+        ('a gloss outside the backticks after a golden pin is not part of the ref',
+         {70: pins_of('`conformance:2023/pb3017_sdidi_divide_remainder_beyond_the_int128_carrier` (the half)')},
+         None),
         ('a pin naming a missing class is caught', {70: ['unit:NoSuchTestClass.Whatever']}, 'no NoSuchTestClass.cs'),
         ('a pin naming a missing golden is caught', {70: ['conformance:2023/no_such_case_at_all']}, 'does not exist'),
         ('a pin of an unknown form is caught', {70: ['vibes:it-looked-right']}, 'not a test-ref form'),
@@ -510,7 +514,8 @@ def check_pin_resolution(pinned: dict[int, list[str]], schema, root: pathlib.Pat
     declares `<Method>(`.
     """
     findings: list[str] = []
-    source: dict[pathlib.Path, str] = {}
+    source: dict[pathlib.Path, str] = {}  # class file -> its text, read once
+    class_files: dict[tuple[str, str], list[pathlib.Path]] = {}  # (test-dir, class) -> its files, searched once
     for n in sorted(pinned):
         for ref in pinned[n]:
             scheme, _, body = ref.partition(':')
@@ -531,7 +536,10 @@ def check_pin_resolution(pinned: dict[int, list[str]], schema, root: pathlib.Pat
             if not cls or (dot and not method):
                 findings.append(f'§7 item {n} `Pinned by` names "{ref}", which is not <Class> or <Class>.<Method>')
                 continue
-            files = list((root / form['test-dir']).rglob(f'{cls}.cs'))
+            key = (form['test-dir'], cls)
+            if key not in class_files:
+                class_files[key] = list((root / form['test-dir']).rglob(f'{cls}.cs'))
+            files = class_files[key]
             if not files:
                 findings.append(f'§7 item {n} `Pinned by` names "{ref}", but there is no {cls}.cs under '
                                 f'{form["test-dir"]}')
@@ -539,7 +547,10 @@ def check_pin_resolution(pinned: dict[int, list[str]], schema, root: pathlib.Pat
             if not method:
                 continue
             rx = re.compile(r'\b' + re.escape(method) + r'\s*\(')
-            if not any(rx.search(source.setdefault(f, f.read_text(encoding='utf-8'))) for f in files):
+            for f in files:
+                if f not in source:
+                    source[f] = f.read_text(encoding='utf-8')
+            if not any(rx.search(source[f]) for f in files):
                 findings.append(f'§7 item {n} `Pinned by` names "{ref}", but {cls}.cs declares no method '
                                 f'"{method}" (a renamed or removed test leaves the determination without its '
                                 f'evidence)')
