@@ -218,7 +218,7 @@ public sealed class MappedText
 /// <summary>Builds a <see cref="MappedText"/> from appended segments, each segment carrying the origins of its own
 /// line pieces (kb/Work PB82, PB1801). Every character written keeps the physical position it came from: a slice of a
 /// mapped input carries the input's spans, rebased to the column it lands on, and text a stage writes itself (a REPLACE
-/// replacement, a COPY statement left in place) takes ONE span at the position it stands for. An output line piece is
+/// replacement, a COPY statement left in place) takes one stretch at the position it stands for, a character position per character (kb/Work PB3031). An output line piece is
 /// named by the origin of the FIRST content written into it, so a COPY statement's leading text, the copybook's lines,
 /// and the trailing remainder each keep their own file, line and column — the splice points of
 /// <c>ExpandCopiesOneLevel</c> and the replacements of <c>ApplyReplacements</c>.</summary>
@@ -234,7 +234,11 @@ public sealed class OriginWriter
     public int LineCount => _lines.Count;
 
     /// <summary>Append <paramref name="s"/>, text this stage writes itself: every piece of it originates at
-    /// <paramref name="at"/> (<see cref="MappedText.PointAt"/>), its characters a column further each.</summary>
+    /// <paramref name="at"/> (<see cref="MappedText.PointAt"/>, one stretch), its characters a CHARACTER POSITION further
+    /// each (<see cref="CharacterPositions"/>, §6.1 1) c): a supplementary-plane character is two resultant units and one
+    /// position, so the span splits at its second unit exactly as the reference-format stage's <c>TextSite.Spans</c> does
+    /// for text it reads (kb/Work PB3031) — a column the parser reports inside the written text names the position the
+    /// programmer counts, whatever the characters.</summary>
     public void Append(ReadOnlySpan<char> s, LineOrigin at)
     {
         while (true)
@@ -242,10 +246,10 @@ public sealed class OriginWriter
             int nl = s.IndexOf('\n');
             if (nl < 0)
             {
-                Write(s, at, 0);
+                WriteText(s, at);
                 return;
             }
-            Write(s[..nl], at, 0);
+            WriteText(s[..nl], at);
             EndPiece(at, 0);
             s = s[(nl + 1)..];
         }
@@ -299,6 +303,28 @@ public sealed class OriginWriter
         foreach (var span in origin.Spans)
             if (span.ResultColumn > column && span.ResultColumn < column + run.Length)
                 AddSpan(span with { ResultColumn = _column + span.ResultColumn - column });
+        _sb.Append(run);
+        _column += run.Length;
+    }
+
+    /// <summary>Write <paramref name="run"/> (no newline), text this stage composes: one stretch from the start of
+    /// <paramref name="at"/>, each character a position further than the one before it, and the second unit of a
+    /// surrogate pair standing at its first unit's position (kb/Work PB3031).</summary>
+    private void WriteText(ReadOnlySpan<char> run, LineOrigin at)
+    {
+        if (run.IsEmpty) return;
+        var start = at.PointAt(0);
+        AddSpan(start with { ResultColumn = _column });
+        if (CharacterPositions.HasSurrogate(run))
+        {
+            int position = 0;   // the characters before the one at unit i
+            for (int i = 0; i < run.Length; position++)
+            {
+                int units = CharacterPositions.UnitsAt(run, i);
+                if (units == 2) AddSpan(new OriginSpan(_column + i + 1, start.Origin, start.SourceColumn + position));
+                i += units;
+            }
+        }
         _sb.Append(run);
         _column += run.Length;
     }
