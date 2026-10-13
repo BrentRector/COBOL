@@ -45,8 +45,9 @@ Duplication: `semgrep verify` raw-code-literal count went DOWN (268 -> 198). A d
 leaves a later `>>IF` on that name reporting "not a previously-defined variable"; that cascade is older than this change
 and was left alone.
 
-**Arch oracle.** Re-recorded at 3b6ba6e18e69, the branch merged with main at 015c04173 (`compare_oracle.py` against
-c41f1b82af2c: 5 of 7,796 cases differ). Four are ADDED, this change's own goldens: `corpus/2014/pb1616_define_zero_length_literal`
+**Arch oracle.** Re-recorded at 0065fae4b61b, the branch merged with main at 53788e78c after PB2495 landed first and
+re-recorded the baseline as f34b1aea29f0 (`compare_oracle.py` against it: 5 of 7,799 cases differ, the same five as
+against c41f1b82af2c before PB2495, which changes none of them). Four are ADDED, this change's own goldens: `corpus/2014/pb1616_define_zero_length_literal`
 and the three `negative/pb1616-*`. One is DIAGNOSTICS, `negative/w73a-directive-hex-literal-non-hex-digit`, and both parts of it
 are intended. At every edition, X"GG" in `>>DEFINE` is now refused by LiteralScreen's COBOLNET2630 (SR5 named), where the
 evaluator's COBOLNET1619 refused it before. Every position also moves down one line because the golden's own comment
