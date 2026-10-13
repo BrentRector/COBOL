@@ -35,3 +35,8 @@ source) is split to a successor, and PB3101 (one activation-conformance relation
 §14.9.23.4 GR7c doc comment, so `FactoryClassOf` carried two `<summary>` blocks and `OoUnivStop` none. The method now sits
 above the comment, which documents `OoUnivStop` again. A sweep for doc comments that open `<summary>` twice found 58 more
 on main, none from this branch; that tree-wide class is left for its own change.
+The finisher's first gate was RED on `SpecTraceabilityInventoryDriftTests.EveryTestRef_ResolvesToARealTest`: rows
+GR-8.4.3.3.4-3 and GR-13.18.60.4-8 named the class `unit:NationalUnitDriftTests`, which resolves to no test. A batch
+retired that ref and named the two methods that witness the rule (verdicts unchanged, GAP 101). The predecessor's gate had
+planned that drift test into leg 2, so it never ran there. Re-gate: `LEG 1 ONLY (batched gating, PB2515): GREEN`
+(run 20261013T192134Z-5a6bf2).
