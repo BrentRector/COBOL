@@ -1,6 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-namespace CobolNet.Frontend.Preprocessor;
+namespace CobolNet.Frontend.Common;
 
 /// <summary>
 /// ⛔ THE ONE DEFINITION OF A CHARACTER POSITION (kb/Work PB1966; docs/CONFORMANCE.md DOC-A.1-157; §6.1 1) c) "The
