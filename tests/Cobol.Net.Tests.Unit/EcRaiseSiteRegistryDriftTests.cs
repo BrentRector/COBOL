@@ -39,8 +39,16 @@ namespace CobolNet.Tests.Unit;
 /// generator, outside the catalog and the gate tables; the EC-I-O family is raised through the status map
 /// (<see cref="ExceptionCatalog.IoEcOfStatus"/> over every two-digit status) and the three names §13.18.34.4 / §14.9.51.4
 /// name outright. That proves a raise site EXISTS, not that it is reachable — reachability is the conformance goldens'
-/// job, and the cost of this rule is one literal per name. The test was seen to fail by deleting one declaration (the
-/// <c>BoundSetEntry</c> row's EC-PROGRAM-NOT-FOUND), by name.</para>
+/// job, and the cost of this rule is one literal per name.</para>
+///
+/// <para>⚠ <b>WHAT IT DOES NOT CATCH: A LOST ROW FOR A NAME ANOTHER SOURCE STILL DECLARES.</b> The registry is per NAME
+/// (<see cref="EcBinder.AllDeclaredNames"/>), so it fails when a name loses its LAST declaration, never when one
+/// statement kind loses its row. It was seen to fail by removing EC-OO-RESOURCE from the INVOKE row (the failure names
+/// the name). Deleting the <c>BoundSetEntry</c> row's EC-PROGRAM-NOT-FOUND leaves it GREEN — <c>ProgramNames</c> (the
+/// CALL and CANCEL rows), <c>ActivationSiteNames</c> and the address-operand row still declare the name — and that loss is
+/// caught by the goldens that run the row: <c>conformance:2002/pb1549_set_program_address_fatal_resume</c> (the ISO
+/// ADDRESS OF PROGRAM sender) and <c>conformance:2002/pb3102_set_entry_not_found_declared</c> (the ENTRY senders), both
+/// seen red with the row deleted (kb/Work PB3102, review finding R1-1).</para>
 /// </summary>
 [Trait("Sweep", "tree")]
 public sealed class EcRaiseSiteRegistryDriftTests

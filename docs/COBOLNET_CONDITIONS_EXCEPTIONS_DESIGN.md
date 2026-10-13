@@ -866,9 +866,12 @@ the ACTIVATING statement's `EcCheckingProfile`, §14.9.18.4 GR1 b)). Declared-bu
 raised-but-never-declared is the PB452 / PB1453 shape (`>>TURN … CHECKING ON` wrapping nothing); a name that is neither is
 unaccounted for; each fails with its shape named. "Raised" proves a raise site EXISTS, not that it is reachable —
 reachability is the goldens' job. The test was seen to fail by removing EC-OO-RESOURCE from the INVOKE row (it names
-the name), and NOT by deleting the `BoundSetEntry` row's EC-PROGRAM-NOT-FOUND, as the first draft of this section said:
-the registry is per NAME, and `ProgramNames`, the CALL row and the operand row also declare that name, so the loss of one
-node-kind row for a name another source still declares is the conformance goldens' catch (pb452), not the registry's.
+the name), and NOT by deleting the `BoundSetEntry` row's EC-PROGRAM-NOT-FOUND: the registry is per NAME, and
+`ProgramNames` (the CALL and CANCEL rows), `ActivationSiteNames` and the address-operand row also declare that name, so
+the loss of one node-kind row for a name another source still declares is the conformance goldens' catch, not the
+registry's. For that row the goldens are `conformance:2002/pb1549_set_program_address_fatal_resume` (the ADDRESS OF
+PROGRAM sender) and `conformance:2002/pb3102_set_entry_not_found_declared` (the ENTRY senders, literal and identifier),
+both seen red with the row deleted.
 
 Measured while building this test (2026-10-12): 133 catalogued level-3 names, and three of the raised-but-never-declared
 shape that were real defects, fixed with it — EC-OO-RESOURCE (the PB1524 raise site existed, but no INVOKE ever set its

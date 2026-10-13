@@ -21,7 +21,11 @@ requires to quote the name, or be one of the two names RAISING LAST EXCEPTION st
 statement's `EcCheckingProfile` enables. A second test asks `IoFilesOf` for every bound statement that carries a `FileModel`.
 It was seen to fail by removing EC-OO-RESOURCE from the INVOKE row. The note's own proof (delete the `BoundSetEntry`
 EC-PROGRAM-NOT-FOUND row) cannot work on a per-name registry, because the CALL row, the operand row and `ProgramNames` also
-declare that name; D13 says so.
+declare that name; D13 says so. The branch review (finding R1-1) found the test's own doc comment still making the
+old claim. The comment now says what the test does not catch, and a new golden,
+`conformance:2002/pb3102_set_entry_not_found_declared`, pins that row for the ENTRY senders (literal and identifier):
+with the row deleted its declarative never runs and EXCEPTION-STATUS is blank. `pb1549_set_program_address_fatal_resume`
+pins the ADDRESS OF PROGRAM sender, and it also went red with the row deleted. No golden had pinned the ENTRY form before.
 
 **Three defects the classification found, fixed.**
 - EC-OO-RESOURCE (ISO 1989:2023 section 16.2.1.2 GR2): PB1524 landed the runtime raise and its checking flag, but no
