@@ -80,4 +80,26 @@ public sealed class LiteralScreenDriftTests
             + "own §8.3.3 rules are a property of the TOKEN; a second site is a second funnel the next literal position "
             + "will miss");
     }
+
+    /// <summary>The file-level pin above says WHICH file parses a directive fragment; this says WHERE in it: every
+    /// <c>DirectiveExpressionFragment.Parse…</c> call sits inside one of the three funnels, and each funnel screens what
+    /// it parsed. A fourth parse arm written beside an evaluator would otherwise skip the screen (kb/Work PB1616).</summary>
+    [Fact]
+    public void DirectiveFragmentParse_IsCalledOnlyInsideTheThreeScreeningFunnels()
+    {
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Frontend", "Preprocessor", "ConditionalCompilationProcessor.cs"));
+        var decls = Regex.Matches(text, @"(?m)^[ \t]*(?:private|internal|public)[ \t]+(?:static[ \t]+)?[^=;(\r\n]*?\b(\w+)\(")
+            .Select(m => (m.Index, Name: m.Groups[1].Value)).ToList();
+        string[] funnels = ["ParseOperandFragment", "ParseCceFragment", "ParseDisplayFragment"];
+        var calls = Regex.Matches(text, @"DirectiveExpressionFragment\.Parse\w*\(").ToList();
+        Assert.Equal(funnels.Length, calls.Count);   // a fourth call fails here, a vanished funnel too
+        foreach (Match call in calls)
+        {
+            var enclosing = decls.Last(d => d.Index < call.Index);
+            Assert.True(funnels.Contains(enclosing.Name),
+                $"'{call.Value}' is called inside {enclosing.Name}, not one of the screening funnels [{string.Join(", ", funnels)}]");
+            int end = decls.Where(d => d.Index > call.Index).Select(d => d.Index).DefaultIfEmpty(text.Length).First();
+            Assert.Contains("ScreenLiterals(", text.Substring(call.Index, end - call.Index), StringComparison.Ordinal);
+        }
+    }
 }
