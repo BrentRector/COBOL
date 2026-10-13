@@ -37,8 +37,9 @@ this per WAITING TO LAND branch, and an agent is dispatched only for what a scri
      moved, MERGED in once more, without a second gate (kb/Work PB3023 review R1-2): the local gate confirms the change
      (step 3), and the merge group, which builds this pull request on the current main, runs the whole population
      (DESIGN-test-build-ci.md section 3.17.2 step 4). A conflict here is exit 4, as in step 2. Then `devlog.py stamp
-     <branch>`: the branch's `DEVLOG/pending-<slug>.md` is numbered (alloc.py devlog: enqueue order is number order) and
-     stamped in one commit, and an entry main has overtaken is re-stamped. Then `queue`, the pull request titled with
+     <branch>`: the branch's `DEVLOG/pending-<slug>.md` is numbered (alloc.py devlog: number order is stamp order) and
+     stamped in one commit; an entry stamped by an earlier run keeps its number, even when main has since landed a
+     higher one (kb/Work PB3123: the queue orders landings after their stamps). Then `queue`, the pull request titled with
      that entry's title and carrying the entry and the commit list as its body. Should main move again between the
      fetch and `queue`'s own (seconds), step 4 runs again, at most CATCH_UP times.
 Every outcome ends on ONE line `=== ENQUEUE: <OUTCOME> … ===` for a caller to block on (MANDATORY-PRACTICES P2).
@@ -64,7 +65,8 @@ Every outcome ends on ONE line `=== ENQUEUE: <OUTCOME> … ===` for a caller to 
 
 `checks` — THE LANDING CHECKS, one sequence in one place (`land` runs it before it opens the pull request), each
 refusing on the landing's own range before a CI run is spent:
-  devlog.py check   (exactly one new, stamped DEVLOG/ entry, numbered above main's; kb/Work PB2605, PB3025) → exit 6
+  devlog.py check   (exactly one new, stamped DEVLOG/ entry, numbered above the tree it was stamped on and unique;
+                    kb/Work PB2605, PB3025, PB3123) → exit 6
   landing_oracle.py (the arch-oracle baseline describes the landed tree; kb/Work PB2885) → exit 7
   landing_check.py  (the R3 file-set partition and in-flight overlap; kb/Work PB2118) → exit 3 (STOP: re-plan, never
                     retry as is)
@@ -553,13 +555,13 @@ def land(repo: pathlib.Path, branch: str, worktree: pathlib.Path | None, *, gh: 
 
 
 def _stamp(wt: pathlib.Path, branch: str) -> int:
-    """`devlog.py stamp` when the branch still has a pending entry or one main has overtaken; 0 when it is stamped."""
-    devlog = [sys.executable, str(HERE.parent / "devlog.py")]
-    base = ["--base", "refs/remotes/origin/main"]
-    if not any((wt / "DEVLOG").glob("pending-*.md")) and \
-            subprocess.run([*devlog, "check", "--rev", "HEAD", *base], cwd=wt, capture_output=True).returncode == 0:
+    """`devlog.py stamp` when the branch still has a pending entry; 0 when it has none. A stamped entry keeps its
+    number on every later run, a re-run after a bounce included (kb/Work PB3123: number order is stamp order, and the
+    landing checks hold it to the tree it was stamped on), so there is nothing to re-stamp."""
+    if not any((wt / "DEVLOG").glob("pending-*.md")):
         return 0
-    return subprocess.run([*devlog, "stamp", branch, "--repo", str(wt), *base], cwd=wt).returncode
+    return subprocess.run([sys.executable, str(HERE.parent / "devlog.py"), "stamp", branch, "--repo", str(wt)],
+                          cwd=wt).returncode
 
 
 # ── self-test ────────────────────────────────────────────────────────────────────────────────────────────────────
