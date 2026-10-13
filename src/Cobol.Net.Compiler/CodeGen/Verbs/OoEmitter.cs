@@ -526,6 +526,12 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         w.Line();
     }
 
+    /// <summary>The factory singleton class of the class an INVOKE names by class-name (the New and Factory forms): the
+    /// binder sets that form's class C# name, so a null here is a binder defect, never a name to emit.</summary>
+    private static string FactoryClassOf(string? classCsName) =>
+        NamingConvention.FactoryClassName(classCsName
+            ?? throw new InvalidOperationException("a class-name INVOKE form carries no class C# name"));
+
     /// <summary>Render the §14.9.23.4 GR7c two-arm stop for one <c>__CobolInvoke</c> conformance check.
     ///
     /// <para>GR7c sets EC-OO-UNIVERSAL "if checking for it is enabled in BOTH the activated method and the
@@ -538,12 +544,6 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// nonconforming crossing still cannot proceed into typed-native code, so the stop is a
     /// <c>CobolImplementorFatalException</c>, which carries NO EC name and therefore cannot be selected by any
     /// statement guard's <c>EcName ==</c> match (§14.6.13.1.1 NOTE 3 undefined-results latitude).</para></summary>
-    /// <summary>The factory singleton class of the class an INVOKE names by class-name (the New and Factory forms): the
-    /// binder sets that form's class C# name, so a null here is a binder defect, never a name to emit.</summary>
-    private static string FactoryClassOf(string? classCsName) =>
-        NamingConvention.FactoryClassName(classCsName
-            ?? throw new InvalidOperationException("a class-name INVOKE form carries no class C# name"));
-
     private static string OoUnivStop(OoMethodSymbol m, string cond, string detailExpr) =>
         $"if ({cond}) {{ {OoUnivThrow(m, detailExpr)} }}";
 
@@ -1959,10 +1959,6 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             : recv.Item.IsGroup ? $"{CallEmitter.BoundaryImageWidth(recv.Item)}"
             : $"{CallEmitter.ElementaryFormalWindow(recv.Item)}";
 
-    /// <summary>The copy-in read of an identifier argument for a STRING-CARRIED formal: a reference-modified
-    /// place reads its window verbatim (§8.4.3.3.4 GR6 — the operand IS elementary alphanumeric); a string-stored
-    /// item reads directly; a native display-numeric item formats through its OWN profile (caller-side). A
-    /// CONTENT crossing normalizes to the formal's width (MOVE pad/truncate).</summary>
     /// <summary>The INVOKE-site propagation pickup (D-EO6): a method GOBACK/EXIT … RAISING stages; the
     /// ACTIVATING site consumes — after the RETURNING delivery and copy-outs (GR1b ordering). Instance/
     /// Self/Super/Factory + UNIVERSAL dispatches all pick up; NEW needs none (the generated ctor runs no
