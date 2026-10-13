@@ -867,7 +867,7 @@ internal sealed class VersionConformancePass
         /// 5/6) — the dual-obligation window rows; EXIT PROGRAM — ARCHAIC in 2023 (0903 warning; VCR 89).</summary>
         public override object? VisitExitStatement(CobolParserCore.ExitStatementContext ctx)
         {
-            if (ctx.METHOD() is not null)
+            if (ctx.methodKeyword() is not null)
                 _p.Check(Constructs.ExitMethodWindow, "the EXIT METHOD statement");
             else if (ctx.FUNCTION() is not null)
                 _p.Check(Constructs.ExitFunctionWindow, "the EXIT FUNCTION statement");
