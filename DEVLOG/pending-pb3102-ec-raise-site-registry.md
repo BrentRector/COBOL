@@ -42,3 +42,5 @@ code-location witnesses and added two; the GAP count stays 103. PB1037 and PB176
 
 Self-review (architecture, full code, performance, duplication): the enumeration allocates an iterator per statement as the
 closure did; the tables are static. The ambient rows replace 40 `if (Enabled) add` pairs with data.
+
+Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — Conformance 4,900/11,496 · Unit 32,581/33,468 · Characterization 6/36 cases ran` (run `20261013T032042Z-6ef3fc`; the full Conformance project, 11,496 of 11,496, was also run locally and passed). The Linux gate is the landing's. The arch-oracle baseline must be re-recorded at the landing (L11): the emitted C# of programs that enable EC-OO-RESOURCE, EC-REPORT-NOT-TERMINATED or EC-PROGRAM-IMP (directly, or through EC-ALL or their level-2 names) gains a guard; that is the expected difference class, not measured here.
