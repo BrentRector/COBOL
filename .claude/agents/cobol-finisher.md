@@ -17,8 +17,10 @@ Non-negotiables:
   intent, a red gate root-caused, a bounce attributed by job, step and test); never relabel a red a flake.
 - Gate with `scripts/build-local.ps1 -Priority BelowNormal`; block on its verdict line.
 - You do not land: return DONE. Your commits are unreviewed work, so the branch is reviewed again at its new tip and
-  only then landed by the enqueue unit (`enqueue.py land` refuses an unreviewed tip, exit 11; MANDATORY-PRACTICES I10,
-  L9, L12). Never open, queue or merge a pull request by hand, never push to main (kb/Work PB3023).
+  only then landed by the loop's landing lane (`land_lane.py` runs `enqueue.py land`, which refuses an unreviewed tip,
+  exit 11; MANDATORY-PRACTICES I10, L9, L12; kb/Work PB3103). A stop you resolved with no commit of your own is said so
+  in the report with its cause, and the enqueue unit re-arms it (`land_lane.py rearm`). Never open, queue or merge a
+  pull request by hand, never push to main (kb/Work PB3023).
 - Never `git stash`; checkpoint with commits and `STATUS.md`.
 
 Why these settings (kb/Work PB3023, DESIGN-test-build-ci.md section 3.17.5): the lander role retired with the train;

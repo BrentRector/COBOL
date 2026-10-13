@@ -31,7 +31,8 @@ who acts next:
                    REPORT_NAME, under coord.reports_dir()) says `Status: DONE`, and its header's review stamp is CLEAN
                    at the branch's tip, or at an older head followed only by mechanical commits (main merged in
                    cleanly, the DEVLOG stamp: `unreviewed_since`, the one coverage rule `enqueue.py land` enforces
-                   too): the loop's enqueue unit runs `enqueue.py land <branch>` on it (kb/Work PB3023),
+                   too): the loop's landing lane runs `enqueue.py land <branch>` on it (land_lane.py, kb/Work PB3103,
+                   PB3023),
                    one branch at a time, the most harmful lead first (`--brief` lists them in that order, kb/Work
                    PB2981's ranking). (A stamp that says FINDINGS is a DECISION row: the next wave's finisher answers
                    them, plan_wave.py.)
@@ -39,8 +40,11 @@ who acts next:
                    in a merge group and lands it (kb/Work PB3024). Nobody touches it.
   BOUNCED          its pull request is open but the queue REMOVED it (a red merge group, a conflict, a timeout: the
                    reason is GitHub's) and its head is still the branch's tip: the enqueue unit dispatches ONE finisher
-                   with the reason named, which fixes the branch and re-runs enqueue.py. A tip that moved past the
-                   bounced head is the fix, and reads by its report again.
+                   with the reason named. A finisher that fixes the branch returns DONE and lands nothing: its new tip
+                   is reviewed again, then the landing lane lands it. A bounce resolved with no commit (infrastructure,
+                   a red already on main) is re-armed by the enqueue unit (`land_lane.py rearm`, kb/Work PB3103), and
+                   the lane lands it again at the same head. A tip that moved past the bounced head is the fix, and
+                   reads by its report again.
                    The pull-request states come from ONE GraphQL read (`pull_requests`); offline, unauthenticated or with
                    no gh it is empty and the lifecycle is git-only (a non-observation, never a claim that nothing is
                    queued).
@@ -411,7 +415,7 @@ def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours:
         if rv and rv.verdict == 'CLEAN' and (rv.covers(row.tip) or row.review_holds):
             since = '' if rv.covers(row.tip) else ' (later commits mechanical: main merged in, the DEVLOG stamp)'
             return 'WAITING TO LAND', (f'{rep.name}: Status DONE, Review CLEAN at {rv.sha[:12]} ({rv.reviewer}){since}; '
-                                       f'the enqueue unit lands it (enqueue.py land)')
+                                       f'the landing lane lands it (enqueue.py land)')
         if rv and rv.verdict == 'FINDINGS' and rv.covers(row.tip):
             return 'DECISION', (f'{rep.name}: DONE, but its branch review found {rv.findings} finding(s) ({rv.file}): '
                                 f'a finisher answers them, and the next wave plans it (plan_wave.py, kb/Work PB3027); '
@@ -629,7 +633,7 @@ def note_rank(work_dir: pathlib.Path | None = None) -> Callable[[str], tuple[int
 
 
 def landing_order(rows: list[Row], rank: Callable[[str], tuple[int, int]]) -> list[Row]:
-    """The WAITING TO LAND rows in the order the enqueue unit lands them, one at a time (kb/Work PB2981's ranking, kept
+    """The WAITING TO LAND rows in the order the landing lane lands them, one at a time (kb/Work PB2981's ranking, kept
     by PB3023): by their report's lead note (`rank`: the most harmful first, a compiler fix before process work), then
     the OLDEST report first, then the name."""
     return sorted((r for r in rows if r.state == 'WAITING TO LAND'),

@@ -1,58 +1,145 @@
 # WiseOwl COBOL
 
-A COBOL compiler for .NET, built from the ISO/IEC 1989:2023 standard, with correct support for every earlier edition
-(1985, 2002, 2014). It compiles standard COBOL to idiomatic, typed-native C# — a COBOL record is a .NET record
-struct, an elementary item is a native field — which Roslyn builds into an ordinary .NET assembly.
+WiseOwl COBOL compiles standard COBOL to .NET. It implements ISO/IEC 1989:2023 and supports the 1985, 2002 and 2014
+editions, each with its own syntax and semantics. The compiler translates a program to typed-native C#, in which a
+COBOL record is a .NET `record struct` and an elementary item is a native field, and Roslyn builds that C# into an
+ordinary .NET assembly.
 
-The standard is the specification: every rule of ISO/IEC 1989:2023 is a row in a traceability inventory, and each
-row closes only when a spec-derived test proves the compiler conforms. Behavior the standard leaves to the
-implementor is documented, with its rationale, in [docs/CONFORMANCE.md](docs/CONFORMANCE.md).
+The standard is the specification. Every normative rule of ISO/IEC 1989:2023 is a row in a traceability inventory,
+and a row closes only when a test derived from the standard proves the compiler conforms. Where the standard leaves a
+choice to the implementor, [docs/CONFORMANCE.md](docs/CONFORMANCE.md) records the choice and its reasons.
 
-## Quick start
+## What you need
+
+| Tool | Version | Why |
+|---|---|---|
+| .NET SDK | 10.0.100 or a later 10.0 release (`global.json`) | builds the solution; runs compiled programs |
+| PowerShell | 7 or later (`pwsh`) | the build regenerates the ANTLR parser through a PowerShell step; the gate scripts |
+| Java | 21 or later | runs the checked-in ANTLR 4.13.2 jar when a grammar changes |
+| Python | 3.14 or later | the gate driver, the specification tools, the work register |
+| Git | a current release | |
+
+Windows and Linux both work as hosts. On Windows, WSL with Ubuntu lets you run the Linux legs of the test suite
+before you push, and GnuCOBOL 3.2 inside WSL enables the differential comparison. Both are optional.
+
+## Get the code and build it
 
 ```bash
 git clone https://github.com/WiseOwlSoftware/COBOL.git
 cd COBOL
+git config merge.renormalize true
 dotnet build Cobol.Net.sln
+```
 
-# compile a COBOL program (the source is a positional argument)
-dotnet run --project src/Cobol.Net.Cli -- hello.cob -o hello.dll
+Every tracked text file is LF on every platform, and `.gitattributes` enforces it; the `merge.renormalize` setting
+keeps a merge from reporting conflicts that are only line endings. The first build regenerates the parser from the
+grammars under `src/Cobol.Net.Frontend`, so it takes a few minutes; later builds regenerate it only when a grammar
+changes.
+
+The build leaves the compiler at `src/Cobol.Net.Cli/bin/Debug/net10.0/cobol` (`cobol.exe` on Windows). Build the
+whole solution, not one project: the tests run against the compiler the solution build produced.
+
+## Compile and run a program
+
+Put this in `hello.cob` (fixed reference format: code in columns 8 to 72):
+
+```cobol
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. HELLO.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 GREETING PIC X(20) VALUE "Hello from COBOL".
+       PROCEDURE DIVISION.
+           DISPLAY GREETING
+           STOP RUN.
+```
+
+Then compile it and run it:
+
+```bash
+cobol hello.cob -o hello.dll      # or: dotnet run --project src/Cobol.Net.Cli -- hello.cob -o hello.dll
 dotnet hello.dll
 ```
 
-Select an edition with `--std 85|2002|2014|2023` (default 2023). A construct the selected edition does not have is
-rejected; `--permissive` turns such rejections into warnings for migration work.
+The compiler writes four files beside the output: `hello.dll`, `hello.runtimeconfig.json`, the runtime library
+`Cobol.Net.Runtime.dll`, and `hello.g.cs`, the C# it generated. Read the `.g.cs` file to see how your program maps
+to .NET.
 
-A NuGet distribution (`WiseOwl.COBOL`, a .NET global tool providing the `cobol` command) and a documentation site are
-planned; see [docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md](docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md).
+The options you will use most:
 
-## Status
+| Option | Effect |
+|---|---|
+| `--run` | runs the program after a successful compile |
+| `--std 85`, `2002`, `2014` or `2023` | selects the edition (default 2023); a construct newer than the edition is rejected, and so is one the edition removed |
+| `--permissive` | accepts a construct the targeted edition removed, with a warning in place of the rejection, for migration work; a construct newer than the edition is still rejected |
+| `--source-format fixed`, `free` or `auto` | the reference format the source starts in (default fixed) |
+| `--copy DIR` | a COPY library directory; repeat it for several |
+| `--sign-encoding ibm` or `ascii` | the overpunched-sign convention for DISPLAY numerics (default ibm) |
+| `--flag-extensions` | warns at every nonstandard extension the compiler accepts |
+| `--nist NAME` | the NIST CCVS placeholder preprocessing |
 
-As of 2026-09-26 (measured, not estimated):
+`cobol --help` lists them all. `cobol check-batch manifest.json` parses, edition-checks and binds many sources in one
+process without emitting code.
 
-- **Traceability:** 4,347 normative rules; every one adjudicated against the standard; 3,286 closed (75.6 %) and
-  1,061 open. Clause 15 (intrinsic functions) is fully closed.
-- **Tests on every change:** 9,046 conformance tests, 29,491 unit tests, 33 characterization tests — plus the NIST
-  CCVS suite, a per-edition version matrix, and a GnuCOBOL differential run per batch. CI runs on Windows and Linux.
-- **Declined facilities** (documented non-support, each with a compile-time warning, as §4.2.6 permits): the
-  Message Control System, commit and rollback, the VALIDATE facility, and screen handling. Optional modules and
-  processor-dependent elements are dispositioned in [docs/CONFORMANCE.md](docs/CONFORMANCE.md).
+## Run the tests
 
-## What it covers
+The gate builds the solution and runs the tests in an order that puts the ones your change is most likely to break
+first:
 
-- **All four editions** — COBOL-85, 2002, 2014 and 2023 — each with its own syntax and semantics, and gating
-  diagnostics where an edition lacks a construct.
-- **The language** (current standing per rule in [docs/CONFORMANCE.md](docs/CONFORMANCE.md) — conformance is
-  measured, not claimed): the Identification, Environment, Data and Procedure divisions, including the compiler
-  directing facility and conditional compilation, COPY/REPLACE, national and boolean data, dynamic-capacity tables,
-  typed and strongly-typed items, exception handling (declaratives and `EC-` exception conditions), sequential,
-  relative and indexed files, SORT and MERGE, the report writer, inter-program communication (CALL, nested and
-  recursive programs, function and program prototypes), user-defined functions, object orientation (classes,
-  interfaces, methods, properties, factories), locales and culturally sensitive collation, and every intrinsic
-  function of Clause 15.
-- **Arithmetic:** native, and standard-decimal (decimal128 intermediates) as selected by the OPTIONS paragraph.
+```bash
+pwsh scripts/build-local.ps1      # or: bash scripts/build-local.sh
+```
 
-## Architecture
+Read the last line it prints, `=== BUILD-LOCAL GATE: … ===`. `GREEN` is the only pass. Locally the gate runs its
+first leg: your change's own tests, the previous run's failures, the host-only witnesses and the cheap tree-wide
+sweeps. The whole population runs in CI, on Windows and Linux, for every pull request in the merge queue.
+
+To run one test project yourself, build the solution first, then test with `--no-build`:
+
+```bash
+dotnet build Cobol.Net.sln
+dotnet test tests/Cobol.Net.Tests.Unit --no-build
+dotnet test tests/Cobol.Net.Tests.Conformance --no-build --filter "FullyQualifiedName~NistDifferentialTests"
+```
+
+On Windows, `bash scripts/linux-gate.sh` runs CI's Linux legs under WSL before you push. It clones the committed
+HEAD into the Linux filesystem and builds and tests it there, the way CI's Ubuntu jobs do.
+
+The test populations:
+
+- `tests/Cobol.Net.Tests.Conformance` over `tests/conformance/`: programs derived from the standard with their
+  expected output, one directory per edition; a negative corpus of programs each edition must reject; the NIST CCVS
+  suite under `tests/nist/`; and the version matrix, which compiles one corpus at all four editions.
+- `tests/Cobol.Net.Tests.Unit`: the runtime and compiler units, and the drift tests that keep two copies of one rule
+  from diverging.
+- `tests/Cobol.Net.Tests.Characterization`: snapshots of diagnostics and emitted C# over a fixed corpus.
+- `tests/differential/`: the committed goldens of the Conformance project's `*DifferentialTests` classes, compared on
+  every gate and CI run (recorded once, from an oracle since retired).
+- `tests/external/`: the GnuCOBOL differential, run once per batch against the pinned GnuCOBOL 3.2 test corpus.
+
+## Find your way around
+
+```
+src/
+  Cobol.Net.Cli/                 the cobol command
+  Cobol.Net.Frontend/            reference format, COPY and REPLACE, directives, the ANTLR grammars and parser
+  Cobol.Net.Compiler/            binder, bound tree, C# emitter, Roslyn backend
+  Cobol.Net.Compiler.SourceGen/  the source generator for the bound-tree visitor
+  Cobol.Net.Editions/            the construct registry and per-edition gating
+  Cobol.Net.Runtime/             the library every compiled program runs on
+tests/                           the populations above
+specs/ISO_COBOL.md               the standard, transcribed to Markdown and searchable
+docs/COBOLNET_DESIGN.md          the design, with one deep-dive document per subsystem beside it
+docs/CONFORMANCE.md              every implementor-defined choice, with its reasons
+kb/Work/                         the work register: one note per defect, analysis or decision
+DEVLOG/                          the history, one file per landing
+scripts/                         the gate, the specification tools, the generators
+```
+
+Start with [docs/DOC_INDEX.md](docs/DOC_INDEX.md), the map of every document.
+[docs/rearchitecture/DESIGN-test-build-ci.md](docs/rearchitecture/DESIGN-test-build-ci.md) describes the gate and CI.
+
+The pipeline:
 
 ```
 COBOL source
@@ -64,33 +151,52 @@ COBOL source
   → Roslyn            a .NET assembly, linked to the typed-native runtime
 ```
 
-```
-src/
-  Cobol.Net.Cli/                 the `cobol` command
-  Cobol.Net.Frontend/            preprocessor, grammar, parser, compile-time expressions
-  Cobol.Net.Compiler/            binder, bound tree, C# emitter, Roslyn backend
-  Cobol.Net.Compiler.SourceGen/  source generator for the bound-tree visitor
-  Cobol.Net.Editions/            per-edition construct registry and gating
-  Cobol.Net.Runtime/             the runtime library compiled programs use
-  CobolSharp.*                   the legacy engine, kept only as a differential oracle until it is retired
-tests/
-  Cobol.Net.Tests.Conformance/   spec-derived programs with expected output, per edition, plus negatives
-  Cobol.Net.Tests.Unit/          unit and drift tests
-  Cobol.Net.Tests.Characterization/
-  nist/                          the NIST CCVS programs and expected output
-```
+## How work is done here
 
-## Building and testing
+- **The standard decides.** Settle every question of syntax, semantics or output from `specs/ISO_COBOL.md`, cite
+  the clause and rule, and check the citation: `python scripts/spec/cite.py --check 14.9.25.3 "<quoted text>"`.
+  Other compilers and test suites are evidence, never authority.
+- **Work lives in `kb/Work/`.** `python scripts/spec/work.py next` ranks what to fix next by what a defect does to a
+  user's program. A new defect becomes a note there before anything else.
+- **Every change ships with its tests and its documents.** A behavior change adds a program under `tests/conformance/`
+  with expected output derived from the standard, and a negative program for each earlier edition that must reject
+  it. The documents that describe the behavior change in the same pull request.
+- **Every landing carries a DEVLOG entry.** Write `DEVLOG/pending-<slug>.md` with the change; the landing numbers
+  and stamps it.
+- **One pull request per branch, through the merge queue.** `main` is protected, and the `ci-gate` check must pass.
+  Your first pull request asks you to sign the [Contributor License Agreement](CLA.md) once.
 
-Requires the .NET 10 SDK, PowerShell 7+, Python 3.14+ and Java 21+ (ANTLR parser generation).
+[CONTRIBUTING.md](CONTRIBUTING.md) has the complete rules, including what a pull request needs.
 
-```bash
-dotnet build Cobol.Net.sln
-pwsh scripts/build-local.ps1   # build + every Conformance, Unit and Characterization test, likely reds first
-```
+## Status
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow, the standard-citation rule and the Contributor License
-Agreement.
+Every normative rule of ISO/IEC 1989:2023 is a row of the traceability inventory,
+`tests/version-matrix/traceability-inventory.json`, and a row closes only when a test derived from the standard proves
+the compiler conforms. The open rows are the project's one progress number, and the checkout computes it:
+`pwsh scripts/session-probe.ps1` prints the rows, the open rows and the corpus sizes for the commit you are on, and
+the gate's verdict line prints the tests it ran.
+
+Four facilities are declined and documented as non-support. The Message Control System and commit and rollback compile
+with the warning §4.2.6 requires for a processor-dependent element (COBOLNET1578, COBOLNET1579). VALIDATE compiles
+with a warning by documented choice under §4.2.7 (COBOLNET1580). Screen handling is refused with errors under §4.2.7
+and Annex A.4.1 (COBOLNET1560, COBOLNET1707). [docs/CONFORMANCE.md](docs/CONFORMANCE.md) dispositions every optional
+module and processor-dependent element.
+
+A NuGet distribution of the compiler as a .NET tool (`WiseOwl.COBOL`, the `cobol` command) and a documentation site
+are planned; see [docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md](docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md).
+
+## What it covers
+
+- **All four editions**, COBOL-85, 2002, 2014 and 2023, each with its own syntax and semantics, and a diagnostic
+  wherever an edition lacks a construct.
+- **The language**, with the standing of each rule recorded in [docs/CONFORMANCE.md](docs/CONFORMANCE.md): the
+  Identification, Environment, Data and Procedure divisions, the compiler directing facility and conditional
+  compilation, COPY and REPLACE, national and boolean data, dynamic-capacity tables, typed and strongly-typed items,
+  exception handling (declaratives and the `EC-` exception conditions), sequential, relative and indexed files, SORT
+  and MERGE, the report writer, inter-program communication (CALL, nested and recursive programs, program and
+  function prototypes), user-defined functions, object orientation (classes, interfaces, methods, properties,
+  factories), locales and culturally sensitive collation, and every intrinsic function of Clause 15.
+- **Arithmetic:** native, and standard-decimal with decimal128 intermediates, as the OPTIONS paragraph selects.
 
 ## Community
 

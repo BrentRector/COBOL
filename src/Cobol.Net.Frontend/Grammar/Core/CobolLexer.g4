@@ -73,7 +73,7 @@ channels { ABSENT_DEBUG_LINE }
     // to "is this word a user-defined word here" (ReservedWordSet.AdmitsAsUserWord — the question the parser's
     // userWordHere gate and the §8.9 funnel ask) is handed in by TokenRetypes.PrimeLexer, and a word it refuses
     // stops triggering. An intrinsic-function-name word keeps its trigger (a keyword-omitted call, §8.4.3.2.3 SR2),
-    // which is why PrimeLexer excludes the functionName rule's own tokens rather than this lexer listing them.
+    // which is why PrimeLexer excludes the intrinsicKeywordName rule's own tokens rather than this lexer listing them.
     private readonly System.Collections.Generic.HashSet<int> _reservedNonNames =
         new System.Collections.Generic.HashSet<int>();
     public void SetReservedNonDataNames(System.Collections.Generic.IReadOnlySet<int> types)
@@ -230,7 +230,7 @@ channels { ABSENT_DEBUG_LINE }
         // ⚠ THE `&& PreviousTokenCouldBeDataName()` CONJUNCT THAT STOOD HERE IS GONE, and dropping it is part of
         // the fix rather than a tidy-up. SR6 keys on the '(' following an intrinsic-function-name — it says
         // nothing about whether that name's TOKEN happens to be one of the context-sensitive words that can also
-        // be a data name. Of the ten `functionName` alternatives, nine are in _dataNameTokens and BIT is not, so
+        // be a data name. Of the nine `intrinsicKeywordName` tokens, eight are in _dataNameTokens and BIT is not, so
         // the conjunct silently made `FUNCTION BIT(…)` the one function call whose parens were not an argument
         // region — a difference with no rule behind it, and exactly the sort of accidental exception a later
         // reader would preserve as intentional.

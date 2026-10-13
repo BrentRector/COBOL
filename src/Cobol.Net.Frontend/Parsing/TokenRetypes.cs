@@ -62,13 +62,15 @@ public sealed record TokenRetypes(CobolWordsMap CobolWords, IReadOnlySet<string>
     /// <b>both axes off</b>: <c>--permissive</c> does not make an undeclared reserved word a name) and the program has
     /// not declared (<paramref name="declared"/>, upper-case). An intrinsic-function-name token is never in it: its '('
     /// opens a keyword-omitted function call's argument capture (§8.4.3.2.3 SR2) whatever the word's reservation, and
-    /// the set of such tokens is read off the GENERATED parser's <c>functionName</c> rule, never listed here.</summary>
+    /// the set of such tokens is read off the GENERATED parser's <c>intrinsicKeywordName</c> rule — the keyword-token arm
+    /// of <c>functionName</c>, whose other arm (<c>cobolWord</c>, a function-prototype-name) names no intrinsic function
+    /// (kb/Work PB2721) — never listed here.</summary>
     private static IReadOnlySet<int> ReservedNonDataNames(EditionInfo edition, IReadOnlySet<string> declared)
     {
         var reserved = s_reservedNonDataNames.GetOrAdd(edition.Year, static year =>
         {
             var strict = EditionInfo.Of(year);
-            var functionNames = FunctionNameTokens.Value;
+            var functionNames = IntrinsicKeywordNameTokens.Value;
             var set = new HashSet<int>();
             foreach (int t in CobolLexer.SubscriptTriggerTokens)
             {
@@ -86,10 +88,10 @@ public sealed record TokenRetypes(CobolWordsMap CobolWords, IReadOnlySet<string>
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<int, IReadOnlySet<int>>
         s_reservedNonDataNames = new();
 
-    private static readonly Lazy<Antlr4.Runtime.Misc.IntervalSet> FunctionNameTokens = new(() =>
+    private static readonly Lazy<Antlr4.Runtime.Misc.IntervalSet> IntrinsicKeywordNameTokens = new(() =>
     {
         var atn = CobolParserCore._ATN;
-        return atn.NextTokens(atn.ruleToStartState[CobolParserCore.RULE_functionName]);
+        return atn.NextTokens(atn.ruleToStartState[CobolParserCore.RULE_intrinsicKeywordName]);
     });
 
     /// <summary>The COBOL word a keyword token spells: its symbolic name with '_' read as '-' and the generator's

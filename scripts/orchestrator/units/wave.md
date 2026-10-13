@@ -14,8 +14,8 @@ UNIT: wave.
 3. Check {STOP_UNIT} IMMEDIATELY before the call; if it exists, do not launch: hand off naming the args file (the
    specs are reusable by the next unit). Otherwise start `.claude/skills/workstream/templates/wf_rolling_wave.js` with
    the args file it wrote ({SCRATCH}\wf-args-w<wave>.json), and run stall_watch.py beside it as the skill says.
-4. Stay in this session until the Workflow returns (it starts no lander: the next `enqueue` unit lands its branches,
-   kb/Work PB3023; the Workflow dies with this
+4. Stay in this session until the Workflow returns (it starts no lander: the supervisor's landing lane lands each
+   branch reviewed CLEAN as it comes back, beside this unit, kb/Work PB3103, PB3023; the Workflow dies with this
    process). The supervisor keeps this session alive and wakes you when a background task finishes, but do not rely on
    being woken: wave 1017's one-shot session was terminated 600 s after its model ended a turn with the Workflow
    running, and an eight-agent fleet died. Prefer waiting by tool calls: repeat, as separate foreground Bash calls,

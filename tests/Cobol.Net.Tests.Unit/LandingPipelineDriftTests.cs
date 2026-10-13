@@ -12,7 +12,9 @@ namespace CobolNet.Tests.Unit;
 /// <c>merge_group</c> event and only the cheap jobs on <c>pull_request</c>; its already-verified short-circuit counts only
 /// a run that could have run the matrix, never a pull request's; no tracked file but
 /// <c>scripts/orchestrator/enqueue.py</c> opens or queues a pull request, and enqueue.py asks <c>ruleset.py check</c> for
-/// an ACTIVE queue before it checks, pushes or opens anything; and the direct-push landing is gone: its scripts do not
+/// an ACTIVE queue before it checks, pushes or opens anything; every gate row enqueue.py runs takes the shared gate slot
+/// (kb/Work PB3104: <c>unslotted</c> refuses a row that would not, and its self-test arms are held here by name); and the
+/// direct-push landing is gone: its scripts do not
 /// exist, the workflow has no landing-branch trigger, and no tracked file outside the history names them.
 /// </summary>
 /// <remarks>
@@ -249,6 +251,15 @@ public sealed class LandingPipelineDriftTests
                 + "merge) is exit 11 before anything is merged or gated, the report told why",
             "review: a FINDINGS stamp or no report is unreviewed; only a lane I10 does not review, named with "
                 + "--lane, lands without a stamp",
+            // kb/Work PB3103, PB3104: every gate row at enqueue is a landing gate under the shared gate slot
+            "the gate at enqueue is a LANDING gate: its slot is served before waiting implementer gates "
+                + "(kb/Work PB3103, gate_slot.py CLASS_ENV)",
+            "gate rows: the Linux row runs under `gate_slot.py run` with the landing class, and the slot is taken "
+                + "before its command starts (kb/Work PB3104)",
+            "gate rows: every row of GATES_WINDOWS and GATES_LINUX takes the shared gate slot, build-local through "
+                + "run_gate_legs.py and every other row under `gate_slot.py run` (kb/Work PB3104)",
+            "gate rows: a planted unslotted row (a bare row, an unknown slot, a script claiming its own slot without "
+                + "the driver, a driver that no longer acquires) is refused, and run_gates runs no row (kb/Work PB3104)",
         });
         SelfTestArmSource.AssertDeclares(TestRepo.Scripts("orchestrator", "ruleset.py"), new[]
         {

@@ -1,3 +1,3 @@
 ok=false
 tests/characterization/negative/char_neg_typedef85.cob(5,16): error COBOLNET0900: TYPEDEF clause (a type declaration) requires COBOL-2002 (targeting COBOL-85) — the TYPEDEF clause (ISO §13.18.58; data-model D17 — the type-declaration entry (a named template; no storage). LIVE (weak-TYPE spine))
-tests/characterization/negative/char_neg_typedef85.cob(7,13): error COBOLNET0900: TYPE clause (TYPEDEF family) requires COBOL-2002 (targeting COBOL-85) — the TYPE clause (ISO §13.18.58; PROVISIONAL 2002 edge (ISO-validation DEVLOG 582; decision-1 policy))
+tests/characterization/negative/char_neg_typedef85.cob(7,13): error COBOLNET0900: TYPE clause (TYPEDEF family) requires COBOL-2002 (targeting COBOL-85) — the TYPE clause (ISO §13.18.57 (the TYPEDEF family, §13.18.58); PROVISIONAL 2002 edge (ISO-validation DEVLOG 582; decision-1 policy))
