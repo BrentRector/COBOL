@@ -1,4 +1,4 @@
-## Entry 1990 — 2026-10-12 23:07 PDT — PB1616 - a literal in a compiler-directive operand is screened by the unit's own LiteralScreen
+## Entry 2002 — 2026-10-13 11:42 PDT — PB1616 - a literal in a compiler-directive operand is screened by the unit's own LiteralScreen
 
 **What the note said, and what the re-probe showed.** PB1616 (filed from the PB1393 report) said a `>>DEFINE` / `>>IF`
 literal is parsed by `DirectiveExpressionFragment` from text no tree walk reaches, so `>>DEFINE D AS X"414"` compiles
