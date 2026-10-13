@@ -90,7 +90,7 @@ public static class ActivationRelations
               + "match rule 3 e))";
     }
 
-    /// <summary>The clause identity of ISO §9.3.6 match rule 3 e) and §14.8.2.3.2 rule 2, with §14.8.2.3.2
+    /// <summary>The clause identity of ISO §9.3.6 match rule 3 e), its ANY LENGTH item read through §14.8.2.3.2
     /// "Additionally" d) and e): "If the formal parameter is described with the ANY LENGTH clause, its length is
     /// considered to match the length of the corresponding argument" — the argument is compared in the form it would
     /// have were it described with ANY LENGTH (<see cref="ActivationDescription.AnyLengthClauses"/>; null when its
@@ -132,16 +132,12 @@ public static class ActivationRelations
     /// bound through a universal receiver (§14.9.23.4 GR7 c)) and at compile time of a typed one (§14.9.23.3 SR5 c),
     /// §14.8.1) — one relation read at two times (kb/Work PB2077). Null when the pair conforms, else the reason. The
     /// elementary and object-reference identities of §14.8.2.3.2 rule 2 / rule 4 are what match rule 3 d)/e) already
-    /// proved; what remains is the group rules of §14.8.2.2 and, for a <paramref name="universalReceiver"/> only, GR7
-    /// c)'s own ANY LENGTH ban.</summary>
-    public static string? ParameterViolation(ActivationDescription argument, ActivationDescription formal,
-        bool universalReceiver)
+    /// proved; what remains is the group rules of §14.8.2.2. GR7 c)'s own ANY LENGTH ban is not a relation of a pair:
+    /// it bans the bound METHOD's description whatever its arguments (an OMITTED one included, which §9.3.6 3 b) exempts
+    /// from further checking), and only for a universal receiver, so the universal switch raises it unconditionally for
+    /// such a method (<c>OoEmitter.EmitCobolInvokeCase</c>) and the typed lane, which it does not govern, never meets it.</summary>
+    public static string? ParameterViolation(ActivationDescription argument, ActivationDescription formal)
     {
-        // GR7 c) bans the formal's DESCRIPTION, so it is asked before an OMITTED argument's exemption (§9.3.6 3 b)
-        // exempts the MATCH from further checking, not the bound method from GR7 c)).
-        if (universalReceiver && formal.AnyLength)
-            return "the formal parameter is described with the ANY LENGTH clause, which a method invoked through a "
-                + "universal object reference shall not have (ISO §14.9.23.4 GR7 c))";
         if (argument.Shape is ActivationShape.Omitted) return null;
         // The match already required the same type-NAME of a strongly-typed group (§8.5.2.1: it is the class and
         // category) and the same class of every other pair, so what §14.8.2.2 still asks is the type's §8.5.3.1
@@ -272,17 +268,18 @@ public static class ActivationRelations
             return $"the argument ({argument}) is described with the ANY LENGTH clause and the formal parameter is not "
                 + "(ISO §14.8.2.3.2 \"Additionally\" e))";
         // "Additionally" d): an ANY LENGTH formal's "length is considered to match the length of the corresponding
-        // argument" — only the length: every other clause of rule 2 is still compared, the argument in the form it would
-        // have at ANY LENGTH (the reading §9.3.6 match rule 3 e) shares, SameClausesAtFormalLength; kb/Work PB2077 — this
-        // arm compared the category and usage alone, so a JUSTIFIED or reference-modified argument conformed).
-        // (§13.18.2.3 SR2 confines ANY LENGTH to a function, a contained program or a method, none of which a CALL
-        // reaches through a program-specifier: this arm is completeness, not a common path.)
-        return string.Equals(argument.Category, formal.Category, StringComparison.Ordinal)
-               && SameClausesAtFormalLength(argument, formal)
-            ? null
+        // argument" — its one-symbol PICTURE has no length of its own (§13.18.2), so what remains comparable is the class
+        // and category and the usage. (§13.18.2.3 SR2 confines ANY LENGTH to a function, a contained program or a method,
+        // none of which a CALL reaches through a program-specifier: this arm is completeness, not a common path.)
+        if (formal.AnyLength)
+            return string.Equals(formal.Category, argument.Category, StringComparison.Ordinal)
+                   && string.Equals(formal.Usage, argument.Usage, StringComparison.Ordinal)
+                ? null
+                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same category and usage "
+                  + "(ISO §14.8.2.3.2 rule 2, \"Additionally\" d))";
+        return SameElementaryClauses(argument, formal) ? null
             : $"the formal parameter ({formal}) and the argument ({argument}) are not described with the same ALIGN, "
-              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2"
-              + (formal.AnyLength ? ", \"Additionally\" d))" : ")");
+              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2)";
     }
 
     /// <summary>§14.8.2.3.3, Elementary items passed by content or by value — and §14.8.2.2 rule 2 for a group.</summary>
@@ -360,15 +357,13 @@ public static class ActivationRelations
             return $"the receiving item ({receiving}) is described with the ANY LENGTH clause and the returning item "
                 + $"({sending}) is not (ISO §14.8.3.3 \"Additionally\" 4))";
         // 5) "If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is
-        // considered to match the length of the receiving operand" — only the length: the receiving item is compared in
-        // the form it would have at ANY LENGTH, every other clause still compared (SameClausesAtFormalLength, the
-        // reading §14.8.2.3.2 "Additionally" d) and §9.3.6 match rule 3 e) share; kb/Work PB2077).
+        // considered to match the length of the receiving operand" — what remains comparable is the category and usage.
         if (sending.AnyLength && !receiving.AnyLength)
             return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
-                   && SameClausesAtFormalLength(receiving, sending)
+                   && string.Equals(receiving.Usage, sending.Usage, StringComparison.Ordinal)
                 ? null
-                : $"the returning item ({sending}) and the receiving item ({receiving}) are not described with the same "
-                  + "clauses at the receiving item's length (ISO §14.8.3.3 \"Additionally\" 5))";
+                : $"the returning item ({sending}) and the receiving item ({receiving}) are not of the same category and "
+                  + "usage (ISO §14.8.3.3 \"Additionally\" 5))";
         return ReturningConformance(receiving, sending);
     }
 
@@ -378,6 +373,15 @@ public static class ActivationRelations
 
     private static bool IsGroup(ActivationDescription d) =>
         d.Shape is ActivationShape.AlphanumericGroup or ActivationShape.StrongGroup or ActivationShape.VariableLengthGroup;
+
+    /// <summary>§14.8.2.3.2 rule 2 / §14.8.3.3 / §9.3.6 match rule 3 e): the same class and category, the same clause
+    /// identity (<see cref="ActivationDescription.Clauses"/> — ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE
+    /// with its currency and DECIMAL-POINT IS COMMA facets, SIGN, USAGE and the LOCALE phrase's SIZE) and the same LOCALE
+    /// external identification ("Additionally" a)).</summary>
+    private static bool SameElementaryClauses(ActivationDescription a, ActivationDescription b) =>
+        string.Equals(a.Category, b.Category, StringComparison.Ordinal)
+        && string.Equals(a.Clauses, b.Clauses, StringComparison.Ordinal)
+        && SameLocaleIdentification(a, b);
 
     /// <summary>ISO §9.3.6 match rules 6 and 7, split on the INVOCATION's returning item <paramref name="receiving"/>:
     /// when it is "usage OBJECT REFERENCE, POINTER or INDEX" the method's returning item <paramref name="sending"/> "may

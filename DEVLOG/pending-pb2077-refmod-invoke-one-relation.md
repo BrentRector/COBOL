@@ -11,7 +11,9 @@ COBOLNET_OO_DESIGN D6 item 6 set the shape: the typed lane asks the universal sw
 **The fix.** `OoBinder.ByReferenceArgumentReason` is the typed lane's one BY REFERENCE entry. It builds both
 descriptions with `ActivationDescriptions.OfPlace` / `OfFormal` and asks `ActivationRelations.MatchViolation`, a new
 relation holding the description half of match rule 3 (`Matches` is now it plus the ACTIVE-CLASS value half), then
-`ParameterViolation(…, universalReceiver: false)`; GR7 c)'s ANY LENGTH ban stays universal-only. An ACTIVE-CLASS formal
+`ParameterViolation`. GR7 c)'s ANY LENGTH ban bans the bound method's description, not a pair, so it left
+`ParameterViolation` for the universal switch's unconditional stop (which already raised it), and the typed lane never
+meets it; the shipped runtime surface is unchanged (the new members are unshipped, so the ABI pin holds). An ACTIVE-CLASS formal
 keeps the static §14.8.2.3.2 rule 4 arm. The binder's hand-written `RefModPlace` arm and its `DescriptionMismatch` call
 are deleted, along with a dead `OoConformanceError` wrapper. A slice BY CONTENT now takes the MOVE rules like any
 operand (§9.3.6 4 d)), so a slice BY CONTENT into a group formal binds where it was refused.
@@ -21,8 +23,10 @@ Three pieces the one relation needed:
   through §14.8.2.3.2 "Additionally" d): `ActivationDescription.AnyLengthClauses` carries the clauses an item would
   have at ANY LENGTH, and the relation compares those, so only the length is relaxed. Both lanes read it. Through a
   universal receiver a `PIC X(4)` into `PIC X ANY LENGTH` now matches and then meets GR7 c) (EC-OO-UNIVERSAL instead of
-  EC-OO-METHOD; `pb480_universal_any_length_omitted` row 1 re-derived). The CALL lane's rule 2 d) and returning 5) arms
-  had compared only category and usage, so a JUSTIFIED or sliced argument conformed. They read the same form now.
+  EC-OO-METHOD; `pb480_universal_any_length_omitted` row 1 re-derived). The CALL lane's run-time rule 2 d) and returning 5)
+  arms still compare only category and usage; reading the any-length form there would make an old module's
+  description refuse what it passed (a call-ABI bump), so it is a lead. The boundary-layout hash moved only because
+  every description now carries the field, which no CALL relation reads: re-pinned, the call ABI unchanged.
 - `OfReferenceModification` takes GR6's category from the one reader, so an alphabetic slice stays alphabetic. When
   the slice's length is a run-time value, its compile-time size is the maximum extent (D-RM1 a)).
 - `CallEmitter.AreaOf`: a slice whose length is a run-time value states no storage area. Before, the group formal was

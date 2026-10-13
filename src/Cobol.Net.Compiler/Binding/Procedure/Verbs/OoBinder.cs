@@ -1839,7 +1839,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         if (formal.Item.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass)
             return OoConformance.ActiveClassFormalMismatch(null, activeClass,
                 argument.Item.Pic?.ObjectRef ?? ObjectRefDescriptor.Universal, invokedWith, byReference: true);
-        return CobolNet.Runtime.ActivationRelations.ParameterViolation(a, f, universalReceiver: false);
+        return CobolNet.Runtime.ActivationRelations.ParameterViolation(a, f);
     }
 
     // ── Method-context control flow (deep-dive D8) ──────────────────────────────────────────────────────────

@@ -116,7 +116,7 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
                 var da = ActivationDescriptions.OfPlace(argument, classes: null)!;
                 var df = ActivationDescriptions.OfFormal(oof, classes: null)!;
                 bool relation = ActivationRelations.Matches(da, null, df, null!)
-                    && ActivationRelations.ParameterViolation(da, df, universalReceiver: false) is null;
+                    && ActivationRelations.ParameterViolation(da, df) is null;
                 bool binder = OoBinder.ByReferenceArgumentReason(argument, oof, null, ObjectRefDescriptor.Universal) is null;
                 pairs++;
                 if (binder) matched++;

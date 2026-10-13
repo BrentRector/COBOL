@@ -281,8 +281,8 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    entry, `OoBinder.ByReferenceArgumentReason`: `ActivationRelations.MatchViolation` (the match's description half —
    rules 3 a)-c), 3 d) 1.-3., 3 e), null or the reason; `Matches` is it plus the ACTIVE-CLASS value half, which the typed
    lane answers statically by §14.8.2.3.2 rule 4 with `invokedWith`) and
-   `ActivationRelations.ParameterViolation(…, universalReceiver)` (GR7 c)'s ANY LENGTH ban is the one universal-only
-   arm). A BY REFERENCE INVOKE argument has NO second comparator; a reference-modified argument BY CONTENT takes
+   `ActivationRelations.ParameterViolation` (§14.8.2.2's group rules; GR7 c)'s ANY LENGTH ban bans the bound METHOD's
+   description, not a pair, so it is the universal switch's unconditional stop and never the typed lane's). A BY REFERENCE INVOKE argument has NO second comparator; a reference-modified argument BY CONTENT takes
    §14.8.2.3.3's MOVE rules like any operand (§9.3.6 4 d)). This item is the INVOKE step of item 7: pair mode
    (override, implements, property, RETURNING) asks `OoConformance.DescriptionMismatch` only until PB3101 deletes the
    comparator and sends pair mode to `SameSignature`. What the one relation settles by
@@ -298,8 +298,8 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    "Additionally" d)/e) on BOTH lanes (`ActivationDescription.AnyLengthClauses`: the argument compared as if it were
    described with ANY LENGTH — only the length is relaxed), so a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal
    and, through a universal receiver, is then refused by GR7 c) (EC-OO-UNIVERSAL), while a slice matches no ANY LENGTH
-   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's §14.8.2.3.2 rule 2 d) and §14.8.3.3
-   "Additionally" 5) arms read the same any-length form. Drift: `TypedAndUniversalInvokeVerdictsAgreeDriftTests` —
+   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's run-time §14.8.2.3.2 rule 2 d) and §14.8.3.3 5) arms still compare
+   category and usage only (kb/Work PB2077's lead: reading the any-length form there moves the call ABI). Drift: `TypedAndUniversalInvokeVerdictsAgreeDriftTests` —
    structural (a Roslyn walk: `OoBinder` calls no `DescriptionMismatch`, its BY REFERENCE entry asks the two relations
    and names no `RefModPlace`, and no `if` of `OoBindInvocationArg` branches on one) and behavioral (the binder's entry
    and the relation agree over every elementary, reference-modified and ANY LENGTH pair; PB3098's rows compile to their
@@ -321,8 +321,8 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    symmetric identity of §9.3.8.2.3 rules 1-6, §11.7.3 SR3/SR4 and §13.7.3 SR2). `ParameterConformance.CheckArgument`
    is the ONE bind-time entry: CALL Format 2, a function reference and INVOKE build the argument's description
    (`OfCallArgument` / `OfPlace` / `OfValue`, the §14.9.4.4 GR8 reduction written once) and the formal's, and ask
-   `CallArgumentViolation` (program, function) or `MatchViolation` then `ParameterViolation(universalReceiver:
-   false)` (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
+   `CallArgumentViolation` (program, function) or `MatchViolation` then `ParameterViolation`
+   (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
    `MethodConformanceMismatches` (override, implements, interface), the property accessor check,
    `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SameSignature`. There is NO
    `DataItem` comparator: `OoConformance.DescriptionMismatch`, `ContentMismatch`, `ContentValueMismatch`, the literal

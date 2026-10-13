@@ -157,9 +157,10 @@ public sealed record ActivationDescription
     /// its PICTURE the one symbol its character-string repeats (§13.18.2.3 SR1) and its length unstated — or null when
     /// the character-string repeats no single symbol, so that no ANY LENGTH item has its PICTURE clause. ISO §14.8.2.3.2
     /// "Additionally" d) makes an ANY LENGTH formal's length "considered to match the length of the corresponding
-    /// argument", and §14.8.3.3 "Additionally" 5) an ANY LENGTH sending item's; every other clause is still compared, so
-    /// the relations compare this with the ANY LENGTH side's <see cref="Clauses"/> (kb/Work PB2077; docs/CONFORMANCE.md
-    /// D-RM1 b)).</summary>
+    /// argument", and every other clause is still compared, so §9.3.6 match rule 3 e)'s ANY LENGTH item
+    /// (<see cref="ActivationRelations.MatchViolation"/>) compares this with the ANY LENGTH formal's <see cref="Clauses"/>
+    /// (kb/Work PB2077; docs/CONFORMANCE.md D-RM1 b)). Null in a description an older compiler built, which reproduces
+    /// the literal reading that description was compiled under.</summary>
     public string? AnyLengthClauses { get; init; }
 
     /// <summary>The item's CHARACTER positions: an alphanumeric group's image width (§14.8.2.2 rule 1 / §14.8.3.2 compare

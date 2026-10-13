@@ -124,7 +124,7 @@ public sealed class PictureClauseIdentityDriftTests
                 pairs++;
                 bool identical = OoConformance.DescriptionMismatch(formal, arg) is null;
                 bool matches = ActivationRelations.Matches(da, null, df, null!)
-                    && ActivationRelations.ParameterViolation(da, df, universalReceiver: true) is null;
+                    && ActivationRelations.ParameterViolation(da, df) is null;
                 Assert.True(identical == matches,
                     $"PIC {formal.PictureText} vs PIC {arg.PictureText}: comparator says {(identical ? "identical" : "differs")}"
                     + $" but the run-time relation says {(matches ? "matches" : "does not match")} ('{df.Clauses}' / '{da.Clauses}')");
