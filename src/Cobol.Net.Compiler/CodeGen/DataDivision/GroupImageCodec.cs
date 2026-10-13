@@ -353,13 +353,23 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
 
     /// <summary>Where the OCCURS DEPENDING table lies in a member that holds it as its TRAILING storage
     /// (§13.18.38.3 SR22): the character offset of the table within the member's image, one occurrence's width
-    /// and the maximum count. The member's CURRENT image is a character prefix of its maximum image — the same
-    /// law <c>OdoGroupPlace</c> applies to a fixed-length group operand (§13.18.38.4 GR8).</summary>
+    /// and the maximum count — <see cref="OdoModel.GeometryOf"/>, THE ONE geometry <c>OdoGroupPlace</c> also reads for a
+    /// fixed-length group operand (§13.18.38.4 GR8), so the member's CURRENT image is the same character prefix of its
+    /// maximum image. ⛔ It used to take one occurrence's <see cref="DataItem.ImageWidth"/>, a national element's
+    /// POSITIONS, where the image holds its BYTES (kb/Work PB546's two widths): <c>DISPLAY G</c> of a variable-length
+    /// group whose member holds <c>PIC N OCCURS 1 TO 4 DEPENDING ON N</c> at N = 2 sent two bytes of the third
+    /// occurrence. A bit-counted table (USAGE BIT beneath) is not composed here: <c>DataItem.CurrentExtentComposes</c>
+    /// refuses it (kb/Work PB3030), so reaching this with one is a compiler defect.</summary>
     private static (int TailStart, int Elem, int Max) OdoGeometry(DataItem member, int memberWidth)
     {
-        var table = DataItem.OdoTableOnOrBeneath(member)!;
-        int elem = table.ImageWidth, max = table.Occurs ?? 1;
-        return (memberWidth - elem * max, elem, max);
+        var g = OdoModel.GeometryOf(member, DataItem.OdoTableOnOrBeneath(member)!);
+        if (g.InBits)
+            throw new InvalidOperationException(
+                $"the variable-length group codec met the bit-counted OCCURS DEPENDING member '{member.CobolName}' that "
+                + "DataItem.CurrentExtentComposes refuses (kb/Work PB3030)");
+        // SR22: the table is the member's trailing storage, so it starts its occurrences' width before the end of the
+        // member's emitted field (the character arm of GeometryOf's own law, over the field this codec lays out).
+        return (memberWidth - g.ElemUnits * g.MaxOccurs, g.ElemUnits, g.MaxOccurs);
     }
 
     /// <summary>The image of a member holding the OCCURS DEPENDING table, truncated to the table's current count.</summary>
@@ -527,7 +537,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// without one.</summary>
     private OdoTail RecordOdo(DataItem group) =>
         OdoModel.TableUnder(group) is not { } t ? default
-        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t) ? new OdoTail(t.ImageWidth, t.Occurs ?? 1)
+        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t) ? new OdoTail(OdoModel.GeometryOf(group, t).ElemUnits, t.Occurs ?? 1)
         : new OdoTail(VarFixedWidth(t), t.Occurs ?? 1, VarComponentCount(t));
 
     /// <summary>The character width of a variable-length group's FIXED run — its image with every

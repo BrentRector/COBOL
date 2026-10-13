@@ -21,3 +21,12 @@ states the rule for every usage-national category instead of a "sanctioned diver
 `2002/pb546_national_leaf_one_width`, `2014/pb546_group_into_national_dynamic`, negatives
 `pb546-national-boolean-below-2002`, `pb546-group-into-national-dynamic-below-2014`. Rows GR-8.4.3.3.4-3 and
 GR-13.18.60.4-8 re-verdicted CONFORMS and SR-14.8.2.2-1 re-probed (GAP 103 → 101).
+
+**The sibling the sweep found, and PB3030's first half.** The variable-length group codec measured an OCCURS
+DEPENDING member's table with one occurrence's `ImageWidth`, a national element's positions, while the image holds its
+bytes: `DISPLAY G` of a group with a dynamic-length leaf and a member holding `PIC N OCCURS 1 TO 4 DEPENDING ON N`
+(N = 2) sent two bytes of the third occurrence. The table's geometry is now one function, `OdoModel.GeometryOf`, read by
+`OdoModel.WrapGroup` for a group operand and by the codec's current image, carrier, receiving splice and record layout
+for a member; golden `2014/pb546_odo_national_tail` (DISPLAY, the GR9 group MOVE, WRITE / READ). This is the extraction
+kb/Work PB3030's design read asked for; PB3030's bit arm (a USAGE BIT ODO member, whose record layout needs a count
+source) is split to a successor, and PB3101 (one activation-conformance relation) was not started.

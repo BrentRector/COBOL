@@ -1303,7 +1303,10 @@ cannot disagree about a member. The member kinds: **Fixed** (the member-image la
 **Nested** (a scalar variable-length group, flattened in place), **NestedTable** (a FIXED-OCCURS table of
 variable-length elements: `Occurs` flattened copies, a compile-time multiplicity — also `Atoms`' unrolling in the
 §8.5.1.12 correspondence and the per-occurrence `FUNCTION LENGTH` walk), **OdoFixed** (a member of fixed image
-that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22) and **OdoTable** (that table
+that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22; where the table lies in it is
+`OdoModel.GeometryOf`, the ONE geometry `OdoModel.WrapGroup` also gives a group operand — bytes on the physical
+basis, so a national element counts its two bytes a position, kb/Work PB546; a bit-counted table is refused by
+`DataItem.CurrentExtentComposes` until kb/Work PB3030 composes it) and **OdoTable** (that table
 when its ELEMENTS are variable-length groups: `NestedTable` at a count that is a parameter - the first `__odo`
 occurrences' carriers at a statement, all of them at a boundary - with the maximum's fixed width and component
 count, so every earlier component keeps its position; the receiving `FromVarImage` loops to the maximum and a

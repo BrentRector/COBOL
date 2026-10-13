@@ -242,7 +242,8 @@
   "pb2967_numval_f_wide_binary_receiver_size_error",
   "pb2964_length_bit_variable_group",
   "pb2988_capacity_register_type_copies",
-  "pb546_group_into_national_dynamic"
+  "pb546_group_into_national_dynamic",
+  "pb546_odo_national_tail"
  ],
  "pending": []
 }
