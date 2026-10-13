@@ -125,14 +125,24 @@ public sealed class ImageWidthIsStorageWidthTests
         Assert.True(item.IsImageCapable);
     }
 
-    /// <summary>NATIONAL is the ONE sanctioned divergence and it is exactly 2× (D-N1/D-N3) — asserted, so a
-    /// future change cannot quietly widen the exemption.</summary>
-    [Fact]
-    public void NationalLeaf_IsExactlyTwoBytesPerPosition()
+    /// <summary>THE RULE FOR A USAGE-NATIONAL LEAF (kb/Work PB546; D-N1): an ELEMENTARY item's <c>ImageWidth</c> counts
+    /// its character positions and its <c>ByteWidth</c> the storage they occupy, so the storage is
+    /// <see cref="PicInfo.BytesPerPosition"/> × positions — for EVERY category a usage-national item can have
+    /// (ISO §13.18.60.3 SR12: boolean, national, national-edited, numeric, numeric-edited), because §13.18.60.4 GR8
+    /// makes the representation a matter of usage. Under an alphanumeric group the two widths are one (the next
+    /// tests); under a national group the group counts positions.</summary>
+    [Theory]
+    [InlineData(PicCategory.National)]
+    [InlineData(PicCategory.Boolean)]
+    [InlineData(PicCategory.Numeric)]
+    [InlineData(PicCategory.NumericEdited)]
+    public void UsageNationalLeaf_OccupiesTheUnitReadersBytesPerPosition(PicCategory category)
     {
-        var item = Leaf(new PicInfo(PicCategory.National, Usage.National, Length: 4, Digits: 0, Scale: 0, Signed: false));
+        var pic = new PicInfo(category, Usage.National, Length: 4, Digits: category is PicCategory.Numeric ? 4 : 0, Scale: 0, Signed: false);
+        var item = Leaf(pic);
         Assert.Equal(4, item.ImageWidth);
-        Assert.Equal(8, item.ByteWidth);
+        Assert.Equal(pic.BytesPerPosition * item.ImageWidth, item.ByteWidth);
+        Assert.Equal(CobolNet.Runtime.CobolBits.BytesPerNational, pic.BytesPerPosition);
     }
 
     /// <summary>
@@ -209,8 +219,8 @@ public sealed class ImageWidthIsStorageWidthTests
         return child;
     }
 
-    /// <summary>⛔ kb/Work PB1665 — THE GROUP ARM OF THE ONE-WIDTH INVARIANT. The national leaf is the one
-    /// sanctioned divergence between an ELEMENTARY item's two widths (positions vs bytes, asserted above), but an
+    /// <summary>⛔ kb/Work PB1665 — THE GROUP ARM OF THE ONE-WIDTH INVARIANT. A usage-national leaf's two widths
+    /// are its positions and the bytes they occupy (the unit reader's rule, asserted above), but an
     /// ALPHANUMERIC group is a string of storage characters (§8.5.2.1; §14.9.25.4 GR4 moves it as an alphanumeric
     /// item), so a national position counts as the two it occupies and the group's ImageWidth IS its ByteWidth —
     /// the quantity every group MOVE, comparison and boundary window is sized by. Counting the leaf once made

@@ -1528,7 +1528,9 @@ of an unsupported facility.
   byte count cannot be national content (D-N1: two bytes per position), so the last position is completed with the
   alphanumeric space GR4's elementary-move fill supplies, as a fixed national receiver already is: `MOVE G3 TO DN` with
   a three-byte `G3` leaves `DN` two positions long and `FUNCTION LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). GnuCOBOL
-  3.2 has no dynamic-length items. Witness: `conformance:2014/pb546_group_into_national_dynamic` when PB546 lands.
+  3.2 has no dynamic-length items. Implementing site: `ReceivingStore.ContentCharacters` over `CobolBits.NatFromStorage`
+  (also the READ of an elementary dynamic-length national record). Witness:
+  `conformance:2014/pb546_group_into_national_dynamic`.
 - **D-VGB — a BY REFERENCE formal's FIXED table stored past the capacity of the argument's dynamic-capacity table
   creates the occurrences the callee stored into (kb/Work PB2690).** §14.2.3 GR8: "the activated runtime element operates
   as if the formal parameter occupies the same storage area as the argument". A formal table of a fixed (or DEPENDING)

@@ -102,6 +102,20 @@ internal static class ReceivingStore
         _ => area,
     };
 
+    /// <summary>The CHARACTERS a DYNAMIC-LENGTH item takes from a storage image that is its whole new content — the
+    /// decode half of <see cref="StorageArea"/> for the receiver with no position count of its own (§8.5.1.10.4: "The
+    /// new length of the dynamic-length elementary item is determined by the length of new content"). A national
+    /// item's content is the image's UTF-16BE pairs, an odd tail completed with the alphanumeric space (design D-N8,
+    /// kb/Work PB546: a GROUP sender into <c>PIC N DYNAMIC LENGTH</c> used to take the group's bytes as its
+    /// characters, so three bytes became three national positions and <c>LENGTH</c> said 6); an alphanumeric item's
+    /// is the bytes as they are (§8.5.1.10.1: a dynamic-length item is alphanumeric or national). Asked by the GR4
+    /// group MOVE and by the READ of an elementary dynamic-length record, so the two transfers decode alike.</summary>
+    public static string ContentCharacters(DataItem item, string image) => item.Pic switch
+    {
+        { Usage: Usage.National } => RuntimeApi.NatFromStorage(image),
+        _ => image,
+    };
+
     /// <summary>The SIZE of a receiving operand in CHARACTER POSITIONS at execution — a C# int expression, because an
     /// ANY LENGTH receiver's size is its carrier's (ISO §13.18.2.4 GR1 b), "n is the length of the corresponding
     /// argument or returning item of the activating runtime element") and so is not known to the binder. It is the

@@ -839,7 +839,9 @@
   "pb2548_template_counter_unused_elsewhere",
   "pb2967_float_result_wide_binary_receiver_size_error",
   "pb2498_length_odo_bit_national_group",
-  "pb2589_repository_function_keyword_omitted"
+  "pb2589_repository_function_keyword_omitted",
+  "pb2921_factory_named_class",
+  "pb546_national_leaf_one_width"
   ],
   "pending": []
 }
