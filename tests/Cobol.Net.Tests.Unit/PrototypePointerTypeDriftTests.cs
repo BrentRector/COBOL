@@ -70,6 +70,56 @@ public sealed class PrototypePointerTypeDriftTests
             + "PrototypeSignatures.Same (kb/Work PB2464):\n  " + string.Join("\n  ", offenders));
     }
 
+    /// <summary>A <c>PicInfo</c> record-equality compare as the type model writes it: a <c>with { EditingRules = null, … }</c>
+    /// projection, the shape that elides the members a record compare cannot carry.</summary>
+    private static readonly Regex ProfileProjection = new(@"with\s*\{\s*EditingRules\s*=\s*null[^}]*\}", RegexOptions.Compiled);
+
+    /// <summary>The restricted-pointer names a <c>PicInfo</c> record compare must not read (kb/Work PB3120): the prototype
+    /// name (a program- or function-pointer is typed by its prototype's SIGNATURE) and the type-name (a data-pointer is
+    /// typed by the DECLARATION it names, which the record compare elides).</summary>
+    private static readonly string[] RestrictionNames = ["RestrictedPrototypeName", "RestrictedTypeName"];
+
+    /// <summary>⛔ A <c>PicInfo</c> RECORD COMPARE DOES NOT DECIDE A RESTRICTED POINTER'S TYPE (kb/Work PB3120).
+    /// <c>StrongTypeModel.SameAnalyzedProfile</c> compares two elementary items' analyzed profiles with <c>PicInfo</c>'s own
+    /// record equality, which compares <c>RestrictedPrototypeName</c> and <c>RestrictedTypeName</c> by value — the NAMES
+    /// §8.5.3.1 does not compare. A group formal that held a pointer restricted to two differently named prototypes of one
+    /// signature (or to two declarations of one type-name) was therefore decided by the name while the elementary formal of
+    /// the same pair was decided by the type, refusing the first (COBOLNET1513) and admitting the second. Every
+    /// <c>with { EditingRules = null, … }</c> projection in the compiler must elide BOTH names, and the comparison reads
+    /// <c>PrototypeSignatures.SameType</c> / <c>StrongTypeModel.SameRestriction</c> instead.</summary>
+    [Fact]
+    public void EveryPicInfoProfileProjectionElidesTheRestrictedNames()
+    {
+        var offenders = new List<string>();
+        string root = TestRepo.Src("Cobol.Net.Compiler");
+        foreach (string file in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+                     .Where(f => !f.Contains(Path.DirectorySeparatorChar + "obj" + Path.DirectorySeparatorChar)
+                                 && !f.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar)))
+            foreach (string missing in ProjectionsMissingARestrictedName(File.ReadAllText(file)))
+                offenders.Add($"{Path.GetRelativePath(root, file)}  {missing}");
+        Assert.True(offenders.Count == 0,
+            "A PicInfo profile projection leaves a restricted-pointer name in the record compare, so a restricted pointer is "
+            + "decided by its NAME (kb/Work PB3120) - elide it and ask the pointer's TYPE:\n  " + string.Join("\n  ", offenders));
+    }
+
+    private static IEnumerable<string> ProjectionsMissingARestrictedName(string source) =>
+        ProfileProjection.Matches(source)
+            .Where(m => RestrictionNames.Any(n => !m.Value.Contains(n + " = null", StringComparison.Ordinal)))
+            .Select(m => m.Value);
+
+    [Fact]
+    public void TheProjectionPin_FiresOnThePB3120Defect()
+    {
+        // The exact projection StrongTypeModel.SameAnalyzedProfile carried before the repair.
+        Assert.NotEmpty(ProjectionsMissingARestrictedName(
+            "if ((x with { EditingRules = null, RestrictedTypeDecl = null }) != (y with { EditingRules = null, RestrictedTypeDecl = null }))"));
+        // Eliding only the prototype name still leaves a data-pointer's type-name in the compare.
+        Assert.NotEmpty(ProjectionsMissingARestrictedName(
+            "x with { EditingRules = null, RestrictedTypeDecl = null, RestrictedPrototypeName = null }"));
+        Assert.Empty(ProjectionsMissingARestrictedName(
+            "x with { EditingRules = null, RestrictedTypeName = null, RestrictedTypeDecl = null, RestrictedPrototypeName = null }"));
+    }
+
     /// <summary>⛔ EVERY GROUP-LEVEL SIGNATURE CHECK RUNS AFTER THE POINTER TYPES EXIST (kb/Work PB2495). A restricted
     /// program- or function-pointer formal is typed by the signature class <c>BinderDriver.ResolvePointerRestrictions</c>
     /// attaches; a check that runs before it reads an unstamped pointer, whose identity is its prototype's own NAME, and so
