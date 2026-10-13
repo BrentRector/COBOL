@@ -1232,6 +1232,22 @@ of an unsupported facility.
   reading — admitting them as user words at every edition — would make each vendor construct ambiguous with a
   data reference in every operand list.
 
+- **D-RW2 — METHOD is reserved at COBOL-2002 and COBOL-2014 and is a user-defined word at COBOL-2023 (§4.2.8, §8.9;
+  kb/Work PB2623).** §4.2.8: "An implementation shall recognize as reserved words all the COBOL reserved words
+  specified in 8.9, Reserved words" (`cite.py --check 4.2.8 "shall recognize as reserved words all the COBOL reserved
+  words specified in 8.9"` → OK). The printed 2023 §8.9 list runs MERGE, MESSAGE-TAG, METHOD-ID, MINUS, MODE (PDF page
+  236, printed page 206; `cite.py --check 8.9 "METHOD-ID"` → OK) and has no METHOD, and §8.10 lists none either. An
+  earlier generator revision added METHOD to the 2023 set as an "OCR omission"; rendering the page refutes that, so
+  the line is gone and METHOD follows every other 2002/2014 word the 2023 list dropped (POSITION, COBOL, …): reserved
+  at 2002 and 2014, a user-defined word at 85 (no OO) and at 2023. The standard still SPELLS METHOD in the END METHOD
+  marker (§10.7.2; `cite.py --check 10.7.2 "METHOD, and INTERFACE are underlined"` → OK) and in EXIT METHOD (`cite.py --check E.2 "EXIT METHOD statement"` → OK; the 2002 and 2014 statement,
+  removed at 2023); those keyword positions read the word whether or not the program also declares a data item of that
+  name (`methodKeyword`, `CobolOO.g4`). ⚠ DETERMINATION (owner may overturn): the standard's own text decides — a
+  word its list does not reserve is not reserved (§4.2.8, §8.3.2.1 rule 1) — so the alternative, treating the
+  omission as a typo and keeping METHOD reserved at 2023, would be an added reserved word that §4.2.10 3) obliges this
+  document to list, and would refuse a program the standard permits. Pinned by `conformance:2023/pb2623_method_is_a_user_word_at_2023`,
+  `negative/pb2623-method-reserved-at-2002-2014` and `MethodUserWordTests`.
+
 - **D-DECLREF — the declaratives reference boundary: an SR4 violation is an error, an SR3 violation is a warning
   (kb/Work PB362).** §14.9.49.3 SR3 ("Within a declarative procedure, there shall be no reference to any
   nondeclarative procedures except in a RESUME statement") and SR4 ("Procedure-names within a declarative section

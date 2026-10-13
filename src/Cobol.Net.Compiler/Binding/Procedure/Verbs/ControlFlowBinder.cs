@@ -383,7 +383,7 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
             }
             return new BoundExitSection(sec.EndPc, ctx.SourceLine(e));
         }
-        if (e.METHOD() is not null) return host.Oo.OoBindExitMethod(e);   // method-return synonym ≤2014; 0902 at 2023 (validator)
+        if (e.methodKeyword() is not null) return host.Oo.OoBindExitMethod(e);   // method-return synonym ≤2014; 0902 at 2023 (validator)
         if (e.FUNCTION() is not null) return host.Udf.UdfBindExitFunction(e);   // function-return synonym ≤2014; 0900/0902 window (validator)
         return new BoundNop();   // bare EXIT (§14.9.14.4 GR1); its SR1 placement is asked by the funnel, see above
     }
