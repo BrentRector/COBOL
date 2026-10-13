@@ -1,4 +1,4 @@
-## PB2017 - the arithmetic operators' spacing (ISO 8.7.1) is asked, and COBOLNET2631 stops advising a meaning-changing space
+## Entry 2009 — 2026-10-13 15:55 PDT — PB2017 - the arithmetic operators' spacing (ISO 8.7.1) is asked, and COBOLNET2631 stops advising a meaning-changing space
 
 **What the note said, and what the re-probe showed.** PB2017 (found by the adjudication of the battery #88 differential flip
 `run_misc:156`) said two things: `COMPUTE X=1*2` compiles with no diagnostic although 8.7.1 requires an arithmetic operator
@@ -48,3 +48,4 @@ from 8.8.1.2 by hand before the run). Negatives `pb2017-binary-operator-no-space
 comma); Conformance `OperatorSpacingDiagnosticTests` (one diagnostic at every edition, no COBOLNET2631, the conforming
 comma spellings compile, the directive lane). The 8.7.1 clause has no traceability-inventory row, so the note closes none
 (`closes_rows_reason`).
+
