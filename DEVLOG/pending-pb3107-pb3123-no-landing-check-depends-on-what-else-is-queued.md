@@ -45,3 +45,8 @@ L11 and DESIGN-orchestrator-loop.md §4.7: a landing check's verdict may not dep
 workstream, land-a-fix and architecture-review skills; `units/enqueue.md`; `land_lane.py`; the cobol-finisher role;
 DESIGN-test-build-ci.md §3.17.2, §3.17.4, §3.17.8; DESIGN-architecture-review.md §3 R0, §4.1, §8;
 DESIGN-orchestrator-loop.md §4.5, §4.7 and its wiring note; DOC_INDEX; the plan's live-state line.
+
+**Verification.** The new oracle path end to end: `=== ARCH-ORACLE: IDENTICAL — 7799 cases (baseline 3b1261dfe86f, new 5cb2f1a37c2e) ===`. `devlog.py --self-test` 45/45 (the stacked arms, a
+retitled entry keeping its stamp's floor), `enqueue.py --self-test` PASS, `check_practices.py` GREEN, `work.py check`
+clean; the leg-2 `LandingPipelineDriftTests` and `SelfTestDiscoveryDriftTests` run by name, 14/14. The first gate was
+RED on the citations audit (a phantom bare `§3.17.4` in PB3123's note, fixed); the second: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — … Conformance 5,703/11,536 · Unit 32,649/33,474 · Characterization 7/36 cases ran (skipped 0) in 1 of 2 leg(s) … run 20261013T212112Z-029494 ===`.
