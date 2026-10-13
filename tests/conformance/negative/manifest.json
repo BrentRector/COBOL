@@ -2624,7 +2624,10 @@
   "pb2548-template-dynamic-from-to",
   "pb2589-repository-function-at-85",
   "pb2502-record-key-alias-of-numeric",
-  "pb2623-method-reserved-at-2002-2014"
+  "pb2623-method-reserved-at-2002-2014",
+  "pb1616-define-hex-odd",
+  "pb1616-omitted-branch-hex-odd",
+  "pb1616-define-zero-length-below-2014"
  ],
  "pending": []
 }

@@ -458,8 +458,8 @@ public static partial class ConditionalCompilationProcessor
                         // §7.3.12.4 GR1: the operands are transferred when the directive is processed — in an emitting branch
                         // only, like every directive (an omitted branch is not compiled). The line itself is consumed.
                         if (emitting) ApplyDisplay(rest, _evaluator, _diag, _inputs, _bag);
-                        else if (rest.Length > 0 && DirectiveExpressionFragment.ParseDisplay(rest) is null)
-                            _diag.Malformed(">>DISPLAY", rest);   // omitted branch: nothing is transferred, but the operands are still parsed (§7.2.1)
+                        else if (rest.Length > 0)
+                            ParseDisplayFragment(rest, _diag, ">>DISPLAY", compiled: false);   // omitted branch: nothing is transferred, but the operands are still parsed (§7.2.1)
                         break;
                     default:
                         // A >> directive other than the conditional-compilation set handled above. Its edition
@@ -757,7 +757,7 @@ public static partial class ConditionalCompilationProcessor
     private static CtValue? EvaluateOperandText(string text, CompileTimeExpressionEvaluator evaluator,
         DirectiveDiag diag, string where)
     {
-        if (DirectiveExpressionFragment.ParseOperand(text) is not { } frag) { diag.Malformed(where, text); return null; }
+        if (ParseOperandFragment(text, diag, where, compiled: true) is not { } frag) return null;
         var operand = frag.compileTimeOperand();
         diag.FlagArithmetic(operand);   // b COMPILE-TIME-ARITHMETIC-EXPRESSIONS (§7.3.15.4 GR4 b) — evaluated context
         diag.GateBooleanOperators(operand);
@@ -768,15 +768,43 @@ public static partial class ConditionalCompilationProcessor
     /// branch (ISO §7.2.1: compiler directives shall be syntactically correct in the initial source text, and the false
     /// path of an IF or EVALUATE is part of it). A syntax error is COBOLNET1619, exactly as in a compiled branch;
     /// evaluation errors (undefined name, category, division) need values and belong to a compiled branch only.</summary>
-    private static void CheckOperandSyntax(string text, DirectiveDiag diag, string where)
-    {
-        if (DirectiveExpressionFragment.ParseOperand(text) is null) diag.Malformed(where, text);
-    }
+    private static void CheckOperandSyntax(string text, DirectiveDiag diag, string where) =>
+        ParseOperandFragment(text, diag, where, compiled: false);
 
     /// <summary>The constant-conditional-expression twin of <see cref="CheckOperandSyntax"/>.</summary>
-    private static void CheckCceSyntax(string text, DirectiveDiag diag, string where)
+    private static void CheckCceSyntax(string text, DirectiveDiag diag, string where) =>
+        ParseCceFragment(text, diag, where, compiled: false);
+
+    // ── ⭐ THE THREE DIRECTIVE-FRAGMENT PARSE FUNNELS (kb/Work PB1616) ───────────────────────────────────────────
+    // A directive operand is lexed apart from the unit, so no tree walk of the unit reaches it. Every fragment this stage
+    // parses comes through one of these three, and each asks the same two things of it: is it SYNTACTICALLY a fragment
+    // (COBOLNET1619 when not), and is every literal in it sound (the literal's own §8.3.3 rules, always; the edition gates
+    // of its format, in a COMPILED branch). A fragment that fails either has no value and is returned as null — the
+    // "already reported" result every caller keeps. A fourth parse site calls a funnel, never DirectiveExpressionFragment.
+
+    /// <summary>The compile-time operand fragment of <paramref name="text"/>, or null (reported) when it is malformed or
+    /// holds a literal that breaks its own rules. <paramref name="compiled"/>: the directive is in a compiled branch.</summary>
+    private static CobolParserCore.CompileTimeOperandFragmentContext? ParseOperandFragment(string text, DirectiveDiag diag,
+        string where, bool compiled)
     {
-        if (DirectiveExpressionFragment.ParseCce(text) is null) diag.Malformed(where, text);
+        if (DirectiveExpressionFragment.ParseOperand(text) is not { } frag) { diag.Malformed(where, text); return null; }
+        return diag.ScreenLiterals(frag, compiled) ? frag : null;
+    }
+
+    /// <summary>The constant-conditional-expression fragment of <paramref name="text"/>; see <see cref="ParseOperandFragment"/>.</summary>
+    private static CobolParserCore.ConstantConditionalExpressionFragmentContext? ParseCceFragment(string text,
+        DirectiveDiag diag, string where, bool compiled)
+    {
+        if (DirectiveExpressionFragment.ParseCce(text) is not { } frag) { diag.Malformed(where, text); return null; }
+        return diag.ScreenLiterals(frag, compiled) ? frag : null;
+    }
+
+    /// <summary>The <c>&gt;&gt;DISPLAY</c> operand-list fragment of <paramref name="text"/>; see <see cref="ParseOperandFragment"/>.</summary>
+    private static CobolParserCore.DisplayDirectiveFragmentContext? ParseDisplayFragment(string text, DirectiveDiag diag,
+        string where, bool compiled)
+    {
+        if (DirectiveExpressionFragment.ParseDisplay(text) is not { } frag) { diag.Malformed(where, text); return null; }
+        return diag.ScreenLiterals(frag, compiled) ? frag : null;
     }
 
     /// <summary>Fragment-parse and evaluate a constant-conditional-expression; a malformed cce / formation error
@@ -784,7 +812,7 @@ public static partial class ConditionalCompilationProcessor
     private static bool EvaluateCceText(string text, CompileTimeExpressionEvaluator evaluator,
         DirectiveDiag diag, string where)
     {
-        if (DirectiveExpressionFragment.ParseCce(text) is not { } frag) { diag.Malformed(where, text); return false; }
+        if (ParseCceFragment(text, diag, where, compiled: true) is not { } frag) return false;
         var cce = frag.constantConditionalExpression();
         diag.FlagArithmetic(cce);   // b COMPILE-TIME-ARITHMETIC-EXPRESSIONS (§7.3.15.4 GR4 b) — evaluated context
         diag.GateBooleanOperators(cce);
@@ -920,6 +948,15 @@ public static partial class ConditionalCompilationProcessor
         {
             if (bag is not null) LogicalOperatorGate.Check(edition, new BagSink(bag, At), fragment);
         }
+
+        /// <summary>A directive operand's literals against their own §8.3.3 syntax rules and — in a COMPILED branch —
+        /// the edition gates of their format (kb/Work PB1616), through the ONE body the compilation-unit walk uses
+        /// (<see cref="LiteralScreen"/>), once per parsed fragment, at the directive's line. True when every literal is
+        /// sound; a fragment holding one that is not has no value and is never evaluated. With no bag the diagnostics
+        /// have nowhere to go, but the verdict is still the rule's (the evaluator must not take an unsound literal's
+        /// empty decoding for the operand's value).</summary>
+        public bool ScreenLiterals(Antlr4.Runtime.Tree.IParseTree fragment, bool compiled) =>
+            LiteralScreen.Run(fragment, edition, new BagSink(bag ?? new DiagnosticBag(), At), compiled);
 
         public void Report(CtDiagCode code, string message) => Emit(
             code == CtDiagCode.DirectiveWordAsName
