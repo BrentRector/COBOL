@@ -118,6 +118,17 @@ public static class SeparatorRule
         }
     }
 
+    /// <summary>Whether <paramref name="u"/> heads a LITERAL-ONLY slot rather than an arithmetic expression: the VALUE
+    /// clauses' <c>valueClauseOperand : unaryExpression | …</c> parses its signs as unary operators (a superset parse), but
+    /// the position admits a literal and nothing else, so a sign there is the literal's — `--5` is "more than one sign
+    /// character" (§8.3.3.3.2 2), <c>COBOLNET2155</c>, which the literal rules own — and no operator exists to be spaced.</summary>
+    private static bool InLiteralSlot(Core.UnaryExpressionContext u)
+    {
+        IParseTree top = u;
+        while (top.Parent is Core.UnaryExpressionContext outer) top = outer;
+        return top.Parent is Core.ValueClauseOperandContext;
+    }
+
     /// <summary>The §8.7.3 / §8.7.4 verdict on a concatenation or invocation operator: null when a separator space
     /// immediately precedes AND follows it, otherwise the message naming the side (or sides) that touch.</summary>
     private static string? OperatorSpacingMessage(string text, IToken op)
@@ -198,7 +209,7 @@ public static class SeparatorRule
                 case Core.PowerExpressionContext pow:
                     foreach (var op in pow.POWER()) Judge(op.Symbol, "binary arithmetic operator", unary: false);
                     break;
-                case Core.UnaryExpressionContext u when u.addOp() is { } sign
+                case Core.UnaryExpressionContext u when u.addOp() is { } sign && !InLiteralSlot(u)
                         && !ArithmeticFormationRules.SignIsPartOfLiteral(sign.Start, u.unaryExpression()):
                     Judge(sign.Start, "unary arithmetic operator", unary: true);
                     break;
