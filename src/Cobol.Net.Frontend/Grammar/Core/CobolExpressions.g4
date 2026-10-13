@@ -690,12 +690,25 @@ displayDirectiveOperand
     ;
 displayUponPhrase : UPON cobolWord+ ;
 
-// Function names are normally IDENTIFIERs, but several intrinsic function names
-// collide with reserved words (lexer tokens). List them explicitly so the parser
-// accepts them after FUNCTION.
+// The word after FUNCTION (§8.4.3.2.2): a function-prototype-name-1 or an intrinsic-function-name-1.
+// ⛔ THE NAME ARM IS cobolWord, NEVER A BARE IDENTIFIER (kb/Work PB2721). A function-prototype-name is a user-defined
+// word (§8.3.2.2.10) DECLARED by `FUNCTION-ID.` through programName — which is cobolWord — so this REFERENCE slot,
+// and the REPOSITORY specifier that reads this rule too (§12.3.8.2 `FUNCTION function-prototype-name-1`), must admit
+// the same word set. It used to be IDENTIFIER, so a function named by a §8.10 context-sensitive word that has a lexer
+// token (`FUNCTION-ID. CAPACITY.`, §8.3.2.1 3)) was declared cleanly and then refused at `REPOSITORY. FUNCTION
+// CAPACITY.` and at `FUNCTION CAPACITY(V)`. An intrinsic-function-name is no user-defined word, but no §15 name
+// spelled by IDENTIFIER is §8.9-reserved, so the §8.9 funnel the cobolWord arm passes through never meets one; the
+// reserved ones have their own tokens and their own arm.
 functionName
-    : IDENTIFIER
-    | DISPLAY
+    : cobolWord
+    | intrinsicKeywordName
+    ;
+
+// The intrinsic-function-names that collide with a lexer token not in cobolWord (reserved words), listed so the parser
+// accepts them after FUNCTION. TokenRetypes reads THIS rule's tokens off the ATN: each keeps its '(' a subscript
+// trigger, for the keyword-omitted call §8.4.3.2.3 SR2 permits.
+intrinsicKeywordName
+    : DISPLAY
     | LENGTH
     | MERGE
     | NATIONAL

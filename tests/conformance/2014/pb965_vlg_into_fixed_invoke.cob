@@ -11,9 +11,9 @@
       *> EXPECTED VALUES, DERIVED:
       *>   LF   - VT has capacity 2 opposite LF's 3-occurrence LT; 14.6.9.2 space fills the third -> [ghkl ij].
       *>   SG   - the method's variable-length returning item LR (capacity 3) into the fixed SG (8.5.1.12.3).
-      *>   VG   - 14.2.3 GR8: L1 := qq and LT(1..3) := m n o reach VG. DETERMINATION: a formal with a FIXED
-      *>          occurrence count cannot change the argument table's capacity, so VCAP stays 2 and the third
-      *>          occurrence the formal stored has no storage in VG.
+      *>   VG   - 14.2.3 GR8: L1 := qq and LT(1..3) := m n o reach VG. LT(3) is a receiving reference to
+      *>          VT with a subscript that "exceeds the current capacity of the table", so 8.5.1.9.3
+      *>          creates the third occurrence and VCAP becomes 3 (kb/Work PB2690).
       *>   VG2  - the second method returns a FIXED item into VG: its 3 occurrences become VT at capacity 3.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB965FI.
@@ -39,7 +39,8 @@
            INVOKE PB965FK "NEW" RETURNING O
            INVOKE O "XFER" USING VG RETURNING SG
            DISPLAY "SG=[" SG "]"
-           DISPLAY "VG=[" V1 "][" VT(1) VT(2) "][" V3 "] VCAP=" VCAP
+           DISPLAY "VG=[" V1 "][" VT(1) VT(2) VT(3) "][" V3 "] VCAP="
+               VCAP
            INVOKE O "FIXR" RETURNING VG
            DISPLAY "VG2=[" V1 "][" VT(1) VT(2) VT(3) "][" V3 "] VCAP="
                VCAP

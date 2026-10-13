@@ -15,8 +15,9 @@
       *>   LF   - VT has capacity 2 opposite a 3-occurrence table; 14.6.9.2 fits it: the missing third
       *>          occurrence is space filled -> [ghkl ij].
       *>   VG   - 14.2.3 GR8 ("operates as if the formal parameter occupies the same storage area as the
-      *>          argument"): L1 := qq reaches V1. DETERMINATION: a formal with a FIXED occurrence count
-      *>          cannot change the argument table's current capacity, so VCAP stays 2.
+      *>          argument"): L1 := qq reaches V1. The callee stores nothing into an occurrence past
+      *>          the argument table's capacity (8.5.1.9.3 creates one only for a receiving
+      *>          reference), so VCAP stays 2.
       *>   LC   - BY CONTENT, the same view; the callee's MOVE never reaches VG (14.2.3 GR9).
       *>   LP   - a table-less formal of 2 characters is a PREFIX (14.8.2.2 rule 1); VT lies past its last
       *>          character (8.5.1.12.2's last sentence). P1 := PP reaches V1 and the rest of VG survives.

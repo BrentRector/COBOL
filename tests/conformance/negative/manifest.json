@@ -1,6 +1,7 @@
 {
  "_comment": "The NEGATIVE corpus (must-REJECT programs; VERSION_TEST_MATRIX_DESIGN P2.8/Phase-2): each enabled entry is <name>.cob + <name>.err (the expected diagnostic substring, e.g. an edition-band code). The editions that must reject are named by the SOURCE, not by this manifest: CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic reads them from the '*> reject-at: <year> ...' header on <name>.cob's FIRST line and throws when it is absent. (This comment used to promise an \"editions\" map; no entry ever carried one and the runner never looked for one.) Seeding: >=1 case per Wave-1 gate + the reserved-word interval witnesses (roadmap Phase 2 W2). The matrix reject cells already pin gate diagnostics; THIS corpus holds the free-form adversarial cases.",
  "enabled": [
+  "pb2732-qualified-index-name",
   "pb2841-continue-after-non-finite-below-2023",
   "pb2729-float-significand-point-value",
   "pb2729-float-significand-point-compute",
@@ -2596,6 +2597,7 @@
   "pb2748-reopen-sharing-below-2002",
   "pb2751-sharing-clause-below-2002",
   "pb2690-fixed-group-vlg-element-tables-below-2014",
+  "pb2690-fixed-table-formal-grows-dynamic-argument-below-2014",
   "pb1941-constant-length-cycle-open-entry",
   "pb1941-constant-length-report-cycle",
   "pb2051-parameterized-class-body-unexpanded",
@@ -2619,7 +2621,9 @@
   "pb2548-template-key-unresolved",
   "pb2548-template-odo-counter-not-integer",
   "pb2548-template-dynamic-from-to",
-  "pb2589-repository-function-at-85"
+  "pb2589-repository-function-at-85",
+  "pb2502-record-key-alias-of-numeric",
+  "pb2623-method-reserved-at-2002-2014"
  ],
  "pending": []
 }

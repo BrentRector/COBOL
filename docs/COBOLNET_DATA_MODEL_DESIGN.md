@@ -55,7 +55,7 @@ Fixed-point = native `long` holding the UNSCALED value; scale is compile-time me
 
 == 7. LEVELS 66 (RENAMES) and 88 (condition-names) ==
   • 88 condition-name: NOT a storage item — a named boolean predicate over its parent (the conditional variable). DECISION: emit each 88 as a C# `static bool` PROPERTY (or a method) over the parent Place: `private static bool LvlOk => CobolCond.In(Parent.Read(), <value-or-range-set>);` where the value set comes from the (possibly multi-valued, THRU-ranged) VALUE clause. SET cond TO TRUE → assign the parent its first/low value (ISO §14.9.39.4 GR6). The binder captures 88 entries as `Condition88` records on their conditional variable (IMPLEMENTED — `DataBinder.Conditions` multimap); ensure the captured VALUE list covers THRU ranges + multiple literals.
-  • 66 RENAMES: a re-grouping alias. Without THROUGH it forwards to data-name-2's place (§13.18.45.4 GR1); with THROUGH it is a `RenamesPlace` that concatenates on read, and splits on write, the STORAGE IMAGES of the parts that tile its window (GR2: "an alphanumeric group item"). Resolution is a post-build pass (`DataBinder`'s RENAMES resolution, `RenamesOwners()`).
+  • 66 RENAMES: a re-grouping alias. Without THROUGH it forwards to data-name-2's place (§13.18.45.4 GR1); with THROUGH it is a `RenamesPlace` that concatenates on read, and splits on write, the STORAGE IMAGES of the parts that tile its window (GR2: "an alphanumeric group item"). Resolution is a post-build pass (`DataBinder`'s RENAMES resolution, `RenamesOwners()`). An alias rides `Renames66`, not `Children`, so the child walks of `RecordLayout` never meet it: its byte POSITION is data-name-2's (`FirstOccurrenceOffsetOf`, `OffsetInRecord` and the variable-length key walk each forward to `Renames.From`), its WIDTH is its own `Pic` (THROUGH) or data-name-2's `ByteWidth` (no THROUGH, a group), and its group kind and operand category are data-name-2's (`ItemCategory.GroupKindsOf`; `DataItem.AsIfPic` / `IsAsIfElementary` forward a no-THROUGH alias, so a national-group alias is a national operand) — so an alias is a legal RECORD KEY / ALTERNATE RECORD KEY / SORT key like the item it names (kb/Work PB2502; §12.4.5.12.3 SR2, §14.9.40.3 SR6).
     A THROUGH alias answers two DIFFERENT questions from two fields, and each rule asks the one it means: its STORAGE
     (`RenamesInfo.Span` — the record's storage BYTES tiled once each by whichever leaves cover them, a REDEFINES view's
     leaves included, a leaf under an OCCURS group once per occurrence of that group, `RenamesSpanPart.Outer`, kb/Work
@@ -422,6 +422,26 @@ content-validation half is separately answered by the declined A.4.14 facility (
   every consumer of a group's image (MOVE, comparison, boundary windows, ref-mod positions, RENAMES) sizes by
   it. A site counting what an elementary item OCCUPIES reads `ByteWidth`; a site counting an elementary
   carrier's positions reads `ImageWidth`.
+  **The ONE unit reader (kb/Work PB546; decision PB3099, 2026-10-12).** How many bytes a position occupies is a
+  function of USAGE alone — §13.18.60.4 GR8 speaks of usage, and §13.18.60.3 SR12 lists the five picture shapes a
+  usage-national item takes (boolean, national, national-edited, numeric, numeric-edited) — and it is spelled once:
+  `PicInfo.BytesPerPosition` (`Usage.National` → `CobolBits.BytesPerNational`, else 1; a usage-bit position is
+  `RefModPlace.PositionBits`' bit). `ElementaryByteWidth`, `PositionBits`, `RecordLayout.ImageContribution`,
+  `ItemLength`, `FileModel.RecordImageUnit` and every `NatBytes` / `NatReadWindow` emission read it. A byte count keyed
+  on `PicCategory.National` is the defect shape PB546 measured twice — a boolean slice of usage national serialized
+  one byte per position; a dynamic national receiver converting where GR4 copies — because a usage-national item of
+  category boolean, numeric or numeric-edited falls into the one-byte arm. `NationalUnitDriftTests` keeps the reader
+  the only place: every national-unit call in the compiler is guarded by a usage test or reached through the reader,
+  never by the category alone. The alphanumeric-group reading itself (a national position is two alphanumeric
+  positions in LENGTH, reference modification, a group MOVE, a BY REFERENCE group formal and DISPLAY) is spec-derived —
+  §15.50.4 r3, §8.4.3.3.4 GR1/GR5 a), §14.9.25.4 GR4, §14.8.2.2 rule 1, §14.9.11.4 GR1 under GR8 — and GnuCOBOL 3.2
+  measures the same unit; PB3099 records it, so DOC-A.1-57 is a derivation, not an owner determination.
+- **D-N8 a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; PB3099). §14.9.25.4 GR4 makes the
+  move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's; an odd byte count cannot be
+  national content, so the last position is completed with the alphanumeric space GR4's elementary-move fill supplies,
+  exactly as the fixed national receiver already does (`CobolBits.NatReadWindow` over the bytes). `MOVE G3 TO DN` with
+  a three-byte `G3` leaves `DN` two positions long and `LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). Recorded in
+  CONFORMANCE.md §3 D-N8.
 - **D-N6 national-edited IS category National carrying an `EditMask`** (kb/Work PB492, 2026-09-12). §8.5.2.11's
   category has no `PicCategory` member of its own, exactly as alphanumeric-edited has none: an item is
   national-edited iff `{ Category: National, EditMask: not null }` and alphanumeric-edited iff
