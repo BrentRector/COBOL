@@ -1006,6 +1006,20 @@ def self_test() -> int:
                and len(blocked_run) == 1 and blocked_run[0][:2] == ("Planted", False)
                and blocked_run[0][2].startswith("REFUSED"),
                f"{refused} no_acquire={no_acquire} acquires={acquires} marker={marker.exists()} {blocked_run}")
+
+        # A BOUNCED BRANCH KEEPS ITS NUMBER (kb/Work PB3123; review R1-1 of wave 1071): its entry is already stamped
+        # and main has since taken a higher one, and `_stamp` must leave it alone: no pending file, no devlog.py run.
+        bounced = root / "bounced"
+        (bounced / "DEVLOG").mkdir(parents=True)
+        kept = bounced / "DEVLOG" / "1994-kept.md"
+        kept.write_text("## Entry 1994 — 2026-10-13 07:00 UTC — Kept\n\nbody\n", encoding="utf-8", newline="\n")
+        before = kept.read_text(encoding="utf-8")
+        rc = _stamp(bounced, "worktree-bounced")
+        expect("_stamp: a branch whose entry is already stamped (a bounce main overtook) is not re-stamped: exit 0, the "
+               "entry file unchanged, no pending file made (kb/Work PB3123)",
+               rc == 0 and kept.read_text(encoding="utf-8") == before
+               and sorted(p.name for p in (bounced / "DEVLOG").iterdir()) == ["1994-kept.md"],
+               f"rc={rc} files={sorted(p.name for p in (bounced / 'DEVLOG').iterdir())}")
     finally:
         shutil.rmtree(root, ignore_errors=True)
     print(f"=== enqueue.py self-test: {'FAIL' if failures else 'PASS'} ({len(failures)} failure(s)) ===")

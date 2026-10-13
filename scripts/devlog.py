@@ -238,8 +238,9 @@ def lint(files: dict[str, str], monolith: bool) -> list[str]:
 
 
 def new_entries(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, str]) -> list[str]:
-    """THE NEW ENTRIES OF A LANDING, the ONE definition (kb/Work PB3023 review R1-3): `check` refuses on it, `stamp`
-    re-numbers by it and `enqueue.py` titles the pull request from it. The entry files of `rev`, newest first, whose
+    """THE NEW ENTRIES OF A LANDING, the ONE definition (kb/Work PB3023 review R1-3): `check` refuses on it,
+    `range_check` reads each one's stamp floor by it (`stamp_floor`, kb/Work PB3123) and `enqueue.py` titles the pull
+    request from it (`landing_entries`). The entry files of `rev`, newest first, whose
     header line the base's history does not carry: its entry files and, on the landing that migrates the log, the
     header lines of its monolithic DEVLOG.md (`base_extra_headers`). Never a file-name test: the migrating landing adds
     every entry of the history as a new FILE."""
