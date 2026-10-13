@@ -1,4 +1,4 @@
-## Entry 1994 — 2026-10-12 23:19 PDT — PB3109: the lock-file host's lock directory is renamed away before it is deleted, so a waiting region-lock hold no longer answers Unavailable on Windows
+## Entry 1998 — 2026-10-13 00:21 PDT — PB3109: the lock-file host's lock directory is renamed away before it is deleted, so a waiting region-lock hold no longer answers Unavailable on Windows
 
 PB3109 (runtime/io-sharing, MAJOR, wrong answer and silent) bounced PR 19 out of the merge queue: `RegionLocksDriftTests.TwoWaitingHoldsBothGetTheByteInTurn(kind: LockFiles)` read `Expected [Ok, Ok] Actual [Unavailable, Ok]`.
 
