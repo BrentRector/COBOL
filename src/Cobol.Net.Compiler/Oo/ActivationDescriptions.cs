@@ -104,6 +104,7 @@ public static class ActivationDescriptions
             Usage = p.Usage.ToString(),
             Clauses = ElementaryClauses(item),
             AnyLength = item.IsAnyLength,
+            AnyLengthClauses = AnyLengthClausesOf(item),
             Positions = p.Length,
             LocaleExternal = p.LocaleEdit?.Locale.Named?.External,
             LocaleFromLiteral = p.LocaleEdit?.Locale.Named?.FromLiteral ?? false,
@@ -115,30 +116,37 @@ public static class ActivationDescriptions
 
     /// <summary>The description of a REFERENCE-MODIFIED argument — the unique data item ISO §8.4.3.3.4 GR5 creates, which
     /// GR6 makes "an elementary data item without the JUSTIFIED clause" of identifier-1's class, category and usage
-    /// (alphanumeric- and national-edited, numeric and numeric-edited read as alphanumeric or national). It is
-    /// described by no PICTURE clause and none of §9.3.6 match rule 3 e)'s other clauses, so it matches only a formal
-    /// that has none of them either — a group of its class — and §14.8.2.2 rule 1 then compares its length: the
-    /// EVALUATED length (GR5 c)), which the call site sets from the slice it boxes
-    /// (<see cref="CobolInvokeArg.ReferenceModified"/>), so a non-literal modifier is measured too. The compile-time
-    /// length here (<see cref="RefModPlace.StaticLength"/>) is only what the description says before that.</summary>
+    /// (alphanumeric- and national-edited, numeric and numeric-edited read as alphanumeric or national; alphabetic and
+    /// boolean kept — the ONE GR6 reader, <see cref="ItemCategory.CategoryName(Place)"/>). It is described by no PICTURE
+    /// clause and none of §9.3.6 match rule 3 e)'s other clauses (kb/Work PB3098), so it matches only a formal that has
+    /// none of them either — a group of its class — and §14.8.2.2 rule 1 then compares its length. At run time that is
+    /// the EVALUATED length (GR5 c)), which the universal call site sets from the slice it boxes
+    /// (<see cref="CobolInvokeArg.ReferenceModified"/>). At compile time it is the length when that is static
+    /// (<see cref="RefModPlace.StaticLength"/>), otherwise the slice's MAXIMUM extent — identifier-1's positions from a
+    /// static leftmost position on, or all of them — the measure §14.8.2.2 gives the other argument whose length moves
+    /// at run time, "the maximum length is used" for an occurs-depending group (docs/CONFORMANCE.md D-RM1 a); kb/Work
+    /// PB2077). Zero when identifier-1's own length is not static, which no group formal admits.</summary>
     public static ActivationDescription OfReferenceModification(RefModPlace r)
     {
-        string category = r.Category switch
-        {
-            PicCategory.National => ActivationCategory.National,
-            PicCategory.Boolean => ActivationCategory.Boolean,
-            _ => ActivationCategory.Alphanumeric,
-        };
+        int? inner = r.Inner.Item.OperandPic?.Length;
         return new ActivationDescription
         {
             Shape = ActivationShape.Elementary,
-            Category = category,
+            Category = ItemCategory.CategoryName(r)!,
             Usage = r.Inner.Item.OperandPic?.Usage.ToString() ?? "",
-            Positions = r.StaticLength(r.Inner.Item.OperandPic?.Length) ?? 0,
+            Positions = r.StaticLength(inner) ?? MaximumExtent(r, inner) ?? 0,
             // GR6's category, with the alphabetic rider the ONE ref-mod Table-16 reader keeps (kb/Work PB73).
             Table16 = Table16Operand.Of(r).Heading,
         };
     }
+
+    /// <summary>The most positions a slice whose length is a run-time value can have: identifier-1's
+    /// <paramref name="inner"/> positions from a static leftmost position to the end (§8.4.3.3.4 GR5 b) / c)), or all of
+    /// them when the leftmost position is a run-time value too. Null when identifier-1's length is not static.</summary>
+    private static int? MaximumExtent(RefModPlace r, int? inner) =>
+        inner is not { } size ? null
+        : r.Start is PositionConstant { Value: >= 1 } left && left.Value <= size ? size - (int)left.Value + 1
+        : size;
 
     /// <summary>The class facts of a description as it carries them: folded, as <see cref="ActivationDescription.ObjectName"/>
     /// is, so a rendered description spells one name one way.</summary>
@@ -259,12 +267,34 @@ public static class ActivationDescriptions
         if (p.Category is PicCategory.ProgramPointer or PicCategory.FunctionPointer)
             return PrototypeSignatures.RestrictionIdentity(item) ?? ActivationDescription.Unrestricted;
         // An ANY LENGTH item's one-symbol picture has no length of its own (§13.18.2.3 SR1).
-        string picture = item.IsAnyLength ? "*" + (p.Clause?.CharacterString ?? "") : p.Clause?.Key ?? "";
+        return item.IsAnyLength
+            ? ClausesAtAnyLength(item, p.Clause?.CharacterString ?? "")
+            : ClausesOf(item, p.Clause?.Key ?? "", p.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    /// <summary><see cref="ActivationDescription.AnyLengthClauses"/>: the <see cref="ElementaryClauses"/> of
+    /// <paramref name="item"/> as if it were described with the ANY LENGTH clause — §13.18.2.3 SR1's one-symbol PICTURE,
+    /// the symbol its expanded character-string repeats, and no length — so that §14.8.2.3.2 "Additionally" d)'s "its
+    /// length is considered to match" relaxes the length and nothing else. Null for a PICTURE that repeats no single
+    /// symbol, or that carries a currency string, a DECIMAL-POINT IS COMMA state or an EDITING phrase (a one-symbol
+    /// ANY LENGTH picture carries none), and for every item without a PICTURE clause.</summary>
+    private static string? AnyLengthClausesOf(DataItem item) =>
+        !item.IsAnyLength && item.Pic is { Clause: { CharacterString: { Length: > 0 } cs } clause, LocaleEdit: null }
+        && clause is { CurrencyString: null, DecimalPointIsComma: null, Editing: null } && cs.All(c => c == cs[0])
+            ? ClausesAtAnyLength(item, cs[..1])
+            : null;
+
+    private static string ClausesAtAnyLength(DataItem item, string symbol) => ClausesOf(item, "*" + symbol, "*");
+
+    /// <summary>The one spelling of ISO §9.3.6 match rule 3 e)'s clause identity, given the PICTURE and LENGTH texts.</summary>
+    private static string ClausesOf(DataItem item, string picture, string length)
+    {
+        var p = item.Pic!;
         string locale = p.LocaleEdit is { } le ? $"|LOCALE {(le.Locale.IsCurrent ? "-" : "N")} SIZE {le.Size} {le.Picture}" : "";
         string dynamic = item.IsDynamicLength
             ? $"|DYNAMIC LENGTH {item.DynMaxSize} {CobolNames.Fold(item.DynStructure?.Name ?? "")}" : "";
         return $"USAGE {p.Usage}|SIGN {(p.Signed ? "S" : "U")} {p.SignKind}|DIGITS {p.Digits}.{p.Scale}"
-            + $"|LENGTH {(item.IsAnyLength ? "*" : p.Length.ToString(System.Globalization.CultureInfo.InvariantCulture))}"
+            + $"|LENGTH {length}"
             + $"|{(item.BlankWhenZero ? "BLANK WHEN ZERO" : "-")}|{(item.Justified ? "JUSTIFIED" : "-")}"
             + $"|{(item.IsAligned ? "ALIGNED" : "-")}{dynamic}|PICTURE {picture}{locale}";
     }

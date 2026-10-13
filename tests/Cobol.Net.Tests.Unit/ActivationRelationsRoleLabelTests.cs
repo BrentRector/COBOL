@@ -25,7 +25,7 @@ public sealed class ActivationRelationsRoleLabelTests
     [Fact]
     public void ParameterViolation_NamesTheArgumentAndTheFormalByTheirOwnDescriptions()
     {
-        string? reason = ActivationRelations.ParameterViolation(Var(2), Var(3));
+        string? reason = ActivationRelations.ParameterViolation(Var(2), Var(3), universalReceiver: true);
         Assert.NotNull(reason);
         Assert.Contains("the argument (a variable-length group (2,D))", reason);
         Assert.Contains("the formal parameter (a variable-length group (3,D))", reason);

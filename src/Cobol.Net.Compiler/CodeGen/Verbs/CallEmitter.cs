@@ -672,7 +672,12 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
         string? start = null;
         if (p is RefModPlace rm)
         {
-            if (rm.Inner is not RedefViewPlace) return null;
+            // ⛔ A SLICE WHOSE LENGTH IS A RUN-TIME VALUE STATES NO AREA (kb/Work PB2077; docs/CONFORMANCE.md D-RM1 a)):
+            // §14.8.2.2 rule 1 was proved on its MAXIMUM extent, so the evaluated slice can be shorter than a group formal,
+            // and a formal laid over identifier-1 would read and write the positions past the slice. With no area the
+            // formal holds the carrier's copy — the slice, padded to the formal's width — and the write-back splices it
+            // through the slice's own receiving store, truncated to the slice.
+            if (rm.Inner is not RedefViewPlace || rm.StaticLength(rm.Inner.Item.OperandPic?.Length) is null) return null;
             start = PositionRenderer.Render(rm.Start);
             p = rm.Inner;
         }

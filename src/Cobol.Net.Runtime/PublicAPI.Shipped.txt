@@ -10,6 +10,8 @@ CobolNet.Runtime.ActivationDescription.<Clone>$() -> CobolNet.Runtime.Activation
 CobolNet.Runtime.ActivationDescription.ActivationDescription() -> void
 CobolNet.Runtime.ActivationDescription.AnyLength.get -> bool
 CobolNet.Runtime.ActivationDescription.AnyLength.init -> void
+CobolNet.Runtime.ActivationDescription.AnyLengthClauses.get -> string?
+CobolNet.Runtime.ActivationDescription.AnyLengthClauses.init -> void
 CobolNet.Runtime.ActivationDescription.Atoms.get -> CobolNet.Runtime.GroupAtom![]?
 CobolNet.Runtime.ActivationDescription.Atoms.init -> void
 CobolNet.Runtime.ActivationDescription.BinaryWidth.get -> bool
@@ -2437,8 +2439,9 @@ static CobolNet.Runtime.ActivationDescription.operator ==(CobolNet.Runtime.Activ
 static CobolNet.Runtime.ActivationRelations.CallArgumentViolation(CobolNet.Runtime.CobolPassMode mode, CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal, bool specifiedProgram) -> string?
 static CobolNet.Runtime.ActivationRelations.CallReturningViolation(CobolNet.Runtime.ActivationDescription! receiving, CobolNet.Runtime.ActivationDescription! sending) -> string?
 static CobolNet.Runtime.ActivationRelations.IsLengthRulePair(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> bool
+static CobolNet.Runtime.ActivationRelations.MatchViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> string?
 static CobolNet.Runtime.ActivationRelations.Matches(CobolNet.Runtime.ActivationDescription! argument, object? value, CobolNet.Runtime.ActivationDescription! formal, CobolNet.Runtime.CobolObject! receiver) -> bool
-static CobolNet.Runtime.ActivationRelations.ParameterViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> string?
+static CobolNet.Runtime.ActivationRelations.ParameterViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal, bool universalReceiver) -> string?
 static CobolNet.Runtime.ActivationRelations.ReturningMatches(CobolNet.Runtime.ActivationDescription! receiving, CobolNet.Runtime.ActivationDescription! sending) -> bool
 static CobolNet.Runtime.ActivationRelations.ReturningViolation(CobolNet.Runtime.ActivationDescription! receiving, CobolNet.Runtime.ActivationDescription! sending) -> string?
 static CobolNet.Runtime.ActivationStack.RequireForMethod(string! method, string! className) -> void

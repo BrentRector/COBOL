@@ -667,7 +667,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         // GR7 c): the bound method's conformance — §14.8.2 per argument, §14.8.3 for the returning item.
         var violations = Enumerable.Range(0, formals)
             .Select(i => $"({(i < minArgs ? "" : $"__a.Length <= {i} ? null : ")}{nameof(ActivationRelations)}."
-                + $"{nameof(ActivationRelations.ParameterViolation)}(__a[{i}].Description, {CaseDescription(c, i)}))")
+                + $"{nameof(ActivationRelations.ParameterViolation)}(__a[{i}].Description, {CaseDescription(c, i)}, "
+                + "universalReceiver: true))")
             .Concat(returning is null ? [] : [$"{nameof(ActivationRelations)}.{nameof(ActivationRelations.ReturningViolation)}("
                 + $"__ret!.Description, {CaseDescription(c, -1)})"])
             .ToList();
