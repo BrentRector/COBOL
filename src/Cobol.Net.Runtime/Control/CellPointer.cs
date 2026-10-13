@@ -49,6 +49,17 @@ public sealed class CellPointer(StorageCell cell, long offset, int generation) :
     /// formal over it only when the formal describes that storage or a prefix of it (<see cref="GroupCompatibility.LaysOver"/>).</summary>
     public GroupAtom[]? Shape { get; init; }
 
+    /// <summary>⛔ THE POSITIONS THE ADDRESSED ARGUMENT OCCUPIES FROM <see cref="Offset"/>, when they end before the
+    /// cell's identifier does (kb/Work PB2077 review round 3): a reference-modified argument whose length is a run-time
+    /// value (ISO §8.4.3.3.4 GR5: "a subset of the data item referenced by identifier-1") states its EVALUATED length
+    /// here. Such a slice's compile-time conformance was proved on its maximum extent (docs/CONFORMANCE.md D-RM1 a)), so
+    /// at run time it can be shorter than a group formal. <see cref="CobolArgAdapt.Area(CellPointer?, bool, int, GroupAtom[]?, Func{StorageCell}?)"/>
+    /// therefore lays a formal over the area only when the formal's positions fit within this extent: every slice at
+    /// least as long as the formal is shared storage (§14.2.3 GR8), and a shorter one gets a fresh copy instead of a
+    /// formal that reads and writes past the slice. Null for every other area (the extent then runs to the end of the
+    /// cell) and for every pointer a statement computes.</summary>
+    public int? Extent { get; init; }
+
     /// <inheritdoc/>
     public override bool IsNull => OmittedArgument;
 }

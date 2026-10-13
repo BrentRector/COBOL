@@ -1164,51 +1164,28 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "ISO §14.9.23.3 SR15 admits only class message-tag, numeric, object or pointer by value");
                 return null;
             }
-            // A reference-modified operand is a unique ELEMENTARY ALPHANUMERIC item of the window length
-            // (§8.4.3.3.4 GR6): conformance goes against that effective description, never the whole inner item.
-            if (place is RefModPlace rmp)
-            {
-                if (formal.IsGroup || formal.Pic?.Category is not PicCategory.Alphanumeric)
-                {
-                    Err($"reference-modified argument '{argText}': the operand is elementary "
-                        + $"alphanumeric (§8.4.3.3.4 GR6) and does not conform to formal '{formal.CobolName}'");
-                    return null;
-                }
-                if (byReference)
-                {
-                    // Strict identity needs a PROVABLE window length equal to the formal's.
-                    if (rmp.Start.Int32Literal is null || rmp.Length?.Int32Literal is not { } rlen)
-                    {
-                        Err($"BY REFERENCE reference-modified argument '{argText}' needs a "
-                            + "compile-time (start:length) to prove §14.8.2.3.2 conformance — pass it "
-                            + "BY CONTENT or use literal subscripts");
-                        return null;
-                    }
-                    if (!formal.IsAnyLength && rlen != formal.Pic.Length)   // ANY LENGTH: any window length matches (§14.8.2.3.2 rule d)
-                    {
-                        Err($"reference-modified argument window ({rlen}) does not match formal "
-                            + $"'{formal.CobolName}' X({formal.Pic.Length}) (ISO §14.8.2.3.2)");
-                        return null;
-                    }
-                }
-                return new BoundInvokeArg(formal, place, null, null,
-                    WriteBack: byReference, ByContent: !byReference);
-            }
-
+            // ⛔ BY REFERENCE: THE UNIVERSAL SWITCH'S TWO RELATIONS, ASKED AT COMPILE TIME (kb/Work PB2077, decision PB3098;
+            // COBOLNET_OO_DESIGN D6 item 6). A reference-modified operand is the unique data item §8.4.3.3.4 GR5 / GR6
+            // create — no PICTURE clause — so it is described as itself (ActivationDescriptions.OfPlace), never as the
+            // item it windows, and there is no second comparator for it here.
             if (byReference)
             {
-                if (OoConformance.DescriptionMismatch(formal, place.Item, byRefGroupPrefix: true,
-                        anyLengthActivationRelax: true, invokedWith) is { } err1)   // §14.8.2.3.2 rules d/e (ANY LENGTH); rule 4
+                if (ByReferenceArgumentReason(place, oof, host.OoClasses, invokedWith) is { } why)
                 {
-                    Err($"USING argument '{argText}' does not conform to formal parameter "
-                        + $"'{formal.CobolName}': {err1} (ISO §14.8.2.3.2 — BY REFERENCE requires the "
-                        + "identical description)");
+                    Err($"USING argument '{argText}' does not match or conform to formal parameter "
+                        + $"'{formal.CobolName}' BY REFERENCE: {why}"
+                        + (place is RefModPlace && !formal.IsGroup
+                            ? " — a reference-modified argument has no PICTURE clause (ISO §8.4.3.3.4 GR6), so BY "
+                              + "REFERENCE it matches only an alphanumeric group formal of no more bytes; pass it BY "
+                              + "CONTENT (ISO §9.3.6 match rule 4 d)) or describe the formal as a group"
+                            : ""));
                     return null;
                 }
                 return new BoundInvokeArg(formal, place, null, null, WriteBack: true);
             }
 
-            // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category.
+            // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category — a reference-modified operand included, as
+            // the view it is (ContentMismatch reads RefModPlace's GR6 category).
             if (OoConformance.ContentMismatch(host.OoClasses, host.Set.PointerAssignmentReason, formal, place, invokedWith) is { } cerr)
             {
                 Err($"BY CONTENT argument '{argText}' does not conform to formal "
@@ -1456,8 +1433,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
             // A REFERENCE-MODIFIED argument is the unique data item §8.4.3.3.4 GR5/GR6 create, never the description of
             // the item it windows (it used to cross under identifier-1's whole description).
-            if ((p is RefModPlace rm ? ActivationDescriptions.OfReferenceModification(rm) : ActivationDescriptions.Of(p.Item, host.OoClasses))
-                is not { } d)
+            if (ActivationDescriptions.OfPlace(p, host.OoClasses) is not { } d)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
                     $"INVOKE: the argument '{p.Item.CobolName}' has no crossing form — "
@@ -1840,15 +1816,31 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         return digits.TrimStart('0').Length;
     }
 
-    /// <summary>The §14.8.2/§14.8.3 STRICT conformance check between a formal/returning item and an
-    /// argument/receiver item — delegates to the ONE shared description-equality rule
-    /// (<see cref="OoConformance.DescriptionMismatch"/>, also the §9.3.8.2 override-signature check) that
-    /// makes the emitted marshaling TYPE-PRESERVING. Null when conformant, else the mismatch.</summary>
-    private static string? OoConformanceError(DataItem formal, DataItem arg)
-        // Activation mode: §14.8.2.3.2 rules d/e for arguments; for the INVOKE RETURNING delivery pair the
-        // sender (parameter 1 = the method's returning item) being ANY LENGTH matches any receiver length
-        // (§14.8.3.3 rule 5) while an ANY LENGTH receiver demands an ANY LENGTH sender (rule 4).
-        => OoConformance.DescriptionMismatch(formal, arg, anyLengthActivationRelax: true);
+    /// <summary>⛔ THE TYPED LANE'S VERDICT ON ONE BY REFERENCE ARGUMENT — the universal switch's relations over the
+    /// SAME descriptions (kb/Work PB2077, decision PB3098; COBOLNET_OO_DESIGN D6 item 6). §14.9.23.4 GR7 b) locates the
+    /// method for every INVOKE by §9.3.6, and §14.9.23.3 SR5 c) with §14.8.1 asks §14.8.2's conformance at compile time
+    /// of a typed receiver: so the MATCH (<see cref="ActivationRelations.MatchViolation"/>, §9.3.6 rule 3) and then the
+    /// CONFORMANCE (<see cref="ActivationRelations.ParameterViolation"/>, without GR7 c)'s universal-only ANY LENGTH
+    /// ban). An ACTIVE-CLASS formal's 3 d) 4./5. is a condition on the invocation, answered statically by §14.8.2.3.2
+    /// rule 4 with <paramref name="invokedWith"/> (<see cref="OoConformance.ActiveClassFormalMismatch"/>), where the
+    /// universal switch asks it of the run-time object. Null when the argument matches and conforms, else the reason.
+    /// An operand with no crossing form (a group with no character image, carrier or leaf vector) is refused with the
+    /// Tier-C reason, as the universal lane refuses it.</summary>
+    internal static string? ByReferenceArgumentReason(Place argument, OoFormal formal, OoClassTable? classes,
+        ObjectRefDescriptor invokedWith)
+    {
+        if (ActivationDescriptions.OfPlace(argument, classes) is not { } a)
+            return argument.Item.IsGroup ? TierCIsland.Reason(argument.Item, "argument group")
+                : "the argument has no PICTURE description";
+        if (ActivationDescriptions.OfFormal(formal, classes) is not { } f)
+            return formal.Item.IsGroup ? TierCIsland.Reason(formal.Item, "formal group")
+                : "the formal parameter has no PICTURE description";
+        if (CobolNet.Runtime.ActivationRelations.MatchViolation(a, f) is { } noMatch) return noMatch;
+        if (formal.Item.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass)
+            return OoConformance.ActiveClassFormalMismatch(null, activeClass,
+                argument.Item.Pic?.ObjectRef ?? ObjectRefDescriptor.Universal, invokedWith, byReference: true);
+        return CobolNet.Runtime.ActivationRelations.ParameterViolation(a, f);
+    }
 
     // ── Method-context control flow (deep-dive D8) ──────────────────────────────────────────────────────────
 
