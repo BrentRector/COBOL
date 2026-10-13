@@ -34,3 +34,7 @@ PROGRAM COLLATING SEQUENCE twice. Which reader owns that count is a design decis
 
 **Rows.** None: the rule is the ANSI X3.23-1985 figure, which carries no row in the 2023 inventory (`closes_rows: []`
 with its reason).
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261013T203445Z-0be032`: Conformance
+5,554/11,540 · Unit 32,561/33,473 · Characterization 7/36), with the three goldens and the new drift test Passed in
+leg 1. The Linux gate is the landing's (batched gating).
