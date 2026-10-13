@@ -1,4 +1,4 @@
-## Entry 1985 — 2026-10-12 20:43 PDT — DIVIDE ... REMAINDER takes its statement's lane, float intermediates past the carrier raise, and the SDIDI operand lift answers from one predicate
+## Entry 1993 — 2026-10-12 23:19 PDT — DIVIDE ... REMAINDER takes its statement's lane, float intermediates past the carrier raise, and the SDIDI operand lift answers from one predicate
 
 Wave 1069 group A, one root: the numeric renderer's landings of an operand into the 128-bit integer carrier (PB3017,
 PB3018, PB3019). Re-probed on the branch's own build; two of the three notes needed their premise corrected.
@@ -50,3 +50,4 @@ DIVIDE REMAINDER lane paragraph), CONFORMANCE.md DOC-A.1-82 and DOC-A.1-179. Not
 
 
 **The arch-oracle baseline (finisher, landing-oracle stop).** The landing refused the branch at exit 7: the recorded baseline (00435d6e90c0, then main's c41f1b82af2c after merging origin/main) predated the numeric changes. `compare_oracle.py` against c41f1b82af2c found 6 of 7,795 cases different, each explained by its class. ADDED (3): the branch's own goldens `pb3017_sdidi_divide_remainder_beyond_the_int128_carrier`, `pb3018_native_dec_lane_wide_binary_operand_signed_and_unsigned_agree` and `pb3019_native_float_intermediate_past_the_carrier_is_a_size_error`. CSHARP (3, emitted C# only, output and diagnostics identical): `l1_divide_quotient_remainder_standard_decimal` and `pb84_standard_decimal_intermediate_consumers`, whose STANDARD-DECIMAL DIVIDE ... REMAINDER now runs in its statement's CobolDec lane (`CobolDec.Div` plus `CobolDec.SubsidiaryQuotient`) instead of the Int128 `CobolNum.Divide`/`CapDigits` path (PB3017); and `pb84_sdidi_intermediate_consumers`, whose float-to-scaled intermediate is `CobolFloat.ToScaledIntermediate` (raises past the carrier) instead of `ToScaledSaturating` (PB3019). The baseline is re-recorded at 8b0941c5f232, the merge of origin/main into the branch.
+
