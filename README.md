@@ -117,6 +117,11 @@ The test populations:
   every gate and CI run (recorded once, from an oracle since retired).
 - `tests/external/`: the GnuCOBOL differential, run once per batch against the pinned GnuCOBOL 3.2 test corpus.
 
+Two more projects in the solution measure rather than test. `tests/Cobol.Net.ArchOracle` runs the architecture
+review's behavior-neutrality oracle outside xunit for `scripts/arch/capture_oracle.py`, whose recorded baseline lives
+under `docs/rearchitecture/evidence/arch-oracle/`. `tests/Cobol.Net.Benchmarks` is the BenchmarkDotNet harness behind
+`scripts/arch/perf_baseline.py`, the recorded performance baseline. No test asserts a time.
+
 ## Find your way around
 
 ```
@@ -162,7 +167,8 @@ COBOL source
   with expected output derived from the standard, and a negative program for each earlier edition that must reject
   it. The documents that describe the behavior change in the same pull request.
 - **Every landing carries a DEVLOG entry.** Write `DEVLOG/pending-<slug>.md` with the change; the landing numbers
-  and stamps it.
+  and stamps it. A change under `src/`, or to the data the architecture oracle reads, also re-records the oracle's
+  baseline with `scripts/arch/capture_oracle.py`; the landing refuses a baseline that describes another tree.
 - **One pull request per branch, through the merge queue.** `main` is protected, and the `ci-gate` check must pass.
   Your first pull request asks you to sign the [Contributor License Agreement](CLA.md) once.
 
@@ -176,11 +182,24 @@ the compiler conforms. The open rows are the project's one progress number, and 
 `pwsh scripts/session-probe.ps1` prints the rows, the open rows and the corpus sizes for the commit you are on, and
 the gate's verdict line prints the tests it ran.
 
-Four facilities are declined and documented as non-support. The Message Control System and commit and rollback compile
-with the warning §4.2.6 requires for a processor-dependent element (COBOLNET1578, COBOLNET1579). VALIDATE compiles
-with a warning by documented choice under §4.2.7 (COBOLNET1580). Screen handling is refused with errors under §4.2.7
-and Annex A.4.1 (COBOLNET1560, COBOLNET1707). [docs/CONFORMANCE.md](docs/CONFORMANCE.md) dispositions every optional
-module and processor-dependent element.
+What the compiler declines is documented as §4.2.6 and §4.2.7 require, in [docs/CONFORMANCE.md](docs/CONFORMANCE.md):
+its §2 dispositions every processor-dependent element of Annex A.3, its §5 every optional module of Annex A.4, and its
+§4 the facilities declined whole. In short:
+
+- The Message Control System and commit and rollback compile with the warning §4.2.6 requires for a
+  processor-dependent element (COBOLNET1578, COBOLNET1579). VALIDATE compiles with a warning by documented choice under
+  §4.2.7 (COBOLNET1580). Such a program runs with the facility inert.
+- Screen handling (COBOLNET1560, COBOLNET1707), FORMAT and SELECT WHEN file handling (COBOLNET1705) and WRITE FILE and
+  REWRITE FILE (COBOLNET1706) are refused with errors, which is how Annex A.4.1 reads for an optional module whose
+  support is not claimed.
+- ARITHMETIC IS STANDARD-BINARY is refused (COBOLNET0806). FLOAT-BINARY-128 and the standard decimal floating-point
+  usages have no conforming .NET type and are refused (COBOLNET1564); the FLOAT-DECIMAL clause compiles with a warning
+  (COBOLNET2424).
+- The RECORD DELIMITER clause compiles with a warning (COBOLNET1778), the SOURCE phrase of a record key is refused
+  (COBOLNET1954), and no reel or unit device backs the phrases that name one.
+- Multiple class inheritance (COBOLNET0849) and method overloading (COBOLNET0822) are refused; multiple interface
+  inheritance is supported.
+- The report writer and dynamic-length items are partial, and §5 itemizes what each supports.
 
 A NuGet distribution of the compiler as a .NET tool (`WiseOwl.COBOL`, the `cobol` command) and a documentation site
 are planned; see [docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md](docs/rearchitecture/DESIGN-USER-DOCUMENTATION.md).
