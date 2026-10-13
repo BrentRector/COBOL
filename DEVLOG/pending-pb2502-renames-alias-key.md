@@ -42,3 +42,8 @@ Sibling sweep: the other readers of an alias DataItem (`Pic`, `ByteWidth`, `Grou
 
 **Review round 2 (R2-1).** The round-1 golden sat in the 2023 corpus on the false premise that GROUP-USAGE is 2023-only; it was introduced in 2002, so a 2002 or 2014 regression of the national-group alias
 path was invisible to the per-edition compilers. The golden moved to the introducing edition's corpus (`2002/`, both manifests updated); the reviewer verified the same output at 2014 and 2023.
+
+**Arch-oracle baseline (finisher, landing stop exit 7).** Main moved the baseline to `4dfb26c315bf` while this branch waited, so the branch's own baseline was behind its inputs. After merging
+origin/main, `compare_oracle.py` read `=== ARCH-ORACLE: DIFFERENT — 4 of 7790 cases differ (baseline 4dfb26c315bf, new c8129c45e139) ===`, every difference of class ADDED and each one this
+branch's own golden: `corpus/85/pb2502_renames_record_key`, `corpus/85/pb2502_renames_sort_key`, `corpus/2002/pb2502_renames_record_key_national_group` and
+`negative/pb2502-record-key-alias-of-numeric`. No existing case changed its emitted C#, diagnostics or output. The baseline was re-recorded at the merged tip and replaces main's.
