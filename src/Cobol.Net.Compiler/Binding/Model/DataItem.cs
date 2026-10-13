@@ -85,9 +85,19 @@ public sealed class DataItem
         "PICTURE (ISO §13.18.40) — in neither GR-1 exclusion list")]
     public PicInfo? Pic { get; set; }
 
+    /// <summary>The prototype a restricted program- or function-pointer's <see cref="PicInfo.RestrictedPrototypeName"/>
+    /// resolves to through the unit's prototype tables — its namespace, externalized name and signature (kb/Work
+    /// PB2495) — set post-build by <c>DataBinder.ResolveRestrictedPrototypes</c>, for EVERY forest of the group before
+    /// any is classified, so a signature comparison can follow a formal's restriction to the signature it names
+    /// (<c>PrototypeSignatures.SameType</c>) instead of to the class that comparison is still building. Null for a name
+    /// the tables do not hold, for an unrestricted pointer and for every other item.</summary>
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "resolved post-build by DataBinder.ResolveRestrictedPrototypes in the copy's OWN scope (the prototype names resolve through the unit that declares the copy), after every clone exists")]
+    internal RestrictedPrototype? RestrictedPrototype { get; set; }
+
     /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER (kb/Work PB2464): the signature class its
-    /// <see cref="PicInfo.RestrictedPrototypeName"/> belongs to, set post-build by
-    /// <c>DataBinder.ResolveRestrictedPrototypes</c> once the unit's prototype tables exist
+    /// <see cref="RestrictedPrototype"/> belongs to, set post-build by <c>DataBinder.ClassifyRestrictedPrototypes</c>
+    /// once every forest's <see cref="RestrictedPrototype"/> is resolved
     /// (<c>PrototypeSignatureClasses</c>) — the prototype-pointer twin of <see cref="PicInfo.RestrictedTypeDecl"/>.
     /// ISO §13.18.60.4 GR25 / GR26 type such a pointer by SIGNATURE ("shall contain only … the address of a program
     /// with the same signature as that identified by the specified program-prototype-name"), so two pointers
@@ -97,7 +107,7 @@ public sealed class DataItem
     /// so that the PICTURE profile's record text (the §8.5.3.1 same-type key) does not change with the stamping
     /// state. Null before resolution, for an unrestricted pointer and for every non-pointer item.</summary>
     [DescriptionCopy(DescriptionCopyKind.None,
-        "resolved post-build by DataBinder.ResolveRestrictedPrototypes in the copy's OWN scope (the prototype names resolve through the unit that declares the copy), after every clone exists")]
+        "classified post-build by DataBinder.ClassifyRestrictedPrototypes from the copy's OWN RestrictedPrototype (resolved in the copy's own scope), after every clone exists")]
     public string? PointerRestrictionIdentity { get; set; }
 
     /// <summary>GROUP-USAGE (ISO §13.18.29; data-model design D20; kb/Work PB79) — <see cref="Model.GroupUsage.None"/>
