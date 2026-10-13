@@ -292,7 +292,8 @@ def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, st
         floor = (stamped_on or {}).get(n, base_floor)
         if k[0] <= floor:
             reasons.append(f"{DIR}/{n}: number {k[0]} is not above the newest entry {floor} of the tree it was stamped "
-                           "on (only `python scripts/devlog.py stamp <branch>` numbers an entry): re-stamp it")
+                           f"on (only `python scripts/devlog.py stamp <branch>` numbers an entry): make it "
+                           f"{DIR}/pending-<slug>.md again, first line `## <Title>`, and let `enqueue.py land` stamp it")
     gone = sorted(n for _, n in entries(base) if n not in rev)
     reasons += [f"{DIR}/{n} is on the base and the landing deletes it: the log is the only history" for n in gone]
     # The base's monolith is history too (kb/Work PB3025, review R1-1): every header it holds, as many times as it holds
@@ -318,14 +319,18 @@ def range_check(repo: pathlib.Path, base: str, rev: str) -> tuple[list[str], lis
 
 
 def stamp_floor(repo: pathlib.Path, base: str, rev: str, name: str) -> int | None:
-    """The newest entry number of the tree `DEVLOG/<name>` was STAMPED on: the first parent of the newest commit in
-    base..rev that added the file (`devlog.py stamp`'s commit), read with renames off, because the stamp renames
+    """The newest entry number of the tree `DEVLOG/<name>` was STAMPED on: the first parent of the OLDEST commit in
+    base..rev that added a file of its number (`devlog.py stamp`'s commit; a later retitle that renamed the file adds
+    the new name on a tree that may already hold higher numbers), read with renames off, because the stamp renames
     `pending-<slug>.md`. None when no such commit is in the range (the file arrived through a merge's resolution)."""
+    m = ENTRY_NAME.match(name)
+    if not m:
+        return None
     added = _git(repo, "log", "--no-renames", "--diff-filter=A", "--format=%H", f"{base}..{rev}", "--",
-                 f"{DIR}/{name}").stdout.split()
+                 f":(glob){DIR}/{m.group('num')}{m.group('sfx')}-*.md").stdout.split()
     if not added:
         return None
-    parent = f"{added[0]}^1"
+    parent = f"{added[-1]}^1"
     if _git(repo, "rev-parse", "--verify", "--quiet", f"{parent}^{{commit}}").returncode != 0:
         return 0                                     # a root commit: there was no tree before it
     listed = _git(repo, "ls-tree", "--name-only", parent, f"{DIR}/").stdout.splitlines()
@@ -607,6 +612,10 @@ def self_test() -> int:
     qc = stamped_branch("qc", base, {f"{DIR}/0012-a-twin.md": e("12", "a twin"), "c.py": "c = 1"})
     range_verdict("stacked: two queued branches holding ONE number (an allocator failure) -> REFUSED", g_a,
                   group("g-ac", g_a, qc), 1, "same entry number")
+    retitled = stamped_branch("retitled", qa, {f"{DIR}/0012-queued-first.md": None,
+                                               f"{DIR}/0012-queued-first-retitled.md": e("12", "queued first, retitled")})
+    range_verdict("a stamped entry retitled (its file renamed) after its stamp keeps the stamp's floor -> PASS", g_b,
+                  group("g-br", g_b, retitled), 0)
     hand = stamped_branch("hand", g_ba, {f"{DIR}/0009-hand-numbered.md": e("9", "hand numbered"), "d.py": "d = 1"})
     range_verdict("a number below every entry of the tree it was stamped on (hand-numbered) -> REFUSED", g_ba, hand, 1,
                   "tree it was stamped on")

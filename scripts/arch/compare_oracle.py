@@ -174,8 +174,16 @@ def main() -> int:
         if p is not None and (p.name != "manifest.json" or not p.is_file()):
             print(f"compare_oracle: {p} is not a capture's manifest.json (its blobs sit beside it)", file=sys.stderr)
             return 2
-    baseline = args.baseline or capture_commit(resolve_base(args.base))
-    new = args.new or capture_oracle.capture(build=not args.no_build, jobs=args.jobs)
+    try:
+        baseline = args.baseline or capture_commit(resolve_base(args.base))
+        new = args.new or capture_oracle.capture(build=not args.no_build, jobs=args.jobs)
+    except (SystemExit, subprocess.CalledProcessError) as e:
+        # capture_oracle stops with sys.exit(<message>), whose status is 1, and 1 means DIFFERENT here: a capture that
+        # could not be made is exit 2, never a verdict.
+        if isinstance(e, SystemExit) and e.code in (0, 2, None):
+            raise
+        print(f"compare_oracle: no capture to compare ({e}); NOT RUN", file=sys.stderr)
+        return 2
     return compare(baseline, new, args.diff)
 
 
