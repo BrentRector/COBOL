@@ -1841,12 +1841,7 @@ public enum BoundOpenTapePhrase { None, NoRewind, Reversed }
 public sealed record BoundOpen(IReadOnlyList<BoundOpenFile> Files) : BoundStatement;
 
 /// <summary><c>CLOSE file [WITH LOCK | REEL/UNIT] …</c> (ISO §14.9.7).</summary>
-public sealed record BoundClose(IReadOnlyList<(FileModel File, BoundCloseKind Kind)> Files) : BoundStatement
-{
-    /// <summary>§14.9.6.4 GR5: EC-REPORT-NOT-TERMINATED checking is enabled (>>TURN) at this statement — the
-    /// emitter then guards a report file's close on its reports' active state (kb/Work PB141).</summary>
-    public bool ReportNotTerminatedCheck { get; init; }
-}
+public sealed record BoundClose(IReadOnlyList<(FileModel File, BoundCloseKind Kind)> Files) : BoundStatement;
 
 /// <summary>The ONE <c>[BEFORE] [AFTER] ADVANCING {n LINES | PAGE}</c> phrase of a WRITE (ISO §14.9.51.2
 /// Format 1): print-control output. <paramref name="Page"/> = ADVANCING PAGE (a form feed); otherwise

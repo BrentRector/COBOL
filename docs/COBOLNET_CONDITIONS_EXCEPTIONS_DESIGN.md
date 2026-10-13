@@ -180,7 +180,7 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   (kb/Work PB459). §13.18.38.4 GR2 names three statements that may drive an index outside the implementor's
   range — "An index may be modified only by a PERFORM VARYING statement, a SEARCH statement, and a SET
   statement" — and the §14.9.39.4 GR2 a) 1. b / 2. a / 3. b and GR4 a) limits are that same limit. A PRECISE
-  `QueryFor` case per node kind would be a hand-maintained list of every emitter path that stores into an index
+  `NodeKindRaises` row per node kind would be a hand-maintained list of every emitter path that stores into an index
   (`SetEmitter`'s store/augment pair alone is ridden by three verbs), and the next such path would silently stop
   being CHECKABLE — which is exactly the EC-DATA-INCOMPATIBLE `node is BoundMove` defect. The raise fires only
   inside `CobolIndex`, so the flag around an index-free statement is a no-op. ⛔ **The condition had NO raise
@@ -354,8 +354,8 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
     `CallEmitter.FunctionActivationText` used to emit no pickup and the registry DISCARDED every
     condition a function propagated from a PERFORM UNTIL, a SEARCH WHEN, an EVALUATE object or a short-circuited
     operand). That second activation text is deleted: the lambda body is `EmitCall`'s own output, captured, so the
-    EC-FUNCTION-NOT-FOUND arm and the pickup are the same in both positions. `EcWrap.QueryFor` asks every
-    activation family for a `BoundActivationSite`, because a window's activations are invisible to its
+    EC-FUNCTION-NOT-FOUND arm and the pickup are the same in both positions. `EcBinder.DeclaredRaisableNames` declares every
+    activation family (`ActivationSiteNames`) for a `BoundActivationSite`, because a window's activations are invisible to its
     statement-shaped cases.
   - **An activator that enables nothing raises nothing**, fatal or not, and execution continues as if the
     activation had returned without a RAISING phrase. There is no boundary "terminate loudly" default —
@@ -830,35 +830,55 @@ condition exists, it is raised only if checking for that exception condition is 
 homes, each read mechanically, never from a hand list:
 
 - **A statement SHAPE** raises through its own node kind — a READ's I-O status, a CALL's program lookup, a SET … TO
-  ENTRY, GOBACK's GR6 — and `EcBinder`'s `QueryFor` switch is the structure for those: one arm per kind naming a family
-  array (`IoNames` is `ExceptionCatalog.IoMaskNames`, the status map's own declaration).
+  ENTRY, GOBACK's GR6. `EcBinder.NodeKindRaises` is the table for those (one row per kind, naming a family array),
+  `EcBinder.IoRaise` declares the EC-I-O family once per file `EcBinder.IoFilesOf` names (`IoNames` is
+  `ExceptionCatalog.IoMaskNames`, the status map's own declaration), and `ActivationSiteNames` is what an operand
+  activation window holds. `EcRaiseSiteRegistryDriftTests` reads every bound statement that carries a `FileModel` and
+  asks `IoFilesOf` for it, so an I-O verb added tomorrow cannot be missing (DELETE FILE once was, kb/Work PB141).
 - **An OPERAND** raises wherever it is written: a program-address-identifier (§8.4.3.13.4 GR4) in a relation, a CALL
   or an INVOKE argument alike; a function reference's argument check (§15.3 item 14: EC-ARGUMENT-FUNCTION, and the
   families that ride the same intrinsic call — EC-ORDER-NOT-SUPPORTED, EC-DATA-CONVERSION, EC-LOCALE-INVALID).
   `EcBinder.OperandRaises` declares each over the GENERATED value parts (`BoundStatementTree.OwnValueParts`), so a
   statement kind added tomorrow is covered without an edit; `OperandRaisableNames` is the one walker, and the
-  intrinsic families are its declarations — `ContainsIntrinsic` and its nested-statement recursion are gone, because a
-  nested statement is its own EC region (kb/Work PB441) and wraps itself.
+  intrinsic families are its declarations (`PartHasIntrinsic`) — the former `ContainsIntrinsic` and its nested-statement
+  recursion are gone, because a nested statement is its own EC region (kb/Work PB441) and wraps itself.
 - **An AMBIENT site** no bound node identifies — a named collating sequence at use, a dynamic table's growth, a
-  locale-edited store — rides every statement of a checking-on region (a guard that never fires is harmless).
+  locale-edited store, the *-ARG-OMITTED condition of the activated element's kind — rides every statement of a
+  checking-on region (a guard that never fires is harmless): `EcBinder.AmbientRaises`, one row per name, with the element
+  kind and the locale CHARACTER CLASSIFICATION as the only scopes.
 
-`EcBinder.DeclaredRaisableNames(BoundStatement)` is the union, and `EcWrap`'s query is that enumeration filtered by
-`TurnState.Enabled`; the three sources are also exposed by name (`NodeKindNames`, `OperandRaises`, `AmbientNames`) so a
-test reads them without parsing C#. The universe is CLOSED: `ExceptionCatalog.TryGet` answers only catalogued names
-and the user-defined `EC-USER-*` family (kb/Work PB1531; the 22 `EC-<family>-IMP` names, Table 13's implementor-defined
-level-2 name per family, are catalogued, and the implementation sets only EC-PROGRAM-IMP, DOC-A.1-100). **`EcRaiseSiteRegistryDriftTests`** holds the three together: for every catalogued level-3 name,
-the binder declares it AND the runtime raises it (its `ExceptionState.Set` / `Raise…` literals, collected by a Roslyn
-walk of `src/Cobol.Net.Runtime`; the I-O status map through `IoMaskNames`), OR the name is on `DeclinedRaiseSites`, a
-table whose every entry cites the `kb/Work` note or the `docs/CONFORMANCE.md` anchor that says why it is never raised
-(the declined MCS, screen and VALIDATE facilities of CONFORMANCE.md §4; the `EC-*-IMP` names DOC-A.1-100 says the
-implementation never sets; EC-PROGRAM-IMP, which `ProgramRegistry` raises, is declared and raised like any other name).
-Declared-but-never-raised
-is a dead guard; raised-but-never-declared is the PB452 / PB1453 shape (`>>TURN … CHECKING ON` wrapping nothing); each
-fails with its shape named. The test is proven to fail once by deleting one declaration. Measured before PB3102
-(2026-10-12): 35 of 135 catalogued names occurred nowhere outside the catalog (18 of the 22 `EC-*-IMP`, seven MCS, four
-screen and three VALIDATE names, `EC-BOUND-FUNC-RET-VALUE`, and two I-O names the status map raises), five earlier instances of the
-raised-but-never-declared shape are recorded in `QueryFor`'s own comments (PB452, PB409, PB326, PB349/PB1036, PB233),
-and PB1036's four sort-merge names sat unraised for months behind a green suite.
+`EcBinder.DeclaredRaisableNames(BoundStatement, EcRaiseScope)` is the union (a desugar wrapper — a sequence, a receiver
+bracket, an implicit-statement series, an activation site — is transparent: its members' families add to its own), and
+`EcWrap`'s query is that enumeration filtered by `TurnState.Enabled` at the statement's line; nothing else computes a
+statement's names, and the declared set is also `EcBinder.AllDeclaredNames`, so a test reads it without parsing C#. The
+universe is CLOSED: `ExceptionCatalog.TryGet` answers only catalogued names and the user-defined `EC-USER-*` family
+(kb/Work PB1531; the 22 `EC-<family>-IMP` names, Table 13's implementor-defined level-2 name per family, are catalogued,
+and the implementation sets only EC-PROGRAM-IMP, DOC-A.1-100).
+
+**`EcRaiseSiteRegistryDriftTests`** holds the three together: for every catalogued level-3 name, the binder declares it
+AND a raise site exists — a string literal that IS the name (not one it is merely compared with) in `src/Cobol.Net.Runtime`
+or in the code generator, outside the catalog and the gate table, or a name the I-O status map (`IoEcOfStatus` over every
+two-digit status) or §13.18.34.4 / §14.9.51.4 give outright — OR the name is on `DeclinedRaiseSites`, a table whose every
+entry names the `docs/CONFORMANCE.md` Annex A.1 row, §4 facility or §3 determination that says why it is never raised
+(the test reads that text and fails when it does not quote the name), OR it is on `RaisedAtTheActivationBoundary` (the
+two names RAISING LAST EXCEPTION stages at run time, EC-RAISING-NOT-SPECIFIED and EC-OO-EXCEPTION, whose enabled test is
+the ACTIVATING statement's `EcCheckingProfile`, §14.9.18.4 GR1 b)). Declared-but-never-raised is a dead guard;
+raised-but-never-declared is the PB452 / PB1453 shape (`>>TURN … CHECKING ON` wrapping nothing); a name that is neither is
+unaccounted for; each fails with its shape named. "Raised" proves a raise site EXISTS, not that it is reachable —
+reachability is the goldens' job. The test was seen to fail by removing EC-OO-RESOURCE from the INVOKE row (it names
+the name), and NOT by deleting the `BoundSetEntry` row's EC-PROGRAM-NOT-FOUND, as the first draft of this section said:
+the registry is per NAME, and `ProgramNames`, the CALL row and the operand row also declare that name, so the loss of one
+node-kind row for a name another source still declares is the conformance goldens' catch (pb452), not the registry's.
+
+Measured while building this test (2026-10-12): 133 catalogued level-3 names, and three of the raised-but-never-declared
+shape that were real defects, fixed with it — EC-OO-RESOURCE (the PB1524 raise site existed, but no INVOKE ever set its
+checking flag, so `>>TURN EC-OO-RESOURCE CHECKING ON` reached nothing: `OoResourceStatementGuardTests`),
+EC-REPORT-NOT-TERMINATED (the CLOSE decided the check in the binder and carried no statement context, so WITH LOCATION
+answered spaces: `conformance:2023/pb3102_report_not_terminated_with_location`) and EC-PROGRAM-IMP (the one name the
+implementation sets was in no CALL statement's enabled set, so the guard's `CarriedNames` filter could never admit it).
+Five earlier instances of the same shape are recorded in the
+tables' own comments (PB452, PB409, PB326, PB349/PB1036, PB233), and PB1036's four sort-merge names sat unraised for months
+behind a green suite.
 
 ## C# mapping
 

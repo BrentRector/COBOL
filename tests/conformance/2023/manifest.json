@@ -846,7 +846,9 @@
   "pb2079_baseconvert_data_item_bases",
   "pb1508_options_printed_sequence",
   "pb2497_vlg_record_odo_count_after_dynamic",
-  "pb2623_method_is_a_user_word_at_2023"
+  "pb2623_method_is_a_user_word_at_2023",
+  "pb3102_report_not_terminated_with_location",
+  "pb3102_intrinsic_names_ride_every_statement"
   ],
  "pending": [
   "pb485_value_only_format1"
