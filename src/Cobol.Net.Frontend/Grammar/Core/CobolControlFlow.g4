@@ -524,7 +524,7 @@ exitStatement
     // EXIT PROGRAM [RAISING …] (ISO §14.9.14 Format 2 — the RAISING tail re-raises in the activator; archaic-
     // flagged in 2023, parsed at every edition and binder-gated). The METHOD/FUNCTION forms share the tail
     // syntactically (Formats 3/4); their semantics land with the OO wave.
-    : EXIT ( PROGRAM raisingPhrase? | PERFORM CYCLE? | SECTION | PARAGRAPH | METHOD raisingPhrase? | FUNCTION raisingPhrase? )?
+    : EXIT ( PROGRAM raisingPhrase? | PERFORM CYCLE? | SECTION | PARAGRAPH | methodKeyword raisingPhrase? | FUNCTION raisingPhrase? )?
     ;
 
 // ==========================================
