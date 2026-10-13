@@ -87,7 +87,20 @@ public static class ActivationRelations
             ? null
             : $"the argument ({argument}) and the formal parameter ({formal}) are not described with the same ALIGNED, "
               + "ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §9.3.6 "
-              + "match rule 3 e))";
+              + "match rule 3 e))" + FirstClauseDifference(argument, formal);
+    }
+
+    /// <summary>Where two clause identities first differ, for a refusal's reader: the first
+    /// <see cref="ActivationDescription.Clauses"/> segment (each names its clause — USAGE, SIGN, LENGTH, PICTURE, …) the
+    /// argument and the formal parameter spell differently, or the empty string when either has none.</summary>
+    private static string FirstClauseDifference(ActivationDescription argument, ActivationDescription formal)
+    {
+        string[] a = argument.Clauses.Split('|'), f = formal.Clauses.Split('|');
+        if (argument.Clauses.Length == 0 || formal.Clauses.Length == 0) return "";
+        for (int i = 0; i < Math.Min(a.Length, f.Length); i++)
+            if (!string.Equals(a[i], f[i], StringComparison.Ordinal))
+                return $": the argument has '{a[i]}' where the formal parameter has '{f[i]}'";
+        return "";
     }
 
     /// <summary>The clause identity of ISO §9.3.6 match rule 3 e), its ANY LENGTH item read through §14.8.2.3.2

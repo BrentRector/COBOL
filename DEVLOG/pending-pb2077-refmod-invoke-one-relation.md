@@ -29,6 +29,10 @@ Three pieces the one relation needed:
   every description now carries the field, which no CALL relation reads: re-pinned, the call ABI unchanged.
 - `OfReferenceModification` takes GR6's category from the one reader, so an alphabetic slice stays alphabetic. When
   the slice's length is a run-time value, its compile-time size is the maximum extent (D-RM1 a)).
+- A bit / national group is "described with PICTURE 1(m)" / "N(m)" (§13.18.29.4 GR1 b) / GR2 b)), but its
+  description carried no clauses, so the universal lane refused a national group into `PIC N(5)` and matched two
+  national groups of different lengths. Its clauses are that picture's now (`pb480_universal_match_relations` row TQ:
+  EC-OO-METHOD, re-derived).
 - `CallEmitter.AreaOf`: a slice whose length is a run-time value states no storage area. Before, the group formal was
   laid over identifier-1 and read and wrote past a short slice (`X(3:N)`, N = 2: `TG:CDEF`, four bytes written). Now it
   holds `CD  ` and writes back through the slice (`ABwxEFGHIJ`).

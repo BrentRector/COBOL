@@ -289,7 +289,10 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    construction: a reference-modified argument is §8.4.3.3.4 GR6's PICTURE-less elementary item
    (`OfReferenceModification`), so BY REFERENCE it matches an alphanumeric group formal of no more bytes and never an
    elementary one (3 e)) — the typed lane used to accept `X(1:5)` into `PIC X(5)` and refuse the group; a whole
-   `PIC X(n)` into a group formal is refused on both lanes (3 e)); a slice whose length is a run-time value takes
+   `PIC X(n)` into a group formal is refused on both lanes (3 e)); a bit / national group is "described with PICTURE 1(m) / N(m)" (§13.18.29.4 GR1 b) /
+   GR2 b)), so its description carries that picture's clauses: it matches an elementary bit / national item of its
+   length (§14.8.2.3.2 "Additionally" b) / c)) on both lanes, and no group of another length (EC-OO-METHOD, not
+   EC-OO-UNIVERSAL); a slice whose length is a run-time value takes
    §14.8.2.2 rule 1 at compile time on its MAXIMUM extent (docs/CONFORMANCE.md D-RM1, the occurs-depending model of
    §14.8.2.2) and the evaluated length at the boundary — on the universal lane through the box's evaluated description
    (EC-OO-UNIVERSAL when it is shorter than the formal), on the typed lane through the carrier: such a slice states no

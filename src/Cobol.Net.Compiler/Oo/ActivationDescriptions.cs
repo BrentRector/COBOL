@@ -44,16 +44,29 @@ public static class ActivationDescriptions
                 }
                 : null;
         // A bit / national group is "treated as an elementary item" at the activation boundary (§14.8.2.1 / §14.8.3.1
-        // NOTE), of class and category boolean / national (§8.5.2.1), and carries no clause of match rule 3 e)'s list.
+        // NOTE), of class and category boolean / national (§8.5.2.1) — and "treated as though it were an elementary data
+        // item of usage bit … described with PICTURE 1(m)" / "of usage national … described with PICTURE N(m)"
+        // (§13.18.29.4 GR1 b) / GR2 b)), so match rule 3 e) compares THAT picture: a national group matches an
+        // elementary PIC N(m) USAGE NATIONAL of its length and no national group of another length (kb/Work PB2077 —
+        // the typed lane's answer, §14.8.2.3.2 "Additionally" b) / c); this description carried no clauses, so the
+        // universal lane refused the first pair and matched the second).
         if (item.IsAsIfElementary)
+        {
+            var asIf = item.AsIfPic!;
+            string symbol = item.GroupUsage is GroupUsage.Bit ? "1" : "N";
+            string picture = PictureClauseIdentity.Of(string.Concat(Enumerable.Repeat(symbol, asIf.Length)), '$', "$",
+                decimalPointIsComma: false).Key;
             return new ActivationDescription
             {
                 Shape = ActivationShape.AsIfElementaryGroup,
                 Category = item.GroupUsage is GroupUsage.Bit ? ActivationCategory.Boolean : ActivationCategory.National,
                 Usage = item.GroupUsage is GroupUsage.Bit ? nameof(Usage.Bit) : nameof(Usage.National),
-                Positions = item.AsIfPic!.Length,
+                Clauses = ClausesOf(item, asIf, picture, Invariant(asIf.Length)),
+                AnyLengthClauses = ClausesAtAnyLength(item, asIf, symbol),
+                Positions = asIf.Length,
                 Table16 = Table16Operand.Of(item).Heading,
             };
+        }
         if (item.IsGroup)
         {
             // §8.5.2.1: "an alphanumeric group item has class and category alphanumeric". A group carries none of the
@@ -268,9 +281,11 @@ public static class ActivationDescriptions
             return PrototypeSignatures.RestrictionIdentity(item) ?? ActivationDescription.Unrestricted;
         // An ANY LENGTH item's one-symbol picture has no length of its own (§13.18.2.3 SR1).
         return item.IsAnyLength
-            ? ClausesAtAnyLength(item, p.Clause?.CharacterString ?? "")
-            : ClausesOf(item, p.Clause?.Key ?? "", p.Length.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            ? ClausesAtAnyLength(item, p, p.Clause?.CharacterString ?? "")
+            : ClausesOf(item, p, p.Clause?.Key ?? "", Invariant(p.Length));
     }
+
+    private static string Invariant(int n) => n.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary><see cref="ActivationDescription.AnyLengthClauses"/>: the <see cref="ElementaryClauses"/> of
     /// <paramref name="item"/> as if it were described with the ANY LENGTH clause — §13.18.2.3 SR1's one-symbol PICTURE,
@@ -279,17 +294,18 @@ public static class ActivationDescriptions
     /// symbol, or that carries a currency string, a DECIMAL-POINT IS COMMA state or an EDITING phrase (a one-symbol
     /// ANY LENGTH picture carries none), and for every item without a PICTURE clause.</summary>
     private static string? AnyLengthClausesOf(DataItem item) =>
-        !item.IsAnyLength && item.Pic is { Clause: { CharacterString: { Length: > 0 } cs } clause, LocaleEdit: null }
+        !item.IsAnyLength && item.Pic is { Clause: { CharacterString: { Length: > 0 } cs } clause, LocaleEdit: null } pic
         && clause is { CurrencyString: null, DecimalPointIsComma: null, Editing: null } && cs.All(c => c == cs[0])
-            ? ClausesAtAnyLength(item, cs[..1])
+            ? ClausesAtAnyLength(item, pic, cs[..1])
             : null;
 
-    private static string ClausesAtAnyLength(DataItem item, string symbol) => ClausesOf(item, "*" + symbol, "*");
+    private static string ClausesAtAnyLength(DataItem item, PicInfo p, string symbol) => ClausesOf(item, p, "*" + symbol, "*");
 
-    /// <summary>The one spelling of ISO §9.3.6 match rule 3 e)'s clause identity, given the PICTURE and LENGTH texts.</summary>
-    private static string ClausesOf(DataItem item, string picture, string length)
+    /// <summary>The one spelling of ISO §9.3.6 match rule 3 e)'s clause identity of <paramref name="item"/> described
+    /// by <paramref name="p"/> (its own PICTURE, or a bit / national group's as-if one), given the PICTURE and LENGTH
+    /// texts.</summary>
+    private static string ClausesOf(DataItem item, PicInfo p, string picture, string length)
     {
-        var p = item.Pic!;
         string locale = p.LocaleEdit is { } le ? $"|LOCALE {(le.Locale.IsCurrent ? "-" : "N")} SIZE {le.Size} {le.Picture}" : "";
         string dynamic = item.IsDynamicLength
             ? $"|DYNAMIC LENGTH {item.DynMaxSize} {CobolNames.Fold(item.DynStructure?.Name ?? "")}" : "";

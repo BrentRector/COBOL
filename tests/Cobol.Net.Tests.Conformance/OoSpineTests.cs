@@ -1505,7 +1505,7 @@ public sealed class OoSpineTests
                 DISPLAY LK.
             END METHOD M.
             """).Replace("01 T USAGE OBJECT",
-                "01 WS PIC S9(4) SIGN LEADING SEPARATE VALUE -1.\n01 T USAGE OBJECT")), "SIGN clause mismatch");
+                "01 WS PIC S9(4) SIGN LEADING SEPARATE VALUE -1.\n01 T USAGE OBJECT")), "the argument has 'SIGN S LeadingSeparate' where the formal parameter has 'SIGN S TrailingOverpunch'");
     }
 
     /// <summary>§14.8.2.3.3 rule 2a — BY CONTENT numeric arguments follow COMPUTE rules: ANY numeric argument
