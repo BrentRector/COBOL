@@ -1,4 +1,4 @@
-## PB3104: every gate row of `enqueue.py land` runs under the shared gate slot
+## Entry 1981 — 2026-10-12 17:00 PDT — PB3104: every gate row of `enqueue.py land` runs under the shared gate slot
 
 `enqueue.py land` took a gate slot only for its Windows gate row. That row runs build-local, which takes its slot through
 `run_gate_legs.py`. The Linux row, `bash scripts/linux-gate.sh --nice` (CI's whole legs in WSL), ran with no slot at
@@ -40,3 +40,4 @@ now describe the slotted rows. `units/enqueue.md` step 3 needed no change: the f
 PB3022 item 10; and an implementer's own `linux-gate.sh` run under scope `whole`, which still takes no slot.
 
 **Register.** kb/Work PB3104 is landed with `closes_rows: []`: it is process tooling, governed by no ISO rule.
+
