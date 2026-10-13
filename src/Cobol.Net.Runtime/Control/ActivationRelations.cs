@@ -20,6 +20,10 @@ namespace CobolNet.Runtime;
 /// matches a <c>PIC X(n)</c>; conformance then admits a formal group no larger than the argument (§14.8.2.2 rule 1)
 /// and refuses a larger one. Every argument here comes from <see cref="ActivationDescription"/>s the compiler built
 /// in one place (<c>ActivationDescriptions</c>).
+/// <para>⛔ THE TYPED INVOKE LANE ASKS THE SAME TWO RELATIONS AT COMPILE TIME (kb/Work PB2077): a typed receiver's
+/// descriptions are all static, so <c>OoBinder.ByReferenceArgumentReason</c> asks <see cref="MatchViolation"/> (the match's
+/// description half) and <see cref="ParameterViolation"/> without GR7 c)'s universal-only ANY LENGTH ban — one relation,
+/// read at two times, so the two lanes cannot answer one argument differently.</para>
 /// <para>A CALL whose activated program is located by name at run time asks the CONFORMANCE relations too
 /// (<see cref="CallArgumentViolation"/>, <see cref="CallReturningViolation"/>; kb/Work PB165), through
 /// <see cref="BoundaryItem"/> at <c>ProgramTable.CallProgram</c>. The §14.8.2.2 group rules, the §14.8.2.3.2
@@ -29,34 +33,100 @@ public static class ActivationRelations
 {
     /// <summary>ISO §9.3.6 match rule 3, for one BY REFERENCE parameter of the invocation: does
     /// <paramref name="argument"/> (whose run-time value is <paramref name="value"/>) match <paramref name="formal"/> of
-    /// a method of the object <paramref name="receiver"/>?</summary>
+    /// a method of the object <paramref name="receiver"/>? The description half (<see cref="MatchViolation"/>), and for
+    /// an ACTIVE-CLASS formal 3 d) 4./5., a condition on the argument's VALUE — "the corresponding parameter shall
+    /// evaluate to an object reference of the same class specified in the invocation" / "to the factory of the class
+    /// specified in the invocation" (kb/Work PB1112's universal leg).</summary>
     public static bool Matches(ActivationDescription argument, object? value, ActivationDescription formal,
-        CobolObject receiver)
+        CobolObject receiver) =>
+        MatchViolation(argument, formal) is null
+        && (argument.Shape is ActivationShape.Omitted
+            || formal is not { Shape: ActivationShape.ObjectReference, ObjectKind: ObjectReferenceKind.ActiveClass }
+            || ActiveClassValueMatches(value, formal.Factory, receiver));
+
+    /// <summary>⛔ THE DESCRIPTION HALF OF ISO §9.3.6 MATCH RULE 3 — the ONE copy both INVOKE lanes ask (kb/Work PB2077,
+    /// decision PB3098; COBOLNET_OO_DESIGN D6 item 6): the universal switch at run time (<see cref="Matches"/>) and the
+    /// typed binder at compile time, where every description is static (§14.9.23.4 GR7 b) locates the method by §9.3.6
+    /// for every INVOKE). Rules 3 a), 3 b), 3 c), 3 d) 1.–3. and 3 e); 3 d) 4./5. is the value half, which
+    /// <see cref="Matches"/> asks of the run-time object and the typed lane answers by §14.8.2.3.2 rule 4. Null when
+    /// <paramref name="argument"/> matches <paramref name="formal"/>, else the reason.
+    /// <para>3 e) is a CLAUSE-LIST identity, so an item that has no PICTURE clause — a group, and the unique data item
+    /// reference modification creates (§8.4.3.3.4 GR5 / GR6 give it a class, a category and a usage, never a PICTURE
+    /// clause) — matches only a formal that has none either, and never an elementary one. Its ANY LENGTH item is read
+    /// through §14.8.2.3.2 "Additionally" d) / e) (docs/CONFORMANCE.md D-RM1 b)): an ANY LENGTH formal's length is
+    /// considered to match the argument's, so the argument is compared as if it too were described with ANY LENGTH
+    /// (<see cref="ActivationDescription.AnyLengthClauses"/>), and an ANY LENGTH argument needs an ANY LENGTH formal.</para></summary>
+    public static string? MatchViolation(ActivationDescription argument, ActivationDescription formal)
     {
         // 3 a) "is specified with the BY REFERENCE phrase" — a BY VALUE formal never matches (kb/Work PB1051).
-        if (formal.ByValue) return false;
+        if (formal.ByValue)
+            return $"the formal parameter ({formal}) is specified BY VALUE, and a parameter passed by reference matches "
+                + "only a BY REFERENCE formal parameter (ISO §9.3.6 match rule 3 a))";
         // 3 b) "if the passed parameter is specified with the OMITTED phrase, shall be specified with the OPTIONAL
         // phrase. No further checking is performed on this parameter".
-        if (argument.Shape is ActivationShape.Omitted) return formal.Optional;
+        if (argument.Shape is ActivationShape.Omitted)
+            return formal.Optional ? null
+                : $"the argument is OMITTED and the formal parameter ({formal}) is not described with the OPTIONAL "
+                  + "phrase (ISO §9.3.6 match rule 3 b))";
+        // 3 c) "is the same class and category": an object reference opposite an object reference only.
+        if ((formal.Shape is ActivationShape.ObjectReference) != (argument.Shape is ActivationShape.ObjectReference))
+            return $"the argument ({argument}) and the formal parameter ({formal}) are not of the same class and "
+                + "category (ISO §9.3.6 match rule 3 c))";
+        // 3 d) 1.–3.: the same description; an ACTIVE-CLASS formal's 4./5. is the value half (see Matches).
         if (formal.Shape is ActivationShape.ObjectReference)
-        {
-            // 3 c) "is the same class and category": an object reference opposite an object reference only.
-            if (argument.Shape is not ActivationShape.ObjectReference) return false;
-            // 3 d) 4./5.: a condition on the VALUE, not on the argument's description — "the corresponding parameter
-            // shall evaluate to an object reference of the same class specified in the invocation" / "to the factory of
-            // the class specified in the invocation" (kb/Work PB1112's universal leg). 3 d) 1.–3.: the same description.
-            return formal.ObjectKind is ObjectReferenceKind.ActiveClass
-                ? ActiveClassValueMatches(value, formal.Factory, receiver)
-                : SameObjectReferenceDescription(argument, formal);
-        }
-        if (argument.Shape is ActivationShape.ObjectReference) return false;   // 3 c)
-        // 3 c) the same class and category; 3 e) the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH,
-        // JUSTIFIED, PICTURE, SIGN and USAGE clauses (3 e) 1./2. folded into the PICTURE identity, 3. the LOCALE).
-        return string.Equals(argument.Category, formal.Category, StringComparison.Ordinal)
-            && argument.AnyLength == formal.AnyLength
-            && string.Equals(argument.Clauses, formal.Clauses, StringComparison.Ordinal)
-            && SameLocaleIdentification(argument, formal);
+            return formal.ObjectKind is ObjectReferenceKind.ActiveClass || SameObjectReferenceDescription(argument, formal)
+                ? null
+                : $"the argument ({argument}) is not described as the formal parameter ({formal}) is (ISO §9.3.6 match "
+                  + "rule 3 d))";
+        if (!string.Equals(argument.Category, formal.Category, StringComparison.Ordinal))
+            return $"the argument ({argument}) and the formal parameter ({formal}) are not of the same class and "
+                + "category (ISO §9.3.6 match rule 3 c))";
+        // 3 e) the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses
+        // (3 e) 1./2. folded into the PICTURE identity, 3. the LOCALE), the ANY LENGTH item read as above.
+        return SameClausesAtFormalLength(argument, formal)
+            ? null
+            : $"the argument ({argument}) and the formal parameter ({formal}) are not described with the same ALIGNED, "
+              + "ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §9.3.6 "
+              + "match rule 3 e))" + FirstClauseDifference(argument, formal);
     }
+
+    /// <summary>Where two clause identities first differ, for a refusal's reader: the first
+    /// <see cref="ActivationDescription.Clauses"/> segment (each names its clause — USAGE, SIGN, LENGTH, PICTURE, …) the
+    /// argument and the formal parameter spell differently, or the empty string when either has none. It diffs the
+    /// PAIR <see cref="SameClausesAtFormalLength"/> compared: opposite an ANY LENGTH formal the argument's
+    /// <see cref="ActivationDescription.AnyLengthClauses"/>, and never the LENGTH segment, which §14.8.2.3.2
+    /// "Additionally" d) considers to match — so the refusal names the clause that differs (JUSTIFIED, PICTURE, …) and
+    /// not the one length the rule relaxes (kb/Work PB2077 review R1-2).</summary>
+    private static string FirstClauseDifference(ActivationDescription argument, ActivationDescription formal)
+    {
+        bool lengthMatches = formal.AnyLength && !argument.AnyLength;
+        string compared = lengthMatches ? argument.AnyLengthClauses ?? argument.Clauses : argument.Clauses;
+        if (compared.Length == 0 || formal.Clauses.Length == 0) return "";
+        string[] a = compared.Split('|'), f = formal.Clauses.Split('|');
+        for (int i = 0; i < Math.Min(a.Length, f.Length); i++)
+            if (!string.Equals(a[i], f[i], StringComparison.Ordinal)
+                && !(lengthMatches && a[i].StartsWith(LengthSegment, StringComparison.Ordinal)))
+                return $": the argument has '{a[i]}' where the formal parameter has '{f[i]}'";
+        return "";
+    }
+
+    /// <summary>The prefix of the LENGTH segment of a <see cref="ActivationDescription.Clauses"/> identity (the
+    /// compiler's <c>ActivationDescriptions.ClausesOf</c> spells it).</summary>
+    private const string LengthSegment = "LENGTH ";
+
+    /// <summary>The clause identity of ISO §9.3.6 match rule 3 e), its ANY LENGTH item read through §14.8.2.3.2
+    /// "Additionally" d) and e): "If the formal parameter is described with the ANY LENGTH clause, its length is
+    /// considered to match the length of the corresponding argument" — the argument is compared in the form it would
+    /// have were it described with ANY LENGTH (<see cref="ActivationDescription.AnyLengthClauses"/>; null when its
+    /// PICTURE repeats no one symbol, so no ANY LENGTH formal is its PICTURE clause) — and "If the argument is described
+    /// with the ANY LENGTH clause, the corresponding formal parameter shall be described with the ANY LENGTH clause".
+    /// The LOCALE phrase's external identification is compared too (3 e) 3. b.; "Additionally" a)).</summary>
+    private static bool SameClausesAtFormalLength(ActivationDescription argument, ActivationDescription formal) =>
+        (formal.AnyLength && !argument.AnyLength
+            ? string.Equals(argument.AnyLengthClauses, formal.Clauses, StringComparison.Ordinal)
+            : argument.AnyLength == formal.AnyLength
+              && string.Equals(argument.Clauses, formal.Clauses, StringComparison.Ordinal))
+        && SameLocaleIdentification(argument, formal);
 
     /// <summary>ISO §9.3.6 match rule 3 d) 4./5. evaluated on the argument's VALUE: the class "specified in the
     /// invocation" is the class of the object the method is invoked on (§9.3.6: "it is the class of the actual object
@@ -82,17 +152,16 @@ public static class ActivationRelations
               && LocaleIdentification.SameExternalIdentification(a.LocaleExternal, a.LocaleFromLiteral,
                   b.LocaleExternal, b.LocaleFromLiteral);
 
-    /// <summary>ISO §14.8.2 for a BY REFERENCE parameter of a method §9.3.6 has BOUND (§14.9.23.4 GR7 c)). Null when the
-    /// pair conforms, else the reason. The elementary and object-reference identities of §14.8.2.3.2 rule 2 / rule 4
-    /// are what match rule 3 d)/e) already proved; what remains is the group rules of §14.8.2.2 and GR7 c)'s own ANY
-    /// LENGTH ban.</summary>
+    /// <summary>ISO §14.8.2 for a BY REFERENCE parameter of a method §9.3.6 has BOUND: asked at run time of a method
+    /// bound through a universal receiver (§14.9.23.4 GR7 c)) and at compile time of a typed one (§14.9.23.3 SR5 c),
+    /// §14.8.1) — one relation read at two times (kb/Work PB2077). Null when the pair conforms, else the reason. The
+    /// elementary and object-reference identities of §14.8.2.3.2 rule 2 / rule 4 are what match rule 3 d)/e) already
+    /// proved; what remains is the group rules of §14.8.2.2. GR7 c)'s own ANY LENGTH ban is not a relation of a pair:
+    /// it bans the bound METHOD's description whatever its arguments (an OMITTED one included, which §9.3.6 3 b) exempts
+    /// from further checking), and only for a universal receiver, so the universal switch raises it unconditionally for
+    /// such a method (<c>OoEmitter.EmitCobolInvokeCase</c>) and the typed lane, which it does not govern, never meets it.</summary>
     public static string? ParameterViolation(ActivationDescription argument, ActivationDescription formal)
     {
-        // GR7 c) bans the formal's DESCRIPTION, so it is asked before an OMITTED argument's exemption (§9.3.6 3 b)
-        // exempts the MATCH from further checking, not the bound method from GR7 c)).
-        if (formal.AnyLength)
-            return "the formal parameter is described with the ANY LENGTH clause, which a method invoked through a "
-                + "universal object reference shall not have (ISO §14.9.23.4 GR7 c))";
         if (argument.Shape is ActivationShape.Omitted) return null;
         // The match already required the same type-NAME of a strongly-typed group (§8.5.2.1: it is the class and
         // category) and the same class of every other pair, so what §14.8.2.2 still asks is the type's §8.5.3.1

@@ -1509,13 +1509,18 @@ of an unsupported facility.
   more bytes (3 c), §14.8.2.2 rule 1), on the typed lane (a compile-time refusal, COBOLNET0828) and the universal lane
   (EC-OO-METHOD) alike; an elementary formal takes it BY CONTENT (§9.3.6 4 d)). Two readings the text leaves open:
   **(a)** a slice whose length is a run-time value is measured for the compile-time rule 1 by its MAXIMUM extent — the
-  model §14.8.2.2 gives an occurs-depending group ("the maximum length is used") — and by its evaluated length at the
-  boundary; **(b)** the ANY LENGTH item of match rule 3 e) is read through §14.8.2.3.2 d)/e) (a formal's ANY LENGTH
-  matches any argument length; an ANY LENGTH argument needs an ANY LENGTH formal), because the literal reading empties
-  §13.18.2 for methods; a universal receiver never reaches it (§14.9.23.4 GR7 c)). GnuCOBOL 3.2 gives no answer: its
-  prototype conformance check reads identifier-1's description and ignores the modifier (measured). Witnesses:
-  `conformance:2002/pb480_universal_refmod_evaluated_length`; `conformance:2002/pb2077_refmod_argument_both_lanes` when
-  PB2077 lands.
+  model §14.8.2.2 gives an occurs-depending group ("the maximum length is used"): identifier-1's positions from a
+  static leftmost position on, or all of them — and by its evaluated length at the boundary: the universal lane raises
+  EC-OO-UNIVERSAL when it is shorter than the group formal; the typed lane's formal holds the slice padded to the
+  formal's width and writes back through the slice, truncated to it (such a slice states no storage area, so the formal
+  never reads or writes past it); **(b)** the ANY LENGTH item of match rule 3 e) is read through §14.8.2.3.2
+  "Additionally" d)/e) (a formal's ANY LENGTH matches any argument length, every other clause still compared; an ANY
+  LENGTH argument needs an ANY LENGTH formal), because the literal reading empties §13.18.2 for methods. One relation
+  serves both lanes, so through a universal receiver a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal and the
+  bound method is then refused by §14.9.23.4 GR7 c) (EC-OO-UNIVERSAL, not EC-OO-METHOD); a slice matches no ANY LENGTH
+  formal (it has no PICTURE clause). GnuCOBOL 3.2 gives no answer: its prototype conformance check reads identifier-1's
+  description and ignores the modifier (measured). Witnesses: `conformance:2002/pb480_universal_refmod_evaluated_length`,
+  `conformance:2002/pb2077_refmod_argument_both_lanes`, `conformance:2002/pb480_universal_any_length_omitted`.
 - **D-N8 — a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; decision PB3099, 2026-10-12).
   §14.9.25.4 GR4 makes the move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's. An odd
   byte count cannot be national content (D-N1: two bytes per position), so the last position is completed with the
