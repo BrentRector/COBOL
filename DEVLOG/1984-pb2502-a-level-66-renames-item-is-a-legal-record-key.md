@@ -1,4 +1,4 @@
-## PB2502 - a level-66 RENAMES item is a legal RECORD KEY, ALTERNATE RECORD KEY and SORT key
+## Entry 1984 — 2026-10-12 18:01 PDT — PB2502 - a level-66 RENAMES item is a legal RECORD KEY, ALTERNATE RECORD KEY and SORT key
 
 **The defect (re-probed on this build).** `RECORD KEY IS KR` with `66 KR RENAMES K1 THRU K2.` compiled clean and then aborted the run unit at file registration with
 `NotImplementedCobolFeatureException: ... RECORD KEY missing or not locatable in the record image (ISO 12.4.5.12)`, for the THRU form and the no-THRU form alike (a no-THRU
@@ -47,3 +47,4 @@ path was invisible to the per-edition compilers. The golden moved to the introdu
 origin/main, `compare_oracle.py` read `=== ARCH-ORACLE: DIFFERENT — 4 of 7790 cases differ (baseline 4dfb26c315bf, new c8129c45e139) ===`, every difference of class ADDED and each one this
 branch's own golden: `corpus/85/pb2502_renames_record_key`, `corpus/85/pb2502_renames_sort_key`, `corpus/2002/pb2502_renames_record_key_national_group` and
 `negative/pb2502-record-key-alias-of-numeric`. No existing case changed its emitted C#, diagnostics or output. The baseline was re-recorded at the merged tip and replaces main's.
+
