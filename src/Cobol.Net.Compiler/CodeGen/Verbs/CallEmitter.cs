@@ -677,7 +677,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // and a formal laid over identifier-1 would read and write the positions past the slice. With no area the
             // formal holds the carrier's copy — the slice, padded to the formal's width — and the write-back splices it
             // through the slice's own receiving store, truncated to the slice.
-            if (rm.Inner is not RedefViewPlace || rm.StaticLength(rm.Inner.Item.OperandPic?.Length) is null) return null;
+            if (rm.Inner is not RedefViewPlace || rm.StaticLength(rm.StaticInnerPositions) is null) return null;
             start = PositionRenderer.Render(rm.Start);
             p = rm.Inner;
         }

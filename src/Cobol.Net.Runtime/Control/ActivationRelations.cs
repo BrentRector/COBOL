@@ -92,16 +92,27 @@ public static class ActivationRelations
 
     /// <summary>Where two clause identities first differ, for a refusal's reader: the first
     /// <see cref="ActivationDescription.Clauses"/> segment (each names its clause — USAGE, SIGN, LENGTH, PICTURE, …) the
-    /// argument and the formal parameter spell differently, or the empty string when either has none.</summary>
+    /// argument and the formal parameter spell differently, or the empty string when either has none. It diffs the
+    /// PAIR <see cref="SameClausesAtFormalLength"/> compared: opposite an ANY LENGTH formal the argument's
+    /// <see cref="ActivationDescription.AnyLengthClauses"/>, and never the LENGTH segment, which §14.8.2.3.2
+    /// "Additionally" d) considers to match — so the refusal names the clause that differs (JUSTIFIED, PICTURE, …) and
+    /// not the one length the rule relaxes (kb/Work PB2077 review R1-2).</summary>
     private static string FirstClauseDifference(ActivationDescription argument, ActivationDescription formal)
     {
-        string[] a = argument.Clauses.Split('|'), f = formal.Clauses.Split('|');
-        if (argument.Clauses.Length == 0 || formal.Clauses.Length == 0) return "";
+        bool lengthMatches = formal.AnyLength && !argument.AnyLength;
+        string compared = lengthMatches ? argument.AnyLengthClauses ?? argument.Clauses : argument.Clauses;
+        if (compared.Length == 0 || formal.Clauses.Length == 0) return "";
+        string[] a = compared.Split('|'), f = formal.Clauses.Split('|');
         for (int i = 0; i < Math.Min(a.Length, f.Length); i++)
-            if (!string.Equals(a[i], f[i], StringComparison.Ordinal))
+            if (!string.Equals(a[i], f[i], StringComparison.Ordinal)
+                && !(lengthMatches && a[i].StartsWith(LengthSegment, StringComparison.Ordinal)))
                 return $": the argument has '{a[i]}' where the formal parameter has '{f[i]}'";
         return "";
     }
+
+    /// <summary>The prefix of the LENGTH segment of a <see cref="ActivationDescription.Clauses"/> identity (the
+    /// compiler's <c>ActivationDescriptions.ClausesOf</c> spells it).</summary>
+    private const string LengthSegment = "LENGTH ";
 
     /// <summary>The clause identity of ISO §9.3.6 match rule 3 e), its ANY LENGTH item read through §14.8.2.3.2
     /// "Additionally" d) and e): "If the formal parameter is described with the ANY LENGTH clause, its length is

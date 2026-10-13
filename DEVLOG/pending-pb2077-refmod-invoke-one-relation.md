@@ -54,3 +54,5 @@ PB2515): GREEN` (Conformance 4,937/11,498 · Unit 32,634/33,476 · Characterizat
 whole-population Conformance run found four more reds leg 1 never reached (above), all fixed; the whole Unit assembly
 ran 33,509/33,509. Self-review: the relation builds a reason string only on a mismatch; the CALL lane's ANY LENGTH
 arms and a slice of a non-static item are leads in the report.
+
+**Branch review round 1.** Two findings, both fixed. A slice of an alphanumeric GROUP (`G(1:N)`, `G(3:)`) was measured as zero positions, because `OfReferenceModification` read identifier-1's length through `OperandPic`, which a group lacks; the typed lane refused it into every group formal (COBOLNET0828) while the universal lane ran it. It reads `RefModPlace.StaticInnerPositions` now, the one position reader, and `CallEmitter.AreaOf` and `ConditionBinder` use it too. Re-probed: both lanes print `TG:ABCD|` and `TG:CDEF|`. And a JUSTIFIED argument refused by an ANY LENGTH formal was told its LENGTH differed, the one clause the rule relaxes: `FirstClauseDifference` now diffs the pair the relation compared and names `JUSTIFIED`. Golden rows on both lanes and six drift-test cases witness them.

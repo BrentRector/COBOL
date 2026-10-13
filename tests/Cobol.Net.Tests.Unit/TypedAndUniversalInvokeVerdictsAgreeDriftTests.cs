@@ -132,7 +132,9 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
         Assert.True(matched > 15, $"only {matched} matching pairs — the population no longer reaches a match");
     }
 
-    private static bool TypedLaneAccepts(string formal, string argument)
+    private static bool TypedLaneAccepts(string formal, string argument) => TypedLaneErrors(formal, argument).Count == 0;
+
+    private static IReadOnlyList<string> TypedLaneErrors(string formal, string argument)
     {
         string source = string.Join("\n",
             "       IDENTIFICATION DIVISION.",
@@ -147,6 +149,10 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
             "       01 X  PIC X(10).",
             "       01 Y  PIC X(4).",
             "       01 N  PIC 9(2).",
+            "       01 G.",
+            "          05 G1 PIC X(5).",
+            "          05 G2 PIC X(5).",
+            "       01 J  PIC X(4) JUSTIFIED RIGHT.",
             "       PROCEDURE DIVISION.",
             "           INVOKE C2077DT \"NEW\" RETURNING T",
             $"           INVOKE T \"M\" USING {argument}",
@@ -182,7 +188,7 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
                 DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
             Assert.True(r.Errors.All(e => e.Contains("COBOLNET0828", StringComparison.Ordinal)),
                 "the probe program drew an error other than the verdict under test:\n" + string.Join("\n", r.Errors));
-            return r.Errors.Count == 0;
+            return r.Errors;
         }
         finally { try { Directory.Delete(dir, recursive: true); } catch { /* best-effort */ } }
     }
@@ -204,6 +210,23 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
     [InlineData("       01 LF PIC X(5).", "BY CONTENT X(1:5)", true)] // 4 d): a valid MOVE
     [InlineData(Group4, "BY CONTENT X(2:6)", true)]                    // 4 d): a MOVE into a group
     [InlineData("       01 LF PIC X ANY LENGTH.", "Y", true)]          // d): the length is considered to match
+    // A slice of a GROUP: identifier-1's length is static (ten characters) though the group has no PICTURE, so rule 1
+    // reads the same extents a slice of PIC X(10) gives (kb/Work PB2077 review R1-1: these were measured as zero).
+    [InlineData(Group4, "G(1:N)", true)]                               // maximum extent 10 >= 4
+    [InlineData(Group4, "G(3:)", true)]                                // to the end: 8 >= 4
+    [InlineData(Group4, "G(7:N)", true)]                               // maximum extent 4 = 4
+    [InlineData(Group4, "G(8:)", false)]                               // to the end: 3 < 4
+    [InlineData(Group4, "G(1:3)", false)]                              // rule 1: 4 > 3
     public void PB3098sRows_CompileToTheirVerdicts(string formal, string argument, bool accepted) =>
         Assert.Equal(accepted, TypedLaneAccepts(formal, argument));
+
+    /// <summary>The refusal names the clause that differs, never the length §14.8.2.3.2 "Additionally" d) relaxes
+    /// (kb/Work PB2077 review R1-2): opposite an ANY LENGTH formal, a JUSTIFIED argument is refused for JUSTIFIED.</summary>
+    [Fact]
+    public void AnAnyLengthFormalsRefusal_NamesTheClauseThatDiffers_NotTheLength()
+    {
+        string error = Assert.Single(TypedLaneErrors("       01 LF PIC X ANY LENGTH.", "J"));
+        Assert.Contains("the argument has 'JUSTIFIED' where the formal parameter has '-'", error);
+        Assert.DoesNotContain("has 'LENGTH ", error);
+    }
 }

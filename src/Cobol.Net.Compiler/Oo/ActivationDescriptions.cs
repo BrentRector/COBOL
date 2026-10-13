@@ -138,10 +138,12 @@ public static class ActivationDescriptions
     /// (<see cref="RefModPlace.StaticLength"/>), otherwise the slice's MAXIMUM extent — identifier-1's positions from a
     /// static leftmost position on, or all of them — the measure §14.8.2.2 gives the other argument whose length moves
     /// at run time, "the maximum length is used" for an occurs-depending group (docs/CONFORMANCE.md D-RM1 a); kb/Work
-    /// PB2077). Zero when identifier-1's own length is not static, which no group formal admits.</summary>
+    /// PB2077). identifier-1's positions are the ONE reader's (<see cref="RefModPlace.StaticInnerPositions"/>), so a
+    /// slice of an alphanumeric group, whose length is static, is measured too. Zero when identifier-1's own length is
+    /// not static (an ANY LENGTH or DYNAMIC LENGTH item), which no group formal admits.</summary>
     public static ActivationDescription OfReferenceModification(RefModPlace r)
     {
-        int? inner = r.Inner.Item.OperandPic?.Length;
+        int? inner = r.StaticInnerPositions;
         return new ActivationDescription
         {
             Shape = ActivationShape.Elementary,

@@ -28,6 +28,9 @@
       *>   T TG BY CONTENT X(2:6)  MOVE to a group        -> TG:BCDE|  x=ABCDEFGHIJ
       *>   T TP BY CONTENT X(1:5)  MOVE to PIC X(5)       -> TP:ABCDE|
       *>   T TA Y (PIC X(4))       d): length matches     -> TA:MNOP|  y=q
+      *>   G is a 10-character GROUP (ABCDEFGHIJ): its slices are measured as X's are (kb/Work PB2077 R1-1)
+      *>   T TG G(1:N) N=6         group, max 10 >= 4     -> TG:ABCD|  g=wxyzEFGHIJ
+      *>   T TG G(3:)              group, 8 >= 4          -> TG:CDEF|  g=ABwxyzGHIJ
       *>   U TP X(1:5)             3 e): no PICTURE       -> HANDLED=EC-OO-METHOD
       *>   U TP X(1:N) N=6         3 e)                   -> HANDLED=EC-OO-METHOD
       *>   U TA X(1:5)             3 e): no PICTURE       -> HANDLED=EC-OO-METHOD
@@ -36,6 +39,8 @@
       *>   U TG X(3:N) N=2         rule 1 on 2            -> HANDLED=EC-OO-UNIVERSAL  x=ABCDEFGHIJ
       *>   U TG X                  3 e): PICTURE one side -> HANDLED=EC-OO-METHOD
       *>   U TA Y                  matches; GR7 c)        -> HANDLED=EC-OO-UNIVERSAL
+      *>   U TG G(1:N) N=6         group, 6 >= 4          -> TG:ABCD|  g=wxyzEFGHIJ
+      *>   U TG G(3:)              group, 8 >= 4          -> TG:CDEF|  g=ABwxyzGHIJ
        >>TURN EC-OO CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2077RM.
@@ -50,6 +55,9 @@
        01 X  PIC X(10).
        01 Y  PIC X(4).
        01 N  PIC 9(2).
+       01 G.
+          05 G1 PIC X(5).
+          05 G2 PIC X(5).
        PROCEDURE DIVISION.
        DECLARATIVES.
        H SECTION.
@@ -81,6 +89,13 @@
            MOVE "MNOP" TO Y
            INVOKE T "TA" USING Y
            DISPLAY "y=" Y
+           MOVE "ABCDEFGHIJ" TO G
+           MOVE 6 TO N
+           INVOKE T "TG" USING G(1:N)
+           DISPLAY "g=" G
+           MOVE "ABCDEFGHIJ" TO G
+           INVOKE T "TG" USING G(3:)
+           DISPLAY "g=" G
            DISPLAY "-- universal"
            MOVE "ABCDEFGHIJ" TO X
            INVOKE U "TP" USING X(1:5)
@@ -98,6 +113,13 @@
            INVOKE U "TG" USING X
            MOVE "MNOP" TO Y
            INVOKE U "TA" USING Y
+           MOVE "ABCDEFGHIJ" TO G
+           MOVE 6 TO N
+           INVOKE U "TG" USING G(1:N)
+           DISPLAY "g=" G
+           MOVE "ABCDEFGHIJ" TO G
+           INVOKE U "TG" USING G(3:)
+           DISPLAY "g=" G
            DISPLAY "END".
            STOP RUN.
        END PROGRAM PB2077RM.
