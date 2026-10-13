@@ -1172,4 +1172,12 @@ public sealed record RefModPlace(Place Inner, Position Start, Position? Length) 
     /// <summary>This view's <see cref="PositionCount"/> — the positions of the item reference modification indexes
     /// (ISO §8.4.3.3.4 GR5).</summary>
     public int InnerPositions => PositionCount(Inner.Item);
+
+    /// <summary><see cref="InnerPositions"/> when identifier-1's length is a COMPILE-TIME quantity — the
+    /// <c>innerLength</c> a static reader passes to <see cref="StaticLength"/> — or null for an ANY LENGTH or
+    /// DYNAMIC LENGTH identifier-1, whose length is a run-time value (§13.18.2.4 GR1 b); §8.5.1.10). ⛔ A GROUP'S length is
+    /// static too: reading it through <see cref="DataItem.OperandPic"/>, which an alphanumeric group lacks, measured
+    /// <c>G(3:)</c> as a run-time slice and every slice of a group as zero positions (kb/Work PB2077 review R1-1).</summary>
+    public int? StaticInnerPositions =>
+        Inner.Item is { IsAnyLength: false, IsDynamicLength: false } ? InnerPositions : null;
 }

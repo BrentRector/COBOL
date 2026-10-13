@@ -206,6 +206,8 @@
   "pb480_universal_any_length_omitted",
   "pb480_universal_restricted_pointer_type",
   "pb480_universal_refmod_evaluated_length",
+  "pb2077_refmod_argument_both_lanes",
+  "pb2077_refmod_runtime_length_shares_storage",
   "pb1112_active_class_universal",
   "pb460_set_program_pointer_effect",
   "pb548_set_restricted_pointer_plain",
