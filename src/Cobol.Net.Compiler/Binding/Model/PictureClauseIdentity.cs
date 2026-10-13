@@ -124,7 +124,8 @@ public sealed record PictureClauseIdentity(string CharacterString, string? Curre
     /// never compared — <see cref="Key"/> is): the PICTURE clause, a run of four or more of one symbol written with
     /// its repetition count (<c>9(6)</c>, <c>X(10)</c>); the currency string the source element's CURRENCY SIGN clause
     /// gives its currency symbol; DECIMAL-POINT IS COMMA when the clause is in effect for it; and the EDITING phrase.
-    /// Equal keys have equal phrases, so a refusal never names a difference the identity does not hold.</summary>
+    /// Equal keys have equal phrases, so a refusal never names a difference the identity does not hold; two EDITING
+    /// phrases are named by presence only.</summary>
     public IEnumerable<string> Phrases()
     {
         yield return "PICTURE " + Spelled(CharacterString);

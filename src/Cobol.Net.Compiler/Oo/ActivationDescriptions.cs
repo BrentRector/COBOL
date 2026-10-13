@@ -347,8 +347,10 @@ public static class ActivationDescriptions
     /// (<see cref="ActivationDescription.ClausePhrases"/>): the PICTURE clause's phrases (<paramref name="picture"/>,
     /// <see cref="PictureClauseIdentity.Phrases"/>), then ANY LENGTH, USAGE, a SIGN clause that is not the default
     /// trailing embedded sign, BLANK WHEN ZERO, JUSTIFIED, ALIGNED, DYNAMIC LENGTH and the PICTURE clause's LOCALE
-    /// phrase — each fact the key holds, so two descriptions whose keys differ name the clause they differ in. Built
-    /// beside the key from the same item, never parsed back out of it (kb/Work PB2077 review).</summary>
+    /// phrase — every clause the key holds, so two descriptions whose keys differ name the clause they differ in. Two
+    /// facts are named by presence only: an EDITING phrase's rules and a LOCALE phrase's own picture, so a pair that
+    /// differs only there names no clause and its refusal cites the rule alone. Built beside the key from the same
+    /// item, never parsed back out of it (kb/Work PB2077 review).</summary>
     private static string[] PhrasesOf(DataItem item, PicInfo p, IEnumerable<string> picture)
     {
         List<string> phrases = [.. picture];
