@@ -58,3 +58,9 @@ a record whose member is a program-pointer was compared through the template, wh
 drew COBOLNET1513; goldens `2002/pb3120_universal_type_subject_key` (equivalent: TR:REACHED; a class whose T-REC differs
 in length: EC-OO-METHOD), `2002/pb3120_group_formal_template_pointer_signature` and negative
 `pb3120-group-formal-template-pointer-signature-mismatch` (QA 9(4) against QB X(4): still COBOLNET1513).
+
+**Review round 2 (R2-1).** The comment on `IsOpenDeclaration` justified matching a subject to its template by type-name with
+"13.18.58 makes a type-name unique", and 13.18.58 states no uniqueness rule (`cite.py --check 13.18.58 "unique"` fails). The rule
+is 8.3.2.2 (a user-defined word may be only one type of user-defined word within a source element; `--check` OK). The same
+inherited wording sat at four sibling sites (DataBinder.cs, PicInfo.cs, StrongTypeModel.cs, DESIGN-data-model.md); all five now
+cite 8.3.2.2. Comment and doc text only; no behavior change.

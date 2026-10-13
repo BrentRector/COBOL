@@ -214,7 +214,7 @@ public static class StrongTypeModel
     /// template itself, or a TYPE SUBJECT of it. A subject's subtree is a clone of its template, so the two are one
     /// type declaration (§8.5.3.1: the type of an item described with a TYPE clause is the declaration that clause
     /// references) held by the model in two forms, and a key built from either form must be the same string. The
-    /// back-reference is therefore recognized across the forms by the type-name, which §13.18.58 makes unique within
+    /// back-reference is therefore recognized across the forms by the type-name, which §8.3.2.2 restricts to one type of user-defined word within
     /// a source element and which is what the member's declaration was resolved by (kb/Work PB3120).</summary>
     private static bool IsOpenDeclaration(DataItem open, DataItem decl) =>
         ReferenceEquals(open, decl) || (decl.IsTypedef && !open.IsTypedef && CobolNames.Same(open.TypeName, decl.CobolName));
@@ -377,7 +377,7 @@ public static class StrongTypeModel
     /// to. <see langword="default"/> — a null <see cref="Name"/> — is UNRESTRICTED.
     /// <para>Both are carried because a restriction's spelling and its declaration answer different halves of
     /// §8.5.3.1: the name is the first conjunct of declaration equivalence, and the declaration is the rest of
-    /// it. Within one source element a type-name resolves to exactly one declaration (§13.18.58 makes the
+    /// it. Within one source element a type-name resolves to exactly one declaration (§8.3.2.2 makes the
     /// type-name unique), so the name alone decides; ACROSS source elements two declarations may share a name
     /// and differ — which is why the declaration travels with it.</para></summary>
     /// <param name="Name">The type-name the restriction names, or null when unrestricted.</param>

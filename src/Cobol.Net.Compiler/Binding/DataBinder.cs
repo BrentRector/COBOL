@@ -3574,7 +3574,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <see cref="ExpandTypes"/>, so every template's own nested TYPE / SAME AS references are already expanded
     /// and the declaration it attaches is the complete one.
     /// <para>The restriction's carried identity used to be the NAME alone, which decides correctly WITHIN a
-    /// source element (§13.18.58 makes a type-name unique there) and wrongly ACROSS them: two elements may each
+    /// source element (§8.3.2.2 lets a user-defined word be only one type of user-defined word there) and wrongly ACROSS them: two elements may each
     /// declare a non-equivalent type under one name, and §8.5.3.1 makes equivalence — not the spelling — the
     /// test §14.9.39.3 SR19, §14.9.3.3 SR4/SR5 and §14.8.2.3.2 spend (kb/Work PB427). No diagnostic is
     /// raised for an unresolved name: §13.18.60.3 SR18 already requires such an entry to be a TYPEDEF, and a
