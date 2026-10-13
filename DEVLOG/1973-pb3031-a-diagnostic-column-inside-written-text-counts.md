@@ -26,4 +26,6 @@ DESIGN-cc-in-copy.md describe the writer's rule.
 the oracle host's MSBuild closure), so the landing refused the baseline `60d47c6d52a9` (exit 7). `compare_oracle.py`
 against it reports `IDENTICAL — 7780 cases`: no emitted C# and no diagnostic differs, because no corpus, NIST or
 version-matrix case writes a supplementary-plane character through REPLACE or COPY ... REPLACING (the new goldens are
-xunit tests, not oracle cases). The baseline is re-recorded at `b5237d034c28`.
+xunit tests, not oracle cases). Main meanwhile re-recorded its own baseline (`c41f1b82af2c`, PB2623), so the merge of
+main conflicted on the manifest; the merged head compares `IDENTICAL — 7792 cases` against main's `c41f1b82af2c`, and
+the baseline is re-recorded on the merged head at `88213eb8a08b`.
