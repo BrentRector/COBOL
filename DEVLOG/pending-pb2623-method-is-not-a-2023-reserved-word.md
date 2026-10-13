@@ -9,3 +9,7 @@
 **Goldens.** `conformance/2023/pb2623_method_is_a_user_word_at_2023` (data item METHOD plus a method closed by END METHOD), `negative/pb2623-method-reserved-at-2002-2014` (0901), and `MethodUserWordTests` (EXIT METHOD under `--permissive` at 2023 with a METHOD data item compiles; the same program at 2014 is refused).
 
 **Rows.** None claimed, none closed.
+
+**Arch-oracle.** `compare_oracle.py` against 00435d6e90c0: 4 of 7792 cases differ. Two are ADDED (this branch's two goldens). Two are DIAGNOSTICS on `negative/l1c22-format3-in-method` and `negative/l1c22-format3-in-program`, both already-rejected nested-method programs whose first error (COBOL0001 at the inner method) is unchanged and is the `.err` the corpus pins: the cascade at the stray `END METHOD` that followed used to read `COBOLNET0901: 'METHOD' is a reserved word in COBOL-2023` (the false claim this note removes) and now reads a plain COBOL0001 syntax error. Baseline re-recorded at c41f1b82af2c.
+
+**Gate.** `LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261013T031258Z-099e52). Semgrep verify PASS, no count moved.
