@@ -1,4 +1,4 @@
-## PB2532: the COBOL-85 identification comment paragraphs are screened once each and in sequence
+## Entry 2005 — 2026-10-13 14:11 PDT — PB2532: the COBOL-85 identification comment paragraphs are screened once each and in sequence
 
 **Re-probe.** On the branch's own build, `AUTHOR. A.` then `AUTHOR. B.`, and `SECURITY. X.` before `AUTHOR. A.`,
 compiled clean at `--std 85` (EXIT 0). The `ClauseCardinalities` identification-division row ranked the one element
@@ -38,3 +38,4 @@ with its reason).
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261013T203445Z-0be032`: Conformance
 5,554/11,540 · Unit 32,561/33,473 · Characterization 7/36), with the three goldens and the new drift test Passed in
 leg 1. The Linux gate is the landing's (batched gating).
+
