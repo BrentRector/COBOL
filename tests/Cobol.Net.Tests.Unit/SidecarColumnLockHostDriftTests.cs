@@ -429,6 +429,31 @@ public sealed class SidecarColumnLockHostDriftTests
             SidecarLockFiles.LockDirectoryOf(Path.Combine(Path.GetTempPath(), "pb2484-case", "other.dat")));
     }
 
+    /// <summary>⛔ THE LOCK DIRECTORY NEVER PASSES THROUGH DELETE-PENDING UNDER ITS OWN NAME (kb/Work PB3109): a directory
+    /// deleted in place is, for as long as any handle on it is open, listed but "access denied" to every open inside it
+    /// and every listing of it. The OPEN that meets it reads that as a lock directory this user may not write (and tests
+    /// the others over a listing it could not make) and answers '61' or grants no file lock. The CLOSE renames the empty
+    /// directory away first (<see cref="SidecarLockFiles.RetireDirectory"/>), so the next OPEN finds the name free. The
+    /// witness reads the ORDER the host reports (<see cref="DirectoryNameWatch"/>), as <c>RegionLocksDriftTests</c> does
+    /// for the region host.</summary>
+    [Fact]
+    public void TheLastHoldersCloseRenamesTheLockDirectoryAwayAndTheNextOpenIsGranted()
+    {
+        var (dir, file) = NewFile();
+        try
+        {
+            Assert.Equal(RunUnitFileLock.Outcome.Held, RunUnitFileLock.Take(Host, file, FileSharing.AllOther, FileOpenMode.Input, out var first));
+            string lockDir = SidecarLockFiles.LockDirectoryOf(file);
+            using var watch = new DirectoryNameWatch(dir);
+            first!.Dispose();               // the last holder's CLOSE
+            watch.AssertRenamedAwayRatherThanDeletedInPlace(Path.GetFileName(lockDir));
+            Assert.Equal(RunUnitFileLock.Outcome.Held, RunUnitFileLock.Take(Host, file, FileSharing.NoOther, FileOpenMode.IO, out var second));
+            Assert.Equal(RunUnitFileLock.Outcome.Refused, RunUnitFileLock.Take(Host, file, FileSharing.AllOther, FileOpenMode.Input, out _));
+            second!.Dispose();
+        }
+        finally { Clean(dir); }
+    }
+
     /// <summary>A host that cannot put a lock beside the file — here a directory that is really a file — holds
     /// nothing and refuses nothing: the connector keeps the file lock its <see cref="FileShare"/> gives. It is an
     /// <see cref="RunUnitFileLock.Outcome.Unavailable"/>, never an exception out of an OPEN.</summary>
