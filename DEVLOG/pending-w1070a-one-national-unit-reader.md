@@ -30,3 +30,21 @@ bytes: `DISPLAY G` of a group with a dynamic-length leaf and a member holding `P
 for a member; golden `2014/pb546_odo_national_tail` (DISPLAY, the GR9 group MOVE, WRITE / READ). This is the extraction
 kb/Work PB3030's design read asked for; PB3030's bit arm (a USAGE BIT ODO member, whose record layout needs a count
 source) is split to a successor, and PB3101 (one activation-conformance relation) was not started.
+
+**The branch review, answered (wave 1072 A2).** The read-only review of the branch at `18d11007f` found one thing
+(R1-1): `OoEmitter.FactoryClassOf` had been inserted between `OoUnivStop` and its §14.9.23.4 GR7c doc comment, so
+`FactoryClassOf` carried two `<summary>` blocks and `OoUnivStop` none. `FactoryClassOf` now sits above the block. The
+same file held a second instance of the shape, an orphaned `<summary>` describing a STRING-CARRIED copy-in read whose
+method no longer exists, stacked on `EmitInvokePickup`'s own; it is deleted. The tree-wide sweep for two adjacent
+`<summary>` blocks finds 54 more such members outside `OoEmitter.cs`; that mechanical sweep, with the drift test
+that keeps it at zero, is a lead for its own landing rather than a widening of this one. The finisher merged the
+branch onto main `2da05a28a` (unions in `kb/Work/PB3101.md` and two manifests), re-probed PB2921 (a class `X` and a
+class `X--FACTORY` in one compilation group: `X FACTORY`, `X--FACTORY FACTORY`) and PB2988 (two `TYPE ST` entries with
+`CAPACITY IN DC`: `0000000001 0000000003`) on the merged build, and re-recorded the arch-oracle baseline over main's
+`a6376c64ff94`. The comparison: 3,462 of 7,813 cases differ and 9 are added (this branch's goldens), every difference
+in one of four classes: the runtime major stamp `"2.0.0.0"` → `"3.0.0.0"` in the module registration (3,187 cases
+differ by that alone); PB2921's factory family `X__FACTORY` → `__FACTORY_X` and `BASE__FACTORY` → `__FACTORY_BASE`
+(about 266 OO cases); PB546's `PicInfo.BytesPerPosition`, which appears in the §8.5.3.1 type-identity key
+(`StrongTypeModel.EssentialCharacteristicsKey` renders PicInfo's record text by design) of strongly-typed
+activation descriptions; and PB546's D-N8 store, `NatReadWindow(…, Length / 2)` → `NatFromStorage(…)` for a
+dynamic-length national receiver (`2014/pb1094_dynamic_length_structure_elementary_record`).
