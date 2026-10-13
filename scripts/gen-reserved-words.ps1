@@ -139,7 +139,12 @@ for ($i = $start + 1; $i -lt $end; $i++) {
     # 2023 WRITE ADVANCING PAGE / RD PAGE LIMIT formats still spell it. Only the NOTE paragraph marker is excluded.
     if ($t -match '^[A-Z][A-Z0-9-]*[A-Z0-9]$' -and $t -ne 'NOTE') { [void]$iso2023.Add($t) }
 }
-[void]$iso2023.Add('METHOD')                        # OCR omission (DEVLOG 578)
+# ⛔ METHOD IS NOT A §8.9 WORD (kb/Work PB2623). An earlier revision added it here as an 'OCR omission (DEVLOG 578)';
+# the printed list (PDF page 236, printed page 206) reads MERGE, MESSAGE-TAG, METHOD-ID, MINUS, MODE, MOVE, MULTIPLY -
+# there is nothing to restore, and §8.10 does not list it either. §4.2.8 makes the §8.9 words THE reserved words,
+# so METHOD is a user-defined word at 2023 like every other 2002/2014 word the 2023 list dropped (POSITION, COBOL,
+# ...: provenance 'dropped by 2023 §8.9'). The END METHOD marker (§10.7.2) still spells it, as a keyword in that
+# position only (docs/CONFORMANCE.md, the §4.2.8 determination).
 
 # ---- 3. Parse VCR row 32: the 16 words newly reserved in 2023 (Annex E.2 item 25) ----
 $vcrRow = (Get-Content -LiteralPath $vcrPath) | Where-Object { $_ -match '^\|\s*32\s*\|' } | Select-Object -First 1

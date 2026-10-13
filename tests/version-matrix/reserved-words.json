@@ -2373,9 +2373,9 @@
       "r85": false,
       "r2002": true,
       "r2014": true,
-      "r2023": true,
+      "r2023": false,
       "confidence": "high",
-      "provenance": "added 2002 (GnuCOBOL 2002 list; ISO 2023 §8.9)"
+      "provenance": "added 2002 (GnuCOBOL 2002 list; dropped by 2023 §8.9)"
     },
     {
       "word": "METHOD-ID",
