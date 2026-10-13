@@ -43,3 +43,5 @@ the binary-capacity cap legs R = 4 and R = 2) and
 `CobolDateSecondsLandingTests` pins the date screen. Docs: COBOLNET_NUMERIC_DESIGN.md (the intermediate landing, the
 DIVIDE REMAINDER lane paragraph), CONFORMANCE.md DOC-A.1-82 and DOC-A.1-179. Notes PB3017, PB3018 and PB3019 are landed with
 `closes_rows: []` and a reason: none claimed an inventory row.
+
+**Review round 3 (finding R3-1).** The branch review found DOC-A.1-70's `Pinned by` cell still naming the test PB3019 renamed (`..._SaturatesIntermediate_...`); no gate read a ref that only the Annex A.1 register carries (`check_pins` checks the inventory's refs against it, `UnresolvedTestRefs` resolves only the inventory's refs). The cell now names `..._RaisesIntermediate_...`, and `audit_annex_a1.py` gained `check_pin_resolution`: every `Pinned by` ref must resolve (a golden file exists; an xUnit class file exists and declares the method; a bare class pins the family), with self-test cases proving each failure reason. `pins_of` now drops a gloss written outside the backticks (item 81 carried one). `audit_annex_a1.py --check` and `--self-test` are green.
