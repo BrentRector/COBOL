@@ -169,9 +169,12 @@ internal sealed class BinderDriver
         ResolvePointerRestrictions(units, classes, oo.InterfaceData, session);
         // ⛔ EVERY SIGNATURE COMPARISON RUNS AFTER THE POINTER TYPES EXIST (kb/Work PB2495): a formal or returning item
         // that is a restricted program- or function-pointer is typed by its prototype's signature class (ISO §13.18.60.4
-        // GR25 / GR26), which ResolvePointerRestrictions has just attached. These ran before the program units' DATA
-        // bound, and so compared such a pair by prototype NAME: an override, an implementation or a prototype /
-        // definition pair restricted to two differently named prototypes of one signature was refused.
+        // GR25 / GR26), which ResolvePointerRestrictions has just attached. A check that runs before it reads an
+        // unstamped pointer, whose identity is its prototype's NAME, and refuses an override, an implementation or a
+        // prototype / definition pair restricted to two differently named prototypes of one signature. Running after
+        // the DATA phase is NOT enough: CheckPrototypeSignaturePairs refused such pairs from inside BuildGroupRepository,
+        // after every BindUnitData. So each check is a top-level statement of Bind, after this call, and
+        // PrototypePointerTypeDriftTests pins that execution order.
         CheckPrototypeSignaturePairs(units, session.Edition);   // §10.6.2 SR2 / SR3
         OoConformance.ValidateInterfaceInheritance(table, edition);   // §11.6.3 SR5 — an inheriting interface conforms to all it inherits (kb/Work PB1502)
         OoConformance.ValidateOverrideSignatures(table, edition);   // §9.3.8.2 — after all formals resolve (slice 3a)
