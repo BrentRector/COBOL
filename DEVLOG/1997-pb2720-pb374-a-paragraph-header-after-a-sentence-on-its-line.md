@@ -1,4 +1,4 @@
-## PB2720 + PB374: a paragraph header after a sentence on its line; the asynchronous messaging facility named at every surface and gated on introduction
+## Entry 1997 — 2026-10-12 23:49 PDT — PB2720 + PB374: a paragraph header after a sentence on its line; the asynchronous messaging facility named at every surface and gated on introduction
 
 Wave 1069 group G, the parser-core cluster (`CobolParserCore.g4`, `CobolParserCoreBase.cs`, `EcNameResolution.cs`).
 
@@ -81,3 +81,4 @@ it is the one the source states. The same stale sentence sat in three other plac
 `EditionContext.Declined` doc comment, the `DiagnosticDescriptor.PermissiveInert` parameter doc ("compiles to a
 no-op"), and the rearchitecture plan's declined-facility paragraph. The behavior is pinned by the round-1 witnesses
 `DeclinedModuleExceptionName_Permissive_*`, which the preface now names.
+
