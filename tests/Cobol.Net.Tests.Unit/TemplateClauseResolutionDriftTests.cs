@@ -33,7 +33,7 @@ public sealed class TemplateClauseResolutionDriftTests
     private static string BodyOf(string file, string method)
     {
         string text = File.ReadAllText(Path.Combine(TestRepo.Src("Cobol.Net.Compiler", "Binding"), file));
-        var start = Regex.Match(text, $@"^    (?:internal |private )?[\w<>\[\], ]+ {method}\(", RegexOptions.Multiline);
+        var start = Regex.Match(text, $@"^    (?:internal |private )?[\w<>\[\]][\w<>\[\], ]* {method}\(", RegexOptions.Multiline);
         Assert.True(start.Success, $"{method} not found in {file} — the pin measured nothing");
         // the body ends at the next member at the same indent: the first line "    }" (block body) or ";" (expression body)
         var end = Regex.Match(text[start.Index..], @"^    (?:\}|[^\s/].*;)\s*$", RegexOptions.Multiline);
