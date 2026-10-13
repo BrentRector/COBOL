@@ -474,7 +474,8 @@ public static class CobolArgAdapt
     /// for the program ABI and the METHOD ABI alike (kb/Work PB2087 — a method formal crosses as its carrier, its
     /// <paramref name="sharedArea"/> and its omitted flag): <paramref name="sharedArea"/> — the argument's own area,
     /// supplied only BY REFERENCE to a BY REFERENCE formal — when it can hold <paramref name="areaWidth"/> positions in a
-    /// live cell and the formal's description can be laid over it, else a FRESH cell, which answers
+    /// live cell, within its <see cref="CellPointer.Extent"/> when it states one (a run-time-length slice, kb/Work PB2077),
+    /// and the formal's description can be laid over it, else a FRESH cell, which answers
     /// <see cref="ManagedPointer.IsNull"/> when the argument is not <paramref name="present"/> (§14.9.4.4 GR11 /
     /// §14.9.23.4 GR9).
     /// <para>⛔ A VARIABLE-LENGTH GROUP IS LAID OVER ONLY ITS OWN STORAGE (kb/Work PB2094). Its components are slots of the
@@ -489,6 +490,7 @@ public static class CobolArgAdapt
         if (!present)
             return new CellPointer(FreshArea(areaWidth, fresh), 0) { OmittedArgument = true, Shape = formalShape };
         if (sharedArea is { } a && a.Generation == a.Cell.Generation && a.Offset >= 0 && a.Offset <= (long)a.Cell.Ref.Length - areaWidth
+            && (a.Extent is not { } extent || areaWidth <= extent)
             && (a.Shape is { } shape ? formalShape is not null && GroupCompatibility.LaysOver(formalShape, shape) : formalShape is null))
             return a;
         return new CellPointer(FreshArea(areaWidth, fresh), 0) { Shape = formalShape };

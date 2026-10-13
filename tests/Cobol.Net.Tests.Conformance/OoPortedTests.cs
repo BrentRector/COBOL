@@ -152,9 +152,9 @@ public sealed class OoPortedTests
     /// (the index-name is synthetically placed in the WS area) is NOT subclass OBJECT data — it must compile,
     /// not trip the legacy subclass-own-data reject (COBOL0113). Greenfield: subclass-own data is fully
     /// supported (no 0113 analog exists), so this port asserts the combination compiles AND runs.
-    /// PORTED-VERBATIM NOTE: the driver's <c>USING T</c> (PIC 9, one character) does not conform to the
-    /// method's 3-character group formal LK under strict §14.8.2.3.2 — the legacy's laxer conformance
-    /// accepted it; the run adjudicates (OoConformance.DescriptionMismatch may 0828 it).</summary>
+    /// PORTED NOTE: the legacy driver passed an elementary <c>PIC X(3)</c> to the method's 3-character group formal LK,
+    /// which ISO §9.3.6 match rule 3 e) refuses (the argument has a PICTURE clause the group lacks; kb/Work PB2077,
+    /// decision PB3098) — so the driver's T is a 3-character group, which matches and conforms (§14.8.2.2 rule 1).</summary>
     [Fact]
     public void Ported_Inherits_SubclassMethodLinkageIndex_Allowed()
     {
@@ -169,7 +169,8 @@ public sealed class OoPortedTests
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 O USAGE OBJECT REFERENCE CLSP9.
-       01 T PIC X(3) VALUE SPACES.
+       01 T.
+          05 T1 PIC X(3) VALUE SPACES.
        PROCEDURE DIVISION.
        MAIN.
            INVOKE CLSP9 ""NEW"" RETURNING O.
