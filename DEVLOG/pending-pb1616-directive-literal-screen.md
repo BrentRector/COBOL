@@ -45,5 +45,12 @@ Duplication: `semgrep verify` raw-code-literal count went DOWN (268 -> 198). A d
 leaves a later `>>IF` on that name reporting "not a previously-defined variable"; that cascade is older than this change
 and was left alone.
 
+**Arch oracle.** Re-recorded at 3b6ba6e18e69, the branch merged with main at 015c04173 (`compare_oracle.py` against
+c41f1b82af2c: 5 of 7,796 cases differ). Four are ADDED, this change's own goldens: `corpus/2014/pb1616_define_zero_length_literal`
+and the three `negative/pb1616-*`. One is DIAGNOSTICS, `negative/w73a-directive-hex-literal-non-hex-digit`, and both parts of it
+are intended. At every edition, X"GG" in `>>DEFINE` is now refused by LiteralScreen's COBOLNET2630 (SR5 named), where the
+evaluator's COBOLNET1619 refused it before. Every position also moves down one line because the golden's own comment
+grew by one line.
+
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261013T034137Z-f154db): Conformance
 4,984 of 11,530, Unit 32,615 of 33,463, Characterization 6 of 36 ran in leg 1; the Linux gate is the landing's.
