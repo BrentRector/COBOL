@@ -1116,13 +1116,13 @@ public sealed partial class DataBinder
         var rdClauses = rd.reportDescriptionClause();
         string rdWhere = $"RD '{model.Name}'";
         UnrepeatedElements.AtMostOnce(Edition, rdClauses.Count(c => c.reportGlobalClause() is not null), rdWhere,
-            "the GLOBAL clause", "13.14.2");
+            "the GLOBAL clause", "ISO §13.14.2");
         UnrepeatedElements.AtMostOnce(Edition, rdClauses.Count(c => c.reportCodeClause() is not null), rdWhere,
-            "the CODE clause", "13.14.2");
+            "the CODE clause", "ISO §13.14.2");
         UnrepeatedElements.AtMostOnce(Edition, rdClauses.Count(c => c.reportControlClause() is not null), rdWhere,
-            "the CONTROL clause", "13.14.2");
+            "the CONTROL clause", "ISO §13.14.2");
         UnrepeatedElements.AtMostOnce(Edition, rdClauses.Count(c => c.reportPageClause() is not null), rdWhere,
-            "the PAGE clause", "13.14.2");
+            "the PAGE clause", "ISO §13.14.2");
         foreach (var clause in rdClauses)
         {
             // §13.18.27.3 SR1 e) — the report-name is a global name. The containment half (visibility in contained
@@ -1209,7 +1209,7 @@ public sealed partial class DataBinder
                 var subs = page.reportPageSubclause();
                 foreach (var phrase in Enum.GetValues<PagePhrase>())
                     UnrepeatedElements.AtMostOnce(Edition, subs.Count(s => PagePhraseOf(s) == phrase), rdWhere,
-                        $"the PAGE clause's {PagePhraseWords(phrase)} phrase", "13.18.39.2");
+                        $"the PAGE clause's {PagePhraseWords(phrase)} phrase", "ISO §13.18.39.2");
                 // §13.18.39.3 SR3 — "The HEADING, FIRST DETAIL, LAST CONTROL HEADING, LAST DETAIL, or FOOTING
                 // phrase may be specified only if integer-1 is specified." Each phrase subdivides the page
                 // (GR2c–GR2g) and a report with no page limit has no page to subdivide.
