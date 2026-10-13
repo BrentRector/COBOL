@@ -563,7 +563,7 @@ public sealed class FileModel
     /// (§8.5.1.9.1, DOC-A.1-60), never its TO phrase, which is only the EXPECTED capacity and "may be exceeded
     /// with a nonfatal exception".</para></summary>
     internal static long MaxDynamicExtent(DataItem item) =>
-        item.IsDynamicLength ? (long)item.DynMaxSize * (item.Pic?.Category is PicCategory.National ? 2 : 1) + StructureOverhead(item)
+        item.IsDynamicLength ? (long)item.DynMaxSize * (item.Pic?.BytesPerPosition ?? 1) + StructureOverhead(item)
         : item.IsElementary || !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(item) ? (long)item.ByteWidth * (item.Occurs ?? 1)
         : item.Children.Where(c => c.RedefinesTargetName is null).Sum(MaxDynamicExtent) * (item.Occurs ?? 1);
 
@@ -581,7 +581,7 @@ public sealed class FileModel
     /// an alphanumeric item and for a national MEMBER of a group (it contributes its content character for character,
     /// DOC-A.1-63), two for a national item that IS the record, whose image is its UTF-16BE byte pairs (D-N1, the
     /// <c>AsStorageImage</c> arm of the record-area channel).</summary>
-    internal static int RecordImageUnit(DataItem item) => item.Parent is null && item.Pic?.Category is PicCategory.National ? 2 : 1;
+    internal static int RecordImageUnit(DataItem item) => item.Parent is null ? item.Pic?.BytesPerPosition ?? 1 : 1;
 
     /// <summary>The characters <paramref name="item"/>'s DYNAMIC LENGTH STRUCTURE adds around its data in a record
     /// (length field + delimiter) — 0 for an item with none. Counted by <see cref="MaxDynamicExtent"/> and
@@ -751,9 +751,9 @@ public sealed class FileModel
     /// (<see cref="RecordAreaIsNational"/>, §14.9.30.4 GR15) and a WRITE / REWRITE's record-name-1 category
     /// (§14.9.51.4 GR21 / GR22, §14.9.35.4 GR17 — kb/Work PB1191), so the three cannot answer it differently.</summary>
     public static bool IsNationalRecord(DataItem record) =>
-        record.OperandPic is { } p
-        && (p.Category == PicCategory.National
-            || (p.Usage == Usage.National && p.Category is PicCategory.Numeric or PicCategory.NumericEdited or PicCategory.Boolean));
+        // A usage-national item is of category boolean, national, national-edited, numeric or numeric-edited
+        // (§13.18.60.3 SR12), so its USAGE is the whole test (kb/Work PB546: a national answer is usage-keyed).
+        record.OperandPic is { Usage: Usage.National };
 
     /// <summary>⛔ §14.9.30.4 GR15's RECORD-AREA CATEGORY — "the record-area associated with file-name-1 is specified
     /// implicitly or explicitly as national" — true when ANY record description of the FD is national, because every

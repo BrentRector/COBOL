@@ -439,7 +439,9 @@ content-validation half is separately answered by the declined A.4.14 facility (
 - **D-N8 a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; PB3099). §14.9.25.4 GR4 makes the
   move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's; an odd byte count cannot be
   national content, so the last position is completed with the alphanumeric space GR4's elementary-move fill supplies,
-  exactly as the fixed national receiver already does (`CobolBits.NatReadWindow` over the bytes). `MOVE G3 TO DN` with
+  exactly as the fixed national receiver already does; the decode of a WHOLE image is `CobolBits.NatFromStorage`, asked
+  through `ReceivingStore.ContentCharacters` by the GR4 group MOVE and by the READ of an elementary dynamic-length
+  record. `MOVE G3 TO DN` with
   a three-byte `G3` leaves `DN` two positions long and `LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). Recorded in
   CONFORMANCE.md §3 D-N8.
 - **D-N6 national-edited IS category National carrying an `EditMask`** (kb/Work PB492, 2026-09-12). §8.5.2.11's

@@ -312,8 +312,12 @@ internal static class OperandText
         // coded character set", one character per boolean position, so its carrier IS its storage. That is why
         // the test reads the USAGE and not the category (measured: `PIC 1(8)` without USAGE BIT correctly
         // returns 3131303031303130 sliced and unsliced alike, and must keep doing so).
+        // ⛔ The national arm is keyed on the USAGE, through the ONE unit reader (kb/Work PB546): a slice of a
+        // usage-national item of category BOOLEAN keeps category boolean (GR6, PB73) and is still two bytes a
+        // position (§8.4.3.3.4 GR3 "as if it were redefined as a data item of class and category national of the
+        // same size"), so the category test serialized `BN(1:2)` one byte per position and BYTE-LENGTH said 2.
         if (p is RefModPlace rmp)
-            return rmp.Category is PicCategory.National ? RuntimeApi.NatBytes(PlaceRenderer.Read(p))
+            return rmp.Inner.Item.OperandPic is { BytesPerPosition: > 1 } ? RuntimeApi.NatBytes(PlaceRenderer.Read(p))
                 : rmp.Inner.Item.OperandPic is { Category: PicCategory.Boolean, Usage: Usage.Bit }
                     ? RuntimeApi.BitsPackAll(PlaceRenderer.Read(p))
                     : PlaceRenderer.Read(p);

@@ -1308,7 +1308,7 @@ public sealed class DataItem
                 Usage.FloatDecimal16 => 8,                            // decimal64 = 8 bytes
                 Usage.Pointer or Usage.ProgramPointer or Usage.FunctionPointer
                     or Usage.ObjectReference => PointerByteWidth,
-                Usage.National => CobolNet.Runtime.CobolBits.BytesPerNational * ElementaryImageWidth,   // UTF-16, D-N1/D-N3
+                Usage.National => pic.BytesPerPosition * ElementaryImageWidth,   // UTF-16, D-N1/D-N3 — the ONE unit reader
                 _ => ElementaryImageWidth,                       // DISPLAY / BIT: 1 byte per character/boolean position
             };
         }

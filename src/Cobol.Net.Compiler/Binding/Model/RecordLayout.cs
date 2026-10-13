@@ -56,7 +56,7 @@ internal static class RecordLayout
     private static int ImageContribution(DataItem group, DataItem child)
     {
         int w = ImageWidth(child);
-        return !InNationalGroup(group) && IsNationalClass(child) ? w * CobolNet.Runtime.CobolBits.BytesPerNational : w;
+        return !InNationalGroup(group) && IsNationalClass(child) ? w * PicInfo.BytesPerPositionOf(Usage.National) : w;
     }
 
     /// <summary>A national item is an elementary item of usage national or a national group

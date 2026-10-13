@@ -2553,7 +2553,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (operand is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;
         bool national = !ItemCategory.IsAlphanumeric(key);
-        int positions = national ? key.ByteWidth / CobolNet.Runtime.CobolBits.BytesPerNational : key.ByteWidth;
+        int positions = key.ByteWidth / (key.OperandPic?.BytesPerPosition ?? 1);   // the ONE unit reader (kb/Work PB546)
         var category = national ? PicCategory.National : PicCategory.Alphanumeric;
         string value = operand.Form switch
         {

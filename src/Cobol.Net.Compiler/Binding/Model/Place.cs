@@ -1165,8 +1165,11 @@ public sealed record RefModPlace(Place Inner, Position Start, Position? Length) 
     public static int PositionBits(DataItem inner) => inner.OperandPic switch
     {
         { Usage: Usage.Bit } => 1,
-        { Usage: Usage.National } => 16,
-        _ => 8,
+        // A character position's bytes are the ONE unit reader's (PicInfo.BytesPerPosition, kb/Work PB546) —
+        // keyed on the usage, so a boolean, numeric or numeric-edited item of usage national (§13.18.60.3 SR12)
+        // is two bytes a position exactly as a national one is.
+        { } pic => BitLayout.BitsPerCharacter * pic.BytesPerPosition,
+        null => BitLayout.BitsPerCharacter,
     };
 
     /// <summary>This view's <see cref="PositionCount"/> — the positions of the item reference modification indexes
