@@ -624,7 +624,16 @@ the signatures the two restrictions name as the greatest fixed point (`Prototype
 compared is assumed equal), so prototypes that name each other or themselves are classified by what they describe and
 never by what they are called (kb/Work PB2495). Two differently named prototypes of one signature are therefore one
 type on both lanes; the class identity is group-local until the external repository (`DESIGN-external-repository.md`)
-supplies a record's identity.
+supplies a record's identity. The same relation decides a pointer that is a MEMBER of a group (kb/Work PB3120): a
+strongly-typed group formal is compared through §8.5.3.1's type-declaration equivalence
+(`StrongTypeModel.EquivalentTypeDeclarations` / `SameElementaryLayout`), whose per-item profile compare
+(`SameAnalyzedProfile`) elides `PicInfo.RestrictedPrototypeName` and `RestrictedTypeName` from the record equality and
+asks `PrototypeSignatures.SameType` / `StrongTypeModel.SameRestriction` instead, under one private `Comparison` that
+carries the enclosing signature comparison's `PrototypeBisimulation` (so a group holding a pointer restricted to the
+prototype being compared terminates) and the declaration pairs assumed equivalent while compared (so a type whose
+pointer member is restricted back to it terminates). `StrongTypeModel.TypeIdentityKey` keys such a member the same way
+(the signature class, the folded type-name and the key of the declaration it resolves to, `@depth` for a cycle).
+`PrototypePointerTypeDriftTests` pins that no profile projection leaves either restricted name in the record compare.
 
 ### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that emits nothing and binds only for its own rules.
 

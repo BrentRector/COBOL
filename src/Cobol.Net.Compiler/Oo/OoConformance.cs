@@ -524,11 +524,11 @@ public static class OoConformance
     /// <param name="arg">The argument / receiving returning item, or <see langword="null"/> when the operand is
     /// a REFERENCE-MODIFIED view rather than a data item — §8.4.3.3.4 GR6 makes such a view elementary
     /// alphanumeric, so it is of no type and can never be the formal's.</param>
-    private static string? StrongTypeMismatch(DataItem formal, DataItem? arg)
+    private static string? StrongTypeMismatch(DataItem formal, DataItem? arg, PrototypeBisimulation? prototypes)
     {
         bool formalStrong = StrongTypeModel.IsStrongGroup(formal);
         if (!formalStrong && !(arg is { } a0 && StrongTypeModel.IsStrongGroup(a0))) return null;
-        if (arg is { } a && StrongTypeModel.SameType(formal, a)) return null;
+        if (arg is { } a && StrongTypeModel.SameType(formal, a, prototypes)) return null;
         string strongSide = formalStrong ? "formal parameter / returning item" : "argument";
         return $"the {strongSide} is a strongly-typed group item, so both shall be of the SAME type "
             + "(ISO §14.8.2.2 / §14.8.3.2 / §9.3.8.2.3 rule 7; §8.5.3.1 makes two type declarations equivalent "
@@ -573,7 +573,7 @@ public static class OoConformance
         // deliberately leaves to this caller. Measured missing before kb/Work PB427: a plain `01 G. 05 A PIC
         // X(4).` argument crossed BY REFERENCE into a `01 LF TYPE CT-T.` strong formal of the same width and
         // ran, defeating exactly the data integrity §8.5.3.3's restrictions exist to protect.
-        if (StrongTypeMismatch(formal, arg) is { } strongWhy) return strongWhy;
+        if (StrongTypeMismatch(formal, arg, prototypes) is { } strongWhy) return strongWhy;
         // ANY LENGTH (ISO §13.18.2). PAIR mode (the default — override/implements signatures; the §9.3.8.2/§14.8.2 conformance tables :12177/:12247/:12335/:12383 list ANY LENGTH among
         // the clauses that shall be THE SAME between corresponding items): the clause must match between the
         // sides, and when both carry it the length compare is void — both lengths track the same runtime
@@ -996,7 +996,7 @@ public static class OoConformance
         // (kb/Work PB427 — the two-arm question asked and answered). A REF-MOD argument is the elementary
         // alphanumeric view §8.4.3.3.4 GR6 creates, never the strong group itself, so it is screened as the
         // non-strong side it is.
-        if (StrongTypeMismatch(formal, argPlace is RefModPlace ? null : arg) is { } strongWhy) return strongWhy;
+        if (StrongTypeMismatch(formal, argPlace is RefModPlace ? null : arg, prototypes: null) is { } strongWhy) return strongWhy;
         // §8.4.3.3.4 GR2/GR6 (fix-queue PB72): a REF-MOD argument crosses as the ELEMENTARY plain-alphanumeric
         // (or GR6b/c national) view it creates, never as the inner item — whose numeric category would satisfy
         // the COMPUTE arm below for a slice that is class alphanumeric, and whose finer alphabetic/edited flags

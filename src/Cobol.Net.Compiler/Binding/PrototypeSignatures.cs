@@ -83,7 +83,7 @@ internal static class PrototypeSignatures
     private static bool SameDescription(DataItem a, DataItem b, PrototypeBisimulation assumed) =>
         OoConformance.DescriptionMismatch(a, b, prototypes: assumed) is null
         && (a.IsGroup == b.IsGroup)
-        && (!a.IsGroup || StrongTypeModel.SameElementaryLayout(a, b));
+        && (!a.IsGroup || StrongTypeModel.SameElementaryLayout(a, b, assumed));
 
     /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER ITEM (kb/Work PB2464) — the one reader of
     /// <see cref="DataItem.PointerRestrictionIdentity"/>: <c>TO name</c> of the signature class
