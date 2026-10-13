@@ -1506,6 +1506,34 @@ of an unsupported facility.
   alphanumeric space GR4's elementary-move fill supplies, as a fixed national receiver already is: `MOVE G3 TO DN` with
   a three-byte `G3` leaves `DN` two positions long and `FUNCTION LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). GnuCOBOL
   3.2 has no dynamic-length items. Witness: `conformance:2014/pb546_group_into_national_dynamic` when PB546 lands.
+- **D-VGB — a BY REFERENCE formal's FIXED table stored past the capacity of the argument's dynamic-capacity table
+  creates the occurrences the callee stored into (kb/Work PB2690).** §14.2.3 GR8: "the activated runtime element operates
+  as if the formal parameter occupies the same storage area as the argument". A formal table of a fixed (or DEPENDING)
+  occurrence count opposite the argument's dynamic-capacity table is legal when the two correspond and match (§8.5.1.12.1,
+  §8.5.1.12.2; §8.5.1.12.3 sentence 3: the dynamic-capacity table "is considered to be the same length as the
+  corresponding table"), and the callee may subscript it up to its own count. A store to an occurrence past the
+  argument's current capacity is therefore a receiving reference to the dynamic-capacity table whose subscript "exceeds
+  the current capacity of the table", and §8.5.1.9.3 says what that does: "a new element is automatically created and the
+  capacity of the table is increased to the value given by the subscript" (intermediate occurrences too). Until
+  kb/Work PB2690 the store was dropped silently and the argument kept its capacity. **Determination (the only latitude
+  the standard leaves):** a copy of the argument crosses the boundary and only the finished view comes back, so a store
+  past the capacity is recognised by its EFFECT: the capacity becomes the highest occurrence of the formal's table whose
+  image is not all spaces (the image the view showed for an occurrence the argument lacks: "all the remaining elements of
+  the receiving table are space filled", §14.6.9.2 2)). A
+  callee that only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only), and one that
+  stores spaces into an occurrence the argument lacks cannot be told from one that did not store. **Known departure
+  (kb/Work PB2690, REMAINING):** the items of a created occurrence that the callee did not store, and the intermediate
+  occurrences, come back space filled, where §8.5.1.9.5 initializes them "as though they had been the subject of a statement of
+  the form INITIALIZE ... WITH FILLER ALL TO VALUE THEN TO DEFAULT" when the table says INITIALIZED (without it their content is
+  undefined, so only an INITIALIZED table is affected). The same law holds one
+  level down for a dynamic-capacity table nested in an element, and across an INVOKE (`CobolVarGroup.Overlay`'s
+  `OverlaidTable` / `GrownCount`, shared by the CALL and INVOKE boundaries). A fixed-length ARGUMENT cannot
+  grow (it has no more occurrences); a BY CONTENT formal never reaches the argument (§14.2.3 GR9). The ISO text decides the
+  arm that matters, so no vendor behavior was consulted (CLAUDE.md rule 1). Witnesses:
+  `conformance:2014/pb2690_fixed_table_formal_grows_dynamic_argument_call`,
+  `conformance:2014/pb2690_fixed_table_formal_grows_vlg_element_table_call`,
+  `conformance:2014/pb2690_fixed_table_formal_grows_dynamic_argument_invoke`, `conformance:2014/pb965_vlg_into_fixed_invoke`,
+  `conformance:negative/pb2690-fixed-table-formal-grows-dynamic-argument-below-2014`.
 
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 

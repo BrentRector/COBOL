@@ -24,8 +24,9 @@
       *>       both start at byte 8. It stores ZZ into BT(3).
       *>         TB:hh/AABBCC/xyz  G2=hh/AABBZZ/xyz
       *>       with capacity 2 (AA BB): the formal's third occurrence has no argument occurrence under it, so it reads
-      *>       spaces and its store is not reflected (a fixed-occurrence formal cannot re-size the argument's table).
-      *>         TB:hh/AABB  /xyz  G2=hh/AABB/xyz C2=2
+      *>       spaces; its store of ZZ is a receiving reference to T2 past its capacity (14.2.3 GR8), so 8.5.1.9.3
+      *>       creates the third occurrence (OK 8.5.1.9.3; kb/Work PB2690). C2 is set back to 2 before each lane.
+      *>         TB:hh/AABB  /xyz  G2=hh/AABBZZ/xyz C2=3
       *>   TA  G5 = 55 + D5 "d5" + X5 "xx" + T5 dynamic (capacity 2: p q): T5 starts at byte 4, beyond LA's last
       *>       character, so it corresponds to nothing and survives the store.
       *>         TA:55/d5/xx  G5=55/Q/ax/pq
@@ -96,10 +97,11 @@
            SET C2 TO 2
            INVOKE U "TB" USING G2
            MOVE C2 TO C2D
-           DISPLAY "G2=" H2 "/" T2(1) T2(2) "/" D2 " C2=" C2D
+           DISPLAY "G2=" H2 "/" T2(1) T2(2) T2(3) "/" D2 " C2=" C2D
+           SET C2 TO 2
            INVOKE T "TB" USING G2
            MOVE C2 TO C2D
-           DISPLAY "G2=" H2 "/" T2(1) T2(2) "/" D2 " C2=" C2D
+           DISPLAY "G2=" H2 "/" T2(1) T2(2) T2(3) "/" D2 " C2=" C2D
            SET C5 TO 2
            MOVE "p" TO T5(1) MOVE "q" TO T5(2)
            MOVE "d5" TO D5
