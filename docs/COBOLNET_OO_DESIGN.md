@@ -611,12 +611,20 @@ of a CALL asks it through `MaySet`. **Residue:** §14.8.3.3 rule 2 describes an 
 operand by how the method was INVOKED (2 b) 1.–4.), which a run-time dispatch does not carry, so the object's own class is
 what the delivery (`CobolObject.NarrowUniversal`) checks. A PROGRAM- or FUNCTION-pointer's restriction is its prototype's SIGNATURE
 class, not its name (§13.18.60.4 GR25 / GR26; kb/Work PB2464): `PrototypeSignatureClasses` partitions a group's
-prototypes by `PrototypeSignatures.Same`, `DataBinder.ResolveRestrictedPrototypes` stamps each pointer item with its
-class (`DataItem.PointerRestrictionIdentity`), and `PrototypeSignatures.RestrictionIdentity` is the one reader — the
-`TO <class>` text of `ActivationDescription.Clauses` (so the §9.3.6 match, the §14.8.2 / §14.8.3 conformance and rule
-6's SET validity all agree) and the typed comparator's pointer arm. Two differently named prototypes of one signature
-are therefore one type on both lanes; the class identity is group-local until the external repository
-(`DESIGN-external-repository.md`) supplies a record's identity.
+prototypes by `PrototypeSignatures.Same`, and `BinderDriver.ResolvePointerRestrictions` stamps each pointer item in two
+passes over every forest — `DataBinder.ResolveRestrictedPrototypes` attaches the prototype its `TO` phrase resolves to
+(`DataItem.RestrictedPrototype`), then `DataBinder.ClassifyRestrictedPrototypes` its class
+(`DataItem.PointerRestrictionIdentity`) — BEFORE any signature check runs (the §10.6.2 SR2 / SR3 prototype pairs and the
+§9.3.8.2.3 override / implements / interface-inheritance / property-accessor checks run after it, kb/Work PB2495).
+`PrototypeSignatures.SameType` is the one "of the same type" relation over two such pointers: outside a signature
+comparison it compares the classes (`PrototypeSignatures.RestrictionIdentity`, also the `TO <class>` text of
+`ActivationDescription.Clauses`, so the §9.3.6 match, the §14.8.2 / §14.8.3 conformance and rule 6's SET validity all
+agree with the typed comparator's pointer arm); INSIDE `Same`, where a formal is itself a restricted pointer, it compares
+the signatures the two restrictions name as the greatest fixed point (`PrototypeBisimulation`: a pair already being
+compared is assumed equal), so prototypes that name each other or themselves are classified by what they describe and
+never by what they are called (kb/Work PB2495). Two differently named prototypes of one signature are therefore one
+type on both lanes; the class identity is group-local until the external repository (`DESIGN-external-repository.md`)
+supplies a record's identity.
 
 ### D12. Parameterized classes and interfaces (§9.3.12 / §9.3.13) are EXPANDED, one ordinary class per expansion — never C# generics; the parameterized definition itself is a skeleton that emits nothing and binds only for its own rules.
 
