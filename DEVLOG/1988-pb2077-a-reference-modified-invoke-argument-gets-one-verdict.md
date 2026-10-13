@@ -1,4 +1,4 @@
-## PB2077: a reference-modified INVOKE argument gets one verdict on the typed and the universal lane
+## Entry 1988 — 2026-10-12 21:48 PDT — PB2077: a reference-modified INVOKE argument gets one verdict on the typed and the universal lane
 
 The typed and the universal INVOKE lanes answered one §9.3.6 / §14.8.2 question with two mechanisms and gave opposite
 verdicts on a reference-modified argument. Re-probed on this build: the typed lane ran `X(1:5)` into a `PIC X(5)`
@@ -57,3 +57,4 @@ arms and a slice of a non-static item are leads in the report.
 
 **Branch review round 1.** Two findings, both fixed. A slice of an alphanumeric GROUP (`G(1:N)`, `G(3:)`) was measured as zero positions, because `OfReferenceModification` read identifier-1's length through `OperandPic`, which a group lacks; the typed lane refused it into every group formal (COBOLNET0828) while the universal lane ran it. It reads `RefModPlace.StaticInnerPositions` now, the one position reader, and `CallEmitter.AreaOf` and `ConditionBinder` use it too. Re-probed: both lanes print `TG:ABCD|` and `TG:CDEF|`. And a JUSTIFIED argument refused by an ANY LENGTH formal was told its LENGTH differed, the one clause the rule relaxes: `FirstClauseDifference` now diffs the pair the relation compared and names `JUSTIFIED`. Golden rows on both lanes and six drift-test cases witness them.
 The review finisher's gate: `TestResults/build-local/20261013T042344Z-bcfb55`, `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 5,074/11,502 · Unit 32,690/33,482 · Characterization 6/36).
+
