@@ -47,3 +47,10 @@ PB3098's typed rows compile to their verdicts. No inventory rows: PB2077 claimed
 **Sibling sweep.** The prototype CALL and user-function lanes ask the same §14.8.2.3.2 rule 2 sentence through
 `ParameterConformance.CheckArgument` and still accept a slice BY REFERENCE. That lane is PB3101's restructure (one
 bind-time entry, the comparator deleted), so it is not re-filed; PB3101 records what this landing took.
+
+**Gate.** `TestResults/build-local/20261013T035906Z-aab809` at `13e927143`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
+PB2515): GREEN` (Conformance 4,937/11,498 · Unit 32,634/33,476 · Characterization 6/36). One red on the way:
+`RuntimeAbiPinDriftTests` (a shipped-signature change), answered by keeping the shipped surface. An extra
+whole-population Conformance run found four more reds leg 1 never reached (above), all fixed; the whole Unit assembly
+ran 33,509/33,509. Self-review: the relation builds a reason string only on a mismatch; the CALL lane's ANY LENGTH
+arms and a slice of a non-static item are leads in the report.
