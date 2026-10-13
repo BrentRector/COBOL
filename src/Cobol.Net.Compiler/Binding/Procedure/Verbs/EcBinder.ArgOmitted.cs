@@ -19,7 +19,7 @@ namespace CobolNet.Binding.Procedure;
 /// (<see cref="MarkFormals"/>), so every access path rooted at it renders through the runtime guard
 /// <see cref="OmittedFormal"/> — the raise site.</item>
 /// <item>THE CHECKING SCOPE: every statement of the element queries >>TURN for the kind's name
-/// (<see cref="ArgOmittedName"/>), so the statement's §7.3.25.4 scope sets the flag the raise tests. Before PB971
+/// (the per-element-kind rows of <see cref="AmbientRaises"/>), so the statement's §7.3.25.4 scope sets the flag the raise tests. Before PB971
 /// the name was queried only for a CALL / CANCEL (as if the ACTIVATOR raised it), so the callee's referencing
 /// statement never enabled it and the condition could not be raised at all, in any of the three kinds.</item>
 /// </list>
@@ -36,9 +36,6 @@ internal sealed partial class EcBinder
         SourceElementKind.MethodDefinition => ActivatedElementKind.Method,
         _ => throw new System.ArgumentOutOfRangeException(nameof(kind)),
     };
-
-    /// <summary>The *-ARG-OMITTED name the CURRENT element's statements enable (§7.3.25.4 GR6 scope).</summary>
-    private string ArgOmittedName => OmittedFormal.ConditionName(ElementKindOf(ctx.SourceElement));
 
     /// <summary>Mark a PROGRAM or FUNCTION unit's formals (called once the unit's data is bound, before any
     /// contained program bridges its GLOBAL roots — the bridge carries the presence member too). A no-op when the
