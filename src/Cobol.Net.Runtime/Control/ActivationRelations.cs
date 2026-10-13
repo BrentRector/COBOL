@@ -20,6 +20,10 @@ namespace CobolNet.Runtime;
 /// matches a <c>PIC X(n)</c>; conformance then admits a formal group no larger than the argument (§14.8.2.2 rule 1)
 /// and refuses a larger one. Every argument here comes from <see cref="ActivationDescription"/>s the compiler built
 /// in one place (<c>ActivationDescriptions</c>).
+/// <para>⛔ THE TYPED INVOKE LANE ASKS THE SAME TWO RELATIONS AT COMPILE TIME (kb/Work PB2077): a typed receiver's
+/// descriptions are all static, so <c>OoBinder.ByReferenceArgumentReason</c> asks <see cref="MatchViolation"/> (the match's
+/// description half) and <see cref="ParameterViolation"/> without GR7 c)'s universal-only ANY LENGTH ban — one relation,
+/// read at two times, so the two lanes cannot answer one argument differently.</para>
 /// <para>A CALL whose activated program is located by name at run time asks the CONFORMANCE relations too
 /// (<see cref="CallArgumentViolation"/>, <see cref="CallReturningViolation"/>; kb/Work PB165), through
 /// <see cref="BoundaryItem"/> at <c>ProgramTable.CallProgram</c>. The §14.8.2.2 group rules, the §14.8.2.3.2
