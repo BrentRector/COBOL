@@ -1,4 +1,4 @@
-## PB1616 - a literal in a compiler-directive operand is screened by the unit's own LiteralScreen
+## Entry 1990 — 2026-10-12 23:07 PDT — PB1616 - a literal in a compiler-directive operand is screened by the unit's own LiteralScreen
 
 **What the note said, and what the re-probe showed.** PB1616 (filed from the PB1393 report) said a `>>DEFINE` / `>>IF`
 literal is parsed by `DirectiveExpressionFragment` from text no tree walk reaches, so `>>DEFINE D AS X"414"` compiles
@@ -54,3 +54,4 @@ grew by one line.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261013T034137Z-f154db): Conformance
 4,984 of 11,530, Unit 32,615 of 33,463, Characterization 6 of 36 ran in leg 1; the Linux gate is the landing's.
+
