@@ -70,6 +70,9 @@ The conditional-compilation stage (§7.2 text-manipulation) has two different jo
    ANTLR fragment parse (CobolLexer + CobolParserCore, DEFAULT mode, ZeroTokenRewriter applied)
         │  → compileTimeOperandFragment / constantConditionalExpressionFragment tree
         ▼
+   LiteralScreen (every literal TOKEN of the fragment: its own §8.3.3 rules, always; the edition gates of its
+        │         FORMAT in a compiled branch — kb/Work PB1616) — an unsound literal has no value: the fragment is null
+        ▼
    CompileTimeExpressionEvaluator (walks CobolParserCore.*Context; boolean via BooleanExpressionResolver)
         │  injected: edition (→ arithmetic mode + literal capacity) · name resolver · code-preserving diag sink ·
         │            operand-source clause · decimalPointIsComma
@@ -86,7 +89,18 @@ conditional-compilation arms fragment-parse their operands in an omitted branch 
 `CheckCceSyntax`, which report a malformed operand as COBOLNET1619 and never need a value) and *evaluation* (names,
 categories, division, which WHEN matches — a compiled branch only, because an omitted branch's `Q` need not be a
 compilation variable). A `>>DEFINE` in an omitted branch is checked against its general format and its operand is
-parsed, but it applies nothing. Words whose operand a downstream stage parses (`TURN`, `FLAG-02`, `FLAG-14`,
+parsed, but it applies nothing.
+
+**Every fragment comes through one of three funnels** (`ParseOperandFragment` / `ParseCceFragment` /
+`ParseDisplayFragment` in `ConditionalCompilationProcessor`; `LiteralScreenDriftTests` pins that nothing else calls
+`DirectiveExpressionFragment`), and each funnel asks two things of it: is it a fragment (COBOLNET1619) and is every literal
+in it sound (kb/Work PB1616). A directive operand is lexed apart from the unit, so the unit-tree walk never reaches its
+literals; the funnel hands the fragment to `LiteralScreen`, the body the unit walk uses, so a directive literal draws the
+codes the same literal draws in the program text — COBOLNET0814 (length), COBOLNET1635 (hexadecimal grouping),
+COBOLNET2630 (repertoire) — in a compiled branch and an omitted one alike (§7.2.1). The edition gates of a literal's
+FORMAT (the hexadecimal alphanumeric literal, 2002; the zero-length literal, 2014) are asked in a compiled branch only,
+as the directive's own gate and `BooleanOperatorGate` are. A fragment holding an unsound literal is never evaluated, so
+the evaluator's decoders (which answer "" for such a literal) can never supply an operand's value. Words whose operand a downstream stage parses (`TURN`, `FLAG-02`, `FLAG-14`,
 `COBOL-WORDS`) are the exception: their stage runs on the FINAL text and never sees an omitted line, so their operand
 syntax is not yet checked in an omitted branch.
 

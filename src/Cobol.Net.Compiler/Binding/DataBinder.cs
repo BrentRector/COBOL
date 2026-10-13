@@ -6506,7 +6506,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         }
         // Signs in front of a numeric literal that do not make ONE literal (`--5`, `+-5`, `- 5`, a sign at the end
         // of a line and its digits on the next): §8.3.3.3.2 rule 2 is the rule broken, so it is the rule named
-        // (kb/Work PB1445) — the same code LiteralScreenPass reports for a separated sign in every other literal slot.
+        // (kb/Work PB1445) — the same code LiteralScreen reports for a separated sign in every other literal slot.
         if (op.unaryExpression() is { } signedShape
             && CobolNet.Frontend.Expressions.ArithmeticFormationRules.SignedLiteralViolation(signedShape) is { } why)
         {

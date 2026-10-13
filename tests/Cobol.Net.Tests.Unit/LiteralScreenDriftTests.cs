@@ -4,7 +4,6 @@ using System.Text.RegularExpressions;
 using CobolNet.Frontend.Generated;
 using CobolNet.Frontend.Parsing;
 using CobolNet.Tests.Shared;
-using CobolNet.Validation;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -12,7 +11,8 @@ namespace CobolNet.Tests.Unit;
 /// <summary>
 /// ⛔ A LITERAL'S OWN SYNTAX RULES ARE ASKED ONCE, OF EVERY LITERAL TOKEN, AT ONE SITE (kb/Work PB1393): the §8.3.3
 /// length rule (COBOLNET0814), hexadecimal grouping rule (COBOLNET1635) and content repertoire rule (COBOLNET2630,
-/// kb/Work PB1441) live in <c>LiteralScreenPass</c>, which walks every token of the unit's tree, and nowhere else; and
+/// kb/Work PB1441) live in <c>LiteralScreen</c>, which walks every token of the unit's tree and of each compiler-directive
+/// fragment (kb/Work PB1616), and nowhere else; and
 /// the literal token set (<c>LiteralTokens.Types</c>, shared with the §8.3.5 <c>SeparatorRule</c>) is every token the
 /// lexer defines over a literal body fragment, so a new literal token joins both rules or fails here.
 /// </summary>
@@ -48,17 +48,19 @@ public sealed class LiteralScreenDriftTests
     }
 
     /// <summary>The three rule predicates are asked only through <c>CobolLiteral.SyntaxViolation</c>, their one order;
-    /// that is asked once per lexing of literal tokens — the unit's tree (<c>LiteralScreenPass</c>) and a compiler-directive
-    /// operand, lexed apart from the unit (<c>CompileTimeExpressionEvaluator</c>, kb/Work PB1441); the descriptors have ONE
-    /// emit site, and no emit site spells a code as a bare string.</summary>
+    /// that is asked by <c>LiteralScreen</c> alone, over the unit's tree and over each compiler-directive fragment (lexed
+    /// apart from the unit); a directive fragment is parsed only in the conditional-compilation stage's three funnels
+    /// (kb/Work PB1616), each of which screens it; the descriptors have ONE emit site, and no emit site spells a code as
+    /// a bare string.</summary>
     [Theory]
-    [InlineData("CobolLiteral.SyntaxViolation(", "CompileTimeExpressionEvaluator.cs,LiteralScreenPass.cs")]
+    [InlineData("CobolLiteral.SyntaxViolation(", "LiteralScreen.cs")]
+    [InlineData("DirectiveExpressionFragment.Parse", "ConditionalCompilationProcessor.cs")]
     [InlineData("CobolLiteral.HexGroupViolation(", "")]
     [InlineData("CobolLiteral.RepertoireViolation(", "")]
     [InlineData("CobolLiteral.LengthViolation(", "")]
-    [InlineData("DiagnosticCatalog.LiteralContentRepertoire", "LiteralScreenPass.cs")]
-    [InlineData("DiagnosticCatalog.HexLiteralDigitGrouping", "LiteralScreenPass.cs")]
-    [InlineData("DiagnosticCatalog.LiteralTooLong", "LiteralScreenPass.cs")]
+    [InlineData("DiagnosticCatalog.LiteralContentRepertoire", "LiteralScreen.cs")]
+    [InlineData("DiagnosticCatalog.HexLiteralDigitGrouping", "LiteralScreen.cs")]
+    [InlineData("DiagnosticCatalog.LiteralTooLong", "LiteralScreen.cs")]
     [InlineData("\"COBOLNET2630\"", "")]
     [InlineData("\"COBOLNET0814\"", "")]
     [InlineData("\"COBOLNET1635\"", "")]

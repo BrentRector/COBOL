@@ -205,7 +205,7 @@ internal sealed class BinderDriver
         // position it is written in, so they are asked once per token of the raw tree rather than once per
         // consuming funnel (which is how VALUE / CONSTANT / ALL / concatenation-operand literals escaped them).
         // kb/Work PB1393.
-        global::CobolNet.Validation.LiteralScreenPass.Run(tree, edition);
+        global::CobolNet.Frontend.Parsing.LiteralScreen.Run(tree, edition.Edition, edition, gateFormats: true);
 
         // The declined-optional-element pass (ISO Annex A.4.1) — a THIRD sibling on the same footing: it answers
         // "does this implementation claim support for this optional module", which is orthogonal to both the
