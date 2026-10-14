@@ -1,4 +1,4 @@
-## PB2690: the occurrences a BY REFERENCE formal's fixed table creates take the table's INITIALIZED default
+## Entry 2017 — 2026-10-14 00:37 PDT — PB2690: the occurrences a BY REFERENCE formal's fixed table creates take the table's INITIALIZED default
 
 Wave 1072 group C fixed the open half of kb/Work PB2690, and its branch review left one residue open as the note's new
 REMAINING half (below). Wave 1069 C had made a store through a BY REFERENCE formal's
@@ -83,3 +83,4 @@ to `half` with it as REMAINING, and D-VGB names it a known departure.
 `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261014T024145Z-533a73; Conformance
 5,905/11,544, Unit 32,552/33,501, Characterization 7/36 ran in leg 1).
 The Linux gate is the landing's (batched gating). The landing's Linux gate (merged head 305fba0d8) was RED in characterization: the major bump above changes the runtime version every module records, and the 14 `EmittedCSharp_MatchesSnapshot` snapshots still carried "2.0.0.0" in the `CobolRepositoryAttribute` line and the `EnsureRegistered` call. Not a host difference: Windows leg 1 ran only 6 of the 36 characterization cases (no impact map for the base, so every case was tier 1 and the snapshots fell past the 2 % budget into leg 2). The finisher re-recorded the 14 snapshots (`COBOLNET_UPDATE_SNAPSHOTS=1`); the diff is exactly those two lines per snapshot, "2.0.0.0" to "3.0.0.0".
+
