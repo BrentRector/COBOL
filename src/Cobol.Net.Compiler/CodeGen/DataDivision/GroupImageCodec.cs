@@ -393,7 +393,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// asks a LINKAGE dynamic-length member to agree with its DYNAMIC LENGTH clause (ISO §14.6.13.2 rule 5; kb/Work
     /// PB1937 / PB1118), as opposed to the activation boundary's own copy-out, which references nothing.</summary>
     private static string AsVarImageParameters(DataItem group) =>
-        DataItem.HasOdoBeneath(group) ? "int __odo, bool __agree = false" : "bool __agree = false";
+        DataItem.HasOdoBeneath(group) ? "int __odo, bool __agree = false, bool __byReference = false"
+                                      : "bool __agree = false, bool __byReference = false";
 
     /// <summary>The parameters of <c>FromVarImage</c>: the carrier, <c>__storage</c> (a LINKAGE formal's copy-in, kb/Work
     /// PB1937) and, for a group that holds the OCCURS DEPENDING table, the RECEIVING count <c>__odo</c> - how many
@@ -407,36 +408,38 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                                       : "CobolVarGroup __v, bool __storage = false";
 
     private static string AsVarImageArguments(DataItem group) =>
-        DataItem.HasOdoBeneath(group) ? "__odo, __agree" : "__agree";
+        DataItem.HasOdoBeneath(group) ? "__odo, __agree, __byReference" : "__agree, __byReference";
 
     /// <param name="agree">null: the plain field; <c>"true"</c>: a sending read that agrees with the maximum when
     /// the member lies in the LINKAGE SECTION — storage the activating element wrote through ITS OWN description
     /// (§14.2.3 GR8) and which <c>PlaceRenderer.Read</c> already agrees on an elementary reference
     /// (<c>ReadsForeignDynamicLength</c>); <c>"__agree"</c>: the same, decided at run time by the caller.</param>
     private string CurrentMemberImage(DataItem d, string? agree = null) =>
-        d.IsDynamicTable
-            // A GROUP element of fixed image renders through its AsImage; one that is itself a variable-length group
-            // (kb/Work PB244) through its own CurrentImage - each occurrence at its own current extent.
-            ? d.IsGroup ? d.ElementImageCapable ? $"{d.CsName}.CurrentImage(static __e => __e.AsImage())"
-                                                : $"{d.CsName}.CurrentImage(static __e => __e.CurrentImage())"
-            // The element lane mirrors PhysicalModel's numLeaf rule exactly: a NATIVE numeric element goes
-            // through its byte-form lane (float via the distinctly-named IEEE lane), a string-carried element
-            // (alphanumeric / edited / StoreAsImage) passes through. A USAGE BIT element is the third lane (kb/Work
-            // PB2818): its carrier is the '0'/'1' string of its boolean positions, and its slice of the image is
-            // those positions PACKED into ceil(n/8) characters (§8.5.1.6.3, §13.18.60.4 GR5) - the width ByteWidth gives
-            // the table's element, which FromCurrentImage divides the carried content by.
-            : BitLayout.IsBitLeaf(d)
-                ? $"{d.CsName}.CurrentImage(__e => {RuntimeApi.BitsPack("__e", $"{d.Pic!.Length}")})"
-            : !d.StoreAsImage && d.Pic is { HasImageByteForm: true }
-                ? (d.Pic.IsFloat
-                    ? $"{d.CsName}.CurrentImage(__e => {RuntimeApi.NumFormatImageFloat("__e", d.ProfileName, d.Pic.IsSingle)})"
-                    : $"{d.CsName}.CurrentImage(__e => {RuntimeApi.NumFormatImage("__e", d.ProfileName)})")
-                : $"{d.CsName}.CurrentImage(static __e => __e)"
+        d.IsDynamicTable ? $"{d.CsName}.CurrentImage({DynElementImage(d)})"
         // §15.50.4 r7b — a dynamic-length leaf's current content at its current length
         : agree is not null && d.Section is EntrySection.Linkage
             ? agree == "true" ? RuntimeApi.DynAgree(d.CsName, d.DynMaxSize)
                               : $"({agree} ? {RuntimeApi.DynAgree(d.CsName, d.DynMaxSize)} : {d.CsName})"
         : d.CsName;
+
+    /// <summary>The lambda that renders ONE element of the dynamic-capacity table <paramref name="d"/> as its image — what
+    /// the table's current-extent image concatenates (<see cref="CurrentMemberImage"/>) and what its created element is
+    /// carried as (<c>CobolDynTable.CreatedAs</c>, <see cref="EmitVarImageMethods"/>; kb/Work PB2690).</summary>
+    private string DynElementImage(DataItem d) =>
+        // A GROUP element of fixed image renders through its AsImage; one that is itself a variable-length group
+        // (kb/Work PB244) through its own CurrentImage - each occurrence at its own current extent.
+        d.IsGroup ? d.ElementImageCapable ? "static __e => __e.AsImage()" : "static __e => __e.CurrentImage()"
+        // The element lane mirrors PhysicalModel's numLeaf rule exactly: a NATIVE numeric element goes
+        // through its byte-form lane (float via the distinctly-named IEEE lane), a string-carried element
+        // (alphanumeric / edited / StoreAsImage) passes through. A USAGE BIT element is the third lane (kb/Work
+        // PB2818): its carrier is the '0'/'1' string of its boolean positions, and its slice of the image is
+        // those positions PACKED into ceil(n/8) characters (§8.5.1.6.3, §13.18.60.4 GR5) - the width ByteWidth gives
+        // the table's element, which FromCurrentImage divides the carried content by.
+        : BitLayout.IsBitLeaf(d) ? $"__e => {RuntimeApi.BitsPack("__e", $"{d.Pic!.Length}")}"
+        : !d.StoreAsImage && d.Pic is { HasImageByteForm: true }
+            ? d.Pic.IsFloat ? $"__e => {RuntimeApi.NumFormatImageFloat("__e", d.ProfileName, d.Pic.IsSingle)}"
+                            : $"__e => {RuntimeApi.NumFormatImage("__e", d.ProfileName)}"
+        : "static __e => __e";
 
     // ── The VARIABLE-LENGTH GROUP's ACTIVATION-BOUNDARY codec (ISO §14.8.2.2 / §14.8.3.2 via §14.9.4.3 SR25;
     //    kb/Work PB204) ─────────────────────────────────────────────────────────────────────────────────────
@@ -545,6 +548,13 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         VarParts(group).Any(p => p.Kind is VarPartKind.DynGroupTable
             || p.Kind is VarPartKind.Nested or VarPartKind.NestedTable or VarPartKind.OdoTable && CarriesNested(p.Item!));
 
+    /// <summary>Does the group's carrier hold a dynamic-capacity table (<see cref="VarPartKind.DynTable"/>,
+    /// <see cref="VarPartKind.DynGroupTable"/>) at any depth of its flattening — whether its <c>AsVarImage</c> states the
+    /// carrier's <c>Created</c>, each table's creation of an element (kb/Work PB2690).</summary>
+    private bool CarriesDynTable(DataItem group) =>
+        VarParts(group).Any(p => p.Kind is VarPartKind.DynTable or VarPartKind.DynGroupTable
+            || p.Kind is VarPartKind.Nested or VarPartKind.NestedTable or VarPartKind.OdoTable && CarriesDynTable(p.Item!));
+
     /// <summary>Emit a variable-length group's <c>AsVarImage()</c> / <c>FromVarImage()</c> — the boundary codec
     /// §14.8.2.2 and §14.8.3.2 need, the exact analogue of <c>AsImage</c>/<c>FromImage</c> for a group that has
     /// no fixed record window. Gated on <see cref="DataItem.CurrentExtentImageCapable"/>, THE ONE capability
@@ -558,6 +568,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         var parts = VarParts(group);
         int totalFixed = parts.Sum(p => p.FixedWidth);
         bool nested = CarriesNested(group);
+        bool creates = CarriesDynTable(group);
         using (w.Block($"public readonly CobolVarGroup AsVarImage({AsVarImageParameters(group)})"))
         {
             var fixedParts = new List<string>();
@@ -565,6 +576,13 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             // Parallel to dynParts when the carrier holds a nested component (kb/Work PB2496): each component's
             // occurrence carriers, null for a plain one; a spliced nested group's own list, every entry, in place.
             var elemParts = new List<string>();
+            // Parallel to dynParts when the carrier holds a dynamic-capacity table (kb/Work PB2690): the element each
+            // INITIALIZED table creates (ISO §8.5.1.9.5, CobolDynTable.CreatedAs, null for a table without the phrase),
+            // which a BY REFERENCE formal's fixed table sees past the capacity and creates from; null for a dynamic-length
+            // item; a spliced nested group's own list in place.
+            // Stated only for STORAGE (__byReference: a BY REFERENCE crossing's carrier) - a MOVE's sender and a BY CONTENT
+            // copy are values, and allocate nothing for it.
+            var createdParts = new List<string>();
             int n = 0;
             foreach (var p in parts)
             {
@@ -579,14 +597,20 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         fixedParts.Add(OdoPrefixImage(p));
                         break;
                     case VarPartKind.DynLeaf:
+                        dynParts.Add(CurrentMemberImage(p.Item!, agree: "__agree"));
+                        elemParts.Add("null");
+                        createdParts.Add("null");
+                        break;
                     case VarPartKind.DynTable:
                         dynParts.Add(CurrentMemberImage(p.Item!, agree: "__agree"));
                         elemParts.Add("null");
+                        createdParts.Add($"{p.Field.Name}.CreatedAs({DynElementImage(p.Item!)})");
                         break;
                     case VarPartKind.DynGroupTable:
                         // ONE nested component: no characters of its own, its occurrences' carriers beside it.
                         dynParts.Add("\"\"");
-                        elemParts.Add($"{p.Field.Name}.CurrentOccurrencesAs(__e => __e.AsVarImage(__agree))");
+                        elemParts.Add($"{p.Field.Name}.CurrentOccurrencesAs(__e => __e.AsVarImage(__agree, __byReference))");
+                        createdParts.Add($"{p.Field.Name}.CreatedAs(__e => __e.AsVarImage(__agree, true))");
                         break;
                     case VarPartKind.Nested:
                     case VarPartKind.NestedTable:
@@ -600,12 +624,13 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         {
                             VarPartKind.Nested => $"{p.Field.Name}.AsVarImage({AsVarImageArguments(p.Item!)});",
                             VarPartKind.NestedTable =>
-                                $"{RuntimeApi.VarGroupConcat($"global::System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree))")};",
-                            _ => $"{RuntimeApi.TableConcatVarImages(p.Field.Name, "__odo", "__e => __e.AsVarImage(__agree)")};",
+                                $"{RuntimeApi.VarGroupConcat($"global::System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree, __byReference))")};",
+                            _ => $"{RuntimeApi.TableConcatVarImages(p.Field.Name, "__odo", "__e => __e.AsVarImage(__agree, __byReference)")};",
                         });
                         fixedParts.Add($"__n{n}.Fixed");
                         dynParts.Add($".. __n{n}.Dynamic");
                         elemParts.Add($".. {RuntimeApi.VarGroupElementList($"__n{n}")}");
+                        createdParts.Add($".. {RuntimeApi.VarGroupCreatedList($"__n{n}")}");
                         n++;
                         break;
                     default:
@@ -613,7 +638,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                 }
             }
             w.Line($"return new CobolVarGroup({(fixedParts.Count > 0 ? string.Join(" + ", fixedParts) : "\"\"")}, "
-                + $"[{string.Join(", ", dynParts)}]{(nested ? $", [{string.Join(", ", elemParts)}]" : "")});");
+                + $"[{string.Join(", ", dynParts)}]"
+                + $"{(nested || creates ? $", {(nested ? $"[{string.Join(", ", elemParts)}]" : "null")}" : "")}"
+                + $"{(creates ? $", __byReference ? [{string.Join(", ", createdParts)}] : null" : "")});");
         }
         // THE FILE-RECORD HALF (determination D-FRA; kb/Work PB981): a record read back as ONE contiguous image
         // (§8.5.1.11.2 — what CurrentImage() wrote) is decomposed into this same carrier by the ONE split rule,
