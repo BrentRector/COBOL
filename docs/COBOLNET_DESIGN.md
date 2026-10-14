@@ -932,7 +932,7 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   `CobolSort.EnterProcedure`, `Sort` ends the input phase, and an output-procedure at-end sets the GR3 latch. The
   program's RELEASE and RETURN STATEMENTS render the checked entries `ReleaseStatement` / `ReturnStatement`, which
   test that phase before acting — §14.9.32.4 GR1 EC-FLOW-RELEASE, §14.9.34.4 GR1 EC-FLOW-RETURN, §14.9.34.4 GR3
-  EC-SORT-MERGE-RETURN, each a `FatalAmbientGates` row whose `QueryFor` arm is the bound RELEASE / RETURN node —
+  EC-SORT-MERGE-RETURN, each a `FatalAmbientGates` row whose `EcBinder.NodeKindRaises` row is the bound RELEASE / RETURN node —
   while the implicit USING release and GIVING return keep the unchecked `Release` / `Return` primitives, because
   each verb's GR1 governs the statement the program writes. With checking off nothing is raised and the statement
   proceeds (a RELEASE with no SORT executing has no store to release to).
@@ -948,7 +948,7 @@ value of the typed RECORD KEY / RELATIVE KEY field.
   §14.9.24.4 GR7 b) — the READ size against the SD's range, min 0 for a fixed SD). EC-SORT-MERGE-SEQUENCE is a
   per-stream scan in `Merge` over the SAME key columns the merge compares with, run only while enabled
   (§14.9.24.4 GR6). The statement's body after `Init` is a `try … finally { Close }`, so every way out — including
-  a raise the guard disposes of after the unwind — releases the store. `EcBinder.QueryFor`'s SORT/MERGE arms ask
+  a raise the guard disposes of after the unwind — releases the store. `EcBinder.NodeKindRaises`' SORT/MERGE rows ask
   these names AND the EC-I-O family per USING/GIVING file, which is what arms the implicit transfers'
   `__IoCheckEc` hooks. The disposition is `EcEmitter.VerbDisposes`: a condition the SORT/MERGE statement itself
   raised is disposed of by the verb (§14.6.13.1.3 2) — declarative, then the statement ends, the run unit

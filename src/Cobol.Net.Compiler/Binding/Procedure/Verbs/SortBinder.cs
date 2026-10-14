@@ -451,7 +451,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// <summary>Bind RELEASE (ISO §14.9.32): record-name-1 shall name a logical record of an SD entry and may be
     /// qualified (SR1); FROM ≡ MOVE then RELEASE (GR4). The EC-FLOW-RELEASE legality check (GR1 — only inside the
     /// executing SORT's input procedure) is dynamic: <c>CobolSort.ReleaseStatement</c> tests the store's procedure
-    /// phase, and <c>EcBinder.QueryFor</c> gives this node its >>TURN gate (kb/Work PB349).</summary>
+    /// phase, and <c>EcBinder.NodeKindRaises</c> gives this node its >>TURN gate (kb/Work PB349).</summary>
     public BoundStatement BindRelease(Core.ReleaseStatementContext rel)
     {
         if (rel.dataReference() is not { } rn)
@@ -506,7 +506,7 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
     /// MOVE record-area → identifier-1 (GR5); the AT END and NOT AT END phrases may be written in REVERSED order
     /// (SR4 — detected by the phrase's leading NOT). The EC-FLOW-RETURN / EC-SORT-MERGE-RETURN legality checks
     /// (GR1/GR3) are dynamic: <c>CobolSort.ReturnStatement</c> tests the store's procedure phase and at-end latch,
-    /// and <c>EcBinder.QueryFor</c> gives this node its >>TURN gate (kb/Work PB349).</summary>
+    /// and <c>EcBinder.NodeKindRaises</c> gives this node its >>TURN gate (kb/Work PB349).</summary>
     public BoundStatement BindReturn(Core.ReturnStatementContext r)
     {
         string name = r.fileName().GetText();
