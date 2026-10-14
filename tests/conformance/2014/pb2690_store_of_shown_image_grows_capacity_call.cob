@@ -45,6 +45,17 @@
       *>       references an occurrence past the capacity       = 1
       *>   GP  GQ, but the middle program first stores the
       *>       default "a" into its FE (3)                       = ab ab ab, 3
+      *>   GZ  the callee's four ON SIZE ERROR stores into
+      *>       occurrence 3, one per resultant category (fixed
+      *>       numeric, numeric-edited, floating-point edited,
+      *>       COMP-1), each too large for its receiver: 14.7.5
+      *>       SIZE ERROR rule 2) "the content of that resultant
+      *>       identifier is not changed from the content that
+      *>       existed at the start of the execution of the
+      *>       arithmetic statement". No store, so no receiving
+      *>       reference is recorded and no element is created:
+      *>       every phrase runs (QEGF)                          = QEGF, 1
+      *>   DZ  the same four statements made in the caller     = QEGF, 1
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690SG.
        DATA DIVISION.
@@ -110,6 +121,21 @@
           05 PTB OCCURS DYNAMIC CAPACITY IN CPP FROM 1 INITIALIZED.
              10 PQE PIC X VALUE "a".
              10 PQF PIC X VALUE "b".
+       01 WS-SE PIC X(4).
+       01 GZ.
+          05 ZX PIC X VALUE "x".
+          05 ZTB OCCURS DYNAMIC CAPACITY IN CZ FROM 1 INITIALIZED.
+             10 ZQ PIC 9 VALUE 9.
+             10 ZE PIC Z9 VALUE " 7".
+             10 ZG PIC +9.9E+99 VALUE "+1.0E+00".
+             10 ZF USAGE COMP-1 VALUE 0.
+       01 DZ.
+          05 DZX PIC X VALUE "x".
+          05 DZTB OCCURS DYNAMIC CAPACITY IN CDZ FROM 1 INITIALIZED.
+             10 DZQ PIC 9 VALUE 9.
+             10 DZE PIC Z9 VALUE " 7".
+             10 DZG PIC +9.9E+99 VALUE "+1.0E+00".
+             10 DZF USAGE COMP-1 VALUE 0.
        PROCEDURE DIVISION.
        MAIN.
            CALL "PB2690SA" AS NESTED USING GA
@@ -153,6 +179,24 @@
            MOVE CPP TO WS-C
            DISPLAY "GP=[" PQE (1) PQF (1) " " PQE (2) PQF (2) " "
                PQE (3) PQF (3) "] " WS-C
+           MOVE "...." TO WS-SE
+           CALL "PB2690SZ" AS NESTED USING GZ WS-SE
+           MOVE CZ TO WS-C
+           DISPLAY "GZ=[" WS-SE "] " WS-C
+           MOVE "...." TO WS-SE
+           ADD 5 TO DZQ (3) ON SIZE ERROR MOVE "Q" TO WS-SE (1:1)
+           END-ADD
+           ADD 500 TO 1 GIVING DZE (3)
+               ON SIZE ERROR MOVE "E" TO WS-SE (2:1)
+           END-ADD
+           COMPUTE DZG (3) = 1.0E300
+               ON SIZE ERROR MOVE "G" TO WS-SE (3:1)
+           END-COMPUTE
+           COMPUTE DZF (3) = 1.0E300
+               ON SIZE ERROR MOVE "F" TO WS-SE (4:1)
+           END-COMPUTE
+           MOVE CDZ TO WS-C
+           DISPLAY "DZ=[" WS-SE "] " WS-C
            STOP RUN.
 
        IDENTIFICATION DIVISION.
@@ -331,4 +375,32 @@
        MAIN.
            GOBACK.
        END PROGRAM PB2690SD.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SZ.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LZ.
+          05 LZX PIC X.
+          05 TZ OCCURS 3.
+             10 LZQ PIC 9.
+             10 LZE PIC Z9.
+             10 LZG PIC +9.9E+99.
+             10 LZF USAGE COMP-1.
+       01 LSE PIC X(4).
+       PROCEDURE DIVISION USING LZ LSE.
+       MAIN.
+           ADD 5 TO LZQ (3) ON SIZE ERROR MOVE "Q" TO LSE (1:1)
+           END-ADD
+           ADD 500 TO 1 GIVING LZE (3)
+               ON SIZE ERROR MOVE "E" TO LSE (2:1)
+           END-ADD
+           COMPUTE LZG (3) = 1.0E300
+               ON SIZE ERROR MOVE "G" TO LSE (3:1)
+           END-COMPUTE
+           COMPUTE LZF (3) = 1.0E300
+               ON SIZE ERROR MOVE "F" TO LSE (4:1)
+           END-COMPUTE
+           GOBACK.
+       END PROGRAM PB2690SZ.
        END PROGRAM PB2690SG.

@@ -55,3 +55,11 @@ statement, which fell outside the loop. The store and its record are now one blo
 embeds a store keeps both. It reproduced on Windows with the same compiler, so it was the branch's own defect, not a
 host difference. The Windows leg 1 never ran the three: no impact map was recorded for the base, so every case was tier 1
 and leg 1 took the cheapest half by recorded time. The Linux gate runs the whole population and caught it.
+
+**Branch review round 3 (R3-1, a test gap).** The one-block fix also corrected a wrong answer on the SIZE ERROR path.
+`ArithmeticEmitter` emits `else <store>` for its five resultant arms, and with the record as a second bare statement the
+record ran even when the size error left the receiver unchanged, so a callee's `ADD 5 TO FQ (3) ON SIZE ERROR` raised the
+caller's capacity to 3 where ISO §14.7.5 SIZE ERROR rule 2) and the caller's own statement give 1. Nothing witnessed it,
+so `_call` gains lanes GZ (the callee's four ON SIZE ERROR stores: fixed numeric, numeric-edited, floating-point edited,
+COMP-1) and DZ (the same four in the caller), both `[QEGF] 1`. A mutation check confirmed that the lane bites: with the
+braces removed, GZ printed 3.
