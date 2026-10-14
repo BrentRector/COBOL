@@ -98,13 +98,15 @@ public static class UniversalGroupCarrier
             : CobolString.Store((string)box!, formal.Positions);
 
     /// <summary>The argument box after the FIXED-length group formal's image <paramref name="image"/> is stored back
-    /// over it: the formal's positions replace the argument's leading ones and the rest survives.</summary>
+    /// over it: the formal's positions replace the argument's leading ones and the rest survives. <paramref name="received"/>
+    /// is the receiving references the method made through the formal (<see cref="CobolVarGroup.Overlay"/>; kb/Work
+    /// PB2690).</summary>
     public static object WriteBackFixed(object? box, ActivationDescription argument, ActivationDescription formal,
-        string image)
+        string image, ReceivingReferences? received)
     {
         if (box is CobolVarGroup v)
             return CobolVarGroup.OverlayImage(v, ActivationRelations.AtomsOf(argument), image,
-                ActivationRelations.AtomsOf(formal));
+                ActivationRelations.AtomsOf(formal), received);
         string current = (string)box!;
         return image.Length >= current.Length ? image[..current.Length] : image + current[image.Length..];
     }
@@ -117,11 +119,13 @@ public static class UniversalGroupCarrier
             : CobolVarGroup.FromImage((string)box!, ActivationRelations.AtomsOf(argument), ActivationRelations.AtomsOf(formal));
 
     /// <summary>The argument box after the VARIABLE-length group formal's carrier <paramref name="carrier"/> is stored
-    /// back: a variable-length argument takes the carrier, a fixed one the record image it rebuilds.</summary>
+    /// back: a variable-length argument takes the carrier, a fixed one the record image it rebuilds.
+    /// <paramref name="received"/> is <see cref="WriteBackFixed"/>'s.</summary>
     public static object WriteBackVariable(object? box, ActivationDescription argument, ActivationDescription formal,
-        CobolVarGroup carrier) =>
+        CobolVarGroup carrier, ReceivingReferences? received) =>
         box is CobolVarGroup v
-            ? CobolVarGroup.Overlay(v, carrier, ActivationRelations.AtomsOf(argument), ActivationRelations.AtomsOf(formal))
+            ? CobolVarGroup.Overlay(v, carrier, ActivationRelations.AtomsOf(argument), ActivationRelations.AtomsOf(formal),
+                received)
             : CobolVarGroup.OverlaidImage((string)box!, ActivationRelations.AtomsOf(argument), carrier,
                 ActivationRelations.AtomsOf(formal));
 

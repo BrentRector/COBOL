@@ -241,9 +241,11 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// material past the formal's last character survives. A formal whose table has a FIXED occurrence count states no
     /// capacity of its own, so a store reaching the argument's dynamic-capacity table past its capacity creates the
     /// occurrence (§8.5.1.9.3, <see cref="OverlaidTable"/>) and one that does not leaves the capacity as it was. The image
-    /// stored back is the one <see cref="ToImage"/> showed of the argument's storage, with the callee's stores in it.</summary>
+    /// stored back is the one <see cref="ToImage"/> showed of the argument's storage, with the callee's stores in it;
+    /// <paramref name="received"/> is what the callee referenced as a receiving item in it (<see cref="Overlay"/>).</summary>
     public static CobolVarGroup OverlayImage(CobolVarGroup current, GroupAtom[] currentShape, string image,
-        GroupAtom[] imageShape) => Overlay(current, OfImage(image), currentShape, imageShape);
+        GroupAtom[] imageShape, ReceivingReferences? received) =>
+        Overlay(current, OfImage(image), currentShape, imageShape, received);
 
     /// <summary>The inverse crossing: a variable-length formal's carrier <paramref name="view"/> (of shape
     /// <paramref name="viewShape"/>) stored back over the storage of a FIXED-length group argument whose record image is
@@ -251,7 +253,7 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// The image keeps its width, so the fixed group cannot grow a table past its fixed extent (the callee's missing
     /// occurrences are space filled, §14.6.9.2), and the argument's material the formal does not describe survives.</summary>
     public static string OverlaidImage(string current, GroupAtom[] imageShape, CobolVarGroup view, GroupAtom[] viewShape) =>
-        CobolString.Store(Overlay(OfImage(current), view, imageShape, viewShape).Fixed, current.Length);
+        CobolString.Store(Overlay(OfImage(current), view, imageShape, viewShape, received: null).Fixed, current.Length);
 
     /// <summary>⛔ ONE VARIABLE-LENGTH GROUP'S CARRIER IN THE SHAPE OF ANOTHER, COMPATIBLE ONE (kb/Work PB480). Two
     /// variable-length groups are compatible when their variable-length items correspond and match (ISO §8.5.1.12.1),
@@ -393,9 +395,14 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     ///     created element with the view's element stored over it, and one a variable table of the formal brings is the
     ///     view's element seen in the argument's element shape;</item>
     ///   <item>every component of the argument the formal does not reach (beyond its last character) survives.</item>
-    /// </list></summary>
+    /// </list>
+    /// <paramref name="received"/> records the positions of <paramref name="view"/>'s STORAGE (its fixed run with each
+    /// dynamic-capacity table's one-element reservation in place, <see cref="Geometry.StorageAt"/>) the activated element
+    /// referenced as a receiving item (<see cref="ReceivingReferences"/>, kept by the fresh area the view was copied into),
+    /// or is null when nothing recorded them: a store into an occurrence past the capacity creates it whatever image it
+    /// stored (§8.5.1.9.3; <see cref="OverlaidTable"/>).</summary>
     public static CobolVarGroup Overlay(CobolVarGroup current, CobolVarGroup view, GroupAtom[] currentShape,
-        GroupAtom[] viewShape)
+        GroupAtom[] viewShape, ReceivingReferences? received)
     {
         if (GroupCompatibility.SameShape(currentShape, viewShape)) return view;
         var pairs = Correspondence(currentShape, viewShape);
@@ -423,7 +430,8 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
                 else if (ord < dyn.Length && seen is not null)
                 {
                     var now = OverlaidOccurrences(arg.Occurrences(current, pa) ?? [], seen, resize: b.IsComponent,
-                        ElementShape(a), ElementShape(b), current.CreatedAt(ord));
+                        ElementShape(a), ElementShape(b), current.CreatedAt(ord),
+                        b.IsComponent ? null : received?.From(formal.StorageAt(pb)), b.ElementChars);
                     dyn[ord] = IsNested(a) ? "" : FixedImages(now);
                     elements[ord] = IsNested(a) ? now : null;
                 }
@@ -434,7 +442,8 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
                 if (!a.IsComponent)
                     fixedRun.Append(CobolString.Store(now ?? arg.Content(current, pa) ?? "", a.Chars));
                 else if (ord < dyn.Length && now is not null)
-                    dyn[ord] = b.IsComponent ? now : OverlaidTable(dyn[ord], now, a.ElementChars, current.CreatedAt(ord));
+                    dyn[ord] = b.IsComponent ? now
+                        : OverlaidTable(dyn[ord], now, a.ElementChars, current.CreatedAt(ord), received?.From(formal.StorageAt(pb)));
             }
             (prevA, prevB) = (pa + 1, pb + 1);
         }
@@ -448,16 +457,22 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// argument's current occurrences, creating those past its capacity that it stored into (<see cref="GrownCount"/>,
     /// <see cref="OverlaidTable"/>'s determination): each created occurrence is the element the table creates
     /// (<paramref name="create"/>, §8.5.1.9.5) with the view's element stored over it, exactly as an occurrence the
-    /// argument had is overlaid.</summary>
+    /// argument had is overlaid. <paramref name="received"/> is the FIXED table's receiving-reference record (null for a
+    /// variable one), whose fixed-length elements are <paramref name="seenChars"/> positions each.</summary>
     private static CobolVarGroup[] OverlaidOccurrences(CobolVarGroup[] was, CobolVarGroup[] seen, bool resize,
-        GroupAtom[] wasShape, GroupAtom[] seenShape, Func<int, CobolVarGroup>? create)
+        GroupAtom[] wasShape, GroupAtom[] seenShape, Func<int, CobolVarGroup>? create, ReceivingReferences? received,
+        int seenChars)
     {
-        var now = new CobolVarGroup[resize ? seen.Length : GrownCount(was.Length, seen, wasShape, seenShape, create)];
+        var now = new CobolVarGroup[resize ? seen.Length
+            : GrownCount(was.Length, seen, wasShape, seenShape, create, received, seenChars)];
         for (int i = 0; i < now.Length; i++)
+        {
+            var element = received?.From(i * seenChars);
             now[i] = i >= seen.Length ? was[i]
-                : i < was.Length ? Overlay(was[i], seen[i], wasShape, seenShape)
+                : i < was.Length ? Overlay(was[i], seen[i], wasShape, seenShape, element)
                 : resize || create is null ? Reshape(seen[i], seenShape, wasShape)
-                : Overlay(create(i + 1), seen[i], wasShape, seenShape);
+                : Overlay(create(i + 1), seen[i], wasShape, seenShape, element);
+        }
         return now;
     }
 
@@ -473,25 +488,28 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// §14.2.3 GR8 makes the formal occupy the argument's storage, so the store is a receiving reference to the dynamic
     /// table with a subscript that "exceeds the current capacity of the table", and §8.5.1.9.3 then creates "a new
     /// element" and raises the capacity "to the value given by the subscript" (intermediate occurrences too).
-    /// ⚠ DETERMINATION D-VGB (docs/CONFORMANCE.md §3; the rest is §8.5.1.12.3 sentence 3, which makes the pair the same
+    /// <para>THE STORE IS THE CALLEE'S RECEIVING REFERENCE (kb/Work PB2690): the formal's fresh area records every position a
+    /// store through it reached (<paramref name="received"/>, positions of the formal's table; <see cref="ReceivingReferences"/>),
+    /// so the capacity becomes the highest occurrence the callee referenced as a receiving item, whatever image it stored
+    /// there — the INITIALIZED default or spaces included.</para>
+    /// <para>⚠ DETERMINATION D-VGB (docs/CONFORMANCE.md §3; the rest is §8.5.1.12.3 sentence 3, which makes the pair the same
     /// length only "for purposes of determining compatibility"): the view showed each occurrence the argument lacks as the
     /// table creates it (<see cref="Reshape"/>: its <paramref name="create"/> image, §8.5.1.9.5's INITIALIZED default, when
-    /// the table writes the phrase; otherwise the space fill, since §8.5.1.9.5 leaves that content "undefined"), and only
-    /// the finished view comes back, so a store is recognised by its effect — the capacity becomes the highest occurrence
-    /// whose image differs from the one the view showed. The created occurrences of an INITIALIZED table therefore keep the
-    /// default in every item the callee did not store, and the intermediate ones are the default whole, as §8.5.1.9.5
-    /// requires; a table without the phrase sees every store but one of spaces (a numeric store never is). A callee that
-    /// only READS the occurrences past the capacity leaves it alone. ⚠ KNOWN DEPARTURE (kb/Work PB2690, REMAINING): a callee
-    /// that stores into an occurrence past the capacity exactly the image the view showed (spaces into a table without
-    /// INITIALIZED, the INITIALIZED default into one with it) leaves the CAPACITY as it was, where §8.5.1.9.3 raises it to the
-    /// subscript; the content is the same either way. Telling those stores apart needs the callee's receiving references,
-    /// which a finished image does not carry.</summary>
-    private static string OverlaidTable(string was, string now, int elementChars, Func<int, CobolVarGroup>? create)
+    /// the table writes the phrase; otherwise the space fill, since §8.5.1.9.5 leaves that content "undefined"), so the
+    /// created occurrences of an INITIALIZED table keep the default in every item the callee did not store, and the
+    /// intermediate ones are the default whole, as §8.5.1.9.5 requires. A callee that only READS the occurrences past the
+    /// capacity leaves it alone. A store that reached the area by a path that records no reference — a further activation's
+    /// boundary copy of the whole group back into it (<c>CallEmitter.BoundaryCopyWrite</c>), which would otherwise make a
+    /// store into one occurrence a reference to all of them — is still recognised by its EFFECT: an occurrence whose image
+    /// differs from the one the view showed was stored into.</para></summary>
+    private static string OverlaidTable(string was, string now, int elementChars, Func<int, CobolVarGroup>? create,
+        ReceivingReferences? received)
     {
         if (elementChars <= 0 || now.Length <= was.Length) return Overlaid(was, now);
         int kept = was.Length;
         for (int end = now.Length / elementChars * elementChars; end > kept; end -= elementChars)
-            if (!now.AsSpan(end - elementChars, elementChars).SequenceEqual(CreatedImage(create, end / elementChars, elementChars)))
+            if (received?.Within(end - elementChars, end) == true
+                || !now.AsSpan(end - elementChars, elementChars).SequenceEqual(CreatedImage(create, end / elementChars, elementChars)))
             {
                 kept = end;
                 break;
@@ -501,16 +519,18 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
 
     /// <summary>The occurrence count a FIXED table of the formal leaves the argument's dynamic-capacity table of
     /// variable-length elements with (<see cref="OverlaidTable"/>'s rule one level up): the argument's
-    /// <paramref name="current"/> count, or the highest occurrence of <paramref name="seen"/> past it that differs from
-    /// what the view showed there — the created element (<paramref name="create"/>) seen in the formal's element shape
-    /// <paramref name="seenShape"/> (<see cref="Reshape"/>), or, when the carrier states no creation (a table without
-    /// INITIALIZED), the space fill: a fixed-length element's carrier with a blank fixed run and no components. The same
-    /// known departure as <see cref="OverlaidTable"/>'s holds.</summary>
+    /// <paramref name="current"/> count, or the highest occurrence of <paramref name="seen"/> past it that the callee
+    /// referenced as a receiving item (<paramref name="received"/>, the formal's table of <paramref name="seenChars"/>-wide
+    /// elements) or that differs from what the view showed there — the created element (<paramref name="create"/>) seen in
+    /// the formal's element shape <paramref name="seenShape"/> (<see cref="Reshape"/>), or, when the carrier states no
+    /// creation (a table without INITIALIZED), the space fill: a fixed-length element's carrier with a blank fixed run and
+    /// no components.</summary>
     private static int GrownCount(int current, CobolVarGroup[] seen, GroupAtom[] wasShape, GroupAtom[] seenShape,
-        Func<int, CobolVarGroup>? create)
+        Func<int, CobolVarGroup>? create, ReceivingReferences? received, int seenChars)
     {
         for (int end = seen.Length; end > current; end--)
         {
+            if (received?.Within((end - 1) * seenChars, end * seenChars) == true) return end;
             var s = seen[end - 1];
             bool shown = create is null
                 ? s.Dynamic.Length == 0 && !s.Fixed.AsSpan().ContainsAnyExcept(' ')
@@ -619,6 +639,17 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
 
         /// <summary>The character count of atoms [<paramref name="from"/>, <paramref name="to"/>) in the fixed run.</summary>
         public int FixedChars(int from, int to) => _fixedAt[to] - _fixedAt[from];
+
+        /// <summary>Where atom <paramref name="i"/> starts in the group's STORAGE — its fixed run with each dynamic-capacity
+        /// table's one-element reservation in place (§8.5.1.12.3: such a table counts "the length of a single element";
+        /// <c>StorageCell.RunOf</c> cuts the reservations out of a cell's image): the positions a receiving reference is
+        /// recorded in (<see cref="ReceivingReferences"/>).</summary>
+        public int StorageAt(int i)
+        {
+            int at = 0;
+            for (int j = 0; j < i; j++) at += _atoms[j].Chars;
+            return at;
+        }
 
         /// <summary>Atom <paramref name="i"/>'s content: a component's carried string (null when the carrier did not
         /// carry it), a fixed table's characters of the fixed run. A NESTED component has no characters; read through a

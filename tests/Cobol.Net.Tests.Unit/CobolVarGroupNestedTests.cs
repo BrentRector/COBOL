@@ -54,7 +54,7 @@ public sealed class CobolVarGroupNestedTests
         var argument = Carrier("h", "zz", DynElement("ab", "pq"));
         // The formal (fixed one-occurrence IT) changed IT (1, 1) to "w" and grew the table to two elements.
         var view = Carrier("h", "zz", FixedElement("ab", "w"), FixedElement("new", " "));
-        var stored = CobolVarGroup.Overlay(argument, view, Group(ElemDyn), Group(ElemFixed)).ElementsAt(0)!;
+        var stored = CobolVarGroup.Overlay(argument, view, Group(ElemDyn), Group(ElemFixed), received: null).ElementsAt(0)!;
         // IT (1, 2) "q" survives: a fixed table of the formal is written over the argument's occurrences, never shrinking them.
         Assert.Equal(["ab", "wq"], stored[0].Dynamic);
         Assert.Equal(["new", " "], stored[1].Dynamic);

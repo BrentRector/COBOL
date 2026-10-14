@@ -1,0 +1,57 @@
+## PB2690 closed: a BY REFERENCE store of exactly the image the formal was shown raises the dynamic table's capacity
+
+**Mechanism.** A BY REFERENCE formal whose fixed table faces the argument's dynamic-capacity table occupies a fresh area
+filled from the argument and stored back at return. Since wave 1069 C the write-back raised the capacity to the highest
+occurrence whose image differed from the one the formal was shown (the INITIALIZED default, or spaces), so a callee that
+stored exactly that image (`MOVE "a" TO FE (3)` with `AE VALUE "a"`, or SPACES into a table without INITIALIZED) left the
+capacity where it was. ISO 8.5.1.9.3 raises it for any data item "referenced as a receiving item" past the capacity,
+whatever is stored (14.2.3 GR8 makes the formal's store that reference).
+
+**Re-probe.** `E:\COBOL-coord\scratch\w1077a\p\p1.cob` (`--std 2014`) on a6744fa4d: `CALL=1 DIRECT=3 NUM=3`; after the
+fix `CALL=3 DIRECT=3 NUM=3`.
+
+**Fix shape.** The receiving references are recorded where they are made. Every store through a Tier-B view of a class
+located by a data-address pointer (a LINKAGE or BASED item) is now followed by `StorageCell.Received(offset, width)`
+(`PlaceRenderer.Received`), a null test unless a boundary watches the cell. The boundary starts the record after the
+formal's copy-in (`ManagedPointer<T>.Watch`, emitted for every area formal, program and method), and a view over storage
+a store can grow (`ManagedPointer<T>.OverStorage`: `CobolArgAdapt.Text` and `VarGroup`, the typed INVOKE's overlaying
+argument store, the universal box) hands the record (`ReceivingReferences`, in the formal's storage positions) to
+`CobolVarGroup.Overlay`, whose `OverlaidTable` and `GrownCount` create every occurrence up to the highest one referenced.
+A boundary copy of a whole group (a copy-in, the write half of an argument's view) records nothing
+(`CallEmitter.BoundaryCopyWrite` → `PlaceRenderer.WriteGroupCopy`), and a store that reaches the area only through such a
+copy is still recognised by its effect. The runtime major is 4 (`Overlay` and `UniversalGroupCarrier.WriteBack*` changed
+signature in the shipped surface; `RuntimeAbiPinDriftTests` re-pinned); the call ABI number stays 1 because no carrier,
+crossing arm or description changed. Docs: `docs/CONFORMANCE.md` D-VGB (the known departure is gone),
+`docs/COBOLNET_INTERPROGRAM_DESIGN.md` (the receiving-reference record).
+
+**Goldens.** `2014/pb2690_store_of_shown_image_grows_capacity_call` (the probe, a direct store, SPACES into a table without
+INITIALIZED, occurrence 2 only, a read-only callee, a variable-length formal, the nested element arm, BY CONTENT, a formal
+passed on to a program of the same description, and one passed on to an elementary formal that stores only inside the capacity, which creates nothing) and `_invoke` (typed, variable formal, universal, SPACES, BY CONTENT);
+negative `pb2690-store-of-shown-image-grows-capacity-below-2014` (COBOLNET0900); unit
+`BoundaryGroupCorrespondenceTests.AStoreOfTheShownImagePastTheCapacity_CreatesTheOccurrence_ByTheReceivingReference`.
+No inventory row claimed or closed (kb/Work PB2690 `closes_rows_reason`); PB2690 flipped to landed.
+
+**Gate.** Run 20261014T194320Z-7a8a00: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,089, Unit 32,991, Characterization 6 cases in leg 1). The first run (20261014T193710Z-12a96f) was RED on the boundary-layout pin, moved again by the copy-in change, and on the `filter_population.py` self-test (MSB4236, an SDK not resolved during a dotnet first-run in its scrubbed environment; it passes alone and passed in the re-gate). Self-review: the record is emitted only for descriptions holding a table of a fixed or DEPENDING count (a table-less LINKAGE record pays nothing), and a whole-group boundary copy records nothing (golden lane GE).
+
+**Branch review round 1.** Four findings, all fixed. R1-1: `PlaceRenderer.WriteView` switched on the storage form with a
+catch-all arm, which `PlaceStorageFormSwitchDriftTests` rejects; it now switches on the window coding. The gate had not run
+that tree-wide sweep (it was planned into leg 2), so CI would have been the first to see it. R1-2 and R1-3: the
+non-recording boundary copy covered only a bare view, so the write half of an occurs-depending group (CALL and typed
+INVOKE) and of a universal box recorded every occurrence. When the next callee stored nothing, the caller's table still
+grew to the formal's maximum. The test now looks at the group's full allocation; the universal box's write half and the
+method cell copy-in use it, and the RETURNING delivery still records because it is the statement's own store. An
+elementary or reference-modified argument's view is written per store, so it keeps recording (probes `e1.cob` and
+`u3.cob` in `E:/COBOL-coord/scratch/w1077a/fin/`). New golden lanes: `_call` GQ and GP, `_invoke` UO, US and TO. On the
+reviewed head, GQ, UO and TO printed 3 where 8.5.1.9.3 gives 1. R1-4: the record's coordinates are the formal's storage
+positions, not its fixed run, and the comments now say so. Re-gate: run 20261014T201825Z-618d8a, `=== BUILD-LOCAL GATE:
+LEG 1 ONLY (batched gating, PB2515): GREEN`; `PlaceStorageFormSwitchDriftTests` was again planned into leg 2, and it passed
+when run on its own.
+
+**Landing stop (Linux gate RED on 917df8e03).** Three 2002 table-SORT goldens over a BASED table
+(`pb1175_table_sort_shared_storage`, `pb1922_table_sort_pointer_element`, `pb1951_table_sort_pointer_table_element`)
+no longer compiled: CS0103 on the loop variable `__eN`. `PlaceRenderer.Write` returns ONE C# statement, and the table
+SORT's place-back loop embeds it as the loop body (`for (…) <store>`), but `Received` appended the record as a second bare
+statement, which fell outside the loop. The store and its record are now one block statement, so every caller that
+embeds a store keeps both. It reproduced on Windows with the same compiler, so it was the branch's own defect, not a
+host difference. The Windows leg 1 never ran the three: no impact map was recorded for the base, so every case was tier 1
+and leg 1 took the cheapest half by recorded time. The Linux gate runs the whole population and caught it.

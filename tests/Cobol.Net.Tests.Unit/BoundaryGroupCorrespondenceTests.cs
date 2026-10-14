@@ -241,6 +241,37 @@ public sealed class BoundaryGroupCorrespondenceTests
         Assert.Equal(["T"], caller.Value.Dynamic);
     }
 
+    /// <summary>kb/Work PB2690, the last half — a store of EXACTLY the image the view showed past the capacity: ISO
+    /// §8.5.1.9.3 raises the capacity of a dynamic-capacity table "referenced as a receiving item" to the subscript,
+    /// whatever value the statement stored. The view is copied into a fresh area that records the receiving references made
+    /// through it (<c>ManagedPointer.Watch</c>, <c>StorageCell.Received</c>), and the store back creates every occurrence up
+    /// to the highest one referenced; with nothing referenced the same image creates nothing.</summary>
+    [Fact]
+    public void AStoreOfTheShownImagePastTheCapacity_CreatesTheOccurrence_ByTheReceivingReference()
+    {
+        static CobolVarGroup Storage() =>
+            new("CDEF", ["T"], null, [n => CobolVarGroup.OfImage(n == 2 ? "p" : "q")]);
+        var caller = ManagedPointer<CobolVarGroup>.Cell(Storage());
+        var args = new[] { new CobolArg(CobolPassMode.Reference, caller, null, VarLGAtoms) };
+
+        string Call(params int[] stored)
+        {
+            caller.Value = Storage();
+            var formal = CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms, static () => "");
+            var area = new CellPointer(new StorageCell { Ref = formal.Value }, 0);
+            formal.Watch(area);
+            foreach (int at in stored) area.Cell.Received(at, 1);   // the callee's stores, each of the image it was shown
+            formal.Value = area.Cell.Ref;
+            return caller.Value!.Dynamic[0];
+        }
+
+        Assert.Equal("CDTpqEF", CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms, static () => "").Value);
+        Assert.Equal("Tpq", Call(4));       // occurrence 3 referenced: 2 and 3 created as the table creates them
+        Assert.Equal("Tp", Call(3));        // occurrence 2 only
+        Assert.Equal("T", Call());          // a callee that only reads creates nothing
+        Assert.Equal("T", Call(0, 2));      // references to the fixed material and to occurrence 1 create nothing
+    }
+
     /// <summary>kb/Work PB2690 — the nested arm: a fixed table of fixed elements over a dynamic-capacity table of
     /// variable-length elements of STORAGE. A created element is the table's created element (its own inner table at its
     /// creation, with an inner creation of its own) with the formal's element stored over it, so every item and inner

@@ -1547,7 +1547,7 @@ of an unsupported facility.
   (also the READ of an elementary dynamic-length national record). Witness:
   `conformance:2014/pb546_group_into_national_dynamic`.
 - **D-VGB — a BY REFERENCE formal's FIXED table stored past the capacity of the argument's dynamic-capacity table
-  creates the occurrences the callee stored into (kb/Work PB2690; one known departure, below).** §14.2.3 GR8: "the activated runtime element operates
+  creates the occurrences the callee stored into (kb/Work PB2690).** §14.2.3 GR8: "the activated runtime element operates
   as if the formal parameter occupies the same storage area as the argument". A formal table of a fixed (or DEPENDING)
   occurrence count opposite the argument's dynamic-capacity table is legal when the two correspond and match (§8.5.1.12.1,
   §8.5.1.12.2; §8.5.1.12.3 sentence 3: the dynamic-capacity table "is considered to be the same length as the
@@ -1567,14 +1567,16 @@ of an unsupported facility.
   initialized": the INITIALIZED recipe, the seed a receiving subscript past the capacity grows the table with
   (`CobolDynTable.CreatedAs`); without the phrase, whose created contents §8.5.1.9.5 leaves "undefined", the view shows
   the space fill, chosen because no numeric store matches it, so a store of the element's own VALUE (a zero) is still
-  seen; and (ii) a store past the capacity is recognised by its EFFECT: the capacity becomes the highest occurrence of the
-  formal's table whose image differs from the one the view showed. A callee that only reads such an occurrence creates
-  nothing (§8.5.1.9.3 acts on a receiving reference only), and an INITIALIZED table's callee that stores SPACES there
-  creates it. **Known departure (kb/Work PB2690, REMAINING; a wrong CAPACITY, not latitude):** a callee that stores into
-  an occurrence past the capacity exactly the image the view showed (the INITIALIZED default into an INITIALIZED table,
-  SPACES into one without the phrase) leaves the capacity as it was, where §8.5.1.9.3 raises it to the subscript; the
-  content is the same either way. Only the callee's receiving references can tell such a store from none, and the
-  finished image the boundary sees does not carry them. The creation travels on the argument's
+  seen; and (ii) a store past the capacity is the callee's RECEIVING REFERENCE, recorded where it is made: the formal's
+  fresh area records the window of every store through a view of it (`StorageCell.Received`, emitted after each store
+  through a LINKAGE or BASED view), from the moment the area is filled (`ManagedPointer.Watch`), and the store back
+  (`ManagedPointer.OverStorage` → `CobolVarGroup.Overlay`) raises the capacity to the highest occurrence the callee
+  referenced as a receiving item, whatever it stored there: the INITIALIZED default, SPACES, the element's VALUE. A callee
+  that only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only). A store that reaches
+  the area only through a further activation's boundary copy of the whole group (the copy covers every occurrence, so it
+  records none, whatever the group's shape and whether the further activation is a CALL, a typed INVOKE or a universal
+  one: `CallEmitter.BoundaryCopyWrite`) is recognised by its effect, an occurrence whose image differs from the
+  one the view showed. The creation travels on the argument's
   carrier only for a BY REFERENCE crossing (`CobolVarGroup.Created`, stated by `AsVarImage(__byReference: true)` and
   `StorageCell.VarGroupAt(byReference: true)`): a BY CONTENT formal is a record "allocated by the activating runtime element"
   that does "not occupy the same storage area as the argument" (§14.2.3 GR9), filled as by a MOVE, so past the sending
@@ -1588,8 +1590,11 @@ of an unsupported facility.
   `conformance:2014/pb2690_fixed_table_formal_grows_vlg_element_table_call`,
   `conformance:2014/pb2690_fixed_table_formal_grows_dynamic_argument_invoke`, `conformance:2014/pb965_vlg_into_fixed_invoke`,
   `conformance:2014/pb2690_initialized_created_occurrences_call`, `conformance:2014/pb2690_initialized_created_occurrences_invoke`,
+  `conformance:2014/pb2690_store_of_shown_image_grows_capacity_call`,
+  `conformance:2014/pb2690_store_of_shown_image_grows_capacity_invoke`,
   `conformance:negative/pb2690-fixed-table-formal-grows-dynamic-argument-below-2014`,
-  `conformance:negative/pb2690-initialized-created-occurrences-below-2014`.
+  `conformance:negative/pb2690-initialized-created-occurrences-below-2014`,
+  `conformance:negative/pb2690-store-of-shown-image-grows-capacity-below-2014`.
 
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 

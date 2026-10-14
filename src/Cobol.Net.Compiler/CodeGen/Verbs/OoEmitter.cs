@@ -76,9 +76,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         : OoClassTable.LeafCarried(root) ? PlaceRenderer.GroupLeaves(MethodCellPlace(root))
         : PlaceRenderer.Read(MethodCellPlace(root));
 
-    /// <summary>The inverse of <see cref="MethodCellFormalLoad"/>: store the argument into the root's cell.</summary>
+    /// <summary>The inverse of <see cref="MethodCellFormalLoad"/>: store the argument into the root's cell — a formal's
+    /// copy-in, so a boundary copy that records no receiving reference (<see cref="CallEmitter.BoundaryCopyWrite"/>;
+    /// kb/Work PB2690).</summary>
     private string MethodCellFormalStore(DataItem root, string value) =>
-        OoCrossingType(root) == "string" ? CallEmitter.CallStringWrite(MethodCellPlace(root), value)
+        OoCrossingType(root) == "string" ? CallEmitter.BoundaryCopyWrite(MethodCellPlace(root), value)
         : OoVarGroupCarried(root) ? PlaceRenderer.WriteVarGroupImage(MethodCellPlace(root), value, "OO method formal copy-in of",
             formalStorage: true)
         : OoClassTable.LeafCarried(root) ? PlaceRenderer.WriteGroupLeaves(MethodCellPlace(root), value)
@@ -710,12 +712,18 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 ? g ? $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.VariableCarrier)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)})"
                     : $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.FixedImage)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)})"
                 : OoUnivUnbox(fi, $"__a[{i}].Value");
+            // A GROUP formal's write-back is a view over STORAGE (ManagedPointer.OverStorage, kb/Work PB2690): the method's
+            // fresh area hands it the receiving references made through the formal (__r), so a store past the capacity of
+            // the argument's dynamic-capacity table creates the occurrence whatever image it stored (§8.5.1.9.3).
             string rebox = OoUnivGroupCarried(fi) is { } rg
-                ? rg ? $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.WriteBackVariable)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)}, __v)"
-                    : $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.WriteBackFixed)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)}, __v)"
+                ? rg ? $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.WriteBackVariable)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)}, __v, __r)"
+                    : $"{nameof(UniversalGroupCarrier)}.{nameof(UniversalGroupCarrier.WriteBackFixed)}(__a[{i}].Value, __a[{i}].Description, {CaseDescription(c, i)}, __v, __r)"
                 : OoUnivRebox(fi, "__v");
             string crossing = OoFormalCrossingType(fi);
-            w.Line($"var __p{i} = __o{i} ? ManagedPointer<{crossing}>.Cell(default!) : ManagedPointer<{crossing}>.OverField(() => {unbox}, __v => __a[{i}].Value = {rebox});");
+            string view = OoUnivGroupCarried(fi) is not null
+                ? $"ManagedPointer<{crossing}>.{nameof(ManagedPointer<string>.OverStorage)}(() => {unbox}, (__v, __r) => __a[{i}].Value = {rebox})"
+                : $"ManagedPointer<{crossing}>.OverField(() => {unbox}, __v => __a[{i}].Value = {rebox})";
+            w.Line($"var __p{i} = __o{i} ? ManagedPointer<{crossing}>.Cell(default!) : {view};");
         }
         string argList = string.Join(", ", Enumerable.Range(0, formals).Select(i => OoArgPair($"__p{i}", $"__o{i} ? null : __a[{i}].Area", $"__o{i}")));
         w.Line(returning is null ? $"this.{m.CsName}({argList});" : $"var __rv = this.{m.CsName}({argList});");
@@ -810,9 +818,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
               // the slice the box reads, whatever the modifier's form (a literal one measures to its static length).
               + (src is RefModPlace
                 ? RuntimeApi.ObjReferenceModifiedArgument(RuntimeApi.ActivationDescriptionNew(a.Description),
-                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v"), U.Call.ArgumentArea(src))
+                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v", argumentView: true), U.Call.ArgumentArea(src))
                 : RuntimeApi.ObjLiveArgument(RuntimeApi.ActivationDescriptionNew(a.Description),
-                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v"), U.Call.ArgumentArea(src)))));
+                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v", argumentView: true), U.Call.ArgumentArea(src)))));
         w.Line($"var __ua{id} = new CobolInvokeArg[] {{ {boxes} }};");
         w.Line(u.Returning is not null
             ? $"var __ur{id} = new CobolInvokeArg({RuntimeApi.ActivationDescriptionNew(u.ReturningDescription!)});"
@@ -827,7 +835,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 OperandText.FieldImage(u.MethodSource!), Ctx.Data.Edition.DialectLevel));   // the edition's spelling, as the literal's (PB2991)
         w.Line($"{RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(u.Receiver))}.__CobolInvoke({selector}, __ua{id}, __ur{id});");
         if (u.Returning is { } ret)
-            w.Line(OoUnivCallerWrite(ret, $"__ur{id}!.Value") + "   // RETURNING delivery (§14.9.23.4 GR8)");
+            w.Line(OoUnivCallerWrite(ret, $"__ur{id}!.Value", argumentView: false) + "   // RETURNING delivery (§14.9.23.4 GR8)");
         EmitInvokePickup(u);   // §14.6.13.1.5 / §14.9.18.4 GR1b — the universal path propagates identically (D-EO6)
     }
 
@@ -953,15 +961,19 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
 
     /// <summary>The caller's copy-out / RETURNING delivery of a universal box — the twin of <see cref="OoUnivCallerRead"/>,
     /// arm for arm. The box comes back in the argument's own form (a smaller formal group's write-back is spliced over the
-    /// argument's image by the callee, §14.8.2.2 rule 1), so a fixed group takes its whole image back through
-    /// <see cref="CallEmitter.CallStringWrite"/>, the boundary writer that distributes the FULL image (the elementary
-    /// alphabet for a bit / national group).</summary>
-    private static string OoUnivCallerWrite(Place p, string box) =>
+    /// argument's image by the callee, §14.8.2.2 rule 1), so a fixed group takes its whole image back through the boundary
+    /// writer that distributes the FULL image (the elementary alphabet for a bit / national group).
+    /// <para>⛔ <paramref name="argumentView"/> is true for the WRITE HALF of an argument's live box, false for the RETURNING
+    /// delivery (kb/Work PB2690, branch review R1-3). The write half of a group's box is the method's whole image stored back
+    /// at its return, whichever occurrences it stored into, so it is a boundary copy that records no receiving reference
+    /// (<see cref="CallEmitter.BoundaryCopyWrite"/>); the RETURNING delivery is the INVOKE statement's own store into its
+    /// receiving item (§14.9.23.4 GR8), recorded like any other store (<see cref="CallEmitter.CallStringWrite"/>).</para></summary>
+    private static string OoUnivCallerWrite(Place p, string box, bool argumentView) =>
         p is RefModPlace ? PlaceRenderer.Write(p, $"(string){box}!")
         : CallEmitter.CallPlaceIsVarGroup(p)
             ? PlaceRenderer.WriteVarGroupImage(p, $"({RuntimeApi.VarGroupType}){box}!", "INVOKE copy-out into")
         : OoClassTable.LeafCarried(p.Item) ? PlaceRenderer.WriteGroupLeaves(p, $"(object?[]){box}!")
-        : p.Item.IsGroup ? CallEmitter.CallStringWrite(p, $"(string){box}!")
+        : p.Item.IsGroup ? argumentView ? CallEmitter.BoundaryCopyWrite(p, $"(string){box}!") : CallEmitter.CallStringWrite(p, $"(string){box}!")
         : OoUnivNativeBoxOverImage(p.Item) ? PlaceRenderer.Write(p, NumericRenderer.ImageOfCarrier($"({p.Item.Pic!.ClrType}){box}!", p.Item))   // kb/Work PB187
         : OoStringCarried(p.Item) ? PlaceRenderer.Write(p, $"(string){box}!")
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Write(new NumericImagePlace(p), $"(string){box}!")
@@ -1116,7 +1128,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         var (shape, fresh) = fields.AreaFormalShape(root);
                         w.Line($"{bf.CarrierLocal} = {RuntimeApi.ArgAdaptAreaOf(bf.ByValue ? "null" : bf.AreaParam, $"!{bf.OmittedFlag}", root.Class!.Width, shape, fresh)};   "
                             + $"// LINKAGE formal {root.CobolName} — laid over the argument's area (§14.2.3 GR8)");
-                        w.Line($"if (!{bf.OmittedFlag} && !ReferenceEquals({bf.CarrierLocal}, {bf.AreaParam})) {{ {MethodCellFormalStore(root, $"{bf.ParamName}.Value")} }}   "
+                        // …and, BY REFERENCE, records from then on the receiving references made through it, which a view
+                        // over storage a store can grow takes back at return (ManagedPointer.Watch; kb/Work PB2690).
+                        string watch = bf.ByValue ? "" : $" {bf.ParamName}.{nameof(ManagedPointer<string>.Watch)}({bf.CarrierLocal});";
+                        w.Line($"if (!{bf.OmittedFlag} && !ReferenceEquals({bf.CarrierLocal}, {bf.AreaParam})) {{ {MethodCellFormalStore(root, $"{bf.ParamName}.Value")}{watch} }}   "
                             + "// no area to share: the fresh cell takes the argument's value (§14.2.3 GR9 / GR10)");
                         continue;
                     }
@@ -1802,7 +1817,10 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             }
             if (a.WriteBack && a.Source is { } src)
             {
-                argExprs.Add(OoArgPair($"ManagedPointer<{crossing}>.OverField(() => {argValue}, __v => {{ {InvokeArgumentStore(a, src, "__v")} }})",
+                string store = InvokeArgumentStore(a, src, "__v", "__r", out bool overStorage);
+                argExprs.Add(OoArgPair(overStorage
+                        ? $"ManagedPointer<{crossing}>.{nameof(ManagedPointer<string>.OverStorage)}(() => {argValue}, (__v, __r) => {{ {store} }})"
+                        : $"ManagedPointer<{crossing}>.OverField(() => {argValue}, __v => {{ {store} }})",
                     U.Call.ArgumentArea(src), fwdTest ?? "false"));
                 continue;
             }
@@ -1896,33 +1914,44 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// <summary>⛔ HOW A STORE THROUGH A METHOD FORMAL REACHES ITS BY REFERENCE ARGUMENT (ISO §14.2.3 GR8; kb/Work PB2087):
     /// <paramref name="value"/>, in the formal's crossing form, written into the argument's own storage — the inverse of
     /// the read the typed INVOKE's arm chain states, so the formal's carrier (a view over the argument) round-trips on
-    /// every access. It is the write half of the view, never a copy-out after the call.</summary>
-    private string InvokeArgumentStore(BoundInvokeArg a, Place src, string value)
+    /// every access. It is the write half of the view, never a copy-out after the call.
+    /// <para>The two arms that OVERLAY a variable-length argument's storage set <paramref name="overStorage"/>: their store
+    /// can create occurrences of its dynamic-capacity tables, so the view is <c>ManagedPointer.OverStorage</c> and the store
+    /// takes the receiving references the method made (<paramref name="received"/>, kb/Work PB2690; §8.5.1.9.3).</para></summary>
+    private string InvokeArgumentStore(BoundInvokeArg a, Place src, string value, string received, out bool overStorage)
     {
         bool stringCarried = OoStringCarried(a.Formal);
+        overStorage = false;
         if (OoVarGroupCarried(a.Formal))
+        {
             // No prefix splice: a variable-length crossing carries whole components, so the write-back is
             // the exact inverse of the read (kb/Work PB204) — for a FIXED-length argument, the inverse of
             // its decomposition, each component fitted to its fixed table as §14.6.9.2 fits a dynamic
             // sender into a non-dynamic receiver (kb/Work PB965).
-            return FixedArgumentShapes(src, a.Formal) is (var fixedArgShape, var fixedFormalShape)
-                ? CallEmitter.CallStringWrite(src,
-                    RuntimeApi.VarGroupOverlaidImage(CallEmitter.CallStringRead(src), Atoms(fixedArgShape), value, Atoms(fixedFormalShape)))
-                // …and of a variable-length argument of another shape, the formal's store overlaid on the argument's
-                // storage: its material past the formal and its components the formal does not reach survive (kb/Work
-                // PB480; §14.2.3 GR8).
-                : VarGroupShapes(src, a.Formal) is (var argShape, var formalShape)
-                    ? PlaceRenderer.WriteVarGroupImage(src,
-                        RuntimeApi.VarGroupOverlay(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into", byReference: true), value,
-                            Atoms(argShape), Atoms(formalShape)),
-                        "INVOKE copy-out into")
-                : PlaceRenderer.WriteVarGroupImage(src, value, "INVOKE copy-out into");
-        else if (VarPlaceShapes(src, a.Formal) is (var wvArg, var wvFormal))
-            // …and its write-back OVERLAYS the argument's storage (§14.2.3 GR8): the argument's tables keep
-            // their current capacities and its material past the formal survives (kb/Work PB965).
+            if (FixedArgumentShapes(src, a.Formal) is (var fixedArgShape, var fixedFormalShape))
+                return CallEmitter.BoundaryCopyWrite(src,
+                    RuntimeApi.VarGroupOverlaidImage(CallEmitter.CallStringRead(src), Atoms(fixedArgShape), value, Atoms(fixedFormalShape)));
+            // …and of a variable-length argument of another shape, the formal's store overlaid on the argument's
+            // storage: its material past the formal and its components the formal does not reach survive (kb/Work
+            // PB480; §14.2.3 GR8).
+            if (VarGroupShapes(src, a.Formal) is not (var argShape, var formalShape))
+                return PlaceRenderer.WriteVarGroupImage(src, value, "INVOKE copy-out into");
+            overStorage = true;
             return PlaceRenderer.WriteVarGroupImage(src,
-                RuntimeApi.VarGroupOverlayImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into", byReference: true), Atoms(wvArg), value, Atoms(wvFormal)),
+                RuntimeApi.VarGroupOverlay(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into", byReference: true), value,
+                    Atoms(argShape), Atoms(formalShape), received),
                 "INVOKE copy-out into");
+        }
+        else if (VarPlaceShapes(src, a.Formal) is (var wvArg, var wvFormal))
+        {
+            // …and its write-back OVERLAYS the argument's storage (§14.2.3 GR8): the argument's tables keep
+            // their current capacities, but for the occurrences the method stored into past one (§8.5.1.9.3), and its
+            // material past the formal survives (kb/Work PB965, PB2690).
+            overStorage = true;
+            return PlaceRenderer.WriteVarGroupImage(src,
+                RuntimeApi.VarGroupOverlayImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into", byReference: true), Atoms(wvArg), value, Atoms(wvFormal), received),
+                "INVOKE copy-out into");
+        }
         else if (OoClassTable.LeafCarried(a.Formal))
             return PlaceRenderer.WriteGroupLeaves(src, value);   // the leaf vector's copy-back (kb/Work PB1116)
         else if (a.Formal.IsGroup || src.Item.IsGroup)
@@ -1930,7 +1959,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             int fw = a.Formal.IsGroup ? CallEmitter.BoundaryImageWidth(a.Formal) : CallEmitter.ElementaryFormalWindow(a.Formal);
             // The §14.8.2.2 rule-1 prefix: splice the formal's characters back over the argument's
             // LEADING positions, preserving the tail beyond the formal's width.
-            return CallEmitter.CallStringWrite(src,
+            return CallEmitter.BoundaryCopyWrite(src,
                 // to-the-end window from fw+1 — the OMITTED-length sentinel; empty when the argument is no wider than
                 // the formal (an image WINDOW the compiler chose, not a program's reference modification — it
                 // neither raises nor terminates; kb/Work PB1707).
