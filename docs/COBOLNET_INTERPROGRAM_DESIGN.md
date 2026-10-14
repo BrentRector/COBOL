@@ -623,7 +623,8 @@ leaves the created content "undefined", and the view keeps the space fill (branc
 half).** The formal's fresh area is a `StorageCell`, and every store through a view of a class located by a data-address
 pointer (a LINKAGE item, a BASED item: `RedefinesClass.BasedPointerField`) is followed by `StorageCell.Received(offset,
 width)` over the view's window (`PlaceRenderer.Received`, wrapping every Tier-B view store: `Write`'s `RedefViewPlace` arm
-and the national group image store) — a null test unless a boundary watches the cell. The boundary starts the record once
+and the national group image store; the store and its record are ONE block statement, because `Write` returns one C#
+statement that a table SORT's place-back loop embeds as its body) — a null test unless a boundary watches the cell. The boundary starts the record once
 the area is filled (`ManagedPointer<T>.Watch(area)`, emitted after each area formal's copy-in, program and method), so the
 filling is no reference; a view over storage a store can GROW (`ManagedPointer<T>.OverStorage`: `CobolArgAdapt.Text`'s and
 `VarGroup`'s variable-argument arms, the typed INVOKE's overlaying argument store, the universal box's `WriteBackFixed` /

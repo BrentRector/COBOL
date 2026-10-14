@@ -46,3 +46,12 @@ reviewed head, GQ, UO and TO printed 3 where 8.5.1.9.3 gives 1. R1-4: the record
 positions, not its fixed run, and the comments now say so. Re-gate: run 20261014T201825Z-618d8a, `=== BUILD-LOCAL GATE:
 LEG 1 ONLY (batched gating, PB2515): GREEN`; `PlaceStorageFormSwitchDriftTests` was again planned into leg 2, and it passed
 when run on its own.
+
+**Landing stop (Linux gate RED on 917df8e03).** Three 2002 table-SORT goldens over a BASED table
+(`pb1175_table_sort_shared_storage`, `pb1922_table_sort_pointer_element`, `pb1951_table_sort_pointer_table_element`)
+no longer compiled: CS0103 on the loop variable `__eN`. `PlaceRenderer.Write` returns ONE C# statement, and the table
+SORT's place-back loop embeds it as the loop body (`for (…) <store>`), but `Received` appended the record as a second bare
+statement, which fell outside the loop. The store and its record are now one block statement, so every caller that
+embeds a store keeps both. It reproduced on Windows with the same compiler, so it was the branch's own defect, not a
+host difference. The Windows leg 1 never ran the three: no impact map was recorded for the base, so every case was tier 1
+and leg 1 took the cheapest half by recorded time. The Linux gate runs the whole population and caught it.

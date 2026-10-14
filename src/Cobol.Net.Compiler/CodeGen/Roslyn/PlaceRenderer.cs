@@ -276,11 +276,15 @@ internal static class PlaceRenderer
     /// item, a BASED item: <c>RedefinesClass.BasedPointerField</c>) can lie over a boundary's fresh area, and only its own
     /// cell (not a dynamic-capacity table's element cell) is that area. And only a description holding a table of a fixed
     /// (or DEPENDING) occurrence count can face a dynamic-capacity table (§8.5.1.12.1: such a table corresponds to a
-    /// table), so a store through a description with none records nothing and costs nothing.</summary>
+    /// table), so a store through a description with none records nothing and costs nothing.
+    /// ⛔ The store and its record are ONE block statement: <see cref="Write"/> returns ONE C# statement, and its callers
+    /// embed it where only one statement stands (a table SORT's place-back loop, <c>for (…) &lt;store&gt;</c>), so two
+    /// bare statements would leave the record outside the loop, naming the loop's variable out of its scope (CS0103 on
+    /// legal source: the 2002 table-SORT goldens over a BASED table, kb/Work PB2690's landing).</summary>
     private static string Received(RedefViewPlace v, string store) =>
         v is { Cell: { Segments: [RootFieldSegment] } cell, ViewItem.Root: { Class.BasedPointerField: not null } root }
         && DataItem.DescendantsOf(root).Any(static d => d.Occurs is not null && !d.IsDynamicTable)
-            ? $"{store} {RenderPath(cell, AccessDir.Sending)}.{nameof(StorageCell.Received)}({PositionRenderer.Render(v.Offset)}, {v.Width});"
+            ? $"{{ {store} {RenderPath(cell, AccessDir.Sending)}.{nameof(StorageCell.Received)}({PositionRenderer.Render(v.Offset)}, {v.Width}); }}"
             : store;
 
     /// <summary>⛔ A BOUNDARY COPY OF A GROUP'S WHOLE IMAGE (<c>CallEmitter.BoundaryCopyWrite</c>: the write half of a BY
