@@ -1,0 +1,8 @@
+TG:ABCD|
+d=wxyzEFGHIJ|10
+TG:CDEF|
+d=ABwxyzGHIJ|10
+TG:AB  |
+d=wxCDEFGHIJ|10
+TG:EFGH|
+d=ABCDwxyzIJ|10

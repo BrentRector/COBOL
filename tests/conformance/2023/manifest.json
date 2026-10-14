@@ -1,6 +1,7 @@
 {
  "_comment": "The 2023 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2023 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
  "enabled": [
+  "pb2586_unstring_sr2_category_operands",
   "pb2841_continue_after_non_finite",
   "pb2757_medium_bytes_not_bom_sniffed",
   "pb1965_annex_c_word_keys",
@@ -453,6 +454,9 @@
   "pb2918_sdidi_lift_prohibited",
   "pb2918_native_dec_lane_wide_binary_operand",
   "pb2966_sdidi_unsigned_wide_operand_and_landing",
+  "pb3017_sdidi_divide_remainder_beyond_the_int128_carrier",
+  "pb3019_native_float_intermediate_past_the_carrier_is_a_size_error",
+  "pb3018_native_dec_lane_wide_binary_operand_signed_and_unsigned_agree",
   "pb2965_sdidi_equivalent_expression_functions_round_wide_argument",
   "pb66_float_edited_comma_mode",
   "pb66_float_edited_algebraic_and_checking",

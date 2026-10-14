@@ -267,7 +267,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
                     return new BoundUnsupported("UNSTRING DELIMITER IN operand");   // identifier-5 is a receiver — the chokepoint reported it (kb/Work PB429)
                 // identifier-5 is SR2's fourth name (kb/Work PB155) — the delimiter RECEIVER shares the
                 // category rule, not SR4's receiver list.
-                if (Sr2OffendingCategory(d5.Item) is { } badD5)
+                if (Sr2OffendingCategory(d5) is { } badD5)
                     return Reject($"UNSTRING DELIMITER IN '{DataBinder.WrittenText(drefs[next])}' is category {badD5} "
                         + "(identifier-5 shall reference a data item of category alphanumeric or national, "
                         + "ISO §14.9.48.3 SR2)");
@@ -504,13 +504,17 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     /// them).</summary>
     private static string? UnstringSenderCategory(BoundOperand source) => source switch
     {
-        BoundFieldOperand f => Sr2OffendingCategory(f.Place.Item),
+        BoundFieldOperand f => Sr2OffendingCategory(f.Place),
         // ⛔ THE LITERAL ARMS OF §14.9.48.3 SR1 (kb/Work PB1181): "Literal-1 and literal-2 shall be literals of the
         // category alphanumeric or national" — a numeric literal (written, or a constant-name's, or a function folded
         // at bind) and a boolean one (plain or ALL) offend. They fell to `_ => null` because this arm was written for
         // the IDENTIFIER positions of SR2 only, so `DELIMITED BY 5` split the sender on the digit.
         BoundNumericLiteral => "numeric",
         BoundStringLiteral { Category: PicCategory.Boolean } or BoundAllLiteral { Category: PicCategory.Boolean } => "boolean",
+        // ⛔ THE FUNCTION ARM OF THE ALPHABETIC FOLD (kb/Work PB2586): FUNCTION CONCAT over arguments that are all PIC A
+        // returns a value of category ALPHABETIC (§15.18.4 r3), which the model carries as `ResultCategory`
+        // Alphanumeric plus the `ResultIsAlphabetic` rider — the alphabetic result is none of SR2's two categories.
+        BoundComputedOperand { Expr: BoundIntrinsicCall { ResultIsAlphabetic: true } } => "alphabetic",
         // ⛔ THE SAME WHITELIST, ON THE OTHER ARM (kb/Work PB664). This arm listed the categories it REFUSES
         // while its FIELD twin was being turned into the rule's own admit-list — two arms of one sentence, one
         // of them fixed, which is this repository's most reproducible defect shape. It is behaviour-identical
@@ -537,24 +541,29 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
     /// <para>A GROUP has no PICTURE and answers by its GROUP-USAGE: an ordinary group is "an alphanumeric group
     /// item" (§13.18.29.4 GR3) and a national group is category national (GR2), both admitted; a BIT group is
     /// class and category BOOLEAN (GR1a) and is not.</para>
-    /// <para>⚠ Category ALPHABETIC is admitted here, and the reason is a MODEL fold, not an adjudication: the
-    /// storage model carries PIC A as <see cref="PicCategory.Alphanumeric"/> (one string carrier), so this
-    /// predicate cannot tell them apart. SR2 is category-worded and would separate them — the un-folding lives
-    /// in <c>IntrinsicArgumentRules.ClassOfPlace</c>'s <c>PicInfo.IsAlphabetic</c> and reaching it from here is
-    /// a change of verdict for existing source, so it is recorded rather than made silently.</para></summary>
-    private static string? Sr2OffendingCategory(DataItem item) => item.Pic switch
+    /// <para>⛔ ELEMENTARY OPERANDS ASK THE ONE CATEGORY PREDICATE, <see cref="ItemCategory.IsAlphanumericOrNational(Place)"/>
+    /// (kb/Work PB2586). Category ALPHABETIC (PIC A) is a category of its own in §8.5.2.1 Table 2, and SR2 names
+    /// only alphanumeric and national, so a PIC A sender, delimiter or DELIMITER IN receiver offends — this screen
+    /// used to match <c>PicCategory.Alphanumeric</c> directly, which the storage model also uses for PIC A (one
+    /// string carrier), and so admitted it. The predicate reads the alphabetic rider the model keeps
+    /// (<c>PicInfo.IsAlphabetic</c>) and the edited axes, and it takes the PLACE: a reference-modified operand is
+    /// the §8.4.3.3.4 GR6 unique data item, whose category is the item's own with the exhaustive GR6 a)-c)
+    /// rewrites — alphabetic SURVIVES the slice (so <c>A(1:2)</c> over PIC A offends, kb/Work PB73) while a
+    /// slice of a numeric or numeric-edited item is category alphanumeric (or national) and is a LEGAL operand,
+    /// which the old screen, reading the inner item, refused. SR4's identifier-4 is a different rule and keeps
+    /// category alphabetic (<see cref="UnstringReceiverAllowed"/>).</para></summary>
+    private static string? Sr2OffendingCategory(Place place) => place.Item.Pic switch
     {
         // ⛔ A STRONGLY-TYPED GROUP is none of the three (kb/Work PB244): §8.5.2.1 — "Both the class and the category
         // of a strongly-typed group item are the type-name specified in the TYPE clause", and only the groups that
         // are NOT strongly typed are alphanumeric, boolean or national. SR2 admits category alphanumeric or
         // national only, so it offends by construction (it compiled and aborted at run time when it held a
         // pointer leaf, and quietly examined the image of one that did not).
-        null when StrongTypeModel.IsStrongGroup(item) =>
-            $"'{StrongTypeModel.TypeAnchor(item)?.TypeName ?? item.CobolName}' — the type-name of a strongly-typed group item (§8.5.2.1)",
-        null => item.GroupUsage is GroupUsage.Bit ? "boolean (a bit group, §13.18.29.4 GR1 a)" : null,
-        { Category: PicCategory.Alphanumeric or PicCategory.National, EditMask: null } => null,
+        null when StrongTypeModel.IsStrongGroup(place.Item) =>
+            $"'{StrongTypeModel.TypeAnchor(place.Item)?.TypeName ?? place.Item.CobolName}' — the type-name of a strongly-typed group item (§8.5.2.1)",
+        null => place.Item.GroupUsage is GroupUsage.Bit ? "boolean (a bit group, §13.18.29.4 GR1 a)" : null,
         // Every other category offends, named in §8.5.2.1 Table 2's words through the ONE spelling (kb/Work PB850).
-        { } p => ItemCategory.CategoryName(p),
+        _ => ItemCategory.IsAlphanumericOrNational(place) ? null : ItemCategory.CategoryName(place),
     };
 
     /// <summary>A STRING / UNSTRING syntax-rule violation: reported at BIND (COBOLNET1651 — the compile fails) and

@@ -1,6 +1,8 @@
 {
  "_comment": "The NEGATIVE corpus (must-REJECT programs; VERSION_TEST_MATRIX_DESIGN P2.8/Phase-2): each enabled entry is <name>.cob + <name>.err (the expected diagnostic substring, e.g. an edition-band code). The editions that must reject are named by the SOURCE, not by this manifest: CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic reads them from the '*> reject-at: <year> ...' header on <name>.cob's FIRST line and throws when it is absent. (This comment used to promise an \"editions\" map; no entry ever carried one and the runner never looked for one.) Seeding: >=1 case per Wave-1 gate + the reserved-word interval witnesses (roadmap Phase 2 W2). The matrix reject cells already pin gate diagnostics; THIS corpus holds the free-form adversarial cases.",
  "enabled": [
+  "pb2532-comment-paragraph-repeated",
+  "pb2532-comment-paragraph-out-of-order",
   "pb3129-type-index-in-constant-record",
   "pb3129-type-group-pointer-in-constant-record",
   "pb3129-type-based-variable-length-group",
@@ -1460,6 +1462,13 @@
   "pb155-divide-into-alpha",
   "pb155-set-to-edited",
   "pb155-unstring-edited-sender",
+  "pb2586-unstring-alphabetic-sender",
+  "pb2586-unstring-alphabetic-delimiter",
+  "pb2586-unstring-alphabetic-delimiter-in",
+  "pb2586-unstring-alphabetic-slice-sender",
+  "pb2586-unstring-alphabetic-function-sender",
+  "pb2586-unstring-alphabetic-function-slice-sender",
+  "pb2586-move-concat-alphabetic-slices-to-boolean",
   "pb155-unstring-numeric-delimiter",
   "pb157-compute-all-literal",
   "pb157-compute-bool-arith-rhs",
@@ -1866,6 +1875,7 @@
   "pb480-universal-variable-length-below-2014",
   "pb480-universal-variable-length-shapes-below-2014",
   "pb480-typed-restricted-pointer-type",
+  "pb3128-refmod-dynamic-limit-below-group-formal",
   "pb2077-refmod-into-elementary-by-reference",
   "pb2077-refmod-shorter-than-group-formal",
   "pb2077-elementary-into-group-formal",
@@ -2640,7 +2650,12 @@
   "pb2623-method-reserved-at-2002-2014",
   "pb1616-define-hex-odd",
   "pb1616-omitted-branch-hex-odd",
-  "pb1616-define-zero-length-below-2014"
+  "pb1616-define-zero-length-below-2014",
+  "pb2017-binary-operator-no-spaces",
+  "pb2017-binary-operator-no-space-after",
+  "pb2017-unary-operator-no-space-after",
+  "pb2017-operator-in-subscript",
+  "pb2017-operator-touches-comma-decimal-point"
  ],
  "pending": []
 }

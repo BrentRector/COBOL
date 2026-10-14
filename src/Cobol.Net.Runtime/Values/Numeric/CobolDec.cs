@@ -135,6 +135,38 @@ public readonly record struct CobolDec(Int128 Sig, int Exp)
         return new CobolDec(Sig < 0 && rem != 0 ? q - 1 : q, 0);
     }
 
+    /// <summary>⛔ THE SUBSIDIARY QUOTIENT OF DIVIDE ... GIVING ... REMAINDER ON THE SDIDI (ISO §14.9.12.4 6) c), kb/Work
+    /// PB3017): "a subsidiary quotient is developed that is signed and derived from the quotient by truncation of digits
+    /// at the least significant end and that has the same number of digits and the same decimal point location as the
+    /// data item referenced by identifier-3" — the SDIDI <paramref name="quotient"/> truncated toward zero at
+    /// <paramref name="scale"/> fraction digits (the receiver's decimal point location), then, when
+    /// <paramref name="digits"/> is positive, reduced to its low-order <paramref name="digits"/> digits (the
+    /// receiver's digit count, the digits a §14.7.5 no-phrase store would keep — <see cref="CobolNum.CapDigits"/>'s
+    /// rule on this carrier). GR7 then forms the remainder as the SDIDI expression dividend − (subsidiary-quotient ×
+    /// divisor). The result stays an SDIDI AT the quotient's own exponent (never re-expressed at <paramref name="scale"/>,
+    /// which would put a 38-digit significand into a carrier whose invariant is 34): a quotient already coarser than the
+    /// scale comes back with its significand untouched, so the Int128 carrier plays no part — a quotient near 4.86E+37
+    /// (an unsigned 16-byte dividend, or a float past 1.7E+38) is as exact here as 7.</summary>
+    public static CobolDec SubsidiaryQuotient(CobolDec quotient, int scale, int digits)
+    {
+        if (quotient.Sig == 0) return new CobolDec(0, 0);
+        Int128 sig = quotient.Sig;
+        int exp = quotient.Exp;
+        int e = exp + scale;                                    // the decimal places between the quotient's last digit and the scale
+        if (e < 0)
+        {
+            sig = -e > 38 ? 0 : DivRemPow10(sig, -e).Q;         // truncation toward zero at the receiver's scale
+            exp = -scale;
+            e = 0;
+        }
+        if (digits > 0 && digits <= 38)
+        {
+            if (e >= digits) return new CobolDec(0, 0);         // every kept digit lies below the first nonzero one
+            sig %= Pow10.AsWide(digits - e);                    // (sig × 10^e) mod 10^digits, sign preserved
+        }
+        return sig == 0 ? new CobolDec(0, 0) : new CobolDec(sig, exp);
+    }
+
     /// <summary>The multiplicative identity (the §8.8.1.5.4 r1/r3 constant 1).</summary>
     private static readonly CobolDec One = new(1, 0);
 

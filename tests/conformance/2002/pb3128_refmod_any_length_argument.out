@@ -1,0 +1,10 @@
+TG:ABCD|
+la=wxyzEFGHIJ
+TG:yzEF|
+la=wxwxyzGHIJ
+TG:AB  |
+la=wxCDEFGHIJ
+x1=xCDEF |x2=xCDEF |
+TG:CDEF|
+la=ABwxyzGHIJ
+g=ABwxyzGHIJ

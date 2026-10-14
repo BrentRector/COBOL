@@ -780,7 +780,7 @@
 078000     MOVE -1.92090 TO MIN-RANGE.                                  IF1174.2
 078100     MOVE -1.92074 TO MAX-RANGE.                                  IF1174.2
 078200 F-LOG10-TEST-22.                                                 IF1174.2
-078300     COMPUTE WS-NUM = FUNCTION LOG10((A * G)/ 1000).              IF1174.2
+078300     COMPUTE WS-NUM = FUNCTION LOG10((A * G) / 1000).             IF1174.2
 078400     IF (WS-NUM >= MIN-RANGE) AND                                 IF1174.2
 078500        (WS-NUM <= MAX-RANGE) THEN                                IF1174.2
 078600                    PERFORM PASS                                  IF1174.2
