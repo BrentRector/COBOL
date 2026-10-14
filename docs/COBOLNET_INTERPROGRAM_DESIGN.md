@@ -630,10 +630,13 @@ filling is no reference; a view over storage a store can GROW (`ManagedPointer<T
 `WriteBackVariable`) hands the record (`ReceivingReferences`, in the positions of the formal's STORAGE: its fixed run with
 each dynamic-capacity table's one-element reservation, `Geometry.StorageAt`) to `CobolVarGroup.Overlay`, and
 `OverlaidTable` / `GrownCount` raise the capacity to the highest occurrence the callee referenced as a receiving item,
-whatever image it stored there (§8.5.1.9.3). ⛔ A BOUNDARY COPY records nothing: a formal's copy-in and the write half of a
-BY REFERENCE argument's view of a GROUP (`CallEmitter.BoundaryCopyWrite` → `PlaceRenderer.WriteGroupCopy`) store the whole
-image whichever positions the activated element touched, so recording them would make one store a reference to every
-occurrence; a store that reaches the area only so (a further activation's non-aliased copy) is still recognised by its
+whatever image it stored there (§8.5.1.9.3). ⛔ A BOUNDARY COPY records nothing: a formal's copy-in (program and method) and the write half of a
+BY REFERENCE argument's view or universal box of a GROUP (`CallEmitter.BoundaryCopyWrite` → `PlaceRenderer.WriteGroupCopy`,
+decided on the group's FULL allocation, so an occurs-depending group and a bit / national group crossing as its elementary
+value are covered too; `OoUnivCallerWrite(argumentView: true)`) store the whole image whichever positions the activated
+element touched, so recording them would make one store a reference to every occurrence. An ELEMENTARY or
+reference-modified argument's view is written per store, so its write half is the activated element's receiving reference
+and records, and a RETURNING delivery is the statement's own store and records too; a store that reaches the area only so (a further activation's non-aliased copy) is still recognised by its
 effect, an occurrence whose image differs from the one the view showed. Goldens
 `2014/pb2690_store_of_shown_image_grows_capacity_call` and `_invoke`. ⛔ ONE SIGNAL, ON THE DATA: only a BY REFERENCE crossing's builder states it
 (the emitted `AsVarImage(__byReference: true)`, `StorageCell.VarGroupAt(byReference: true)`, reached through

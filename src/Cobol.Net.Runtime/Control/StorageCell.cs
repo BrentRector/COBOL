@@ -82,8 +82,9 @@ public sealed class StorageCell
     /// boundary calls it once the fresh area is filled from the argument, so the filling itself is no reference.</summary>
     internal void WatchReceiving() => _received = new bool[Ref.Length];
 
-    /// <summary>The receiving references recorded since <see cref="WatchReceiving"/>, in the positions of the formal whose
-    /// image starts at <paramref name="offset"/>; null when nothing watches the cell.</summary>
+    /// <summary>The receiving references recorded since <see cref="WatchReceiving"/>, in the STORAGE positions of the formal
+    /// whose area starts at <paramref name="offset"/> (the cell's positions: <see cref="ReceivingReferences"/>); null when
+    /// nothing watches the cell.</summary>
     internal ReceivingReferences? ReceivedFrom(long offset) =>
         _received is { } marks ? new ReceivingReferences(marks, (int)offset) : null;
 

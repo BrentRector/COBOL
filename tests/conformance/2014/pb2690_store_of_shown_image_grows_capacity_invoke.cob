@@ -22,6 +22,16 @@
       *>       stores SPACE into LSP (3)                       = q, 3
       *>   UP  SP through a universal object reference        = q, 3
       *>   BC  SA BY CONTENT (14.2.3 GR9): nothing created    = 1
+      *>   UO  a method whose formal has a fixed table passes it
+      *>       on through a universal object reference to a
+      *>       method whose formal has a DYNAMIC-CAPACITY table
+      *>       (another shape), which stores nothing: no
+      *>       statement references an occurrence past the
+      *>       capacity                                        = 1
+      *>   US  UO, but the first method stores the default "a"
+      *>       into its LE (3) before passing it on            = ab ab ab, 3
+      *>   TO  an OCCURS DEPENDING formal passed on to the same
+      *>       method through the typed reference SELF          = 1
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690SGI.
        ENVIRONMENT DIVISION.
@@ -60,6 +70,21 @@
           05 BTB OCCURS DYNAMIC CAPACITY IN CB FROM 1 INITIALIZED.
              10 BE PIC X VALUE "a".
              10 BF PIC X VALUE "b".
+       01 GUO.
+          05 OH PIC X VALUE "x".
+          05 OTB OCCURS DYNAMIC CAPACITY IN COU FROM 1 INITIALIZED.
+             10 OQE PIC X VALUE "a".
+             10 OQF PIC X VALUE "b".
+       01 GUS.
+          05 QH PIC X VALUE "x".
+          05 QTB OCCURS DYNAMIC CAPACITY IN CQS FROM 1 INITIALIZED.
+             10 QQE PIC X VALUE "a".
+             10 QQF PIC X VALUE "b".
+       01 GTO.
+          05 TN1 PIC 9 VALUE 3.
+          05 TTB OCCURS DYNAMIC CAPACITY IN CTO FROM 1 INITIALIZED.
+             10 TQE PIC X VALUE "a".
+             10 TQF PIC X VALUE "b".
        PROCEDURE DIVISION.
        MAIN.
            INVOKE PB2690SK3 "NEW" RETURNING O
@@ -86,6 +111,16 @@
            INVOKE O "STORESA" USING BY CONTENT GB
            MOVE CB TO WS-C
            DISPLAY "BC=" WS-C
+           INVOKE O "PASSONU" USING GUO
+           MOVE COU TO WS-C
+           DISPLAY "UO=" WS-C
+           INVOKE O "STOREPASSONU" USING GUS
+           MOVE CQS TO WS-C
+           DISPLAY "US=[" QQE (1) QQF (1) " " QQE (2) QQF (2) " "
+               QQE (3) QQF (3) "] " WS-C
+           INVOKE O "PASSONT" USING GTO
+           MOVE CTO TO WS-C
+           DISPLAY "TO=" WS-C
            STOP RUN.
        END PROGRAM PB2690SGI.
 
@@ -136,6 +171,78 @@
        MAIN-P.
            MOVE SPACE TO LSP (3).
        END METHOD STORESP.
+
+       METHOD-ID. PASSONU.
+       DATA DIVISION.
+       LOCAL-STORAGE SECTION.
+       01 UL USAGE OBJECT REFERENCE.
+       LINKAGE SECTION.
+       01 LO.
+          05 LOH PIC X.
+          05 LOT OCCURS 3.
+             10 LOE PIC X.
+             10 LOF PIC X.
+       PROCEDURE DIVISION USING LO.
+       MAIN-P.
+           SET UL TO SELF
+           INVOKE UL "TAKEDYN" USING LO.
+       END METHOD PASSONU.
+
+       METHOD-ID. STOREPASSONU.
+       DATA DIVISION.
+       LOCAL-STORAGE SECTION.
+       01 UL USAGE OBJECT REFERENCE.
+       LINKAGE SECTION.
+       01 LQ.
+          05 LQH PIC X.
+          05 LQT OCCURS 3.
+             10 LQE PIC X.
+             10 LQF PIC X.
+       PROCEDURE DIVISION USING LQ.
+       MAIN-P.
+           MOVE "a" TO LQE (3)
+           SET UL TO SELF
+           INVOKE UL "TAKEDYN" USING LQ.
+       END METHOD STOREPASSONU.
+
+       METHOD-ID. TAKEDYN.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LD.
+          05 LDH PIC X.
+          05 LDT OCCURS DYNAMIC CAPACITY IN CDT FROM 1.
+             10 LDE PIC X.
+             10 LDF PIC X.
+       PROCEDURE DIVISION USING LD.
+       MAIN-P.
+           CONTINUE.
+       END METHOD TAKEDYN.
+
+       METHOD-ID. PASSONT.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LT9.
+          05 LTN PIC 9.
+          05 LTT OCCURS 1 TO 3 DEPENDING ON LTN.
+             10 LTE PIC X.
+             10 LTF PIC X.
+       PROCEDURE DIVISION USING LT9.
+       MAIN-P.
+           INVOKE SELF "TAKEDYN9" USING LT9.
+       END METHOD PASSONT.
+
+       METHOD-ID. TAKEDYN9.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LD9.
+          05 LD9N PIC 9.
+          05 LD9T OCCURS DYNAMIC CAPACITY IN CD9 FROM 1.
+             10 LD9E PIC X.
+             10 LD9F PIC X.
+       PROCEDURE DIVISION USING LD9.
+       MAIN-P.
+           CONTINUE.
+       END METHOD TAKEDYN9.
 
        END OBJECT.
        END CLASS PB2690SK3.

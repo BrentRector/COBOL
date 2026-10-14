@@ -38,6 +38,13 @@
       *>       stores "Q" into its position 2 (FE (1), inside the
       *>       capacity): no occurrence past the capacity is
       *>       referenced, so none is created                   = Qb, 1
+      *>   GQ  an OCCURS DEPENDING formal (count 3 from the
+      *>       argument) passed on BY REFERENCE to a program
+      *>       whose formal has a DYNAMIC-CAPACITY table (another
+      *>       shape), which stores nothing: no statement
+      *>       references an occurrence past the capacity       = 1
+      *>   GP  GQ, but the middle program first stores the
+      *>       default "a" into its FE (3)                       = ab ab ab, 3
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690SG.
        DATA DIVISION.
@@ -93,6 +100,16 @@
           05 ETB OCCURS DYNAMIC CAPACITY IN CE FROM 1 INITIALIZED.
              10 EE PIC X VALUE "a".
              10 EF PIC X VALUE "b".
+       01 GQ.
+          05 ON1 PIC 9 VALUE 3.
+          05 OTB OCCURS DYNAMIC CAPACITY IN COO FROM 1 INITIALIZED.
+             10 OQE PIC X VALUE "a".
+             10 OQF PIC X VALUE "b".
+       01 GP.
+          05 PN1 PIC 9 VALUE 3.
+          05 PTB OCCURS DYNAMIC CAPACITY IN CPP FROM 1 INITIALIZED.
+             10 PQE PIC X VALUE "a".
+             10 PQF PIC X VALUE "b".
        PROCEDURE DIVISION.
        MAIN.
            CALL "PB2690SA" AS NESTED USING GA
@@ -129,6 +146,13 @@
            CALL "PB2690SE" AS NESTED USING GE
            MOVE CE TO WS-C
            DISPLAY "GE=[" EE (1) EF (1) "] " WS-C
+           CALL "PB2690SO" AS NESTED USING GQ
+           MOVE COO TO WS-C
+           DISPLAY "GQ=" WS-C
+           CALL "PB2690SP" AS NESTED USING GP
+           MOVE CPP TO WS-C
+           DISPLAY "GP=[" PQE (1) PQF (1) " " PQE (2) PQF (2) " "
+               PQE (3) PQF (3) "] " WS-C
            STOP RUN.
 
        IDENTIFICATION DIVISION.
@@ -262,4 +286,49 @@
            MOVE "Q" TO LX7 (2:1)
            GOBACK.
        END PROGRAM PB2690SX.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SO.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LO.
+          05 LON PIC 9.
+          05 TO1 OCCURS 1 TO 3 DEPENDING ON LON.
+             10 LOE PIC X.
+             10 LOF PIC X.
+       PROCEDURE DIVISION USING LO.
+       MAIN.
+           CALL "PB2690SD" USING LO
+           GOBACK.
+       END PROGRAM PB2690SO.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SP.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LP.
+          05 LPN PIC 9.
+          05 TP1 OCCURS 1 TO 3 DEPENDING ON LPN.
+             10 LPE PIC X.
+             10 LPF PIC X.
+       PROCEDURE DIVISION USING LP.
+       MAIN.
+           MOVE "a" TO LPE (3)
+           CALL "PB2690SD" USING LP
+           GOBACK.
+       END PROGRAM PB2690SP.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SD IS COMMON.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LD.
+          05 LDN PIC 9.
+          05 TD OCCURS DYNAMIC CAPACITY IN CDD FROM 1.
+             10 LDE PIC X.
+             10 LDF PIC X.
+       PROCEDURE DIVISION USING LD.
+       MAIN.
+           GOBACK.
+       END PROGRAM PB2690SD.
        END PROGRAM PB2690SG.

@@ -76,9 +76,11 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
         : OoClassTable.LeafCarried(root) ? PlaceRenderer.GroupLeaves(MethodCellPlace(root))
         : PlaceRenderer.Read(MethodCellPlace(root));
 
-    /// <summary>The inverse of <see cref="MethodCellFormalLoad"/>: store the argument into the root's cell.</summary>
+    /// <summary>The inverse of <see cref="MethodCellFormalLoad"/>: store the argument into the root's cell — a formal's
+    /// copy-in, so a boundary copy that records no receiving reference (<see cref="CallEmitter.BoundaryCopyWrite"/>;
+    /// kb/Work PB2690).</summary>
     private string MethodCellFormalStore(DataItem root, string value) =>
-        OoCrossingType(root) == "string" ? CallEmitter.CallStringWrite(MethodCellPlace(root), value)
+        OoCrossingType(root) == "string" ? CallEmitter.BoundaryCopyWrite(MethodCellPlace(root), value)
         : OoVarGroupCarried(root) ? PlaceRenderer.WriteVarGroupImage(MethodCellPlace(root), value, "OO method formal copy-in of",
             formalStorage: true)
         : OoClassTable.LeafCarried(root) ? PlaceRenderer.WriteGroupLeaves(MethodCellPlace(root), value)
@@ -816,9 +818,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
               // the slice the box reads, whatever the modifier's form (a literal one measures to its static length).
               + (src is RefModPlace
                 ? RuntimeApi.ObjReferenceModifiedArgument(RuntimeApi.ActivationDescriptionNew(a.Description),
-                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v"), U.Call.ArgumentArea(src))
+                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v", argumentView: true), U.Call.ArgumentArea(src))
                 : RuntimeApi.ObjLiveArgument(RuntimeApi.ActivationDescriptionNew(a.Description),
-                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v"), U.Call.ArgumentArea(src)))));
+                    $"(object?){OoUnivCallerRead(src)}", OoUnivCallerWrite(src, "__v", argumentView: true), U.Call.ArgumentArea(src)))));
         w.Line($"var __ua{id} = new CobolInvokeArg[] {{ {boxes} }};");
         w.Line(u.Returning is not null
             ? $"var __ur{id} = new CobolInvokeArg({RuntimeApi.ActivationDescriptionNew(u.ReturningDescription!)});"
@@ -833,7 +835,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 OperandText.FieldImage(u.MethodSource!), Ctx.Data.Edition.DialectLevel));   // the edition's spelling, as the literal's (PB2991)
         w.Line($"{RuntimeApi.ObjRequireNonNull(PlaceRenderer.Read(u.Receiver))}.__CobolInvoke({selector}, __ua{id}, __ur{id});");
         if (u.Returning is { } ret)
-            w.Line(OoUnivCallerWrite(ret, $"__ur{id}!.Value") + "   // RETURNING delivery (§14.9.23.4 GR8)");
+            w.Line(OoUnivCallerWrite(ret, $"__ur{id}!.Value", argumentView: false) + "   // RETURNING delivery (§14.9.23.4 GR8)");
         EmitInvokePickup(u);   // §14.6.13.1.5 / §14.9.18.4 GR1b — the universal path propagates identically (D-EO6)
     }
 
@@ -959,15 +961,19 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
 
     /// <summary>The caller's copy-out / RETURNING delivery of a universal box — the twin of <see cref="OoUnivCallerRead"/>,
     /// arm for arm. The box comes back in the argument's own form (a smaller formal group's write-back is spliced over the
-    /// argument's image by the callee, §14.8.2.2 rule 1), so a fixed group takes its whole image back through
-    /// <see cref="CallEmitter.CallStringWrite"/>, the boundary writer that distributes the FULL image (the elementary
-    /// alphabet for a bit / national group).</summary>
-    private static string OoUnivCallerWrite(Place p, string box) =>
+    /// argument's image by the callee, §14.8.2.2 rule 1), so a fixed group takes its whole image back through the boundary
+    /// writer that distributes the FULL image (the elementary alphabet for a bit / national group).
+    /// <para>⛔ <paramref name="argumentView"/> is true for the WRITE HALF of an argument's live box, false for the RETURNING
+    /// delivery (kb/Work PB2690, branch review R1-3). The write half of a group's box is the method's whole image stored back
+    /// at its return, whichever occurrences it stored into, so it is a boundary copy that records no receiving reference
+    /// (<see cref="CallEmitter.BoundaryCopyWrite"/>); the RETURNING delivery is the INVOKE statement's own store into its
+    /// receiving item (§14.9.23.4 GR8), recorded like any other store (<see cref="CallEmitter.CallStringWrite"/>).</para></summary>
+    private static string OoUnivCallerWrite(Place p, string box, bool argumentView) =>
         p is RefModPlace ? PlaceRenderer.Write(p, $"(string){box}!")
         : CallEmitter.CallPlaceIsVarGroup(p)
             ? PlaceRenderer.WriteVarGroupImage(p, $"({RuntimeApi.VarGroupType}){box}!", "INVOKE copy-out into")
         : OoClassTable.LeafCarried(p.Item) ? PlaceRenderer.WriteGroupLeaves(p, $"(object?[]){box}!")
-        : p.Item.IsGroup ? CallEmitter.CallStringWrite(p, $"(string){box}!")
+        : p.Item.IsGroup ? argumentView ? CallEmitter.BoundaryCopyWrite(p, $"(string){box}!") : CallEmitter.CallStringWrite(p, $"(string){box}!")
         : OoUnivNativeBoxOverImage(p.Item) ? PlaceRenderer.Write(p, NumericRenderer.ImageOfCarrier($"({p.Item.Pic!.ClrType}){box}!", p.Item))   // kb/Work PB187
         : OoStringCarried(p.Item) ? PlaceRenderer.Write(p, $"(string){box}!")
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Write(new NumericImagePlace(p), $"(string){box}!")

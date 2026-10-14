@@ -1574,7 +1574,8 @@ of an unsupported facility.
   referenced as a receiving item, whatever it stored there: the INITIALIZED default, SPACES, the element's VALUE. A callee
   that only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only). A store that reaches
   the area only through a further activation's boundary copy of the whole group (the copy covers every occurrence, so it
-  records none: `CallEmitter.BoundaryCopyWrite`) is recognised by its effect, an occurrence whose image differs from the
+  records none, whatever the group's shape and whether the further activation is a CALL, a typed INVOKE or a universal
+  one: `CallEmitter.BoundaryCopyWrite`) is recognised by its effect, an occurrence whose image differs from the
   one the view showed. The creation travels on the argument's
   carrier only for a BY REFERENCE crossing (`CobolVarGroup.Created`, stated by `AsVarImage(__byReference: true)` and
   `StorageCell.VarGroupAt(byReference: true)`): a BY CONTENT formal is a record "allocated by the activating runtime element"

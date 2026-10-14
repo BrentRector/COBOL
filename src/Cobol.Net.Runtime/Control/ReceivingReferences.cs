@@ -14,8 +14,12 @@ namespace CobolNet.Runtime;
 /// stored back cannot tell a store of exactly the image the formal was shown from no store at all. So the area records
 /// the reference itself: every store through a view of a pointer-located class notes its window on the area's cell
 /// (<see cref="StorageCell.Received"/>), the boundary starts the record once the area is filled
-/// (<see cref="ManagedPointer{T}.Watch"/>), and the write-back reads it here, in the positions of the formal's own image
-/// (its fixed run, for a variable-length formal).</para>
+/// (<see cref="ManagedPointer{T}.Watch"/>), and the write-back reads it here.</para>
+/// <para>⛔ THE COORDINATES ARE THE FORMAL'S STORAGE, the positions of its area's cell: for a variable-length formal that
+/// is its fixed run WITH each dynamic-capacity table's one-element reservation in place (<c>CobolVarGroup</c>'s
+/// <c>Geometry.StorageAt</c>), never the fixed run alone (<c>Geometry.FixedChars</c>, which <c>StorageCell.RunOf</c> cuts
+/// the reservations out of). A reader indexing this record by fixed-run offsets would read an occurrence shifted by every
+/// reservation before it.</para>
 /// </summary>
 public sealed class ReceivingReferences
 {
@@ -28,15 +32,15 @@ public sealed class ReceivingReferences
         _base = @base;
     }
 
-    /// <summary>True when any position in [<paramref name="from"/>, <paramref name="to"/>) of the formal's image — the
-    /// positions this record starts at — was referenced as a receiving item.</summary>
+    /// <summary>True when any position in [<paramref name="from"/>, <paramref name="to"/>) of the formal's storage, counted
+    /// from where this record starts, was referenced as a receiving item.</summary>
     public bool Within(int from, int to)
     {
         int lo = Math.Max(0, _base + from), hi = Math.Min(_marks.Length, _base + to);
         return lo < hi && _marks.AsSpan(lo, hi - lo).Contains(true);
     }
 
-    /// <summary>This record from position <paramref name="offset"/> of the formal's image on — the positions of one of its
-    /// fixed-length table elements, whose own image starts there.</summary>
+    /// <summary>This record from storage position <paramref name="offset"/> of the formal on: the positions of one of its
+    /// fixed-length tables or table elements, whose own storage starts there.</summary>
     public ReceivingReferences From(int offset) => offset == 0 ? this : new(_marks, _base + offset);
 }

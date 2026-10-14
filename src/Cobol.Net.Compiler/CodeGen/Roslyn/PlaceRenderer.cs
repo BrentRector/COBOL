@@ -284,44 +284,47 @@ internal static class PlaceRenderer
             : store;
 
     /// <summary>⛔ A BOUNDARY COPY OF A GROUP'S WHOLE IMAGE (<c>CallEmitter.BoundaryCopyWrite</c>: the write half of a BY
-    /// REFERENCE argument's view, and a formal's copy-in): the activated element's image of the whole group, stored WITHOUT
+    /// REFERENCE argument's view or universal box, and a formal's copy-in; <paramref name="v"/> is the group's full
+    /// allocation, an occurs-depending wrapper unwrapped): the activated element's image of the whole group, stored WITHOUT
     /// recording a receiving reference (<see cref="Received"/>). The image covers every position of the group whichever ones
     /// the activated element stored into, so recording it would make a store into one occurrence a reference to all of
     /// them (kb/Work PB2690); the activated element's own references were recorded on its own area, and a store that
     /// reaches this storage only so is still recognised by its effect (<c>CobolVarGroup.OverlaidTable</c>).</summary>
     public static string WriteGroupCopy(RedefViewPlace v, string image) => WriteView(v, image);
 
-    /// <summary>The store of <paramref name="rhs"/> through the Tier-B view <paramref name="v"/>, by its window's coding.</summary>
-    private static string WriteView(RedefViewPlace v, string rhs) => v switch
+    /// <summary>The store of <paramref name="rhs"/> through the Tier-B view <paramref name="v"/>, by its window's CODING: the
+    /// storage form is already known (a <see cref="RedefViewPlace"/>, no decorator), so the switch asks only how the window
+    /// is coded, and an uncoded window is the byte-window splice.</summary>
+    private static string WriteView(RedefViewPlace v, string rhs) => v.Coding switch
     {
         // Splice the member's BOOLEAN positions back into the class's ONE backing, leaving every other bit of it
         // untouched (kb/Work PB203). ⛔ Bit-granular splicing is REQUIRED, not an optimization: §8.5.1.6.3 puts two
         // same-level bit members at successive bit positions of the SAME byte, so a byte-granular store through
         // either would silently clobber the other. The value is first stored to exactly the member's boolean
         // position count with §14.6.8.6's boolean-ZERO fill.
-        RedefViewPlace { Coding: BitWindow b } => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+        BitWindow b => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
             $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(b.Offset)})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
         // Splice the member's NATIONAL positions back into the class's ONE backing as UTF-16BE byte pairs,
         // leaving every other byte untouched (kb/Work PB231; §13.18.44.4 GR1 — one storage area, so a write
         // through one view must not disturb another's bytes). The receiving twin of the national read arm; the
         // fit to exactly the member's position count happens in POSITIONS inside the runtime helper, because
         // padding the BYTES would manufacture U+2020 characters instead of national spaces.
-        RedefViewPlace { Coding: NationalWindow n } => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+        NationalWindow n => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
             $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(v.Offset)})", n.Positions.ToString(), rhs)};",
         // Store a POINTER-CLASS member into the area's MANAGED SLOT (kb/Work PB231) — the receiving twin of the
         // slot read. The member's own 8 positions get the pointer IMAGE of the stored value (kb/Work PB1071, the
         // DOC-A.1-216 image, written by the runtime's one store beside the slot) and no other member's positions are
         // touched (§13.18.44.4 GR1 — one storage area, and every other member's positions are its own).
-        RedefViewPlace { Coding: SlotWindow s } =>
+        SlotWindow s =>
             $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({PositionRenderer.Render(v.Offset)})", v.ViewItem.ElementType, rhs)};",
         // Store a DYNAMIC-LENGTH member's new content into the cell's dynamic slot (kb/Work PB1026) — the receiving
         // twin of the slot read. rhs already carries §8.5.1.10.4's receiving rule (CobolDynString.Store).
         // The cell is reached RECEIVING: inside a dynamic-capacity table's element cell (kb/Work PB1042) the store
         // is a receiving reference to that occurrence, which grows the table to it (§8.5.1.9.3).
-        RedefViewPlace { Coding: DynSlotWindow d } => $"{RuntimeApi.CellDynWrite(RenderPath(d.Cell, AccessDir.Receiving), PositionRenderer.Render(d.Ordinal), rhs)};",
+        DynSlotWindow d => $"{RuntimeApi.CellDynWrite(RenderPath(d.Cell, AccessDir.Receiving), PositionRenderer.Render(d.Ordinal), rhs)};",
         // A VARIABLE-LENGTH GROUP of a cell-backed class receiving a character value (kb/Work PB1026): the value is
         // a contiguous image (§8.5.1.11.2), decomposed by the ONE take step determination D-FRA states.
-        RedefViewPlace { Coding: VarGroupWindow g } => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
+        VarGroupWindow g => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
             $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynFixedAt.Select(_ => 0), g.DynTable, g.Odo, rhs)};",
         // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
         _ => ByteWindowWrite(v, rhs),

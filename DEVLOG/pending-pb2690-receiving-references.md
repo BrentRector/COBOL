@@ -32,3 +32,15 @@ negative `pb2690-store-of-shown-image-grows-capacity-below-2014` (COBOLNET0900);
 No inventory row claimed or closed (kb/Work PB2690 `closes_rows_reason`); PB2690 flipped to landed.
 
 **Gate.** Run 20261014T194320Z-7a8a00: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,089, Unit 32,991, Characterization 6 cases in leg 1). The first run (20261014T193710Z-12a96f) was RED on the boundary-layout pin, moved again by the copy-in change, and on the `filter_population.py` self-test (MSB4236, an SDK not resolved during a dotnet first-run in its scrubbed environment; it passes alone and passed in the re-gate). Self-review: the record is emitted only for descriptions holding a table of a fixed or DEPENDING count (a table-less LINKAGE record pays nothing), and a whole-group boundary copy records nothing (golden lane GE).
+
+**Branch review round 1.** Four findings, all fixed. R1-1: `PlaceRenderer.WriteView` switched on the storage form with a
+catch-all arm, which `PlaceStorageFormSwitchDriftTests` rejects; it now switches on the window coding. The gate had not run
+that tree-wide sweep (it was planned into leg 2), so CI would have been the first to see it. R1-2 and R1-3: the
+non-recording boundary copy covered only a bare view, so the write half of an occurs-depending group (CALL and typed
+INVOKE) and of a universal box recorded every occurrence. When the next callee stored nothing, the caller's table still
+grew to the formal's maximum. The test now looks at the group's full allocation; the universal box's write half and the
+method cell copy-in use it, and the RETURNING delivery still records because it is the statement's own store. An
+elementary or reference-modified argument's view is written per store, so it keeps recording (probes `e1.cob` and
+`u3.cob` in `E:/COBOL-coord/scratch/w1077a/fin/`). New golden lanes: `_call` GQ and GP, `_invoke` UO, US and TO. On the
+reviewed head, GQ, UO and TO printed 3 where 8.5.1.9.3 gives 1. R1-4: the record's coordinates are the formal's storage
+positions, not its fixed run, and the comments now say so.

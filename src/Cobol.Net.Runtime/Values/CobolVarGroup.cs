@@ -396,7 +396,8 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     ///     view's element seen in the argument's element shape;</item>
     ///   <item>every component of the argument the formal does not reach (beyond its last character) survives.</item>
     /// </list>
-    /// <paramref name="received"/> records the positions of <paramref name="view"/>'s fixed run the activated element
+    /// <paramref name="received"/> records the positions of <paramref name="view"/>'s STORAGE (its fixed run with each
+    /// dynamic-capacity table's one-element reservation in place, <see cref="Geometry.StorageAt"/>) the activated element
     /// referenced as a receiving item (<see cref="ReceivingReferences"/>, kept by the fresh area the view was copied into),
     /// or is null when nothing recorded them: a store into an occurrence past the capacity creates it whatever image it
     /// stored (§8.5.1.9.3; <see cref="OverlaidTable"/>).</summary>
