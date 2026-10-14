@@ -77,7 +77,19 @@ public enum ObjectRefKind
 /// <see cref="ObjectRefKind.Universal"/>: their general-format alternatives carry no FACTORY phrase.</param>
 /// <param name="Only">The ONLY phrase (GR22 d)2.) — the referenced object is of EXACTLY the named class, not a
 /// subclass. Legal only on the object-class-name-1 alternative.</param>
-public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Name, bool Factory, bool Only)
+/// <param name="Formal">True when <paramref name="Name"/> is a PARAMETER-NAME of the parameterized class or interface
+/// definition being bound as itself (kb/Work PB2937; OO deep-dive D12 determination 6). ISO §11.3.4 GR6: "Parameter-name-1
+/// may be specified within this class definition only where an object-class-name or an interface-name is permitted", so a
+/// formal description takes the alternative its REPOSITORY specifier declares (<see cref="ObjectRefKind.ObjectClass"/> for
+/// <c>CLASS T</c>, <see cref="ObjectRefKind.Interface"/> for <c>INTERFACE T</c>) — it IS that alternative — while the class
+/// or interface it names is each expansion's actual (§9.3.8.2.4: "treated as if the actual parameter classes or interfaces
+/// were substituted for the parameters throughout the class definition"). So every question about the description that
+/// turns on WHICH class or interface it names is the expansion's, and every other one (the alternative itself, the FACTORY
+/// and ONLY axes, the identity of two references to one parameter-name) is asked of the skeleton. Only a skeleton's own
+/// binders produce one: an expansion's re-parsed text has every formal replaced (kb/Work PB759), and nothing emits a
+/// skeleton.</param>
+public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Name, bool Factory, bool Only,
+    bool Formal = false)
 {
     /// <summary>The bare <c>USAGE OBJECT REFERENCE</c> — §13.18.60.4 GR22 b).</summary>
     public static ObjectRefDescriptor Universal { get; } = new(ObjectRefKind.Universal, null, false, false);
@@ -88,6 +100,13 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// <summary><c>USAGE OBJECT REFERENCE [FACTORY OF] object-class-name-1 [ONLY]</c> — GR22 d).</summary>
     public static ObjectRefDescriptor ObjectClass(string name, bool factory = false, bool only = false)
         => new(ObjectRefKind.ObjectClass, name, factory, only);
+
+    /// <summary>A description written with a PARAMETER-NAME of the definition being bound as itself (see
+    /// <see cref="Formal"/>): the alternative its REPOSITORY specifier declares — the interface-name alternative for
+    /// <c>INTERFACE parameter-name</c>, which carries neither FACTORY OF nor ONLY — with the phrases as written.</summary>
+    public static ObjectRefDescriptor FormalParameter(string parameterName, bool isInterface, bool factory, bool only)
+        => isInterface ? new(ObjectRefKind.Interface, parameterName, false, false, Formal: true)
+            : new(ObjectRefKind.ObjectClass, parameterName, factory, only, Formal: true);
 
     /// <summary><c>USAGE OBJECT REFERENCE [FACTORY OF] ACTIVE-CLASS</c> — GR22 e). <paramref name="containing"/>
     /// is the class the entry is written in: a factory definition, an instance definition, or a method definition of
@@ -145,10 +164,24 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// with the ACTIVE-CLASS phrase, and the presence or absence of the FACTORY phrase is the same in both
     /// interfaces" — the CONTAINING class is not part of the description (GR22 e) binds it at activation), so two
     /// ACTIVE-CLASS descriptions agree whatever classes they were written in: an override in a subclass, a class
-    /// implementing an interface prototype's (owner-less) formal.</summary>
+    /// implementing an interface prototype's (owner-less) formal.
+    /// <para>A <see cref="Formal"/> description is the same as another only when both name the same parameter-name: a
+    /// parameter-name and a class of the group spelled alike are different words (inside its definition the word names
+    /// the formal, <c>OoNameResolution.Lookup</c>). Whether a formal and a DIFFERENT name describe the same thing is each
+    /// expansion's question, which <see cref="TurnsOnFormal"/> tells the caller before it asks this.</para></summary>
     public bool SameDescriptionAs(ObjectRefDescriptor other)
-        => Kind == other.Kind && Factory == other.Factory && Only == other.Only
+        => Kind == other.Kind && Factory == other.Factory && Only == other.Only && Formal == other.Formal
            && (IsActiveClass || CobolNames.Same(Name, other.Name));
+
+    /// <summary>True when the identical-description question between this description and <paramref name="other"/>
+    /// has different answers in different expansions of the definition being bound as itself (ISO §9.3.8.2.4): one side
+    /// is a <see cref="Formal"/> description, the two do not name the same parameter-name, and they agree on every axis
+    /// but the name (the alternative, FACTORY, ONLY) — so an actual that IS the other side's class or interface makes
+    /// them identical and another does not. That question is the expansion's; the skeleton admits it. An axis that
+    /// differs differs in every expansion, and <see cref="SameDescriptionAs"/> answers it here.</summary>
+    public bool TurnsOnFormal(ObjectRefDescriptor other)
+        => (Formal || other.Formal) && !(Formal && other.Formal && CobolNames.Same(Name, other.Name))
+           && Kind == other.Kind && Factory == other.Factory && Only == other.Only;
 
     /// <summary>How the description reads back in a diagnostic — the phrases as written, so a message never
     /// has to say "universal" about a typed reference (the PB389 misdiagnosis). The ONE spelling is the run-time
