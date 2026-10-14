@@ -136,7 +136,7 @@
                NOT ON SIZE ERROR DISPLAY "R=W2 ok"
            END-COMPUTE.
            PERFORM SHOWR.
-           COMPUTE R = -W2
+           COMPUTE R = - W2
                ON SIZE ERROR DISPLAY "R=-W2 size error"
                NOT ON SIZE ERROR DISPLAY "R=-W2 ok"
            END-COMPUTE.

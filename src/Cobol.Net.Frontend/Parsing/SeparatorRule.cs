@@ -1,10 +1,14 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using Antlr4.Runtime;
+using Antlr4.Runtime.Tree;
 using CobolNet.Common;
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
+using CobolNet.Frontend.Expressions;
 using CobolNet.Frontend.Generated;
+
+using Core = CobolNet.Frontend.Generated.CobolParserCore;
 
 namespace CobolNet.Frontend.Parsing;
 
@@ -21,12 +25,16 @@ namespace CobolNet.Frontend.Parsing;
 /// pseudo-text delimiter. The closing delimiter shall be immediately followed by one of the separators space, comma,
 /// semicolon, period, right parenthesis, or closing pseudo-text delimiter": <c>DISPLAY "AB"N</c>, <c>MOVE"AB" TO A</c>
 /// and <c>W"AB"</c> beside a data item W (<c>COBOLNET2633</c>);</item>
-/// <item>the two operator clauses that state their OWN separator context — §8.7.3 "The concatenation operator is the
-/// COBOL character '&amp;', which shall be immediately preceded and followed by a separator space" and §8.7.4 "The
-/// invocation operator is the two contiguous COBOL characters '::', which shall be immediately preceded and followed by
-/// a separator space": <c>SPACE&amp;SPACE</c>, <c>O:: "M"</c> and <c>O ::"M"</c> (<c>COBOLNET2993</c>; kb/Work
-/// PB1430). §8.7.1's arithmetic operators state the same rule with a unary-operator exception and are not yet asked
-/// here (kb/Work PB2017).</item>
+/// <item>the three operator clauses that state their OWN separator context — §8.7.1 "[the arithmetic operators are
+/// COBOL characters] that shall be preceded by a space and followed by a space except that no space is required
+/// between a left parenthesis and a unary operator or between a unary operator and a left parenthesis", §8.7.3 "The
+/// concatenation operator is the COBOL character '&amp;', which shall be immediately preceded and followed by a
+/// separator space" and §8.7.4 "The invocation operator is the two contiguous COBOL characters '::', which shall be
+/// immediately preceded and followed by a separator space": <c>SPACE&amp;SPACE</c>, <c>O:: "M"</c>, <c>O ::"M"</c>,
+/// <c>1*2</c>, <c>(A)+(B)</c> and <c>-Y</c> (<c>COBOLNET2993</c>; kb/Work PB1430, PB2017). §8.7.3 and §8.7.4 are asked
+/// by <see cref="Violations"/> over the token stream; §8.7.1 by <see cref="ArithmeticOperatorViolations"/> over the
+/// parse tree, because only the tree says whether a <c>+</c> or <c>-</c> is a binary operator, a unary operator or
+/// no operator at all (a numeric literal's own sign, a <c>LINE PLUS</c> screen clause).</item>
 /// </list>
 /// </summary>
 /// <remarks>
@@ -110,24 +118,107 @@ public static class SeparatorRule
         }
     }
 
+    /// <summary>Whether <paramref name="u"/> heads a LITERAL-ONLY slot rather than an arithmetic expression: the VALUE
+    /// clauses' <c>valueClauseOperand : unaryExpression | …</c> parses its signs as unary operators (a superset parse), but
+    /// the position admits a literal and nothing else, so a sign there is the literal's — `--5` is "more than one sign
+    /// character" (§8.3.3.3.2 2), <c>COBOLNET2155</c>, which the literal rules own — and no operator exists to be spaced.</summary>
+    private static bool InLiteralSlot(Core.UnaryExpressionContext u)
+    {
+        IParseTree top = u;
+        while (top.Parent is Core.UnaryExpressionContext outer) top = outer;
+        return top.Parent is Core.ValueClauseOperandContext;
+    }
+
     /// <summary>The §8.7.3 / §8.7.4 verdict on a concatenation or invocation operator: null when a separator space
     /// immediately precedes AND follows it, otherwise the message naming the side (or sides) that touch.</summary>
     private static string? OperatorSpacingMessage(string text, IToken op)
     {
-        bool before = IsSeparatorSpace(CharAt(text, op.StartIndex - 1));
-        bool after = IsSeparatorSpace(CharAt(text, op.StopIndex + 1));
-        if (before && after) return null;
         var (name, clause) = op.Type == CobolLexer.COLONCOLON
             ? ("invocation operator", "§8.7.4")
             : ("concatenation operator", "§8.7.3");
+        return OperatorSpacingMessage(text, op, name, clause, parenthesisAdmitted: false);
+    }
+
+    /// <summary>The ONE spacing verdict of the operator clauses (§8.7.1, §8.7.3, §8.7.4): null when a separator space
+    /// immediately precedes AND follows <paramref name="op"/>, otherwise the message naming the side (or sides) that
+    /// touch. <paramref name="parenthesisAdmitted"/> is §8.7.1's one exception — a UNARY arithmetic operator needs no
+    /// space against a left parenthesis, on either side — so a '(' stands in for the space there. A comma or semicolon
+    /// immediately followed by a space is "a separator that may be used anywhere the separator space is used"
+    /// (§8.3.5 2)), so <c>1 *, 1</c> follows its operator with one — while <c>1 *,1</c> does not: that comma is the
+    /// literal's decimal point (<see cref="IsDecimalComma"/>), no separator.</summary>
+    private static string? OperatorSpacingMessage(string text, IToken op, string name, string clause,
+        bool parenthesisAdmitted)
+    {
+        bool before = IsSeparatorSpace(CharAt(text, op.StartIndex - 1))
+            || (parenthesisAdmitted && CharAt(text, op.StartIndex - 1) == '(');
+        int next = CharAt(text, op.StopIndex + 1);
+        bool after = IsSeparatorSpace(next) || (parenthesisAdmitted && next == '(')
+            || (next is ',' or ';' && IsSeparatorSpace(CharAt(text, op.StopIndex + 2)));   // §8.3.5 2): usable anywhere the space is
+        if (before && after) return null;
         var (missing, fix) = (before, after) switch
         {
             (false, false) => ("preceded or followed", "on both sides of it"),
             (false, true) => ("preceded", "before it"),
             _ => ("followed", "after it"),
         };
-        return $"the {name} '{op.Text}' is not immediately {missing} by a separator space — ISO {clause} requires it to be "
-            + $"immediately preceded and followed by a separator space; write a space {fix}";
+        string what = parenthesisAdmitted ? "a separator space or a left parenthesis" : "a separator space";
+        return $"the {name} '{op.Text}' is not immediately {missing} by {what} — ISO {clause} requires it to be "
+            + $"immediately preceded and followed by {what}; write a space {fix}";
+    }
+
+    /// <summary>⭐ §8.7.1 — "[the arithmetic operators are COBOL characters] that shall be preceded by a space and followed
+    /// by a space except that no space is required between a left parenthesis and a unary operator or between a unary
+    /// operator and a left parenthesis" — decided over the PARSE TREE of <paramref name="tree"/>, lexed from
+    /// <paramref name="text"/>, in source order (kb/Work PB2017).
+    /// <para>⛔ WHY THE TREE, WHEN THE REST OF THIS CLASS READS TOKENS. Whether a <c>+</c> or <c>-</c> is a BINARY
+    /// operator (spaced on both sides), a UNARY operator (a left parenthesis may stand where the space does) or no
+    /// operator at all is a question of grammar, not of the character beside it: <c>N -1</c> is a subtraction written
+    /// without its second space, <c>-1</c> alone is a numeric literal whose sign is its leftmost character
+    /// (§8.3.3.3.2 2) — the ONE contiguity test, <see cref="ArithmeticFormationRules.SignIsPartOfLiteral"/>), and the
+    /// same <c>+</c> in <c>LINE + 1</c> is a screen clause's relative-line symbol. Only the expression tiers know, so the
+    /// verdict is read off <c>addOp</c> / <c>mulOp</c> / <c>POWER</c> under <c>additiveExpression</c>,
+    /// <c>multiplicativeExpression</c>, <c>powerExpression</c> (binary) and <c>unaryExpression</c> (unary) — every
+    /// arithmetic expression of every statement, subscript, reference modifier and function argument at once, with no
+    /// consumer to forget.</para>
+    /// <para>Tokens are judged by their own source indices, so the tree may come from the unit's text or from a
+    /// directive operand lexed apart (kb/Work PB1616) — each caller passes the text its tree was lexed from.</para></summary>
+    public static IReadOnlyList<Violation> ArithmeticOperatorViolations(string text, IParseTree tree)
+    {
+        List<Violation>? found = null;
+        void Judge(IToken? op, string name, bool unary)
+        {
+            if (op is null || op.StartIndex < 0) return;   // a missing token of an error-recovered parse has no characters
+            if (OperatorSpacingMessage(text, op, name, "§8.7.1", parenthesisAdmitted: unary) is { } message)
+                (found ??= []).Add(new(op, DiagnosticCatalog.SeparatorOperatorSpacing, message));
+        }
+
+        var pending = new Stack<IParseTree>();
+        pending.Push(tree);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            if (node is ITerminalNode) continue;
+            switch (node)
+            {
+                case Core.AdditiveExpressionContext add:
+                    foreach (var op in add.addOp()) Judge(op.Start, "binary arithmetic operator", unary: false);
+                    break;
+                case Core.MultiplicativeExpressionContext mul:
+                    foreach (var op in mul.mulOp()) Judge(op.Start, "binary arithmetic operator", unary: false);
+                    break;
+                case Core.PowerExpressionContext pow:
+                    foreach (var op in pow.POWER()) Judge(op.Symbol, "binary arithmetic operator", unary: false);
+                    break;
+                case Core.UnaryExpressionContext u when u.addOp() is { } sign && !InLiteralSlot(u)
+                        && !ArithmeticFormationRules.SignIsPartOfLiteral(sign.Start, u.unaryExpression()):
+                    Judge(sign.Start, "unary arithmetic operator", unary: true);
+                    break;
+            }
+            for (int i = node.ChildCount - 1; i >= 0; i--) pending.Push(node.GetChild(i));
+        }
+        if (found is null) return [];
+        found.Sort(static (a, b) => a.Token.StartIndex.CompareTo(b.Token.StartIndex));
+        return found;
     }
 
     /// <summary>Whether <paramref name="tokens"/>[<paramref name="at"/>] is a §8.7.3 / §8.7.4 operator whose own
@@ -163,13 +254,19 @@ public static class SeparatorRule
     }
 
     /// <summary>A comma that is a numeric literal's decimal point under DECIMAL-POINT IS COMMA: a digit follows it, and a
-    /// digit, a sign, a left parenthesis or a separator space precedes it (<c>1,5</c>, <c>,5</c>, <c>-,5</c>).</summary>
+    /// digit, an operator character, a left parenthesis or a separator space precedes it (<c>1,5</c>, <c>,5</c>,
+    /// <c>-,5</c>, <c>*,5</c>, <c>=,5</c>). §8.3.3.3.2 3) lets the decimal point be the leftmost character of a literal,
+    /// so a literal that begins with it can follow anything that ends a character-string; an operator touching it is
+    /// the OPERATOR's violation (§8.7.1, <see cref="ArithmeticOperatorViolations"/>), and calling the comma a missing
+    /// separator advises a space that changes the program's meaning: <c>1 *,1</c> is 1 times 0,1, and <c>1 *, 1</c> —
+    /// conforming, clean — is 1 times 1 (kb/Work PB2017).</summary>
     private static bool IsDecimalComma(string text, IToken t)
     {
         if (t.Type != CobolLexer.COMMA) return false;
         if (!char.IsAsciiDigit((char)Math.Max(0, CharAt(text, t.StopIndex + 1)))) return false;
         int before = CharAt(text, t.StartIndex - 1);
-        return IsSeparatorSpace(before) || before is '+' or '-' or '(' || char.IsAsciiDigit((char)Math.Max(0, before));
+        return IsSeparatorSpace(before) || before is '+' or '-' or '*' or '/' or '=' or '<' or '>' or '('
+            || char.IsAsciiDigit((char)Math.Max(0, before));
     }
 
     private static string Name(IToken t) => t.Type == CobolLexer.COMMA ? "comma" : "semicolon";
