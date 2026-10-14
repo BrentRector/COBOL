@@ -372,7 +372,7 @@ public static partial class ReferenceFormatProcessor
         /// <summary>The 0-based physical column of the character at index <paramref name="i"/> of the text — the column a
         /// diagnostic names: its character position in the line as the file holds it (a TAB counts one column, as in the
         /// user's editor, and a supplementary-plane character counts one, not two).</summary>
-        public int Col(int i) => Columns is null ? Index + i : Columns.ToPhysical(Index + i);
+        public int Col(int i) => PhysicalLine.ColumnOf(Columns, Index + i);
 
         /// <summary>A one-span origin of text at <paramref name="i"/>, written at resultant column
         /// <paramref name="resultColumn"/>.</summary>
