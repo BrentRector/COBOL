@@ -45,3 +45,11 @@ DESIGN-external-repository §21 item 3 records what is in the tree and one quest
 
 **Not done (the finisher's):** `HostSurface`/`HostLanding`, the published `RecordStructEmitter` mode, `HostEntryEmitter`,
 `OutputKind` library, the host harness, the §17.3 drift tests, and the retirement of the untyped host route.
+
+**Self-review.** One list of run-unit fatals for both boundaries. No catch-block epilogue on the host's stack. The two
+comments that claimed more than they proved were corrected. Semgrep verify passed with no rule count up.
+
+**Gate.** `TestResults/build-local/20261014T192801Z-ea375c` (HEAD 2a098d875): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
+gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,539 · Unit 636 · Characterization 30 …
+Conformance 6,126/11,665 · Unit 32,981/33,617 · Characterization 6/36 cases ran (skipped 0) in 1 of 2 leg(s)`.
+`HostRunUnitEndingTests` passed in leg 1.
