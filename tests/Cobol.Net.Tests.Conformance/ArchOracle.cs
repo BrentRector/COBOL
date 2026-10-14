@@ -49,56 +49,36 @@ public static class ArchOracle
     /// <param name="Member">The <c>[PartitionedRowSource]</c> member's name.</param>
     /// <param name="Rows">The member itself.</param>
     /// <param name="ToCases">Row → the cases the family's theory compiles for it.</param>
-    /// <param name="DataRoots">The repository files and directories its cases' sources are READ from, each one the
-    /// SAME member the family's reader opens (<see cref="ConformanceCorpus.Root"/>, <see cref="CorpusManifest.Root"/>,
-    /// <see cref="VersionMatrixCatalogue.CataloguePath"/>), never a second spelling of the path. With the compiler's
-    /// project closure they are the oracle's INPUTS (<see cref="DataInputs"/>), which <c>--record</c> writes into the
-    /// baseline so that a landing whose inputs moved past its baseline is refused (kb/Work PB2885).</param>
     internal sealed record RowSource(
-        Type Family, string Member, Func<IEnumerable<object[]>> Rows, Func<object[], IEnumerable<OracleCase>> ToCases,
-        IReadOnlyList<string> DataRoots);
+        Type Family, string Member, Func<IEnumerable<object[]>> Rows, Func<object[], IEnumerable<OracleCase>> ToCases);
 
     /// <summary>Every enrolled row source — exactly the assembly's <c>[PartitionedRowSource]</c> members
     /// (<c>ArchOracleDriftTests</c>) — each with the compile its theory performs for a row.</summary>
     internal static IReadOnlyList<RowSource> Sources { get; } =
     [
         new(typeof(CorpusRunnerTestsBase<>), nameof(CorpusRunnerTestsBase<Slot0>.AllEnabledPositive),
-            CorpusRunnerTestsBase<Slot0>.AllEnabledPositive, CorpusPositive, [ConformanceCorpus.Root]),
+            CorpusRunnerTestsBase<Slot0>.AllEnabledPositive, CorpusPositive),
         new(typeof(CorpusRunnerTestsBase<>), nameof(CorpusRunnerTestsBase<Slot0>.AllEnabledNegative),
-            CorpusRunnerTestsBase<Slot0>.AllEnabledNegative, CorpusNegative, [ConformanceCorpus.Root]),
+            CorpusRunnerTestsBase<Slot0>.AllEnabledNegative, CorpusNegative),
         new(typeof(NistDifferentialTestsBase<>), nameof(NistDifferentialTestsBase<Slot0>.AllGreenPrograms),
-            NistDifferentialTestsBase<Slot0>.AllGreenPrograms, NistGolden, [CorpusManifest.Root]),
+            NistDifferentialTestsBase<Slot0>.AllGreenPrograms, NistGolden),
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllMatrix),
-            VersionMatrixTestsBase<Slot0>.AllMatrix, row => MatrixCell(row, permissive: false),
-            [VersionMatrixCatalogue.CataloguePath]),
+            VersionMatrixTestsBase<Slot0>.AllMatrix, row => MatrixCell(row, permissive: false)),
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllIntroducedMatrix),
-            VersionMatrixTestsBase<Slot0>.AllIntroducedMatrix, row => MatrixCell(row, permissive: true),
-            [VersionMatrixCatalogue.CataloguePath]),
+            VersionMatrixTestsBase<Slot0>.AllIntroducedMatrix, row => MatrixCell(row, permissive: true)),
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllRemovedMatrix),
-            VersionMatrixTestsBase<Slot0>.AllRemovedMatrix, row => MatrixCell(row, permissive: true),
-            [VersionMatrixCatalogue.CataloguePath]),
+            VersionMatrixTestsBase<Slot0>.AllRemovedMatrix, row => MatrixCell(row, permissive: true)),
         // The obsolete theory compiles strict at its row's edition — the very compile the strict matrix cell is, so
         // its cases coincide with AllMatrix's by identity and are counted once.
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllObsoleteMatrix),
-            VersionMatrixTestsBase<Slot0>.AllObsoleteMatrix, row => MatrixCell(row, permissive: false),
-            [VersionMatrixCatalogue.CataloguePath]),
+            VersionMatrixTestsBase<Slot0>.AllObsoleteMatrix, row => MatrixCell(row, permissive: false)),
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllContinuityCells),
-            VersionMatrixTestsBase<Slot0>.AllContinuityCells, ContinuityCell, [CorpusManifest.Root]),
+            VersionMatrixTestsBase<Slot0>.AllContinuityCells, ContinuityCell),
         // Partitioned since kb/Work PB2527: every subset spelling of a format's optional words, one case per format.
-        // Its templates live in the drift-test file (the project closure); one is derived from a corpus golden.
+        // Its templates live in the drift-test file; one is derived from a corpus golden.
         new(typeof(OptionalWordSubsetDriftTestsBase<>), nameof(OptionalWordSubsetDriftTestsBase<Slot0>.AllCases),
-            OptionalWordSubsetDriftTestsBase<Slot0>.AllCases, OptionalWordFormat, [ConformanceCorpus.Root]),
+            OptionalWordSubsetDriftTestsBase<Slot0>.AllCases, OptionalWordFormat),
     ];
-
-    /// <summary>The oracle's DATA inputs: every enrolled source's <see cref="RowSource.DataRoots"/>,
-    /// repository-relative with forward slashes, once each, in ordinal order. <c>capture</c> writes them to
-    /// <c>inputs.txt</c>; <c>scripts/arch/capture_oracle.py</c> adds the compiler's project closure and records the
-    /// union as the manifest's <c>inputs</c>, which <c>scripts/orchestrator/landing_oracle.py</c> reads at every
-    /// landing (kb/Work PB2885).</summary>
-    internal static IReadOnlyList<string> DataInputs() =>
-        [.. Sources.SelectMany(s => s.DataRoots)
-            .Select(p => Path.GetRelativePath(TestRepo.Root, p).Replace(Path.DirectorySeparatorChar, '/'))
-            .Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)];
 
     /// <summary>The whole population: every enrolled source's cases, one per identity, in ordinal id order. An id
     /// names its compile completely (suite, program or construct, edition, severity axis), so two sources yielding
@@ -278,8 +258,7 @@ public static class ArchOracle
     /// <summary>
     /// <c>capture --out DIR [--jobs N]</c> compiles every case and writes, under DIR, each case's emitted C#
     /// (<c>&lt;id&gt;.g.cs</c>) and diagnostic stream (<c>&lt;id&gt;.diag.txt</c>), <c>cases.tsv</c> — one line
-    /// per case, ordinal order: id, population, SHA-256 of the C# (<c>-</c> when none), SHA-256 of the diagnostics —
-    /// and <c>inputs.txt</c>, the <see cref="DataInputs"/> one per line.
+    /// per case, ordinal order: id, population, SHA-256 of the C# (<c>-</c> when none), SHA-256 of the diagnostics.
     /// <c>list</c> prints the population (id TAB population) without compiling. Exit 0 on success; 2 on a usage
     /// error; 3 when the compiled-program cache is on (the oracle must observe the compiler); 4 when a case threw.
     /// </summary>
@@ -336,7 +315,6 @@ public static class ArchOracle
         }
 
         File.WriteAllText(Path.Combine(outDir, "cases.tsv"), string.Join("\n", lines) + "\n");
-        File.WriteAllText(Path.Combine(outDir, "inputs.txt"), string.Join("\n", DataInputs()) + "\n");
         stdout.WriteLine($"captured {cases.Count} cases into {outDir}");
         return 0;
     }

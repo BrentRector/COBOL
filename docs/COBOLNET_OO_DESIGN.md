@@ -267,32 +267,54 @@ test forbidding a self-spelled `.AsImage()`/`.FromImage(` outside the generator)
 **Rejected alternatives.** Keep the ManagedPointer[] args ABI (legacy) for uniformity with CALL — rejected: byte-substrate-adjacent, unidiomatic, and unnecessary now that types are native. Box everything to object[] for all params — rejected: loses Roslyn type checking and adds boxing.
 
 **Implementation.** Every formal is a `ref` parameter (uniform; the value-param-when-never-written polish is deferred — deciding it needs the body's write-set, which isn't known when signatures must exist). The load-bearing realizations:
-1. **The conformance rule is selected by the EFFECTIVE passing mode.** The identical-description rule is **§14.8.2.3.2, BY REFERENCE ONLY** (incl. SIGN representation via `ImageSignKind`, BLANK WHEN ZERO, JUSTIFIED; and the §14.8.2.2 rule-1 GROUP-PREFIX allowance: a by-ref group formal may be SMALLER than the argument — the callee sees the leading positions, the write-back SPLICES the prefix and preserves the tail). **BY CONTENT** (explicit, SR-10 auto-CONTENT, and all literals) follows **§14.8.2.3.3**: COMPUTE rules for numeric formals (ANY fixed-point numeric argument/literal — converted by rescale+truncate through the OWNER class's `internal` profile, qualified `{OWNER}._P_n`; the cross-class-profile rule), SET rules for object references — `OoConformance.ObjectRefAssignmentMismatch`, the ONE §14.9.39.3 SR10/SR12/SR14 sender-into-receiver table, keyed on the RECEIVER's §13.18.60.2 description (universal accepts anything; an interface receiver takes an implementing class or factory; an object-class receiver takes the same class or a subclass unless ONLY, with FACTORY presence invariant; an ACTIVE-CLASS receiver takes only ACTIVE-CLASS with the same FACTORY presence). §9.3.8.2.3 rule 5 shares the table with `activeClassSenderAdmitted: false` — its printed 5 b)/5 c) enumerate no ACTIVE-CLASS sender where SET SR10 c)/SR12 b) do, MOVE rules otherwise (pad/truncate; integer-display→alnum legal); §9.3.6 rule 5 makes TRUNCATING literals conforming. **RETURNING delivery** follows §14.8.3.3 rule 1 = SET rules (subclass results deliver into superclass-typed and universal receivers; C# 9+ covariant returns render override covariance, §9.3.8.2.3 5a/5c2). A reference-modified argument conforms by its EFFECTIVE description (elementary alphanumeric of the window length, §8.4.3.3.4).
+1. **The conformance rule is selected by the EFFECTIVE passing mode.** The identical-description rule is **§14.8.2.3.2, BY REFERENCE ONLY** (incl. SIGN representation via `ImageSignKind`, BLANK WHEN ZERO, JUSTIFIED; and the §14.8.2.2 rule-1 GROUP-PREFIX allowance: a by-ref group formal may be SMALLER than the argument — the callee sees the leading positions, the write-back SPLICES the prefix and preserves the tail). **BY CONTENT** (explicit, SR-10 auto-CONTENT, and all literals) follows **§14.8.2.3.3**: COMPUTE rules for numeric formals (ANY fixed-point numeric argument/literal — converted by rescale+truncate through the OWNER class's `internal` profile, qualified `{OWNER}._P_n`; the cross-class-profile rule), SET rules for object references — `OoConformance.ObjectRefAssignmentMismatch`, the ONE §14.9.39.3 SR10/SR12/SR14 sender-into-receiver table, keyed on the RECEIVER's §13.18.60.2 description (universal accepts anything; an interface receiver takes an implementing class or factory; an object-class receiver takes the same class or a subclass unless ONLY, with FACTORY presence invariant; an ACTIVE-CLASS receiver takes only ACTIVE-CLASS with the same FACTORY presence). §9.3.8.2.3 rule 5 shares the table with `activeClassSenderAdmitted: false` — its printed 5 b)/5 c) enumerate no ACTIVE-CLASS sender where SET SR10 c)/SR12 b) do, MOVE rules otherwise (pad/truncate; integer-display→alnum legal); §9.3.6 rule 5 makes TRUNCATING literals conforming. **RETURNING delivery** follows §14.8.3.3 rule 1 = SET rules (subclass results deliver into superclass-typed and universal receivers; C# 9+ covariant returns render override covariance, §9.3.8.2.3 5a/5c2). A reference-modified argument is §8.4.3.3.4 GR5/GR6's unique data item — its class, category and usage, no PICTURE clause — described by `ActivationDescriptions.OfReferenceModification` (item 6).
 2. **§14.9.23.4 GR6 a) auto-CONTENT, decided before resolution (kb/Work PB1137)**: a keyword-less identifier is BY REFERENCE only when it meets §14.9.23.3 SR9 (a data item of the file, working-storage, local-storage or linkage section) and SR10 (not factory/instance object data) — `ParameterConformance.MeetsByReferenceRules`, the test CALL's GR9 a) asks too — and is otherwise resolved as a SENDING operand and passed BY CONTENT (callee writes invisible): object data, an object property (§8.4.3.9.4's conceptual temporary — so only its GET runs), a report's PAGE-COUNTER, EXCEPTION-OBJECT. Explicit BY REFERENCE of object data is 0828 (SR10); of any other non-section item COBOLNET2452 (SR9 — an object property excepted, §8.4.3.9.3 SR6). Every BY REFERENCE argument and the RETURNING item (typed and universal) also take the SR12 bit-alignment proof (COBOLNET2453) and the SR11 section rule. literal-2 binds through the ONE `ExpressionBinder.NonNumericLiteralOperand` mapping (alphanumeric, hexadecimal, national, boolean; a constant-name substitutes its literal, §13.10.3 SR2), refuses a zero-length literal (SR17, COBOLNET2454), and takes the shared §14.8.2.3.3 verdict; NULL is identifier-5 and crosses BY CONTENT into an object-reference formal. Through a UNIVERSAL receiver an ADDRESS-IDENTIFIER crosses as its pointer value under a class-pointer descriptor (`ActivationDescriptions.OfAddress` — the same `Clauses` restriction text a pointer ITEM's description carries: a data-pointer's TYPE identity, a program-pointer's prototype signature class, `*` for none; kb/Work PB2464).
 3. **Call-site lowering**: a plain field of matching storage passes `ref` DIRECTLY (subscripts evaluate once — GR7a for free); everything else is copy-in temp → `ref` temp → copy-out (BY REFERENCE identifiers only), groups crossing as character images, storage-form bridges via caller-side `FormatDisplay`/`ParseDisplay`/`NumericImagePlace`; float formals read the float value directly (never the scaled-integer path). **Emission order per GR8**: the call → the BY REFERENCE copy-outs → the RETURNING store into identifier-4 LAST.
 4. **Crossing-form harmonization** (`HarmonizeStorageCrossings`, in `StorageFormPass`): once the storage form is computed, override chains UNION the image-stored form across corresponding formal/RETURNING pairs to a fixed point, so base and override always emit the same C# signature (otherwise a base/override storage-form desync is CS0115 on the emitted C#). The union covers EVERY byte-form numeric (`PicInfo.HasImageByteForm`, minus the national-form numeric per D-N1 carriage), not the DISPLAY pair alone (kb/Work PB187): a formal REDEFINED in its linkage section (§14.2.2 NOTE 2) is image-stored whatever its usage, so its plain prototype/override twin is promoted to the image too. The universal box (D-U6a) stays canonical BY DESCRIPTOR, so its two bridges are: a zoned DISPLAY box over a NATIVE local (`OoUnivImageBridged`), and a NATIVE box (float/binary/packed/index) over an IMAGE local (`OoUnivNativeBoxOverImage` — `NumericRenderer.CarrierOfImage`/`ImageOfCarrier` (the ONE native↔storage-image pair, shared with the CALL/INVOKE copy-out arms of kb/Work PB970) through the item's own byte form, both the callee's unbox/rebox and the caller's box/copy-out). The typed call site's `NumericImagePlace` takes the IEEE lane for a native float.
 5. **Emitted-name safety**: a METHOD-ID named like its CLASS-ID renames the SYMBOL (`_M` suffix — §8.3.2.2's implementor-defined externalized mapping); overrides adopt the base slot's CsName verbatim; the one unrepresentable corner (a derived class named like an inherited slot) is a 0820 restriction diagnostic. Numeric profiles emit `internal` so CONTENT conversions qualify them cross-class.
-The procedure-division header's BY phrases parse and CARRY on a method (kb/Work PB1051): `OoBindMethodData` threads the using-phrase mode across the formals as the program arm does (§14.2.3 GR4, transitive until the other phrase) into `OoFormal.ByValue`, and asks the ONE header screen (`ProcedureHeaderScreen.ByValueClass`, §14.2.2 SR2, COBOLNET1553). A BY VALUE formal crosses the method ABI exactly as a BY REFERENCE one does (the typed `ref` plus the omitted flag): the activator hands a DETACHED temporary and the method skips the copy-out (§14.2.3 GR10), so there is no second C# signature. `OoBindInvocationArg` takes the argument's mode from the formal when the formal is BY VALUE (§14.9.23.4 GR6 b)), refuses SR5 a)/b) from both sides, asks SR16 (a literal) and SR15 (an identifier's class, COBOLNET2741), and binds a BY VALUE argument through the BY CONTENT arms (§14.8.2.3.3 covers both) — the INVOKE and inline forms alike. A universal invocation passes every argument BY REFERENCE (SR6), so a method with a BY VALUE formal never matches it (§9.3.6 match rule 3 a); the `__CobolInvoke` case breaks to EC-OO-METHOD). `MethodConformanceMismatches` compares the passing mode per formal pair (§9.3.8.2.3 rule 1). A PROGRAM or FUNCTION BY VALUE formal, floating-point included, is carried by the program ABI (kb/Work PB1114). The fixed-point⇄float BY CONTENT conversion IS carried on the INVOKE lane, as on CALL (`OoEmitter.IsFloatLanding` over `FloatResultant`; kb/Work PB1114), and every storage-less BY CONTENT sender — a numeric literal, an arithmetic expression, a boolean value — is described as the sender it is and asked ONE verdict, `OoConformance.ContentValueMismatch` (§14.8.2.3.3 rule 2 in its order: 2 b) SET for an index formal, 2 a) COMPUTE, 2 c) length only, 2 d) MOVE), by the INVOKE, CALL and function lanes alike; a numeric literal or an arithmetic expression into a non-numeric elementary formal crosses as the formal's MOVE record (`MoveEmitter.ConvertSource`) on both the INVOKE and CALL carriers (kb/Work PB1113, PB1946): rule 2 d) takes the argument's VALUE as the MOVE's sending operand (kb/Work PB1936), so an expression is a numeric sender on Table 16's NONINTEGER row (admitted into a numeric-edited formal and edited, refused into an alphanumeric or national one), refused into a group formal (no character image for §14.9.25.4 GR4's copy) and into a class-pointer or object-reference formal (no SET format sends a value); dynamic-length refmod BY REFERENCE args are a documented later refinement. All are loud today. OMITTED and OPTIONAL are carried (the pair above). The one-entry / one-relation redesign of argument conformance across CALL, function, typed and universal INVOKE is kb/Work PB1780.
+The procedure-division header's BY phrases parse and CARRY on a method (kb/Work PB1051): `OoBindMethodData` threads the using-phrase mode across the formals as the program arm does (§14.2.3 GR4, transitive until the other phrase) into `OoFormal.ByValue`, and asks the ONE header screen (`ProcedureHeaderScreen.ByValueClass`, §14.2.2 SR2, COBOLNET1553). A BY VALUE formal crosses the method ABI exactly as a BY REFERENCE one does (the typed `ref` plus the omitted flag): the activator hands a DETACHED temporary and the method skips the copy-out (§14.2.3 GR10), so there is no second C# signature. `OoBindInvocationArg` takes the argument's mode from the formal when the formal is BY VALUE (§14.9.23.4 GR6 b)), refuses SR5 a)/b) from both sides, asks SR16 (a literal) and SR15 (an identifier's class, COBOLNET2741), and binds a BY VALUE argument through the BY CONTENT arms (§14.8.2.3.3 covers both) — the INVOKE and inline forms alike. A universal invocation passes every argument BY REFERENCE (SR6), so a method with a BY VALUE formal never matches it (§9.3.6 match rule 3 a); the `__CobolInvoke` case breaks to EC-OO-METHOD). `MethodConformanceMismatches` compares the passing mode per formal pair (§9.3.8.2.3 rule 1). A PROGRAM or FUNCTION BY VALUE formal, floating-point included, is carried by the program ABI (kb/Work PB1114). The fixed-point⇄float BY CONTENT conversion IS carried on the INVOKE lane, as on CALL (`OoEmitter.IsFloatLanding` over `FloatResultant`; kb/Work PB1114), and every storage-less BY CONTENT sender — a numeric literal, an arithmetic expression, a boolean value — is described as the sender it is and asked ONE verdict, `OoConformance.ContentValueMismatch` (§14.8.2.3.3 rule 2 in its order: 2 b) SET for an index formal, 2 a) COMPUTE, 2 c) length only, 2 d) MOVE), by the INVOKE, CALL and function lanes alike; a numeric literal or an arithmetic expression into a non-numeric elementary formal crosses as the formal's MOVE record (`MoveEmitter.ConvertSource`) on both the INVOKE and CALL carriers (kb/Work PB1113, PB1946): rule 2 d) takes the argument's VALUE as the MOVE's sending operand (kb/Work PB1936), so an expression is a numeric sender on Table 16's NONINTEGER row (admitted into a numeric-edited formal and edited, refused into an alphanumeric or national one), refused into a group formal (no character image for §14.9.25.4 GR4's copy) and into a class-pointer or object-reference formal (no SET format sends a value); a reference-modified argument whose length is a run-time value crosses BY REFERENCE into a group formal (item 6, D-RM1 a)). OMITTED and OPTIONAL are carried (the pair above). The one-entry / one-relation redesign of argument conformance across CALL, function, typed and universal INVOKE is kb/Work PB1780.
 
 6. **One relation, read at two times (kb/Work PB2077; decision PB3098, 2026-10-12).** §14.9.23.4 GR7 b) locates the
    method for EVERY INVOKE by §9.3.6's match; conformance is asked of a typed receiver at compile time (§14.9.23.3 SR5 c),
    §14.8.1) and of a universal one at run time (GR7 c)). The typed lane therefore asks the universal switch's two relations
-   over the SAME descriptions `Oo/ActivationDescriptions` builds for the box: `ActivationRelations.DescriptionMatches`
-   (the match's description half — rules 3 a)-c), 3 d) 1.-3., 3 e); `Matches` adds the ACTIVE-CLASS value half, which
-   the typed lane answers statically by §14.8.2.3.2 rule 4 with `invokedWith`) and
-   `ActivationRelations.ParameterViolation(…, universalReceiver)` (GR7 c)'s ANY LENGTH ban is the one universal-only
-   arm). A BY REFERENCE INVOKE argument has NO second comparator. This item is the INVOKE step of item 7: pair mode
+   over the SAME descriptions `Oo/ActivationDescriptions` builds for the box (`OfPlace`, `OfFormal`), through ONE binder
+   entry, `OoBinder.ByReferenceArgumentReason`: `ActivationRelations.MatchViolation` (the match's description half —
+   rules 3 a)-c), 3 d) 1.-3., 3 e), null or the reason; `Matches` is it plus the ACTIVE-CLASS value half, which the typed
+   lane answers statically by §14.8.2.3.2 rule 4 with `invokedWith`) and
+   `ActivationRelations.ParameterViolation` (§14.8.2.2's group rules; GR7 c)'s ANY LENGTH ban bans the bound METHOD's
+   description, not a pair, so it is the universal switch's unconditional stop and never the typed lane's). A BY REFERENCE INVOKE argument has NO second comparator; a reference-modified argument BY CONTENT takes
+   §14.8.2.3.3's MOVE rules like any operand (§9.3.6 4 d)). This item is the INVOKE step of item 7: pair mode
    (override, implements, property, RETURNING) asks `OoConformance.DescriptionMismatch` only until PB3101 deletes the
    comparator and sends pair mode to `SameSignature`. What the one relation settles by
    construction: a reference-modified argument is §8.4.3.3.4 GR6's PICTURE-less elementary item
    (`OfReferenceModification`), so BY REFERENCE it matches an alphanumeric group formal of no more bytes and never an
    elementary one (3 e)) — the typed lane used to accept `X(1:5)` into `PIC X(5)` and refuse the group; a whole
-   `PIC X(n)` into a group formal is refused on both lanes (3 e)); a slice whose length is a run-time value takes
+   `PIC X(n)` into a group formal is refused on both lanes (3 e)); a bit / national group is "described with PICTURE 1(m) / N(m)" (§13.18.29.4 GR1 b) /
+   GR2 b)), so its description carries that picture's clauses: it matches an elementary bit / national item of its
+   length (§14.8.2.3.2 "Additionally" b) / c)) on both lanes, and no group of another length (EC-OO-METHOD, not
+   EC-OO-UNIVERSAL); a slice whose length is a run-time value takes
    §14.8.2.2 rule 1 at compile time on its MAXIMUM extent (docs/CONFORMANCE.md D-RM1, the occurs-depending model of
-   §14.8.2.2) and the evaluated length at the boundary, through the universal carrier's prefix window; the 3 e) ANY LENGTH
-   item is read through §14.8.2.3.2 d)/e). Drift: `TypedAndUniversalInvokeVerdictsAgree` — structural (`OoBinder`
-   holds no conformance arm of its own) and behavioral (the binder's entry and the relation agree over a table of
-   argument × formal descriptions).
+   §14.8.2.2) and the evaluated length at the boundary — on the universal lane through the box's evaluated description
+   (EC-OO-UNIVERSAL when it is shorter than the formal), on the typed lane through the carrier: such a slice states no
+   storage AREA (`CallEmitter.AreaOf`), so the group formal holds the slice padded to the formal's width and the
+   write-back splices through the slice, truncated to it; the 3 e) ANY LENGTH item is read through §14.8.2.3.2
+   "Additionally" d)/e) on BOTH lanes (`ActivationDescription.AnyLengthClauses`: the argument compared as if it were
+   described with ANY LENGTH — only the length is relaxed), so a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal
+   and, through a universal receiver, is then refused by GR7 c) (EC-OO-UNIVERSAL), while a slice matches no ANY LENGTH
+   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's run-time §14.8.2.3.2 rule 2 d) and §14.8.3.3 5) arms still compare
+   category and usage only (kb/Work PB2077's lead: reading the any-length form there moves the call ABI). Both lanes
+   quote the relation's refusal, so a refusal spells each description as its entry does and never as its identity key:
+   `ActivationDescription.Clauses` is the 3 e) identity (compared), `ClausePhrases` the same clauses as phrases
+   (`PICTURE 9(6)`, `USAGE POINTER TO T-REC`, `DECIMAL-POINT IS COMMA`; never compared), built beside it by
+   `ActivationDescriptions.ElementaryClauses`, and `ActivationRelations.ClauseDifference` names the phrases one side has
+   and the other lacks. Drift: `TypedAndUniversalInvokeVerdictsAgreeDriftTests` —
+   structural (a Roslyn walk: `OoBinder` calls no `DescriptionMismatch`, its BY REFERENCE entry asks the two relations
+   and names no `RefModPlace`, and no `if` of `OoBindInvocationArg` branches on one) and behavioral (the binder's entry
+   and the relation agree over every elementary, reference-modified and ANY LENGTH pair; PB3098's rows compile to their
+   verdicts; a refusal carries no identity key, `ARefusal_SpellsItsClauses_NeverAnIdentityKey`). Goldens:
+   `conformance:2002/pb2077_refmod_argument_both_lanes` and the negatives
+   `pb2077-refmod-into-elementary-by-reference`, `pb2077-refmod-shorter-than-group-formal`,
+   `pb2077-elementary-into-group-formal`.
 
 7. **The relation family is the ONLY conformance comparator, at bind time as at run time (kb/Work PB1780 → PB3101,
    2026-10-12).** The standard writes the description identity once — §9.3.5.3's eight clauses — and asks it from five
@@ -301,15 +323,15 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    prototype against its definition (§13.7.3 SR2). The compiler writes it ONCE too: `ActivationDescriptions` builds the
    description (the `Clauses` key through `PictureClauseIdentity`, the ONE builder of that key; a `GroupAtom` carries
    each leaf's category and clauses, so a group's subordinate layout is part of the description), and
-   `Runtime/Control/ActivationRelations` holds every relation over it — `Matches` / `DescriptionMatches` /
+   `Runtime/Control/ActivationRelations` holds every relation over it — `Matches` / `MatchViolation` /
    `ReturningMatches` (§9.3.6), `ParameterViolation` / `ReturningViolation` (§14.8.2 / §14.8.3 for a method),
    `CallArgumentViolation` / `CallReturningViolation` (a program or function: rule 1's length or rule 2's identity,
    §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MayMove` / `MaySet`, §14.8.2.2) and `SameSignature` (the
    symmetric identity of §9.3.8.2.3 rules 1-6, §11.7.3 SR3/SR4 and §13.7.3 SR2). `ParameterConformance.CheckArgument`
    is the ONE bind-time entry: CALL Format 2, a function reference and INVOKE build the argument's description
    (`OfCallArgument` / `OfPlace` / `OfValue`, the §14.9.4.4 GR8 reduction written once) and the formal's, and ask
-   `CallArgumentViolation` (program, function) or `DescriptionMatches` then `ParameterViolation(universalReceiver:
-   false)` (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
+   `CallArgumentViolation` (program, function) or `MatchViolation` then `ParameterViolation`
+   (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
    `MethodConformanceMismatches` (override, implements, interface), the property accessor check,
    `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SameSignature`. There is NO
    `DataItem` comparator: `OoConformance.DescriptionMismatch`, `ContentMismatch`, `ContentValueMismatch`, the literal
@@ -680,15 +702,40 @@ through the same `NewClassSymbol` / `NewInterfaceSymbol` and roster collection t
 `ParameterizedClasses` / `ParameterizedInterfaces` and out of every name lookup, and asks it the header rules every
 definition is asked (CLASS-ID / INTERFACE-ID / METHOD-ID AS literal, duplicate METHOD-ID, the INHERITS and IMPLEMENTS
 REPOSITORY rules). `OoDriver.BindParameterized` then binds its environment and data divisions and its method
-headers as itself, after every emitted class, and drops the result. A parameter-name resolves through the one
+headers as itself, after every emitted class, and KEEPS the forests (`OoDriver.SkeletonClasses` /
+`SkeletonInterfaceData`, carried on `GroupBindContext` outside `AllBinders`): no pass that produces code sees
+them, and the edition pass's data gates (`VersionConformancePass.GateData`) read them as they read every emitted
+class's, together with every INTERFACE's prototype forest, which no gate read either (kb/Work PB2937) — so a
+`USAGE FLOAT-BINARY-64` in an unexpanded skeleton, or on an interface prototype's formal, is COBOLNET0900 below
+2014. A parameter-name resolves through the one
 funnel as a FORMAL (`OoNameResolution.Result.IsFormal`, from the scope's own USING clause, asked before any group
-class of the same spelling), and a reference typed by a formal takes the universal description: what it names is
-known only in an expansion, where §9.3.8.2.4 asks every conformance question "as if the actual parameter classes or
-interfaces were substituted". The PROCEDURE statements of the definition bind only in its expansions: a statement
-through a formal-typed reference (a literal INVOKE argument, `SUPER` over a formal base, a formal as INVOKE's
-class-name) obeys rules that differ between the universal description and the typed one an expansion binds, so
-binding them here needs a description kind of its own (a FORMAL object-reference kind beside universal, class,
-interface and ACTIVE-CLASS) — the open half, outside this decision's current text.
+class of the same spelling). §11.3.4 GR6 lets it stand "only where an object-class-name or an interface-name is
+permitted", so a reference typed by it takes the alternative its REPOSITORY specifier declares, marked FORMAL
+(`ObjectRefDescriptor.Formal` — an AXIS of the object-class-name / interface-name alternative, not a fifth kind,
+because the formal IS that alternative; the measured universal stand-in drew five false refusals, kb/Work PB2937).
+§9.3.8.2.4 treats the definition "as if the actual parameter classes or interfaces were substituted", so the rule is:
+**a question that turns on WHICH class or interface the formal names is each expansion's; every other question is
+asked of the skeleton.** Concretely: (a) a SET-style pair (§14.9.39.3, the BY CONTENT and RETURNING conformances that
+are "as if a SET") is asked with the formal side standing for the actual MOST FAVOURABLE to the pair
+(`OoClassTable.SetOperands`), so only what no actual can change is refused — the FACTORY and ONLY axes (SR12 a)1./a)3.:
+`SET ONE TO X` with ONE `T ONLY` and X `T` is refused in every expansion), a universal sender into a formal-typed
+receiver, a formal-typed sender into ACTIVE-CLASS (SR14), an interface formal into a class-typed receiver; two
+references to the SAME parameter-name are one class (opaque identity). (b) An identical-description question
+(§9.3.8.2.3 rule 2 through `DescriptionMismatch`) is admitted when the two sides differ only in a name a formal may
+take (`ObjectRefDescriptor.TurnsOnFormal`). (c) A statement that SELECTS A METHOD through a formal — an INVOKE whose
+receiver is a formal-typed reference or a formal class-name, SELF of a method the definition does not define while
+its superclass is a formal (`OoClassSymbol.FormalBaseName`), SUPER or `B OF SUPER` over a formal superclass, an inline
+invocation or object property through a formal, `SET … TO` a formal class-name — binds the operands whose rules do
+not read the method (an undefined argument name is §8.4.2.1's refusal in every expansion) and is then the
+expansion's: the site records it on the EXPANSION-DEFERRAL ledger (`EditionContext.NoteExpansionDeferred`) and the
+statement funnel keeps a `BoundDeferredToExpansion` (never emitted; the refusal ledger stands aside for it). The
+node KEEPS what the verb binder built (`Bound`), so the statements nested in a deferred compound statement — an IF's
+branches under a condition read through a formal — are the same in every expansion and are walked by the edition
+pass like any others; and each statement takes its own refusals off the ledger (`EditionContext.TakeRefusalsSince`),
+so a compound statement never answers for a nested statement's deferral shadow. So
+`OoDriver.BindClassBody` runs over every skeleton after the emitted classes (`BinderDriver.Bind`), their forests take
+part in `ResolvePointerRestrictions`, and the edition pass walks their bound trees as well as their data. A
+skeleton's WRITTEN superclass is its `Base` as an ordinary class's is, so SUPER binds against it.
 
 **Diagnostics.** COBOLNET2239 — the definition's own rules (§11.3.3 SR8/SR9, §11.6.3 SR4/SR7, §11.3.4 GR6 /
 §11.6.4 GR4, §12.3.8.3 SR3), reported on the skeleton whether or not anything expands it. COBOLNET2240 — the

@@ -3,9 +3,8 @@
 docs/rearchitecture/DESIGN-test-build-ci.md section 3.17.4).
 
     python scripts/devlog.py render [--since NNNN] [--out FILE]   the descending narrative (README, then newest first)
-    python scripts/devlog.py stamp <branch> [--coord DIR] [--base origin/main]
-                                                                   number and stamp the branch's pending entries as
-                                                                   one (or re-stamp one main has overtaken); one commit
+    python scripts/devlog.py stamp <branch> [--coord DIR]        number and stamp the branch's pending entries as
+                                                                   one; one commit
     python scripts/devlog.py check [--base origin/main] [--rev HEAD] the landing rule, on the trees of the range
     python scripts/devlog.py next                                  the highest entry number in DEVLOG/ (the allocator's floor)
     python scripts/devlog.py --self-test
@@ -28,11 +27,14 @@ the render order is the name order and needs no list. A NEW entry is held to the
 
 THE FLOW. The implementer writes `DEVLOG/pending-<slug>.md` whose first line is `## <Title>` (no number, no stamp) and
 whose body follows. `stamp <branch>` runs when the branch is enqueued: it allocates the number through
-`scripts/orchestrator/alloc.py devlog` (so number order is enqueue order is landing order), renames the file to
+`scripts/orchestrator/alloc.py devlog` (so number order is STAMP order), renames the file to
 `NNNN-<slug>.md`, completes the header with the number and the current stamp, and commits that in the branch's
 worktree. A branch that merged an unlanded predecessor (a same-file successor, a review finisher) carries that
 predecessor's pending entry too and lands it, so `stamp` folds every pending entry into the ONE new entry, oldest
-first (one landing on main, one entry). `check` is the landing rule (owner 2026-10-08, kb/Work PB2605: it covers "Only commits landing on main"),
+first (one landing on main, one entry). A stamped entry keeps its number for good: GitHub orders the merge queue
+AFTER the stamp (each pull request enters it when its own checks finish, and each merge group is built on every group
+ahead of it), so a landing stamped earlier can reach main after one stamped later, and a bounced branch that lands
+again lands under the number it was first given (kb/Work PB3123). `check` is the landing rule (owner 2026-10-08, kb/Work PB2605: it covers "Only commits landing on main"),
 run where every landing passes and on every pull request and merge group in CI.
 
 WHAT `check` REFUSES (exit 1), on the committed trees of <base> and <rev>, never an index or a working tree:
@@ -41,8 +43,11 @@ WHAT `check` REFUSES (exit 1), on the committed trees of <base> and <rev>, never
   - an entry whose first line is not an `## Entry` header, whose header number disagrees with its file name, or whose
     number (with its letter) another file also holds;
   - a landing that adds no NEW entry, or more than one (new = a header line the base's history does not carry);
-  - a new entry without the strict header, with a letter, or whose number is not above every number on <base> (a stale
-    number after a rebase: re-stamp it);
+  - a new entry without the strict header, with a letter, or whose number is not above every number of the tree it
+    was STAMPED on (the first parent of the commit in <base>..<rev> that added its file, which is `stamp`'s; <base>'s
+    own entries when no commit in the range added it). Never "above <base>'s newest": a merge group is built on the
+    groups queued ahead of it, which may carry higher numbers stamped later (kb/Work PB3123; runs 38355538654 and
+    38360587401 bounced on that rule). Uniqueness is the item above: no two files hold one number;
   - a landing that deletes an entry <base> had: an entry FILE of <base> missing from <rev>, or, when <base> still has
     the monolithic DEVLOG.md (the one landing that migrates the log), a header line of it that no entry of <rev>
     carries, counted with multiplicity (the history repeats some headers).
@@ -233,8 +238,9 @@ def lint(files: dict[str, str], monolith: bool) -> list[str]:
 
 
 def new_entries(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, str]) -> list[str]:
-    """THE NEW ENTRIES OF A LANDING, the ONE definition (kb/Work PB3023 review R1-3): `check` refuses on it, `stamp`
-    re-numbers by it and `enqueue.py` titles the pull request from it. The entry files of `rev`, newest first, whose
+    """THE NEW ENTRIES OF A LANDING, the ONE definition (kb/Work PB3023 review R1-3): `check` refuses on it,
+    `range_check` reads each one's stamp floor by it (`stamp_floor`, kb/Work PB3123) and `enqueue.py` titles the pull
+    request from it (`landing_entries`). The entry files of `rev`, newest first, whose
     header line the base's history does not carry: its entry files and, on the landing that migrates the log, the
     header lines of its monolithic DEVLOG.md (`base_extra_headers`). Never a file-name test: the migrating landing adds
     every entry of the history as a new FILE."""
@@ -255,16 +261,18 @@ def landing_entries(repo: pathlib.Path, base: str, rev: str) -> tuple[dict[str, 
     return rev_files, new_entries(base_files, monolith_headers(repo, base), rev_files)
 
 
-def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, str], rev_monolith: bool) -> tuple[
-        list[str], list[str]]:
+def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, str], rev_monolith: bool,
+          stamped_on: dict[str, int] | None = None) -> tuple[list[str], list[str]]:
     """(refusal reasons, the new entries' names) for a landing from the tree `base` to the tree `rev`.
-    `base_extra_headers` is the header lines of the base's monolithic DEVLOG.md (`monolith_headers`), repeats kept."""
+    `base_extra_headers` is the header lines of the base's monolithic DEVLOG.md (`monolith_headers`), repeats kept.
+    `stamped_on` maps a new entry to the newest entry number of the tree it was STAMPED on (`stamp_floor`); a new
+    entry it does not name is held to the base's newest instead, the floor of a landing built straight on <base>."""
     reasons = lint(rev, rev_monolith)
     pending = sorted(n for n in rev if PENDING_NAME.match(n))
     for n in pending:
         reasons.append(f"{DIR}/{n} is an unstamped entry: run `python scripts/devlog.py stamp <branch>` before landing")
     new = new_entries(base, base_extra_headers, rev)
-    floor = floor_of(base, base_extra_headers)
+    base_floor = floor_of(base, base_extra_headers)
     if not new and not pending:
         reasons.append("the landing carries no new DEVLOG entry. Every landing on main carries one (owner 2026-10-08, "
                        f"kb/Work PB2605): write {DIR}/pending-<slug>.md (first line `## <Title>`, then the body) and "
@@ -278,9 +286,15 @@ def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, st
         k = key_of(n)
         if k[1]:
             reasons.append(f"{DIR}/{n}: a new entry carries a plain number, never a letter")
+        # NUMBER ORDER IS STAMP ORDER, NOT MERGE ORDER (kb/Work PB3123). The number is allocated when the branch is
+        # enqueued, and GitHub orders the merge queue later, so a merge group may be built on a group that carries a
+        # HIGHER number than its own. The rule is therefore the allocator's own guarantee: above every entry of the
+        # tree the entry was stamped on, and unique on the landing's tree (`lint`: two files never hold one number).
+        floor = (stamped_on or {}).get(n, base_floor)
         if k[0] <= floor:
-            reasons.append(f"{DIR}/{n}: number {k[0]} is not above the base's newest entry {floor} (a stale number "
-                           "after a rebase): re-stamp it")
+            reasons.append(f"{DIR}/{n}: number {k[0]} is not above the newest entry {floor} of the tree it was stamped "
+                           f"on (only `python scripts/devlog.py stamp <branch>` numbers an entry): make it "
+                           f"{DIR}/pending-<slug>.md again, first line `## <Title>`, and let `enqueue.py land` stamp it")
     gone = sorted(n for _, n in entries(base) if n not in rev)
     reasons += [f"{DIR}/{n} is on the base and the landing deletes it: the log is the only history" for n in gone]
     # The base's monolith is history too (kb/Work PB3025, review R1-1): every header it holds, as many times as it holds
@@ -293,15 +307,45 @@ def check(base: dict[str, str], base_extra_headers: list[str], rev: dict[str, st
     return reasons, new
 
 
+def range_check(repo: pathlib.Path, base: str, rev: str) -> tuple[list[str], list[str], dict[str, str]]:
+    """`check` on the committed range base..rev: (refusal reasons, the new entries' names, the DEVLOG/ files at rev).
+    Raises RangeError when either end cannot be read."""
+    base_files, _ = commit_files(repo, base)
+    rev_files, rev_monolith = commit_files(repo, rev)
+    extra = monolith_headers(repo, base)
+    stamped_on = {n: f for n in new_entries(base_files, extra, rev_files)
+                  if (f := stamp_floor(repo, base, rev, n)) is not None}
+    reasons, new = check(base_files, extra, rev_files, rev_monolith, stamped_on)
+    return reasons, new, rev_files
+
+
+def stamp_floor(repo: pathlib.Path, base: str, rev: str, name: str) -> int | None:
+    """The newest entry number of the tree `DEVLOG/<name>` was STAMPED on: the first parent of the OLDEST commit in
+    base..rev that added a file of its number (`devlog.py stamp`'s commit; a later retitle that renamed the file adds
+    the new name on a tree that may already hold higher numbers), read with renames off, because the stamp renames
+    `pending-<slug>.md`. None when no such commit is in the range (the file arrived through a merge's resolution)."""
+    m = ENTRY_NAME.match(name)
+    if not m:
+        return None
+    added = _git(repo, "log", "--no-renames", "--diff-filter=A", "--format=%H", f"{base}..{rev}", "--",
+                 f":(glob){DIR}/{m.group('num')}{m.group('sfx')}-*.md").stdout.split()
+    if not added:
+        return None
+    parent = f"{added[-1]}^1"
+    if _git(repo, "rev-parse", "--verify", "--quiet", f"{parent}^{{commit}}").returncode != 0:
+        return 0                                     # a root commit: there was no tree before it
+    listed = _git(repo, "ls-tree", "--name-only", parent, f"{DIR}/").stdout.splitlines()
+    return max([highest(n[len(DIR) + 1:] for n in listed)]
+               + [int(m.group("num")) for h in monolith_headers(repo, parent) if (m := HEADER.match(h))])
+
+
 def run_check(repo: pathlib.Path, base: str, rev: str) -> int:
     try:
-        base_files, _ = commit_files(repo, base)
-        rev_files, rev_monolith = commit_files(repo, rev)
+        reasons, new, rev_files = range_check(repo, base, rev)
     except RangeError as e:
         print(f"⛔ devlog check: {e}")
         print("=== DEVLOG CHECK: NOT RUN (the range could not be read) ===")
         return 2
-    reasons, new = check(base_files, monolith_headers(repo, base), rev_files, rev_monolith)
     for r in reasons:
         print(f"⛔ devlog check: {r}")
     if reasons:
@@ -368,42 +412,14 @@ def stamp(wt: pathlib.Path, number: int, now: dt.datetime) -> tuple[str, str]:
     return name, header
 
 
-def unstamp_overtaken(wt: pathlib.Path, base: str) -> str | None:
-    """The branch's ONE added entry, when <base> (main) has since reached its number, made pending again so the next
-    stamp numbers it above main's (kb/Work PB3023: a branch waits after its stamp — a merge-queue bounce, a finisher —
-    while other landings take higher numbers, and `check` then refuses the stale number). Returns the stale file's
-    name, or None when there is nothing to re-stamp (no added entry, more than one, or one still above main's). The
-    added entry is `new_entries`' (the landing rule's own definition), so on the migrating landing, which adds every
-    entry of the history as a file, it is still the one."""
-    try:
-        base_files, _ = commit_files(wt, base)
-    except RangeError:
-        return None
-    extra = monolith_headers(wt, base)
-    files = worktree_files(wt)
-    added = new_entries(base_files, extra, files)
-    if len(added) != 1 or key_of(added[0])[0] > floor_of(base_files, extra):
-        return None
-    stale, text = added[0], files[added[0]]
-    title = title_of(first_line(text))
-    body = text.split("\n", 1)[1] if "\n" in text else ""
-    (wt / DIR / f"pending-{slugify(title)}.md").write_bytes(f"## {title}\n{body}".encode("utf-8"))
-    (wt / DIR / stale).unlink()
-    _git(wt, "rm", "-q", "--cached", "--ignore-unmatch", "--", f"{DIR}/{stale}", check=True)
-    return stale
-
-
-def run_stamp(repo: pathlib.Path, branch: str, coord_override: str | None, base: str = "origin/main") -> int:
+def run_stamp(repo: pathlib.Path, branch: str, coord_override: str | None) -> int:
     sys.path.insert(0, str(HERE / "orchestrator"))
     import alloc  # noqa: PLC0415
     import coord  # noqa: PLC0415
     wt = worktree_of(repo, branch)
     if not any(PENDING_NAME.match(n) for n in names_in(wt)):
-        stale = unstamp_overtaken(wt, base)
-        if not stale:
-            raise SystemExit(f"⛔ devlog stamp: {wt / DIR} has no pending entry to stamp (and no stamped entry that "
-                             f"{base} has overtaken)")
-        print(f"re-stamping {DIR}/{stale}: {base} already holds its number")
+        raise SystemExit(f"⛔ devlog stamp: {wt / DIR} has no pending entry to stamp (an entry keeps the number it was "
+                         "first stamped with: kb/Work PB3123)")
     number, _ = alloc.allocate("devlog", 1, wt, coord.coord_dir(coord_override))
     name, header = stamp(wt, number, dt.datetime.now().astimezone())
     _git(wt, "commit", "-q", "-m", f"DEVLOG {number}: stamp the entry ({DIR}/{name})", check=True)
@@ -491,7 +507,8 @@ def self_test() -> int:
     landing("no new entry -> REFUSED", {"code.py": "x = 3\n"}, 1, "no new DEVLOG entry")
     landing("two new entries -> REFUSED", {**new12, f"{DIR}/0013-another.md": e("13", "another")}, 1, "exactly one")
     landing("an unstamped header -> REFUSED", {f"{DIR}/0012-x.md": f"## Entry 12 - x\n\nbody\n"}, 1, "is not `")
-    landing("a stale number (not above the base) -> REFUSED", {f"{DIR}/0011-again.md": e("11", "again")}, 1, "stale")
+    landing("a number not above the tree it was stamped on -> REFUSED", {f"{DIR}/0011-again.md": e("11", "again")}, 1,
+            "tree it was stamped on")
     landing("a pending entry -> REFUSED", {f"{DIR}/pending-x.md": "## X\n\nbody\n"}, 1, "unstamped")
     landing("a letter on a new entry -> REFUSED", {f"{DIR}/0012a-x.md": e("12a", "x")}, 1, "never a letter")
     landing("a header that disagrees with its name -> REFUSED", {f"{DIR}/0012-x.md": e("13", "x")}, 1, "file name")
@@ -524,17 +541,6 @@ def self_test() -> int:
     ok("landing_entries on the migrating landing: every history file is added, ONE entry is new (the pull request's "
        "title reads it; kb/Work PB3023 review R1-3)",
        landed == ["0012-the-landing.md"] and len([n for n in files_at if key_of(n)]) == 3, landed)
-    # the same landing waits while main's monolith reaches 12: its 12 is overtaken and made pending again
-    mono_wt = root / "mono-wt"
-    sh("worktree", "add", "-q", "-b", "mono-impl", str(mono_wt), "HEAD")
-    sh("checkout", "-q", "-B", "mono-main", mono_base)
-    tree({MONOLITH: "# Log\n" + e("12", "main took twelve") + e("11", "older") + e("10", "oldest")})
-    sh("commit", "-qam", "main reaches 12")
-    stale = unstamp_overtaken(mono_wt, "mono-main")
-    ok("unstamp_overtaken on the migrating landing finds its one entry by the landing rule and makes it pending again",
-       stale == "0012-the-landing.md" and (mono_wt / DIR / "pending-the-landing.md").is_file()
-       and not (mono_wt / DIR / stale).exists(), f"{stale} {sorted(names_in(mono_wt))}")
-    sh("worktree", "remove", "--force", str(mono_wt))
     sh("checkout", "-q", "mono")
     tree({f"{DIR}/0011-older.md": e("11", "older, retitled")})
     sh("commit", "-qam", "retitle")
@@ -569,6 +575,52 @@ def self_test() -> int:
     except RangeError:
         ok("an unreadable revision -> NOT RUN (exit 2), never a pass", True)
 
+    # THE MERGE QUEUE STACKS (kb/Work PB3123). GitHub builds each queued pull request's merge group ON TOP of every
+    # group ahead of it, in an order it picks when each pull request's checks finish, and CI runs `check` on (the
+    # group's base, the group's head). Two branches stamped from one main (12, then 13) must pass in BOTH orders; until
+    # PB3123 the order 13-then-12 refused the 12 as "not above the base's newest entry 13" (runs 38355538654,
+    # 38360587401). The trees are built as the queue builds them: a merge commit of each branch onto the group ahead.
+    sh("checkout", "-q", "main")
+
+    def stamped_branch(name: str, at: str, edits: dict[str, str | None]) -> str:
+        sh("checkout", "-q", "-B", name, at)
+        tree(edits)
+        sh("add", "-A")
+        sh("commit", "-qm", f"WIP checkpoint: {name} and its stamped entry")
+        return sh("rev-parse", "HEAD")
+
+    def group(name: str, onto: str, branch: str) -> str:
+        sh("checkout", "-q", "-B", name, onto)
+        sh("merge", "-q", "--no-ff", "-m", f"Merge {branch} (the merge queue's group)", branch)
+        return sh("rev-parse", "HEAD")
+
+    def range_verdict(label: str, lo: str, hi: str, want: int, needle: str = "") -> None:
+        reasons, _, _ = range_check(repo, lo, hi)
+        got = 1 if reasons else 0
+        ok(label, got == want and (not needle or any(needle in x for x in reasons)), "; ".join(reasons) or "PASS")
+
+    qa = stamped_branch("qa", base, {f"{DIR}/0012-queued-first.md": e("12", "queued first"), "a.py": "a = 1"})
+    qb = stamped_branch("qb", base, {f"{DIR}/0013-queued-second.md": e("13", "queued second"), "b.py": "b = 1"})
+    g_a = group("g-a", base, qa)
+    range_verdict("stacked, queue order 12 then 13: the first group -> PASS", base, g_a, 0)
+    range_verdict("stacked, queue order 12 then 13: the second group, built on the first -> PASS", g_a,
+                  group("g-ab", g_a, qb), 0)
+    g_b = group("g-b", base, qb)
+    range_verdict("stacked, queue order 13 then 12: the first group -> PASS", base, g_b, 0)
+    g_ba = group("g-ba", g_b, qa)
+    range_verdict("stacked, queue order 13 then 12 (PB3123's bounce): the second group, built on the first -> PASS",
+                  g_b, g_ba, 0)
+    qc = stamped_branch("qc", base, {f"{DIR}/0012-a-twin.md": e("12", "a twin"), "c.py": "c = 1"})
+    range_verdict("stacked: two queued branches holding ONE number (an allocator failure) -> REFUSED", g_a,
+                  group("g-ac", g_a, qc), 1, "same entry number")
+    retitled = stamped_branch("retitled", qa, {f"{DIR}/0012-queued-first.md": None,
+                                               f"{DIR}/0012-queued-first-retitled.md": e("12", "queued first, retitled")})
+    range_verdict("a stamped entry retitled (its file renamed) after its stamp keeps the stamp's floor -> PASS", g_b,
+                  group("g-br", g_b, retitled), 0)
+    hand = stamped_branch("hand", g_ba, {f"{DIR}/0009-hand-numbered.md": e("9", "hand numbered"), "d.py": "d = 1"})
+    range_verdict("a number below every entry of the tree it was stamped on (hand-numbered) -> REFUSED", g_ba, hand, 1,
+                  "tree it was stamped on")
+
     # stamp: a branch in a linked worktree; the number comes from the allocator; one commit
     sh("checkout", "-q", "main")
     wt = root / "wt"
@@ -596,23 +648,19 @@ def self_test() -> int:
                             "--coord", str(cdir)], capture_output=True, text=True, encoding="utf-8", env=env)
     ok("stamp: a branch with no pending entry is refused, nothing allocated", again.returncode != 0 and
        json.loads((cdir / "alloc.json").read_text(encoding="utf-8")).get("devlog") == 12, again.stdout + again.stderr)
-    # RE-STAMP (kb/Work PB3023): another landing took 12 and 13 on main while `impl` waited (a queue bounce); main is
-    # merged in, and the stale 12 is numbered again above main's, in one commit that removes the stale file
+    # OVERTAKEN, KEPT (kb/Work PB3123): another landing, stamped 13 after `impl` took 12, reached main first (the queue
+    # ordered it ahead, or `impl` bounced); main is merged in and `impl` keeps its 12, which still passes the landing
+    # rule: it is above every entry of the tree it was stamped on, and no other file holds it.
     sh("checkout", "-q", "main")
-    tree({f"{DIR}/0012-another-landing.md": e("12", "another landing"), f"{DIR}/0013-a-third.md": e("13", "a third")})
+    tree({f"{DIR}/0013-a-later-stamp.md": e("13", "a later stamp")})
     sh("add", "-A")
-    sh("commit", "-qm", "two landings on main")
+    sh("commit", "-qm", "a later-stamped landing reaches main first")
     sh("merge", "-q", "--no-edit", "main", cwd=wt)
-    restamp = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve()), "stamp", "impl", "--repo",
-                              str(repo), "--coord", str(cdir), "--base", "main"], capture_output=True, text=True,
-                             encoding="utf-8", env=env)
+    kept, _, _ = range_check(repo, "main", "impl")
     names = sorted(p.name for p in (wt / DIR).iterdir())
-    ok("stamp: an entry main has overtaken is re-stamped above main's, the stale file removed, in one commit",
-       restamp.returncode == 0 and "0014-pb9-the-fix-and-why.md" in names and "0012-pb9-the-fix-and-why.md" not in names
-       and not any(n.startswith("pending-") for n in names) and not sh("status", "--porcelain", cwd=wt)
-       and not check(commit_files(repo, "main")[0], set(), *commit_files(repo, "impl"))[0],
-       restamp.stdout + restamp.stderr + repr(names))
-    ok("next: the highest number in the tree", highest(names_in(wt)) == 14)
+    ok("an entry a later-stamped landing overtook on main keeps its number and passes check",
+       not kept and "0012-pb9-the-fix-and-why.md" in names, "; ".join(kept) + repr(names))
+    ok("next: the highest number in the tree", highest(names_in(wt)) == 13)
     # FOLD (kb/Work PB3023 review R1-3): a successor that merged an unlanded predecessor carries both pending entries
     # and lands both (the predecessor lands THROUGH it): ONE entry, the predecessor's first, each body kept
     sh("checkout", "-q", "main")
@@ -631,14 +679,13 @@ def self_test() -> int:
     del env["GIT_COMMITTER_DATE"]
     sh("merge", "-q", "--no-edit", "pred", cwd=succ)
     fold = subprocess.run([sys.executable, str(pathlib.Path(__file__).resolve()), "stamp", "succ", "--repo", str(repo),
-                           "--coord", str(cdir), "--base", "main"], capture_output=True, text=True, encoding="utf-8",
-                          env=env)
+                           "--coord", str(cdir)], capture_output=True, text=True, encoding="utf-8", env=env)
     names = sorted(p.name for p in (succ / DIR).iterdir())
-    folded = [n for n in names if n.startswith("0015-")]
+    folded = [n for n in names if n.startswith("0014-")]
     text = (succ / DIR / folded[0]).read_text(encoding="utf-8") if folded else ""
     ok("stamp: two pending entries (a merged predecessor's and the branch's) fold into ONE entry, the predecessor's "
        "first, both bodies kept, and the branch passes check",
-       fold.returncode == 0 and folded == ["0015-pb1-the-predecessor-pb2-the-successor.md"]
+       fold.returncode == 0 and folded == ["0014-pb1-the-predecessor-pb2-the-successor.md"]
        and first_line(text).endswith("PB1: the predecessor; PB2: the successor")
        and text.index("### PB1: the predecessor") < text.index("### PB2: the successor")
        and "The predecessor's body." in text and "The successor's body." in text
@@ -704,7 +751,6 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("stamp", help="number and stamp a branch's pending entry, in one commit in its worktree")
     s.add_argument("branch")
     s.add_argument("--coord", help="the coordination directory alloc.py reserves the number in")
-    s.add_argument("--base", default="origin/main", help="main: a stamped entry whose number it has reached is re-stamped")
     c = sub.add_parser("check", help="the landing rule on the committed range base..rev")
     c.add_argument("--base", default="origin/main")
     c.add_argument("--rev", default="HEAD")
@@ -731,7 +777,7 @@ def main(argv: list[str] | None = None) -> int:
     if a.cmd == "check":
         return run_check(repo, a.base, a.rev)
     if a.cmd == "stamp":
-        return run_stamp(repo, a.branch, a.coord, a.base)
+        return run_stamp(repo, a.branch, a.coord)
     if a.cmd == "next":
         print(highest(names_in(repo)))
         return 0
