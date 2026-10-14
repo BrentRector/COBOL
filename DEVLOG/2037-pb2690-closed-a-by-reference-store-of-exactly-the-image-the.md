@@ -1,4 +1,4 @@
-## PB2690 closed: a BY REFERENCE store of exactly the image the formal was shown raises the dynamic table's capacity
+## Entry 2037 — 2026-10-14 16:55 PDT — PB2690 closed: a BY REFERENCE store of exactly the image the formal was shown raises the dynamic table's capacity
 
 **Mechanism.** A BY REFERENCE formal whose fixed table faces the argument's dynamic-capacity table occupies a fresh area
 filled from the argument and stored back at return. Since wave 1069 C the write-back raised the capacity to the highest
@@ -89,3 +89,4 @@ finisher re-recorded them from the emitter (`COBOLNET_UPDATE_SNAPSHOTS=1`); the 
 snapshot, "3.0.0.0" to "4.0.0.0", and all 36 characterization cases then pass on Windows. This is the second time the
 branch stopped this way (the 2.0.0 to 3.0.0 bump stopped at 305fba0d8): Windows leg 1 again ran 6 of 36 cases, because a
 `<Version>` change does not raise the snapshot cases into leg 1 (kb/Work PB3144, open).
+
