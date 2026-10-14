@@ -648,7 +648,7 @@ of one account bracket a measured spend (open decisions D6, D8).
 ## 9. The wave planner (`plan_wave.py`)
 
 `python scripts/orchestrator/plan_wave.py (--budget-points P | --from-budget) [--wave N|next] [--scratch DIR]
-[--reports DIR] [--clusters-json FILE] [--half-clusters-json FILE] [--no-branches] [--max-groups N] [--dry-run]`.
+[--reports DIR] [--clusters-json FILE] [--half-clusters-json FILE] [--no-branches] [--max-groups N] [--drain] [--dry-run]`.
 `--wave` defaults to one past the highest wave in the reports directory, the dispatch ledger or the newest DEVLOG
 lines (a wave planned with no report yet, another session's included, holds its number: kb/Work PB2806).
 
@@ -667,11 +667,25 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    `NOT STARTED`, whatever its branch's state (a `land` unit lands only `DONE` branches, so an unlanded `SPLIT` branch
    held for one was stranded; kb/Work PB2575), or says `DONE` with a branch review stamped `Review: FINDINGS` (kb/Work
    PB3027: the landing step never fixes a finding; the finisher's `pred` names the findings file and asks for every
-   finding answered by its id): one finisher group per predecessor report. (b) The half
+   finding answered by its id): one finisher group per predecessor report. A `FINDINGS` report whose lead note the
+   fix lane cannot see (a `process_only` note, or an owner task's note that exists only on its own branch, read from
+   that branch: `branch_lead_notes`) gets its finisher too, from the newest report of its branch (kb/Work PB3150). (b) The half
    clusters, one finisher group each. (c) An `UNLANDED` branch whose commit subjects name an open note no report
    covers. Each finisher's `pred` is a fixed paragraph naming the predecessor report, branch, worktree, head and the
-   branch's class (cherry-pick if unlanded, orient from the report if landed). A finisher on a primary file absorbs
-   the notes of the open clusters on that file up to the cap of five.
+   branch's class (cherry-pick if unlanded, orient from the report if landed). **A carried branch** is the exception:
+   when another `DONE` report's branch, not on main, contains it (`branch_carrier`, `git merge-base --is-ancestor`: a
+   same-file successor merged its predecessor), its finisher merges that carrier instead of cherry-picking, because the
+   commits would otherwise land twice; and a carried `FINDINGS` branch gets no finisher of its own: the carrier's answers
+   it. A finisher on a primary file absorbs the notes of the open clusters on that file up to the cap of five.
+
+   **`--drain`** (the owner's drain of 2026-10-13: "do not schedule new work items but continue all necessary work to
+   get in-process work to main"; kb/Work PB3150) keeps only the finishers of STARTED work: every review-`FINDINGS`
+   finisher, a `SPLIT` or `NOT STARTED` report's finisher only while its branch holds unlanded work no carrier holds,
+   and (c) on the same terms. No cluster is planned and no finisher absorbs one; a half note's open half, a report whose
+   branch landed with work left, and a carried branch's notes wait with the reason, and the clusters' notes are counted.
+   Every finisher's `pred` tells it to finish only what its branch started. `--max-groups N` is not a drain: it takes
+   the first N groups in rank order, and wave 1075's first was a carried `SPLIT` whose finisher would have started a
+   note nobody had started.
 3. **Clusters**, minus every note above, ranked by inventory rows claimed (the sum of each note's
    `inventory_rows`, read with `work.py`'s one frontmatter reader), then by harm.
 4. **One group per primary file**: a later group on the same file becomes a same-file successor (`after: <letter>`,

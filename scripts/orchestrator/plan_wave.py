@@ -19,7 +19,9 @@ cost the orchestrator a hand-written groups.json; this computes it.
    kb/Work PB2575), a DONE report whose branch review stamped FINDINGS (kb/Work PB3027: the finisher answers each
    finding), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
    name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
-   branch.
+   branch. A FINDINGS report whose lead note the fix lane cannot see (a `process_only` note, or an owner task's note
+   that exists only on its own branch, read from there) gets its finisher too, unless another DONE branch carries
+   its branch (kb/Work PB3150).
 3. CLUSTERS from fix_clusters.py --json (the public submodule's view of kb/Work), minus the notes above, ranked by
    inventory rows claimed (the sum of each note's `inventory_rows`), then harm. A finisher on a cluster's primary
    file absorbs that cluster's notes up to the cap of five.
@@ -33,6 +35,13 @@ cost the orchestrator a hand-written groups.json; this computes it.
    leads (units/enqueue.md step 5; kb/Work PB3023 retired the train's lead-id blocks).
 8. A note whose body says it needs a frontier model under the owner's approval (model_rules.json
    routing.owner_approval_patterns) is never planned: it is listed as waiting (MANDATORY-PRACTICES P1).
+
+9. --drain (the owner's drain: "do not schedule new work items but continue all necessary work to get in-process work
+   to main", 2026-10-13; kb/Work PB3150) plans only the finishers of STARTED work: every review-FINDINGS finisher, a
+   SPLIT or NOT STARTED report's finisher only while its branch holds unlanded work that no other DONE branch carries
+   (`git merge-base --is-ancestor`: a predecessor its successor merged lands THROUGH that successor), and an unlanded
+   branch's finisher on the same terms; never a cluster, a half note's open half, or a note a report left NOT
+   started (each waits, with the reason). Every finisher's pred says so.
 
 --cluster LEAD plans a CAMPAIGN wave instead (design section 9.1, kb/Work PB2120): the notes are work.py's
 cluster_order() of LEAD (every open note whose `cluster` names it, whatever its harm flags), clustered by the sites
@@ -171,18 +180,38 @@ def harm_weights() -> dict[str, int]:
     return {k: int(v) for k, v in (p.split("=") for p in fleet["harm"].split(","))}
 
 
+def note_of(text: str, stem: str, harm_weights: dict[str, int]) -> Note | None:
+    """One note from its file's text (the one frontmatter reader), or None when it has no frontmatter."""
+    fm = parse_frontmatter(text)
+    if not fm:
+        return None
+    rows = fm.get("inventory_rows") or []
+    return Note(str(fm.get("id") or stem), str(fm.get("status", "")), str(fm.get("area", "")), str(fm.get("title", "")),
+                list(rows) if isinstance(rows, list) else [], str(fm.get("_body", "")),
+                sum(w for k, w in harm_weights.items() if fm.get(k) is True))
+
+
 def load_notes(work_dir: pathlib.Path, harm_weights: dict[str, int]) -> dict[str, Note]:
     notes = {}
     for p in sorted(work_dir.glob("PB*.md")):
-        fm = parse_frontmatter(p.read_text(encoding="utf-8", errors="replace"))
-        if not fm:
-            continue
-        nid = str(fm.get("id") or p.stem)
-        rows = fm.get("inventory_rows") or []
-        notes[nid] = Note(nid, str(fm.get("status", "")), str(fm.get("area", "")), str(fm.get("title", "")),
-                          list(rows) if isinstance(rows, list) else [], str(fm.get("_body", "")),
-                          sum(w for k, w in harm_weights.items() if fm.get(k) is True))
+        if n := note_of(p.read_text(encoding="utf-8", errors="replace"), p.stem, harm_weights):
+            notes[n.id] = n
     return notes
+
+
+def branch_lead_notes(reports: list[Report], notes: dict[str, Note], harm_weights: dict[str, int],
+                      git: Callable[..., Any]) -> dict[str, Note]:
+    """The lead notes of FINDINGS reports that main does not have, read from each report's own branch: an owner task
+    files its note on its own branch (memory: owner-task-branch-needs-a-note), and the planner reads main's register,
+    so the review finisher of `license-product-name` (PB3146) was never planned (kb/Work PB3150)."""
+    out: dict[str, Note] = {}
+    for r in reports:
+        if r.lead in notes or r.lead in out or not r.branch or not (r.review and r.review.verdict == "FINDINGS"):
+            continue
+        shown = git("show", f"{r.branch}:kb/Work/{r.lead}.md")
+        if shown.returncode == 0 and (n := note_of(shown.stdout, r.lead, harm_weights)):
+            out[r.lead] = n
+    return out
 
 
 def parse_report(p: pathlib.Path) -> Report | None:
@@ -235,6 +264,23 @@ def git_branch_classifier() -> Callable[[str], str]:
                 cache[branch] = prune_worktrees.classify(branch, names)[0]
         return cache[branch]
     return classify
+
+
+def branch_carrier(reports: list[Report], classify: Callable[[str], str],
+                   git: Callable[..., Any]) -> Callable[[str], str | None]:
+    """branch -> the branch of a DONE report, not on main, that contains it (`git merge-base --is-ancestor`), or None.
+    A predecessor that a successor merged lands THROUGH that successor (MANDATORY-PRACTICES O2): wave 1074's group A
+    split on `…-e99-1`, A2 merged it into `…-e99-4`, and a finisher that cherry-picked `…-e99-1` onto main again would
+    redo work `…-e99-4` already carries (kb/Work PB3150)."""
+    done = list(dict.fromkeys(r.branch for r in reversed(reports) if r.branch and r.status == "DONE"))
+    cache: dict[str, str | None] = {}
+
+    def carried(branch: str) -> str | None:
+        if branch not in cache:
+            cache[branch] = next((c for c in done if c != branch and classify(c) not in LANDED_CLASSES and
+                                  git("merge-base", "--is-ancestor", branch, c).returncode == 0), None)
+        return cache[branch]
+    return carried
 
 
 def unlanded_branch_notes(open_ids: set[str]) -> dict[str, list[str]]:
@@ -601,7 +647,8 @@ def branch_resume(branch: str, nid_list: list[str]) -> str:
             f"branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots.")
 
 
-def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: list[str]) -> str:
+def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: list[str],
+                  carried_by: str | None = None) -> str:
     if rep is None:
         return "FINISH-FIRST: " + branch_resume(branch or "?", nid_list)
     if rep.status == "DONE" and rep.review and rep.review.verdict == "FINDINGS":
@@ -614,7 +661,10 @@ def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: li
                 f"each in your report's `## Review findings` section; re-gate; your branch is reviewed again when it "
                 f"returns DONE (kb/Work PB3027).")
     where = (f"Its branch {rep.branch} (worktree {rep.worktree or 'removed'}, head {rep.head or '?'}) is {cls}: "
-             + ("cherry-pick its unlanded commits onto current main (never merge the branch) and re-gate before new work."
+             + (f"it is contained in {carried_by}, which carries its work to main: `git merge {carried_by}` into your "
+                f"branch (never cherry-pick {rep.branch}: its commits would land twice) and re-gate before new work."
+                if carried_by else
+                "cherry-pick its unlanded commits onto current main (never merge the branch) and re-gate before new work."
                 if cls in ("UNLANDED", "CHECK") else
                 "its landed part is already on main, so orient from the report only."))
     return (f"FINISH-FIRST: predecessor {rep.slug} ({rep.lead}) returned {rep.status or 'an unfinished report'} for "
@@ -627,7 +677,8 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
          reports: list[Report], classify: Callable[[str], str], unlanded: dict[str, list[str]],
          rules: dict[str, Any], budget_points: float, max_groups: int | None = None,
          deps: dict[str, list[str]] | None = None, busy: dict[str, set[str]] | None = None,
-         held: dict[str, str] | None = None) -> dict[str, Any]:
+         held: dict[str, str] | None = None, drain: bool = False,
+         carrier: Callable[[str], str | None] | None = None) -> dict[str, Any]:
     """`clusters` and `half_clusters` are fix_clusters.py --json views of the open and the half notes; they also
     define which notes are plannable at all (fix_clusters applies .agent-fleet.json's kind and skip flags).
     `held`, {note: the dispatch holding it} from held_by_dispatch, applies in BOTH lanes: a held note waits.
@@ -639,7 +690,11 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     group. A group whose blockers are planned in no group, or in two chains, waits for a later wave (`waiting`).
     A campaign also passes `busy`, {in-flight owner: the files it changes}: a group whose files meet one waits
     (file_set_collisions, the file-set partition), and so does every group that would follow it.
-    Without `deps` nothing here changes the fix lane's plan (test_plan_wave.py check 8 holds it to a golden)."""
+    Without `deps` nothing here changes the fix lane's plan (test_plan_wave.py check 8 holds it to a golden).
+
+    `carrier` (branch_carrier) names the DONE branch that contains a branch; `drain` plans the finishers of started
+    work only (the module docstring's item 9, kb/Work PB3150)."""
+    carrier = carrier or (lambda _b: None)
     wave_rules = rules["wave"]
     cap = wave_rules["max_notes_per_group"]
     open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"] if n["id"] in notes}
@@ -652,8 +707,21 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
             if i in open_ids:
                 newest[i] = r
 
+    def findings(r: Report, cls: str) -> bool:
+        return cls not in LANDED_CLASSES and r.status == "DONE" and bool(r.review) and r.review.verdict == "FINDINGS"
+
+    def drained(branch: str | None, cls: str) -> str | None:
+        """Why the drain plans no finisher for unfinished work on this branch, or None when the work is started and
+        only a finisher of its own takes it to main."""
+        if cls in LANDED_CLASSES:
+            return "DRAIN: what its report left is work never started (its branch is on main or gone): a later wave"
+        if c := carrier(branch or ""):
+            return f"DRAIN: its branch {branch} is contained in {c}, which carries that work to main"
+        return None
+
     awaiting: dict[str, list[str]] = {}
     finisher_by_rep: dict[pathlib.Path, list[str]] = {}
+    waiting: dict[str, str] = {}
     for nid, r in newest.items():
         cls = classify(r.branch) if r.branch else "ABSENT"
         # A SPLIT or NOT STARTED report is unfinished whatever its branch's state: the landing lane lands only DONE
@@ -662,14 +730,24 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         # note NOT started still lands first: the landing lane lands its finished work.
         # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the enqueue unit never fixes
         # a review finding, so its finisher answers them (finisher_pred's review arm).
-        if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or \
-                (cls not in LANDED_CLASSES and r.status == "DONE" and r.review and r.review.verdict == "FINDINGS"):
-            finisher_by_rep.setdefault(r.path, []).append(nid)
+        if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or findings(r, cls):
+            if drain and not findings(r, cls) and (why := drained(r.branch, cls)):
+                waiting[nid] = why
+            else:
+                finisher_by_rep.setdefault(r.path, []).append(nid)
         elif cls not in LANDED_CLASSES:
             awaiting.setdefault(r.branch or str(r.path), []).append(nid)
+    # A FINDINGS report whose lead the fix lane cannot see (a `process_only` note, or a note main does not have yet:
+    # branch_lead_notes) never reached `newest`, so its finisher was never planned and the branch sat as a DECISION
+    # row (license-product-name, PB3146: kb/Work PB3150). Only the newest report of its branch, and never one whose
+    # branch another DONE branch carries: that one answers it.
+    newest_of_branch = {r.branch: r for r in reports if r.branch}
+    for b, r in sorted(newest_of_branch.items()):
+        if r.lead not in open_ids and r.lead in notes and r.path not in finisher_by_rep and r.review and \
+                r.review.verdict == "FINDINGS" and findings(r, classify(b)) and not carrier(b):
+            finisher_by_rep[r.path] = [r.lead]
 
-    taken: set[str] = {i for ids in awaiting.values() for i in ids}
-    waiting: dict[str, str] = {}
+    taken: set[str] = {i for ids in awaiting.values() for i in ids} | set(waiting)
     # A note an unreported dispatch holds is another agent's, or a planned wave's not launched yet (kb/Work PB2806).
     for nid in sorted(open_ids & set(held or {}) - taken, key=work.id_order):
         waiting[nid] = (f"held by {held[nid]}, which has no report yet: re-planning it would dispatch the same work "
@@ -686,16 +764,18 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     for path, ids in finisher_by_rep.items():
         rep = rep_by_path[path]
         ids = sorted(set(ids) - taken, key=lambda s: int(s[2:]))
+        cls = classify(rep.branch) if rep.branch else "ABSENT"
+        by = carrier(rep.branch) if rep.branch and cls in ("UNLANDED", "CHECK") and rep.status != "DONE" else None
         for k in range(0, len(ids), cap):
             chunk = ids[k:k + cap]
             groups.append(Group("finisher", chunk, note_file.get(chunk[0], ""),
                                 sorted({f for i in chunk for f in note_files.get(i, [])}),
-                                pred=finisher_pred(rep, rep.branch, classify(rep.branch) if rep.branch else "ABSENT", chunk)))
+                                pred=finisher_pred(rep, rep.branch, cls, chunk, carried_by=by)))
             taken |= set(chunk)
     # A half note may also sit on an unlanded branch (a killed wave's WIP): its group carries that branch's resume
     # instruction too, or the finisher starts over from main and the branch's work is lost (wave 1018's plan).
     branch_of = {i: b for b, ids in sorted(unlanded.items()) for i in ids if i not in newest}
-    for c in half_clusters:  # `status: half` notes, clustered by fix_clusters.py --open-status half
+    for c in (half_clusters if not drain else []):  # `status: half` notes, clustered by fix_clusters.py --open-status half
         chunk = [n["id"] for n in c["notes"] if n["id"] not in taken][:cap]
         if chunk:
             on_branch = {b: [i for i in unlanded[b] if i in chunk]
@@ -708,6 +788,10 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
             taken |= set(chunk)
     for branch, ids in sorted(unlanded.items()):
         ids = [i for i in ids if i not in taken and i not in newest]
+        if ids and drain and (why := drained(branch, "UNLANDED")):
+            waiting.update({i: why for i in ids})
+            taken |= set(ids)
+            continue
         if ids:
             groups.append(Group("finisher", ids[:cap], note_file.get(ids[0], ""),
                                 sorted({f for i in ids[:cap] for f in note_files.get(i, [])}),
@@ -717,8 +801,16 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     def rows(ids: list[str]) -> int:
         return sum(len(notes[i].rows) for i in ids if i in notes)
 
+    # The drain plans no cluster, a finisher absorbs none, and a half note's open half waits too: counted, not listed.
+    not_started = sorted({n["id"] for c in clusters + half_clusters for n in c["notes"]} & open_ids - taken
+                         - {i for g in groups for i in g.notes}, key=work.id_order) if drain else []
+    if drain:
+        for g in groups:
+            g.pred += (" DRAIN (plan_wave.py --drain, the owner's: no new work, only in-process work to main): finish "
+                       "only what this branch STARTED and answer its review findings; a note its report says was NOT "
+                       "started stays open and unstarted: name it in your report.")
     ranked = []
-    for c in clusters:
+    for c in (clusters if not drain else []):
         ids = [n["id"] for n in c["notes"] if n["id"] in open_ids and n["id"] not in taken]
         if ids:
             ranked.append((c, ids))
@@ -801,7 +893,10 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         chosen.append(g)
         spent += need
     return {"groups": chosen, "skipped": skipped, "awaiting_landing": awaiting, "points": spent,
-            "unlanded_without_note": sorted(b for b, ids in unlanded.items() if not ids), "waiting": waiting}
+            "unlanded_without_note": sorted(b for b, ids in unlanded.items()
+                                            if not ids and b not in {rep_by_path[p].branch for p in finisher_by_rep}),
+            "waiting": waiting,
+            "drain_not_started": not_started}
 
 
 # ── rendering ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -912,6 +1007,9 @@ def main(argv: list[str] | None = None) -> int:
                                                 "to run the fix lane through the orchestrator loop (kb/Work PB1981)"))
     ap.add_argument("--cluster", metavar="LEAD", help="plan a CAMPAIGN wave from the open notes whose `cluster` names "
                     "LEAD (work.py next --cluster), whatever their harm flags, instead of the fix lane's clusters")
+    ap.add_argument("--drain", action="store_true", help="the owner's drain: plan only the finishers of STARTED work "
+                    "(review findings, and unlanded unfinished branches no DONE branch carries); never a cluster or a "
+                    "note no report started (kb/Work PB3150)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--record-dispatch", metavar="IDS", help="record a HAND dispatch of these comma-separated notes in "
                     "the dispatch ledger (their computed file sets) and exit: scripts/hooks/dispatch_guard.py runs it")
@@ -981,9 +1079,12 @@ def main(argv: list[str] | None = None) -> int:
     reports = load_reports(reports_dir)
     open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"]}
     if a.no_branches:
-        classify, unlanded = (lambda _b: "ABSENT"), {}
+        classify, unlanded, carrier = (lambda _b: "ABSENT"), {}, None
     else:
+        import prune_worktrees  # noqa: PLC0415  (its git runner, reused)
         classify, unlanded = git_branch_classifier(), unlanded_branch_notes(open_ids)
+        carrier = branch_carrier(reports, classify, prune_worktrees.git)
+        notes.update(branch_lead_notes(reports, notes, harm_weights(), prune_worktrees.git))
     busy = None
     items = work.load()
     status_of = {i.get("id"): i.get("status") for i in items}
@@ -998,8 +1099,10 @@ def main(argv: list[str] | None = None) -> int:
             busy["the open external-repository slices"] = work.slice_file_set()
     p = plan(notes, clusters, half_clusters, reports, classify, unlanded, rules, budget_points,
              a.max_groups or rules["wave"]["max_groups"], deps=deps, busy=busy,
-             held=held_by_dispatch(cdir, reports, terminal))
+             held=held_by_dispatch(cdir, reports, terminal), drain=a.drain, carrier=carrier)
     waiting.update(p["waiting"])
+    if a.drain:
+        campaign += " — DRAIN (finishers of started work only)"
 
     wave = str(next_wave(REPO, reports, cdir)) if a.wave == "next" else str(a.wave)
     peek_code = alloc.peek("code", REPO, cdir)
@@ -1026,6 +1129,8 @@ def main(argv: list[str] | None = None) -> int:
         print("  waiting (a later wave): " + "; ".join(f"{i}: {why}" for i, why in waiting.items()))
     if p["unlanded_without_note"]:
         print("  UNLANDED branches naming no open note (judgment): " + ", ".join(p["unlanded_without_note"]))
+    if p["drain_not_started"]:
+        print(f"  DRAIN: {len(p['drain_not_started'])} open note(s) no report started wait for the drain to lift")
     print(f"  next {len(p['skipped'])} candidates skipped (budget, cap or predecessor): " +
           ", ".join(f"{g.letter}({'+'.join(g.notes[:2])}{'…' if len(g.notes) > 2 else ''})" for g in p["skipped"][:8]))
     if a.dry_run or not p["groups"]:
