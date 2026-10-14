@@ -1050,8 +1050,8 @@ internal static class PlaceRenderer
     /// "up to and including the rightmost position of the data item referenced by identifier-1" from the leftmost one,
     /// computed in <c>long</c> so a saturated start cannot overflow it and floored at zero (the slice's own read or write
     /// raises EC-BOUND-REF-MOD for a leftmost position out of range, naming its exact value). identifier-1's positions are
-    /// its static count (<see cref="RefModPlace.StaticInnerPositions"/>: a SIGN SEPARATE position, a COMP item's bytes,
-    /// a bit group's as-if positions all included) or, for an item whose length is a run-time value, its current one: a
+    /// its static count (<see cref="RefModPlace.StaticInnerPositions"/>: a SIGN SEPARATE position and a bit group's
+    /// as-if positions included) or, for an item whose length is a run-time value, its current one: a
     /// DYNAMIC LENGTH item's (§8.5.1.10.4 "is treated as a fixed-length data item whose length is the dynamic-length
     /// elementary item's current length") and an ANY LENGTH item's, its argument's (§13.18.2.4 GR1 b)), both the length
     /// of the read (the ANY LENGTH width idiom, <c>ReceivingStore.AnyLengthWidth</c>). The ACCEPT transfer and a CALL /

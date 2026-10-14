@@ -97,7 +97,8 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
             // DYNAMIC LENGTH or ANY LENGTH identifier-1, whose length is a run-time value, and one short of a SIGN
             // SEPARATE item). The slice write below raises EC-BOUND-REF-MOD for an out-of-range start or length
             // (§8.4.3.3.4 item 5c), naming the position's exact value.
-            w.Line(PlaceRenderer.Write(target, $"AcceptSource.Device({PlaceRenderer.SliceLength(rm)})"));
+            string len = PlaceRenderer.SliceLength(rm);
+            w.Line(PlaceRenderer.Write(target, $"AcceptSource.Device({len})"));
             return;
         }
 
