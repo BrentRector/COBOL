@@ -1,4 +1,4 @@
-## PB2099 part 1: the host's outermost activation boundary and R48's run-unit-ended result
+## PB2099 parts 1-2: the host's outermost activation boundary, R48's run-unit-ended result, the host type table and the door rules
 
 Wave 1077 group E took kb/Work PB2099, slice 3 of DESIGN-external-repository: the typed host entry and the one host
 surface. Two earlier waves had left it unstarted. The re-probe at a6744fa4d found none of the slice in the tree:
@@ -53,3 +53,41 @@ comments that claimed more than they proved were corrected. Semgrep verify passe
 gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,539 · Unit 636 · Characterization 30 …
 Conformance 6,126/11,665 · Unit 32,981/33,617 · Characterization 6/36 cases ran (skipped 0) in 1 of 2 leg(s)`.
 `HostRunUnitEndingTests` passed in leg 1.
+
+### Part 2: the host type of a description and the door rules (wave 1078 group C)
+
+Wave 1078 group C cherry-picked part 1 onto main (c29af1704) and took the second mechanism: the one function that
+names a description's .NET host type and the one runtime class that lands and decodes host values. The re-probe found
+neither in the tree (`HostSurface`, `HostLanding` absent; part 1's boundary present and building 0/0).
+
+**The design question, settled.** §4.3 named `HostSurface.TypeOf(DescriptionRecord)`, a §6.1 type slice 4 introduces.
+§6.3 decodes a repository record into a codec-owned forest of bound `DataItem`s so derived members answer as on a
+bound item, so the bound description is what both the emitter and the decoder hold. `TypeOf(DataItem)` is therefore
+the final key, not an interim one; §4.3 and §21 item 3 say so.
+
+**`HostSurface.TypeOf`** (`Binding/Model/HostSurface.cs`) returns a `HostType(Kind, CsType)`. "Decoding never narrows"
+drove two corrections to the table. A capacity-truncated binary item with no scale is mapped by its container's exact
+range: an unsigned 16-byte COMP-5 item holds [0, 2^128) and needs `UInt128`, which the table's "first of long,
+Int128" lacked. A display item's P positions are counted once ("The symbol 'P' is not counted in the size of the
+item", §13.18.40.4 14)); the first run of the witness caught `PIC 9(20)P(11)` mapped to `CobolDec` because
+`UnscaledDigitBound` counts P positions as digits. One storage has no exact .NET type: an unsigned 16-byte container
+with a scale reaches 2^128 units, past `CobolDec`'s `Int128` significand. §14.2.3 13) lets the implementor state the
+restriction, and it is stated in the table: content of 2^127 units or more is refused by the decode, never narrowed.
+
+**`HostLanding`** (runtime, `[EditorBrowsable(Never)]`, 15 Unshipped lines) is the one home of §4.3's door rules. A
+number lands through the runtime's own COMPUTE store (`CobolNum.TryStore`/`TryStoreU`) under
+`CobolRounding.Prohibited`, so "exact" is the capacity rule every COBOL receiver of the description obeys and an inexact
+transfer is refused; a negative value into an unsigned item is refused because GR6's "absolute value of the sending
+value is used" (§14.9.25.4 6)) drops the sign. A string lands through the MOVE's own alignment (`CobolString.Store`;
+zero fill for boolean, §13.18.32.4 2)), refused when it would be truncated or when a boolean position would hold a
+character other than 0 or 1 (§8.8.4.4.4 3) e)). `SharesStorage` is the alias rule (§14.2.3 8)), `RequireOccurrences`
+the OCCURS array rule, `TryDecode` the validity rule (the class test NUMERIC, §8.8.4.4.4 3) n), as
+`CobolNum.IsNumericImage` answers), keeping the first refusal for the entry to throw after every other write-back.
+
+**Witnesses.** `HostLandingTests` (11 facts): the §17.3 loss fixture, with high order, low order, sign, P positions,
+each binary capacity, string length and boolean characters refused and the exact boundary values accepted, and the
+validity decode agreeing with `IsNumericImage` on zoned, packed and binary images. `HostSurfaceTests` pins every row of
+the table over 31 bound LINKAGE descriptions. The expected values come from each storage's range, not from the code.
+
+**Not done (the finisher's):** the published `RecordStructEmitter` mode, `HostEntryEmitter`, `OutputKind` library, the
+host harness, the §17.3 drift tests over emitted code, and the retirement of the untyped host route.

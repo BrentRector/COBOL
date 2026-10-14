@@ -450,8 +450,13 @@ public static class ACCT_UPDATE
   member lands so and every OCCURS array has its declared length (an OCCURS DEPENDING ON array's length is the DEPENDING
   value and lies within its bounds). Anything else is refused with `ArgumentOutOfRangeException` naming the parameter
   (and the member, for a group) BEFORE anything is activated: a host site has no ON SIZE ERROR, and a silently
-  narrowed amount is a wrong answer. One function decides it, `HostLanding.Land(value, description)` in the runtime,
-  so the rule is written once (r7-brk: high-order, sign, low-order, COMP-5 capacity and string length each refused).
+  narrowed amount is a wrong answer. One runtime class decides it, `HostLanding`, so the rule is written once (r7-brk:
+  high-order, sign, low-order, COMP-5 capacity and string length each refused): `HostLanding.Land(value, formal's
+  NumProfile, parameter, member)` for a number, one overload per numeric host type, which runs the runtime's own COMPUTE
+  store (`CobolNum.TryStore`/`TryStoreU`) under `CobolRounding.Prohibited` — so "exact" is the capacity rule every
+  COBOL receiver of that description obeys, and an inexact transfer is refused — and returns the formal's unscaled carrier
+  value; `HostLanding.LandText` (fixed length) and `LandVariable` (DYNAMIC LENGTH up to its LIMIT, ANY LENGTH) for a
+  string, through the MOVE's own alignment (`CobolString.Store`, space fill, zero fill for boolean, ISO §13.18.32.4 2)).
   An edited formal (numeric-edited, alphanumeric-edited) takes the host string as its character content under the
   same fit rule; a host that holds the number formats it.
 - **The arguments are the ones a COBOL CALL renders.** For each formal the entry renders the `CobolArg` that
@@ -523,13 +528,16 @@ public static class ACCT_UPDATE
   `HostLanding` decodes; the RETURNING decode. No `catch` clause, no `ICobolProgram`, `ProgramTable` or instance
   member, no test or mapping of an EC condition.
 
-**The host type of a description** (`HostSurface.TypeOf(DescriptionRecord)`, one function, used by the emitter and by
-the record decoder for display):
+**The host type of a description** (`HostSurface.TypeOf(DataItem)` in `Binding/Model/HostSurface.cs`, one function,
+used by the emitter, the published record struct and the record decoder; witnessed by `HostSurfaceTests`). It is keyed on
+the BOUND description because §6.3's decoder binds a repository record into a codec-owned forest of `DataItem`s, so the
+emitter (this slice) and the decoder (slice 4) hold the same input and nothing is re-keyed when slice 4 lands (settled
+2026-10-14, §21 item 3). It answers one occurrence; an OCCURS member's property is an array of it.
 
 | COBOL description | Host type |
 |---|---|
-| fixed-point numeric, no positions right of the decimal point (`Scale ≤ 0`) | the first of `long`, `Int128` that holds EVERY value the item's storage can hold: for display, national and packed forms the PICTURE's digits with P positions; for a binary form whose truncation is by capacity (COMP-5, BINARY-CHAR … BINARY-DOUBLE) the byte width's range — so an unsigned 8-byte binary item is `Int128` |
-| fixed-point numeric with `Scale > 0` | `decimal` when `Digits ≤ 28` and `Scale ≤ 28`; otherwise the runtime's `CobolDec` (exact: a fixed-point item's at most 31 digits fit its 34-digit significand at any exponent) |
+| fixed-point numeric, no positions right of the decimal point (`Scale ≤ 0`) | the first of `long`, `Int128`, `UInt128` that holds EVERY value the item's storage can hold: for display, national and packed forms the PICTURE's 9 positions times its P positions' scaling (a P position stores no digit, ISO §13.18.40.4 14)), so `long` to 18 value digits and `Int128` to 38; for a binary form whose truncation is by capacity (COMP-5, BINARY-CHAR … BINARY-DOUBLE) the container's exact range — a signed container of up to 8 bytes and an unsigned one of fewer are `long`, an unsigned 8-byte or a signed 16-byte one `Int128`, an unsigned 16-byte one (`PIC 9(20) COMP-5`, [0, 2^128)) `UInt128`; a 16-byte container with P positions is past 38 digits and takes `CobolDec` |
+| fixed-point numeric with `Scale > 0` | `decimal` when the unscaled value has at most 28 digits (the PICTURE's for display, national and packed forms; the container's for a capacity-truncated binary form, so an 8-byte COMP-5 item's 19) and `Scale ≤ 28`; otherwise the runtime's `CobolDec`, exact for every signed storage (its significand is an `Int128`). ⚠ GR13 RESTRICTION: an UNSIGNED 16-byte capacity container with fraction or P positions reaches 2^128 units, past `CobolDec`'s significand; its content below 2^127 units decodes exactly and content at or above it is refused by the validity decode (`HostLanding.TryDec`, `FormatException`), never narrowed |
 | floating-point (COMP-1/COMP-2, FLOAT-*) | the item's own CLR carrier (`float` / `double` / the decimal-float carrier) |
 | alphanumeric, national, boolean, alphanumeric-edited, numeric-edited; DYNAMIC LENGTH | `string` |
 | ANY LENGTH (a FUNCTION's BY REFERENCE formal only: §13.18.2.3 SR2 allows it in a function, a contained program or a method, and SR4 makes it a function's BY REFERENCE formal) | `string`, whose length is the argument's length (§13.18.2.4 GR1) |
@@ -1779,10 +1787,11 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
 3. **The host entry and the one host surface (kb/Work PB2099; in progress — its runtime boundary is in the tree:
    `ProgramTable.CallProgram`/`Cancel` take `string? callerPath`, the null arm `ProgramTable.CallFromHost` is the
    outermost boundary, `RunUnit.EndForHost` performs the §14.6.11 actions and replaces the host's ambient run unit, and
-   `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`). To settle
-   before the emitter: §4.3 states `HostSurface.TypeOf` over `DescriptionRecord`, a §6.1 model type this list leaves to
-   slice 4, so the slice either brings the §6.1 description model (the records, without the attributes, renderer and
-   reader) forward or keys `TypeOf` on the bound description until slice 4 re-keys it.**
+   `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`; the door rules
+   and the type table are in the tree too: `HostLanding` in the runtime, pinned by `HostLandingTests` on §17.3's loss and
+   validity fixtures, and `HostSurface.TypeOf(DataItem)` in the binder's model, pinned by `HostSurfaceTests`). Settled
+   2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
+   binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
    validity decode); `RecordStructEmitter`'s published mode; `HostEntryEmitter` over the CALL lane's renderer with
    `Call` and `Cancel`; `CallProgram`'s and `Cancel`'s nullable `callerPath` and its outermost-boundary arm with R48's
