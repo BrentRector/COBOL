@@ -13,3 +13,5 @@ license, and the SPDX id `BUSL-1.1` would drop the license's parameters. Verifie
 
 The owner has also asked whether the Business Source License is the right license before the compiler is complete.
 That is still open; this change fixes only the name and the metadata.
+
+The package design (DESIGN-USER-DOCUMENTATION.md section 6) and the distribution note PB1613 now state the settled choice; they had offered the BUSL-1.1 expression as an option.
