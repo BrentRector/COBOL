@@ -1827,9 +1827,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <summary>A written reference matched against the source element's named CAPACITY registers: the owning
     /// dynamic-capacity <paramref name="Table"/>, the <paramref name="Register"/> view item, the
     /// <paramref name="Place"/> when the reference is legal, and the <paramref name="Fault"/> otherwise.
-    /// <paramref name="Reached"/> is every register of the nearest declaring element the written qualifiers reach
-    /// (more than one only under <see cref="CapacityRefFault.Ambiguous"/>, whose <paramref name="Place"/> is the first
-    /// declared one's: the reporting site's <c>--permissive</c> resolution).</summary>
+    /// <paramref name="Reached"/> is every register's table of the nearest declaring element the written qualifiers
+    /// reach (more than one only under <see cref="CapacityRefFault.Ambiguous"/>). <paramref name="Place"/> is non-null
+    /// exactly when <paramref name="Fault"/> is <see cref="CapacityRefFault.None"/>: an ambiguous reference has no
+    /// place until the reporting site's <c>--permissive</c> disposition picks a register, and that register is then
+    /// judged by <see cref="CapacityRegisterPlaceOf"/> like an unambiguous one (kb/Work PB2988 review R1-1).</summary>
     internal readonly record struct CapacityRef(
         DataItem Table, DataItem Register, CapacityRegisterPlace? Place, CapacityRefFault Fault,
         NameCandidates<DataItem> Reached);
@@ -1880,18 +1882,29 @@ public sealed partial class ReferenceResolver(DataBinder data)
         reached.RemoveAll(t => data.DeclaringDepth(t) != depth);
         if (table.OccursSpec?.CapacityRegister is not { } reg
             || data.Symbols.NearerDataNameHides(name, written.Qualifiers, depth)) return null;
-        var path = BuildTablePath(table);
+        var place = CapacityRegisterPlaceOf(table);
         var fault =
               written.SubscriptGroup is not null                     ? CapacityRefFault.Subscripted
             : written.RefModCount > 0                                ? CapacityRefFault.RefModified
             : reached.Count == 0                                     ? CapacityRefFault.Qualifiers
             : reached.Count > 1                                      ? CapacityRefFault.Ambiguous
-            : path is null                                           ? CapacityRefFault.UnderATable
+            : place is null                                          ? CapacityRefFault.UnderATable
             : CapacityRefFault.None;
-        var place = path is null || fault is not (CapacityRefFault.None or CapacityRefFault.Ambiguous)
-            ? null : new CapacityRegisterPlace(path, reg);
-        return new CapacityRef(table, reg, place, fault, new NameCandidates<DataItem>(reached));
+        return new CapacityRef(table, reg, fault is CapacityRefFault.None ? place : null, fault,
+            new NameCandidates<DataItem>(reached));
     }
+
+    /// <summary>⛔ THE ONE JUDGMENT OF A REGISTER ITSELF, once the written reference has picked it: the place of
+    /// <paramref name="table"/>'s CAPACITY register, or <see langword="null"/> when the table is subordinate to a
+    /// table (<see cref="CapacityRefFault.UnderATable"/>: §13.18.38.3 SR30 puts the register inside that outer table,
+    /// where §8.4.2.3.3 SR3 requires the subscript §13.18.38.3 SR31 forbids). It is asked of the register a unique
+    /// reference names AND of the one the <c>--permissive</c> disposition of an ambiguous reference picks, because
+    /// ambiguity is a fault of the WRITTEN reference and does not excuse the register it resolves to (kb/Work PB2988
+    /// review R1-1: when only the unique arm asked it, the permissive arm handed back a null place with no
+    /// diagnostic, COBOLNET2362).</summary>
+    private CapacityRegisterPlace? CapacityRegisterPlaceOf(DataItem table) =>
+        table.OccursSpec?.CapacityRegister is { } reg && BuildTablePath(table) is { } path
+            ? new CapacityRegisterPlace(path, reg) : null;
 
     /// <summary>⛔ <b>THE ONE TEST for "this written reference IS the predefined object reference
     /// EXCEPTION-OBJECT"</b> (ISO §8.4.3.6; kb/Work PB922) — spelling, FORM and EDITION together, so no caller can
@@ -1937,6 +1950,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
         string text = DataBinder.WrittenText(dref);
         string subject = cap.Register.CobolName ?? cap.Register.CsName;
         string table = cap.Table.CobolName ?? cap.Table.CsName;
+        void ReportUnderATable() =>
+            data.Edition.Error(DiagnosticCatalog.CapacityRegisterUnderTable,
+                $"'{text}': '{subject}' is the CAPACITY register of '{table}', which is itself subordinate to a "
+                + "table, so ISO §13.18.38.3 SR30 places the register inside that outer table. ISO §8.4.2.3.3 "
+                + "SR3 and SR5 then require one subscript per enclosing OCCURS clause, and ISO §13.18.38.3 SR31 "
+                + "forbids subscripting data-name-3 — no reference form is writable. Name the register only on "
+                + "a dynamic-capacity table that has no table ancestor, or read the capacity with FUNCTION "
+                + "LENGTH over the subscripted inner table instead.");
         switch (cap.Fault)
         {
             case CapacityRefFault.Subscripted:
@@ -1962,18 +1983,16 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     + "of successively more inclusive levels in the hierarchy\".");
                 return null;
             case CapacityRefFault.Ambiguous:
-                // §8.4.2.2.3 SR1, through the ONE verdict every name class shares (its --permissive disposition
-                // resolves to the first declared register, whose place the match carries).
-                return data.UniqueOrReportAmbiguous(cap.Reached, "the CAPACITY register reference", text, out _)
-                    is not null ? cap.Place : null;
+                // §8.4.2.2.3 SR1, through the ONE verdict every name class shares. Its --permissive disposition
+                // picks the first declared register, which is then judged like a unique reference's: a register
+                // under a table is still COBOLNET2126, never a null place with no diagnostic (review R1-1).
+                if (data.UniqueOrReportAmbiguous(cap.Reached, "the CAPACITY register reference", text, out _)
+                    is not { } picked) return null;
+                if (CapacityRegisterPlaceOf(picked) is { } pickedPlace) return pickedPlace;
+                ReportUnderATable();
+                return null;
             case CapacityRefFault.UnderATable:
-                data.Edition.Error(DiagnosticCatalog.CapacityRegisterUnderTable,
-                    $"'{text}': '{subject}' is the CAPACITY register of '{table}', which is itself subordinate to a "
-                    + "table, so ISO §13.18.38.3 SR30 places the register inside that outer table. ISO §8.4.2.3.3 "
-                    + "SR3 and SR5 then require one subscript per enclosing OCCURS clause, and ISO §13.18.38.3 SR31 "
-                    + "forbids subscripting data-name-3 — no reference form is writable. Name the register only on "
-                    + "a dynamic-capacity table that has no table ancestor, or read the capacity with FUNCTION "
-                    + "LENGTH over the subscripted inner table instead.");
+                ReportUnderATable();
                 return null;
             default:
                 // CapacityRefFault.None cannot reach here (its Place is returned before the switch), and every other
@@ -2608,9 +2627,14 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 + "associated, as well as any name by which that table may be qualified.\")");
             return new IndexRef(IndexRefOutcome.Failed, null);
         }
-        return data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _) is { } first
-            ? new IndexRef(IndexRefOutcome.Resolved, first)   // --permissive: warned, first declaration
-            : new IndexRef(IndexRefOutcome.Failed, null);
+        if (data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _) is not { } first)
+            return new IndexRef(IndexRefOutcome.Failed, null);
+        // --permissive: warned, and resolved to the first declaration, which is then screened like a unique one —
+        // ambiguity is a fault of the WRITTEN reference and does not excuse the table it resolves to (§13.7.3 SR4;
+        // the PB2988 review R1-1 shape: when only the unique arm screened, an index of an unreferenceable linkage
+        // record reached the backend and failed it, CS0131).
+        ScreenLinkageIndex(first, name, qualifiers, writtenAt);
+        return new IndexRef(IndexRefOutcome.Resolved, first);
     }
 
     /// <summary>The written index-name references already reported as §13.7.3 SR4 e) violations.</summary>

@@ -48,3 +48,21 @@ differ by that alone); PB2921's factory family `X__FACTORY` → `__FACTORY_X` an
 (`StrongTypeModel.EssentialCharacteristicsKey` renders PicInfo's record text by design) of strongly-typed
 activation descriptions; and PB546's D-N8 store, `NatReadWindow(…, Length / 2)` → `NatFromStorage(…)` for a
 dynamic-length national receiver (`2014/pb1094_dynamic_length_structure_elementary_record`).
+
+**The second branch review, answered (wave 1073 A2).** The review of `0d9ddd99f` found one defect (R1-1) in
+PB2988's new ambiguity arm. `CapacityRegisterFor` ranks `CapacityRefFault.Ambiguous` above `UnderATable`, and the
+reporting site's `--permissive` arm returned the place computed for the unique case, which is null when the register's
+table lies under a table. So a bare `MOVE DC` over two `TYPE ST` copies of `05 R OCCURS 2. 10 D … CAPACITY IN DC`
+gave the COBOLNET1639 warning and then the internal error COBOLNET2362, where §13.18.38.3 SR30 and SR31 with
+§8.4.2.3.3 SR3 call for COBOLNET2126. The register's own judgment is now one helper,
+`ReferenceResolver.CapacityRegisterPlaceOf`, asked of the register a unique reference names and of the one the
+permissive disposition picks; a `CapacityRef` carries a place only when it has no fault. The sibling sweep over every
+caller of `UniqueOrReportAmbiguous` found the same shape in the index-name resolver: `ResolveIndexName` screened
+§13.7.3 SR4 only for a unique candidate, so a permissive pick whose table lay in a LINKAGE record outside the USING
+phrase reached Roslyn and failed it (CS0131). The pick is now screened, COBOLNET2746. The other callers return the
+picked item to code that judges it like any other. Regression tests (the negative corpus runs strict only, so these
+are `CompileFull(…, permissive: true)` tests): `OccursDynamicGuardTests.Permissive_AmbiguousCapacityRegister_*` (two
+under-a-table shapes, plus the legal first-declared copy that runs and reads 3) and
+`IndexNameUniquenessTests.Permissive_AmbiguousIndexName_ScreensTheLinkageRecordItResolvesTo`. Merging main brought
+in PB3107, which commits no arch-oracle baseline, so the baseline the first review finisher re-recorded is deleted in
+the merge; the four difference classes above stand as that comparison's record.

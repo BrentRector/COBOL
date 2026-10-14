@@ -172,6 +172,53 @@ public sealed class OccursDynamicGuardTests
         EditionHarness.AssertHasDiagnostic(diag, "COBOLNET1526");
     }
 
+    /// <summary>kb/Work PB2988 review R1-1: the <c>--permissive</c> disposition of an ambiguous CAPACITY register
+    /// reference (§8.4.2.2.3 SR1, warned, resolved to the first declared register) judges the register it picks like
+    /// a unique reference's. When the first declared copy's table is subordinate to a table, §13.18.38.3 SR30 puts
+    /// the register inside that table, §8.4.2.3.3 SR3 requires the subscript that §13.18.38.3 SR31 ("Data-name-3 shall
+    /// not be subscripted") forbids, and the reference is COBOLNET2126; when it is not, the reference resolves to it and
+    /// runs. Before: the ambiguity arm handed back the place computed for the unique case, null under a table, and
+    /// the user got the internal error COBOLNET2362 instead of the rule.</summary>
+    [Theory]
+    [InlineData("R11CAP1", "01 ST TYPEDEF.\n   05 R OCCURS 2.\n      10 D PIC X OCCURS DYNAMIC CAPACITY IN DC.\n01 A TYPE ST.\n01 B TYPE ST.")]
+    [InlineData("R11CAP2", "01 ST TYPEDEF.\n   05 D PIC X OCCURS DYNAMIC CAPACITY IN DC.\n01 G.\n   05 B TYPE ST OCCURS 2.\n01 A TYPE ST.")]
+    public void Permissive_AmbiguousCapacityRegister_FirstUnderATable_Is2126(string id, string entries)
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull(CapacityProg(id, entries, "MOVE DC TO W"), 2014,
+            permissive: true);
+        Assert.False(ok, "the first declared register lies under a table (ISO §13.18.38.3 SR30, SR31)");
+        EditionHarness.AssertHasDiagnostic(warnings, "COBOLNET1639");
+        EditionHarness.AssertHasDiagnostic(errors, "COBOLNET2126");
+        EditionHarness.AssertHasDiagnostic(errors, "'DC': 'DC' is the CAPACITY register");   // the bare reference
+        EditionHarness.AssertNoDiagnostic(errors, "COBOLNET2362");
+    }
+
+    /// <summary>The legal half of <see cref="Permissive_AmbiguousCapacityRegister_FirstUnderATable_Is2126"/>: the
+    /// first declared copy (A's) has no table ancestor, so the warned bare <c>DC</c> reads A's register, which the
+    /// qualified SET made 3.</summary>
+    [Fact]
+    public void Permissive_AmbiguousCapacityRegister_FirstLegal_ReadsIt()
+    {
+        var (ok, stdout, detail) = EditionHarness.CompileAndRun(CapacityProg("R11CAP3",
+            "01 ST TYPEDEF.\n   05 D PIC X OCCURS DYNAMIC CAPACITY IN DC.\n01 A TYPE ST.\n01 G.\n   05 B TYPE ST OCCURS 2.",
+            "SET DC OF A TO 3\n    MOVE DC TO W"), 2014, permissive: true);
+        Assert.True(ok, detail);
+        Assert.Equal("W 0003", stdout.Trim());
+    }
+
+    private static string CapacityProg(string id, string entries, string statements) => $"""
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. {id}.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        """ + "\n" + entries + "\n" + """
+        01 W PIC 9(4) VALUE 0.
+        PROCEDURE DIVISION.
+        """ + "\n    " + statements + "\n" + """
+            DISPLAY "W " W
+            STOP RUN.
+        """;
+
     /// <summary>The positive companions: a well-formed FROM/TO, and a Format 1 VALUE on the SUBORDINATE of a GROUP
     /// dynamic table with NO OCCURS TO (the element's per-occurrence seed at capacity = FROM, §13.18.63.4 GR9 +
     /// §14.6.2.3.2 item 6 — never a VALUE-derived capacity, which is the FORMAT 2 GR16's job alone), both compile

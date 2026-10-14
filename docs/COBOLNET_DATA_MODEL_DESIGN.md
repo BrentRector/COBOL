@@ -1252,7 +1252,12 @@ remaining question is a syntax rule reported by `CapacityPlaceOf`, never a "not 
   end); a register of a DIFFERENT written entry, or an explicit data-name of the spelling, stays **COBOLNET1523**.
   The copies are told apart by SR30's second sentence — qualification through the implied level (`DC OF A`,
   `DC OF B`) — and a reference the qualifiers leave reaching two registers of the nearest element is §8.4.2.2.3 SR1's
-  ambiguity, judged by the ONE verdict `DataBinder.UniqueOrReportAmbiguous` (**COBOLNET1639**).
+  ambiguity, judged by the ONE verdict `DataBinder.UniqueOrReportAmbiguous` (**COBOLNET1639**). Its `--permissive`
+  disposition picks the first declared register, which `ReferenceResolver.CapacityRegisterPlaceOf` then judges like a
+  unique reference's register: ambiguity is a fault of the written reference and excuses nothing about the register
+  it resolves to, so a picked register under a table is still **COBOLNET2126** (the PB2988 review's R1-1; the
+  index-name arm's permissive pick is screened by §13.7.3 SR4 the same way). A `CapacityRef` carries a place only
+  when it has no fault.
 - **Subscripted** is **COBOLNET2125** — §13.18.38.3 SR31, "Data-name-3 shall not be subscripted."
 - **Reference-modified** goes to the ONE §8.4.3.3.3 SR1 screen (`RefModExclusion` → COBOLNET1647): the register is a
   numeric item of an implementor-chosen binary usage, and SR1 admits only usage DISPLAY or NATIONAL.
