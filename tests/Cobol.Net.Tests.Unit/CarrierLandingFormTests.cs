@@ -77,26 +77,27 @@ public sealed class CarrierLandingFormTests
         foreach (CobolRounding mode in Enum.GetValues<CobolRounding>())
         {
             Assert.Equal(CobolFloat.ToScaled(v, scale, mode), CobolFloat.ToScaledUnchecked(v, scale, mode));
-            Assert.Equal(CobolFloat.ToScaledSaturating(v, scale, mode), CobolFloat.ToScaledUnchecked(v, scale, mode));
+            Assert.Equal(CobolFloat.ToScaledIntermediate(v, scale, mode), CobolFloat.ToScaledUnchecked(v, scale, mode));
         }
     }
 
     /// <summary>Past the carrier: the CHECKED landing RAISES EC-SIZE-TRUNCATION (kb/Work PB2967 - never a sentinel a
-    /// 16-byte receiver would accept); the SATURATING (intermediate) one clamps; the UNCHECKED one lands the exact
+    /// 16-byte receiver would accept); the INTERMEDIATE one raises EC-SIZE-OVERFLOW (kb/Work PB3019 - the SDIDI intermediate's
+    /// twin, never a sentinel a comparison would take for a value); the UNCHECKED one lands the exact
     /// low-order digits - and a non-finite value lands zero, never a sentinel to truncate.</summary>
     [Fact]
-    public void ToScaled_PastTheCarrier_RaisesChecked_SaturatesIntermediate_LandsLowOrderDigitsUnchecked()
+    public void ToScaled_PastTheCarrier_RaisesChecked_RaisesIntermediate_LandsLowOrderDigitsUnchecked()
     {
         Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(1.0e40, 0, CobolRounding.Truncation)).EcName);
         Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(-2.5e40, 5, CobolRounding.Truncation)).EcName);
         Assert.Equal("EC-SIZE-TRUNCATION", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(double.NegativeInfinity, 0, CobolRounding.Truncation)).EcName);
         Assert.Equal(Int128.Zero, CobolFloat.ToScaled(double.NaN, 3, CobolRounding.Truncation));   // NaN lands zero, in range, silent
-        Assert.Equal(Int128.MaxValue, CobolFloat.ToScaledSaturating(1.0e40, 0, CobolRounding.Truncation));
-        Assert.Equal(Int128.MinValue, CobolFloat.ToScaledSaturating(-2.5e40, 5, CobolRounding.Truncation));
-        Assert.Equal(Int128.Zero, CobolFloat.ToScaledSaturating(double.NaN, 3, CobolRounding.Truncation));
+        Assert.Equal("EC-SIZE-OVERFLOW", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaledIntermediate(1.0e40, 0, CobolRounding.Truncation)).EcName);
+        Assert.Equal("EC-SIZE-OVERFLOW", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaledIntermediate(-2.5e40, 5, CobolRounding.Truncation)).EcName);
+        Assert.Equal(Int128.Zero, CobolFloat.ToScaledIntermediate(double.NaN, 3, CobolRounding.Truncation));
         Assert.Equal(Int128.Parse("303786028427003666890752"), CobolFloat.ToScaledUnchecked(1.0e40, 0, CobolRounding.Truncation));
         Assert.Equal(Int128.Parse("-155002161260194579873792"), CobolFloat.ToScaledUnchecked(-2.5e40, 0, CobolRounding.Truncation));
-        Assert.Equal(Int128.MaxValue, CobolFloat.ToScaledSaturating(double.PositiveInfinity, 0, CobolRounding.Truncation));
+        Assert.Equal("EC-SIZE-OVERFLOW", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaledIntermediate(double.PositiveInfinity, 0, CobolRounding.Truncation)).EcName);
         Assert.Equal(Int128.Zero, CobolFloat.ToScaledUnchecked(double.PositiveInfinity, 0, CobolRounding.Truncation));
         Assert.Equal(Int128.Zero, CobolFloat.ToScaledUnchecked(double.NaN, 3, CobolRounding.Truncation));
     }
@@ -300,10 +301,10 @@ public sealed class CarrierLandingFormTests
             + "landing form is the caller's statement to make.");
         Assert.Contains("nameof(CobolFloat.ToScaledUnchecked)", src);
         Assert.Contains("nameof(CobolFloat.ToScaled)", src);
-        // The INTERMEDIATE consumer's saturating landing is a SEPARATE entry, so the store form can never be asked
+        // The INTERMEDIATE consumer's raising landing is a SEPARATE entry, so the store form can never be asked
         // for it by a flag: a sentinel into a store is the PB2967 defect.
         Assert.Contains("public static string FloatToScaledIntermediate(string value, string scale, CobolRounding mode)", src);
-        Assert.Contains("nameof(CobolFloat.ToScaledSaturating)", src);
+        Assert.Contains("nameof(CobolFloat.ToScaledIntermediate)", src);
     }
 
     /// <summary>The quantizer / exact-family renders that reach the runtime with a working scale carry the ONE
@@ -440,15 +441,14 @@ public sealed class CarrierLandingFormTests
                         if (exact >= (BigInteger)Int128.MinValue && exact <= (BigInteger)Int128.MaxValue)
                         {
                             Assert.True((Int128)exact == CobolFloat.ToScaled(v, scale, mode), "checked landing: " + why);
-                            Assert.True((Int128)exact == CobolFloat.ToScaledSaturating(v, scale, mode), "intermediate landing: " + why);
+                            Assert.True((Int128)exact == CobolFloat.ToScaledIntermediate(v, scale, mode), "intermediate landing: " + why);
                             Assert.True((Int128)exact == CobolFloat.ToScaledUnchecked(v, scale, mode), "unchecked landing: " + why);
                             checkedRows++;
                         }
                         else
                         {
                             // Past the carrier the LANDING FORM decides, and the two forms are different answers.
-                            Assert.True((exact > 0 ? Int128.MaxValue : Int128.MinValue) == CobolFloat.ToScaledSaturating(v, scale, mode),
-                                "past-carrier saturation (intermediate): " + why);
+                            Assert.Equal("EC-SIZE-OVERFLOW", Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaledIntermediate(v, scale, mode)).EcName);
                             Assert.Throws<CobolSizeError>(() => CobolFloat.ToScaled(v, scale, mode));
                             Assert.True((Int128)(exact % BigInteger.Pow(10, 38)) == CobolFloat.ToScaledUnchecked(v, scale, mode),
                                 "past-carrier low-order digits: " + why);

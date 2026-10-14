@@ -231,7 +231,7 @@ public sealed class DynamicLengthTests
         Assert.Equal("LEN=0012", stdout.Trim());
     }
 
-    /// <summary>§8.5.1.10.1 — the maximum size is "the smallest of" the LIMIT phrase and the implementor maximum, so
+    /// <summary>§8.5.1.10.1 — the maximum size "is smallest of" the LIMIT phrase and the implementor maximum, so
     /// a LIMIT phrase ABOVE the implementor maximum is legal (§13.18.19.3 states no rule bounding integer-1 unless a
     /// dynamic-length-structure-name is also written, SR4) and simply cannot raise the maximum. It is REPORTED
     /// (COBOLNET2027) rather than accepted in silence.

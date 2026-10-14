@@ -295,6 +295,21 @@ public abstract class KeyedConnector : FileConnector
         return new StoreStatement(this);
     }
 
+    /// <summary>⛔ A HOST FAILURE OF A STATEMENT'S OWN ENTRY IS A PERMANENT ERROR, NOT AN EXCEPTION (kb/Work PB2842).
+    /// Taking the mutex, reading the generation stamp and reloading the store are all host I/O, and §9.1.13.6 1)'s
+    /// <i>"A permanent error exists and no further information is available concerning the input-output
+    /// operation"</i> ('30') is what the standard gives such a failure — the answer OPEN's catch already gives the
+    /// same reload (a file longer than <see cref="RecordFraming.MaxStoreBytes"/>, <see cref="ReadImage"/>) and
+    /// <see cref="CompleteStatement"/> gives the same statement's persist. The statement is entered all the same,
+    /// holding what it took: the status is recorded (<see cref="FileConnector.SetStatus"/>, which starts the permanent
+    /// error of §9.1.13.1, <i>"The permanent error condition remains in effect for all subsequent input-output
+    /// operations on the file"</i>) and the statement's own body ends at the replay every verb makes first
+    /// (<see cref="FileConnector.PermanentErrorReplay"/>) — so READ and START invalidate the file position indicator as
+    /// they do for any permanent error, and nothing reads the stale store. A failure that is not the host's is not
+    /// the file's and escapes as before, with the entry undone.</summary>
+    private static bool IsHostStoreFailure(Exception failure) =>
+        failure is IOException or UnauthorizedAccessException or OutOfMemoryException;
+
     private void Enter(KeyedStore store)
     {
         if (store.StatementDepth++ > 0) return;   // the run unit is already inside the mutex
@@ -303,6 +318,14 @@ public abstract class KeyedConnector : FileConnector
             store.MutexHolder = HoldStoreMutex(exclusive: _regions!.Writable);
             if (ReadGeneration() is { } stamped && stamped != store.Generation) Reload(store);
             store.VersionAtEntry = store.Version;
+        }
+        catch (Exception failure) when (IsHostStoreFailure(failure))
+        {
+            // The statement changed nothing, and a failed reload leaves the store as Reload's contract says (untouched, or
+            // stamped with a generation the file no longer has and owing the file nothing) — never half-reloaded and
+            // trusted — so this statement's permanent error is the whole damage.
+            store.VersionAtEntry = store.Version;
+            SetStatus(FileStatusCode.PermanentError);
         }
         catch
         {
@@ -324,7 +347,7 @@ public abstract class KeyedConnector : FileConnector
             Persist(store);
             return status;
         }
-        catch (Exception failure) when (failure is IOException or UnauthorizedAccessException)
+        catch (Exception failure) when (IsHostStoreFailure(failure))
         {
             SetStatus(FileStatusCode.PermanentError);
             return FileStatusCode.PermanentError;
@@ -381,12 +404,52 @@ public abstract class KeyedConnector : FileConnector
         return RecordFraming.DecodeGeneration(head[..got]);
     }
 
+    /// <summary>⛔ A RELOAD THAT FAILS LEAVES THE STORE EITHER UNTOUCHED OR UNTRUSTED, NEVER HALF-RELOADED AND TRUSTED
+    /// (kb/Work PB2842, review round 1). The file is read and decoded FIRST, touching nothing of the store: a failure
+    /// there (a file past <see cref="RecordFraming.MaxStoreBytes"/>, an allocation the host refuses) leaves the
+    /// records, the generation and the owed persist exactly as they were. Only <see cref="Fill"/> replaces records,
+    /// and a failure inside it leaves a partial store, which then owes the file nothing
+    /// (<see cref="KeyedStore.PersistedVersion"/> = <see cref="KeyedStore.Version"/>), so a CLOSE cannot write the
+    /// partial records over the other run unit's. The generation the store reflects is stamped only AFTER the records
+    /// are in, so in both cases it still differs from the file's stamp and every coherent statement entry of the run
+    /// unit — this connector's or another connector's on the same store — reloads again.</summary>
     private void Reload(KeyedStore store)
     {
-        var frames = ReadImage(store, out long releaseMint);
-        Fill(store, frames, releaseMint);
+        var frames = ReadImage(out long releaseMint, out ulong generation);
+        HostFaultObserver.Value?.Invoke(HostFaultPoint.ReloadDecoded);
+        try
+        {
+            Fill(store, frames, releaseMint);
+        }
+        catch
+        {
+            store.PersistedVersion = store.Version;
+            throw;
+        }
+        store.Generation = generation;
         store.PersistedVersion = store.Version;
     }
+
+    /// <summary>A point in a keyed connector's host I/O at which a test makes the host refuse
+    /// (<see cref="HostFaultObserver"/>) — failures a real file cannot be made to produce on demand (an allocation the
+    /// host refuses while decoding or composing a store near <see cref="RecordFraming.MaxStoreBytes"/>).</summary>
+    internal enum HostFaultPoint
+    {
+        /// <summary>The file has been read and decoded; nothing of the store has changed yet.</summary>
+        ReloadDecoded,
+        /// <summary>The store has just been emptied for a reload (<see cref="Fill"/>, after its Clear) and is about to
+        /// be refilled: a refusal here leaves a partial store.</summary>
+        ReloadFilling,
+        /// <summary>The persist is about to compose the store's image.</summary>
+        PersistComposing,
+    }
+
+    /// <summary>Test seam, per async flow (the <see cref="FileRegistry.PauseObserver"/> precedent): called at each
+    /// <see cref="HostFaultPoint"/>; the observer throws what the host would.</summary>
+    internal static readonly AsyncLocal<Action<HostFaultPoint>?> HostFaultObserver = new();
+
+    /// <summary>The organizations' <see cref="Fill"/> calls this right after it empties the store.</summary>
+    private protected static void FaultPointReloadFilling() => HostFaultObserver.Value?.Invoke(HostFaultPoint.ReloadFilling);
 
     /// <summary>⛔ THE ONE LOAD — the first opener's (the <c>KeyedStoreTable</c> attach callback) and every coherent
     /// reload's. It reads under the store mutex, so it never sees a store another run unit is half-way through
@@ -416,6 +479,7 @@ public abstract class KeyedConnector : FileConnector
         try
         {
             ulong generation = (ReadGeneration() ?? store.Generation) + 1;
+            HostFaultObserver.Value?.Invoke(HostFaultPoint.PersistComposing);
             using var image = RecordFraming.ComposeStore(DeclaredAttributes, PersistFrames(), generation, ReleaseMint,
                 CodeSet);
             WriteThroughAreas(handle, new ReadOnlySpan<byte>(image.GetBuffer(), 0, (int)image.Length));
@@ -434,9 +498,9 @@ public abstract class KeyedConnector : FileConnector
     }
 
     /// <summary>The whole physical file, read positionally through the input-output areas under the caller's mutex,
-    /// decoded; the store is stamped with the generation the image carries and <paramref name="releaseMint"/> receives
-    /// its release mint.</summary>
-    private List<StoredFrame?> ReadImage(KeyedStore into, out long releaseMint)
+    /// decoded; <paramref name="generation"/> receives the generation the image carries and <paramref name="releaseMint"/>
+    /// its release mint. Touches nothing of the store — <see cref="Reload"/> stamps the generation once the records are in.</summary>
+    private List<StoredFrame?> ReadImage(out long releaseMint, out ulong generation)
     {
         var handle = _handle!;
         // ⛔ A FILE LONGER THAN ANY STORE THE FORMAT DESCRIBES IS NOT ONE THIS CONNECTOR CAN READ (kb/Work PB2748):
@@ -444,7 +508,7 @@ public abstract class KeyedConnector : FileConnector
         // refuses the record that would take it there), so the bytes beyond are not records. It is §9.1.13.6 1)'s
         // permanent error, "no further information is available", answered '30' through OPEN's IOException mapping — a
         // checked cast used to kill the run unit with an OverflowException instead. A reload inside a later statement
-        // (Enter) has no such mapping yet: kb/Work PB2842.
+        // (Enter) maps it to the same '30' (kb/Work PB2842).
         long length = RandomAccess.GetLength(handle);
         if (length > RecordFraming.MaxStoreBytes)
             throw new IOException($"'{HostPath}' is {length} bytes, longer than any store this format describes "
@@ -456,7 +520,7 @@ public abstract class KeyedConnector : FileConnector
         try
         {
             int got = ReadThroughAreas(handle, all.AsSpan(0, size));
-            into.Generation = RecordFraming.DecodeGeneration(all.AsSpan(0, got)) ?? 0;
+            generation = RecordFraming.DecodeGeneration(all.AsSpan(0, got)) ?? 0;
             return RecordFraming.DecodeStore(all, got, out releaseMint, CodeSet);
         }
         finally { ArrayPool<byte>.Shared.Return(all); }
