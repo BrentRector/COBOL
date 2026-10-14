@@ -514,6 +514,27 @@ public sealed class AcceptDifferentialTests
             expected: "-0099]-0099]",
             stdin: "0099\n0099\n");
 
+    // kb/Work PB3128 review R1-1 — the USAGE NATIONAL twin. GR3 operates on a national numeric item as if it were
+    // national "of the same size", and GR4 gives "the sign position ... an ordinal number within that data item", so
+    // S PIC S9(4) USAGE NATIONAL SIGN LEADING SEPARATE has five national positions and S(2:) is its four digit
+    // positions, exactly S2(2:4). The position count read the PICTURE length (4) for every national item, so (2:)
+    // transferred three characters (measured: -0009) and S2(2:4) was refused COBOLNET2670 "extends past the
+    // 4-position item".
+    [Fact]
+    public void Device_OmittedLengthNationalSignSeparateSlice_CountsTheSignPosition()
+        => AssertOutputs(
+            Program("ACCPB3128N", """
+                01 S  PIC S9(4) USAGE NATIONAL SIGN LEADING SEPARATE VALUE -12.
+                01 S2 PIC S9(4) USAGE NATIONAL SIGN LEADING SEPARATE VALUE -12.
+                """, """
+                ACCEPT S(2:).
+                ACCEPT S2(2:4).
+                DISPLAY S "]" S2 "]".
+            """),
+            expected: "-0099]-0099]",
+            stdin: "0099\n0099\n",
+            dialect: 2002);
+
     // kb/Work PB3128 — the omitted-length width over an identifier-1 whose length is a RUN-TIME value. A
     // reference-modified DYNAMIC LENGTH item "is treated as a fixed-length data item whose length is the
     // dynamic-length elementary item's current length" (§8.5.1.10.4), and an ANY LENGTH formal is n repetitions of

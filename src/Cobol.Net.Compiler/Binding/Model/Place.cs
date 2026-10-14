@@ -1141,20 +1141,27 @@ public sealed record RefModPlace(Place Inner, Position Start, Position? Length) 
     /// length is the dynamic-length elementary item's current length", bounded by the §13.18.19.4 GR2 LIMIT. Both
     /// measured as a wrong answer: <c>MOVE BE(1:4) TO B1 B2</c> gave <c>1000</c> and <c>MOVE DL(2:5) TO D1 D2</c>
     /// gave <c>B</c>, because a one-character capacity truncated the intermediate.</para>
-    /// <para>The BIT and NATIONAL position counts are read through <see cref="DataItem.OperandPic"/> — THE ONE
-    /// operand-category/length reader — so §13.18.29.4 GR1b/GR2b's as-if PICTURE answers for a bit group and a
-    /// national group, which §8.4.3.3.3 SR1's last sentence ("bit group items and national group items are treated
-    /// as elementary data items") requires. A variable-length group cannot be reference-modified at all (SR1's last
-    /// bullet), so no arm is owed one.</para></summary>
+    /// <para>The BIT position count, and a NATIONAL GROUP's, are read through <see cref="DataItem.OperandPic"/> —
+    /// THE ONE operand-category/length reader — so §13.18.29.4 GR1b/GR2b's as-if PICTURE answers for a bit group and
+    /// a national group, which §8.4.3.3.3 SR1's last sentence ("bit group items and national group items are treated
+    /// as elementary data items") requires. An ELEMENTARY national item is counted by <see cref="DataItem.ImageWidth"/>,
+    /// whose leaf width is in national positions (D-N1: one UTF-16 code unit each, never the two bytes each
+    /// occupies) and carries GR4's SIGN IS SEPARATE position ("the sign position is assigned an ordinal number within
+    /// that data item"): its PICTURE length is the digit count alone, so reading it measured
+    /// <c>PIC S9(4) USAGE NATIONAL SIGN LEADING SEPARATE</c> as 4 positions, <c>ACCEPT S(2:)</c> stored one digit too
+    /// few and <c>T(1:5)</c> was refused (kb/Work PB3128 review R1-1). A variable-length group cannot be
+    /// reference-modified at all (SR1's last bullet), so no arm is owed one.</para></summary>
     public static int PositionCount(DataItem inner) =>
         // §8.5.1.10.4 + §13.18.19.4 GR2 — the current length is a run-time value; the LIMIT is its ceiling.
         inner.IsDynamicLength ? Math.Max(0, inner.DynMaxSize)
-        // GR5 a) — bit positions under usage bit; a national item's character positions are its NATIONAL
-        // positions (D-N1: one UTF-16 code unit each), never the two bytes each occupies.
-        : inner.OperandPic is { Usage: Usage.Bit or Usage.National } p ? p.Length
+        // GR5 a) — bit positions under usage bit, an elementary bit item's or a bit group's as-if PICTURE length.
+        : inner.OperandPic is { Usage: Usage.Bit } bit ? bit.Length
+        // §8.4.3.3.3 SR1's last sentence — a national group is an elementary national item of its as-if PICTURE.
+        : inner.Pic is null && inner.AsIfPic is { Usage: Usage.National } group ? group.Length
         // GR5 a)'s "otherwise" — character positions, which for every remaining shape (an alphanumeric or numeric
-        // elementary item under GR2's as-if alphanumeric redefinition, including its GR4 SIGN IS SEPARATE
-        // position, and an alphanumeric group) IS the item's character occupancy.
+        // elementary item under GR2's as-if alphanumeric redefinition or GR3's as-if national one, each including
+        // its GR4 SIGN IS SEPARATE position, a national item counted in national positions, and an alphanumeric
+        // group) IS the item's character occupancy.
         : inner.ImageWidth;
 
     /// <summary>The storage width, in BITS, of ONE position <see cref="PositionCount"/> counts — the unit a
@@ -1173,8 +1180,8 @@ public sealed record RefModPlace(Place Inner, Position Start, Position? Length) 
     /// the capacity §14.9.25.4 GR1's intermediate result item needs (<c>SendingValueTemp.OfPlace</c>) and the maximum
     /// extent §14.8.2.2 rule 1 measures a run-time-length slice by (<c>ActivationDescriptions.OfReferenceModification</c>,
     /// docs/CONFORMANCE.md D-RM1 a)). It is identifier-1's <see cref="PositionCount"/> for every item whose description
-    /// fixes a bound: its static count, or for a DYNAMIC LENGTH item its §8.5.1.10.1 maximum size ("the smallest of: the
-    /// value declared in the LIMIT phrase … the maximum permitted by the implementor"), of which a reference-modified one's
+    /// fixes a bound: its static count, or for a DYNAMIC LENGTH item its §8.5.1.10.1 maximum size (it "is smallest of": "the
+    /// value declared in the LIMIT phrase", …, "the maximum permitted by the implementor"), of which a reference-modified one's
     /// current length (§8.5.1.10.4) is never more. An ANY LENGTH item's description fixes none: §13.18.2.4 GR1 b) gives it
     /// "n repetitions of the picture symbol … where n is the length of the corresponding argument", so its bound is the
     /// largest character string the run time holds, <see cref="CobolNet.Runtime.CobolDynString.MaxLength"/> (the

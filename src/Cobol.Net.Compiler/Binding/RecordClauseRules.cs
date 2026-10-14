@@ -287,7 +287,7 @@ internal static class RecordClauseRules
         foreach (var record in file.Records)
         {
             // ⛔ EVERY record description is a subject, a variable-length one included (kb/Work PB1562). GR8 b) sums
-            // the MAXIMUM, and §8.5.1.10.1 gives a dynamic-length item one — "the smallest of" its LIMIT phrase, the
+            // the MAXIMUM, and §8.5.1.10.1 gives a dynamic-length item one — it "is smallest of" its LIMIT phrase, the
             // largest integer storable in its prefixed usage and the implementor maximum (DOC-A.1-62) — so a record
             // holding one has a maximum byte count like a record holding a table (FileModel.MaxRecordSize already
             // computes it, and the implied clause of PB1276 reads it), and its minimum is the item at zero length
