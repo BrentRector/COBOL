@@ -53,3 +53,5 @@ it (kb/Work PB3131). The row is re-sited by a `record_verdicts.py` batch to `Dat
 now declares the METHOD-ID (or the property-name it names) through `DeclareUserWord` inside the method's own census,
 and retires the deleted member with its reason; a sweep of every inventory code-location against the tree finds no
 other dangling member, and the branch deleted no other method declaration.
+Finisher gate run `20261014T072258Z-315405`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`,
+`EveryCodeLocation_ResolvesInTheTree` Passed in leg 1 (the previous red, tier 0a).
