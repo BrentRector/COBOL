@@ -714,7 +714,14 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     /// (§8.4.2.2.1: qualifiers are "superordinate names from the hierarchy to which a user-defined name belongs"),
     /// so a trailing <c>IN word</c> that names a declared alphabet IS the phrase, and the reference is bound without
     /// it. Only the LAST suffix, only the <c>IN</c> spelling (the phrase prints no <c>OF</c>) and only a bare word
-    /// (the phrase takes no subscript) can be it; any other qualifier keeps its qualification reading.</para></summary>
+    /// (the phrase takes no subscript) can be it; any other qualifier keeps its qualification reading.</para>
+    /// <para>⛔ THE ARGUMENT HOLDS WITHIN ONE SOURCE ELEMENT ONLY (kb/Work PB3153). A contained program or a method
+    /// also sees the alphabet-names its container declares, and "a source element's reference to such a name, even
+    /// when it is a different type of user-defined word, is to the item which that source element describes"
+    /// (§8.4.6.1): over an inherited alphabet GRP, <c>HI IN GRP</c> with the element's own group GRP is a qualified
+    /// reference. So the qualified reference is probed first, and only when it identifies nothing is the trailing
+    /// word the phrase (whose resolution records the §8.3.2.2 use). In one element an alphabet-name and a qualifier
+    /// cannot share a spelling, so the probe changes no answer there.</para></summary>
     private (BoundOperand Hi, string? AlphabetWord) BindRangeHigh(Core.ValueRangeContext range)
     {
         var hiNode = range.valueOperand(1);
@@ -722,7 +729,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         if (hiNode.arithmeticExpression() is { } expr && ConditionBinder.SoleDataRef(expr) is { } dref
             && dref.dataReferenceSuffix() is { Length: > 0 } suffixes
             && suffixes[^1].qualification() is { } q && q.IN() is not null && q.ChildCount == 2
-            && ctx.Data.IsAlphabetName(q.cobolWord().GetText()))
+            && ctx.Data.IsAlphabetName(q.cobolWord().GetText()) && ctx.Refs.Probe(dref) is null)
             return (host.Expr.FieldOperand(ReferenceResolver.WithoutTrailingSuffix(dref)), q.cobolWord().GetText());
         return (BindValueOperand(hiNode), null);
     }

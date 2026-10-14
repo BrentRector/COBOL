@@ -167,6 +167,47 @@ public sealed class InheritedConfigurationNameUseTests
         if (!legal) EditionHarness.AssertHasDiagnostic(diags, "COBOLNET2365");
     }
 
+    /// <summary>The same rule at FUNCTION STANDARD-COMPARE's argument-4 positions (§15.85.2 "( argument-1 argument-2
+    /// [ ordering-name-1 ] [ argument-4 ] )"). Position 3 of the THREE-argument form admits an integer data item as
+    /// well as an ordering-name, so the contained program's own PBV is argument-4, not its container's ordering-name
+    /// PBV: legal, and no ordering-name use is recorded. With FOUR arguments position 3 IS ordering-name-1, so PBV
+    /// there is a use of the inherited ordering-name beside the element's own data-name PBV (COBOLNET2692, the
+    /// census's refusal at a position that admits the one type only), while PBV at position 4 is argument-4, the own
+    /// item, never the "ordering-name in the argument-4 position" refusal. The corpus golden
+    /// <c>2014/pb3153_inherited_names_yield_to_own_items</c> pins the three-argument form, the EVALUATE and VALUE
+    /// alphabet phrases and the VALUE constant-name end to end (review round 1, kb/Work PB3027).</summary>
+    [Theory]
+    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV)", true)]
+    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV PBV)", false)]
+    public void StandardCompare_TheElementsOwnItem_IsArgument4_WhereTheFormatAdmitsIt(string call, bool legal)
+    {
+        string source = $"""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB3153SO.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            SPECIAL-NAMES.
+                ORDER TABLE PBV IS "ISO 14651_2020_TABLE1".
+            PROCEDURE DIVISION.
+                CALL "PB3153SI".
+                STOP RUN.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB3153SI.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 PBV PIC 9 VALUE 1.
+            PROCEDURE DIVISION.
+                DISPLAY FUNCTION {call}.
+            END PROGRAM PB3153SI.
+            END PROGRAM PB3153SO.
+            """;
+        var (ok, diags) = EditionHarness.Compile(source, 2014);
+        Assert.Equal(legal, ok);
+        EditionHarness.AssertNoDiagnostic(diags, "in the argument-4 position");
+        if (legal) EditionHarness.AssertNoDiagnostic(diags, "COBOLNET2692");
+        else EditionHarness.AssertHasDiagnostic(diags, "(data-name and ordering-name)");
+    }
+
     /// <summary>A METHOD is a source element of its own (§10.5), and the class-name its class's SPECIAL-NAMES declares
     /// reaches it the same way: method M1A uses PB53MDIG in a class condition and declares a paragraph PB53MDIG (refused
     /// at the use), while method M1B only declares the paragraph (legal).</summary>

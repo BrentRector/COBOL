@@ -965,6 +965,13 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// <para>⚠ A BARE WORD IS NOT AUTOMATICALLY A NAME. §15.3 type 6 admits "an integer data item", so
     /// <c>FUNCTION STANDARD-COMPARE(A B WS-LEVEL)</c> is legal COBOL with WS-LEVEL a data-name; keying the
     /// ordering-name arm on "is a bare word" rather than on "is a DECLARED ordering-name" would reject it.</para>
+    /// <para>⛔ AND A DECLARED ORDERING-NAME MAY BE ANOTHER ELEMENT'S (kb/Work PB3153). A contained program or a
+    /// method sees the ORDER TABLE names its container declares, and "a source element's reference to such a name,
+    /// even when it is a different type of user-defined word, is to the item which that source element describes"
+    /// (§8.4.6.1). So in the two positions that admit argument-4 (position 3 of the three-argument form, position 4
+    /// of the four-argument form), the referring element's own item of that spelling is asked FIRST, and only the
+    /// ordering-name reading records the §8.3.2.2 use. In one element the two cannot coexist (COBOLNET2692 at the
+    /// second declaration), so the probe changes no answer there.</para>
     /// </remarks>
     private BoundExpr BindStandardCompare(IntrinsicSig sig, IReadOnlyList<Core.FunctionArgumentContext> argCtxs)
     {
@@ -990,7 +997,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // The ordering-name slot: position 3 always when four arguments are written, position 3 in the
             // three-argument form only when the word actually names an ORDER TABLE clause's ordering-name.
             bool mustBeName = at == 2 && argCtxs.Count == 4;
-            if (at == 2 && KeywordWordOf(a) is { } word && ctx.Data.OrderTables.TryUse(a, word, out string? literal9))
+            // An argument-4 position: the element's own item of the word's spelling is the referent (§8.4.6.1).
+            bool ownItem = !mustBeName && SoleDataReference(a) is { } own && ctx.Refs.Probe(own) is not null;
+            if (at == 2 && !ownItem && KeywordWordOf(a) is { } word
+                && ctx.Data.OrderTables.TryUse(a, word, out string? literal9))
             {
                 orderingTable = literal9;
                 continue;
@@ -1005,7 +1015,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                         : $"; declared: {string.Join(", ", ctx.Data.OrderTables.Names)}"));
             // A SECOND ordering-name where argument-4 belongs. Reachable, and worth its own message: the operand
             // path would otherwise report it as an unresolved data-name, which is true and useless.
-            if (KeywordWordOf(a) is { } second && ctx.Data.OrderTables.Declares(second))
+            if (!ownItem && KeywordWordOf(a) is { } second && ctx.Data.OrderTables.Declares(second))
                 return Malformed($"is given the ordering-name '{second}' in the argument-4 position — the "
                     + "§15.85.2 general format admits ONE [ ordering-name-1 ], and the fourth position is "
                     + "argument-4, the ordering level (ISO §15.85.3 r6)");

@@ -745,10 +745,19 @@ duplicate check or a second read of an already-resolved name asks `Declares` / `
 mnemonic-names keep their parse-tree registry (`Procedure.MnemonicRegistry`), whose `TryUse` records the same way.
 `InheritConfiguration` hands every table down (`InheritFrom`; the symbolic characters were not handed down at all
 before PB3153, so a contained program's use of one was COBOLNET1639). Where a format admits both an inherited name and
-an identifier (a bare literal-alias operand, `SET LOCALE … TO`, `WRITE … ADVANCING`), the referring element's own item
-of the same spelling is asked first — §8.4.6.1: "a source element's reference to such a name, even when it is a
-different type of user-defined word, is to the item which that source element describes" — and only the inherited
-reading records a use. `UserWordDeclarationDriftTests.EveryConfigurationSectionNameType_ResolvesThroughARecordingTable`
+another reading of the same word, the referring element's own item of the same spelling is asked first — §8.4.6.1: "a
+source element's reference to such a name, even when it is a different type of user-defined word, is to the item which
+that source element describes" — and only the inherited reading records a use. The positions: a bare literal-alias
+operand (`ExpressionBinder.LiteralAliasOf`, constant-name then data item before the symbolic-character), a VALUE
+operand (`DataBinder.RawValueOperandText`, constant-name before the symbolic-character), `SET LOCALE … TO`,
+`WRITE … ADVANCING`, a bare class-word operand (`ConditionBinder.BareClassWord`), FUNCTION STANDARD-COMPARE's
+argument-4 positions (`IntrinsicBinder.BindStandardCompare`), and the trailing `IN alphabet-name-1` of a THROUGH range
+(`EvaluateBinder.BindRangeHigh` probes the qualified reference; `DataBinder.RangeAlphabetPhraseOf`'s IN-omitted peel
+yields to a constant-name). A position that admits the configuration-section type ONLY (a class condition, `DISPLAY …
+UPON`, an ORDER TABLE position 3 of four) resolves the inherited name and lets the census refuse a same-spelled own
+item, which refuses exactly the programs §8.4.6.1's reading does. Two configuration-section names of different types
+cannot meet in one element this way: a contained program has no configuration section (§12.3.3 SR1), nor does a
+method (SR2). `UserWordDeclarationDriftTests.EveryConfigurationSectionNameType_ResolvesThroughARecordingTable`
 parses §8.4.6.1's list and keeps every type's registry a recording one; negative
 `pb3153-contained-program-paragraph-spells-an-inherited-class-it-uses`, golden `85/pb3153_inherited_special_names_words`
 and `InheritedConfigurationNameUseTests` (every type, and a method) are the witnesses.

@@ -4796,7 +4796,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         }
         // The IN-omitted spelling: a bare last operand, after at least one literal-2.
         if (items[^1].valueClauseRange() is not null || (items.Length == 1 && ops.Length == 1)) return (null, null);
-        return dref.GetText() is var word && IsAlphabetName(word) ? (word, last) : (null, null);
+        // The §8.3.2.2 argument holds within ONE source element: a contained program or a method also sees its
+        // container's alphabet-names, and "a source element's reference to such a name, even when it is a
+        // different type of user-defined word, is to the item which that source element describes" (§8.4.6.1;
+        // kb/Work PB3153), so the element's own constant-name of the spelling keeps its literal-2 reading.
+        return dref.GetText() is var word && IsAlphabetName(word) && ConstantOf(dref) is null
+            ? (word, last) : (null, null);
     }
 
     /// <summary>Screen <c>[ WHEN SET TO FALSE IS literal-4 ]</c> — Format 3's SECOND literal position (ISO
@@ -6416,11 +6421,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // character as an ALL literal of its class — GR2's fill in a VALUE association, exactly like ALL "c".
             : op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symAll && SymbolicRaw(symAll, symAll.GetText()) is { } rawAll
             ? rawAll
-            : SymbolicValueRawText(op) is { } rawBare ? rawBare
             // A constant-name substitutes its literal AS WRITTEN and that literal then takes the path the written
             // literal takes (§13.10.4 GR1 "as if literal-1 … were written"; kb/Work PB1230): `VALUE K` where
-            // `K CONSTANT AS 1,5` under DECIMAL-POINT IS COMMA normalizes exactly as `VALUE 1,5` does.
-            : NormalizeIfNumericLiteral(ConstantValueRawText(op) ?? op.GetText());
+            // `K CONSTANT AS 1,5` under DECIMAL-POINT IS COMMA normalizes exactly as `VALUE 1,5` does. Asked BEFORE
+            // the symbolic-character, as every other literal-position reader asks it (ConcatFolder.FoldTerm,
+            // ExpressionBinder.LiteralAliasOf): a symbolic-character a CONTAINING element declares yields to the
+            // element's own constant-name of the spelling (§8.4.6.1; kb/Work PB3153), and its resolution records
+            // a §8.3.2.2 use. In one element the two cannot coexist (COBOLNET2692), so the order decides nothing there.
+            : ConstantValueRawText(op) is { } constantRaw ? NormalizeIfNumericLiteral(constantRaw)
+            : SymbolicValueRawText(op) is { } rawBare ? rawBare
+            : NormalizeIfNumericLiteral(op.GetText());
     }
 
     /// <summary>THE literal-position predicate for a VALUE operand (kb/Work PB732), PURE — no folding, no
