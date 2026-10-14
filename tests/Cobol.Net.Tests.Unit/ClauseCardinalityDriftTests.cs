@@ -26,8 +26,8 @@ using Core = CobolParserCore;
 /// </list></summary>
 public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
 {
-    /// <summary>The closed formats whose figure was read and does NOT print every element once: SPECIAL-NAMES,
-    /// I-O-CONTROL and OBJECT-COMPUTER repeat most of their elements; SOURCE-COMPUTER holds a single element. (The
+    /// <summary>The closed formats whose figure was read and does NOT print every element once: SPECIAL-NAMES
+    /// and I-O-CONTROL repeat most of their elements; SOURCE-COMPUTER holds a single element. (The
     /// configuration section and the identification division list paragraphs, each bracketed once, and are rows —
     /// kb/Work PB1508.)</summary>
     private static readonly IReadOnlySet<Type> ReviewedExemptions = new HashSet<Type>
@@ -35,7 +35,6 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
         typeof(Core.SpecialNameEntryContext),
         typeof(Core.IoControlClauseContext),
         typeof(Core.SourceComputerParagraphContext),
-        typeof(Core.ObjectComputerClauseContext),
     };
 
     private static IReadOnlyList<Type> AlternativesOf(Type listContext) =>
@@ -149,6 +148,33 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
             var figure = row.At(year);
             Assert.Same(row, figure);
             Assert.Equal([typeof(Core.OptionsParagraphContext)], figure.Sequence!);
+        }
+    }
+
+    /// <summary>⛔ THE OBJECT-COMPUTER PARAGRAPH IS COUNTED BY THE TABLE, NOT BY THE BINDER (kb/Work PB3133). From 2002 its
+    /// two clauses sit in choice indicators (ISO §12.3.6.2; §5.2.6.4: each at most once, any order) — a free
+    /// sequence; below 2002 the COBOL-85 figure ranks MEMORY SIZE, PROGRAM COLLATING SEQUENCE and SEGMENT-LIMIT in that
+    /// sequence, each once. Pinned through <see cref="ClauseList.At"/>, the method <c>ClosedFormatPass</c> asks.</summary>
+    [Fact]
+    public void TheObjectComputerRow_ScreensTheCobol85FigureBelow2002()
+    {
+        Assert.True(ClauseCardinalities.ByClauseContext.TryGetValue(typeof(Core.ObjectComputerClauseContext), out var row));
+        var cobol85 = row!.At(1985);
+        Assert.Equal("ANSI X3.23-1985", cobol85.Format);
+        Assert.Equal(
+            [
+                typeof(Core.MemorySizeClauseContext), typeof(Core.ProgramCollatingSequenceClauseContext),
+                typeof(Core.SegmentLimitClauseContext),
+            ],
+            cobol85.Sequence!);
+        Assert.Contains(typeof(Core.CharacterClassificationClauseContext), cobol85.Repeatable);
+        foreach (int year in new[] { 2002, 2014, 2023 })
+        {
+            var figure = row.At(year);
+            Assert.Same(row, figure);
+            Assert.Null(figure.Sequence);   // choice indicators: any order
+            Assert.DoesNotContain(typeof(Core.ProgramCollatingSequenceClauseContext), figure.Repeatable);
+            Assert.DoesNotContain(typeof(Core.CharacterClassificationClauseContext), figure.Repeatable);
         }
     }
 
