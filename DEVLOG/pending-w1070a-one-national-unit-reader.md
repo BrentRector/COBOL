@@ -93,3 +93,7 @@ place. It gets the same split. Regression tests:
 `IndexNameUniquenessTests.Permissive_AmbiguousIndexName_SetResolvesToTheFirstDeclarationAtEveryAsk`,
 `…_InAReferenceableLinkageRecord_Compiles` and
 `OccursDynamicGuardTests.Permissive_AmbiguousCapacityRegister_InSubscriptAndRefModPositions_ReadsTheFirst`.
+The finisher's first gate was RED in the self-tests on `test_orchestrate_stop.ps1` ("stale lock taken over"), which
+passed alone. Its "dead" lock PID 999999 was not dead: this host's live PIDs pass 1,000,000, and Windows ignores a
+PID's two low bits, so the lock named process 999996 whenever one was running. The case now writes
+`Int32.MaxValue - 3`, which no Windows or Linux process can hold.
