@@ -180,6 +180,10 @@ public sealed class HostLandingTests
         Assert.Equal(9999999999999999999999999999m, HostLanding.Decimal(Int128.Parse("9999999999999999999999999999"), 0));
         Assert.Equal((Int128)12000, HostLanding.Integer(12, -3));
         Assert.Equal((Int128)(-42), HostLanding.Integer(-42, 0));
+        // Outside the row's reach is loud, never a truncated significand or a wrapped product.
+        Assert.Throws<OverflowException>(() => HostLanding.Decimal((Int128)1 << 96, 0));
+        Assert.Throws<OverflowException>(() => HostLanding.Decimal(1, 29));
+        Assert.Throws<OverflowException>(() => HostLanding.Integer(Int128.MaxValue / 10 + 1, -1));
         Assert.Equal(new CobolDec(5, -3), HostLanding.Dec(5, 3));
         FormatException? failure = null;
         Assert.True(HostLanding.TryDec((UInt128)Int128.MaxValue, 2, "W", ref failure, out var below));

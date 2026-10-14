@@ -190,14 +190,21 @@ public static class HostLanding
 
     /// <summary>The host integer of a fixed-point item with no fraction positions: <paramref name="unscaled"/> at
     /// <paramref name="scale"/> (≤ 0 — trailing P positions multiply it).</summary>
+    /// <exception cref="OverflowException">The value has more than 38 digits, which no description whose host type is an
+    /// integer can hold (a generated entry never passes one).</exception>
     public static Int128 Integer(Int128 unscaled, int scale) =>
-        scale >= 0 ? unscaled : unscaled * Pow10.AsWide(-scale);
+        scale >= 0 ? unscaled : checked(unscaled * Pow10.AsWide(-scale));
 
     /// <summary>The host <see cref="decimal"/> of a fixed-point item with fraction positions, whose unscaled value has at
     /// most 28 digits and whose scale is at most 28 (the <see cref="decimal"/> row of the host-type table).</summary>
+    /// <exception cref="OverflowException">The value is outside <see cref="decimal"/>'s 96-bit significand or 28-digit
+    /// scale, which no description whose host type is <see cref="decimal"/> can hold (a generated entry never passes
+    /// one); never a silently truncated significand.</exception>
     public static decimal Decimal(Int128 unscaled, int scale)
     {
         Int128 magnitude = Int128.Abs(unscaled);
+        if (magnitude >> 96 != 0 || scale is < 0 or > 28)
+            throw new OverflowException($"HostLanding.Decimal: {unscaled} at scale {scale} is not a decimal value");
         return new decimal((int)(uint)magnitude, (int)(uint)(magnitude >> 32), (int)(uint)(magnitude >> 64),
             unscaled < 0, (byte)scale);
     }
