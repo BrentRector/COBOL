@@ -1168,11 +1168,14 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>The class-name-1 / alphabet-name-1 (ISO §8.8.4.4.2) a bare operand names, or null — the ONE symbol
     /// test behind <see cref="BareOperandForm.ClassName"/>. A word only: neither name is a data-name, so neither
-    /// takes a qualifier, a subscript or a reference modifier. PURE (dictionary lookups and a diagnostic-free
-    /// <see cref="ReferenceResolver.Probe"/>), so a classifier may ask it before anything is bound.</summary>
+    /// takes a qualifier, a subscript or a reference modifier. A class-name a CONTAINING element declares yields to
+    /// the referring element's own data item or constant-name of that spelling (§8.4.6.1; kb/Work PB3153): an
+    /// EVALUATE object <c>WHEN KW</c> with <c>01 KW CONSTANT AS "AB"</c> is a literal comparison object. PURE
+    /// (dictionary lookups and the diagnostic-free <see cref="ReferenceResolver.DescribesOwnItem"/>), so a
+    /// classifier may ask it before anything is bound.</summary>
     public string? BareClassWord(Core.ValueOperandContext? vo) =>
         vo?.arithmeticExpression() is { } expr && SoleDataRef(expr) is { } dref && dref.dataReferenceSuffix().Length == 0
-            && dref.cobolWord() is { } word && ctx.Data.IsClassConditionWord(word.GetText()) && ctx.Refs.Probe(dref) is null
+            && dref.cobolWord() is { } word && ctx.Data.IsClassConditionWord(word.GetText()) && !ctx.Refs.DescribesOwnItem(dref)
             ? word.GetText() : null;
 
     /// <summary>§14.9.13.3 SR5 over a selection object the grammar parsed as a whole <c>condition</c>: the

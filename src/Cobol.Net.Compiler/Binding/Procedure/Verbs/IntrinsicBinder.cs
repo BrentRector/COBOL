@@ -998,7 +998,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // three-argument form only when the word actually names an ORDER TABLE clause's ordering-name.
             bool mustBeName = at == 2 && argCtxs.Count == 4;
             // An argument-4 position: the element's own item of the word's spelling is the referent (§8.4.6.1).
-            bool ownItem = !mustBeName && SoleDataReference(a) is { } own && ctx.Refs.Probe(own) is not null;
+            bool ownItem = !mustBeName && SoleDataReference(a) is { } own && ctx.Refs.DescribesOwnItem(own);
             if (at == 2 && !ownItem && KeywordWordOf(a) is { } word
                 && ctx.Data.OrderTables.TryUse(a, word, out string? literal9))
             {

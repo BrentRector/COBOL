@@ -729,7 +729,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         if (hiNode.arithmeticExpression() is { } expr && ConditionBinder.SoleDataRef(expr) is { } dref
             && dref.dataReferenceSuffix() is { Length: > 0 } suffixes
             && suffixes[^1].qualification() is { } q && q.IN() is not null && q.ChildCount == 2
-            && ctx.Data.IsAlphabetName(q.cobolWord().GetText()) && ctx.Refs.Probe(dref) is null)
+            && ctx.Data.IsAlphabetName(q.cobolWord().GetText()) && !ctx.Refs.DescribesOwnItem(dref))
             return (host.Expr.FieldOperand(ReferenceResolver.WithoutTrailingSuffix(dref)), q.cobolWord().GetText());
         return (BindValueOperand(hiNode), null);
     }

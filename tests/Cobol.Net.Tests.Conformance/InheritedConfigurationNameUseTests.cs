@@ -126,11 +126,14 @@ public sealed class InheritedConfigurationNameUseTests
 
     /// <summary>The same rule at WRITE … ADVANCING, which admits a mnemonic-name and an identifier: the contained
     /// program's own PBT is the line count, not its container's mnemonic-name PBT for C01. An integer item is legal; an
-    /// alphanumeric one is §14.9.51.3 SR14's refusal (COBOLNET2365), never a use of the mnemonic-name.</summary>
+    /// alphanumeric one is §14.9.51.3 SR14's refusal (COBOLNET2365), never a use of the mnemonic-name. An own integer
+    /// CONSTANT-NAME is integer-1 (§13.10.3 SR2: it "may be used anywhere that a format specifies a literal of the
+    /// class and category of constant-name-1"), so it wins too (review round 2; a bare data probe missed it).</summary>
     [Theory]
-    [InlineData("PIC 9 VALUE 2", true)]
-    [InlineData("PIC X VALUE \"2\"", false)]
-    public void WriteAdvancing_TheElementsOwnItem_WinsOverAnInheritedMnemonicName(string description, bool legal)
+    [InlineData("PIC 9 VALUE 2", true, 85)]
+    [InlineData("PIC X VALUE \"2\"", false, 85)]
+    [InlineData("CONSTANT AS 2", true, 2002)]
+    public void WriteAdvancing_TheElementsOwnItem_WinsOverAnInheritedMnemonicName(string description, bool legal, int edition)
     {
         string source = $"""
             IDENTIFICATION DIVISION.
@@ -161,7 +164,7 @@ public sealed class InheritedConfigurationNameUseTests
             END PROGRAM PB3153WI.
             END PROGRAM PB3153WO.
             """;
-        var (ok, diags) = EditionHarness.Compile(source, 85);
+        var (ok, diags) = EditionHarness.Compile(source, edition);
         EditionHarness.AssertNoDiagnostic(diags, "COBOLNET2692");
         Assert.Equal(legal, ok);
         if (!legal) EditionHarness.AssertHasDiagnostic(diags, "COBOLNET2365");
@@ -175,11 +178,17 @@ public sealed class InheritedConfigurationNameUseTests
     /// census's refusal at a position that admits the one type only), while PBV at position 4 is argument-4, the own
     /// item, never the "ordering-name in the argument-4 position" refusal. The corpus golden
     /// <c>2014/pb3153_inherited_names_yield_to_own_items</c> pins the three-argument form, the EVALUATE and VALUE
-    /// alphabet phrases and the VALUE constant-name end to end (review round 1, kb/Work PB3027).</summary>
+    /// alphabet phrases and the VALUE constant-name end to end (review round 1, kb/Work PB3027). The own item may be
+    /// a CONSTANT-NAME as well as a data item: an integer constant-name stands where argument-4's integer literal
+    /// may be written (§13.10.3 SR2), and it is no data item, so a data probe alone claimed it as the inherited
+    /// ordering-name (review round 2).</summary>
     [Theory]
-    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV)", true)]
-    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV PBV)", false)]
-    public void StandardCompare_TheElementsOwnItem_IsArgument4_WhereTheFormatAdmitsIt(string call, bool legal)
+    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV)", true, "PIC 9 VALUE 1", "data-name")]
+    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV PBV)", false, "PIC 9 VALUE 1", "data-name")]
+    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV)", true, "CONSTANT AS 1", "constant-name")]
+    [InlineData("STANDARD-COMPARE(\"a\" \"b\" PBV PBV)", false, "CONSTANT AS 1", "constant-name")]
+    public void StandardCompare_TheElementsOwnItem_IsArgument4_WhereTheFormatAdmitsIt(string call, bool legal,
+        string description, string ownType)
     {
         string source = $"""
             IDENTIFICATION DIVISION.
@@ -195,7 +204,7 @@ public sealed class InheritedConfigurationNameUseTests
             PROGRAM-ID. PB3153SI.
             DATA DIVISION.
             WORKING-STORAGE SECTION.
-            01 PBV PIC 9 VALUE 1.
+            01 PBV {description}.
             PROCEDURE DIVISION.
                 DISPLAY FUNCTION {call}.
             END PROGRAM PB3153SI.
@@ -205,7 +214,7 @@ public sealed class InheritedConfigurationNameUseTests
         Assert.Equal(legal, ok);
         EditionHarness.AssertNoDiagnostic(diags, "in the argument-4 position");
         if (legal) EditionHarness.AssertNoDiagnostic(diags, "COBOLNET2692");
-        else EditionHarness.AssertHasDiagnostic(diags, "(data-name and ordering-name)");
+        else EditionHarness.AssertHasDiagnostic(diags, $"({ownType} and ordering-name)");
     }
 
     /// <summary>A METHOD is a source element of its own (§10.5), and the class-name its class's SPECIAL-NAMES declares

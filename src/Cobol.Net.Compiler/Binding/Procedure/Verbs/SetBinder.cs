@@ -370,8 +370,8 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // source element. A locale-name a CONTAINING element declares yields to the referring element's own item of
         // the same spelling — "a source element's reference to such a name, even when it is a different type of
         // user-defined word, is to the item which that source element describes" (§8.4.6.1; kb/Work PB3153) — so
-        // the probe is asked first, and only the locale-name reading records the §8.3.2.2 use.
-        if (to.ChildCount == 1 && ctx.Data.Locales.Declares(toText) && ctx.Refs.Probe(to) is null
+        // the own-item test is asked first, and only the locale-name reading records the §8.3.2.2 use.
+        if (to.ChildCount == 1 && ctx.Data.Locales.Declares(toText) && !ctx.Refs.DescribesOwnItem(to)
             && ctx.Data.Locales.TryUse(to, toText, out var symbol))
             return new BoundSetLocale(categories, setsUserDefault, LocaleSetSource.LocaleName, symbol, null);
         // identifier-10: an elementary data item of category data-pointer (SR27).

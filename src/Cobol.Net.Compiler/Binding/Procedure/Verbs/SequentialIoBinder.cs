@@ -482,12 +482,14 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
     /// <see cref="BindAdvancing"/> refuses the suffix by name. Pure (no report), because the SR13 screen asks it
     /// too. A mnemonic-name a CONTAINING element declares yields to the referring element's own item of the same
     /// spelling (§8.4.6.1: "a source element's reference to such a name, even when it is a different type of
-    /// user-defined word, is to the item which that source element describes"; kb/Work PB3153), so the probe is
-    /// asked first and only the mnemonic reading records the §8.3.2.2 use.</summary>
+    /// user-defined word, is to the item which that source element describes"; kb/Work PB3153), so
+    /// <see cref="ReferenceResolver.DescribesOwnItem"/> is asked first (an own data item OR an own integer
+    /// constant-name, which §13.10.3 SR2 admits as integer-1) and only the mnemonic reading records the §8.3.2.2
+    /// use.</summary>
     private (Core.DataReferenceContext Ref, string Name, ImplementorName System)? MnemonicOperand(
         Core.WriteBeforeAfterContext? wba)
         => wba?.dataReference() is { } m && m.cobolWord() is { } word
-           && ctx.Mnemonics.TryPeek(wba, word.GetText(), out _) && ctx.Refs.Probe(m) is null
+           && ctx.Mnemonics.TryPeek(wba, word.GetText(), out _) && !ctx.Refs.DescribesOwnItem(m)
            && ctx.Mnemonics.TryUse(wba, word.GetText(), out var system)
             ? (m, word.GetText(), system)
             : null;

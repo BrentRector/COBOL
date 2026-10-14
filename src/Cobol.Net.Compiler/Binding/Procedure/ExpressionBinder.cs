@@ -470,8 +470,8 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // spelling: "a source element's reference to such a name, even when it is a different type of user-defined
         // word, is to the item which that source element describes" (§8.4.6.1, kb/Work PB3153). Asked BEFORE the
         // resolution, which records the word as used as a symbolic-character (§8.3.2.2). In one element the two
-        // cannot coexist (COBOLNET2692 at the second declaration), so the probe changes no own-element answer.
-        : ctx.Data.NamesSymbolic(dref) && ctx.Refs.Probe(dref) is null
+        // cannot coexist (COBOLNET2692 at the second declaration), so the own-item test changes no own-element answer.
+        : ctx.Data.NamesSymbolic(dref) && !ctx.Refs.DescribesOwnItem(dref)
           && ctx.Data.SymbolicOf(dref) is { } s ? new(DataBinder.WrittenText(dref), null, s)
         : null;
 

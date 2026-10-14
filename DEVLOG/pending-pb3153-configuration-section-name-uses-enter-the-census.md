@@ -62,3 +62,13 @@ reading without asking the own reading first, and two configuration-section name
 across elements, because neither a contained program nor a method has a configuration section (§12.3.3 SR1, SR2).
 The finisher's gate, run 20261014T225418Z-18b752: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`
 (Conformance 6,172/11,701, Unit 33,090/33,652, Characterization 6/36 in leg 1; leg 2 left to CI); semgrep verify PASS.
+
+**Review round 2.** The reviewer found round 1's own-item test asked only the data-item probe, so an own
+constant-name (§13.10.3 SR2: "may be used anywhere that a format specifies a literal of the class and category of
+constant-name-1") at STANDARD-COMPARE's argument-4 was still claimed as the inherited ordering-name and refused
+COBOLNET2692. The sweep found the same raw probe at WRITE ADVANCING integer-1 and an EVALUATE object (both reproduced
+2692). One own-item test, `ReferenceResolver.DescribesOwnItem` (constant-name or data item), now serves every
+position that pairs a configuration-section-name lookup with the own reading, and a drift test refuses the raw-probe
+pairing. The golden gains PB3153Y3 (three own constant-names) and an inherited class-name arm; the unit theories gain
+constant-name rows. A CALL / CANCEL target constant-name, refused COBOLNET1639 even in one element (PB780's
+territory), is left as a lead.

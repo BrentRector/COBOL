@@ -176,6 +176,28 @@ public sealed class UserWordDeclarationDriftTests
         Assert.Equal(listed, tabled.Append(UserWordKind.MnemonicName).Distinct().Order().ToArray());
     }
 
+    /// <summary>⛔ AN INHERITED CONFIGURATION-SECTION NAME YIELDS TO THE ELEMENT'S OWN ITEM THROUGH ONE TEST (kb/Work
+    /// PB3153 review round 2). Where a format admits both an inherited SPECIAL-NAMES name and an operand, §8.4.6.1 makes
+    /// the referring element's own item of that spelling the referent, and that item may be a data item OR a
+    /// constant-name (§13.10.3 SR2 admits one wherever a literal of its category is). A bare <c>Refs.Probe(…)</c> sees
+    /// only the data item, so STANDARD-COMPARE's argument-4, WRITE ADVANCING's integer-1 and an EVALUATE object
+    /// claimed an own constant-name as the inherited ordering-name, mnemonic-name or class-name and refused legal source
+    /// COBOLNET2692. So no expression pairs a configuration-section-name lookup with a raw probe: it asks
+    /// <c>ReferenceResolver.DescribesOwnItem</c>, and the next two-reading position gets both halves.</summary>
+    [Fact]
+    public void AConfigurationNameLookup_AsksTheOneOwnItemTest_NeverARawProbe()
+    {
+        var raw = CompilerSources().SelectMany(s => Regex.Matches(s.Text,
+                @"(?:IsClassConditionWord|IsAlphabetName|NamesSymbolic|Mnemonics\.TryPeek|Mnemonics\.TryUse"
+                + @"|(?:Locales|OrderTables|Alphabets|Classes|Symbolics)\.(?:Declares|TryUse|TryPeek))\([^;{}]*?Refs\.Probe\(")
+            .Select(m => $"{s.Name}:{s.Text[..m.Index].Count(c => c == '\n') + 1}")).ToList();
+        Assert.True(raw.Count == 0, "a configuration-section-name lookup is paired with a raw Refs.Probe, which misses an "
+            + "own constant-name (" + string.Join(", ", raw) + "): ask ReferenceResolver.DescribesOwnItem (§8.4.6.1, kb/Work PB3153)");
+        string resolver = CompilerSources().Single(s => s.Name == "ReferenceResolver.cs").Text;
+        Assert.Matches(@"public bool DescribesOwnItem\(Core\.DataReferenceContext dref\) =>\s+"
+            + @"data\.ConstantOf\(dref\) is not null \|\| Probe\(dref\) is not null;", resolver);
+    }
+
     private static List<(string Name, string Text)> CompilerSources() =>
         [.. Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))

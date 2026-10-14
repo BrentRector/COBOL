@@ -747,7 +747,11 @@ mnemonic-names keep their parse-tree registry (`Procedure.MnemonicRegistry`), wh
 before PB3153, so a contained program's use of one was COBOLNET1639). Where a format admits both an inherited name and
 another reading of the same word, the referring element's own item of the same spelling is asked first — §8.4.6.1: "a
 source element's reference to such a name, even when it is a different type of user-defined word, is to the item which
-that source element describes" — and only the inherited reading records a use. The positions: a bare literal-alias
+that source element describes" — and only the inherited reading records a use. The own item may be a data item or a
+constant-name (§13.10.3 SR2 admits a constant-name wherever a literal of its category is, and a constant is no data
+item), so a procedure-division position asks the ONE own-item test, `ReferenceResolver.DescribesOwnItem` (constant-name
+or data-item probe), never a bare `Refs.Probe`; `UserWordDeclarationDriftTests.AConfigurationNameLookup_AsksTheOneOwnItemTest_NeverARawProbe`
+refuses a configuration-name lookup paired with a raw probe. The positions: a bare literal-alias
 operand (`ExpressionBinder.LiteralAliasOf`, constant-name then data item before the symbolic-character), a VALUE
 operand (`DataBinder.RawValueOperandText`, constant-name before the symbolic-character), `SET LOCALE … TO`,
 `WRITE … ADVANCING`, a bare class-word operand (`ConditionBinder.BareClassWord`), FUNCTION STANDARD-COMPARE's
