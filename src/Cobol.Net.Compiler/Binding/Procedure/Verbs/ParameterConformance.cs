@@ -46,9 +46,10 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// <list type="bullet">
     /// <item>An ADDRESS-IDENTIFIER (kb/Work PB239) is a pointer value with no storage behind it; its law is the
     /// class-pointer paragraph both passing regimes share.</item>
-    /// <item>BY REFERENCE: §14.8.2.3.2 / §14.8.2.2 rule 1 — the same-description comparator, in ACTIVATION mode
-    /// (rules d/e: an ANY LENGTH formal takes the argument's length), plus the class-pointer paragraph's last
-    /// sentence: "If either is a restricted pointer, both shall be restricted and of the same type."</item>
+    /// <item>BY REFERENCE: §14.8.2.3.2 / §14.8.2.2 rule 1 — the run-time CALL lane's relation over the two
+    /// descriptions (<see cref="ByReferenceViolation"/>): rule 2's clause identity, "Additionally" d) / e) for ANY
+    /// LENGTH, the class-pointer paragraph with its restricted-pointer sentence, the object-reference rules and the
+    /// group rules.</item>
     /// <item>BY CONTENT / BY VALUE: §14.8.2.3.3 / §14.8.2.2 rule 2 — the COMPUTE / SET / MOVE regime per formal
     /// category.</item>
     /// </list></summary>
@@ -80,28 +81,10 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         }
         if (arg.Mode is CobolPassMode.Reference && arg.Place is { } ap)
         {
-            if (CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(formal, ap.Item,
-                    byRefGroupPrefix: true,
-                    // §14.8.2.3.2 rules d/e — ACTIVATION mode, the INVOKE twin's (OoBinder) setting. PAIR mode
-                    // demanded the same ANY LENGTH clause on both sides, so a plain argument meeting an ANY LENGTH
-                    // formal — the clause's whole purpose, rule d: "its length is considered to match the length
-                    // of the corresponding argument" — was refused at every AS NESTED call (kb/Work PB240).
-                    anyLengthActivationRelax: true) is { } why)
+            if (ByReferenceViolation(ap, formal) is { } why)
                 ctx.Edition.Error(site.Conformance,
                     $"{site.Callee} argument {position} ('{ap.Item.CobolName}') does not conform to formal "
                     + $"parameter '{formal.CobolName}': {why} (ISO §14.8.2 via {site.ImportingRule})");
-            // ⛔ THE `asNested` SCOPING IS GONE, AND ITS PREMISE WITH IT (kb/Work PB427). §8.5.3.1's equivalence
-            // is decided from the DECLARATIONS themselves — StrongTypeModel.SameRestriction resolves each
-            // restriction to its own source element's type declaration and compares them structurally — so a
-            // separately-declared activated element is exactly the case the rule is FOR (kb/Work PB153).
-            var argR = StrongTypeModel.PointerRestriction(ap.Item);
-            var formalR = StrongTypeModel.PointerRestriction(formal);
-            if ((argR.IsRestricted || formalR.IsRestricted) && !StrongTypeModel.SameRestriction(argR, formalR))
-                ctx.Edition.Error(site.Conformance,
-                    $"{site.Callee} argument {position} ('{ap.Item.CobolName}') and formal parameter "
-                    + $"'{formal.CobolName}': one is a RESTRICTED data-pointer and the other is not restricted to "
-                    + $"the same type (argument: {argR}; formal: {formalR}) — ISO §14.8.2.3.2 requires that if either "
-                    + "is a restricted pointer, both shall be restricted and of the same type");
             return;
         }
         // §14.8.2.3.3 (BY CONTENT / BY VALUE) + §14.8.2.2 rule 2 — the OTHER ARM OF THE SAME DISPATCH (kb/Work
@@ -117,6 +100,24 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                 // §14.8.2 as a whole, as the BY REFERENCE arm says it: the reason names its own subclause —
                 // §14.8.2.3.3 for an elementary formal, §14.8.2.2 rule 2 for a group one (kb/Work PB1617).
                 + $"(ISO §14.8.2 via {site.ImportingRule})");
+    }
+
+    /// <summary>⛔ ISO §14.8.2.3.2 / §14.8.2.2 FOR A BY REFERENCE ARGUMENT, ASKED OF THE ONE RELATION (kb/Work PB3101,
+    /// PB3127): <see cref="ActivationRelations.CallArgumentViolation"/> — the copy a CALL located by name at run time
+    /// asks (§14.9.4.4 GR3 d)) — over the descriptions <see cref="CobolNet.Compiler.Oo.ActivationDescriptions"/> builds
+    /// for both sides, so the bind-time and the run-time lanes cannot answer one pair differently. Every activation
+    /// this entry serves is one §14.8.2.3.2 rule 2 governs: "a program for which there is a program-specifier in the
+    /// REPOSITORY paragraph", "a program and the NESTED phrase is specified on the CALL statement", "a function" — so
+    /// the rule-2 clause identity, never rule 1's length. A reference-modified argument is the unique data item
+    /// §8.4.3.3.4 GR5 creates, which has no PICTURE clause (docs/CONFORMANCE.md D-RM1, decision PB3098): it conforms to
+    /// an alphanumeric group formal of no more bytes and to no elementary formal. Null when the pair conforms.</summary>
+    private string? ByReferenceViolation(Place argument, DataItem formal)
+    {
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.OfPlace(argument, host.OoClasses) is not { } a)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(argument.Item, formal: false);
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(formal, host.OoClasses) is not { } f)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(formal, formal: true);
+        return ActivationRelations.CallArgumentViolation(CobolPassMode.Reference, a, f, specifiedProgram: true);
     }
 
     /// <summary>⛔ THE ONE RETURNING-ITEM HALF OF ISO §14.8.3 — for every activation whose activated element's returning

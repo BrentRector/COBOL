@@ -257,7 +257,9 @@ public sealed record ActivationDescription
         ActivationShape.AlphanumericGroup => $"an alphanumeric group of {Positions} character positions",
         ActivationShape.AsIfElementaryGroup => $"a {Category} group of {Positions} positions",
         ActivationShape.VariableLengthGroup => $"a variable-length group ({GroupCompatibility.Describe(Atoms ?? [])})",
-        ActivationShape.StrongGroup => $"a strongly-typed group of type {Category}",
+        // The category is "type:" + the type-name (§8.5.2.1: a strongly-typed group's class and category ARE its
+        // type-name), so the reader is shown the type-name alone.
+        ActivationShape.StrongGroup => $"a strongly-typed group of type {Category[(Category.IndexOf(':') + 1)..]}",
         ActivationShape.Literal => $"a {Category} literal",
         ActivationShape.Expression => "an arithmetic expression",
         ActivationShape.PredefinedNull => "NULL",

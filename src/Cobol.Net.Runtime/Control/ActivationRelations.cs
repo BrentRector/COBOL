@@ -96,14 +96,16 @@ public static class ActivationRelations
     /// are a type declaration's layout or a PICTURE identity's packed fields (kb/Work PB2077 review). Opposite an ANY
     /// LENGTH formal, whose "length is considered to match the length of the corresponding argument" (§14.8.2.3.2
     /// "Additionally" d)), the PICTURE and ANY LENGTH phrases are named only when no other clause differs, so the
-    /// refusal names the clause that differs (JUSTIFIED, USAGE, …) and not the one length the rule relaxes. Two data-
+    /// refusal names the clause that differs (JUSTIFIED, USAGE, …) and not the one length the rule relaxes — unless
+    /// the argument has no ANY LENGTH form (<see cref="ActivationDescription.AnyLengthClauses"/> null: a PICTURE that
+    /// repeats no one symbol, or no PICTURE clause at all), where the PICTURE clause IS what differs. Two data-
     /// pointers spelled alike are restricted to two type declarations of one type-name that are not equivalent
     /// (§8.5.3.1). The empty string when the phrases name no difference.</summary>
     private static string ClauseDifference(ActivationDescription argument, ActivationDescription formal)
     {
         string[] a = [.. (argument.ClausePhrases ?? []).Except(formal.ClausePhrases ?? [], StringComparer.Ordinal)];
         string[] f = [.. (formal.ClausePhrases ?? []).Except(argument.ClausePhrases ?? [], StringComparer.Ordinal)];
-        if (formal.AnyLength && !argument.AnyLength)
+        if (formal.AnyLength && !argument.AnyLength && argument.AnyLengthClauses is not null)
         {
             string[] aOther = [.. a.Where(p => !IsLengthPhrase(p))], fOther = [.. f.Where(p => !IsLengthPhrase(p))];
             if (aOther.Length + fOther.Length > 0) (a, f) = (aOther, fOther);
@@ -222,7 +224,19 @@ public static class ActivationRelations
                 : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — two type "
                   + "declarations of one type-name are the same type only when equivalent (ISO §14.8.2.2; §8.5.3.1)";
         if (formal.Shape is ActivationShape.VariableLengthGroup || argument.Shape is ActivationShape.VariableLengthGroup)
-            return VariableLengthViolation(argument, formal, "argument", "formal parameter");
+        {
+            // Compatibility is the whole rule for two variable-length groups (§3.11: a variable-length group is no
+            // "alphanumeric group item"). Opposite a FIXED alphanumeric group, rule 1 binds that side too, measured in
+            // the lengths §8.5.1.12.3 gives the PAIR ("the dynamic-capacity table is considered to be the same length
+            // as the corresponding table") — the tally the one walk keeps (kb/Work PB965's rule, PB3101).
+            var widths = new GroupCharTally();
+            if (VariableLengthViolation(argument, formal, "argument", "formal parameter", widths) is { } vlWhy) return vlWhy;
+            return (formal.Shape is ActivationShape.AlphanumericGroup || argument.Shape is ActivationShape.AlphanumericGroup)
+                   && widths.Second > widths.First
+                ? $"the formal parameter ({widths.Second} character positions, as §8.5.1.12.3 measures the pair) is "
+                  + $"larger than the argument ({widths.First}) (ISO §14.8.2.2 rule 1)"
+                : null;
+        }
         if (formal.Shape is not ActivationShape.AlphanumericGroup && argument.Shape is not ActivationShape.AlphanumericGroup)
             return null;
         if (!IsAlphanumericGroupPartner(formal) || !IsAlphanumericGroupPartner(argument))
@@ -304,19 +318,16 @@ public static class ActivationRelations
             return $"the argument ({argument}) is described with the ANY LENGTH clause and the formal parameter is not "
                 + "(ISO §14.8.2.3.2 \"Additionally\" e))";
         // "Additionally" d): an ANY LENGTH formal's "length is considered to match the length of the corresponding
-        // argument" — its one-symbol PICTURE has no length of its own (§13.18.2), so what remains comparable is the class
-        // and category and the usage. (§13.18.2.3 SR2 confines ANY LENGTH to a function, a contained program or a method,
-        // none of which a CALL reaches through a program-specifier: this arm is completeness, not a common path.)
-        if (formal.AnyLength)
-            return string.Equals(formal.Category, argument.Category, StringComparison.Ordinal)
-                   && string.Equals(formal.Usage, argument.Usage, StringComparison.Ordinal)
-                ? null
-                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same category and usage "
-                  + "(ISO §14.8.2.3.2 rule 2, \"Additionally\" d))";
-        return SameElementaryClauses(argument, formal) ? null
+        // argument" — the LENGTH and nothing else, so the argument is compared as if it were described with ANY LENGTH
+        // and every other clause of rule 2 (JUSTIFIED, SIGN, BLANK WHEN ZERO, USAGE, …) is still compared: the reading
+        // match rule 3 e) gives the same pair (SameClausesAtFormalLength; kb/Work PB3127). An ANY LENGTH formal is
+        // reached by a function and by a contained program the NESTED phrase activates (§13.18.2.3 SR2).
+        return string.Equals(argument.Category, formal.Category, StringComparison.Ordinal)
+               && SameClausesAtFormalLength(argument, formal)
+            ? null
             : $"the formal parameter ({formal}) and the argument ({argument}) are not described with the same ALIGN, "
-              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2)"
-              + ClauseDifference(argument, formal);
+              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2"
+              + (formal.AnyLength ? ", \"Additionally\" d))" : ")") + ClauseDifference(argument, formal);
     }
 
     /// <summary>§14.8.2.3.3, Elementary items passed by content or by value — and §14.8.2.2 rule 2 for a group.</summary>
@@ -394,13 +405,15 @@ public static class ActivationRelations
             return $"the receiving item ({receiving}) is described with the ANY LENGTH clause and the returning item "
                 + $"({sending}) is not (ISO §14.8.3.3 \"Additionally\" 4))";
         // 5) "If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is
-        // considered to match the length of the receiving operand" — what remains comparable is the category and usage.
+        // considered to match the length of the receiving operand" — the LENGTH and nothing else: the receiving item is
+        // compared as if it were described with ANY LENGTH, every other clause still compared (kb/Work PB3127, the
+        // sibling of §14.8.2.3.2 "Additionally" d)). The sending item stands where the relaxed formal stands there.
         if (sending.AnyLength && !receiving.AnyLength)
             return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
-                   && string.Equals(receiving.Usage, sending.Usage, StringComparison.Ordinal)
+                   && SameClausesAtFormalLength(receiving, sending)
                 ? null
-                : $"the returning item ({sending}) and the receiving item ({receiving}) are not of the same category and "
-                  + "usage (ISO §14.8.3.3 \"Additionally\" 5))";
+                : $"the returning item ({sending}) and the receiving item ({receiving}) are not described with the same "
+                  + "clauses (ISO §14.8.3.3, \"Additionally\" 5))" + ClauseDifference(receiving, sending);
         return ReturningConformance(receiving, sending);
     }
 
@@ -411,7 +424,7 @@ public static class ActivationRelations
     private static bool IsGroup(ActivationDescription d) =>
         d.Shape is ActivationShape.AlphanumericGroup or ActivationShape.StrongGroup or ActivationShape.VariableLengthGroup;
 
-    /// <summary>§14.8.2.3.2 rule 2 / §14.8.3.3 / §9.3.6 match rule 3 e): the same class and category, the same clause
+    /// <summary>§14.8.3.3's elementary identity of two returning items: the same class and category, the same clause
     /// identity (<see cref="ActivationDescription.Clauses"/> — ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE
     /// with its currency and DECIMAL-POINT IS COMMA facets, SIGN, USAGE and the LOCALE phrase's SIZE) and the same LOCALE
     /// external identification ("Additionally" a)).</summary>
@@ -564,9 +577,7 @@ public static class ActivationRelations
                   + "\"Additionally\" 2) / 3))";
         // §14.8.3.3: "the receiving operand shall have the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED,
         // PICTURE, SIGN, and USAGE clauses" (the class-pointer restriction is its USAGE clause's TO phrase).
-        return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
-               && string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal)
-               && SameLocaleIdentification(receiving, sending)
+        return SameElementaryClauses(receiving, sending)
             ? null
             : $"the returning item ({sending}) and the receiving item ({receiving}) are not described with the same "
               + "clauses (ISO §14.8.3.3)";
@@ -595,15 +606,16 @@ public static class ActivationRelations
     /// in 8.5.1.12" — the ONE §8.5.1.12 walk (<see cref="GroupCompatibility.Walk"/>, the walk the compiler's bind-time
     /// screen asks) over the atoms both descriptions carry. A variable-length group is compatible only with a GROUP
     /// (§8.5.1.12.1: "unless the other operand is a compatible group"). A fixed-length partner is converted over the two
-    /// shapes by the same walk (<see cref="CobolVarGroup.Reshape"/>, kb/Work PB2690), so the walk is the whole question.
-    /// Null when compatible.</summary>
+    /// shapes by the same walk (<see cref="CobolVarGroup.Reshape"/>, kb/Work PB2690), so the walk is the whole
+    /// compatibility question; <paramref name="widths"/>, when not null, receives the pair-relative character lengths
+    /// (<paramref name="a"/>'s first) that §14.8.2.2 rule 1 compares opposite a fixed group. Null when compatible.</summary>
     private static string? VariableLengthViolation(ActivationDescription a, ActivationDescription b, string aRole,
-        string bRole)
+        string bRole, GroupCharTally? widths = null)
     {
         string Refusal(string why) => $"the {aRole} ({a}) and the {bRole} ({b}) are not compatible: {why}";
         if (!IsGroupPartner(a) || !IsGroupPartner(b))
             return Refusal("a variable-length group is compatible only with a group (ISO §8.5.1.12.1)");
-        if (GroupCompatibility.Walk(AtomsOf(a), AtomsOf(b)) is { } why)
+        if (GroupCompatibility.Walk(AtomsOf(a), AtomsOf(b), tally: widths) is { } why)
             return Refusal($"{GroupMismatchText(why)} (ISO §8.5.1.12)");
         return null;
     }

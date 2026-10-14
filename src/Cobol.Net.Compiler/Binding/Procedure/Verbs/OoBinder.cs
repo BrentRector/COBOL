@@ -1890,11 +1890,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         ObjectRefDescriptor invokedWith)
     {
         if (ActivationDescriptions.OfPlace(argument, classes) is not { } a)
-            return argument.Item.IsGroup ? TierCIsland.Reason(argument.Item, "argument group")
-                : "the argument has no PICTURE description";
+            return ActivationDescriptions.NoDescriptionReason(argument.Item, formal: false);
         if (ActivationDescriptions.OfFormal(formal, classes) is not { } f)
-            return formal.Item.IsGroup ? TierCIsland.Reason(formal.Item, "formal group")
-                : "the formal parameter has no PICTURE description";
+            return ActivationDescriptions.NoDescriptionReason(formal.Item, formal: true);
         if (CobolNet.Runtime.ActivationRelations.MatchViolation(a, f) is { } noMatch) return noMatch;
         if (formal.Item.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass)
             return OoConformance.ActiveClassFormalMismatch(null, activeClass,

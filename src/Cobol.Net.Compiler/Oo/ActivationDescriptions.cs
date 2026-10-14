@@ -68,7 +68,11 @@ public static class ActivationDescriptions
                 Table16 = Table16Operand.Of(item).Heading,
             };
         }
-        if (item.IsGroup)
+        // ⛔ The CATEGORY question "is this a group item?" (ItemCategory.IsGroupItem), never the structural IsGroup: a
+        // level-66 THROUGH alias has no subordinate entries and carries a composed alphanumeric PICTURE for its carrier,
+        // yet §13.18.45.4 GR2 makes it "an alphanumeric group item" — so it is described, matched and conformed as one
+        // (its atoms are the elementary items it includes, VariableLengthCompatibility.GroupAtoms; kb/Work PB3101).
+        if (ItemCategory.IsGroupItem(item))
         {
             // §8.5.2.1: "an alphanumeric group item has class and category alphanumeric". A group carries none of the
             // §9.3.6 3 e) clauses, so its Clauses are empty: two groups match whatever their sizes, and a group never
@@ -168,6 +172,14 @@ public static class ActivationDescriptions
     /// <summary>The class facts of a description as it carries them: folded, as <see cref="ActivationDescription.ObjectName"/>
     /// is, so a rendered description spells one name one way.</summary>
     private static string[]? Folded(IReadOnlyList<string>? names) => names?.Select(CobolNames.Fold).ToArray();
+
+    /// <summary>Why <paramref name="item"/> has no description (<see cref="Of"/> answered null), for the refusal of a
+    /// bind-time lane that asks a relation of it: a group with no crossing form names its Tier-C leaf
+    /// (<see cref="TierCIsland.Reason(DataItem, string, string?)"/>), any other item its missing PICTURE clause.
+    /// <paramref name="formal"/> says which side of the pair the item is.</summary>
+    public static string NoDescriptionReason(DataItem item, bool formal) =>
+        item.IsGroup ? TierCIsland.Reason(item, formal ? "formal group" : "argument group")
+        : formal ? "the formal parameter has no PICTURE description" : "the argument has no PICTURE description";
 
     /// <summary>The description of a PLACE an activation names — an argument or a RETURNING item: a reference-modified
     /// operand is the unique data item §8.4.3.3.4 GR5 creates (<see cref="OfReferenceModification"/>), any other place
