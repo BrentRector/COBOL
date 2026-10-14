@@ -339,6 +339,17 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
     private static (string Sub, string Message)? RaisingObjectMismatch(OoClassTable? table,
         ObjectRefDescriptor od, IReadOnlyList<RaisingTarget> raising)
     {
+        // A description written with a parameter-name of the definition bound as itself (kb/Work PB2937): its class or
+        // interface is each expansion's actual (§9.3.8.2.4), which may be one the RAISING phrase lists or conform to
+        // one, so only a phrase that lists no class or interface with the identifier's FACTORY presence refuses it in
+        // every expansion.
+        if (od.Formal)
+            return raising.Any(t => t.Kind is RaisingTargetKind.Interface
+                                    || t.Kind is RaisingTargetKind.ObjectClass && t.Factory == od.Factory)
+                ? null
+                : (od.Kind is ObjectRefKind.Interface ? "b" : "a", $"no class or interface the RAISING phrase of the "
+                    + "procedure division header of the containing source element specifies can be the one "
+                    + $"'{od.Name}' names in an expansion — it shall be specified there");
         if (od.Kind is ObjectRefKind.Interface)
         {
             var mine = table?.FindInterface(od.Name!);

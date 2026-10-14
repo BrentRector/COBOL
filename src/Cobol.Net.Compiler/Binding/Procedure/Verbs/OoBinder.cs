@@ -229,11 +229,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // receiver resolves as identifier-1, because a class-name is not a data item and resolving it as one
             // drew the resolver's false "is not defined" (kb/Work PB1136). A data-name shadows a class-name, so the
             // class-name reading is taken only for a name that is not a data item (the OoBindByReceiver partition).
+            // A parameter-name declared CLASS is an object-class-name in every expansion (§11.3.4 GR6), so SR3 holds for
+            // it in the definition bound as itself too (kb/Work PB2937).
             if (computedReceiver is null && atom?.dataReference() is { } cref && ctx.Refs.Probe(cref) is null
                 && Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, cref, cref.GetText(),
-                    Compiler.Oo.OoNameResolution.Want.Class).Class is { } namedClass)
+                    Compiler.Oo.OoNameResolution.Want.Class) is { Class: not null } or { IsFormal: true })
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
-                    $"INVOKE {namedClass.Name} {mref.GetText()}: when object-class-name-1 is specified, literal-1 "
+                    $"INVOKE {cref.GetText()} {mref.GetText()}: when object-class-name-1 is specified, literal-1 "
                     + "shall be specified (ISO §14.9.23.3 SR3) — identifier-2 may be specified only when identifier-1 "
                     + "is a universal object reference (SR7)");
             // kb/Work PB1030: a reference that did not resolve is the resolver's diagnostic, never SR7's.
@@ -351,9 +353,16 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             if (OoPredefinedSearchRoot(isSuper, superQualifier, "INVOKE") is not { } root)
                 return BoundRejected.Reported(ctx.Edition);
             var (cur, searchRoot) = root;
+            string predefined = superQualifier is not null ? $"{superQualifier.GetText()} OF SUPER" : isSuper ? "SUPER" : "SELF";
+            // SUPER over a formal superclass: the search starts in the actual (§8.4.3.8.4 GR3; kb/Work PB2937).
+            if (searchRoot is null) return OoBindDeferredInvoke(site, $"INVOKE {predefined} \"{methodName}\"");
             // Roster selection by CONTEXT (§14.9.23.3 SR4f/g/h/i): a factory method's SELF/SUPER resolve
             // over the FACTORY interface; an instance method's over the instance interface.
             var sm = host.OoInFactory ? searchRoot.FindFactoryMethod(methodName) : searchRoot.FindMethod(methodName);
+            // Not in the definition bound as itself, nor in a written superclass: the method may be the formal
+            // superclass's, which each expansion's actual decides (§9.3.9, §9.3.8.2.4; kb/Work PB2937).
+            if (sm is null && cur.FormalBaseName is not null)
+                return OoBindDeferredInvoke(site, $"INVOKE {predefined} \"{methodName}\"");
             if (sm is null)
             {
                 // §14.9.23.3 SR4 f)–i): SELF or SUPER × a factory or an instance method — the same two facts the
@@ -410,9 +419,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 ? OoBindInstanceInvoke(site, receiver, methodName) : ra.Refusal(ctx.Edition);
         // The class-name-1 alternative is scoped by §8.4.6.4 to the names this SOURCE ELEMENT may reference,
         // so the partition asks the ONE funnel (kb/Work PB365 — `OoClasses.Find` asked the whole group).
-        if (Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, dref, dref.GetText(),
-                Compiler.Oo.OoNameResolution.Want.Class).Class is { } cls)
+        var named = Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, dref, dref.GetText(),
+            Compiler.Oo.OoNameResolution.Want.Class);
+        if (named.Class is { } cls)
             return OoBindClassInvoke(site, cls, methodName);
+        // A parameter-name declared CLASS, as class-name-1 (§11.3.4 GR6): the factory interface SR3 searches is the
+        // actual's, so the method is selected in each expansion (§9.3.8.2.4; kb/Work PB2937).
+        if (named.IsFormal)
+            return OoBindDeferredInvoke(site, $"INVOKE {dref.GetText()} \"{methodName}\"");
         return BoundRejected.Report(ctx.Edition, "COBOLNET0823",
             $"INVOKE: '{DataBinder.WrittenText(dref)}' is neither a resolvable data item nor a class this source element "
             + "may reference (ISO §14.9.23.2 — identifier-1 or class-name-1; §8.4.6.4)");
@@ -427,8 +441,11 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// INHERITS one class here (a multiple-INHERITS class is declined, Annex A.4.10 item 1). Null after the refusal is
     /// reported: SR1 outside a method (COBOLNET0827), SR4 (COBOLNET2777), SUPER in a class that inherits nothing —
     /// reported unless <paramref name="report"/> is false (a resolver PROBE, which never diagnoses).
-    /// <paramref name="position"/> names the construct for the message ("INVOKE", "the object-property reference …").</summary>
-    internal (OoClassSymbol Current, OoClassSymbol SearchRoot)? OoPredefinedSearchRoot(bool isSuper,
+    /// <paramref name="position"/> names the construct for the message ("INVOKE", "the object-property reference …").
+    /// <para>A null <c>SearchRoot</c> is SUPER (or <c>parameter-name OF SUPER</c>) in a parameterized definition bound
+    /// as itself whose INHERITS clause names a parameter-name (<see cref="OoClassSymbol.FormalBaseName"/>): the search
+    /// starts in each expansion's actual (kb/Work PB2937), so the caller defers what it selects.</para></summary>
+    internal (OoClassSymbol Current, OoClassSymbol? SearchRoot)? OoPredefinedSearchRoot(bool isSuper,
         Core.CobolWordContext? qualifier, string position, bool report = true)
     {
         string written = qualifier is not null ? $"{qualifier.GetText()} OF SUPER" : isSuper ? "SUPER" : "SELF";
@@ -443,8 +460,11 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // §8.4.3.8.3 SR4: "Object-class-name-1 shall be the name of a class specified in the INHERITS clause of the
             // containing class definition"; GR4: "the search for the method shall include only those methods defined
             // for object-class-name-1".
-            var named = Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, qualifier, qualifier.GetText(),
-                Compiler.Oo.OoNameResolution.Want.Class).Class;
+            var lookup = Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, qualifier, qualifier.GetText(),
+                Compiler.Oo.OoNameResolution.Want.Class);
+            // The formal superclass named as object-class-name-1: SR4 holds (it IS the class the INHERITS clause names).
+            if (lookup.IsFormal && CobolNames.Same(qualifier.GetText(), cur.FormalBaseName)) return (cur, null);
+            var named = lookup.Class;
             if (named is null || !ReferenceEquals(named, cur.Base))
             {
                 if (report)
@@ -460,6 +480,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             return (cur, named);
         }
         if (cur.Base is { } b) return (cur, b);   // GR3 — the restricted search STARTS at the base class
+        if (cur.FormalBaseName is not null) return (cur, null);   // … at the actual of a formal superclass (PB2937)
         // Trap #7 — SUPER in a root class is a clean compile diagnostic, never an internal error (applies identically
         // to the FACTORY flavor).
         if (report)
@@ -596,6 +617,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // path; interface-name → the interface's prototype closure; object-class-name or ACTIVE-CLASS → the
         // named/containing class, and its FACTORY half when FACTORY OF was written.
         var rdesc = pic.ObjectRef ?? ObjectRefDescriptor.Universal;
+        // A receiver described with a parameter-name (kb/Work PB2937): typed in every expansion, by the actual's roster —
+        // SR4 a)/b)/e) select the method there (§9.3.8.2.4).
+        if (rdesc.Formal) return OoBindDeferredInvoke(site, $"INVOKE '{recvName}' \"{method}\"");
         if (rdesc.IsUniversal)
             // A UNIVERSAL receiver with a literal selector (SR4 permits literal-1; it still cannot bind
             // statically — no roster exists at compile time): the D10 dynamic path.
@@ -667,6 +691,27 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // A factory-object receiver's argument PROFILES live in the FACTORY singleton type, not the instance
         // class — the same qualification InvokeForm.Factory gets by appending the suffix at emit time.
         return rdesc.Factory && bound is BoundInvoke fbi ? fbi with { OwnerCsName = cls.FactoryCsName } : bound;
+    }
+
+    /// <summary>⛔ AN INVOCATION WHOSE METHOD IS SELECTED IN EACH EXPANSION (kb/Work PB2937; OO deep-dive D12 determination
+    /// 6): the receiver reaches a method through a parameter-name of the parameterized definition being bound as itself —
+    /// a formal-typed reference, a formal class-name, SELF or SUPER over a formal superclass — so which method, and so
+    /// every rule that reads its formals and returning item (§14.9.23.3 SR4, §14.8.2, §14.8.3), is the actual's
+    /// (§9.3.8.2.4). The rules that do not read the method are asked here: each identifier argument and the RETURNING
+    /// identifier resolve (an undefined name is §8.4.2.1's refusal in every expansion), and an address-identifier takes
+    /// its one screen. The statement is then the expansion's (<see cref="EditionContext.NoteExpansionDeferred"/>), and
+    /// an inline invocation through it has no returning place to read.</summary>
+    private BoundStatement OoBindDeferredInvoke(InvocationSite site, string construct)
+    {
+        foreach (var a in site.Args)
+        {
+            if (a.Address is { } addrCtx) _ = host.Ptr.BindAddressIdentifier(addrCtx, $"{site.Verb} … USING");
+            else if (a.Ref is { } dref && host.Expr.LiteralAliasOf(dref) is null)
+                _ = host.Expr.ResolveSending(dref).PlaceOrReported(ctx.Edition);
+        }
+        if (site.ReturningRef is { } retRef) _ = host.Expr.ResolveReceiving(retRef);
+        ctx.Edition.NoteExpansionDeferred(construct);
+        return new BoundDeferredToExpansion(construct);
     }
 
     /// <summary>The shared USING + RETURNING binding tail for a RESOLVED method — the Instance / SELF / SUPER
@@ -1164,51 +1209,28 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "ISO §14.9.23.3 SR15 admits only class message-tag, numeric, object or pointer by value");
                 return null;
             }
-            // A reference-modified operand is a unique ELEMENTARY ALPHANUMERIC item of the window length
-            // (§8.4.3.3.4 GR6): conformance goes against that effective description, never the whole inner item.
-            if (place is RefModPlace rmp)
-            {
-                if (formal.IsGroup || formal.Pic?.Category is not PicCategory.Alphanumeric)
-                {
-                    Err($"reference-modified argument '{argText}': the operand is elementary "
-                        + $"alphanumeric (§8.4.3.3.4 GR6) and does not conform to formal '{formal.CobolName}'");
-                    return null;
-                }
-                if (byReference)
-                {
-                    // Strict identity needs a PROVABLE window length equal to the formal's.
-                    if (rmp.Start.Int32Literal is null || rmp.Length?.Int32Literal is not { } rlen)
-                    {
-                        Err($"BY REFERENCE reference-modified argument '{argText}' needs a "
-                            + "compile-time (start:length) to prove §14.8.2.3.2 conformance — pass it "
-                            + "BY CONTENT or use literal subscripts");
-                        return null;
-                    }
-                    if (!formal.IsAnyLength && rlen != formal.Pic.Length)   // ANY LENGTH: any window length matches (§14.8.2.3.2 rule d)
-                    {
-                        Err($"reference-modified argument window ({rlen}) does not match formal "
-                            + $"'{formal.CobolName}' X({formal.Pic.Length}) (ISO §14.8.2.3.2)");
-                        return null;
-                    }
-                }
-                return new BoundInvokeArg(formal, place, null, null,
-                    WriteBack: byReference, ByContent: !byReference);
-            }
-
+            // ⛔ BY REFERENCE: THE UNIVERSAL SWITCH'S TWO RELATIONS, ASKED AT COMPILE TIME (kb/Work PB2077, decision PB3098;
+            // COBOLNET_OO_DESIGN D6 item 6). A reference-modified operand is the unique data item §8.4.3.3.4 GR5 / GR6
+            // create — no PICTURE clause — so it is described as itself (ActivationDescriptions.OfPlace), never as the
+            // item it windows, and there is no second comparator for it here.
             if (byReference)
             {
-                if (OoConformance.DescriptionMismatch(formal, place.Item, byRefGroupPrefix: true,
-                        anyLengthActivationRelax: true, invokedWith) is { } err1)   // §14.8.2.3.2 rules d/e (ANY LENGTH); rule 4
+                if (ByReferenceArgumentReason(place, oof, host.OoClasses, invokedWith) is { } why)
                 {
-                    Err($"USING argument '{argText}' does not conform to formal parameter "
-                        + $"'{formal.CobolName}': {err1} (ISO §14.8.2.3.2 — BY REFERENCE requires the "
-                        + "identical description)");
+                    Err($"USING argument '{argText}' does not match or conform to formal parameter "
+                        + $"'{formal.CobolName}' BY REFERENCE: {why}"
+                        + (place is RefModPlace && !formal.IsGroup
+                            ? " — a reference-modified argument has no PICTURE clause (ISO §8.4.3.3.4 GR6), so BY "
+                              + "REFERENCE it matches only an alphanumeric group formal of no more bytes; pass it BY "
+                              + "CONTENT (ISO §9.3.6 match rule 4 d)) or describe the formal as a group"
+                            : ""));
                     return null;
                 }
                 return new BoundInvokeArg(formal, place, null, null, WriteBack: true);
             }
 
-            // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category.
+            // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category — a reference-modified operand included, as
+            // the view it is (ContentMismatch reads RefModPlace's GR6 category).
             if (OoConformance.ContentMismatch(host.OoClasses, host.Set.PointerAssignmentReason, formal, place, invokedWith) is { } cerr)
             {
                 Err($"BY CONTENT argument '{argText}' does not conform to formal "
@@ -1456,8 +1478,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
             // A REFERENCE-MODIFIED argument is the unique data item §8.4.3.3.4 GR5/GR6 create, never the description of
             // the item it windows (it used to cross under identifier-1's whole description).
-            if ((p is RefModPlace rm ? ActivationDescriptions.OfReferenceModification(rm) : ActivationDescriptions.Of(p.Item, host.OoClasses))
-                is not { } d)
+            if (ActivationDescriptions.OfPlace(p, host.OoClasses) is not { } d)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
                     $"INVOKE: the argument '{p.Item.CobolName}' has no crossing form — "
@@ -1498,6 +1519,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// statement were performed" (§14.8.2.3.3; kb/Work PB1137). Empty when SELF conforms.</summary>
     private IEnumerable<string> SelfSenderRefusals(ObjectRefDescriptor rd, OoClassSymbol cur)
     {
+        // Whether the class containing the statement is, or implements, what the receiver names turns on an actual when
+        // the receiver names a parameter-name or the class inherits from one (kb/Work PB2937): those relations are each
+        // expansion's (§9.3.8.2.4), and only the ONLY and FACTORY axes below are asked here.
+        bool relationTurnsOnFormal = rd.Formal || cur.FormalBaseName is not null;
         switch (rd.Kind)
         {
             case ObjectRefKind.Universal:
@@ -1508,7 +1533,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // through unchecked and the emitter rendered a raw `(I)(this)` cast — a runtime
                 // InvalidCastException, or a Roslyn CS error on generated user source for a sealed
                 // class, which the G4 no-CS-on-user-source rule forbids.
-                if (host.OoClasses?.FindInterface(rd.Name!) is { } tiface
+                if (!relationTurnsOnFormal && host.OoClasses?.FindInterface(rd.Name!) is { } tiface
                     && !host.OoClasses.ImplementsClosure(cur, host.OoInFactory).Contains(tiface))
                     yield return
                         $"the {(host.OoInFactory ? "factory" : "instance")} "
@@ -1525,7 +1550,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                         + "a permitted sending operand (ISO §14.9.39.3 SR12c1)";
                 // c)2. — the class containing the SET statement shall be the receiver's class or a
                 // subclass of it.
-                else if (host.OoClasses?.Find(rd.Name!) is { } tcls && !cur.ConformsTo(tcls))
+                else if (!relationTurnsOnFormal && host.OoClasses?.Find(rd.Name!) is { } tcls && !cur.ConformsTo(tcls))
                     yield return
                         $"class '{cur.Name}' is not '{tcls.Name}' or a "
                         + "subclass of it (ISO §14.9.39.3 SR12c2)";
@@ -1707,7 +1732,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // SR13's class-name-1 sender is a source reference and takes the §8.4.6.4 scope (PB365).
             else if (senderRef?.cobolWord()?.GetText() is { } sname
                      && Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, senderRef, sname,
-                            Compiler.Oo.OoNameResolution.Want.Class).Class is { } scls)
+                            Compiler.Oo.OoNameResolution.Want.Class) is var named
+                     && (named.Class is not null || named.IsFormal))
             {
                 // SR11 + SR13: the sender names a CLASS → the FACTORY OBJECT of that class (D11's singleton
                 // makes it a direct reference). ⛔ BOTH RULES FALL OUT OF THE ONE TABLE once the sender is
@@ -1728,7 +1754,12 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // own precondition ("the data item referenced by identifier-3 is described with an
                 // object-class-name") is FALSE for an interface-name or ACTIVE-CLASS receiver.  Which syntax
                 // rule governs is therefore READ OFF THE RECEIVER, never hard-coded (kb/Work PB451).
-                var senderDesc = ObjectRefDescriptor.ObjectClass(scls.Name, factory: true, only: true);
+                // A parameter-name declared CLASS as object-class-name-1 (§11.3.4 GR6; kb/Work PB2937): the factory object
+                // of each expansion's actual, described the same way — the FACTORY and ONLY axes are asked here, which
+                // class it is in the expansion.
+                var scls = named.Class;
+                var senderDesc = scls is not null ? ObjectRefDescriptor.ObjectClass(scls.Name, factory: true, only: true)
+                    : ObjectRefDescriptor.FormalParameter(sname, isInterface: false, factory: true, only: true);
                 foreach (var tp in targets)
                 {
                     var rdesc = tp.Item.Pic!.ObjectRef ?? ObjectRefDescriptor.Universal;
@@ -1736,10 +1767,15 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     {
                         return BoundRejected.Report(ctx.Edition, "COBOLNET0867",
                             $"SET '{tp.Item.CobolName}' TO {sname}: object-class-name-1 sends the FACTORY "
-                            + $"OBJECT of class '{scls.Name}' (ISO §14.9.39.4 GR10) and the receiver's "
+                            + $"OBJECT of class '{scls?.Name ?? sname}' (ISO §14.9.39.4 GR10) and the receiver's "
                             + $"description puts the statement under {OoConformance.ClassNameSenderRule(rdesc.Kind)} "
                             + $"— {ferr}");
                     }
+                }
+                if (scls is null)
+                {
+                    ctx.Edition.NoteExpansionDeferred($"SET … TO {sname}");
+                    return new BoundDeferredToExpansion($"SET … TO {sname}");
                 }
                 srcFactoryClassCs = scls.FactoryCsName;
             }
@@ -1840,15 +1876,31 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         return digits.TrimStart('0').Length;
     }
 
-    /// <summary>The §14.8.2/§14.8.3 STRICT conformance check between a formal/returning item and an
-    /// argument/receiver item — delegates to the ONE shared description-equality rule
-    /// (<see cref="OoConformance.DescriptionMismatch"/>, also the §9.3.8.2 override-signature check) that
-    /// makes the emitted marshaling TYPE-PRESERVING. Null when conformant, else the mismatch.</summary>
-    private static string? OoConformanceError(DataItem formal, DataItem arg)
-        // Activation mode: §14.8.2.3.2 rules d/e for arguments; for the INVOKE RETURNING delivery pair the
-        // sender (parameter 1 = the method's returning item) being ANY LENGTH matches any receiver length
-        // (§14.8.3.3 rule 5) while an ANY LENGTH receiver demands an ANY LENGTH sender (rule 4).
-        => OoConformance.DescriptionMismatch(formal, arg, anyLengthActivationRelax: true);
+    /// <summary>⛔ THE TYPED LANE'S VERDICT ON ONE BY REFERENCE ARGUMENT — the universal switch's relations over the
+    /// SAME descriptions (kb/Work PB2077, decision PB3098; COBOLNET_OO_DESIGN D6 item 6). §14.9.23.4 GR7 b) locates the
+    /// method for every INVOKE by §9.3.6, and §14.9.23.3 SR5 c) with §14.8.1 asks §14.8.2's conformance at compile time
+    /// of a typed receiver: so the MATCH (<see cref="ActivationRelations.MatchViolation"/>, §9.3.6 rule 3) and then the
+    /// CONFORMANCE (<see cref="ActivationRelations.ParameterViolation"/>, without GR7 c)'s universal-only ANY LENGTH
+    /// ban). An ACTIVE-CLASS formal's 3 d) 4./5. is a condition on the invocation, answered statically by §14.8.2.3.2
+    /// rule 4 with <paramref name="invokedWith"/> (<see cref="OoConformance.ActiveClassFormalMismatch"/>), where the
+    /// universal switch asks it of the run-time object. Null when the argument matches and conforms, else the reason.
+    /// An operand with no crossing form (a group with no character image, carrier or leaf vector) is refused with the
+    /// Tier-C reason, as the universal lane refuses it.</summary>
+    internal static string? ByReferenceArgumentReason(Place argument, OoFormal formal, OoClassTable? classes,
+        ObjectRefDescriptor invokedWith)
+    {
+        if (ActivationDescriptions.OfPlace(argument, classes) is not { } a)
+            return argument.Item.IsGroup ? TierCIsland.Reason(argument.Item, "argument group")
+                : "the argument has no PICTURE description";
+        if (ActivationDescriptions.OfFormal(formal, classes) is not { } f)
+            return formal.Item.IsGroup ? TierCIsland.Reason(formal.Item, "formal group")
+                : "the formal parameter has no PICTURE description";
+        if (CobolNet.Runtime.ActivationRelations.MatchViolation(a, f) is { } noMatch) return noMatch;
+        if (formal.Item.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass)
+            return OoConformance.ActiveClassFormalMismatch(null, activeClass,
+                argument.Item.Pic?.ObjectRef ?? ObjectRefDescriptor.Universal, invokedWith, byReference: true);
+        return CobolNet.Runtime.ActivationRelations.ParameterViolation(a, f);
+    }
 
     // ── Method-context control flow (deep-dive D8) ──────────────────────────────────────────────────────────
 

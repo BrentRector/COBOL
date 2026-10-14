@@ -15,7 +15,10 @@ namespace CobolNet.Tests.Unit;
 /// an ACTIVE queue before it checks, pushes or opens anything; every gate row enqueue.py runs takes the shared gate slot
 /// (kb/Work PB3104: <c>unslotted</c> refuses a row that would not, and its self-test arms are held here by name); and the
 /// direct-push landing is gone: its scripts do not
-/// exist, the workflow has no landing-branch trigger, and no tracked file outside the history names them.
+/// exist, the workflow has no landing-branch trigger, and no tracked file outside the history names them; and no landing
+/// is held to a COMMITTED RECORD OF ITS OWN TREE (kb/Work PB3107): a merge group is built on every group queued ahead of
+/// it, so such a record cannot describe the tree that lands — the arch-oracle baseline is not committed and the landing
+/// oracle that refused on it is retired with the direct-push scripts.
 /// </summary>
 /// <remarks>
 /// <para>The operator's review (2026-10-11 13:39, mailbox 20261011-133923): a pull request runs only CI's cheap jobs, so
@@ -138,10 +141,14 @@ public sealed class LandingPipelineDriftTests
     }
 
     /// <summary>The retired landing's files, by name: the direct-push landing script (both forms), the landing lease
-    /// and the train applier (kb/Work PB3023, PB3024).</summary>
+    /// and the train applier (kb/Work PB3023, PB3024), and the landing oracle, which held a landing to a committed
+    /// arch-oracle baseline of the branch's own tree (kb/Work PB3107).</summary>
     private static readonly string[] RetiredScripts =
         ["scripts/push-main.sh", "scripts/push-main.ps1", "scripts/orchestrator/landing_lease.py",
-         "scripts/orchestrator/train_apply.py"];
+         "scripts/orchestrator/train_apply.py", "scripts/orchestrator/landing_oracle.py"];
+
+    /// <summary>The directory that held the committed arch-oracle baseline until kb/Work PB3107.</summary>
+    private const string RetiredOracleRecord = "docs/rearchitecture/evidence/arch-oracle/";
 
     /// <summary>The tracked paths that keep the HISTORY, where a retired name is a fact about the past: the DEVLOG,
     /// frozen evidence, the work register and adjudication records. Every other tracked file describes the current
@@ -178,10 +185,30 @@ public sealed class LandingPipelineDriftTests
         Assert.Contains(ThisFile, tracked);
         var offenders = FilesNamingARetiredScript(TestRepo.Root, tracked);
         Assert.True(offenders.Count == 0,
-            "these current-state files name a retired landing script (the direct-push script, the landing lease or the "
-            + "train applier; kb/Work PB3024): describe the landing as `enqueue.py land` into GitHub's merge queue, or, "
-            + "for a past fact that must stay, say 'the former direct-push landing script' or 'the retired train "
-            + $"applier' without the file name:\n  {string.Join("\n  ", offenders)}");
+            "these current-state files name a retired landing script (the direct-push script, the landing lease, the "
+            + "train applier or the landing oracle; kb/Work PB3024, PB3107): describe the landing as `enqueue.py land` "
+            + "into GitHub's merge queue, or, for a past fact that must stay, say 'the former direct-push landing script', "
+            + "'the retired train applier' or 'the retired landing oracle' without the file name:\n  "
+            + string.Join("\n  ", offenders));
+    }
+
+    /// <summary>⛔ NO LANDING IS HELD TO A COMMITTED RECORD OF ITS OWN TREE (kb/Work PB3107). GitHub's merge queue builds
+    /// each pull request's group on every group queued ahead of it, in an order it picks after the branch was checked, so
+    /// a record of the branch's own tree cannot describe the tree that lands: two branches that each re-recorded the
+    /// arch-oracle baseline on one main left two baselines in the stacked tree, and nine merge-group runs of 2026-10-13
+    /// failed on it (38355538654 among them). The oracle's baseline is the capture of a change's base commit, made on
+    /// demand (scripts/arch/compare_oracle.py), so no such record is tracked.</summary>
+    [Fact]
+    public void NoTrackedRecord_DescribesOneBranchsTree()
+    {
+        IReadOnlyList<string> tracked = TrackedTree.Files();
+        Assert.True(tracked.Count >= 1000, $"`git ls-files` reported only {tracked.Count} paths — the sweep would scan nothing");
+        var records = tracked.Where(p => p.StartsWith(RetiredOracleRecord, StringComparison.Ordinal)).ToList();
+        Assert.True(records.Count == 0, $"a committed arch-oracle baseline is back ({string.Join(", ", records)}): the "
+            + "merge queue lands a tree no branch recorded; compare against the capture of the base commit instead "
+            + "(scripts/arch/compare_oracle.py --base, kb/Work PB3107)");
+        string capture = File.ReadAllText(TestRepo.Scripts("arch", "capture_oracle.py"));
+        Assert.DoesNotContain("--record", capture);
     }
 
     /// <summary>⭐ The retirement sweep's failure branch, fired: a planted script and skill that name a retired file are
@@ -221,8 +248,8 @@ public sealed class LandingPipelineDriftTests
             "GitHub's refusal of the pull request list, the pull request or the queue is exit 9, never 0",
             "HEAD beside origin/main is refused (main brought in first), and HEAD on main is refused before any check",
             "HEAD at origin/main has nothing to land; an empty title or body is a usage error",
-            "checks runs the three landing scripts on the range in order and maps each refusal to its own code: "
-                + "DEVLOG 6, oracle 7, landing check 3, unreadable 2",
+            "checks runs the two landing scripts on the range in order and maps each refusal to its own code: "
+                + "DEVLOG 6, landing check 3, unreadable 2",
             // kb/Work PB3023: the whole landing step, one script
             "land: the migrating landing (the whole history added as files) titles its pull request from its ONE new "
                 + "entry, the landing rule's own (devlog.landing_entries)",

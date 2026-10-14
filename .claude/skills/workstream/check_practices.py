@@ -40,7 +40,7 @@ BRIEFS = {
     # the lanes MANDATORY-PRACTICES I10 does not review name themselves at the landing (enqueue.py UNREVIEWED_LANES)
     'golden-lane-brief.md': [r'claude-skills', POINTER, r'build-local\.ps1 -Priority BelowNormal', *LANDS,
                              r'enqueue\.py land <your branch> --lane golden',
-                             r'compare_oracle', r'landing_oracle'],  # PB2885 (L11): goldens are oracle inputs
+                             r'compare_oracle'],  # L11 (PB3107): a golden lane's ADDED cases, compared against its base
     'registrar-brief.md': [r'claude-skills', POINTER, r'code site', *LANDS, r'enqueue\.py land <your branch> --lane registrar'],
     # PB2483: a stop is scoped; every workflow names the owner's global stop AND the fleet's own.
     'wf_lane3_adjudicate.js': [r'claude-skills', r'args\.stopFile', r'args\.globalStopFile', r'GRACEFUL STOP', r'CHECKPOINT PER RULE', r"model: 'opus'", r"agentType: 'cobol-adjudicator'", r"agentType: 'cobol-refuter'"],
