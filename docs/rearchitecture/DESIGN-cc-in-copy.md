@@ -159,7 +159,7 @@ from that physical line, starting at that PHYSICAL column (an index of the line 
 one, as in the user's editor). The piece is NAMED by its first span's line (`LineOrigin.Origin`, the PB82 rule: the
 origin of the first content written into it), and `LineOrigin.Locate(column)` is the one place a resultant column
 becomes a physical one. `OriginWriter` assembles the outputs: a slice of a mapped input keeps the input's spans,
-rebased to the column it lands on; text a stage writes itself takes one span at the position it stands for
+rebased to the column it lands on; text a stage writes itself takes one stretch at the position it stands for, a character position per character (a supplementary-plane character ends the span, kb/Work PB3031)
 (`MappedText.PointAt`). The stages and their splice rules —
 - the reference-format conversion (`ReferenceFormatProcessor.LogicalLineBuilder`, fed a `TextSite` per physical line:
   the program text's start index in the expanded line and the line's `ColumnMap`) BEARS the spans: a fixed-form line's

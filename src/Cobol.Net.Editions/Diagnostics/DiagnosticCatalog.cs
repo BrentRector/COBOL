@@ -163,7 +163,7 @@ public static class DiagnosticCatalog
     // kb/Work PB1393. The code predates the catalog (the Phase-4a "0814 band"), and was written as a bare string at
     // the two procedure-operand funnels that checked it — the national and boolean ones only, so an over-long
     // alphanumeric literal, and ANY literal in a VALUE clause, CONSTANT entry or ALL figurative, compiled clean. It
-    // is reported by exactly one site now: LiteralScreenPass, which sees every literal token in the unit.
+    // is reported by exactly one site now: LiteralScreen, which sees every literal token in the unit.
     public static readonly DiagnosticDescriptor LiteralTooLong = new(
         "COBOLNET0814", "literal-too-long", EditionSeverity.Error,
         "A literal shall be at most 8,191 character positions of its class, excluding the separators that delimit "
@@ -5326,7 +5326,7 @@ public static class DiagnosticCatalog
         + "more than one sign character. ISO §8.3.3.3.2 2): \"A literal shall not contain more than one sign "
         + "character. If a sign is used, it shall appear as the leftmost character of the literal\" — and a space "
         + "is a separator (§8.3.5), so `- 5` is two things, not the literal -5. Screened in every signed literal slot "
-        + "(LiteralScreenPass) and in the VALUE clause's literal positions, which admit no arithmetic expression.",
+        + "(LiteralScreen) and in the VALUE clause's literal positions, which admit no arithmetic expression.",
         "ISO §8.3.3.3.2 2)");
 
     /// <summary>The literal of the EXTERNAL clause's <c>AS</c> phrase violated §13.18.22.3 SR3: "Literal-1
@@ -6550,7 +6550,7 @@ public static class DiagnosticCatalog
     /// PB1394): §8.3.3.2.3 SR5 / §8.3.3.5.3 SR4 "Hex-character-sequence-1 shall be composed of hexadecimal digits"
     /// (<c>X"…"</c>, <c>NX"…"</c>), §8.3.3.4.3 SR3 "Hexadecimal-digit-1 shall be a hexadecimal digit" (<c>BX"…"</c>)
     /// and §8.3.3.4.3 SR2 "Boolean-character-1 shall be a boolean character, '0' or '1'" (<c>B"…"</c>). Asked of every
-    /// literal token by <c>LiteralScreenPass</c>; before the lexer admitted any content, such a literal silently
+    /// literal token by <c>LiteralScreen</c>; before the lexer admitted any content, such a literal silently
     /// re-lexed as a data-name plus a Format 1 literal.</summary>
     public static readonly DiagnosticDescriptor LiteralContentRepertoire = new(
         "COBOLNET2630", "literal-content-repertoire", EditionSeverity.Error,

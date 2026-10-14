@@ -3,6 +3,10 @@
  "enabled": [
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",
+  "pb3129-type-index-in-constant-record",
+  "pb3129-type-group-pointer-in-constant-record",
+  "pb3129-type-based-variable-length-group",
+  "pb3129-type-pointer-in-weak-group",
   "pb2732-qualified-index-name",
   "pb2841-continue-after-non-finite-below-2023",
   "pb2729-float-significand-point-value",
@@ -61,6 +65,12 @@
   "pb2464-function-pointer-signature-type-below-2014",
   "pb2464-typed-pointer-signature-mismatch",
   "pb2495-recursive-prototype-signature-mismatch",
+  "pb3121-sibling-program-not-in-prototype-scope",
+  "pb2937-skeleton-data-edition-gate",
+  "pb2937-interface-formal-edition-gate",
+  "pb2937-skeleton-statement-rule",
+  "pb2937-skeleton-only-receiver",
+  "pb2937-skeleton-nested-edition-gate",
   "pb2076-universal-returning-move-match-below-2002",
   "pb2463-universal-returning-set-match-below-2002",
   "pb552-value-through-not-ascending",
@@ -1858,6 +1868,9 @@
   "pb480-universal-variable-length-below-2014",
   "pb480-universal-variable-length-shapes-below-2014",
   "pb480-typed-restricted-pointer-type",
+  "pb2077-refmod-into-elementary-by-reference",
+  "pb2077-refmod-shorter-than-group-formal",
+  "pb2077-elementary-into-group-formal",
   "pb888-national-group-result-below-2002",
   "pb889-group-usage-over-same-as",
   "pb889-group-usage-over-type",
@@ -2626,7 +2639,10 @@
   "pb2548-template-dynamic-from-to",
   "pb2589-repository-function-at-85",
   "pb2502-record-key-alias-of-numeric",
-  "pb2623-method-reserved-at-2002-2014"
+  "pb2623-method-reserved-at-2002-2014",
+  "pb1616-define-hex-odd",
+  "pb1616-omitted-branch-hex-odd",
+  "pb1616-define-zero-length-below-2014"
  ],
  "pending": []
 }

@@ -316,6 +316,26 @@ public sealed class DiagnosticPositionTests : IDisposable
         Assert.Contains(lines, d => d.Contains("sup.cpy(1,24): error COBOLNET1941"));
     }
 
+    /// <summary>⛔ kb/Work PB3031 — text a stage WRITES is counted in character positions too (ISO §6.1 1) a), §6.3.1): a
+    /// REPLACE replacement (§7.2.4.4 2)) and COPY ... REPLACING text (§7.2.3.4 8)) holding supplementary-plane letters is
+    /// two units per letter, one position per letter, so the parser's error at a word after them names the position the
+    /// programmer counts. The replacement ends in a second TO, which the parser rejects: the word "X" stands at position
+    /// 17 of its line, the two letters, a blank, TO and a blank fill positions 17-22, and the second TO stands at 23.</summary>
+    [Fact]
+    public void ReplaceAndCopyReplacing_WrittenSupplementaryCharacters_NameTheirPosition()
+    {
+        Write("srep.cob", Head + $"       PROCEDURE DIVISION.\n       REPLACE ==X== BY =={Wide} TO TO==.\n           MOVE X.\n           STOP RUN.\n");
+        var (ok, lines) = Compile("srep.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("srep.cob(8,23): error COBOL0001"));
+
+        Write("srepl.cpy", "           MOVE X.\n");
+        Write("srepl.cob", Head + $"       PROCEDURE DIVISION.\n       COPY \"srepl.cpy\" REPLACING ==X== BY =={Wide} TO TO==.\n           STOP RUN.\n");
+        (ok, lines) = Compile("srepl.cob", format: InitialReferenceFormat.Fixed);
+        Assert.False(ok);
+        Assert.Contains(lines, d => d.Contains("srepl.cpy(1,23): error COBOL0001"));
+    }
+
     /// <summary>⛔ kb/Work PB2982 — the indicator-column gates name column 7, and column 7 IS the physical column of the
     /// indicator on every line the gates fire on. A TAB written in positions 1-7 fills through position 8 (DOC-A.1-157), so
     /// the indicator area of such a line holds a space and the line is no continuation line (the hyphen after the tab

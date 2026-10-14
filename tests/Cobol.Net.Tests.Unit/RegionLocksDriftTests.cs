@@ -321,6 +321,34 @@ public sealed class RegionLocksDriftTests
         }
     }
 
+    /// <summary>⛔ THE LOCK DIRECTORY NEVER PASSES THROUGH DELETE-PENDING UNDER ITS OWN NAME (kb/Work PB3109). Windows'
+    /// RemoveDirectory sets the delete disposition and closes its handle, and for as long as ANY other handle on the
+    /// directory is open (an indexer's, a scanner's, a deleter frozen between its two steps) the directory stays listed
+    /// but every open inside it and every listing of it is "access denied", the very answer an unobservable holder gives.
+    /// The last holder's CLOSE therefore renames the empty directory away before deleting it
+    /// (<see cref="SidecarLockFiles.RetireDirectory"/>), as <see cref="SidecarLockFiles.Retire"/> does a lock file, so
+    /// no name a publisher or tester enters is ever deleted in place and the next hold finds it free: a waiting hold
+    /// answered <see cref="RegionLockResult.Unavailable"/> instead of waiting (measured 11 of 3,000 two-endpoint rounds
+    /// under CPU load, each at <c>HostFile.OpenLockHolder</c>), and the store mutex it stood for was not taken (the
+    /// PB2936 lost-update shape). The race cannot be made to happen on demand, so the witness reads the ORDER the host
+    /// reports (<see cref="DirectoryNameWatch"/>): the lock directory's name went by a rename, never by a deletion.</summary>
+    [Fact]
+    public void TheLastHoldersCloseRenamesTheLockDirectoryAwayRatherThanDeletingItInPlace()
+    {
+        using var site = new Site(RegionHostKind.LockFiles);
+        var a = site.Endpoint();
+        var b = site.Endpoint();
+        Assert.Equal(RegionLockResult.Ok, b.Hold(Byte2, exclusive: false, wait: false));
+        string lockDir = SidecarLockFiles.LockDirectoryOf(site.File);
+        using var watch = new DirectoryNameWatch(site.Directory);
+        b.Release(Byte2);               // the last holder's CLOSE
+        watch.AssertRenamedAwayRatherThanDeletedInPlace(Path.GetFileName(lockDir));
+        Assert.Equal(RegionLockResult.Ok, a.HeldByAnother(Byte1));
+        Assert.Equal(RegionLockResult.Ok, a.Hold(Byte1, exclusive: true, wait: true));
+        Assert.Equal(RegionLockResult.Ok, b.Hold(Byte2, exclusive: true, wait: true));
+        Assert.Equal(RegionLockResult.Held, a.Hold(Byte2, exclusive: true, wait: false));
+    }
+
     /// <summary>A host that cannot put a lock beside the file — here a directory that is really a file — holds nothing
     /// and refuses nothing: <see cref="RegionLockResult.Unavailable"/>, never an exception out of a statement.</summary>
     [Fact]

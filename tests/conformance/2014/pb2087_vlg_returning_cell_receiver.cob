@@ -99,7 +99,10 @@
        METHOD-ID. TOUCH.
        DATA DIVISION.
        LINKAGE SECTION.
-       01 TG PIC X(7).
+      *> A group formal: SG is a group, and 9.3.6 match rule 3 e) never
+      *> matches a group to an elementary PIC X(7) (kb/Work PB2077).
+       01 TG.
+          05 TG1 PIC X(7).
        PROCEDURE DIVISION USING TG.
        MAIN-P.
            DISPLAY "TOUCH " TG.

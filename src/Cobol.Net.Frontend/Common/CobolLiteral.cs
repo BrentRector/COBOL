@@ -211,8 +211,8 @@ public static class CobolLiteral
     /// <see cref="HexGroupViolation"/> and <see cref="LengthViolation"/>, or <see langword="null"/>. Content outside the
     /// repertoire has no digit count to group, and a malformed hexadecimal literal has no value to measure, so the first
     /// violation is the one to report. Every consumer that meets a literal TOKEN asks this, never the three predicates:
-    /// <c>LiteralScreenPass</c> for the unit's tree, and the compile-time evaluator for a compiler-directive operand,
-    /// whose fragment is lexed apart from the unit and so is never on that tree (kb/Work PB1441).
+    /// <c>LiteralScreen</c>, which walks the unit's tree and each compiler-directive operand's fragment — lexed apart
+    /// from the unit and so never on that tree (kb/Work PB1441, PB1616) — and nothing else.
     /// </summary>
     public static (LiteralRule Rule, string Message)? SyntaxViolation(string raw) =>
         RepertoireViolation(raw) is { } repertoire ? (LiteralRule.Repertoire, repertoire)
@@ -239,7 +239,7 @@ public static class CobolLiteral
     /// <para>⛔ THE LEXER NO LONGER DECIDES THIS, AND MUST NOT. Its bodies used to spell each repertoire, so a body
     /// outside it was not a literal at all and fell back to IDENTIFIER + Format 1 literal — a silent wrong answer
     /// beside a data item of the prefix's name. Every prefixed body is now any quoted content (CobolLexer.g4
-    /// HEX_BODY), and this rule is asked of every literal token by <c>LiteralScreenPass</c>. It PRECEDES the
+    /// HEX_BODY), and this rule is asked of every literal token by <c>LiteralScreen</c>. It PRECEDES the
     /// grouping rule: a non-hexadecimal sequence has no digit count to group, so <see cref="HexGroupViolation"/>
     /// declines such a literal, and every decoder answers "" for it (<see cref="IsInRepertoire"/>).</para>
     /// </remarks>

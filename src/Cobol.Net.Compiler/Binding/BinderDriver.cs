@@ -166,7 +166,10 @@ internal sealed class BinderDriver
         // to each directly or indirectly contained source unit"), and until kb/Work PB1100 the class bodies bound
         // first, against no table, so every user-function reference in a method drew COBOLNET1505.
         session.Repository = BuildGroupRepository(units, classes, session);
-        ResolvePointerRestrictions(units, classes, oo.InterfaceData, session);
+        // The unexpanded parameterized definitions' forests are resolved with the rest (kb/Work PB2937): their method
+        // bodies bind below, and a restricted pointer in them is typed by its prototype's signature exactly as anywhere.
+        ResolvePointerRestrictions(units, [.. classes, .. oo.SkeletonClasses],
+            [.. oo.InterfaceData, .. oo.SkeletonInterfaceData], session);
         // ⛔ EVERY SIGNATURE COMPARISON RUNS AFTER THE POINTER TYPES EXIST (kb/Work PB2495): a formal or returning item
         // that is a restricted program- or function-pointer is typed by its prototype's signature class (ISO §13.18.60.4
         // GR25 / GR26), which ResolvePointerRestrictions has just attached. A check that runs before it reads an
@@ -181,13 +184,18 @@ internal sealed class BinderDriver
         OoConformance.ValidatePropertyAccessorPairs(table, edition);   // §8.4.3.9.3 SR7 — get RETURNING = set USING, over the formals just resolved
         var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
         foreach (var cls in classes) oo.BindClassBody(cls);
+        // The method BODIES of a parameterized definition nothing expands bind as themselves too, after every emitted
+        // class's (kb/Work PB2937; OO deep-dive D12 determination 6): every rule of their text is asked, and a statement
+        // that selects a method through a parameter-name is each expansion's (BoundDeferredToExpansion). Nothing emits
+        // them; the edition pass walks them (VersionConformancePass.Run).
+        foreach (var skeleton in oo.SkeletonClasses) oo.BindClassBody(skeleton);
 
         // The whole-group middle-end (P6 Steps 3–4): the DECLARED manifest — ProcedureBinding →
         // UsageCollectionPass → StorageFormPass → VersionConformancePass (the NAMED terminal pass, the SOLE
         // edition gate; each pass's doc lives with its body; the ORDER lives in BindPipeline.GroupTail,
         // DAG-validated against the resolve prefix above). Once the tail completes, the edition sink carries
         // EVERY edition diagnostic — the driver's CheckOnly verdict needs nothing beyond this Bind.
-        var ctx = new GroupBindContext(tree, units, classes, oo.InterfaceData, session);
+        var ctx = new GroupBindContext(tree, units, classes, oo.InterfaceData, oo.SkeletonClasses, oo.SkeletonInterfaceData, session);
         foreach (var pass in BindPipeline.GroupTail())
         {
             RequireAll(ctx, pass);      // watermark gate: the prerequisite RAN on every binder (P6 Step 6)
@@ -214,7 +222,7 @@ internal sealed class BinderDriver
         // position it is written in, so they are asked once per token of the raw tree rather than once per
         // consuming funnel (which is how VALUE / CONSTANT / ALL / concatenation-operand literals escaped them).
         // kb/Work PB1393.
-        global::CobolNet.Validation.LiteralScreenPass.Run(tree, edition);
+        global::CobolNet.Frontend.Parsing.LiteralScreen.Run(tree, edition.Edition, edition, gateFormats: true);
 
         // The declined-optional-element pass (ISO Annex A.4.1) — a THIRD sibling on the same footing: it answers
         // "does this implementation claim support for this optional module", which is orthogonal to both the
@@ -647,8 +655,9 @@ internal sealed class BinderDriver
             // program, a function, and an outermost program): the unit kind is known only here.
             UnitIsContained = unit.Parent is not null,
             UnitIsFunction = unit.IsFunction,
-            // §8.4.6.6 / §8.4.6.8 — the SELF leg of the two prototype-name scope rules (kb/Work PB452/PB817).
-            UnitSelfName = unit.Name,
+            // §8.4.6.6 / §8.4.6.8 — the no-specifier leg of the two prototype-name scope rules: the ONE set the
+            // registries read too (ContainingDefinitions; kb/Work PB452/PB817, PB3121).
+            ContainingDefinitionNames = new HashSet<string>(ContainingDefinitions(unit).Select(u => u.Name), CobolNames.Comparer),
             UnitStaticWs = unit.Recursive && !unit.Initial,
         };
         data.CallSeedUids(session.TakeUidBand());
@@ -826,7 +835,7 @@ internal sealed class BinderDriver
     /// pointer is compared by the prototype IT names (<see cref="PrototypeSignatures.SameType"/>) — which may be declared
     /// in a forest later in the group, so every forest is resolved before any is classified.</para></summary>
     private static void ResolvePointerRestrictions(IReadOnlyList<BoundUnit> units, IReadOnlyList<OoClassUnit> classes,
-        IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> interfaces, BindSession session)
+        IReadOnlyList<KeyValuePair<OoInterfaceSymbol, DataBinder>> interfaces, BindSession session)
     {
         var repository = session.Repository;
         var forests = new List<(DataBinder Data, BoundUnit? Unit, int Position)>();
@@ -857,7 +866,7 @@ internal sealed class BinderDriver
             UserFunctions = UserFunctionsOf(data, unit, session.Repository, unit.SourcePosition),
             // §8.4.6.6 — inside a function definition its OWN name is a referable function-prototype-name
             // (self-recursion without a repository entry; §12.3.8.3 SR11 makes a present self-entry a no-op —
-            // SpecifiesItself, which UserFunctionsOf asks).
+            // UserFunctionsOf ignores it; both read ContainingDefinitions).
             UdfSelfName = unit.IsFunction ? unit.Name : null,
             // ISO §14.2.2 SR10's enumeration of the five source elements that may carry a Format-1/2 procedure
             // division — the input to every EXIT / GOBACK placement rule (kb/Work PB403). Derived HERE, beside
@@ -1154,18 +1163,16 @@ internal sealed class BinderDriver
             // compile-time signature.
             map[name] = new ProgramPrototype(name, spec.ExternalizedName,
                 repository.ProgramDetails(spec.ExternalizedName, position));
-        // §8.4.6.8's second spelling: "the program-name of a containing program definition" is a referable
-        // program-prototype-name with NO specifier at all. It also subsumes §12.3.8.3 SR15's containing-program
-        // half — a specifier naming a container is "ignored" and references go to that definition, which is
-        // precisely what overwriting the specifier's entry with the definition does.
-        for (var u = unit?.Parent; u is not null; u = u.Parent)
+        // §8.4.6.8's other spelling: "the program-name of a containing program definition" is a referable
+        // program-prototype-name with NO specifier at all — the element's OWN program definition included, the one
+        // set ContainingDefinitions names and DataBinder's TO-phrase screen asks (kb/Work PB3121). Registered LAST,
+        // it also realizes §12.3.8.3 SR15 — a specifier naming "the program definition in which this REPOSITORY
+        // paragraph is specified or ... a containing program definition" is "ignored" and references go to that
+        // definition, which is precisely what overwriting the specifier's entry does. (§11.10.4 GR4's RECURSIVE
+        // attribute is what makes a self-call reachable at run time; without it §14.9.4.4 GR3 f) raises
+        // EC-PROGRAM-RECURSIVE-CALL.)
+        foreach (var u in ContainingDefinitions(unit))
             if (!u.IsFunction) map[u.Name] = SelfPrototype(u);
-        // §12.3.8.3 SR15's OTHER half — "the name of the program definition in which this REPOSITORY paragraph is
-        // specified". Scoped to a WRITTEN specifier, because SR15 is a rule about a specifier and §8.4.6.8's
-        // no-specifier spelling says "containing", never "this". (§11.10.4 GR4's RECURSIVE attribute is what makes
-        // such a self-call reachable at run time; without it §14.9.4.4 GR3 f) raises EC-PROGRAM-RECURSIVE-CALL.)
-        if (SpecifiesItself(unit, data.ProgramSpecifiers, function: false))
-            map[unit!.Name] = SelfPrototype(unit);
         return map;
 
         // The prototype NAME is the referable word (§8.4.6.8), its EXTERNALIZED name is what CallBinder
@@ -1176,18 +1183,24 @@ internal sealed class BinderDriver
             new(u.Name, u.ExternalizedName, new CalleeSignature(u.Data.LinkageFormals, u.Data.LinkageReturning));
     }
 
-    /// <summary>⛔ THE ONE SELF-SPECIFIER RULE, asked by both prototype arms (kb/Work PB1084). §12.3.8.3 states it
-    /// once per specifier kind — SR11: "If the specified function-prototype-name-1 is the name of the function
-    /// definition in which this REPOSITORY paragraph is specified, references to function-prototype-name-1 are to
-    /// that function definition and this function-specifier is ignored"; SR15, the same sentence for a
-    /// program-prototype-name-1 and its program definition — so a REPOSITORY entry naming the element it is written
-    /// in never redirects that element's references, whatever its <c>AS</c> literal says. True when
-    /// <paramref name="unit"/> is a definition of the <paramref name="function"/> kind and
-    /// <paramref name="specifiers"/> names it. The FUNCTION arm used to skip this test and apply
-    /// <c>FUNCTION FACT AS "OTHERF"</c> inside FUNCTION-ID. FACT as a remap, so the recursive self-call bound
-    /// against OTHERF's signature (COBOLNET1506) while the program arm was right.</summary>
-    private static bool SpecifiesItself<T>(BoundUnit? unit, IReadOnlyDictionary<string, T> specifiers, bool function)
-        => unit is not null && unit.IsFunction == function && specifiers.ContainsKey(unit.Name);
+    /// <summary>⛔ THE ONE "CONTAINING DEFINITION" SET of the two prototype-name scope rules (kb/Work PB3121): ISO
+    /// §8.4.6.6 admits "the user-function-name of the containing function definition" and §8.4.6.8 "the program-name of
+    /// a containing program definition" with no REPOSITORY entry. The two are the same sentence over two namespaces,
+    /// and in §8.4.6.6 "the containing function definition" can only be the element's OWN definition (a function
+    /// definition contains no other source unit — §10.2 gives nested programs to "a program definition for an
+    /// outermost program" alone), so "containing" names the definition the reference is written in and every one
+    /// enclosing it: <paramref name="unit"/> itself, then each program that contains it. All of them are of
+    /// <paramref name="unit"/>'s own kind. A class forest (<paramref name="unit"/> null) has none: a class is
+    /// neither definition kind. The program registry (<see cref="ProgramPrototypesOf"/>), the function registry's
+    /// self entry (<see cref="UserFunctionsOf"/>) and the DATA-phase TO-phrase screen
+    /// (<c>DataBinder.ContainingDefinitionNames</c>, seeded from here) all read THIS set, so "is this name in
+    /// scope" has one answer in every phase — they used to disagree in both directions: the screen admitted the
+    /// element's own program-name, which the registry registered only under a written specifier, and refused a
+    /// containing program's, which the registry always held.</summary>
+    internal static IEnumerable<BoundUnit> ContainingDefinitions(BoundUnit? unit)
+    {
+        for (var u = unit; u is not null; u = u.Parent) yield return u;
+    }
 
     /// <summary>The user-defined functions ONE source element may reference, by the function-prototype-name it
     /// WRITES — the function twin of <see cref="ProgramPrototypesOf"/> (kb/Work PB974, PB989), resolved by
@@ -1199,8 +1212,8 @@ internal sealed class BinderDriver
     /// the reference draws COBOLNET1505 at its use; a definition that FOLLOWS the element and has no prototype is
     /// such a name. A hit that is NOT the function the word names, while a different function does carry the word,
     /// warns (COBOLNET2969): the externalized name wins, as GnuCOBOL's does.
-    /// A specifier naming the function definition it is written in is IGNORED (§12.3.8.3 SR11,
-    /// <see cref="SpecifiesItself{T}"/>) and the name resolves to that definition's own signature — registered LAST,
+    /// A specifier naming the function definition it is written in is IGNORED (§12.3.8.3 SR11; the definition is
+    /// <see cref="ContainingDefinitions"/>' function member) and the name resolves to its own signature — registered LAST,
     /// as <see cref="ProgramPrototypesOf"/> registers its self entry. <paramref name="data"/> is a program unit's
     /// forest or a CLASS's OBJECT / FACTORY forest (whose specifiers are the class REPOSITORY's — §12.3.4 GR1,
     /// kb/Work PB1100; <paramref name="unit"/> is then null, and <paramref name="position"/> is the class's own start).
@@ -1212,12 +1225,17 @@ internal sealed class BinderDriver
         DataBinder data, BoundUnit? unit, GroupRepository repository, int position)
     {
         var group = repository.FunctionsAt(position);
-        bool self = unit is { IsFunction: true };
-        bool selfSpecified = SpecifiesItself(unit, data.FunctionSpecifiers, function: true);
+        // §8.4.6.6's no-specifier leg — the containing function definition, i.e. the element's own when it is one.
+        var selves = ContainingDefinitions(unit).Where(u => u.IsFunction).ToList();
         Dictionary<string, UserFunctionSignature>? own = null;
         foreach (var (name, specifier) in data.FunctionSpecifiers)
         {
-            if (selfSpecified && CobolNames.Same(name, unit!.Name)) continue;
+            // §12.3.8.3 SR11: "If the specified function-prototype-name-1 is the name of the function definition in
+            // which this REPOSITORY paragraph is specified, references to function-prototype-name-1 are to that
+            // function definition and this function-specifier is ignored" — whatever its AS literal says, so it is
+            // never resolved (a remap there bound the recursive self-call against another function's signature,
+            // kb/Work PB1084); the self entry below is the reference's target.
+            if (selves.Exists(u => CobolNames.Same(name, u.Name))) continue;
             own ??= new Dictionary<string, UserFunctionSignature>(group, CobolNames.Comparer);
             if (repository.ResolveFunction(name, specifier.ExternalizedName, position) is not { } resolved)
             {
@@ -1238,11 +1256,10 @@ internal sealed class BinderDriver
                     + $"\"{shadowed.ExternalizedName}\" (§8.4.6.7)");
             }
         }
-        if (self)
+        foreach (var u in selves)
         {
             own ??= new Dictionary<string, UserFunctionSignature>(group, CobolNames.Comparer);
-            own[unit!.Name] = new UserFunctionSignature(unit.Name, unit.ExternalizedName,
-                unit.Data.LinkageReturning, unit.Data.LinkageFormals);
+            own[u.Name] = new UserFunctionSignature(u.Name, u.ExternalizedName, u.Data.LinkageReturning, u.Data.LinkageFormals);
         }
         return own ?? group;
     }

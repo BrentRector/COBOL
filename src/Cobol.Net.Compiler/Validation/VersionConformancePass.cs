@@ -117,6 +117,20 @@ internal sealed class VersionConformancePass
             pass.GateData(cls.Data);
             pass.GateData(cls.FactoryData);
         }
+        // ⛔ EVERY DATA FOREST THE GROUP BINDS IS GATED, not only the ones it emits code for (kb/Work PB2937). An
+        // unexpanded parameterized class is a definition all the same (OO deep-dive D12 determination 6) — bound as
+        // itself and never emitted, so its OBJECT and FACTORY data were never asked their USAGE / PICTURE gates and
+        // `USAGE FLOAT-BINARY-64` in one compiled at --std 2002. An interface's method prototypes declare data too —
+        // their formals and returning items — and no interface forest, written or parameterized, was ever gated.
+        foreach (var data in group.SkeletonClasses.SelectMany(c => new[] { c.Data, c.FactoryData })
+                     .Concat(group.InterfaceData.Values).Concat(group.SkeletonInterfaceData.Values))
+            pass.GateData(data);
+        // … and every bound statement: an unexpanded skeleton's method bodies bind as themselves (kb/Work PB2937).
+        foreach (var skeleton in group.SkeletonClasses)
+        {
+            pass.WalkProgram(skeleton.Bound);
+            pass.WalkProgram(skeleton.FactoryBound);
+        }
     }
 
     /// <summary>&gt;&gt;COBOL-WORDS SR3/SR4 category validation (ISO §7.3.10.3): the EXISTING word (literal-1/3/4)
@@ -2430,7 +2444,7 @@ internal sealed class VersionConformancePass
             if ((nat || ctx.BOOLLIT() is not null) && InStatement(ctx))
                 _p.Check(nat ? Constructs.NationalData2002 : Constructs.BooleanData2002,
                     nat ? "national literal N\"…\"" : "boolean literal B\"…\"");
-            // The literal's OWN syntax rules — the §8.3.3 length and hexadecimal-grouping rules — are LiteralScreenPass's,
+            // The literal's OWN syntax rules — the §8.3.3 length and hexadecimal-grouping rules — are LiteralScreen's,
             // asked of every literal TOKEN wherever it is written (kb/Work PB1393). The grouping rule used to be asked
             // here and in the ALL arm below, and a concatenation operand and a keyword-omitted intrinsic argument
             // slipped past both.
