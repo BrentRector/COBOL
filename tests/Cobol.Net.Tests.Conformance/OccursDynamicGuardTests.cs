@@ -206,6 +206,35 @@ public sealed class OccursDynamicGuardTests
         Assert.Equal("W 0003", stdout.Trim());
     }
 
+    /// <summary>The permissive pick of an ambiguous CAPACITY register is the same register at EVERY ask of the
+    /// written reference — including the subscript and reference-modification positions, whose resolution may probe
+    /// before it commits (R30) — so each bare <c>DC</c> reads A's register: 3. Element 3 of A holds Q, element 2 a
+    /// space; <c>W(3:1)</c> is Y and <c>W(4:)</c> is Z (§8.4.3.3.3 SR4 makes both bounds arithmetic expressions).</summary>
+    [Fact]
+    public void Permissive_AmbiguousCapacityRegister_InSubscriptAndRefModPositions_ReadsTheFirst()
+    {
+        var (ok, stdout, detail) = EditionHarness.CompileAndRun("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. W74CAPP.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 ST TYPEDEF.
+               05 D PIC X OCCURS DYNAMIC CAPACITY IN DC.
+            01 A TYPE ST.
+            01 B TYPE ST.
+            01 W PIC X(4) VALUE "WXYZ".
+            PROCEDURE DIVISION.
+                SET DC OF A TO 3
+                MOVE "Q" TO D OF A (DC)
+                DISPLAY D OF A (DC) " " D OF A (DC - 1) "|"
+                DISPLAY W(DC:1) " " W(DC + 1:)
+                EVALUATE DC WHEN 3 DISPLAY "THREE" WHEN OTHER DISPLAY "OTHER" END-EVALUATE
+                STOP RUN.
+            """, 2014, permissive: true);
+        Assert.True(ok, detail);
+        Assert.Equal(["Q  |", "Y Z", "THREE"], stdout.ReplaceLineEndings().Trim().Split(Environment.NewLine));
+    }
+
     private static string CapacityProg(string id, string entries, string statements) => $"""
         IDENTIFICATION DIVISION.
         PROGRAM-ID. {id}.

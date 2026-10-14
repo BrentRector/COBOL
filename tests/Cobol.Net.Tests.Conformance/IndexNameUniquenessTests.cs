@@ -153,10 +153,9 @@ public sealed class IndexNameUniquenessTests
 
     /// <summary>The <c>--permissive</c> disposition of an ambiguous index-name (§8.4.2.2.3 SR1, warned, resolved to
     /// the first declaration) still screens the table it resolves to: here that table lies in a LINKAGE record that
-    /// is no operand of the USING phrase, so §13.7.3 SR4 ("It is an operand of the USING phrase or the RETURNING
-    /// phrase of the procedure division header") refuses the reference, COBOLNET2746, exactly as it refuses the
-    /// qualified <c>IX OF T1</c>. Before (kb/Work PB2988 review R1-1's shape): only the unique arm screened, and the
-    /// generated C# failed Roslyn with CS0131.</summary>
+    /// is no operand of the USING phrase, so §13.7.3 SR4 e) ("It is a condition-name or index-name associated with a
+    /// data item that satisfies one of the above conditions") refuses the reference, COBOLNET2746, exactly as it
+    /// refuses the qualified <c>IX OF T1</c>.</summary>
     [Fact]
     public void Permissive_AmbiguousIndexName_ScreensTheLinkageRecordItResolvesTo()
     {
@@ -177,5 +176,56 @@ public sealed class IndexNameUniquenessTests
         EditionHarness.AssertHasDiagnostic(warnings, "COBOLNET1639");
         EditionHarness.AssertHasDiagnostic(errors, "COBOLNET2746");
         EditionHarness.AssertNoDiagnostic(errors, "CS0131");
+    }
+
+    /// <summary>Every ask of one written ambiguous index-name reference gets the same answer under
+    /// <c>--permissive</c>: the first declaration (§8.4.2.2.3 SR1's disposition). SET classifies its operand and then
+    /// binds it, and the resolver reports a written reference once; before the wave 1074 fix the SECOND ask answered
+    /// "failed", so the SET receiver became the inert occurrence number <c>1</c> and the generated C# failed Roslyn
+    /// (CS0131, wave 1073 review R1-1). Here <c>IX</c> resolves to <c>L1</c>'s index: SET IX TO 2 and UP BY 1 make it
+    /// 3, and <c>T1(IX OF T1)</c> reads <c>L1</c>'s third element.</summary>
+    [Fact]
+    public void Permissive_AmbiguousIndexName_SetResolvesToTheFirstDeclarationAtEveryAsk()
+    {
+        var (ok, stdout, detail) = EditionHarness.CompileAndRun("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. W74IXS.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 L1.
+               05 T1 PIC X OCCURS 3 INDEXED BY IX VALUE "A".
+            01 L2.
+               05 T2 PIC X OCCURS 3 INDEXED BY IX VALUE "B".
+            PROCEDURE DIVISION.
+                SET IX TO 2
+                SET IX UP BY 1
+                IF IX = 3 DISPLAY "THREE" END-IF
+                DISPLAY T1(IX OF T1)
+                STOP RUN.
+            """, 2023, permissive: true);
+        Assert.True(ok, detail);
+        Assert.Equal(["THREE", "A"], stdout.ReplaceLineEndings().Trim().Split(Environment.NewLine));
+    }
+
+    /// <summary>The legal LINKAGE half of <see cref="Permissive_AmbiguousIndexName_ScreensTheLinkageRecordItResolvesTo"/>:
+    /// the first declaration's record IS the USING operand (§13.7.3 SR4 a) and e)), so the warned SET compiles.</summary>
+    [Fact]
+    public void Permissive_AmbiguousIndexName_InAReferenceableLinkageRecord_Compiles()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. W74IXU.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L1.
+               05 T1 PIC X OCCURS 3 INDEXED BY IX.
+            01 L2.
+               05 T2 PIC X OCCURS 3 INDEXED BY IX.
+            PROCEDURE DIVISION USING L1.
+                SET IX TO 2
+                GOBACK.
+            """, 2023, permissive: true);
+        Assert.True(ok, string.Join(Environment.NewLine, errors));
+        EditionHarness.AssertHasDiagnostic(warnings, "COBOLNET1639");
     }
 }

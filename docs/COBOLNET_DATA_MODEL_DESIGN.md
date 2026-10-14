@@ -1257,7 +1257,10 @@ remaining question is a syntax rule reported by `CapacityPlaceOf`, never a "not 
   unique reference's register: ambiguity is a fault of the written reference and excuses nothing about the register
   it resolves to, so a picked register under a table is still **COBOLNET2126** (the PB2988 review's R1-1; the
   index-name arm's permissive pick is screened by §13.7.3 SR4 the same way). A `CapacityRef` carries a place only
-  when it has no fault.
+  when it has no fault. The verdict is the same at EVERY ask of one written reference: a probe and a repeated ask
+  (SET classifies its operand, then binds it) get the pick silently (`UniqueOrReportAmbiguous(…, report: false)`),
+  and only the report is once per reference — for the register in `CapacityPlaceOf` and for the index-name in
+  `ResolveIndexName` alike.
 - **Subscripted** is **COBOLNET2125** — §13.18.38.3 SR31, "Data-name-3 shall not be subscripted."
 - **Reference-modified** goes to the ONE §8.4.3.3.3 SR1 screen (`RefModExclusion` → COBOLNET1647): the register is a
   numeric item of an implementor-chosen binary usage, and SR1 admits only usage DISPLAY or NATIONAL.

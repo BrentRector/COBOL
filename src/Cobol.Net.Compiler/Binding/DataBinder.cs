@@ -8506,26 +8506,32 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// (COBOLNET1639) and with its disposition: an error, or under <c>--permissive</c> a warning and the
     /// first-declared survivor (ReferenceResolver.ResolveUnqualified, kb/Work R33). None returns null WITHOUT a
     /// report: an operand that names nothing breaks the CLAUSE's own rule, which the caller states
-    /// (<paramref name="ambiguityReported"/> says which of the two a null is).</summary>
+    /// (<paramref name="ambiguityReported"/> says which of the two a null is).
+    /// <para>⛔ THE VERDICT DOES NOT DEPEND ON WHETHER IT IS REPORTED. <paramref name="report"/> false asks the same
+    /// question silently — a probe (R30 purity, kb/Work PB157), or a written reference whose report another binder
+    /// already made (SET classifies its operand, then binds it) — and returns exactly what the reporting ask
+    /// returns. The PB2988 review R1-1 of wave 1073 measured the alternative: the index-name resolver answered a
+    /// SECOND ask of an ambiguous <c>--permissive</c> reference "failed" instead of the first-declared index, so the
+    /// backend received an inert occurrence number as an assignment target (CS0131).</para></summary>
     internal T? UniqueOrReportAmbiguous<T>(NameCandidates<T> candidates, string clauseFace, string written,
-                                           out bool ambiguityReported) where T : class
+                                           out bool ambiguityReported, bool report = true) where T : class
     {
         ambiguityReported = false;
         if (candidates.Count <= 1) return candidates.Single;
         ambiguityReported = true;
+        T? verdict = Edition.Permissive ? candidates.FirstDeclaredForPermissive : null;
+        if (!report) return verdict;
         // One verdict for every name class §8.4.2.2.3 SR1 covers (kb/Work PB919): only the noun differs.
         string what = typeof(T) == typeof(IndexDeclaration) ? "an index-name" : "a data item";
         string msg = $"{clauseFace} '{written}' does not uniquely identify {what} — {candidates.Count} "
             + "declarations match the written reference (ISO §8.4.2.2.3 SR1: \"For each non unique user-defined "
             + "name that is explicitly referenced, uniqueness shall be established through a sequence of qualifiers "
             + "that precludes any ambiguity of reference\")";
-        if (!Edition.Permissive)
-        {
+        if (verdict is null)
             Edition.Error(DiagnosticCatalog.UndefinedReference, msg);
-            return null;
-        }
-        Edition.Warning(DiagnosticCatalog.UndefinedReference, msg + "; --permissive resolves to the first declaration");
-        return candidates.FirstDeclaredForPermissive;
+        else
+            Edition.Warning(DiagnosticCatalog.UndefinedReference, msg + "; --permissive resolves to the first declaration");
+        return verdict;
     }
 
     /// <summary>The written form of a qualified data-name, for a diagnostic: <c>K OF G OF R</c>.</summary>

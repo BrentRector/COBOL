@@ -69,10 +69,27 @@ gave the COBOLNET1639 warning and then the internal error COBOLNET2362, where §
 permissive disposition picks; a `CapacityRef` carries a place only when it has no fault. The sibling sweep over every
 caller of `UniqueOrReportAmbiguous` found the same shape in the index-name resolver: `ResolveIndexName` screened
 §13.7.3 SR4 only for a unique candidate, so a permissive pick whose table lay in a LINKAGE record outside the USING
-phrase reached Roslyn and failed it (CS0131). The pick is now screened, COBOLNET2746. The other callers return the
+phrase went unscreened. The pick is now screened, COBOLNET2746. The other callers return the
 picked item to code that judges it like any other. Regression tests (the negative corpus runs strict only, so these
 are `CompileFull(…, permissive: true)` tests): `OccursDynamicGuardTests.Permissive_AmbiguousCapacityRegister_*` (two
 under-a-table shapes, plus the legal first-declared copy that runs and reads 3) and
 `IndexNameUniquenessTests.Permissive_AmbiguousIndexName_ScreensTheLinkageRecordItResolvesTo`. Merging main brought
 in PB3107, which commits no arch-oracle baseline, so the baseline the first review finisher re-recorded is deleted in
 the merge; the four difference classes above stand as that comparison's record.
+
+**The third branch review, answered (wave 1074 A2).** Wave 1074 A2 merged the wave-1074 A branch (PB3030's bit arm,
+the R2 method-member names) with the wave-1073 A2 branch, unioning the two manifests and this entry, and answered
+the review of `c5324ec37` (R1-1). The index-name CS0131 did not come from the missing linkage screen. `ResolveIndexName`
+reports a written reference once, and SET asks about its operand twice: it classifies the operand, then binds it. The
+second ask of an ambiguous reference answered `Failed` with no declaration, so the SET receiver was the inert
+occurrence number `1`, and `1 = __set0;` failed Roslyn. Every `--permissive` ambiguous SET of an index-name failed
+this way, legal shapes included. Re-probed: `SET IX TO 2`, `SET IX UP BY 1` over two tables `INDEXED BY IX` gave
+three COBOLNET1639 warnings and then CS0131 twice. Now the verdict does not depend on whether the ask reports:
+`DataBinder.UniqueOrReportAmbiguous` takes `report` and returns the same item either way (still the one reader of
+the first-declared survivor that `DataNameResolutionDriftTests` pins), and `ResolveIndexName` gates only the
+diagnostic. The program prints `THREE` and `A`. The sibling is `CapacityPlaceOf`, whose report-once guard returned
+null for a probe or a repeated ask of an ambiguous register where the reporting ask returned the picked register's
+place. It gets the same split. Regression tests:
+`IndexNameUniquenessTests.Permissive_AmbiguousIndexName_SetResolvesToTheFirstDeclarationAtEveryAsk`,
+`…_InAReferenceableLinkageRecord_Compiles` and
+`OccursDynamicGuardTests.Permissive_AmbiguousCapacityRegister_InSubscriptAndRefModPositions_ReadsTheFirst`.

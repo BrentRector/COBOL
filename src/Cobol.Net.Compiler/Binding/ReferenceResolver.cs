@@ -1946,7 +1946,11 @@ public sealed partial class ReferenceResolver(DataBinder data)
     private Place? CapacityPlaceOf(Core.DataReferenceContext dref, CapacityRef cap)
     {
         if (cap.Fault is CapacityRefFault.None) return cap.Place;
-        if (_probing || !_diagnosed.Add(dref)) return null;   // R30 purity: a probe never diagnoses (kb/Work PB157)
+        // R30 purity: a probe never diagnoses, and a written reference is reported once (kb/Work PB157). Every fault
+        // but Ambiguous yields null at every ask; Ambiguous's --permissive pick must be the SAME place at every ask,
+        // reported or not (the index-name sibling of wave 1073 review R1-1).
+        bool report = !_probing && _diagnosed.Add(dref);
+        if (!report && cap.Fault is not CapacityRefFault.Ambiguous) return null;
         string text = DataBinder.WrittenText(dref);
         string subject = cap.Register.CobolName ?? cap.Register.CsName;
         string table = cap.Table.CobolName ?? cap.Table.CsName;
@@ -1986,10 +1990,10 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 // §8.4.2.2.3 SR1, through the ONE verdict every name class shares. Its --permissive disposition
                 // picks the first declared register, which is then judged like a unique reference's: a register
                 // under a table is still COBOLNET2126, never a null place with no diagnostic (review R1-1).
-                if (data.UniqueOrReportAmbiguous(cap.Reached, "the CAPACITY register reference", text, out _)
+                if (data.UniqueOrReportAmbiguous(cap.Reached, "the CAPACITY register reference", text, out _, report)
                     is not { } picked) return null;
                 if (CapacityRegisterPlaceOf(picked) is { } pickedPlace) return pickedPlace;
-                ReportUnderATable();
+                if (report) ReportUnderATable();
                 return null;
             case CapacityRefFault.UnderATable:
                 ReportUnderATable();
@@ -2616,23 +2620,26 @@ public sealed partial class ReferenceResolver(DataBinder data)
             ScreenLinkageIndex(one, name, qualifiers, writtenAt);
             return new IndexRef(IndexRefOutcome.Resolved, one);
         }
-        // R30 purity (kb/Work PB157): a probe never diagnoses, and the committing resolution reports once.
-        if (_probing || !_indexRefsReported.Add(writtenAt)) return new IndexRef(IndexRefOutcome.Failed, null);
+        // R30 purity (kb/Work PB157): a probe never diagnoses, and of the several asks one written reference gets
+        // (SET classifies its operand, then binds it) only the first committing one reports. The OUTCOME is the
+        // same at every ask — only the report is once (wave 1073 review R1-1: a second ask that answered Failed
+        // handed the backend the inert "1" as a SET receiver, CS0131).
+        bool report = !_probing && _indexRefsReported.Add(writtenAt);
         string written = DataBinder.WrittenQualified(name, qualifiers);
         if (cands.Count == 0)
         {
-            data.Edition.Error(DiagnosticCatalog.UndefinedReference, $"'{written}' is not defined — '{name}' is an "
-                + "index-name, but no table that declares it is named by the written qualifiers (ISO §8.4.2.2.3 SR6: "
-                + "\"The qualification of an index-name may include the name of the table with which the index-name is "
-                + "associated, as well as any name by which that table may be qualified.\")");
+            if (report)
+                data.Edition.Error(DiagnosticCatalog.UndefinedReference, $"'{written}' is not defined — '{name}' is "
+                    + "an index-name, but no table that declares it is named by the written qualifiers (ISO §8.4.2.2.3 "
+                    + "SR6: \"The qualification of an index-name may include the name of the table with which the "
+                    + "index-name is associated, as well as any name by which that table may be qualified.\")");
             return new IndexRef(IndexRefOutcome.Failed, null);
         }
-        if (data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _) is not { } first)
+        if (data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _, report) is not { } first)
             return new IndexRef(IndexRefOutcome.Failed, null);
         // --permissive: warned, and resolved to the first declaration, which is then screened like a unique one —
-        // ambiguity is a fault of the WRITTEN reference and does not excuse the table it resolves to (§13.7.3 SR4;
-        // the PB2988 review R1-1 shape: when only the unique arm screened, an index of an unreferenceable linkage
-        // record reached the backend and failed it, CS0131).
+        // ambiguity is a fault of the WRITTEN reference and does not excuse the table it resolves to (§13.7.3 SR4 e):
+        // an index of a linkage record outside the USING phrase is refused as it would be for a unique reference).
         ScreenLinkageIndex(first, name, qualifiers, writtenAt);
         return new IndexRef(IndexRefOutcome.Resolved, first);
     }
