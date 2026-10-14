@@ -74,7 +74,9 @@ public sealed class NulByteDriftTests
             + Environment.NewLine
             + "A NUL inside a C# literal is the backslash-zero (or backslash-u0000) escape written as a RAW character: the "
             + "tool that wrote the file decoded the escape. Replace the byte with the escape sequence written as ordinary "
-            + "characters, verified with `grep -c -P '\\x00' <file>`.");
+            + "characters, verified with `grep -c -a -P '\\x00' <file>` (without -a, grep reads a file holding a NUL as "
+            + "binary and counts 0). A golden .out whose program displays a NUL is re-expressed so every byte it pins "
+            + "is printable (a national character whose UTF-16 bytes are both printable, NX\"5831\").");
     }
 
     /// <summary>The sweep read the tree it claims to have swept — a missing git or an empty index would otherwise make

@@ -26,6 +26,10 @@ public sealed class OoMethodDataScope
     /// method-private: two methods each with <c>INDEXED BY IX</c> get DISTINCT cells, and a method IX shadows an
     /// object IX with its OWN cell — never one of the unit's <see cref="DataBinder.IndexNames"/>).</summary>
     public IndexNameRegistry IndexNames { get; } = new();
+
+    /// <summary>The method's own §8.3.2.2 census: a method is a source element of its own (§10.5), so its words may
+    /// repeat, as another type, a word of its class or of a sibling method (§8.4.6.1; kb/Work PB2921).</summary>
+    internal UserWordCensus Words { get; } = new();
 }
 
 /// <summary>
@@ -265,9 +269,34 @@ public sealed partial class DataBinder
     // (P6 Step 7b) — every consumer resolves through Symbols.TryResolve/IndexCandidates with an
     // EXPLICIT Scope (ActiveScope at statement-bind sites; ScopeOf(anchorRoot) at post-build-pass sites).
 
-    /// <summary>Set while binding a METHOD's data entries (M2-OO-1h step 4) so INDEXED BY index-names register into
-    /// the method's own scope, never the unit's. Null at program/object scope.</summary>
+    /// <summary>Set while a METHOD's declarations are bound or collected (<see cref="EnterMethodDeclarations"/>):
+    /// INDEXED BY index-names register into the method's own scope, never the unit's (M2-OO-1h step 4), and every
+    /// user-defined word lands in the method's own §8.3.2.2 census (kb/Work PB2921). Null at program/object scope.</summary>
     private OoMethodDataScope? _bindingMethodScope;
+
+    /// <summary>Declare into <paramref name="scope"/>'s method until the returned token is disposed: its data entries
+    /// and METHOD-ID (<see cref="OoBindMethodData"/>) and its procedure-names (the class-body collection,
+    /// <c>StatementBinder.BindClassBody</c>). One method source element at a time, so no scope nests.</summary>
+    internal MethodDeclarationScope EnterMethodDeclarations(OoMethodDataScope scope)
+    {
+        _bindingMethodScope = scope;
+        return new MethodDeclarationScope(this);
+    }
+
+    /// <summary>The restore token of <see cref="EnterMethodDeclarations"/>.</summary>
+    internal readonly struct MethodDeclarationScope(DataBinder binder) : IDisposable
+    {
+        public void Dispose() => binder._bindingMethodScope = null;
+    }
+
+    /// <summary>Reserve the C# member names of the methods emitted into the same C# class as this binder's data (the
+    /// instance methods beside the object data, the factory methods beside the factory data), BEFORE the data
+    /// division binds, so a data root spelled like one of them takes a distinct field name (<c>PQ_2</c>) instead of a
+    /// second member <c>PQ</c> (CS0102). The COBOL is legal: the METHOD-ID's method-name belongs to the method's own
+    /// source element (§8.4.6.5, §10.5), and §8.3.2.2 bars one word as two types only within one source element
+    /// (kb/Work PB2921). The data root is private, so its C# name is free to move; the method's is its contract.</summary>
+    internal void ReserveMethodMemberNames(IEnumerable<OoMethodSymbol> methods) =>
+        _rootNames.Reserve(methods.Select(static m => m.CsName));
 
     /// <summary>True when <paramref name="item"/> is OBJECT data of a class unit (§14.9.23.3 SR 10): its 01/77
     /// root is not method-scoped. Always false outside a class unit.</summary>
@@ -302,35 +331,43 @@ public sealed partial class DataBinder
             m.MethodOptions = OptionsBinder.BindParagraph(mo, Edition, Options);
 
         var dd = m.Ctx.dataDivision();
-        _bindingMethodScope = m.DataScope;   // M2-OO-1h step 4: route INDEXED BY index-names to the method scope
-        if (dd is not null)
+        using (EnterMethodDeclarations(m.DataScope))
         {
-            // The method's constant entries are declared before its sections bind, so one may be referenced before
-            // the entry that defines it (kb/Work PB1231); BindRemainingConstants below binds what nothing needed.
-            DeclareDataEntries(dd);
-            // The sections a method definition may not carry — FILE, WORKING-STORAGE, REPORT, SCREEN (§13.4.3,
-            // §13.5.3, §13.8.3, §13.9.3 SR1) — are judged once, at EVERY edition, by the one DATA-division placement
-            // table (kb/Work PB1251, PB1308 decision R62). A method's own data division is LOCAL-STORAGE (§13.6.3) and
-            // LINKAGE (§13.7.3), both bound below. The same screen refuses every GLOBAL clause written in the method
-            // (§13.18.27.3 SR4, COBOLNET1520 — a method prototype of an interface included; kb/Work PB1045).
-            OoDefinitionRules.Screen(OoDefinition.Method, where, dd, Edition);
-            if (dd.workingStorageSection() is { } ws)
+            // The METHOD-ID's word belongs to the METHOD's source element (§8.4.6.5: "The method-name of a method is
+            // declared in the METHOD-ID paragraph"), not its class's, so a METHOD-ID spelled like its CLASS-ID is legal
+            // (§8.4.6.1; kb/Work PB2921): a method-name, or for a GET/SET PROPERTY method the property-name it names.
+            // The accessors a PROPERTY clause synthesizes carry no METHOD-ID and never come here.
+            using (Edition.At(m.Ctx))
+                DeclareUserWord(m.PropertyName ?? m.Name,
+                    m.PropertyName is null ? UserWordKind.MethodName : UserWordKind.PropertyName);
+            if (dd is not null)
             {
-                // §13.5.3 SR1 refused this section above (OoDefinitionRules, at EVERY edition — 2002, 2014 and 2023
-                // alike, kb/Work PB1308 decision R62; never an edition gate, never relaxed by --permissive). The
-                // entries are still bound — in their own (working-storage) section, so every section rule keeps
-                // answering — into the method's local roots: recovery only (the compile has failed), so the method
-                // body's references to these names do not draw a cascade of "not defined" errors that would bury the
-                // real one. There is no static-field mapping of method data any more.
-                m.Binding!.LocalRoots.AddRange(BindEntries(ws.dataDescriptionEntry(), _rootNames));
+                // The method's constant entries are declared before its sections bind, so one may be referenced before
+                // the entry that defines it (kb/Work PB1231); BindRemainingConstants below binds what nothing needed.
+                DeclareDataEntries(dd);
+                // The sections a method definition may not carry — FILE, WORKING-STORAGE, REPORT, SCREEN (§13.4.3,
+                // §13.5.3, §13.8.3, §13.9.3 SR1) — are judged once, at EVERY edition, by the one DATA-division placement
+                // table (kb/Work PB1251, PB1308 decision R62). A method's own data division is LOCAL-STORAGE (§13.6.3) and
+                // LINKAGE (§13.7.3), both bound below. The same screen refuses every GLOBAL clause written in the method
+                // (§13.18.27.3 SR4, COBOLNET1520 — a method prototype of an interface included; kb/Work PB1045).
+                OoDefinitionRules.Screen(OoDefinition.Method, where, dd, Edition);
+                if (dd.workingStorageSection() is { } ws)
+                {
+                    // §13.5.3 SR1 refused this section above (OoDefinitionRules, at EVERY edition — 2002, 2014 and 2023
+                    // alike, kb/Work PB1308 decision R62; never an edition gate, never relaxed by --permissive). The
+                    // entries are still bound — in their own (working-storage) section, so every section rule keeps
+                    // answering — into the method's local roots: recovery only (the compile has failed), so the method
+                    // body's references to these names do not draw a cascade of "not defined" errors that would bury the
+                    // real one. There is no static-field mapping of method data any more.
+                    m.Binding!.LocalRoots.AddRange(BindEntries(ws.dataDescriptionEntry(), _rootNames));
+                }
+                if (dd.localStorageSection() is { } ls)
+                    m.Binding!.LocalRoots.AddRange(BindEntries(ls.dataDescriptionEntry(), _rootNames, EntrySection.LocalStorage));
+                if (dd.linkageSection() is { } lk)
+                    m.Binding!.LinkageRoots.AddRange(BindEntries(lk.dataDescriptionEntry(), _rootNames, EntrySection.Linkage));
+                BindRemainingConstants();
             }
-            if (dd.localStorageSection() is { } ls)
-                m.Binding!.LocalRoots.AddRange(BindEntries(ls.dataDescriptionEntry(), _rootNames, EntrySection.LocalStorage));
-            if (dd.linkageSection() is { } lk)
-                m.Binding!.LinkageRoots.AddRange(BindEntries(lk.dataDescriptionEntry(), _rootNames, EntrySection.Linkage));
-            BindRemainingConstants();
         }
-        _bindingMethodScope = null;
 
         foreach (var root in m.Binding!.LocalRoots.Concat(m.Binding!.LinkageRoots))
         {

@@ -935,9 +935,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
                 data = $"__dyn{ctx.Names.NextKeyedSeq()}";
                 w.Line($"string {data} = {RuntimeApi.DynStructureUnframe(structure.Code, currentRecord)};");
             }
-            string content = item.Pic?.Category is PicCategory.National
-                ? RuntimeApi.NatReadWindow(data, "0", $"{data}.Length / 2")
-                : data;
+            string content = ReceivingStore.ContentCharacters(item, data);
             // D-FRA (vi): the fixed form of a dynamic-length record fills its whole field with the content and spaces;
             // the spaces are padding, never data (the group arm drops them member by member, in Decompose). A
             // STRUCTURED record's data is already exact — its length field or delimiter ended it — so a trailing space

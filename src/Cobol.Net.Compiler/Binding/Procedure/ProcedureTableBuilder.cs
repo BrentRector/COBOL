@@ -136,23 +136,14 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
         return pc;
     }
 
-    public void CollectParagraphs(Core.ProcedureDivisionContext pd)
+    /// <summary>The NONDECLARATIVE portion's walk, ONE for a program's procedure division (<see cref="CollectParagraphs"/>)
+    /// and a method's (<c>StatementBinder.BindClassBody</c>, with <see cref="BinderContext.CurrentMethodScope"/> set, so
+    /// every name registers method-locally): the unnamed lead sentences at the next pc, then each paragraph and section
+    /// at its header's position, every procedure-name declared through the one funnel. The method arm kept its own copy
+    /// of this walk, which declared no section-name and reported a procedure-name's §8.3.2.2 conflict without a
+    /// position (kb/Work PB2921).</summary>
+    public void CollectNondeclaratives(Core.ProcedureDivisionContext pd, HashSet<string> used)
     {
-        var used = new HashSet<string>(StringComparer.Ordinal);
-
-        // DECLARATIVES first (ISO §14.2.3 GR1 — execution begins with the first NONdeclarative procedure; the
-        // declarative sections share the ONE pc space, entered only via the USE dispatch or an explicit PERFORM —
-        // §14.9.49.3 SR4 admits no other reference into a declarative section from outside it, and
-        // ResolveProcedureOperand enforces it, kb/Work PB362). The walk records the BoundDeclarative scopes
-        // (StatementBinder.Declaratives.cs).
-        foreach (var dp in pd.declarativePart())
-            foreach (var sec in dp.declarativeSection())
-            {
-                using var _ = ctx.Edition.At(sec);   // the declarative section's position (kb/Work PB82)
-                DeclCollectSection(sec, used);
-            }
-        _entryPc = _paras.Count;
-
         // §14.4.3 — sentences written directly after the PROCEDURE DIVISION header, with no paragraph-name.
         // They form the first nondeclarative paragraph, so they must take the ENTRY pc (execution begins with
         // the first nondeclarative procedure, §14.2.3 GR1) — hence before the procedureUnit walk.
@@ -176,9 +167,28 @@ internal sealed class ProcedureTableBuilder(BinderContext ctx)
                 foreach (var p in section.paragraphDefinition())
                     AddParagraph(p.paragraphName().GetText(), p.sentence(), info, used);
                 info.CloseAt(_paras.Count - 1);   // zero paragraphs ⇒ the range stays EMPTY (§14.4.2)
-                _sections.Declare(info.Name, info);
+                (ctx.CurrentMethodScope?.Sections ?? _sections).Declare(info.Name, info);
             }
         }
+    }
+
+    public void CollectParagraphs(Core.ProcedureDivisionContext pd)
+    {
+        var used = new HashSet<string>(StringComparer.Ordinal);
+
+        // DECLARATIVES first (ISO §14.2.3 GR1 — execution begins with the first NONdeclarative procedure; the
+        // declarative sections share the ONE pc space, entered only via the USE dispatch or an explicit PERFORM —
+        // §14.9.49.3 SR4 admits no other reference into a declarative section from outside it, and
+        // ResolveProcedureOperand enforces it, kb/Work PB362). The walk records the BoundDeclarative scopes
+        // (StatementBinder.Declaratives.cs).
+        foreach (var dp in pd.declarativePart())
+            foreach (var sec in dp.declarativeSection())
+            {
+                using var _ = ctx.Edition.At(sec);   // the declarative section's position (kb/Work PB82)
+                DeclCollectSection(sec, used);
+            }
+        _entryPc = _paras.Count;
+        CollectNondeclaratives(pd, used);
 
         // X3.23-1985 USE FOR DEBUGGING (VCR Table 7 row 7.17): resolve the debug SUBJECTS now that every
         // nondeclarative procedure is in the pc space — the ALL PROCEDURES / procedure-name legs bind to real

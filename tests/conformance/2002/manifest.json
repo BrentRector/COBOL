@@ -850,7 +850,12 @@
   "pb2937_skeleton_bodies_bind_as_themselves",
   "pb3120_group_formal_pointer_type",
   "pb3120_group_formal_template_pointer_signature",
-  "pb3120_universal_type_subject_key"
+  "pb3120_universal_type_subject_key",
+  "pb2921_factory_named_class",
+  "pb2921_class_named_method",
+  "pb2921_data_named_like_method",
+  "pb546_national_leaf_one_width",
+  "pb3132_contained_program_word_it_never_references"
   ],
   "pending": []
 }
