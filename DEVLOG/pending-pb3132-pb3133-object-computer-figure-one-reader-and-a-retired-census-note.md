@@ -62,3 +62,7 @@ four doc sites, PB3133's note and two inventory rows (FMT-12.3.6.2, RV-15.57.4-3
 `pb78-object-computer-duplicate-clause` and `pb64t5-classification-twice` expect it; the 85 negatives still expect
 COBOLNET2423; `ClauseCardinalityDriftTests.TheObjectComputerRow_ScreensTheCobol85FigureBelow2002` pins the flag per
 figure and `EveryChoiceIndicatorFigure_IsOrderFree` ties the flag to an absent `Sequence`.
+
+**Review round 2 (R2-1, a comment).** The binder comment in `DataBinder.Switches.cs` still said the OBJECT-COMPUTER repeat is
+COBOLNET2423; round 1 had moved the 2002+ repeat to COBOLNET2104. It now names both codes by figure. Swept every
+COBOLNET2423 mention under src/ and docs/: the rest describe the 85 figure, the OPTIONS paragraph or RD brackets, and are true.
