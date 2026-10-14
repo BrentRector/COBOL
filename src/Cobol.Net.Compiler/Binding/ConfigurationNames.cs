@@ -29,16 +29,10 @@ internal sealed class ConfigurationNames<T>(UserWordKind kind,
 {
     private readonly Dictionary<string, T> _entries = new(CobolNames.Comparer);
 
-    /// <summary>The type of user-defined word every entry is (§8.3.2.2's list).</summary>
-    public UserWordKind Kind => kind;
-
     public int Count => _entries.Count;
 
     /// <summary>The declared names, in declaration order (a diagnostic's "declared:" list).</summary>
     public IEnumerable<string> Names => _entries.Keys;
-
-    /// <summary>Every entry, for the readers that are no reference to a name (the emitter's carriers).</summary>
-    public IEnumerable<KeyValuePair<string, T>> Entries => _entries;
 
     /// <summary>Declare <paramref name="name"/>; false (the first declaration kept) when it is already declared.</summary>
     public bool TryAdd(string name, T value) => _entries.TryAdd(name, value);
@@ -47,7 +41,7 @@ internal sealed class ConfigurationNames<T>(UserWordKind kind,
     public void Set(string name, T value) => _entries[name] = value;
 
     /// <summary>Resolve a REFERENCE to <paramref name="name"/> in this type's position, and record it as a use of the
-    /// word as <see cref="Kind"/> in the census of the source element <paramref name="site"/> lies in (§8.3.2.2).
+    /// word as this table's type in the census of the source element <paramref name="site"/> lies in (§8.3.2.2).
     /// False, recording nothing, when no entry is named so.</summary>
     public bool TryUse(Antlr4.Runtime.RuleContext? site, string name, [MaybeNullWhen(false)] out T value)
     {

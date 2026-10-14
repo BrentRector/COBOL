@@ -468,7 +468,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         ctx.Data.ConstantOf(dref) is { } k ? new(DataBinder.WrittenText(dref), k, null)
         // A symbolic-character a CONTAINING element declares yields to the referring element's own item of the same
         // spelling: "a source element's reference to such a name, even when it is a different type of user-defined
-        // word, is to the item which that source element describes" (§8.4.6.1; kb/Work PB3153). Asked BEFORE the
+        // word, is to the item which that source element describes" (§8.4.6.1, kb/Work PB3153). Asked BEFORE the
         // resolution, which records the word as used as a symbolic-character (§8.3.2.2). In one element the two
         // cannot coexist (COBOLNET2692 at the second declaration), so the probe changes no own-element answer.
         : ctx.Data.NamesSymbolic(dref) && ctx.Refs.Probe(dref) is null

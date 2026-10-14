@@ -88,6 +88,85 @@ public sealed class InheritedConfigurationNameUseTests
         EditionHarness.AssertNoDiagnostic(diags, "COBOLNET2692");
     }
 
+    /// <summary>§8.4.6.1: "a source element's reference to such a name, even when it is a different type of
+    /// user-defined word, is to the item which that source element describes". SET LOCALE … TO admits a locale-name
+    /// and an identifier, so the contained program's own PBL is the operand, not its container's locale-name PBL: a
+    /// data-pointer item is legal, and an alphanumeric one is §14.9.39.3 SR27's refusal (COBOLNET1668), never a use
+    /// of the locale-name (COBOLNET2692).</summary>
+    [Theory]
+    [InlineData("USAGE POINTER", true)]
+    [InlineData("PIC X", false)]
+    public void SetLocaleTo_TheElementsOwnItem_WinsOverAnInheritedLocaleName(string description, bool legal)
+    {
+        string source = $"""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB3153LO.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            SPECIAL-NAMES.
+                LOCALE PBL IS "en-US".
+            PROCEDURE DIVISION.
+                CALL "PB3153LI".
+                STOP RUN.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB3153LI.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 PBL {description}.
+            PROCEDURE DIVISION.
+                SET LOCALE LC_ALL TO PBL.
+            END PROGRAM PB3153LI.
+            END PROGRAM PB3153LO.
+            """;
+        var (ok, diags) = EditionHarness.Compile(source, 2002);
+        EditionHarness.AssertNoDiagnostic(diags, "COBOLNET2692");
+        Assert.Equal(legal, ok);
+        if (!legal) EditionHarness.AssertHasDiagnostic(diags, "COBOLNET1668");
+    }
+
+    /// <summary>The same rule at WRITE … ADVANCING, which admits a mnemonic-name and an identifier: the contained
+    /// program's own PBT is the line count, not its container's mnemonic-name PBT for C01. An integer item is legal; an
+    /// alphanumeric one is §14.9.51.3 SR14's refusal (COBOLNET2365), never a use of the mnemonic-name.</summary>
+    [Theory]
+    [InlineData("PIC 9 VALUE 2", true)]
+    [InlineData("PIC X VALUE \"2\"", false)]
+    public void WriteAdvancing_TheElementsOwnItem_WinsOverAnInheritedMnemonicName(string description, bool legal)
+    {
+        string source = $"""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB3153WO.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            SPECIAL-NAMES.
+                C01 IS PBT.
+            PROCEDURE DIVISION.
+                CALL "PB3153WI".
+                STOP RUN.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. PB3153WI.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "pb3153w.dat".
+            DATA DIVISION.
+            FILE SECTION.
+            FD F.
+            01 R PIC X(10).
+            WORKING-STORAGE SECTION.
+            01 PBT {description}.
+            PROCEDURE DIVISION.
+                OPEN OUTPUT F.
+                WRITE R AFTER ADVANCING PBT.
+                CLOSE F.
+            END PROGRAM PB3153WI.
+            END PROGRAM PB3153WO.
+            """;
+        var (ok, diags) = EditionHarness.Compile(source, 85);
+        EditionHarness.AssertNoDiagnostic(diags, "COBOLNET2692");
+        Assert.Equal(legal, ok);
+        if (!legal) EditionHarness.AssertHasDiagnostic(diags, "COBOLNET2365");
+    }
+
     /// <summary>A METHOD is a source element of its own (§10.5), and the class-name its class's SPECIAL-NAMES declares
     /// reaches it the same way: method M1A uses PB53MDIG in a class condition and declares a paragraph PB53MDIG (refused
     /// at the use), while method M1B only declares the paragraph (legal).</summary>
