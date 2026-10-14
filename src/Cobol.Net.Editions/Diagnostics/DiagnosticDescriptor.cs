@@ -64,8 +64,9 @@ public enum DeclinedAnnex
 /// <c>COBOLNET0899</c> family sets this explicitly — e.g. <c>recognized-not-implemented</c> — so a developer can
 /// mute all deferred-feature diagnostics as a group without also muting genuine validation errors on the same
 /// code).</param>
-/// <param name="PermissiveInert">The declined element compiles to a no-op under <c>--permissive</c> — read by the
-/// one <c>EditionContext.Declined</c> seam, never tested at an emit site.</param>
+/// <param name="PermissiveInert">The declined element is accepted under <c>--permissive</c> (a warning, not the
+/// refusal): a clause binds to a no-op, a declined module's exception-name resolves and is raised only by a RAISE
+/// statement — read by the one refuse rule <c>EditionContext.Refuses</c>, never tested at an emit site.</param>
 /// <param name="Annex">For a DECLINED-FACILITY diagnostic, which annex lists the element (kb/Work PB709). See
 /// <see cref="DeclinedAnnex"/>: it is what <see cref="PostureClause"/> derives the licensing § from, so the clause
 /// cannot be written by hand at one site and contradicted at the next. <see cref="DeclinedAnnex.None"/> for every

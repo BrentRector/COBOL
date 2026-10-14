@@ -313,34 +313,12 @@ public abstract class CobolParserCoreBase : Parser
             && !Word(second, "IS");
     }
 
-    /// <summary>
-    /// True when the current token spells a reserved-as-facility keyword AT THE TARGETED EDITION — i.e. it can
-    /// only be the (unsupported) facility verb here, never a user-defined word. Gates the recognize-and-name
-    /// statement arms for the facilities WiseOwl COBOL does not implement: MCS SEND/RECEIVE (ISO §14.9.31/§14.9.38,
-    /// Annex A.3 item 4), COMMIT/ROLLBACK (A.3 items 6–7), VALIDATE (§14.9.50).
-    /// <para>
-    /// WHY A PREDICATE AT ALL, given these are now hard lexer tokens: their §8.9 reservation is NON-MONOTONIC —
-    /// RECEIVE/SEND/END-RECEIVE are reserved at 85, USER WORDS at 2002/2014, and re-reserved at 2023;
-    /// COMMIT/ROLLBACK/END-SEND are reserved at 2023 only; VALIDATE is a user word at 85; MESSAGE runs the other
-    /// way (reserved 85/2002, user word 2014/2023). The tokens are admitted to the <c>cobolWord</c> nameSlot
-    /// funnel so they remain legal user names wherever unreserved, and this predicate stops the STATEMENT arm
-    /// from firing at those editions — so <c>01 RECEIVE PIC X.</c> at --std 2002 stays a data item.
-    /// </para>
-    /// <para>
-    /// ⛔ The arms this gates are KEYWORD-TOKEN-LED, never IDENTIFIER-led. An IDENTIFIER-led <c>statement</c>
-    /// alternative poisons ANTLR's ALL(*) boolean-factor prediction DFA and regresses
-    /// <c>COMPUTE R = B-NOT A.</c> at every edition — empirically proven and reverted (DEVLOG 903). A predicate
-    /// on a distinct leading token is unreachable during arithmetic/boolean prediction and cannot poison it.
-    /// </para>
-    /// Reads the SAME <see cref="ReservedWords"/> table the §8.9 funnel uses, so recognition and reservation
-    /// can never diverge. Read-only — safe for ANTLR's repeated speculative prediction calls.
-    /// </summary>
     /// <summary>True when <paramref name="keyword"/> is a §8.9 reserved word at the compile edition — the
     /// cobolWord exclusion predicate (kb/Work PB137): a word the edition reserves cannot be a user-defined
-    /// word, so the alternative that would absorb it into an operand list must not match.</summary>
+    /// word, so the alternative that would absorb it into an operand list must not match.
     /// <para>Through the &gt;&gt;COBOL-WORDS resolution (kb/Work PB250): an UNDEFINE'd word is not reserved
     /// here at any edition (§7.3.10.4 GR3), and an EQUATEd synonym is reserved exactly where its canonical
-    /// word is (GR2).</para>
+    /// word is (GR2).</para></summary>
     protected bool reservedHere(string keyword)
         => Canonical(keyword) is { } w && (ReservedWords.Find(w)?.IsReservedAt(Edition.Year) ?? false);
 
@@ -657,6 +635,20 @@ public abstract class CobolParserCoreBase : Parser
             : null;
     }
 
+    /// <summary>True when the current token spells <paramref name="keyword"/> AND §8.9 reserves it at the targeted
+    /// edition — the predicate on the recognize-and-name statement arms of VALIDATE (§14.9.50, Annex A.4.14) and
+    /// COMMIT / ROLLBACK (§14.9.7 / §14.9.36, Annex A.3 items 6–7). For these verbs the reservation begins at the
+    /// statement's introduction and never lapses (VALIDATE from 2002, COMMIT and ROLLBACK from 2023), so "reserved
+    /// here" is exactly "the statement exists here", and where the word is a user word the arm stays out of the way:
+    /// <c>COMMIT.</c> at --std 2014 is a paragraph.
+    /// <para>⛔ NOT FOR A VERB WHOSE RESERVATION IS NON-MONOTONIC (kb/Work PB374). RECEIVE and SEND are reserved at
+    /// COBOL-85 for the '85 communication module, user words at 2002/2014 and reserved again at 2023 for asynchronous
+    /// messaging, so this predicate recognized the 2023 formats at --std 85. Their arms are the union grammar
+    /// (<see cref="wordAhead"/>) and the edition pass gates their introduction (COBOLNET0900).</para>
+    /// <para>⛔ The arms this gates are KEYWORD-TOKEN-LED, never IDENTIFIER-led: an IDENTIFIER-led <c>statement</c>
+    /// alternative poisons ANTLR's ALL(*) boolean-factor prediction DFA and regresses <c>COMPUTE R = B-NOT A.</c> at
+    /// every edition (DEVLOG 903). Reads the SAME <see cref="ReservedWords"/> table the §8.9 funnel uses, so
+    /// recognition and reservation cannot diverge; read-only, so safe for repeated speculative prediction.</para></summary>
     protected bool facilityWord(string keyword)
     {
         var t = CurrentToken;
@@ -668,30 +660,6 @@ public abstract class CobolParserCoreBase : Parser
     protected CobolParserCoreBase(ITokenStream input) : base(input) { }
     protected CobolParserCoreBase(ITokenStream input, TextWriter output, TextWriter errorOutput)
         : base(input, output, errorOutput) { }
-
-    /// <summary>
-    /// Returns true if the current token is the first non-whitespace token on its line.
-    /// Used to prevent stray identifiers (like LINES after WRITE ADVANCING)
-    /// from being misinterpreted as paragraph names.
-    /// </summary>
-    protected bool IsAtLineStart()
-    {
-        var token = CurrentToken;
-        if (token == null) return false;
-
-        // Check if this token's column is 0, or if the previous token
-        // is on a different line
-        int tokenLine = token.Line;
-        int tokenIndex = token.TokenIndex;
-
-        if (tokenIndex <= 0) return true;
-
-        var prevToken = TokenStream.Get(tokenIndex - 1);
-        // A debugging line that is source (kb/Work PB1705) begins with its hidden DEBUG_LINE marker, which stands on the
-        // line but is no program text: the token after it is the first token of the line, so a paragraph name written on a
-        // debugging line (DB101A's `DDEBUG-LINE-TEST-03-A.`) begins its paragraph.
-        return prevToken.Type == CobolLexer.DEBUG_LINE || prevToken.Line < tokenLine;
-    }
 
     /// <summary>
     /// Predicate for the bare (adjective-less) INSPECT TALLYING count phrase. An ALL or

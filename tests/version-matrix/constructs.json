@@ -124,6 +124,19 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. IV.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS IVC.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 OBJ USAGE OBJECT REFERENCE IVC.\nPROCEDURE DIVISION.\nMAIN.\n    INVOKE IVC \"NEW\" RETURNING OBJ.\n    INVOKE OBJ \"DOIT\".\n    STOP RUN.\nEND PROGRAM IV.\n\nIDENTIFICATION DIVISION.\nCLASS-ID. IVC INHERITS FROM BASE.\nENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nREPOSITORY.\n    CLASS BASE.\nIDENTIFICATION DIVISION.\nOBJECT.\nPROCEDURE DIVISION.\nMETHOD-ID. DOIT.\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY \"OK\".\nEND METHOD DOIT.\nEND OBJECT.\nEND CLASS IVC.\n"
   },
   {
+   "id": "async-messaging-2023",
+   "status": "active",
+   "description": "The asynchronous messaging statements RECEIVE (ISO §14.9.31) and SEND (§14.9.38) — a COBOL-2023 introduction (Annex E.3.2 item 1). The facility is declined (Annex A.3 item 4; docs/CONFORMANCE.md §4 item 1): at 2023 each statement is accepted inert under COBOLNET1578. Both grammar arms are the UNION grammar, predicated only on the verb's spelling, because §8.9 reserves RECEIVE and SEND at 85 (the '85 communication module) and again at 2023 with a user-word gap between; the VersionConformancePass parse arm (VisitMcsReceiveStatement / VisitMcsSendStatement) names the edition on RECOGNITION, so 85, 2002 and 2014 all answer COBOLNET0900 (kb/Work PB374: the reservation predicate had compiled the 2023 formats at --std 85 under a warning naming the 2023 facility).",
+   "display": "RECEIVE/SEND (asynchronous messaging)",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §14.9.31 / §14.9.38 (asynchronous messaging; Annex E.3.2 item 1)",
+   "introducedIn": 2023,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "VCR Table 2 row 38 (Annex E.3.2 item 1)",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. AMG.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 WS-TAG PIC X(8).\n01 WS-MSG PIC X(20).\n01 WS-LEN PIC 9(4).\nPROCEDURE DIVISION.\nMAIN.\n    RECEIVE FROM WS-TAG GIVING WS-MSG WS-LEN.\n    SEND TO WS-TAG FROM WS-MSG.\n    STOP RUN.\n"
+  },
+  {
    "id": "goback-returning-2002",
    "description": "GOBACK RETURNING/GIVING identifier — an IMPLEMENTOR EXTENSION, not an ISO phrase (kb/Work PB407). §14.9.18.2's general format has exactly two alternatives inside its choice-indicator bracket, raising-phrase and status-phrase; there is no RETURNING or GIVING phrase, and §14.9.18.4 GR2's RETURNING is the PROCEDURE DIVISION HEADER's item, not a phrase of the statement. The row is kept because the extension is accepted (the shipped 2002/goback_returning.cob golden runs it) and is gated at 2002 because GOBACK itself is a 2002 introduction — but it no longer cites a GOBACK clause as the authority for a phrase that clause does not contain.",
    "display": "GOBACK RETURNING",

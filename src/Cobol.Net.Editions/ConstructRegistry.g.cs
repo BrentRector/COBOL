@@ -21,6 +21,7 @@ public static partial class ConstructRegistry
         new("allocate-2002", "ALLOCATE", 2002, null, null, "COBOLNET0900", "ISO §14.9.3"),
         new("free-2002", "FREE", 2002, null, null, "COBOLNET0900", "ISO §14.9.15"),
         new("invoke-2002", "INVOKE", 2002, null, null, "COBOLNET0900", "ISO §14.9.23 (OO)"),
+        new("async-messaging-2023", "RECEIVE/SEND (asynchronous messaging)", 2023, null, null, "COBOLNET0900", "ISO §14.9.31 / §14.9.38 (asynchronous messaging; Annex E.3.2 item 1)"),
         new("goback-returning-2002", "GOBACK RETURNING", 2002, null, null, "COBOLNET0900", "NOT ISO — an extension of §14.9.18.2's general format; gated at the GOBACK statement's own 2002 introduction (ISO §14.9.18)"),
         new("stop-run-status-2002", "STOP RUN WITH status", 2002, null, null, "COBOLNET0900", "ISO §14.9.42"),
         new("goback-status-2023", "GOBACK WITH NORMAL/ERROR STATUS", 2023, null, null, "COBOLNET0900", "ISO §14.9.18.2 / §14.9.18.4 GR3; Annex E.3.3 (2023 new-features annex item 32)"),

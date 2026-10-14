@@ -92,6 +92,7 @@ names), or if a spec LINE number reappears anywhere in this file — so the ledg
 | all-literal-multichar-numeric-removed-2002 | 85 | removed 2002 | COBOLNET0902 | done | 7.13 |
 | arithmetic-standard-2002 | 2002 | removed 2023 | COBOLNET0807 | done | 28 |
 | assign-using-2002 | 2002 | — | COBOLNET0900 | done | 7.27 |
+| async-messaging-2023 | 2023 | — | COBOLNET0900 | done | 38 |
 | close-with-lock-removed-2023 | 85 | removed 2023 | COBOLNET0902 | done | 7 |
 | cobol-words-directive-2023 | 2023 | — | COBOLNET0900 | done | 11, 55 |
 | col7-continuation-obsolete-2023 | 85 | obsolete 2023 | COBOLNET0903 | done | 94 |
@@ -188,7 +189,7 @@ names), or if a spec LINE number reappears anywhere in this file — so the ledg
 
 | # | Change (title) | § | Edition delta | Old → New behavior | Affects existing? | Compiler gating action |
 |---|---|---|---|---|---|---|
-| 38 | Asynchronous messaging facility | E.3.2 item 1 (introduces EC-MCS-* + reserved/context words) | 2014→2023 | **Old:** no standard inter-run-unit messaging. **New:** communication between run units via messages (same or different processors, not necessarily co-located). | Yes | new-feature-gate <!-- todo --> |
+| 38 | Asynchronous messaging facility | E.3.2 item 1 (introduces EC-MCS-* + reserved/context words) | 2014→2023 | **Old:** no standard inter-run-unit messaging. **New:** communication between run units via messages (same or different processors, not necessarily co-located). | Yes | new-feature-gate: RECEIVE and SEND parse at every edition and the edition pass names the introduction (COBOLNET0900; kb/Work PB374); at 2023 the declined facility is accepted inert (COBOLNET1578) <!-- gate:async-messaging-2023 --> |
 | 39 | Commit and rollback facility | E.3.2 item 2 (EC-FLOW-APPLY-COMMIT / EC-FLOW-COMMIT / EC-FLOW-ROLLBACK) | 2014→2023 | **Old:** no standard commit/rollback over file changes. **New:** commit file changes at specified stages; rollback to previous commit / run-unit start; specified data items saved by a commit for rollback restore. | Yes | new-feature-gate <!-- todo --> |
 | 40 | New exception conditions (EC-MCS-*, EC-FLOW-*, EC-CONTINUE-*, EC-EXTERNAL-*, EC-I-O-WARNING, EC-IO-RECORD-CONTENT) | E.3.2 item 3 | 2014→2023 | **Old:** these EC-* names did not exist (words available as user-defined names). **New:** reserved EC-* names added: EC-MCS, EC-MCS-ABNORMAL-TERMINATION, EC-MCS-IMP, EC-MCS-INVALID-TAG, EC-MCS-MESSAGE-LENGTH, EC-MCS-NO-REQUESTOR, EC-MCS-NO-SERVER, EC-MCS-NORMAL-TERMINATION, EC-MCS-REQUESTOR-FAILED; EC-FLOW-APPLY-COMMIT, EC-FLOW-COMMIT, EC-FLOW-ROLLBACK; EC-CONTINUE, EC-CONTINUE-IMP, EC-CONTINUE-LESS-THAN-ZERO; EC-EXTERNAL, EC-EXTERNAL-DATA-MISMATCH, EC-EXTERNAL-FILE-MISMATCH, EC-EXTERNAL-FORMAT-CONFLICT, EC-EXTERNAL-IMP; EC-I-O-WARNING; EC-IO-RECORD-CONTENT. | Yes | flag-new-reserved-word <!-- todo --> |
 | 41 | Logical operators EXCLUSIVE-OR / XOR | E.3.2 item 4 | 2014→2023 | **Old:** logical operators limited to AND/OR/NOT; EXCLUSIVE-OR and XOR were user-defined words. **New:** EXCLUSIVE-OR and XOR added (reserved). | Yes | flag-new-reserved-word <!-- gate:logical-xor-operator-2023 --> |
