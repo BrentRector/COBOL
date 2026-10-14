@@ -1,7 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding;
-using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Runtime;
@@ -14,32 +13,6 @@ namespace CobolNet.Compiler.Oo;
 /// pair; <paramref name="Factory"/> marks the FACTORY side.</summary>
 public readonly record struct AdapterPair(
     OoInterfaceSymbol Iface, OoMethodSymbol Proto, OoMethodSymbol Impl, bool Factory);
-
-/// <summary>A BY CONTENT / BY VALUE argument that has NO STORAGE, described as the sending operand ISO §14.8.2.3.3
-/// rule 2 names — the input of <see cref="OoConformance.ContentValueMismatch"/> (kb/Work PB1113).</summary>
-/// <param name="Position">Its §14.9.25.3 Table 16 row.</param>
-/// <param name="Operand">The bound operand the whole MOVE question reads (SR6/SR7/SR8 shapes), or null for a value
-/// that has none (a boolean expression).</param>
-/// <param name="IsExpression">An arithmetic expression — rule 2 a)'s COMPUTE sender. Its VALUE is a numeric sender
-/// judged by Table 16 exactly like a numeric literal (<paramref name="Position"/>: noninteger, because an expression's
-/// value carries no compile-time integer guarantee), but it has no character image, so a GROUP formal's §14.9.25.4 GR4
-/// character copy has nothing to copy.</param>
-/// <param name="Spelled">How a refusal names the argument.</param>
-public readonly record struct ContentValue(Table16Operand Position, BoundOperand? Operand, bool IsExpression, string Spelled)
-{
-    /// <summary>A numeric literal: Table 16's numeric row, integer or noninteger by its own digits
-    /// (<see cref="MoveTable16.SenderPosition"/> — the reader the written MOVE uses).</summary>
-    public static ContentValue Numeric(BoundNumericLiteral literal) =>
-        new(MoveTable16.SenderPosition(literal), literal, false, $"the numeric literal {literal.Text}");
-
-    /// <summary>An arithmetic expression (or a numeric intrinsic function's value, §15.4): a numeric COMPUTE sender.</summary>
-    public static ContentValue Arithmetic { get; } =
-        new(new Table16Operand(PicCategory.Numeric, IsNonInteger: true), null, true, "an arithmetic expression");
-
-    /// <summary>A boolean expression or a boolean literal: Table 16's boolean row (§8.8.2 — a boolean value).</summary>
-    public static ContentValue Boolean { get; } =
-        new(new Table16Operand(PicCategory.Boolean), null, false, "a boolean value");
-}
 
 /// <summary>
 /// The OO conformance SERVICE (P9 — R3: validation moved OFF the pass-1 symbol table, which stays a pure
@@ -910,273 +883,22 @@ public static class OoConformance
             ? invokedWith with { Factory = returning.Factory }
             : ObjectRefDescriptor.Universal;
 
-    // ══ ISO §14.8.2.3.3 — ELEMENTARY ITEMS PASSED BY CONTENT OR BY VALUE ═════════════════════════════════
-    // ⛔ THE ONE HOME FOR THE RULE, for EVERY activation form that imports §14.8.2 (kb/Work PB165). It used
-    // to live as `OoBinder.OoContentMismatch`, private to INVOKE — so the Format-2 CALL lane, which
-    // §14.9.4.3 SR25 puts under the very same clause, had NO by-content screen at all and
-    // `CobolArgAdapt`'s converting views silently adapted a non-conforming pair instead (measured on the
-    // pre-fix tree: `CALL "S" AS NESTED USING BY CONTENT A` with `A PIC X(4)` and a `PIC 9(4)` formal
-    // printed `LA=0000`). One rule written in one place is what keeps INVOKE and CALL from drifting, and
-    // it is the same discipline `DescriptionMismatch` above already carries for §14.8.2.3.2.
-    //
-    // The clause selects the rule by the FORMAL's shape (rule 2 — the regime for a NESTED call, a program
-    // prototype, a method or a function):
-    //   a) numeric formal        → "the same as for a COMPUTE statement"
-    //   b) index-data-item formal→ "the same as for a SET statement"
-    //   c) ANY LENGTH formal     → "its length is considered to match the length of the corresponding argument"
-    //   d) otherwise             → "the same as for a MOVE statement"  (⇒ §14.9.25.3 Table 16)
-    // and, ahead of those, the class-pointer / object-reference paragraph: "the conformance rules shall be
-    // the same as if a SET statement were performed in the activating runtime element with the argument as
-    // the sending operand and the corresponding formal parameter as the receiving operand."
-    // §14.8.2.2 rule 2 states the GROUP twin in the same words ("the same as for a MOVE statement"), which
-    // is why one entry point answers for a group formal too.
-
-    /// <summary>ISO §14.8.2.3.3 — the BY CONTENT / BY VALUE conformance rules for an IDENTIFIER argument,
-    /// per formal category: COMPUTE for numeric (any numeric argument, fixed-point or floating-point, into a
-    /// fixed-point or floating-point formal — kb/Work PB1114), SET for
-    /// object references (widening — the argument's class shall be the receiver's class or a subclass), MOVE
-    /// otherwise (§14.9.25.3 Table 16). Null when conformant.</summary>
-    /// <param name="pointerAssignment">The ONE §14.9.39.3 verdict for a pointer identifier SET into a pointer receiver of
-    /// its category (<c>SetBinder.PointerAssignmentReason</c>, receiver first): the class-pointer arm's SET question
-    /// beyond the category — restriction and prototype signature, which need the binder's prototype tables.</param>
-    /// <param name="invokedWith">INVOKE only — see <see cref="DescriptionMismatch"/>: an ACTIVE-CLASS formal takes
-    /// §14.8.2.3.3's two ACTIVE-CLASS alternatives, each a condition on the invocation AND a SET.</param>
-    public static string? ContentMismatch(OoClassTable? classes, Func<DataItem, DataItem, string?> pointerAssignment,
-        DataItem formal, Place argPlace, ObjectRefDescriptor? invokedWith = null)
-    {
-        DataItem arg = argPlace.Item;
-        // §14.8.2.2's strongly-typed sentence carries NO passing-mode qualification — it follows rules 1 (BY
-        // REFERENCE) and 2 (BY CONTENT) and governs both, and §14.8.2.1 routes a strongly-typed group to
-        // §14.8.2.2 because it is a group item. Same rule, same predicate, the other mode's entry point
-        // (kb/Work PB427 — the two-arm question asked and answered). A REF-MOD argument is the elementary
-        // alphanumeric view §8.4.3.3.4 GR6 creates, never the strong group itself, so it is screened as the
-        // non-strong side it is.
-        if (StrongTypeMismatch(formal, argPlace is RefModPlace ? null : arg, prototypes: null) is { } strongWhy) return strongWhy;
-        // §8.4.3.3.4 GR2/GR6 (fix-queue PB72): a REF-MOD argument crosses as the ELEMENTARY plain-alphanumeric
-        // (or GR6b/c national) view it creates, never as the inner item — whose numeric category would satisfy
-        // the COMPUTE arm below for a slice that is class alphanumeric, and whose finer alphabetic/edited flags
-        // refused legal Table-16 crossings. The view's category comes from the ONE GR6 reader
-        // (RefModPlace.CategoryOf); a view is elementary by definition, never a group.
-        PicCategory? argCat = argPlace is RefModPlace rmp ? rmp.Category : arg.Pic?.Category;
-        bool argIsGroup = argPlace.DenotedItem is not null && arg.IsGroup;
-
-        if (formal.IsGroup || formal.Pic?.Category is PicCategory.Alphanumeric)
-        {
-            if (argIsGroup)
-                // ⛔ §14.8.2.2's VARIABLE-LENGTH SENTENCE FIRST, exactly as the BY REFERENCE sibling
-                // (DescriptionMismatch above) applies it — "If either the formal parameter or the argument is a
-                // variable length group, the formal parameter and the argument shall be compatible, as
-                // described in 8.5.1.12" — an ADMISSION subject to a relation, not a prohibition, and
-                // §14.8.2.3.3 rule 2d routes a BY CONTENT group crossing through the same MOVE rules.
-                // ⚠ This line used to ask `IsImageCapable`, which is false for a variable-length group, so it
-                // refused legal source — the residue kb/Work PB818 filed against PB204's rim. PB165 had to
-                // repair it here rather than leave it: the extraction made this the rule's ONE home and put the
-                // Format-2 CALL lane behind it, which turned PB818's latent INVOKE-only defect into a hard
-                // failure of the landed golden conformance:2023/pb204_vlg_boundary. The predicate is PB204's
-                // own, unchanged.
-                return VariableLengthCompatibility.Mismatch(formal, arg)
-                    // Two strong groups of the same type (decided above) cross as their leaf vector (kb/Work PB1116).
-                    ?? (arg.BoundaryImageCapable || (OoClassTable.LeafCarried(formal) && OoClassTable.LeafCarried(arg))
-                        ? null : TierCIsland.Reason(arg, "argument group"));
-            // ⛔ §14.8.2.3.3 rule 2d IS THE WHOLE MOVE QUESTION, ASKED OF THE ONE CHAIN (kb/Work PB878). This
-            // arm was a hand list of sender categories — a fourth private copy of Table 16's alphanumeric column
-            // that could not see the ALPHABETIC column (numeric-edited → PIC A is "No"), SR8 (a BINARY-LONG
-            // argument at a PIC X formal) or a group formal's §14.9.25.4 GR4 conversion-free copy.
-            return MoveContentMismatch(formal, argPlace);
-        }
-        var f = formal.Pic!;
-        // ⛔ RULE 2b BEFORE RULE 2a (kb/Work PB1113). "If the formal parameter is an index data item, the conformance
-        // rules are the same as for a SET statement with the argument as the sending operand" — and an index data
-        // item carries PicCategory.Numeric, so the COMPUTE arm below used to answer for it and admitted a PIC 9(4)
-        // argument. SET Format 1 with a class-index receiver takes identifier-2 "of class index" (§14.9.39.3 SR2)
-        // and refuses arithmetic-expression-1 (SR3); an identifier argument is identifier-2.
-        if (f.Usage is Usage.Index)
-            return argCat is PicCategory.Numeric && arg.Pic is { Usage: Usage.Index } && !argIsGroup ? null
-                : IndexFormalRefusal("the argument");
-        return f.Category switch
-        {
-            // The numeric/float/object arms key on the VIEW category — a ref-mod view is never numeric or an
-            // object reference (GR6c), so their arg.Pic detail reads are only reachable for a whole-item arg.
-            // ⛔ RULE 2a IS "the same as for a COMPUTE statement", AND A COMPUTE TAKES ANY NUMERIC SENDER —
-            // fixed-point or floating-point, either direction. The float restrictions that used to sit here
-            // ("a float formal takes the identical float usage BY CONTENT") were an INVOKE CARRIER limitation,
-            // not a conformance rule, and moving them into the shared rule REJECTED LEGAL SOURCE the moment
-            // the CALL lane started asking: kb/Work PB238 landed the float crossing for a Format-2 CALL
-            // deliberately (§14.2.3 GR10's "COMPUTE statement without the ROUNDED phrase" makes
-            // `01 F FLOAT-LONG VALUE 1.5` reach a `PIC S9(3)V99` BY VALUE formal as 001.50), and the landed
-            // golden conformance:2023/pb238_call_format2_operands proves it. The INVOKE carrier now lands a
-            // fixed-point or other-usage float argument in a float formal through FloatResultant too
-            // (OoEmitter.IsFloatLanding; kb/Work PB1114), so no carrier residue is left to screen.
-            PicCategory.Numeric =>
-                argIsGroup ? "a group argument does not conform to a numeric formal (§14.8.2.3.3)"
-                : argCat is PicCategory.Numeric ? null
-                : "COMPUTE-rule conformance needs a numeric argument (ISO §14.8.2.3.3 rule 2a)",
-            // A CLASS-POINTER formal takes the SET rules, not the MOVE rules (§14.8.2.3.3: "If the formal parameter
-            // is of class pointer or an object reference described without the ACTIVE-CLASS phrase, the conformance
-            // rules shall be the same as if a SET statement were performed"), and a SET of an identifier into a
-            // pointer is category-to-same-category (§14.9.39.3 SR17 data-pointer, SR20 function-pointer, SR21
-            // program-pointer). This arm used to fall into the default MOVE arm, where Table 16 happened to admit the pair;
-            // once that arm asks §14.9.25.3 SR1 (kb/Work PB970 arm 2) it would refuse every pointer argument.
-            // ⛔ AND THE WHOLE SET, NOT ITS CATEGORY SCREEN ALONE (kb/Work PB1063): SR19 refuses a restricted
-            // data-pointer stored into an unrestricted one (and the converse), SR22 an unrestricted or differently
-            // signed program-pointer into a restricted one, SR20 a function-pointer of another signature — the
-            // argument is the SENDER and the formal the RECEIVER, the same direction the SET binder asks.
-            PicCategory.Pointer or PicCategory.ProgramPointer or PicCategory.FunctionPointer =>
-                argCat == f.Category ? pointerAssignment(formal, arg)
-                : $"a {f.Category} formal takes an argument of the same pointer category (SET rules, §14.8.2.3.3)",
-            PicCategory.ObjectReference =>
-                argCat is not PicCategory.ObjectReference || arg.Pic is not { } ap
-                    ? "an object-reference formal takes an object-reference argument (SET rules, §14.8.2.3.3)"
-                : f.ObjectRef is { Kind: ObjectRefKind.ActiveClass } afd && invokedWith is { } iw
-                    ? ActiveClassFormalMismatch(classes, afd, ap.ObjectRef ?? ObjectRefDescriptor.Universal, iw,
-                        byReference: false)
-                : ObjectRefAssignmentMismatch(classes, ap, f),
-            // ⭐ BOOLEAN / NATIONAL / NUMERIC-EDITED FORMALS ASK TABLE 16, NOT STRICT IDENTITY (fix-queue PB53).
-            // This arm used to call DescriptionMismatch — which is §14.8.2.3.2, the BY **REFERENCE** rule —
-            // described in its own comment as a "conservative strict gate". It was not conservative, it was the
-            // WRONG CLAUSE: §14.8.2.3.3 rule 2d says a BY CONTENT crossing whose formal is not numeric, not an
-            // index item and not ANY LENGTH conforms "as for a MOVE statement", i.e. by §14.9.25.3 Table 16.
-            // Identity is far narrower, so three pairings the standard admits were refused with a "category
-            // mismatch" naming a rule that does not govern the crossing:
-            //     boolean → national · alphanumeric → boolean · national → boolean
-            // ⛔ ANY LENGTH RELAXES LENGTH, AND ONLY LENGTH (kb/Work PB1113). §14.8.2.3.3 rule 2c makes such a
-            // formal's length "considered to match the length of the corresponding argument" — a statement about
-            // LENGTH that leaves the category pair to rule 2d's MOVE question, which never asks a length. This arm
-            // used to answer an ANY LENGTH formal with "conformant" outright, so a PIC 9V9 argument reached a
-            // PIC N ANY LENGTH formal (Table 16: numeric noninteger → national is "No") and printed its digits.
-            _ => MoveContentMismatch(formal, argPlace),
-        };
-    }
-
-    /// <summary>§14.8.2.3.3 rule 2b's refusal for a sender that is not an index data item — the ONE wording the
-    /// identifier lane (<see cref="ContentMismatch"/>) and the value lane (<see cref="ContentValueMismatch"/>) share.</summary>
-    private static string IndexFormalRefusal(string sender) =>
-        $"§14.8.2.3.3 rule 2b transfers a value into an index data item by the SET rules, and {sender} is not a data "
-        + "item of class index (ISO §14.9.39.3 SR2: \"Identifier-2 shall reference a data item of class index\"; SR3 "
-        + "refuses arithmetic-expression-1, a literal or an expression, into a class-index receiver)";
-
-    /// <summary>ISO §14.8.2.3.3 rule 2d — "Otherwise, the conformance rules are the same as for a MOVE statement
-    /// with the argument as the sending operand and the corresponding formal parameter as the receiving operand"
-    /// — asked as the WHOLE §14.9.25.3 question (<see cref="MoveTable16.Validity(BoundOperand, Table16Operand, DataItem)"/>:
-    /// SR2, SR8, SR9 and Table 16), never as Table 16 alone (kb/Work PB878: a BINARY-LONG argument at a
-    /// non-numeric formal (SR8) and a variable-length-group argument at an incompatible formal (SR9) were
-    /// admitted where the written MOVE of the same pair is refused). ONE call for both the alphanumeric-formal and
-    /// the other-category arms of <see cref="ContentMismatch"/>. Null when conformant.</summary>
-    private static string? MoveContentMismatch(DataItem formal, Place argPlace)
-    {
-        var sender = new BoundFieldOperand(argPlace);
-        // ⛔ SR1 FIRST — the MOVE question's class screen, which MoveTable16.Validity leaves to its askers because
-        // each frames it differently (kb/Work PB970 arm 2). Rule 2d is "the same as for a MOVE statement", and a
-        // MOVE whose sending operand is of class pointer or object is refused by §14.9.25.3 SR1 before Table 16 is
-        // consulted. Without it a POINTER argument BY CONTENT to a PIC X(8) formal of a NESTED or prototyped
-        // activation compiled — the runtime then delivered the pointer's storage image, which is §14.8.2.3.3
-        // rule 1's answer for a rule-1 activation only, on source rule 2 says is in error.
-        return MoveTable16.SenderClassRefusal(sender)
-            ?? MoveTable16.Validity(sender, Table16Operand.Of(formal), formal)?.Reason;
-    }
-
-    /// <summary>
-    /// ⛔ THE ONE ISO §14.8.2.3.3 VERDICT FOR A SENDING VALUE WITH NO STORAGE — a numeric literal, an arithmetic
-    /// expression, or a boolean expression or literal (kb/Work PB1113). Each shape is DESCRIBED as the sending operand
-    /// it is and asked the question rule 2 asks an identifier (<see cref="ContentMismatch"/>), in rule 2's order:
-    /// <list type="bullet">
-    /// <item>2 b) an index data item formal — the SET rules: "Identifier-2 shall reference a data item of class index"
-    /// (§14.9.39.3 SR2) and arithmetic-expression-1 is refused into a class-index receiver (SR3), so no value qualifies;</item>
-    /// <item>2 a) a numeric formal — the COMPUTE rules: any numeric sending operand, fixed-point or floating-point
-    /// (kb/Work PB1114), and nothing else (§8.8.1.1);</item>
-    /// <item>2 c) an ANY LENGTH formal — its length "is considered to match", which is about LENGTH only, so it falls
-    /// through to</item>
-    /// <item>2 d) the MOVE rules — the whole §14.9.25.3 question for an operand that has one
-    /// (<see cref="MoveTable16.Validity(BoundOperand, Table16Operand, DataItem)"/>), Table 16 itself for a boolean
-    /// value, which has no bound operand and no data item for SR2/SR8/SR9 to read.</item>
-    /// </list>
-    /// <para>⛔ IT REPLACED THREE HAND-WRITTEN ADMISSION LISTS, each narrower than the rule: the numeric-literal list
-    /// admitted only a numeric or an UNSIGNED-INTEGER-into-alphanumeric formal (so <c>12.5</c> into <c>PIC ZZ9.99</c>,
-    /// <c>12</c> into <c>PIC N(4)</c> and <c>-5</c> into <c>PIC X(4)</c> were refused, where Table 16 says Yes to each),
-    /// the boolean list refused a national formal "on purpose", and both admitted an index-data-item formal through the
-    /// numeric arm. One question asked of a described sender is what keeps the next category automatic.</para>
-    /// <para>⛔ AN ARITHMETIC EXPRESSION IS A NUMERIC SENDER, ASKED RULE 2 d)'S QUESTION OF ITS VALUE (kb/Work PB1946,
-    /// verdict kb/Work PB1936). Rule 2 d) applies the MOVE rules "with the argument as the sending operand" — the
-    /// clause's own words for an ARGUMENT, which §14.9.4.3 SR17 says includes "any identifier specified in
-    /// arithmetic-expression-1" — so the expression's value is the sender, the numeric category a numeric literal is.
-    /// An expression into a numeric-edited formal is therefore Table 16's "Yes" and edits, and into an alphanumeric or
-    /// national formal it takes the NONINTEGER numeric row's "No" (an expression's value carries no compile-time integer
-    /// guarantee, the principle §15.2 gives a NUMERIC function, <see cref="MoveTable16.SenderPosition"/>). It used to be
-    /// refused for EVERY non-numeric formal on the reading that a MOVE's sending operand is an identifier or a literal
-    /// (§14.9.25.2), which is MOVE's own syntax and not the clause's argument. Null when conformant.</para>
-    /// </summary>
-    public static string? ContentValueMismatch(DataItem formal, ContentValue sender)
-    {
-        // §14.8.2.3.3's SET paragraph: no SET format sends a numeric, boolean or arithmetic VALUE into a class-pointer or
-        // object-reference formal. ONE refusal for every value shape, whichever lane asks.
-        if (SlotWindow.CarriedBySlot(formal))
-            return "§14.8.2.3.3 transfers a value into a formal parameter of class pointer or object reference by the SET "
-                + $"rules, and {sender.Spelled} is not a sending operand of any SET format";
-        if (formal is { IsGroup: false, Pic.Usage: Usage.Index }) return IndexFormalRefusal(sender.Spelled);
-        if (formal is { IsGroup: false, Pic.Category: PicCategory.Numeric })
-            return sender.Position.Category is PicCategory.Numeric ? null
-                : $"§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and "
-                  + $"{sender.Spelled} is not a numeric sending operand (ISO §8.8.1.1)";
-        // A group formal takes §14.9.25.4 GR4's character copy "with no conversion", and an expression has no description
-        // whose characters could be copied (a numeric literal has its own digits, a boolean value its bit string).
-        if (formal.IsGroup && sender.IsExpression)
-            return $"§14.8.2.2 rule 2 transfers {sender.Spelled} into a group formal parameter by the MOVE rules, whose "
-                + "group move copies the sending operand's characters (ISO §14.9.25.4 GR4), and an arithmetic expression "
-                + "has no character image";
-        var receiver = Table16Operand.Of(formal);
-        string? why = sender.Operand is { } op
-            ? MoveTable16.Validity(op, receiver, formal)?.Reason
-            : MoveValidity.Table16Refusal(sender.Position.Heading, receiver.Heading);
-        return why is null ? null : $"§14.8.2.3.3 rule 2d transfers {sender.Spelled} by the MOVE rules: {why}";
-    }
-
-    /// <summary>The three sender categories a bound NONNUMERIC literal can actually be — §8.3.3.2 alphanumeric
-    /// (including the hexadecimal format), §8.3.3.5 national and §8.3.3.4 boolean. ⛔ The bound tree renders all
-    /// three as <c>BoundStringLiteral</c>, which carries the VALUE and not the CATEGORY, so a consumer holding
-    /// only the bound node cannot tell them apart (kb/Work PB165 — measured: screening every such literal as
-    /// alphanumeric refused `CALL … USING BY CONTENT N"AB" BY CONTENT B"01"` against `PIC N(2)` / `PIC 1(2)`
-    /// formals, which are conforming Table-16 crossings). Until the literal's category rides the bound node,
-    /// the conformance rule below refuses only what NO reading of rule 2d can admit.</summary>
-    private static readonly Table16Operand[] NonNumericLiteralSenders =
-    [
-        new(PicCategory.Alphanumeric), new(PicCategory.National), new(PicCategory.Boolean),
-    ];
-
-    /// <summary>ISO §14.8.2.3.3 rule 2d for a NONNUMERIC literal argument — "the conformance rules are the same
-    /// as for a MOVE statement", i.e. §14.9.25.3 Table 16 with the literal as the sending operand. Null when
-    /// conformant. An ELEMENTARY formal only: a group formal is §14.8.2.2 rule 2's WHOLE MOVE question (SR2's strong
-    /// type and SR9's variable-length group included), which <c>ParameterConformance.ContentConformanceReason</c> asks
-    /// of <see cref="MoveTable16.Validity(BoundOperand, Table16Operand, DataItem?)"/> before it reaches here (kb/Work PB1617).
-    /// <para>The verdict is Table 16's, asked once per sender category the literal could be
-    /// (<see cref="NonNumericLiteralSenders"/>) — conformant when ANY of them is admitted. That is deliberately
-    /// weaker than the rule the standard states for a KNOWN category, and it is the honest strength for a bound
-    /// node that has lost the category: it still refuses the shape this screen exists for (a nonnumeric literal
-    /// at a numeric or numeric-edited formal, which no sender category rescues) and it never rejects legal
-    /// source. Narrowing it to the exact category is what carrying the category on the literal node buys.</para>
-    /// </summary>
-    public static string? ContentAlphanumericLiteralMismatch(DataItem formal)
-    {
-        var receiver = Table16Operand.Of(formal);
-        return NonNumericLiteralSenders.Any(s => MoveValidity.Table16Refusal(s.Heading, receiver.Heading) is null)
-            ? null
-            : "a nonnumeric literal argument has no conforming MOVE into this formal parameter under any "
-              + "literal category (ISO §14.8.2.3.3 rule 2d / §14.9.25.3 Table 16)";
-    }
-
-    /// <summary>ISO §14.8.2.3.3 rule 2d for a nonnumeric literal argument whose CATEGORY the bound node carries
-    /// (<c>BoundStringLiteral.Category</c> — an alphanumeric literal, plain or hexadecimal, a national literal or a
-    /// boolean literal): §14.9.25.3 Table 16 asked of THAT sender, which is what carrying the category buys over
-    /// <see cref="ContentAlphanumericLiteralMismatch"/>'s any-category reading (kb/Work PB1137 — a national literal at
-    /// an alphanumeric formal is Table 16's "No", and the any-category reading admitted it because an ALPHANUMERIC
-    /// literal would have moved). An ELEMENTARY formal only — a group formal takes the whole MOVE question first
-    /// (<see cref="ContentAlphanumericLiteralMismatch"/>'s remark; kb/Work PB1617). Null when conformant.</summary>
-    public static string? ContentNonNumericLiteralMismatch(DataItem formal, PicCategory literalCategory)
-    {
-        return MoveValidity.Table16Refusal(new Table16Operand(literalCategory).Heading, Table16Operand.Of(formal).Heading) is { } why
-            ? $"a {literalCategory.ToString().ToLowerInvariant()} literal argument has no conforming MOVE into this "
-              + $"formal parameter: {why} (ISO §14.8.2.3.3 rule 2d)"
-            : null;
-    }
+    /// <summary>ISO §14.8.2.3.3 for an OBJECT-REFERENCE argument BY CONTENT / BY VALUE into an object-reference formal —
+    /// the one pair the activation entry (<c>ParameterConformance.ContentConformanceReason</c>) does not ask the run-time
+    /// relation of, because its answer reads the class table AS A PAIR (<see cref="OoClassTable.SetOperands"/>) and, for an
+    /// ACTIVE-CLASS formal, how the method is invoked. "If the formal parameter is of class pointer or an object reference
+    /// described without the ACTIVE-CLASS phrase, the conformance rules shall be the same as if a SET statement were
+    /// performed in the activating runtime element with the argument as the sending operand and the corresponding formal
+    /// parameter as the receiving operand" (<see cref="ObjectRefAssignmentMismatch(OoClassTable?, PicInfo, PicInfo, bool)"/>);
+    /// an ACTIVE-CLASS formal takes one of the two alternatives, each a condition on the invocation AND a SET
+    /// (<see cref="ActiveClassFormalMismatch"/>; <paramref name="invokedWith"/> is null for a CALL, whose formals are never
+    /// ACTIVE-CLASS). Null when conformant.</summary>
+    public static string? ObjectReferenceContentMismatch(OoClassTable? classes, PicInfo formal, PicInfo argument,
+        ObjectRefDescriptor? invokedWith) =>
+        formal.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass && invokedWith is { } invocation
+            ? ActiveClassFormalMismatch(classes, activeClass, argument.ObjectRef ?? ObjectRefDescriptor.Universal, invocation,
+                byReference: false)
+            : ObjectRefAssignmentMismatch(classes, argument, formal);
 
 
     /// <summary>

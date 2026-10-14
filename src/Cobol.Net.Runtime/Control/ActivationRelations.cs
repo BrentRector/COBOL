@@ -221,11 +221,7 @@ public static class ActivationRelations
     private static string? ReferenceGroupViolation(ActivationDescription argument, ActivationDescription formal)
     {
         if (formal.Shape is ActivationShape.StrongGroup || argument.Shape is ActivationShape.StrongGroup)
-            return formal.StrongType is not null
-                   && string.Equals(formal.StrongType, argument.StrongType, StringComparison.Ordinal)
-                ? null
-                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — two type "
-                  + "declarations of one type-name are the same type only when equivalent (ISO §14.8.2.2; §8.5.3.1)";
+            return StrongTypeViolation(argument, formal);
         if (formal.Shape is ActivationShape.VariableLengthGroup || argument.Shape is ActivationShape.VariableLengthGroup)
         {
             // Compatibility is the whole rule for two variable-length groups (§3.11: a variable-length group is no
@@ -249,6 +245,20 @@ public static class ActivationRelations
             : $"the formal parameter ({formal.Positions} character positions) is larger than the argument "
               + $"({argument.Positions}) (ISO §14.8.2.2 rule 1)";
     }
+
+    /// <summary>§14.8.2.2's strongly-typed sentence, which carries no passing-mode qualification — it follows rules 1 (BY
+    /// REFERENCE) and 2 (BY CONTENT) and governs both: "If either the formal parameter or the corresponding argument is a
+    /// strongly-typed group item, both shall be of the same type" (§8.5.3.1's equivalence,
+    /// <see cref="ActivationDescription.StrongType"/>). Null when neither side is strongly typed, or both are of one type.</summary>
+    private static string? StrongTypeViolation(ActivationDescription argument, ActivationDescription formal) =>
+        formal.Shape is not ActivationShape.StrongGroup && argument.Shape is not ActivationShape.StrongGroup
+        || formal.StrongType is not null && string.Equals(formal.StrongType, argument.StrongType, StringComparison.Ordinal)
+            ? null
+            : formal.Shape is ActivationShape.StrongGroup && argument.Shape is ActivationShape.StrongGroup
+                ? $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — two type "
+                  + "declarations of one type-name are the same type only when equivalent (ISO §14.8.2.2; §8.5.3.1)"
+                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — a "
+                  + "strongly-typed group item conforms only to a strongly-typed group item of its type (ISO §14.8.2.2)";
 
     /// <summary>⛔ ISO §14.8.2 FOR ONE ARGUMENT OF A CALL whose activated program is located by name at run time (kb/Work
     /// PB165): a dynamic Format-1 CALL, or a program-prototype whose details §12.3.8.4 GR10 c) takes from the external
@@ -348,10 +358,14 @@ public static class ActivationRelations
         if (argument.Shape is ActivationShape.PredefinedNull)
             return "NULL is a sending operand only of a SET into a data item of class pointer or object reference, and the "
                 + $"formal parameter ({formal}) is neither (ISO §14.8.2.3.3; §8.4.3.10.3)";
+        // §14.8.2.2's strongly-typed sentence governs BY CONTENT as it governs BY REFERENCE: a strongly-typed group argument
+        // reaches only a formal of its type, whatever a MOVE of the pair would allow (MOVE's SR2 keys only the RECEIVING
+        // side, so a strongly-typed group argument into a PIC X formal used to conform here; kb/Work PB3101).
+        if (StrongTypeViolation(argument, formal) is { } strongWhy) return strongWhy;
         // §14.8.2.2 rule 2: "If the argument is passed by content, the conformance rules are the same as for a MOVE
         // statement with the argument as the sending operand and the corresponding formal parameter as the receiving
-        // operand" — a strongly-typed group and a variable-length group included (their sentences are MOVE's SR2 / SR9
-        // too), and an arithmetic expression has no character image for a group move to copy (§14.9.25.4 GR4).
+        // operand" — a variable-length group included (its sentence is MOVE's SR9 too), and an arithmetic expression has
+        // no character image for a group move to copy (§14.9.25.4 GR4).
         if (IsGroup(formal) || IsGroup(argument))
             return argument.Shape is ActivationShape.Expression
                 ? $"an arithmetic expression has no character image for the group move into the formal parameter ({formal}) "
@@ -376,20 +390,25 @@ public static class ActivationRelations
     }
 
     /// <summary>The MOVE question of §14.8.2.2 rule 2 / §14.8.2.3.3 rule 2 d) with the argument as the sending operand:
-    /// <see cref="MayMove"/> for an argument with storage or a literal of a known category, and for a figurative constant
-    /// or an ALL literal, whose category the receiving context chooses (§8.3.3.6.4 GR1), a MOVE valid under ANY of the three
-    /// categories it can take — the reading the compiler's own screen gives the same argument when it knows the formal
-    /// (<c>OoConformance.ContentAlphanumericLiteralMismatch</c>).</summary>
+    /// <see cref="MoveViolation"/> for an argument with storage or a value of a known category, and for a figurative
+    /// constant or an ALL literal, whose category the receiving context chooses (§8.3.3.6.4 GR1), a MOVE valid under ANY
+    /// of the three categories it can take — every bind-time lane asks this too (<c>ParameterConformance</c>; kb/Work
+    /// PB3101).</summary>
     private static string? ContentMoveViolation(ActivationDescription argument, ActivationDescription formal)
     {
-        bool valid = argument.Category is ActivationCategory.Figurative or ActivationCategory.FigurativeZero
-            && argument.Shape is ActivationShape.Literal
-            ? FigurativeCategories.Any(c => MayMove(argument with { Table16 = c }, formal))
-            : MayMove(argument, formal);
-        return valid ? null
-            : $"the argument ({argument}) is not a valid sending operand of a MOVE to the formal parameter ({formal}) "
-              + "(ISO §14.8.2.3.3 rule 2 d) / §14.8.2.2 rule 2; §14.9.25.3)";
+        string? why = IsFigurative(argument)
+            ? FigurativeCategories.Select(c => MoveViolation(argument with { Table16 = c }, formal))
+                .Aggregate((first, next) => first is null || next is null ? null : first)
+            : MoveViolation(argument, formal);
+        return why is null ? null
+            : $"the argument ({argument}) is not a valid sending operand of a MOVE to the formal parameter ({formal}): {why} "
+              + "(ISO §14.8.2.3.3 rule 2 d) / §14.8.2.2 rule 2)";
     }
+
+    /// <summary>A figurative constant or an ALL literal written as an argument.</summary>
+    private static bool IsFigurative(ActivationDescription d) =>
+        d.Shape is ActivationShape.Literal && d.Category is ActivationCategory.Figurative
+            or ActivationCategory.FigurativeZero or ActivationCategory.FigurativeBoolean;
 
     /// <summary>The Table 16 rows a figurative constant or an ALL literal can stand in (§8.3.3.6.4 GR1).</summary>
     private static readonly Table16Category[] FigurativeCategories =
@@ -443,13 +462,13 @@ public static class ActivationRelations
     /// <summary>ISO §9.3.6 match rules 6 and 7, split on the INVOCATION's returning item <paramref name="receiving"/>:
     /// when it is "usage OBJECT REFERENCE, POINTER or INDEX" the method's returning item <paramref name="sending"/> "may
     /// be a sending item in a SET statement with the returning item as the receiving item" (rule 6,
-    /// <see cref="MaySet"/>), otherwise it "may be a sending item in a MOVE statement" (rule 7, <see cref="MayMove"/>).
+    /// <see cref="MaySet"/>), otherwise it "may be a sending item in a MOVE statement" (rule 7, <see cref="MoveViolation"/>).
     /// "May be" is the statement's VALIDITY — its syntax rules over the two descriptions — not only which statement
     /// applies: a method returning <c>PIC 9V99</c> does not match an invocation returning <c>PIC X(4)</c> (Table 16:
     /// Numeric Noninteger → Alphanumeric is "No"), so the search goes on up the INHERITS chain and ends in EC-OO-METHOD
     /// (§9.3.6 6)) rather than binding the method and failing its §14.8.3 conformance (kb/Work PB2076).</summary>
     public static bool ReturningMatches(ActivationDescription receiving, ActivationDescription sending) =>
-        SetClass(receiving) is { } setClass ? MaySet(setClass, receiving, sending) : MayMove(sending, receiving);
+        SetClass(receiving) is { } setClass ? MaySet(setClass, receiving, sending) : MoveViolation(sending, receiving) is null;
 
     /// <summary>The class a SET statement receives a description into (§9.3.6 rule 6's "usage OBJECT REFERENCE,
     /// POINTER or INDEX"; POINTER read as the class, §8.5.2.1 Table 2's three pointer categories, since a
@@ -508,24 +527,33 @@ public static class ActivationRelations
                 : d.ObjectName,
             d.Factory, d.Only, d.ObjectClasses, d.ObjectInterfaces);
 
-    /// <summary>§9.3.6 rule 7: is a MOVE of <paramref name="sending"/> to <paramref name="receiving"/> valid by ISO
-    /// §14.9.25.3? Its syntax rules over two data items, in SR order: SR1 (neither of class index, object or pointer —
-    /// the receiving side is not, or rule 6 would apply), SR2 (a strongly-typed group receiver takes only a group of the
-    /// same type), SR8 (a binary-char/-short/-long/-double sender needs a numeric or numeric-edited receiver), SR9
-    /// (a variable-length group only to or from a compatible group, §8.5.1.12) and SR10 (Table 16). SR8 and SR10 are
-    /// the ONE copy the compiler's MOVE screens read (<see cref="MoveValidity"/>).</summary>
-    private static bool MayMove(ActivationDescription sending, ActivationDescription receiving)
+    /// <summary>§9.3.6 rule 7 and §14.8.2.3.3 rule 2 d): is a MOVE of <paramref name="sending"/> to
+    /// <paramref name="receiving"/> valid by ISO §14.9.25.3? Its syntax rules over two descriptions, in SR order: SR1
+    /// (neither of class index, object or pointer — the receiving side is not, or rule 6 would apply), SR2 (a
+    /// strongly-typed group receiver takes only a group of the same type), SR6 / SR7 (a figurative constant into an
+    /// alphabetic or a boolean receiver), SR8 (a binary-char/-short/-long/-double sender needs a numeric or
+    /// numeric-edited receiver), SR9 (a variable-length group only to or from a compatible group, §8.5.1.12) and SR10
+    /// (Table 16). SR6 / SR7, SR8 and SR10 are the ONE copy the compiler's MOVE screens read (<see cref="MoveValidity"/>).
+    /// Null when the move is valid, else the rule it breaks.</summary>
+    private static string? MoveViolation(ActivationDescription sending, ActivationDescription receiving)
     {
-        if (SetClass(sending) is not null) return false;                                                    // SR1
+        if (SetClass(sending) is not null)                                                                    // SR1
+            return "the sending operand is of class index, object or pointer, which no MOVE sends (ISO §14.9.25.3 SR1)";
         if (receiving.Shape is ActivationShape.StrongGroup
             && (sending.Shape is not ActivationShape.StrongGroup
                 || !string.Equals(receiving.StrongType, sending.StrongType, StringComparison.Ordinal)))
-            return false;                                                                                     // SR2
-        if (MoveValidity.BinaryWidthRefusal(sending.BinaryWidth, receiving.Table16) is not null) return false; // SR8
+            return "the sending operand shall be a group item of the same type (ISO §14.9.25.3 SR2 / §8.5.3.3)"; // SR2
+        if (IsFigurative(sending)                                                                             // SR6 / SR7
+            && MoveValidity.FigurativeRefusal(sending.Category is ActivationCategory.FigurativeZero,
+                sending.Category is ActivationCategory.FigurativeZero or ActivationCategory.FigurativeBoolean,
+                receiving.Table16) is { } figurativeWhy)
+            return figurativeWhy;
+        if (MoveValidity.BinaryWidthRefusal(sending.BinaryWidth, receiving.Table16) is { } binaryWhy)       // SR8
+            return binaryWhy;
         if ((sending.Shape is ActivationShape.VariableLengthGroup || receiving.Shape is ActivationShape.VariableLengthGroup)
-            && VariableLengthViolation(sending, receiving, "sending item", "receiving item") is not null)
-            return false;                                                                                     // SR9
-        return MoveValidity.Table16Refusal(sending.Table16, receiving.Table16) is null;                       // SR10
+            && VariableLengthViolation(sending, receiving, "sending item", "receiving item") is { } lengthWhy)
+            return lengthWhy + " (ISO §14.9.25.3 SR9)";                                                      // SR9
+        return MoveValidity.Table16Refusal(sending.Table16, receiving.Table16);                               // SR10
     }
 
     /// <summary>ISO §14.8.3 for the returning item of a method §9.3.6 has BOUND (§14.9.23.4 GR7 c)):

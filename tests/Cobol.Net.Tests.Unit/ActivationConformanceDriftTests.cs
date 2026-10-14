@@ -21,8 +21,8 @@ namespace CobolNet.Tests.Unit;
 /// <para>The shape that keeps the NEXT activation from repeating it: the per-argument conformance
 /// (<c>ParameterConformance.CheckArgument</c>), the BY VALUE class answer (<c>ValueArgumentClass</c>) and the
 /// bit-alignment proof (<c>ScreenBitAlignment</c>) are DEFINED in <c>ParameterConformance</c> alone, both
-/// <c>CallBinder</c> and <c>UdfBinder</c> call them, and no other verb binder except INVOKE's own lane
-/// (<c>OoBinder</c>) reaches the §14.8.2 comparators in <c>OoConformance</c> directly.</para>
+/// <c>CallBinder</c> and <c>UdfBinder</c> call them, and INVOKE (<c>OoBinder</c>) asks the same BY CONTENT entry; every
+/// lane asks <c>ActivationRelations</c>, the one copy the run-time CALL lane asks too (kb/Work PB3101).</para>
 /// </summary>
 public sealed class ActivationConformanceDriftTests
 {
@@ -93,22 +93,38 @@ public sealed class ActivationConformanceDriftTests
             + "CALL and function activations would drift apart again (kb/Work PB1418):\n" + string.Join("\n", offenders));
     }
 
+    /// <summary>⛔ A BY CONTENT / BY VALUE ARGUMENT IS ASKED THE ONE RUN-TIME RELATION TOO (kb/Work PB3101). The BY CONTENT
+    /// comparator family (<c>OoConformance.ContentMismatch</c>, <c>ContentValueMismatch</c> and the two literal arms)
+    /// re-derived §14.8.2.3.3 from <c>DataItem</c> fields while the run-time CALL lane asked
+    /// <c>ActivationRelations.CallArgumentViolation</c>, and the two disagreed: a group argument into a numeric formal was
+    /// refused at bind (§14.8.2.2 rule 2's MOVE admits it), the run-time lane let a strongly-typed group argument reach a
+    /// <c>PIC X</c> formal, and ZERO into a <c>PIC A</c> formal and SPACE into a <c>PIC 1</c> one ran on both (§14.9.25.3
+    /// SR6 / SR7). The family is deleted: <c>OoConformance</c> answers a BY CONTENT argument only for the object-reference
+    /// pair, which reads the class table as a pair, and every verb binder reaches the rule through
+    /// <c>ParameterConformance.ContentConformanceReason</c>.</summary>
     [Fact]
-    public void NoOtherVerbBinder_ReachesTheArgumentComparatorsDirectly()
+    public void TheContentArgumentRule_IsTheRunTimeRelation_AskedThroughOneEntry()
     {
-        // OoBinder is INVOKE's lane over the BY CONTENT comparators (§14.9.23.3); its BY REFERENCE arguments ask the
-        // ActivationRelations (kb/Work PB2077, TypedAndUniversalInvokeVerdictsAgreeDriftTests). ParameterConformance is
-        // the shared one.
-        string[] allowed = ["ParameterConformance.cs", "OoBinder.cs"];
-        var argumentComparator = new Regex(@"OoConformance\s*\.\s*Content\w*Mismatch\s*\(");
+        var comparator = new Regex(@"^(Content\w*|MoveContent)Mismatch$");
+        var copies = typeof(CobolNet.Compiler.Oo.OoConformance)
+            .GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.NonPublic)
+            .Select(m => m.Name)
+            .Where(n => comparator.IsMatch(n))
+            .Distinct()
+            .ToList();
+        Assert.True(copies.Count == 0,
+            "OoConformance defines a BY CONTENT argument comparator again (" + string.Join(", ", copies) + ") — a second "
+            + "copy of §14.8.2.3.3 beside ActivationRelations.CallArgumentViolation (kb/Work PB3101).");
+        Assert.Contains("ActivationRelations.CallArgumentViolation(arg.Mode", Verb("ParameterConformance.cs"));
+        var direct = new Regex(@"OoConformance\s*\.\s*\w*Content\w*Mismatch\s*\(");
         var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !allowed.Contains(Path.GetFileName(f)))
-            .Where(f => argumentComparator.IsMatch(CodeOf(f)))
+            .Where(f => Path.GetFileName(f) != "ParameterConformance.cs" && direct.IsMatch(CodeOf(f)))
             .Select(Path.GetFileName)
             .ToList();
         Assert.True(offenders.Count == 0,
-            "A verb binder calls the §14.8.2 argument comparators directly instead of through "
-            + "ParameterConformance.CheckArgument (kb/Work PB1418): " + string.Join(", ", offenders));
+            "A verb binder asks an OoConformance BY CONTENT comparator directly instead of "
+            + "ParameterConformance.ContentConformanceReason (kb/Work PB1418, PB3101): " + string.Join(", ", offenders));
     }
 
     /// <summary>⛔ A BY REFERENCE ARGUMENT AND A RETURNING ITEM ARE ASKED THE ONE RUN-TIME RELATION AT BIND TIME (kb/Work

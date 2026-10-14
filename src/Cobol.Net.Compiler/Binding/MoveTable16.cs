@@ -110,7 +110,7 @@ public readonly record struct MoveRefusal(MoveRule Rule, string Reason);
 /// </para>
 /// <para>
 /// ⛔ THEY HAD ALREADY DRIFTED, WHICH IS WHY THIS EXISTS (fix-queue PB53). <c>MoveBinder</c> implemented the
-/// table; <c>OoConformance.ContentMismatch</c> (then <c>OoBinder.OoContentMismatch</c>) fell back to §14.8.2.3.2 STRICT IDENTITY — the BY <b>REFERENCE</b>
+/// table; the INVOKE BY CONTENT screen (then <c>OoBinder.OoContentMismatch</c>) fell back to §14.8.2.3.2 STRICT IDENTITY — the BY <b>REFERENCE</b>
 /// rule — for boolean, national and numeric-edited formals. Identity is a much narrower test than Table 16, so
 /// three pairings the standard admits were refused: boolean→national, alphanumeric→boolean and
 /// national→boolean, each reported as a "category mismatch" naming a rule that does not govern the crossing.
@@ -217,21 +217,9 @@ public static class MoveTable16
         if (sender is BoundFieldOperand f && ShapeRefusal(f.Place.Item, receiver) is { } itemKeyed)
             return itemKeyed;
 
-        // §14.9.25.3 SR7 — "Any figurative constant for which the associated character or characters are not
-        // boolean characters shall not be moved to a boolean data item." ZERO is boolean zeros by context
-        // (§8.3.3.6.4 GR4), which is why it is the one exempt Kind.
-        if (receiver.Category is PicCategory.Boolean)
-        {
-            if (sender is BoundFigurative { Kind: not 'Z' })
-                return "a figurative constant whose characters are not boolean characters shall not be moved "
-                     + "to a boolean data item (ISO §14.9.25.3 SR7)";
-            if (sender is BoundAllLiteral bal && (bal.Literal.Length == 0 || !bal.Literal.All(c => c is '0' or '1')))
-                return $"ALL \"{bal.Literal}\" contains non-boolean characters and shall not be moved to a "
-                     + "boolean data item (ISO §14.9.25.3 SR7)";
-        }
-
-        // §14.9.25.3 SR6 — "The figurative constant ZERO shall not be moved to an alphabetic data item."
-        // ⚠ `ALL ZERO` IS the figurative constant ZERO and IS refused: §8.3.3.6.2 Format 1 prints ALL as an
+        // §14.9.25.3 SR6 / SR7 — the figurative-constant rules, written ONCE in the runtime (MoveValidity.FigurativeRefusal)
+        // because the activation relations ask them too, of a figurative argument BY CONTENT (kb/Work PB3101).
+        // ⚠ `ALL ZERO` IS the figurative constant ZERO and IS refused by SR6: §8.3.3.6.2 Format 1 prints ALL as an
         // OPTIONAL (un-underlined) word of the zero format, so it binds to the same 'Z' kind. What SR6 does NOT
         // reach is `ALL "0"` — Format 6's ALL-literal, a different figurative constant, which Table 16 places in
         // the Alphanumeric row that the Alphabetic column admits.
@@ -240,12 +228,22 @@ public static class MoveTable16
         // adjudication of §8.4.3.3.4 GR6), and the caller's --permissive lever is defined against TABLE 16's
         // reading of such a view, not against SR6 — which the standard states unconditionally, with no reference
         // to the table. Asked and answered rather than left to be rediscovered.
-        if (sender is BoundFigurative { Kind: 'Z' } && receiver.IsAlphabetic)
-            return "the figurative constant ZERO shall not be moved to an alphabetic data item "
-                 + "(ISO §14.9.25.3 SR6)";
-
-        return null;
+        return sender is BoundFigurative or BoundAllLiteral
+            ? MoveValidity.FigurativeRefusal(sender is BoundFigurative { Kind: 'Z' }, HasBooleanCharacters(sender),
+                receiver.Heading)
+            : null;
     }
+
+    /// <summary>ISO §14.9.25.3 SR7's exemption: a figurative constant whose "associated character or characters" are
+    /// boolean characters — ZERO, boolean zeros in a boolean context (§8.3.3.6.4 GR4), and an ALL literal every one of
+    /// whose characters is '0' or '1'. The ONE reading of it, which an activation argument's description carries too
+    /// (<c>ActivationDescriptions.OfValue</c>, <see cref="ActivationCategory.FigurativeBoolean"/>; kb/Work PB3101).</summary>
+    public static bool HasBooleanCharacters(BoundOperand figurative) => figurative switch
+    {
+        BoundFigurative { Kind: 'Z' } => true,
+        BoundAllLiteral { Literal: { Length: > 0 } chars } => chars.All(c => c is '0' or '1'),
+        _ => false,
+    };
 
     /// <summary>The ITEM-KEYED source-shape refusals of ISO §14.9.25.3 — the rules whose antecedent is
     /// <i>"if identifier-1 references a data item described with …"</i>, so the sending DATA ITEM is the whole

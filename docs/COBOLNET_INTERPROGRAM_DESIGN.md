@@ -323,8 +323,8 @@ and the formal holds the pointer's 8 storage positions. `CobolArgAdapt.WithPoint
 string cell holding `PointerImage.OfCarrier(…)` (DOC-A.1-216), after which the ordinary storage-image arms adopt
 it. BY REFERENCE and BY VALUE (GR10 fills the formal's own description by COMPUTE/SET) stay EC-PROGRAM-ARG-MISMATCH,
 a group formal stays refused (§14.8.2.2 rule 2's MOVE), and a rule-2 activation is refused at BIND —
-`OoConformance.MoveContentMismatch` asks §14.9.25.3 SR1 of the sender before Table 16, because rule 2d is *“the
-same as for a MOVE statement”*.
+`ActivationRelations.MoveViolation` asks §14.9.25.3 SR1 of the sender before Table 16, because rule 2d is *“the
+same as for a MOVE statement”* (asked through `ParameterConformance.ContentConformanceReason`; kb/Work PB3101).
 
 ⛔ **The ACTIVATING and the ACTIVATED sides now read ONE classification**, `CallCrossing` +
 `CallEmitter.CrossingOf` / `ProgramEmitter.FormalCrossing`. They were two formulations of one rule — a caller
@@ -454,8 +454,9 @@ The BY VALUE float formal needed nothing more: it is non-resident (a float forma
 existing copy-in / no-copy-out round trip over the detached cell carries it; the header's COBOLNET0899 refusal of
 it (a "value-copy carrier not yet implemented" that was not true of the program and function arms) is gone. The
 literal and arithmetic-expression arguments into a float formal, refused COBOLNET1688 as "a documented
-refinement", are conformant (`OoConformance.ContentValueMismatch` — the ONE §14.8.2.3.3 verdict for a
-storage-less sending value: a numeric literal, an arithmetic expression or a boolean value, kb/Work PB1113).
+refinement", are conformant (`ActivationRelations.CallArgumentViolation` over `ActivationDescriptions.OfValue` —
+the ONE §14.8.2.3.3 verdict for a storage-less sending value: a numeric literal, an arithmetic expression or a
+boolean value, kb/Work PB1113, PB3101).
 
 **The INVOKE lane is the same rule and was the same defect's other arm.** `OoEmitter`'s BY CONTENT arms already
 landed caller-side (§14.8.2.3.3 rule 2 a): *"If the formal parameter is numeric, the conformance rules are the
@@ -818,30 +819,34 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   (§14.9.4.3 SR25 / §8.4.3.2.3 SR13 → §14.8.2; kb/Work PB133 → PB204 → PB165 → PB1418).** Wherever the activated
   element's PD header is known at BIND — the AS NESTED containment table, a program prototype's §12.3.8.4 GR10 a)
   definition, or a function prototype (directly, or through a function-pointer's USAGE TO phrase) — the activating
-  binder asks `ParameterConformance.CheckArgument` for every argument, and every rule it applies lives in
-  `OoConformance`: `DescriptionMismatch` for
-  §14.8.2.3.2 / §14.8.2.2 (BY REFERENCE, identical description with the rule-1 group-prefix allowance and
-  §8.5.1.12 variable-length compatibility), and `ContentMismatch` + the four value-shape rules for §14.8.2.3.3
-  (BY CONTENT / BY VALUE: 2a COMPUTE for a numeric formal, 2b SET for an index item, 2c ANY LENGTH, 2d MOVE via
-  §14.9.25.3 Table 16, plus the class-pointer / object-reference SET paragraph).
-  `ParameterConformance.ContentConformanceReason` dispatches on the BOUND argument's shape — identifier, boolean
-  expression, arithmetic expression, alphanumeric literal, numeric literal, and an intrinsic function-identifier
-  by its RESULT category (§15.4) — and an arithmetic expression into a formal that is not numeric is asked rule 2 d)'s
-  MOVE question of its VALUE (a numeric sender on Table 16's noninteger row: edited into a numeric-edited formal,
-  refused into an alphanumeric, national, group, pointer or object-reference one; kb/Work PB1946, verdict PB1936;
-  `ArgText` crosses it through `ConvertSource`, the numeric literal's twin) — and a constant-name needs no arm
-  because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688 for a CALL and its twin
+  binder asks `ParameterConformance.CheckArgument` for every argument, and every rule it applies is the run-time
+  CALL lane's own relation, `ActivationRelations.CallArgumentViolation`, over the two descriptions
+  `ActivationDescriptions` builds (kb/Work PB3101): §14.8.2.3.2 / §14.8.2.2 BY REFERENCE (rule 2's clause identity,
+  rule 1's group sizes, §8.5.1.12 variable-length compatibility), and §14.8.2.3.3 / §14.8.2.2 rule 2 BY CONTENT /
+  BY VALUE (2a COMPUTE for a numeric formal, 2b SET for an index item, 2c ANY LENGTH, 2d the whole §14.9.25.3 MOVE
+  question — SR1, SR2, SR6 / SR7 for a figurative constant, SR8, SR9, Table 16 — plus the class-pointer SET
+  paragraph and §14.8.2.2's strongly-typed sentence, which governs both modes). Two object references BY CONTENT
+  are the one pair asked of the class table instead (`OoConformance.ObjectReferenceContentMismatch`: the SET table
+  over the pair's class facts, a parameterized class's formal standing for the most favourable actual, and an
+  ACTIVE-CLASS formal's conditions on the invocation). `ParameterConformance.ContentConformanceReason` describes
+  the BOUND argument as the sending operand it is (`ActivationDescriptions.OfCallArgument` / `OfValue`) —
+  identifier, boolean value, arithmetic expression, alphanumeric literal, numeric literal, figurative constant, and
+  an intrinsic function-identifier by its RESULT category (§15.4) — and an arithmetic expression into a formal that
+  is not numeric is asked rule 2 d)'s MOVE question of its VALUE (a numeric sender on Table 16's noninteger row:
+  edited into a numeric-edited formal, refused into an alphanumeric, national, group, pointer or object-reference
+  one; kb/Work PB1946, verdict PB1936; `ArgText` crosses it through `ConvertSource`, the numeric literal's twin) —
+  and a constant-name needs no arm because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688 for a CALL and its twin
   COBOLNET2470 for a function-identifier, the same code the BY REFERENCE arm uses, because it is the same
   obligation. The same collaborator owns the bit-alignment proof (§14.9.4.3 SR6/SR8 and §8.4.3.2.3 SR14 —
   COBOLNET1683 / COBOLNET2471) and the BY VALUE class answer (§14.9.4.3 SR22 / §8.4.3.2.3 SR10 —
   `ValueArgumentClass`). ⚠ The function-identifier (`UdfBinder`) used to re-implement CALL's argument binding
   WITHOUT this regime, so a non-conforming function argument aliased its formal silently (kb/Work PB1418 /
-  PB1115); `ActivationConformanceDriftTests` pins both lanes to the shared routine. INVOKE (`OoBinder`) still
-  dispatches the same `OoConformance` comparators from its own lane for identifier arguments, but asks
-  `ParameterConformance.ContentConformanceReason` for its literal-2 verdict (kb/Work PB1137), so a literal gets one
-  answer from all three activations; a written nonnumeric literal is judged by its OWN category
-  (`OoConformance.ContentNonNumericLiteralMismatch` — a national literal does not move to an alphanumeric formal),
-  a figurative / ALL literal under any category.
+  PB1115); `ActivationConformanceDriftTests` pins both lanes to the shared routine. INVOKE (`OoBinder`) asks the
+  same relation: BY REFERENCE through `OoBinder.ByReferenceArgumentReason` (the §9.3.6 match, then §14.8.2;
+  kb/Work PB2077), BY CONTENT through `ParameterConformance.ContentConformanceReason` for every argument shape
+  (kb/Work PB1137, PB3101), so one argument gets one answer from all three activations and from the run-time CALL
+  lane; a written nonnumeric literal is judged by its OWN category (a national literal does not move to an
+  alphanumeric formal), a figurative / ALL literal under any category.
 - **The activation OPERAND screens are shared by CALL and INVOKE (kb/Work PB1137).** §14.9.4.3 and §14.9.23.3 state
   two operand rules in the same words, and `ParameterConformance` checks both for either statement: the
   STORAGE-SECTION rule — a BY REFERENCE argument is "an address-identifier or … a data item defined in the file,

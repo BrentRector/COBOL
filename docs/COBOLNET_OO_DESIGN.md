@@ -331,7 +331,7 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    `Runtime/Control/ActivationRelations` holds every relation over it — `Matches` / `MatchViolation` /
    `ReturningMatches` (§9.3.6), `ParameterViolation` / `ReturningViolation` (§14.8.2 / §14.8.3 for a method),
    `CallArgumentViolation` / `CallReturningViolation` (a program or function: rule 1's length or rule 2's identity,
-   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MayMove` / `MaySet`, §14.8.2.2) and `SameSignature` (the
+   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MoveViolation` / `MaySet`, §14.8.2.2) and `SameSignature` (the
    symmetric identity of §9.3.8.2.3 rules 1-6, §11.7.3 SR3/SR4 and §13.7.3 SR2). `ParameterConformance.CheckArgument`
    is the ONE bind-time entry: CALL Format 2, a function reference and INVOKE build the argument's description
    (`OfCallArgument` / `OfPlace` / `OfValue`, the §14.9.4.4 GR8 reduction written once) and the formal's, and ask
@@ -347,7 +347,7 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    LENGTH or category against each other). Measured before PB3101 (2026-10-12): a reference-modified argument BY
    REFERENCE ran into a prototyped CALL's, a function's and a typed INVOKE's `PIC X(5)` formal, and a whole `PIC X(4)`
    ran into a typed INVOKE group formal, while the universal lane refused each — one rule in two currencies.
-   **Where it stands (wave 1077, kb/Work PB3101 SPLIT).** Landed: the typed INVOKE BY REFERENCE step (item 6, PB2077);
+   **Where it stands (waves 1077-1078, kb/Work PB3101).** Landed: the typed INVOKE BY REFERENCE step (item 6, PB2077);
    `ParameterConformance.CheckArgument`'s BY REFERENCE arm asks `CallArgumentViolation` (rule 2: every activation that
    entry serves has a program-specifier, the NESTED phrase or is a function) over `ActivationDescriptions.OfPlace` /
    `Of`, so a slice BY REFERENCE into a prototyped program's, a NESTED program's or a function's elementary or ANY
@@ -355,13 +355,28 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    pair but two object references (§14.8.3.3 rule 1's SET table, unchanged); `ActivationDescriptions.Of` describes a
    level-66 THROUGH alias as the alphanumeric group §13.18.45.4 GR2 makes it; `ReferenceGroupViolation` applies
    §14.8.2.2 rule 1 to a fixed group opposite a variable-length one in the pair lengths §8.5.1.12.3 gives (the walk's
-   `GroupCharTally`); and `DescriptionMismatch` is pair mode only (its activation flags are gone). Remaining for
-   PB3101: the BY CONTENT / BY VALUE arm (`ContentConformanceReason` and OoBinder's content arms still ask
-   `ContentMismatch` / `ContentValueMismatch` and the literal arms), the GR8 reduction written once (PB613), pair mode
-   on `SameSignature` with `GroupAtom` carrying each leaf's identity, the deletions and `OneRelationDriftTests`.
-   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`; negatives
-   `pb3101-prototype-call-refmod-by-reference`, `pb3101-function-refmod-by-reference`,
-   `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`.
+   `GroupCharTally`); and `DescriptionMismatch` is pair mode only (its activation flags are gone). Wave 1078 landed the
+   BY CONTENT / BY VALUE arm: `ParameterConformance.ContentConformanceReason` — asked by CALL, a function and every
+   INVOKE argument shape (identifier, literal-2, figurative, boolean value, arithmetic expression) — describes the
+   argument (`OfCallArgument` / `OfValue`) and asks `CallArgumentViolation`, and `OoConformance.ContentMismatch`,
+   `MoveContentMismatch`, `ContentValueMismatch`, the two literal arms and the `ContentValue` input type are deleted.
+   ⚠ DESIGN CORRECTION (wave 1078): two object references BY CONTENT stay with the class table
+   (`OoConformance.ObjectReferenceContentMismatch`), as the returning arm's pair does: the compile-time SET reads the
+   class facts AS A PAIR (`OoClassTable.SetOperands`, a parameterized class's formal standing for the most favourable
+   actual, kb/Work PB2937) and an ACTIVE-CLASS formal's alternatives are conditions on the invocation, which no
+   description carries. The relation gained what the bind-time copy had and it lacked — §14.8.2.2's strongly-typed
+   sentence in BY CONTENT mode (`StrongTypeViolation`, both modes), §14.9.25.3 SR6 / SR7 for a figurative argument
+   (`MoveValidity.FigurativeRefusal`, the one copy the compiler's MOVE chain asks too; an ALL literal of boolean
+   characters is `ActivationCategory.FigurativeBoolean`), and a MOVE refusal that names its rule (`MoveViolation`) —
+   and the bind-time copy's one refusal the standard does not make is gone (a group argument BY CONTENT into a numeric
+   formal: §14.8.2.2 rule 2's MOVE admits it). Remaining for PB3101: the GR8 reduction written once (PB613: CallBinder.Gr8Classify
+   and OoBinder's inline block), pair mode on `SameSignature` with `GroupAtom` carrying each leaf's identity, the
+   deletion of `DescriptionMismatch` / `AsIfElementaryGroupMismatch` / `CategoryArmMismatch` /
+   `StrongTypeModel.SameElementaryLayout`, and `OneRelationDriftTests`.
+   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`, `conformance:2002/pb3101_content_one_relation`;
+   negatives `pb3101-prototype-call-refmod-by-reference`, `pb3101-function-refmod-by-reference`,
+   `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`,
+   `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`.
 
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
 

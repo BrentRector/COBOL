@@ -206,11 +206,12 @@ public static class ActivationDescriptions
     }
 
     /// <summary>The description of a BY CONTENT / BY VALUE argument that has NO STORAGE, as the sending operand ISO
-    /// §14.8.2.3.3 rule 2 names — the same readings the compiler's own screen gives each shape when it knows the formal
-    /// (<c>ParameterConformance.ContentConformanceReason</c>): a nonnumeric literal is its category's Table 16 row; a
+    /// §14.8.2.3.3 rule 2 names — the one description the relation (<c>ActivationRelations.CallArgumentViolation</c>) is
+    /// asked of, at bind time (<c>ParameterConformance.ContentConformanceReason</c>) and at run time alike: a nonnumeric literal is its category's Table 16 row; a
     /// numeric literal (and a BY VALUE literal bound as an expression, §14.9.4.4 GR8) the numeric row of its own digits;
     /// a figurative constant or an ALL literal an alphanumeric value of any category, ZERO also a numeric COMPUTE sender
-    /// (§8.8.1.1); a character-valued intrinsic function its §15.2 type's row; a numeric function or an arithmetic
+    /// (§8.8.1.1), and the two §14.9.25.3 SR6 / SR7 read apart (ZERO; an ALL literal of boolean characters); a
+    /// character-valued intrinsic function its §15.2 type's row; a numeric function or an arithmetic
     /// expression a numeric value with no character image, of its function's row or — for an expression, which carries
     /// no compile-time integer guarantee — the noninteger row (kb/Work PB1946); NULL a SET sender only. Null for a shape
     /// none of these names.</summary>
@@ -219,7 +220,10 @@ public static class ActivationDescriptions
         BoundPredefinedNull => new ActivationDescription { Shape = ActivationShape.PredefinedNull },
         BoundFigurative f => Value(ActivationShape.Literal,
             f.Kind == 'Z' ? ActivationCategory.FigurativeZero : ActivationCategory.Figurative, Table16Category.None),
-        BoundAllLiteral => Value(ActivationShape.Literal, ActivationCategory.Figurative, Table16Category.None),
+        // §14.9.25.3 SR7 reads an ALL literal's characters: one of '0' and '1' only may move to a boolean receiver.
+        BoundAllLiteral all => Value(ActivationShape.Literal,
+            MoveTable16.HasBooleanCharacters(all) ? ActivationCategory.FigurativeBoolean : ActivationCategory.Figurative,
+            Table16Category.None),
         BoundStringLiteral s => Value(ActivationShape.Literal, CategoryName(s.Category), MoveTable16.SenderPosition(s).Heading),
         BoundNumericLiteral n => Value(ActivationShape.Literal, ActivationCategory.Numeric, MoveTable16.SenderPosition(n).Heading),
         BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } text =>

@@ -65,11 +65,19 @@ public sealed class VariableLengthBoundaryDriftTests
     [Fact]
     public void BoundaryScreens_AskTheBoundaryPredicate()
     {
-        // OoConformance: the three group arms of THE one comparator — the BY REFERENCE argument-group screen,
-        // the formal-group screen, and (PB165, closing PB818) the BY CONTENT argument-group screen that used to
-        // ask IsImageCapable. All must admit a compatible variable-length group.
+        // OoConformance: the group arms of the pair-mode comparator — the argument-group screen and the formal-group
+        // screen. All must admit a compatible variable-length group. The BY CONTENT argument-group screen (PB165,
+        // closing PB818: it used to ask IsImageCapable) left with the BY CONTENT comparator (kb/Work PB3101): a BY
+        // CONTENT group is described by ActivationDescriptions.Of, whose variable-length arm asks
+        // CurrentExtentImageCapable before IsImageCapable — the two halves of BoundaryImageCapable.
         string oo = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
-        Assert.Equal(4, CodeOccurrences(oo, "BoundaryImageCapable"));
+        Assert.Equal(3, CodeOccurrences(oo, "BoundaryImageCapable"));
+        string descriptions = File.ReadAllText(
+            TestRepo.At("src", "Cobol.Net.Compiler", "Oo", "ActivationDescriptions.cs"));
+        Assert.True(CodeOccurrences(descriptions, "item.CurrentExtentImageCapable") > 0
+                    && CodeOccurrences(descriptions, "item.IsImageCapable") > 0,
+            "ActivationDescriptions.Of no longer describes a group by both halves of BoundaryImageCapable — a compatible "
+            + "variable-length group argument BY CONTENT would have no description and be refused (kb/Work PB818).");
         Assert.Equal(0, CodeOccurrences(oo, "arg.IsImageCapable"));
         Assert.Equal(0, CodeOccurrences(oo, "formal.IsImageCapable"));
 
@@ -79,7 +87,8 @@ public sealed class VariableLengthBoundaryDriftTests
         Assert.Equal(0, CodeOccurrences(call, "p.Item.IsGroup && !p.Item.IsImageCapable"));
 
         // And the compatibility relation is consulted from the comparator, not re-implemented at a call site
-        // (three consultations: the BY REFERENCE argument arm, the formal arm, and PB165's BY CONTENT arm).
-        Assert.Equal(3, CodeOccurrences(oo, "VariableLengthCompatibility.Mismatch"));
+        // (two consultations: the argument arm and the formal arm; PB165's BY CONTENT arm is the run-time relation's
+        // §8.5.1.12 walk now, ActivationRelations.VariableLengthViolation over the descriptions' atoms, kb/Work PB3101).
+        Assert.Equal(2, CodeOccurrences(oo, "VariableLengthCompatibility.Mismatch"));
     }
 }

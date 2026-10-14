@@ -432,9 +432,11 @@ equivalence is therefore no longer deferred — it is what the walk decides.
 implicit move — `… FROM`, `… INTO`), §8.8.4.2.3 SR1 (`CheckRelationalOperands`, the ONE relation chokepoint) and
 §8.8.4.2.12 (`RelationPair.Classify` → `StrongGroupComparison`, which pairs the two operands' elementary items by
 POSITION — the same correspondence this predicate proves — and compares them element by element), and the activation boundary's one sentence written three times — §14.8.2.2 (arguments), §14.8.3.2
-(returning items), §9.3.8.2.3 rule 7 (interface conformance) — in `OoConformance.StrongTypeMismatch`, reached from
-BOTH `DescriptionMismatch` (BY REFERENCE, RETURNING, override and prototype signatures) and `ContentMismatch` (BY
-CONTENT / BY VALUE), because §14.8.2.2's sentence qualifies neither mode. That last one also completes
+(returning items), §9.3.8.2.3 rule 7 (interface conformance) — for an activation in
+`ActivationRelations.StrongTypeViolation` over the descriptions' `StrongType` identity (the §8.5.3.1 key,
+`StrongTypeModel.TypeIdentityKey`), asked in BOTH modes because §14.8.2.2's sentence qualifies neither (kb/Work
+PB3101), and in pair mode in `OoConformance.StrongTypeMismatch`, reached from `DescriptionMismatch` (override and
+prototype signatures). That last one also completes
 §8.5.1.12.1's *"Two fixed-length groups are always compatible, unless they are strongly typed and have different
 type definitions"*, whose strong half `VariableLengthCompatibility` deliberately leaves to its caller.
 
