@@ -96,4 +96,34 @@ public sealed class GlobalNameClassDriftTests
             Assert.True(m.Groups["body"].Value.Contains(reach, StringComparison.Ordinal),
                 $"InheritGlobalSubtree no longer reaches the name index '{index}' (expected '{reach}').");
     }
+
+    /// <summary>Inherited name index → the text <c>DataBinder.DeclaredNearerThan</c> asks it by.</summary>
+    private static readonly Dictionary<string, string> AskedByShadowing = new()
+    {
+        ["ByName"] = "ByName.TryGetValue(",
+        ["Conditions"] = "Conditions.TryGetValue(",
+        ["IndexNames"] = "IndexNames.Declares(",
+        ["_capacityRegisters"] = "_capacityRegisters.TryGetValue(",
+    };
+
+    /// <summary>⛔ THE SAME LIST DECIDES SHADOWING (kb/Work PB3154 review R2-1). An inherited constant-name or
+    /// symbolic-character is hidden by a NEARER declaration of its spelling in ANY name class (ISO §8.4.6.1 — "even
+    /// when it is a different type of user-defined word, is to the item which that source element describes"), and
+    /// <c>DeclaredNearerThan</c> is the one predicate that asks. It asked <c>ByName</c>, <c>Conditions</c> and
+    /// <c>IndexNames</c> but not the CAPACITY register index, so a contained program's register spelled like its
+    /// container's symbolic-character read the figurative. Every name index a contained program inherits is a name
+    /// class a nearer element can declare, so the predicate must ask each one.</summary>
+    [Fact]
+    public void DeclaredNearerThan_AsksEveryInheritedNameIndex()
+    {
+        Assert.Equal(Inherited.Keys.Order(StringComparer.Ordinal), AskedByShadowing.Keys.Order(StringComparer.Ordinal));
+        string text = File.ReadAllText(Path.Combine(TestRepo.Root, "src", "Cobol.Net.Compiler", "Binding",
+            "DataBinder.Constants.cs"));
+        var m = Regex.Match(text, @"private bool DeclaredNearerThan\(string name, int depth\)\s*\{(?<body>.*?)\n    \}",
+            RegexOptions.Singleline);
+        Assert.True(m.Success, "DeclaredNearerThan not found in DataBinder.Constants.cs");
+        foreach (var (index, ask) in AskedByShadowing)
+            Assert.True(m.Groups["body"].Value.Contains(ask, StringComparison.Ordinal),
+                $"DeclaredNearerThan no longer asks the name index '{index}' (expected '{ask}').");
+    }
 }

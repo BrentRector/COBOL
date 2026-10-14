@@ -118,15 +118,53 @@ public sealed partial class DataBinder
     /// §8.4.6.2.1 3) ("a) If the name is declared in source element B, the item in source element B is the referenced
     /// item. b) … 1. The item in source element A if the name is declared in source element A"), so it leaves the
     /// table before any procedure reference can substitute it (kb/Work PB1009; the nearer-container half kb/Work
-    /// PB1047 — an outer program's constant used to beat the middle program's global data-name).</summary>
+    /// PB1047 — an outer program's constant used to beat the middle program's global data-name).
+    /// <para>The INHERITED SYMBOLIC CHARACTERS figurative constants (§12.3.7.4 GR11 a; <see cref="InheritConfiguration"/>)
+    /// obey the same rule: §8.4.6.1 "a source element's reference to such a name, even when it is a different type of
+    /// user-defined word, is to the item which that source element describes", so a contained program's or an OO
+    /// half's data item spelled like its container's symbolic-character is the referenced item (kb/Work PB3154 review
+    /// R1-1: <c>MOVE S1 TO Y</c> moved the container's figurative instead of the local <c>01 S1</c>, with no
+    /// diagnostic). A shadowed symbolic is HIDDEN (<see cref="_shadowedSymbolics"/>), never removed: a contained unit
+    /// inherits the whole table from this one (<see cref="InheritConfiguration"/> copies one level), and this unit's
+    /// local data-name hides nothing from it.</para>
+    /// <para>Every tier a name can be declared at is asked by <see cref="DeclaredNearerThan"/>; a METHOD's own names
+    /// are the one tier nearer still, asked at reference time (<see cref="ActiveMethodDeclares"/>).</para></summary>
     internal void DropShadowedConstants()
     {
         foreach (var (name, depth) in _inheritedConstants.ToList())
-            if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth))
+            if (DeclaredNearerThan(name, depth))
             {
                 _constants.Remove(name);
                 _inheritedConstants.Remove(name);
             }
+        foreach (var (name, depth) in _inheritedSymbolics)
+            if (DeclaredNearerThan(name, depth)) _shadowedSymbolics.Add(name);
+    }
+
+    /// <summary>⛔ ISO §8.4.6.2.1 3) ACROSS NAME CLASSES for a word that stands for a literal: whether this unit's set
+    /// of names (its own and every container's global ones) declares <paramref name="name"/> as a data-name, a
+    /// condition-name or an index-name in a source element NEARER than <paramref name="depth"/> (the containment
+    /// distance of the element that declared the constant or symbolic-character; 1 = the direct container). "b) 1.
+    /// The item in source element A if the name is declared in source element A. 2. The item in the containing
+    /// source element if the name is not declared in source element A and is declared in the source element
+    /// containing source element A." A condition-name is placed by its conditional variable.
+    /// <para>⛔ EVERY NAME INDEX A DATA DESCRIPTION ENTRY DECLARES INTO, not only <see cref="ByName"/> (kb/Work PB3154
+    /// review R2-1): a named OCCURS DYNAMIC CAPACITY register is a data-name (§13.18.38.3 SR30) kept off
+    /// <see cref="ByName"/> in <see cref="_capacityRegisters"/>, placed by its table (a METHOD's own table is the
+    /// method tier, <see cref="ActiveMethodDeclares"/>, so the object half never counts it); a REPORT SECTION sum
+    /// counter is a data-name too (§13.18.54.4 GR5) kept off it in <see cref="_sumCounters"/>, always this element's
+    /// own. <c>GlobalNameClassDriftTests</c> holds this predicate to the inherited name-index list, so a name index
+    /// added there is asked here too.</para></summary>
+    private bool DeclaredNearerThan(string name, int depth)
+    {
+        if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth)) return true;
+        if (Conditions.TryGetValue(name, out var conds) && conds.Any(c => DeclaringDepth(c.Parent) < depth)) return true;
+        if (_capacityRegisters.TryGetValue(name, out var tables)
+            && tables.Any(t => !OoMethodScopedRoots.Contains(t.Root) && DeclaringDepth(t) < depth)) return true;
+        if (depth > 0 && _sumCounters.ContainsKey(name)) return true;
+        if (!IndexNames.Declares(name)) return false;
+        IndexNames.Candidates(name, static _ => true, out int indexDepth);   // int.MaxValue when none survives
+        return indexDepth < depth;
     }
 
     /// <summary>⛔ THE ONE CONSTANT LOOKUP (§13.10.4 GR1/GR3 substitution; kb/Work PB1231): the defined constant named
@@ -138,6 +176,7 @@ public sealed partial class DataBinder
     /// <see cref="IntegerOperandValue"/>, <see cref="ExpandPicConstants"/> and <c>LiteralEnvironment.Constant</c>.</summary>
     internal ConstantDef? FindConstant(string name)
     {
+        if (ActiveMethodDeclares(name)) return null;   // a method's own name is nearer (§8.4.6.2.1 3) a); kb/Work PB3154 R1-1)
         if (_declaredConstants.TryGetValue(name, out var declared))
             foreach (var d in declared)
             {

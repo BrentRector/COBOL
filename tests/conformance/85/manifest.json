@@ -422,7 +422,9 @@
   "pb2502_renames_record_key",
   "pb2502_renames_sort_key",
   "pb2017_arithmetic_operator_spacing",
-  "pb2722_evaluate_object_not_ownership"
+  "pb2722_evaluate_object_not_ownership",
+  "pb3154_contained_symbolic_character",
+  "pb3154_contained_symbolic_shadowed"
  ],
  "pending": []
 }
