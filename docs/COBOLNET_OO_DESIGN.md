@@ -305,8 +305,9 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    "Additionally" d)/e) on BOTH lanes (`ActivationDescription.AnyLengthClauses`: the argument compared as if it were
    described with ANY LENGTH — only the length is relaxed), so a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal
    and, through a universal receiver, is then refused by GR7 c) (EC-OO-UNIVERSAL), while a slice matches no ANY LENGTH
-   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's run-time §14.8.2.3.2 rule 2 d) and §14.8.3.3 5) arms still compare
-   category and usage only (kb/Work PB2077's lead: reading the any-length form there moves the call ABI). Both lanes
+   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's §14.8.2.3.2 rule 2 d) and §14.8.3.3
+   5) arms read the same any-length form (`SameClausesAtFormalLength`; kb/Work PB3127), so an ANY LENGTH formal or
+   sending item relaxes the length and nothing else on every lane. Both lanes
    quote the relation's refusal, so a refusal spells each description as its entry does and never as its identity key:
    `ActivationDescription.Clauses` is the 3 e) identity (compared), `ClausePhrases` the same clauses as phrases
    (`PICTURE 9(6)`, `USAGE POINTER TO T-REC`, `DECIMAL-POINT IS COMMA`; never compared), built beside it by
@@ -346,6 +347,21 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    LENGTH or category against each other). Measured before PB3101 (2026-10-12): a reference-modified argument BY
    REFERENCE ran into a prototyped CALL's, a function's and a typed INVOKE's `PIC X(5)` formal, and a whole `PIC X(4)`
    ran into a typed INVOKE group formal, while the universal lane refused each — one rule in two currencies.
+   **Where it stands (wave 1077, kb/Work PB3101 SPLIT).** Landed: the typed INVOKE BY REFERENCE step (item 6, PB2077);
+   `ParameterConformance.CheckArgument`'s BY REFERENCE arm asks `CallArgumentViolation` (rule 2: every activation that
+   entry serves has a program-specifier, the NESTED phrase or is a function) over `ActivationDescriptions.OfPlace` /
+   `Of`, so a slice BY REFERENCE into a prototyped program's, a NESTED program's or a function's elementary or ANY
+   LENGTH formal is refused as on the INVOKE lanes; `ReturningConformanceReason` asks `CallReturningViolation` for every
+   pair but two object references (§14.8.3.3 rule 1's SET table, unchanged); `ActivationDescriptions.Of` describes a
+   level-66 THROUGH alias as the alphanumeric group §13.18.45.4 GR2 makes it; `ReferenceGroupViolation` applies
+   §14.8.2.2 rule 1 to a fixed group opposite a variable-length one in the pair lengths §8.5.1.12.3 gives (the walk's
+   `GroupCharTally`); and `DescriptionMismatch` is pair mode only (its activation flags are gone). Remaining for
+   PB3101: the BY CONTENT / BY VALUE arm (`ContentConformanceReason` and OoBinder's content arms still ask
+   `ContentMismatch` / `ContentValueMismatch` and the literal arms), the GR8 reduction written once (PB613), pair mode
+   on `SameSignature` with `GroupAtom` carrying each leaf's identity, the deletions and `OneRelationDriftTests`.
+   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`; negatives
+   `pb3101-prototype-call-refmod-by-reference`, `pb3101-function-refmod-by-reference`,
+   `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`.
 
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
 
