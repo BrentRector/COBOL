@@ -1,4 +1,4 @@
-## The wave planner drains: --drain plans only the finishers of started work (PB3150)
+## Entry 2038 — 2026-10-14 16:55 PDT — The wave planner drains: --drain plans only the finishers of started work (PB3150)
 
 Under the owner's drain (2026-10-13 21:35 PDT: no new work items, only in-process work to main), wave 1075's unit ran
 `plan_wave.py --max-groups 2` as the last handoff asked, for the two review finishers left (e99-4 R4-1 and
@@ -27,3 +27,4 @@ review finisher was dispatched and had not reported was planned again (R2-1): th
 the unlanded branches' notes now all read the planner's leads. Self-test `test_plan_wave.py`: 159/159 (sections 6b'''
 and 6c). DESIGN-orchestrator-loop.md
 section 9 and `units/wave.md` step 2 (a drain adds `--drain`, never `--max-groups` alone) changed in the same change.
+
