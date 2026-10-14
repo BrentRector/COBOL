@@ -305,8 +305,8 @@ internal static class PlaceRenderer
             terms.Add(cell[i] is CellTableSegment table && i + 1 < cell.Count && cell[i + 1] is DynTableSegment occurrence
                 ? $"{PositionRenderer.Render(table.Ordinal)}, {PositionRenderer.Render(occurrence.OneBasedIndex)}"
                 : throw new System.InvalidOperationException(
-                    "internal error: a cell window's path is not its area followed by (table, occurrence) pairs "
-                    + $"({string.Join(", ", cell.Select(static s => s.GetType().Name))})"));
+                    "a cell window's path must be its area, then one table and occurrence pair per dynamic-capacity "
+                    + $"level, never [{string.Join(", ", cell.Select(static s => s.GetType().Name))}] (an internal error)"));
         return $"[{string.Join(", ", terms)}], ";
     }
 
