@@ -237,37 +237,7 @@ internal static class PlaceRenderer
         MemberPlace m => $"{RenderPath(m.Path, AccessDir.Sending)} = {rhs};",
         // A dynamic-table store uses RefReceiving, which grows-and-seeds past the current capacity (§8.5.1.9.3).
         DynTablePlace d => $"{RenderPath(d.Path, AccessDir.Receiving)} = {rhs};",
-        // Splice the member's BOOLEAN positions back into the class's ONE backing, leaving every other bit of it
-        // untouched (kb/Work PB203). ⛔ Bit-granular splicing is REQUIRED, not an optimization: §8.5.1.6.3 puts two
-        // same-level bit members at successive bit positions of the SAME byte, so a byte-granular store through
-        // either would silently clobber the other. The value is first stored to exactly the member's boolean
-        // position count with §14.6.8.6's boolean-ZERO fill.
-        RedefViewPlace { Coding: BitWindow b } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
-            $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(b.Offset)})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
-        // Splice the member's NATIONAL positions back into the class's ONE backing as UTF-16BE byte pairs,
-        // leaving every other byte untouched (kb/Work PB231; §13.18.44.4 GR1 — one storage area, so a write
-        // through one view must not disturb another's bytes). The receiving twin of the national read arm; the
-        // fit to exactly the member's position count happens in POSITIONS inside the runtime helper, because
-        // padding the BYTES would manufacture U+2020 characters instead of national spaces.
-        RedefViewPlace { Coding: NationalWindow n } v => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
-            $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(v.Offset)})", n.Positions.ToString(), rhs)};",
-        // Store a POINTER-CLASS member into the area's MANAGED SLOT (kb/Work PB231) — the receiving twin of the
-        // slot read. The member's own 8 positions get the pointer IMAGE of the stored value (kb/Work PB1071, the
-        // DOC-A.1-216 image, written by the runtime's one store beside the slot) and no other member's positions are
-        // touched (§13.18.44.4 GR1 — one storage area, and every other member's positions are its own).
-        RedefViewPlace { Coding: SlotWindow s } v =>
-            $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({PositionRenderer.Render(v.Offset)})", v.ViewItem.ElementType, rhs)};",
-        // Store a DYNAMIC-LENGTH member's new content into the cell's dynamic slot (kb/Work PB1026) — the receiving
-        // twin of the slot read. rhs already carries §8.5.1.10.4's receiving rule (CobolDynString.Store).
-        // The cell is reached RECEIVING: inside a dynamic-capacity table's element cell (kb/Work PB1042) the store
-        // is a receiving reference to that occurrence, which grows the table to it (§8.5.1.9.3).
-        RedefViewPlace { Coding: DynSlotWindow d } => $"{RuntimeApi.CellDynWrite(RenderPath(d.Cell, AccessDir.Receiving), PositionRenderer.Render(d.Ordinal), rhs)};",
-        // A VARIABLE-LENGTH GROUP of a cell-backed class receiving a character value (kb/Work PB1026): the value is
-        // a contiguous image (§8.5.1.11.2), decomposed by the ONE take step determination D-FRA states.
-        RedefViewPlace { Coding: VarGroupWindow g } v => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
-            $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynFixedAt.Select(_ => 0), g.DynTable, g.Odo, rhs)};",
-        // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
-        RedefViewPlace v => ByteWindowWrite(v, rhs),
+        RedefViewPlace v => Received(v, WriteView(v, rhs)),
         // Unreachable: SET Format 14 routes to BoundSetCapacity, and any other store into the CAPACITY register is
         // rejected COBOLNET1523 at bind time (§13.18.38 SR30–32). The backstop for a receiver path that forgot the gate.
         CapacityRegisterPlace => throw new System.InvalidOperationException(
@@ -294,6 +264,64 @@ internal static class PlaceRenderer
             "EXCEPTION-OBJECT shall not be specified as a receiving operand (ISO §8.4.3.6.3 SR1); a store must be "
             + "rejected at bind time and never reach PlaceRenderer.Write"),
         _ => throw Unhandled(p),
+    };
+
+    /// <summary>⛔ A STORE THROUGH A VIEW OF A POINTER-LOCATED CLASS IS RECORDED ON ITS CELL AS A RECEIVING REFERENCE
+    /// (kb/Work PB2690): <paramref name="store"/>, then <c>StorageCell.Received</c> over the view's window. ISO §8.5.1.9.3
+    /// acts on a data item "referenced as a receiving item", and a BY REFERENCE formal (or a BASED item laid over one)
+    /// whose fixed table faces the argument's dynamic-capacity table may occupy a fresh area that is stored back at return
+    /// (§14.2.3 GR8 realized by a copy), where the image alone cannot show a store of exactly what the formal was shown.
+    /// So every store through such a view states its window, and the cell records it while a boundary watches it
+    /// (<c>ManagedPointer.Watch</c>) — a null test otherwise. Only a class located by a data-address pointer (a LINKAGE
+    /// item, a BASED item: <c>RedefinesClass.BasedPointerField</c>) can lie over a boundary's fresh area, and only its own
+    /// cell (not a dynamic-capacity table's element cell) is that area.</summary>
+    private static string Received(RedefViewPlace v, string store) =>
+        v is { Cell: { Segments: [RootFieldSegment] } cell, ViewItem.Root.Class.BasedPointerField: not null }
+            ? $"{store} {RenderPath(cell, AccessDir.Sending)}.{nameof(StorageCell.Received)}({PositionRenderer.Render(v.Offset)}, {v.Width});"
+            : store;
+
+    /// <summary>⛔ A BOUNDARY COPY OF A GROUP'S WHOLE IMAGE (<c>CallEmitter.BoundaryCopyWrite</c>: the write half of a BY
+    /// REFERENCE argument's view, and a formal's copy-in): the activated element's image of the whole group, stored WITHOUT
+    /// recording a receiving reference (<see cref="Received"/>). The image covers every position of the group whichever ones
+    /// the activated element stored into, so recording it would make a store into one occurrence a reference to all of
+    /// them (kb/Work PB2690); the activated element's own references were recorded on its own area, and a store that
+    /// reaches this storage only so is still recognised by its effect (<c>CobolVarGroup.OverlaidTable</c>).</summary>
+    public static string WriteGroupCopy(RedefViewPlace v, string image) => WriteView(v, image);
+
+    /// <summary>The store of <paramref name="rhs"/> through the Tier-B view <paramref name="v"/>, by its window's coding.</summary>
+    private static string WriteView(RedefViewPlace v, string rhs) => v switch
+    {
+        // Splice the member's BOOLEAN positions back into the class's ONE backing, leaving every other bit of it
+        // untouched (kb/Work PB203). ⛔ Bit-granular splicing is REQUIRED, not an optimization: §8.5.1.6.3 puts two
+        // same-level bit members at successive bit positions of the SAME byte, so a byte-granular store through
+        // either would silently clobber the other. The value is first stored to exactly the member's boolean
+        // position count with §14.6.8.6's boolean-ZERO fill.
+        RedefViewPlace { Coding: BitWindow b } => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+            $"{RuntimeApi.BitsWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(b.Offset)})", RuntimeApi.StrStoreBoolean(rhs, b.Bits.ToString(), justifiedRight: false))};",
+        // Splice the member's NATIONAL positions back into the class's ONE backing as UTF-16BE byte pairs,
+        // leaving every other byte untouched (kb/Work PB231; §13.18.44.4 GR1 — one storage area, so a write
+        // through one view must not disturb another's bytes). The receiving twin of the national read arm; the
+        // fit to exactly the member's position count happens in POSITIONS inside the runtime helper, because
+        // padding the BYTES would manufacture U+2020 characters instead of national spaces.
+        RedefViewPlace { Coding: NationalWindow n } => $"{RenderPath(v.Backing, AccessDir.Receiving)} = " +
+            $"{RuntimeApi.NatWriteWindow(RenderPath(v.Backing, AccessDir.Receiving),$"(int)({PositionRenderer.Render(v.Offset)})", n.Positions.ToString(), rhs)};",
+        // Store a POINTER-CLASS member into the area's MANAGED SLOT (kb/Work PB231) — the receiving twin of the
+        // slot read. The member's own 8 positions get the pointer IMAGE of the stored value (kb/Work PB1071, the
+        // DOC-A.1-216 image, written by the runtime's one store beside the slot) and no other member's positions are
+        // touched (§13.18.44.4 GR1 — one storage area, and every other member's positions are its own).
+        RedefViewPlace { Coding: SlotWindow s } =>
+            $"{RuntimeApi.PtrSlotWrite(RenderPath(s.Cell, AccessDir.Receiving), $"(int)({PositionRenderer.Render(v.Offset)})", v.ViewItem.ElementType, rhs)};",
+        // Store a DYNAMIC-LENGTH member's new content into the cell's dynamic slot (kb/Work PB1026) — the receiving
+        // twin of the slot read. rhs already carries §8.5.1.10.4's receiving rule (CobolDynString.Store).
+        // The cell is reached RECEIVING: inside a dynamic-capacity table's element cell (kb/Work PB1042) the store
+        // is a receiving reference to that occurrence, which grows the table to it (§8.5.1.9.3).
+        RedefViewPlace { Coding: DynSlotWindow d } => $"{RuntimeApi.CellDynWrite(RenderPath(d.Cell, AccessDir.Receiving), PositionRenderer.Render(d.Ordinal), rhs)};",
+        // A VARIABLE-LENGTH GROUP of a cell-backed class receiving a character value (kb/Work PB1026): the value is
+        // a contiguous image (§8.5.1.11.2), decomposed by the ONE take step determination D-FRA states.
+        RedefViewPlace { Coding: VarGroupWindow g } => $"{RuntimeApi.CellVarStoreContiguous(RenderPath(g.Cell, AccessDir.Receiving),
+            $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynMax, g.DynFixedAt.Select(_ => 0), g.DynTable, g.Odo, rhs)};",
+        // Splice the new image back into the class's ONE backing, preserving its full width (§13.18.44).
+        _ => ByteWindowWrite(v, rhs),
     };
 
     // Unreachable: every concrete Place subtype has an explicit arm above (there is no Place.Read()/Write() to fall
@@ -565,7 +593,7 @@ internal static class PlaceRenderer
     {
         // A NATIONAL GROUP view's STORAGE image is its 2m-byte window; its Write is the m-position VALUE store
         // (kb/Work PB1653 — WriteGroupValue is the value channel).
-        RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => ByteWindowWrite(v, image),
+        RedefViewPlace { Coding: NationalWindow, ViewItem.IsGroup: true } v => Received(v, ByteWindowWrite(v, image)),
         // A BIT GROUP view's STORAGE image is its m bits PACKED into ceil(m/8) characters (§13.18.60.4 GR5 /
         // §8.5.1.6.3 — the CobolBits.Pack law a record-struct bit group's FromImage reads); its Write is the
         // boolean-POSITION store, so the image is unpacked to its m positions first (kb/Work PB1904).

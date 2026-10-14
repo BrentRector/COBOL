@@ -62,6 +62,31 @@ public sealed class StorageCell
     /// a cell with no managed member costs one null field.</para></summary>
     private Dictionary<int, object?>? _slots;
 
+    /// <summary>The receiving-reference record of a formal's fresh area while a boundary watches it (kb/Work PB2690;
+    /// <see cref="ReceivingReferences"/>): one mark per character position of <see cref="Ref"/>. Null for every other
+    /// cell, so a store through a view of a pointer-located class costs one null test.</summary>
+    private bool[]? _received;
+
+    /// <summary>⛔ A STORE THROUGH A VIEW OF THIS CELL (kb/Work PB2690): the activated element referenced the
+    /// <paramref name="width"/> positions from <paramref name="at"/> as a receiving item (ISO §8.5.1.9.3). The emitted
+    /// store through every view of a pointer-located class (a LINKAGE formal, a BASED item) calls it; it records only while
+    /// a boundary watches the cell (<see cref="WatchReceiving"/>).</summary>
+    public void Received(long at, int width)
+    {
+        if (_received is not { } marks) return;
+        long lo = Math.Max(0, at), hi = Math.Min(marks.Length, at + width);
+        if (lo < hi) marks.AsSpan((int)lo, (int)(hi - lo)).Fill(true);
+    }
+
+    /// <summary>Start recording the receiving references made through this cell's views (<see cref="Received"/>) — the
+    /// boundary calls it once the fresh area is filled from the argument, so the filling itself is no reference.</summary>
+    internal void WatchReceiving() => _received = new bool[Ref.Length];
+
+    /// <summary>The receiving references recorded since <see cref="WatchReceiving"/>, in the positions of the formal whose
+    /// image starts at <paramref name="offset"/>; null when nothing watches the cell.</summary>
+    internal ReceivingReferences? ReceivedFrom(long offset) =>
+        _received is { } marks ? new ReceivingReferences(marks, (int)offset) : null;
+
     /// <summary>The managed value at <paramref name="byteOffset"/>, or <see langword="null"/> when nothing
     /// has been stored there (ISO §14.9.3.4 GR9's null initial state — see <see cref="_slots"/>).</summary>
     public object? SlotAt(int byteOffset) =>

@@ -1,0 +1,226 @@
+      *> kb/Work PB2690 - A BY REFERENCE FORMAL'S FIXED TABLE STORED PAST THE
+      *> CAPACITY OF THE ARGUMENT'S DYNAMIC-CAPACITY TABLE RAISES THE CAPACITY
+      *> WHATEVER IMAGE IT STORES: the INITIALIZED default, and SPACES into a
+      *> table without the phrase, exactly the image the formal was shown.
+      *>
+      *> 14.2.3 GR8: the formal "operates as if the formal parameter occupies
+      *> the same storage area as the argument", so a store through occurrence
+      *> N of the formal's fixed table is a receiving reference to occurrence N
+      *> of the argument's dynamic-capacity table, and 8.5.1.9.3: "When a data
+      *> item in a dynamic-capacity table is referenced as a receiving item and
+      *> the value of the subscript exceeds the current capacity of the table,
+      *> a new element is automatically created and the capacity of the table
+      *> is increased to the value given by the subscript". The value stored
+      *> does not enter the rule. 8.5.1.9.5 initializes the items of an
+      *> INITIALIZED table's new elements that the statement does not store.
+      *>
+      *> EXPECTED VALUES, DERIVED (each table starts with ONE element; the
+      *> INITIALIZED element is "ab"):
+      *>   GA  the callee stores FE (3) := "a", the default     = ab ab ab, 3
+      *>   DA  the same store made in the caller                = ab ab ab, 3
+      *>   GS  no INITIALIZED (PIC X elements "q"); the callee
+      *>       stores SPACE into TS (3)                          = q, 3
+      *>   G2  the callee stores the default into FE (2)       = ab ab, 2
+      *>   GR  the callee only reads FE (3): nothing created    = 1
+      *>   GV  a variable-length formal (its own DYNAMIC LENGTH
+      *>       item after the fixed table); it stores the
+      *>       default into VE (3)                               = ab ab ab, 3
+      *>   GN  elements holding an INITIALIZED inner dynamic
+      *>       table (ND "d", NI "i" FROM 1); the callee stores
+      *>       the default "d" into LND (3)                      = d d d, 3
+      *>   GC  BY CONTENT (14.2.3 GR9: a record that does "not
+      *>       occupy the same storage area"): nothing created  = 1
+      *>   GK  the formal passed on BY REFERENCE to a program of
+      *>       the same description, which stores the default
+      *>       into FE (3): one storage area throughout         = 3
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SG.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-C PIC 9.
+       01 GA.
+          05 AX PIC X VALUE "x".
+          05 ATB OCCURS DYNAMIC CAPACITY IN CA FROM 1 INITIALIZED.
+             10 AE PIC X VALUE "a".
+             10 AF PIC X VALUE "b".
+       01 DA.
+          05 DX PIC X VALUE "x".
+          05 DTB OCCURS DYNAMIC CAPACITY IN CDA FROM 1 INITIALIZED.
+             10 DQ PIC X VALUE "a".
+             10 DR PIC X VALUE "b".
+       01 GS.
+          05 SX PIC X VALUE "x".
+          05 STB PIC X OCCURS DYNAMIC CAPACITY IN CS FROM 1 VALUE "q".
+       01 G2.
+          05 BX PIC X VALUE "x".
+          05 BTB OCCURS DYNAMIC CAPACITY IN CB FROM 1 INITIALIZED.
+             10 BE PIC X VALUE "a".
+             10 BF PIC X VALUE "b".
+       01 GR.
+          05 RX PIC X VALUE "x".
+          05 RTB OCCURS DYNAMIC CAPACITY IN CR FROM 1 INITIALIZED.
+             10 RQE PIC X VALUE "a".
+             10 RQF PIC X VALUE "b".
+       01 GV.
+          05 VX PIC X VALUE "x".
+          05 VTB OCCURS DYNAMIC CAPACITY IN CV FROM 1 INITIALIZED.
+             10 VE PIC X VALUE "a".
+             10 VF PIC X VALUE "b".
+          05 VDL PIC X DYNAMIC LENGTH LIMIT 5.
+       01 GN.
+          05 NH PIC X VALUE "h".
+          05 NT OCCURS DYNAMIC CAPACITY IN CN FROM 1 INITIALIZED.
+             10 ND PIC X VALUE "d".
+             10 NI PIC X OCCURS DYNAMIC CAPACITY IN CNI FROM 1
+                INITIALIZED VALUE "i".
+       01 GC.
+          05 CX PIC X VALUE "x".
+          05 CTB OCCURS DYNAMIC CAPACITY IN CC FROM 1 INITIALIZED.
+             10 CQE PIC X VALUE "a".
+             10 CQF PIC X VALUE "b".
+       01 GK.
+          05 KX PIC X VALUE "x".
+          05 KTB OCCURS DYNAMIC CAPACITY IN CK FROM 1 INITIALIZED.
+             10 KE PIC X VALUE "a".
+             10 KF PIC X VALUE "b".
+       PROCEDURE DIVISION.
+       MAIN.
+           CALL "PB2690SA" AS NESTED USING GA
+           MOVE CA TO WS-C
+           DISPLAY "GA=[" AE (1) AF (1) " " AE (2) AF (2) " "
+               AE (3) AF (3) "] " WS-C
+           MOVE "a" TO DQ (3)
+           MOVE CDA TO WS-C
+           DISPLAY "DA=[" DQ (1) DR (1) " " DQ (2) DR (2) " "
+               DQ (3) DR (3) "] " WS-C
+           CALL "PB2690SS" AS NESTED USING GS
+           MOVE CS TO WS-C
+           DISPLAY "GS=[" STB (1) "] " WS-C
+           CALL "PB2690S2" AS NESTED USING G2
+           MOVE CB TO WS-C
+           DISPLAY "G2=[" BE (1) BF (1) " " BE (2) BF (2) "] " WS-C
+           CALL "PB2690SR" AS NESTED USING GR
+           MOVE CR TO WS-C
+           DISPLAY "GR=" WS-C
+           MOVE "dd" TO VDL
+           CALL "PB2690SV" AS NESTED USING GV
+           MOVE CV TO WS-C
+           DISPLAY "GV=[" VE (1) VF (1) " " VE (2) VF (2) " "
+               VE (3) VF (3) "] " WS-C
+           CALL "PB2690SN" AS NESTED USING GN
+           MOVE CN TO WS-C
+           DISPLAY "GN=[" ND (1) " " ND (2) " " ND (3) "] " WS-C
+           CALL "PB2690SA" AS NESTED USING BY CONTENT GC
+           MOVE CC TO WS-C
+           DISPLAY "GC=" WS-C
+           CALL "PB2690SK" AS NESTED USING GK
+           MOVE CK TO WS-C
+           DISPLAY "GK=" WS-C
+           STOP RUN.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SA IS COMMON.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LA.
+          05 LAX PIC X.
+          05 TF OCCURS 3.
+             10 FE PIC X.
+             10 FF PIC X.
+       PROCEDURE DIVISION USING LA.
+       MAIN.
+           MOVE "a" TO FE (3)
+           GOBACK.
+       END PROGRAM PB2690SA.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SS.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LS.
+          05 LSX PIC X.
+          05 TS PIC X OCCURS 3.
+       PROCEDURE DIVISION USING LS.
+       MAIN.
+           MOVE SPACE TO TS (3)
+           GOBACK.
+       END PROGRAM PB2690SS.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690S2.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 L2.
+          05 L2X PIC X.
+          05 T2 OCCURS 3.
+             10 E2 PIC X.
+             10 F2 PIC X.
+       PROCEDURE DIVISION USING L2.
+       MAIN.
+           MOVE "a" TO E2 (2)
+           GOBACK.
+       END PROGRAM PB2690S2.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SR.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 W-E PIC X.
+       LINKAGE SECTION.
+       01 LR.
+          05 LRX PIC X.
+          05 TR OCCURS 3.
+             10 ER PIC X.
+             10 FR PIC X.
+       PROCEDURE DIVISION USING LR.
+       MAIN.
+           MOVE ER (3) TO W-E
+           GOBACK.
+       END PROGRAM PB2690SR.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SV.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LV.
+          05 LVX PIC X.
+          05 TV OCCURS 3.
+             10 LVE PIC X.
+             10 LVF PIC X.
+          05 LDL PIC X DYNAMIC LENGTH LIMIT 5.
+       PROCEDURE DIVISION USING LV.
+       MAIN.
+           MOVE "a" TO LVE (3)
+           GOBACK.
+       END PROGRAM PB2690SV.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SN.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LN.
+          05 LNH PIC X.
+          05 LNT OCCURS 3.
+             10 LND PIC X.
+             10 LNI PIC X OCCURS 2.
+       PROCEDURE DIVISION USING LN.
+       MAIN.
+           MOVE "d" TO LND (3)
+           GOBACK.
+       END PROGRAM PB2690SN.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SK.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LK.
+          05 LKX PIC X.
+          05 TK OCCURS 3.
+             10 KE2 PIC X.
+             10 KF2 PIC X.
+       PROCEDURE DIVISION USING LK.
+       MAIN.
+           CALL "PB2690SA" USING LK
+           GOBACK.
+       END PROGRAM PB2690SK.
+       END PROGRAM PB2690SG.
