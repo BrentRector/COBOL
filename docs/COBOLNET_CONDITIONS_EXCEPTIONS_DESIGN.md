@@ -112,7 +112,14 @@ the engine's design specifics:
 **File map.** Frontend: `Preprocessor/TurnDirectiveProcessor.cs` (the `>>TURN` stage — runs LAST, after COPY/NIST,
 on the FINAL text so `TurnEvent.Line` is directly comparable to token `Start.Line`; line-count preserving, asserted
 by `Frontend.Parse`; an emitting-branch TURN survives `ConditionalCompilationProcessor` via `leaveTurnDirectives` —
-the legacy pipeline keeps consuming TURN there). Compiler: `Binding/TurnState.cs` (the compile-time §7.3.25.4 fold),
+the legacy pipeline keeps consuming TURN there). **§7.3.25.3 SR2 (every written exception-name is one of §14.6.13.1's,
+in this edition) is a SYNTAX rule of the directive, so the `>>TURN` stage reports it** — COBOLNET0711 / 0878 — for a
+compiled line and, through `CheckOperand`, for a line in an OMITTED `>>IF` branch alike (§7.2.1; kb/Work PB2740). The
+rule itself is `Editions/ExceptionNameRule.cs` (`TryGet` + `Window`), which the binder's written-name funnel
+(`EcNameResolution.TryResolve`) asks too; what stays in the binder is the policy half (the RAISE level test, the
+declined-module postures, the §15.33 width advisory — `EcNameResolution.Advise`), which `TurnState.Build` reaches through
+`AdviseResolved` for names the stage already resolved (a refused name never enters the `TurnEvent`).
+Compiler: `Binding/TurnState.cs` (the compile-time §7.3.25.4 fold),
 `Binding/Procedure/Verbs/EcBinder.cs` (RAISE/RESUME/SET LAST EXCEPTION/RAISING binds + the per-statement
 `EcWrap` fold → `BoundEcChecked`), `CodeGen/EcEmitter.cs` (guards + the generated `__EcDispatch` /
 `__IoCheckEc`), `CodeGen/Verbs/CallEmitter.cs` (RAISING staging, the CALL-site propagation pickup, the EC-PROGRAM
