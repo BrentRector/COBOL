@@ -1,4 +1,4 @@
-## PB3156: the extent of an ALIGNED bit table is one rule (BitLayout.TableBits), so FUNCTION LENGTH of its bit group, the group's bit string and its image agree
+## Entry 2028 — 2026-10-14 12:52 PDT — PB3156: the extent of an ALIGNED bit table is one rule (BitLayout.TableBits), so FUNCTION LENGTH of its bit group, the group's bit string and its image agree
 
 FUNCTION LENGTH of `01 BG GROUP-USAGE BIT. 05 BA PIC 1 USAGE BIT. 05 TA PIC 1(3) USAGE BIT ALIGNED OCCURS 1 TO 4 DEPENDING ON N.`
 was the named stage COBOLNET1756 ("its occurrences are padded to whole bytes, which a boolean-position count cannot state"),
@@ -44,3 +44,4 @@ channel overshoots (a crash on MOVE). The character-channel arithmetic is unchan
 walk, which needs to know its absolute origin.
 
 Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,552 · Unit 633 · Characterization 30 (scope leg1) — Conformance 6,113/11,665 · Unit 32,994/33,627 · Characterization 6/36 cases ran (skipped 0) in 1 of 2 leg(s)` (run 20261014T193116Z-148547); the golden's `UnitTestResult` (`CorpusRunnerTests_P6.EnabledProgram_CompilesStrict_AndMatchesOutIfPresent(edition: "2002", name: "pb3156_aligned_odo_bit_table_extent")`) is Passed in `leg-1-Conformance.trx`. `scripts/semgrep/verify.py`: PASS, no count moved. Inventory: no row claimed, none re-verdicted (`closes_rows: []` with its reason).
+
