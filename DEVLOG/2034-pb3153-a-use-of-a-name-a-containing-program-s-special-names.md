@@ -1,4 +1,4 @@
-## PB3153: a use of a name a containing program's SPECIAL-NAMES declares is a §8.3.2.2 use in the using element
+## Entry 2034 — 2026-10-14 16:31 PDT — PB3153: a use of a name a containing program's SPECIAL-NAMES declares is a §8.3.2.2 use in the using element
 
 **The defect (kb/Work PB3153, wave 1078 G).** ISO §8.3.2.2 says "Within a source element, a given user-defined word
 may be used as only one type of user-defined word". A contained program that writes `IF X IS DIGS` over its
@@ -75,3 +75,4 @@ territory), is left as a lead.
 The round-2 finisher's gate, run 20261014T231215Z-47b403: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515):
 GREEN` (Conformance 6,192/11,704, Unit 33,104/33,653, Characterization 6/36 in leg 1; leg 2 left to CI); semgrep
 verify PASS.
+
