@@ -43,4 +43,6 @@ method cell copy-in use it, and the RETURNING delivery still records because it 
 elementary or reference-modified argument's view is written per store, so it keeps recording (probes `e1.cob` and
 `u3.cob` in `E:/COBOL-coord/scratch/w1077a/fin/`). New golden lanes: `_call` GQ and GP, `_invoke` UO, US and TO. On the
 reviewed head, GQ, UO and TO printed 3 where 8.5.1.9.3 gives 1. R1-4: the record's coordinates are the formal's storage
-positions, not its fixed run, and the comments now say so.
+positions, not its fixed run, and the comments now say so. Re-gate: run 20261014T201825Z-618d8a, `=== BUILD-LOCAL GATE:
+LEG 1 ONLY (batched gating, PB2515): GREEN`; `PlaceStorageFormSwitchDriftTests` was again planned into leg 2, and it passed
+when run on its own.
