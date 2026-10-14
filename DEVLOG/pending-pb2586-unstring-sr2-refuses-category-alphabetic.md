@@ -35,3 +35,12 @@ Self-review (architecture, full code, performance, duplication): one predicate n
 question for all four SR2 operands; the doc comment that recorded the fold as a limitation was replaced; no allocation was
 added on a hot path (bind time only). GnuCOBOL accepts PIC A here; that leniency is not made an extension because the
 precedence puts the standard first and no owner decision registers one.
+
+Branch review round 1 (R1-1): the CONCAT rider (`IntrinsicBinder.IsAlphabeticArg`) still read PB72's reversed reading, so
+`UNSTRING FUNCTION CONCAT(A(1:2) A(3:3))` over a PIC A item was admitted while `UNSTRING A(1:5)` was refused, and
+`MOVE FUNCTION CONCAT(A(1:2) A(3:2)) TO a-boolean` passed Table 16 beside the refused `MOVE A(1:2) TO` it. The arm now asks
+the one reader `Table16Operand.Of(Place).IsAlphabetic` (an alphabetic slice stays alphabetic, section 8.4.3.3.4 GR6's
+exhaustive exception list, PB73). Goldens: negatives `pb2586-unstring-alphabetic-function-slice-sender` (COBOLNET1651) and
+`pb2586-move-concat-alphabetic-slices-to-boolean` (COBOLNET0819), and golden leg T5 (a CONCAT mixing a PIC A slice with a
+PIC X slice is alphanumeric, a legal sender). Sibling found, not fixed here: `IntrinsicArgumentRules.ClassOfPlace` still
+classes a PIC A slice as class alphanumeric (a function-argument class screen), a lead for a note.
