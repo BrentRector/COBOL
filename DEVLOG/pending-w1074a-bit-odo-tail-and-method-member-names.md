@@ -70,3 +70,5 @@ never references the class keeps its class-named METHOD-ID (`2002/pb2921_class_n
 then a same-spelled paragraph) beside a sibling method that declares the word as a data-name and stays legal. A
 drift test keeps the two census recorders the only ones. PB3132 reopened and landed with this branch; the nested-program
 residue its note names (an inherited configuration name used beside a local declaration of another type) is unchanged.
+Finisher gate run `20261014T083522Z-e09c86`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`; both
+PB3132 negatives and `TheCensus_IsRecordedOnlyByTheDeclarationAndReferenceFunnels` Passed in leg 1; semgrep verify PASS.
