@@ -139,7 +139,10 @@ public sealed class ImplicitStatementSeriesDriftTests
             new Regex(@"bound is BoundImplicitSeries\s+\w+[\s\S]{0,400}?new BoundEcChecked\("),
             code);
 
-        Assert.Contains("QueryFor(member)", code, StringComparison.Ordinal);
+        // The enabled set of a series is the UNION over its members (one written statement, one >>TURN scope): the ONE
+        // enumeration, EcBinder.DeclaredRaisableNames (kb/Work PB3102), reads every member.
+        string declarations = CodeOf(Path.Combine(VerbsDir, "EcBinder.RaiseDeclarations.cs"));
+        Assert.Matches(new Regex(@"series\.Members\.SelectMany\(\w+ => DeclaredRaisableNames\(\w+, scope\)\)"), declarations);
     }
 
     /// <summary>A bind-time desugar (the user-function activation hoist, the OO property pre-op triple) wraps the

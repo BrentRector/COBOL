@@ -240,6 +240,8 @@
   "pb2690_fixed_table_formal_grows_dynamic_argument_call",
   "pb2690_fixed_table_formal_grows_vlg_element_table_call",
   "pb2690_fixed_table_formal_grows_dynamic_argument_invoke",
+  "pb2690_initialized_created_occurrences_call",
+  "pb2690_initialized_created_occurrences_invoke",
   "pb2967_numval_f_wide_binary_receiver_size_error",
   "pb2964_length_bit_variable_group",
   "pb1616_define_zero_length_literal",

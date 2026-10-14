@@ -314,8 +314,6 @@ CobolNet.Runtime.CobolTiming
 CobolNet.Runtime.CobolValueClass
 CobolNet.Runtime.CobolVarGroup
 CobolNet.Runtime.CobolVarGroup.<Clone>$() -> CobolNet.Runtime.CobolVarGroup!
-CobolNet.Runtime.CobolVarGroup.CobolVarGroup(string! Fixed, string![]! Dynamic, CobolNet.Runtime.CobolVarGroup![]?[]? Elements = null) -> void
-CobolNet.Runtime.CobolVarGroup.Deconstruct(out string! Fixed, out string![]! Dynamic, out CobolNet.Runtime.CobolVarGroup![]?[]? Elements) -> void
 CobolNet.Runtime.CobolVarGroup.Dyn(int i) -> string!
 CobolNet.Runtime.CobolVarGroup.Dynamic.get -> string![]!
 CobolNet.Runtime.CobolVarGroup.Dynamic.init -> void
@@ -2041,7 +2039,6 @@ CobolNet.Runtime.StorageCell.StorageCell() -> void
 CobolNet.Runtime.StorageCell.StoreArea(long offset, CobolNet.Runtime.StorageCell! source) -> void
 CobolNet.Runtime.StorageCell.StoreContiguousAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynStructure, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, string! image, CobolNet.Runtime.RecordExtents? extents = null, bool fixedForm = false, int count = 2147483647) -> bool
 CobolNet.Runtime.StorageCell.StoreVarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynMax, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CobolVarGroup! v, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool storage = false) -> void
-CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null) -> CobolNet.Runtime.CobolVarGroup!
 CobolNet.Runtime.StorageEnd
 CobolNet.Runtime.StorageEnd.ActivationEnded = 2 -> CobolNet.Runtime.StorageEnd
 CobolNet.Runtime.StorageEnd.Cancelled = 3 -> CobolNet.Runtime.StorageEnd

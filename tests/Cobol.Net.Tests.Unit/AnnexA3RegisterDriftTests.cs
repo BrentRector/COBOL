@@ -45,11 +45,12 @@ public sealed class AnnexA3RegisterDriftTests
 
     /// <summary>One parsed row of the §2 table: the A.3 item number cell (which may name a RANGE, "28–30"), the
     /// element, the § citation cell, the disposition and the note.</summary>
-    private sealed record Row(string Items, string Element, string Section, string Disposition, string Note);
+    internal sealed record Row(string Items, string Element, string Section, string Disposition, string Note);
 
     /// <summary>Parse §2's markdown table. Stops at the next <c>## </c> heading, so a pipe table elsewhere in
-    /// the document can never be mistaken for this register.</summary>
-    private static List<Row> Register()
+    /// the document can never be mistaken for this register. The one parser of the register:
+    /// <see cref="ReadmeDeclinedSummaryDriftTests"/> reads the rows through it.</summary>
+    internal static List<Row> Register()
     {
         string[] lines = File.ReadAllLines(TestRepo.Docs("CONFORMANCE.md"));
         var rows = new List<Row>();
