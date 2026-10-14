@@ -56,5 +56,11 @@ nothing new; a BY REFERENCE view seeds one element per occurrence it shows past 
 renders an element's image for both the current image and the creation (`GroupImageCodec.DynElementImage`), and one
 builds the cell's element carrier (`StorageCell.ElementCarrier`). `semgrep/verify.py` PASS, no count moved.
 
+**Arch oracle.** `compare_oracle.py` against a6376c64ff94: DIFFERENT, 3456 of 7807 cases, every one classified by
+script (`E:\COBOL-coord\scratch\w1072c\classify.py`): 3342 differ only by the runtime version string the module records
+("2.0.0.0" to "3.0.0.0", the major above); 111 differ by that and by the storage-carrier emission (`AsVarImage`'s
+`__byReference` parameter, the `Created` list, `VarGroupAt(..., byReference: true)`); 3 are ADDED (this branch's goldens).
+None is unexplained. The baseline is re-recorded at 42d6471e33f7.
+
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261014T012409Z-986e91; Conformance
 5,903/11,546, Unit 32,552/33,499, Characterization 7/36 ran in leg 1). The Linux gate is the landing's (batched gating).
