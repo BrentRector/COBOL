@@ -37,3 +37,5 @@ produce their outputs.
 **Rows.** None were open: all 22 rows under §14.8.2 and §14.8.3 are CONFORMS. PB3127 is landed; PB3101 stays open
 (SPLIT), with the BY CONTENT arm, the GR8 reduction, pair mode on `SameSignature`, the deletions and
 `OneRelationDriftTests` named in its note and in docs/COBOLNET_OO_DESIGN.md D6 item 7.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261014T195501Z-c8027a`; Conformance 6,097/11,669, Unit 32,911/33,618, Characterization 6/36 in leg 1; every added golden and negative passed in leg 1). LINUX GATE: the lander's (batched gating).
