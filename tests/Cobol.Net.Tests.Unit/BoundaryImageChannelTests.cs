@@ -194,13 +194,20 @@ public sealed class BoundaryImageChannelTests
         }
         // The ref-mod pad and the figurative fill are the other two-arm pair PB173 fixed; both must read
         // OperandPic (null-safe for a GROUP), never the raw Pic that made a bit-group slice space-fill. The
-        // ACCEPT omitted-length width is the THIRD arm of that family.
+        // ACCEPT omitted-length width is the THIRD arm of that family: it takes the ONE evaluated-length renderer
+        // (PlaceRenderer.SliceLength), whose identifier-1 count is RefModPlace.StaticInnerPositions — PositionCount,
+        // which reads OperandPic — or the run-time length of an ANY LENGTH / DYNAMIC LENGTH item, and never re-spells
+        // the count from a PICTURE length (kb/Work PB3128: OperandPic?.Length was one position short of a SIGN
+        // SEPARATE item and one position for both run-time-length shapes).
         Assert.DoesNotContain("r.Inner.Item.Pic is { Category: PicCategory.Boolean }", src);
         string move = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "CodeGen", "Verbs", "MoveEmitter.cs"));
         Assert.Contains("rmp.Inner.Item.OperandPic?.Category", move);
         Assert.DoesNotContain("rmp.Inner.Item.Pic?.Category", move);
         string acc = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "CodeGen", "Verbs", "AcceptDisplayEmitter.cs"));
-        Assert.Contains("rm.Inner.Item.OperandPic?.Length ?? rm.Inner.Item.ImageWidth", acc);
-        Assert.DoesNotContain("rm.Inner.Item.Pic?.Length ?? rm.Inner.Item.ImageWidth", acc);
+        Assert.Contains("PlaceRenderer.SliceLength(rm)", acc);
+        Assert.DoesNotContain("Pic?.Length ??", acc);
+        int slice = src.IndexOf("string SliceLength(", StringComparison.Ordinal);
+        Assert.True(slice > 0, "PlaceRenderer.SliceLength not found — the ONE evaluated-length renderer was renamed or removed.");
+        Assert.Contains("r.StaticInnerPositions", src[slice..]);
     }
 }

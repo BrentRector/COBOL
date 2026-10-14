@@ -188,6 +188,7 @@ public sealed class RelativeConnector : KeyedConnector
     {
         var store = (RelativeStore)into;
         store.Clear();
+        FaultPointReloadFilling();
         for (int i = 0; i < frames.Count; i++)
             if (frames[i] is { } rec)
                 store.Put(i + 1, rec);       // slot ordinal = frame ordinal (1-based RRN, §12.4.5.13 GR1)

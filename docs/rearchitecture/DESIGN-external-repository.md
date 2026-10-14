@@ -167,7 +167,7 @@ Each quotation was run through `cite.py --check`. **(group)** marks a row the in
 | §12.3.8.3 SR6 | "If literal-1 is specified, there shall be information in the external repository for the class literal-1"; "If literal-1 is not specified, there shall be information in the external repository for the class object-class-name-1" | §8.4; REPO-1 |
 | §12.3.8.3 SR9 | "If literal-2 is specified, there shall be information in the external repository for the interface literal-2" (and the twin) | §8.4; REPO-1 |
 | §12.3.8.3 SR10 | the name shall be a prototype in the group, "the name of a function definition specified previously in this compilation group", or "the name of a function for which information exists in the external repository" | §8.3 (legality: all three alternatives honored), REPO-1 |
-| §12.3.8.3 SR11 | self-naming function specifier ignored | (group) `BinderDriver.SpecifiesItself` |
+| §12.3.8.3 SR11 | self-naming function specifier ignored | (group) `BinderDriver.UserFunctionsOf` (the `ContainingDefinitions` function member) |
 | §12.3.8.3 SR14 | the name shall be a prototype in the group, "the name of a program definition specified previously in this compilation group", or "the name of a program for which information exists in the external repository" | §8.2, REPO-1 |
 | §12.3.8.3 SR15 | self/containing-program specifier ignored | (group) `ProgramPrototypesOf` |
 | §12.3.8.3 SR16 | "there shall be information in the external repository for the property property-name-1 that is part of one of the classes or interfaces that are declared in this REPOSITORY paragraph" (and the literal twin; §19 T1) | §8.5; REPO-1 |

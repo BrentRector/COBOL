@@ -5215,7 +5215,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     isDynamicLength = true;
                     dynLengthStructureName = dl.cobolWord()?.GetText();
                     // ⛔ integer-1 is read WIDE and bounded LATER, by CobolDynString.MaxSizeOf: §8.5.1.10.1 makes
-                    // the item's maximum size "the smallest of" this phrase and the implementor maximum, so a
+                    // the item's maximum size the smallest of this phrase and the implementor maximum, so a
                     // literal past `int` is not "unparseable", it is simply larger than the maximum. Narrowing it
                     // HERE is what let such a LIMIT fall through to -1 — "no bound at all" — and take the same
                     // wrapping path as an item with no LIMIT phrase (kb/Work PB463). A literal too wide even for
@@ -5511,7 +5511,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // function-prototype-name-1") differ only in which namespace the name is resolved in. The SCOPE rules are
         // the same sentence twice as well — §8.4.6.6 for function-prototype-names ("either the user-function-name
         // of the containing function definition or a function-prototype-name declared in the REPOSITORY
-        // paragraph") and §8.4.6.8 for program-prototype-names — so the SELF leg and the REPOSITORY leg are one
+        // paragraph") and §8.4.6.8 for program-prototype-names — so the CONTAINING-DEFINITION leg and the REPOSITORY leg are one
         // lookup parameterized by the carrier. The OPTIONALITY is the only real difference, and it is measured on
         // the PRINTED general format (folio 503): FUNCTION-POINTER's TO phrase carries NO brackets while
         // PROGRAM-POINTER's does, so every function-pointer is restricted and a bare one is nonconforming.
@@ -5590,10 +5590,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // of the containing function definition or a function-prototype-name declared in the REPOSITORY
         // paragraph") and §8.4.6.8 for a program-prototype-name, which is the same sentence over the other
         // namespace. A name in neither leg names no signature, so the GR25/GR26 restriction would be
-        // unverifiable — and a restriction nothing can check is the a_dead_lookup_is_also_unverified shape.
+        // unverifiable — and a restriction nothing can check is the a_dead_lookup_is_also_unverified shape. The
+        // containing-definition leg is the set the registries read (ContainingDefinitionNames, kb/Work PB3121).
         if (restrictedPrototypeName is not null
-            && !(CobolNames.Same(UnitSelfName, restrictedPrototypeName)
-                 && UnitIsFunction == isFunctionPointer)
+            && !(UnitIsFunction == isFunctionPointer && ContainingDefinitionNames.Contains(restrictedPrototypeName))
             && !(isFunctionPointer
                  ? UserFunctionNames.Contains(restrictedPrototypeName)
                  : ProgramSpecifiers.ContainsKey(restrictedPrototypeName)))
@@ -6084,7 +6084,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         item.IsDynamicLength = isDynamicLength;
         if (isDynamicLength)
         {
-            // §8.5.1.10.1 — the item's MAXIMUM SIZE is "the smallest of" the LIMIT phrase value, the largest
+            // §8.5.1.10.1 — the item's MAXIMUM SIZE "is smallest of" the LIMIT phrase value, the largest
             // integer storable in the PREFIXED usage, and the maximum permitted by the implementor. The PREFIXED
             // candidate is the length field of the dynamic-length-structure-name the clause names, when that
             // structure has a PREFIXED phrase (kb/Work PB829). The rule is written ONCE, in

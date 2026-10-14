@@ -125,18 +125,21 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
     /// written more than once (ISO §5.2.6.2, §5.2.7), through the ONE <see cref="UnrepeatedElements"/> reader the
     /// RD entry already uses. Reported at the SECOND occurrence — the one that makes the entry non-conforming. Where
     /// the list's figure fixes the order (<see cref="ClauseList.Sequence"/>), an element written after one the figure
-    /// prints LATER is refused too (§5.2.1; kb/Work PB1508), at the element written out of place.</summary>
+    /// prints LATER is refused too (§5.2.1; kb/Work PB1508), at the element written out of place. The figure is the
+    /// one the targeted edition prints (<see cref="ClauseList.At"/>; kb/Work PB2532 — the COBOL-85 identification
+    /// division's comment-entry paragraphs are counted and ranked at 85 only).</summary>
     private void ScreenClauseRepetition(ParserRuleContext container)
     {
-        Dictionary<(string Clause, object Element), (ClauseList List, int Count, ParserRuleContext First, ParserRuleContext Second)>? seen = null;
+        Dictionary<(string Format, object Element), (ClauseList List, int Count, ParserRuleContext First, ParserRuleContext Second)>? seen = null;
         (int Rank, ParserRuleContext Clause)? latest = null;   // the element the figure prints LAST among those written so far
         for (int i = 0; i < container.ChildCount; i++)
         {
             if (container.GetChild(i) is not ParserRuleContext clause
-                || !ClauseCardinalities.ByClauseContext.TryGetValue(clause.GetType(), out var list)
-                || ClauseCardinalities.ElementOf(list, clause) is not { } element) continue;
+                || !ClauseCardinalities.ByClauseContext.TryGetValue(clause.GetType(), out var row)) continue;
+            var list = row.At(_edition.DialectLevel);
+            if (ClauseCardinalities.ElementOf(list, clause) is not { } element) continue;
             seen ??= [];
-            var key = (list.Clause, element);
+            var key = (list.Format, element);
             seen[key] = seen.TryGetValue(key, out var prior)
                 ? (list, prior.Count + 1, prior.First, prior.Count == 1 ? clause : prior.Second)
                 : (list, 1, clause, clause);
@@ -154,7 +157,7 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
             // "paragraph"s, as the closed-format refusal does; every other list holds clauses.
             string noun = ClosedFormats.Of(first.GetType())?.Noun ?? "clause";
             UnrepeatedElements.AtMostOnce(_edition, count, $"{list.Subject}{OwnerSuffix(container)}",
-                $"the {noun} '{WrittenOpening(first)}'", list.Clause, orderFree: list.Sequence is null);
+                $"the {noun} '{WrittenOpening(first)}'", list.Format, orderFree: list.Sequence is null);
         }
     }
 
@@ -168,7 +171,7 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
         using var at = _edition.At(clause);
         _edition.Error(DiagnosticCatalog.FormatElementOutOfOrder,
             $"{list.Subject}{OwnerSuffix(container)}: '{WrittenOpening(clause)}' is written after "
-            + $"'{WrittenOpening(printedLater)}', but ISO §{list.Clause}'s general format prints it before — no rule "
+            + $"'{WrittenOpening(printedLater)}', but {list.Format}'s general format prints it before — no rule "
             + "of that format frees the order, so the elements shall be written in the sequence the format gives "
             + "(§5.2.1)");
     }

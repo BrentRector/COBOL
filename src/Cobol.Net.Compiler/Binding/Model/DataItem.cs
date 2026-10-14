@@ -776,7 +776,7 @@ public sealed class DataItem
         "DYNAMIC LENGTH (ISO §13.18.19) — in neither GR-1 exclusion list")]
     public bool IsDynamicLength { get; set; }
 
-    /// <summary>THE MAXIMUM SIZE of this dynamic-length item in characters (ISO §8.5.1.10.1 — "the smallest of"
+    /// <summary>THE MAXIMUM SIZE of this dynamic-length item in characters (ISO §8.5.1.10.1 — it "is smallest of"
     /// the LIMIT phrase value, the largest integer storable in the PREFIXED usage, and the maximum permitted by the
     /// implementor). ALWAYS a real bound in <c>[0, CobolDynString.MaxLength]</c>, computed by the ONE producer
     /// <see cref="CobolNet.Runtime.CobolDynString.MaxSizeOf"/>; an absent LIMIT phrase (§13.18.19.4 GR2) yields the

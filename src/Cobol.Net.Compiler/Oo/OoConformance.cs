@@ -750,7 +750,10 @@ public static class OoConformance
                 // rule cannot see.
                 if (fd.Kind is ObjectRefKind.ActiveClass && invokedWith is { } iw)
                     return ActiveClassFormalMismatch(null, fd, ad, iw, byReference: true);
-                return fd.SameDescriptionAs(ad) ? null
+                // A parameter-name of the definition bound as itself on one side, naming something other than the
+                // other side's parameter-name: identical in an expansion whose actual IS the other side's class or
+                // interface, and not in another — the expansion's question (§9.3.8.2.4; kb/Work PB2937).
+                return fd.SameDescriptionAs(ad) || fd.TurnsOnFormal(ad) ? null
                     : $"object-reference description mismatch (formal {fd.Spelled}, argument {ad.Spelled} — "
                       + "§9.3.8.2.3 rule 2 requires the same kind, name, FACTORY presence and ONLY presence)";
             case PicCategory.Numeric:
@@ -917,7 +920,8 @@ public static class OoConformance
                 return null;
             if (arg is { Kind: ObjectRefKind.ObjectClass, Only: true } && arg.Factory == formal.Factory
                 && InvokedThroughOnlyClass(invokedWith)
-                && CobolNames.Same(arg.Name, invokedWith.Name))
+                // A parameter-name may be substituted by that very class (§9.3.8.2.4; kb/Work PB2937).
+                && (arg.Formal || CobolNames.Same(arg.Name, invokedWith.Name)))
                 return null;
             return $"the formal parameter is described ACTIVE-CLASS ({factory} FACTORY) and the argument is "
                 + $"{arg.Spelled}, invoked with {invokedWith.Spelled} — BY REFERENCE the argument shall be a) an "
@@ -1249,7 +1253,11 @@ public static class OoConformance
     /// PicInfo, bool)"/>.</summary>
     public static string? ObjectRefAssignmentMismatch(OoClassTable table, ObjectRefDescriptor send,
         ObjectRefDescriptor recv, bool activeClassSenderAdmitted = true)
-        => ObjectReferenceSet.Refusal(table.SetOperand(send), table.SetOperand(recv), activeClassSenderAdmitted);
+    {
+        // A formal side stands for the actual most favourable to the pair (OoClassTable.SetOperands; kb/Work PB2937).
+        var (s, r) = table.SetOperands(send, recv);
+        return ObjectReferenceSet.Refusal(s, r, activeClassSenderAdmitted);
+    }
 
     /// <summary>
     /// Which §14.9.39.3 syntax rule governs a SET format-5 statement whose sender is <b>object-class-name-1</b>
