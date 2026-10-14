@@ -242,6 +242,7 @@
   "pb2690_fixed_table_formal_grows_dynamic_argument_invoke",
   "pb2967_numval_f_wide_binary_receiver_size_error",
   "pb2964_length_bit_variable_group",
+  "pb3030_bit_odo_variable_group",
   "pb1616_define_zero_length_literal",
   "pb2937_unemitted_forest_edition_gates",
   "pb2988_capacity_register_type_copies",

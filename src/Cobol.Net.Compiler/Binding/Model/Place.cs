@@ -611,14 +611,17 @@ public sealed record VarGroupWindow(AccessPath Cell, Position DynBase, IReadOnly
     }
 
     /// <summary>The OCCURS DEPENDING table <paramref name="group"/> holds as its trailing storage, as the cell's
-    /// <see cref="OdoTail"/>: the element's width in the group's FIXED RUN (the one-element extent a
-    /// dynamic-capacity table inside the element reserves in the window is not part of the run), the maximum count
-    /// and how many variable-length components one occurrence holds (<see cref="CellComponents.PerOccurrence"/>).</summary>
+    /// <see cref="OdoTail"/>. A table of fixed-image elements is <see cref="OdoModel.FixedImageTail"/>'s, the tail a
+    /// declared group's codec reads too (counted in bits when a USAGE BIT item lies beneath, kb/Work PB3030). A table
+    /// whose occurrences hold variable-length components is the element's width in the group's FIXED RUN (the
+    /// one-element extent a dynamic-capacity table inside the element reserves in the window is not part of the run),
+    /// the maximum count and how many components one occurrence holds (<see cref="CellComponents.PerOccurrence"/>).</summary>
     private static OdoTail OdoOf(DataItem group) =>
-        OdoModel.TableUnder(group) is { } table
-            ? new OdoTail(table.ByteWidth - CellComponents.Of(table).Where(p => p.Item.IsDynamicTable).Sum(p => p.Item.ByteWidth),
-                              table.Occurs ?? 1, CellComponents.PerOccurrence(table))
-            : default;
+        OdoModel.TableUnder(group) is not { } table ? default
+        : CellComponents.PerOccurrence(table) is var comps && comps == 0
+            ? OdoModel.FixedImageTail(OdoModel.ImageHolder(group, table), table)
+        : new OdoTail(table.ByteWidth - CellComponents.Of(table).Where(p => p.Item.IsDynamicTable).Sum(p => p.Item.ByteWidth),
+                      table.Occurs ?? 1, comps);
 
     /// <summary>The window shape of one ELEMENT of the dynamic-capacity table <paramref name="table"/> when that
     /// element is itself a variable-length group (a runtime-length item or a nested table inside it), else null: the

@@ -1305,8 +1305,13 @@ variable-length elements: `Occurs` flattened copies, a compile-time multiplicity
 §8.5.1.12 correspondence and the per-occurrence `FUNCTION LENGTH` walk), **OdoFixed** (a member of fixed image
 that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22; where the table lies in it is
 `OdoModel.GeometryOf`, the ONE geometry `OdoModel.WrapGroup` also gives a group operand — bytes on the physical
-basis, so a national element counts its two bytes a position, kb/Work PB546; a bit-counted table is refused by
-`DataItem.CurrentExtentComposes` until kb/Work PB3030 composes it) and **OdoTable** (that table
+basis, so a national element counts its two bytes a position, kb/Work PB546; the runtime states it as
+`OdoModel.FixedImageTail`'s `OdoTail`, the ONE tail the member's current image (`CutAt`), the receiving splice
+(`KeepUnused`) and the record layout (`RecordUnit` / `RecordMaxUnits`) read, and a cell-backed group's window reads
+too. A table under which a USAGE BIT item lies is counted in BITS (§8.5.1.6.3: occurrences share bytes): the member's
+current image is the ceiling of its bits in characters, the receiving splice keeps the later occurrences at the bit,
+and the record states the table one CHARACTER per unit from the character holding its first bit (determination
+D-FRA (ix); kb/Work PB3030)) and **OdoTable** (that table
 when its ELEMENTS are variable-length groups: `NestedTable` at a count that is a parameter - the first `__odo`
 occurrences' carriers at a statement, all of them at a boundary - with the maximum's fixed width and component
 count, so every earlier component keeps its position; the receiving `FromVarImage` loops to the maximum and a

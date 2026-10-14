@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using OdoTail = CobolNet.Runtime.OdoTail;
+
 namespace CobolNet.Binding.Model;
 
 /// <summary>ONE data-name-2 of an OCCURS KEY phrase (ISO §13.18.38) together with the direction word that governs
@@ -215,6 +217,33 @@ public static class OdoModel
             ? BitLayout.StartBitOf(group, table)
             : Model.RecordLayout.PhysicalWidth(group) - elem * max;            // SR22 — the variable tail is trailing
         return new OdoGeometry(fixedUnits, elem, min, max, bitUnits ? BitLayout.BitsPerCharacter : 1);
+    }
+
+    /// <summary>The member of <paramref name="group"/> whose image holds <paramref name="table"/> as its trailing
+    /// storage: the outermost image-capable item on the table's chain below <paramref name="group"/> (the table itself
+    /// when it is a direct member). The table's geometry is measured in THAT member's unit (<see cref="GeometryOf"/>),
+    /// never the whole group's: a USAGE BIT leaf elsewhere in a variable-length group would count it in bits.</summary>
+    public static DataItem ImageHolder(DataItem group, DataItem table)
+    {
+        var holder = table;
+        for (var a = table.Parent; a is not null && !ReferenceEquals(a, group); a = a.Parent)
+            if (a.IsImageCapable) holder = a;
+        return holder;
+    }
+
+    /// <summary>⛔ THE ONE <see cref="OdoTail"/> OF A TABLE OF FIXED-IMAGE ELEMENTS (kb/Work PB3030): <see cref="GeometryOf"/>
+    /// over the <paramref name="holder"/> (<see cref="ImageHolder"/>), as the runtime states it — one occurrence's
+    /// width and the maximum count in the holder's unit, and for a table counted in BITS the bits of fixed material
+    /// sharing its first character and the unit (§8.5.1.6.3: a bit occurrence may share a byte, so the table's
+    /// characters are the ceiling of its bits). Read by the variable-length group codec (<c>GroupImageCodec</c>: the
+    /// member's current image, the receiving splice and the record layout) and by a cell-backed group's window
+    /// (<c>VarGroupWindow</c>), so a declared group and a cell cannot measure one table two ways.</summary>
+    public static OdoTail FixedImageTail(DataItem holder, DataItem table)
+    {
+        var g = GeometryOf(holder, table);
+        return g.InBits
+            ? new OdoTail(g.ElemUnits, g.MaxOccurs, 0, g.FixedUnits % g.PositionsPerCharacter, g.PositionsPerCharacter)
+            : new OdoTail(g.ElemUnits, g.MaxOccurs);
     }
 
     /// <summary>The SEARCH / SEARCH ALL depending item for an OCCURS DEPENDING table (ISO §14.9.37.4 GR4/GR9 →

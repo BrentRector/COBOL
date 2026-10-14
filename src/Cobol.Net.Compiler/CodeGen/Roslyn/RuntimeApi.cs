@@ -2308,9 +2308,21 @@ internal static class RuntimeApi
     /// <summary>The OCCURS DEPENDING table a variable-length group holds as its trailing storage (<c>OdoTail</c>,
     /// kb/Work PB244, PB2497), as the argument of the cell's group helpers and of a record layout; <c>default</c> for
     /// a group that holds none. <paramref name="odo"/> is the table's element width, maximum count and components per
-    /// occurrence (zero when absent).</summary>
+    /// occurrence (zero when absent), and for a table counted in bits its lead bits and unit (kb/Work PB3030).</summary>
     private static string OdoTailOf(OdoTail odo) =>
-        odo.Max > 0 ? $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})" : "default";
+        odo.Max <= 0 ? "default"
+        : odo.PositionsPerCharacter <= 1 ?$"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})"
+        : $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps}, {odo.Lead}, {odo.PositionsPerCharacter})";
+
+    /// <summary>How many trailing characters of a member's maximum image lie beyond <paramref name="countExpr"/>
+    /// occurrences of its OCCURS DEPENDING table — <c>OdoTail.CutAt</c> (kb/Work PB3030).</summary>
+    public static string OdoTailCutAt(OdoTail odo, string countExpr) =>
+        $"{OdoTailOf(odo)}.{nameof(OdoTail.CutAt)}({countExpr})";
+
+    /// <summary>A receiving store's run that keeps the occurrences past <paramref name="countExpr"/> —
+    /// <c>OdoTail.KeepUnused</c> (§13.18.38.4 GR8 a; kb/Work PB3030).</summary>
+    public static string OdoTailKeepUnused(OdoTail odo, string receivedExpr, string currentExpr, string countExpr) =>
+        $"{OdoTailOf(odo)}.{nameof(OdoTail.KeepUnused)}({receivedExpr}, {currentExpr}, {countExpr})";
 
     /// <summary>Make a contiguous image a cell-backed variable-length group's content — <c>StorageCell.StoreContiguousAt</c>,
     /// whose value says whether the image stated its own OCCURS DEPENDING count. <paramref name="count"/> is the count

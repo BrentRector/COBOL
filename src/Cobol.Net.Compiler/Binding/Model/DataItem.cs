@@ -1111,11 +1111,12 @@ public sealed class DataItem
     /// all of them at an activation boundary ("the maximum length is used", §14.8.2.2), and a receiver takes every
     /// occurrence it has from whatever the carrier holds - the ones past the carried components are the
     /// §14.9.25.4 GR9b excess part.
-    /// A group holding USAGE BIT items is outside the ODO arm: its extent is a §8.5.1.6.3 bit layout, not a
-    /// character prefix.</summary>
+    /// A member holding USAGE BIT items composes on the first arm too (kb/Work PB3030): its OCCURS DEPENDING table is
+    /// counted in BITS (§8.5.1.6.3), and its current image is the ceiling of those bits in characters
+    /// (<c>OdoModel.GeometryOf</c>, the unit the composer reads).</summary>
     private static bool CurrentExtentComposes(DataItem c) =>
-        c.IsImageCapable ? !HasOdoOnOrBeneath(c) || (!c.HasBitDescendant && OdoTableOnOrBeneath(c) is not null)
-        : (c.IsDynamicLength && c.IsElementary)
+        c.IsImageCapable
+        || (c.IsDynamicLength && c.IsElementary)
           || (c.IsDynamicTable && !HasOdoOnOrBeneath(c) && (c.ElementImageCapable || c.ComposesCurrentExtent()))
           || (c.IsGroup && !c.IsDynamicTable && c.Occurs is null && c.ComposesCurrentExtent())
           || (c.IsGroup && !c.IsDynamicTable && c.Occurs is not null && c.OccursSpec?.DependingName is null
