@@ -264,9 +264,12 @@ public sealed record BoundReportVaryingRef(string CsName) : BoundExpr;
 /// position unit: characters, or — in a group holding USAGE BIT items (§8.5.1.6.3; kb/Work PB2964) — BIT positions,
 /// with <paramref name="PositionsPerCharacter"/> positions to a character (8) so the extent rounds up to whole
 /// characters (<c>CobolTable.OdoExtentChars</c>, the image channel's rounding), or 1 when the positions ARE the
-/// answer (a bit group's LENGTH in boolean positions, §15.50.4 r1).</summary>
+/// answer (a bit group's LENGTH in boolean positions, §15.50.4 r1). <paramref name="TrailingWidth"/> is the padding of
+/// the table's LAST occurrence that its <paramref name="ElemWidth"/> stride counts and its extent does not (an ALIGNED
+/// bit table's, §13.18.1.4 GR2; <c>BitLayout.TrailingFillerBits</c>): given back once an occurrence exists, so the
+/// answer is the one the same table fixed at that many occurrences has (kb/Work PB3156).</summary>
 public sealed record BoundOdoExtent(Place Depending, int MinOccurs, int MaxOccurs, int FixedWidth, int ElemWidth,
-    int PositionsPerCharacter = 1) : BoundExpr
+    int TrailingWidth, int PositionsPerCharacter = 1) : BoundExpr
 {
     /// <summary>The BASED entry's data-address field (<c>__addr_X</c>) when the group is a BASED record (kb/Work PB80):
     /// §15.50.4 r4a / §15.14.4 r2a — "if argument-1 is a based entry not associated with actual data … the length

@@ -1001,9 +1001,17 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         // BG PIC X(2).`: [0000|0000|0000], where the SAME declaration without the alias — the record-struct
         // lane — gave [1010|0101|1010]. §13.18.63.4 GR12/GR13 govern this lane exactly as they govern the other
         // two, so it asks DataItem.ValueAt with the occurrence tuple like they do.
-        return m.Occurs is { } occ and > 0
-            ? OccurrenceRunEmit.Image(OccurrenceRunsOf(m, useValues, subs, occ), o => OneBitCarrierOf(m, useValues, subs.With(o)))
-            : OneBitCarrierOf(m, useValues, subs);
+        if (m.Occurs is not { } occ || occ <= 0) return OneBitCarrierOf(m, useValues, subs);
+        // ⛔ THE OCCURRENCES SIT ONE STRIDE APART (§13.18.1.4 GR2, kb/Work PB3156) — the compile-time twin of
+        // BitCarrierOf: every occurrence is padded to its stride and the last one's padding cut off again, which is
+        // BitLayout.TableBits. A table without the ALIGNED clause has stride = width and needs neither.
+        int filler = BitLayout.TrailingFillerBits(m);
+        if (filler == 0)
+            return OccurrenceRunEmit.Image(OccurrenceRunsOf(m, useValues, subs, occ), o => OneBitCarrierOf(m, useValues, subs.With(o)));
+        string padding = EmitText.CsLiteral(new string('0', filler));
+        string padded = OccurrenceRunEmit.Image(OccurrenceRunsOf(m, useValues, subs, occ),
+            o => $"({OneBitCarrierOf(m, useValues, subs.With(o))} + {padding})");
+        return RuntimeApi.StrStoreBoolean(padded, $"{BitLayout.TableBits(m, occ)}", justifiedRight: false);
     }
 
     /// <summary>ONE occurrence of a bit run member’s initial carrier — see <see cref="InitialBitCarrierOf"/>,
@@ -1035,10 +1043,12 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         int per = m.IsGroup ? m.AsIfPic!.Length : m.Pic!.Length;
         if (m.Occurs is { } o)
         {
+            // The occurrences are one STRIDE apart (§13.18.1.4 GR2 — an ALIGNED table's, kb/Work PB3156), each `per` wide.
+            int stride = BitLayout.StrideBits(m);
             using (w.Block($"for (int __i = 0; __i < {o}; __i++)"))
                 w.Line(m.IsGroup
-                    ? $"{m.CsName}[__i].FromBits({RuntimeApi.BitsSlice(carrier, $"{at} + __i * {per}", $"{per}")});"
-                    : $"{m.CsName}[__i] = {RuntimeApi.BitsSlice(carrier, $"{at} + __i * {per}", $"{per}")};");
+                    ? $"{m.CsName}[__i].FromBits({RuntimeApi.BitsSlice(carrier, $"{at} + __i * {stride}", $"{per}")});"
+                    : $"{m.CsName}[__i] = {RuntimeApi.BitsSlice(carrier, $"{at} + __i * {stride}", $"{per}")};");
         }
         else
         {
@@ -1057,11 +1067,18 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// <summary>A §8.5.1.6.3 run member's BIT CARRIER expression — THE one carrier law (kb/Work PB161): a bit
     /// leaf's '0'/'1' string field; a bit GROUP's <c>AsBits()</c>; a fixed-OCCURS member the concatenation of
     /// every occurrence's carrier (the AsImage run packer read the raw <c>string[]</c> field before, CS1503).</summary>
-    private static string BitCarrierOf(DataItem m) =>
-        m.Occurs is not null
-            ? (m.IsGroup ? $"string.Concat(global::System.Array.ConvertAll({m.CsName}, __e => __e.AsBits()))"
-                         : $"string.Concat({m.CsName})")
-            : m.IsGroup ? $"{m.CsName}.AsBits()" : m.CsName;
+    private static string BitCarrierOf(DataItem m)
+    {
+        if (m.Occurs is null) return m.IsGroup ? $"{m.CsName}.AsBits()" : m.CsName;
+        string occurrences = m.IsGroup ? $"global::System.Array.ConvertAll({m.CsName}, __e => __e.AsBits())" : m.CsName;
+        // ⛔ THE OCCURRENCES SIT ONE STRIDE APART, NOT ONE WIDTH (§13.18.1.4 GR2, kb/Work PB3156): an ALIGNED table puts
+        // every occurrence at the first bit of a byte, so the carrier carries the filler between them — the extent
+        // BitLayout.TableBits states, which BitAreaOf and the run packer both advance by. A table without the clause
+        // has stride = width, and keeps the plain concatenation.
+        return BitLayout.StrideBits(m) == BitLayout.WidthBits(m)
+            ? $"string.Concat({occurrences})"
+            : RuntimeApi.BitsStrided(occurrences, $"{BitLayout.StrideBits(m)}");
+    }
 
     private static string AsImageOf(PhysicalModel.Physical f) =>
         // D19/PB43 — a USAGE BIT run images as its PACKED bits (§13.18.60.4 GR5), high-order first, and a run may

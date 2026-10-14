@@ -137,7 +137,26 @@ internal static class BitLayout
     public static int RunBits(DataItem m) =>
         m.IsDynamicTable ? RoundUpToByte(WidthBits(m))
         : m.Occurs is not { } n || n <= 1 ? WidthBits(m)
-        : StrideBits(m) * (n - 1) + WidthBits(m);
+        : TableBits(m, n);
+
+    /// <summary>⛔ THE ONE EXTENT OF <paramref name="occurrences"/> OCCURRENCES of a table, in bits — the distance
+    /// from its first bit to the end of its last occurrence: every occurrence but the last takes its
+    /// <see cref="StrideBits"/>, the last only its <see cref="WidthBits"/>, and no occurrence at all takes none.
+    /// <para>The shape is stated in §8.5.1.6.3: its implicit filler is generated "as needed to advance alignment to a
+    /// required natural boundary for the next item within that group", and the last occurrence of a table has no
+    /// next occurrence to align, so the padding §13.18.1.4 GR2 ("applies to each occurrence of that item") gives an
+    /// ALIGNED occurrence is not part of the extent (<see cref="StrideBits"/> carries the same remark). It was
+    /// written out THREE times — here, in <c>FileModel.MinExtent</c> and in
+    /// <c>SequentialIoEmitter.OdoRecordExceedsMaximum</c> — and the OCCURS DEPENDING LENGTH of a bit group needs it
+    /// as a fourth, so it is one method now (kb/Work PB3156).</para></summary>
+    public static int TableBits(DataItem table, int occurrences) =>
+        occurrences <= 0 ? 0 : StrideBits(table) * (occurrences - 1) + WidthBits(table);
+
+    /// <summary>The filler bits that pad the LAST occurrence of <paramref name="table"/> to its
+    /// <see cref="StrideBits"/> and are not part of its <see cref="TableBits"/> extent: zero unless the table is
+    /// ALIGNED (§13.18.1.4 GR2). The amount an OCCURS DEPENDING extent counted as <c>fixed + count × stride</c> must
+    /// give back once at least one occurrence exists.</summary>
+    public static int TrailingFillerBits(DataItem table) => StrideBits(table) - WidthBits(table);
 
     /// <summary>⛔ THE CHARACTER POSITIONS A §8.5.1.6.3 RUN OCCUPIES in its group's image — its members' bits packed
     /// back to back and rounded up to a byte, because whatever follows the run is "at the first bit position of the

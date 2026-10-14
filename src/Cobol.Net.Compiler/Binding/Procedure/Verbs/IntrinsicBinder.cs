@@ -2399,7 +2399,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// boundaries, so subtracting its counted extent leaves the fixed part exactly; the OCCURS DEPENDING table of
     /// bit elements, whose occurrences share bytes, is counted in bit positions
     /// (<see cref="BoundOdoExtent.PositionsPerCharacter"/>), and a bit GROUP's LENGTH is those positions
-    /// (§15.50.4 r1) rather than the bytes they occupy.</para>
+    /// (§15.50.4 r1) rather than the bytes they occupy. An ALIGNED table's occurrences are padded to whole bytes
+    /// (§13.18.1.4 GR2): the positions are counted a stride apart with the LAST occurrence's padding given back
+    /// (<see cref="BitLayout.TableBits"/>, <see cref="BoundOdoExtent.TrailingWidth"/>), so the answer is the one the same
+    /// table fixed at that many occurrences has (kb/Work PB3156).</para>
     /// </remarks>
     private BoundExpr VariableLengthGroupSum(IntrinsicSig sig, BoundFieldOperand op, bool bytes)
     {
@@ -2498,25 +2501,28 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                         int prefixBits = BitLayout.StartBitOf(group, c), strideBits = BitLayout.StrideBits(c);
                         if (prefixBits < 0)
                         { failure = Stage($"the OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' follows an overlay chain whose layout is not modelled"); return; }
-                        // The last occurrence's trailing filler is not part of the extent (BitLayout.StrideBits); in whole
-                        // characters that is the same number, in boolean positions it is not.
-                        if (bitPositions && strideBits != BitLayout.WidthBits(c))
-                        { failure = Stage($"the ALIGNED OCCURS DEPENDING table '{c.CobolName ?? c.CsName}' of a bit group — its occurrences are padded to whole bytes, which a boolean-position count cannot state"); return; }
-                        long endBits = prefixBits + (long)max * strideBits;
+                        // An ALIGNED table's occurrences are a stride apart and the LAST one's padding is not part of the
+                        // extent (BitLayout.TableBits; §8.5.1.6.3 generates filler "as needed to advance alignment to a
+                        // required natural boundary for the next item"): in whole characters that is the same number
+                        // (the padding is under a byte), in boolean positions it is not, and §15.50.4 r1 counts those —
+                        // so the runtime term gives it back once an occurrence exists (BoundOdoExtent.TrailingWidth), and
+                        // the maximum the constant part is taken from is the table's TableBits (kb/Work PB3156).
+                        int trailingBits = bitPositions ? BitLayout.TrailingFillerBits(c) : 0;
+                        long endBits = prefixBits + (long)max * strideBits - trailingBits;
                         // The dynamic-capacity tables found so far each sit in the prefix as ONE occurrence (whole bytes,
                         // on byte boundaries): their runtime terms add the full capacity, so the prefix counts none.
                         fixedPart += bitPositions ? 0 : dynamicBytes;
                         fixedPart -= bitPositions ? endBits : BitLayout.Characters((int)endBits);
                         Add(new BoundOdoExtent(odo.Depending, spec.Min, max,
                                 prefixBits - (bitPositions ? 0 : (int)dynamicBytes * BitLayout.BitsPerCharacter), strideBits,
-                                bitPositions ? 1 : BitLayout.BitsPerCharacter)
+                                trailingBits, bitPositions ? 1 : BitLayout.BitsPerCharacter)
                             { BasedAddress = basedAddress });
                     }
                     else
                     {
                         if (nationalPositions) elem = ItemLength.Positions(c);
                         fixedPart -= (long)elem * max;
-                        Add(new BoundOdoExtent(odo.Depending, spec.Min, max, 0, elem) { BasedAddress = basedAddress });
+                        Add(new BoundOdoExtent(odo.Depending, spec.Min, max, 0, elem, 0) { BasedAddress = basedAddress });
                     }
                 }
                 else if (c.Occurs is { } times)
