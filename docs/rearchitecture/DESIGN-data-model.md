@@ -468,7 +468,7 @@ a strong record): by §8.5.3.1's second alternative its type is the declaration 
 length in it, carried as `TypeRestriction.Member`, and `SameRestriction` then also compares position and length
 (through the same `SamePosition` `SameType` asks), so the address of a nested group is never "of the type of the whole
 record" (kb/Work PB1408). Within one
-source element §13.18.58 makes a type-name unique, so the name alone decides; ACROSS source elements two
+source element §8.3.2.2 lets a user-defined word be only one type of user-defined word, so the name alone decides; ACROSS source elements two
 declarations may share a name and differ, which is why the declaration travels with it —
 `DataBinder.ResolveRestrictedTypes` (the tail of the ONE `ExpandTypes` pass) attaches it to
 `PicInfo.RestrictedTypeDecl`, and `SameRestriction` compares names always and declarations whenever both sides

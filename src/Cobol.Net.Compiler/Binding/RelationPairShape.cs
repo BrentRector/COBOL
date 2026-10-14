@@ -46,7 +46,7 @@ internal static class RelationPair
     {
         DataItem? l = GroupItemOf(left), r = GroupItemOf(right);
         if (l is not null && r is not null && StrongTypeModel.IsStrongGroup(l) && StrongTypeModel.IsStrongGroup(r)
-            && StrongTypeModel.SameType(l, r))
+            && StrongTypeModel.SameType(l, r, prototypes: null))
             return RelationPairShape.StrongElementOrder;
         if ((l is not null && VariableLengthCompatibility.IsVariableLength(l))
             || (r is not null && VariableLengthCompatibility.IsVariableLength(r)))
