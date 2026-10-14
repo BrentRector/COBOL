@@ -1173,7 +1173,7 @@ TEMPLATE = """<title>{title}</title>
       <tbody>
         <tr><td>Annex A.3 — processor-dependent ({a3_rows} rows)</td><td class="dim"><span class="num">{a3_claimed}</span> claimed · <span class="num">{a3_partial}</span> partial · <span class="num">{a3_not}</span> not claimed · <span class="num">{a3_na}</span> n/a</td></tr>
         <tr><td>Annex A.4 — optional modules ({a4_rows})</td><td class="dim"><span class="num">{a4_claimed}</span> claimed — {a4_claimed_list} · <span class="num">{a4_partial}</span> partial — {a4_partial_list} · <span class="num">{a4_not}</span> not claimed — {a4_not_list}</td></tr>
-        <tr><td>Documented non-support ({facilities_n} facilities)</td><td class="dim">{facilities} — each with a named compile-time warning, exactly the posture §4.2.6 ¶3 requires and D13 permits</td></tr>
+        <tr><td>Documented non-support ({facilities_n} facilities)</td><td class="dim">{facilities} — each named by a compile-time diagnostic (a warning, or an error where the facility is refused): the mechanism §4.2.6 ¶3 requires for processor-dependent elements (A.3), the posture §4.2.7's user documentation states for optional modules (A.4); D13 permits both</td></tr>
         <tr><td>Annex A.1 — implementor-defined register</td><td>{a1_state}</td></tr>
         <tr><td>Version-change ledger anchors</td><td class="dim"><span class="num">{vcr_done}</span> of {vcr_total} dispositioned ({vcr_pct}%): {vcr_gated} gated · {vcr_ref} ref-only · {vcr_pin} pinned-to-spec · <span class="num">{vcr_todo}</span> todo; the matrix registry stands at {constructs} constructs</td></tr>
       </tbody>
