@@ -22,7 +22,7 @@ namespace CobolNet.Binding;
 /// spellings were refused as syntax errors. Relaxing that one rule to <c>*</c> and writing "if both, error" at
 /// the GOBACK binder would make the NEXT figure with choice indicators need its own second copy. §14.9.18.2 is
 /// not the only such figure; §14.9.20.2's category-name brace, §13.18.13.2's FOR ALPHANUMERIC / FOR NATIONAL
-/// pair and §12.3.6.2's SOURCE-COMPUTER clauses each read the same rule, and each wrote it out again.</para>
+/// pair and §12.3.6.2's SOURCE-COMPUTER clauses each read the same rule, and each wrote it out again. A ClauseCardinalities row whose figure sits in choice indicators (the OBJECT-COMPUTER paragraph, ClauseList.ChoiceIndicators) counts for itself and reports through the count overload below, so the rule keeps one message and one code.</para>
 /// </summary>
 internal static class ChoiceIndicators
 {
@@ -42,12 +42,28 @@ internal static class ChoiceIndicators
                                    string statement, string alternative, string clause)
         where T : ParserRuleContext
     {
-        if (occurrences.Length > 1)
+        AtMostOnce(edition, occurrences.Length, statement, alternative, $"ISO §{clause}");
+        return occurrences.Length > 0 ? occurrences[0] : null;
+    }
+
+    /// <summary>⛔ THE ONE DIAGNOSTIC OF §5.2.6.4's "only once" half (COBOLNET2104), for a reader that has already
+    /// COUNTED the alternative: <see cref="AtMostOnce{T}"/> counts a parsed array and calls this, and
+    /// <c>ClosedFormatPass</c> calls it for a <c>ClauseCardinalities</c> row whose figure encloses its clauses in
+    /// choice indicators (<c>ClauseList.ChoiceIndicators</c>: the OBJECT-COMPUTER paragraph, §12.3.6.2; kb/Work
+    /// PB3133, ISO review R1-1) — two ways to count, one rule and one code. A repeated bracket WITHOUT choice
+    /// indicators (§5.2.6.2, §5.2.7) is <c>UnrepeatedElements</c>' COBOLNET2423.</summary>
+    /// <param name="edition">The one diagnostic sink.</param>
+    /// <param name="count">How many times the alternative was written; nothing is reported at 1 or fewer.</param>
+    /// <param name="statement">The construct as the user wrote it, for the message.</param>
+    /// <param name="alternative">The alternative as the figure names it.</param>
+    /// <param name="format">The general format as the message names it ("ISO §14.9.18.2").</param>
+    public static void AtMostOnce(EditionContext edition, int count, string statement, string alternative, string format)
+    {
+        if (count > 1)
             edition.Error(DiagnosticCatalog.ChoiceAlternativeRepeated,
-                $"{statement}: {alternative} is specified {occurrences.Length} times; ISO §{clause}'s general "
+                $"{statement}: {alternative} is specified {count} times; {format}'s general "
                 + "format encloses it in choice indicators, and §5.2.6.4 admits any single alternative only "
                 + "once (in any order, but once)");
-        return occurrences.Length > 0 ? occurrences[0] : null;
     }
 
     /// <summary>⛔ THE ONE READER of the FOR ALPHANUMERIC / FOR NATIONAL choice pair (kb/Work PB1075). Five general

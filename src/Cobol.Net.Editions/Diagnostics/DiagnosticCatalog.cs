@@ -6387,11 +6387,10 @@ public static class DiagnosticCatalog
         "A clause or phrase is written more than once where its general format admits it once. ISO §5.2.6.2: "
         + "brackets indicate that the enclosed element \"may be explicitly specified or that portion of the "
         + "general format may be omitted\"; §5.2.7: repetition is indicated only by an ellipsis, which \"applies to "
-        + "the portion of the format between the determined pair of delimiters\"; §5.2.6.4: a bracket of choice "
-        + "indicators admits each alternative only once. A rule that lets the elements be "
-        + "written in any order (§13.14.3 SR2, §13.18.39.3 SR4, §5.2.6.4) does not let any of them be written twice. "
-        + "Delete the repeated clause or phrase.",
-        "ISO §5.2.6.2 · §5.2.7 · §5.2.6.4");
+        + "the portion of the format between the determined pair of delimiters\". A rule that lets the elements be "
+        + "written in any order (§13.14.3 SR2, §13.18.39.3 SR4) does not let any of them be written twice. Delete "
+        + "the repeated clause or phrase. (A bracket of CHOICE INDICATORS, §5.2.6.4, is COBOLNET2104.)",
+        "ISO §5.2.6.2 · §5.2.7");
 
     /// <summary>COBOLNET2987 — an element of a general format whose printed sequence binds is written after one the
     /// figure prints later (§5.2.1; kb/Work PB1508). The OPTIONS paragraph (§11.9.2) and the CONFIGURATION SECTION

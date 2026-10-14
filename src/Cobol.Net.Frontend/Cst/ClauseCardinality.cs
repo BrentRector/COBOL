@@ -45,8 +45,15 @@ namespace CobolNet.Frontend.Cst;
 /// only when an earlier figure counts an element this figure does not — the COBOL-85 identification division's five
 /// comment-entry paragraphs, which the 2023 figure does not print at all.
 /// <c>ClauseCardinalityDriftTests</c> holds every figure of the chain to the same obligations as the row.</param>
+/// <param name="ChoiceIndicators">⛔ WHICH RULE A REPEAT BREAKS: true when the figure encloses its clauses in CHOICE
+/// INDICATORS (ISO §5.2.6.4 — each alternative at most once, in any order; the OBJECT-COMPUTER paragraph's
+/// §12.3.6.2), so <c>ClosedFormatPass</c> reports a repeat through the one choice-indicator reader
+/// (<c>ChoiceIndicators.AtMostOnce</c>, COBOLNET2104) and not as a bracket without an ellipsis (§5.2.6.2, §5.2.7;
+/// COBOLNET2423). A choice-indicator group is order-free by the same clause, so it carries no
+/// <see cref="Sequence"/> (kb/Work PB3133, ISO review R1-1).</param>
 public sealed record ClauseList(string Format, string FormatLabel, string Subject, IReadOnlySet<Type> Repeatable,
-    IReadOnlyList<Type>? Sequence, Func<ParserRuleContext, object>? KindOf = null, EarlierFigure? Earlier = null)
+    IReadOnlyList<Type>? Sequence, Func<ParserRuleContext, object>? KindOf = null, EarlierFigure? Earlier = null,
+    bool ChoiceIndicators = false)
 {
     /// <summary>The figure the edition <paramref name="year"/> prints for this list: this one, or the
     /// <see cref="Earlier"/> chain's figure in force at that edition.</summary>
@@ -218,7 +225,7 @@ public static class ClauseCardinalities
             // CLASSIFICATION and PROGRAM COLLATING SEQUENCE, in CHOICE INDICATORS within brackets, which §5.2.6.4 defines as
             // zero or more of the alternatives, each at most once, in any order: the elements are once-only and the ORDER is
             // free (kb/Work PB3133 — this list's counts used to live in the binder, COBOLNET1652, beside a table that
-            // exempted it; one reader, here, now). The '85 clauses MEMORY SIZE and SEGMENT-LIMIT are not elements of this
+            // exempted it; the table counts it, the ONE choice-indicator reader ChoiceIndicators.AtMostOnce reports it as COBOLNET2104 — ChoiceIndicators: true). The '85 clauses MEMORY SIZE and SEGMENT-LIMIT are not elements of this
             // figure — the removal gate (COBOLNET0902) refuses them at 2002+ — so they are not counted against it.
             //
             // ⛔ EARLIER: THE COBOL-85 FIGURE (kb/Work PB3133), in force below 2002. ⚠ DERIVED, NOT QUOTED — the repository
@@ -238,7 +245,7 @@ public static class ClauseCardinalities
                         typeof(Core.MemorySizeClauseContext), typeof(Core.SegmentLimitClauseContext),
                         typeof(Core.UnrecognizedClauseContext),
                     },
-                    Sequence: null,
+                    Sequence: null, ChoiceIndicators: true,
                     Earlier: new(2002,
                         new("ANSI X3.23-1985", "", "OBJECT-COMPUTER paragraph",
                             new HashSet<Type>

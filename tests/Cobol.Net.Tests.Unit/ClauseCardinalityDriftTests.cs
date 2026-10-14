@@ -168,14 +168,31 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
             ],
             cobol85.Sequence!);
         Assert.Contains(typeof(Core.CharacterClassificationClauseContext), cobol85.Repeatable);
+        Assert.False(cobol85.ChoiceIndicators);   // three separate brackets: COBOLNET2423, not the choice-indicator reader
         foreach (int year in new[] { 2002, 2014, 2023 })
         {
             var figure = row.At(year);
             Assert.Same(row, figure);
             Assert.Null(figure.Sequence);   // choice indicators: any order
+            Assert.True(figure.ChoiceIndicators);   // 5.2.6.4: a repeat is the one choice-indicator reader's COBOLNET2104
             Assert.DoesNotContain(typeof(Core.ProgramCollatingSequenceClauseContext), figure.Repeatable);
             Assert.DoesNotContain(typeof(Core.CharacterClassificationClauseContext), figure.Repeatable);
         }
+    }
+
+    /// <summary>⛔ A CHOICE-INDICATOR FIGURE IS ORDER-FREE (ISO §5.2.6.4: "The alternatives may be specified in any order").
+    /// A figure flagged <see cref="ClauseList.ChoiceIndicators"/> is reported through the one choice-indicator reader
+    /// (COBOLNET2104), whose message grants that licence, so it can never also carry a fixed
+    /// <see cref="ClauseList.Sequence"/> (kb/Work PB3133, review R1-1).</summary>
+    [Fact]
+    public void EveryChoiceIndicatorFigure_IsOrderFree()
+    {
+        var flagged = ClauseCardinalities.ByClauseContext
+            .SelectMany(r => r.Value.Figures().Select(figure => (List: r.Key, Row: figure)))
+            .Where(r => r.Row.ChoiceIndicators).ToList();
+        Assert.NotEmpty(flagged);   // a probe that finds nothing is not a green result
+        Assert.All(flagged, r => Assert.True(r.Row.Sequence is null,
+            $"{r.List.Name}'s {r.Row.Format} is a choice-indicator figure (5.2.6.4: any order) yet fixes a Sequence"));
     }
 
     /// <summary>The report group description entry is the one row that is NOT a closed format with an error

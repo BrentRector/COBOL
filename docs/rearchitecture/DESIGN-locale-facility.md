@@ -1013,7 +1013,7 @@ renumbering:
 | (f) format-2 PICTURE violates SR32–SR36 / Table 11 / EDITING-beside-LOCALE (one code, sub-rule named) | ✅ T6 — **COBOLNET1673** `picture-locale-format2` (`PictureAnalyzer.AnalyzeLocaleEdited`; SR32's two halves in `DataBinder`) |
 | (g) `SIGN` clause with a LOCALE PICTURE phrase (§13.16.3 SR19; §13.17.3 SR9 rides the A.4.2 SCREEN posture — the whole section is COBOLNET1560-recognized, so the screen twin is subsumed by that documented non-support; §13.15.3 has NO report-writer twin, a deliberate non-arm with a positive golden) | ✅ T6 — **COBOLNET1674** `sign-clause-with-locale-picture` |
 | (h) an alphabet defined `IS LOCALE` used where a **coded character set** is required (§8.8.4.4.3 SR2; §12.3.7.3 SR16g/SR17d; §13.18.13.3 SR1/SR2; Table 6) | ✅ T5 — **COBOLNET1669** `locale-alphabet-not-a-charset` at the class condition (`DataBinder.IsLocaleAlphabet`, both alphabet classes); the SYMBOLIC CHARACTERS / CLASS `IN` phrases and CODE-SET bind nothing yet — kb/Work PB110 |
-| (i) `CHARACTER CLASSIFICATION` / `PROGRAM COLLATING SEQUENCE` specified twice in one OBJECT-COMPUTER paragraph — ✅ landed with PB78 and, since PB3133, reported by the `ClauseCardinalities` OBJECT-COMPUTER row as COBOLNET2423 `format-element-repeated` | done |
+| (i) `CHARACTER CLASSIFICATION` / `PROGRAM COLLATING SEQUENCE` specified twice in one OBJECT-COMPUTER paragraph — ✅ landed with PB78 and, since PB3133, reported by the `ClauseCardinalities` OBJECT-COMPUTER row as COBOLNET2104 `choice-alternative-repeated` | done |
 
 ⚠ Under the **keep-non-support** decision (§15 Q1 answer "no"), a different, smaller set is required — one
 named diagnostic per un-named entry point (rows 6–11 of §1) reusing `COBOLNET1518` with a per-element
@@ -1145,7 +1145,7 @@ catch.
   coded character set's behavior; `>>TURN EC-LOCALE-MISSING CHECKING ON` → the class test and the case
   function each raise at use, the statement interrupted; catches a classification that silently falls back.
 - ✅ `locale_classification_order` — landed as the PB78 OBJECT-COMPUTER rewrite (`objectComputerClause*`); the
-  negative `pb64t5-classification-twice` pins the at-most-once rule (COBOLNET2423).
+  negative `pb64t5-classification-twice` pins the at-most-once rule (COBOLNET2104).
 - `object_computer_no_name` — `OBJECT-COMPUTER. PROGRAM COLLATING SEQUENCE IS a.` with computer-name-1 omitted
   (§1 row 14); **not a locale golden** — it belongs with the OBJECT-COMPUTER rules and ships with G3.
 - `object_computer_obsolete_gates` — MEMORY SIZE / SEGMENT-LIMIT at `--std 2002` and SOURCE-COMPUTER
