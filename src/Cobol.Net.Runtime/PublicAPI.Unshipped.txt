@@ -77,3 +77,12 @@ CobolNet.Runtime.ActivationDescription.AnyLengthClauses.init -> void
 CobolNet.Runtime.ActivationDescription.ClausePhrases.get -> string![]?
 CobolNet.Runtime.ActivationDescription.ClausePhrases.init -> void
 static CobolNet.Runtime.ActivationRelations.MatchViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> string?
+CobolNet.Runtime.CobolVarGroup.CobolVarGroup(string! Fixed, string![]! Dynamic, CobolNet.Runtime.CobolVarGroup![]?[]? Elements = null, System.Func<int, CobolNet.Runtime.CobolVarGroup!>?[]? Created = null) -> void
+CobolNet.Runtime.CobolVarGroup.Deconstruct(out string! Fixed, out string![]! Dynamic, out CobolNet.Runtime.CobolVarGroup![]?[]? Elements, out System.Func<int, CobolNet.Runtime.CobolVarGroup!>?[]? Created) -> void
+CobolNet.Runtime.CobolVarGroup.Created.get -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>?[]?
+CobolNet.Runtime.CobolVarGroup.Created.init -> void
+CobolNet.Runtime.CobolVarGroup.CreatedAt(int i) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>?
+CobolNet.Runtime.CobolVarGroup.CreatedList.get -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>?[]!
+CobolNet.Runtime.CobolDynTable<T>.CreatedAs(System.Func<T, CobolNet.Runtime.CobolVarGroup!>! carrierOf) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>!
+CobolNet.Runtime.CobolDynTable<T>.CreatedAs(System.Func<T, string!>! imageOf) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>!
+CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool byReference = false) -> CobolNet.Runtime.CobolVarGroup!

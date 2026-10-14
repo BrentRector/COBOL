@@ -1538,25 +1538,37 @@ of an unsupported facility.
   argument's current capacity is therefore a receiving reference to the dynamic-capacity table whose subscript "exceeds
   the current capacity of the table", and §8.5.1.9.3 says what that does: "a new element is automatically created and the
   capacity of the table is increased to the value given by the subscript" (intermediate occurrences too). Until
-  kb/Work PB2690 the store was dropped silently and the argument kept its capacity. **Determination (the only latitude
-  the standard leaves):** a copy of the argument crosses the boundary and only the finished view comes back, so a store
-  past the capacity is recognised by its EFFECT: the capacity becomes the highest occurrence of the formal's table whose
-  image is not all spaces (the image the view showed for an occurrence the argument lacks: "all the remaining elements of
-  the receiving table are space filled", §14.6.9.2 2)). A
-  callee that only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only), and one that
-  stores spaces into an occurrence the argument lacks cannot be told from one that did not store. **Known departure
-  (kb/Work PB2690, REMAINING):** the items of a created occurrence that the callee did not store, and the intermediate
-  occurrences, come back space filled, where §8.5.1.9.5 initializes them "as though they had been the subject of a statement of
-  the form INITIALIZE ... WITH FILLER ALL TO VALUE THEN TO DEFAULT" when the table says INITIALIZED (without it their content is
-  undefined, so only an INITIALIZED table is affected). The same law holds one
-  level down for a dynamic-capacity table nested in an element, and across an INVOKE (`CobolVarGroup.Overlay`'s
-  `OverlaidTable` / `GrownCount`, shared by the CALL and INVOKE boundaries). A fixed-length ARGUMENT cannot
-  grow (it has no more occurrences); a BY CONTENT formal never reaches the argument (§14.2.3 GR9). The ISO text decides the
-  arm that matters, so no vendor behavior was consulted (CLAUDE.md rule 1). Witnesses:
+  kb/Work PB2690 the store was dropped silently and the argument kept its capacity. The occurrences it creates are
+  initialized: §8.5.1.9.5, with INITIALIZED, "any elementary items not referenced as receiving operands in a statement
+  that creates new elements in that table are first initialized as though they had been the subject of a statement of the
+  form INITIALIZE ... WITH FILLER ALL TO VALUE THEN TO DEFAULT", so the intermediate occurrences and every item of a
+  created one the callee did not store hold the element's VALUE, exactly as the same store made in the caller leaves them
+  (until the second PB2690 landing they came back space filled). **Determination (the latitude the standard leaves):** a
+  copy of the argument crosses the boundary and only the finished view comes back, so (i) the formal VIEWS an occurrence
+  the argument lacks as the occurrence the argument's table creates, the §8.5.1.9.5 NOTE's "functionally identical to one
+  where the intermediate occurrences are physically allocated and, if specified, initialized": the table's own creation
+  seed, the one a receiving subscript past the capacity grows it with (`CobolDynTable.CreatedAs`; the INITIALIZED recipe
+  when the phrase is written, otherwise, for contents §8.5.1.9.5 leaves undefined, the element's initial state, as a
+  statement in the caller would create it); and (ii) a store past the capacity is recognised by its EFFECT: the capacity
+  becomes the highest occurrence of the formal's table whose image differs from the one the view showed. A callee that
+  only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only); one that stores SPACES
+  there creates it; and one that stores into an occurrence exactly the image the table creates leaves the capacity as it
+  was (the content is the same either way, only the CAPACITY register can tell). The creation travels on the argument's
+  carrier only for a BY REFERENCE crossing (`CobolVarGroup.Created`, stated by `AsVarImage(__byReference: true)` and
+  `StorageCell.VarGroupAt(byReference: true)`): a BY CONTENT formal is a record "allocated by the activating runtime element"
+  that does "not occupy the same storage area as the argument" (§14.2.3 GR9), filled as by a MOVE, so past the sending
+  capacity its fixed table holds the MOVE's space fill (§14.6.9.2 2)) and nothing returns. The same law holds one level
+  down for a dynamic-capacity table nested in an element (a created element is the table's created element, its own inner
+  table at its creation, with the formal's element stored over it), and across an INVOKE, the universal lane included
+  (`CobolVarGroup.Reshape` / `Overlay`'s `OverlaidTable` / `GrownCount` / `OverlaidOccurrences`, shared by the CALL and
+  INVOKE boundaries). A fixed-length ARGUMENT cannot grow (it has no more occurrences). The ISO text decides the arm that
+  matters, so no vendor behavior was consulted (CLAUDE.md rule 1). Witnesses:
   `conformance:2014/pb2690_fixed_table_formal_grows_dynamic_argument_call`,
   `conformance:2014/pb2690_fixed_table_formal_grows_vlg_element_table_call`,
   `conformance:2014/pb2690_fixed_table_formal_grows_dynamic_argument_invoke`, `conformance:2014/pb965_vlg_into_fixed_invoke`,
-  `conformance:negative/pb2690-fixed-table-formal-grows-dynamic-argument-below-2014`.
+  `conformance:2014/pb2690_initialized_created_occurrences_call`, `conformance:2014/pb2690_initialized_created_occurrences_invoke`,
+  `conformance:negative/pb2690-fixed-table-formal-grows-dynamic-argument-below-2014`,
+  `conformance:negative/pb2690-initialized-created-occurrences-below-2014`.
 
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 
