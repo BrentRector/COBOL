@@ -857,7 +857,8 @@
   "pb546_national_leaf_one_width",
   "pb3132_contained_program_word_it_never_references",
   "pb3154_half_data_named_like_class_words",
-  "pb3154_half_data_hides_class_symbolic"
+  "pb3154_half_data_hides_class_symbolic",
+  "pb3154_sum_counter_hides_symbolic"
   ],
   "pending": []
 }
