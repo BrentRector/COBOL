@@ -30,3 +30,16 @@ Unit tests `CobolVarGroupContiguousTests.BitOdoTail_*` cover the tail arithmetic
 No inventory verdict changed (`closes_rows: []` with its reason). Found on the way, not fixed: a MOVE into a
 CELL-BACKED group whose dynamic-capacity table has variable-length elements loses the table (capacity 0; `q9.cob`).
 That is a lead in the report. PB3101 was not started.
+
+**The branch review, answered (wave 1074 A2 finisher, review R1-1).** The bit tail above measured a table from the member
+that holds it, and a member that CONTINUES a same-level §8.5.1.6.3 run has no characters of its own: `05 B PIC 1 USAGE
+BIT. 05 TB PIC 1 USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.` directly in a variable-length group packed B and TB into the
+leader's field at the maximum, while the codec cut TB's EMPTY field to the count. Re-probed: `DISPLAY G` threw
+ArgumentOutOfRange, at OCCURS 1 TO 8 it showed a NUL character LENGTH did not count, a cell-backed group of the shape
+showed the same extra character, and a FILE record of it threw at WRITE. Fix: `GroupImageCodec.VarParts` classifies a
+run's leader field by the member the run holds, and `OdoModel.FixedImageTail` counts the run's earlier bits as lead
+(`BitLayout.BitsBeforeInRun`, read off the one run law `RunsOf`), so the declared codec, the record layout and the cell
+window measure the table from the run's first bit. Golden `2014/pb3030_bit_odo_run_continuation` covers the three arms,
+a nine-bit leader, a GROUP-USAGE BIT holder continuing a run, a GR8 a) MOVE and a CALL at the maximum, each value derived
+by hand; it fails on the reviewed head. The PB3030 golden's comment cited GR8 b) for a sending group whose data-name-1
+lies outside it, which GR8 a) governs; corrected.

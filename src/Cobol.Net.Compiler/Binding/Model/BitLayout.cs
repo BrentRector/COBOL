@@ -152,6 +152,24 @@ internal static class BitLayout
         return Characters(bits);
     }
 
+    /// <summary>The bits the §8.5.1.6.3 run <paramref name="item"/> CONTINUES places before it: the
+    /// <see cref="RunBits"/> of the run's earlier members (zero when <paramref name="item"/> leads its run or is in
+    /// none). The run is ONE slice of its group's image, at the leader's field (<c>PhysicalModel.Physical.BitRun</c>), so
+    /// an item that continues one starts that many bits into the slice: an OCCURS DEPENDING table that continues a run
+    /// shares the run's characters, and its tail is measured from the run's start (<c>OdoModel.FixedImageTail</c>;
+    /// kb/Work PB2921 review R1-1). Read off <see cref="RunsOf"/>, the one run law.</summary>
+    public static int BitsBeforeInRun(DataItem item)
+    {
+        if (item.Parent is not { } parent || RunsOf(parent.Children).RunOf(item) is not { } run) return 0;
+        int bits = 0;
+        foreach (var m in run)
+        {
+            if (ReferenceEquals(m, item)) return bits;
+            bits += RunBits(m);
+        }
+        return 0;
+    }
+
     /// <summary>True when every member of a §8.5.1.6.3 run spans a whole number of bytes per occurrence, so no two
     /// members SHARE a byte and each one starts on a byte boundary — the run is then laid out exactly as the plain
     /// per-item byte sum lays it out (a bit leaf's <see cref="DataItem.ByteWidth"/> is <c>ceil(n / 8)</c>, which is
@@ -359,6 +377,10 @@ internal sealed class BitRunMap(IReadOnlyDictionary<DataItem, IReadOnlyList<Data
 
     /// <summary>The run this item LEADS, or null when it leads none (a continuation, or not a bit member).</summary>
     public IReadOnlyList<DataItem>? RunLedBy(DataItem item) => start.TryGetValue(item, out var r) ? r : null;
+
+    /// <summary>The run this item belongs to, as its leader or as a continuation, or null when it is in none.</summary>
+    public IReadOnlyList<DataItem>? RunOf(DataItem item) =>
+        !inRun.Contains(item) ? null : start.Values.First(r => r.Contains(item, ReferenceEqualityComparer.Instance));
 
     /// <summary>True when this item belongs to a run — as its leader or as a continuation.</summary>
     public bool IsInRun(DataItem item) => inRun.Contains(item);

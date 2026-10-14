@@ -5,12 +5,12 @@
       *> 8.5.1.6.3: a bit item following a bit item of the same level
       *>   is placed "at the next bit position in storage", so B and
       *>   the occurrences of TB share bytes and H's extent is counted
-      *>   in bits. 13.18.38.4 GR8 b) gives a sending group the part of
-      *>   the table that data-name-1 names, and GR8 a) gives a
-      *>   receiving group "only that part of the table area that is
+      *>   in bits. 13.18.38.4 GR8 a): data-name-1 is outside each
+      *>   group, so "only that part of the table area that is
       *>   specified by the value of the data item referenced by
-      *>   data-name-1 at the start of the operation" when the item is
-      *>   outside it, so the occurrences past it keep their content.
+      *>   data-name-1 at the start of the operation will be used",
+      *>   sending or receiving, and a receiver's occurrences past it
+      *>   keep their content.
       *> 15.50.4 rule 7: a variable-length group's LENGTH is the sum of
       *>   its non-variable-length subordinates, the current lengths of
       *>   its dynamic-length items and its dynamic-capacity tables at

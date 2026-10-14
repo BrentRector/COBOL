@@ -237,13 +237,20 @@ public static class OdoModel
     /// sharing its first character and the unit (§8.5.1.6.3: a bit occurrence may share a byte, so the table's
     /// characters are the ceiling of its bits). Read by the variable-length group codec (<c>GroupImageCodec</c>: the
     /// member's current image, the receiving splice and the record layout) and by a cell-backed group's window
-    /// (<c>VarGroupWindow</c>), so a declared group and a cell cannot measure one table two ways.</summary>
+    /// (<c>VarGroupWindow</c>), so a declared group and a cell cannot measure one table two ways.
+    /// <para>⛔ A HOLDER THAT CONTINUES A §8.5.1.6.3 RUN SHARES THE RUN'S CHARACTERS (kb/Work PB2921 review R1-1): "an
+    /// elementary bit data item immediately following an elementary bit data item or bit group item of the same level"
+    /// is placed "at the next bit position in storage", so the run is ONE slice of the group's image (the leader's
+    /// field) and the holder starts <see cref="BitLayout.BitsBeforeInRun"/> bits into it. Those bits are fixed material
+    /// sharing the table's first character exactly as the holder's own leading bits are, so they join
+    /// <see cref="OdoTail.Lead"/>. Measured from the holder alone, the table of <c>05 B PIC 1 USAGE BIT. 05 TB PIC 1
+    /// USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.</c> was two characters wide inside a three-character run.</para></summary>
     public static OdoTail FixedImageTail(DataItem holder, DataItem table)
     {
         var g = GeometryOf(holder, table);
-        return g.InBits
-            ? new OdoTail(g.ElemUnits, g.MaxOccurs, 0, g.FixedUnits % g.PositionsPerCharacter, g.PositionsPerCharacter)
-            : new OdoTail(g.ElemUnits, g.MaxOccurs);
+        if (!g.InBits) return new OdoTail(g.ElemUnits, g.MaxOccurs);
+        int lead = BitLayout.BitsBeforeInRun(holder) + g.FixedUnits;
+        return new OdoTail(g.ElemUnits, g.MaxOccurs, 0, lead % g.PositionsPerCharacter, g.PositionsPerCharacter);
     }
 
     /// <summary>The SEARCH / SEARCH ALL depending item for an OCCURS DEPENDING table (ISO §14.9.37.4 GR4/GR9 →

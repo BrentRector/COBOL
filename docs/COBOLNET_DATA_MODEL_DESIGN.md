@@ -1319,7 +1319,10 @@ basis, so a national element counts its two bytes a position, kb/Work PB546; the
 too. A table under which a USAGE BIT item lies is counted in BITS (§8.5.1.6.3: occurrences share bytes): the member's
 current image is the ceiling of its bits in characters, the receiving splice keeps the later occurrences at the bit,
 and the record states the table one CHARACTER per unit from the character holding its first bit (determination
-D-FRA (ix); kb/Work PB3030)) and **OdoTable** (that table
+D-FRA (ix); kb/Work PB3030). A member that CONTINUES a same-level §8.5.1.6.3 run — `05 B PIC 1 USAGE BIT. 05 TB PIC 1
+USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.` — has no characters of its own: the run is ONE slice at its leader's field
+(`PhysicalModel.Physical.BitRun`), so `VarParts` classifies the LEADER's field by the member the run holds, and the
+tail counts the run's earlier bits as lead (`BitLayout.BitsBeforeInRun`; kb/Work PB2921 review R1-1)) and **OdoTable** (that table
 when its ELEMENTS are variable-length groups: `NestedTable` at a count that is a parameter - the first `__odo`
 occurrences' carriers at a statement, all of them at a boundary - with the maximum's fixed width and component
 count, so every earlier component keeps its position; the receiving `FromVarImage` loops to the maximum and a

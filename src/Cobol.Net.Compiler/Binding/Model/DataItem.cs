@@ -1113,7 +1113,10 @@ public sealed class DataItem
     /// §14.9.25.4 GR9b excess part.
     /// A member holding USAGE BIT items composes on the first arm too (kb/Work PB3030): its OCCURS DEPENDING table is
     /// counted in BITS (§8.5.1.6.3), and its current image is the ceiling of those bits in characters
-    /// (<c>OdoModel.GeometryOf</c>, the unit the composer reads).</summary>
+    /// (<c>OdoModel.GeometryOf</c>, the unit the composer reads). A member that CONTINUES a same-level bit run (an
+    /// OCCURS DEPENDING bit table directly after a bit item) composes there too: its characters are the run's, so the
+    /// composer classifies it at the run's leading field and measures the table from the run's first bit
+    /// (<c>OdoModel.FixedImageTail</c>; kb/Work PB2921 review R1-1).</summary>
     private static bool CurrentExtentComposes(DataItem c) =>
         c.IsImageCapable
         || (c.IsDynamicLength && c.IsElementary)

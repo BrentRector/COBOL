@@ -523,9 +523,23 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     || DataItem.HasOdoOnOrBeneath(c)))
             .ToDictionary(c => c.CsName, StringComparer.Ordinal);
         var parts = new List<VarPart>();
+        var runContinuations = new HashSet<string>(StringComparer.Ordinal);
         foreach (var f in phys.PhysicalChildrenOf(group))
         {
-            if (!composite.TryGetValue(f.Name, out var d))
+            // ⛔ A §8.5.1.6.3 RUN IS ONE SLICE, AT ITS LEADER'S FIELD (PhysicalModel.Physical.BitRun), so the member a
+            // run holds is classified THERE: an OCCURS DEPENDING table that continues a run (05 B PIC 1 USAGE BIT.
+            // 05 TB PIC 1 USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.) lives in the leader's characters, which are then
+            // the OdoFixed part, cut to the table's count; the continuation's own field holds nothing (kb/Work PB2921
+            // review R1-1: classifying the empty continuation cut "" at a negative length while the leader packed
+            // the whole run at the maximum). SR22 makes the table the run's last member.
+            DataItem? d;
+            if (f.BitRun is { } run)
+            {
+                foreach (var m in run.Skip(1)) runContinuations.Add(m.CsName);
+                d = run.Select(m => composite.GetValueOrDefault(m.CsName)).LastOrDefault(x => x is not null);
+            }
+            else d = runContinuations.Contains(f.Name) ? null : composite.GetValueOrDefault(f.Name);
+            if (d is null)
             {
                 parts.Add(new VarPart(VarPartKind.Fixed, f, null, f.Width, 0));
                 continue;
