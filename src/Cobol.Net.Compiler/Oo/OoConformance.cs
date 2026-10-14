@@ -920,7 +920,8 @@ public static class OoConformance
                 return null;
             if (arg is { Kind: ObjectRefKind.ObjectClass, Only: true } && arg.Factory == formal.Factory
                 && InvokedThroughOnlyClass(invokedWith)
-                && CobolNames.Same(arg.Name, invokedWith.Name))
+                // A parameter-name may be substituted by that very class (§9.3.8.2.4; kb/Work PB2937).
+                && (arg.Formal || CobolNames.Same(arg.Name, invokedWith.Name)))
                 return null;
             return $"the formal parameter is described ACTIVE-CLASS ({factory} FACTORY) and the argument is "
                 + $"{arg.Spelled}, invoked with {invokedWith.Spelled} — BY REFERENCE the argument shall be a) an "

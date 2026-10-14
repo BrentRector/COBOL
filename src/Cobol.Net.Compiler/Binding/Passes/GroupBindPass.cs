@@ -18,7 +18,7 @@ namespace CobolNet.Binding.Passes;
 /// error by construction. <see cref="SkeletonClasses"/> / <see cref="SkeletonInterfaceData"/> are the unexpanded
 /// PARAMETERIZED definitions' forests (OO deep-dive D12 determination 6): bound for their own rules, never emitted, so
 /// they are deliberately OUTSIDE <see cref="AllBinders"/> (no producing pass runs over them) and are read only by the
-/// edition pass's data gates (kb/Work PB2937).</summary>
+/// edition pass, which gates their data and walks their bound method bodies (kb/Work PB2937).</summary>
 internal sealed record GroupBindContext(
     CobolParserCore.CompilationUnitContext Tree,
     IReadOnlyList<BoundUnit> Units,

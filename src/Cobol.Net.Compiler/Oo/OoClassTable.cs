@@ -194,7 +194,8 @@ public sealed class OoClassTable
         }
         if (d.Kind is ObjectRefKind.Interface && FindInterface(d.Name!) is { } i)
             interfaces = InterfaceLineage(i);
-        else if (d.Kind is ObjectRefKind.ObjectClass or ObjectRefKind.ActiveClass && d.Name is { } n && Find(n) is { } c)
+        else if (d.Kind is ObjectRefKind.ObjectClass or ObjectRefKind.ActiveClass && d.Name is { } n
+                 && (Find(n) ?? ContainingSkeleton(d, n)) is { } c)
         {
             classes = ClassLineage(c);
             interfaces = ImplementsClosure(c, d.Factory).Select(x => x.Name).ToArray();
@@ -217,6 +218,10 @@ public sealed class OoClassTable
     {
         var s = SetOperand(send);
         var r = SetOperand(recv);
+        // An ACTIVE-CLASS sender in a definition whose superclass is a parameter-name: its class inherits from the actual,
+        // which may be the receiver's class or one implementing the receiver's interface (§9.3.9) — most favourable too.
+        if (send.IsActiveClass && send.Name is { } own && ContainingSkeleton(send, own)?.FormalBaseName is not null)
+            s = s with { Classes = [.. s.Classes ?? [], .. r.Classes ?? []], Interfaces = [.. s.Interfaces ?? [], .. r.Interfaces ?? []] };
         if (send.Formal && recv.Formal && CobolNames.Same(send.Name, recv.Name)) return (s, r);
         if (send.Formal)
             return (s with { Name = r.Name ?? s.Name, Classes = r.Classes ?? s.Classes, Interfaces = r.Interfaces ?? s.Interfaces }, r);
@@ -229,6 +234,12 @@ public sealed class OoClassTable
             });
         return (s, r);
     }
+
+    /// <summary>The unexpanded parameterized class an ACTIVE-CLASS description written inside it names (its containing
+    /// class, <see cref="ObjectRefDescriptor.ActiveClass"/>; kb/Work PB2937): it is in no name lookup (it creates no class),
+    /// but its bodies bind as themselves and SELF there is described by it.</summary>
+    private OoClassSymbol? ContainingSkeleton(ObjectRefDescriptor d, string name) =>
+        d.IsActiveClass ? _parameterizedClasses.FirstOrDefault(c => CobolNames.Same(c.Name, name)) : null;
 
     /// <summary>The class and every class it inherits from, nearest first (cycle-safe; §11.3.3 SR4 refuses a cycle).</summary>
     private static string[] ClassLineage(OoClassSymbol cls)

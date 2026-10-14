@@ -38,15 +38,15 @@ internal sealed class OoDriver(BindSession session)
     /// the targeted edition does not have — governs its text whether or not anything expands it, and until this bind
     /// those rules were asked of an expansion only, so an unexpanded definition compiled whatever its body held. Its
     /// parameter-names resolve through the one funnel as formals (<c>OoNameResolution.Result.IsFormal</c>), and a
-    /// reference typed by a formal takes the universal description: what the formal names is known only in an
-    /// expansion, where §9.3.8.2.4 asks every conformance question "as if the actual parameter classes or interfaces
-    /// were substituted". The uid band it draws is its own and comes after every emitted class's, so emission is
-    /// unchanged. The bound forests are KEPT (<see cref="SkeletonClasses"/>, <see cref="SkeletonInterfaceData"/>) for the
-    /// one later pass that judges data rules over every forest, the edition pass's data gates; no pass that produces
-    /// code sees them. Its method BODIES bind only in each expansion: a statement through a formal-typed reference
-    /// obeys rules that differ between the universal description and the typed one an expansion binds (a literal INVOKE
-    /// argument, SUPER over a formal base, a formal as INVOKE's class-name), so they wait on a formal description kind
-    /// of their own (D12 determination 6; kb/Work PB2937's open half).</summary>
+    /// reference typed by a formal takes the alternative its REPOSITORY specifier declares, marked
+    /// <see cref="ObjectRefDescriptor.Formal"/>: what the formal names is known only in an expansion, where §9.3.8.2.4
+    /// asks every question that turns on it "as if the actual parameter classes or interfaces were substituted". The
+    /// uid band it draws is its own and comes after every emitted class's, so emission is unchanged. The bound forests
+    /// are KEPT (<see cref="SkeletonClasses"/>, <see cref="SkeletonInterfaceData"/>); no pass that produces code sees
+    /// them. Its method BODIES bind through <see cref="BindClassBody"/> too, after every emitted class's
+    /// (<c>BinderDriver.Bind</c>): a statement that selects a method through a formal is each expansion's
+    /// (<c>BoundDeferredToExpansion</c>), every other statement rule is asked here, and the edition pass walks the
+    /// result (D12 determination 6; kb/Work PB2937).</summary>
     public void BindParameterized(OoClassSymbol skeleton)
     {
         var unit = new OoClassUnit { Symbol = skeleton };
@@ -59,7 +59,8 @@ internal sealed class OoDriver(BindSession session)
     public void BindParameterized(OoInterfaceSymbol skeleton) => _skeletonInterfaceData[skeleton] = BindInterface(skeleton);
 
     /// <summary>The unexpanded parameterized CLASS definitions, their data and method headers bound as themselves
-    /// (<see cref="BindParameterized(OoClassSymbol)"/>); <c>Bound</c> / <c>FactoryBound</c> stay unset.</summary>
+    /// (<see cref="BindParameterized(OoClassSymbol)"/>), and their method bodies (<see cref="BindClassBody"/>, which
+    /// <c>BinderDriver.Bind</c> runs over them after every emitted class; kb/Work PB2937).</summary>
     public IReadOnlyList<OoClassUnit> SkeletonClasses => _skeletonClasses;
     private readonly List<OoClassUnit> _skeletonClasses = [];
 
