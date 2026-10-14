@@ -735,7 +735,7 @@ operand model: its concatenation IS this rule (kb/Work PB1627).
 **3.3e The computer paragraphs (kb/Work PB78, 2026-08-18).** `objectComputerParagraph : OBJECT_COMPUTER DOT
 (({!objectComputerClauseAhead()}? computerName)? objectComputerClause* DOT)?` — ISO §12.3.6.2's `[computer-name-1]`
 is optional and the two clauses (`programCollatingSequenceClause | characterClassificationClause`) may follow the
-period in any order (each at most once, §5.2.6.4 — a duplicate is COBOLNET1652 in the binder). Two load-bearing
+period in any order (each at most once, §5.2.6.4 — a duplicate is COBOLNET2104, the one choice-indicator reader, counted by the `ClauseCardinalities` row described under PB3133 below, not by the binder). Two load-bearing
 decisions: (1) the X3.23-1985 clauses ISO 2002 deleted are MODELLED — `memorySizeClause` and `segmentLimitClause`
 are `objectComputerClause` alternatives, `debuggingModeClause` hangs off SOURCE-COMPUTER's name — and each is
 gated at its own node (`VisitMemorySizeClause` / `VisitSegmentLimitClause` / `VisitDebuggingModeClause`, the last one
@@ -1253,9 +1253,9 @@ joined the table the same way, which is the table doing its job: a tenth format 
   the §13.4.5.2 file description entry, the §13.4.6.2 SD entry and the §12.4.5.1 file control entry — and names the
   alternatives that DO repeat (the file control entry's ALTERNATE RECORD KEY and collating-sequence clauses, an
   error production, the declined validation clauses); `ClosedFormatPass.VisitChildren` counts every clause list's
-  elements against it and reports COBOLNET2423 through the one `UnrepeatedElements` reader the RD entry already uses.
+  elements against it and reports COBOLNET2423 through the one `UnrepeatedElements` reader the RD entry already uses (a row whose figure sits in choice indicators, `ClauseList.ChoiceIndicators`, reports COBOLNET2104 through `ChoiceIndicators.AtMostOnce` instead: one rule, one code).
   `ClauseCardinalityDriftTests` makes the table total: every closed format is a row or a reviewed exemption
-  (SPECIAL-NAMES, I-O-CONTROL, OBJECT-COMPUTER and SOURCE-COMPUTER repeat their elements or hold one), so a new
+  (SPECIAL-NAMES and I-O-CONTROL repeat their elements, SOURCE-COMPUTER holds one), so a new
   closed format cannot arrive without its figure being read for ellipses.
 - **And the ORDER half (kb/Work PB1508).** §5.2.1: the elements of a general format "shall be written in the
   compilation group in the sequence given in the general format, unless otherwise specified by the rules of that
@@ -1275,7 +1275,16 @@ joined the table the same way, which is the table doing its job: a tenth format 
   and leaves OPTIONS (a 2002 introduction) and REMARKS (the COBOL-74 carryover) uncounted; from 2002 the §11.2.1
   figure ranks OPTIONS alone and the removed comment paragraphs are the removal gate's. A diagnostic names the
   figure's authority (`ClauseList.Format`: "ISO §11.2.1" or "ANSI X3.23-1985"), and the drift test holds every
-  figure of the chain to the row's obligations. The OPTIONS
+  figure of the chain to the row's obligations. **The OBJECT-COMPUTER paragraph is a row of this table (kb/Work
+  PB3133), and the table is the ONE reader of its counts** — the binder used to count PROGRAM COLLATING SEQUENCE and
+  CHARACTER CLASSIFICATION itself (COBOLNET1652, deleted) while `ClauseCardinalityDriftTests` exempted the list, so the
+  1985 figure's cardinality and order had no reader at all. From 2002 the §12.3.6.2 figure encloses the two clauses in
+  choice indicators within brackets (rendered from the printed page): §5.2.6.4 admits each alternative at most once, in
+  any order (`Sequence` null), and a repeat is COBOLNET2104 (`ClauseList.ChoiceIndicators`: ClosedFormatPass reports it through `ChoiceIndicators.AtMostOnce`, the one reader of §5.2.6.4, never as a bracket without an ellipsis). Below 2002 the COBOL-85 figure ranks MEMORY SIZE,
+  PROGRAM COLLATING SEQUENCE and SEGMENT-LIMIT once each in that sequence (derived, not quoted — no 1985 text is
+  in the repository; IBM Enterprise COBOL's language reference prints the same figure and GnuCOBOL's parser takes the
+  clauses in any order and number, so it is no arm of the precedence); CHARACTER CLASSIFICATION (a 2002 introduction) and
+  the 1985 clauses at 2002+ are the removal and introduction gates', so each figure leaves them uncounted. The OPTIONS
   paragraph's independent `[.]` is its own grammar alternative: `OPTIONS DOT (optionsClause+ DOT | DOT)?` is §11.9.2's
   bracket plus §11.9.3 SR1 (a period is required once a clause is written), so `OPTIONS. .` is accepted.
 - **Its second error production — a KNOWN phrase in the WRONG position.** `misplacedSpecialNamesForPhrase`

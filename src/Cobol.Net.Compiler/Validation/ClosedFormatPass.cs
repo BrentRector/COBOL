@@ -123,7 +123,8 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
 
     /// <summary>Count the elements <paramref name="container"/>'s clause children fill and diagnose each that is
     /// written more than once (ISO §5.2.6.2, §5.2.7), through the ONE <see cref="UnrepeatedElements"/> reader the
-    /// RD entry already uses. Reported at the SECOND occurrence — the one that makes the entry non-conforming. Where
+    /// RD entry already uses — or, for a figure whose clauses sit in choice indicators (§5.2.6.4,
+    /// <see cref="ClauseList.ChoiceIndicators"/>), through <see cref="ChoiceIndicators"/>. Reported at the SECOND occurrence — the one that makes the entry non-conforming. Where
     /// the list's figure fixes the order (<see cref="ClauseList.Sequence"/>), an element written after one the figure
     /// prints LATER is refused too (§5.2.1; kb/Work PB1508), at the element written out of place. The figure is the
     /// one the targeted edition prints (<see cref="ClauseList.At"/>; kb/Work PB2532 — the COBOL-85 identification
@@ -156,8 +157,11 @@ internal sealed class ClosedFormatPass(EditionContext edition) : CursorFollowing
             // A paragraph list (the identification division, the CONFIGURATION SECTION) names its elements
             // "paragraph"s, as the closed-format refusal does; every other list holds clauses.
             string noun = ClosedFormats.Of(first.GetType())?.Noun ?? "clause";
-            UnrepeatedElements.AtMostOnce(_edition, count, $"{list.Subject}{OwnerSuffix(container)}",
-                $"the {noun} '{WrittenOpening(first)}'", list.Format, orderFree: list.Sequence is null);
+            string subject = $"{list.Subject}{OwnerSuffix(container)}", written = $"the {noun} '{WrittenOpening(first)}'";
+            // A figure whose clauses sit in CHOICE INDICATORS is §5.2.6.4's, read by the ONE choice-indicator reader
+            // (COBOLNET2104); any other repeated bracket is §5.2.6.2 / §5.2.7's (COBOLNET2423; kb/Work PB3133, review R1-1).
+            if (list.ChoiceIndicators) ChoiceIndicators.AtMostOnce(_edition, count, subject, written, list.Format);
+            else UnrepeatedElements.AtMostOnce(_edition, count, subject, written, list.Format, orderFree: list.Sequence is null);
         }
     }
 

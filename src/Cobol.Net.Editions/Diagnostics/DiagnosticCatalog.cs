@@ -2491,14 +2491,12 @@ public static class DiagnosticCatalog
         + "DELIMITED BY phrase (SR7), COUNT IN / TALLYING IN / POINTER items are integers without P (SR5/SR6), and no "
         + "operand may be a variable-length group (SR10). Rejected at bind — the statement is not run.",
         "ISO §14.9.43.3 / §14.9.48.3");
-    // kb/Work PB78: the OBJECT-COMPUTER paragraph's clauses (§12.3.6.2's bracketed choice indicators — §5.2.6.4:
-    // zero or more, EACH AT MOST ONCE, any order) are a list since computer-name-1 became optional in the grammar.
-    public static readonly DiagnosticDescriptor ObjectComputerDuplicateClause = new(
-        "COBOLNET1652", "object-computer-duplicate-clause", EditionSeverity.Error,
-        "An OBJECT-COMPUTER clause (PROGRAM COLLATING SEQUENCE, CHARACTER CLASSIFICATION) is specified more than once "
-        + "in the paragraph. ISO §12.3.6.2's format encloses the clauses in choice indicators within brackets, which "
-        + "§5.2.6.4 defines as zero or more of the alternatives, each at most once, in any order. Keep one.",
-        "ISO §12.3.6.2 / §5.2.6.4");
+    // ⛔ `object-computer-duplicate-clause` (COBOLNET1652) is DELETED, not disabled (kb/Work PB3133): kb/Work PB78 counted the
+    // OBJECT-COMPUTER paragraph's PROGRAM COLLATING SEQUENCE and CHARACTER CLASSIFICATION clauses in the binder (§12.3.6.2's
+    // choice indicators — §5.2.6.4: each at most once, any order), beside a ClauseCardinalities table that exempted the
+    // list; the list is now a table row, read by ClosedFormatPass like every other closed clause list, which also
+    // owns the COBOL-85 figure's sequence. A repeated clause is COBOLNET2423 (format-element-repeated) and a misplaced one
+    // COBOLNET2987. The code and the name are retired and never reused.
     // kb/Work PB79 (data-model design D20): the GROUP-USAGE clause's syntax rules — SR1 (a group item that is not
     // strongly typed and not a variable-length group), SR2/SR3 (no explicit USAGE on the subject; every subordinate
     // group the same GROUP-USAGE). The subordinate LEAF conformance rides the shared §13.18.60.4 GR1 usage-inheritance
@@ -6391,7 +6389,7 @@ public static class DiagnosticCatalog
         + "general format may be omitted\"; §5.2.7: repetition is indicated only by an ellipsis, which \"applies to "
         + "the portion of the format between the determined pair of delimiters\". A rule that lets the elements be "
         + "written in any order (§13.14.3 SR2, §13.18.39.3 SR4) does not let any of them be written twice. Delete "
-        + "the repeated clause or phrase.",
+        + "the repeated clause or phrase. (A bracket of CHOICE INDICATORS, §5.2.6.4, is COBOLNET2104.)",
         "ISO §5.2.6.2 · §5.2.7");
 
     /// <summary>COBOLNET2987 — an element of a general format whose printed sequence binds is written after one the

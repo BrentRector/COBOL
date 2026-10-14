@@ -21,6 +21,7 @@ public sealed class CobolDynTable<T>
     private T _scratch = default!;      // the benign out-of-range slot (COBOL-85 / checking-off policy)
     private readonly Func<int, T> _seedAt;   // occurrence-indexed seed (1-based); a Format 2 (table) VALUE varies by occurrence
     private readonly Func<int, T> _createdAt;   // the seed of an occurrence a STATEMENT creates (§8.5.1.9.5 INITIALIZED)
+    private readonly bool _initialized;         // INITIALIZED is written: §8.5.1.9.5 defines a created element (CreatedAs)
     private readonly int _min;
     private readonly int? _expected;    // TO integer-5 — the expected capacity (nonfatal to exceed)
 
@@ -35,8 +36,9 @@ public sealed class CobolDynTable<T>
     /// <param name="expected">TO integer-5 — the expected capacity (§13.18.38 GR17), or null if unbounded.</param>
     /// <param name="initializedSeed">The INITIALIZED phrase's seed (§8.5.1.9.5 — the element "as though … the
     /// subject of a statement of the form INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT") for every
-    /// occurrence a STATEMENT creates later, or null when it is the same as <paramref name="seed"/> — which it
-    /// always may be when INITIALIZED is absent, since those contents are then undefined (kb/Work PB1267).</param>
+    /// occurrence a STATEMENT creates later, or null exactly when INITIALIZED is absent: those contents are then
+    /// undefined and <paramref name="seed"/> creates them (kb/Work PB1267). It is passed even when it composes the
+    /// same element as <paramref name="seed"/>, because it also says the phrase is written (<see cref="CreatedAs(Func{T, CobolVarGroup})"/>).</param>
     public CobolDynTable(Func<T> seed, int min, int? expected, Func<T>? initializedSeed)
         : this((Func<int, T>)(_ => seed()), min, expected,
                initializedSeed is null ? null : (Func<int, T>)(_ => initializedSeed()), min) { }
@@ -45,11 +47,13 @@ public sealed class CobolDynTable<T>
     /// and an explicit initial current capacity (<paramref name="initialCapacity"/> — the GR16 value, ≥ the FROM
     /// minimum). Occurrences 1..initialCapacity take their keyed VALUE literal; growth beyond re-seeds through
     /// <paramref name="initializedSeedAt"/> when INITIALIZED is written, else through the same
-    /// <paramref name="seedAt"/> (occurrences outside the VALUE range yield the element default).</summary>
+    /// <paramref name="seedAt"/> (occurrences outside the VALUE range yield the element default);
+    /// <paramref name="initializedSeedAt"/> is null exactly when INITIALIZED is absent, as for the other overload.</summary>
     public CobolDynTable(Func<int, T> seedAt, int min, int? expected, Func<int, T>? initializedSeedAt, int initialCapacity)
     {
         _seedAt = seedAt;
         _createdAt = initializedSeedAt ?? seedAt;
+        _initialized = initializedSeedAt is not null;
         _min = min < 0 ? 0 : min;
         _expected = expected;
         int open = Math.Max(_min, initialCapacity < 0 ? 0 : initialCapacity);
@@ -290,6 +294,25 @@ public sealed class CobolDynTable<T>
         for (int i = 0; i < _count; i++) outp[i] = map(_store[i]);
         return outp;
     }
+
+    /// <summary>The element a statement creates at a 1-based occurrence number (§8.5.1.9.3) as the carrier
+    /// <paramref name="carrierOf"/> makes of it, when §8.5.1.9.5 DEFINES that element (the table writes INITIALIZED, whose
+    /// recipe is the seed <see cref="RefReceiving"/> grows with), else null: "Otherwise, the content of any unreferenced
+    /// locations in the new table element and the content of the other new occurrences are undefined". It is what a
+    /// variable-length group carrier of this table's storage states as its creation (<see cref="CobolVarGroup.Created"/>,
+    /// kb/Work PB2690), so a BY REFERENCE formal whose FIXED table reaches past the current capacity sees and creates the
+    /// occurrences this table would. ⛔ Null without the phrase is not an economy: the formal then sees those occurrences
+    /// as the MOVE's space fill, and the write-back recognises a store there by any image but spaces, so a store of the
+    /// element's VALUE (a numeric zero) still raises the capacity to its subscript, which a view of the initial state
+    /// could not tell from no store at all (<c>CobolVarGroup.OverlaidTable</c>'s determination; kb/Work PB2690 review
+    /// finding R1-1). A table whose elements are variable-length groups maps each to its own carrier.</summary>
+    public Func<int, CobolVarGroup>? CreatedAs(Func<T, CobolVarGroup> carrierOf) =>
+        _initialized ? occurrence => carrierOf(_createdAt(occurrence)) : null;
+
+    /// <summary><see cref="CreatedAs(Func{T, CobolVarGroup})"/> for a table of fixed-length elements, each rendered by
+    /// <paramref name="imageOf"/> (the lambda <see cref="CurrentImage"/> concatenates) and carried as its image.</summary>
+    public Func<int, CobolVarGroup>? CreatedAs(Func<T, string> imageOf) =>
+        _initialized ? occurrence => CobolVarGroup.OfImage(imageOf(_createdAt(occurrence))) : null;
 
     /// <summary>The write half of <see cref="CurrentImage"/> — distribute a carried current-extent image back
     /// into the table (kb/Work PB204). The capacity BECOMES the number of whole
