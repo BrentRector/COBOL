@@ -1,4 +1,4 @@
-## PB3129: a TYPE entry cannot launder a pointer into an ordinary group (§13.18.60.3 SR14 via §13.18.57.4 GR1)
+## Entry 2012 — 2026-10-13 19:59 PDT — PB3129: a TYPE entry cannot launder a pointer into an ordinary group (§13.18.60.3 SR14 via §13.18.57.4 GR1)
 
 Wave 1072, group F. PB3129 was filed as legal source rejected: a group that is not strongly typed, holding a
 PROGRAM-POINTER leaf written `05 L-P TYPE T1`, could not cross `CALL PX USING G` (COBOLNET1688, the Tier-C island) and
@@ -50,3 +50,4 @@ need to. Goldens: `negative/pb3129-type-index-in-constant-record`, `negative/pb3
 (COBOLNET1726), `negative/pb3129-type-based-variable-length-group` (COBOLNET2560), and the positive
 `2002/pb3129_type_in_constant_record_ok`. Rows `SR-13.18.60.3-4` and `SR-13.18.5.3-2` were re-verdicted CONFORMS with
 the TYPE-route witnesses (GAP 103 → 103).
+
