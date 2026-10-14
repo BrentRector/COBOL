@@ -24,6 +24,10 @@ namespace CobolNet.Binding;
 ///     form only under a type declaration that includes the STRONG phrase.</item>
 ///   <item><c>01 P USAGE POINTER. 01 G. 05 Q SAME AS P.</c> — the same level-05 pointer manufactured by a
 ///     fourth acquisition route.</item>
+///   <item><c>01 PT IS TYPEDEF USAGE POINTER. 01 G. 05 A TYPE PT.</c> — the fifth, the TYPE twin of SAME AS
+///     (§13.18.57.4 GR1 and §13.18.49.4 GR1 state the same "as though … coded in place" effect). The template is
+///     a legal level-1 entry, so only the SITE breaks the rule; it compiled clean until kb/Work PB3129, and its
+///     group then failed at a CALL or a prototype pair with a carrier diagnostic (COBOLNET1688 / COBOLNET1513).</item>
 /// </list>
 ///
 /// <para><b>⛔ The rule was verified against the PRINTED page before the screen was written.</b> SR14's reading
@@ -85,7 +89,13 @@ public sealed partial class DataBinder
     /// copy. That is deliberate: SR14's drafting twin §13.18.57.3 SR6 is implemented as TWO hand-written parent
     /// walks (<c>ExpandType</c> and <c>ExpandSameAs</c>), and writing a fifth copy at each of four sites would
     /// have reproduced that duplication at twice the scale. A fifth acquisition route added later is screened
-    /// here for free.</para></summary>
+    /// here for free.</para>
+    ///
+    /// <para>⛔ ONE route is not a clone of a judged template: the TYPE entry ITSELF (kb/Work PB3129). The pruning
+    /// skips it with its clone subtree, and for a GROUP type that is right (the template's members were judged), but
+    /// an ELEMENTARY pointer-class type declaration is a level-1 entry that passes SR14, while the TYPE entry that
+    /// references it stands wherever it was written. So the second loop asks arm B
+    /// (<see cref="ScreenSr14ElementaryPlacement"/>) of every WRITTEN entry that carries a TYPE clause.</para></summary>
     internal void CheckUsageDeclarations()
     {
         foreach (var item in ConformanceForest())
@@ -190,15 +200,7 @@ public sealed partial class DataBinder
             // usage), never the resolved CATEGORY (kb/Work PB819): a usage the compiler refuses by name — MESSAGE-TAG,
             // declined non-support — binds a recovery profile with no class, so a class-keyed arm B never saw
             // `05 A USAGE MESSAGE-TAG.` inside an ordinary group while arm A reported its group spelling.
-            if (!Sr14Elementary(item) || Sr14PhraseOf(item) is not { } phraseB) continue;
-            if (Sr14PermittedLevel(item.Level) || UnderStrongTypeDeclaration(item)) continue;
-
-            Edition.Error(DiagnosticCatalog.UsageDeclarationPlacement, $"data item '{name}' is described with "
-                + $"USAGE {phraseB} at level {item.Level:00}, subordinate to "
-                + $"'{item.Parent?.CobolName ?? "FILLER"}', which is not a type declaration that includes the "
-                + $"STRONG phrase — a USAGE clause with the {Sr14PhraseList} phrase may be specified only for "
-                + "an elementary data item at level 1 or an elementary data item subordinate to a type "
-                + "declaration that includes the STRONG phrase (ISO §13.18.60.3 SR14)");
+            ScreenSr14ElementaryPlacement(item, name);
         }
 
         // ── THE COMPOSED-ENTRY HALF OF §13.18.22.3 SR4 AND §13.18.5.3 SR1 (kb/Work PB1212) ──────────────────
@@ -208,13 +210,44 @@ public sealed partial class DataBinder
         // a TYPE clause, because the template was gated once. So the SAME two screens are asked, by the same code, of
         // each entry that DIRECTLY carries a TYPE clause. Only a level-1 entry can write EXTERNAL or BASED, so the
         // entries reached here are the site entries and nothing is reported twice (the templates were judged above).
+        //
+        // ⛔ §13.18.60.3 SR14 IS THE THIRD RULE OF THAT KIND (kb/Work PB3129). `01 PT IS TYPEDEF USAGE POINTER.` writes
+        // the phrase at level 1, which SR14 permits, so the template passes; `01 G. 05 A TYPE PT.` then places it at
+        // level 05 in an ordinary group, "as though the data description identified by type-name-1 had been coded in
+        // place of the TYPE clause" (§13.18.57.4 GR1) — the level-05 spelling arm B refuses. SAME AS states that effect
+        // in the same words (§13.18.49.4 GR1), and its copy was always screened (a SAME AS subject is a written entry),
+        // so the TYPE spelling was the one route by which a pointer- or object-class leaf reached a group that is not
+        // strongly typed — a shape that then failed far from its declaration, at a CALL or a prototype pair, under a
+        // rule that is not the one it breaks. So arm B is asked of every WRITTEN entry carrying a TYPE clause: a site
+        // entry, or a TYPE entry written inside a template. Never of a clone a TYPE expansion composes beneath one
+        // (its parent carries the TYPE clause): the entry the programmer must change is judged here or above.
         foreach (var item in CompositionForest().Where(i => i.TypeName is not null))
         {
             using var _ = Edition.At(item);
             string name = item.CobolName ?? "FILLER";
             if (ScreenExternalClassItem(item, name)) continue;
-            ScreenBasedClassObjectItem(item, name);
+            if (ScreenBasedClassObjectItem(item, name)) continue;
+            if (item.Parent is null || IsWrittenEntry(item.Parent)) ScreenSr14ElementaryPlacement(item, name);
         }
+    }
+
+    /// <summary>§13.18.60.3 SR14, ARM B — an ELEMENTARY item that carries one of SR14's usage phrases, however it
+    /// acquired it (<see cref="Sr14PhraseOf(DataItem)"/>), outside the two placements the rule permits: "an elementary
+    /// data item at level 1 or an elementary data item subordinate to a type declaration that includes the STRONG
+    /// phrase". One screen for the WRITTEN-entry loop and the TYPE-entry loop of <see cref="CheckUsageDeclarations"/>
+    /// (kb/Work PB3129: the TYPE spelling escaped it).</summary>
+    private void ScreenSr14ElementaryPlacement(DataItem item, string name)
+    {
+        if (!Sr14Elementary(item) || Sr14PhraseOf(item) is not { } phrase) return;
+        if (Sr14PermittedLevel(item.Level) || UnderStrongTypeDeclaration(item)) return;
+
+        string acquired = item.TypeName is { } typeName ? $" (by TYPE {typeName}, ISO §13.18.57.4 GR1)" : "";
+        Edition.Error(DiagnosticCatalog.UsageDeclarationPlacement, $"data item '{name}' is described with "
+            + $"USAGE {phrase}{acquired} at level {item.Level:00}, subordinate to "
+            + $"'{item.Parent?.CobolName ?? "FILLER"}', which is not a type declaration that includes the "
+            + $"STRONG phrase — a USAGE clause with the {Sr14PhraseList} phrase may be specified only for "
+            + "an elementary data item at level 1 or an elementary data item subordinate to a type "
+            + "declaration that includes the STRONG phrase (ISO §13.18.60.3 SR14)");
     }
 
     /// <summary>§13.18.22.3 SR4 — "The EXTERNAL clause shall not be specified for a data item of class object or

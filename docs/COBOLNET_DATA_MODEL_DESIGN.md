@@ -1891,6 +1891,18 @@ prunes TYPE-clone subtrees — so one predicate over it covers all four routes, 
 that must change (a weak typedef's pointer member is reported ONCE at the template, not once per `TYPE` use), and
 screens a fifth route added later for free.
 
+⛔ **The pruning has ONE blind spot, and it is closed by the same predicate, not a copy (kb/Work PB3129).** The
+forest prunes the TYPE entry ITSELF with its clone subtree. For a GROUP type that is right, but an ELEMENTARY
+pointer-class type declaration (`01 PT IS TYPEDEF USAGE POINTER.`) is a legal level-1 entry, while
+`01 G. 05 A TYPE PT.` is, by §13.18.57.4 GR1, "as though the data description identified by type-name-1 had been
+coded in place of the TYPE clause" — the level-05 spelling SR14 forbids, and the exact twin of the SAME AS copy
+(§13.18.49.4 GR1, the same words), which was always rejected. That spelling compiled clean and its group then failed
+at a CALL or a program prototype pair with a carrier diagnostic (COBOLNET1688 / COBOLNET1513) naming no rule it
+broke. So `CheckUsageDeclarations`' second loop — the composed-entry loop that already asks the EXTERNAL and BASED
+class rules of each entry carrying a TYPE clause (PB1212) — asks SR14's elementary arm
+(`ScreenSr14ElementaryPlacement`, the one helper both loops call) of every WRITTEN entry that carries a TYPE clause:
+a site entry or a TYPE entry written inside a template, never a clone composed beneath one.
+
 **Two determinations recorded here rather than left implicit.**
 1. **A level-77 entry SATISFIES SR14's "at level 1" arm.** §8.5.1.3.2 places a 77 entry outside the level system
    ("three types of entries exist for which there is no true concept of level"), and §13.11.1 declares the level-1
@@ -1905,7 +1917,8 @@ screens a fifth route added later for free.
 **Consequence for the storage model, worth stating because it bounds other subsystems' input.** On conforming
 source, the ONLY way to write a GROUP containing a pointer/object-class leaf is inside a `TYPEDEF STRONG`
 template. Everything else — an ordinary group member, a weak typedef member, a SAME AS copy into a group, a
-group-level pointer USAGE — is now rejected at the declaration. That is what makes `ComputeTier`'s nested
+TYPE entry of an elementary pointer-class type below level 1 (PB3129), a group-level pointer USAGE — is now
+rejected at the declaration. That is what makes `ComputeTier`'s nested
 pointer/object Tier-D backstop (D5 / `COBOLNET_REDEFINES_DESIGN.md`) unreachable-by-construction on conforming
 source; the backstop is kept as the recovery-path guard, never deleted.
 
