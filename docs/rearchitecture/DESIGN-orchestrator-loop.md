@@ -675,8 +675,8 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    branch's class (cherry-pick if unlanded, orient from the report if landed). **A carried branch** is the exception:
    when another `DONE` report's branch, not on main, contains it (`branch_carrier`, `git merge-base --is-ancestor`: a
    same-file successor merged its predecessor), its finisher merges that carrier instead of cherry-picking, because the
-   commits would otherwise land twice; and a carried `FINDINGS` branch gets no finisher of its own: the carrier's answers
-   it. A finisher on a primary file absorbs the notes of the open clusters on that file up to the cap of five.
+   commits would otherwise land twice; and a carried `FINDINGS` branch whose lead the fix lane cannot see gets no
+   finisher of its own: its work lands through the carrier. A finisher on a primary file absorbs the notes of the open clusters on that file up to the cap of five.
 
    **`--drain`** (the owner's drain of 2026-10-13: "do not schedule new work items but continue all necessary work to
    get in-process work to main"; kb/Work PB3150) keeps only the finishers of STARTED work: every review-`FINDINGS`

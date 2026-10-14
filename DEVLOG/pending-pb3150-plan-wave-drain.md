@@ -11,8 +11,8 @@ them. The e99-4 finisher came only after A. license-product-name was not planned
 `plan_wave.py` now does three new things (kb/Work PB3150):
 
 - `branch_carrier` finds a branch that another DONE branch contains (`git merge-base --is-ancestor`). The finisher
-  of a carried SPLIT merges the carrier instead of cherry-picking, and a carried FINDINGS branch gets no finisher of
-  its own.
+  of a carried SPLIT merges the carrier instead of cherry-picking. A carried FINDINGS branch whose lead the fix lane
+  cannot see gets no finisher of its own.
 - `branch_lead_notes` reads a FINDINGS report's lead from its own branch when main lacks that note. Such a report now
   gets its finisher in every mode.
 - `--drain` plans only the finishers of started work. It plans no cluster and no absorption, and it never starts a
