@@ -1776,7 +1776,11 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    (subordinates named `AsImage`, `Equals`, `ToString`, `F` beside `F` and `F-2`, a record named `CloseFiles`, and a
    TYPE clone of a type with such members) compiles and runs; `CsNameReservationDriftTests` keeps the seeds total.
    The published scopes of slice 3 reuse the allocator with their own seeds.
-3. **The host entry and the one host surface.** `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
+3. **The host entry and the one host surface (kb/Work PB2099; in progress — its runtime boundary is in the tree:
+   `ProgramTable.CallProgram`/`Cancel` take `string? callerPath`, the null arm `ProgramTable.CallFromHost` is the
+   outermost boundary, `RunUnit.EndForHost` performs the §14.6.11 actions and replaces the host's ambient run unit, and
+   `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`).**
+   `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
    validity decode); `RecordStructEmitter`'s published mode; `HostEntryEmitter` over the CALL lane's renderer with
    `Call` and `Cancel`; `CallProgram`'s and `Cancel`'s nullable `callerPath` and its outermost-boundary arm with R48's
    run-unit-ended exception (the §14.6.11 actions, then the one documented type); `OutputKind` library for a group

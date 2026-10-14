@@ -1938,8 +1938,8 @@ CobolNet.Runtime.ProgramReturn.ProgramReturn() -> void
 CobolNet.Runtime.ProgramTable
 CobolNet.Runtime.ProgramTable.CallFunctionPointer(CobolNet.Runtime.FunctionPointer target, string! callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, bool siteArgMismatchChecking = false) -> void
 CobolNet.Runtime.ProgramTable.CallPointer(CobolNet.Runtime.ProgramPointer target, string! callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, bool siteArgMismatchChecking = false, string![]? programSpecifiers = null, bool siteSizeTruncationChecking = false) -> void
-CobolNet.Runtime.ProgramTable.CallProgram(string! name, string! callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, string! notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false, string![]? programSpecifiers = null, bool siteSizeTruncationChecking = false) -> void
-CobolNet.Runtime.ProgramTable.Cancel(string! name, string! callerPath) -> void
+CobolNet.Runtime.ProgramTable.CallProgram(string! name, string? callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, string! notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false, string![]? programSpecifiers = null, bool siteSizeTruncationChecking = false) -> void
+CobolNet.Runtime.ProgramTable.Cancel(string! name, string? callerPath) -> void
 CobolNet.Runtime.ProgramTable.EntryOf(string! name, out bool notFound) -> CobolNet.Runtime.ProgramPointer
 CobolNet.Runtime.ProgramTable.FunctionAddressOf(string! name, out bool notFound) -> CobolNet.Runtime.FunctionPointer
 CobolNet.Runtime.ProgramTable.FunctionSignatureMatches(CobolNet.Runtime.FunctionPointer p, int expectedFormals) -> bool
@@ -3606,8 +3606,8 @@ static CobolNet.Runtime.ProgramPointer.operator !=(CobolNet.Runtime.ProgramPoint
 static CobolNet.Runtime.ProgramPointer.operator ==(CobolNet.Runtime.ProgramPointer left, CobolNet.Runtime.ProgramPointer right) -> bool
 static CobolNet.Runtime.ProgramRegistry.CallFunctionPointer(CobolNet.Runtime.FunctionPointer target, string! callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, bool siteArgMismatchChecking = false) -> void
 static CobolNet.Runtime.ProgramRegistry.CallPointer(CobolNet.Runtime.ProgramPointer target, string! callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, bool siteArgMismatchChecking = false, string![]? programSpecifiers = null, bool siteSizeTruncationChecking = false) -> void
-static CobolNet.Runtime.ProgramRegistry.CallProgram(string! name, string! callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, string! notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false, string![]? programSpecifiers = null, bool siteSizeTruncationChecking = false) -> void
-static CobolNet.Runtime.ProgramRegistry.Cancel(string! name, string! callerPath) -> void
+static CobolNet.Runtime.ProgramRegistry.CallProgram(string! name, string? callerPath, CobolNet.Runtime.CobolArg[]! args, CobolNet.Runtime.CobolArg? returning, string! notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false, string![]? programSpecifiers = null, bool siteSizeTruncationChecking = false) -> void
+static CobolNet.Runtime.ProgramRegistry.Cancel(string! name, string? callerPath) -> void
 static CobolNet.Runtime.ProgramRegistry.EntryOf(string! name, out bool notFound) -> CobolNet.Runtime.ProgramPointer
 static CobolNet.Runtime.ProgramRegistry.EntryOfArgument(string! name, bool checkNotFound) -> CobolNet.Runtime.ProgramPointer
 static CobolNet.Runtime.ProgramRegistry.EntryOfOperand(string! name, bool checkNotFound) -> CobolNet.Runtime.ProgramPointer

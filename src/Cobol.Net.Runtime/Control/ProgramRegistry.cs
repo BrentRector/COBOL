@@ -141,14 +141,14 @@ public static class ProgramRegistry
         => RunUnit.Current.Programs.RunModule(ensureRegistered, mainPath);
 
     /// <inheritdoc cref="ProgramTable.CallProgram"/>
-    public static void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,
+    public static void CallProgram(string name, string? callerPath, CobolArg[] args, CobolArg? returning,
         string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false, string[]? programSpecifiers = null,
         bool siteSizeTruncationChecking = false)
         => RunUnit.Current.Programs.CallProgram(name, callerPath, args, returning, notFoundEc, siteArgMismatchChecking,
             programSpecifiers, siteSizeTruncationChecking);
 
     /// <inheritdoc cref="ProgramTable.Cancel"/>
-    public static void Cancel(string name, string callerPath) => RunUnit.Current.Programs.Cancel(name, callerPath);
+    public static void Cancel(string name, string? callerPath) => RunUnit.Current.Programs.Cancel(name, callerPath);
 
     /// <inheritdoc cref="ProgramTable.EntryOf"/>
     public static ProgramPointer EntryOf(string name, out bool notFound)

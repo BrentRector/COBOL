@@ -224,7 +224,26 @@ public sealed class RunUnit
         var ru = StartAfter(prior);
         _current.Value = ru;
         try { body(ru); }
-        finally { ru.Terminate(); _current.Value = prior; }
+        finally
+        {
+            ru.Terminate();
+            // A run unit the body's activations ENDED was replaced by a new ambient one (EndForHost), which ends here too.
+            if (_current.Value is { } replacement && !ReferenceEquals(replacement, ru)) replacement.Terminate();
+            _current.Value = prior;
+        }
+    }
+
+    /// <summary>End this run unit for the .NET host whose activation it was running when a STOP RUN or a run-unit fatal
+    /// reached the outermost boundary (<see cref="ProgramTable.CallProgram"/> with no caller; owner decision R48,
+    /// docs/CONFORMANCE.md DOC-A.1-167): the §14.6.11 actions (<see cref="Terminate"/>), then, when this run unit is the
+    /// ambient one, a NEW ambient run unit in its place, so the host's next activation begins a run unit that inherits
+    /// nothing (kb/Work PB1069: a new run unit is a new object) while the host process continues. The termination status
+    /// travels in the <see cref="RunUnitEndedException"/> the boundary throws, and the new run unit's own
+    /// <see cref="ExitStatus"/> starts at 0; neither touches the host process's exit code (kb/Work PB3163).</summary>
+    internal void EndForHost()
+    {
+        Terminate();
+        if (ReferenceEquals(_current.Value, this)) _current.Value = StartAfter(this);
     }
 
     /// <summary>Begin a NEW run unit and make it the ambient one — the emitted run-unit driver's first statement

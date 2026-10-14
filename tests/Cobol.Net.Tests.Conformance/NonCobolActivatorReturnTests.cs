@@ -63,11 +63,11 @@ public sealed class NonCobolActivatorReturnTests
                     asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
                 }
                 Console.WriteLine("HOST BEFORE");
-                ProgramRegistry.CallProgram("L1HSTGB", "", Array.Empty<CobolArg>(), null);
+                ProgramRegistry.CallProgram("L1HSTGB", null, Array.Empty<CobolArg>(), null);
                 Console.WriteLine("HOST RESUMED AFTER GOBACK");
-                ProgramRegistry.CallProgram("L1HSTEP", "", Array.Empty<CobolArg>(), null);
+                ProgramRegistry.CallProgram("L1HSTEP", null, Array.Empty<CobolArg>(), null);
                 Console.WriteLine("HOST RESUMED AFTER EXIT PROGRAM");
-                ProgramRegistry.CallProgram("L1HSTGB", "", Array.Empty<CobolArg>(), null);
+                ProgramRegistry.CallProgram("L1HSTGB", null, Array.Empty<CobolArg>(), null);
                 Console.WriteLine("HOST DONE");
                 return 0;
             }

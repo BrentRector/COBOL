@@ -129,13 +129,13 @@ public sealed class DefaultLocaleDeterminationTests
                 CultureInfo.CurrentCulture = new CultureInfo("es-ES");
                 BeginRunUnit();
                 Console.WriteLine("RUN UNIT 1, CULTURE es-ES");
-                ProgramRegistry.CallProgram("A118LOC", "", Array.Empty<CobolArg>(), null);
+                ProgramRegistry.CallProgram("A118LOC", null, Array.Empty<CobolArg>(), null);
                 CultureInfo.CurrentCulture = new CultureInfo("de-DE");
                 Console.WriteLine("RUN UNIT 1, HOST SWITCHED TO de-DE");
-                ProgramRegistry.CallProgram("A118LOC", "", Array.Empty<CobolArg>(), null);
+                ProgramRegistry.CallProgram("A118LOC", null, Array.Empty<CobolArg>(), null);
                 BeginRunUnit();
                 Console.WriteLine("RUN UNIT 2, CULTURE de-DE");
-                ProgramRegistry.CallProgram("A118LOC", "", Array.Empty<CobolArg>(), null);
+                ProgramRegistry.CallProgram("A118LOC", null, Array.Empty<CobolArg>(), null);
                 return 0;
             }
         }

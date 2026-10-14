@@ -11,6 +11,10 @@ CobolNet.Runtime.Collation.ResolvedLocaleCollation.Failure.init -> void
 CobolNet.Runtime.ConfigEntry.FamilyMember.get -> System.Func<string!, bool>?
 CobolNet.Runtime.ConfigEntry.FamilyMember.init -> void
 CobolNet.Runtime.ProgramTable.RunModule(System.Action! ensureRegistered, string? mainPath) -> void
+CobolNet.Runtime.RunUnitEndedException
+CobolNet.Runtime.RunUnitEndedException.Abnormal.get -> bool
+CobolNet.Runtime.RunUnitEndedException.ExitStatus.get -> long
+CobolNet.Runtime.RunUnitEndedException.RunUnitEndedException(long exitStatus, bool abnormal, string! message) -> void
 static CobolNet.Runtime.CobolIntrinsics.FractionPartU(System.UInt128 v, int scale) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerPartU(System.UInt128 v, int scale) -> System.UInt128
 static CobolNet.Runtime.CobolIntrinsics.SignOfU(System.UInt128 v) -> long

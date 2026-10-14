@@ -146,17 +146,17 @@ public sealed class NonCobolActivatorLinkageTests
                 var la = Text("ABCD");
                 var lg = Text("AB12");
                 var ret = Text("....");
-                ProgramRegistry.CallProgram("A116LNK", "", new[] { Ref(la), Ref(lg), Ref(Text("007")) },
+                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(la), Ref(lg), Ref(Text("007")) },
                     new CobolArg(CobolPassMode.Reference, ret, null, Length: 4));
                 Console.WriteLine("HOST LA=" + la.Value + " LG=" + lg.Value + " RETURNING=" + ret.Value);
                 Console.WriteLine("CALL, NULL CARRIER");
-                ProgramRegistry.CallProgram("A116LNK", "", new[] { Ref(Text("WXYZ")), Ref(Text("CD34")), Ref(ManagedPointer.Null) }, null);
+                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(Text("WXYZ")), Ref(Text("CD34")), Ref(ManagedPointer.Null) }, null);
                 Console.WriteLine("CALL, FEWER ARGUMENTS");
-                ProgramRegistry.CallProgram("A116LNK", "", new[] { Ref(Text("MNOP")), Ref(Text("EF56")) }, null);
+                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(Text("MNOP")), Ref(Text("EF56")) }, null);
                 Console.WriteLine("CALL, LN ONLY");
                 var ld = Text("EFGH");
                 var lgd = Text("IJ78");
-                ProgramRegistry.CallProgram("A116LNK", "", new[] { Ref(ld), Ref(lgd), Ref(Text("042")) }, null);
+                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(ld), Ref(lgd), Ref(Text("042")) }, null);
                 ld.Value = "QQQQ";
                 lgd.Value = "KL90";
                 Console.WriteLine("MAIN ENTRY, SAME INSTANCE");
