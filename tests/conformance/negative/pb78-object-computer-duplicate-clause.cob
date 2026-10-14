@@ -1,6 +1,6 @@
       *> reject-at: 2002 2014 2023
       *> ISO 12.3.6.2's format encloses the OBJECT-COMPUTER clauses in choice indicators within brackets - 5.2.6.4:
-      *> zero or more, EACH AT MOST ONCE, any order. A second PROGRAM COLLATING SEQUENCE clause is COBOLNET1652.
+      *> zero or more, EACH AT MOST ONCE, any order. A second PROGRAM COLLATING SEQUENCE clause is COBOLNET2423 (kb/Work PB3133: counted by the ClauseCardinalities row, formerly COBOLNET1652).
       *> kb/Work PB78.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB78DUP.

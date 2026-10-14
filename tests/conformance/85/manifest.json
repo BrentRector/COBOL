@@ -1,5 +1,7 @@
 {
  "enabled": [
+  "pb2532_identification_comment_paragraphs_85",
+  "pb3133_object_computer_clauses_in_sequence_85",
   "pb1935_parenthesized_numeric_comparand",
   "pb2734_parenthesized_condition_figurative_zero",
   "pb2697_set_index_trailing_p",

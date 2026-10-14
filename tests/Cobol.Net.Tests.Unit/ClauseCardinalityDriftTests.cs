@@ -26,8 +26,8 @@ using Core = CobolParserCore;
 /// </list></summary>
 public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
 {
-    /// <summary>The closed formats whose figure was read and does NOT print every element once: SPECIAL-NAMES,
-    /// I-O-CONTROL and OBJECT-COMPUTER repeat most of their elements; SOURCE-COMPUTER holds a single element. (The
+    /// <summary>The closed formats whose figure was read and does NOT print every element once: SPECIAL-NAMES
+    /// and I-O-CONTROL repeat most of their elements; SOURCE-COMPUTER holds a single element. (The
     /// configuration section and the identification division list paragraphs, each bracketed once, and are rows —
     /// kb/Work PB1508.)</summary>
     private static readonly IReadOnlySet<Type> ReviewedExemptions = new HashSet<Type>
@@ -35,7 +35,6 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
         typeof(Core.SpecialNameEntryContext),
         typeof(Core.IoControlClauseContext),
         typeof(Core.SourceComputerParagraphContext),
-        typeof(Core.ObjectComputerClauseContext),
     };
 
     private static IReadOnlyList<Type> AlternativesOf(Type listContext) =>
@@ -73,9 +72,12 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
         {
             var alternatives = AlternativesOf(list).ToHashSet();
             Assert.NotEmpty(alternatives);
-            var dead = row.Repeatable.Where(t => !alternatives.Contains(t)).Select(t => t.Name).ToList();
-            Assert.True(dead.Count == 0,
-                $"{list.Name}'s Repeatable set names {string.Join(", ", dead)}, which the grammar no longer offers there");
+            foreach (var figure in row.Figures())
+            {
+                var dead = figure.Repeatable.Where(t => !alternatives.Contains(t)).Select(t => t.Name).ToList();
+                Assert.True(dead.Count == 0, $"{list.Name}'s {figure.Format} Repeatable set names "
+                    + $"{string.Join(", ", dead)}, which the grammar no longer offers there");
+            }
         }
     }
 
@@ -87,19 +89,21 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
     [Fact]
     public void EveryFixedSequence_RanksExactlyTheOnceOnlyAlternatives()
     {
-        var ordered = ClauseCardinalities.ByClauseContext.Where(r => r.Value.Sequence is not null).ToList();
-        Assert.True(ordered.Count >= 3,
-            "the OPTIONS paragraph, CONFIGURATION SECTION and identification division rows must carry a Sequence");
+        var ordered = ClauseCardinalities.ByClauseContext
+            .SelectMany(r => r.Value.Figures().Select(figure => (List: r.Key, Row: figure)))
+            .Where(r => r.Row.Sequence is not null).ToList();
+        Assert.True(ordered.Count >= 4, "the OPTIONS paragraph, CONFIGURATION SECTION and identification division rows "
+            + "(and the identification division's COBOL-85 figure) must carry a Sequence");
         foreach (var (list, row) in ordered)
         {
             var onceOnly = AlternativesOf(list).Where(t => !row.Repeatable.Contains(t)).ToHashSet();
             var ranked = row.Sequence!.ToHashSet();
-            Assert.True(ranked.Count == row.Sequence!.Count, $"{list.Name}'s Sequence names an element twice");
+            Assert.True(ranked.Count == row.Sequence!.Count, $"{list.Name}'s {row.Format} Sequence names an element twice");
             var unranked = onceOnly.Except(ranked).Select(t => t.Name).ToList();
-            Assert.True(unranked.Count == 0, $"{list.Name}'s Sequence does not rank {string.Join(", ", unranked)}: read "
+            Assert.True(unranked.Count == 0, $"{list.Name}'s {row.Format} Sequence does not rank {string.Join(", ", unranked)}: read "
                 + "the printed figure (scripts/render-spec-page.py) and place it where the figure prints it");
             var dead = ranked.Except(onceOnly).Select(t => t.Name).ToList();
-            Assert.True(dead.Count == 0, $"{list.Name}'s Sequence ranks {string.Join(", ", dead)}, which is not a "
+            Assert.True(dead.Count == 0, $"{list.Name}'s {row.Format} Sequence ranks {string.Join(", ", dead)}, which is not a "
                 + "once-only alternative of the list");
         }
     }
@@ -119,6 +123,59 @@ public sealed class ClauseCardinalityDriftTests : CobolNetTestBase
                 typeof(Core.IntermediateRoundingClauseContext),
             ],
             row.Sequence!);
+    }
+
+    /// <summary>⛔ THE IDENTIFICATION DIVISION IS SCREENED AGAINST ITS EDITION'S FIGURE (kb/Work PB2532). Below 2002 the
+    /// COBOL-85 figure ranks the five comment-entry paragraphs in their printed sequence and leaves the OPTIONS
+    /// paragraph (a 2002 introduction) uncounted; from 2002 the ISO §11.2.1 figure ranks OPTIONS alone. Pinned through
+    /// <see cref="ClauseList.At"/>, the one method <c>ClosedFormatPass</c> asks, so the edition edge cannot drift.</summary>
+    [Fact]
+    public void TheIdentificationDivisionRow_ScreensTheCobol85FigureBelow2002()
+    {
+        Assert.True(ClauseCardinalities.ByClauseContext.TryGetValue(typeof(Core.IdentificationParagraphContext), out var row));
+        var cobol85 = row!.At(1985);
+        Assert.Equal("ANSI X3.23-1985", cobol85.Format);
+        Assert.Equal(
+            [
+                typeof(Core.AuthorParagraphContext), typeof(Core.InstallationParagraphContext),
+                typeof(Core.DateWrittenParagraphContext), typeof(Core.DateCompiledParagraphContext),
+                typeof(Core.SecurityParagraphContext),
+            ],
+            cobol85.Sequence!);
+        Assert.Contains(typeof(Core.OptionsParagraphContext), cobol85.Repeatable);
+        foreach (int year in new[] { 2002, 2014, 2023 })
+        {
+            var figure = row.At(year);
+            Assert.Same(row, figure);
+            Assert.Equal([typeof(Core.OptionsParagraphContext)], figure.Sequence!);
+        }
+    }
+
+    /// <summary>⛔ THE OBJECT-COMPUTER PARAGRAPH IS COUNTED BY THE TABLE, NOT BY THE BINDER (kb/Work PB3133). From 2002 its
+    /// two clauses sit in choice indicators (ISO §12.3.6.2; §5.2.6.4: each at most once, any order) — a free
+    /// sequence; below 2002 the COBOL-85 figure ranks MEMORY SIZE, PROGRAM COLLATING SEQUENCE and SEGMENT-LIMIT in that
+    /// sequence, each once. Pinned through <see cref="ClauseList.At"/>, the method <c>ClosedFormatPass</c> asks.</summary>
+    [Fact]
+    public void TheObjectComputerRow_ScreensTheCobol85FigureBelow2002()
+    {
+        Assert.True(ClauseCardinalities.ByClauseContext.TryGetValue(typeof(Core.ObjectComputerClauseContext), out var row));
+        var cobol85 = row!.At(1985);
+        Assert.Equal("ANSI X3.23-1985", cobol85.Format);
+        Assert.Equal(
+            [
+                typeof(Core.MemorySizeClauseContext), typeof(Core.ProgramCollatingSequenceClauseContext),
+                typeof(Core.SegmentLimitClauseContext),
+            ],
+            cobol85.Sequence!);
+        Assert.Contains(typeof(Core.CharacterClassificationClauseContext), cobol85.Repeatable);
+        foreach (int year in new[] { 2002, 2014, 2023 })
+        {
+            var figure = row.At(year);
+            Assert.Same(row, figure);
+            Assert.Null(figure.Sequence);   // choice indicators: any order
+            Assert.DoesNotContain(typeof(Core.ProgramCollatingSequenceClauseContext), figure.Repeatable);
+            Assert.DoesNotContain(typeof(Core.CharacterClassificationClauseContext), figure.Repeatable);
+        }
     }
 
     /// <summary>The report group description entry is the one row that is NOT a closed format with an error

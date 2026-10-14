@@ -29,17 +29,19 @@ internal static class UnrepeatedElements
     /// <param name="count">How many times the element was written.</param>
     /// <param name="where">The construct as the user wrote it ("RD 'R-1'").</param>
     /// <param name="element">The element as the figure names it ("the CONTROL clause").</param>
-    /// <param name="clause">The clause whose general format this is ("13.14.2").</param>
+    /// <param name="format">The general format as the message names it ("ISO §13.14.2"; "ANSI X3.23-1985" for a
+    /// COBOL-85 figure the 2023 text does not carry, kb/Work PB2532).</param>
     /// <param name="orderFree">Whether a rule of the format lets its elements be written in any order (§13.14.3 SR2);
     /// false where the figure's printed sequence binds (§5.2.1 — the OPTIONS paragraph, the CONFIGURATION SECTION),
     /// so the message never grants an order licence the format does not (kb/Work PB1508).</param>
-    public static void AtMostOnce(EditionContext edition, int count, string where, string element, string clause,
+    public static void AtMostOnce(EditionContext edition, int count, string where, string element, string format,
         bool orderFree = true)
     {
         if (count > 1)
             edition.Error(DiagnosticCatalog.FormatElementRepeated,
-                $"{where}: {element} is written {count} times; ISO §{clause}'s general format encloses it in its "
-                + "own bracket with no ellipsis, so it may be written at most once (§5.2.6.2, §5.2.7)"
+                $"{where}: {element} is written {count} times; {format}'s general format admits it at most once — a "
+                + "bracket with no ellipsis allows its element once (§5.2.6.2, §5.2.7) and a bracket of choice "
+                + "indicators allows each alternative once (§5.2.6.4)"
                 + (orderFree ? " — the elements may be written in any order, but each once"
                              : " — once, in the sequence the format prints (§5.2.1)"));
     }
