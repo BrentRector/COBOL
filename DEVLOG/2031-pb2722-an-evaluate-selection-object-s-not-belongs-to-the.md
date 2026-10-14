@@ -1,4 +1,4 @@
-## PB2722: an EVALUATE selection object's NOT belongs to the five alternatives that print it
+## Entry 2031 — 2026-10-14 14:09 PDT — PB2722: an EVALUATE selection object's NOT belongs to the five alternatives that print it
 
 Wave 1077 group F (PB2722, one root: the selection-object rule in `CobolControlFlow.g4` and its binder).
 
@@ -55,3 +55,4 @@ comments before locating a rule (PartialExpressionSpineDriftTests' own lesson) �
 the prefix and requires each shape to be present. Re-gate 20261014T194745Z-233bde:
 `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 5,857/11,669 · Unit 32,826/33,625 ·
 Characterization 6/36 in leg 1; leg 2 left to CI), all five pb2722 goldens Passed.
+
