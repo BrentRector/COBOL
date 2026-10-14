@@ -213,9 +213,10 @@ public sealed partial class DataBinder
         // compose is asked here too, through the same helper and in the same order: §13.18.60.3 SR4 (the CONSTANT
         // RECORD usages, `01 CR CONSTANT RECORD. 05 A TYPE IT.` with IT a USAGE INDEX type — asked FIRST, as above,
         // so the narrower rule names a CONSTANT RECORD pointer), then the EXTERNAL and BASED class rules, then
-        // §13.18.5.3 SR2 (`01 A TYPE VT BASED.`, a variable-length group), then SR14 arm B. SR15 is not here because
-        // its TYPE twin is a rule of its own (§13.18.57.3 SR8, COBOLNET2960), and arm A's subject is a group that WROTE
-        // its usage, which a TYPE entry never does. UsageDeclarationPlacementDriftTests
+        // §13.18.5.3 SR2 (`01 A TYPE VT BASED.`, a variable-length group), and last
+        // §13.18.60.3 SR14 arm B. §13.18.60.3 SR15 is not here because its TYPE twin is a rule of its own
+        // (§13.18.57.3 SR8, COBOLNET2960), and SR14 arm A's subject is a group that WROTE its usage, which a TYPE entry
+        // never does. UsageDeclarationPlacementDriftTests
         // .EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo pins that list and that order.
         foreach (var item in CompositionForest().Where(i => i.TypeName is not null))
         {
