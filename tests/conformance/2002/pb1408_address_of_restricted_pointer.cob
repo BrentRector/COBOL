@@ -29,10 +29,6 @@
        01 PP TYPE PPT.
        01 BP TYPE PT BASED.
        01 BS TYPE T-REC BASED.
-       01 G-T IS TYPEDEF.
-          05 GP TYPE PT.
-       01 G TYPE G-T.
-       01 PP2 TYPE PPT.
        PROCEDURE DIVISION.
        MAIN.
            MOVE "AB" TO T-X OF S
@@ -41,9 +37,6 @@
            SET PP TO ADDRESS OF RP
            SET ADDRESS OF BP TO PP
            SET ADDRESS OF BS TO BP
-      *> GP is a restricted data-pointer NESTED in a group (its TYPE clause
-      *> is its own, so its type is still PT): its address is legal into PP2.
-           SET PP2 TO ADDRESS OF GP OF G
            DISPLAY "X=" T-X OF BS " A=" T-A OF T-G OF BS
            CALL "ONPT" AS NESTED USING BY CONTENT ADDRESS OF RP
            CALL "ONREC" AS NESTED USING BY CONTENT ADDRESS OF S

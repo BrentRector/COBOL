@@ -55,7 +55,7 @@ THE TICK, in order:
        exit 2 (main moved under every catch-up, or the branch could not be read), exit 9 (GitHub refused the push, the
                 PR or the queue), or a runner that DIED           retried ONCE at this head (enqueue.md's own rule)
        exit 8 — QUEUE NOT ACTIVE                                   HALT (above); relaunched once the halt is cleared
-       anything else — CONFLICT 4, GATE RED 5, a DEVLOG refusal 6, a stale oracle baseline 7, UNREVIEWED 11, an exit
+       anything else — CONFLICT 4, GATE RED 5, a DEVLOG refusal 6, UNREVIEWED 11, an exit
                 2 or 9 retried once already                       STOPPED: never relaunched at this head unless
                                                                    re-armed; the enqueue unit dispatches its finisher
                                                                    or reviewer, and re-arms a stop resolved with no
@@ -305,12 +305,17 @@ def landing_check_free(worktree: str) -> tuple[bool, str]:
 def spawn(argv: list[str], log: pathlib.Path) -> int:
     """Start `argv` DETACHED, its output appended to `log`; its pid. On Windows it leaves the supervisor's console and,
     where the job allows it, the supervisor's job, so a supervisor that ends does not end a landing mid-gate; a job that
-    refuses breakaway keeps it (the landing is idempotent: the next tick reaps it DIED and retries it once)."""
+    refuses breakaway keeps it (the landing is idempotent: the next tick reaps it DIED and retries it once).
+
+    It leaves the console through CREATE_NO_WINDOW (a new console with no window, which every descendant inherits), never
+    DETACHED_PROCESS (no console at all): under DETACHED_PROCESS each console program the landing starts (enqueue.py,
+    git, pwsh, dotnet) gets a console of its own, and with Windows Terminal as the default terminal each one opens a
+    window that takes the desktop's focus (kb/Work PB3117)."""
     log.parent.mkdir(parents=True, exist_ok=True)
     with log.open("ab") as out:
         kw: dict[str, Any] = {"stdin": subprocess.DEVNULL, "stdout": out, "stderr": subprocess.STDOUT, "close_fds": True}
         if os.name == "nt":
-            base = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+            base = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP
             try:
                 return subprocess.Popen(argv, creationflags=base | subprocess.CREATE_BREAKAWAY_FROM_JOB, **kw).pid
             except OSError:
@@ -946,6 +951,22 @@ def self_test() -> int:
         rearm(c12b, "w11a", "reviewed CLEAN at y1", say=said.append, tip_for=lambda wt: "y1")
         expect("an UNREVIEWED exit 11 waits, then a reviewer's CLEAN stamp plus rearm lands it at the same head",
                stopped_first and f12b.tick(c12b) == ["w11a"], f"{f12b.started} {f12b.said}")
+
+        # 13. a launch opens no window (kb/Work PB3117): the runner OWNS a console with no visible window, so every
+        #     console program it starts (enqueue.py, git, pwsh, dotnet) shares it. Under DETACHED_PROCESS the runner has
+        #     no console (code page 0), and each program it starts gets a console of its own, a window that takes focus.
+        if os.name == "nt":
+            log13 = root / "console-probe.log"
+            spawn([sys.executable, "-c", "import ctypes; k = ctypes.windll.kernel32; u = ctypes.windll.user32; "
+                   "h = k.GetConsoleWindow(); print('console-cp', k.GetConsoleCP(), 'visible', "
+                   "1 if (h and u.IsWindowVisible(h)) else 0, flush=True)"], log13)
+            deadline = time.monotonic() + 120
+            while time.monotonic() < deadline and "console-cp" not in (
+                    log13.read_text(encoding="utf-8", errors="replace") if log13.exists() else ""):
+                time.sleep(0.2)
+            words = (log13.read_text(encoding="utf-8", errors="replace") if log13.exists() else "").split()
+            expect("a spawned runner owns a console with no visible window, so nothing it starts opens a window",
+                   words[:4:2] == ["console-cp", "visible"] and words[1] != "0" and words[3] == "0", " ".join(words))
     finally:
         for dirpath, _, files in os.walk(root):  # git writes read-only objects, which rmtree cannot delete on Windows
             for name in files:

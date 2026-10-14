@@ -23,8 +23,8 @@ internal static class VersionMatrixCatalogue
         string Source, string Status, string? ExpectDiagnostic, int? ObsoleteIn, string? ExpectDiagnosticBelow,
         IReadOnlyDictionary<string, string>? Copybooks = null);
 
-    /// <summary>The catalogue file: the one spelling of the path, which the architecture oracle also records as an
-    /// input (<see cref="ArchOracle.RowSource"/>). Declared before <see cref="All"/>, whose initializer reads it.</summary>
+    /// <summary>The catalogue file: the one spelling of the path. Declared before <see cref="All"/>, whose initializer
+    /// reads it.</summary>
     internal static string CataloguePath { get; } = TestRepo.VersionMatrix("constructs.json");
 
     internal static IReadOnlyList<Construct> All { get; } = LoadCatalogue();

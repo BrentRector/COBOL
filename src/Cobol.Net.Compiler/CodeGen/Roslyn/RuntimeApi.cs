@@ -2065,11 +2065,18 @@ internal static class RuntimeApi
     /// <summary>The storage area of a cell-backed argument (kb/Work PB2087): a data pointer at <paramref name="offset"/>
     /// characters into <paramref name="cell"/> — the <c>CobolArg.Area</c> an area formal is laid over. A variable-length
     /// group's area also states the component ordinal it begins at and its §8.5.1.12 atoms (<paramref name="dynBase"/>,
-    /// <paramref name="shape"/>; kb/Work PB2094), so a formal of the same storage numbers its components from there.</summary>
-    public static string ArgArea(string cell, string offset, string? dynBase = null, string? shape = null) =>
-        dynBase is null
-            ? $"new {nameof(CellPointer)}({cell}, {offset})"
-            : $"new {nameof(CellPointer)}({cell}, {offset}) {{ {nameof(CellPointer.DynBase)} = (int)({dynBase}), {nameof(CellPointer.Shape)} = {shape} }}";
+    /// <paramref name="shape"/>; kb/Work PB2094), so a formal of the same storage numbers its components from there. A
+    /// reference-modified slice whose length is a run-time value states that evaluated length as <paramref name="extent"/>
+    /// (<c>CellPointer.Extent</c>; kb/Work PB2077), so a formal is laid over it only when it fits within the slice.</summary>
+    public static string ArgArea(string cell, string offset, string? dynBase = null, string? shape = null, string? extent = null) =>
+        (dynBase, extent) switch
+        {
+            (null, null) => $"new {nameof(CellPointer)}({cell}, {offset})",
+            (null, { } e) => $"new {nameof(CellPointer)}({cell}, {offset}) {{ {nameof(CellPointer.Extent)} = {e} }}",
+            ({ } d, null) => $"new {nameof(CellPointer)}({cell}, {offset}) {{ {nameof(CellPointer.DynBase)} = (int)({d}), {nameof(CellPointer.Shape)} = {shape} }}",
+            // A variable-length group cannot be reference-modified (§8.4.3.3.3 SR1), so no area states both.
+            _ => throw new InvalidOperationException("an area states a component base or a slice extent, never both"),
+        };
 
     /// <summary>The BY CONTENT record of a group whose values ride managed slots (§14.2.3 GR9; kb/Work PB1940) —
     /// <c>CobolArgAdapt.ContentRecord</c>: a detached copy of <paramref name="width"/> positions of <paramref name="area"/>.</summary>

@@ -1,6 +1,8 @@
 {
   "_comment": "The 2002 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2002 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
   "enabled": [
+  "pb3129_type_in_constant_record_ok",
+  "pb3129_type_pointer_placement_ok",
   "pb2721_context_word_user_word_slots",
   "pb2919_hex_literal_ff_is_the_storage_byte",
   "pb2991_data_item_names_edition_spelled",
@@ -33,6 +35,9 @@
   "pb2463_universal_returning_set_match",
   "pb2463_call_object_reference_set_conformance",
   "pb2464_prototype_pointer_signature_type",
+  "pb2495_recursive_prototype_signature",
+  "pb2495_pointer_type_in_signature_checks",
+  "pb3121_containing_definition_scope",
   "pb1670_replacing_partial_word_copy_replace",
   "pb1042_redefines_national_table_initialize",
   "pb643_report_file_connector_properties",
@@ -204,6 +209,8 @@
   "pb480_universal_any_length_omitted",
   "pb480_universal_restricted_pointer_type",
   "pb480_universal_refmod_evaluated_length",
+  "pb2077_refmod_argument_both_lanes",
+  "pb2077_refmod_runtime_length_shares_storage",
   "pb1112_active_class_universal",
   "pb460_set_program_pointer_effect",
   "pb548_set_restricted_pointer_plain",
@@ -835,7 +842,8 @@
   "pb2548_template_counter_unused_elsewhere",
   "pb2967_float_result_wide_binary_receiver_size_error",
   "pb2498_length_odo_bit_national_group",
-  "pb2589_repository_function_keyword_omitted"
+  "pb2589_repository_function_keyword_omitted",
+  "pb2937_skeleton_bodies_bind_as_themselves"
   ],
   "pending": []
 }

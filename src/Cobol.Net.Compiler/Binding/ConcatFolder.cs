@@ -166,7 +166,7 @@ internal static class ConcatFolder
 
     /// <summary>Whether a concatenation operand is a zero-length literal — asked STRUCTURALLY (contiguous delimiters,
     /// <see cref="CobolLiteral.IsZeroLength"/>), never as "decodes to nothing": a malformed hexadecimal literal decodes
-    /// to nothing too, and is LiteralScreenPass's COBOLNET1635, not SR2. A constant-name is its literal (§13.10.4
+    /// to nothing too, and is LiteralScreen's COBOLNET1635, not SR2. A constant-name is its literal (§13.10.4
     /// GR1); a figurative constant is one character (§8.3.3.6.4 GR3a).</summary>
     private static bool IsZeroLengthOperand(Core.ConcatOperandContext op, LiteralEnvironment env) =>
         op.cobolWord()?.GetText() is { } word ? env.Constant(word) is { } k && CobolLiteral.IsZeroLength(k.RawText)

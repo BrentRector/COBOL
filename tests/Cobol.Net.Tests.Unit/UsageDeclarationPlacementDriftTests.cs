@@ -1,8 +1,10 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Reflection;
+using System.Text.RegularExpressions;
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
+using CobolNet.Tests.Shared;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -193,5 +195,48 @@ public sealed class UsageDeclarationPlacementDriftTests
     {
         var m = M("Sr14PermittedLevel");
         Assert.Equal(permitted, (bool)m.Invoke(null, [level])!);
+    }
+
+    /// <summary>The first-loop arms of <c>DataBinder.CheckUsageDeclarations</c> that the TYPE-entry loop does NOT
+    /// ask, each with the reason it needs no TYPE twin there. Keyed by the arm's diagnostic, because those arms
+    /// report inline rather than through a <c>Screen…</c> helper.</summary>
+    private static readonly Dictionary<string, string> WrittenOnlyArms = new()
+    {
+        // §13.18.60.3 SR15's TYPE twin is a rule of its own, §13.18.57.3 SR8 (COBOLNET2960, DataBinder.cs).
+        ["UsageObjectReferenceFileSection"] = "§13.18.57.3 SR8 is the TYPE twin",
+        // SR14 arm A judges a GROUP that WROTE one of the phrases; a TYPE entry writes no USAGE clause.
+        ["UsageDeclarationPlacement"] = "SR14 arm A: a group's own written USAGE",
+    };
+
+    /// <summary>⛔ EVERY WRITTEN-ENTRY SCREEN IS ASKED OF THE TYPE ENTRY TOO, IN THE SAME ORDER (kb/Work PB3129 and
+    /// its review finding R1-1). <c>ConformanceForest</c> prunes every entry that carries a TYPE clause together with
+    /// its clones, so a rule the first loop asks of an entry's COMPOSED shape (§13.18.57.4 GR1: "as though the data
+    /// description identified by type-name-1 had been coded in place of the TYPE clause") is blind to the TYPE
+    /// spelling unless the composed-entry loop asks it too. That blind spot was closed one rule at a time (PB1212:
+    /// EXTERNAL and BASED; PB3129: SR14) and the review found SR4 and §13.18.5.3 SR2 still open: so the list is
+    /// read from the source here, and a new first-loop screen fails this test until the second loop asks it or
+    /// <see cref="WrittenOnlyArms"/> records why it need not.</summary>
+    [Fact]
+    public void EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo()
+    {
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.UsageDeclaration.cs"))
+            .ReplaceLineEndings("\n");
+        int start = text.IndexOf("internal void CheckUsageDeclarations()", StringComparison.Ordinal);
+        Assert.True(start >= 0, "DataBinder.CheckUsageDeclarations is gone: re-derive this test from its successor");
+        int end = text.IndexOf("\n    }\n", start, StringComparison.Ordinal);
+        string body = text[start..end];
+        int split = body.IndexOf("foreach (var item in CompositionForest()", StringComparison.Ordinal);
+        Assert.True(split > 0, "the composed-entry (TYPE) loop of CheckUsageDeclarations is gone");
+        string written = body[..split], composed = body[split..];
+
+        static List<string> Screens(string loop) => Regex
+            .Matches(loop, @"\b(Screen\w+)\(item\b").Select(m => m.Groups[1].Value).ToList();
+        var writtenScreens = Screens(written);
+        Assert.NotEmpty(writtenScreens);
+        Assert.Equal(writtenScreens, Screens(composed));
+
+        var inlineArms = Regex
+            .Matches(written, @"Edition\.Error\(DiagnosticCatalog\.(\w+)").Select(m => m.Groups[1].Value).ToHashSet();
+        Assert.Equal(WrittenOnlyArms.Keys.ToHashSet(), inlineArms);
     }
 }

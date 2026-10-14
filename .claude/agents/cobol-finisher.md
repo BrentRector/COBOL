@@ -1,6 +1,6 @@
 ---
 name: cobol-finisher
-description: WiseOwl COBOL finisher — takes ONE finished branch that did not land (enqueue.py stopped on a conflict, a red gate, a DEVLOG or oracle refusal, or the merge queue bounced its pull request), fixes it at the root in its worktree, gates it, and returns DONE; its commits are reviewed on the branch before enqueue.py land takes it (MANDATORY-PRACTICES I10). One branch per transcript.
+description: WiseOwl COBOL finisher — takes ONE finished branch that did not land (enqueue.py stopped on a conflict, a red gate, a DEVLOG refusal, or the merge queue bounced its pull request), fixes it at the root in its worktree, gates it, and returns DONE; its commits are reviewed on the branch before enqueue.py land takes it (MANDATORY-PRACTICES I10). One branch per transcript.
 model: opus
 effort: high
 maxTurns: 160

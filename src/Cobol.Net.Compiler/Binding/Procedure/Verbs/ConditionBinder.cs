@@ -259,7 +259,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// <c>RefModLen</c> substituted for an unknown slice (kb/Work PB589: `IF B(1:N)` over a PIC 1(8) item was
     /// rejected by SR1 as an 8-position operand). OperandPic — a bit group's as-if 1(m) (kb/Work PB157).</summary>
     private static int? StaticBoolRefLength(BoundBoolRef r) =>
-        r.Place is RefModPlace rm ? rm.StaticLength(rm.Inner.Item.OperandPic?.Length) : r.Place.Item.OperandPic?.Length;
+        r.Place is RefModPlace rm ? rm.StaticLength(rm.StaticInnerPositions) : r.Place.Item.OperandPic?.Length;
 
     private static string FlipBits(string bits)
     {

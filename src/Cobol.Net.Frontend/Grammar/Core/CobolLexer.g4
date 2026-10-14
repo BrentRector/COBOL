@@ -1069,7 +1069,7 @@ fragment STR_BODY  : '"' (~["\n] | '""')* '"' | '\'' (~['\n] | '\'\'')* '\'' ;  
 // data item named X, `DISPLAY X"GG"` compiled and printed the item followed by GG, and `MAX(NX"00G1")` answered
 // the item's value. The repertoire rules — §8.3.3.2.3 SR5 and §8.3.3.5.3 SR4 (hexadecimal digits), §8.3.3.4.3
 // SR3 (a hexadecimal digit) and SR2 (a boolean character, '0' or '1') — are now asked of the whole token by
-// LiteralScreenPass (CobolLiteral.RepertoireViolation → COBOLNET2630), beside the §8.3.3 grouping and length
+// LiteralScreen (CobolLiteral.RepertoireViolation → COBOLNET2630), beside the §8.3.3 grouping and length
 // rules it already asked: the token must MATCH so something is left to diagnose (the R03 doctrine this block
 // began with). Every prefixed body is therefore STR_BODY, doubled delimiters included, so no content can split one.
 // ⚠ ZERO LENGTH IS LEGAL IN EVERY FORMAT, and STR_BODY admits it: §8.3.3.5.3 NOTE 2 "Hexadecimal-national literals
@@ -1078,8 +1078,8 @@ fragment STR_BODY  : '"' (~["\n] | '""')* '"' | '\'' (~['\n] | '\'\'')* '\'' ;  
 // Hexadecimal-alphanumeric X"…" / X'…' (§8.3.3.2.2 Format 2 — the printed page shows BOTH delimiters with
 // the hex sequence OPTIONAL, verified at 300 dpi 2026-08-09): one body, both delimiters, zero length legal —
 // the Group-B discipline.
-// LiteralScreenPass asks the §8.3.3 length and grouping rules of every literal TOKEN of the unit's one tree (kb/Work
-// PB1393), and a keyword-omitted intrinsic's argument list is part of that tree like any other operand: its literals
+// LiteralScreen asks the §8.3.3 length and grouping rules of every literal TOKEN of the unit's one tree and of each
+// compiler-directive fragment (kb/Work PB1393, PB1616), and a keyword-omitted intrinsic's argument list is part of that tree like any other operand: its literals
 // are the ordinary DEFAULT-mode tokens (kb/Work PB2113), so `LENGTH(X"414")` is screened as the HEXLIT it is.
 // LiteralScreenDriftTests requires every token defined over one of these literal body fragments to be in the screen's
 // token set.
@@ -1183,7 +1183,7 @@ NATLIT      : NAT_BODY ;
 // rendered and verified — PB59). The quotation arm's `+` was fixed by R03's sweep; the APOSTROPHE arm kept
 // its `+` until PB59, so X'' split into IDENTIFIER + a zero-length Format-1 literal — the same silent-split
 // hole, one delimiter over. The GROUPING rule (§8.3.3.2.3 r6, pairs of digits) and the REPERTOIRE rule (SR5,
-// hexadecimal digits) are asked by LiteralScreenPass, not here: a lexer that refused an odd count or a non-hex
+// hexadecimal digits) are asked by LiteralScreen, not here: a lexer that refused an odd count or a non-hex
 // digit would put the literal back in the silent-split hole this whole item exists to close (see HEX_BODY).
 HEXLIT      : HEX_BODY ;
 // Boolean literal B"0101" / B'0101' (ISO §8.3.3.4, COBOL-2002). The leading B is part of the token so

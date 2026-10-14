@@ -1,4 +1,6 @@
 #nullable enable
+CobolNet.Runtime.CellPointer.Extent.get -> int?
+CobolNet.Runtime.CellPointer.Extent.init -> void
 CobolNet.Runtime.Collation.LocaleCollationException
 CobolNet.Runtime.Collation.LocaleCollationException.DataSource.get -> string!
 CobolNet.Runtime.Collation.LocaleCollationException.Line.get -> int?
@@ -71,3 +73,8 @@ static CobolNet.Runtime.CobolFloat.ToScaledIntermediate(double v, int scale, Cob
 static CobolNet.Runtime.ExternalizedNames.FormInEdition(string? value, int dialectLevel) -> string!
 static CobolNet.Runtime.CobolNames.HasEditionSpelling(int dialectLevel) -> bool
 static CobolNet.Runtime.CobolDec.SubsidiaryQuotient(CobolNet.Runtime.CobolDec quotient, int scale, int digits) -> CobolNet.Runtime.CobolDec
+CobolNet.Runtime.ActivationDescription.AnyLengthClauses.get -> string?
+CobolNet.Runtime.ActivationDescription.AnyLengthClauses.init -> void
+CobolNet.Runtime.ActivationDescription.ClausePhrases.get -> string![]?
+CobolNet.Runtime.ActivationDescription.ClausePhrases.init -> void
+static CobolNet.Runtime.ActivationRelations.MatchViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> string?
