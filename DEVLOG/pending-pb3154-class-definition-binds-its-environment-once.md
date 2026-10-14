@@ -63,3 +63,15 @@ name-index list so the next name index is asked too. Goldens `2014/pb3154_capaci
 pre-fix build. Left as a lead, a different mechanism (pre-existing): a method's named CAPACITY register is visible to its
 sibling methods (`ReferenceResolver.CapacityRegisterFor` reads the class binder's one register index with no method
 filter), and a sibling's `DISPLAY` of it fails C# compilation (CS0103).
+
+**Review round 3 (R3-1, fixed).** Round 2's sum-counter ask, `_sumCounters.ContainsKey(name)`, had no tier, but the
+index also holds every inherited GLOBAL report's counters. With `RD R-1 IS GLOBAL` and its counter `S1` in the
+outermost program and `01 S1 CONSTANT IS GLOBAL AS "KKK"` in the middle one, the innermost program's `MOVE S1` printed
+`INNER [005]` where main printed `INNER [KKK]` (§8.4.6.2.1 3) b) 2.: the middle program is the nearest declaring
+element). The predicate now places each counter by its report's depth. Sweeping the other arm found the same fault at
+reference time, pre-existing on main: `ReferenceResolver.SumCounterFamilyFor` resolves a counter before ordinary
+lookup, so the outer counter also beat the middle program's GLOBAL data item `S2` (`INNER 005` for `INNER MMM`). It now
+yields to a name declared nearer than the counter's report. Golden `2002/pb3154_global_sum_counter_tier`
+(`MID KKK MMM 005 / INNER KKK MMM 005 / INNER Q 005`) printed `INNER 005 005 005` on the pre-fix build; probes of a
+nearer counter against a farther data item (the counter wins) and of a nearer GLOBAL index-name against a farther
+counter (the index wins) agree with the rule.

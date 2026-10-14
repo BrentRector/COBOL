@@ -119,11 +119,16 @@ public sealed class GlobalNameClassDriftTests
         Assert.Equal(Inherited.Keys.Order(StringComparer.Ordinal), AskedByShadowing.Keys.Order(StringComparer.Ordinal));
         string text = File.ReadAllText(Path.Combine(TestRepo.Root, "src", "Cobol.Net.Compiler", "Binding",
             "DataBinder.Constants.cs"));
-        var m = Regex.Match(text, @"private bool DeclaredNearerThan\(string name, int depth\)\s*\{(?<body>.*?)\n    \}",
+        var m = Regex.Match(text, @"internal bool DeclaredNearerThan\(string name, int depth\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
         Assert.True(m.Success, "DeclaredNearerThan not found in DataBinder.Constants.cs");
         foreach (var (index, ask) in AskedByShadowing)
             Assert.True(m.Groups["body"].Value.Contains(ask, StringComparison.Ordinal),
                 $"DeclaredNearerThan no longer asks the name index '{index}' (expected '{ask}').");
+        // The REPORT SECTION sum counters are a name index too, kept off ByName, and they hold a container's GLOBAL
+        // report's counters beside this element's own: asked by spelling alone, a FARTHER container's counter hid a
+        // NEARER container's constant (kb/Work PB3154 review R3-1). The ask places each counter by its report.
+        Assert.True(m.Groups["body"].Value.Contains("ReportDepth(c.Report) < depth", StringComparison.Ordinal),
+            "DeclaredNearerThan no longer places a sum counter by its report's depth (ReportDepth).");
     }
 }
