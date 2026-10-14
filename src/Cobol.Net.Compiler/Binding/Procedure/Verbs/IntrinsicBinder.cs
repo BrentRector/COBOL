@@ -874,8 +874,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
 
         // §15.18.4 r3 — CONCAT returns an ALPHABETIC value when argument-1 is usage display and argument-1 and
         // all argument-2 are of class alphabetic (PB59 family 7 / RV-15.18.4-3). Class alphabetic is a PIC A
-        // DATA ITEM — §8.3.3 (to which §8.5.2.1 delegates a literal's class) gives no literal that class, a ref-mod view is class alphanumeric (§8.4.3.3.4
-        // GR2/GR6), and a nested CONCAT contributes through its own rider — and every PIC A item is usage
+        // DATA ITEM — §8.3.3 (to which §8.5.2.1 delegates a literal's class) gives no literal that class, a ref-mod view of a PIC A item stays alphabetic
+        // (§8.4.3.3.4 GR6's exhaustive exception list, kb/Work PB73), and a nested CONCAT contributes through its own rider — and every PIC A item is usage
         // display, so all-alphabetic subsumes r3's usage-display precondition. Fail-soft: any shape not
         // provably alphabetic keeps r3's "otherwise" arm (alphanumeric).
         bool alphabetic = resolved.Name == "CONCAT" && args.Count > 0 && args.All(IsAlphabeticArg);
@@ -885,12 +885,12 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     }
 
     /// <summary>Is this argument provably CLASS ALPHABETIC (§8.5.2.1 Table 2 — category alphabetic, the PIC A
-    /// shape)? A ref-mod view never is (§8.4.3.3.4 GR2/GR6 make every view plain alphanumeric); a nested
-    /// CONCAT is exactly when its own §15.18.4 r3 rider says so.</summary>
+    /// shape)? A field is exactly when its Table-16 position says so, a ref-mod view of a PIC A item included
+    /// (§8.4.3.3.4 GR6's exception list is exhaustive and does not rewrite alphabetic — kb/Work PB73 reversed
+    /// PB72's erasure); a nested CONCAT is exactly when its own §15.18.4 r3 rider says so.</summary>
     private static bool IsAlphabeticArg(BoundOperand op) => op switch
     {
-        BoundFieldOperand { Place: RefModPlace } => false,
-        BoundFieldOperand f => f.Place.Item.Pic is { IsAlphabetic: true },
+        BoundFieldOperand f => Table16Operand.Of(f.Place).IsAlphabetic,
         BoundComputedOperand { Expr: BoundIntrinsicCall { ResultIsAlphabetic: true } } => true,
         _ => false,
     };

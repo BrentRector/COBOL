@@ -1465,6 +1465,13 @@
   "pb155-divide-into-alpha",
   "pb155-set-to-edited",
   "pb155-unstring-edited-sender",
+  "pb2586-unstring-alphabetic-sender",
+  "pb2586-unstring-alphabetic-delimiter",
+  "pb2586-unstring-alphabetic-delimiter-in",
+  "pb2586-unstring-alphabetic-slice-sender",
+  "pb2586-unstring-alphabetic-function-sender",
+  "pb2586-unstring-alphabetic-function-slice-sender",
+  "pb2586-move-concat-alphabetic-slices-to-boolean",
   "pb155-unstring-numeric-delimiter",
   "pb157-compute-all-literal",
   "pb157-compute-bool-arith-rhs",
@@ -1871,6 +1878,7 @@
   "pb480-universal-variable-length-below-2014",
   "pb480-universal-variable-length-shapes-below-2014",
   "pb480-typed-restricted-pointer-type",
+  "pb3128-refmod-dynamic-limit-below-group-formal",
   "pb2077-refmod-into-elementary-by-reference",
   "pb2077-refmod-shorter-than-group-formal",
   "pb2077-elementary-into-group-formal",
@@ -2645,7 +2653,12 @@
   "pb2623-method-reserved-at-2002-2014",
   "pb1616-define-hex-odd",
   "pb1616-omitted-branch-hex-odd",
-  "pb1616-define-zero-length-below-2014"
+  "pb1616-define-zero-length-below-2014",
+  "pb2017-binary-operator-no-spaces",
+  "pb2017-binary-operator-no-space-after",
+  "pb2017-unary-operator-no-space-after",
+  "pb2017-operator-in-subscript",
+  "pb2017-operator-touches-comma-decimal-point"
  ],
  "pending": []
 }

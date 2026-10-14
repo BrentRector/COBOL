@@ -1481,8 +1481,9 @@ the separator space, so no grammar rule can see whether a separator was written 
 over EVERY token of the unit (all channels), and judges each from the source characters beside it: rule 2 — a
 COMMA / SUB_COMMA / SUB_SEMICOLON, or a lone ';' (the `SEMICOLON` token rides the HIDDEN channel so this rule sees it
 and the parser does not), not immediately followed by a space → COBOLNET2631, except a numeric literal's
-DECIMAL-POINT IS COMMA decimal point (a digit after, a digit / sign / '(' / space before), which the numeric-literal
-rules own; rule 3 — a DOT not followed by a space → COBOLNET2632 (a period inside a numeric literal or PICTURE
+DECIMAL-POINT IS COMMA decimal point (a digit after, a digit / sign / operator character / '(' / space before — a comma
+that begins a literal right after `*`, `/`, `=`, `<` or `>` is the decimal point, and the operator's spacing is the rule
+broken, kb/Work PB2017), which the numeric-literal rules own; rule 3 — a DOT not followed by a space → COBOLNET2632 (a period inside a numeric literal or PICTURE
 string is part of that token); rule 5 — every literal token of either mode (`LiteralTokens.Types`, the one set
 `LiteralScreen` also reads) whose opening delimiter is not preceded by a space, '(' or '==' or whose closing
 delimiter is not followed by a space, ',', ';', '.', ')' or '==' → COBOLNET2633, touching literals reported once.
@@ -1490,7 +1491,17 @@ The operator clauses that state their own separator context are decided at the s
 concatenation operator '&' and §8.7.4's invocation operator '::' "shall be immediately preceded and followed by a
 separator space" → COBOLNET2993, naming the side that touches; when that neighbour is a literal the operator owns the
 boundary and the literal's COBOLNET2633 stands down, so one missing space is one report. §8.7.1's arithmetic operators
-(with the unary-operator exception) are the next case here (kb/Work PB2017). "Separator space" is the lexer's own `WS` set plus the start and end of the text. The parse-recovery hints that
+("preceded by a space and followed by a space", except that a UNARY operator needs no space against a left parenthesis)
+are the same COBOLNET2993 but cannot be decided from the token run (kb/Work PB2017): whether a `+` or `-` is binary,
+unary or no operator (a numeric literal's own sign, `LINE PLUS`'s `+`) is a question of grammar, so
+`SeparatorRule.ArithmeticOperatorViolations` reads the PARSE TREE — `addOp` under `additiveExpression`, `mulOp` under
+`multiplicativeExpression` and `POWER` under `powerExpression` are binary, `addOp` under `unaryExpression` is unary unless
+`ArithmeticFormationRules.SignIsPartOfLiteral` makes the sign the literal's — and judges the characters beside each
+through the one `OperatorSpacingMessage` verdict (a comma or semicolon followed by a space counts as the space, §8.3.5
+2)). It runs once per tree in `Frontend.LexAndParse` after the parse, and once per directive fragment in the
+conditional-compilation stage's three fragment funnels (`DirectiveDiag.ScreenFragment`, beside `LiteralScreen`), so
+every arithmetic expression — a statement's, a subscript's, a reference modifier's, a function argument's, a
+`>>DEFINE` operand's — is held to it with no consumer to forget. "Separator space" is the lexer's own `WS` set plus the start and end of the text. The parse-recovery hints that
 guessed at rule 5 on a parse error (COBOL0301/0302) are gone: the rule has one home. It applies to the main
 compilation-group lex; the D2 keyword-omitted re-parse needs no second screen because every one of its tokens was
 already a SUBSCRIPT-mode token of the main lex.

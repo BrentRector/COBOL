@@ -141,30 +141,29 @@ public static class ActivationDescriptions
     /// (<see cref="RefModPlace.StaticLength"/>), otherwise the slice's MAXIMUM extent — identifier-1's positions from a
     /// static leftmost position on, or all of them — the measure §14.8.2.2 gives the other argument whose length moves
     /// at run time, "the maximum length is used" for an occurs-depending group (docs/CONFORMANCE.md D-RM1 a); kb/Work
-    /// PB2077). identifier-1's positions are the ONE reader's (<see cref="RefModPlace.StaticInnerPositions"/>), so a
-    /// slice of an alphanumeric group, whose length is static, is measured too. Zero when identifier-1's own length is
-    /// not static (an ANY LENGTH or DYNAMIC LENGTH item), which no group formal admits.</summary>
-    public static ActivationDescription OfReferenceModification(RefModPlace r)
+    /// PB2077). identifier-1's positions are the ONE readers' (<see cref="RefModPlace.StaticInnerPositions"/> for the
+    /// exact length, <see cref="RefModPlace.MaximumInnerPositions"/> for the bound), so a slice of an alphanumeric group,
+    /// whose length is static, is measured too, and so is a slice of an item whose own length is a run-time value: a
+    /// DYNAMIC LENGTH item's slice by its §8.5.1.10.1 maximum size, an ANY LENGTH item's by the carrier's ceiling, which
+    /// every group formal fits (§13.18.2.4 GR1 b) — its length is the argument's; kb/Work PB3128).</summary>
+    public static ActivationDescription OfReferenceModification(RefModPlace r) => new()
     {
-        int? inner = r.StaticInnerPositions;
-        return new ActivationDescription
-        {
-            Shape = ActivationShape.Elementary,
-            Category = ItemCategory.CategoryName(r)!,
-            Usage = r.Inner.Item.OperandPic?.Usage.ToString() ?? "",
-            Positions = r.StaticLength(inner) ?? MaximumExtent(r, inner) ?? 0,
-            // GR6's category, with the alphabetic rider the ONE ref-mod Table-16 reader keeps (kb/Work PB73).
-            Table16 = Table16Operand.Of(r).Heading,
-        };
-    }
+        Shape = ActivationShape.Elementary,
+        Category = ItemCategory.CategoryName(r)!,
+        Usage = r.Inner.Item.OperandPic?.Usage.ToString() ?? "",
+        Positions = r.StaticLength(r.StaticInnerPositions) ?? MaximumExtent(r),
+        // GR6's category, with the alphabetic rider the ONE ref-mod Table-16 reader keeps (kb/Work PB73).
+        Table16 = Table16Operand.Of(r).Heading,
+    };
 
     /// <summary>The most positions a slice whose length is a run-time value can have: identifier-1's
-    /// <paramref name="inner"/> positions from a static leftmost position to the end (§8.4.3.3.4 GR5 b) / c)), or all of
-    /// them when the leftmost position is a run-time value too. Null when identifier-1's length is not static.</summary>
-    private static int? MaximumExtent(RefModPlace r, int? inner) =>
-        inner is not { } size ? null
-        : r.Start is PositionConstant { Value: >= 1 } left && left.Value <= size ? size - (int)left.Value + 1
-        : size;
+    /// <see cref="RefModPlace.MaximumInnerPositions"/> from a static leftmost position to the end (§8.4.3.3.4 GR5 b) /
+    /// c)), or all of them when the leftmost position is a run-time value too.</summary>
+    private static int MaximumExtent(RefModPlace r)
+    {
+        int size = r.MaximumInnerPositions;
+        return r.Start is PositionConstant { Value: >= 1 } left && left.Value <= size ? size - (int)left.Value + 1 : size;
+    }
 
     /// <summary>The class facts of a description as it carries them: folded, as <see cref="ActivationDescription.ObjectName"/>
     /// is, so a rendered description spells one name one way.</summary>
