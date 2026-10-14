@@ -1,4 +1,4 @@
-## Enqueue leads of 2026-10-14: PB3139 and PB3140 filed; PB2922, PB3084 and PB3126 extended
+## Entry 2015 — 2026-10-13 21:51 PDT — Enqueue leads of 2026-10-14: PB3139 and PB3140 filed; PB2922, PB3084 and PB3126 extended
 
 Register-only change; no code. PB3139 (new, kind analysis) records the unprobed Tier-C arm of
 `OoConformance.DescriptionMismatch` for a strong variable-length group with a pointer leaf, carried from PB3129's
@@ -13,3 +13,4 @@ prose "merged the reviewed branch <name>" in a report header made `prune_worktre
 the successor's report. PB3126 gains a third arm: the harness refusing the isolation worktree (7 of 26 spawns of the
 wave that ended 2026-10-14). Not filed: the COBOLNET0902 diagnostic without a file:line, which needs a compiler
 judgment on whether it is a defect.
+
