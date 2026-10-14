@@ -42,4 +42,5 @@ run's leader field by the member the run holds, and `OdoModel.FixedImageTail` co
 window measure the table from the run's first bit. Golden `2014/pb3030_bit_odo_run_continuation` covers the three arms,
 a nine-bit leader, a GROUP-USAGE BIT holder continuing a run, a GR8 a) MOVE and a CALL at the maximum, each value derived
 by hand; it fails on the reviewed head. The PB3030 golden's comment cited GR8 b) for a sending group whose data-name-1
-lies outside it, which GR8 a) governs; corrected.
+lies outside it, which GR8 a) governs; corrected. Gate run `20261014T064005Z-0faf96`: `=== BUILD-LOCAL GATE: LEG 1 ONLY
+(batched gating, PB2515): GREEN`, both PB3030 goldens Passed in leg 1; semgrep verify PASS.
