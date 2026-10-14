@@ -855,7 +855,10 @@
   "pb2921_class_named_method",
   "pb2921_data_named_like_method",
   "pb546_national_leaf_one_width",
-  "pb3132_contained_program_word_it_never_references"
+  "pb3132_contained_program_word_it_never_references",
+  "pb3156_aligned_odo_bit_table_extent",
+  "pb2722_evaluate_partial_not_ownership",
+  "pb2740_omitted_branch_turn_valid_names"
   ],
   "pending": []
 }

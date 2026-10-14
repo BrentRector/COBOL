@@ -63,10 +63,9 @@ internal sealed partial class FlagConformancePass
             foreach (var clause in ctx.evaluateWhenClause())
                 foreach (var phrase in clause.evaluateWhenPhrase())
                 {
-                    var objects = phrase.evaluateWhenGroup();
+                    var objects = phrase.evaluateWhenItem();
                     for (int i = 0; i < objects.Length; i++)
-                        ScanEvaluateObject(i < subjects.Length ? subjects[i].valueOperand() : null,
-                            objects[i].evaluateWhenItem());
+                        ScanEvaluateObject(i < subjects.Length ? subjects[i].valueOperand() : null, objects[i]);
                 }
         }
         return base.VisitChildren(ctx);

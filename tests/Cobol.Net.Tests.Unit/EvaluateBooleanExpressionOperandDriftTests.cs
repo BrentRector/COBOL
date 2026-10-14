@@ -29,20 +29,25 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class EvaluateBooleanExpressionOperandDriftTests
 {
-    private static string Grammar() => File.ReadAllText(Path.Combine(TestRepo.Root,
-        "src", "Cobol.Net.Frontend", "Grammar", "Core", "CobolControlFlow.g4"));
+    /// <summary>The grammar with its line comments removed BEFORE a rule is located: a prose comment may hold a ';'
+    /// (a §-reference's punctuation), which would otherwise end the rule body early (PartialExpressionSpineDriftTests'
+    /// measured lesson).</summary>
+    private static string Grammar() => Regex.Replace(File.ReadAllText(Path.Combine(TestRepo.Root,
+        "src", "Cobol.Net.Frontend", "Grammar", "Core", "CobolControlFlow.g4")), @"//[^\r\n]*", "");
 
     private static string Binder() => File.ReadAllText(Path.Combine(TestRepo.Root,
         "src", "Cobol.Net.Compiler", "Binding", "Procedure", "Verbs", "EvaluateBinder.cs"));
 
-    /// <summary>The rule's alternatives, comments stripped, as written.</summary>
+    /// <summary>The rule's alternatives, comments stripped, as written — less the bracketed <c>NOT?</c> §14.9.13.2
+    /// prints on five selection-object alternatives (which ones may carry it is
+    /// <c>EvaluateSelectionObjectArityDriftTests</c>' rule, kb/Work PB2722), so each names its operand shape.</summary>
     private static string[] Alternatives(string rule)
     {
         var m = Regex.Match(Grammar(), $@"^{rule}\s*\r?\n\s*:(?<body>.*?);", RegexOptions.Multiline | RegexOptions.Singleline);
         Assert.True(m.Success, $"grammar rule '{rule}' not found — if it was renamed this guard must move with it");
         return Regex.Replace(m.Groups["body"].Value, @"//[^\r\n]*", "")
             .Split('|', StringSplitOptions.RemoveEmptyEntries)
-            .Select(a => a.Trim()).Where(a => a.Length > 0).ToArray();
+            .Select(a => Regex.Replace(a, @"\bNOT\?\s*", "").Trim()).Where(a => a.Length > 0).ToArray();
     }
 
     private const string Gate = "{boolExprAhead()}? booleanExpression";
@@ -116,7 +121,7 @@ public sealed class EvaluateBooleanExpressionOperandDriftTests
         var subject = Assert.Single(ev.evaluateSubject());
         Assert.NotNull(subject.booleanExpression());
         Assert.Null(subject.condition());
-        var item = ev.evaluateWhenClause(0).evaluateWhenPhrase(0).evaluateWhenGroup(0).evaluateWhenItem();
+        var item = ev.evaluateWhenClause(0).evaluateWhenPhrase(0).evaluateWhenItem(0);
         Assert.NotNull(item.booleanExpression());
         Assert.Null(item.condition());
     }
@@ -148,6 +153,6 @@ public sealed class EvaluateBooleanExpressionOperandDriftTests
     {
         var ev = ParseEvaluate("EVALUATE X\nWHEN B\"1000\" CONTINUE\nEND-EVALUATE.");
         Assert.NotNull(Assert.Single(ev.evaluateSubject()).valueOperand());
-        Assert.NotNull(ev.evaluateWhenClause(0).evaluateWhenPhrase(0).evaluateWhenGroup(0).evaluateWhenItem().valueOperand());
+        Assert.NotNull(ev.evaluateWhenClause(0).evaluateWhenPhrase(0).evaluateWhenItem(0).valueOperand());
     }
 }

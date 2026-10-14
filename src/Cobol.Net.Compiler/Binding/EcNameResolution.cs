@@ -37,10 +37,12 @@ internal static class EcNameResolution
     public static bool TryResolve(EditionContext edition, string raw, string where, out EcInfo info,
         EcRaiseSite? level3 = null)
     {
-        if (!ExceptionCatalog.TryGet(raw, out info))
+        // The SR2 rule itself (is it a name, does the edition have it) is ExceptionNameRule's — the front end's
+        // >>TURN stage asks the same two questions, and an omitted conditional-compilation branch never reaches
+        // this binder (kb/Work PB2740).
+        if (!ExceptionNameRule.TryGet(raw, where, out info, out var unknown))
         {
-            edition.Error(DiagnosticCatalog.EcNameUnknown, $"{where}: '{raw}' is not an exception-name of "
-                + "ISO/IEC 1989 §14.6.13.1 (and not a valid EC-USER- name; this implementation defines no EC-IMP- name, DOC-A.1-99)");
+            edition.Error(unknown.Descriptor, unknown.Message);
             return false;
         }
         // The EC-LOCALE family (Annex A.4.9 item 1) WAS refused here by name while the locale module was documented
@@ -59,13 +61,24 @@ internal static class EcNameResolution
                 + $"name; only a LEVEL-3 exception-name may be raised ({site.Cite(site.Level3Rule)})");
             return false;
         }
-        if (info.IntroducedIn > edition.DialectLevel)
+        if (ExceptionNameRule.Window(info, edition.DialectLevel, where) is { } later)
         {
-            edition.Error(DiagnosticCatalog.EcNameIntroducedLater, $"{where}: exception-name {info.Name} was "
-                + $"introduced by ISO/IEC 1989:{info.IntroducedIn} — it requires --std {info.IntroducedIn} or "
-                + $"later (targeting COBOL-{edition.DialectLevel})");
+            edition.Error(later.Descriptor, later.Message);
             return false;
         }
+        return Advise(edition, info, where);
+    }
+
+    /// <summary>The binder half of a name the FRONT END already resolved (<c>&gt;&gt;TURN</c>: the directive stage
+    /// reports the §7.3.25.3 SR2 diagnostics itself, compiled or omitted — kb/Work PB2740): look the canonical name up
+    /// again for its row and apply <see cref="Advise"/>, which is policy and not syntax (declined-module postures, the
+    /// §15.33 width advisory). A name the stage let through always resolves; one that does not is a broken hand-off,
+    /// never a user error, so it throws rather than vanish.</summary>
+    public static bool AdviseResolved(EditionContext edition, string resolvedName, string where, out EcInfo info)
+    {
+        if (!ExceptionNameRule.TryGet(resolvedName, where, out info, out var violation))
+            throw new InvalidOperationException(
+                $"{where}: the front end handed the binder an exception-name it never resolved: {violation.Message}");
         return Advise(edition, info, where);
     }
 
