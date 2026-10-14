@@ -29,3 +29,9 @@ crossing BY REFERENCE per §14.2.3 GR8) and `negative/pb3129-type-pointer-in-wea
 `2002/pb1408_address_of_restricted_pointer` (`05 GP TYPE PT` in a weak typedef). That case has no conforming spelling,
 because ADDRESS OF a member of a strong group is COBOLNET2785, so it was removed and the program's output is unchanged.
 Row `SR-13.18.60.3-14` was re-verdicted CONFORMS with the new witnesses (GAP 103 → 103).
+
+Gate: the first run was red on the new negative's own comment line (261 positions, over the 255 that ISO §6.1 3) a)
+allows a free-form line, COBOLNET2653). The re-gate (run `20261014T005513Z-22f025`) read `=== BUILD-LOCAL GATE: LEG 1
+ONLY (batched gating, PB2515): GREEN`, with both new goldens and pb1408 Passed in leg 1. Self-review found no second
+copy of the rule. The two loops of `CheckUsageDeclarations` visit disjoint sets: the first skips every entry with a
+TYPE anchor, and the second visits only entries that carry a TYPE clause.
