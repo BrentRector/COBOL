@@ -39,8 +39,8 @@ internal static class UnrepeatedElements
     {
         if (count > 1)
             edition.Error(DiagnosticCatalog.FormatElementRepeated,
-                $"{where}: {element} is written {count} times; {format}'s general format encloses it in its "
-                + "own bracket with no ellipsis, so it may be written at most once (§5.2.6.2, §5.2.7)"
+                $"{where}: {element} is written {count} times; {format}'s general format admits it at most once — a "
+                + "bracket with no ellipsis allows its element once (§5.2.6.2, §5.2.7)"
                 + (orderFree ? " — the elements may be written in any order, but each once"
                              : " — once, in the sequence the format prints (§5.2.1)"));
     }

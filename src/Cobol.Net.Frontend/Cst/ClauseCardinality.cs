@@ -45,8 +45,15 @@ namespace CobolNet.Frontend.Cst;
 /// only when an earlier figure counts an element this figure does not — the COBOL-85 identification division's five
 /// comment-entry paragraphs, which the 2023 figure does not print at all.
 /// <c>ClauseCardinalityDriftTests</c> holds every figure of the chain to the same obligations as the row.</param>
+/// <param name="ChoiceIndicators">⛔ WHICH RULE A REPEAT BREAKS: true when the figure encloses its clauses in CHOICE
+/// INDICATORS (ISO §5.2.6.4 — each alternative at most once, in any order; the OBJECT-COMPUTER paragraph's
+/// §12.3.6.2), so <c>ClosedFormatPass</c> reports a repeat through the one choice-indicator reader
+/// (<c>ChoiceIndicators.AtMostOnce</c>, COBOLNET2104) and not as a bracket without an ellipsis (§5.2.6.2, §5.2.7;
+/// COBOLNET2423). A choice-indicator group is order-free by the same clause, so it carries no
+/// <see cref="Sequence"/> (kb/Work PB3133, ISO review R1-1).</param>
 public sealed record ClauseList(string Format, string FormatLabel, string Subject, IReadOnlySet<Type> Repeatable,
-    IReadOnlyList<Type>? Sequence, Func<ParserRuleContext, object>? KindOf = null, EarlierFigure? Earlier = null)
+    IReadOnlyList<Type>? Sequence, Func<ParserRuleContext, object>? KindOf = null, EarlierFigure? Earlier = null,
+    bool ChoiceIndicators = false)
 {
     /// <summary>The figure the edition <paramref name="year"/> prints for this list: this one, or the
     /// <see cref="Earlier"/> chain's figure in force at that edition.</summary>
@@ -93,8 +100,9 @@ public sealed record EarlierFigure(int Until, ClauseList Figure);
 /// printing one element — and the
 /// §11.9.2 OPTIONS paragraph, the §12.3.2 CONFIGURATION SECTION and the §11.2.1 identification division, whose figures
 /// fix the order too (<see cref="ClauseList.Sequence"/>, kb/Work PB1508). (The RD entry and its PAGE clause count
-/// their own elements through <c>UnrepeatedElements</c>.) SPECIAL-NAMES, I-O-CONTROL and OBJECT-COMPUTER lists are
-/// not rows: their formats repeat most elements. A row whose list an earlier edition printed differently carries that
+/// their own elements through <c>UnrepeatedElements</c>.) The §12.3.6.2 OBJECT-COMPUTER paragraph is a row too (its
+/// clauses sit in choice indicators, §5.2.6.4, below 2002 in the 1985 figure's fixed sequence; kb/Work PB3133).
+/// SPECIAL-NAMES and I-O-CONTROL lists are not rows: their formats repeat most elements. A row whose list an earlier edition printed differently carries that
 /// figure too (<see cref="ClauseList.Earlier"/>, kb/Work PB2532), and <c>ClosedFormatPass</c> screens the figure of
 /// the edition it compiles for (<see cref="ClauseList.At"/>).</para>
 /// </summary>
@@ -211,6 +219,43 @@ public static class ClauseCardinalities
                                 typeof(Core.AuthorParagraphContext), typeof(Core.InstallationParagraphContext),
                                 typeof(Core.DateWrittenParagraphContext), typeof(Core.DateCompiledParagraphContext),
                                 typeof(Core.SecurityParagraphContext),
+                            ]))),
+
+            // §12.3.6.2 (RENDERED, PDF p315 / folio 285): the OBJECT-COMPUTER paragraph encloses its two clauses, CHARACTER
+            // CLASSIFICATION and PROGRAM COLLATING SEQUENCE, in CHOICE INDICATORS within brackets, which §5.2.6.4 defines as
+            // zero or more of the alternatives, each at most once, in any order: the elements are once-only and the ORDER is
+            // free (kb/Work PB3133 — this list's counts used to live in the binder, COBOLNET1652, beside a table that
+            // exempted it; the table counts it, the ONE choice-indicator reader ChoiceIndicators.AtMostOnce reports it as COBOLNET2104 — ChoiceIndicators: true). The '85 clauses MEMORY SIZE and SEGMENT-LIMIT are not elements of this
+            // figure — the removal gate (COBOLNET0902) refuses them at 2002+ — so they are not counted against it.
+            //
+            // ⛔ EARLIER: THE COBOL-85 FIGURE (kb/Work PB3133), in force below 2002. ⚠ DERIVED, NOT QUOTED — the repository
+            // holds no 1985 text (docs/VERSION_CHANGE_REFERENCE.md ratified decision #1; row 7.7 for the clause). ANSI
+            // X3.23-1985 prints `OBJECT-COMPUTER. [ computer-name [ MEMORY SIZE integer-1 { WORDS | CHARACTERS | MODULES } ]
+            // [ PROGRAM COLLATING SEQUENCE IS alphabet-name-1 ] [ SEGMENT-LIMIT IS segment-number ] ] .` — three clauses,
+            // each in its own bracket with no ellipsis and no choice indicators, so each is written at most once and in
+            // that sequence (§5.2.6.2, §5.2.7, §5.2.1 state the conventions); IBM Enterprise COBOL's language reference
+            // prints the same figure for the same paragraph (the precedence of CLAUDE.md rule 1, there being no
+            // GnuCOBOL arm: its parser takes the clauses in any order and any number). CHARACTER CLASSIFICATION is a 2002
+            // introduction, refused at 85 by its own gate, so it is not counted. Overturn here if a 1985 text says
+            // otherwise.
+            [typeof(Core.ObjectComputerClauseContext)] =
+                new("ISO §12.3.6.2", "", "OBJECT-COMPUTER paragraph",
+                    new HashSet<Type>
+                    {
+                        typeof(Core.MemorySizeClauseContext), typeof(Core.SegmentLimitClauseContext),
+                        typeof(Core.UnrecognizedClauseContext),
+                    },
+                    Sequence: null, ChoiceIndicators: true,
+                    Earlier: new(2002,
+                        new("ANSI X3.23-1985", "", "OBJECT-COMPUTER paragraph",
+                            new HashSet<Type>
+                            {
+                                typeof(Core.CharacterClassificationClauseContext), typeof(Core.UnrecognizedClauseContext),
+                            },
+                            Sequence:
+                            [
+                                typeof(Core.MemorySizeClauseContext), typeof(Core.ProgramCollatingSequenceClauseContext),
+                                typeof(Core.SegmentLimitClauseContext),
                             ]))),
         }.ToFrozenDictionary();
 
