@@ -1641,7 +1641,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     ///   <item>a FIXED-POINT operand passes through at its own scale with NO narrowing cast — the former
     ///         <c>(long)(expr)</c> silently WRAPPED a wide picture's unscaled form (a 9(5)V9(15) item holding
     ///         the in-range 45296.5 fabricated 02:20:03), and the runtime now takes <see cref="Int128"/>;</item>
-    ///   <item>a FLOAT operand lands through <c>CobolFloat.ToScaledSaturating</c> at scale 9 — the
+    ///   <item>a FLOAT operand lands through <c>CobolDate.SecondsOfReal</c> at scale 9 — the
     ///         FORMATTED-CURRENT-DATE nanosecond convention, and every reliable binary64 fraction digit under a
     ///         5-integer-digit bound — where the former cast truncated to WHOLE seconds;</item>
     ///   <item>an SDIDI operand (a legal §15.3 type-10 expression under a standard mode) lands exactly at scale

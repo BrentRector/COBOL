@@ -17,7 +17,9 @@ namespace CobolNet.Tests.Unit;
 /// followed by one of the separators space, comma, semicolon, period, right parenthesis, or closing pseudo-text
 /// delimiter"; §8.3.3.2.3 SR5 / §8.3.3.5.3 SR4 / §8.3.3.4.3 SR3 hexadecimal digits, §8.3.3.4.3 SR2 '0' or '1'; and
 /// §8.7.3 / §8.7.4 (kb/Work PB1430): the concatenation operator '&amp;' and the invocation operator '::' "shall be
-/// immediately preceded and followed by a separator space".
+/// immediately preceded and followed by a separator space"; and §8.7.1 (kb/Work PB2017): the arithmetic operators "shall
+/// be preceded by a space and followed by a space except that no space is required between a left parenthesis and a unary
+/// operator or between a unary operator and a left parenthesis".
 /// </summary>
 public sealed class SeparatorRuleTests
 {
@@ -93,6 +95,83 @@ public sealed class SeparatorRuleTests
         Assert.Contains(clause, v.Message);
         Assert.EndsWith(fix, v.Message);
     }
+
+    /// <summary>The operators <see cref="SeparatorRule.ArithmeticOperatorViolations"/> reports in the arithmetic
+    /// expression <paramref name="expression"/>, in source order — parsed as the fragment lane parses a compile-time
+    /// operand (the SAME expression grammar the unit uses), so the tree says which operator is binary, unary or none.</summary>
+    private static List<string> Spacing(string expression)
+    {
+        var tree = DirectiveExpressionFragment.ParseOperand(expression);
+        Assert.NotNull(tree);
+        return [.. SeparatorRule.ArithmeticOperatorViolations(expression, tree).Select(v => v.Token.Text)];
+    }
+
+    [Theory] // §8.7.1: a space on each side of a binary operator; a unary one may touch a left parenthesis instead
+    [InlineData("A + B")]
+    [InlineData("A - B * C / D ** E")]
+    [InlineData("(A + B) * (C - D)")]
+    [InlineData("A +\nB")]                    // a line end is a separator space (§8.3.5 1))
+    [InlineData("A\n+ B")]
+    [InlineData("- A")]                       // unary: a space after it
+    [InlineData("-(A)")]                      // unary beside a left parenthesis: no space required
+    [InlineData("- (A)")]
+    [InlineData("(- A)")]                     // a left parenthesis beside a unary operator: no space required
+    [InlineData("(-(A))")]
+    [InlineData("A * -2")]                    // a sign abutting its digits is part of the literal (§8.3.3.3.2 2)): no operator
+    [InlineData("A - -2")]
+    [InlineData("-2")]
+    [InlineData("+2.5 * 3")]
+    [InlineData("A * -(B)")]
+    [InlineData("A +, B")]                    // a comma followed by a space is a separator, usable wherever the space is (§8.3.5 2))
+    public void SpacedArithmeticOperators_AreNotReported(string expression) => Assert.Empty(Spacing(expression));
+
+    [Theory]
+    [InlineData("A+B", "+")]
+    [InlineData("A +B", "+")]                 // the space after it is missing
+    [InlineData("A+ B", "+")]                 // the space before it is missing
+    [InlineData("A -1", "-")]                 // an operand cannot follow an operand: the binary minus, no space after it
+    [InlineData("A*B", "*")]
+    [InlineData("A/B", "/")]
+    [InlineData("A**B", "**")]
+    [InlineData("(A)+(B)", "+")]              // a parenthesis exempts only a UNARY operator
+    [InlineData("(A + B)*C", "*")]
+    [InlineData("-A", "-")]                   // unary against an identifier: not exempt
+    [InlineData("(-A)", "-")]                 // the left parenthesis exempts the space BEFORE it, not the one after
+    [InlineData("A * -B", "-")]
+    [InlineData("A *-2", "*")]                // the sign is the literal's; the binary operator beside it is not spaced
+    [InlineData("- -A", "-")]                 // the first unary is spaced; the second touches its operand
+    public void UnspacedArithmeticOperator_IsReportedOnce(string expression, string op) =>
+        Assert.Equal([op], Spacing(expression));
+
+    [Fact] // every offending operator is reported, in source order
+    public void EveryUnspacedOperator_IsReported_InSourceOrder() => Assert.Equal(["*", "+", "-"], Spacing("A*B + C +D - E -F"));
+
+    [Theory] // the message names the clause, the kind of operator and the side that touches
+    [InlineData("A+ B", "binary arithmetic operator '+'", "write a space before it")]
+    [InlineData("A +B", "binary arithmetic operator '+'", "write a space after it")]
+    [InlineData("A*B", "binary arithmetic operator '*'", "write a space on both sides of it")]
+    [InlineData("-A", "unary arithmetic operator '-'", "write a space after it")]
+    public void ArithmeticOperatorSpacing_NamesTheClauseTheKindAndTheSide(string expression, string what, string fix)
+    {
+        var tree = DirectiveExpressionFragment.ParseOperand(expression);
+        var v = Assert.Single(SeparatorRule.ArithmeticOperatorViolations(expression, tree!));
+        Assert.Equal("COBOLNET2993", v.Descriptor.Code);
+        Assert.Contains("§8.7.1", v.Message);
+        Assert.Contains(what, v.Message);
+        Assert.EndsWith(fix, v.Message);
+    }
+
+    [Theory] // §8.3.3.3.2 3): a comma that begins a literal after an operator character is the decimal point, never a missing
+             // separator — the operator's own §8.7.1 violation is the one reported (kb/Work PB2017)
+    [InlineData("COMPUTE X = 1 *,1.\n")]
+    [InlineData("COMPUTE X = 1 /,1.\n")]
+    [InlineData("COMPUTE X = 1 **,1.\n")]
+    [InlineData("COMPUTE X = 1 +,1.\n")]
+    [InlineData("COMPUTE X = 1 -,1.\n")]
+    [InlineData("IF X =,1 DISPLAY 1.\n")]
+    [InlineData("IF X >,1 DISPLAY 1.\n")]
+    [InlineData("IF X <,1 DISPLAY 1.\n")]
+    public void CommaBeginningALiteralAfterAnOperator_IsNotAMissingSeparator(string text) => Assert.Empty(Codes(text));
 
     [Fact] // two literals that touch: the closing delimiter's report covers the boundary — one diagnostic, not two
     public void AdjacentLiterals_ReportTheBoundaryOnce() => Assert.Equal(["COBOLNET2633"], Codes("DISPLAY \"A\"'B'.\n"));

@@ -158,11 +158,17 @@ def unreachable_items() -> dict[int, str]:
     return out
 
 
+GLOSS_RX = re.compile(r'`\s*\([^)]*\)\s*$')
+
+
 def pins_of(cell: str) -> list[str]:
     """The test-refs a `Pinned by` cell names — backticks are legibility, not content."""
     if cell.strip() in ('', '—', '-'):
         return []
-    return [p.strip().strip('`').strip() for p in cell.split(';') if p.strip().strip('`').strip()]
+    # A ref may carry a trailing gloss OUTSIDE its backticks (`conformance:2023/x` (out-of-range half)); the gloss
+    # is prose for the reader, not part of the ref, so it is dropped before the ref is compared or resolved.
+    refs = [GLOSS_RX.sub('`', p.strip()).strip('`').strip() for p in cell.split(';') if p.strip()]
+    return [r for r in refs if r]
 
 
 SELF_TEST_HEADER = ('## 7. Annex A.1\n\n| A.1 item | Element | Our determination | Pinned by |\n'
@@ -284,6 +290,33 @@ def self_test() -> int:
     ]
     for name, pinned, inv, want in pin_cases:
         got = check_pins(pinned, inv, schema)
+        ok = (not got) if want is None else any(want in f for f in got)
+        if ok:
+            print(f'  ok: {name}')
+        else:
+            print(f'  SELF-TEST FAILED: {name} -> {got}')
+            rc = 1
+    # review R3-1 (PB3018): the `Pinned by` resolution check, proven able to fail for each of its reasons.
+    pin_resolution_cases = [
+        ('a pin naming a real xUnit method resolves',
+         {70: ['unit:CarrierLandingFormTests.Store_PastTheCarrier_KeepsTheLowOrderDigits']}, None),
+        ('a pin naming a method the class no longer declares is caught',
+         {70: ['unit:CarrierLandingFormTests.ToScaled_PastTheCarrier_RaisesChecked_SaturatesIntermediate_X']},
+         'declares no method'),
+        ('a bare class pin (the whole family) resolves', {70: ['unit:CarrierLandingFormTests']}, None),
+        # Each gloss case is ONE real ref plus a gloss: with the gloss kept in the ref (the origin/main pins_of)
+        # the ref names no file, so the case fails and nothing else can make it pass.
+        ('a gloss outside the backticks after an xUnit class pin is not part of the ref',
+         {70: pins_of('`unit:CarrierLandingFormTests` (the family)')}, None),
+        ('a gloss outside the backticks after a golden pin is not part of the ref',
+         {70: pins_of('`conformance:2023/pb3017_sdidi_divide_remainder_beyond_the_int128_carrier` (the half)')},
+         None),
+        ('a pin naming a missing class is caught', {70: ['unit:NoSuchTestClass.Whatever']}, 'no NoSuchTestClass.cs'),
+        ('a pin naming a missing golden is caught', {70: ['conformance:2023/no_such_case_at_all']}, 'does not exist'),
+        ('a pin of an unknown form is caught', {70: ['vibes:it-looked-right']}, 'not a test-ref form'),
+    ]
+    for name, pins, want in pin_resolution_cases:
+        got = check_pin_resolution(pins, schema, ROOT)
         ok = (not got) if want is None else any(want in f for f in got)
         if ok:
             print(f'  ok: {name}')
@@ -468,6 +501,62 @@ def check_pins(pinned: dict[int, list[str]], inventory: list[dict], schema) -> l
     return findings
 
 
+def check_pin_resolution(pinned: dict[int, list[str]], schema, root: pathlib.Path) -> list[str]:
+    """Every test-ref a §7 `Pinned by` cell names RESOLVES on disk, by the same rule the inventory's refs obey.
+
+    ⛔ WHY THIS IS ITS OWN CHECK (review R3-1 of kb/Work PB3018's branch, 2026-10-12). `check_pins` holds the
+    INVENTORY's refs to be a subset of what §7 names, and the C# `UnresolvedTestRefs` resolves the INVENTORY's
+    refs; neither reads a ref that only §7 carries. A test renamed by a landing (PB3019 renamed
+    `ToScaled_PastTheCarrier_RaisesChecked_SaturatesIntermediate_...`) therefore left DOC-A.1-70's `Pinned by`
+    naming a method that no longer existed, and a reader following the determination to its evidence found
+    nothing; no gate saw it. The determination's own evidence column is held to the inventory's standard: a
+    path-template form must name an existing file, an xUnit form a `<Class>.cs` under its test directory that
+    declares `<Method>(`.
+    """
+    findings: list[str] = []
+    source: dict[pathlib.Path, str] = {}  # class file -> its text, read once
+    class_files: dict[tuple[str, str], list[pathlib.Path]] = {}  # (test-dir, class) -> its files, searched once
+    for n in sorted(pinned):
+        for ref in pinned[n]:
+            scheme, _, body = ref.partition(':')
+            body = body.strip()
+            form = schema.test_ref_forms.get(scheme)
+            if form is None or not body:
+                findings.append(f'§7 item {n} `Pinned by` names "{ref}", which is not a test-ref form '
+                                f'({sorted(schema.test_ref_forms)}) with a body')
+                continue
+            if (template := form.get('path-template')) is not None:
+                rel = template.replace('{0}', body)
+                if not (root / rel).is_file():
+                    findings.append(f'§7 item {n} `Pinned by` names "{ref}", but {rel} does not exist')
+                continue
+            # A bare <Class> pins the whole class (a determination whose evidence is a family of tests); it
+            # resolves when the class file exists. <Class>.<Method> additionally needs the method declared.
+            cls, dot, method = body.rpartition('.') if '.' in body else (body, '', '')
+            if not cls or (dot and not method):
+                findings.append(f'§7 item {n} `Pinned by` names "{ref}", which is not <Class> or <Class>.<Method>')
+                continue
+            key = (form['test-dir'], cls)
+            if key not in class_files:
+                class_files[key] = list((root / form['test-dir']).rglob(f'{cls}.cs'))
+            files = class_files[key]
+            if not files:
+                findings.append(f'§7 item {n} `Pinned by` names "{ref}", but there is no {cls}.cs under '
+                                f'{form["test-dir"]}')
+                continue
+            if not method:
+                continue
+            rx = re.compile(r'\b' + re.escape(method) + r'\s*\(')
+            for f in files:
+                if f not in source:
+                    source[f] = f.read_text(encoding='utf-8')
+            if not any(rx.search(source[f]) for f in files):
+                findings.append(f'§7 item {n} `Pinned by` names "{ref}", but {cls}.cs declares no method '
+                                f'"{method}" (a renamed or removed test leaves the determination without its '
+                                f'evidence)')
+    return findings
+
+
 def main(argv: list[str]) -> int:
     for stream in (sys.stdout, sys.stderr):
         try:
@@ -519,6 +608,7 @@ def main(argv: list[str]) -> int:
     # has not been built (the error a missing inventory raises is a SystemExit with the rebuild command).
     from inventory_schema import load_inventory, load_schema
     findings.extend(check_pins(pinned, load_inventory(), load_schema()))
+    findings.extend(check_pin_resolution(pinned, load_schema(), ROOT))
 
     print('\n=== docs/CONFORMANCE.md §7 ROWS ===')
     seen: set[int] = set()

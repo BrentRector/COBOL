@@ -6589,17 +6589,21 @@ public static class DiagnosticCatalog
         + "period, right parenthesis or closing pseudo-text delimiter.",
         "ISO §8.3.5 5)");
 
-    /// <summary>COBOLNET2993 — a concatenation operator or invocation operator not immediately preceded and followed by
-    /// a separator space (kb/Work PB1430). §8.7.3: "The concatenation operator is the COBOL character '&amp;', which shall
-    /// be immediately preceded and followed by a separator space"; §8.7.4 says the same of the invocation operator
-    /// '::'. The lexer skips the separator space, so the parser sees <c>O::"M"</c> and <c>O :: "M"</c> as one token
-    /// run; decided post-lex by <c>SeparatorRule</c> from the characters beside the operator, which also owns the
-    /// boundary when the touching neighbour is a literal (one report, not a COBOLNET2633 beside it).</summary>
+    /// <summary>COBOLNET2993 — an operator not immediately preceded and followed by a separator space (kb/Work PB1430,
+    /// PB2017). §8.7.3: "The concatenation operator is the COBOL character '&amp;', which shall be immediately preceded
+    /// and followed by a separator space"; §8.7.4 says the same of the invocation operator '::'; §8.7.1 says it of the
+    /// arithmetic operators ("preceded by a space and followed by a space") with one exception — no space is required
+    /// between a left parenthesis and a UNARY operator, on either side. The lexer skips the separator space, so the
+    /// parser sees <c>O::"M"</c> and <c>O :: "M"</c>, <c>1*2</c> and <c>1 * 2</c> as one token run; decided by
+    /// <c>SeparatorRule</c> from the characters beside the operator (§8.7.1 over the parse tree, which alone says
+    /// binary, unary or no operator), which also owns the boundary when the touching neighbour is a literal (one
+    /// report, not a COBOLNET2633 beside it).</summary>
     public static readonly DiagnosticDescriptor SeparatorOperatorSpacing = new(
         "COBOLNET2993", "separator-operator-spacing", EditionSeverity.Error,
-        "A concatenation operator (&) or invocation operator (::) is not immediately preceded and followed by a "
-        + "separator space.",
-        "ISO §8.7.3 · §8.7.4");
+        "An arithmetic operator (+ - * / **), a concatenation operator (&) or an invocation operator (::) is not "
+        + "immediately preceded and followed by a separator space (a unary arithmetic operator may instead touch a "
+        + "left parenthesis).",
+        "ISO §8.7.1 · §8.7.3 · §8.7.4");
 
     /// <summary>COBOLNET2994 — an inline method invocation written with an empty parenthesis pair, <c>O :: "M" ( )</c>
     /// (kb/Work PB1430). §8.4.3.4.2 brackets the whole parenthesised group (so it may be omitted) but encloses the five
