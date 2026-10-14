@@ -284,18 +284,14 @@ evaluateWhenOther
     : WHEN OTHER statementBlock
     ;
 
-evaluateWhenPhrase
-    : WHEN evaluateWhenGroup (ALSO evaluateWhenGroup)*
-    ;
-
 // ⛔ EXACTLY ONE selection-object per position — NOT a list (fix-queue PB45, the open half).
 // §14.9.13.2's general format is `{ { WHEN selection-object [ ALSO selection-object ] … } … imperative-statement-1 } …`
-// (verified against the PRINTED page, folio 618): selection-objects repeat ONLY through ALSO — which is
-// evaluateWhenGroup's own caller — never by juxtaposition. §14.9.13.3 SR2 fixes the count against the subjects
-// ("The number of selection objects within each set of selection objects shall be equal to the number of selection
-// subjects"), and the transcription's 900-dpi figure note records the object brace as "a single pair of braces
-// spanning ten stacked alternatives — exactly one shall be selected".
-// ⚠ THIS WAS `evaluateWhenItem+`, AND THE UNLICENSED REPETITION SILENTLY MISCOMPILED A FUNCTION-IDENTIFIER OBJECT.
+// (verified against the PRINTED page, folio 618): selection-objects repeat ONLY through ALSO — this rule's own loop —
+// never by juxtaposition. §14.9.13.3 SR2 fixes the count against the subjects ("The number of selection objects
+// within each set of selection objects shall be equal to the number of selection subjects"), and the transcription's
+// 900-dpi figure note records the object brace as "a single pair of braces spanning ten stacked alternatives —
+// exactly one shall be selected".
+// ⚠ THE OBJECT WAS ONCE `NOT? evaluateWhenItem+`, AND THE UNLICENSED REPETITION SILENTLY MISCOMPILED A FUNCTION-IDENTIFIER OBJECT.
 // `WHEN FUNCTION SQRT(W-Z) > 1` has two readings: the CORRECT one (a relation condition whose left operand is the
 // function-identifier) and a PEELED one that takes `FUNCTION SQRT` as a bare zero-argument object and re-reads the
 // ARGUMENT parenthesis as a second, parenthesised object `(W-Z) > 1`. The greedy/correct reading cannot consume the
@@ -308,30 +304,58 @@ evaluateWhenPhrase
 // and §14.9.13.4 Table 15 makes the object's legality depend on the SUBJECT, which no context-free ordering can
 // express. With one item the peel is simply not a parse of this rule, and the alternative order is left untouched.
 // Pinned by EvaluateSelectionObjectArityDriftTests.
-evaluateWhenGroup
-    : NOT? evaluateWhenItem
+evaluateWhenPhrase
+    : WHEN evaluateWhenItem (ALSO evaluateWhenItem)*
     ;
 
+// ONE selection-object (§14.9.13.2), spelled alternative by alternative as the printed brace stacks them.
+// ⛔ THE `[ NOT ]` IS PRINTED ON FIVE ALTERNATIVES, AND IT IS WRITTEN ON EXACTLY THOSE (kb/Work PB2722). The figure
+// note: "The bracketed `NOT` applies only to the first five alternatives, exactly as stacked" — identifier-2,
+// literal-2, arithmetic-expression-2, boolean-expression-2, range-expression. condition-2 and partial-expression-1
+// carry no bracketed NOT because each already owns its own: `NOT A > B` is a negated condition (§8.8.4.10.1, "A
+// condition is negated by use of the logical operator 'NOT'"), and `NOT > 5` / `NOT NUMERIC` / `NOT POSITIVE` are
+// partial-expressions whose leftmost portion is the relational operator `NOT >` (§8.7.5) or the class / sign
+// condition's own `IS [NOT]` (§14.9.13.3 SR5).
+// ⚠ THE NOT USED TO BE HOISTED OVER ALL SEVEN ALTERNATIVES (`evaluateWhenGroup : NOT? evaluateWhenItem`), AND THAT
+// WAS A SILENT WRONG ANSWER, NOT MERELY AN UNDER-REJECTION. ANTLR enters a greedy `?` whenever both readings are
+// viable, so the hoisted NOT took the leading NOT of every condition-2 and partial-expression-1 and the binder negated
+// the WHOLE object: `WHEN NOT A > B AND A > B` — by §8.8.4.11.3 ("The order of precedence of logical operators is
+// 'NOT', 'AND' …") (NOT A > B) AND A > B, never true — bound as NOT (A > B AND A > B), always true; and
+// `EVALUATE X WHEN NOT > 5 AND < 2` (SR8's `X NOT > 5 AND < 2`) as NOT (X > 5 AND X < 2). Written on the alternatives
+// that print it, the NOT cannot be read as anything but theirs: `NOT A > B` has no `NOT identifier-2` reading (the `>`
+// cannot follow a selection object), so only `condition` is viable and its own unaryLogicalExpression takes the NOT
+// with §8.8.4.11.3's precedence. EvaluateSelectionObjectArityDriftTests pins which alternatives may carry it.
+// ⛔ `NOT? booleanLiteral` AND `NOT? ANY` ARE THE PARSE-WIDE HALF OF A BIND-NARROW SCREEN (DESIGN-frontend-grammar.md
+// invariant 8). §14.9.13.2 prints TRUE, FALSE and ANY with no NOT, so `WHEN NOT ANY` and `WHEN NOT TRUE` are source no
+// format admits and §4.2.2 owes them an indication: they PARSE so EvaluateBinder.ScreenObjectNegation refuses them by
+// name (COBOLNET3710) rather than ANTLR reporting a stray token. `WHEN NOT ANY` used to compile clean and bind to the
+// negation of GR4 a) 1.'s constant true — an arm that can never run. TRUE/FALSE is its own alternative (it used to
+// reach the binder as a one-word `condition`), so the object word is read off the parse tree as ANY is; it precedes
+// `condition`, which a TRUE or FALSE inside a longer condition still parses as.
 // ⛔ ALTERNATIVE ORDER IS LOAD-BEARING AND IS NOT THE PLACE TABLE 15 IS DECIDED (see the block above). `valueRange`
 // leads because its THRU is what distinguishes it; `valueOperand` precedes `condition` because a BARE word is both
-// and only the resolved SYMBOL can say which (EvaluateBinder.ClassifyPair asks, once); `partialExpression` is last
-// of the shapes because `className`'s user-word alternative would otherwise claim a bare identifier-2.
+// and only the resolved SYMBOL can say which (EvaluateBinder.ClassifyPair asks, once) — so `NOT X` too reads as
+// `NOT identifier-2` ahead of the negated condition `NOT X`, the same truth value for a condition-name; and
+// `partialExpression` is last of the shapes because `className`'s user-word alternative would otherwise claim a bare
+// identifier-2.
 // partial-expression-1 (§14.9.13.3 SR5) had NO alternative here at all, so `EVALUATE WS-N WHEN > 5` — the first
 // shape SR5's own list names and the ordinary way to write a threshold arm — was a raw parse error, and FIVE rules
 // (SR5, SR7 d), SR8, SR6 e) and §14.9.13.4 GR4 a) 2.) had no code site, with Table 15's Partial-expression row a
 // permanently dead lookup (kb/Work PB398).
 // boolean-expression-2 (§14.9.13.2's `[ NOT ] boolean-expression-2`, kb/Work PB1412) sits between valueOperand and
 // condition for the subject rule's reason: an operator-bearing object with no relational tail is Table 15's
-// Boolean-expression ROW, not condition-2. `valueRange` leads and is untouched (a boolean operand may not end a
-// range, SR4).
+// Boolean-expression ROW, not condition-2. Its `{boolExprAhead()}?` stays at the LEFT EDGE, ahead of the NOT: a
+// predicate after a token is only asserted, never used in prediction, and the scan reads past a leading NOT anyway.
+// `valueRange` leads and is untouched (a boolean operand may not end a range, SR4).
 evaluateWhenItem
-    : valueRange                         // WHEN A THRU N, WHEN 1 THRU 10, WHEN "A" THRU "M" IN ALPH
-    | addressIdentifier                  // identifier-2 that is an address-identifier (kb/Work PB1060, see evaluateSubject)
-    | valueOperand                       // single value: "A", 1, VAR
-    | {boolExprAhead()}? booleanExpression   // WHEN A B-AND C — boolean-expression-2 (§14.9.13.4 GR4 a) 6.)
-    | condition                          // for EVALUATE TRUE / complex WHEN
-    | partialExpression                  // WHEN > 5, WHEN NUMERIC, WHEN POSITIVE, WHEN > 5 AND < 10 (§14.9.13.3 SR5)
-    | ANY                                // match anything
+    : NOT? valueRange                            // [NOT] range-expression: WHEN 1 THRU 10, WHEN NOT "A" THRU "M" IN ALPH
+    | NOT? addressIdentifier                     // [NOT] identifier-2 that is an address-identifier (kb/Work PB1060)
+    | NOT? valueOperand                          // [NOT] identifier-2 / literal-2 / arithmetic-expression-2: "A", 1, VAR
+    | {boolExprAhead()}? NOT? booleanExpression  // [NOT] boolean-expression-2: WHEN A B-AND C (§14.9.13.4 GR4 a) 6.)
+    | NOT? booleanLiteral                        // TRUE / FALSE: a NOT here is refused by name (COBOLNET3710)
+    | condition                                  // condition-2 (EVALUATE TRUE / complex WHEN), owning its leading NOT
+    | partialExpression                          // WHEN > 5, WHEN NOT NUMERIC, WHEN > 5 AND < 10 (§14.9.13.3 SR5), owning its NOT
+    | NOT? ANY                                   // ANY: a NOT here is refused by name (COBOLNET3710)
     ;
 
 // ==========================================

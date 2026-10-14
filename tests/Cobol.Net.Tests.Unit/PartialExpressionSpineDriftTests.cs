@@ -132,13 +132,17 @@ public sealed class PartialExpressionSpineDriftTests
     {
         var alts = RuleBody("CobolControlFlow.g4", "evaluateWhenItem")
             .Split('|', StringSplitOptions.RemoveEmptyEntries)
-            .Select(a => a.Trim()).Where(a => a.Length > 0).ToArray();
+            // Less the bracketed NOT? §14.9.13.2 prints on five alternatives (kb/Work PB2722) — which ones carry it is
+            // EvaluateSelectionObjectArityDriftTests' rule; this one is about the ORDER of the shapes.
+            .Select(a => Regex.Replace(a, @"\bNOT\?\s*", "").Trim()).Where(a => a.Length > 0).ToArray();
         int partial = Array.IndexOf(alts, "partialExpression");
         int value = Array.IndexOf(alts, "valueOperand");
         int range = Array.IndexOf(alts, "valueRange");
         int cond = Array.IndexOf(alts, "condition");
         Assert.True(partial >= 0, $"evaluateWhenItem lost its partial-expression alternative (ISO §14.9.13.3 SR5); "
             + $"got [{string.Join(" | ", alts)}]");
+        Assert.True(value >= 0 && range >= 0 && cond >= 0,
+            $"evaluateWhenItem must still name valueOperand, valueRange and condition; got [{string.Join(" | ", alts)}]");
         Assert.True(partial > value && partial > range && partial > cond,
             "evaluateWhenItem's partialExpression alternative moved ahead of valueOperand / valueRange / condition. "
             + "classConditionName's cobolWord alternative matches a bare word, so it would claim every bare identifier-2 "

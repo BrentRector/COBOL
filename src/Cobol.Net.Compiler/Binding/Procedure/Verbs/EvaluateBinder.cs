@@ -58,8 +58,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             var phraseMatches = new List<BoundCondition>();
             foreach (var phrase in clause.evaluateWhenPhrase())
             {
-                var groups = phrase.evaluateWhenGroup();
-                ScreenObjectCount(phrase, groups.Length, subjects.Length);
+                var objects = phrase.evaluateWhenItem();
+                ScreenObjectCount(phrase, objects.Length, subjects.Length);
                 var terms = new List<BoundCondition>();
                 // ⛔ THE COUNT IS A SYNTAX RULE, SCREENED ABOVE — this clamp is pure RECOVERY (kb/Work PB399).
                 // It used to be `if (i >= subjects.Length) return new BoundUnsupported(…)`: a defensive index
@@ -70,9 +70,9 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 // above, an over- or under-long phrase has already failed the compile; binding the pairs the
                 // programmer DID write keeps the rest of the statement's diagnostics flowing instead of
                 // truncating the bind at the first bad phrase.
-                int paired = System.Math.Min(groups.Length, subjects.Length);
+                int paired = System.Math.Min(objects.Length, subjects.Length);
                 for (int i = 0; i < paired; i++)
-                    terms.Add(BindWhenGroup(slots[i], groups[i]));
+                    terms.Add(BindSelectionObject(slots[i], objects[i]));
                 phraseMatches.Add(terms.Count == 1 ? terms[0] : new BoundLogical("&&", terms));
             }
             BoundCondition match = phraseMatches.Count == 1 ? phraseMatches[0] : new BoundLogical("||", phraseMatches);
@@ -90,9 +90,10 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     /// <summary>One subject↔object pair → a boolean term (§14.9.13 GR4–7):
     /// ANY → always true; a TRUE/FALSE subject pairs with a CONDITION object (TRUE → the condition, FALSE → its
     /// negation); a value subject pairs with an operand (equality), a THRU range (inclusive bounds), or — when
-    /// the object IS a condition over the same item (the grammar's escape) — the condition itself. A leading NOT
-    /// on the group negates the whole term.</summary>
-    private BoundCondition BindWhenGroup(SubjectSlot subject, Core.EvaluateWhenGroupContext group)
+    /// the object IS a condition over the same item (the grammar's escape) — the condition itself. The bracketed
+    /// NOT of §14.9.13.2's five operand alternatives negates the whole term (GR4 a) 5. and 6. — "selection-subject
+    /// [NOT] = selection-object"); a condition-2 or partial-expression-1 carries its own NOT inside its parse.</summary>
+    private BoundCondition BindSelectionObject(SubjectSlot subject, Core.EvaluateWhenItemContext item)
     {
         // ONE selection-object per position (§14.9.13.2 general format — objects repeat only through ALSO, which is
         // this method's CALLER; §14.9.13.3 SR2 fixes the count against the subjects). The grammar enforces the arity,
@@ -102,8 +103,35 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // item, so the only thing that rule ever bound was PB45's peeled misparse of
         // `WHEN FUNCTION SQRT(X) > 1` (item 1 = `FUNCTION SQRT`, item 2 = `(X) > 1`), which is exactly how a
         // function-identifier object reached the "value WHEN object" error below instead of binding as a condition.
-        BoundCondition cond = BindWhenItem(subject, group.evaluateWhenItem());
-        return group.NOT() is not null ? new BoundNot(cond) : cond;
+        if (!ScreenObjectNegation(item)) return Constant(false);
+        BoundCondition cond = BindWhenItem(subject, item);
+        return item.NOT() is not null ? new BoundNot(cond) : cond;
+    }
+
+    /// <summary>⛔ ISO §14.9.13.2 prints the bracketed NOT on five selection-object alternatives only — the figure
+    /// note: "The bracketed `NOT` applies only to the first five alternatives, exactly as stacked" (identifier-2,
+    /// literal-2, arithmetic-expression-2, boolean-expression-2, range-expression) — so a NOT before ANY, TRUE or
+    /// FALSE is source no format admits, and §4.2.2 owes it a compile-time indication ("to indicate violations of the
+    /// general formats", kb/Work PB2722). The grammar parses the
+    /// two words with a NOT only so this screen can NAME the mistake; before it, `WHEN NOT ANY` compiled clean and
+    /// bound to the negation of GR4 a) 1.'s constant true, a WHEN arm that could never run. condition-2 and
+    /// partial-expression-1 are not asked: their NOT is inside their own parse (§8.8.4.10.1's negated condition; the
+    /// `NOT >` operator or class / sign condition SR5 names), never this one.
+    /// <para>Returns false when the object has been refused: the caller binds nothing more of it, because Table 15
+    /// would only read the same mistake a second time.</para></summary>
+    private bool ScreenObjectNegation(Core.EvaluateWhenItemContext item)
+    {
+        if (item.NOT() is not { } negation) return true;
+        string? word = item.ANY() is not null ? "ANY"
+            : item.booleanLiteral() is { } literal ? (literal.TRUE_() is not null ? "TRUE" : "FALSE")
+            : null;
+        if (word is null) return true;
+        using var _ = ctx.Edition.At(negation.Symbol);
+        ctx.Edition.Error(DiagnosticCatalog.EvaluateObjectNegationNotPermitted,
+            $"the selection object '{DataBinder.WrittenText(item)}' writes NOT before the word {word}; ISO §14.9.13.2 "
+            + "admits the bracketed NOT only before identifier-2, literal-2, arithmetic-expression-2, "
+            + $"boolean-expression-2 and a range-expression, never before {word}");
+        return false;
     }
 
     /// <summary>The Table-15 coordinates of ONE selection pair, after §14.9.13.3 SR6's per-WHEN
@@ -367,11 +395,12 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         : default;
 
     /// <summary>The object's Table-15 ROW before SR6, or null when the shape cannot be named with certainty.
-    /// The object-only forms are grammatical (ANY, a THRU range, an explicit condition — including the
-    /// TRUE/FALSE spelling of one); everything else is the SHARED bare-operand classification.</summary>
+    /// The object-only forms are grammatical (ANY, the words TRUE and FALSE, a THRU range, an explicit condition);
+    /// everything else is the SHARED bare-operand classification.</summary>
     private EvaluateObjectOperand? ObjectKind(Core.EvaluateWhenItemContext item, in BareOperandAnalysis bare)
     {
         if (item.ANY() is not null) return EvaluateObjectOperand.Any;
+        if (item.booleanLiteral() is not null) return EvaluateObjectOperand.TrueOrFalse;
         if (item.valueRange() is not null) return EvaluateObjectOperand.RangeExpression;
         // An address-identifier IS identifier-2 (§8.4.3.1.2 Format 9; kb/Work PB1060) — Table 15's Identifier row.
         if (item.addressIdentifier() is not null) return EvaluateObjectOperand.Identifier;
@@ -381,10 +410,9 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // Table 15's Partial-expression row stops being a lookup no operand can reach (kb/Work PB398).
         if (item.partialExpression() is not null) return EvaluateObjectOperand.PartialExpression;
         if (item.condition() is { } c)
-            return SoleBooleanLiteral(c) is not null ? EvaluateObjectOperand.TrueOrFalse
-                // SR5 again, where the grammar's `condition` claimed the object: its leftmost simple condition is a
-                // BARE class-name / alphabet-name, i.e. "a class condition without the identifier" (kb/Work PB843).
-                : host.Cond.LeadingBareClassWord(c) is not null ? EvaluateObjectOperand.PartialExpression
+            // SR5 again, where the grammar's `condition` claimed the object: its leftmost simple condition is a
+            // BARE class-name / alphabet-name, i.e. "a class condition without the identifier" (kb/Work PB843).
+            return host.Cond.LeadingBareClassWord(c) is not null ? EvaluateObjectOperand.PartialExpression
                 : EvaluateObjectOperand.Condition;
         // §14.9.13.2's [NOT] boolean-expression-2 (Table 15's Boolean-expression ROW) before SR6 reclassifies it by
         // its result length (kb/Work PB1412).
@@ -468,8 +496,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             // §14.9.13.4 GR4 a) 4. — a TRUE/FALSE object: "the selection subject is condition-1 … if the truth
             // value of the selection subject and selection object match, the result of the analysis is true",
             // which for a constant object IS the subject condition or its negation.
-            if (item.condition() is { } c && SoleBooleanLiteral(c) is { } objBool)
-                return objBool ? subjCond : new BoundNot(subjCond);
+            if (item.booleanLiteral() is { } objWord)
+                return objWord.TRUE_() is not null ? subjCond : new BoundNot(subjCond);
             // ⛔ TABLE 15 ALSO ADMITS Condition × Condition, AND IT IS THE SAME ANALYSIS (kb/Work PB400). The
             // Condition ROW is 'Y' under BOTH the Condition and the TRUE-or-FALSE column, and GR4 a) 3. and
             // a) 4. state the analysis in one shared sentence — "If the truth value of the selection subject
@@ -497,9 +525,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         // the pair "true" exactly when the two truth values match — so `EVALUATE TRUE WHEN TRUE` is true and
         // `EVALUATE FALSE WHEN TRUE` is false. The object's word used to go through BindCondition, whose bare-word
         // arm is not a condition (§8.8.4.2.1) and refused conforming source through the COBOLNET2319 net.
-        if (pair.Subject is EvaluateSubjectOperand.TrueOrFalse && item.condition() is { } wordObject
-            && SoleBooleanLiteral(wordObject) is { } objectWordTrue)
-            return Constant(subjTrue == objectWordTrue);
+        if (pair.Subject is EvaluateSubjectOperand.TrueOrFalse && item.booleanLiteral() is { } wordObject)
+            return Constant(subjTrue == (wordObject.TRUE_() is not null));
 
         // A `condition` the classifier re-read as SR5's partial-expression (a bare class-name leftmost — PB843) is
         // NOT condition-2: it falls through to the partial arm below, which splices the subject in.
@@ -739,18 +766,6 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     private static BoundCondition Constant(bool value) =>
         value ? new BoundLogical("&&", []) : new BoundNot(new BoundLogical("&&", []));
 
-    /// <summary>The boolean value of a condition that is a SOLE <c>TRUE</c>/<c>FALSE</c> literal, else null.</summary>
-    private static bool? SoleBooleanLiteral(Core.ConditionContext cond)
-    {
-        Antlr4.Runtime.Tree.IParseTree n = cond;
-        while (n is not Core.BooleanLiteralContext)
-        {
-            if (n.ChildCount != 1) return null;
-            n = n.GetChild(0);
-        }
-        return ((Core.BooleanLiteralContext)n).TRUE_() is not null;
-    }
-
     /// <summary>
     /// ⛔ ONE SELECTION SUBJECT, BOUND ONCE FOR THE WHOLE STATEMENT — ISO §14.9.13.4 GR3, "At the beginning of
     /// the execution of the EVALUATE statement, each selection subject is evaluated and assigned a value, a
@@ -913,8 +928,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
         foreach (var clause in ev.evaluateWhenClause())
             foreach (var phrase in clause.evaluateWhenPhrase())
             {
-                var groups = phrase.evaluateWhenGroup();
-                var item = index < groups.Length ? groups[index].evaluateWhenItem() : null;
+                var objects = phrase.evaluateWhenItem();
+                var item = index < objects.Length ? objects[index] : null;
                 bool reads = item is not null && item.ANY() is null;
                 if (!seenFirst) { readByFirst = reads; seenFirst = true; }
                 if (reads) uses += item!.valueRange() is not null ? 2 : 1;
