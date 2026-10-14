@@ -1,4 +1,4 @@
-## PB2728: READ has no FILE arm; `READ FILE f` is a syntax error at every edition
+## Entry 2029 — 2026-10-14 13:00 PDT — PB2728: READ has no FILE arm; `READ FILE f` is a syntax error at every edition
 
 Wave 1077, group G (kb/Work PB2728, an R2 lexer-grammar finding).
 
@@ -31,3 +31,4 @@ it. The dead local was removed in the same change.
 by the positive control `85/a413_declined_phrase_positive_control` (`READ F-IO INTO WS-IN`). The witness was added
 to FMT-14.9.30.2's test-ref with a witness-only `record_verdicts` batch. That row was already OK (CONFORMS), so
 the note closes no row (`closes_rows: []`, with its reason).
+
