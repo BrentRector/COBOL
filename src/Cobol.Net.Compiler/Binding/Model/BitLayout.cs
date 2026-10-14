@@ -70,11 +70,23 @@ internal static class BitLayout
     /// position §8.5.1.12.2 correspondence asks for — the determination recorded in <c>docs/CONFORMANCE.md</c> §7.</para>
     /// </summary>
     public static bool SharesByteWith(DataItem? prev, DataItem c) =>
-        !c.IsDynamicTable && prev?.IsDynamicTable != true       // §8.5.1.9.1 — a dynamic-capacity table is out of line (below)
+        prev is not null && !prev.IsDynamicTable                // §8.5.1.9.1 — a dynamic-capacity table is out of line (above)
+        && KeepsPosition(c)
+        && IsBitItem(prev)                                       // §8.5.1.6.3 rules 1 and 2 — both sides bit items…
+        && prev.Level == c.Level;                                // …"of the same level"
+
+    /// <summary>⛔ THE CONJUNCTS OF <see cref="SharesByteWith"/> THAT ARE ABOUT THE SUBJECT ALONE: a bit item that no
+    /// rule moves to a byte boundary of its own. Read as the whole answer for a group's FIRST child, whose
+    /// predecessor is the group's own start: §8.5.1.6.3 — "the alignment of the start of a group item and the
+    /// alignment of the first item within that group, when the first item is a bit data item, are at the same bit
+    /// position in storage" — so a first bit child begins wherever the group begins (mid-byte for a bit group that
+    /// shares its predecessor's byte, kb/Work PB3158), unless it is ALIGNED (§13.18.1.4 GR1), a group-typed TYPE
+    /// subject (§13.18.57.4 GR2 d)) or a dynamic-capacity table (§8.5.1.9.1 3)).</summary>
+    private static bool KeepsPosition(DataItem c) =>
+        !c.IsDynamicTable                                       // §8.5.1.9.1 — a dynamic-capacity table is out of line
         && !c.IsAligned                                         // §13.18.1.4 GR1 — an ALIGNED subject never shares
         && !c.AlignedAsLevelOne                                 // §13.18.57.4 GR2 d) — nor does a group-typed subject
-        && IsBitItem(c) && prev is not null && IsBitItem(prev)   // §8.5.1.6.3 rules 1 and 2 — both sides bit items…
-        && prev.Level == c.Level;                                // …"of the same level"
+        && IsBitItem(c);
 
     /// <summary>⛔ THE ONE ANSWER TO "which of these siblings SHARE bytes" (ISO §8.5.1.6.3): a RUN is a maximal
     /// stretch of consecutive same-level bit members — "an elementary bit data item immediately following an
@@ -134,10 +146,14 @@ internal static class BitLayout
     /// <see cref="DataItem.AsIfPic"/> reports as §13.18.29.4 GR1b's <c>m</c>), and one spelling means the
     /// per-occurrence extent used as a WIDTH (the Tier-B bit window, kb/Work PB203) and the one used as a STRIDE
     /// (a subscripted bit member) cannot drift apart.</para></summary>
-    public static int RunBits(DataItem m) =>
-        m.IsDynamicTable ? RoundUpToByte(WidthBits(m))
-        : m.Occurs is not { } n || n <= 1 ? WidthBits(m)
-        : TableBits(m, n);
+    public static int RunBits(DataItem m) => RunBitsAt(m, PhaseOf(m));
+
+    /// <summary><see cref="RunBits"/> for an item whose first bit lies <paramref name="phase"/> bits into a byte of the
+    /// record (see <see cref="PhaseOf"/>) — the form <see cref="Walk"/> reads, which already knows where it is.</summary>
+    private static int RunBitsAt(DataItem m, int phase) =>
+        m.IsDynamicTable ? RoundUpToByte(WidthBitsAt(m, phase))
+        : m.Occurs is not { } n || n <= 1 ? WidthBitsAt(m, phase)
+        : TableBitsAt(m, n, phase);
 
     /// <summary>⛔ THE ONE EXTENT OF <paramref name="occurrences"/> OCCURRENCES of a table, in bits — the distance
     /// from its first bit to the end of its last occurrence: every occurrence but the last takes its
@@ -149,8 +165,10 @@ internal static class BitLayout
     /// written out THREE times — here, in <c>FileModel.MinExtent</c> and in
     /// <c>SequentialIoEmitter.OdoRecordExceedsMaximum</c> — and the OCCURS DEPENDING LENGTH of a bit group needs it
     /// as a fourth, so it is one method now (kb/Work PB3156).</para></summary>
-    public static int TableBits(DataItem table, int occurrences) =>
-        occurrences <= 0 ? 0 : StrideBits(table) * (occurrences - 1) + WidthBits(table);
+    public static int TableBits(DataItem table, int occurrences) => TableBitsAt(table, occurrences, PhaseOf(table));
+
+    private static int TableBitsAt(DataItem table, int occurrences, int phase) =>
+        occurrences <= 0 ? 0 : StrideBitsAt(table, phase) * (occurrences - 1) + WidthBitsAt(table, phase);
 
     /// <summary>The filler bits that pad the LAST occurrence of <paramref name="table"/> to its
     /// <see cref="StrideBits"/> and are not part of its <see cref="TableBits"/> extent: zero unless the table is
@@ -206,10 +224,12 @@ internal static class BitLayout
     /// out by the same rules (§8.5.1.6.3 applies "within that group" at every level).
     /// <para>⛔ This is a WIDTH, not a STRIDE. For an ALIGNED multiple-occurrence item the two differ — use
     /// <see cref="StrideBits"/> wherever the number multiplies a subscript.</para></summary>
-    public static int WidthBits(DataItem item) =>
+    public static int WidthBits(DataItem item) => WidthBitsAt(item, PhaseOf(item));
+
+    private static int WidthBitsAt(DataItem item, int phase) =>
         IsBitLeaf(item) ? item.Pic!.Length
         : item.IsElementary ? item.ElementaryByteWidth * BitsPerCharacter
-        : ExtentBits(item);
+        : ExtentBitsAt(item, phase);
 
     /// <summary>
     /// ⛔ THE ONE SUBSCRIPT STRIDE in bits — the distance from one occurrence's first bit to the next
@@ -229,8 +249,10 @@ internal static class BitLayout
     /// occurrence. <see cref="RunBits"/> therefore counts <c>stride × (n−1) + width</c>, not <c>stride × n</c>;
     /// the group's own tail filler is rule 4's round-up, applied once by <see cref="ExtentBits"/>.</para>
     /// </summary>
-    public static int StrideBits(DataItem item) =>
-        item.IsAligned ? RoundUpToByte(WidthBits(item)) : WidthBits(item);
+    public static int StrideBits(DataItem item) => StrideBitsAt(item, PhaseOf(item));
+
+    private static int StrideBitsAt(DataItem item, int phase) =>
+        item.IsAligned ? RoundUpToByte(WidthBitsAt(item, phase)) : WidthBitsAt(item, phase);
 
     /// <summary>
     /// The total bit extent of <paramref name="group"/> — the §8.5.1.6.3 cursor walk over its NON-redefining
@@ -256,14 +278,50 @@ internal static class BitLayout
     /// the end of a level 77 item, or the end of a level 1 elementary item" — which is why an ELEMENTARY bit item
     /// never comes through here and keeps its exact bit count (see <see cref="WidthBits"/>).</para>
     /// </summary>
-    public static int ExtentBits(DataItem group)
+    public static int ExtentBits(DataItem group) => ExtentBitsAt(group, PhaseOf(group));
+
+    private static int ExtentBitsAt(DataItem group, int phase)
     {
-        int cursor = Walk(group, null);
+        int cursor = Walk(group, phase, null);
         // Rule 4 — the trailing filler: stated for "a record that is an alphanumeric group or strongly-typed group
         // item" (§13.18.29.4 GR3 makes every group WITHOUT a GROUP-USAGE clause alphanumeric), and its NOTE excludes
         // "the end of a record that is entirely a bit group" — so a GROUP-USAGE BIT group (D20/PB79) keeps its EXACT
         // bit extent (its PICTURE 1(m) length, §15.50.4 r1); its character OCCUPANCY is still Characters(extent).
         return group.GroupUsage is GroupUsage.Bit ? cursor : RoundUpToByte(cursor);
+    }
+
+    /// <summary>
+    /// ⛔ WHERE IN A BYTE OF THE RECORD <paramref name="item"/> BEGINS, in bits (0..7) — the origin every
+    /// byte-boundary rule inside a bit group is counted from. §8.5.1.6.3 starts "a bit group item immediately
+    /// following a bit group item or elementary bit data item of the same level" at "the next bit position in
+    /// storage", so a GROUP-USAGE BIT group can begin in the middle of a byte, and "the alignment of the start of a
+    /// group item and the alignment of the first item within that group, when the first item is a bit data item, are
+    /// at the same bit position in storage": its first member begins there too. Any other bit item is "at the first
+    /// bit position of the first available byte" and an ALIGNED subject is (§13.18.1.4 GR1) "aligned on the first
+    /// bit of the first available byte boundary" — a byte boundary of the RECORD, not of the group it sits in. So
+    /// the group's walk starts its cursor at this phase and rounds up to the record's bytes (kb/Work PB3158:
+    /// <c>05 BA PIC 1(2). 05 SUB GROUP-USAGE BIT. 10 SA PIC 1. 10 TA PIC 1(5) ALIGNED</c> puts TA at record bit 8,
+    /// bit 6 of SUB — not bit 8 of SUB, which is record bit 10).
+    /// <para>Only a GROUP-USAGE BIT group can begin mid-byte (a leaf has no interior, and a group that is not a bit
+    /// group never shares a byte with its predecessor, <see cref="SharesByteWith"/>), so every other item answers 0
+    /// without a walk. The phase is read off the parent's walk at the parent's own phase: the recursion climbs only
+    /// through enclosing bit groups, and <see cref="Walk"/> passes the phase it already knows down, never asking
+    /// this method again. A table of bit groups is laid out as its FIRST occurrence: the stride must be uniform, and
+    /// a stride that is not a whole number of bytes would start later occurrences at other phases, so the first
+    /// occurrence's phase is the one the table's layout (and so every subscript) is built on.</para>
+    /// </summary>
+    private static int PhaseOf(DataItem item)
+    {
+        if (item.GroupUsage is not GroupUsage.Bit || item.Parent is not { } parent) return 0;
+        var siblings = parent.Children;
+        int at = -1;
+        for (int i = 0; i < siblings.Count && at < 0; i++)
+            if (ReferenceEquals(siblings[i], item)) at = i;
+        if (at < 0) return 0;
+        int parentPhase = PhaseOf(parent);
+        var starts = new int[siblings.Count];
+        Walk(parent, parentPhase, starts);
+        return starts[at] < 0 ? 0 : (parentPhase + starts[at]) % BitsPerCharacter;
     }
 
     /// <summary>The start-bit offset of DIRECT child <paramref name="child"/> within <paramref name="group"/>,
@@ -288,7 +346,7 @@ internal static class BitLayout
     public static int[] ChildStarts(DataItem group)
     {
         var starts = new int[group.Children.Count];
-        Walk(group, starts);
+        Walk(group, PhaseOf(group), starts);
         return starts;
     }
 
@@ -302,13 +360,15 @@ internal static class BitLayout
     /// group item and the alignment of the first item within that group, when the first item is a bit data item, are
     /// at the same bit position in storage". The cursor here is RELATIVE to the group's start, so the first child is
     /// at 0 whatever the group's own offset; callers add their origin.
+    /// <para>⛔ The STARTS and the returned extent are relative, but every byte-boundary round-up is of the RECORD
+    /// (<paramref name="phase"/> = <see cref="PhaseOf"/> the group: where in a byte the group begins, kb/Work PB3158).</para>
     /// <para>When <paramref name="starts"/> is non-null it receives each child's start bit relative to the group;
     /// a child that REDEFINES a sibling takes its target's start, or -1 when the target is not among the siblings.
     /// Returns the cursor after the last non-redefining child, before rule 4's trailing filler.</para></summary>
-    private static int Walk(DataItem group, int[]? starts)
+    private static int Walk(DataItem group, int phase, int[]? starts)
     {
         var children = group.Children;
-        int cursor = 0;
+        int cursor = phase;   // counted from a byte of the RECORD (PhaseOf), so RoundUpToByte is the record's byte boundary
         DataItem? prev = null;
         for (int i = 0; i < children.Count; i++)
         {
@@ -316,12 +376,12 @@ internal static class BitLayout
             if (c.RedefinesTargetName is not null) continue;   // overlays its target — no advance (§13.18.44)
 
             // Rule 1 vs 2 (and §13.18.1.4 GR1) — ONE predicate.
-            if (!SharesByteWith(prev, c)) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
-            if (starts is not null) starts[i] = cursor;
-            cursor += RunBits(c);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
+            if (!(prev is null ? KeepsPosition(c) : SharesByteWith(prev, c))) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
+            if (starts is not null) starts[i] = cursor - phase;
+            cursor += RunBitsAt(c, cursor % BitsPerCharacter);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
             prev = c;
         }
-        if (starts is null) return cursor;
+        if (starts is null) return cursor - phase;
         // A redefining child begins at its target's first position (§13.18.44.4 GR1). §13.18.44.3 SR17 bars a
         // dynamic item under REDEFINES, so chasing the overlay chain terminates.
         for (int i = 0; i < children.Count; i++)
@@ -338,7 +398,7 @@ internal static class BitLayout
             }
             starts[i] = at;
         }
-        return cursor;
+        return cursor - phase;
     }
 
     private static int IndexOfNamed(IReadOnlyList<DataItem> siblings, string name)
