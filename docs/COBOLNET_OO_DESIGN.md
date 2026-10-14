@@ -719,7 +719,11 @@ its superclass is a formal (`OoClassSymbol.FormalBaseName`), SUPER or `B OF SUPE
 invocation or object property through a formal, `SET … TO` a formal class-name — binds the operands whose rules do
 not read the method (an undefined argument name is §8.4.2.1's refusal in every expansion) and is then the
 expansion's: the site records it on the EXPANSION-DEFERRAL ledger (`EditionContext.NoteExpansionDeferred`) and the
-statement funnel keeps a `BoundDeferredToExpansion` (never emitted; the refusal ledger stands aside for it). So
+statement funnel keeps a `BoundDeferredToExpansion` (never emitted; the refusal ledger stands aside for it). The
+node KEEPS what the verb binder built (`Bound`), so the statements nested in a deferred compound statement — an IF's
+branches under a condition read through a formal — are the same in every expansion and are walked by the edition
+pass like any others; and each statement takes its own refusals off the ledger (`EditionContext.TakeRefusalsSince`),
+so a compound statement never answers for a nested statement's deferral shadow. So
 `OoDriver.BindClassBody` runs over every skeleton after the emitted classes (`BinderDriver.Bind`), their forests take
 part in `ResolvePointerRestrictions`, and the edition pass walks their bound trees as well as their data. A
 skeleton's WRITTEN superclass is its `Base` as an ordinary class's is, so SUPER binds against it.

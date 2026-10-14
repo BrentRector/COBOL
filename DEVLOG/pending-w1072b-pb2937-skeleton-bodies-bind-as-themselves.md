@@ -46,6 +46,18 @@ actual too. The golden `2002/pb2051_parameterized_definition_binds_itself` carri
 and the class PI, and prints `PI-OK` / `PB2937-OK`. `negative/pb2937-skeleton-statement-rule` rejects with
 COBOLNET1639 and `negative/pb2937-skeleton-only-receiver` with COBOLNET0867, both at 2002, 2014 and 2023.
 
+**Branch review round 1.** The reviewer found two defects in the funnel, and both reproduced on the reviewed head
+(`w1072b/r/*.cob`). R1-1: `IF CNT2 = 1 MOVE CNT2 TO SZP OF ITEM END-IF` in a skeleton drew a false COBOLNET2362
+(internal error) on the IF, and an EVALUATE did the same. The nested MOVE's refusal node is the deferral's shadow. Its
+own funnel took the deferral, but the refusal stayed on the ledger, and the IF answered for it. The refusal ledger is
+now taken per statement, like the unbuilt and deferral ledgers beside it (`EditionContext.TakeRefusalsSince`). A
+nested statement answers for its own refusals once. R1-2: `IF ITEM :: "SZ" = 1 MOVE ALL "12" TO CNT2 END-IF` compiled
+clean, because the deferred IF replaced its whole bound statement, branches included. `BoundDeferredToExpansion` now
+keeps what the verb binder built (`Bound`), and the generated `StatementChildren` walk reaches the branches, so the
+nested MOVE draws COBOLNET0902 as it does in any class. The positive golden gains the nested shapes (IF, EVALUATE,
+inline PERFORM, an IF condition through a formal). The new negative `negative/pb2937-skeleton-nested-edition-gate`
+rejects with COBOLNET0902 at 2002, 2014 and 2023.
+
 **Rows.** Batch `w1072b-pb2937-skeleton-bodies`: GR-11.3.4-6 (already CONFORMS) gains the PB2937 witnesses, and GAP
 stays at 103. PB2937 lands with `closes_rows: []`.
 

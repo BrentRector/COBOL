@@ -916,8 +916,12 @@ public sealed record BoundUnsupported(string Feature) : BoundStatement;
 /// the actual is substituted (ISO §9.3.8.2.4), and every expansion re-binds it with that actual. Its operands were bound
 /// for their own rules before the site deferred (<see cref="Binding.EditionContext.NoteExpansionDeferred"/>); this node
 /// is what <c>StatementBinder.BindStatement</c> keeps in its place. Never emitted: no pass that produces code reads a
-/// skeleton's bound tree (<c>OoDriver.SkeletonClasses</c>). <paramref name="Construct"/> names what waits.</summary>
-public sealed record BoundDeferredToExpansion(string Construct) : BoundStatement;
+/// skeleton's bound tree (<c>OoDriver.SkeletonClasses</c>). <paramref name="Construct"/> names what waits.
+/// <paramref name="Bound"/> is what the verb binder built for the statement, KEPT so the generated
+/// <c>StatementChildren</c> walk reaches the statements nested in it (review R1-2): an IF whose condition reads through a
+/// formal defers, but its branches are the same in every expansion, so the edition pass asks their gates in the
+/// skeleton. Null when the site IS the deferral and built nothing else (an INVOKE or SET through a formal).</summary>
+public sealed record BoundDeferredToExpansion(string Construct, BoundStatement? Bound = null) : BoundStatement;
 
 /// <summary>⛔ A REFUSAL, AND NOTHING ELSE (kb/Work PB909): a statement the SOURCE got wrong — written in a shape no
 /// general format prints, or with an operand its syntax rules exclude. It is the other half of the split that

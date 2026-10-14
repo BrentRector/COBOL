@@ -64,6 +64,7 @@
   "pb2937-interface-formal-edition-gate",
   "pb2937-skeleton-statement-rule",
   "pb2937-skeleton-only-receiver",
+  "pb2937-skeleton-nested-edition-gate",
   "pb2076-universal-returning-move-match-below-2002",
   "pb2463-universal-returning-set-match-below-2002",
   "pb552-value-through-not-ascending",

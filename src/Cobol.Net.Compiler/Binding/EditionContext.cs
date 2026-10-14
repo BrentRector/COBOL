@@ -154,8 +154,23 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// dropped as the same fact) still counts as "this statement drew an error".</summary>
     public int ErrorsRecorded { get; private set; }
 
-    /// <summary>Refusal nodes bound so far (kb/Work PB1029) — see <see cref="NoteRefusal"/>.</summary>
-    public int RefusalsBound { get; private set; }
+    /// <summary>Refusal nodes bound and not yet answered for by a statement (kb/Work PB1029) — see <see cref="NoteRefusal"/>.</summary>
+    private int _refusalsBound;
+
+    /// <summary>The refusal ledger's high-water mark, taken by the funnel before a statement binds.</summary>
+    internal int RefusalMark => _refusalsBound;
+
+    /// <summary>Whether a refusal node was bound since <paramref name="mark"/>, and the ledger cut back to it — a
+    /// statement answers for its own refusals once, as for its unbuilt operands and its deferrals (kb/Work PB2937,
+    /// review R1-1). A nested statement's refusals were answered by its own funnel — reported, or the shadow of a
+    /// deferral it took — so the statement enclosing it never answers for them again: before this, a compound statement
+    /// (IF, EVALUATE, an inline PERFORM) around a deferred object property drew a false COBOLNET2362.</summary>
+    internal bool TakeRefusalsSince(int mark)
+    {
+        bool any = _refusalsBound > mark;
+        _refusalsBound = mark;
+        return any;
+    }
 
     private readonly List<string> _unbuilt = [];
 
@@ -165,9 +180,9 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// descriptor) rather than let the node reach the generated program.</summary>
     internal void NoteRefusal(DiagnosticDescriptor unreported, string feature)
     {
-        RefusalsBound++;
+        _refusalsBound++;
         // A refusal node a verb binder built over an operand an expansion owns (an open deferral, below) is the
-        // deferral's shadow, and the funnel replaces its statement; it reported nothing because nothing is wrong yet.
+        // deferral's shadow, and the funnel defers its statement; it reported nothing because nothing is wrong yet.
         if (ErrorsRecorded == 0 && _expansionDeferred.Count == 0) Error(unreported, UnreportedRefusalMessage(feature));
     }
 

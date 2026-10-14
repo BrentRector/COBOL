@@ -14,7 +14,10 @@
       *> invocation and an object property through a formal, SET of the
       *> factory object of E, SET between descriptions that name the
       *> same formal (one class, whatever it is) and between different
-      *> formals (E's actual may implement I's). PB2937SC has a WRITTEN
+      *> formals (E's actual may implement I's). Each of those nested
+      *> in an IF, EVALUATE or inline PERFORM defers alone, and so does
+      *> an IF whose condition reads through a formal (they drew a
+      *> false internal error COBOLNET2362). PB2937SC has a WRITTEN
       *> superclass, so its SUPER "SHOW" binds against PB2937SB here.
       *> Neither is expanded, so neither creates a class or displays.
       *> PI is an ordinary class spelled like the zero-argument
@@ -98,6 +101,13 @@
            SET ANY1 TO ITEM AS E.
            MOVE ITEM :: "SZ" TO CNT2.
            MOVE CNT2 TO SZP OF ITEM.
+           IF CNT2 = 1 MOVE CNT2 TO SZP OF ITEM END-IF.
+           EVALUATE TRUE WHEN CNT2 = 1
+               INVOKE ITEM "SHOW"
+               MOVE SZP OF ITEM TO CNT2 END-EVALUATE.
+           PERFORM UNTIL CNT2 = 1
+               MOVE ITEM :: "SZ" TO CNT2 END-PERFORM.
+           IF ITEM :: "SZ" = 1 MOVE 1 TO CNT2 END-IF.
            RAISE ITEM.
        END METHOD SHOW.
        END OBJECT.
