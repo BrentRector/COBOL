@@ -1,4 +1,4 @@
-## PB3146: LICENSE names WiseOwl COBOL as the licensed work, and every package carries that LICENSE instead of declaring MIT
+## Entry 2022 — 2026-10-14 02:46 PDT — PB3146: LICENSE names WiseOwl COBOL as the licensed work, and every package carries that LICENSE instead of declaring MIT
 
 At the owner's request (2026-10-14), `LICENSE` now names the Licensed Work `WiseOwl COBOL`. It had named
 `CobolSharp`, the legacy engine deleted from main in PHASE 15 Cut 2 (kb/Work PB2110).
@@ -15,3 +15,4 @@ The owner has also asked whether the Business Source License is the right licens
 That is still open; this change fixes only the name and the metadata.
 
 The package design (DESIGN-USER-DOCUMENTATION.md section 6) and the distribution note PB1613 now state the settled choice; they had offered the BUSL-1.1 expression as an option.
+
