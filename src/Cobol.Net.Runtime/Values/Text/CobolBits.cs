@@ -189,4 +189,22 @@ public static class CobolBits
         }
         return new string(buf);
     }
+
+    /// <summary>The national CONTENT a whole storage image becomes in a receiver whose length is the content's — a
+    /// dynamic-length national item (ISO §8.5.1.10.4: "The new length of the dynamic-length elementary item is
+    /// determined by the length of new content"). The image's UTF-16BE pairs decode as <see cref="NatReadWindow"/>
+    /// decodes them; an ODD byte count cannot be whole national content, so its last position is completed with the
+    /// alphanumeric space, the fill §14.9.25.4 GR4's elementary-move rules supply and the fixed national receiver
+    /// already takes (design D-N8, kb/Work PB546): the three bytes "ABC" become two positions, U+4142 and U+4320.</summary>
+    public static string NatFromStorage(string image)
+    {
+        var chars = new char[(image.Length + BytesPerNational - 1) / BytesPerNational];
+        for (int i = 0; i < chars.Length; i++)
+        {
+            int hi = BytesPerNational * i;
+            byte lo = hi + 1 < image.Length ? StorageByte.ToByte(image[hi + 1]) : StorageByte.ToByte(' ');
+            chars[i] = (char)((StorageByte.ToByte(image[hi]) << 8) | lo);
+        }
+        return new string(chars);
+    }
 }

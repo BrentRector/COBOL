@@ -243,7 +243,10 @@
   "pb2967_numval_f_wide_binary_receiver_size_error",
   "pb2964_length_bit_variable_group",
   "pb1616_define_zero_length_literal",
-  "pb2937_unemitted_forest_edition_gates"
+  "pb2937_unemitted_forest_edition_gates",
+  "pb2988_capacity_register_type_copies",
+  "pb546_group_into_national_dynamic",
+  "pb546_odo_national_tail"
  ],
  "pending": []
 }

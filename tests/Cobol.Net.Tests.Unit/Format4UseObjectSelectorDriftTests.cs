@@ -18,7 +18,7 @@ namespace CobolNet.Tests.Unit;
 /// <para><b>Why the census facts exist.</b> GR14 a) names both object kinds in ONE clause — the exception object
 /// "is a factory object or instance object of object-class-name-1 or of a subclass of object-class-name-1" — but
 /// a COBOL class is emitted as TWO DISJOINT C# hierarchies: the instance class (rooted at its base's instance
-/// class) and the sibling <c>…__FACTORY</c> singleton (rooted at its base's factory class). The generated
+/// class) and the sibling <c>__FACTORY_…</c> singleton (rooted at its base's factory class). The generated
 /// <c>__EcObjDispatch</c> tested only the INSTANCE name, so every factory exception object selected NO
 /// declarative — silently: nothing ran and nothing said so. One COBOL class-name is a SET of emitted C# types,
 /// and <see cref="Compiler.Oo.OoClassSymbol.FactoryOrInstanceCsTypes"/> is the ONE place that says which. The
@@ -119,8 +119,9 @@ public sealed class Format4UseObjectSelectorDriftTests
     }
 
     /// <summary>Every C# type the backend emits FOR a COBOL class is one this class symbol's census names.
-    /// `__` cannot occur in a COBOL-derived name, so `F4CBASE` and `F4CBASE__…` are exactly that class's
-    /// emitted halves — the census must equal them, in both directions.</summary>
+    /// No COBOL-derived name begins with `__` (kb/Work PB2921), so `F4CBASE` and a `NamingConvention` prefix family
+    /// over it (`__FACTORY_F4CBASE`) are exactly that class's emitted halves — the census must equal them, in both
+    /// directions.</summary>
     [Fact]
     public void EveryEmittedHalfOfAClass_IsInTheClassSymbolsCensus()
     {
@@ -128,7 +129,7 @@ public sealed class Format4UseObjectSelectorDriftTests
         var cls = classes.Find("F4CBASE");
         Assert.NotNull(cls);
 
-        var emitted = Regex.Matches(csharp, @"\bclass\s+(" + cls!.CsName + @"(?:__[A-Z0-9_]+)?)\b\s*:")
+        var emitted = Regex.Matches(csharp, @"\bclass\s+((?:__[A-Z]+_)?" + cls!.CsName + @")\b\s*:")
             .Select(m => m.Groups[1].Value)
             .ToHashSet(StringComparer.Ordinal);
 

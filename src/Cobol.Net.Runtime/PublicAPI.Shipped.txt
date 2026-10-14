@@ -62,8 +62,8 @@ CobolNet.Runtime.AlphanumericCollation
 CobolNet.Runtime.AlphanumericCollation.AlphanumericCollation(ushort[]! codes, ushort[]! positions, ushort[]! repByPos, int nextFree, char highValue = '\uffff', char lowValue = '\0') -> void
 CobolNet.Runtime.BASE
 CobolNet.Runtime.BASE.BASE() -> void
-CobolNet.Runtime.BASE__FACTORY
-CobolNet.Runtime.BASE__FACTORY.BASE__FACTORY() -> void
+CobolNet.Runtime.__FACTORY_BASE
+CobolNet.Runtime.__FACTORY_BASE.__FACTORY_BASE() -> void
 CobolNet.Runtime.BoundaryItem
 CobolNet.Runtime.BoundaryItem.ArgumentViolation(CobolNet.Runtime.CobolPassMode mode, in CobolNet.Runtime.BoundaryItem formal, bool specifiedProgram) -> string?
 CobolNet.Runtime.BoundaryItem.BoundaryItem() -> void
@@ -2269,8 +2269,8 @@ override CobolNet.Runtime.ActivationDescription.GetHashCode() -> int
 override CobolNet.Runtime.ActivationDescription.ToString() -> string!
 override CobolNet.Runtime.BASE.__CobolInvoke(string! name, CobolNet.Runtime.CobolInvokeArg![]! args, CobolNet.Runtime.CobolInvokeArg? returning) -> void
 override CobolNet.Runtime.BASE.__FactoryClassType.get -> System.Type?
-override CobolNet.Runtime.BASE__FACTORY.__CobolInvoke(string! name, CobolNet.Runtime.CobolInvokeArg![]! args, CobolNet.Runtime.CobolInvokeArg? returning) -> void
-override CobolNet.Runtime.BASE__FACTORY.__InstanceClassType.get -> System.Type?
+override CobolNet.Runtime.__FACTORY_BASE.__CobolInvoke(string! name, CobolNet.Runtime.CobolInvokeArg![]! args, CobolNet.Runtime.CobolInvokeArg? returning) -> void
+override CobolNet.Runtime.__FACTORY_BASE.__InstanceClassType.get -> System.Type?
 override CobolNet.Runtime.BoundaryItem.GetHashCode() -> int
 override CobolNet.Runtime.CarrierLanding<T>.Land(in CobolNet.Runtime.CobolArg arg, CobolNet.Runtime.NumProfile? formal, bool checking) -> CobolNet.Runtime.CobolArg
 override CobolNet.Runtime.CellGroupShape.Equals(object? obj) -> bool
@@ -2442,7 +2442,7 @@ static CobolNet.Runtime.ActivationRelations.ParameterViolation(CobolNet.Runtime.
 static CobolNet.Runtime.ActivationRelations.ReturningMatches(CobolNet.Runtime.ActivationDescription! receiving, CobolNet.Runtime.ActivationDescription! sending) -> bool
 static CobolNet.Runtime.ActivationRelations.ReturningViolation(CobolNet.Runtime.ActivationDescription! receiving, CobolNet.Runtime.ActivationDescription! sending) -> string?
 static CobolNet.Runtime.ActivationStack.RequireForMethod(string! method, string! className) -> void
-static CobolNet.Runtime.BASE__FACTORY.__Instance.get -> CobolNet.Runtime.BASE__FACTORY!
+static CobolNet.Runtime.__FACTORY_BASE.__Instance.get -> CobolNet.Runtime.__FACTORY_BASE!
 static CobolNet.Runtime.BoundaryItem.operator !=(CobolNet.Runtime.BoundaryItem left, CobolNet.Runtime.BoundaryItem right) -> bool
 static CobolNet.Runtime.BoundaryItem.operator ==(CobolNet.Runtime.BoundaryItem left, CobolNet.Runtime.BoundaryItem right) -> bool
 static CobolNet.Runtime.CellGroupShape.operator !=(CobolNet.Runtime.CellGroupShape? left, CobolNet.Runtime.CellGroupShape? right) -> bool
@@ -3692,9 +3692,9 @@ static readonly CobolNet.Runtime.NonfatalSelectorFn.None -> CobolNet.Runtime.Non
 static readonly CobolNet.Runtime.PredefinedNullArgument.Instance -> CobolNet.Runtime.PredefinedNullArgument!
 static readonly CobolNet.Runtime.ProgramPointer.Null -> CobolNet.Runtime.ProgramPointer
 virtual CobolNet.Runtime.BASE.FACTORYOBJECT() -> CobolNet.Runtime.CobolObject?
-virtual CobolNet.Runtime.BASE.__FactoryOfClass.get -> CobolNet.Runtime.BASE__FACTORY!
-virtual CobolNet.Runtime.BASE__FACTORY.__Create() -> CobolNet.Runtime.BASE!
-virtual CobolNet.Runtime.BASE__FACTORY.__New() -> CobolNet.Runtime.CobolObject?
+virtual CobolNet.Runtime.BASE.__FactoryOfClass.get -> CobolNet.Runtime.__FACTORY_BASE!
+virtual CobolNet.Runtime.__FACTORY_BASE.__Create() -> CobolNet.Runtime.BASE!
+virtual CobolNet.Runtime.__FACTORY_BASE.__New() -> CobolNet.Runtime.CobolObject?
 virtual CobolNet.Runtime.CobolCollation.KeyOf(string? value) -> CobolNet.Runtime.Collation.CollationKey?
 virtual CobolNet.Runtime.CobolCollation.Snapshot() -> CobolNet.Runtime.CobolCollation!
 virtual CobolNet.Runtime.CobolCollation.SupportsKeys.get -> bool

@@ -2491,6 +2491,12 @@ internal static class RuntimeApi
     public static string NatReadWindow(string imageExpr, string startByteExpr, string positionsExpr) =>
         $"{nameof(CobolBits)}.{nameof(CobolBits.NatReadWindow)}({imageExpr}, {startByteExpr}, {positionsExpr})";
 
+    /// <summary>The national content of a WHOLE storage image, for a receiver whose length is its content's (a
+    /// dynamic-length national item, §8.5.1.10.4) — <c>CobolBits.NatFromStorage</c>, an odd tail completed with the
+    /// alphanumeric space (design D-N8, kb/Work PB546).</summary>
+    public static string NatFromStorage(string imageExpr) =>
+        $"{nameof(CobolBits)}.{nameof(CobolBits.NatFromStorage)}({imageExpr})";
+
     /// <summary>Splice a value into a national window of the class backing, leaving every other byte untouched —
     /// <c>CobolBits.NatWriteWindow</c>, the receiving twin of <see cref="NatReadWindow"/> (kb/Work PB231). The
     /// fit to exactly the member's position count is the helper's, done in POSITIONS before serialization.</summary>

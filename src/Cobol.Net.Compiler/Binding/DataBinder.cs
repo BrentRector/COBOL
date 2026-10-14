@@ -171,8 +171,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// table in a GLOBAL record is subordinate to a global name — SR30 places it "at the same level as the entry
     /// containing the OCCURS clause" — so it is a global name too (§8.4.6.2.2: "All data-names and screen-names
     /// subordinate to a global name are global names"), and a contained program inherits it with the rest of the
-    /// record (<see cref="InheritGlobalSubtree"/>). This element's own register (at most one per spelling: SR30's
-    /// "shall not be defined elsewhere in the source element") comes first, then each container's, so
+    /// record (<see cref="InheritGlobalSubtree"/>). This element's own registers come first (one written definition
+    /// per spelling: SR30's "shall not be defined elsewhere in the source element", reproduced once per TYPE / SAME AS
+    /// copy of its entry, kb/Work PB2988), then each container's, so
     /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The OWN registers alone are
     /// <see cref="DeclaredCapacityRegisterTables"/>.</para></summary>
     public IReadOnlyDictionary<string, List<DataItem>> CapacityRegisters
@@ -1598,7 +1599,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     internal string? CollatingAlphabetFault(string alphabet, bool national)
     {
         if (!Alphabets.ContainsKey(alphabet) && !NationalAlphabets.ContainsKey(alphabet)
-            && _wordTypes.TryGetValue(alphabet, out var declaredAs) && declaredAs == UserWordKind.AlphabetName)
+            && _ownWords.IsDeclaredAs(alphabet, UserWordKind.AlphabetName))   // SPECIAL-NAMES: never a method's (§12.3.3 SR2)
             return null;
         if (national)
             return NationalAlphabets.TryGetValue(alphabet, out var nd)
@@ -2552,7 +2553,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (operand is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;
         bool national = !ItemCategory.IsAlphanumeric(key);
-        int positions = national ? key.ByteWidth / CobolNet.Runtime.CobolBits.BytesPerNational : key.ByteWidth;
+        int positions = key.ByteWidth / (key.OperandPic?.BytesPerPosition ?? 1);   // the ONE unit reader (kb/Work PB546)
         var category = national ? PicCategory.National : PicCategory.Alphanumeric;
         string value = operand.Form switch
         {
@@ -3401,16 +3402,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             using (Edition.At(f)) DeclareUserWord(f.GetText(), UserWordKind.ParameterName);
     }
 
-    /// <summary>The TYPE each user-defined word of THIS source element was first declared as — the census behind
-    /// §8.3.2.2's "<i>a given user-defined word may be used as only one type of user-defined word</i>" (kb/Work
-    /// PB990). One instance of the binder is one source element, so the map is per element by construction; a name a
-    /// containing element's SPECIAL-NAMES passes down is inherited, not declared here, and a contained source element
-    /// may re-declare it as another type (§8.4.6.1: each element "may use identical user-defined words"). Keyed
-    /// case-insensitively, like every COBOL word.</summary>
-    private readonly Dictionary<string, UserWordKind> _wordTypes = new(CobolNames.Comparer);
+    /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, or a class's
+    /// object, factory or interface definition. A name a containing element's SPECIAL-NAMES passes down is inherited,
+    /// not declared here, and a contained source element may re-declare it as another type (§8.4.6.1: each element
+    /// "may use identical user-defined words").</summary>
+    private readonly UserWordCensus _ownWords = new();
 
-    /// <summary>The words already reported as two types, so a third declaration does not repeat the refusal.</summary>
-    private readonly HashSet<string> _wordTypeConflictReported = new(CobolNames.Comparer);
+    /// <summary>The census a declaration lands in: the METHOD whose words are being declared
+    /// (<see cref="EnterMethodDeclarations"/> — its data entries, its METHOD-ID and its procedure-names), which is a
+    /// source element of its own, else this binder's own (kb/Work PB2921).</summary>
+    private UserWordCensus WordCensus => _bindingMethodScope?.Words ?? _ownWords;
 
     /// <summary>⛔ §8.3.2.2: "<i>Within a source element, a given user-defined word may be used as only one type of
     /// user-defined word</i>", except as <see cref="UserWordKinds.MayBeOneWord"/> says. Asked at the ONE declaration funnel
@@ -3421,9 +3422,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is.</summary>
     private void CheckOneTypePerWord(string word, UserWordKind kind)
     {
-        if (_wordTypes.TryAdd(word, kind)) return;
-        var first = _wordTypes[word];
-        if (UserWordKinds.MayBeOneWord(first, kind) || !_wordTypeConflictReported.Add(word)) return;
+        if (WordCensus.Declare(word, kind) is not { } first) return;
         Edition.Error(DiagnosticCatalog.UserWordTypeConflict,
             $"'{word}' names two types of user-defined word in this source element ({first.Spelling()} and "
             + $"{kind.Spelling()}) — a given user-defined word may be used as only one type of user-defined word "

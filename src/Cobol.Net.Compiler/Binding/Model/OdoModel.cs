@@ -101,6 +101,16 @@ public sealed class OccursSpec
     public bool Initialized { get; init; }
 }
 
+/// <summary>Where an OCCURS DEPENDING table lies in the group that holds it as its trailing storage
+/// (<see cref="OdoModel.GeometryOf"/>): <paramref name="FixedUnits"/> before the table, <paramref name="ElemUnits"/> per
+/// occurrence, the §13.18.38.4 GR7 bounds, in units of which <paramref name="PositionsPerCharacter"/> make one
+/// character of the group's image — 1 (the unit IS a character, bytes on the physical basis) or 8 (bits, §8.5.1.6.3).</summary>
+public readonly record struct OdoGeometry(int FixedUnits, int ElemUnits, int MinOccurs, int MaxOccurs, int PositionsPerCharacter)
+{
+    /// <summary>The extent is counted in BITS (a USAGE BIT leaf lies in the subtree).</summary>
+    public bool InBits => PositionsPerCharacter > 1;
+}
+
 /// <summary>Pure model helpers for the OCCURS DEPENDING ON subsystem (ISO/IEC 1989:2023 §13.18.38).
 /// (<c>OdoGroupPlace</c> — the GR8 group-operand decoration — lives with the rest of the <see cref="Place"/>
 /// hierarchy in <c>Place.cs</c>, P5.11a.)</summary>
@@ -169,6 +179,22 @@ public static class OdoModel
     /// (<c>AsBits</c>/<c>FromBits</c>, §13.18.29.4 GR1b's as-if PICTURE 1(m)) uses the positions directly.</para></summary>
     public static OdoGroupPlace WrapGroup(Place inner, Place depending, DataItem group, DataItem table)
     {
+        var g = GeometryOf(group, table);
+        return new OdoGroupPlace(inner, depending, g.FixedUnits, g.ElemUnits, g.MinOccurs, g.MaxOccurs,
+            IsWithin(depending.Item, group), g.PositionsPerCharacter);
+    }
+
+    /// <summary>⛔ THE ONE GEOMETRY OF AN OCCURS DEPENDING TABLE IN THE GROUP THAT HOLDS IT AS ITS TRAILING STORAGE
+    /// (§13.18.38.3 SR22; kb/Work PB3030, PB546): the units before the table, one occurrence's units, the bounds, and
+    /// the unit. Asked by <see cref="WrapGroup"/> for a group OPERAND and by the variable-length group codec
+    /// (<c>GroupImageCodec</c>: the current image, the carrier's fixed run, the receiving splice and the record layout)
+    /// for a group MEMBER, so the operand and the member cannot measure one table two ways — they did: the codec took
+    /// one occurrence's <see cref="DataItem.ImageWidth"/>, a national element's POSITIONS, where the image holds its
+    /// BYTES, so a variable-length group's current image carried two bytes too many per unused national occurrence.
+    /// <para>The extent is counted in the group's own position unit, BITS when the subtree holds a USAGE BIT leaf (see
+    /// <see cref="WrapGroup"/>); <see cref="OdoGeometry.PositionsPerCharacter"/> records it.</para></summary>
+    public static OdoGeometry GeometryOf(DataItem group, DataItem table)
+    {
         // Bit-granular whenever the subtree holds a USAGE BIT leaf — not merely when the group is GROUP-USAGE BIT:
         // an ordinary alphanumeric group with a trailing bit ODO table has exactly the same sub-byte arithmetic.
         // The prefix is the table's own placement offset (never `total − elem × max`, which would charge rule 4's
@@ -188,8 +214,7 @@ public static class OdoModel
         int fixedUnits = bitUnits
             ? BitLayout.StartBitOf(group, table)
             : Model.RecordLayout.PhysicalWidth(group) - elem * max;            // SR22 — the variable tail is trailing
-        return new OdoGroupPlace(inner, depending, fixedUnits, elem, min, max, IsWithin(depending.Item, group),
-            bitUnits ? BitLayout.BitsPerCharacter : 1);
+        return new OdoGeometry(fixedUnits, elem, min, max, bitUnits ? BitLayout.BitsPerCharacter : 1);
     }
 
     /// <summary>The SEARCH / SEARCH ALL depending item for an OCCURS DEPENDING table (ISO §14.9.37.4 GR4/GR9 →

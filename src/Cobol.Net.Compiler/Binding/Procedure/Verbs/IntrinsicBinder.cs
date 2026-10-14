@@ -2133,7 +2133,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // §15.50.4 r6 — a DYNAMIC LENGTH item's length is its current length in BYTES: a national item's is
         // 2 × its positions (D-N1), read from the storage channel (kb/Work PB61 / RV-15.50.4-6 — it staged loud
         // where the alphanumeric sibling one line below already rode the runtime channel).
-        BoundFieldOperand { Place.Item: { IsDynamicLength: true, Pic.Category: PicCategory.National } } =>
+        BoundFieldOperand { Place.Item: { IsDynamicLength: true, Pic.Usage: Usage.National } } =>
             new BoundIntrinsicCall(sig, args, PicCategory.Numeric) { LengthInBytes = true },
         BoundFieldOperand { Place.Item.IsDynamicLength: true } =>
             new BoundIntrinsicCall(sig, args, PicCategory.Numeric),
@@ -2551,7 +2551,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                             : null;
                     if (cPlace is null) { failure = Stage($"the dynamic-length subordinate '{c.CobolName ?? c.CsName}' could not be addressed"); return; }
                     Add(new BoundIntrinsicCall(sig, [new BoundFieldOperand(cPlace)], PicCategory.Numeric)
-                            { LengthInBytes = !bytes && c.Pic is { Category: PicCategory.National } });
+                            { LengthInBytes = !bytes && c.Pic is { Usage: Usage.National } });
                 }
                 else if (c.IsGroup) Walk(c, cPath, shift);
             }
@@ -2598,7 +2598,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     private BoundExpr BindByteLengthFold(IntrinsicSig sig, List<BoundOperand> args) => args[0] switch
     {
         // A zero-length literal is ZERO bytes (§8.5.4; §15.14.4 r1) — the Max(1, …) clamp is gone (kb/Work PB61 / RV-15.14.4-1).
-        BoundStringLiteral { Category: PicCategory.National } s => new BoundNumLiteral((2 * s.Value.Length).ToString()),
+        BoundStringLiteral { Category: PicCategory.National } s => new BoundNumLiteral((PicInfo.BytesPerPositionOf(Usage.National) * s.Value.Length).ToString()),
         BoundStringLiteral { Category: PicCategory.Alphanumeric } s => new BoundNumLiteral(s.Value.Length.ToString()),
         // A literal of any OTHER class — in practice a BOOLEAN literal, since the alphanumeric and national
         // arms matched above. §15.14.3 r1 admits "an alphanumeric or national literal" and stops there.
