@@ -47,3 +47,11 @@ rename removed (`#evaluateWhenGroup`, `#BindWhenGroup`, `WhenGroup_HoldsExactlyO
 COBOLNET2318; the `>>WHEN` directive refuses `NOT 2` (COBOLNET1619); no other grammar `NOT?` precedes a sub-rule that
 can itself begin with NOT (`unaryLogicalExpression`, `cceNot`, the class / sign / omitted / DEFINED tails all precede
 keywords or a NOT-free primary).
+
+**Self-review and gate.** The first gate (20261014T194008Z-f7709b) was RED on three Unit drift facts: a `;` in an
+alternative's trailing comment ended the regex-located rule body, so the two EVALUATE drift classes now strip line
+comments before locating a rule (PartialExpressionSpineDriftTests' own lesson) — and that class's
+`WhenItem_PutsPartialExpression_AfterTheOtherShapes` had gone VACUOUS on the `NOT?`-prefixed shapes, so it now strips
+the prefix and requires each shape to be present. Re-gate 20261014T194745Z-233bde:
+`=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 5,857/11,669 · Unit 32,826/33,625 ·
+Characterization 6/36 in leg 1; leg 2 left to CI), all five pb2722 goldens Passed.
