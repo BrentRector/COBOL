@@ -421,7 +421,8 @@
   "pb2739_data_name_ending_id_then_copy",
   "pb2502_renames_record_key",
   "pb2502_renames_sort_key",
-  "pb2017_arithmetic_operator_spacing"
+  "pb2017_arithmetic_operator_spacing",
+  "pb3154_contained_symbolic_character"
  ],
  "pending": []
 }

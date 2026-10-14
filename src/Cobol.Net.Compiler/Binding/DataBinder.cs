@@ -489,7 +489,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // §12.3.3 SR1: "The configuration section shall not be specified in a program that is contained within
         // another program" — the container's applies (§12.3.4 GR1, InheritConfiguration). Diagnosed, then the
         // section is still walked below so a second diagnostic never masks this one.
-        if (UnitIsContained && EnvDivisions(program).Any(env => env.configurationSection() is not null))
+        if (UnitIsContained && program.environmentDivision()?.configurationSection() is not null)
             Edition.Error(DiagnosticCatalog.ConfigurationSectionInContainedProgram,
                 "a CONFIGURATION SECTION is specified in a program contained within another program; the "
                 + "containing program's configuration section applies to it (ISO §12.3.3 SR1 / §12.3.4 GR1)");
@@ -521,9 +521,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // and to any source unit contained within that source unit", and a contained program cannot restate the
         // clause (§12.3.3 SR1), so inheritance is its only route. An assignment here reset every contained unit to
         // false and compiled its USE FOR DEBUGGING section as comment lines (kb/Work PB1088).
-        DebuggingModeDeclared |= EnvDivisions(program).Any(env => env.configurationSection()?.configurationParagraph()
+        DebuggingModeDeclared |= program.environmentDivision()?.configurationSection()?.configurationParagraph()
             .Any(p => p.sourceComputerParagraph()?.debuggingModeClause() is not null)
-            ?? false);
+            ?? false;
 
         // REPOSITORY PROPERTY specifiers (§12.3.8 :14727-14729) — §8.4.3.9.3 SR1 makes a property-specifier
         // a PRECONDITION of every object-property reference in the unit; captured here, checked at the
@@ -535,9 +535,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // The REPOSITORY's own user-defined words, declared AFTER the loop: a specifier written before
         // `FUNCTION ALL INTRINSIC` is inside its scope all the same (§12.3.8.3 SR13; kb/Work PB1083).
         var specifierWords = new List<(Core.RepositoryEntryContext At, string Word, UserWordKind Kind)>();
-        foreach (var re in EnvDivisions(program).SelectMany(env => env.configurationSection()?.configurationParagraph()
+        foreach (var re in program.environmentDivision()?.configurationSection()?.configurationParagraph()
                      .Select(p => p.repositoryParagraph()).FirstOrDefault(r => r is not null)
-                     ?.repositoryEntry() ?? []))
+                     ?.repositoryEntry() ?? [])
         {
             // REPOSITORY PROPERTY/INTERFACE/CLASS (§12.3.8, OO): the COBOL-2002 introduction gates are now
             // VersionConformancePass ParseArm.VisitRepositoryEntry (14g.5). The PROPERTY name still registers here for
@@ -1175,28 +1175,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     // ── FILE-CONTROL + FILE SECTION (ISO §12.4.5 / §13.18; COBOLNET_DESIGN §8) ─────────────────────────────────
 
-    /// <summary>Every ENVIRONMENT DIVISION of the unit, OUTERMOST (class-level) FIRST. A real program unit
-    /// carries at most ONE; an OO synthetic reparent unit (OoDriver's CallReparent pattern) carries
-    /// [half's-own-env, class-env] nearer-first, so iterating REVERSED binds the class scope first and the
-    /// nearer half's registrations override per-clause — the ISO §10.6 scoping (the class definition's
-    /// environment division applies to the factory and object definitions). This is the DEVLOG-738 latent-bug
-    /// fix: the former SINGULAR environmentDivision() read silently DROPPED the class-level env whenever the
-    /// half carried its own (the shadow-0× case).</summary>
-    internal static IReadOnlyList<Core.EnvironmentDivisionContext> EnvDivisions(Core.ProgramUnitContext program) =>
-        [.. program.GetRuleContexts<Core.EnvironmentDivisionContext>().Reverse()];
-
     /// <summary>Bind the FILE-CONTROL paragraph's SELECT clauses into <see cref="FileModel"/>s (assign target,
-    /// organization, access mode, OPTIONAL, FILE STATUS). The FD records attach in <see cref="BindFileSection"/>.</summary>
+    /// organization, access mode, OPTIONAL, FILE STATUS). The FD records attach in <see cref="BindFileSection"/>.
+    /// A unit carries at most ONE environment division: an OO definition's synthetic unit (<c>OoDriver.OoReparent</c>)
+    /// carries only its own, and a class definition's configuration reaches its factory and instance definitions by
+    /// inheritance (<see cref="InheritConfiguration"/>; kb/Work PB3154), never as a second division.</summary>
     private void BindFileControl(Core.ProgramUnitContext program)
     {
-        foreach (var env in EnvDivisions(program)) BindFileControl(env);
-    }
-
-    private void BindFileControl(Core.EnvironmentDivisionContext env)
-    {
-        var fc = env.inputOutputSection()?.fileControlParagraph();
-        if (fc is null) return;
-        // A class-level input-output section (the OO binder hands it to both the factory and the object half) is
+        if (program.environmentDivision() is not { } env
+            || env.inputOutputSection()?.fileControlParagraph() is not { } fc) return;
+        // A class-level input-output section (the class definition's own binder binds it, OoDriver.BindClassData) is
         // outside §12.4.5.2's "factory, function, object, or program" and is forbidden by §12.4.3 SR1 (kb/Work
         // PB1076), so SR2 and SR3 do not screen its entries.
         bool screened = env.Parent is not Core.ClassDefinitionContext;
@@ -3402,9 +3390,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             using (Edition.At(f)) DeclareUserWord(f.GetText(), UserWordKind.ParameterName);
     }
 
-    /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, or a class's
-    /// object, factory or interface definition. A name a containing element's SPECIAL-NAMES passes down is inherited,
-    /// not declared here, and a contained source element may re-declare it as another type (§8.4.6.1: each element
+    /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, a class
+    /// definition, its object or factory definition, or an interface definition. A name a containing element's
+    /// configuration section passes down (a container's SPECIAL-NAMES, a class definition's REPOSITORY; kb/Work
+    /// PB3154) is inherited, not declared here, and a contained source element may re-declare it as another type (§8.4.6.1: each element
     /// "may use identical user-defined words"). The constructing driver passes the element's census from
     /// <see cref="Compiler.Oo.OoClassTable.CensusOf"/>, the object the element's class-name references record into too
     /// (kb/Work PB3132); the default serves a binder no driver made (a TYPE expansion's, a unit test's).</summary>

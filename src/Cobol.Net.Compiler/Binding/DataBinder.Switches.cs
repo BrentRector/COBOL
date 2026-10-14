@@ -440,11 +440,18 @@ public sealed partial class DataBinder
     /// switch and is entitled to inherit every one of them. Called by <c>BinderDriver.BindUnitData</c> for every
     /// contained unit BEFORE <see cref="Bind"/> (the SPECIAL-NAMES state must be in place before the containee's
     /// first literal or PICTURE binds); the container itself inherited from ITS container first (units bind
-    /// container-first), so one level carries the whole ancestry. ONE method, the WHOLE configuration-derived
+    /// container-first), so one level carries the whole ancestry. A class definition's factory and instance
+    /// definitions inherit the class definition's configuration by the same call (<c>OoDriver.BindClassData</c>;
+    /// kb/Work PB3154): they are contained source units (§3.165), so the class's names are INHERITED, never declared
+    /// in their own §8.3.2.2 census. ONE method, the WHOLE configuration-derived
     /// state (feedback_model_the_rule_shape_not_one_case): before this landed only the REPOSITORY sets were
     /// inherited, and inside a contained program of a DECIMAL-POINT IS COMMA unit NUMVAL("123,45") valued 0
     /// while NUMVAL("123.45") valued 123.45 — the exact inversion of §15.67.3 r5, with no diagnostic
-    /// (kb/Work PB60 / AR-15.67.3-5). §11.9.4 GR1's OPTIONS inheritance rides the same call.
+    /// (kb/Work PB60 / AR-15.67.3-5). The SYMBOLIC CHARACTERS figurative constants were the one SPECIAL-NAMES
+    /// table still missing: a contained program's <c>MOVE SYM-A TO Y</c> naming its container's symbolic-character
+    /// was COBOLNET1639 "not defined" (kb/Work PB3154's sweep; §8.4.6.1 lists symbolic-character among the names a
+    /// configuration section declares for "any source element contained within that source element").
+    /// §11.9.4 GR1's OPTIONS inheritance rides the same call.
     /// <para>⚠ One sibling still lives elsewhere: EVERY SPECIAL-NAMES mnemonic-name — the switch mnemonics SET reads
     /// as much as the device and feature mnemonics DISPLAY UPON / ACCEPT FROM / WRITE ADVANCING read (kb/Work
     /// PB454 moved the switch ones there rather than keep a second copy here) — inherits through
@@ -465,6 +472,7 @@ public sealed partial class DataBinder
         foreach (var (k, v) in container.OrderTables) OrderTables.TryAdd(k, v);
         foreach (var (k, v) in container.DynamicLengthStructures) DynamicLengthStructures.TryAdd(k, v);   // §8.4.6.1
         foreach (var (k, v) in container.Locales) Locales.TryAdd(k, v);   // §12.3.7.4 GR1 — locale-names reach contained units
+        foreach (var (k, v) in container.SymbolicCharacters) SymbolicCharacters.TryAdd(k, v);   // §8.4.6.1 (kb/Work PB3154)
         // OBJECT-COMPUTER … PROGRAM COLLATING SEQUENCE (§12.3.6 GR9–GR11) and CHARACTER CLASSIFICATION (GR1 — every
         // OBJECT-COMPUTER clause applies to the contained units)
         Collating = container.Collating;
@@ -816,8 +824,7 @@ public sealed partial class DataBinder
         // The names THIS source element declares — a containing element's inherited names may be re-declared
         // (§8.4.6.1: each source element "may use identical user-defined words"), its own may not (§8.4.2.1).
         var ownDls = new HashSet<string>(CobolNames.Comparer);
-        foreach (var para in EnvDivisions(program)
-                     .SelectMany(env => env.configurationSection()?.configurationParagraph() ?? []))
+        foreach (var para in program.environmentDivision()?.configurationSection()?.configurationParagraph() ?? [])
         {
             // OBJECT-COMPUTER … PROGRAM COLLATING SEQUENCE (ISO §12.3.6 — the 85 single-name IS form, the 2002
             // two-name IS form, and the 2002 FOR ALPHANUMERIC/FOR NATIONAL forms; resolved AFTER the walk). The
