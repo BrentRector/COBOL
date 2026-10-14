@@ -147,11 +147,21 @@ public sealed partial class DataBinder
     /// distance of the element that declared the constant or symbolic-character; 1 = the direct container). "b) 1.
     /// The item in source element A if the name is declared in source element A. 2. The item in the containing
     /// source element if the name is not declared in source element A and is declared in the source element
-    /// containing source element A." A condition-name is placed by its conditional variable.</summary>
+    /// containing source element A." A condition-name is placed by its conditional variable.
+    /// <para>⛔ EVERY NAME INDEX A DATA DESCRIPTION ENTRY DECLARES INTO, not only <see cref="ByName"/> (kb/Work PB3154
+    /// review R2-1): a named OCCURS DYNAMIC CAPACITY register is a data-name (§13.18.38.3 SR30) kept off
+    /// <see cref="ByName"/> in <see cref="_capacityRegisters"/>, placed by its table (a METHOD's own table is the
+    /// method tier, <see cref="ActiveMethodDeclares"/>, so the object half never counts it); a REPORT SECTION sum
+    /// counter is a data-name too (§13.18.54.4 GR5) kept off it in <see cref="_sumCounters"/>, always this element's
+    /// own. <c>GlobalNameClassDriftTests</c> holds this predicate to the inherited name-index list, so a name index
+    /// added there is asked here too.</para></summary>
     private bool DeclaredNearerThan(string name, int depth)
     {
         if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth)) return true;
         if (Conditions.TryGetValue(name, out var conds) && conds.Any(c => DeclaringDepth(c.Parent) < depth)) return true;
+        if (_capacityRegisters.TryGetValue(name, out var tables)
+            && tables.Any(t => !OoMethodScopedRoots.Contains(t.Root) && DeclaringDepth(t) < depth)) return true;
+        if (depth > 0 && _sumCounters.ContainsKey(name)) return true;
         if (!IndexNames.Declares(name)) return false;
         IndexNames.Candidates(name, static _ => true, out int indexDepth);   // int.MaxValue when none survives
         return indexDepth < depth;

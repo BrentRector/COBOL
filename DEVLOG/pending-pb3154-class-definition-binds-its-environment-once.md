@@ -49,3 +49,17 @@ middle GLOBAL and middle-local tiers) and `2002/pb3154_half_data_hides_class_sym
 both differ from the pre-fix build. Left as a lead, a different mechanism: a method's own CONSTANT entries live in the
 class binder's one table, so a sibling method reads them and two methods declaring the same constant-name with
 different values are refused COBOLNET1547.
+
+**Review round 2 (R2-1, fixed).** The round-1 predicate `DeclaredNearerThan` asked the data-name, condition-name and
+index-name indexes, but a named OCCURS DYNAMIC CAPACITY register is a data-name kept off `ByName` (§13.18.38.3 SR30), and
+so is a REPORT SECTION sum counter (§13.18.54.4 GR5). A contained program's `CAPACITY IN S1` spelled like its container's
+symbolic-character moved the figurative (the branch refused `MOVE S1 TO N` with COBOLNET0902 at 2023; main printed
+`INNER 003`); the same register spelled like a container's GLOBAL constant read the constant (`INNER 005`, pre-existing
+on main); the OO halves and a method's own register likewise. Fix: the predicate asks both indexes (a
+method's table is the method tier, excluded at the object tier), `ActiveMethodDeclares` asks the method's own registers,
+and `GlobalNameClassDriftTests.DeclaredNearerThan_AsksEveryInheritedNameIndex` ties the predicate to the inherited
+name-index list so the next name index is asked too. Goldens `2014/pb3154_capacity_register_hides_alias`,
+`2014/pb3154_half_capacity_register_hides_symbolic` and `2002/pb3154_sum_counter_hides_symbolic`, each different on the
+pre-fix build. Left as a lead, a different mechanism (pre-existing): a method's named CAPACITY register is visible to its
+sibling methods (`ReferenceResolver.CapacityRegisterFor` reads the class binder's one register index with no method
+filter), and a sibling's `DISPLAY` of it fails C# compilation (CS0103).

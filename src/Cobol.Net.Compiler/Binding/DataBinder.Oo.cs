@@ -56,7 +56,11 @@ public sealed partial class DataBinder
     /// always false outside a method's statements.</summary>
     internal bool ActiveMethodDeclares(string word) =>
         ActiveMethodScope is { } m
-        && (m.ByName.ContainsKey(word) || m.Conditions.ContainsKey(word) || m.IndexNames.Declares(word));
+        && (m.ByName.ContainsKey(word) || m.Conditions.ContainsKey(word) || m.IndexNames.Declares(word)
+            // A method table's named CAPACITY register is the method's data-name too (§13.18.38.3 SR30), but it lives
+            // in the class binder's register index, not in the method's ByName (kb/Work PB3154 review R2-1).
+            || (_capacityRegisters.TryGetValue(word, out var tables)
+                && tables.Exists(t => OoRootOwner.TryGetValue(t.Root, out var owner) && owner.DataScope == m)));
 
     /// <summary>True when this binder binds a CLASS unit (per-binder-instance configuration, set ONCE at
     /// construction by <c>Oo/OoDriver</c> — init-only since P9 Step 6, so a mid-bind mutation cannot compile): a root
