@@ -1,0 +1,3 @@
+## Filed PB3155 and extended PB3112 from the w1076a (PB2921) finisher's gate leads
+
+Clerk record, no code changed (drain mode). From the PB2921 report's "Why the Windows gate missed both": item (b), tier 0a never reading the landing's `TestResults/linux-gate/*.trx` reds, is new note PB3155 (MAJOR, CI-invariant leak path). Item (a), the tier-0c cap keeping `NulByteDriftTests` in leg 2 because its timings were recorded under whole-population load and each of its three facts re-walks the tree, is the same mechanism as the open PB3112, so a dated evidence paragraph went into PB3112 instead of a new note. Item (c) is the batched-gating design and was not filed.
