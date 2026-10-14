@@ -23,7 +23,6 @@ namespace CobolNet.Tests.Unit;
 /// The behaviour is pinned by the golden <c>tests/conformance/2002/pb3158_aligned_in_mid_byte_bit_group.cob</c> and
 /// <c>BitRunImageDriftTests</c> (BRD09, BRD10).
 /// </summary>
-[Trait("Sweep", "tree")]
 public sealed class BitGroupPhaseDriftTests
 {
     private static string BitLayoutText() =>
