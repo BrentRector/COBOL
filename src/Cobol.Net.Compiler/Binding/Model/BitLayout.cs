@@ -318,6 +318,15 @@ internal static class BitLayout
         for (int i = 0; i < siblings.Count && at < 0; i++)
             if (ReferenceEquals(siblings[i], item)) at = i;
         if (at < 0) return 0;
+        if (item.RedefinesTargetName is null)
+        {
+            // The two cheap answers, so a walk is paid only by a group that really continues a predecessor's byte.
+            DataItem? prev = null;
+            for (int i = at - 1; i >= 0 && prev is null; i--)
+                if (siblings[i].RedefinesTargetName is null) prev = siblings[i];
+            if (prev is null ? !KeepsPosition(item) : !SharesByteWith(prev, item)) return 0;   // a byte of its own
+            if (prev is null) return PhaseOf(parent);                                           // begins where its group does
+        }
         int parentPhase = PhaseOf(parent);
         var starts = new int[siblings.Count];
         Walk(parent, parentPhase, starts);
