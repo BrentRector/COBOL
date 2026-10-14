@@ -1,0 +1,32 @@
+## PB3030's bit arm: one OCCURS DEPENDING tail counted in bits; PB2921 review round 2 (data named like a method)
+
+Wave 1074 group A, finishing the w1071 B branch (merged at 1a473341f) and taking PB3030's second half.
+
+**PB2921, review round 2.** R2-1: the per-method §8.3.2.2 census (round 2's fix) let an object data-name spelled
+like a METHOD-ID through to the emitter, which gave the private data field and the method one C# member name
+(CS0102 on legal source; probe `E:\COBOL-coord\scratch\w1074a\r2\p1.cob`, and `p5.cob` for the factory pair). The
+object data and the instance methods share one emitted C# class, so `OoDriver.BindClassData` now reserves the methods'
+C# names in the data binder's member scope before the data binds (`DataBinder.ReserveMethodMemberNames`) and the field
+takes `PQ_2`. A derived class's data spelled like an inherited method (`p6.cob`) and a method's LOCAL-STORAGE item
+spelled like a sibling method (`p8.cob`) were already right. Golden `2002/pb2921_data_named_like_method`. R2-2: the
+census paragraph of `docs/COBOLNET_INTRINSICS_DESIGN.md` and two `DataBinder` comments still described one census per
+binder and a method declared by the OO driver; both now name the per-method census and `OoBindMethodData`.
+
+**PB3030.** Re-probed: `FUNCTION LENGTH` of a group holding a dynamic-capacity table of dynamic-length elements and an
+OCCURS DEPENDING table of USAGE BIT items still warned COBOLNET1756 and aborted the run unit. `DataItem.
+CurrentExtentComposes` refused the bit-bearing member; admitting it needed the variable-length group codec to count the
+table in bits (§8.5.1.6.3 places each bit occurrence "at the next bit position in storage", so occurrences share
+bytes). The fix is one tail: `OdoModel.FixedImageTail` states `OdoModel.GeometryOf` as the runtime `OdoTail`, which
+gained a lead and a unit (`PositionsPerCharacter`, 8 for bits). `CutAt` takes the ceiling of the bits (§15.50.4 rule
+9), `KeepUnused` is §13.18.38.4 GR8 a)'s receiving splice (a `CobolBits` window when the first unused occurrence starts
+inside a byte), and `RecordUnit` / `RecordMaxUnits` state the table as the record's last component, one CHARACTER per
+unit (new determination D-FRA (ix): a record of characters cannot say a bit count). The declared group's codec and a
+CELL-BACKED group's window both read it. The cell arm was the sibling: it measured a bit table one character per
+occurrence, and `DISPLAY` of an ADDRESS-OF-taken group of this shape threw ArgumentOutOfRange (`q8.cob`).
+
+Golden `2014/pb3030_bit_odo_variable_group` covers LENGTH / BYTE-LENGTH at three counts, DISPLAY, a GR8 a) MOVE into a
+declared and a cell-backed group, a nested CALL BY REFERENCE and a WRITE / READ round trip, each value derived by hand.
+Unit tests `CobolVarGroupContiguousTests.BitOdoTail_*` cover the tail arithmetic. No edition-gated construct was added.
+No inventory verdict changed (`closes_rows: []` with its reason). Found on the way, not fixed: a MOVE into a
+CELL-BACKED group whose dynamic-capacity table has variable-length elements loses the table (capacity 0; `q9.cob`).
+That is a lead in the report. PB3101 was not started.

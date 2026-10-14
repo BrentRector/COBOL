@@ -714,9 +714,14 @@ missing edition in its COBOLNET1543 text; both read the row through `ConstructRe
 
 **The same funnel is the one-type-per-word census (kb/Work PB990, §8.3.2.2).** "*Within a source element, a given
 user-defined word may be used as only one type of user-defined word*" is asked at `DeclareUserWord` too
-(`CheckOneTypePerWord`): the binder keeps `word → the type it was first declared as` for ITS source element (one
-`DataBinder` is one element; a name a containing element passes down is inherited, not declared, and a contained
-element may re-declare it, §8.4.6.1), and a later declaration of another type is **COBOLNET2692** unless
+(`CheckOneTypePerWord`): ONE `UserWordCensus` per source element keeps `word → the type it was first declared as`
+(a name a containing element passes down is inherited, not declared, and a contained element may re-declare it,
+§8.4.6.1). A program's `DataBinder` is one element and owns one census (`_ownWords`); a class binder also hosts its
+METHODS, each a source element of its own (§10.5), so each method carries its own census (`OoMethodDataScope.Words`)
+and `DataBinder.WordCensus` selects it while `DataBinder.EnterMethodDeclarations` is open — around the method's data
+entries and METHOD-ID (`OoBindMethodData`) and its procedure-names (`StatementBinder.BindClassBody`). ⛔ A new
+declaration site inside a method runs under `EnterMethodDeclarations`, or its word lands in the class's census
+(kb/Work PB2921). A later declaration of another type is **COBOLNET2692** unless
 `UserWordKinds.MayBeOneWord` allows it — the standard's three exceptions as DATA (a compilation-variable-name; a
 level-number beside a paragraph- or section-name; the constant-name / data-name / property-name / record-key-name /
 record-name group), which `UserWordDeclarationDriftTests.TheSharingRelation_IsRebuiltFromTheStandardsExceptions`

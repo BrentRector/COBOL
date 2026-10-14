@@ -1416,7 +1416,16 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // ⚠ ResolveSending, deliberately: the receiving chokepoint REFUSES a CAPACITY register (COBOLNET1523 —
         // "except in a SET statement Format 14"), and this IS Format 14; the call exists only for the resolver's
         // own reference diagnostic.
-        if (cap.Place is not { } place) { host.Expr.ResolveSending(targets[0]); return new BoundUnsupported("SET receiving operand"); }
+        // An AMBIGUOUS register (§8.4.2.2.3 SR1; kb/Work PB2988) is the same screen's: refused, or under --permissive
+        // warned and resolved to the first declared register, whose place the resolver then hands back.
+        CapacityRegisterPlace place;
+        if (cap.Fault is not ReferenceResolver.CapacityRefFault.None || cap.Place is null)
+        {
+            if (host.Expr.ResolveSending(targets[0]).Place is not CapacityRegisterPlace resolved)
+                return new BoundUnsupported("SET receiving operand");
+            place = resolved;
+        }
+        else place = cap.Place;
         if (targets.Count > 1)
         {
             return BoundRejected.Report(ctx.Edition, "COBOLNET1524",

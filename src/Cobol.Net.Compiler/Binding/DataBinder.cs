@@ -171,8 +171,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// table in a GLOBAL record is subordinate to a global name — SR30 places it "at the same level as the entry
     /// containing the OCCURS clause" — so it is a global name too (§8.4.6.2.2: "All data-names and screen-names
     /// subordinate to a global name are global names"), and a contained program inherits it with the rest of the
-    /// record (<see cref="InheritGlobalSubtree"/>). This element's own register (at most one per spelling: SR30's
-    /// "shall not be defined elsewhere in the source element") comes first, then each container's, so
+    /// record (<see cref="InheritGlobalSubtree"/>). This element's own registers come first (one written definition
+    /// per spelling: SR30's "shall not be defined elsewhere in the source element", reproduced once per TYPE / SAME AS
+    /// copy of its entry, kb/Work PB2988), then each container's, so
     /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The OWN registers alone are
     /// <see cref="DeclaredCapacityRegisterTables"/>.</para></summary>
     public IReadOnlyDictionary<string, List<DataItem>> CapacityRegisters
@@ -1598,7 +1599,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     internal string? CollatingAlphabetFault(string alphabet, bool national)
     {
         if (!Alphabets.ContainsKey(alphabet) && !NationalAlphabets.ContainsKey(alphabet)
-            && _wordTypes.TryGetValue(alphabet, out var declaredAs) && declaredAs == UserWordKind.AlphabetName)
+            && _ownWords.IsDeclaredAs(alphabet, UserWordKind.AlphabetName))   // SPECIAL-NAMES: never a method's (§12.3.3 SR2)
             return null;
         if (national)
             return NationalAlphabets.TryGetValue(alphabet, out var nd)
@@ -2552,7 +2553,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (operand is null || !ItemCategory.IsAlphanumericOrNational(key)) return null;
         bool national = !ItemCategory.IsAlphanumeric(key);
-        int positions = national ? key.ByteWidth / CobolNet.Runtime.CobolBits.BytesPerNational : key.ByteWidth;
+        int positions = key.ByteWidth / (key.OperandPic?.BytesPerPosition ?? 1);   // the ONE unit reader (kb/Work PB546)
         var category = national ? PicCategory.National : PicCategory.Alphanumeric;
         string value = operand.Form switch
         {
@@ -3401,16 +3402,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             using (Edition.At(f)) DeclareUserWord(f.GetText(), UserWordKind.ParameterName);
     }
 
-    /// <summary>The TYPE each user-defined word of THIS source element was first declared as — the census behind
-    /// §8.3.2.2's "<i>a given user-defined word may be used as only one type of user-defined word</i>" (kb/Work
-    /// PB990). One instance of the binder is one source element, so the map is per element by construction; a name a
-    /// containing element's SPECIAL-NAMES passes down is inherited, not declared here, and a contained source element
-    /// may re-declare it as another type (§8.4.6.1: each element "may use identical user-defined words"). Keyed
-    /// case-insensitively, like every COBOL word.</summary>
-    private readonly Dictionary<string, UserWordKind> _wordTypes = new(CobolNames.Comparer);
+    /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, or a class's
+    /// object, factory or interface definition. A name a containing element's SPECIAL-NAMES passes down is inherited,
+    /// not declared here, and a contained source element may re-declare it as another type (§8.4.6.1: each element
+    /// "may use identical user-defined words").</summary>
+    private readonly UserWordCensus _ownWords = new();
 
-    /// <summary>The words already reported as two types, so a third declaration does not repeat the refusal.</summary>
-    private readonly HashSet<string> _wordTypeConflictReported = new(CobolNames.Comparer);
+    /// <summary>The census a declaration lands in: the METHOD whose words are being declared
+    /// (<see cref="EnterMethodDeclarations"/> — its data entries, its METHOD-ID and its procedure-names), which is a
+    /// source element of its own, else this binder's own (kb/Work PB2921).</summary>
+    private UserWordCensus WordCensus => _bindingMethodScope?.Words ?? _ownWords;
 
     /// <summary>⛔ §8.3.2.2: "<i>Within a source element, a given user-defined word may be used as only one type of
     /// user-defined word</i>", except as <see cref="UserWordKinds.MayBeOneWord"/> says. Asked at the ONE declaration funnel
@@ -3421,9 +3422,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is.</summary>
     private void CheckOneTypePerWord(string word, UserWordKind kind)
     {
-        if (_wordTypes.TryAdd(word, kind)) return;
-        var first = _wordTypes[word];
-        if (UserWordKinds.MayBeOneWord(first, kind) || !_wordTypeConflictReported.Add(word)) return;
+        if (WordCensus.Declare(word, kind) is not { } first) return;
         Edition.Error(DiagnosticCatalog.UserWordTypeConflict,
             $"'{word}' names two types of user-defined word in this source element ({first.Spelling()} and "
             + $"{kind.Spelling()}) — a given user-defined word may be used as only one type of user-defined word "
@@ -3457,8 +3456,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// a FUNCTION-ID paragraph (§8.3.2.2) — once the REPOSITORY in scope is known: the unit's own paragraph and, for a
     /// contained program, its container's (inherited by <c>InheritConfiguration</c>; §12.3.4 GR1 — "the entries
     /// explicitly or implicitly specified in the configuration section of a source unit that contains other source
-    /// units apply to each directly or indirectly contained source unit"). A class, interface or method
-    /// is declared by the OO driver, whose units reach this binder as synthetic contexts with no identification
+    /// units apply to each directly or indirectly contained source unit"). A class or interface is declared by the OO
+    /// driver (<c>OoDriver.BindClassData</c> / <c>BindInterface</c>), a method's METHOD-ID by <see cref="OoBindMethodData"/>
+    /// into the method's own census; their units reach this binder as synthetic contexts with no identification
     /// division.</summary>
     private void DeclareUnitName(Core.ProgramUnitContext program)
     {
@@ -3468,7 +3468,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>The user-defined word a unit's own identification paragraph declares, and its type — null for a
     /// unit with no PROGRAM-ID / FUNCTION-ID paragraph (a class, interface or method reaches this binder as a synthetic
-    /// context; the OO driver declares those). The IS PROTOTYPE format declares a prototype-name instead (§11.10.2
+    /// context; <see cref="DeclareUnitName"/> names who declares those). The IS PROTOTYPE format declares a prototype-name instead (§11.10.2
     /// Format 2, §11.5.2 Format 2). ONE reading, asked by <see cref="DeclareUnitName"/> and by the REPOSITORY
     /// walk, which must not declare a specifier that names the unit itself (§12.3.8.3 SR11 / SR15: "this specifier
     /// is ignored").</summary>
@@ -8506,26 +8506,32 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// (COBOLNET1639) and with its disposition: an error, or under <c>--permissive</c> a warning and the
     /// first-declared survivor (ReferenceResolver.ResolveUnqualified, kb/Work R33). None returns null WITHOUT a
     /// report: an operand that names nothing breaks the CLAUSE's own rule, which the caller states
-    /// (<paramref name="ambiguityReported"/> says which of the two a null is).</summary>
+    /// (<paramref name="ambiguityReported"/> says which of the two a null is).
+    /// <para>⛔ THE VERDICT DOES NOT DEPEND ON WHETHER IT IS REPORTED. <paramref name="report"/> false asks the same
+    /// question silently — a probe (R30 purity, kb/Work PB157), or a written reference whose report another binder
+    /// already made (SET classifies its operand, then binds it) — and returns exactly what the reporting ask
+    /// returns. The PB2988 review R1-1 of wave 1073 measured the alternative: the index-name resolver answered a
+    /// SECOND ask of an ambiguous <c>--permissive</c> reference "failed" instead of the first-declared index, so the
+    /// backend received an inert occurrence number as an assignment target (CS0131).</para></summary>
     internal T? UniqueOrReportAmbiguous<T>(NameCandidates<T> candidates, string clauseFace, string written,
-                                           out bool ambiguityReported) where T : class
+                                           out bool ambiguityReported, bool report = true) where T : class
     {
         ambiguityReported = false;
         if (candidates.Count <= 1) return candidates.Single;
         ambiguityReported = true;
+        T? verdict = Edition.Permissive ? candidates.FirstDeclaredForPermissive : null;
+        if (!report) return verdict;
         // One verdict for every name class §8.4.2.2.3 SR1 covers (kb/Work PB919): only the noun differs.
         string what = typeof(T) == typeof(IndexDeclaration) ? "an index-name" : "a data item";
         string msg = $"{clauseFace} '{written}' does not uniquely identify {what} — {candidates.Count} "
             + "declarations match the written reference (ISO §8.4.2.2.3 SR1: \"For each non unique user-defined "
             + "name that is explicitly referenced, uniqueness shall be established through a sequence of qualifiers "
             + "that precludes any ambiguity of reference\")";
-        if (!Edition.Permissive)
-        {
+        if (verdict is null)
             Edition.Error(DiagnosticCatalog.UndefinedReference, msg);
-            return null;
-        }
-        Edition.Warning(DiagnosticCatalog.UndefinedReference, msg + "; --permissive resolves to the first declaration");
-        return candidates.FirstDeclaredForPermissive;
+        else
+            Edition.Warning(DiagnosticCatalog.UndefinedReference, msg + "; --permissive resolves to the first declaration");
+        return verdict;
     }
 
     /// <summary>The written form of a qualified data-name, for a diagnostic: <c>K OF G OF R</c>.</summary>
