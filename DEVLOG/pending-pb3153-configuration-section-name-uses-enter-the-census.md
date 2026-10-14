@@ -72,3 +72,6 @@ position that pairs a configuration-section-name lookup with the own reading, an
 pairing. The golden gains PB3153Y3 (three own constant-names) and an inherited class-name arm; the unit theories gain
 constant-name rows. A CALL / CANCEL target constant-name, refused COBOLNET1639 even in one element (PB780's
 territory), is left as a lead.
+The round-2 finisher's gate, run 20261014T231215Z-47b403: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515):
+GREEN` (Conformance 6,192/11,704, Unit 33,104/33,653, Characterization 6/36 in leg 1; leg 2 left to CI); semgrep
+verify PASS.
