@@ -721,7 +721,11 @@ METHODS, each a source element of its own (§10.5), so each method carries its o
 and `DataBinder.WordCensus` selects it while `DataBinder.EnterMethodDeclarations` is open — around the method's data
 entries and METHOD-ID (`OoBindMethodData`) and its procedure-names (`StatementBinder.BindClassBody`). ⛔ A new
 declaration site inside a method runs under `EnterMethodDeclarations`, or its word lands in the class's census
-(kb/Work PB2921). A later declaration of another type is **COBOLNET2692** unless
+(kb/Work PB2921). A method's census also records each object-class-name, interface-name and parameter-name the
+method REFERENCES (its class declares them, so no declaration of the method's would): the one class-name resolver,
+`OoNameResolution.Lookup`, calls `OoClassTable.RecordReferenceUse` for every name it resolves (kb/Work PB3132), so a
+METHOD-ID or method paragraph spelled like a class-name the method also references is refused.
+A later declaration or reference of another type is **COBOLNET2692** unless
 `UserWordKinds.MayBeOneWord` allows it — the standard's three exceptions as DATA (a compilation-variable-name; a
 level-number beside a paragraph- or section-name; the constant-name / data-name / property-name / record-key-name /
 record-name group), which `UserWordDeclarationDriftTests.TheSharingRelation_IsRebuiltFromTheStandardsExceptions`

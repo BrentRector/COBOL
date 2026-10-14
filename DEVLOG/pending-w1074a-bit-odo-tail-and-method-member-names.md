@@ -55,3 +55,18 @@ and retires the deleted member with its reason; a sweep of every inventory code-
 other dangling member, and the branch deleted no other method declaration.
 Finisher gate run `20261014T072258Z-315405`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`,
 `EveryCodeLocation_ResolvesInTheTree` Passed in leg 1 (the previous red, tier 0a).
+
+Finisher (landing attempt 20261014T075420363360Z, `ENQUEUE: GATE RED` after main was merged in at a0d94a0f2): main's
+PB3132 landing (PR #47) had added `negative/pb3132-method-id-spells-its-class-id-and-invokes-it`, a METHOD-ID spelled
+like its CLASS-ID in a method whose body also writes `INVOKE PB3132X "NEW"`, and retired PB3132 because the shared
+class census refused the METHOD-ID. Review round 2's per-method census (rightly: a method is a source element of its own,
+§10.5) made the METHOD-ID legal, and with it the INVOKE: the class-name a method references is declared by its CLASS, so
+no declaration of the method's announced it, while §8.3.2.2 says "used". Both intents now hold: `OoNameResolution.Lookup`,
+the one class-name and interface-name resolver, records every name it resolves in the referring METHOD's census
+(`OoClassTable.RecordReferenceUse`; `UserWordCensus.Record` takes a declaration or a use; `UserWordCensus.ConflictMessage`
+is the one COBOLNET2692 wording), so the second of the declaration and the reference is refused, and a method that
+never references the class keeps its class-named METHOD-ID (`2002/pb2921_class_named_method` unchanged). New negative
+`pb3132-method-paragraph-spells-a-class-it-references` pins the reference-first path (a `USAGE OBJECT REFERENCE` item,
+then a same-spelled paragraph) beside a sibling method that declares the word as a data-name and stays legal. A
+drift test keeps the two census recorders the only ones. PB3132 reopened and landed with this branch; the nested-program
+residue its note names (an inherited configuration name used beside a local declaration of another type) is unchanged.

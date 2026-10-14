@@ -106,8 +106,9 @@ public sealed class UserWordDeclarationDriftTests
             UserWordKinds.MayBeLetterless.Select(k => k.Spelling()).Order());
     }
 
-    /// <summary>The census runs at the ONE declaration funnel and nowhere else: a second caller would be a second
-    /// place the rule is asked, and a declaring construct that reached only the second would escape the first.</summary>
+    /// <summary>A DECLARATION is recorded in the census at the ONE declaration funnel and nowhere else: a second caller
+    /// would be a second place the rule is asked, and a declaring construct that reached only the second would escape
+    /// the first. (A REFERENCE is recorded by the reference funnel, the next test.)</summary>
     [Fact]
     public void TheCensus_IsAskedOnlyByTheOneDeclarationFunnel()
     {
@@ -123,6 +124,23 @@ public sealed class UserWordDeclarationDriftTests
         string head = binder[declare..(declare + 260)];
         Assert.Contains("CheckOneTypePerWord(word, kind);", head);
         Assert.Contains("CheckLetter(word, kind);", head);   // §8.3.2.2's letter rule, kb/Work PB1403 — the same funnel
+    }
+
+    /// <summary>§8.3.2.2 says "used": a census is RECORDED from exactly two funnels, the declaration funnel
+    /// (<c>DataBinder.CheckOneTypePerWord</c>) and the reference funnel (<c>OoClassTable.RecordReferenceUse</c>, a
+    /// method's reference to an object-class-name, interface-name or parameter-name its class declares, kb/Work PB3132),
+    /// and the reference funnel is reached only from the one class-name resolver, <c>OoNameResolution.Lookup</c>. A third
+    /// recorder, or a class-name resolution that bypassed Lookup, would let a method use a word as two types unseen.</summary>
+    [Fact]
+    public void TheCensus_IsRecordedOnlyByTheDeclarationAndReferenceFunnels()
+    {
+        var sources = Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f))).ToList();
+        Assert.Equal(["DataBinder.cs", "OoClassTable.cs"],
+            sources.Where(s => Regex.IsMatch(s.Text, @"(?:WordCensus|Words)\.Record\(")).Select(s => s.Name).Order());
+        Assert.Equal(["OoNameResolution.cs"],
+            sources.Where(s => Regex.IsMatch(s.Text, @"\.RecordReferenceUse\(")).Select(s => s.Name));
     }
 
     /// <summary>⛔ A PARAGRAPH-NAME-OMITTED PARAGRAPH IS NAMED NOWHERE (ISO §14.4.3; kb/Work PB990): the procedure table

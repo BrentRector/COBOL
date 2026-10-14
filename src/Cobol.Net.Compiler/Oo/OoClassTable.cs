@@ -112,6 +112,45 @@ public sealed class OoClassTable
     // comparer already IS reference equality.
     private readonly Dictionary<Antlr4.Runtime.RuleContext, OoRepositoryScope> _scopes = [];
 
+    /// <summary>The compilation's diagnostics, for the one rule this table reports at a reference
+    /// (<see cref="RecordReferenceUse"/>). Null only for a table no <see cref="Build"/> made.</summary>
+    private EditionContext? _edition;
+
+    /// <summary>⛔ §8.3.2.2 at a REFERENCE (kb/Work PB3132): "Within a source element, a given user-defined word may be
+    /// used as only one type of user-defined word". A method is a source element of its own (§10.5) whose words are
+    /// recorded in its own census (<see cref="OoMethodDataScope.Words"/>, kb/Work PB2921), and the
+    /// object-class-names, interface-names and parameter-names it references are declared by its CLASS (the CLASS-ID,
+    /// the class's REPOSITORY, its USING clause), never by the method; so the method's census learns them here, from
+    /// the one funnel every such reference resolves through (<see cref="OoNameResolution.Lookup"/>). A METHOD-ID
+    /// spelled like its CLASS-ID is therefore legal until the method references that class-name, and then refused
+    /// COBOLNET2692 at whichever of the two comes second, here or at the declaration funnel
+    /// (<c>DataBinder.DeclareUserWord</c>). A reference outside every method is its own element's declaration already
+    /// (§8.4.6.4: the containing definition's name, or a REPOSITORY entry of that or a containing element).</summary>
+    internal void RecordReferenceUse(Antlr4.Runtime.RuleContext? site, string name, UserWordKind kind)
+    {
+        if (_edition is null || MethodAt(site) is not { } method
+            || method.DataScope.Words.Record(name, kind) is not { } first) return;
+        using (_edition.At(site as Antlr4.Runtime.ParserRuleContext))
+            _edition.Error(DiagnosticCatalog.UserWordTypeConflict, UserWordCensus.ConflictMessage(name, first, kind));
+    }
+
+    /// <summary>The method definition <paramref name="site"/> lies in, when its innermost source element is one: a
+    /// class's instance or factory method, or an interface's method prototype, of this table's definitions or of a
+    /// parameterized definition bound as itself. Memoized by the definition's parse node; a definition with no symbol
+    /// (one refused as a duplicate) is looked up again and answers null.</summary>
+    private OoMethodSymbol? MethodAt(Antlr4.Runtime.RuleContext? site)
+    {
+        if (SourceElementOf(site) is not Core.MethodDefinitionContext md) return null;
+        if (_methodsByDefinition.TryGetValue(md, out var known)) return known;
+        var found = _classes.Concat(_parameterizedClasses).SelectMany(c => c.Methods.Concat(c.FactoryMethods))
+            .Concat(_interfaces.Concat(_parameterizedInterfaces).SelectMany(i => i.Prototypes))
+            .FirstOrDefault(m => ReferenceEquals(m.Ctx, md));
+        if (found is not null) _methodsByDefinition[md] = found;
+        return found;
+    }
+
+    private readonly Dictionary<Core.MethodDefinitionContext, OoMethodSymbol> _methodsByDefinition = [];
+
     /// <summary>The innermost source element containing <paramref name="site"/> — the memo key, and the unit
     /// whose REPOSITORY (plus its containers') the scope is. A method definition is its own key even though it
     /// may not carry a REPOSITORY (§12.3.3 SR2): its scope is its class's, and keying on it costs one entry.</summary>
@@ -297,7 +336,7 @@ public sealed class OoClassTable
         var table = new OoClassTable
         {
             _parameterized = parameterizedNames ?? EmptyNames, _variables = variables,
-            _dialectLevel = edition.Edition.Year,
+            _dialectLevel = edition.Edition.Year, _edition = edition,
         };
         var usedCsNames = new HashSet<string>(StringComparer.Ordinal);
 

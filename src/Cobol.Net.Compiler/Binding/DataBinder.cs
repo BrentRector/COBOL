@@ -3419,16 +3419,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// Before kb/Work PB990 each declaring construct kept its own registry and nothing crossed them, so
     /// <c>ALPHABET ZQ IS NATIVE</c> beside <c>01 ZQ PIC X</c> compiled and ran. The same TYPE declared twice is no
     /// conflict here (a TYPE expansion re-registers a clone of its template's words); whether two declarations of
-    /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is.</summary>
+    /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is. A METHOD's census also
+    /// records the class-names its references resolve (<see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/>,
+    /// kb/Work PB3132), so a declaration after such a use is reported here too.</summary>
     private void CheckOneTypePerWord(string word, UserWordKind kind)
     {
-        if (WordCensus.Declare(word, kind) is not { } first) return;
-        Edition.Error(DiagnosticCatalog.UserWordTypeConflict,
-            $"'{word}' names two types of user-defined word in this source element ({first.Spelling()} and "
-            + $"{kind.Spelling()}) — a given user-defined word may be used as only one type of user-defined word "
-            + "(ISO §8.3.2.2); the "
-            + "exceptions are a compilation-variable-name, a level-number that matches a paragraph-name or "
-            + "section-name, and the constant-name / data-name / property-name / record-key-name / record-name group");
+        if (WordCensus.Record(word, kind) is not { } first) return;
+        Edition.Error(DiagnosticCatalog.UserWordTypeConflict, UserWordCensus.ConflictMessage(word, first, kind));
     }
 
     /// <summary>The letterless words already reported, so a repeated declaration of one (a TYPE expansion re-registers
