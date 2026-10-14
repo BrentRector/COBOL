@@ -268,6 +268,7 @@ internal static class UsageCollectionPass
         public bool Visit(BoundComputeBoolean n) => false;
         public bool Visit(BoundPositionValue n) => false;
         public bool Visit(BoundUnsupported n) => false;
+        public bool Visit(BoundDeferredToExpansion n) => false;
         public bool Visit(BoundRejected n) => false;
         public bool Visit(BoundStop n) => false;
         public bool Visit(BoundStopLiteral n) => false;

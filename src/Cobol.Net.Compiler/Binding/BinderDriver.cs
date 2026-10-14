@@ -166,7 +166,10 @@ internal sealed class BinderDriver
         // to each directly or indirectly contained source unit"), and until kb/Work PB1100 the class bodies bound
         // first, against no table, so every user-function reference in a method drew COBOLNET1505.
         session.Repository = BuildGroupRepository(units, classes, session);
-        ResolvePointerRestrictions(units, classes, oo.InterfaceData, session);
+        // The unexpanded parameterized definitions' forests are resolved with the rest (kb/Work PB2937): their method
+        // bodies bind below, and a restricted pointer in them is typed by its prototype's signature exactly as anywhere.
+        ResolvePointerRestrictions(units, [.. classes, .. oo.SkeletonClasses],
+            [.. oo.InterfaceData, .. oo.SkeletonInterfaceData], session);
         // ⛔ EVERY SIGNATURE COMPARISON RUNS AFTER THE POINTER TYPES EXIST (kb/Work PB2495): a formal or returning item
         // that is a restricted program- or function-pointer is typed by its prototype's signature class (ISO §13.18.60.4
         // GR25 / GR26), which ResolvePointerRestrictions has just attached. A check that runs before it reads an
@@ -181,6 +184,11 @@ internal sealed class BinderDriver
         OoConformance.ValidatePropertyAccessorPairs(table, edition);   // §8.4.3.9.3 SR7 — get RETURNING = set USING, over the formals just resolved
         var ooAdapters = OoConformance.ValidateImplements(table, edition);   // §9.3.11 via §9.3.8.2.3 (D-I1 — the binder is the authority; returns the covariant adapters)
         foreach (var cls in classes) oo.BindClassBody(cls);
+        // The method BODIES of a parameterized definition nothing expands bind as themselves too, after every emitted
+        // class's (kb/Work PB2937; OO deep-dive D12 determination 6): every rule of their text is asked, and a statement
+        // that selects a method through a parameter-name is each expansion's (BoundDeferredToExpansion). Nothing emits
+        // them; the edition pass walks them (VersionConformancePass.Run).
+        foreach (var skeleton in oo.SkeletonClasses) oo.BindClassBody(skeleton);
 
         // The whole-group middle-end (P6 Steps 3–4): the DECLARED manifest — ProcedureBinding →
         // UsageCollectionPass → StorageFormPass → VersionConformancePass (the NAMED terminal pass, the SOLE
@@ -827,7 +835,7 @@ internal sealed class BinderDriver
     /// pointer is compared by the prototype IT names (<see cref="PrototypeSignatures.SameType"/>) — which may be declared
     /// in a forest later in the group, so every forest is resolved before any is classified.</para></summary>
     private static void ResolvePointerRestrictions(IReadOnlyList<BoundUnit> units, IReadOnlyList<OoClassUnit> classes,
-        IReadOnlyDictionary<OoInterfaceSymbol, DataBinder> interfaces, BindSession session)
+        IReadOnlyList<KeyValuePair<OoInterfaceSymbol, DataBinder>> interfaces, BindSession session)
     {
         var repository = session.Repository;
         var forests = new List<(DataBinder Data, BoundUnit? Unit, int Position)>();

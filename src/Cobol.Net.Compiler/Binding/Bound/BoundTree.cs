@@ -908,6 +908,17 @@ public abstract record BoundStatement
 /// refused statement and announces nothing.</para></summary>
 public sealed record BoundUnsupported(string Feature) : BoundStatement;
 
+/// <summary>⛔ A STATEMENT WHOSE MEANING IS EACH EXPANSION'S (kb/Work PB2937; OO deep-dive D12 determination 6). A
+/// parameterized class definition that nothing expands binds its method bodies as itself, so every rule of their text is
+/// asked; but a statement that reaches a method or property THROUGH a parameter-name — an INVOKE whose receiver is a
+/// formal-typed reference or a formal class-name, SELF or SUPER whose search runs into a formal superclass, an inline
+/// invocation or an object property of a formal-typed object — selects a method (or a property's description) only once
+/// the actual is substituted (ISO §9.3.8.2.4), and every expansion re-binds it with that actual. Its operands were bound
+/// for their own rules before the site deferred (<see cref="Binding.EditionContext.NoteExpansionDeferred"/>); this node
+/// is what <c>StatementBinder.BindStatement</c> keeps in its place. Never emitted: no pass that produces code reads a
+/// skeleton's bound tree (<c>OoDriver.SkeletonClasses</c>). <paramref name="Construct"/> names what waits.</summary>
+public sealed record BoundDeferredToExpansion(string Construct) : BoundStatement;
+
 /// <summary>⛔ A REFUSAL, AND NOTHING ELSE (kb/Work PB909): a statement the SOURCE got wrong — written in a shape no
 /// general format prints, or with an operand its syntax rules exclude. It is the other half of the split that
 /// <see cref="BoundUnsupported"/> used to carry alone, when an ungrammatical statement and an unbuilt feature both

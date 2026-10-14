@@ -87,8 +87,12 @@ public sealed partial class ReferenceResolver
         && dref.cobolWord() is { } word && IsClassName(dref, word.Name())
             ? word : null;
 
+    /// <summary>A class-name this source element may reference (§8.4.6.4), or a parameter-name declared CLASS of the
+    /// parameterized definition bound as itself, which stands where an object-class-name does (§11.3.4 GR6; kb/Work
+    /// PB2937 — <c>B OF SUPER</c> over a formal superclass B).</summary>
     private bool IsClassName(RuleContext site, string name) =>
-        data.OoClasses is { } table && OoNameResolution.Lookup(table, site, name, OoNameResolution.Want.Class).Class is not null;
+        data.OoClasses is { } table
+        && OoNameResolution.Lookup(table, site, name, OoNameResolution.Want.Class) is { Class: not null } or { IsFormal: true };
 
     /// <summary>True when <paramref name="dref"/> is the object-view of a qualified data item written as one chain,
     /// <c>A OF G AS C</c> — a view, which §8.4.3.5.3 SR2 forbids as a receiving operand. Pure.</summary>
@@ -211,21 +215,21 @@ public sealed partial class ReferenceResolver
             // The roster is identifier-3's description AS RESOLVED: for a view of a qualified item (`A OF G AS C`) that
             // is the view's (§8.4.3.5.4 GR1), which the probe's un-viewed item is not — the committed place carries it,
             // and a probe reads it from the view's last phrase, as for a view written alone.
-            bool universal = false;
+            bool answered = false;
             PropertyReceiver? typed;
             if (!_probing)
             {
                 var committed = Resolve(objRef);
                 if (committed.Place is not { } place) return (null, committed);
                 typed = RosterOf(place.Item, new PropertyReceiver(InvokeForm.Instance, place, null, null, false), name,
-                    objWritten, out universal);
+                    objWritten, out answered);
             }
             else
                 typed = ViewSubjectChain(objRef) is { View.Parent: Core.PropertyObjectContext viewed }
                     ? BindPropertyObject?.Invoke(viewed, null, true)
                     : RosterOf(sniff.Item, new PropertyReceiver(InvokeForm.Instance, null, null, null, false), name,
-                        objWritten, out universal);
-            if (typed is not { } found) return universal && !_probing ? (null, Refusal()) : default;
+                        objWritten, out answered);
+            if (typed is not { } found) return answered && !_probing ? (null, Refusal()) : default;
             receiver = found;
         }
         if (receiver is { Class: null, Interface: null })
@@ -246,7 +250,17 @@ public sealed partial class ReferenceResolver
         string known = data.OoRepositoryProperties.TryGetValue(name, out var specified) ? specified : name;
         var get = Accessor(receiver, NamingConvention.GetAccessorName(known));
         var set = Accessor(receiver, NamingConvention.SetAccessorName(known));
-        if (get is null && set is null) return default;      // not a property of the roster → generic diagnosis
+        if (get is null && set is null)
+        {
+            // Not in a definition bound as itself whose superclass is a parameter-name: the accessor may be the actual's
+            // (§9.3.9, §9.3.8.2.4; kb/Work PB2937) — each expansion's question, not "not a property".
+            if (receiver.Class?.FormalBaseName is not null && !_probing)
+            {
+                data.Edition.NoteExpansionDeferred($"the object property '{name}' OF '{objWritten}'");
+                return (null, Refusal());
+            }
+            return default;      // not a property of the roster → generic diagnosis
+        }
 
         var model = get?.Binding!.Returning ?? set!.Binding!.Formals[0].Item;
         // R30 PURITY (kb/Work PB157): a PROBE gets the property's MODEL item — the accessor's own description, carrying
@@ -281,15 +295,24 @@ public sealed partial class ReferenceResolver
 
     /// <summary>The roster an object-reference item of <paramref name="item"/>'s description selects (§8.4.3.9.3 SR3/SR4):
     /// FACTORY OF selects the factory half (kb/Work PB389), an interface-typed reference its prototype closure (kb/Work
-    /// PB1449, §11.8.4 GR2). A universal reference is SR2's refusal (reported unless probing); null also for a class this
+    /// PB1449, §11.8.4 GR2). A universal reference is SR2's refusal (reported unless probing), and a reference described
+    /// with a parameter-name of the definition bound as itself has the actual's roster, each expansion's question (noted
+    /// unless probing; kb/Work PB2937) — both set <paramref name="answered"/>, so the caller refuses rather than diagnose
+    /// "not a property" again; null also for a class this
     /// compilation cannot see, which is no property of any roster — the generic diagnosis.</summary>
     private PropertyReceiver? RosterOf(DataItem item, PropertyReceiver receiver, string name, string objWritten,
-        out bool universal)
+        out bool answered)
     {
-        universal = false;
+        answered = false;
         if (item.Pic is not { Category: PicCategory.ObjectReference } pic || data.OoClasses is not { } table) return null;
         var described = pic.ObjectRef ?? ObjectRefDescriptor.Universal;
-        if (universal = described.IsUniversal)
+        if (described.Formal)
+        {
+            if (!_probing) data.Edition.NoteExpansionDeferred($"the object property '{name}' OF '{objWritten}'");
+            answered = true;
+            return null;
+        }
+        if (answered = described.IsUniversal)
         {
             // §8.4.3.9.3 SR2: "Identifier-1 shall be an object reference; neither a universal object reference nor the
             // predefined object reference NULL shall be specified."

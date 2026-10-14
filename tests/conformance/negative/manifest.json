@@ -62,6 +62,8 @@
   "pb3121-sibling-program-not-in-prototype-scope",
   "pb2937-skeleton-data-edition-gate",
   "pb2937-interface-formal-edition-gate",
+  "pb2937-skeleton-statement-rule",
+  "pb2937-skeleton-only-receiver",
   "pb2076-universal-returning-move-match-below-2002",
   "pb2463-universal-returning-set-match-below-2002",
   "pb552-value-through-not-ascending",

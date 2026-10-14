@@ -125,6 +125,12 @@ internal sealed class VersionConformancePass
         foreach (var data in group.SkeletonClasses.SelectMany(c => new[] { c.Data, c.FactoryData })
                      .Concat(group.InterfaceData.Values).Concat(group.SkeletonInterfaceData.Values))
             pass.GateData(data);
+        // … and every bound statement: an unexpanded skeleton's method bodies bind as themselves (kb/Work PB2937).
+        foreach (var skeleton in group.SkeletonClasses)
+        {
+            pass.WalkProgram(skeleton.Bound);
+            pass.WalkProgram(skeleton.FactoryBound);
+        }
     }
 
     /// <summary>&gt;&gt;COBOL-WORDS SR3/SR4 category validation (ISO §7.3.10.3): the EXISTING word (literal-1/3/4)

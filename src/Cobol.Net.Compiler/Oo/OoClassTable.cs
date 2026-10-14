@@ -178,10 +178,20 @@ public sealed class OoClassTable
     /// class containing the data item" (SR10 c), SR12 b) 2.) — has its class and every class it inherits from, and the
     /// §11.8.4 GR2 closure of what its objects (its factory object, FACTORY written) implement (SR10 b) / c)); an
     /// interface-name description has the interface and every interface it inherits from (SR10 a): "an interface that
-    /// identifies int-1 or an interface inheriting from int-1"). A name this table does not resolve has neither.</summary>
+    /// identifies int-1 or an interface inheriting from int-1"). A name this table does not resolve has neither.
+    /// <para>A FORMAL description (<see cref="ObjectRefDescriptor.Formal"/>; kb/Work PB2937) names no class of the table
+    /// — a parameter-name and a group class spelled alike are different words — so alone it is OPAQUE: its lineage is
+    /// the parameter-name and nothing else, which relates it to exactly the descriptions naming the same parameter.
+    /// A pair that relates a formal to something else is <see cref="SetOperands"/>'.</para></summary>
     public ObjectReferenceOperand SetOperand(ObjectRefDescriptor d)
     {
         IReadOnlyList<string>? classes = null, interfaces = null;
+        if (d.Formal)
+        {
+            string[] self = [d.Name!];
+            return new ObjectReferenceOperand(d.RuntimeKind, d.Name, d.Factory, d.Only,
+                d.Kind is ObjectRefKind.Interface ? null : self, d.Kind is ObjectRefKind.Interface ? self : []);
+        }
         if (d.Kind is ObjectRefKind.Interface && FindInterface(d.Name!) is { } i)
             interfaces = InterfaceLineage(i);
         else if (d.Kind is ObjectRefKind.ObjectClass or ObjectRefKind.ActiveClass && d.Name is { } n && Find(n) is { } c)
@@ -190,6 +200,34 @@ public sealed class OoClassTable
             interfaces = ImplementsClosure(c, d.Factory).Select(x => x.Name).ToArray();
         }
         return new ObjectReferenceOperand(d.RuntimeKind, d.Name, d.Factory, d.Only, classes, interfaces);
+    }
+
+    /// <summary>⛔ THE SENDER AND RECEIVER OF ONE §14.9.39.3 PAIR, as the SET table relates them — <see cref="SetOperand"/>
+    /// for each side, except that a FORMAL side (kb/Work PB2937) stands for the actual MOST FAVOURABLE to the pair. ISO
+    /// §9.3.8.2.4 treats the definition "as if the actual parameter classes or interfaces were substituted for the
+    /// parameters", so a definition bound as itself refuses a pair only when EVERY expansion would: a formal sender is
+    /// taken to be the receiver's own class or interface (its class or a subclass of it, one implementing it), a formal
+    /// receiver the sender's own class (or an interface the sender implements). What survives the substitution is what no
+    /// actual can change — the alternative the formal's REPOSITORY specifier declares (an interface-typed sender into a
+    /// class-typed receiver; any typed sender into ACTIVE-CLASS, SR14), the FACTORY and ONLY axes (SR12 a)1./a)3.), a
+    /// universal sender into a typed receiver (SR10, SR12). Two references to the SAME parameter-name keep their opaque
+    /// operands: they name one class, whatever it is.</summary>
+    public (ObjectReferenceOperand Send, ObjectReferenceOperand Recv) SetOperands(ObjectRefDescriptor send,
+        ObjectRefDescriptor recv)
+    {
+        var s = SetOperand(send);
+        var r = SetOperand(recv);
+        if (send.Formal && recv.Formal && CobolNames.Same(send.Name, recv.Name)) return (s, r);
+        if (send.Formal)
+            return (s with { Name = r.Name ?? s.Name, Classes = r.Classes ?? s.Classes, Interfaces = r.Interfaces ?? s.Interfaces }, r);
+        if (recv.Formal)
+            return (s, r with
+            {
+                Name = s.Name ?? r.Name,
+                Classes = s.Classes is [var c, ..] ? [c] : r.Classes,
+                Interfaces = s.Interfaces is [var i, ..] ? [i] : r.Interfaces,
+            });
+        return (s, r);
     }
 
     /// <summary>The class and every class it inherits from, nearest first (cycle-safe; §11.3.3 SR4 refuses a cycle).</summary>
@@ -619,10 +657,11 @@ public sealed class OoClassTable
             string name = id.className(0).GetText();
             // The definition binds as itself (PB2051) only when nothing expands it; an expanded one is asked through
             // its expansions, which re-bind every line of it (one fact, one diagnostic: OoExpansion.Result.ExpandedNames).
+            OoClassSymbol? sym = null;
             if (expandedNames?.Contains(name) != true)
                 using (edition.At(id.className(0)))
                 {
-                    var sym = NewClassSymbol(skeleton);
+                    sym = NewClassSymbol(skeleton);
                     AddMethods(sym);
                     table._parameterizedClasses.Add(sym);
                 }
@@ -630,7 +669,13 @@ public sealed class OoClassTable
             if (id.className().Length < 2) continue;
             var baseCtx = id.className(1);
             string baseName = baseCtx.GetText();
-            if (id.ooParameterName().Any(p => CobolNames.Same(p.GetText(), baseName))) continue;
+            if (id.ooParameterName().Any(p => CobolNames.Same(p.GetText(), baseName)))
+            {
+                // The base is a formal: the method search SUPER starts (§8.4.3.8.4 GR3) and SELF continues through is
+                // the actual's, known only in an expansion (kb/Work PB2937).
+                if (sym is not null) sym.FormalBaseName = baseName;
+                continue;
+            }
             using var atBase = edition.At(baseCtx);
             if (CobolNames.Same(baseName, name))
             {
@@ -639,9 +684,13 @@ public sealed class OoClassTable
                     + "shall not be the name of the class declared by this class definition (ISO §11.3.3 SR3)");
                 continue;
             }
-            if (OoNameResolution.Resolve(table, edition, skeleton, baseName, OoNameResolution.Want.Class,
-                    $"parameterized class '{name}': INHERITS FROM", "COBOLNET0821", "ISO §11.3.3 SR2").Class
-                    is { IsFinal: true })
+            var resolvedBase = OoNameResolution.Resolve(table, edition, skeleton, baseName, OoNameResolution.Want.Class,
+                $"parameterized class '{name}': INHERITS FROM", "COBOLNET0821", "ISO §11.3.3 SR2").Class;
+            // A written class is the skeleton's superclass exactly as it is an ordinary class's (§9.3.9): the search
+            // SUPER starts and the methods SELF inherits are its, whether or not anything expands the definition (kb/Work
+            // PB2937 — the skeleton's bodies bind as themselves). A FINAL one is refused and not inherited, as below.
+            if (sym is not null && resolvedBase is { IsFinal: false }) sym.Base = resolvedBase;
+            if (resolvedBase is { IsFinal: true })
                 edition.Error("COBOLNET0839",
                     $"parameterized class '{name}': INHERITS FROM '{baseName}', which is declared FINAL — a FINAL class "
                     + "shall not be a superclass (ISO §11.3.3 SR5 / §11.3.4 GR3)");
