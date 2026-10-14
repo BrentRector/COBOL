@@ -1891,8 +1891,9 @@ prunes TYPE-clone subtrees — so one predicate over it covers all four routes, 
 that must change (a weak typedef's pointer member is reported ONCE at the template, not once per `TYPE` use), and
 screens a fifth route added later for free.
 
-⛔ **The pruning has ONE blind spot, and it is closed by the same predicate, not a copy (kb/Work PB3129).** The
-forest prunes the TYPE entry ITSELF with its clone subtree. For a GROUP type that is right, but an ELEMENTARY
+⛔ **The pruning has ONE blind spot, the TYPE entry itself, and it is closed for EVERY screen by the same helpers, not
+copies (kb/Work PB3129 and its review R1-1).** The forest prunes the TYPE entry ITSELF with its clone subtree. For a
+GROUP type that is right for a rule the TEMPLATE alone decides, but an ELEMENTARY
 pointer-class type declaration (`01 PT IS TYPEDEF USAGE POINTER.`) is a legal level-1 entry, while
 `01 G. 05 A TYPE PT.` is, by §13.18.57.4 GR1, "as though the data description identified by type-name-1 had been
 coded in place of the TYPE clause" — the level-05 spelling SR14 forbids, and the exact twin of the SAME AS copy
@@ -1902,6 +1903,20 @@ broke. So `CheckUsageDeclarations`' second loop — the composed-entry loop that
 class rules of each entry carrying a TYPE clause (PB1212) — asks SR14's elementary arm
 (`ScreenSr14ElementaryPlacement`, the one helper both loops call) of every WRITTEN entry that carries a TYPE clause:
 a site entry or a TYPE entry written inside a template, never a clone composed beneath one.
+
+The blind spot is a property of the FOREST, not of SR14, so it held for every first-loop rule whose subject a TYPE
+clause composes, and the review of PB3129 measured two more: §13.18.60.3 SR4 (`01 CR CONSTANT RECORD. 05 A TYPE IT.`,
+IT a USAGE INDEX type, compiled and ran; a pointer type there was reported under SR14 instead of SR4) and
+§13.18.5.3 SR2 (`01 G TYPE VT BASED.`, VT a group type with a DYNAMIC LENGTH member, compiled and ran). Each first-loop
+screen is now one helper (`ScreenConstantRecordUsage`, `ScreenExternalClassItem`, `ScreenBasedClassObjectItem`,
+`ScreenBasedSubjectShape`, `ScreenSr14ElementaryPlacement`), and the composed-entry loop asks all of them, in the
+first loop's order, so SR4 still names a CONSTANT RECORD pointer before SR14 does. SR4 asks a TYPE entry for its whole
+composed subtree and reports ONCE at the TYPE entry, naming the first item that carries a barred phrase: the type
+declaration may be legal, and the TYPE clause is what must change. Two first-loop arms have no TYPE twin there:
+§13.18.60.3 SR15, whose TYPE twin is its own rule (§13.18.57.3 SR8, COBOLNET2960), and SR14 arm A, whose subject is
+a group's own written USAGE clause. `UsageDeclarationPlacementDriftTests.EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo`
+reads both loops from the source and fails on a new first-loop screen until the second loop asks it too or the test
+records why it need not.
 
 **Two determinations recorded here rather than left implicit.**
 1. **A level-77 entry SATISFIES SR14's "at level 1" arm.** §8.5.1.3.2 places a 77 entry outside the level system

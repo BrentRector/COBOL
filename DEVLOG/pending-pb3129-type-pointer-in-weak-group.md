@@ -35,3 +35,18 @@ allows a free-form line, COBOLNET2653). The re-gate (run `20261014T005513Z-22f02
 ONLY (batched gating, PB2515): GREEN`, with both new goldens and pb1408 Passed in leg 1. Self-review found no second
 copy of the rule. The two loops of `CheckUsageDeclarations` visit disjoint sets: the first skips every entry with a
 TYPE anchor, and the second visits only entries that carry a TYPE clause.
+
+Branch review R1-1 found that the fix closed the TYPE-entry blind spot for SR14 only. The blind spot belongs to the
+forest, which prunes every entry that carries a TYPE clause, so SR4 had it too: `01 IT IS TYPEDEF USAGE INDEX.` with
+`05 A TYPE IT` inside a CONSTANT RECORD compiled and ran, and a pointer type in the same place was reported under SR14
+instead of SR4 (§13.18.60.3 SR4). Sweeping the first loop's other arms found a third case. `01 G TYPE VT BASED.`, where VT
+has a DYNAMIC LENGTH member, compiled and printed `A=ABC D=HELLO` (§13.18.5.3 SR2), and inventory row `SR-13.18.5.3-2`
+claimed this spelling was screened. Each first-loop screen is now one helper, and the composed-entry loop asks every
+one of them in the first loop's order: SR4 (`ScreenConstantRecordUsage`, which checks a TYPE entry's whole composed
+subtree and reports once at the TYPE entry), EXTERNAL, BASED SR1, SR2 (`ScreenBasedSubjectShape`), then SR14 arm B.
+The new `UsageDeclarationPlacementDriftTests.EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo` reads both loops from
+the source, so a future first-loop screen fails until the second loop asks it too or the test records why it does not
+need to. Goldens: `negative/pb3129-type-index-in-constant-record`, `negative/pb3129-type-group-pointer-in-constant-record`
+(COBOLNET1726), `negative/pb3129-type-based-variable-length-group` (COBOLNET2560), and the positive
+`2002/pb3129_type_in_constant_record_ok`. Rows `SR-13.18.60.3-4` and `SR-13.18.5.3-2` were re-verdicted CONFORMS with
+the TYPE-route witnesses (GAP 103 → 103).
