@@ -324,8 +324,10 @@ internal sealed class SendingValueTemp(BinderContext ctx)
                 // through the ONE reader — never in the item's character OCCUPANCY (kb/Work PB886). A slice of a
                 // USAGE BIT item may be up to its BOOLEAN-position count long and a slice of a DYNAMIC LENGTH item
                 // up to its §13.18.19.4 GR2 LIMIT, both of which ImageWidth answers with a smaller number (1 and 0),
-                // so the intermediate silently truncated the value it exists to preserve.
-                limit: Math.Max(1, rm.InnerPositions));
+                // so the intermediate silently truncated the value it exists to preserve. An ANY LENGTH item's
+                // description fixes no bound at all (§13.18.2.4 GR1 b)): its slice's capacity is the carrier's
+                // ceiling, never the one position its PICTURE spells (kb/Work PB3128).
+                limit: Math.Max(1, rm.MaximumInnerPositions));
         var item = place.Item;
         // A DYNAMIC-LENGTH elementary sender IS frozen exactly, by the carrier the standard defines for it:
         // §8.5.1.10.4 — "A dynamic-length elementary item that is used as a sending operand … is treated as a

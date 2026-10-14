@@ -788,7 +788,7 @@ public static partial class ConditionalCompilationProcessor
         string where, bool compiled)
     {
         if (DirectiveExpressionFragment.ParseOperand(text) is not { } frag) { diag.Malformed(where, text); return null; }
-        return diag.ScreenLiterals(frag, compiled) ? frag : null;
+        return diag.ScreenFragment(frag, text, compiled) ? frag : null;
     }
 
     /// <summary>The constant-conditional-expression fragment of <paramref name="text"/>; see <see cref="ParseOperandFragment"/>.</summary>
@@ -796,7 +796,7 @@ public static partial class ConditionalCompilationProcessor
         DirectiveDiag diag, string where, bool compiled)
     {
         if (DirectiveExpressionFragment.ParseCce(text) is not { } frag) { diag.Malformed(where, text); return null; }
-        return diag.ScreenLiterals(frag, compiled) ? frag : null;
+        return diag.ScreenFragment(frag, text, compiled) ? frag : null;
     }
 
     /// <summary>The <c>&gt;&gt;DISPLAY</c> operand-list fragment of <paramref name="text"/>; see <see cref="ParseOperandFragment"/>.</summary>
@@ -804,7 +804,7 @@ public static partial class ConditionalCompilationProcessor
         string where, bool compiled)
     {
         if (DirectiveExpressionFragment.ParseDisplay(text) is not { } frag) { diag.Malformed(where, text); return null; }
-        return diag.ScreenLiterals(frag, compiled) ? frag : null;
+        return diag.ScreenFragment(frag, text, compiled) ? frag : null;
     }
 
     /// <summary>Fragment-parse and evaluate a constant-conditional-expression; a malformed cce / formation error
@@ -949,14 +949,20 @@ public static partial class ConditionalCompilationProcessor
             if (bag is not null) LogicalOperatorGate.Check(edition, new BagSink(bag, At), fragment);
         }
 
-        /// <summary>A directive operand's literals against their own §8.3.3 syntax rules and — in a COMPILED branch —
-        /// the edition gates of their format (kb/Work PB1616), through the ONE body the compilation-unit walk uses
-        /// (<see cref="LiteralScreen"/>), once per parsed fragment, at the directive's line. True when every literal is
-        /// sound; a fragment holding one that is not has no value and is never evaluated. With no bag the diagnostics
-        /// have nowhere to go, but the verdict is still the rule's (the evaluator must not take an unsound literal's
-        /// empty decoding for the operand's value).</summary>
-        public bool ScreenLiterals(Antlr4.Runtime.Tree.IParseTree fragment, bool compiled) =>
-            LiteralScreen.Run(fragment, edition, new BagSink(bag ?? new DiagnosticBag(), At), compiled);
+        /// <summary>The syntax-level screens of a parsed directive fragment, once per fragment, at the directive's line:
+        /// the arithmetic operators' own separator context (§8.7.1, through <see cref="SeparatorRule"/> — the ONE body
+        /// the compilation-unit parse uses, kb/Work PB2017; it reports and leaves the value intact, as a format gate
+        /// does) and the operand's literals against their own §8.3.3 syntax rules and — in a COMPILED branch — the
+        /// edition gates of their format (kb/Work PB1616), through the ONE body the compilation-unit walk uses
+        /// (<see cref="LiteralScreen"/>). True when every literal is sound; a fragment holding one that is not has no
+        /// value and is never evaluated. With no bag the diagnostics have nowhere to go, but the verdict is still the
+        /// rule's (the evaluator must not take an unsound literal's empty decoding for the operand's value).
+        /// <paramref name="text"/> is the exact text the fragment was lexed from.</summary>
+        public bool ScreenFragment(Antlr4.Runtime.Tree.IParseTree fragment, string text, bool compiled)
+        {
+            foreach (var v in SeparatorRule.ArithmeticOperatorViolations(text, fragment)) Emit(v.Descriptor.Code, v.Message);
+            return LiteralScreen.Run(fragment, edition, new BagSink(bag ?? new DiagnosticBag(), At), compiled);
+        }
 
         public void Report(CtDiagCode code, string message) => Emit(
             code == CtDiagCode.DirectiveWordAsName
