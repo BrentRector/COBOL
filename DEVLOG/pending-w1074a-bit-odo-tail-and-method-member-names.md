@@ -95,3 +95,6 @@ USING a word a containing program's SPECIAL-NAMES passes down (a class condition
 paragraph (`E:\COBOL-coord\scratch\w1076a\s1.cob` compiles clean). The merge with main re-pinned the runtime surface hash
 (800009C74EC953FB): both sides had raised the major from 2 to 3 for their own incompatible changes, and no 3.x has shipped,
 so one major covers both.
+R4-1 gate run `20261014T100113Z-d14226`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`; the new
+negative and positive, both earlier PB3132 negatives and the census and runtime-pin drift tests Passed in leg 1; semgrep
+verify PASS.
