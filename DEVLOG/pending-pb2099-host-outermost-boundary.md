@@ -91,3 +91,12 @@ the table over 31 bound LINKAGE descriptions. The expected values come from each
 
 **Not done (the finisher's):** the published `RecordStructEmitter` mode, `HostEntryEmitter`, `OutputKind` library, the
 host harness, the §17.3 drift tests over emitted code, and the retirement of the untyped host route.
+
+**Self-review (part 2).** The decodes `HostLanding.Decimal` and `Integer` would have truncated a significand or wrapped
+a product if a caller ever passed a value outside their row; both now throw `OverflowException` there, and the tests
+pin it. Semgrep verify passed with no rule count up.
+
+**Gate (part 2).** `TestResults/build-local/20261014T215550Z-036e32` (HEAD 6fad3f257): `=== BUILD-LOCAL GATE: LEG 1 ONLY
+(batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,500 · Unit 618 ·
+Characterization 30 … Conformance 6,172/11,672 · Unit 33,030/33,648 · Characterization 6/36 cases ran (skipped 0) in 1
+of 2 leg(s)`. The 11 `HostLandingTests`, `HostSurfaceTests` and `HostRunUnitEndingTests` passed in leg 1.
