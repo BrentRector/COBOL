@@ -1169,15 +1169,28 @@ public sealed record RefModPlace(Place Inner, Position Start, Position? Length) 
         _ => 8,
     };
 
-    /// <summary>This view's <see cref="PositionCount"/> — the positions of the item reference modification indexes
-    /// (ISO §8.4.3.3.4 GR5).</summary>
-    public int InnerPositions => PositionCount(Inner.Item);
+    /// <summary>⛔ <b>THE MOST POSITIONS identifier-1 can have</b> — the bound every slice of it lies within, which is
+    /// the capacity §14.9.25.4 GR1's intermediate result item needs (<c>SendingValueTemp.OfPlace</c>) and the maximum
+    /// extent §14.8.2.2 rule 1 measures a run-time-length slice by (<c>ActivationDescriptions.OfReferenceModification</c>,
+    /// docs/CONFORMANCE.md D-RM1 a)). It is identifier-1's <see cref="PositionCount"/> for every item whose description
+    /// fixes a bound: its static count, or for a DYNAMIC LENGTH item its §8.5.1.10.1 maximum size ("the smallest of: the
+    /// value declared in the LIMIT phrase … the maximum permitted by the implementor"), of which a reference-modified one's
+    /// current length (§8.5.1.10.4) is never more. An ANY LENGTH item's description fixes none: §13.18.2.4 GR1 b) gives it
+    /// "n repetitions of the picture symbol … where n is the length of the corresponding argument", so its bound is the
+    /// largest character string the run time holds, <see cref="CobolNet.Runtime.CobolDynString.MaxLength"/> (the
+    /// carrier's own ceiling, the implementor maximum a dynamic-length item without a LIMIT takes). ⛔ Never
+    /// <see cref="PositionCount"/> of an ANY LENGTH item, which is the ONE position its PICTURE spells: a slice of one
+    /// measured one position, so <c>MOVE LA(2:5) TO X1 X2</c> carried one character through its intermediate and a typed
+    /// group formal refused the slice as zero positions long (kb/Work PB3128).</summary>
+    public int MaximumInnerPositions =>
+        Inner.Item.IsAnyLength ? CobolNet.Runtime.CobolDynString.MaxLength : PositionCount(Inner.Item);
 
-    /// <summary><see cref="InnerPositions"/> when identifier-1's length is a COMPILE-TIME quantity — the
-    /// <c>innerLength</c> a static reader passes to <see cref="StaticLength"/> — or null for an ANY LENGTH or
-    /// DYNAMIC LENGTH identifier-1, whose length is a run-time value (§13.18.2.4 GR1 b); §8.5.1.10). ⛔ A GROUP'S length is
-    /// static too: reading it through <see cref="DataItem.OperandPic"/>, which an alphanumeric group lacks, measured
-    /// <c>G(3:)</c> as a run-time slice and every slice of a group as zero positions (kb/Work PB2077 review R1-1).</summary>
+    /// <summary>identifier-1's positions when its length is a COMPILE-TIME quantity — the <c>innerLength</c> a static
+    /// reader passes to <see cref="StaticLength"/> — or null for an ANY LENGTH or DYNAMIC LENGTH identifier-1, whose
+    /// length is a run-time value (§13.18.2.4 GR1 b); §8.5.1.10.4); a reader that needs a bound for those asks
+    /// <see cref="MaximumInnerPositions"/>. ⛔ A GROUP'S length is static too: reading it through
+    /// <see cref="DataItem.OperandPic"/>, which an alphanumeric group lacks, measured <c>G(3:)</c> as a run-time slice
+    /// and every slice of a group as zero positions (kb/Work PB2077 review R1-1).</summary>
     public int? StaticInnerPositions =>
-        Inner.Item is { IsAnyLength: false, IsDynamicLength: false } ? InnerPositions : null;
+        Inner.Item is { IsAnyLength: false, IsDynamicLength: false } ? PositionCount(Inner.Item) : null;
 }
