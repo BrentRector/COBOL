@@ -671,9 +671,13 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    the fix lane cannot see (a `process_only` note, or an owner task's note that exists only on its own branch, read
    from that branch: `branch_lead_notes`) is decided by the same rule as an open note: its newest report naming it, on
    any branch, so its review finisher's later report on the finisher's own branch (`SPLIT`, `DONE` or `FINDINGS`)
-   supersedes the `FINDINGS` one (kb/Work PB3150, review R1-1). (b) The half
-   clusters, one finisher group each. (c) An `UNLANDED` branch whose commit subjects name an open note no report
-   covers. Each finisher's `pred` is a fixed paragraph naming the predecessor report, branch, worktree, head and the
+   supersedes the `FINDINGS` one (kb/Work PB3150, review R1-1). Every other arm decides such a lead as it decides an
+   open note: a dispatch that holds it waits (item 1: its review finisher dispatched and not yet reported is never
+   planned twice), the frontier-model hold (item 9) and (c) below all read the planner's leads, never the open notes
+   alone (review R2-1). (b) The half
+   clusters, one finisher group each. (c) An `UNLANDED` branch whose commit subjects name an open note or a live
+   `FINDINGS` lead that no report covers; a branch that names one only a report already covers (a `FINDINGS`
+   branch its review finisher's newer report superseded) is skipped, not listed for judgment. Each finisher's `pred` is a fixed paragraph naming the predecessor report, branch, worktree, head and the
    branch's class (cherry-pick if unlanded, orient from the report if landed). **A carried branch** is the exception:
    when another `DONE` report's branch, not on main, contains it (`branch_carrier`, `git merge-base --is-ancestor`: a
    same-file successor merged its predecessor), its finisher merges that carrier instead of cherry-picking, because the

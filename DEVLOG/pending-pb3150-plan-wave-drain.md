@@ -22,5 +22,8 @@ On the live reports the drain plan is A = e99-4's review finisher and B = licens
 PB3101 wait, carried by e99-4. The branch review (round 1) found two holes in the unseen-lead arm, and both are
 answered by making it the open notes' rule: the newest report naming the lead, on any branch, decides it, so a review
 finisher's SPLIT on its own branch is resumed (R1-1), and a FINDINGS branch another lead's DONE branch merged is
-never silently dropped (R1-2). Self-test `test_plan_wave.py`: 152/152 (section 6b'''). DESIGN-orchestrator-loop.md
+never silently dropped (R1-2). Round 2 found the dispatch hold still read the open notes only, so an unseen lead whose
+review finisher was dispatched and had not reported was planned again (R2-1): the hold, the frontier-model hold and
+the unlanded branches' notes now all read the planner's leads. Self-test `test_plan_wave.py`: 159/159 (sections 6b'''
+and 6c). DESIGN-orchestrator-loop.md
 section 9 and `units/wave.md` step 2 (a drain adds `--drain`, never `--max-groups` alone) changed in the same change.

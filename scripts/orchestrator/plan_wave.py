@@ -23,7 +23,8 @@ cost the orchestrator a hand-written groups.json; this computes it.
    note that exists only on its own branch, read from there) is decided by the same rule as an open note: its newest
    report naming it, on any branch (its review finisher's later report supersedes the FINDINGS one); a FINDINGS
    branch that another DONE branch merely contains still gets its finisher, whose pred names that carrier (kb/Work
-   PB3150).
+   PB3150). Every other arm decides it as it decides an open note too: a dispatch that holds it (item 1), the
+   frontier-model hold (item 8), and an unlanded branch whose commit subjects name it (review R2-1).
 3. CLUSTERS from fix_clusters.py --json (the public submodule's view of kb/Work), minus the notes above, ranked by
    inventory rows claimed (the sum of each note's `inventory_rows`), then harm. A finisher on a cluster's primary
    file absorbs that cluster's notes up to the cap of five.
@@ -285,10 +286,12 @@ def branch_carrier(reports: list[Report], classify: Callable[[str], str],
     return carried
 
 
-def unlanded_branch_notes(open_ids: set[str]) -> dict[str, list[str]]:
-    """{UNLANDED or CHECK branch: [open note ids its commit subjects name]} over every local branch. CHECK (a C# name
+def unlanded_branch_notes() -> dict[str, list[str]]:
+    """{UNLANDED or CHECK branch: [every note id its commit subjects name]} over every local branch. CHECK (a C# name
     the branch declares is missing from main) is unlanded work until someone reads it: wave 1017's group B branch,
-    which only edited existing files, classified CHECK, and its WIP would have been planned over from main."""
+    which only edited existing files, classified CHECK, and its WIP would have been planned over from main.
+    Unfiltered: plan() keeps the ids among its LEADS, the open notes and the unseen FINDINGS leads alike, because only
+    plan() knows the latter (kb/Work PB3150 review R2-1)."""
     import prune_worktrees  # noqa: PLC0415
     names = prune_worktrees.main_names()
     out = {}
@@ -296,7 +299,7 @@ def unlanded_branch_notes(open_ids: set[str]) -> dict[str, list[str]]:
         if b == "main" or prune_worktrees.classify(b, names)[0] not in ("UNLANDED", "CHECK"):
             continue
         subjects = prune_worktrees.git("log", "--format=%s", f"origin/main..{b}").stdout
-        out[b] = sorted({i for i in PB.findall(subjects) if i in open_ids}, key=lambda s: int(s[2:]))
+        out[b] = sorted(set(PB.findall(subjects)), key=lambda s: int(s[2:]))
     return out
 
 
@@ -715,10 +718,13 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     # (license-product-name, PB3146: kb/Work PB3150). ONE rule for both: each takes its NEWEST report naming it, on any
     # branch, through the same arms below. A later report about the lead (its review finisher's SPLIT, DONE or
     # FINDINGS, on that finisher's own branch) supersedes the FINDINGS report; a branch that merely contains it
-    # (branch_carrier) does not, and is named in its finisher's pred instead (review R1-1, R1-2).
+    # (branch_carrier) does not, and is named in its finisher's pred instead (review R1-1, R1-2). Every arm below that
+    # asks "is this note the planner's to decide" reads `leads`, never `open_ids`: the dispatch hold, the frontier-model
+    # hold and an unlanded branch's notes (review R2-1). Only the clusters' own arms read the clusters.
     leads = open_ids | {r.lead for r in reports if r.review and r.review.verdict == "FINDINGS" and
                         r.lead not in open_ids and r.lead in notes and
                         findings(r, classify(r.branch) if r.branch else "ABSENT")}
+    unlanded = {b: [i for i in ids if i in leads] for b, ids in unlanded.items()}
     newest: dict[str, Report] = {}
     for r in reports:  # sorted oldest first, so the last write wins
         for i in r.ids:
@@ -755,13 +761,13 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
 
     taken: set[str] = {i for ids in awaiting.values() for i in ids} | set(waiting)
     # A note an unreported dispatch holds is another agent's, or a planned wave's not launched yet (kb/Work PB2806).
-    for nid in sorted(open_ids & set(held or {}) - taken, key=work.id_order):
+    for nid in sorted(leads & set(held or {}) - taken, key=work.id_order):
         waiting[nid] = (f"held by {held[nid]}, which has no report yet: re-planning it would dispatch the same work "
                         f"twice (plan_wave.py --release that dispatch if it was aborted)")
         taken.add(nid)
     # A note that needs a frontier model under the owner's per-dispatch approval is never planned (MANDATORY-PRACTICES
     # P1): an unattended wave cannot ask, and routing it to Opus would pre-empt the owner's choice.
-    for nid in sorted(open_ids - taken, key=work.id_order):
+    for nid in sorted(leads - taken, key=work.id_order):
         if any(re.search(pat, notes[nid].body) for pat in rules["routing"]["owner_approval_patterns"]):
             waiting[nid] = "needs the owner's approval of a frontier model for this dispatch (P1): ask in the attended session"
             taken.add(nid)
@@ -1083,12 +1089,11 @@ def main(argv: list[str] | None = None) -> int:
         half_clusters = fix_clusters("half", a.half_clusters_json)
     reports_dir = pathlib.Path(a.reports) if a.reports else coord.reports_dir(a.coord)
     reports = load_reports(reports_dir)
-    open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"]}
     if a.no_branches:
         classify, unlanded, carrier = (lambda _b: "ABSENT"), {}, None
     else:
         import prune_worktrees  # noqa: PLC0415  (its git runner, reused)
-        classify, unlanded = git_branch_classifier(), unlanded_branch_notes(open_ids)
+        classify, unlanded = git_branch_classifier(), unlanded_branch_notes()
         carrier = branch_carrier(reports, classify, prune_worktrees.git)
         notes.update(branch_lead_notes(reports, notes, harm_weights(), prune_worktrees.git))
     busy = None
@@ -1134,7 +1139,8 @@ def main(argv: list[str] | None = None) -> int:
     if waiting:
         print("  waiting (a later wave): " + "; ".join(f"{i}: {why}" for i, why in waiting.items()))
     if p["unlanded_without_note"]:
-        print("  UNLANDED branches naming no open note (judgment): " + ", ".join(p["unlanded_without_note"]))
+        print("  UNLANDED branches naming no open note or FINDINGS lead (judgment): "
+              + ", ".join(p["unlanded_without_note"]))
     if p["drain_not_started"]:
         print(f"  DRAIN: {len(p['drain_not_started'])} open note(s) no report started wait for the drain to lift")
     print(f"  next {len(p['skipped'])} candidates skipped (budget, cap or predecessor): " +

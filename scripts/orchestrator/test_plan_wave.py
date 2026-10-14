@@ -8,6 +8,7 @@ selection whatever the harm flags, the blocked_by order, site clustering per dep
 waits (blockers in two chains, the owner, a frontier model), and work.py check's topology rules.
 Run: python scripts/orchestrator/test_plan_wave.py   (no build, no git; the campaign section needs the
 tools/claude-skills submodule, and its absence is a FAIL)."""
+import dataclasses
 import pathlib
 import re
 import subprocess
@@ -275,7 +276,8 @@ dr_notes = dict(notes)
 dr_notes.update(pw.branch_lead_notes(dr_reports, dr_notes, {"wrong_answer": 8}, _show))
 check("an unseen lead is read from its own branch, and only there", sorted(set(dr_notes) - set(notes)), ["PB77"])
 dr_notes["PB79"] = pw.Note("PB79", "open", "process", "PB79 — carried", [], "", 0)
-DR_UNLANDED = {"owner-task": [], "worktree-wf_dr-6": ["PB11"], "worktree-wf_dr-7": ["PB9"]}
+# unlanded_branch_notes is unfiltered (every id the subjects name); plan() keeps its leads (review R2-1)
+DR_UNLANDED = {"owner-task": ["PB77"], "worktree-wf_dr-6": ["PB11"], "worktree-wf_dr-7": ["PB9"]}
 
 
 def dr_plan(drain):
@@ -329,7 +331,7 @@ for successor, carried, want in (
     (SU / "w1075a-PB77-report.md").write_text(successor + "\n\n## X\n", encoding="utf-8", newline="\n")
     for drain in (False, True):
         ps = pw.plan(dr_notes, CLUSTERS, HALF, pw.load_reports(SU), lambda b: SU_CLASS.get(b, "ABSENT"),
-                     {"owner-task": [], "worktree-wf_f-1": []}, RULES, budget_points=100, drain=drain,
+                     {"owner-task": ["PB77"], "worktree-wf_f-1": ["PB77"]}, RULES, budget_points=100, drain=drain,
                      carrier=carried.get)
         g77 = [g for g in ps["groups"] if "PB77" in g.notes]
         mode = f"{want} successor{' (drain)' if drain else ''}"
@@ -337,8 +339,10 @@ for successor, carried, want in (
             check(f"{mode}: the finisher resumes the successor's branch, never the stale FINDINGS report (R1-1)",
                   [("w1075a" in g.pred, "worktree-wf_f-1" in g.pred, "review-owner-task.jsonl" in g.pred) for g in g77],
                   [(True, True, False)])
-            check(f"{mode}: the successor's branch is no judgment row", "worktree-wf_f-1" in ps["unlanded_without_note"],
-                  False)
+            # R2-1: the superseded FINDINGS branch names the unseen lead, which a newer report covers: skipped, as an
+            # open note's stale branch is, never a judgment row (unlanded_branch_notes once kept only open notes)
+            check(f"{mode}: neither the successor's nor the superseded FINDINGS branch is a judgment row (R2-1)",
+                  [b for b in ("worktree-wf_f-1", "owner-task") if b in ps["unlanded_without_note"]], [])
         elif want == "DONE":
             check(f"{mode}: an unreviewed successor awaits landing, no finisher (R1-1)",
                   (g77, ps["awaiting_landing"].get("worktree-wf_f-1")), ([], ["PB77"]))
@@ -374,6 +378,44 @@ p6 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), U
 check("a held note is planned in no group and waits naming its dispatch",
       (any("PB5" in g.notes for g in p6["groups"]), "w1045a" in p6["waiting"].get("PB5", "")), (False, True))
 check("its cluster's other notes are still planned", any("PB2" in g.notes for g in p6["groups"]), True)
+# R2-1 (kb/Work PB3150): an UNSEEN lead (PB77, process_only, its FINDINGS on owner-task) is held exactly as an open note
+# is. Wave 1075 dispatched its review finisher, which has not reported: the next plan, normal or --drain, must not
+# plan a second finisher on the same findings (the hold once read `open_ids`, so PB77 was planned again).
+for drain in (False, True):
+    ph = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                 budget_points=100, drain=drain, carrier=DR_CARRIER.get, held={"PB77": "dispatch w1075a", "PB7": "dispatch w1075b"})
+    mode = "drain" if drain else "normal"
+    check(f"{mode}: a held unseen lead and a held open note both wait naming their dispatch, neither planned (R2-1)",
+          [(any(i in g.notes for g in ph["groups"]), f"held by dispatch {w}" in ph["waiting"].get(i, ""))
+           for i, w in (("PB77", "w1075a"), ("PB7", "w1075b"))], [(False, True), (False, True)])
+    check(f"{mode}: the held unseen lead's branch is no judgment row (R2-1)", "owner-task" in ph["unlanded_without_note"],
+          False)
+# The frontier-model hold reads the leads too: an unseen lead whose body needs Mythos under the owner's approval waits.
+fm_notes = dict(dr_notes)
+fm_notes["PB77"] = dataclasses.replace(dr_notes["PB77"], body="This needs Mythos, under the owner's per-dispatch approval.")
+pf = pw.plan(fm_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+             budget_points=100, carrier=DR_CARRIER.get)
+check("an unseen lead that needs the owner's frontier-model approval waits (R2-1)",
+      (any("PB77" in g.notes for g in pf["groups"]), "owner's approval" in pf["waiting"].get("PB77", "")), (False, True))
+# unlanded_branch_notes is unfiltered: an id that is no lead (a landed note, a typo) leaves its branch a judgment row
+pj = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"),
+             {**DR_UNLANDED, "worktree-wf_dr-8": ["PB4242"]}, RULES, budget_points=100, carrier=DR_CARRIER.get)
+check("a branch naming no lead is a judgment row, its non-lead ids never planned",
+      ("worktree-wf_dr-8" in pj["unlanded_without_note"], any("PB4242" in g.notes for g in pj["groups"])), (True, False))
+# ...and unlanded_branch_notes itself keeps every id the subjects name: it once kept only the open notes, so a
+# superseded FINDINGS branch naming only its unseen lead (owner-task: PB77) reached plan() empty, a judgment row.
+import prune_worktrees  # noqa: E402
+_saved = (prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git)
+_subjects = {"owner-task": "PB77: an owner task\nPB77: answer review R1-1", "worktree-wf_x": "PB2, PB11: fix"}
+prune_worktrees.main_names = lambda: set()
+prune_worktrees.classify = lambda b, _names: ("UNLANDED",)
+prune_worktrees.git = lambda *a, **_k: _Shown(0, "main\n" + "\n".join(_subjects) if a[0] == "branch"
+                                              else _subjects[a[-1].split("..")[1]])
+try:
+    check("unlanded_branch_notes names every id, an unseen lead's too (R2-1)", pw.unlanded_branch_notes(),
+          {"owner-task": ["PB77"], "worktree-wf_x": ["PB2", "PB11"]})
+finally:
+    prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git = _saved
 
 # 7. the group JSON renders through the real template and passes check_practices' same-file rule
 gjson = [pw.as_group_json(g, "77", notes, "COBOLNET0001-COBOLNET0003") for g in p["groups"]]
