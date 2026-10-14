@@ -990,7 +990,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             // The ordering-name slot: position 3 always when four arguments are written, position 3 in the
             // three-argument form only when the word actually names an ORDER TABLE clause's ordering-name.
             bool mustBeName = at == 2 && argCtxs.Count == 4;
-            if (at == 2 && KeywordWordOf(a) is { } word && ctx.Data.OrderTables.TryGetValue(word, out string? literal9))
+            if (at == 2 && KeywordWordOf(a) is { } word && ctx.Data.OrderTables.TryUse(a, word, out string? literal9))
             {
                 orderingTable = literal9;
                 continue;
@@ -1002,10 +1002,10 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     + "argument type 12)"
                     + (ctx.Data.OrderTables.Count == 0
                         ? "; this compilation unit declares no ORDER TABLE clause"
-                        : $"; declared: {string.Join(", ", ctx.Data.OrderTables.Keys)}"));
+                        : $"; declared: {string.Join(", ", ctx.Data.OrderTables.Names)}"));
             // A SECOND ordering-name where argument-4 belongs. Reachable, and worth its own message: the operand
             // path would otherwise report it as an unresolved data-name, which is true and useless.
-            if (KeywordWordOf(a) is { } second && ctx.Data.OrderTables.ContainsKey(second))
+            if (KeywordWordOf(a) is { } second && ctx.Data.OrderTables.Declares(second))
                 return Malformed($"is given the ordering-name '{second}' in the argument-4 position — the "
                     + "§15.85.2 general format admits ONE [ ordering-name-1 ], and the fourth position is "
                     + "argument-4, the ordering level (ISO §15.85.3 r6)");
@@ -1065,7 +1065,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
             string site = $"FUNCTION {sig.Name}'s locale-name-1 '{a.GetText().Trim()}'";
             if (KeywordWordOf(a) is { } word)
             {
-                var sym = ctx.Data.ResolveLocaleName(word, site, rule);
+                var sym = ctx.Data.ResolveLocaleName(a, word, site, rule);
                 if (sym is null) return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name}");
                 locale = new LocaleRef(sym);
             }
@@ -1108,7 +1108,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         LocaleRef locale;
         if (KeywordWordOf(argCtxs[2]) is { } word)
         {
-            var sym = ctx.Data.ResolveLocaleName(word, $"FUNCTION {sig.Name}'s LOCALE phrase '{word}'", rule);
+            var sym = ctx.Data.ResolveLocaleName(argCtxs[2], word, $"FUNCTION {sig.Name}'s LOCALE phrase '{word}'", rule);
             if (sym is null) return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name}");
             locale = new LocaleRef(sym);
         }
@@ -1823,7 +1823,7 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
                     $"the LOCALE keyword of FUNCTION {sig.Name}");
                 if (at + 1 < argCtxs.Count && KeywordWordOf(argCtxs[at + 1]) is { } lname && lname != "ANYCASE")
                 {
-                    var sym = ctx.Data.ResolveLocaleName(lname, $"FUNCTION {sig.Name}'s LOCALE {lname}",
+                    var sym = ctx.Data.ResolveLocaleName(argCtxs[at + 1], lname, $"FUNCTION {sig.Name}'s LOCALE {lname}",
                         "ISO §15.68.3 r5a — locale-name-1 shall be associated with a locale in the SPECIAL-NAMES paragraph");
                     if (sym is null) return BoundExprError.Refused(ctx.Edition, $"FUNCTION {sig.Name}");
                     locale = new LocaleRef(sym);

@@ -480,11 +480,15 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
     /// resolver and drew "'MYTOP (1)' is not defined — no declaration … gives the name 'MYTOP'" for a name
     /// SPECIAL-NAMES does declare. Keyed on the word, the suffixed mnemonic reaches its own arm, where
     /// <see cref="BindAdvancing"/> refuses the suffix by name. Pure (no report), because the SR13 screen asks it
-    /// too.</summary>
+    /// too. A mnemonic-name a CONTAINING element declares yields to the referring element's own item of the same
+    /// spelling (§8.4.6.1: "a source element's reference to such a name, even when it is a different type of
+    /// user-defined word, is to the item which that source element describes"; kb/Work PB3153), so the probe is
+    /// asked first and only the mnemonic reading records the §8.3.2.2 use.</summary>
     private (Core.DataReferenceContext Ref, string Name, ImplementorName System)? MnemonicOperand(
         Core.WriteBeforeAfterContext? wba)
         => wba?.dataReference() is { } m && m.cobolWord() is { } word
-           && ctx.Mnemonics.Of(wba).TryGetValue(word.GetText(), out var system)
+           && ctx.Mnemonics.TryPeek(wba, word.GetText(), out _) && ctx.Refs.Probe(m) is null
+           && ctx.Mnemonics.TryUse(wba, word.GetText(), out var system)
             ? (m, word.GetText(), system)
             : null;
 

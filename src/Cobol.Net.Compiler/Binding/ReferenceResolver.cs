@@ -203,7 +203,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // position needs. R38 adjudicated the vendor alphabet-operand forms (GnuCOBOL's INSPECT CONVERTING
         // alphabet) as extensions no edition admits, and the owner's 2026-08-08 decision keeps WiseOwl COBOL
         // strict-ISO permanently; this arm used to report nothing and let the statement abort at run time.
-        if (data.Alphabets.ContainsKey(name) || data.NationalAlphabets.ContainsKey(name))
+        if (data.IsAlphabetName(name))
         {
             data.Edition.Error(DiagnosticCatalog.UndefinedReference,
                 $"'{text}' is declared as an alphabet-name in the SPECIAL-NAMES paragraph, not as a data item, so "

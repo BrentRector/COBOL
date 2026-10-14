@@ -178,7 +178,7 @@ internal sealed class SetAlterBinder(BinderContext ctx)
     public BoundCondition? SwitchCondOf(Core.DataReferenceContext dref)
     {
         if (dref.dataReferenceSuffix().Length != 0) return null;   // a status condition-name takes no subscript/qualifier
-        return dref.cobolWord()?.GetText() is { } name && ctx.Data.SwitchConditions.TryGetValue(name, out var sc)
+        return dref.cobolWord()?.GetText() is { } name && ctx.Data.SwitchConditions.TryUse(dref, name, out var sc)
             ? new BoundSwitchCondition(sc.ImplementorName, sc.IsOn)
             : null;
     }
@@ -218,7 +218,7 @@ internal sealed class SetAlterBinder(BinderContext ctx)
             foreach (var word in phrase.cobolWord())
             {
                 string name = word.GetText();
-                if (!ctx.Mnemonics.Of(word).TryGetValue(name, out var row) || row.Kind != SystemNameKind.Switch)
+                if (!ctx.Mnemonics.TryUse(word, name, out var row) || row.Kind != SystemNameKind.Switch)
                 {
                     // SR5 is decided here, so it is REPORTED here (kb/Work PB390 — the Format-3 sibling of the
                     // Format-4 condition-name rule; both used to ship as a run-time "not implemented" abort).

@@ -127,13 +127,17 @@ public sealed class OoClassTable
     /// is no conflict. A METHOD-ID spelled like its CLASS-ID, or a contained program's paragraph spelled like a class
     /// its container's REPOSITORY declares, is therefore legal until the element references that class-name, and then
     /// refused COBOLNET2692 at whichever of the two comes second, here or at the declaration funnel
-    /// (<c>DataBinder.DeclareUserWord</c>).</summary>
-    internal void RecordReferenceUse(Antlr4.Runtime.RuleContext? site, string name, UserWordKind kind)
+    /// (<c>DataBinder.DeclareUserWord</c>). The names a CONFIGURATION SECTION declares reach a contained element the
+    /// same way (§8.4.6.1), and the data binder records each reference to one here too
+    /// (<c>DataBinder.RecordConfigurationNameUse</c>, kb/Work PB3153). False, recording nothing, when no census holds
+    /// <paramref name="site"/> (a site in no source element, a table no <see cref="Build"/> made).</summary>
+    internal bool RecordReferenceUse(Antlr4.Runtime.RuleContext? site, string name, UserWordKind kind)
     {
-        if (_edition is null || CensusOf(site) is not { } elementWords
-            || elementWords.Record(name, kind) is not { } first) return;
+        if (_edition is null || CensusOf(site) is not { } elementWords) return false;
+        if (elementWords.Record(name, kind) is not { } first) return true;
         using (_edition.At(site as Antlr4.Runtime.ParserRuleContext))
             _edition.Error(DiagnosticCatalog.UserWordTypeConflict, UserWordCensus.ConflictMessage(name, first, kind));
+        return true;
     }
 
     /// <summary>THE §8.3.2.2 census of the source element <paramref name="site"/> lies in (§10.5), one per element for
