@@ -13,6 +13,7 @@
   "pb3133-object-computer-clause-repeated-85",
   "pb3133-object-computer-clause-out-of-order-85",
   "pb3132-method-id-spells-its-class-id-and-invokes-it",
+  "pb3132-method-paragraph-spells-a-class-it-references",
   "pb2841-continue-after-non-finite-below-2023",
   "pb2729-float-significand-point-value",
   "pb2729-float-significand-point-compute",
@@ -2665,7 +2666,12 @@
   "pb3120-group-formal-pointer-type-below-2002",
   "pb3120-group-formal-pointer-signature-mismatch",
   "pb3120-group-formal-data-pointer-declaration-mismatch",
-  "pb3120-group-formal-template-pointer-signature-mismatch"
+  "pb3120-group-formal-template-pointer-signature-mismatch",
+  "pb2988-capacity-register-copies-unqualified",
+  "pb2988-capacity-register-two-written-entries",
+  "pb546-national-boolean-below-2002",
+  "pb546-group-into-national-dynamic-below-2014",
+  "pb2921-method-section-named-like-its-data"
  ],
  "pending": []
 }

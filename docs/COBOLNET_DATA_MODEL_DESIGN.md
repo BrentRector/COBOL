@@ -439,7 +439,9 @@ content-validation half is separately answered by the declined A.4.14 facility (
 - **D-N8 a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; PB3099). §14.9.25.4 GR4 makes the
   move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's; an odd byte count cannot be
   national content, so the last position is completed with the alphanumeric space GR4's elementary-move fill supplies,
-  exactly as the fixed national receiver already does (`CobolBits.NatReadWindow` over the bytes). `MOVE G3 TO DN` with
+  exactly as the fixed national receiver already does; the decode of a WHOLE image is `CobolBits.NatFromStorage`, asked
+  through `ReceivingStore.ContentCharacters` by the GR4 group MOVE and by the READ of an elementary dynamic-length
+  record. `MOVE G3 TO DN` with
   a three-byte `G3` leaves `DN` two positions long and `LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). Recorded in
   CONFORMANCE.md §3 D-N8.
 - **D-N6 national-edited IS category National carrying an `EditMask`** (kb/Work PB492, 2026-09-12). §8.5.2.11's
@@ -1243,6 +1245,22 @@ remaining question is a syntax rule reported by `CapacityPlaceOf`, never a "not 
 - **Qualified** (`WS-CAP OF WS-TABLE`, `IN` likewise) resolves through the ONE §8.4.2.2 matcher,
   `DataBinder.QualifierChainMatches`, off that `Parent`. §8.4.2.2.3 SR2 permits qualifying a name that needs no
   qualification; a qualifier that names no context of the register is **COBOLNET2127**.
+- **One written definition, several copies (kb/Work PB2988).** SR30's "defined elsewhere" compares WRITTEN
+  definitions: a `CAPACITY IN` written once in a type declaration (or under a SAME AS operand) is reproduced by every
+  TYPE / SAME AS copy of its entry, so `DynamicResolve` lists each copy's register under the one name when every
+  table already listed is a copy of the same written entry (`DataItem.WrittenDefinition`, the `ClonedFrom` chain's
+  end); a register of a DIFFERENT written entry, or an explicit data-name of the spelling, stays **COBOLNET1523**.
+  The copies are told apart by SR30's second sentence — qualification through the implied level (`DC OF A`,
+  `DC OF B`) — and a reference the qualifiers leave reaching two registers of the nearest element is §8.4.2.2.3 SR1's
+  ambiguity, judged by the ONE verdict `DataBinder.UniqueOrReportAmbiguous` (**COBOLNET1639**). Its `--permissive`
+  disposition picks the first declared register, which `ReferenceResolver.CapacityRegisterPlaceOf` then judges like a
+  unique reference's register: ambiguity is a fault of the written reference and excuses nothing about the register
+  it resolves to, so a picked register under a table is still **COBOLNET2126** (the PB2988 review's R1-1; the
+  index-name arm's permissive pick is screened by §13.7.3 SR4 the same way). A `CapacityRef` carries a place only
+  when it has no fault. The verdict is the same at EVERY ask of one written reference: a probe and a repeated ask
+  (SET classifies its operand, then binds it) get the pick silently (`UniqueOrReportAmbiguous(…, report: false)`),
+  and only the report is once per reference — for the register in `CapacityPlaceOf` and for the index-name in
+  `ResolveIndexName` alike.
 - **Subscripted** is **COBOLNET2125** — §13.18.38.3 SR31, "Data-name-3 shall not be subscripted."
 - **Reference-modified** goes to the ONE §8.4.3.3.3 SR1 screen (`RefModExclusion` → COBOLNET1647): the register is a
   numeric item of an implementor-chosen binary usage, and SR1 admits only usage DISPLAY or NATIONAL.
@@ -1293,7 +1311,18 @@ cannot disagree about a member. The member kinds: **Fixed** (the member-image la
 **Nested** (a scalar variable-length group, flattened in place), **NestedTable** (a FIXED-OCCURS table of
 variable-length elements: `Occurs` flattened copies, a compile-time multiplicity — also `Atoms`' unrolling in the
 §8.5.1.12 correspondence and the per-occurrence `FUNCTION LENGTH` walk), **OdoFixed** (a member of fixed image
-that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22) and **OdoTable** (that table
+that holds the group's OCCURS DEPENDING table as its trailing storage, §13.18.38.3 SR22; where the table lies in it is
+`OdoModel.GeometryOf`, the ONE geometry `OdoModel.WrapGroup` also gives a group operand — bytes on the physical
+basis, so a national element counts its two bytes a position, kb/Work PB546; the runtime states it as
+`OdoModel.FixedImageTail`'s `OdoTail`, the ONE tail the member's current image (`CutAt`), the receiving splice
+(`KeepUnused`) and the record layout (`RecordUnit` / `RecordMaxUnits`) read, and a cell-backed group's window reads
+too. A table under which a USAGE BIT item lies is counted in BITS (§8.5.1.6.3: occurrences share bytes): the member's
+current image is the ceiling of its bits in characters, the receiving splice keeps the later occurrences at the bit,
+and the record states the table one CHARACTER per unit from the character holding its first bit (determination
+D-FRA (ix); kb/Work PB3030). A member that CONTINUES a same-level §8.5.1.6.3 run — `05 B PIC 1 USAGE BIT. 05 TB PIC 1
+USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.` — has no characters of its own: the run is ONE slice at its leader's field
+(`PhysicalModel.Physical.BitRun`), so `VarParts` classifies the LEADER's field by the member the run holds, and the
+tail counts the run's earlier bits as lead (`BitLayout.BitsBeforeInRun`; kb/Work PB2921 review R1-1)) and **OdoTable** (that table
 when its ELEMENTS are variable-length groups: `NestedTable` at a count that is a parameter - the first `__odo`
 occurrences' carriers at a statement, all of them at a boundary - with the maximum's fixed width and component
 count, so every earlier component keeps its position; the receiving `FromVarImage` loops to the maximum and a

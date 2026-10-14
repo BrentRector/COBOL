@@ -1814,6 +1814,10 @@ public sealed partial class ReferenceResolver(DataBinder data)
         /// <summary>§13.18.38.3 SR30 second sentence with §8.4.2.2.3 SR4 — the written OF/IN qualifiers do not name
         /// successively more inclusive context of the register's implied position.</summary>
         Qualifiers,
+        /// <summary>§8.4.2.2.3 SR1 — the written qualifiers reach more than one register of the nearest declaring
+        /// element: the TYPE / SAME AS copies of one written entry each carry the register (§13.18.38.3 SR30 second
+        /// sentence, kb/Work PB2988), so "uniqueness shall be established through a sequence of qualifiers".</summary>
+        Ambiguous,
         /// <summary>The register's table is itself subordinate to a table, so SR30 puts the register inside that
         /// outer table: §8.4.2.3.3 SR3/SR5 then REQUIRE a subscript that §13.18.38.3 SR31 FORBIDS, and no reference
         /// form is writable. ⚠ DETERMINATION — see the diagnostic's own note.</summary>
@@ -1822,9 +1826,15 @@ public sealed partial class ReferenceResolver(DataBinder data)
 
     /// <summary>A written reference matched against the source element's named CAPACITY registers: the owning
     /// dynamic-capacity <paramref name="Table"/>, the <paramref name="Register"/> view item, the
-    /// <paramref name="Place"/> when the reference is legal, and the <paramref name="Fault"/> otherwise.</summary>
+    /// <paramref name="Place"/> when the reference is legal, and the <paramref name="Fault"/> otherwise.
+    /// <paramref name="Reached"/> is every register's table of the nearest declaring element the written qualifiers
+    /// reach (more than one only under <see cref="CapacityRefFault.Ambiguous"/>). <paramref name="Place"/> is non-null
+    /// exactly when <paramref name="Fault"/> is <see cref="CapacityRefFault.None"/>: an ambiguous reference has no
+    /// place until the reporting site's <c>--permissive</c> disposition picks a register, and that register is then
+    /// judged by <see cref="CapacityRegisterPlaceOf"/> like an unambiguous one (kb/Work PB2988 review R1-1).</summary>
     internal readonly record struct CapacityRef(
-        DataItem Table, DataItem Register, CapacityRegisterPlace? Place, CapacityRefFault Fault);
+        DataItem Table, DataItem Register, CapacityRegisterPlace? Place, CapacityRefFault Fault,
+        NameCandidates<DataItem> Reached);
 
     /// <summary>⛔ THE ONE MATCH OF A WRITTEN REFERENCE AGAINST THE NAMED OCCURS DYNAMIC CAPACITY REGISTERS
     /// (kb/Work PB457) — a PURE check over <see cref="DataBinder.CapacityRegisters"/> with NO side effects (unlike
@@ -1845,8 +1855,12 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// <para>The qualifier test is the ONE §8.4.2.2 matcher (<see cref="DataBinder.QualifierChainMatches"/>), read
     /// off the register's real <see cref="DataItem.Parent"/> — SR30's "treated as though implicitly defined at the
     /// same level as the entry containing the OCCURS clause", set where the register is minted
-    /// (<c>DataBinder.Odo.cs</c>). Within ONE source element the candidate set has at most one member, by SR30's
-    /// first sentence, so there is no survivor count to take.</para>
+    /// (<c>DataBinder.Odo.cs</c>). Within ONE source element two registers share a spelling only when they are the
+    /// TYPE / SAME AS copies of one written entry (SR30's first sentence forbids every other duplicate; kb/Work
+    /// PB2988), and then SR30's second sentence makes them told apart by qualification: the registers the written
+    /// qualifiers reach in the nearest declaring element are counted, and more than one is §8.4.2.2.3 SR1's
+    /// ambiguity (<see cref="CapacityRefFault.Ambiguous"/>), judged by the ONE verdict
+    /// <see cref="DataBinder.UniqueOrReportAmbiguous{T}"/>.</para>
     /// <para>⛔ ACROSS SOURCE ELEMENTS IT IS §8.4.6.2.1 (kb/Work PB1674). A contained program also sees every
     /// container's GLOBAL record's registers, nearest container first after its own (<see cref="DataBinder.CapacityRegisters"/>),
     /// and rule 1 applies "the normal rules for qualification" over that whole set before rule 3 picks the nearest
@@ -1859,22 +1873,38 @@ public sealed partial class ReferenceResolver(DataBinder data)
         DataReferenceCst r = dref;
         if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var tables)) return null;
         var written = ReadWritten(dref);
-        DataItem table = tables.Find(t => t.OccursSpec?.CapacityRegister is { } cand
-                                          && data.QualifierChainMatches(cand, written.Qualifiers))
-            ?? tables[0];
+        var reached = tables.FindAll(t => t.OccursSpec?.CapacityRegister is { } cand
+                                          && data.QualifierChainMatches(cand, written.Qualifiers));
+        // The nearest declaring element's reached registers (the list is in nearest-element order, §8.4.6.2.1 3)), or
+        // the nearest register at all when the qualifiers reach none, so the qualifier fault is stated about it.
+        DataItem table = reached.Count > 0 ? reached[0] : tables[0];
+        int depth = data.DeclaringDepth(table);
+        reached.RemoveAll(t => data.DeclaringDepth(t) != depth);
         if (table.OccursSpec?.CapacityRegister is not { } reg
-            || data.Symbols.NearerDataNameHides(name, written.Qualifiers, data.DeclaringDepth(table))) return null;
-        var path = BuildTablePath(table);
+            || data.Symbols.NearerDataNameHides(name, written.Qualifiers, depth)) return null;
+        var place = CapacityRegisterPlaceOf(table);
         var fault =
               written.SubscriptGroup is not null                     ? CapacityRefFault.Subscripted
             : written.RefModCount > 0                                ? CapacityRefFault.RefModified
-            : !data.QualifierChainMatches(reg, written.Qualifiers)   ? CapacityRefFault.Qualifiers
-            : path is null                                           ? CapacityRefFault.UnderATable
+            : reached.Count == 0                                     ? CapacityRefFault.Qualifiers
+            : reached.Count > 1                                      ? CapacityRefFault.Ambiguous
+            : place is null                                          ? CapacityRefFault.UnderATable
             : CapacityRefFault.None;
-        return fault is CapacityRefFault.None && path is not null
-            ? new CapacityRef(table, reg, new CapacityRegisterPlace(path, reg), CapacityRefFault.None)
-            : new CapacityRef(table, reg, null, fault);
+        return new CapacityRef(table, reg, fault is CapacityRefFault.None ? place : null, fault,
+            new NameCandidates<DataItem>(reached));
     }
+
+    /// <summary>⛔ THE ONE JUDGMENT OF A REGISTER ITSELF, once the written reference has picked it: the place of
+    /// <paramref name="table"/>'s CAPACITY register, or <see langword="null"/> when the table is subordinate to a
+    /// table (<see cref="CapacityRefFault.UnderATable"/>: §13.18.38.3 SR30 puts the register inside that outer table,
+    /// where §8.4.2.3.3 SR3 requires the subscript §13.18.38.3 SR31 forbids). It is asked of the register a unique
+    /// reference names AND of the one the <c>--permissive</c> disposition of an ambiguous reference picks, because
+    /// ambiguity is a fault of the WRITTEN reference and does not excuse the register it resolves to (kb/Work PB2988
+    /// review R1-1: when only the unique arm asked it, the permissive arm handed back a null place with no
+    /// diagnostic, COBOLNET2362).</summary>
+    private CapacityRegisterPlace? CapacityRegisterPlaceOf(DataItem table) =>
+        table.OccursSpec?.CapacityRegister is { } reg && BuildTablePath(table) is { } path
+            ? new CapacityRegisterPlace(path, reg) : null;
 
     /// <summary>⛔ <b>THE ONE TEST for "this written reference IS the predefined object reference
     /// EXCEPTION-OBJECT"</b> (ISO §8.4.3.6; kb/Work PB922) — spelling, FORM and EDITION together, so no caller can
@@ -1915,11 +1945,23 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// its own <c>CobolDynTable</c> with its own capacity, so one SET cannot mean all of them.</para></summary>
     private Place? CapacityPlaceOf(Core.DataReferenceContext dref, CapacityRef cap)
     {
-        if (cap.Place is { } place) return place;
-        if (_probing || !_diagnosed.Add(dref)) return null;   // R30 purity: a probe never diagnoses (kb/Work PB157)
+        if (cap.Fault is CapacityRefFault.None) return cap.Place;
+        // R30 purity: a probe never diagnoses, and a written reference is reported once (kb/Work PB157). Every fault
+        // but Ambiguous yields null at every ask; Ambiguous's --permissive pick must be the SAME place at every ask,
+        // reported or not (the index-name sibling of wave 1073 review R1-1).
+        bool report = !_probing && _diagnosed.Add(dref);
+        if (!report && cap.Fault is not CapacityRefFault.Ambiguous) return null;
         string text = DataBinder.WrittenText(dref);
         string subject = cap.Register.CobolName ?? cap.Register.CsName;
         string table = cap.Table.CobolName ?? cap.Table.CsName;
+        void ReportUnderATable() =>
+            data.Edition.Error(DiagnosticCatalog.CapacityRegisterUnderTable,
+                $"'{text}': '{subject}' is the CAPACITY register of '{table}', which is itself subordinate to a "
+                + "table, so ISO §13.18.38.3 SR30 places the register inside that outer table. ISO §8.4.2.3.3 "
+                + "SR3 and SR5 then require one subscript per enclosing OCCURS clause, and ISO §13.18.38.3 SR31 "
+                + "forbids subscripting data-name-3 — no reference form is writable. Name the register only on "
+                + "a dynamic-capacity table that has no table ancestor, or read the capacity with FUNCTION "
+                + "LENGTH over the subscripted inner table instead.");
         switch (cap.Fault)
         {
             case CapacityRefFault.Subscripted:
@@ -1944,17 +1986,20 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     + $"are the group names above it{innermost}. ISO §8.4.2.2.3 SR4 requires them \"in the order "
                     + "of successively more inclusive levels in the hierarchy\".");
                 return null;
+            case CapacityRefFault.Ambiguous:
+                // §8.4.2.2.3 SR1, through the ONE verdict every name class shares. Its --permissive disposition
+                // picks the first declared register, which is then judged like a unique reference's: a register
+                // under a table is still COBOLNET2126, never a null place with no diagnostic (review R1-1).
+                if (data.UniqueOrReportAmbiguous(cap.Reached, "the CAPACITY register reference", text, out _, report)
+                    is not { } picked) return null;
+                if (CapacityRegisterPlaceOf(picked) is { } pickedPlace) return pickedPlace;
+                if (report) ReportUnderATable();
+                return null;
             case CapacityRefFault.UnderATable:
-                data.Edition.Error(DiagnosticCatalog.CapacityRegisterUnderTable,
-                    $"'{text}': '{subject}' is the CAPACITY register of '{table}', which is itself subordinate to a "
-                    + "table, so ISO §13.18.38.3 SR30 places the register inside that outer table. ISO §8.4.2.3.3 "
-                    + "SR3 and SR5 then require one subscript per enclosing OCCURS clause, and ISO §13.18.38.3 SR31 "
-                    + "forbids subscripting data-name-3 — no reference form is writable. Name the register only on "
-                    + "a dynamic-capacity table that has no table ancestor, or read the capacity with FUNCTION "
-                    + "LENGTH over the subscripted inner table instead.");
+                ReportUnderATable();
                 return null;
             default:
-                // CapacityRefFault.None cannot reach here (its Place is non-null by construction), and every other
+                // CapacityRefFault.None cannot reach here (its Place is returned before the switch), and every other
                 // member has a case above — CapacityRegisterReferenceDriftTests pins that, so a new fault cannot
                 // ship diagnostic-less. This arm is an internal-error backstop, never a user-reachable path.
                 throw new InvalidOperationException(
@@ -2575,20 +2620,28 @@ public sealed partial class ReferenceResolver(DataBinder data)
             ScreenLinkageIndex(one, name, qualifiers, writtenAt);
             return new IndexRef(IndexRefOutcome.Resolved, one);
         }
-        // R30 purity (kb/Work PB157): a probe never diagnoses, and the committing resolution reports once.
-        if (_probing || !_indexRefsReported.Add(writtenAt)) return new IndexRef(IndexRefOutcome.Failed, null);
+        // R30 purity (kb/Work PB157): a probe never diagnoses, and of the several asks one written reference gets
+        // (SET classifies its operand, then binds it) only the first committing one reports. The OUTCOME is the
+        // same at every ask — only the report is once (wave 1073 review R1-1: a second ask that answered Failed
+        // handed the backend the inert "1" as a SET receiver, CS0131).
+        bool report = !_probing && _indexRefsReported.Add(writtenAt);
         string written = DataBinder.WrittenQualified(name, qualifiers);
         if (cands.Count == 0)
         {
-            data.Edition.Error(DiagnosticCatalog.UndefinedReference, $"'{written}' is not defined — '{name}' is an "
-                + "index-name, but no table that declares it is named by the written qualifiers (ISO §8.4.2.2.3 SR6: "
-                + "\"The qualification of an index-name may include the name of the table with which the index-name is "
-                + "associated, as well as any name by which that table may be qualified.\")");
+            if (report)
+                data.Edition.Error(DiagnosticCatalog.UndefinedReference, $"'{written}' is not defined — '{name}' is "
+                    + "an index-name, but no table that declares it is named by the written qualifiers (ISO §8.4.2.2.3 "
+                    + "SR6: \"The qualification of an index-name may include the name of the table with which the "
+                    + "index-name is associated, as well as any name by which that table may be qualified.\")");
             return new IndexRef(IndexRefOutcome.Failed, null);
         }
-        return data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _) is { } first
-            ? new IndexRef(IndexRefOutcome.Resolved, first)   // --permissive: warned, first declaration
-            : new IndexRef(IndexRefOutcome.Failed, null);
+        if (data.UniqueOrReportAmbiguous(cands, "the index-name reference", written, out _, report) is not { } first)
+            return new IndexRef(IndexRefOutcome.Failed, null);
+        // --permissive: warned, and resolved to the first declaration, which is then screened like a unique one —
+        // ambiguity is a fault of the WRITTEN reference and does not excuse the table it resolves to (§13.7.3 SR4 e):
+        // an index of a linkage record outside the USING phrase is refused as it would be for a unique reference).
+        ScreenLinkageIndex(first, name, qualifiers, writtenAt);
+        return new IndexRef(IndexRefOutcome.Resolved, first);
     }
 
     /// <summary>The written index-name references already reported as §13.7.3 SR4 e) violations.</summary>

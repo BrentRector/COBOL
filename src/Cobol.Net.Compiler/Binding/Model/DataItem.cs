@@ -338,6 +338,19 @@ public sealed class DataItem
     [DescriptionCopy(DescriptionCopyKind.None, "the copy's provenance — identity, written by CloneItem itself")]
     public DataItem? ClonedFrom { get; set; }
 
+    /// <summary>The WRITTEN entry this item stands for: <see cref="ClonedFrom"/> followed to its end, or the item itself
+    /// when it is no copy. Two TYPE / SAME AS expansions of one written entry share it — one definition reproduced
+    /// twice, never two definitions (ISO §8.4.2.2.1 rule 4; kb/Work PB2988).</summary>
+    public DataItem WrittenDefinition
+    {
+        get
+        {
+            var item = this;
+            while (item.ClonedFrom is { } from) item = from;
+            return item;
+        }
+    }
+
     /// <summary>True when this TYPEDEF entry also carries the EXTERNAL clause (ISO §13.18.22 SR1 — a level-1
     /// type declaration may be external; §13.18.58.3 SR3). The type declaration itself has no storage
     /// (§13.18.58.4 GR2); the effect is on its REFERENCES: any record description containing that type is itself
@@ -1098,11 +1111,15 @@ public sealed class DataItem
     /// all of them at an activation boundary ("the maximum length is used", §14.8.2.2), and a receiver takes every
     /// occurrence it has from whatever the carrier holds - the ones past the carried components are the
     /// §14.9.25.4 GR9b excess part.
-    /// A group holding USAGE BIT items is outside the ODO arm: its extent is a §8.5.1.6.3 bit layout, not a
-    /// character prefix.</summary>
+    /// A member holding USAGE BIT items composes on the first arm too (kb/Work PB3030): its OCCURS DEPENDING table is
+    /// counted in BITS (§8.5.1.6.3), and its current image is the ceiling of those bits in characters
+    /// (<c>OdoModel.GeometryOf</c>, the unit the composer reads). A member that CONTINUES a same-level bit run (an
+    /// OCCURS DEPENDING bit table directly after a bit item) composes there too: its characters are the run's, so the
+    /// composer classifies it at the run's leading field and measures the table from the run's first bit
+    /// (<c>OdoModel.FixedImageTail</c>; kb/Work PB2921 review R1-1).</summary>
     private static bool CurrentExtentComposes(DataItem c) =>
-        c.IsImageCapable ? !HasOdoOnOrBeneath(c) || (!c.HasBitDescendant && OdoTableOnOrBeneath(c) is not null)
-        : (c.IsDynamicLength && c.IsElementary)
+        c.IsImageCapable
+        || (c.IsDynamicLength && c.IsElementary)
           || (c.IsDynamicTable && !HasOdoOnOrBeneath(c) && (c.ElementImageCapable || c.ComposesCurrentExtent()))
           || (c.IsGroup && !c.IsDynamicTable && c.Occurs is null && c.ComposesCurrentExtent())
           || (c.IsGroup && !c.IsDynamicTable && c.Occurs is not null && c.OccursSpec?.DependingName is null
@@ -1312,7 +1329,7 @@ public sealed class DataItem
                 Usage.FloatDecimal16 => 8,                            // decimal64 = 8 bytes
                 Usage.Pointer or Usage.ProgramPointer or Usage.FunctionPointer
                     or Usage.ObjectReference => PointerByteWidth,
-                Usage.National => CobolNet.Runtime.CobolBits.BytesPerNational * ElementaryImageWidth,   // UTF-16, D-N1/D-N3
+                Usage.National => pic.BytesPerPosition * ElementaryImageWidth,   // UTF-16, D-N1/D-N3 — the ONE unit reader
                 _ => ElementaryImageWidth,                       // DISPLAY / BIT: 1 byte per character/boolean position
             };
         }

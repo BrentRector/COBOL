@@ -87,3 +87,11 @@ CobolNet.Runtime.CobolVarGroup.CreatedList.get -> System.Func<int, CobolNet.Runt
 CobolNet.Runtime.CobolDynTable<T>.CreatedAs(System.Func<T, CobolNet.Runtime.CobolVarGroup!>! carrierOf) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>?
 CobolNet.Runtime.CobolDynTable<T>.CreatedAs(System.Func<T, string!>! imageOf) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>?
 CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool byReference = false) -> CobolNet.Runtime.CobolVarGroup!
+static CobolNet.Runtime.CobolBits.NatFromStorage(string! image) -> string!
+CobolNet.Runtime.OdoTail.KeepUnused(string! received, string! current, int count) -> string!
+CobolNet.Runtime.OdoTail.Lead.get -> int
+CobolNet.Runtime.OdoTail.Lead.init -> void
+CobolNet.Runtime.OdoTail.PositionsPerCharacter.get -> int
+CobolNet.Runtime.OdoTail.PositionsPerCharacter.init -> void
+CobolNet.Runtime.OdoTail.RecordMaxUnits.get -> int
+CobolNet.Runtime.OdoTail.RecordUnit.get -> int

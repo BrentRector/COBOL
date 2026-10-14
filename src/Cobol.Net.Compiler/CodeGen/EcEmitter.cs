@@ -839,7 +839,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// ONE COBOL name is not ONE C# type. GR14 a) selects when the exception object "is a factory object or
     /// instance object of object-class-name-1 or of a subclass of object-class-name-1" — ONE clause naming BOTH
     /// object kinds, and a COBOL class is emitted as TWO DISJOINT C# hierarchies (the instance class and its
-    /// sibling <c>…__FACTORY</c> singleton, each rooted at its base's corresponding half) — so its census is
+    /// sibling <c>__FACTORY_…</c> singleton, each rooted at its base's corresponding half) — so its census is
     /// <see cref="Oo.OoClassSymbol.FactoryOrInstanceCsTypes"/>; testing only the instance name selected NO
     /// declarative for any factory exception object, silently (kb/Work PB366). GR14 b)'s "described with an
     /// IMPLEMENTS clause that references interface-name-1" is §11.8.4 GR2 (instance objects) / §11.4.4 GR2

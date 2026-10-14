@@ -39,7 +39,9 @@ internal static class ItemLength
             // below already counted the separate sign, so the two arms of ONE rule disagreed.
             // A national GROUP is not elementary: PositionsOf answers null and §13.18.29.4 GR2b's as-if
             // PICTURE N(m) length is the count (the `?? pic.Length` arm).
-            if (pic.Usage is Usage.National || pic.Category is PicCategory.National)
+            // r2 is worded over the USAGE ("an elementary data item of usage national"), and a category-national item
+            // is always of usage national, so the usage alone is the test (kb/Work PB546).
+            if (pic.Usage is Usage.National)
                 return NationalWindow.PositionsOf(item) ?? pic.Length;                      // r2 — national positions
         }
         return item.ByteWidth;                                                              // r3 — alphanumeric positions ≡ bytes
