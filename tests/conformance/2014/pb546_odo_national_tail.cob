@@ -5,7 +5,10 @@
       *> position does (13.18.60.4 GR8, D-N1): H is HX + 2 x 2 bytes = 5 and G is
       *> DL's current 2 + 5 = 7 (15.50.4 r7). DISPLAY, a group MOVE (14.9.25.4 GR9)
       *> and a file record written and read back (8.5.1.11.2) carry exactly those
-      *> bytes: a b Q, then 0000 0058 0000 0059 for X and Y as UTF-16BE pairs.
+      *> bytes: a b Q, then 58 31 59 32, the UTF-16BE pairs of NX"5831" and
+      *> NX"5932". Each national character is chosen so BOTH of its bytes are
+      *> printable: the golden pins every byte as text, where a character such as
+      *> N"X" (00 58) would put a NUL in it (NulByteDriftTests).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB546O.
        ENVIRONMENT DIVISION.
@@ -37,8 +40,8 @@
        MAIN.
            MOVE "ab" TO DL
            MOVE "Q" TO HX
-           MOVE N"X" TO NT(1)
-           MOVE N"Y" TO NT(2)
+           MOVE NX"5831" TO NT(1)
+           MOVE NX"5932" TO NT(2)
            DISPLAY "LENGTH-G=" FUNCTION LENGTH(G)
            DISPLAY "LENGTH-H=" FUNCTION LENGTH(H)
            DISPLAY "G=[" G "]"
@@ -48,7 +51,7 @@
            OPEN OUTPUT F
            WRITE R
            CLOSE F
-           MOVE N"Z" TO RNT(1)
+           MOVE NX"5A5A" TO RNT(1)
            OPEN INPUT F
            READ F
            CLOSE F

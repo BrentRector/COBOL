@@ -376,26 +376,28 @@ public sealed class IntrinsicFunctionDifferentialTests
         // is a conforming reference with the answer 2 (kb/Work PB61, AR-15.14.3-1). It is now the POSITIVE
         // twin below. A variable-length group that also holds USAGE BIT items was the next residue and is now
         // summed too (kb/Work PB2964, PB2498: the fixed part is the §8.5.1.6.3 layout, golden
-        // 2014/pb2964_length_bit_variable_group). The one NAMED residue left in the LENGTH family is a table of
-        // runtime-length elements in a group that ALSO holds an OCCURS DEPENDING table of bit items: the table's
-        // total is a per-occurrence loop that only the group's current-extent image can state, and that composer
-        // does not take a bit-bearing ODO group (DataItem.CurrentExtentComposes), so VariableLengthGroupSum's
-        // ImageOrStage stays the documented loud stage and names the table. That is the shape that proves the
-        // doctrine now. (kb/Work PB244: the FIXED-OCCURS table of runtime-length elements is summed per
-        // occurrence, and an OCCURS DEPENDING or dynamic-capacity table of them - struct-resident or cell-backed -
-        // is the length of its current image — the positive twins, below.)
+        // 2014/pb2964_length_bit_variable_group). The residue after that, a table of runtime-length elements in a
+        // group that ALSO holds an OCCURS DEPENDING table of bit items, is summed too now: the current-extent
+        // composer takes a bit-bearing ODO group (kb/Work PB3030, DataItem.CurrentExtentComposes; golden
+        // 2014/pb3030_bit_odo_variable_group). The one NAMED residue left in the LENGTH family is the ALIGNED
+        // OCCURS DEPENDING table of a GROUP-USAGE BIT group: §15.50.4 r1 counts a bit group in boolean positions,
+        // and an ALIGNED occurrence is padded to whole bytes, so VariableLengthGroupSum stays the documented loud
+        // stage and names the table (kb/Work PB2498). That is the shape that proves the doctrine now. (kb/Work
+        // PB244: the FIXED-OCCURS table of
+        // runtime-length elements is summed per occurrence, and an OCCURS DEPENDING or dynamic-capacity table of
+        // them - struct-resident or cell-backed - is the length of its current image — the positive twins, below.)
         var (ok, output, detail) = new CobolNetCompiler(2023).CompileAndRun(
             Program("01 WS-X PIC X(5) VALUE \"ABCDE\".\n01 T PIC 9(4).",
                 "    MOVE FUNCTION BYTE-LENGTH(WS-X(1:2)) TO T.\n    DISPLAY T."));
         Assert.True(ok, detail);
         Assert.Contains("0002", output);
         (ok, _, detail) = new CobolNetCompiler(2023).CompileAndRun(
-            Program("01 N PIC 9 VALUE 2.\n01 G.\n   05 TD OCCURS DYNAMIC CAPACITY IN CP.\n      10 DD PIC X DYNAMIC LENGTH.\n"
-                    + "   05 H.\n      10 B PIC 1 USAGE BIT.\n      10 TB PIC 1 USAGE BIT OCCURS 1 TO 8 DEPENDING ON N.\n01 T PIC 9(4).",
-                "    MOVE \"ab\" TO DD(1).\n    MOVE FUNCTION LENGTH(G) TO T.\n    DISPLAY T."));
+            Program("01 N PIC 9 VALUE 2.\n01 BG GROUP-USAGE BIT.\n   05 BA PIC 1 USAGE BIT.\n"
+                    + "   05 TA PIC 1(3) USAGE BIT ALIGNED OCCURS 1 TO 4 DEPENDING ON N.\n01 T PIC 9(4).",
+                "    MOVE FUNCTION LENGTH(BG) TO T.\n    DISPLAY T."));
         Assert.False(ok);
         Assert.Contains("LENGTH", detail);
-        Assert.Contains("the dynamic-capacity table 'TD' has a runtime-length element", detail);
+        Assert.Contains("the ALIGNED OCCURS DEPENDING table 'TA' of a bit group", detail);
     }
 
     /// <summary>kb/Work PB244 - the cell-backed twin of

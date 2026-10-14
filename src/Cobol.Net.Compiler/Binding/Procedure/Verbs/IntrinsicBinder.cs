@@ -2416,7 +2416,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // whose occurrences each hold a runtime-length member — is a per-occurrence loop over run-time storage the
         // term-by-term sum below cannot write down. The group's own CurrentImage composes exactly that extent (A.1
         // item 57: LENGTH(G) equals the displayed width), so the length is the image's, through the ONE composer
-        // DISPLAY uses; a group the composer cannot take (a cell-backed or bit-bearing one) stays the named stage.
+        // DISPLAY uses (a bit-bearing group included, kb/Work PB3030); a group the composer cannot take, or a place
+        // none of the composer's storage forms reaches, stays the named stage.
         BoundExpr ImageOrStage(string what) =>
             group.CurrentExtentImageCapable
                 && inner is MemberPlace or DynTablePlace or RedefViewPlace { Coding: VarGroupWindow }
