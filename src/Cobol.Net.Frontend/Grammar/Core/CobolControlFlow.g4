@@ -352,10 +352,10 @@ evaluateWhenItem
     | NOT? addressIdentifier                     // [NOT] identifier-2 that is an address-identifier (kb/Work PB1060)
     | NOT? valueOperand                          // [NOT] identifier-2 / literal-2 / arithmetic-expression-2: "A", 1, VAR
     | {boolExprAhead()}? NOT? booleanExpression  // [NOT] boolean-expression-2: WHEN A B-AND C (§14.9.13.4 GR4 a) 6.)
-    | NOT? booleanLiteral                        // TRUE / FALSE; a NOT here is refused by name (COBOLNET3710)
-    | condition                                  // condition-2 (EVALUATE TRUE / complex WHEN); owns its leading NOT
-    | partialExpression                          // WHEN > 5, WHEN NOT NUMERIC, WHEN > 5 AND < 10 (§14.9.13.3 SR5); owns its NOT
-    | NOT? ANY                                   // ANY; a NOT here is refused by name (COBOLNET3710)
+    | NOT? booleanLiteral                        // TRUE / FALSE: a NOT here is refused by name (COBOLNET3710)
+    | condition                                  // condition-2 (EVALUATE TRUE / complex WHEN), owning its leading NOT
+    | partialExpression                          // WHEN > 5, WHEN NOT NUMERIC, WHEN > 5 AND < 10 (§14.9.13.3 SR5), owning its NOT
+    | NOT? ANY                                   // ANY: a NOT here is refused by name (COBOLNET3710)
     ;
 
 // ==========================================

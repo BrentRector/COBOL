@@ -29,8 +29,11 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class EvaluateBooleanExpressionOperandDriftTests
 {
-    private static string Grammar() => File.ReadAllText(Path.Combine(TestRepo.Root,
-        "src", "Cobol.Net.Frontend", "Grammar", "Core", "CobolControlFlow.g4"));
+    /// <summary>The grammar with its line comments removed BEFORE a rule is located: a prose comment may hold a ';'
+    /// (a §-reference's punctuation), which would otherwise end the rule body early (PartialExpressionSpineDriftTests'
+    /// measured lesson).</summary>
+    private static string Grammar() => Regex.Replace(File.ReadAllText(Path.Combine(TestRepo.Root,
+        "src", "Cobol.Net.Frontend", "Grammar", "Core", "CobolControlFlow.g4")), @"//[^\r\n]*", "");
 
     private static string Binder() => File.ReadAllText(Path.Combine(TestRepo.Root,
         "src", "Cobol.Net.Compiler", "Binding", "Procedure", "Verbs", "EvaluateBinder.cs"));
