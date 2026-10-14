@@ -2630,7 +2630,11 @@
   "pb2623-method-reserved-at-2002-2014",
   "pb1616-define-hex-odd",
   "pb1616-omitted-branch-hex-odd",
-  "pb1616-define-zero-length-below-2014"
+  "pb1616-define-zero-length-below-2014",
+  "pb2988-capacity-register-copies-unqualified",
+  "pb2988-capacity-register-two-written-entries",
+  "pb546-national-boolean-below-2002",
+  "pb546-group-into-national-dynamic-below-2014"
  ],
  "pending": []
 }

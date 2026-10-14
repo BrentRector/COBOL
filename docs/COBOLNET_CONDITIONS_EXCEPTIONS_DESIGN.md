@@ -34,7 +34,7 @@ OO mechanism (feedback_one_mechanism_per_job):
   one `is` or-pattern — one COBOL name is not one C# type.** GR14 a) names BOTH object kinds in one clause ("a
   factory object or instance object of object-class-name-1 or of a subclass") and a COBOL class is emitted as
   TWO DISJOINT C# hierarchies, so a class entry tests `OoClassSymbol.FactoryOrInstanceCsTypes`
-  (`__obj is FOO or FOO__FACTORY`); testing only the instance half selected NO declarative for any factory
+  (`__obj is FOO or __FACTORY_FOO`); testing only the instance half selected NO declarative for any factory
   exception object, silently (kb/Work PB366). GR14 b)'s "described with an IMPLEMENTS clause that references
   interface-name-1" is §11.8.4 GR2 / §11.4.4 GR2's IMPLEMENTS closure, which rides C#'s `is` over the single
   emitted interface (`OoInterfaceSymbol.ImplementedCsTypes`) that both halves carry. "Or of a subclass" rides

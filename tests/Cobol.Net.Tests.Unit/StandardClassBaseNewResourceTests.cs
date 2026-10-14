@@ -10,17 +10,17 @@ namespace CobolNet.Tests.Unit;
 /// kb/Work PB1524 — ISO/IEC 1989:2023 §16.2.1.2 GR2: "If resources needed to create a new object are not available,
 /// the returned object reference is set to NULL, and the EC-OO-RESOURCE exception condition is set to exist and is
 /// propagated back to the runtime element that invoked the New method." Every New form reaches the ONE body
-/// <see cref="BASE__FACTORY.__New"/>; a golden cannot exhaust memory, so these cases inject the allocation failure
+/// <see cref="__FACTORY_BASE.__New"/>; a golden cannot exhaust memory, so these cases inject the allocation failure
 /// through the creation seam <c>__Create</c> that every emitted factory overrides.
 /// </summary>
 public sealed class StandardClassBaseNewResourceTests
 {
     private sealed class Thing : BASE
     {
-        protected override BASE__FACTORY __FactoryOfClass => ThingFactory.Instance;
+        protected override __FACTORY_BASE __FactoryOfClass => ThingFactory.Instance;
     }
 
-    private sealed class ThingFactory(bool exhausted) : BASE__FACTORY
+    private sealed class ThingFactory(bool exhausted) : __FACTORY_BASE
     {
         public static readonly ThingFactory Instance = new(exhausted: false);
 

@@ -444,7 +444,6 @@ public sealed class OoClassTable
             var sym = NewClassSymbol(ctx);
             string csName = sym.CsName;
             ScreenInheritsNames(id, name, edition);
-            usedCsNames.Add(csName + NamingConvention.FactorySuffix);   // belt-and-braces (a `__` name cannot collide with COBOL-derived names)
             if (table._ifaceByName.ContainsKey(name))
                 edition.Error("COBOLNET0840",
                     $"'{name}' is defined as both a class and an interface — one name namespace "
@@ -457,6 +456,11 @@ public sealed class OoClassTable
                     + "type)");
                 continue;
             }
+            // The factory class's name is a NamingConvention prefix family no class-name spells (kb/Work PB2921), so it
+            // is free whenever the class's own name was: a failure here is a defect of the naming convention.
+            if (!usedCsNames.Add(sym.FactoryCsName))
+                throw new InvalidOperationException(
+                    $"factory class name '{sym.FactoryCsName}' of class '{name}' is already taken (kb/Work PB2921)");
             table._classes.Add(sym);
             // The END CLASS and END METHOD names are §10.7.3 SR4 / SR5, asked by Validation.EndMarkerPass.
             AddMethods(sym);
@@ -505,7 +509,7 @@ public sealed class OoClassTable
                 // element is a source unit excluding any contained source units" — so the method-name and the
                 // class-name sit in DIFFERENT source elements, which §8.4.6.1 lets "use identical user-defined
                 // words ... independent of the use of these user-defined words by other source elements".
-                if (mcs == csName) mcs += "_M";
+                if (mcs == csName) mcs = NamingConvention.ClassNamedMethodName(mcs);
                 var method = new OoMethodSymbol(
                     methodName,
                     HasUsing: pd?.usingClause() is not null,
@@ -544,7 +548,8 @@ public sealed class OoClassTable
                     : m.methodName(0).GetText();
                 var pd = m.procedureDivision();
                 string fcs = fsel is not null ? methodName : DataItem.WordIdentifier(methodName);
-                if (fcs == csName + "__FACTORY") fcs += "_M";   // unreachable (no __ in COBOL names) — defensive
+                // No CS0542 guard: the enclosing type is the factory class, a NamingConvention prefix family no
+                // method-name or accessor name spells (kb/Work PB2921).
                 var method = new OoMethodSymbol(
                     methodName,
                     HasUsing: pd?.usingClause() is not null,

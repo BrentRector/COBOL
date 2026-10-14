@@ -5,17 +5,17 @@ using CobolNet.Runtime.Exceptions;
 namespace CobolNet.Runtime;
 
 // ⛔ THE TYPE NAMES ARE A WIRE CONTRACT. The compiler emits a COBOL class-name as its sanitized, uppercased
-// spelling (ObjectRefDescriptor.ClrTypeName) and a factory object's type as that name plus "__FACTORY"
-// (NamingConvention.FactorySuffix). Naming the standard class's implementation BASE / BASE__FACTORY is what lets
+// spelling (ObjectRefDescriptor.ClrTypeName) and a factory object's type as that name behind the prefix "__FACTORY_"
+// (NamingConvention.FactoryClassName). Naming the standard class's implementation BASE / __FACTORY_BASE is what lets
 // `CLASS-ID. C INHERITS FROM BASE`, `USAGE OBJECT REFERENCE BASE` and `FACTORY OF BASE` name these types with no
 // special case in the emitter. Emitted code lives in the global namespace and imports CobolNet.Runtime, so a
 // compilation group that DEFINES its own class BASE shadows these (a global-namespace type wins over a using-
 // imported one) — the same precedence OoClassTable.Find gives a group definition over the standard class.
 //
-// ⛔ BASE AND BASE__FACTORY ARE CONCRETE, AND BASE__FACTORY HAS THE SAME __Instance SINGLETON EVERY GENERATED
+// ⛔ BASE AND __FACTORY_BASE ARE CONCRETE, AND __FACTORY_BASE HAS THE SAME __Instance SINGLETON EVERY GENERATED
 // FACTORY HAS (kb/Work PB2489). §16.2.1.2 GR1 makes New on BASE's own factory create "an object" — an instance of
 // BASE itself — so `INVOKE BASE "NEW"` and `SET f TO FACTORY OF BASE` are legal source, and the emitter reaches them
-// as `BASE__FACTORY.__Instance`, exactly as it reaches `CLS__FACTORY.__Instance` for any class: one shape for every
+// as `__FACTORY_BASE.__Instance`, exactly as it reaches `__FACTORY_CLS.__Instance` for any class: one shape for every
 // factory, so no emit site has a BASE arm. A generated factory that inherits this one hides the accessor with `new`.
 #pragma warning disable CA1707 // the underscore is the emitted factory-type convention, not a style choice
 
@@ -33,10 +33,10 @@ public class BASE : CobolObject
     /// class of the object"). Every emitted BASE-derived class overrides it with its own factory singleton, so the
     /// most-derived override IS the runtime class's factory; a plain BASE object (created by New on BASE's own
     /// factory) is of class BASE.</summary>
-    protected virtual BASE__FACTORY __FactoryOfClass => BASE__FACTORY.__Instance;
+    protected virtual __FACTORY_BASE __FactoryOfClass => __FACTORY_BASE.__Instance;
 
     /// <summary>§9.3.6 match rule 3 d) 5.: the FACTORY type of a plain BASE object's class.</summary>
-    protected internal override Type? __FactoryClassType => typeof(BASE__FACTORY);
+    protected internal override Type? __FactoryClassType => typeof(__FACTORY_BASE);
 
     /// <summary>FactoryObject (§16.2.2.2 GR1): "When invoked on an instance object, the FactoryObject method
     /// determines the class of the object and returns a reference to the factory object associated with that
@@ -64,13 +64,13 @@ public class BASE : CobolObject
 /// that provides a standard mechanism for creating instance objects of a class" (§16.2.1.1). §9.3.14.3: "An
 /// instance object is created as the result of the NEW method being invoked on a factory object."
 /// </summary>
-public class BASE__FACTORY : CobolObject
+public class __FACTORY_BASE : CobolObject
 {
     /// <summary>The factory object of the standard class BASE in the CURRENT run unit, created on first reference
     /// (§9.3.14.2: "A factory object is created before it is first referenced by a run unit") — the same accessor,
     /// by the same name and through the same <see cref="RunUnit.FactoryObject{T}"/>, every generated factory
     /// emits for its own class.</summary>
-    public static BASE__FACTORY __Instance => RunUnit.Current.FactoryObject<BASE__FACTORY>();
+    public static __FACTORY_BASE __Instance => RunUnit.Current.FactoryObject<__FACTORY_BASE>();
 
     /// <summary>§9.3.6 match rule 3 d) 4.: the INSTANCE type of the class this factory belongs to — BASE itself.</summary>
     protected internal override Type? __InstanceClassType => typeof(BASE);

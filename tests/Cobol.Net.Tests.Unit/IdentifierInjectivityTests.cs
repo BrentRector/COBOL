@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using CobolNet.Binding.Model;
+using CobolNet.Compiler.Oo;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -59,6 +60,33 @@ public sealed class IdentifierInjectivityTests
             Assert.Equal(word, Decode(id));
             Assert.True(seen.TryAdd(id, word), $"'{word}' and '{(seen.TryGetValue(id, out var w) ? w : "")}' both give '{id}'");
         }
+    }
+
+    /// <summary>kb/Work PB2921 — a C# name synthesized from a word is a PREFIX family of <see cref="NamingConvention"/>,
+    /// which no word's identifier can spell, because no identifier the mapping gives begins with <c>__</c> (a leading
+    /// hyphen or underscore is escaped <c>_u…_</c>, a leading digit gets one <c>_</c>). A SUFFIX family has no such
+    /// guarantee: the factory class of <c>X</c> was <c>X__FACTORY</c>, the identifier of the legal class-name
+    /// <c>X--FACTORY</c>, and the compilation group refused the second class (COBOLNET0820) — and the CS0542 rename of
+    /// a method named like its class was <c>X_M</c>, the identifier of the method-name <c>X-M</c>.</summary>
+    [Fact]
+    public void NoIdentifier_BeginsAWordDerivedFamily_SoNoClassNameSpellsAFactoryClass()
+    {
+        foreach (string word in Words("-_uU5・AF", 4))
+            foreach (string id in new[] { DataItem.Sanitize(word), DataItem.WordIdentifier(word) })
+                Assert.False(id.StartsWith("__", StringComparison.Ordinal), $"'{word}' gives '{id}', inside the `__` families");
+        Assert.NotEqual(NamingConvention.FactoryClassName(DataItem.WordIdentifier("X")), DataItem.WordIdentifier("X--FACTORY"));
+        Assert.NotEqual(NamingConvention.ClassNamedMethodName(DataItem.WordIdentifier("X")), DataItem.WordIdentifier("X-M"));
+    }
+
+    /// <summary>The standard class BASE's factory is a runtime type, so the convention and the runtime's class name are
+    /// one contract (kb/Work PB2921): the emitted <c>FACTORY OF BASE</c> type and every BASE-derived factory's base type
+    /// are the name <see cref="NamingConvention.FactoryClassName"/> gives the class-name BASE.</summary>
+    [Fact]
+    public void TheRuntimeBaseFactory_IsTheConventionsNameForBase()
+    {
+        Assert.Equal(typeof(CobolNet.Runtime.__FACTORY_BASE).Name, OoStandardClasses.BaseFactoryCsName);
+        Assert.Equal(OoStandardClasses.BaseFactoryCsName,
+            ObjectRefDescriptor.ActiveClass(OoStandardClasses.BaseName, factory: true).ClrTypeName);
     }
 
     private static IEnumerable<string> Words(string alphabet, int maxLength)

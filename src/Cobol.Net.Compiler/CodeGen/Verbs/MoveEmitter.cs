@@ -281,10 +281,12 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // receiver: MoveKind.Group's receiver is a group, FigurativeToNumericImage's is numeric (a
         // dynamic-length item is alphanumeric or national, §8.5.1.10.1), and a RefModSlice receiver is by
         // §8.5.1.10.4's own first sentence a FIXED-length item of the current length.</para>
+        // The image is the receiver's new STORAGE (GR4: no conversion), so a national receiver decodes its
+        // characters from the bytes exactly as the fixed national receiver below does (design D-N8, kb/Work PB546).
         if (item.IsDynamicLength)
         {
             ctx.Writer.Line(PlaceRenderer.Write(target, ReceivingStore.Characters(item,
-                OperandText.NonElementaryMoveSender(source, num, "group MOVE into"), "")));
+                ReceivingStore.ContentCharacters(item, OperandText.NonElementaryMoveSender(source, num, "group MOVE into")), "")));
             return;
         }
         // ⛔ THE OPERAND'S capability, not the declaring entry's (Place.ImageCapable, kb/Work PB189): one occurrence
