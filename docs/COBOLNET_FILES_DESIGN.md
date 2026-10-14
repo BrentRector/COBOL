@@ -2601,6 +2601,13 @@ or validate behavior simply absent. These two are not: an inert FORMAT changes w
 implicit-record model (§14.9.51.4 GR8, §14.9.35.4 GR9) that a whole-record-area write does not implement.
 Compiling them inert is a **wrong answer**, not a missing facility.
 
+**READ has no FILE alternative to decline.** Both READ formats print a bare `READ file-name-1` (§14.9.30.2), and
+no edition prints `READ FILE file-name-1`, so it is not an Annex A.4.13 element and `readStatement` carries no
+`FILE fileName` arm: `READ FILE F1` is a syntax error (`COBOL0001: unexpected 'FILE'`) at every `--std`. The
+rule once copied WRITE's and REWRITE's two-arm head with no binder refusing the third copy, so that spelling
+compiled clean and ran as a plain READ (kb/Work PB2728; witness `negative/pb2728-read-file-unprinted`). In a
+statement head, FILE before a file-name belongs only to WRITE, REWRITE and DELETE FILE (§14.9.10.2 Format 2).
+
 **One mechanism.** Every A.3/A.4 decline — accept-inert and refuse alike — routes through
 `EditionContext.Declined(descriptor, seen)`, and the DESCRIPTOR's severity chooses the disposition. There is
 no local strictness test at any site. `--permissive` does **not** move an A.4 decline in either direction: it

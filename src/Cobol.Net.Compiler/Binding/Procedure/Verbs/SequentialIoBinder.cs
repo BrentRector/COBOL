@@ -248,7 +248,6 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
 
     public BoundStatement BindRead(Core.ReadStatementContext r)
     {
-        string name = r.fileName().GetText();
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
         if (!ctx.Validation.ResolveFile(r.fileName(), "READ", out var file)) return BoundRejected.Reported(ctx.Edition);
         if (!file.IsSequential) return keyedIo.BindRead(r, file);   // relative/indexed READ F1/F2 (ISO 14.9.30; KeyedIo partial)
