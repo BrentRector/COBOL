@@ -2337,12 +2337,12 @@ internal static class RuntimeApi
         $"{cellExpr}.{nameof(StorageCell.ContiguousExtentsAt)}({width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynMax)}, {IntSpan(dynStructure)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count})";
 
     /// <summary>A cell-backed variable-length group's §8.5.1.12 component carrier — <c>StorageCell.VarGroupAt</c>;
-    /// <paramref name="storage"/> for a BY REFERENCE crossing's carrier, which states each table's creation (kb/Work
+    /// <paramref name="byReference"/> for a BY REFERENCE crossing's carrier, which states each table's creation (kb/Work
     /// PB2690).</summary>
     public static string CellVarCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,
                                         IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable,
-                                        OdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem, bool storage = false) =>
-        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count}{CellElemShapes(dynElem)}{(storage ? ", storage: true" : "")})";
+                                        OdoTail odo, string count, IReadOnlyList<CellGroupShape?> dynElem, bool byReference = false) =>
+        $"{cellExpr}.{nameof(StorageCell.VarGroupAt)}({fixedAtExpr}, {width}, (int)({dynBase}), {IntSpan(dynFixedAt)}, {IntSpan(dynTable)}, {OdoTailOf(odo)}, {count}{CellElemShapes(dynElem)}{(byReference ? ", byReference: true" : "")})";
 
     /// <summary>Distribute a component carrier into a cell-backed variable-length group — <c>StorageCell.StoreVarGroupAt</c>.</summary>
     public static string CellVarStoreCarrier(string cellExpr, string fixedAtExpr, int width, string dynBase,

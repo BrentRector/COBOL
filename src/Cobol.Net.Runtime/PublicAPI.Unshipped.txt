@@ -85,4 +85,4 @@ CobolNet.Runtime.CobolVarGroup.CreatedAt(int i) -> System.Func<int, CobolNet.Run
 CobolNet.Runtime.CobolVarGroup.CreatedList.get -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>?[]!
 CobolNet.Runtime.CobolDynTable<T>.CreatedAs(System.Func<T, CobolNet.Runtime.CobolVarGroup!>! carrierOf) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>!
 CobolNet.Runtime.CobolDynTable<T>.CreatedAs(System.Func<T, string!>! imageOf) -> System.Func<int, CobolNet.Runtime.CobolVarGroup!>!
-CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool storage = false) -> CobolNet.Runtime.CobolVarGroup!
+CobolNet.Runtime.StorageCell.VarGroupAt(int fixedAt, int width, int dynBase, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable, CobolNet.Runtime.OdoTail tail, int count, CobolNet.Runtime.CellGroupShape?[]? elems = null, bool byReference = false) -> CobolNet.Runtime.CobolVarGroup!

@@ -965,7 +965,10 @@ public static class CobolArgAdapt
     /// two shapes) pairs the formal's tables with the argument's dynamic-capacity tables, the view reads the argument's
     /// carrier in the formal's shape (<see cref="CobolVarGroup.ToImage"/> — each table fitted to the formal's occurrence
     /// count, §8.5.1.12.3 sentence 3), and a store overlays the argument's storage (<see cref="CobolVarGroup.OverlayImage"/>,
-    /// §14.2.3 GR8) — element by element where a table holds variable-length elements (kb/Work PB2690).</para></summary>
+    /// §14.2.3 GR8) — element by element where a table holds variable-length elements (kb/Work PB2690). A BY REFERENCE
+    /// argument's carrier is its STORAGE (<see cref="CobolVarGroup.Created"/>), so the formal sees and creates the
+    /// occurrences past a dynamic-capacity table's capacity as that table creates them (§8.5.1.9.5); a BY CONTENT copy is a
+    /// value and shows the MOVE's space fill.</para></summary>
     /// <remarks><paramref name="unbound"/> is the factory of the formal's UNBOUND value (kb/Work PB992, PB2671;
     /// docs/CONFORMANCE.md DOC-A.1-116 and DOC-A.1-141) — the category default its declared carrier starts with, which
     /// an unchecked reference to an OMITTED formal reads (the documented §14.9.4.4 GR12 leniency): spaces for a

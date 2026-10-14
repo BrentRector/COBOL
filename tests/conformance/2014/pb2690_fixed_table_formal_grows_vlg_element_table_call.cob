@@ -14,8 +14,8 @@
       *>
       *> EXPECTED VALUES, DERIVED (VG starts as h, [a b c d] [e f], capacity 2):
       *>   S1  the fixed formal sees VG's two elements, each IL cut to two
-      *>       occurrences ("d" superfluous) and the third element missing,
-      *>       space filled                                       = habcef + four spaces
+      *>       occurrences ("d" superfluous) and the third element as VT creates
+      *>       it (D-VGB; no VALUE, so spaces)                    = habcef + four spaces
       *>   R1  the callee stores DF (3) := "Y" and FI (3, 1) := "X": VG has three
       *>       elements, the third IL's first occurrence is "X"; the first two
       *>       keep every occurrence, "d" included                = Y, X, 3

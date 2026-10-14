@@ -9,7 +9,8 @@
       *> variable-length group's collapsed width.
       *>
       *> EXPECTED VALUES, DERIVED:
-      *>   LF   - VT has capacity 2 opposite LF's 3-occurrence LT; 14.6.9.2 space fills the third -> [ghkl ij].
+      *>   LF   - VT has capacity 2 opposite LF's 3-occurrence LT; the third is the one VT creates
+      *>          (determination D-VGB), spaces -> [ghkl ij].
       *>   SG   - the method's variable-length returning item LR (capacity 3) into the fixed SG (8.5.1.12.3).
       *>   VG   - 14.2.3 GR8: L1 := qq and LT(1..3) := m n o reach VG. LT(3) is a receiving reference to
       *>          VT with a subscript that "exceeds the current capacity of the table", so 8.5.1.9.3

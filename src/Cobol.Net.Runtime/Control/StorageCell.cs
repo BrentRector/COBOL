@@ -263,10 +263,10 @@ public sealed class StorageCell
     /// <summary>Component <paramref name="ordinal"/> — a dynamic-capacity table whose elements are variable-length groups
     /// of <paramref name="shape"/> (kb/Work PB2496) — as its occurrences' own §8.5.1.12 carriers, up to its current
     /// capacity: the nested component of <see cref="CobolVarGroup.Elements"/>, each element cell read by the element's
-    /// shape (an element cell is a scope of its own, its slots numbered from zero). <paramref name="storage"/> is
+    /// shape (an element cell is a scope of its own, its slots numbered from zero). <paramref name="byReference"/> is
     /// <see cref="VarGroupAt"/>'s, one level down.</summary>
-    private CobolVarGroup[] ElementCarriersAt(int ordinal, int tableWidth, CellGroupShape shape, bool storage = false) =>
-        DynTableAt(ordinal, 0, tableWidth).CurrentOccurrencesAs(ElementCarrier(shape, storage));
+    private CobolVarGroup[] ElementCarriersAt(int ordinal, int tableWidth, CellGroupShape shape, bool byReference = false) =>
+        DynTableAt(ordinal, 0, tableWidth).CurrentOccurrencesAs(ElementCarrier(shape, byReference));
 
     /// <summary>A variable-length group of this area as its §8.5.1.12 component carrier: the group's fixed run (its
     /// <paramref name="width"/> positions of <see cref="Ref"/> from <paramref name="fixedAt"/>, each table's
@@ -277,12 +277,12 @@ public sealed class StorageCell
     /// <paramref name="count"/> occurrences: the table is the run's trailing storage (§13.18.38.3 SR22), and the
     /// activation boundary passes the table's maximum count (§14.8.2.2); the other helpers below take the same pair.
     /// <paramref name="elems"/> is each table component's element shape when its elements are variable-length groups
-    /// (kb/Work PB2496): that component is carried nested, as its occurrences' own carriers. <paramref name="storage"/>
+    /// (kb/Work PB2496): that component is carried nested, as its occurrences' own carriers. <paramref name="byReference"/>
     /// marks the carrier of a BY REFERENCE crossing, which states each table's creation of an element
     /// (<see cref="CobolVarGroup.Created"/>, kb/Work PB2690) at every level; every other reader takes a value.</summary>
     public CobolVarGroup VarGroupAt(int fixedAt, int width, int dynBase, ReadOnlySpan<int> dynFixedAt,
                                     ReadOnlySpan<int> dynTable, OdoTail tail, int count, CellGroupShape?[]? elems = null,
-                                    bool storage = false)
+                                    bool byReference = false)
     {
         // The occurrences beyond the OCCURS DEPENDING count carry no components (kb/Work PB244): the table is the
         // group's trailing storage, so they are its last ones - the carrier a declared group builds
@@ -295,15 +295,15 @@ public sealed class StorageCell
             // A table of variable-length ELEMENTS is a nested component (kb/Work PB2496): its occurrences' carriers.
             if (elems?[k] is { } shape)
             {
-                (nested ??= new CobolVarGroup[]?[dyn.Length])[k] = ElementCarriersAt(dynBase + k, dynTable[k], shape, storage);
+                (nested ??= new CobolVarGroup[]?[dyn.Length])[k] = ElementCarriersAt(dynBase + k, dynTable[k], shape, byReference);
                 dyn[k] = "";
             }
             else dyn[k] = ComponentAt(dynBase + k, dynTable[k]);
             // Storage states the element each table creates (kb/Work PB2690): what a BY REFERENCE view shows past the
             // capacity, and what a store there creates (CobolVarGroup.Reshape / Overlay; ISO §8.5.1.9.5).
-            if (storage && dynTable[k] > 0)
+            if (byReference && dynTable[k] > 0)
                 (created ??= new Func<int, CobolVarGroup>?[dyn.Length])[k] = DynTableAt(dynBase + k, 0, dynTable[k])
-                    .CreatedAs(elems?[k] is { } es ? ElementCarrier(es, storage: true) : FixedElementCarrier);
+                    .CreatedAs(elems?[k] is { } es ? ElementCarrier(es, byReference: true) : FixedElementCarrier);
         }
         string run = RunOf(fixedAt, width, dynFixedAt, dynTable);
         return new CobolVarGroup(tail.Present ? run[..^tail.CutAt(count)] : run, dyn, nested, created);
@@ -311,8 +311,8 @@ public sealed class StorageCell
 
     /// <summary>An element cell of a table whose elements are variable-length groups of <paramref name="shape"/> as its
     /// §8.5.1.12 carrier (an element cell is a scope of its own, its slots numbered from zero).</summary>
-    private static Func<StorageCell, CobolVarGroup> ElementCarrier(CellGroupShape shape, bool storage) =>
-        e => e.VarGroupAt(0, shape.Width, 0, shape.DynFixedAt, shape.DynTable, default, 0, shape.Elems, storage);
+    private static Func<StorageCell, CobolVarGroup> ElementCarrier(CellGroupShape shape, bool byReference) =>
+        e => e.VarGroupAt(0, shape.Width, 0, shape.DynFixedAt, shape.DynTable, default, 0, shape.Elems, byReference);
 
     /// <summary>An element cell of fixed image as its element carrier: its fixed run.</summary>
     private static readonly Func<StorageCell, CobolVarGroup> FixedElementCarrier = static e => CobolVarGroup.OfImage(e.Ref);

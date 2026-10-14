@@ -649,14 +649,14 @@ internal static class PlaceRenderer
     /// <summary>The carrier of a variable-length group at an ACTIVATION BOUNDARY (CALL / INVOKE argument, LINKAGE
     /// formal copy-out, RETURNING item): an OCCURS DEPENDING table it holds crosses at its MAXIMUM — §14.8.2.2,
     /// "the maximum length is used" — as the fixed-length group does through <c>AsImage</c>.
-    /// <para>⛔ <paramref name="storage"/> is the carrier a BY REFERENCE crossing reads and stores back over — the
+    /// <para>⛔ <paramref name="byReference"/> asks for the carrier a BY REFERENCE crossing reads and stores back over — the
     /// argument's STORAGE, which a formal "occupies" (§14.2.3 GR8) — so it states the element each of its dynamic-capacity
     /// tables creates (<c>CobolVarGroup.Created</c>, kb/Work PB2690): a formal's fixed table past the capacity sees and
     /// creates those occurrences. Every other crossing (a BY CONTENT copy, a copy-out, a RETURNING item) takes a value.</para></summary>
-    public static string VarGroupBoundaryImage(Place group, string context = "activation-boundary image of", bool storage = false) =>
-        VarGroupImageAt(group, context, maximum: true, storage);
+    public static string VarGroupBoundaryImage(Place group, string context = "activation-boundary image of", bool byReference = false) =>
+        VarGroupImageAt(group, context, maximum: true, byReference);
 
-    private static string VarGroupImageAt(Place group, string context, bool maximum, bool storage = false)
+    private static string VarGroupImageAt(Place group, string context, bool maximum, bool byReference = false)
     {
         var (inner, odo) = PeelOdo(group, maximum);
         return inner.Undecorated switch
@@ -665,12 +665,12 @@ internal static class PlaceRenderer
             // (SR22); the operand's count cuts the carrier's fixed run to the current extent (kb/Work PB244).
             RedefViewPlace { Coding: VarGroupWindow g } v when WindowComposes(v, odo) =>
                 RuntimeApi.CellVarCarrier(RenderPath(g.Cell, AccessDir.Sending),
-                    $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo), g.DynElem, storage),   // kb/Work PB1026, PB1042, PB2496, PB2690
+                    $"(int)({PositionRenderer.Render(v.Offset)})", v.Width, PositionRenderer.Render(g.DynBase), g.DynFixedAt, g.DynTable, g.Odo, CellOdoCount(odo), g.DynElem, byReference),   // kb/Work PB1026, PB1042, PB2496, PB2690
             _ when odo is null || inner.Undecorated is RedefViewPlace { Coding: VarGroupWindow } || !inner.Item.CurrentExtentImageCapable =>
                 EmitText.LoudValue(RuntimeApi.VarGroupType, TierCIsland.Reason(inner.Item, context)),
             // A STATEMENT's read asks a LINKAGE dynamic-length member to agree with its clause (§14.6.13.2 rule 5,
             // kb/Work PB1937); the boundary's own copy-out references nothing, so it passes no flag.
-            _ => $"{Read(inner)}.AsVarImage({string.Join(", ", new[] { odo, maximum ? "" : "true", storage ? "__storage: true" : "" }.Where(a => a.Length > 0))})",
+            _ => $"{Read(inner)}.AsVarImage({string.Join(", ", new[] { odo, maximum ? "" : "true", byReference ? "__byReference: true" : "" }.Where(a => a.Length > 0))})",
         };
     }
 

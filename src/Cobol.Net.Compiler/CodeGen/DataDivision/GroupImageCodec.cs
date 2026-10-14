@@ -393,8 +393,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// asks a LINKAGE dynamic-length member to agree with its DYNAMIC LENGTH clause (ISO §14.6.13.2 rule 5; kb/Work
     /// PB1937 / PB1118), as opposed to the activation boundary's own copy-out, which references nothing.</summary>
     private static string AsVarImageParameters(DataItem group) =>
-        DataItem.HasOdoBeneath(group) ? "int __odo, bool __agree = false, bool __storage = false"
-                                      : "bool __agree = false, bool __storage = false";
+        DataItem.HasOdoBeneath(group) ? "int __odo, bool __agree = false, bool __byReference = false"
+                                      : "bool __agree = false, bool __byReference = false";
 
     /// <summary>The parameters of <c>FromVarImage</c>: the carrier, <c>__storage</c> (a LINKAGE formal's copy-in, kb/Work
     /// PB1937) and, for a group that holds the OCCURS DEPENDING table, the RECEIVING count <c>__odo</c> - how many
@@ -408,7 +408,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                                       : "CobolVarGroup __v, bool __storage = false";
 
     private static string AsVarImageArguments(DataItem group) =>
-        DataItem.HasOdoBeneath(group) ? "__odo, __agree, __storage" : "__agree, __storage";
+        DataItem.HasOdoBeneath(group) ? "__odo, __agree, __byReference" : "__agree, __byReference";
 
     /// <param name="agree">null: the plain field; <c>"true"</c>: a sending read that agrees with the maximum when
     /// the member lies in the LINKAGE SECTION — storage the activating element wrote through ITS OWN description
@@ -579,7 +579,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             // Parallel to dynParts when the carrier holds a dynamic-capacity table (kb/Work PB2690): the element each
             // table creates (ISO §8.5.1.9.5, CobolDynTable.CreatedAs), which a BY REFERENCE formal's fixed table sees past
             // the capacity and creates from; null for a dynamic-length item; a spliced nested group's own list in place.
-            // Stated only for STORAGE (__storage: a BY REFERENCE crossing's carrier) - a MOVE's sender and a BY CONTENT
+            // Stated only for STORAGE (__byReference: a BY REFERENCE crossing's carrier) - a MOVE's sender and a BY CONTENT
             // copy are values, and allocate nothing for it.
             var createdParts = new List<string>();
             int n = 0;
@@ -608,7 +608,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     case VarPartKind.DynGroupTable:
                         // ONE nested component: no characters of its own, its occurrences' carriers beside it.
                         dynParts.Add("\"\"");
-                        elemParts.Add($"{p.Field.Name}.CurrentOccurrencesAs(__e => __e.AsVarImage(__agree, __storage))");
+                        elemParts.Add($"{p.Field.Name}.CurrentOccurrencesAs(__e => __e.AsVarImage(__agree, __byReference))");
                         createdParts.Add($"{p.Field.Name}.CreatedAs(__e => __e.AsVarImage(__agree, true))");
                         break;
                     case VarPartKind.Nested:
@@ -623,8 +623,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                         {
                             VarPartKind.Nested => $"{p.Field.Name}.AsVarImage({AsVarImageArguments(p.Item!)});",
                             VarPartKind.NestedTable =>
-                                $"{RuntimeApi.VarGroupConcat($"global::System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree, __storage))")};",
-                            _ => $"{RuntimeApi.TableConcatVarImages(p.Field.Name, "__odo", "__e => __e.AsVarImage(__agree, __storage)")};",
+                                $"{RuntimeApi.VarGroupConcat($"global::System.Array.ConvertAll({p.Field.Name}, __e => __e.AsVarImage(__agree, __byReference))")};",
+                            _ => $"{RuntimeApi.TableConcatVarImages(p.Field.Name, "__odo", "__e => __e.AsVarImage(__agree, __byReference)")};",
                         });
                         fixedParts.Add($"__n{n}.Fixed");
                         dynParts.Add($".. __n{n}.Dynamic");
@@ -639,7 +639,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             w.Line($"return new CobolVarGroup({(fixedParts.Count > 0 ? string.Join(" + ", fixedParts) : "\"\"")}, "
                 + $"[{string.Join(", ", dynParts)}]"
                 + $"{(nested || creates ? $", {(nested ? $"[{string.Join(", ", elemParts)}]" : "null")}" : "")}"
-                + $"{(creates ? $", __storage ? [{string.Join(", ", createdParts)}] : null" : "")});");
+                + $"{(creates ? $", __byReference ? [{string.Join(", ", createdParts)}] : null" : "")});");
         }
         // THE FILE-RECORD HALF (determination D-FRA; kb/Work PB981): a record read back as ONE contiguous image
         // (§8.5.1.11.2 — what CurrentImage() wrote) is decomposed into this same carrier by the ONE split rule,

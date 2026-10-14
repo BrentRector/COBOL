@@ -52,7 +52,7 @@ namespace CobolNet.Runtime;
 /// it (the emitted <c>AsVarImage</c>, <c>StorageCell.VarGroupAt</c>) and the structural rebuilds of the same storage keep
 /// it (<see cref="Slice"/>, <see cref="Concat"/>, <see cref="SplitTail"/>, <see cref="JoinTail"/>); a conversion's result
 /// (<see cref="Reshape"/>, <see cref="Overlay"/>) is a value and states none. The builders state it only for a BY
-/// REFERENCE crossing (their <c>storage</c> argument), never for a MOVE's sender or a BY CONTENT copy, so the carrier
+/// REFERENCE crossing (their <c>byReference</c> argument), never for a MOVE's sender or a BY CONTENT copy, so the carrier
 /// itself says which it is: <see cref="Reshape"/> shows a storage table's occurrences past its capacity as they would be
 /// created, and <see cref="Overlay"/> creates the ones the callee stored into from it.</param>
 public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup[]?[]? Elements = null,
@@ -334,10 +334,11 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
             }
             else
             {
-                string? content = src.Content(v, pa);
-                fixedRun.Append(CobolString.Store(create is null || content is null ? content ?? ""
-                    : content + CreatedImages(create, content.Length / a.ElementChars, b.Chars - content.Length, a.ElementChars),
-                    b.Chars));
+                string? carried = src.Content(v, pa);
+                string content = carried ?? "";
+                if (create is not null && carried is not null && a.ElementChars > 0)
+                    content += CreatedImages(create, content.Length / a.ElementChars, b.Chars - content.Length, a.ElementChars);
+                fixedRun.Append(CobolString.Store(content, b.Chars));
             }
             (prevA, prevB) = (pa + 1, pb + 1);
         }
