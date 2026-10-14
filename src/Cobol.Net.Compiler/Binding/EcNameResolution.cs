@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;
 using CobolNet.Runtime.Exceptions;
 using CobolNet.Runtime;
@@ -27,7 +28,8 @@ internal static class EcNameResolution
     /// only level-3 is legal (the RAISE/RAISING contexts — checked BEFORE the introduction gate so the level
     /// error keeps priority for a level-2 name of a later family); COBOLNET0878 when the name's family postdates
     /// the targeted edition. Otherwise <see cref="Advise"/> decides: it carries the §15.33 width advisory AND the
-    /// EC-SCREEN refusal (COBOLNET1707), and returns false when it refused.
+    /// declined-facility postures (the EC-SCREEN / EC-VALIDATE / commit-and-rollback refusals, the EC-MCS
+    /// accept-inert warning), and returns false when it refused.
     /// <para>⛔ <paramref name="level3"/> is the RAISING SITE, not a bool, because the rule it enforces has a
     /// DIFFERENT ordinal in each of the three statements that reach here (EXIT §14.9.14.3 SR3 · GOBACK
     /// §14.9.18.3 SR2 · RAISE §14.9.29.3 SR1) and this one message prints it — see <see cref="EcRaiseSite"/>
@@ -47,10 +49,10 @@ internal static class EcNameResolution
         // the IS LOCALE sequence §8.8.4.2.11), so a program can >>TURN them on, name them in a USE declarative, or match
         // them in a WHEN phrase — as EC-ORDER-NOT-SUPPORTED has been since PB101 T7. Refusing a name whose condition
         // this compiler raises would make the condition unobservable.
-        // ⚠ THE EC-SCREEN FAMILY IS THE SAME SHAPE IN THE OTHER DIRECTION and lives in Advise (kb/Work PB260):
-        // Annex A.4.2 is still Not claimed, those four names have no raise site and no reader, and accepting
-        // them made a >>TURN or RAISE compile against a facility that does not exist. When the screen module is
-        // ever claimed, delete that branch exactly as PB64 T1 deleted this one — the two are one rule.
+        // ⚠ THE EC-SCREEN FAMILY IS THE SAME SHAPE IN THE OTHER DIRECTION and is a row of the declined-facility
+        // table Advise reads (kb/Work PB260): Annex A.4.2 is still Not claimed, those four names have no raise site
+        // and no reader, and accepting them made a >>TURN or RAISE compile against a facility that does not exist.
+        // When the screen module is ever claimed, delete its row exactly as PB64 T1 deleted this one — one rule.
         if (level3 is { } site && info.Level != 3)
         {
             edition.Error("COBOLNET0710", $"{where}: exception-name '{info.Name}' is a level-{info.Level} "
@@ -69,14 +71,20 @@ internal static class EcNameResolution
 
     /// <summary>One declined module's exception-name family: the name PREFIX it owns, plus the three strings the
     /// diagnostic needs. A record rather than three parallel arrays, and a TABLE rather than an if-chain,
-    /// because the population is open — every A.4 module this compiler declines owns one (CLAUDE.md rule 5:
+    /// because the population is open — every A.3 or A.4 facility this compiler declines owns one (CLAUDE.md rule 5:
     /// prefer the shape that makes the NEXT case automatic).</summary>
     private readonly record struct DeclinedEcFamily(string Prefix, DiagnosticDescriptor Descriptor,
                                                    string Facility, string Annex, string Documentation);
 
-    /// <summary>⛔ THE DECLINED-MODULE EXCEPTION-NAME TABLE. Ordered by prefix length so a longer, more specific
-    /// prefix cannot be shadowed by a shorter one.
-    /// <para>WHY REFUSING THE NAME IS THE CONFORMING ANSWER, not over-strictness: §14.6.13.1.1 says "The
+    /// <summary>⛔ THE DECLINED-MODULE EXCEPTION-NAME TABLE. The prefixes name DISJOINT families — a row matches only
+    /// its prefix followed by a hyphen or the end of the name (<see cref="DeclinedModuleOf"/>) — so no row can
+    /// shadow another and the order is immaterial.
+    /// <para>⛔ EACH ROW'S DESCRIPTOR IS ITS POSTURE, read in <see cref="Advise"/> through
+    /// <see cref="EditionContext.Refuses"/>, the one rule <see cref="EditionContext.Declined"/> reports by at every
+    /// other declined site: an <c>Error</c> row REFUSES the name (unless its descriptor is <c>PermissiveInert</c>
+    /// and the compile is <c>--permissive</c>), a <c>Warning</c> row ACCEPTS it inert and names the facility. There
+    /// is no second table and no flag.</para>
+    /// <para>WHY REFUSING THE NAME IS THE CONFORMING ANSWER for an OPTIONAL module, not over-strictness: §14.6.13.1.1 says "The
     /// implementor is not required to raise any exception conditions for level-3 exception-names that are
     /// associated with optional language elements … that the implementor has not implemented" — and that is
     /// exactly the problem. These names had catalog entries and ZERO setting sites, so
@@ -92,13 +100,25 @@ internal static class EcNameResolution
     /// naming the construct) while the A.4.14 and A.4.3 families are refused under COBOLNET1710. The
     /// descriptor also carries whether <c>--permissive</c> moves the refusal, so the row is the only place
     /// a module's posture is written down.
-    /// <para>⚠ EC-MCS-* still has the SAME zero-setting-site shape and is NOT here: asynchronous messaging
-    /// is Annex A.3 item 4, whose §4.2.6 licence is accept-and-WARN (COBOLNET1578), so refusing its names
-    /// would be the wrong posture, not merely a missing row. It is registered work. EC-LOCALE-* was in this
-    /// table until kb/Work PB64 adopted the locale module whole, at which point its row was DELETED rather
-    /// than special-cased — the table's other direction working correctly.</para></para></summary>
+    /// <para>⛔ EC-MCS IS THE ACCEPT-INERT ROW (kb/Work PB374). Its names had the SAME zero-setting-site shape and
+    /// compiled in silence, but asynchronous messaging is Annex A.3 item 4, PROCESSOR-DEPENDENT, so its licence is
+    /// §4.2.6 — "An implementation shall provide a warning mechanism at compile time to indicate use of
+    /// syntactically-detectable processor-dependent language elements not supported by that implementation" — and
+    /// not A.4.1's accept-only-when-claimed. Refusing the names would be the wrong posture, not a stricter one, and
+    /// an inert reading exists: the facility's own statements (SEND, RECEIVE) are accepted inert under the same
+    /// COBOLNET1578, so they set no EC-MCS condition, and a name that is accepted is still a correct operand of
+    /// &gt;&gt;TURN, a USE declarative, a WHEN phrase and RAISE — which raises it exactly as for any other level-3 name.
+    /// The row is the module's procedure-surface code, as EC-SCREEN's is.</para>
+    /// <para>EC-LOCALE-* was in this table until kb/Work PB64 adopted the locale module whole, at which point its
+    /// row was DELETED rather than special-cased — the table's other direction working correctly.</para></para></summary>
     private static readonly DeclinedEcFamily[] DeclinedEcFamilies =
     [
+        // Annex A.3 item 4 — "The asynchronous messaging facility is dependent on the capability of a processor to
+        // allow run units to communicate with each other"; its exception-names are the level-2 EC-MCS and the
+        // level-3 names under it (§14.6.13.1.6 Table 13; Annex E.3.2 item 3 lists them as the facility's). The
+        // descriptor is a WARNING, so the name is accepted inert (kb/Work PB374).
+        new("EC-MCS", DiagnosticCatalog.McsFacilityUnsupported, "the asynchronous messaging facility",
+            "ISO Annex A.3 item 4; §14.9.31 / §14.9.38", "docs/CONFORMANCE.md §4 item 1"),
         // Annex A.4.2 item 10 — the EC-SCREEN conditions in the RAISING phrases of EXIT and GOBACK, the
         // RAISING phrase of the procedure division header, the USE statement, the WHEN phrase of PERFORM,
         // RAISE and the TURN directive. Covers the level-2 EC-SCREEN and all four level-3 names. Its
@@ -147,8 +167,11 @@ internal static class EcNameResolution
     /// a documented-nowhere truncation (Phase-B F6). Below 2023 the word itself cannot reach here (the 31-char
     /// COBOL-2002 word limit rejects it first), so no edition guard is needed. One advisory per spelling —
     /// the same name legitimately appears at TURN + RAISE + USE in one program.</summary>
-    /// <returns><see langword="false"/> when the name was REFUSED (today: the EC-SCREEN family) — every caller
-    /// must treat that as an unresolved name.</returns>
+    /// <returns><see langword="false"/> when the name was REFUSED (a declined module whose row's descriptor
+    /// <see cref="EditionContext.Refuses"/> it: EC-SCREEN always, EC-VALIDATE and the three commit-and-rollback
+    /// names unless the compile is <c>--permissive</c>) — every caller must treat that as an unresolved name. An
+    /// accepted row (EC-MCS, and the PermissiveInert rows under <c>--permissive</c>) is named and returns
+    /// <see langword="true"/>.</returns>
     public static bool Advise(EditionContext edition, EcInfo info, string where = "exception-name")
     {
         // ⛔ EVERY DECLINED MODULE'S EXCEPTION-NAME REFUSAL LIVES HERE, NOT AT THE SIX WRITING SITES (each
@@ -161,13 +184,25 @@ internal static class EcNameResolution
         // (kb/Work PB100), removed when PB64 T1 claimed that module and gave its names real raise sites.
         if (DeclinedModuleOf(info.Name) is { } declined)
         {
+            // The row's descriptor decides under this compile's options, by the ONE rule EditionContext.Declined
+            // reports with (EditionContext.Refuses), never by a local severity test and never by the annex that
+            // lists the facility: an accepted name (a Warning row, or a PermissiveInert Error row under
+            // --permissive) is named and resolves; a refused one is named and does not.
+            if (edition.Refuses(declined.Descriptor))
+            {
+                edition.Declined(declined.Descriptor,
+                    $"the exception-name {info.Name} of {declined.Facility} ({declined.Annex}), written in "
+                    + $"{where} — no statement in this implementation can set that condition, so checking for "
+                    + "it, declaring a handler for it or matching it would be unreachable, and "
+                    + $"{declined.Documentation} records the decline. §14.6.13.1.1 licenses raising nothing for "
+                    + "such a name, but not ACCEPTING it");
+                return false;
+            }
             edition.Declined(declined.Descriptor,
                 $"the exception-name {info.Name} of {declined.Facility} ({declined.Annex}), written in "
-                + $"{where} — no statement in this implementation can set that condition, so checking for "
-                + "it, declaring a handler for it or matching it would be unreachable, and "
-                + $"{declined.Documentation} records the decline. §14.6.13.1.1 licenses raising nothing for "
-                + "such a name, but not ACCEPTING it");
-            return false;
+                + $"{where}, is accepted, but no statement of that facility sets the condition here, so it "
+                + "exists only when a RAISE statement raises it (§14.6.13.1.1 licenses raising nothing for such "
+                + $"a name); {declined.Documentation} records the decline");
         }
         if (info.Level != 3 || info.Name.Length <= 31) return true;
         if (edition.Warnings.Any(w =>

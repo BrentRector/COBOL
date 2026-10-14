@@ -19,6 +19,7 @@ public static class Constructs
     public const string Allocate2002 = "allocate-2002";
     public const string Free2002 = "free-2002";
     public const string Invoke2002 = "invoke-2002";
+    public const string AsyncMessaging2023 = "async-messaging-2023";
     public const string GobackReturning2002 = "goback-returning-2002";
     public const string StopRunStatus2002 = "stop-run-status-2002";
     public const string GobackStatus2023 = "goback-status-2023";

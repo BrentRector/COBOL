@@ -873,9 +873,16 @@ paragraphDefinition
     : paragraphName DOT sentence*
     ;
 
+// ⛔ NO LINE-POSITION PREDICATE (kb/Work PB2720). §14.4.3: "A paragraph consists of a paragraph-name followed by a
+// separator period and by zero, one, or more successive sentences" — no rule places the name at the start of a line,
+// and §6.4.1 lets free-form text "be written anywhere on a line", so `STOP RUN. P2. DISPLAY "B".` on one line is a
+// paragraph header exactly as `STOP RUN. S2 SECTION.` is a section header (sectionName carries no predicate either).
+// The header can only follow a separator period here: `sentence : statement+ DOT` ends every sentence on its period,
+// so a word a statement left unconsumed is a syntax error, never a phantom paragraph — the reason an
+// IsAtLineStart() predicate once stood on both alternatives (DEVLOG 0063, the WRITE … LINES token the lexer now has).
 paragraphName
-    : {IsAtLineStart()}? procedureName
-    | {IsAtLineStart()}? reservedGatedWord
+    : procedureName
+    | reservedGatedWord
     ;
 
 procedureName
@@ -944,11 +951,21 @@ statement
     //    a GENERIC parse error there is a live non-conformance; VALIDATE is Annex A.4.14 and is not in A.3 at
     //    all, so §4.2.7 mandates no warning — naming it is the documented choice docs/CONFORMANCE.md §4 item 3
     //    records, and a generic parse error there is a wrong ANSWER to the user rather than a non-conformance.
-    //    Each arm is
-    //    KEYWORD-TOKEN-LED and predicated on facilityWord(), which fires only at the editions where §8.9
-    //    actually reserves the word — an IDENTIFIER-led arm would poison the ALL(*) DFA (DEVLOG 903). ──
-    | {facilityWord("RECEIVE")}?  mcsReceiveStatement
-    | {facilityWord("SEND")}?     mcsSendStatement
+    //    Each arm is KEYWORD-TOKEN-LED (an IDENTIFIER-led arm would poison the ALL(*) DFA, DEVLOG 903).
+    //    ⛔ RECEIVE AND SEND ARE THE UNION GRAMMAR, GATED ON INTRODUCTION, NOT ON RESERVATION (kb/Work PB374).
+    //    Both words are NON-MONOTONIC in §8.9: reserved at COBOL-85 (the '85 communication module's verbs), user
+    //    words at 2002/2014, reserved again at 2023. A reservation predicate therefore recognized the 2023-only
+    //    §14.9.31.2 / §14.9.38.2 formats at --std 85 and warned COBOLNET1578 naming a 2023 facility, while
+    //    2002/2014 answered a raw parse error. The arm fires wherever the token spells the verb (wordAhead, so a
+    //    >>COBOL-WORDS UNDEFINE still removes it), and the edition pass names the introduction
+    //    (VersionConformancePass VisitMcs*Statement → async-messaging-2023 → COBOLNET0900). No legal program of
+    //    any edition loses a reading: at 2002/2014 a user-defined word RECEIVE or SEND cannot begin a statement,
+    //    and the operand-list keyword choice for an undeclared one is keywordContinuesHere's (kb/Work PB805).
+    //    VALIDATE (reserved from 2002, its introduction) and COMMIT / ROLLBACK (reserved from 2023, theirs) keep
+    //    facilityWord: their reservation starts at their introduction and never lapses, so it never admits a format
+    //    at an edition that lacks it (and a bare `COMMIT.` at 2014, where COMMIT is a user word, stays a paragraph). ──
+    | {wordAhead("RECEIVE")}?     mcsReceiveStatement
+    | {wordAhead("SEND")}?        mcsSendStatement
     | {facilityWord("VALIDATE")}? validateFacilityStatement
     | {facilityWord("COMMIT")}?   commitFacilityStatement
     | {facilityWord("ROLLBACK")}? rollbackFacilityStatement
