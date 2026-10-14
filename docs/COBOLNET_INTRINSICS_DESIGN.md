@@ -721,10 +721,14 @@ METHODS, each a source element of its own (§10.5), so each method carries its o
 and `DataBinder.WordCensus` selects it while `DataBinder.EnterMethodDeclarations` is open — around the method's data
 entries and METHOD-ID (`OoBindMethodData`) and its procedure-names (`StatementBinder.BindClassBody`). ⛔ A new
 declaration site inside a method runs under `EnterMethodDeclarations`, or its word lands in the class's census
-(kb/Work PB2921). A method's census also records each object-class-name, interface-name and parameter-name the
-method REFERENCES (its class declares them, so no declaration of the method's would): the one class-name resolver,
-`OoNameResolution.Lookup`, calls `OoClassTable.RecordReferenceUse` for every name it resolves (kb/Work PB3132), so a
-METHOD-ID or method paragraph spelled like a class-name the method also references is refused.
+(kb/Work PB2921). Every element's census is the one `OoClassTable.CensusOf` keeps for it (a method's is its symbol's;
+a program's, a class's, a factory's and an interface's are kept by parse node and passed to their binder as
+`DataBinder.OwnWords`), and it also records each object-class-name, interface-name and parameter-name the element
+REFERENCES, since another element often declares them (a method's class, a contained program's container, §12.3.4 GR1):
+the one class-name resolver, `OoNameResolution.Lookup`, calls `OoClassTable.RecordReferenceUse` for every name it
+resolves (kb/Work PB3132), so a METHOD-ID, a method paragraph or a contained program's paragraph spelled like a
+class-name the same element also references is refused. A parameter-name is recorded as the type its own REPOSITORY
+specifier declares it, as the skeleton's binder declares it.
 A later declaration or reference of another type is **COBOLNET2692** unless
 `UserWordKinds.MayBeOneWord` allows it — the standard's three exceptions as DATA (a compilation-variable-name; a
 level-number beside a paragraph- or section-name; the constant-name / data-name / property-name / record-key-name /

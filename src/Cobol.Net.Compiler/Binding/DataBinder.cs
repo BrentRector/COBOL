@@ -1599,7 +1599,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     internal string? CollatingAlphabetFault(string alphabet, bool national)
     {
         if (!Alphabets.ContainsKey(alphabet) && !NationalAlphabets.ContainsKey(alphabet)
-            && _ownWords.IsDeclaredAs(alphabet, UserWordKind.AlphabetName))   // SPECIAL-NAMES: never a method's (§12.3.3 SR2)
+            && OwnWords.IsDeclaredAs(alphabet, UserWordKind.AlphabetName))   // SPECIAL-NAMES: never a method's (§12.3.3 SR2)
             return null;
         if (national)
             return NationalAlphabets.TryGetValue(alphabet, out var nd)
@@ -3405,13 +3405,15 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, or a class's
     /// object, factory or interface definition. A name a containing element's SPECIAL-NAMES passes down is inherited,
     /// not declared here, and a contained source element may re-declare it as another type (§8.4.6.1: each element
-    /// "may use identical user-defined words").</summary>
-    private readonly UserWordCensus _ownWords = new();
+    /// "may use identical user-defined words"). The constructing driver passes the element's census from
+    /// <see cref="Compiler.Oo.OoClassTable.CensusOf"/>, the object the element's class-name references record into too
+    /// (kb/Work PB3132); the default serves a binder no driver made (a TYPE expansion's, a unit test's).</summary>
+    internal UserWordCensus OwnWords { private get; init; } = new();
 
     /// <summary>The census a declaration lands in: the METHOD whose words are being declared
     /// (<see cref="EnterMethodDeclarations"/> — its data entries, its METHOD-ID and its procedure-names), which is a
     /// source element of its own, else this binder's own (kb/Work PB2921).</summary>
-    private UserWordCensus WordCensus => _bindingMethodScope?.Words ?? _ownWords;
+    private UserWordCensus WordCensus => _bindingMethodScope?.Words ?? OwnWords;
 
     /// <summary>⛔ §8.3.2.2: "<i>Within a source element, a given user-defined word may be used as only one type of
     /// user-defined word</i>", except as <see cref="UserWordKinds.MayBeOneWord"/> says. Asked at the ONE declaration funnel
@@ -3419,8 +3421,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// Before kb/Work PB990 each declaring construct kept its own registry and nothing crossed them, so
     /// <c>ALPHABET ZQ IS NATIVE</c> beside <c>01 ZQ PIC X</c> compiled and ran. The same TYPE declared twice is no
     /// conflict here (a TYPE expansion re-registers a clone of its template's words); whether two declarations of
-    /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is. A METHOD's census also
-    /// records the class-names its references resolve (<see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/>,
+    /// one type may coexist is §8.4.2's uniqueness, decided where the type's own registry is. Every element's census
+    /// also records the class-names its references resolve (<see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/>,
     /// kb/Work PB3132), so a declaration after such a use is reported here too.</summary>
     private void CheckOneTypePerWord(string word, UserWordKind kind)
     {

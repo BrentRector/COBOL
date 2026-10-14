@@ -117,22 +117,50 @@ public sealed class OoClassTable
     private EditionContext? _edition;
 
     /// <summary>⛔ §8.3.2.2 at a REFERENCE (kb/Work PB3132): "Within a source element, a given user-defined word may be
-    /// used as only one type of user-defined word". A method is a source element of its own (§10.5) whose words are
-    /// recorded in its own census (<see cref="OoMethodDataScope.Words"/>, kb/Work PB2921), and the
-    /// object-class-names, interface-names and parameter-names it references are declared by its CLASS (the CLASS-ID,
-    /// the class's REPOSITORY, its USING clause), never by the method; so the method's census learns them here, from
-    /// the one funnel every such reference resolves through (<see cref="OoNameResolution.Lookup"/>). A METHOD-ID
-    /// spelled like its CLASS-ID is therefore legal until the method references that class-name, and then refused
-    /// COBOLNET2692 at whichever of the two comes second, here or at the declaration funnel
-    /// (<c>DataBinder.DeclareUserWord</c>). A reference outside every method is its own element's declaration already
-    /// (§8.4.6.4: the containing definition's name, or a REPOSITORY entry of that or a containing element).</summary>
+    /// used as only one type of user-defined word". The object-class-names, interface-names and parameter-names a
+    /// source element references are often declared by ANOTHER element: a method's by its CLASS (the CLASS-ID, the
+    /// class's REPOSITORY, its USING clause), a contained program's or a factory definition's by a CONTAINING element's
+    /// REPOSITORY (§12.3.4 GR1), none of which is the referring element (§10.5: "A source element is a source unit
+    /// excluding any contained source units"). So the referring element's census (<see cref="CensusOf"/>) learns each
+    /// one here, from the one funnel every such reference resolves through (<see cref="OoNameResolution.Lookup"/>),
+    /// whatever kind of element refers. A word the element declares itself as the same type is recorded twice, which
+    /// is no conflict. A METHOD-ID spelled like its CLASS-ID, or a contained program's paragraph spelled like a class
+    /// its container's REPOSITORY declares, is therefore legal until the element references that class-name, and then
+    /// refused COBOLNET2692 at whichever of the two comes second, here or at the declaration funnel
+    /// (<c>DataBinder.DeclareUserWord</c>).</summary>
     internal void RecordReferenceUse(Antlr4.Runtime.RuleContext? site, string name, UserWordKind kind)
     {
-        if (_edition is null || MethodAt(site) is not { } method
-            || method.DataScope.Words.Record(name, kind) is not { } first) return;
+        if (_edition is null || CensusOf(site) is not { } elementWords
+            || elementWords.Record(name, kind) is not { } first) return;
         using (_edition.At(site as Antlr4.Runtime.ParserRuleContext))
             _edition.Error(DiagnosticCatalog.UserWordTypeConflict, UserWordCensus.ConflictMessage(name, first, kind));
     }
+
+    /// <summary>THE §8.3.2.2 census of the source element <paramref name="site"/> lies in (§10.5), one per element for
+    /// the whole compilation, so the binder that declares the element's words and every reference that uses one
+    /// (<see cref="RecordReferenceUse"/>) record into the same object whatever order they run in. A method's is its
+    /// symbol's (<see cref="OoMethodDataScope.Words"/>; kb/Work PB2921), found through <see cref="MethodAt"/>. Every
+    /// other element's is kept here by its parse node: a program's (outermost or contained, the node its
+    /// identification division hangs from: <c>BinderDriver.BindUnitData</c> passes that division), an interface's,
+    /// a factory definition's, and a class definition's, which its instance definition SHARES because one binder
+    /// declares both elements' words (<c>OoDriver.BindClassData</c>). Null for a site in no source element, or in a
+    /// method that has no symbol (one refused as a duplicate).</summary>
+    internal UserWordCensus? CensusOf(Antlr4.Runtime.RuleContext? site)
+    {
+        var element = SourceElementOf(site) switch
+        {
+            Core.ObjectParagraphContext instance => instance.Parent,
+            var other => other,
+        };
+        if (element is null) return null;
+        if (element is Core.MethodDefinitionContext) return MethodAt(site)?.DataScope.Words;
+        if (!_elementWords.TryGetValue(element, out var words))
+            _elementWords[element] = words = new UserWordCensus();
+        return words;
+    }
+
+    // Keyed by parse-tree node IDENTITY, like _scopes.
+    private readonly Dictionary<Antlr4.Runtime.RuleContext, UserWordCensus> _elementWords = [];
 
     /// <summary>The method definition <paramref name="site"/> lies in, when its innermost source element is one: a
     /// class's instance or factory method, or an interface's method prototype, of this table's definitions or of a

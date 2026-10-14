@@ -11,18 +11,21 @@ namespace CobolNet.Binding;
 /// excluding any contained source units"), so each method carries its own census on
 /// <see cref="OoMethodDataScope.Words"/> (kb/Work PB2921: one shared census refused a METHOD-ID spelled like its
 /// CLASS-ID, and a condition-name in one method spelled like a data-name in another, both COBOLNET2692 on legal
-/// source). Recorded by <see cref="DataBinder.DeclareUserWord"/> for every declaration, and by
-/// <see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/> for a method's reference to an object-class-name,
-/// interface-name or parameter-name its class declares. Keyed case-insensitively, like every COBOL word.</summary>
+/// source). Each element's census is the one <see cref="Compiler.Oo.OoClassTable.CensusOf"/> keeps for it. Recorded
+/// by <see cref="DataBinder.DeclareUserWord"/> for every declaration, and by
+/// <see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/> for every reference to an object-class-name,
+/// interface-name or parameter-name, including one another element declares (a method's class, a contained
+/// program's container; kb/Work PB3132). Keyed case-insensitively, like every COBOL word.</summary>
 internal sealed class UserWordCensus
 {
     private readonly Dictionary<string, UserWordKind> _firstType = new(CobolNames.Comparer);
     private readonly HashSet<string> _conflictReported = new(CobolNames.Comparer);
 
     /// <summary>Record one declaration or one use of <paramref name="word"/> as <paramref name="kind"/>. §8.3.2.2 says
-    /// "used": a word a method references as a type its CLASS declares (the class-name it INVOKEs) is used in the
-    /// method as that type, so a METHOD-ID spelled like that class-name is two types in the method's source element
-    /// (kb/Work PB3132), while the same METHOD-ID in a method that never references the class-name is legal (§8.4.6.1;
+    /// "used": a word an element references as a type another element declares (the class-name a method INVOKEs, a
+    /// class a contained program's container's REPOSITORY names) is used in the referring element as that type, so a
+    /// METHOD-ID or a paragraph-name spelled like that class-name is two types in the referring source element
+    /// (kb/Work PB3132), while the same word in an element that never references the class-name is legal (§8.4.6.1;
     /// kb/Work PB2921). Returns the type the word was FIRST recorded as when this record is a §8.3.2.2 conflict not
     /// yet reported; null for a first record, a pair <see cref="UserWordKinds.MayBeOneWord"/> admits (the same type
     /// twice included: a TYPE expansion re-registers a clone of its template's words, and a class-name is referenced

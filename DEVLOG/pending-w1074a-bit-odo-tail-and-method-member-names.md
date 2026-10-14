@@ -72,3 +72,26 @@ drift test keeps the two census recorders the only ones. PB3132 reopened and lan
 residue its note names (an inherited configuration name used beside a local declaration of another type) is unchanged.
 Finisher gate run `20261014T083522Z-e09c86`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`; both
 PB3132 negatives and `TheCensus_IsRecordedOnlyByTheDeclarationAndReferenceFunnels` Passed in leg 1; semgrep verify PASS.
+
+Review round 4 (R4-1, answered by wave 1076 A): the reference record reached only a METHOD census, and its comment
+justified that with "a reference outside every method is its own element's declaration already". That is false for a
+contained program, whose container's REPOSITORY applies to it (§12.3.4 GR1) without being its declaration (§10.5): the
+reviewer's `E:\tmp\r4probe\n1.cob` (a contained program with `USAGE OBJECT REFERENCE RQX` and a paragraph `RQX.`, the
+class declared by the container) compiled clean while its flat twin was refused. Re-probed on the merged tree: compiled
+clean. The fix makes the census one object per source element for the whole compilation: `OoClassTable.CensusOf(site)`
+(a method's is its symbol's; every other element's is kept by parse node), the binders take theirs from it
+(`DataBinder.OwnWords`, passed by `BinderDriver.BindUnitData` and `OoDriver`), and `RecordReferenceUse` records into it
+whatever element refers, so a reference and a declaration meet whichever runs first. The first build of that shape
+refused three parameterized goldens (`pb2051_parameterized_definition_binds_itself` and both `pb2937` skeleton goldens):
+the skeleton's binder declares a formal's REPOSITORY specifier as an object-class-name or interface-name, while the
+reference recorded it as a parameter-name. The reference now records the type the formal's own specifier declares
+(§11.3.3 SR8 / §11.6.3 SR4). A compile sweep of the 633 corpus programs carrying CLASS-ID, INTERFACE-ID or REPOSITORY
+draws no COBOLNET2692 the corpus does not pin. After the fix the reviewer's probe is refused at the paragraph, like its flat
+twin. New negative `pb3132-contained-program-paragraph-spells-a-class-it-references` (with a sibling contained program
+that declares the paragraph and never references the class) and positive `2002/pb3132_contained_program_word_it_never_references`.
+A factory or instance definition shows no change: its binder already declares the class's REPOSITORY entries in its own
+census (a pre-existing over-refusal, reported as a lead). Also still uncovered and reported as a lead: a contained program
+USING a word a containing program's SPECIAL-NAMES passes down (a class condition's class-name) beside a same-spelled
+paragraph (`E:\COBOL-coord\scratch\w1076a\s1.cob` compiles clean). The merge with main re-pinned the runtime surface hash
+(800009C74EC953FB): both sides had raised the major from 2 to 3 for their own incompatible changes, and no 3.x has shipped,
+so one major covers both.
