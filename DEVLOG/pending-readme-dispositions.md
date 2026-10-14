@@ -11,5 +11,6 @@ dynamic-length items partial. The section now points at §2, §4 and §5 and lis
 from the catalog and the binders rather than from the conformance prose alone.
 
 The test section names the two projects of the solution that measure rather than test, `tests/Cobol.Net.ArchOracle` and
-`tests/Cobol.Net.Benchmarks`, and the landing rule names the arch-oracle baseline a landing re-records when it changes an
-oracle input (kb/Work PB2885), beside the DEVLOG entry. No code changed.
+`tests/Cobol.Net.Benchmarks`, and says what the oracle captures and compares. The branch's first commit named the recorded
+oracle baseline and the landing check that refused a stale one (kb/Work PB2885); PB3107 retired both the same afternoon,
+the operator flagged it, and the branch merged main and restated the paragraph before its review. No code changed.

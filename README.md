@@ -118,9 +118,11 @@ The test populations:
 - `tests/external/`: the GnuCOBOL differential, run once per batch against the pinned GnuCOBOL 3.2 test corpus.
 
 Two more projects in the solution measure rather than test. `tests/Cobol.Net.ArchOracle` runs the architecture
-review's behavior-neutrality oracle outside xunit for `scripts/arch/capture_oracle.py`, whose recorded baseline lives
-under `docs/rearchitecture/evidence/arch-oracle/`. `tests/Cobol.Net.Benchmarks` is the BenchmarkDotNet harness behind
-`scripts/arch/perf_baseline.py`, the recorded performance baseline. No test asserts a time.
+review's behavior-neutrality oracle outside xunit: `scripts/arch/capture_oracle.py` captures the C# and the diagnostics
+of every compile the file-driven suites perform, and `scripts/arch/compare_oracle.py` compares a tree's capture with
+one it makes on demand of the tree's own base commit, so a restructuring proves it changed no behavior and nothing is
+committed. `tests/Cobol.Net.Benchmarks` is the BenchmarkDotNet harness behind `scripts/arch/perf_baseline.py`, the
+recorded performance baseline. No test asserts a time.
 
 ## Find your way around
 
@@ -167,8 +169,7 @@ COBOL source
   with expected output derived from the standard, and a negative program for each earlier edition that must reject
   it. The documents that describe the behavior change in the same pull request.
 - **Every landing carries a DEVLOG entry.** Write `DEVLOG/pending-<slug>.md` with the change; the landing numbers
-  and stamps it. A change under `src/`, or to the data the architecture oracle reads, also re-records the oracle's
-  baseline with `scripts/arch/capture_oracle.py`; the landing refuses a baseline that describes another tree.
+  and stamps it.
 - **One pull request per branch, through the merge queue.** `main` is protected, and the `ci-gate` check must pass.
   Your first pull request asks you to sign the [Contributor License Agreement](CLA.md) once.
 
