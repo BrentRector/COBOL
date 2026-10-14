@@ -76,7 +76,7 @@ of an unsupported facility.
 | 1 | Significand/exponent >31/>3 digits in float literal / numeric-edited PICTURE | 8.3.3.3.3 / 13.18.40 | **Claimed** (all four) | WiseOwl COBOL supports the standard floating-point usages and STANDARD-DECIMAL arithmetic, so item 1's latitude is unavailable and the FULL forms are provided: a floating-point literal's significand of up to 36 digits and exponent of up to 4 digits (kb/Work PB99 — the value range is A.1 item 82's determination), a floating-point numeric-edited PICTURE with a 36-digit significand and a 4-digit exponent (kb/Work PB66, D21) |
 | 2 | ARITHMETIC IS STANDARD-BINARY | 11.9.5 / 8.8.1.4 | **Not claimed — REVISITABLE** | ⛔ **The ground is PROCESSOR-DEPENDENCE, not obsolescence** (this row said "Obsolete feature" until 2026-08-31, which names a fact that grants nothing). **A.3 item 2**: "The ARITHMETIC IS STANDARD-BINARY clause in the OPTIONS paragraph is dependent on the capabilities of the processor" — and **§4.2.6** is what makes declining it conforming: the decision to claim support "is within an implementor's discretion", the absence "shall be specified in the implementor's user documentation" (this row), and a compile-time warning mechanism is required (COBOLNET0806 — see §1 on why an error). Obsolescence is *not* a licence: Annex **F.2**'s preamble reads "A conforming implementation shall support obsolete language elements **except** for elements that are also optional or processor-dependent" — so the exception is doing the work, and the obsolescence only corroborates. **REVISITABLE by the standard's own words**: F.2 item 3 ("STANDARD-BINARY arithmetic and STANDARD BINARY Intermediate Data Item. These features have not been implemented as of the writing of this revision by any COBOL provider") adds "Unlike other obsolete features, it is intended that interest in these facilities will be **reevaluated** during the next revision". Every rule conditioned solely on the mode carries this ONE determination (a derived verdict — `inventory-schema.json` `derived-verdicts.standard-binary-only`); NATIVE and STANDARD-DECIMAL are provided. Decision: kb/Work PB198. |
 | 3 | ARITHMETIC IS STANDARD-DECIMAL | 11.9.5 | **Claimed** | Full SDIDI consumption (P10): `CobolDec` engine, decimal128 range ECs |
-| 4 | Asynchronous messaging (MCS) facility | E.3.2 | **Not claimed** | Documented non-support (§4) — inter-run-unit communication not provided. SEND and RECEIVE are accepted inert with the §4.2.6 warning COBOLNET1578 at every statement; USAGE MESSAGE-TAG is refused (COBOLNET1943). Every rule conditioned solely on the facility carries this ONE determination, by owner decision R43 (a derived verdict — `inventory-schema.json` `derived-verdicts.mcs-only`); witness `conformance:2023/w59_mcs_facility_witness` |
+| 4 | Asynchronous messaging (MCS) facility | E.3.2 | **Not claimed** | Documented non-support (§4) — inter-run-unit communication not provided. SEND and RECEIVE are accepted inert with the §4.2.6 warning COBOLNET1578 at every statement, and every EC-MCS exception-name with the same warning wherever it is written (kb/Work PB374); USAGE MESSAGE-TAG is refused (COBOLNET1943). Every rule conditioned solely on the facility carries this ONE determination, by owner decision R43 (a derived verdict — `inventory-schema.json` `derived-verdicts.mcs-only`); witnesses `conformance:2023/w59_mcs_facility_witness`, `conformance:2023/pb374_ec_mcs_names_accept_inert` |
 | 5 | BLOCK CONTAINS clause | 13.18.10 | **Claimed** (inert) | Accepted; no effect on the managed I-O model (A.3 item 5 sanctions this) |
 | 6–7 | Commit and rollback facility / its devices | E.3.2 | **Not claimed** | Documented non-support (§4) — no transaction manager |
 | 8 | CONTINUE AFTER precision greater than .99 | 14.9.9 | Not claimed | Implementor m = 0 (integer seconds); a fractional interval truncates (§14.9.9.4 GR1) |
@@ -166,6 +166,15 @@ of an unsupported facility.
   (`conformance:AutomaticPropagationTests.ExceptionObject_ItemThree_ObjectOrEcOoException`). Implemented at the one
   fatal default, `EcEmitter.EmitSelection` (and the EC-I-O arm of `__IoCheckEc`, which §14.6.13.1.3 3) sends on to
   6)), with the element's ON/OFF folded by `PropagateState`.
+
+- **D-GLOBAL-EXIT — EC-FLOW-GLOBAL-EXIT is never set** (kb/Work PB3102). §14.6.13.1.6 Table 13 names it ("EXIT PROGRAM
+  in a global Declarative") as a Fatal condition, and §14.6.13.1.3 6) mentions it beside EC-FLOW-GLOBAL-GOBACK, but the
+  standard states no general rule that SETS it. The sibling is set by §14.9.18.4 GR6 (a GOBACK executed within the range
+  of a global declarative); §14.9.14.4 GR3 gives an EXIT PROGRAM only GOBACK's GR3 and GR4, not GR6, and the one
+  normative statement about EXIT PROGRAM in a global declarative is §14.9.14.3 SR2, which the compiler enforces at compile
+  time. The name is catalogued and accepted wherever an exception-name may be written, and the implementation never
+  raises it: inventing a raise site for a condition the standard never sets would be behaviour with no rule behind it.
+  Held by `unit:EcRaiseSiteRegistryDriftTests.EveryCataloguedLevel3Name_IsDeclaredAndRaised_OrDeclinedWithAReason`.
 
 - **D-TW1 — a period, comma or semicolon written immediately before a closing pseudo-text delimiter is a
   SEPARATOR, so `==STOP RUN.==` holds the text-words `STOP` `RUN` `.`** (kb/Work PB1350). §8.3.5 2)/3) make those
@@ -1894,11 +1903,16 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
   handling, A.4.2), **1705** (FORMAT / SELECT WHEN, A.4.8), **1706** (WRITE / REWRITE FILE, A.4.13) and
   **1708 / 1709 / 1710** (VALIDATE's data-division clauses, APPLY COMMIT, and every declined module's
   exception-names — the `declined-optional-element` suppress family). All of them emit through the ONE
-  declined-element seam, `EditionContext.Declined`, whose descriptor chooses the channel.
-  ⚠ **`--permissive` moves SOME of these and not others, and the axis is whether an inert compile could
-  change the ANSWER.** 1708/1709/1710 downgrade to warnings and bind to a no-op, because their sibling
-  STATEMENTS are already accept-inert (1579/1580) and a declined module's exception-names raise nothing
-  either way — nothing observable changes. 1560/1705/1706/1707 do **not** move in either direction: an
+  declined-element seam, `EditionContext.Declined`, whose refuse rule (`EditionContext.Refuses`) chooses the channel.
+  ⚠ **`--permissive` moves SOME of these and not others, and the axis is whether an accepted element could
+  change the ANSWER the source states.** 1708/1709/1710 downgrade to warnings. The VALIDATE clauses (1708) and
+  APPLY COMMIT (1709) bind to a no-op, because their sibling STATEMENTS are already accept-inert (1579/1580).
+  A declined module's exception-name (1710) is accepted as an ordinary exception-name and RESOLVES: no
+  statement of the declined facility ever sets its condition (§14.6.13.1.1 licenses raising nothing for it),
+  so `>>TURN … CHECKING ON` enables a check only a RAISE can trigger, and a `RAISE EXCEPTION` of the name
+  raises it exactly as written (§14.9.29.4 GR1): a USE declarative for it runs, a WHEN phrase matches it,
+  and execution continues per Table 13 — an observable result, but the one the source states
+  (`DocumentedNonSupportWitnessTests.DeclinedModuleExceptionName_Permissive_*`). 1560/1705/1706/1707 do **not** move in either direction: an
   inert screen `ACCEPT` is re-read as the device ACCEPT and moves the wrong data, an inert `FORMAT` clause
   changes which bytes reach the medium, an inert `WRITE FILE` writes the wrong record. The fact lives on
   the descriptor (`PermissiveInert`) and is read in the seam, never tested at an emit site.
@@ -1906,6 +1920,10 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
 1. **Message Control System (MCS) asynchronous messaging** (E.3.2 item 1 / A.3 item 4): `SEND`, `RECEIVE`,
    and MESSAGE-TAG data items (the ISO/IEC 1989:2023 MCS surface — the pre-2002 COMMUNICATION SECTION is not part
    of this edition). Processor-dependent; not provided. The statements are accepted-inert with **COBOLNET1578**.
+   They are a COBOL-2023 introduction, and below `--std 2023` the edition pass answers **COBOLNET0900**
+   (`async-messaging-2023`) and the facility is not named: §8.9 reserves RECEIVE and SEND at COBOL-85 too, for the
+   '85 communication module, so the 2023 formats are recognized at every edition and gated on introduction, never
+   on reservation (kb/Work PB374; `conformance:negative/pb374-async-messaging-below-2023`).
    The **MESSAGE-TAG usage** is instead REFUSED BY NAME with **COBOLNET1943**, in BOTH its spellings
    (§13.18.60.2 prints `[ USAGE IS ]` as optional, so bare `01 M MESSAGE-TAG.` is the same clause as
    `01 M USAGE MESSAGE-TAG.`). It cannot join the accept-inert band for the reason 1560/1705/1706/1707 cannot:
@@ -1922,8 +1940,15 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
    class object that is permitted as a receiving item") and `SET MT TO MT2` drew the §8.8.1.1 screen
    (COBOLNET0844, *"item 'MT2' of category alphanumeric is not a numeric operand"*), neither of them true of the
    program. Pinned by `conformance:negative/pb453-set-message-tag-format17`.
-   ⚠ The EC-MCS-\* exception-names are still ACCEPTED against a facility with no setting sites — the same shape
-   items 2 and 3 close below; owed with this module's own witnesses.
+   The **EC-MCS exception-names** (the level-2 EC-MCS and every level-3 name under it, §14.6.13.1.6 Table 13) are
+   accepted with **COBOLNET1578** wherever an exception-name may be written — the TURN directive, a USE statement,
+   a PERFORM WHEN phrase, RAISE and the RAISING phrases — through the one exception-name funnel
+   (`EcNameResolution`, whose declined-facility table carries the module as a Warning row; kb/Work PB374). Accepted,
+   not refused as items 2–4's names are, because §4.2.6 governs a processor-dependent element and an inert reading
+   exists: no SEND or RECEIVE sets an EC-MCS condition here (§14.6.13.1.1 licenses raising none), while a RAISE
+   raises the named condition like any level-3 name, so a USE declarative or a WHEN phrase for it still runs.
+   Below `--std 2023` the names draw the introduction gate COBOLNET0878 instead. Pinned by
+   `conformance:2023/pb374_ec_mcs_names_accept_inert` and `conformance:negative/pb374-ec-mcs-name-below-2023`.
 2. **Commit and rollback** (E.3.2 item 2 / A.3 items 6–7 / **Annex A.4.3**), in full — the facility's surface is
    three elements, not one, and each has its own posture:
    * the `COMMIT` and `ROLLBACK` **statements** (§14.9.7, §14.9.36 — A.4.3 items 4 and 5): accepted-inert with
@@ -1962,9 +1987,9 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
    own; they are general rules about what a supported clause does *inside* a VALIDATE statement, so the
    statement's own COBOLNET1580 is their witness.
 4. **Screen handling** (§13.9, optional §4.2.7 / Annex A.4.2): the SCREEN SECTION, ACCEPT/DISPLAY format-3
-   (screen), and the EC-SCREEN family. Not provided; the section draws **COBOLNET1560**. ⚠ The EC-SCREEN-\*
-   names are still ACCEPTED against a facility with no setting sites (`kb/Work PB260`) — owed with this module's
-   own witnesses, one row in the `EcNameResolution` declined-family table.
+   (screen), and the EC-SCREEN family. Not provided; the section draws **COBOLNET1560**, and the EC-SCREEN
+   names are refused with **COBOLNET1707** wherever they are written — one Error row of the `EcNameResolution`
+   declined-facility table (`kb/Work PB260`).
 
 Beyond these four whole facilities, three **optional items of an otherwise-claimed module** are likewise refused
 by name (Annex **A.4.10**, "Object orientation" — the OO core itself is mandatory surface and is implemented):
@@ -1978,8 +2003,8 @@ resolution signature), **COBOLNET0822**. Item 2, the `INTERFACE-ID … INHERITS`
 needs assertions the corpora structurally cannot make: the negative corpus matches ERROR codes only and the
 `.out` goldens capture stdout, while a warning rides the non-failing compile channel.
 `DocumentedNonSupportWitnessTests` is where those assertions live — it pins COBOLNET1579 (item 2) and
-COBOLNET1580 (item 3) on the same sources the positive corpus runs. **COBOLNET1578 (item 1, MCS) is still
-unasserted** and could lose its diagnostic without a gate going red. Item 4 is no longer exposed to this at
+COBOLNET1580 (item 3) on the same sources the positive corpus runs, and COBOLNET1578 (item 1, MCS) at both of its
+statements and at every exception-name site (kb/Work PB1198, PB374). Item 4 is no longer exposed to this at
 all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corpus entries
 (`tests/conformance/negative/a42-*`), each `.err` naming the construct as well as the code.
 
@@ -2691,8 +2716,9 @@ summary claims only what is Claimed/Partial here.
 
 Update this document in the same change set as any change to the supported surface (a new usage, a facility
 newly implemented or newly documented as non-support, an I-O status determination). The declined-facility
-sites — every one of them routed through `EditionContext.Declined`, whose descriptor severity chooses
-warn-inert from refuse — are the code-side counterpart; keep the two in sync. This file is referenced by
+sites — every one of them routed through `EditionContext.Declined`, whose refuse rule (`EditionContext.Refuses`: the
+descriptor's severity, with a `PermissiveInert` refusal accepted under `--permissive`) chooses warn-inert from
+refuse — are the code-side counterpart; keep the two in sync. This file is referenced by
 `docs/VERSION_CHANGE_REFERENCE.md` (the edition-change checklist) and by `docs/DOC_INDEX.md`.
 
 ## 7. Annex A.1 — implementor-defined language element register (§4.2.5 / §4.2.16)

@@ -2178,9 +2178,10 @@ result. Run the long legs ONE AT A TIME.
   elements, whose §4.2.6 licence is accept-and-flag) versus refuse (Error: A.4.2 screen 1560/1707, A.4.8 1705,
   A.4.13 1706, A.4.14 1708, A.4.3 1709, the declined EC names 1710 — Annex A.4 optional modules, whose A.4.1
   licence admits the syntax ONLY when support is claimed). **`DiagnosticDescriptor.PermissiveInert` is the ONE
-  place the `--permissive` policy lives**, read in the seam and never tested at an emit site: 1708/1709/1710
-  downgrade to a warning and bind inert (their sibling statements are already accept-inert, so nothing
-  observable changes); 1560/1705/1706/1707 do not move, because an inert compile would REBIND the source to a
+  place the `--permissive` policy lives**, read by the one refuse rule `EditionContext.Refuses` and never tested at
+  an emit site: 1708/1709/1710 downgrade to a warning; 1708/1709 bind inert (their sibling statements are already
+  accept-inert), and a 1710 exception-name resolves, raised only by a RAISE of it, exactly as written (CONFORMANCE.md
+  §4 preface); 1560/1705/1706/1707 do not move, because an inert compile would REBIND the source to a
   different construct and change the answer.
   Declines with no bound node go through **one parse-level walk**, `Validation/DeclinedFacilityPass` — a third
   sibling to `VersionConformancePass` and `FlagConformancePass` on the axis "is support CLAIMED"; binders call

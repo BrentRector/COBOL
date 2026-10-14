@@ -2166,6 +2166,19 @@ internal sealed class VersionConformancePass
         public override object? VisitInvokeStatement(CobolParserCore.InvokeStatementContext ctx)
         { _p.Check(Constructs.Invoke2002, "the INVOKE statement"); return base.VisitChildren(ctx); }
 
+        /// <summary>The asynchronous messaging statements, RECEIVE (ISO §14.9.31) and SEND (§14.9.38) — a COBOL-2023
+        /// introduction (Annex E.3.2 item 1), gated on RECOGNITION (kb/Work PB374). Both arms are the union grammar:
+        /// they parse at every edition, because §8.9 reserves the two verbs at COBOL-85 for the '85 communication
+        /// module and at 2023 for this facility with a user-word gap between, so the reservation predicate they used to
+        /// carry recognized the 2023 formats at --std 85 and compiled them under a warning naming the 2023 facility.
+        /// At 2023 the statement is accepted inert by the binder (COBOLNET1578).</summary>
+        public override object? VisitMcsReceiveStatement(CobolParserCore.McsReceiveStatementContext ctx)
+        { _p.Check(Constructs.AsyncMessaging2023, "the RECEIVE statement (asynchronous messaging)"); return base.VisitChildren(ctx); }
+
+        /// <summary>SEND — the RECEIVE arm's twin; see <see cref="VisitMcsReceiveStatement"/>.</summary>
+        public override object? VisitMcsSendStatement(CobolParserCore.McsSendStatementContext ctx)
+        { _p.Check(Constructs.AsyncMessaging2023, "the SEND statement (asynchronous messaging)"); return base.VisitChildren(ctx); }
+
         /// <summary>The INLINE METHOD INVOCATION (ISO §8.4.3.4 — the §8.4.3.1.2 Format 4 identifier), gated
         /// with the rest of the object-orientation facility at 2002 (kb/Work PB428).
         /// <para>⛔ IT IS GATED ON RECOGNITION AND IT NOW CAN BE, which is the whole reason the row changed.

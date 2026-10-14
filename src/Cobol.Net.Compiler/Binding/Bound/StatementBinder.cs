@@ -593,8 +593,13 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         //    and naming it is the choice docs/CONFORMANCE.md §4 item 3 records (kb/Work PB709). Each binds
         //    to BoundNop: the program compiles, runs, and the facility is inert — never a silent wrong answer,
         //    and never an EC (licensed off by §14.6.13.1.1). ──
+        //    RECEIVE / SEND parse at EVERY edition (the union grammar, kb/Work PB374), so below 2023 the facility is
+        //    not this edition's to decline: the edition pass's COBOLNET0900 (async-messaging-2023) is the whole
+        //    answer there, and a COBOLNET1578 beside it would name a 2023 facility to a COBOL-85 program.
         _ when s.mcsReceiveStatement() is not null || s.mcsSendStatement() is not null
-            => BindUnsupportedFacility(DiagnosticCatalog.McsFacilityUnsupported),
+            => ConstructRegistry.IsAvailable(Ctx.Edition.Edition, Constructs.AsyncMessaging2023)
+                ? BindUnsupportedFacility(DiagnosticCatalog.McsFacilityUnsupported)
+                : new BoundNop(),
         _ when s.commitFacilityStatement() is not null || s.rollbackFacilityStatement() is not null
             => BindCommitRollback(s.commitFacilityStatement() is not null),
         _ when s.validateFacilityStatement() is not null

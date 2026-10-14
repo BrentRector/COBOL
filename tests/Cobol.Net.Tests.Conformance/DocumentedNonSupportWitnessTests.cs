@@ -173,8 +173,9 @@ public sealed class DocumentedNonSupportWitnessTests
     /// declined one. The facility has TWO statements, RECEIVE (§14.9.31) and SEND (§14.9.38), and until this test
     /// only the SEND site was asserted anywhere (GobackGeneralFormatTests) — so the count, not the code, is the
     /// assertion: a decline wired into one statement's binder arm and not the other would still produce one
-    /// COBOLNET1578 (feedback_two_arm_dispatch). The facility is a COBOL-2023 introduction; below it both words
-    /// are ordinary user-defined words (negative/user-word-receive).
+    /// COBOLNET1578 (feedback_two_arm_dispatch). The facility is a COBOL-2023 introduction; below it the two formats
+    /// draw COBOLNET0900 and no COBOLNET1578 (negative/pb374-async-messaging-below-2023, kb/Work PB374), and at
+    /// 2002/2014 both words are ordinary user-defined words (negative/user-word-receive).
     /// <para>The golden's <c>.out</c> pins the INERT half: with no message I-O neither ON EXCEPTION nor NOT ON
     /// EXCEPTION runs, where a conforming facility runs exactly one of them at each statement (§14.9.31.4 GR4/GR5,
     /// §14.9.38.4 GR2/GR3).</para></summary>
@@ -185,6 +186,108 @@ public sealed class DocumentedNonSupportWitnessTests
         var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023);
         Assert.True(ok, $"an ACCEPT-INERT declined facility must still COMPILE: {string.Join("\n", errors)}");
         Assert.Equal(2, warnings.Count(w => w.Contains(McsNonSupport, StringComparison.Ordinal)));
+    }
+
+    /// <summary>BELOW 2023 THE FORMATS ARE AN INTRODUCTION, NOT THE FACILITY (kb/Work PB374). RECEIVE and SEND are
+    /// §8.9-reserved at COBOL-85 too (the '85 communication module), so a reservation test recognized the 2023 formats
+    /// at --std 85 and compiled them under the 2023 facility's COBOLNET1578. Every edition below 2023 now refuses each
+    /// statement with the introduction gate, and names no facility it does not have: the negative corpus asserts the
+    /// error code only, so the absence of the warning is asserted here.</summary>
+    [Theory]
+    [InlineData(85)]
+    [InlineData(2002)]
+    [InlineData(2014)]
+    public void McsStatements_Below2023_AnswerTheIntroductionGate_NotTheFacility(int edition)
+    {
+        string source = Golden("negative", "pb374-async-messaging-below-2023");
+        var (ok, errors, warnings) = EditionHarness.CompileFull(source, edition);
+        Assert.False(ok, $"the asynchronous messaging formats compiled at COBOL-{edition}");
+        Assert.Equal(2, errors.Count(e => e.Contains("COBOLNET0900", StringComparison.Ordinal)));
+        Assert.DoesNotContain(warnings, w => w.Contains(McsNonSupport, StringComparison.Ordinal));
+    }
+
+    /// <summary>THE SAME FACILITY'S EXCEPTION-NAMES → COBOLNET1578, ONCE PER WRITTEN NAME, AND STILL ACCEPTED (kb/Work
+    /// PB374). The EC-MCS names compiled in SILENCE against a facility with no setting site; asynchronous messaging is
+    /// Annex A.3 item 4, processor-dependent, so §4.2.6's warning mechanism is owed for them as for SEND and RECEIVE,
+    /// and the posture is accept-inert, never the refusal the optional modules' names get. The golden writes the names
+    /// at four of the six sites one funnel serves (TURN, USE, RAISE twice, a PERFORM WHEN), so the count is the
+    /// assertion: a site that bypassed the funnel would drop one (feedback_two_arm_dispatch). Every warning names the
+    /// exception-name it is about, and the golden's <c>.out</c> pins that the accepted names still work: the RAISE
+    /// reaches the USE declarative and the WHEN phrase (§14.9.29.4 GR1).</summary>
+    [Fact]
+    public void McsExceptionNames_NamedNonSupportWarning_AtEverySite_AndAccepted()
+    {
+        string source = Golden("2023", "pb374_ec_mcs_names_accept_inert");
+        var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023);
+        Assert.True(ok, $"an accept-inert facility's exception-names must still COMPILE: {string.Join("\n", errors)}");
+        var mcs = warnings.Where(w => w.Contains(McsNonSupport, StringComparison.Ordinal)).ToList();
+        Assert.Equal(5, mcs.Count);
+        Assert.Equal(3, mcs.Count(w => w.Contains("EC-MCS-INVALID-TAG", StringComparison.Ordinal)));
+        Assert.Equal(2, mcs.Count(w => w.Contains("EC-MCS-MESSAGE-LENGTH", StringComparison.Ordinal)));
+    }
+
+    /// <summary>A DECLINED OPTIONAL MODULE'S EXCEPTION-NAME UNDER <c>--permissive</c> IS ACCEPTED, AND THEN IT RESOLVES
+    /// (kb/Work PB374 review R1-1). COBOLNET1710 is an Error descriptor marked <c>PermissiveInert</c>, so
+    /// <c>EditionContext.Declined</c> warns rather than refuses under <c>--permissive</c>; the exception-name funnel
+    /// decided by a local severity test instead, warned the name as accepted, dropped it anyway, and the RAISE that
+    /// wrote it died as COBOLNET2362, a refusal no diagnostic names. Each source is the strict-mode NEGATIVE that
+    /// pins the refusal (so the two postures read one file), at the three sites that reach the funnel by different
+    /// paths: RAISE, &gt;&gt;TURN and a USE declarative.</summary>
+    [Theory]
+    [InlineData("declined-ec-validate-raise", "EC-VALIDATE-CONTENT")]
+    [InlineData("declined-ec-validate-turn", "EC-VALIDATE")]
+    [InlineData("declined-ec-validate-use", "EC-VALIDATE-FORMAT")]
+    [InlineData("declined-ec-flow-rollback-raise", "EC-FLOW-ROLLBACK")]
+    [InlineData("declined-ec-flow-commit-turn", "EC-FLOW-COMMIT")]
+    [InlineData("declined-ec-flow-apply-commit-use", "EC-FLOW-APPLY-COMMIT")]
+    public void DeclinedModuleExceptionName_Permissive_IsAcceptedAndResolves(string negative, string name)
+    {
+        string source = Golden("negative", negative);
+        var (strictOk, _, _) = EditionHarness.CompileFull(source, 2023);
+        Assert.False(strictOk, $"{negative} compiled under the strict posture; the refusal it pins is gone");
+
+        var (ok, errors, warnings) = EditionHarness.CompileFull(source, 2023, permissive: true);
+        Assert.True(ok, $"a PermissiveInert declined exception-name must compile under --permissive: "
+                        + string.Join("\n", errors));
+        Assert.Contains(warnings, w => w.Contains("COBOLNET1710", StringComparison.Ordinal)
+                                       && w.Contains(name, StringComparison.Ordinal)
+                                       && w.Contains("is accepted", StringComparison.Ordinal));
+    }
+
+    /// <summary>The accepted name is a REAL operand, not a tolerated one: the reviewer's own scenario, a USE declarative
+    /// for EC-VALIDATE-CONTENT and a RAISE of it under <c>--permissive</c>, with checking enabled by &gt;&gt;TURN, runs
+    /// the declarative (§14.9.29.4 GR1, "If exception-name-1 is specified, the associated exception condition is
+    /// raised") and continues after the RAISE, the condition being NONFATAL in Table 13. The complement keeps the
+    /// rule honest: EC-SCREEN's descriptor is not PermissiveInert (an inert screen statement would move the wrong
+    /// data), so <c>--permissive</c> still refuses its names.</summary>
+    [Fact]
+    public void DeclinedModuleExceptionName_Permissive_RaiseReachesTheDeclarative_ScreenStillRefused()
+    {
+        const string source = """
+                   >>TURN EC-VALIDATE-CONTENT CHECKING ON
+                   IDENTIFICATION DIVISION.
+                   PROGRAM-ID. PB374PV.
+                   PROCEDURE DIVISION.
+                   DECLARATIVES.
+                   D-SEC SECTION.
+                       USE AFTER EXCEPTION CONDITION EC-VALIDATE-CONTENT.
+                   D-PARA.
+                       DISPLAY "HANDLER".
+                   END DECLARATIVES.
+                   MAIN SECTION.
+                   M-PARA.
+                       RAISE EXCEPTION EC-VALIDATE-CONTENT.
+                       DISPLAY "AFTER".
+                       STOP RUN.
+            """;
+        var (ok, stdout, detail) = EditionHarness.CompileAndRun(source, 2023, permissive: true);
+        Assert.True(ok, detail);
+        Assert.Equal("HANDLER\nAFTER", stdout.ReplaceLineEndings("\n").TrimEnd('\n'));
+
+        var (screenOk, screenErrors, _) = EditionHarness.CompileFull(Golden("negative", "a42-ec-screen-raise"), 2023,
+                                                                     permissive: true);
+        Assert.False(screenOk, "EC-SCREEN is not PermissiveInert; --permissive must not accept its names");
+        Assert.Contains(screenErrors, e => e.Contains("COBOLNET1707", StringComparison.Ordinal));
     }
 
     /// <summary>The OPTIONS FLOAT-DECIMAL clause → COBOLNET2424 (kb/Work R43 / PB579). Annex A.3 item 13 makes
