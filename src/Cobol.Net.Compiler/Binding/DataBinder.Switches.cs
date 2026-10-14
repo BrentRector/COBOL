@@ -822,32 +822,22 @@ public sealed partial class DataBinder
             // OBJECT-COMPUTER … PROGRAM COLLATING SEQUENCE (ISO §12.3.6 — the 85 single-name IS form, the 2002
             // two-name IS form, and the 2002 FOR ALPHANUMERIC/FOR NATIONAL forms; resolved AFTER the walk). The
             // paragraph's clauses are a list since kb/Work PB78 (either clause, either order, with or without a
-            // computer-name); §5.2.6.4 admits each at most once — a second is COBOLNET1652.
+            // computer-name). ⛔ HOW OFTEN AND IN WHAT ORDER IS NOT ASKED HERE (kb/Work PB3133): the `ClauseCardinalities`
+            // OBJECT-COMPUTER row, read by `ClosedFormatPass`, counts every clause. From 2002 the figure's choice
+            // indicators (§5.2.6.4, each alternative at most once, any order) report a repeat as COBOLNET2104 through
+            // `ChoiceIndicators.AtMostOnce`; the COBOL-85 figure's three separate brackets report a repeat as
+            // COBOLNET2423 and a misplaced clause as COBOLNET2987. This loop used to count the two clauses itself
+            // (COBOLNET1652, deleted) beside a table that exempted the list.
             if (para.objectComputerParagraph() is { } ocp)
             {
                 foreach (var oc in ocp.objectComputerClause())
                 {
-                    using var _ = Edition.At(oc);
-                    if (oc.programCollatingSequenceClause() is { } pcs)
-                    {
-                        if (pcsClause is not null)
-                            Edition.Error(DiagnosticCatalog.ObjectComputerDuplicateClause,
-                                "the OBJECT-COMPUTER PROGRAM COLLATING SEQUENCE clause is specified more than once "
-                                + "(ISO §12.3.6.2 — the paragraph's clauses may each appear at most once, §5.2.6.4)");
-                        pcsClause = pcs;
-                    }
+                    if (oc.programCollatingSequenceClause() is { } pcs) pcsClause = pcs;
                     // §12.3.6 CHARACTER CLASSIFICATION (Annex A.4.9 item 7) — IMPLEMENTED since kb/Work PB64 T5 (it was
                     // refused by name with COBOLNET1518 since PB78, and swallowed by the attribute sink before that).
                     // Saved and resolved AFTER the SPECIAL-NAMES paragraph, whose LOCALE clauses declare the names it
-                    // references (§12.3.6.3 SR3) — the PCS takes the same path. A second clause is COBOLNET1652.
-                    if (oc.characterClassificationClause() is { } cc)
-                    {
-                        if (ccClause is not null)
-                            Edition.Error(DiagnosticCatalog.ObjectComputerDuplicateClause,
-                                "the OBJECT-COMPUTER CHARACTER CLASSIFICATION clause is specified more than once "
-                                + "(ISO §12.3.6.2 — the paragraph's clauses may each appear at most once, §5.2.6.4)");
-                        ccClause = cc;
-                    }
+                    // references (§12.3.6.3 SR3) — the PCS takes the same path.
+                    if (oc.characterClassificationClause() is { } cc) ccClause = cc;
                 }
             }
             if (para.specialNamesParagraph() is not { } sn) continue;

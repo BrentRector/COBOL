@@ -113,7 +113,7 @@ internal sealed class ValueInitializer(EmitContext ctx)
     /// record, §13.18.63.4 GR4 a) — "If more than one VALUE clause applies, the maximum value thus calculated becomes
     /// the initial capacity"; occurrences within it take their keyed element, and growth beyond re-seeds through the
     /// same function to the VALUE-less default); TO is the expected capacity; an occurrence a statement creates takes
-    /// the INITIALIZED phrase's composition when it differs — keyed to ITS occurrence whatever the initial state did,
+    /// the INITIALIZED phrase's composition when the phrase is written — keyed to ITS occurrence whatever the initial state did,
     /// because §8.5.1.9.5's INITIALIZE … TO VALUE sends "the literal in the VALUE clause that corresponds to the
     /// occurrence being initialized" (§14.9.20.4 GR6 a) 3.).</summary>
     /// <param name="outer">The occurrence context above the table (one subscript per enclosing OCCURS level), from
@@ -125,19 +125,20 @@ internal sealed class ValueInitializer(EmitContext ctx)
         int min = s.InitialCap ?? 0;
         string expected = s.ExpectedMax is int e ? e.ToString() : "null";
         bool openingKeyed = valuesSeedInitialState && item.ContainsTableValue;
+        // The INITIALIZED seed is passed exactly when the phrase is written, even when it composes the opening element:
+        // it also tells the table that §8.5.1.9.5 DEFINES a created element, which a BY REFERENCE formal's view past the
+        // capacity shows (CobolDynTable.CreatedAs, kb/Work PB2690); without the phrase that content is undefined.
         if (!openingKeyed && !(s.Initialized && item.ContainsTableValue))
         {
             string opening = elementAt(1, recipe);
-            string created = s.Initialized ? elementAt(1, SeedRecipe.Initialize) : opening;
             return $"new CobolDynTable<{elementType}>(() => {opening}, {min}, {expected}, "
-                 + (created == opening ? "null" : $"() => {created}") + ")";
+                 + (s.Initialized ? $"() => {elementAt(1, SeedRecipe.Initialize)}" : "null") + ")";
         }
         int cap = Math.Max(min, item.TableValueInitialCapacity ?? min);
         var runs = TableValueRuns.Of(item, outer, cap);
         string openingAt = openingKeyed ? OccurrenceSwitch(runs, o => elementAt(o, recipe)) : $"(int __i) => {elementAt(0, recipe)}";
-        string createdAt = s.Initialized ? OccurrenceSwitch(runs, o => elementAt(o, SeedRecipe.Initialize)) : openingAt;
-        return $"new CobolDynTable<{elementType}>({openingAt}, {min}, {expected}, "
-             + $"{(createdAt == openingAt ? "null" : createdAt)}, {(openingKeyed ? cap : min)})";
+        string createdAt = s.Initialized ? OccurrenceSwitch(runs, o => elementAt(o, SeedRecipe.Initialize)) : "null";
+        return $"new CobolDynTable<{elementType}>({openingAt}, {min}, {expected}, {createdAt}, {(openingKeyed ? cap : min)})";
     }
 
     /// <summary>⛔ THE ONE per-occurrence seed switch (kb/Work PB1042 made it shared): <paramref name="elementAt"/>

@@ -604,10 +604,39 @@ whose variable-carrier arm reads the argument through `ToImage`; the typed INVOK
 (`CobolVarGroup.OverlayImage`, §14.2.3 GR8): the occurrences the argument has are written, one past its capacity that
 the callee STORED INTO is created (§8.5.1.9.3: a receiving reference "exceeds the current capacity", so "a new element is
 automatically created" and the capacity is raised to the subscript; `CobolVarGroup.OverlaidTable` / `GrownCount`
-recognise the store by its effect, an image that is not the space fill the view showed), one past the formal's count is
+recognise the store by its effect, an image that differs from the one the view showed), one past the formal's count is
 untouched, and material past a prefix formal survives. Goldens
 `2014/pb965_vlg_into_fixed_boundary`, `2014/pb965_vlg_into_fixed_invoke`; negative
 `pb965-vlg-into-larger-fixed-formal`.
+
+**The STORAGE carrier: what a BY REFERENCE formal's fixed table sees and creates past the capacity (kb/Work PB2690).**
+§8.5.1.9.5 initializes the occurrences a store creates in an INITIALIZED table ("as though they had been the subject of a
+statement of the form INITIALIZE ... WITH FILLER ALL TO VALUE THEN TO DEFAULT"), and the conversions are pure functions
+of two carriers and two atom arrays, neither of which knew the table's default element (it exists only as the
+`CobolDynTable`'s creation seed, an emitted C# expression). So the creation travels on the ARGUMENT's carrier:
+`CobolVarGroup.Created` holds, per component, the element its dynamic-capacity table creates at an occurrence number
+(`CobolDynTable.CreatedAs`, the same seed `RefReceiving` grows with), in the table's element shape — a nested element's
+carrier states its own inner creations. ⛔ Only a table that writes INITIALIZED states one (the emitted constructor
+passes the INITIALIZED seed exactly when the phrase is written, `ValueInitializer.DynTableNew`): without it §8.5.1.9.5
+leaves the created content "undefined", and the view keeps the space fill, which the write-back's effect test needs to
+see a store of the element's own VALUE (a numeric zero) at all (branch review finding R1-1). ⚠ The effect test's one
+residue is a known departure, kb/Work PB2690 REMAINING: a store of exactly the image the view showed (the INITIALIZED
+default, or SPACES without the phrase) leaves the CAPACITY unraised; closing it needs the callee's receiving references
+at the boundary, which a finished image does not carry. ⛔ ONE SIGNAL, ON THE DATA: only a BY REFERENCE crossing's builder states it
+(the emitted `AsVarImage(__byReference: true)`, `StorageCell.VarGroupAt(byReference: true)`, reached through
+`PlaceRenderer.VarGroupBoundaryImage(…, byReference: true)` from `CallEmitter.RefCarrier`, the typed INVOKE's write-back
+argument and copy-out, and the universal box), and the structural rebuilds of the same storage keep it (`Slice`, `Concat`,
+`SplitTail`, `JoinTail`, the nested splice's `CreatedList`); a MOVE's sender, a BY CONTENT copy (§14.2.3 GR9: a record
+that does "not occupy the same storage area as the argument") and every conversion's result state none, and allocate
+nothing for it. A carrier that states a creation is therefore storage, and the conversions read it from the data:
+`Reshape` shows a fixed table's occurrences past the dynamic table's capacity as created (the §8.5.1.9.5 NOTE:
+"functionally identical to one where the intermediate occurrences are physically allocated and, if specified,
+initialized") where a value's are the MOVE's space fill (§14.6.9.2 2)), and `Overlay` keeps the highest occurrence that
+differs from that image and builds each created one as the created element with the formal's stores over it
+(`OverlaidTable` for elements of fixed length, `OverlaidOccurrences` / `GrownCount` for variable-length ones). Goldens
+`2014/pb2690_initialized_created_occurrences_call` and `_invoke` (the typed and universal lanes, BY CONTENT, and a table
+without INITIALIZED whose callee stores the element's VALUE); negative
+`pb2690-initialized-created-occurrences-below-2014`; unit `BoundaryGroupCorrespondenceTests`.
 
 **An OCCURS DEPENDING group argument's two lengths.** §14.8.2.2: "For an argument or formal parameter that is
 described as an occurs-depending group item passed by reference, the maximum length is used. For an occurs-depending

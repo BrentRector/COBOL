@@ -1190,8 +1190,10 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     {
         // §14.8.2.2's variable-length sentence, realized (kb/Work PB204): the carrier is the group's
         // current-extent components, aliased through the SAME OverField shape every other form uses.
+        // ⛔ It reads the argument's STORAGE (kb/Work PB2690): a formal's fixed table past a dynamic-capacity table's
+        // capacity sees, and creates, the occurrences the table creates (ISO §14.2.3 GR8, §8.5.1.9.3, §8.5.1.9.5).
         CallCrossing.VarGroup => RuntimeApi.VarGroupOverField(
-            PlaceRenderer.VarGroupBoundaryImage(p, "CALL argument"),
+            PlaceRenderer.VarGroupBoundaryImage(p, "CALL argument", byReference: true),
             PlaceRenderer.WriteVarGroupImage(p, "__v", "CALL boundary copy into")),
         CallCrossing.Text =>
             $"ManagedPointer<string>.OverField(() => {CallStringRead(p)}, __v => {{ {CallStringWrite(p, "__v")} }})",
