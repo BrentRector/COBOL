@@ -1,8 +1,8 @@
       *> reject-at: 2023
       *> ISO 14.9.39.3 SR34 - "Integer-2 shall be non-negative, and shall be equal to or less than the maximum
       *> size of data-name-3, as specified in 8.5.1.10, Dynamic-length elementary items." 8.5.1.10.1 makes that
-      *> maximum "the smallest of: the value declared in the LIMIT phrase; the largest integer that can be stored
-      *> in an item of the usage specified in the PREFIXED phrase; the maximum permitted by the implementor", and
+      *> maximum the smallest of "the value declared in the LIMIT phrase", "the largest integer that can be stored
+      *> in an item of the usage specified in the PREFIXED phrase", "the maximum permitted by the implementor", and
       *> 13.18.19.4 GR2 makes the LIMIT phrase's integer-1 the declared ceiling - so with LIMIT IS 8 the bound is
       *> 8 and integer-2 = 99 is decidably out of range at compile time.
       *> SR34 is a SYNTAX rule over Format 16's LITERAL alternative; 14.9.39.4 GR37/GR38's EC-STORAGE-NOT-AVAIL

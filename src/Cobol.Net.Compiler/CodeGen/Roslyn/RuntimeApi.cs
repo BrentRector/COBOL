@@ -1110,7 +1110,8 @@ internal static class RuntimeApi
     // implicitly, and NO narrowing to `int` happens before the runtime's range test. An omitted length renders the
     // distinct sentinel above rather than −1. Both rules live HERE and nowhere else: a ref-mod attaches to a storage
     // PLACE (PlaceRenderer, readable and writable), to a ref-modified FUNCTION RESULT (IntrinsicRenderer, read-only —
-    // §8.4.3.3.3 SR2) and to a ref-modified ACCEPT receiver's transfer width (AcceptDisplayEmitter), and they must agree.
+    // §8.4.3.3.3 SR2) and to a slice's evaluated length (PlaceRenderer.SliceLength — an ACCEPT receiver's transfer
+    // width and a CALL / INVOKE argument's area extent), and they must agree.
 
     /// <summary>The leftmost-position argument of the runtime's range-checked reference modification, from the typed
     /// start position (§8.4.3.3.4 item 5b). A value past the carrier saturates inside the position read, so it stays

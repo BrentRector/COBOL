@@ -91,12 +91,14 @@ public sealed class WideRefModDiagnosticTests
 
     /// <summary>The expression arm: <c>X(A + 5:1)</c> materializes its position into the segment temporary before the
     /// statement, and that store used to hold the <c>long</c>-saturated position. The third case's product is a native
-    /// <c>Int128</c> intermediate of 38 digits, which the 38-digit temporary holds exactly.</summary>
+    /// <c>Int128</c> intermediate of 38 digits, which the 38-digit temporary holds exactly. The unary rows are spelled as
+    /// ISO §8.7.1 requires: a space after the operator unless a left parenthesis follows it (<c>X(-A:1)</c> is COBOLNET2993,
+    /// kb/Work PB2017).</summary>
     [Theory]
     [InlineData("E1", "01 A PIC 9(21) VALUE 100000000000000000001.", "MOVE X(A + 5:1) TO Y", "(100000000000000000006:1)")]
     [InlineData("E2", "01 A PIC 9(21) VALUE 100000000000000000001.", "MOVE X(1:A - 7) TO Y", "(1:99999999999999999994)")]
     [InlineData("E3", "01 A PIC 9(19) VALUE 9999999999999999999.", "MOVE X(A * A:1) TO Y", "(99999999999999999980000000000000000001:1)")]
-    [InlineData("E4", "01 A PIC S9(21) VALUE -100000000000000000001.", "MOVE X(-A:1) TO Y", "(100000000000000000001:1)")]
+    [InlineData("E4", "01 A PIC S9(21) VALUE -100000000000000000001.", "MOVE X(- A:1) TO Y", "(100000000000000000001:1)")]
     [InlineData("E5", "01 A PIC 9(21) VALUE 100000000000000000001.", "MOVE X(- (A):1) TO Y", "(-100000000000000000001:1)")]
     public void ExpressionPosition_NamesTheValueTheExpressionComputes(string id, string decl, string statement, string expected)
     {
@@ -105,13 +107,15 @@ public sealed class WideRefModDiagnosticTests
     }
 
     /// <summary>An integer LITERAL, or a named integer constant, past <c>long</c> (<c>PositionWideConstant</c>): the value
-    /// the program wrote is the value named, with the sign it carried. The literal arm needs no declaration.</summary>
+    /// the program wrote is the value named, with the sign it carried. The literal arm needs no declaration. K5's unary
+    /// operator follows the colon with a space: the colon is a separator (§8.3.5 7)) but not the space §8.7.1 requires
+    /// before the operator (<c>X(1:-(N))</c> is COBOLNET2993, kb/Work PB2017).</summary>
     [Theory]
     [InlineData("K1", "", "MOVE X(100000000000000000001:1) TO Y", "(100000000000000000001:1)")]
     [InlineData("K2", "", "MOVE X(1:100000000000000000001) TO Y", "(1:100000000000000000001)")]
     [InlineData("K3", "", "MOVE X(-100000000000000000001:1) TO Y", "(-100000000000000000001:1)")]
     [InlineData("K4", "", "MOVE X(1:-100000000000000000001) TO Y", "(1:-100000000000000000001)")]
-    [InlineData("K5", "", "MOVE X(1:-(100000000000000000001)) TO Y", "(1:-100000000000000000001)")]
+    [InlineData("K5", "", "MOVE X(1: -(100000000000000000001)) TO Y", "(1:-100000000000000000001)")]
     [InlineData("K6", "01 BIG CONSTANT AS 100000000000000000001.", "MOVE X(BIG:1) TO Y", "(100000000000000000001:1)")]
     [InlineData("K7", "", "MOVE X(5000000000:1) TO Y", "(5000000000:1)")]
     public void LiteralPosition_NamesTheLiteralTheProgramWrote(string id, string decl, string statement, string expected)

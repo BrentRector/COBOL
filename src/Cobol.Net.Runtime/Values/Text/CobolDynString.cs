@@ -33,9 +33,9 @@ public static class CobolDynString
     /// this constant so the number and its determination cannot drift apart.</summary>
     public const int MaxLength = 0x3FFF_FFDF;
 
-    /// <summary>§8.5.1.10.1 — THE maximum size of a dynamic-length elementary item, "the smallest of: the value
-    /// declared in the LIMIT phrase; the largest integer that can be stored in an item of the usage specified in
-    /// the PREFIXED phrase; the maximum permitted by the implementor". <paramref name="limitPhrase"/> is
+    /// <summary>§8.5.1.10.1 — THE maximum size of a dynamic-length elementary item, which "is smallest of": "the value
+    /// declared in the LIMIT phrase", "the largest integer that can be stored in an item of the usage specified in
+    /// the PREFIXED phrase", "the maximum permitted by the implementor". <paramref name="limitPhrase"/> is
     /// integer-1 of the LIMIT phrase (§13.18.19.4 GR2) or null when the phrase is absent; it arrives as an
     /// <see cref="Int128"/> so a literal far past <see cref="int"/> is COMPARED at its written value rather than
     /// narrowed first. <paramref name="prefixedMaximum"/> is the PREFIXED candidate — the largest integer the length
