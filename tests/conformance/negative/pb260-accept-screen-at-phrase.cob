@@ -16,20 +16,13 @@
       *> A.4.1 carrying the licence from the format to SR5; per §5's
       *> preamble a Not-claimed module's syntax is not accepted, so
       *> "a parse error or a named error is the conforming posture".
-      *> WITNESS: the AT phrase has no grammar surface at all
-      *> (acceptStatement is `ACCEPT dataReference (FROM acceptSource)?
-      *> END_ACCEPT?` and AT is a lexer token cobolWord does not
-      *> admit), so this source is REFUSED rather than silently
-      *> reinterpreted as a Format-1 ACCEPT that drops the position
-      *> operands. That refusal is what SR5's row closes on.
-      *> PENDING, NOT ENABLED — the emitted diagnostic was NOT measured
-      *> (the tree was frozen when this fixture was written) and a
-      *> negative entry may not ship an unmeasured .err. To enable:
-      *> run the compiler at --std 2023, record the diagnostic
-      *> substring into pb260-accept-screen-at-phrase.err, and move the
-      *> entry from "pending" to "enabled" in the negative manifest.
-      *> Until then the refusal is asserted by conformance-test
-      *> DocumentedNonSupportWitnessTests, which needs no expected code.
+      *> WITNESS: the AT phrase parses (acceptStatement's screenTail)
+      *> and the binder refuses Format 3 BY NAME, COBOLNET1707 "the
+      *> ACCEPT statement's screen format 3" (ScreenFacility), so this
+      *> source is REFUSED rather than silently reinterpreted as a
+      *> Format-1 ACCEPT that drops the position operands. That refusal
+      *> is what SR5's row closes on. ENABLED in the negative manifest;
+      *> pb260-accept-screen-at-phrase.err holds the measured substring.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1SCRW04.
        DATA DIVISION.
