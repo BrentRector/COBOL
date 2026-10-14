@@ -384,7 +384,14 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // (§8.4.3.2.3 SR2; kb/Work PB65 FMT-15.43.2 / FMT-15.58.2 — the former unconditional "data item wins"
         // let a shadowing table answer where §15.43.4 requires +999). A user-function-prototype name keeps the
         // data-item precedence (its declaration is not screened by rule 5).
-        if (!repositoryIntrinsic && ctx.Symbols.TryResolve(name, ctx.ActiveScope, out _)) return null;
+        // A class-name or interface-name this source element may reference (§8.4.6.4) — or a parameter-name of the
+        // parameterized definition bound as itself, which stands where they do (§11.3.4 GR6) — is a user-defined word
+        // too (§8.3.2.1 rule 5), so `INVOKE E "NEW"` with `CLASS E` in the REPOSITORY names the class, never the intrinsic
+        // E (kb/Work PB2937: it drew COBOLNET1543 for a class or a formal spelled like a zero-argument intrinsic).
+        if (!repositoryIntrinsic && (ctx.Symbols.TryResolve(name, ctx.ActiveScope, out _)
+            || Compiler.Oo.OoNameResolution.Lookup(host.OoClasses, dref, name, Compiler.Oo.OoNameResolution.Want.Either)
+                is { Ok: true } or { IsFormal: true }))
+            return null;
         if (!declaredFn)
         {
             // The OTHER arm of the §8.4.3.2.3 SR2 discrimination (kb/Work R22): the name is a catalogued

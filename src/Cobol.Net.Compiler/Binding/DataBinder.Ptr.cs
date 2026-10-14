@@ -167,7 +167,9 @@ public sealed partial class DataBinder
         // A CLASS unit's statements live in its METHODS' procedure divisions, each resolved in its own method's scope
         // (§11.7.4 GR5) — the ADDRESS OF scan's rule (PtrScanAddressOfTargets); the INVOKE operands are scanned with the
         // CALL ones (the INVOKE arm of the same rule, kb/Work PB2087).
-        bool IsUserFunction(string fn) => UserFunctionNames.Contains(fn) || UnitSelfName is { } self && CobolNames.Same(fn, self);
+        // §8.4.6.6: a REPOSITORY function-prototype-name or the containing FUNCTION definition's own name — a program's
+        // own name is no user function (kb/Work PB3121: this test used to admit it whatever the unit's kind).
+        bool IsUserFunction(string fn) => UserFunctionNames.Contains(fn) || UnitIsFunction && ContainingDefinitionNames.Contains(fn);
         var own = OoIsClassUnit
             ? OoBoundMethods.Where(m => m.Ctx?.procedureDivision() is not null)
                 .SelectMany(m => ScanByReferenceOperands(m.Ctx!.procedureDivision(), IsUserFunction).Select(t => (t.Name, t.Qualifiers, t.Invoke, t.SlotsOnly, Method: (OoMethodSymbol?)m)))

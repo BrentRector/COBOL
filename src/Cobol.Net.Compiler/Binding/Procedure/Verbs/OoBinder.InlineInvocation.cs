@@ -255,6 +255,10 @@ internal sealed partial class OoBinder
             var activation = chained is { } prev
                 ? OoBindInstanceInvoke(site, prev, methodName, receiverText)
                 : OoBindByReceiver(site, term!, methodName);
+            // Through a parameter-name (kb/Work PB2937): the method, and so the description of the temporary it returns,
+            // is each expansion's; the statement is the expansion's too (the funnel keeps BoundDeferredToExpansion).
+            if (activation is BoundDeferredToExpansion deferred)
+                return BoundExprError.Carry(deferred.Construct, unbuilt: false);
             if (site.ImplicitReturningPlace is not { } result)
                 // Every failure path already reported (the receiver, roster, arity and conformance
                 // diagnostics are the INVOKE binder's own, re-worded by InvocationSite.Verb).

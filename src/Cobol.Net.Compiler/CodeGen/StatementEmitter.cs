@@ -282,6 +282,9 @@ internal sealed class StatementEmitter : IBoundStatementVisitor<bool>
     }
 
     public bool Visit(BoundUnsupported n) { _ctx.Writer.Line(LoudStmt(n.Feature)); return false; }
+    // A skeleton's bound tree is never emitted (OoDriver.SkeletonClasses): reaching one here is a pipeline defect.
+    public bool Visit(BoundDeferredToExpansion n) => throw new InvalidOperationException(
+        $"{n.Construct}: a statement of an unexpanded parameterized definition reached code generation (kb/Work PB2937)");
 
     /// <summary>A refusal can never be compiled into a program (kb/Work PB909): <see cref="BoundRejected.Report"/>
     /// recorded an error, and an error fails the compile before code generation. Arriving here means that
