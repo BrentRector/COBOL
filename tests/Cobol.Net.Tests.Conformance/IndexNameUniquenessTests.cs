@@ -150,4 +150,32 @@ public sealed class IndexNameUniquenessTests
         Assert.True(ok, detail);
         Assert.Equal("LOCAL=44 GLOBAL=33\nOUTER=22", stdout.Replace("\r\n", "\n").Trim());
     }
+
+    /// <summary>The <c>--permissive</c> disposition of an ambiguous index-name (§8.4.2.2.3 SR1, warned, resolved to
+    /// the first declaration) still screens the table it resolves to: here that table lies in a LINKAGE record that
+    /// is no operand of the USING phrase, so §13.7.3 SR4 ("It is an operand of the USING phrase or the RETURNING
+    /// phrase of the procedure division header") refuses the reference, COBOLNET2746, exactly as it refuses the
+    /// qualified <c>IX OF T1</c>. Before (kb/Work PB2988 review R1-1's shape): only the unique arm screened, and the
+    /// generated C# failed Roslyn with CS0131.</summary>
+    [Fact]
+    public void Permissive_AmbiguousIndexName_ScreensTheLinkageRecordItResolvesTo()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. W57IXL.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L1.
+               05 T1 PIC X OCCURS 3 INDEXED BY IX.
+            01 L2.
+               05 T2 PIC X OCCURS 3 INDEXED BY IX.
+            PROCEDURE DIVISION USING L2.
+                SET IX TO 2
+                GOBACK.
+            """, 2023, permissive: true);
+        Assert.False(ok, "the first declaration's table is in an unreferenceable LINKAGE record (ISO §13.7.3 SR4)");
+        EditionHarness.AssertHasDiagnostic(warnings, "COBOLNET1639");
+        EditionHarness.AssertHasDiagnostic(errors, "COBOLNET2746");
+        EditionHarness.AssertNoDiagnostic(errors, "CS0131");
+    }
 }

@@ -1959,10 +1959,6 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             : recv.Item.IsGroup ? $"{CallEmitter.BoundaryImageWidth(recv.Item)}"
             : $"{CallEmitter.ElementaryFormalWindow(recv.Item)}";
 
-    /// <summary>The copy-in read of an identifier argument for a STRING-CARRIED formal: a reference-modified
-    /// place reads its window verbatim (§8.4.3.3.4 GR6 — the operand IS elementary alphanumeric); a string-stored
-    /// item reads directly; a native display-numeric item formats through its OWN profile (caller-side). A
-    /// CONTENT crossing normalizes to the formal's width (MOVE pad/truncate).</summary>
     /// <summary>The INVOKE-site propagation pickup (D-EO6): a method GOBACK/EXIT … RAISING stages; the
     /// ACTIVATING site consumes — after the RETURNING delivery and copy-outs (GR1b ordering). Instance/
     /// Self/Super/Factory + UNIVERSAL dispatches all pick up; NEW needs none (the generated ctor runs no
