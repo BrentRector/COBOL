@@ -81,3 +81,11 @@ table), and every occurrence the argument lacked is the argument's created eleme
 `SpaceFilled`) with the formal's element stored over it. Goldens: `_call` lanes GW `1 4`, GI `[iii] 1 4`, GX `[Q] 2 2`,
 GF `[Q] 2 2`, GD `4` and the caller twin DW `2 4 2`; `_invoke` lanes NW `1 4`, NU `1 4`, NX `2 2`. On the reviewed
 head the same lanes printed GW `1 2`, GI `1 2`, GX `2 4`, GF `2 4`, GD `2`, NW `1 2`, NU `1 2`, NX `2 4`.
+
+**Landing stop (Linux gate RED on dc0214b9f).** Characterization 14 of 36: every `EmittedCSharp_MatchesSnapshot` case.
+The runtime major went from 3 to 4 above, and every emitted module records the runtime version in its
+`CobolRepositoryAttribute` and its `EnsureRegistered` call, so the committed snapshots still carried "3.0.0.0". The
+finisher re-recorded them from the emitter (`COBOLNET_UPDATE_SNAPSHOTS=1`); the diff is exactly those two lines per
+snapshot, "3.0.0.0" to "4.0.0.0", and all 36 characterization cases then pass on Windows. This is the second time the
+branch stopped this way (the 2.0.0 to 3.0.0 bump stopped at 305fba0d8): Windows leg 1 again ran 6 of 36 cases, because a
+`<Version>` change does not raise the snapshot cases into leg 1 (kb/Work PB3144, open).
