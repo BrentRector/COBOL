@@ -36,9 +36,12 @@ $r = Run-Orch 'second' 'good' @('-Unit', 'wave') {
 Check 'second instance exit' $r.code 3
 Check 'second instance started nothing' $r.runs 0
 Check 'live lock kept' (Test-Path (Join-Path $r.coord 'orchestrate.lock')) $true
-# ...and a lock left by a dead process is stale and taken over
+# ...and a lock left by a dead process is stale and taken over. The dead PID is one no process can hold: this host's
+# live PIDs pass 1,000,000, and Windows ignores a PID's two low bits, so the 999999 this case once used named the live
+# process 999996 whenever one existed (a red that passed alone, wave 1074 A2). Int32.MaxValue - 3 is above any PID
+# Windows or Linux (pid_max <= 2^22) assigns.
 $r = Run-Orch 'stale' 'good' @('-Unit', 'wave', '-MaxUnits', '1', '-FastFailSeconds', '0') {
-    param($c) Set-Content -Path (Join-Path $c 'orchestrate.lock') -Value (@{ pid = 999999; started_at = 'long ago' } | ConvertTo-Json -Compress) }
+    param($c) Set-Content -Path (Join-Path $c 'orchestrate.lock') -Value (@{ pid = [int]::MaxValue - 3; started_at = 'long ago' } | ConvertTo-Json -Compress) }
 Check 'stale lock taken over' $r.runs 1
 
 # 7. the HARD context cap sends STOP-UNIT and the loop's fleet stop, and the unit hands off gracefully (no kill)
