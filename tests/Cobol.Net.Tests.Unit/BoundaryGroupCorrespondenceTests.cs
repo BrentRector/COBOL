@@ -272,20 +272,41 @@ public sealed class BoundaryGroupCorrespondenceTests
     }
 
     /// <summary>The creation a storage carrier states is the table's own (kb/Work PB2690): the seed a receiving reference
-    /// past the capacity grows with (§8.5.1.9.3) — the INITIALIZED phrase's when it is written (§8.5.1.9.5), else the
-    /// initial-state seed — at the occurrence's own number.</summary>
+    /// past the capacity grows with (§8.5.1.9.3), the INITIALIZED phrase's (§8.5.1.9.5), at the occurrence's own number,
+    /// even when it composes the opening element. A table WITHOUT the phrase states none (review finding R1-1): §8.5.1.9.5
+    /// leaves that content "undefined", and the view's space fill is what lets the write-back see a store of the element's
+    /// VALUE at all.</summary>
     [Fact]
-    public void ATablesCreation_IsTheSeedItsReceivingReferenceGrowsWith_ByOccurrence()
+    public void ATablesCreation_IsTheSeedItsReceivingReferenceGrowsWith_ByOccurrence_OnlyWhenInitialized()
     {
         var initialized = new CobolDynTable<string>(() => "s", 1, null, () => "i");
-        Assert.Equal("i", initialized.CreatedAs(static e => e)(5).Fixed);
+        Assert.Equal("i", initialized.CreatedAs(static e => e)!(5).Fixed);
         initialized.RefReceiving(3);
         Assert.Equal("i", initialized.RefSending(2));
         var keyed = new CobolDynTable<string>(n => "v" + n, 1, null, n => "c" + n, 1);
-        Assert.Equal("c3", keyed.CreatedAs(static e => e)(3).Fixed);
-        var plain = new CobolDynTable<string>(() => "s", 1, null, null);
-        Assert.Equal("s", plain.CreatedAs(static e => e)(2).Fixed);
-        Assert.Empty(plain.CreatedAs(static e => e)(2).Dynamic);
+        Assert.Equal("c3", keyed.CreatedAs(static e => e)!(3).Fixed);
+        var sameAsOpening = new CobolDynTable<string>(() => "s", 1, null, () => "s");
+        Assert.Equal("s", sameAsOpening.CreatedAs(static e => e)!(2).Fixed);
+        var plain = new CobolDynTable<string>(() => "0", 1, null, null);
+        Assert.Null(plain.CreatedAs(static e => e));
+        Assert.Null(plain.CreatedAs(static e => CobolVarGroup.OfImage(e)));
+    }
+
+    /// <summary>kb/Work PB2690 review finding R1-1 — a storage carrier whose table states NO creation (no INITIALIZED) is
+    /// viewed past its capacity as the space fill, so a callee's store of the element's VALUE ("0", a PIC 9 VALUE 0
+    /// element) into occurrence 3 is a store, and §8.5.1.9.3 raises the capacity "to the value given by the subscript".</summary>
+    [Fact]
+    public void AStorageTableWithoutInitialized_ShowsTheSpaceFill_SoAStoreOfItsValueGrowsIt()
+    {
+        var table = new CobolDynTable<string>(() => "0", 1, null, null);
+        static CobolVarGroup Storage(CobolDynTable<string> t) =>
+            new("CDEF", ["0"], null, [t.CreatedAs(static e => e)]);
+        var caller = ManagedPointer<CobolVarGroup>.Cell(Storage(table));
+        var args = new[] { new CobolArg(CobolPassMode.Reference, caller, null, VarLGAtoms) };
+        var formal = CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms, static () => "");
+        Assert.Equal("CD0  EF", formal.Value);
+        formal.Value = "CD0 0EF";
+        Assert.Equal(["0 0"], caller.Value!.Dynamic);
     }
 
     [Fact]

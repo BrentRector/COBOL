@@ -1,6 +1,7 @@
       *> kb/Work PB2690 - THE OCCURRENCES A BY REFERENCE FORMAL'S FIXED TABLE
       *> CREATES IN AN INITIALIZED DYNAMIC-CAPACITY TABLE OF THE ARGUMENT, ACROSS
-      *> A FORMAT-2 CALL.
+      *> A FORMAT-2 CALL, AND (GP, GQ) THE CAPACITY A STORE OF THE ELEMENT'S VALUE
+      *> RAISES IN A TABLE WITHOUT THE PHRASE.
       *>
       *> 14.2.3 GR8: "the activated runtime element operates as if the formal
       *> parameter occupies the same storage area as the argument", so a store to
@@ -33,6 +34,16 @@
       *>   GN  elements holding an INITIALIZED inner dynamic table (ND "d", NI
       *>       "i" FROM 1); the callee stores LI (3, 2) := "X": occurrences 2
       *>       and 3 are created initialized, then NI (3, 2)  = di, diX, 3
+      *>   GP  WITHOUT INITIALIZED (PIC 9 VALUE 0 elements, starting "0"),
+      *>       the callee stores TFP (3) := 0, the element's own VALUE: still a
+      *>       receiving reference past the capacity, so 8.5.1.9.3 raises it to
+      *>       3. 8.5.1.9.5: "Otherwise, the content of any unreferenced
+      *>       locations in the new table element and the content of the other
+      *>       new occurrences are undefined", so occurrence 2 is not shown
+      *>                                                    = 0, 0, 3
+      *>   GQ  the same one level down: elements of a variable-length group
+      *>       (QD PIC 9 VALUE 0, QI an inner dynamic table), no INITIALIZED;
+      *>       the callee stores LQD (3) := 0                 = 0, 0, 3
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690ICC.
        DATA DIVISION.
@@ -75,6 +86,15 @@
              10 ND PIC X VALUE "d".
              10 NI PIC X OCCURS DYNAMIC CAPACITY IN CNI FROM 1
                 INITIALIZED VALUE "i".
+       01 GP.
+          05 PX PIC X VALUE "x".
+          05 PTB PIC 9 OCCURS DYNAMIC CAPACITY IN CP FROM 1 VALUE 0.
+       01 GQ.
+          05 QH PIC X VALUE "h".
+          05 QT OCCURS DYNAMIC CAPACITY IN CPQ FROM 1.
+             10 QD PIC 9 VALUE 0.
+             10 QI PIC X OCCURS DYNAMIC CAPACITY IN CPQI FROM 1
+                VALUE "i".
        PROCEDURE DIVISION.
        MAIN.
            CALL "PB2690IA" AS NESTED USING GA
@@ -103,6 +123,12 @@
            MOVE CN TO WS-C
            DISPLAY "GN=[" ND (2) NI (2, 1) "|" ND (3) NI (3, 1)
                NI (3, 2) "] " WS-C
+           CALL "PB2690IP" AS NESTED USING GP
+           MOVE CP TO WS-C
+           DISPLAY "GP=[" PTB (1) "|" PTB (3) "] " WS-C
+           CALL "PB2690IQ" AS NESTED USING GQ
+           MOVE CPQ TO WS-C
+           DISPLAY "GQ=[" QD (1) "|" QD (3) "] " WS-C
            STOP RUN.
 
        IDENTIFICATION DIVISION.
@@ -196,4 +222,32 @@
            MOVE "X" TO LI (3, 2)
            GOBACK.
        END PROGRAM PB2690IN.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690IP.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LP.
+          05 LPX PIC X.
+          05 TFP PIC 9 OCCURS 3.
+       PROCEDURE DIVISION USING LP.
+       MAIN.
+           MOVE 0 TO TFP (3)
+           GOBACK.
+       END PROGRAM PB2690IP.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690IQ.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LQ.
+          05 LQH PIC X.
+          05 LQT OCCURS 3.
+             10 LQD PIC 9.
+             10 LQI PIC X OCCURS 2.
+       PROCEDURE DIVISION USING LQ.
+       MAIN.
+           MOVE 0 TO LQD (3)
+           GOBACK.
+       END PROGRAM PB2690IQ.
        END PROGRAM PB2690ICC.

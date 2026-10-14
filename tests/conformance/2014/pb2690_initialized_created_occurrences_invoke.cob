@@ -1,6 +1,7 @@
       *> kb/Work PB2690 - THE OCCURRENCES A BY REFERENCE FORMAL'S FIXED TABLE
       *> CREATES IN AN INITIALIZED DYNAMIC-CAPACITY TABLE OF THE ARGUMENT, ACROSS
-      *> AN INVOKE: the typed lane, the universal lane (every argument BY
+      *> AN INVOKE (and, PL/PU, the capacity a store of the element's VALUE
+      *> raises in a table without the phrase): the typed lane, the universal lane (every argument BY
       *> REFERENCE, 14.9.23.3 SR6) and BY CONTENT. The INVOKE twin of
       *> pb2690_initialized_created_occurrences_call.
       *>
@@ -24,6 +25,11 @@
       *>   NE  elements holding an INITIALIZED inner dynamic table (ND "d", NI
       *>       "i" FROM 1); the method stores LI (3, 2) := "X"
       *>                                                  = di, diX, 3
+      *>   PL  WITHOUT INITIALIZED (PIC 9 VALUE 0 elements, starting "0"), the
+      *>       method stores LPL (3) := 0, the element's own VALUE: a receiving
+      *>       reference past the capacity all the same (8.5.1.9.3); occurrence
+      *>       2 is "undefined" (8.5.1.9.5) and not shown     = 0, 0, 3
+      *>   PU  PL through a universal object reference    = 0, 0, 3
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690ICI.
        ENVIRONMENT DIVISION.
@@ -67,6 +73,12 @@
              10 ND PIC X VALUE "d".
              10 NI PIC X OCCURS DYNAMIC CAPACITY IN CNI FROM 1
                 INITIALIZED VALUE "i".
+       01 GP.
+          05 PLH PIC X VALUE "x".
+          05 PTB PIC 9 OCCURS DYNAMIC CAPACITY IN CPL FROM 1 VALUE 0.
+       01 GPU.
+          05 PUH PIC X VALUE "x".
+          05 PUE PIC 9 OCCURS DYNAMIC CAPACITY IN CPU FROM 1 VALUE 0.
        PROCEDURE DIVISION.
        MAIN.
            INVOKE PB2690IK "NEW" RETURNING O
@@ -94,6 +106,12 @@
            MOVE CN TO WS-C
            DISPLAY "NE=[" ND (2) NI (2, 1) "|" ND (3) NI (3, 1)
                NI (3, 2) "] " WS-C
+           INVOKE O "STOREPL" USING GP
+           MOVE CPL TO WS-C
+           DISPLAY "PL=[" PTB (1) "|" PTB (3) "] " WS-C
+           INVOKE U "STOREPL" USING GPU
+           MOVE CPU TO WS-C
+           DISPLAY "PU=[" PUE (1) "|" PUE (3) "] " WS-C
            STOP RUN.
        END PROGRAM PB2690ICI.
 
@@ -159,6 +177,17 @@
        MAIN-P.
            MOVE "X" TO LI (3, 2).
        END METHOD STORENE.
+
+       METHOD-ID. STOREPL.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LP.
+          05 LPH PIC X.
+          05 LPL PIC 9 OCCURS 3.
+       PROCEDURE DIVISION USING LP.
+       MAIN-P.
+           MOVE 0 TO LPL (3).
+       END METHOD STOREPL.
 
        END OBJECT.
        END CLASS PB2690IK.

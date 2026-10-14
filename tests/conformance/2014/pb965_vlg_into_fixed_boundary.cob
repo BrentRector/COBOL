@@ -12,8 +12,8 @@
       *> its length rule only when "neither of them is strongly typed or a variable length group".
       *>
       *> EXPECTED VALUES, DERIVED:
-      *>   LF   - VT has capacity 2 opposite a 3-occurrence table: the missing third occurrence is the
-      *>          one VT creates (determination D-VGB), its element's initial state, spaces -> [ghkl ij].
+      *>   LF   - VT has capacity 2 opposite a 3-occurrence table; 14.6.9.2 fits it: the missing third
+      *>          occurrence is space filled -> [ghkl ij].
       *>   VG   - 14.2.3 GR8 ("operates as if the formal parameter occupies the same storage area as the
       *>          argument"): L1 := qq reaches V1. The callee stores nothing into an occurrence past
       *>          the argument table's capacity (8.5.1.9.3 creates one only for a receiving

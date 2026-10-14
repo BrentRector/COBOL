@@ -299,11 +299,13 @@ public sealed class StorageCell
                 dyn[k] = "";
             }
             else dyn[k] = ComponentAt(dynBase + k, dynTable[k]);
-            // Storage states the element each table creates (kb/Work PB2690): what a BY REFERENCE view shows past the
-            // capacity, and what a store there creates (CobolVarGroup.Reshape / Overlay; ISO §8.5.1.9.5).
-            if (byReference && dynTable[k] > 0)
-                (created ??= new Func<int, CobolVarGroup>?[dyn.Length])[k] = DynTableAt(dynBase + k, 0, dynTable[k])
-                    .CreatedAs(elems?[k] is { } es ? ElementCarrier(es, byReference: true) : FixedElementCarrier);
+            // Storage states the element each INITIALIZED table creates (kb/Work PB2690): what a BY REFERENCE view shows
+            // past the capacity, and what a store there creates (CobolVarGroup.Reshape / Overlay; ISO §8.5.1.9.5). A table
+            // without the phrase states none (CobolDynTable.CreatedAs), and then nothing is allocated for it.
+            if (byReference && dynTable[k] > 0
+                && DynTableAt(dynBase + k, 0, dynTable[k])
+                    .CreatedAs(elems?[k] is { } es ? ElementCarrier(es, byReference: true) : FixedElementCarrier) is { } creation)
+                (created ??= new Func<int, CobolVarGroup>?[dyn.Length])[k] = creation;
         }
         string run = RunOf(fixedAt, width, dynFixedAt, dynTable);
         return new CobolVarGroup(tail.Present ? run[..^tail.CutAt(count)] : run, dyn, nested, created);

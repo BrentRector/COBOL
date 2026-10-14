@@ -1530,7 +1530,7 @@ of an unsupported facility.
   a three-byte `G3` leaves `DN` two positions long and `FUNCTION LENGTH(DN)` = 4 (§15.50.4 r6 counts bytes). GnuCOBOL
   3.2 has no dynamic-length items. Witness: `conformance:2014/pb546_group_into_national_dynamic` when PB546 lands.
 - **D-VGB — a BY REFERENCE formal's FIXED table stored past the capacity of the argument's dynamic-capacity table
-  creates the occurrences the callee stored into (kb/Work PB2690).** §14.2.3 GR8: "the activated runtime element operates
+  creates the occurrences the callee stored into (kb/Work PB2690; one known departure, below).** §14.2.3 GR8: "the activated runtime element operates
   as if the formal parameter occupies the same storage area as the argument". A formal table of a fixed (or DEPENDING)
   occurrence count opposite the argument's dynamic-capacity table is legal when the two correspond and match (§8.5.1.12.1,
   §8.5.1.12.2; §8.5.1.12.3 sentence 3: the dynamic-capacity table "is considered to be the same length as the
@@ -1545,15 +1545,19 @@ of an unsupported facility.
   created one the callee did not store hold the element's VALUE, exactly as the same store made in the caller leaves them
   (until the second PB2690 landing they came back space filled). **Determination (the latitude the standard leaves):** a
   copy of the argument crosses the boundary and only the finished view comes back, so (i) the formal VIEWS an occurrence
-  the argument lacks as the occurrence the argument's table creates, the §8.5.1.9.5 NOTE's "functionally identical to one
-  where the intermediate occurrences are physically allocated and, if specified, initialized": the table's own creation
-  seed, the one a receiving subscript past the capacity grows it with (`CobolDynTable.CreatedAs`; the INITIALIZED recipe
-  when the phrase is written, otherwise, for contents §8.5.1.9.5 leaves undefined, the element's initial state, as a
-  statement in the caller would create it); and (ii) a store past the capacity is recognised by its EFFECT: the capacity
-  becomes the highest occurrence of the formal's table whose image differs from the one the view showed. A callee that
-  only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only); one that stores SPACES
-  there creates it; and one that stores into an occurrence exactly the image the table creates leaves the capacity as it
-  was (the content is the same either way, only the CAPACITY register can tell). The creation travels on the argument's
+  the argument lacks, when the table writes INITIALIZED, as the occurrence the table creates, the §8.5.1.9.5 NOTE's
+  "functionally identical to one where the intermediate occurrences are physically allocated and, if specified,
+  initialized": the INITIALIZED recipe, the seed a receiving subscript past the capacity grows the table with
+  (`CobolDynTable.CreatedAs`); without the phrase, whose created contents §8.5.1.9.5 leaves "undefined", the view shows
+  the space fill, chosen because no numeric store matches it, so a store of the element's own VALUE (a zero) is still
+  seen; and (ii) a store past the capacity is recognised by its EFFECT: the capacity becomes the highest occurrence of the
+  formal's table whose image differs from the one the view showed. A callee that only reads such an occurrence creates
+  nothing (§8.5.1.9.3 acts on a receiving reference only), and an INITIALIZED table's callee that stores SPACES there
+  creates it. **Known departure (kb/Work PB2690, REMAINING; a wrong CAPACITY, not latitude):** a callee that stores into
+  an occurrence past the capacity exactly the image the view showed (the INITIALIZED default into an INITIALIZED table,
+  SPACES into one without the phrase) leaves the capacity as it was, where §8.5.1.9.3 raises it to the subscript; the
+  content is the same either way. Only the callee's receiving references can tell such a store from none, and the
+  finished image the boundary sees does not carry them. The creation travels on the argument's
   carrier only for a BY REFERENCE crossing (`CobolVarGroup.Created`, stated by `AsVarImage(__byReference: true)` and
   `StorageCell.VarGroupAt(byReference: true)`): a BY CONTENT formal is a record "allocated by the activating runtime element"
   that does "not occupy the same storage area as the argument" (§14.2.3 GR9), filled as by a MOVE, so past the sending

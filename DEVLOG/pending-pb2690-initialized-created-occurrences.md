@@ -1,6 +1,7 @@
-## PB2690 closed: the occurrences a BY REFERENCE formal's fixed table creates take the table's INITIALIZED default
+## PB2690: the occurrences a BY REFERENCE formal's fixed table creates take the table's INITIALIZED default
 
-Wave 1072 group C finished kb/Work PB2690's last half. Wave 1069 C had made a store through a BY REFERENCE formal's
+Wave 1072 group C fixed the open half of kb/Work PB2690, and its branch review left one residue open as the note's new
+REMAINING half (below). Wave 1069 C had made a store through a BY REFERENCE formal's
 FIXED table, past the capacity of the argument's dynamic-capacity table, create the occurrences (ISO 8.5.1.9.3), and its
 branch review (R1-1) found that every item of a created occurrence the callee did not store, and every intermediate
 occurrence, came back space filled. 8.5.1.9.5 says otherwise for an INITIALIZED table: "any elementary items not
@@ -25,7 +26,7 @@ specified, initialized"). `Overlay` keeps the highest occurrence whose image dif
 each created occurrence as the created element with the formal's stores over it. Every item the callee did not store
 already holds the default in the view it stored over, so the result is exact, a stored SPACE included. The one residue is
 the effect test's: a callee that stores exactly the created image into an occurrence leaves the capacity unchanged. The
-content is the same either way.
+content is the same either way, but the capacity is wrong; see the review round below.
 
 **The trap.** A BY CONTENT CALL argument is a detached cell, and the callee reads it through the same `CobolArgAdapt.Text`
 view as a BY REFERENCE one. The first cut, which stated the creation on every carrier, made a BY CONTENT callee see the
@@ -39,10 +40,9 @@ inner creations); CALL with fixed and variable-length formals, the typed INVOKE,
 BY REFERENCE), and BY CONTENT on both as the counter-arm.
 
 **Witnesses.** Goldens `2014/pb2690_initialized_created_occurrences_call` and `_invoke`, negative
-`pb2690-initialized-created-occurrences-below-2014` (COBOLNET0900), and three unit tests in
+`pb2690-initialized-created-occurrences-below-2014` (COBOLNET0900), and four unit tests in
 `BoundaryGroupCorrespondenceTests`. D-VGB in `docs/CONFORMANCE.md` section 3 and the interprogram design's storage-carrier
-paragraph record the determination. Three older goldens' comments that said "space filled" were re-derived; their outputs
-did not change.
+paragraph record the determination.
 
 **The runtime major is 3.** `CobolVarGroup`'s positional record gained `Created`, and `StorageCell.VarGroupAt` gained its
 `byReference` flag, so two shipped signatures left `PublicAPI.Shipped.txt`. DESIGN-external-repository 15.4 raises the
@@ -60,7 +60,24 @@ builds the cell's element carrier (`StorageCell.ElementCarrier`). `semgrep/verif
 script (`E:\COBOL-coord\scratch\w1072c\classify.py`): 3342 differ only by the runtime version string the module records
 ("2.0.0.0" to "3.0.0.0", the major above); 111 differ by that and by the storage-carrier emission (`AsVarImage`'s
 `__byReference` parameter, the `Created` list, `VarGroupAt(..., byReference: true)`); 3 are ADDED (this branch's goldens).
-None is unexplained. The baseline is re-recorded at 42d6471e33f7.
+None is unexplained. The branch re-recorded the baseline, but main has since deleted the arch-oracle manifests (PB3107),
+so the review finisher's merge of main dropped the re-recorded one.
+
+**Branch review round 1 (R1-1): a regression for tables without INITIALIZED, fixed; the residue stays open.** The
+reviewer found that the first cut stated a creation for EVERY dynamic-capacity table. A table without INITIALIZED was then
+viewed past its capacity as its initial state, so a callee's `MOVE 0 TO TFB (3)` into a `PIC 9 VALUE 0` table was
+invisible to the effect test. The reviewer's probe (`E:\tmp\w1072c-review\p1.cob`) printed `NUM=1`, where 8.5.1.9.3 and
+origin/main give 3. Nothing was gained in return: 8.5.1.9.5 leaves that content "undefined". Now `CobolDynTable.CreatedAs`
+is null unless the table writes INITIALIZED, and the emitted constructor (`ValueInitializer.DynTableNew`) passes the
+INITIALIZED seed exactly when the phrase is written, even when it composes the opening element. A table without the
+phrase therefore keeps main's space-fill view, which no numeric store matches, and the probe prints `NUM=3`. The three
+older goldens' comments go back to the space fill. New lanes GP/GQ (CALL: fixed and variable-length elements) and PL/PU
+(typed and universal INVOKE) witness it, all `0, 0, 3`, with one new unit test. The probe's other line, `CALL=1` against
+`DIRECT=3`, is the residue the reviewer named: a store of exactly the INITIALIZED default (or SPACES into a table without
+the phrase) cannot be told from no store by a finished image. Telling them apart needs the callee's receiving references
+at the boundary, a change to the CALL/INVOKE ABI beyond this slice. It is no longer recorded as latitude: PB2690 returns
+to `half` with it as REMAINING, and D-VGB names it a known departure.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261014T012409Z-986e91; Conformance
-5,903/11,546, Unit 32,552/33,499, Characterization 7/36 ran in leg 1). The Linux gate is the landing's (batched gating).
+5,903/11,546, Unit 32,552/33,499, Characterization 7/36 ran in leg 1); the review finisher's re-gate: GATE_PLACEHOLDER.
+The Linux gate is the landing's (batched gating).

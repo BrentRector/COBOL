@@ -12,10 +12,9 @@
       *> the capacity of the table is increased to the value given by the
       *> subscript". The two descriptions are compatible (8.5.1.12.3: the dynamic-
       *> capacity table is "considered to be the same length as the corresponding
-      *> table"), so the call is legal; where the argument has no occurrence
-      *> the callee reads the one the argument's table creates (determination
-      *> D-VGB: here the element's initial state, "a", the contents 8.5.1.9.5
-      *> leaves undefined without INITIALIZED) and a callee that
+      *> table"), so the call is legal; the callee reads a space-filled occurrence
+      *> where the argument has none (14.6.9.2 2: the remaining elements are
+      *> "space filled") and a callee that
       *> never stores past the capacity creates nothing (8.5.1.9.3 acts only on a
       *> receiving reference).
       *>

@@ -46,9 +46,10 @@ namespace CobolNet.Runtime;
 /// <paramref name="Dynamic"/>: for a dynamic-capacity table of variable-length group elements, its occurrences' own
 /// carriers in occurrence order up to its current capacity, and null for every other component.</param>
 /// <param name="Created">Null unless the carrier describes STORAGE; otherwise one entry per component of
-/// <paramref name="Dynamic"/>: for a dynamic-capacity table, the element a statement creates in it at a 1-based occurrence
-/// number (its <c>CobolDynTable</c>'s creation seed, the §8.5.1.9.5 INITIALIZED default when the phrase is written) as a
-/// carrier in the table's ELEMENT shape, and null for every other component (kb/Work PB2690). The storage builders state
+/// <paramref name="Dynamic"/>: for a dynamic-capacity table with the INITIALIZED phrase, the element a statement creates in
+/// it at a 1-based occurrence number (its <c>CobolDynTable</c>'s creation seed, §8.5.1.9.5's INITIALIZED default) as a
+/// carrier in the table's ELEMENT shape, and null for every other component (kb/Work PB2690) — a table without the phrase
+/// included, whose created content §8.5.1.9.5 leaves undefined (<c>CobolDynTable.CreatedAs</c>). The storage builders state
 /// it (the emitted <c>AsVarImage</c>, <c>StorageCell.VarGroupAt</c>) and the structural rebuilds of the same storage keep
 /// it (<see cref="Slice"/>, <see cref="Concat"/>, <see cref="SplitTail"/>, <see cref="JoinTail"/>); a conversion's result
 /// (<see cref="Reshape"/>, <see cref="Overlay"/>) is a value and states none. The builders state it only for a BY
@@ -277,12 +278,13 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     ///   its characters cut at its element width, each a fixed-length element's carrier.</item>
     /// <item>⛔ a carrier of STORAGE (one stating <see cref="Created"/>: a BY REFERENCE argument, which only the activation
     ///   boundary builds so, kb/Work PB2690) is not a MOVE's sender but the storage a formal VIEWS (§14.2.3 GR8: the formal
-    ///   "occupies the same storage area as the argument"), so a fixed table opposite its dynamic-capacity table shows each
-    ///   occurrence past the capacity as the table would hold it once a store there created it (§8.5.1.9.3) — the creation
-    ///   seed, for an INITIALIZED table §8.5.1.9.5's "INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT" — where a
-    ///   MOVE's remaining elements are "space filled" (§14.6.9.2 2)). The §8.5.1.9.5 NOTE licenses the view ("functionally
-    ///   identical to one where the intermediate occurrences are physically allocated and, if specified, initialized"),
-    ///   and <see cref="Overlay"/> recognises a store by a difference from that same image (determination D-VGB).</item>
+    ///   "occupies the same storage area as the argument"), so a fixed table opposite its INITIALIZED dynamic-capacity table
+    ///   shows each occurrence past the capacity as the table would hold it once a store there created it (§8.5.1.9.3) —
+    ///   §8.5.1.9.5's "INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT" — where a MOVE's remaining elements are "space
+    ///   filled" (§14.6.9.2 2)). The §8.5.1.9.5 NOTE licenses the view ("functionally identical to one where the intermediate
+    ///   occurrences are physically allocated and, if specified, initialized"), and <see cref="Overlay"/> recognises a store
+    ///   by a difference from that same image (determination D-VGB). A table without the phrase states no creation (its
+    ///   created content is "undefined") and shows the space fill, which no store of a numeric value matches.</item>
     /// </list>
     /// A pair the walk does not find compatible never reaches here — the bind-time screen or the run-time relation
     /// (<see cref="ActivationRelations.ParameterViolation"/>) refused it first — so one is an internal fault, raised
@@ -473,13 +475,17 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// element" and raises the capacity "to the value given by the subscript" (intermediate occurrences too).
     /// ⚠ DETERMINATION D-VGB (docs/CONFORMANCE.md §3; the rest is §8.5.1.12.3 sentence 3, which makes the pair the same
     /// length only "for purposes of determining compatibility"): the view showed each occurrence the argument lacks as the
-    /// table creates it (<see cref="Reshape"/>: its <paramref name="create"/> image, §8.5.1.9.5's INITIALIZED default when the
-    /// phrase is written; the space fill when the carrier states no creation), and only the finished view comes back, so a
-    /// store is recognised by its effect — the capacity becomes the highest occurrence whose image differs from the one
-    /// the view showed. The created occurrences therefore keep the default in every item the callee did not store, and the
-    /// intermediate ones are the default whole, as §8.5.1.9.5 requires. A callee that only READS the occurrences past the
-    /// capacity leaves it alone, and one that stores into an occurrence exactly the image the table creates leaves the
-    /// capacity as it was (the content is the same either way).</summary>
+    /// table creates it (<see cref="Reshape"/>: its <paramref name="create"/> image, §8.5.1.9.5's INITIALIZED default, when
+    /// the table writes the phrase; otherwise the space fill, since §8.5.1.9.5 leaves that content "undefined"), and only
+    /// the finished view comes back, so a store is recognised by its effect — the capacity becomes the highest occurrence
+    /// whose image differs from the one the view showed. The created occurrences of an INITIALIZED table therefore keep the
+    /// default in every item the callee did not store, and the intermediate ones are the default whole, as §8.5.1.9.5
+    /// requires; a table without the phrase sees every store but one of spaces (a numeric store never is). A callee that
+    /// only READS the occurrences past the capacity leaves it alone. ⚠ KNOWN DEPARTURE (kb/Work PB2690, REMAINING): a callee
+    /// that stores into an occurrence past the capacity exactly the image the view showed (spaces into a table without
+    /// INITIALIZED, the INITIALIZED default into one with it) leaves the CAPACITY as it was, where §8.5.1.9.3 raises it to the
+    /// subscript; the content is the same either way. Telling those stores apart needs the callee's receiving references,
+    /// which a finished image does not carry.</summary>
     private static string OverlaidTable(string was, string now, int elementChars, Func<int, CobolVarGroup>? create)
     {
         if (elementChars <= 0 || now.Length <= was.Length) return Overlaid(was, now);
@@ -497,8 +503,9 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// variable-length elements with (<see cref="OverlaidTable"/>'s rule one level up): the argument's
     /// <paramref name="current"/> count, or the highest occurrence of <paramref name="seen"/> past it that differs from
     /// what the view showed there — the created element (<paramref name="create"/>) seen in the formal's element shape
-    /// <paramref name="seenShape"/> (<see cref="Reshape"/>), or, when the carrier states no creation, the space fill: a
-    /// fixed-length element's carrier with a blank fixed run and no components.</summary>
+    /// <paramref name="seenShape"/> (<see cref="Reshape"/>), or, when the carrier states no creation (a table without
+    /// INITIALIZED), the space fill: a fixed-length element's carrier with a blank fixed run and no components. The same
+    /// known departure as <see cref="OverlaidTable"/>'s holds.</summary>
     private static int GrownCount(int current, CobolVarGroup[] seen, GroupAtom[] wasShape, GroupAtom[] seenShape,
         Func<int, CobolVarGroup>? create)
     {

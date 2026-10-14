@@ -616,7 +616,13 @@ of two carriers and two atom arrays, neither of which knew the table's default e
 `CobolDynTable`'s creation seed, an emitted C# expression). So the creation travels on the ARGUMENT's carrier:
 `CobolVarGroup.Created` holds, per component, the element its dynamic-capacity table creates at an occurrence number
 (`CobolDynTable.CreatedAs`, the same seed `RefReceiving` grows with), in the table's element shape — a nested element's
-carrier states its own inner creations. ⛔ ONE SIGNAL, ON THE DATA: only a BY REFERENCE crossing's builder states it
+carrier states its own inner creations. ⛔ Only a table that writes INITIALIZED states one (the emitted constructor
+passes the INITIALIZED seed exactly when the phrase is written, `ValueInitializer.DynTableNew`): without it §8.5.1.9.5
+leaves the created content "undefined", and the view keeps the space fill, which the write-back's effect test needs to
+see a store of the element's own VALUE (a numeric zero) at all (branch review finding R1-1). ⚠ The effect test's one
+residue is a known departure, kb/Work PB2690 REMAINING: a store of exactly the image the view showed (the INITIALIZED
+default, or SPACES without the phrase) leaves the CAPACITY unraised; closing it needs the callee's receiving references
+at the boundary, which a finished image does not carry. ⛔ ONE SIGNAL, ON THE DATA: only a BY REFERENCE crossing's builder states it
 (the emitted `AsVarImage(__byReference: true)`, `StorageCell.VarGroupAt(byReference: true)`, reached through
 `PlaceRenderer.VarGroupBoundaryImage(…, byReference: true)` from `CallEmitter.RefCarrier`, the typed INVOKE's write-back
 argument and copy-out, and the universal box), and the structural rebuilds of the same storage keep it (`Slice`, `Concat`,
@@ -628,7 +634,8 @@ nothing for it. A carrier that states a creation is therefore storage, and the c
 initialized") where a value's are the MOVE's space fill (§14.6.9.2 2)), and `Overlay` keeps the highest occurrence that
 differs from that image and builds each created one as the created element with the formal's stores over it
 (`OverlaidTable` for elements of fixed length, `OverlaidOccurrences` / `GrownCount` for variable-length ones). Goldens
-`2014/pb2690_initialized_created_occurrences_call` and `_invoke` (the typed and universal lanes and BY CONTENT); negative
+`2014/pb2690_initialized_created_occurrences_call` and `_invoke` (the typed and universal lanes, BY CONTENT, and a table
+without INITIALIZED whose callee stores the element's VALUE); negative
 `pb2690-initialized-created-occurrences-below-2014`; unit `BoundaryGroupCorrespondenceTests`.
 
 **An OCCURS DEPENDING group argument's two lengths.** §14.8.2.2: "For an argument or formal parameter that is

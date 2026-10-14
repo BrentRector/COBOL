@@ -577,8 +577,9 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             // occurrence carriers, null for a plain one; a spliced nested group's own list, every entry, in place.
             var elemParts = new List<string>();
             // Parallel to dynParts when the carrier holds a dynamic-capacity table (kb/Work PB2690): the element each
-            // table creates (ISO §8.5.1.9.5, CobolDynTable.CreatedAs), which a BY REFERENCE formal's fixed table sees past
-            // the capacity and creates from; null for a dynamic-length item; a spliced nested group's own list in place.
+            // INITIALIZED table creates (ISO §8.5.1.9.5, CobolDynTable.CreatedAs, null for a table without the phrase),
+            // which a BY REFERENCE formal's fixed table sees past the capacity and creates from; null for a dynamic-length
+            // item; a spliced nested group's own list in place.
             // Stated only for STORAGE (__byReference: a BY REFERENCE crossing's carrier) - a MOVE's sender and a BY CONTENT
             // copy are values, and allocate nothing for it.
             var createdParts = new List<string>();
