@@ -98,3 +98,16 @@ so one major covers both.
 R4-1 gate run `20261014T100113Z-d14226`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`; the new
 negative and positive, both earlier PB3132 negatives and the census and runtime-pin drift tests Passed in leg 1; semgrep
 verify PASS.
+
+**Finisher: the landing's Linux gate (two reds, both this branch's).** `enqueue.py land` stopped on 739b86210 with the
+Linux unit and conformance legs red. (1) `NulByteDriftTests.NoTrackedTextFileContainsANulByte`: the golden
+`2014/pb546_odo_national_tail.out` pinned the raw UTF-16BE bytes of `N"X"` and `N"Y"` (00 58, 00 59), two NULs, so every
+grep over the corpus read it as binary. The program now stores `NX"5831"` and `NX"5932"`, characters whose two bytes are
+both printable, so DISPLAY, the GR9 group MOVE and the record round trip still pin every byte of the image, as text. The
+drift test's hint `grep -c -P` counted 0 on a file holding a NUL (grep treats it as binary); it now says `grep -c -a -P`.
+(2) `IntrinsicFunctionDifferentialTests.StagedLoudResidue_FailsLoud_NeverWrong` pinned as a loud stage the very shape
+PB3030 closed (a runtime-length table beside a bit OCCURS DEPENDING table, now 0003 as the golden
+`2014/pb3030_bit_odo_variable_group` pins): a green test holding a closed gap open. It now proves the doctrine on the
+residue that is left, the ALIGNED OCCURS DEPENDING table of a GROUP-USAGE BIT group under LENGTH (§15.50.4 r1 counts
+boolean positions; PB2498). Neither red was in the Windows gate's leg 1: the NUL sweep is a Sweep class too dear for tier
+0c, and with no impact map the residue test was a leg-2 case; the landing's Linux whole-population legs caught both.
