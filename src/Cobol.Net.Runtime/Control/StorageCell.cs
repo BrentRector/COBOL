@@ -337,10 +337,10 @@ public sealed class StorageCell
                                 CobolVarGroup v, CellGroupShape?[]? elems = null, bool storage = false)
     {
         string run = v.Fixed;
-        if (tail.CutAt(count) is > 0 and var cut)
+        if (tail.Present && count < tail.Max)
         {
             string current = RunOf(fixedAt, width, dynFixedAt, dynTable);
-            run = CobolString.Store(run, current.Length)[..^cut] + current[^cut..];
+            run = tail.KeepUnused(CobolString.Store(run, current.Length), current, count);
         }
         StoreRun(fixedAt, width, dynFixedAt, dynTable, run);
         for (int k = 0, used = dynFixedAt.Length - tail.CutComponents(count); k < used; k++)
@@ -416,7 +416,7 @@ public sealed class StorageCell
         var units = new int[n];
         var max = new long[n];
         for (int k = 0; k < comps; k++) { at[k] = pos[k]; units[k] = dynTable[k] > 0 ? dynTable[k] : 1; max[k] = dynMax[k]; }
-        if (tableIsComponent) { at[comps] = runWidth - tail.Width; units[comps] = tail.Elem; max[comps] = tail.Max; }
+        if (tableIsComponent) { at[comps] = runWidth - tail.Width; units[comps] = tail.RecordUnit; max[comps] = tail.RecordMaxUnits; }
         int[]? structure = null;
         if (dynStructure.ContainsAnyExcept(0))
         {

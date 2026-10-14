@@ -352,22 +352,45 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     private static string OdoArgument(DataItem group) => DataItem.HasOdoBeneath(group) ? "__odo" : "";
 
     /// <summary>Where the OCCURS DEPENDING table lies in a member that holds it as its TRAILING storage
-    /// (§13.18.38.3 SR22): the character offset of the table within the member's image, one occurrence's width
-    /// and the maximum count. The member's CURRENT image is a character prefix of its maximum image — the same
-    /// law <c>OdoGroupPlace</c> applies to a fixed-length group operand (§13.18.38.4 GR8).</summary>
-    private static (int TailStart, int Elem, int Max) OdoGeometry(DataItem member, int memberWidth)
+    /// (§13.18.38.3 SR22), read off <see cref="OdoModel.GeometryOf"/>, THE ONE geometry <c>OdoGroupPlace</c> also reads
+    /// for a group operand (§13.18.38.4 GR8), so the member's CURRENT image is the same character prefix of its maximum
+    /// image the operand takes. ⛔ It used to take one occurrence's <see cref="DataItem.ImageWidth"/>, a national
+    /// element's POSITIONS, where the image holds its BYTES (kb/Work PB546's two widths).
+    /// <para>The table is counted in the member's own unit: CHARACTERS (bytes on the physical basis), or BITS when a
+    /// USAGE BIT leaf lies in the subtree (§8.5.1.6.3 places a bit item "at the next bit position in storage", so a bit
+    /// occurrence shares bytes and the current extent is <c>ceiling(bits / 8)</c> characters, §15.50.4 rule 9; kb/Work
+    /// PB3030). Every consumer asks this record, never the unit.</para></summary>
+    /// <param name="Tail">The table as the runtime states it (<see cref="OdoModel.FixedImageTail"/>).</param>
+    /// <param name="MemberWidth">The member's emitted field width in characters (its image at the maximum).</param>
+    private readonly record struct OdoMemberTail(OdoTail Tail, int MemberWidth)
     {
-        var table = DataItem.OdoTableOnOrBeneath(member)!;
-        int elem = table.ImageWidth, max = table.Occurs ?? 1;
-        return (memberWidth - elem * max, elem, max);
+        public static OdoMemberTail Of(VarPart p) =>
+            new(OdoModel.FixedImageTail(p.Item!, DataItem.OdoTableOnOrBeneath(p.Item!)!), p.Field.Width);
+
+        /// <summary>The member's extent in CHARACTERS at the count <paramref name="odo"/> (a C# expression): its
+        /// maximum image less the characters beyond the count (<c>OdoTail.CutAt</c>, the bit arm's ceiling included).</summary>
+        public string CurrentChars(string odo) => $"{MemberWidth} - {RuntimeApi.OdoTailCutAt(Tail, odo)}";
+
+        /// <summary>The table as the RECORD layout's last component (determination D-FRA (ix)): the character offset
+        /// in the member where it starts, its unit and the most units it holds (<c>OdoTail.RecordUnit</c> /
+        /// <c>RecordMaxUnits</c>: one element per unit, or one CHARACTER per unit for a table counted in bits, whose
+        /// occurrences have no character boundary of their own).</summary>
+        public (int StartChar, int Unit, int MaxUnits) RecordTail => (MemberWidth - Tail.Width, Tail.RecordUnit, Tail.RecordMaxUnits);
+
+        /// <summary>The C# statement that keeps the member's occurrences past the RECEIVING count <c>__odo</c>
+        /// (§13.18.38.4 GR8 a): the received fixed run <c>__s</c>, whose member starts at character
+        /// <paramref name="off"/>, takes the member's own content (<paramref name="ownImage"/>) from the first unused
+        /// occurrence on — <c>OdoTail.KeepUnused</c>, the one splice a cell-backed group's store asks too (a bit window
+        /// for a table counted in bits, whose first unused occurrence may start inside a character).</summary>
+        public string KeepUnusedOccurrences(int off, string ownImage) =>
+            $"if (__odo < {Tail.Max}) __s = __s[..{off}] + "
+            + RuntimeApi.OdoTailKeepUnused(Tail, $"__s.Substring({off}, {MemberWidth})", ownImage, "__odo")
+            + $" + __s[{off + MemberWidth}..];";
     }
 
     /// <summary>The image of a member holding the OCCURS DEPENDING table, truncated to the table's current count.</summary>
-    private static string OdoPrefixImage(VarPart p)
-    {
-        var (tailStart, elem, _) = OdoGeometry(p.Item!, p.Field.Width);
-        return $"{AsImageOf(p.Field)}.Substring(0, {tailStart} + __odo * {elem})";
-    }
+    private static string OdoPrefixImage(VarPart p) =>
+        $"{AsImageOf(p.Field)}.Substring(0, {OdoMemberTail.Of(p).CurrentChars("__odo")})";
 
     private string CurrentPartImage(VarPart p) => p.Kind switch
     {
@@ -503,9 +526,23 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     || DataItem.HasOdoOnOrBeneath(c)))
             .ToDictionary(c => c.CsName, StringComparer.Ordinal);
         var parts = new List<VarPart>();
+        var runContinuations = new HashSet<string>(StringComparer.Ordinal);
         foreach (var f in phys.PhysicalChildrenOf(group))
         {
-            if (!composite.TryGetValue(f.Name, out var d))
+            // ⛔ A §8.5.1.6.3 RUN IS ONE SLICE, AT ITS LEADER'S FIELD (PhysicalModel.Physical.BitRun), so the member a
+            // run holds is classified THERE: an OCCURS DEPENDING table that continues a run (05 B PIC 1 USAGE BIT.
+            // 05 TB PIC 1 USAGE BIT OCCURS 1 TO 16 DEPENDING ON N.) lives in the leader's characters, which are then
+            // the OdoFixed part, cut to the table's count; the continuation's own field holds nothing (kb/Work PB2921
+            // review R1-1: classifying the empty continuation cut "" at a negative length while the leader packed
+            // the whole run at the maximum). SR22 makes the table the run's last member.
+            DataItem? d;
+            if (f.BitRun is { } run)
+            {
+                foreach (var m in run.Skip(1)) runContinuations.Add(m.CsName);
+                d = run.Select(m => composite.GetValueOrDefault(m.CsName)).LastOrDefault(x => x is not null);
+            }
+            else d = runContinuations.Contains(f.Name) ? null : composite.GetValueOrDefault(f.Name);
+            if (d is null)
             {
                 parts.Add(new VarPart(VarPartKind.Fixed, f, null, f.Width, 0));
                 continue;
@@ -522,15 +559,16 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     }
 
     /// <summary>The OCCURS DEPENDING table the group holds as its trailing storage (§13.18.38.3 SR22), as its record
-    /// layout states it (<c>CobolContiguousLayout</c>'s <c>Odo</c>; kb/Work PB244, PB2497): one occurrence's width in
-    /// the FIXED run, the maximum count, and how many variable-length components one occurrence holds — zero for
-    /// elements of a fixed image, whose table the layout makes its LAST component (taken out of the fixed run, one
-    /// element per unit), and the element's own component count for variable-length elements, whose components the
-    /// layout lists at the maximum (<see cref="VarPartKind.OdoTable"/>, flattened in place). <c>default</c> for a group
-    /// without one.</summary>
+    /// layout states it (<c>CobolContiguousLayout</c>'s <c>Odo</c>; kb/Work PB244, PB2497): for elements of a fixed
+    /// image <see cref="OdoModel.FixedImageTail"/> over the member that holds it (<see cref="OdoModel.ImageHolder"/>, the
+    /// <see cref="VarPartKind.OdoFixed"/> part), which the layout makes its LAST component, taken out of the fixed run
+    /// (<see cref="OdoMemberTail.RecordTail"/>); for variable-length elements one occurrence's fixed run, the maximum
+    /// count and the element's own component count, whose components the layout lists at the maximum
+    /// (<see cref="VarPartKind.OdoTable"/>, flattened in place). <c>default</c> for a group without one.</summary>
     private OdoTail RecordOdo(DataItem group) =>
         OdoModel.TableUnder(group) is not { } t ? default
-        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t) ? new OdoTail(t.ImageWidth, t.Occurs ?? 1)
+        : !CobolNet.Binding.ReferenceResolver.HasVariableLengthSubordinate(t)
+            ? OdoModel.FixedImageTail(OdoModel.ImageHolder(group, t), t)
         : new OdoTail(VarFixedWidth(t), t.Occurs ?? 1, VarComponentCount(t));
 
     /// <summary>The character width of a variable-length group's FIXED run — its image with every
@@ -694,9 +732,7 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                             // §13.18.38.4 GR8 a): only the first __odo occurrences are used, so the table's remaining
                             // occurrences keep the content they have (the carrier's fixed run is spliced over the member's
                             // CURRENT image from the first unused occurrence on).
-                            var (tailStart, elem, max) = OdoGeometry(p.Item!, p.Field.Width);
-                            w.Line($"if (__odo < {max}) __s = __s[..({off + tailStart} + __odo * {elem})] + "
-                                + $"{AsImageOf(p.Field)}[({tailStart} + __odo * {elem})..] + __s[{off + p.Field.Width}..];");
+                            w.Line(OdoMemberTail.Of(p).KeepUnusedOccurrences(off, AsImageOf(p.Field)));
                         }
                         EmitMemberFromImage(p.Field, off, w);
                         off += p.Field.Width;
@@ -787,12 +823,12 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
                     off += p.FixedWidth;
                     break;
                 case VarPartKind.OdoFixed:
-                    // The OCCURS DEPENDING table is a variable-length COMPONENT of the record: one element per
-                    // unit, up to its maximum. §13.18.38.3 SR22 makes it the record's trailing storage, so it is
-                    // the last component and the record's own length says how many occurrences it holds.
-                    var (tailStart, elem, max) = OdoGeometry(p.Item!, p.Field.Width);
-                    layout.Add((off + tailStart, elem, max, 0));
-                    off += p.Field.Width - elem * max;   // the table itself leaves the FIXED run
+                    // The OCCURS DEPENDING table is a variable-length COMPONENT of the record, up to its maximum
+                    // (OdoMemberTail.RecordTail: one element per unit, or one character per unit for a table counted
+                    // in bits). §13.18.38.3 SR22 makes it the record's trailing storage, so it is the last component.
+                    var (startChar, unit, maxUnits) = OdoMemberTail.Of(p).RecordTail;
+                    layout.Add((off + startChar, unit, maxUnits, 0));
+                    off += startChar;   // the table itself leaves the FIXED run
                     break;
                 default:
                     throw ImageOnlyPartInCarrier(p);

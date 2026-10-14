@@ -646,6 +646,8 @@ internal sealed class BinderDriver
         var data = new DataBinder(edition)
         {
             OoClasses = session.OoClasses,
+            // The unit's own §8.3.2.2 census, the one its class-name references record into too (kb/Work PB3132).
+            OwnWords = session.OoClasses.CensusOf(unit.Ctx.identificationDivision()) ?? new(),
             RefModZeroLength = session.RefModZeroLength,
             CobolWords = session.CobolWords,   // >>COBOL-WORDS intrinsic-function-name synonym/removal (§7.3.10)
             Retypes = session.Retypes,         // the fragment re-parses read words as the tree does (kb/Work PB655)

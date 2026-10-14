@@ -117,10 +117,28 @@ public static class OoNameResolution
     /// <summary>The NON-DIAGNOSING half, for the sites that PARTITION on "is this word a class-name here?" —
     /// the PROCEDURE DIVISION / METHOD-ID RAISING word that may instead be an exception-name (§14.2.2 SR7 vs
     /// SR8/SR9), and INVOKE's receiver, which may instead be an identifier. The partition uses the SAME scoped
-    /// set: a class the source element cannot reference is not a class-name in that position.</summary>
+    /// set: a class the source element cannot reference is not a class-name in that position.
+    /// <para>A name that resolves is a USE of the word as that type in the referring source element, which that
+    /// element's §8.3.2.2 census records (<see cref="OoClassTable.RecordReferenceUse"/>, kb/Work PB3132): the one thing
+    /// this half reports, and only for a word the element has made two types. A parameter-name is recorded as the
+    /// type its own definition's REPOSITORY specifier declares it (§11.3.3 SR8 / §11.6.3 SR4 require that specifier),
+    /// which is how the binder that binds the definition as itself declares the word (an object-class-name or an
+    /// interface-name; <c>OoExpansion</c>'s kb/Work PB1744 scope is where it is a parameter-name), so the definition's
+    /// own references to its formal agree with its declaration of it.</para></summary>
     public static Result Lookup(OoClassTable? table, RuleContext? site, string name, Want want)
     {
         if (table is null) return default;
+        var found = Find(table, site, name, want);
+        if (found.IsFormal || found.Ok)
+            table.RecordReferenceUse(site, name,
+                found.Class is not null || found.IsFormal && table.RepositoryScopeFor(site).DeclaresClass(name)
+                    ? UserWordKind.ObjectClassName : UserWordKind.InterfaceName);
+        return found;
+    }
+
+    /// <summary>The resolution <see cref="Lookup"/> answers, before it records the use.</summary>
+    private static Result Find(OoClassTable table, RuleContext? site, string name, Want want)
+    {
         var scope = table.RepositoryScopeFor(site);
         // A parameter-name of the enclosing parameterized definition, in a position of the kind its own REPOSITORY
         // specifier declares (§11.3.3 SR8 / §11.6.3 SR4 make that declaration mandatory, and OoExpansion reports its

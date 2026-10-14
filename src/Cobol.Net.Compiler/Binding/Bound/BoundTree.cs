@@ -138,7 +138,7 @@ public abstract record BoundEoOperand;
 /// <summary>The object-class-name-1 alternative — ISO §14.9.49.3 SR16, selected by §14.9.49.4 GR14 a): the
 /// exception object "is a factory object or instance object of object-class-name-1 or of a subclass of
 /// object-class-name-1". ONE clause naming BOTH object kinds, and a COBOL class is emitted as TWO DISJOINT C#
-/// hierarchies (the instance class and its sibling <c>…__FACTORY</c> singleton, each rooted at its base's
+/// hierarchies (the instance class and its sibling <c>__FACTORY_…</c> singleton, each rooted at its base's
 /// corresponding half) — so one COBOL class-name selects a SET of C# types, and the selector renders
 /// <see cref="Compiler.Oo.OoClassSymbol.FactoryOrInstanceCsTypes"/>, the ONE census, as one C# or-pattern
 /// (kb/Work PB366: testing only the instance half selected no declarative for any factory exception object,
