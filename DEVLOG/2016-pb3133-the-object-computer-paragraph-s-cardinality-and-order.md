@@ -1,4 +1,4 @@
-## PB3133: the OBJECT-COMPUTER paragraph's cardinality and order have ONE reader, the clause table; PB3132 retired (its repro is already refused)
+## Entry 2016 — 2026-10-13 22:29 PDT — PB3133: the OBJECT-COMPUTER paragraph's cardinality and order have ONE reader, the clause table; PB3132 retired (its repro is already refused)
 
 Wave 1072, group D (the data binder: PB3132, PB3133).
 
@@ -66,3 +66,4 @@ figure and `EveryChoiceIndicatorFigure_IsOrderFree` ties the flag to an absent `
 **Review round 2 (R2-1, a comment).** The binder comment in `DataBinder.Switches.cs` still said the OBJECT-COMPUTER repeat is
 COBOLNET2423; round 1 had moved the 2002+ repeat to COBOLNET2104. It now names both codes by figure. Swept every
 COBOLNET2423 mention under src/ and docs/: the rest describe the 85 figure, the OPTIONS paragraph or RD brackets, and are true.
+
