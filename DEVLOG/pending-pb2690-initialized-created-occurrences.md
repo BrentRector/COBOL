@@ -79,5 +79,7 @@ at the boundary, a change to the CALL/INVOKE ABI beyond this slice. It is no lon
 to `half` with it as REMAINING, and D-VGB names it a known departure.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261014T012409Z-986e91; Conformance
-5,903/11,546, Unit 32,552/33,499, Characterization 7/36 ran in leg 1); the review finisher's re-gate: GATE_PLACEHOLDER.
+5,903/11,546, Unit 32,552/33,499, Characterization 7/36 ran in leg 1); the review finisher's re-gate:
+`=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261014T024145Z-533a73; Conformance
+5,905/11,544, Unit 32,552/33,501, Characterization 7/36 ran in leg 1).
 The Linux gate is the landing's (batched gating).
