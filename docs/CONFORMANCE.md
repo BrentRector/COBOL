@@ -2102,7 +2102,7 @@ reallocated).
    > refused by name — PB78 — and the phrases — PB25 — until T5). `CHARACTER CLASSIFICATION [IS] locale-phrase-1
    > [locale-phrase-2] | FOR ALPHANUMERIC IS … | FOR NATIONAL IS …`, each phrase `locale-name | LOCALE |
    > SYSTEM-DEFAULT | USER-DEFAULT` (§12.3.6.2; §12.3.6.3 SR3 — COBOLNET1664 for an undeclared name; at most once —
-   > COBOLNET1652; inherited by contained units, §12.3.6.4 GR1), is RESOLVED AT EACH ACTIVATION of the module
+   > COBOLNET2104 `choice-alternative-repeated`, counted by the `ClauseCardinalities` OBJECT-COMPUTER row, §5.2.6.4; inherited by contained units, §12.3.6.4 GR1), is RESOLVED AT EACH ACTIVATION of the module
    > (§12.3.6.4 GR5 a–j; GR8 "effective with the initial state of the runtime modules"; §14.6.6 r2) into the module's
    > classification — `LOCALE` is the locale current at THAT activation, and a later `SET LOCALE LC_CTYPE` does not
    > move it. Its two consumers (GR7): `UPPER-CASE` / `LOWER-CASE` without a phrase map through the classification
