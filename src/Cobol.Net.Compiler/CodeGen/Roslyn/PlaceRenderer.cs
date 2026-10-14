@@ -1086,7 +1086,7 @@ internal static class PlaceRenderer
     /// is the group's own — BIT positions for a subtree holding USAGE BIT leaves (§8.5.1.6.3; kb/Work PB173),
     /// character positions otherwise — so this is the extent the <c>AsBits</c>/<c>FromBits</c> channel slices at.</summary>
     public static string LengthExpr(OdoGroupPlace p) =>
-        RuntimeApi.TableOdoExtent(CountRead(p.Depending), p.MinOccurs, p.MaxOccurs, p.FixedUnits, p.ElemUnits);
+        RuntimeApi.TableOdoExtentTrimmed(CountRead(p.Depending), p.MinOccurs, p.MaxOccurs, p.FixedUnits, p.ElemUnits, p.TrailingUnits);
 
     /// <summary>The same extent in CHARACTER positions — <see cref="LengthExpr"/> rounded up (the identity when the
     /// positions already ARE characters). This is what the <c>AsImage</c>/<c>FromImage</c> channel slices at.</summary>
