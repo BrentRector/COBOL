@@ -546,9 +546,9 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
             // raised — so a RESUME AT procedure-name (§14.9.33.4 GR3) leaves the file closed, a declarative sees
             // the updated status, and a RESUME NEXT STATEMENT falls straight to the next implicit CLOSE. Raising
             // it before the close (the pre-PB893 shape) let a RESUME AT transfer out with the file still open.
-            // The checking state is the statement's >>TURN (bind-time, BoundClose).
+            // The checking state is the statement's enabled set (EcBinder.NodeKindRaises declares the name on BoundClose).
             string? active = null;
-            if (c.ReportNotTerminatedCheck
+            if (ec.Enabled("EC-REPORT-NOT-TERMINATED")
                 && ctx.Data.VisibleReports.Where(r => ReferenceEquals(r.File, file)).ToList() is { Count: > 0 } reports)
             {
                 active = $"__rptAct{ctx.Names.NextEc()}";

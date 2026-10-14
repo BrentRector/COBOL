@@ -167,6 +167,15 @@ of an unsupported facility.
   fatal default, `EcEmitter.EmitSelection` (and the EC-I-O arm of `__IoCheckEc`, which §14.6.13.1.3 3) sends on to
   6)), with the element's ON/OFF folded by `PropagateState`.
 
+- **D-GLOBAL-EXIT — EC-FLOW-GLOBAL-EXIT is never set** (kb/Work PB3102). §14.6.13.1.6 Table 13 names it ("EXIT PROGRAM
+  in a global Declarative") as a Fatal condition, and §14.6.13.1.3 6) mentions it beside EC-FLOW-GLOBAL-GOBACK, but the
+  standard states no general rule that SETS it. The sibling is set by §14.9.18.4 GR6 (a GOBACK executed within the range
+  of a global declarative); §14.9.14.4 GR3 gives an EXIT PROGRAM only GOBACK's GR3 and GR4, not GR6, and the one
+  normative statement about EXIT PROGRAM in a global declarative is §14.9.14.3 SR2, which the compiler enforces at compile
+  time. The name is catalogued and accepted wherever an exception-name may be written, and the implementation never
+  raises it: inventing a raise site for a condition the standard never sets would be behaviour with no rule behind it.
+  Held by `unit:EcRaiseSiteRegistryDriftTests.EveryCataloguedLevel3Name_IsDeclaredAndRaised_OrDeclinedWithAReason`.
+
 - **D-TW1 — a period, comma or semicolon written immediately before a closing pseudo-text delimiter is a
   SEPARATOR, so `==STOP RUN.==` holds the text-words `STOP` `RUN` `.`** (kb/Work PB1350). §8.3.5 2)/3) make those
   characters separators only "when followed by a space", and read literally `RUN.==` would form the one text-word

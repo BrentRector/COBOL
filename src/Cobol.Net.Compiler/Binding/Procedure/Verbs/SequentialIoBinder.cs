@@ -129,12 +129,11 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
                 : BoundCloseKind.Normal;
             closes.Add((file, kind));
         }
-        // §14.9.6.4 GR5 (report files): the raise site is the emitter's; the CHECKING state is bind-time.
-        bool rnt = ctx.EcState.Turn.Enabled("EC-REPORT-NOT-TERMINATED", null, c.Start.Line);
         // ISO §14.9.6.4 GR10 — one implicit CLOSE statement per file-name, in source order, with "processing
-        // resumes at the next implicit CLOSE statement, if any" as the resumption point (kb/Work PB419).
-        return BoundImplicitSeries.Of([.. closes.Select(f =>
-            (BoundStatement)new BoundClose([f]) { ReportNotTerminatedCheck = rnt })]);
+        // resumes at the next implicit CLOSE statement, if any" as the resumption point (kb/Work PB419). The
+        // §14.9.6.4 GR5 raise site is the emitter's, and its CHECKING state is the statement's enabled set like every
+        // other raise (EcBinder.NodeKindRaises declares EC-REPORT-NOT-TERMINATED on BoundClose; kb/Work PB3102).
+        return BoundImplicitSeries.Of([.. closes.Select(f => (BoundStatement)new BoundClose([f]))]);
     }
 
     /// <summary>⛔ THE ONE SITE for Annex A.4.13 — the declined <c>FILE file-name-1</c> alternative of

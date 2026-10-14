@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Unit;
 /// specified in the function definition … the EC-ARGUMENT-FUNCTION exception condition is set to exist" — with no
 /// statement-kind qualification anywhere in it.
 ///
-/// <para><b>What went wrong.</b> <c>EcBinder.DirectIntrinsic</c> was a hand-written switch over ~17 statement
+/// <para><b>What went wrong.</b> The former <c>EcBinder.DirectIntrinsic</c> was a hand-written switch over ~17 statement
 /// kinds ending in <c>_ => false</c>, so the gate reached a statement only if someone had remembered its arm:
 /// <c>FUNCTION LOG10(0)</c> raised in COMPUTE/MOVE/DISPLAY/IF and was SILENT in STRING. The list is now the
 /// generated <c>BoundStatementTree.OwnValueParts</c>, discovered from the semantic model.</para>
