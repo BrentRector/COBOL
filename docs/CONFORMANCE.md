@@ -1582,7 +1582,9 @@ of an unsupported facility.
   that does "not occupy the same storage area as the argument" (§14.2.3 GR9), filled as by a MOVE, so past the sending
   capacity its fixed table holds the MOVE's space fill (§14.6.9.2 2)) and nothing returns. The same law holds one level
   down for a dynamic-capacity table nested in an element (a created element is the table's created element, its own inner
-  table at its creation, with the formal's element stored over it), and across an INVOKE, the universal lane included
+  table at its creation, with the formal's element stored over it, whichever of the pair's outer tables is the variable
+  one), including a fixed table nested in an occurrence of the formal's OWN dynamic-capacity table, whose stores are
+  recorded by their subscript path, and across an INVOKE, the universal lane included
   (`CobolVarGroup.Reshape` / `Overlay`'s `OverlaidTable` / `GrownCount` / `OverlaidOccurrences`, shared by the CALL and
   INVOKE boundaries). A fixed-length ARGUMENT cannot grow (it has no more occurrences). The ISO text decides the arm that
   matters, so no vendor behavior was consulted (CLAUDE.md rule 1). Witnesses:

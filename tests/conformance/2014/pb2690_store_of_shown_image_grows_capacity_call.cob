@@ -56,6 +56,30 @@
       *>       reference is recorded and no element is created:
       *>       every phrase runs (QEGF)                          = QEGF, 1
       *>   DZ  the same four statements made in the caller     = QEGF, 1
+      *>   GW  a formal whose OWN table is dynamic, of elements
+      *>       (FY, FI OCCURS 3), opposite elements (WY, WI
+      *>       DYNAMIC FROM 1): the callee stores SPACE into FE
+      *>       (1, 3), a receiving reference to WI (3) of WO (1),
+      *>       so WI's capacity in WO (1) becomes 3; the outer
+      *>       capacity stays 1. Shown: capacity, then FUNCTION
+      *>       LENGTH (WO (1)) = 1 + 3                           = 1 4
+      *>   GI  GW with the inner table INITIALIZED (IE "i"); the
+      *>       callee stores the default "i" into FE (1, 3)    = iii, 1 4
+      *>   GX  GW, but the callee stores "Q" into FE (2, 1): the
+      *>       formal's own table creates occurrence 2, so the
+      *>       argument's does (8.5.1.9.3), and only XI (1) of it
+      *>       is referenced: XI's capacity there stays 1, never
+      *>       the formal's fixed count 3. Shown: XE (2, 1),
+      *>       capacity, LENGTH (XO (2)) = 1 + 1               = Q, 2 2
+      *>   GF  GX through a formal whose OUTER table is fixed
+      *>       (OCCURS 2): the same reference, the same result  = Q, 2 2
+      *>   GD  a third level: dynamic of dynamic of (FY, FI
+      *>       OCCURS 3) opposite dynamic of dynamic of (DY, DI
+      *>       DYNAMIC); SPACE into FE (1, 1, 3). Shown: LENGTH
+      *>       (DP (1, 1)) = 1 + 3                               = 4
+      *>   DW  the stores of GW and GX made in the caller.
+      *>       Shown: capacity, LENGTH (DWO (1)), LENGTH
+      *>       (DWO (2))                                         = 2 4 2
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690SG.
        DATA DIVISION.
@@ -136,6 +160,44 @@
              10 DZE PIC Z9 VALUE " 7".
              10 DZG PIC +9.9E+99 VALUE "+1.0E+00".
              10 DZF USAGE COMP-1 VALUE 0.
+       01 GW.
+          05 WX PIC X VALUE "x".
+          05 WO OCCURS DYNAMIC CAPACITY IN CWO FROM 1.
+             10 WY PIC X.
+             10 WI OCCURS DYNAMIC CAPACITY IN CWI FROM 1.
+                15 WE PIC X.
+       01 GI.
+          05 IX PIC X VALUE "x".
+          05 IO OCCURS DYNAMIC CAPACITY IN CIO FROM 1.
+             10 IY PIC X.
+             10 II OCCURS DYNAMIC CAPACITY IN CII FROM 1
+                INITIALIZED.
+                15 IE PIC X VALUE "i".
+       01 GX.
+          05 XX PIC X VALUE "x".
+          05 XO OCCURS DYNAMIC CAPACITY IN CXO FROM 1.
+             10 XY PIC X.
+             10 XI OCCURS DYNAMIC CAPACITY IN CXI FROM 1.
+                15 XE PIC X.
+       01 GF.
+          05 FFX PIC X VALUE "x".
+          05 FFO OCCURS DYNAMIC CAPACITY IN CFFO FROM 1.
+             10 FFY PIC X.
+             10 FFI OCCURS DYNAMIC CAPACITY IN CFFI FROM 1.
+                15 FFE PIC X.
+       01 GD.
+          05 DDX PIC X VALUE "x".
+          05 DDO OCCURS DYNAMIC CAPACITY IN CDDO FROM 1.
+             10 DP OCCURS DYNAMIC CAPACITY IN CDP FROM 1.
+                15 DDY PIC X.
+                15 DDI OCCURS DYNAMIC CAPACITY IN CDDI FROM 1.
+                   20 DDE PIC X.
+       01 DW.
+          05 DWX PIC X VALUE "x".
+          05 DWO OCCURS DYNAMIC CAPACITY IN CDWO FROM 1.
+             10 DWY PIC X.
+             10 DWI OCCURS DYNAMIC CAPACITY IN CDWI FROM 1.
+                15 DWE PIC X.
        PROCEDURE DIVISION.
        MAIN.
            CALL "PB2690SA" AS NESTED USING GA
@@ -197,6 +259,28 @@
            END-COMPUTE
            MOVE CDZ TO WS-C
            DISPLAY "DZ=[" WS-SE "] " WS-C
+           CALL "PB2690W1" AS NESTED USING GW
+           MOVE CWO TO WS-C
+           DISPLAY "GW=" WS-C " " FUNCTION LENGTH (WO (1))
+           CALL "PB2690W2" AS NESTED USING GI
+           MOVE CIO TO WS-C
+           DISPLAY "GI=[" IE (1, 1) IE (1, 2) IE (1, 3) "] " WS-C
+               " " FUNCTION LENGTH (IO (1))
+           CALL "PB2690W3" AS NESTED USING GX
+           MOVE CXO TO WS-C
+           DISPLAY "GX=[" XE (2, 1) "] " WS-C
+               " " FUNCTION LENGTH (XO (2))
+           CALL "PB2690W4" AS NESTED USING GF
+           MOVE CFFO TO WS-C
+           DISPLAY "GF=[" FFE (2, 1) "] " WS-C
+               " " FUNCTION LENGTH (FFO (2))
+           CALL "PB2690W5" AS NESTED USING GD
+           DISPLAY "GD=" FUNCTION LENGTH (DP (1, 1))
+           MOVE SPACE TO DWE (1, 3)
+           MOVE "Q" TO DWE (2, 1)
+           MOVE CDWO TO WS-C
+           DISPLAY "DW=" WS-C " " FUNCTION LENGTH (DWO (1))
+               " " FUNCTION LENGTH (DWO (2))
            STOP RUN.
 
        IDENTIFICATION DIVISION.
@@ -403,4 +487,85 @@
            END-COMPUTE
            GOBACK.
        END PROGRAM PB2690SZ.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690W1.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LW.
+          05 LWX PIC X.
+          05 LWO OCCURS DYNAMIC CAPACITY IN CLWO FROM 1.
+             10 LWY PIC X.
+             10 LWI OCCURS 3.
+                15 LWE PIC X.
+       PROCEDURE DIVISION USING LW.
+       MAIN.
+           MOVE SPACE TO LWE (1, 3)
+           GOBACK.
+       END PROGRAM PB2690W1.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690W2.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LW.
+          05 LWX PIC X.
+          05 LWO OCCURS DYNAMIC CAPACITY IN CLWO FROM 1.
+             10 LWY PIC X.
+             10 LWI OCCURS 3.
+                15 LWE PIC X.
+       PROCEDURE DIVISION USING LW.
+       MAIN.
+           MOVE "i" TO LWE (1, 3)
+           GOBACK.
+       END PROGRAM PB2690W2.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690W3.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LW.
+          05 LWX PIC X.
+          05 LWO OCCURS DYNAMIC CAPACITY IN CLWO FROM 1.
+             10 LWY PIC X.
+             10 LWI OCCURS 3.
+                15 LWE PIC X.
+       PROCEDURE DIVISION USING LW.
+       MAIN.
+           MOVE "Q" TO LWE (2, 1)
+           GOBACK.
+       END PROGRAM PB2690W3.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690W4.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LW.
+          05 LWX PIC X.
+          05 LWO OCCURS 2.
+             10 LWY PIC X.
+             10 LWI OCCURS 3.
+                15 LWE PIC X.
+       PROCEDURE DIVISION USING LW.
+       MAIN.
+           MOVE "Q" TO LWE (2, 1)
+           GOBACK.
+       END PROGRAM PB2690W4.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690W5.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LW.
+          05 LWX PIC X.
+          05 LWO OCCURS DYNAMIC CAPACITY IN CLWO FROM 1.
+             10 LWP OCCURS DYNAMIC CAPACITY IN CLWP FROM 1.
+                15 LWY PIC X.
+                15 LWI OCCURS 3.
+                   20 LWE PIC X.
+       PROCEDURE DIVISION USING LW.
+       MAIN.
+           MOVE SPACE TO LWE (1, 1, 3)
+           GOBACK.
+       END PROGRAM PB2690W5.
        END PROGRAM PB2690SG.

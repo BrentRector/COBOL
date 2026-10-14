@@ -63,3 +63,21 @@ caller's capacity to 3 where ISO §14.7.5 SIZE ERROR rule 2) and the caller's ow
 so `_call` gains lanes GZ (the callee's four ON SIZE ERROR stores: fixed numeric, numeric-edited, floating-point edited,
 COMP-1) and DZ (the same four in the caller), both `[QEGF] 1`. A mutation check confirmed that the lane bites: with the
 braces removed, GZ printed 3.
+
+**Branch review of wave 1078 A, round 1 (R1-1, a wrong answer one scope down).** The receiving-reference record covered
+only the formal area's own cell. A fixed table nested in an occurrence of the formal's OWN dynamic-capacity table lives
+in that occurrence's element cell, so `PlaceRenderer.Received` skipped the store (it required the cell path to be the
+bare root) and `CobolVarGroup.Overlay` handed no record to a dynamic-opposite-dynamic pair. The reviewer's probe: a
+callee's `MOVE SPACE TO FE (1, 3)` (formal `FO OCCURS DYNAMIC` of `FY, FI OCCURS 3`, argument `NOT1 OCCURS DYNAMIC` of
+`NY, NI OCCURS DYNAMIC FROM 1`) printed `FUNCTION LENGTH (NOT1 (1))` = 2 where ISO §8.5.1.9.3 and the caller's own twin
+give 4. The re-probe also found the sibling arm: an occurrence the argument lacked (created by the formal's own table, or
+by a formal whose outer table is fixed) was the formal's element RESHAPED, so its nested table took the formal's fixed
+count 3 even when the callee referenced only its first occurrence (`LENGTH` 4, expected 2).
+Fix: a store into an element cell is recorded on the AREA's cell, keyed by the subscript path it took (each level's
+component ordinal and occurrence number; `StorageCell.Received(path, at, width)`, emitted by `PlaceRenderer.ReceivedScope`),
+so an element cell the store itself created is covered; `ReceivingReferences` became a view over a tree of scopes with
+`Element(component, occurrence)`; `Overlay` passes each occurrence its own record (`TableReferences`, fixed or dynamic
+table), and every occurrence the argument lacked is the argument's created element (the INITIALIZED default, else the new
+`SpaceFilled`) with the formal's element stored over it. Goldens: `_call` lanes GW `1 4`, GI `[iii] 1 4`, GX `[Q] 2 2`,
+GF `[Q] 2 2`, GD `4` and the caller twin DW `2 4 2`; `_invoke` lanes NW `1 4`, NU `1 4`, NX `2 2`. On the reviewed
+head the same lanes printed GW `1 2`, GI `1 2`, GX `2 4`, GF `2 4`, GD `2`, NW `1 2`, NU `1 2`, NX `2 4`.

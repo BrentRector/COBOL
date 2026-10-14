@@ -32,6 +32,15 @@
       *>       into its LE (3) before passing it on            = ab ab ab, 3
       *>   TO  an OCCURS DEPENDING formal passed on to the same
       *>       method through the typed reference SELF          = 1
+      *>   NW  a formal whose OWN table is dynamic, of elements
+      *>       (FY, FI OCCURS 3), opposite elements (WY, WI
+      *>       DYNAMIC FROM 1); the method stores SPACE into
+      *>       LNE (1, 3), a receiving reference to WI (3) of
+      *>       WO (1). Shown: capacity, LENGTH (WO (1)) = 1 + 3  = 1 4
+      *>   NU  NW through a universal object reference         = 1 4
+      *>   NX  NW, but the method stores "Q" into LNE (2, 1):
+      *>       occurrence 2 is created and only XI (1) of it is
+      *>       referenced. Shown: capacity, LENGTH (XO (2))     = 2 2
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690SGI.
        ENVIRONMENT DIVISION.
@@ -85,6 +94,24 @@
           05 TTB OCCURS DYNAMIC CAPACITY IN CTO FROM 1 INITIALIZED.
              10 TQE PIC X VALUE "a".
              10 TQF PIC X VALUE "b".
+       01 GNW.
+          05 WX PIC X VALUE "x".
+          05 WO OCCURS DYNAMIC CAPACITY IN CWO FROM 1.
+             10 WY PIC X.
+             10 WI OCCURS DYNAMIC CAPACITY IN CWI FROM 1.
+                15 WE PIC X.
+       01 GNU.
+          05 NUX PIC X VALUE "x".
+          05 NUO OCCURS DYNAMIC CAPACITY IN CNUO FROM 1.
+             10 NUY PIC X.
+             10 NUI OCCURS DYNAMIC CAPACITY IN CNUI FROM 1.
+                15 NUE PIC X.
+       01 GNX.
+          05 XX PIC X VALUE "x".
+          05 XO OCCURS DYNAMIC CAPACITY IN CXO FROM 1.
+             10 XY PIC X.
+             10 XI OCCURS DYNAMIC CAPACITY IN CXI FROM 1.
+                15 XE PIC X.
        PROCEDURE DIVISION.
        MAIN.
            INVOKE PB2690SK3 "NEW" RETURNING O
@@ -121,6 +148,15 @@
            INVOKE O "PASSONT" USING GTO
            MOVE CTO TO WS-C
            DISPLAY "TO=" WS-C
+           INVOKE O "STORENW" USING GNW
+           MOVE CWO TO WS-C
+           DISPLAY "NW=" WS-C " " FUNCTION LENGTH (WO (1))
+           INVOKE U "STORENW" USING GNU
+           MOVE CNUO TO WS-C
+           DISPLAY "NU=" WS-C " " FUNCTION LENGTH (NUO (1))
+           INVOKE O "STORENX" USING GNX
+           MOVE CXO TO WS-C
+           DISPLAY "NX=" WS-C " " FUNCTION LENGTH (XO (2))
            STOP RUN.
        END PROGRAM PB2690SGI.
 
@@ -243,6 +279,34 @@
        MAIN-P.
            CONTINUE.
        END METHOD TAKEDYN9.
+
+       METHOD-ID. STORENW.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LN.
+          05 LNX PIC X.
+          05 LNO OCCURS DYNAMIC CAPACITY IN CSTORENW FROM 1.
+             10 LNY PIC X.
+             10 LNI OCCURS 3.
+                15 LNE PIC X.
+       PROCEDURE DIVISION USING LN.
+       MAIN-P.
+           MOVE SPACE TO LNE (1, 3).
+       END METHOD STORENW.
+
+       METHOD-ID. STORENX.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LN.
+          05 LNX PIC X.
+          05 LNO OCCURS DYNAMIC CAPACITY IN CSTORENX FROM 1.
+             10 LNY PIC X.
+             10 LNI OCCURS 3.
+                15 LNE PIC X.
+       PROCEDURE DIVISION USING LN.
+       MAIN-P.
+           MOVE "Q" TO LNE (2, 1).
+       END METHOD STORENX.
 
        END OBJECT.
        END CLASS PB2690SK3.

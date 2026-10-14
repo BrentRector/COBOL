@@ -57,7 +57,21 @@ public sealed class CobolVarGroupNestedTests
         var stored = CobolVarGroup.Overlay(argument, view, Group(ElemDyn), Group(ElemFixed), received: null).ElementsAt(0)!;
         // IT (1, 2) "q" survives: a fixed table of the formal is written over the argument's occurrences, never shrinking them.
         Assert.Equal(["ab", "wq"], stored[0].Dynamic);
-        Assert.Equal(["new", " "], stored[1].Dynamic);
+        // Occurrence 2 is CREATED in the argument's table (§8.5.1.9.3: "a new element is automatically created") and the
+        // view's element stored over it (kb/Work PB2690, wave 1078 A review R1-1): its IT shows the space fill, which no
+        // record and no effect marks as referenced, so it holds none of the formal's fixed occurrences (the store into
+        // storage raises it to its FROM capacity), never the formal's element reshaped (" ").
+        Assert.Equal(["new", ""], stored[1].Dynamic);
+
+        // The same view with the callee's receiving reference to IT (2, 1) recorded on the watched area, keyed by the
+        // subscript path (component 0, occurrence 2) and the position in that occurrence's own scope: created.
+        var area = new StorageCell { Ref = "h zz" };
+        area.WatchReceiving();
+        area.Received([0, 2], 0, 1);
+        var referenced = CobolVarGroup.Overlay(argument, view, Group(ElemDyn), Group(ElemFixed),
+            area.ReceivedFrom(0, 0)).ElementsAt(0)!;
+        Assert.Equal(["ab", "wq"], referenced[0].Dynamic);
+        Assert.Equal(["new", " "], referenced[1].Dynamic);
     }
 
     [Fact]

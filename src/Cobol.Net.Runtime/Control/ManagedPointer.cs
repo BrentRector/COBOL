@@ -132,7 +132,7 @@ public sealed class ManagedPointer<T> : ManagedPointer
         get => _get();
         set
         {
-            if (_watched is { } area) _overStorage!(value, area.Cell.ReceivedFrom(area.Offset));
+            if (_watched is { } area) _overStorage!(value, area.Cell.ReceivedFrom(area.Offset, area.DynBase));
             else _set(value);
         }
     }

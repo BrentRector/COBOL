@@ -274,18 +274,41 @@ internal static class PlaceRenderer
     /// So every store through such a view states its window, and the cell records it while a boundary watches it
     /// (<c>ManagedPointer.Watch</c>) — a null test otherwise. Only a class located by a data-address pointer (a LINKAGE
     /// item, a BASED item: <c>RedefinesClass.BasedPointerField</c>) can lie over a boundary's fresh area, and only its own
-    /// cell (not a dynamic-capacity table's element cell) is that area. And only a description holding a table of a fixed
-    /// (or DEPENDING) occurrence count can face a dynamic-capacity table (§8.5.1.12.1: such a table corresponds to a
-    /// table), so a store through a description with none records nothing and costs nothing.
+    /// cell is that area. A store into an occurrence of the formal's OWN dynamic-capacity table lands in that occurrence's
+    /// element cell, a scope of its own, and a fixed table nested there may face a dynamic-capacity table nested in the
+    /// argument's element, so it is recorded on the AREA's cell too, keyed by the subscript path the store took (each
+    /// level's component ordinal and occurrence number, <see cref="ReceivedScope"/>): the element cell itself may be one
+    /// the store just created, which no boundary watched (kb/Work PB2690 branch review round 1 of wave 1078 A, finding
+    /// R1-1). And only a description holding a table of a fixed (or DEPENDING) occurrence count can face a
+    /// dynamic-capacity table (§8.5.1.12.1: such a table corresponds to a table), so a store through a description with
+    /// none records nothing and costs nothing.
     /// ⛔ The store and its record are ONE block statement: <see cref="Write"/> returns ONE C# statement, and its callers
     /// embed it where only one statement stands (a table SORT's place-back loop, <c>for (…) &lt;store&gt;</c>), so two
     /// bare statements would leave the record outside the loop, naming the loop's variable out of its scope (CS0103 on
     /// legal source: the 2002 table-SORT goldens over a BASED table, kb/Work PB2690's landing).</summary>
     private static string Received(RedefViewPlace v, string store) =>
-        v is { Cell: { Segments: [RootFieldSegment] } cell, ViewItem.Root: { Class.BasedPointerField: not null } root }
+        v is { Cell.Segments: [RootFieldSegment area, ..] cell, ViewItem.Root: { Class.BasedPointerField: not null } root }
         && DataItem.DescendantsOf(root).Any(static d => d.Occurs is not null && !d.IsDynamicTable)
-            ? $"{{ {store} {RenderPath(cell, AccessDir.Sending)}.{nameof(StorageCell.Received)}({PositionRenderer.Render(v.Offset)}, {v.Width}); }}"
+            ? $"{{ {store} {RenderPath(new AccessPath([area]), AccessDir.Sending)}.{nameof(StorageCell.Received)}({ReceivedScope(cell)}{PositionRenderer.Render(v.Offset)}, {v.Width}); }}"
             : store;
+
+    /// <summary>The scope argument of <see cref="Received"/>: empty for a store into the area's own cell, else the
+    /// collection of (component ordinal, one-based occurrence number) pairs, outermost first, that the window's cell path
+    /// takes into the element cell it lies in — every cell path is the area's root then one <see cref="CellTableSegment"/>
+    /// and <see cref="DynTableSegment"/> per dynamic-capacity level (<c>ReferenceResolver.WindowScopeOf</c>,
+    /// <c>PlaceCursor.ElementCell</c>), so any other shape is an internal fault, raised loudly.</summary>
+    private static string ReceivedScope(IReadOnlyList<AccessSegment> cell)
+    {
+        if (cell.Count == 1) return "";
+        var terms = new List<string>(cell.Count / 2);
+        for (int i = 1; i < cell.Count; i += 2)
+            terms.Add(cell[i] is CellTableSegment table && i + 1 < cell.Count && cell[i + 1] is DynTableSegment occurrence
+                ? $"{PositionRenderer.Render(table.Ordinal)}, {PositionRenderer.Render(occurrence.OneBasedIndex)}"
+                : throw new System.InvalidOperationException(
+                    "internal error: a cell window's path is not its area followed by (table, occurrence) pairs "
+                    + $"({string.Join(", ", cell.Select(static s => s.GetType().Name))})"));
+        return $"[{string.Join(", ", terms)}], ";
+    }
 
     /// <summary>⛔ A BOUNDARY COPY OF A GROUP'S WHOLE IMAGE (<c>CallEmitter.BoundaryCopyWrite</c>: the write half of a BY
     /// REFERENCE argument's view or universal box, and a formal's copy-in; <paramref name="v"/> is the group's full
