@@ -89,7 +89,7 @@ public sealed class SdidiOperandLiftDriftTests
         {
             if (!line.Contains("DecOperandExact(")) continue;
             if (line.Contains("private string DecOperandExact(")) continue;                // the declaration
-            if (line.Contains("=> DecOperandExact(x)")) continue;                          // DecOperand's own pass-through arms
+            if (line.Contains("!LiftRounds(x) ? DecOperandExact(x)")) continue;           // DecOperand's own pass-through, guarded by the ONE predicate (kb/Work PB3018)
             if (line.Contains("DecMulToOdd(") || line.Contains("DecDivToOdd(")) continue;   // the round-to-odd consumers
             offenders.Add(line.Trim());
         }

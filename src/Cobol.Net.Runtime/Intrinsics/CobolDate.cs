@@ -499,9 +499,16 @@ public static class CobolDate
     /// negative value lands negative and every bound the screen compares against (0, 86 400, 86 401 — all
     /// representable at scale 9) is crossed by the landed value exactly when it is crossed by the exact one;
     /// for a value in the form it is the truncation it always was. NaN is in no time form (neither comparison
-    /// holds) and lands out of it; ±∞ saturate out of it.</summary>
+    /// holds) and lands out of it; ±∞ and every magnitude of 10^19 or more saturate by sign out of it, exactly
+    /// as <see cref="SecondsOfDec"/> does — the SAME bound, so the two carriers cannot answer differently.
+    /// ⛔ THE SATURATION IS THIS FUNCTION'S OWN SCREEN, NOT THE LANDING'S (kb/Work PB3019): the value is "out of the
+    /// time form" and the caller asks for that membership answer (the function's argument error, §15.3), so a
+    /// sentinel is the right result HERE; <see cref="CobolFloat.ToScaledIntermediate"/>, the landing every other
+    /// intermediate consumer takes, RAISES past the carrier because it has no such question to answer.</summary>
     public static Int128 SecondsOfReal(double seconds) =>
-        double.IsNaN(seconds) ? Int128.MinValue : CobolFloat.ToScaledSaturating(seconds, 9, CobolRounding.TowardLesser);
+        double.IsNaN(seconds) ? Int128.MinValue
+        : Math.Abs(seconds) >= 1.0E19 ? (seconds > 0 ? Int128.MaxValue : Int128.MinValue)
+        : CobolFloat.ToScaledIntermediate(seconds, 9, CobolRounding.TowardLesser);
 
     /// <summary>The SDIDI sibling of <see cref="SecondsOfReal"/>, scale 18 — the documented §15.3.3.2 maximum
     /// fraction width (CONFORMANCE.md item 202). A magnitude the Int128 carrier cannot hold at scale 18 is past both

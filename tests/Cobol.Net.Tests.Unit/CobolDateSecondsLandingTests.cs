@@ -39,6 +39,21 @@ public sealed class CobolDateSecondsLandingTests
         Assert.Equal(Int128.MaxValue, CobolDate.SecondsOfReal(double.PositiveInfinity));
     }
 
+    /// <summary>The binary64 screen is the SDIDI's (kb/Work PB3019): a magnitude of 10^19 or more is out of the form by
+    /// sign and never a size error, although the intermediate landing every OTHER consumer takes raises past the
+    /// carrier; the largest magnitude below the bound still lands exactly at scale 9.</summary>
+    [Fact]
+    public void ABinary64PastTheBound_SaturatesBySign_WhereTheIntermediateLandingRaises()
+    {
+        Assert.Equal(Int128.MaxValue, CobolDate.SecondsOfReal(1.0E+19));
+        Assert.Equal(Int128.MaxValue, CobolDate.SecondsOfReal(1.0E+300));
+        Assert.Equal(Int128.MinValue, CobolDate.SecondsOfReal(-1.0E+300));
+        Assert.Equal(Int128.MinValue, CobolDate.SecondsOfReal(double.NegativeInfinity));
+        Assert.Equal((Int128)9_999_999_999_999_997_952 * 1_000_000_000, CobolDate.SecondsOfReal(Math.BitDecrement(1.0E+19)));
+        Assert.Equal("EC-SIZE-OVERFLOW", Assert.Throws<CobolSizeError>(
+            () => CobolFloat.ToScaledIntermediate(1.0E+300, 9, CobolRounding.TowardLesser)).EcName);
+    }
+
     [Fact]
     public void TheSdidiLanding_KeepsTheSignAndSaturatesPastTheCarrier()
     {
