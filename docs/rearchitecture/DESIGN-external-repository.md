@@ -1779,7 +1779,10 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
 3. **The host entry and the one host surface (kb/Work PB2099; in progress — its runtime boundary is in the tree:
    `ProgramTable.CallProgram`/`Cancel` take `string? callerPath`, the null arm `ProgramTable.CallFromHost` is the
    outermost boundary, `RunUnit.EndForHost` performs the §14.6.11 actions and replaces the host's ambient run unit, and
-   `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`).**
+   `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`). To settle
+   before the emitter: §4.3 states `HostSurface.TypeOf` over `DescriptionRecord`, a §6.1 model type this list leaves to
+   slice 4, so the slice either brings the §6.1 description model (the records, without the attributes, renderer and
+   reader) forward or keys `TypeOf` on the bound description until slice 4 re-keys it.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
    validity decode); `RecordStructEmitter`'s published mode; `HostEntryEmitter` over the CALL lane's renderer with
    `Call` and `Cancel`; `CallProgram`'s and `Cancel`'s nullable `callerPath` and its outermost-boundary arm with R48's
