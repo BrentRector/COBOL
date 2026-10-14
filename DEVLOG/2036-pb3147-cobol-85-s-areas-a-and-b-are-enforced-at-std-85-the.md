@@ -1,4 +1,4 @@
-## PB3147: COBOL-85's areas A and B are enforced at --std 85 — the reference format records where each fixed-form line's text begins, one pre-bind pass asks every token
+## Entry 2036 — 2026-10-14 16:46 PDT — PB3147: COBOL-85's areas A and B are enforced at --std 85 — the reference format records where each fixed-form line's text begins, one pre-bind pass asks every token
 
 **Re-probe (w1078f, base c29af1704).** At `--std 85` a paragraph header written in column 12 (`E:/COBOL-coord/scratch/w1078f/probe/p1.cob`)
 compiled and ran, and so did a program with every area-A item in area B and statements, a continued PIC clause and a USE
@@ -37,3 +37,4 @@ to `2002/`, the edition where that placement is legal; the NIST corpus and the o
 **Rows.** None closed: the inventory's §6.3 rows are 2023 rules and already CONFORMS (closes_rows_reason in the note).
 Residual: the 1985 "area A of a continuation line" rule is not screened (GnuCOBOL accepts it; unverifiable without the
 1985 text), recorded in the note.
+
