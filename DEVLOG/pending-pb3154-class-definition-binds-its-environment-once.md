@@ -75,3 +75,12 @@ yields to a name declared nearer than the counter's report. Golden `2002/pb3154_
 (`MID KKK MMM 005 / INNER KKK MMM 005 / INNER Q 005`) printed `INNER 005 005 005` on the pre-fix build; probes of a
 nearer counter against a farther data item (the counter wins) and of a nearer GLOBAL index-name against a farther
 counter (the index wins) agree with the rule.
+
+**Finisher (landing GATE RED, Linux).** The landing's Linux unit leg failed
+`SpecTraceabilityInventoryDriftTests.EveryCodeLocation_ResolvesInTheTree`: rows SR-13.4.3-1 and FMT-12.2.1 still named
+`OoDriver.OoReparentClassData` and `DataBinder.EnvDivisions`, both deleted by this change. Not a host difference: the
+Windows gate planned the case into leg 2 (`not-run-Unit.txt` of runs 20261014T214627Z-1d31c2 and
+20261014T220353Z-2ab3e2), the third instance of kb/Work PB3131. A `record_verdicts.py` witness-only batch re-sites both
+rows (to `OoDriver.OoReparent` and `BindClassData`; to `DataBinder.BindDeclarations` and `BindFileControl`) and retires
+the deleted witnesses with their reason; GAP 101 to 101, `audit_witness_loss.py --check` GREEN, and a sweep of every
+inventory code-location against the tree finds 0 unresolved.
