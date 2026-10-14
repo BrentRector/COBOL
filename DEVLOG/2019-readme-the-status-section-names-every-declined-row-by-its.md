@@ -1,4 +1,4 @@
-## README: the status section names every declined row by its Annex item, held to CONFORMANCE.md by a test; the test list names the oracle and benchmark projects
+## Entry 2019 — 2026-10-14 00:53 PDT — README: the status section names every declined row by its Annex item, held to CONFORMANCE.md by a test; the test list names the oracle and benchmark projects
 
 PB3134 (docs/readme, MINOR): the owner found the root README outdated the morning after PB3100 landed it. Every claim was
 re-verified against `2da05a28a`; the tools, options, emitted files, gate, CI, tree, documents, license and plans all
@@ -19,3 +19,4 @@ The test section names the two projects of the solution that measure rather than
 oracle baseline and the landing check that refused a stale one (kb/Work PB2885); PB3107 retired both the same afternoon,
 the operator flagged it, and the branch merged main and restated the paragraph before its review. No compiler code
 changed.
+
