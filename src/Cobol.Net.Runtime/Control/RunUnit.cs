@@ -164,9 +164,9 @@ public sealed class RunUnit
         reset();
     }
 
-    /// <summary>Normal and abnormal run-unit termination's runtime epilogue — ONE method for both boundaries
-    /// (<see cref="ProgramTable.RunMain"/>'s and <see cref="Run"/>'s), idempotent so a host that nests them runs it
-    /// harmlessly twice. ISO §14.6.11 2): "An implicit CLOSE statement without any phrases is executed for each file
+    /// <summary>Normal and abnormal run-unit termination's runtime epilogue — ONE method for every boundary
+    /// (<see cref="ProgramTable.RunMain"/>'s, <see cref="Run"/>'s and a host activation's, <see cref="EndForHost"/>),
+    /// idempotent so a host that nests them runs it harmlessly twice. ISO §14.6.11 2): "An implicit CLOSE statement without any phrases is executed for each file
     /// that is in the open mode" (also after an abnormal termination, §14.6.12). Then every adopted static storage
     /// returns to its initial state, which RELEASES what it held — §14.6.11 3) "Any storage obtained with an ALLOCATE
     /// statement and not yet released by a FREE statement is released", 4) "All instance objects are destroyed" and

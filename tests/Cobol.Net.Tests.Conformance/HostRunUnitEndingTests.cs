@@ -148,7 +148,7 @@ public sealed class HostRunUnitEndingTests
                 "ENDED STATUS=7 ABNORMAL=False\n" +
                 "COUNT 1\n" +
                 "HOST DONE", stdout);
-            Assert.Equal(0, exit);                              // the host's own exit status, untouched by the run units
+            Assert.Equal(0, exit);                              // the host ran to its own return: no run-unit ending exited it
             Assert.Equal("", stderr);
         }
         finally { CutRunner.TryDelete(dir); }
