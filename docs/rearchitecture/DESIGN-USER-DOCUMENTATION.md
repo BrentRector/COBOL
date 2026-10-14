@@ -95,9 +95,11 @@ them; which further platforms the package targets (`osx-arm64`, `linux-arm64`, `
 each is one entry in that property. `WiseOwl.COBOL.Runtime`, for programs referenced from a .csproj, is a portable
 library package; a project that publishes with `PublishReadyToRun` precompiles it for its own platform.
 
-License metadata: `PackageLicenseExpression` `BUSL-1.1` (the SPDX id of the Business Source License 1.1) or
-`PackageLicenseFile` pointing at `LICENSE` — settled in PB1613 against how Demeanor's packages declare theirs. Package
-README = the Install + Getting started pages.
+License metadata (settled, kb/Work PB3146): `PackageLicenseFile` `LICENSE`, set once in `Directory.Build.props`, which
+also packs the repository's `LICENSE` at the root of every package whose project is packable. Not a
+`PackageLicenseExpression`: nuget.org accepts an expression only for an OSI- or FSF-approved license, and the SPDX id
+`BUSL-1.1` would drop the license's parameters (the Additional Use Grant, the Change Date and the Change License).
+Package README = the Install + Getting started pages.
 
 ## §7 Work items
 

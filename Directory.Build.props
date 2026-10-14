@@ -7,7 +7,10 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <Copyright>Copyright (c) 2026 Brent Rector</Copyright>
     <Authors>Brent Rector</Authors>
-    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <!-- kb/Work PB3146: every package carries the repository's LICENSE (the Business Source License 1.1 with its
+         parameters) as a file. nuget.org takes a license EXPRESSION only for an OSI- or FSF-approved license, and a
+         bare SPDX id would drop the parameters (the Additional Use Grant, the Change Date and the Change License). -->
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
     <!-- THE PRODUCT VERSION (kb/Work PB2097; docs/rearchitecture/DESIGN-external-repository.md §15.4): the package
          version, and so every assembly's AssemblyVersion. The runtime's MAJOR is a contract: every compiled COBOL module
          records the runtime version it was compiled against ([assembly: CobolRepository], __CobolModule.EnsureRegistered),
@@ -16,6 +19,11 @@
          RuntimeAbiPinDriftTests pins it beside the surface's hash. -->
     <Version>3.0.0</Version>
   </PropertyGroup>
+  <!-- The LICENSE file PackageLicenseFile names, packed at the package root. Items are evaluated after every property,
+       so the project's own IsPackable (false in every test and tool project) is already set here. -->
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)LICENSE" Pack="true" PackagePath="" Visible="false" />
+  </ItemGroup>
   <!-- kb/Work PB985 (DESIGN-test-build-ci §3.12): a DEBUG build's bits must depend on its SOURCES, not on the commit
        it was built at. The SDK queries git and stamps the commit into AssemblyInformationalVersion ("1.0.0+<sha>")
        and into the Source Link map the PDB carries (whose checksum the assembly embeds), so every commit changed
