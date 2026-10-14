@@ -1,0 +1,9 @@
+GA=[ab|ab|rb] 3
+DA=[ab|ab|rb] 3
+GB sees [ab]
+GB=[ab] 1
+GC=[ab|  ] 2
+GD=[ab|ab|az] 3
+GE sees [  ]
+GE=[ab] 1
+GN=[di|diX] 3

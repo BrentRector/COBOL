@@ -212,6 +212,82 @@ public sealed class BoundaryGroupCorrespondenceTests
         Assert.Equal(["T"], caller.Value.Dynamic);
     }
 
+    /// <summary>kb/Work PB2690 — the same store over the argument's STORAGE, whose carrier states the element its table
+    /// creates (<see cref="CobolVarGroup.Created"/>). §8.5.1.9.5: with INITIALIZED, "any elementary items not referenced as
+    /// receiving operands in a statement that creates new elements in that table are first initialized" as by INITIALIZE …
+    /// TO VALUE THEN TO DEFAULT, so the view shows each occurrence past the capacity as the table creates it (its NOTE: as
+    /// if "physically allocated and, if specified, initialized"), and a store is whatever differs from that. The seed is
+    /// per occurrence (a Format 2 VALUE varies by occurrence, CobolDynTable's seedAt), so occurrence 2 is "p" and 3 "q".</summary>
+    [Fact]
+    public void AStorageTable_ShowsAndCreatesTheOccurrencesPastItsCapacity_AsTheTableCreatesThem()
+    {
+        static CobolVarGroup Storage() =>
+            new("CDEF", ["T"], null, [n => CobolVarGroup.OfImage(n == 2 ? "p" : "q")]);
+        var caller = ManagedPointer<CobolVarGroup>.Cell(Storage());
+        var args = new[] { new CobolArg(CobolPassMode.Reference, caller, null, VarLGAtoms) };
+        var formal = CobolArgAdapt.Text(args, 0, 7, FixedSGAtoms, static () => "");
+        Assert.Equal("CDTpqEF", formal.Value);
+        // A store into occurrence 3 only: occurrence 2 is created as the table creates it.
+        formal.Value = "CDTpzEF";
+        Assert.Equal(["Tpz"], caller.Value!.Dynamic);
+        // SPACES stored into occurrence 2 are a store (the space-fill test could not see one), and occurrence 3 left as
+        // shown is not.
+        caller.Value = Storage();
+        formal.Value = "CDT qEF";
+        Assert.Equal(["T "], caller.Value.Dynamic);
+        // A callee that only reads creates nothing.
+        caller.Value = Storage();
+        formal.Value = "CDTpqEF";
+        Assert.Equal(["T"], caller.Value.Dynamic);
+    }
+
+    /// <summary>kb/Work PB2690 — the nested arm: a fixed table of fixed elements over a dynamic-capacity table of
+    /// variable-length elements of STORAGE. A created element is the table's created element (its own inner table at its
+    /// creation, with an inner creation of its own) with the formal's element stored over it, so every item and inner
+    /// occurrence the callee did not store keeps the creation (§8.5.1.9.5), and an inner store past the created element's
+    /// inner capacity creates there too (§8.5.1.9.3).</summary>
+    [Fact]
+    public void AStorageTableOfVariableLengthElements_CreatesEachElementFromItsCreation()
+    {
+        static CobolVarGroup Storage() => new("h", [""], [[new("a", ["bc"])]],
+            [_ => new CobolVarGroup("d", ["i"], null, [_ => CobolVarGroup.OfImage("j")])]);
+        var caller = ManagedPointer<CobolVarGroup>.Cell(Storage());
+        var args = new[] { new CobolArg(CobolPassMode.Reference, caller, null, VarOfElements) };
+        var formal = CobolArgAdapt.Text(args, 0, 7, FixedOfElements, static () => "");
+        // Element 2 does not exist: the view shows its creation, "d" and its inner table "i" with the inner creation "j".
+        Assert.Equal("habcdij", formal.Value);
+        formal.Value = "habcdiX";
+        var stored = caller.Value!.ElementCarriersAt(0);
+        Assert.Equal(2, stored.Length);
+        Assert.Equal(("d", "iX"), (stored[1].Fixed, stored[1].Dynamic[0]));
+        // A store into element 2's own item only: its inner table keeps its created capacity of one.
+        caller.Value = Storage();
+        formal.Value = "habcZij";
+        stored = caller.Value!.ElementCarriersAt(0);
+        Assert.Equal(("Z", "i"), (stored[1].Fixed, stored[1].Dynamic[0]));
+        // Reading only creates nothing.
+        caller.Value = Storage();
+        formal.Value = "habcdij";
+        Assert.Single(caller.Value!.ElementCarriersAt(0));
+    }
+
+    /// <summary>The creation a storage carrier states is the table's own (kb/Work PB2690): the seed a receiving reference
+    /// past the capacity grows with (§8.5.1.9.3) — the INITIALIZED phrase's when it is written (§8.5.1.9.5), else the
+    /// initial-state seed — at the occurrence's own number.</summary>
+    [Fact]
+    public void ATablesCreation_IsTheSeedItsReceivingReferenceGrowsWith_ByOccurrence()
+    {
+        var initialized = new CobolDynTable<string>(() => "s", 1, null, () => "i");
+        Assert.Equal("i", initialized.CreatedAs(static e => e)(5).Fixed);
+        initialized.RefReceiving(3);
+        Assert.Equal("i", initialized.RefSending(2));
+        var keyed = new CobolDynTable<string>(n => "v" + n, 1, null, n => "c" + n, 1);
+        Assert.Equal("c3", keyed.CreatedAs(static e => e)(3).Fixed);
+        var plain = new CobolDynTable<string>(() => "s", 1, null, null);
+        Assert.Equal("s", plain.CreatedAs(static e => e)(2).Fixed);
+        Assert.Empty(plain.CreatedAs(static e => e)(2).Dynamic);
+    }
+
     [Fact]
     public void AFixedGroupArgument_ReachesAVariableLengthFormal_AndItsStoresComeBack()
     {

@@ -1,0 +1,8 @@
+SC=[ab|ab|rb] 3
+sees [ab]
+RD=[ab] 1
+VF=[ab|ab|az] 3
+UN=[ab|ab|rb] 3
+sees [  ]
+BC=[ab] 1
+NE=[di|diX] 3
