@@ -47,3 +47,16 @@ name matched. Duplication: the two-map "is an alphabet-name" test that four site
 comment inside that expression carried one; the comment now uses a comma. The re-gate, run 20261014T223239Z-4450f2:
 `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,174/11,694, Unit 33,048/33,637,
 Characterization 6/36 in leg 1; leg 2 left to CI). `scripts/semgrep/verify.py` PASS, every count unchanged.
+
+**Review round 1.** The branch reviewer found the same trap at four more positions that admit a second reading, each
+refusing legal source with COBOLNET2692 on the branch: FUNCTION STANDARD-COMPARE's three-argument position 3 (an
+inherited ordering-name shadowed the element's own integer argument-4), the EVALUATE range's trailing `IN word` (an
+inherited alphabet-name claimed `HI IN GRP` over the element's own group GRP), the VALUE clause's IN-omitted alphabet
+peel (an inherited alphabet-name claimed the element's own constant-name; main answered N there, a wrong answer that
+predates this branch), and the VALUE operand reader, which asked the now-inherited symbolic-character before the
+constant-name. Each now asks the element's own reading first, under §8.4.6.1's second sentence; the four-argument
+form's argument-4 yields too, while its position 3, which admits the ordering-name only, keeps the census refusal.
+Golden `2014/pb3153_inherited_names_yield_to_own_items` runs both readings of each position (`IN Y < A`, then
+`OUT Y < Z`). The finisher then classified every configuration-name lookup in `src`; none other admits a second
+reading without asking the own reading first, and two configuration-section names of different types cannot meet
+across elements, because neither a contained program nor a method has a configuration section (§12.3.3 SR1, SR2).
