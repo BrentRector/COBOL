@@ -61,7 +61,7 @@ internal sealed class BinderContext(DataBinder data, ReferenceResolver refs)
 
     /// <summary>The per-unit SPECIAL-NAMES mnemonic registry (10h — ACCEPT-FROM and the WRITE SR13 /
     /// ADVANCING zero-advance legs share the ONE lazily built map).</summary>
-    public MnemonicRegistry Mnemonics { get; } = new();
+    public MnemonicRegistry Mnemonics { get; } = new(data);
 
     /// <summary>The EC bind state (10r — the TurnState + PD-RAISING sets + USE-F3 cross-USE pairs + the seven
     /// EcFeatures accumulator bits), shared by <c>EcBinder</c> and the Declaratives half.</summary>

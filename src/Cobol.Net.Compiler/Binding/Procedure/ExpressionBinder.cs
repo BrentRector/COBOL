@@ -344,7 +344,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // GR10's "one or more of the character" IS the fill semantics BoundAllLiteral carries in every context).
         if (fig.cobolWord() is { } symWord)
         {
-            if (ctx.Data.SymbolicOf(symWord.GetText()) is { } sym)
+            if (ctx.Data.SymbolicOf(symWord, symWord.GetText()) is { } sym)
                 return SymbolicOperand(sym) is BoundAllLiteral al7
                     ? al7 with { BeginsWithAll = true }   // the EXPLICIT ALL form — the word is written
                     : SymbolicOperand(sym);
@@ -466,7 +466,13 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// <c>LiteralAliasResolutionDriftTests</c> fails when a procedure binder reads either table itself.</summary>
     internal LiteralAlias? LiteralAliasOf(Core.DataReferenceContext dref) =>
         ctx.Data.ConstantOf(dref) is { } k ? new(DataBinder.WrittenText(dref), k, null)
-        : ctx.Data.SymbolicOf(dref) is { } s ? new(DataBinder.WrittenText(dref), null, s)
+        // A symbolic-character a CONTAINING element declares yields to the referring element's own item of the same
+        // spelling: "a source element's reference to such a name, even when it is a different type of user-defined
+        // word, is to the item which that source element describes" (§8.4.6.1; kb/Work PB3153). Asked BEFORE the
+        // resolution, which records the word as used as a symbolic-character (§8.3.2.2). In one element the two
+        // cannot coexist (COBOLNET2692 at the second declaration), so the probe changes no own-element answer.
+        : ctx.Data.NamesSymbolic(dref) && ctx.Refs.Probe(dref) is null
+          && ctx.Data.SymbolicOf(dref) is { } s ? new(DataBinder.WrittenText(dref), null, s)
         : null;
 
     /// <summary>The bound operand <paramref name="alias"/> stands for: the SAME shape the equivalent written literal

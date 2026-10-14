@@ -590,7 +590,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
                 : item.condition() is { } leadingClass
                     ? host.Cond.BindPartialExpression(leadingClass, spliced)
                 : pair.ObjectBare.ClassWord is { } classWord
-                    ? host.Cond.BindPartialClassName(classWord, spliced)
+                    ? host.Cond.BindPartialClassName(item, classWord, spliced)
                     : host.Cond.Refused($"EVALUATE partial-expression '{item.GetText()}'");
             return host.Udf.UdfAttachPerEvaluation(partialCond, objMark);
         }
@@ -636,7 +636,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             // the carrier registration are the ONE resolver §14.7.8's opening sentence asks for ("This specification
             // applies to THROUGH phrases specified in the VALUE clause and the EVALUATE statement"), so the VALUE
             // clause's identical phrase reaches the same code (kb/Work PB398).
-            string? alphabet = RangeAlphabet(alphabetWord, rangeClass);
+            string? alphabet = RangeAlphabet(range, alphabetWord, rangeClass);
             // §14.7.8 rule 2: an inverted alphanumeric/national THRU range sets the nonfatal EC-RANGE-INVALID, and
             // then "execution proceeds as if the range of values were empty". The EC is a property of the RANGE's
             // CLASS, exactly as the collating sequence one sentence above it is — never of the written FORM of its
@@ -700,8 +700,8 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     /// of the same class — so the pair has one class to have. It is COMPUTED BY THE CALLER and passed in, because
     /// the EC gate one line below keys on the SAME antecedent and the two must not be able to disagree
     /// (kb/Work PB401).</para></summary>
-    private string? RangeAlphabet(string? name, CollatingClass rangeClass) =>
-        name is not null && ctx.Data.TryResolveRangeAlphabet(name, rangeClass, "an EVALUATE WHEN THROUGH range")
+    private string? RangeAlphabet(Core.ValueRangeContext range, string? name, CollatingClass rangeClass) =>
+        name is not null && ctx.Data.TryResolveRangeAlphabet(range, name, rangeClass, "an EVALUATE WHEN THROUGH range")
             ? name : null;
 
     /// <summary>The range's right-hand operand and its <c>IN alphabet-name-1</c> word, with the one ambiguity the

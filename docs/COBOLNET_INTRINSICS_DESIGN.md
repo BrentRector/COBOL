@@ -735,7 +735,23 @@ REFERENCES, since another element often declares them (a method's class, a conta
 the one class-name resolver, `OoNameResolution.Lookup`, calls `OoClassTable.RecordReferenceUse` for every name it
 resolves (kb/Work PB3132), so a METHOD-ID, a method paragraph or a contained program's paragraph spelled like a
 class-name the same element also references is refused. A parameter-name is recorded as the type its own REPOSITORY
-specifier declares it, as the skeleton's binder declares it.
+specifier declares it, as the skeleton's binder declares it. The names a CONFIGURATION SECTION declares reach a
+contained element the same way (§8.4.6.1's list: alphabet-name, class-name, a SPECIAL-NAMES condition-name,
+dynamic-length-structure-name, locale-name, mnemonic-name, ordering-name, symbolic-character; kb/Work PB3153): each
+type's registry is a `ConfigurationNames<T>` table, which exposes no `TryGetValue` — a reference the binder commits to
+resolves through `TryUse(site, name)`, which records the use through the ONE recorder
+`DataBinder.RecordConfigurationNameUse` (into `OoClassTable.RecordReferenceUse`), and a predicate, a declaration's
+duplicate check or a second read of an already-resolved name asks `Declares` / `TryPeek`, which record nothing; the
+mnemonic-names keep their parse-tree registry (`Procedure.MnemonicRegistry`), whose `TryUse` records the same way.
+`InheritConfiguration` hands every table down (`InheritFrom`; the symbolic characters were not handed down at all
+before PB3153, so a contained program's use of one was COBOLNET1639). Where a format admits both an inherited name and
+an identifier (a bare literal-alias operand, `SET LOCALE … TO`, `WRITE … ADVANCING`), the referring element's own item
+of the same spelling is asked first — §8.4.6.1: "a source element's reference to such a name, even when it is a
+different type of user-defined word, is to the item which that source element describes" — and only the inherited
+reading records a use. `UserWordDeclarationDriftTests.EveryConfigurationSectionNameType_ResolvesThroughARecordingTable`
+parses §8.4.6.1's list and keeps every type's registry a recording one; negative
+`pb3153-contained-program-paragraph-spells-an-inherited-class-it-uses`, golden `85/pb3153_inherited_special_names_words`
+and `InheritedConfigurationNameUseTests` (every type, and a method) are the witnesses.
 A later declaration or reference of another type is **COBOLNET2692** unless
 `UserWordKinds.MayBeOneWord` allows it — the standard's three exceptions as DATA (a compilation-variable-name; a
 level-number beside a paragraph- or section-name; the constant-name / data-name / property-name / record-key-name /

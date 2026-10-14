@@ -129,19 +129,57 @@ public sealed class UserWordDeclarationDriftTests
     /// <summary>§8.3.2.2 says "used": a census is RECORDED from exactly two funnels, the declaration funnel
     /// (<c>DataBinder.CheckOneTypePerWord</c>) and the reference funnel (<c>OoClassTable.RecordReferenceUse</c>, a
     /// method's reference to an object-class-name, interface-name or parameter-name its class declares, kb/Work PB3132),
-    /// and the reference funnel is reached only from the one class-name resolver, <c>OoNameResolution.Lookup</c>. A third
-    /// recorder, or a class-name resolution that bypassed Lookup, would let a method use a word as two types unseen.</summary>
+    /// and the reference funnel is reached from two resolvers only: the one class-name resolver,
+    /// <c>OoNameResolution.Lookup</c>, and the one recorder of a reference to a name a CONFIGURATION SECTION declares,
+    /// <c>DataBinder.RecordConfigurationNameUse</c> (kb/Work PB3153), which every <c>ConfigurationNames.TryUse</c> and
+    /// <c>MnemonicRegistry.TryUse</c> calls. A third recorder, or a resolution that bypassed them, would let a contained
+    /// program or a method use a word as two types unseen.</summary>
     [Fact]
     public void TheCensus_IsRecordedOnlyByTheDeclarationAndReferenceFunnels()
     {
-        var sources = Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
-            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f))).ToList();
+        var sources = CompilerSources();
         Assert.Equal(["DataBinder.cs", "OoClassTable.cs"],
             sources.Where(s => Regex.IsMatch(s.Text, @"(?:WordCensus|Words)\.Record\(")).Select(s => s.Name).Order());
-        Assert.Equal(["OoNameResolution.cs"],
-            sources.Where(s => Regex.IsMatch(s.Text, @"\.RecordReferenceUse\(")).Select(s => s.Name));
+        Assert.Equal(["DataBinder.cs", "OoNameResolution.cs"],
+            sources.Where(s => Regex.IsMatch(s.Text, @"\.RecordReferenceUse\(")).Select(s => s.Name).Order());
+        Assert.Equal(["ConfigurationNames.cs", "MnemonicRegistry.cs"],
+            sources.Where(s => Regex.IsMatch(s.Text, @"\b(?:recordUse|data\.RecordConfigurationNameUse)\(")).Select(s => s.Name).Order());
     }
+
+    /// <summary>⛔ EVERY TYPE §8.4.6.1 SAYS A CONFIGURATION SECTION DECLARES HAS A TABLE WHOSE RESOLUTIONS ARE USES
+    /// (kb/Work PB3153). §8.4.6.1 lists the types that, "<i>when they are declared within a configuration section, may be
+    /// referenced only by statements and entries either in that source element that contains a configuration section or
+    /// in any source element contained within that source element</i>": a contained program and a method resolve names
+    /// no declaration of their own announced, so each type's registry is a <c>ConfigurationNames</c> table built with
+    /// the recorder (or, for the mnemonic-name, the <c>MnemonicRegistry</c>, whose <c>TryUse</c> records), and the
+    /// referring element's §8.3.2.2 census sees the use. The list is parsed from <c>specs/ISO_COBOL.md</c>; a type it
+    /// gains, or a table that stops recording, is red here.</summary>
+    [Fact]
+    public void EveryConfigurationSectionNameType_ResolvesThroughARecordingTable()
+    {
+        string spec = File.ReadAllText(Path.Combine(TestRepo.Root, "specs", "ISO_COBOL.md"));
+        int start = spec.IndexOf("when they are declared within a configuration section, may be referenced only by",
+            StringComparison.Ordinal);
+        Assert.True(start >= 0, "§8.4.6.1's configuration-section list moved in specs/ISO_COBOL.md — re-derive this guard");
+        int end = spec.IndexOf("Specific conventions for declarations and references", start, StringComparison.Ordinal);
+        Assert.True(end > start, "§8.4.6.1's list end moved in specs/ISO_COBOL.md — re-derive this guard");
+        var listed = Regex.Matches(spec[start..end], @"^— ([a-z-]+)", RegexOptions.Multiline)
+            .Select(m => KindOfSpelling(m.Groups[1].Value)).Distinct().Order().ToArray();
+        Assert.Equal(8, listed.Length);
+
+        var sources = CompilerSources();
+        var tabled = sources.SelectMany(s => Regex.Matches(s.Text,
+                @"ConfigurationNames<[^>]+>\s+\w+\s*=>\s*field\s*\?\?=\s*new\(UserWordKind\.(\w+),\s*RecordConfigurationNameUse\)")
+            .Select(m => Enum.Parse<UserWordKind>(m.Groups[1].Value)));
+        string registry = sources.Single(s => s.Name == "MnemonicRegistry.cs").Text;
+        Assert.Contains("data.RecordConfigurationNameUse(at, name, UserWordKind.MnemonicName)", registry);
+        Assert.Equal(listed, tabled.Append(UserWordKind.MnemonicName).Distinct().Order().ToArray());
+    }
+
+    private static List<(string Name, string Text)> CompilerSources() =>
+        [.. Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f)))];
 
     /// <summary>⛔ A PARAGRAPH-NAME-OMITTED PARAGRAPH IS NAMED NOWHERE (ISO §14.4.3; kb/Work PB990): the procedure table
     /// registered a declarative section's leading sentences, and its empty-section no-op pc, as a paragraph named like

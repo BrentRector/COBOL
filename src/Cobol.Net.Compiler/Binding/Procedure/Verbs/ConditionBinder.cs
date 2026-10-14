@@ -780,7 +780,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             return new BoundClassCondition(opnd, k, not);
         }
         // Every other alternative is a user-defined word — the class condition's alphabet-name-1 / class-name-1.
-        return BindUserWordClassCondition(userWord ?? cls.GetText(), not, operand);
+        return BindUserWordClassCondition(cls, userWord ?? cls.GetText(), not, operand);
     }
 
     /// <summary>§14.9.13.3 SR5's "class condition without the identifier" written as a BARE user-defined word
@@ -789,14 +789,16 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// one word. <see cref="AnalyzeBareOperand"/> has already resolved the word to a class-name or alphabet-name
     /// (<see cref="BareOperandForm.ClassName"/>); SR8 then splices the selection subject in, exactly as for the
     /// <c>IS</c>-led spelling, and the ONE user-word class body binds it (kb/Work PB843).</summary>
-    public BoundCondition BindPartialClassName(string word, PartialSubjectOperand subject) =>
-        BindUserWordClassCondition(word, not: false, () => subject.Content);
+    public BoundCondition BindPartialClassName(Antlr4.Runtime.RuleContext at, string word, PartialSubjectOperand subject) =>
+        BindUserWordClassCondition(at, word, not: false, () => subject.Content);
 
     /// <summary>The §8.8.4.4.2 alternatives that are USER-DEFINED WORDS — alphabet-name-1 and class-name-1 — over
     /// an operand the caller names. One body for the written <c>classConditionName</c> spelling and the bare EVALUATE
     /// object (kb/Work PB843), so the LOCALE refusal, the operand screens and the undeclared-name diagnostic
-    /// cannot drift between them.</summary>
-    private BoundCondition BindUserWordClassCondition(string word, bool not, System.Func<BoundOperand> operand)
+    /// cannot drift between them. <paramref name="at"/> is where the word is written: the class-name or alphabet-name
+    /// it resolves to is a §8.3.2.2 use in that source element (kb/Work PB3153).</summary>
+    private BoundCondition BindUserWordClassCondition(Antlr4.Runtime.RuleContext at, string word, bool not,
+        System.Func<BoundOperand> operand)
     {
         // §8.8.4.4.3 SR2 — "Alphabet-name-1 shall not reference an alphabet associated with a locale": a LOCALE
         // alphabet is a collating sequence, not a coded character set (Table 6), so it names no character set a
@@ -810,7 +812,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             return Refused($"class condition '{word}'");
         }
         // A SPECIAL-NAMES user-defined class (§12.3.7): membership over the expanded character set.
-        if (ctx.Data.UserClasses.TryGetValue(word, out var userClass))
+        if (ctx.Data.UserClasses.TryUse(at, word, out var userClass))
         {
             var opnd = operand();
             CheckClassConditionOperand(opnd, ClassConditionModel.ClassName);   // SR3 + SR4 name class-name-1
@@ -819,8 +821,8 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // An ALPHABET-NAME class (§8.8.4.4.4 GR3 a — kb/Work PB109): membership of the CODED CHARACTER SET the
         // alphabet identifies (the LOCALE refusal above already took Table 6's blank row). It used to fall to the
         // loud staged BoundConditionError.
-        if ((ctx.Data.Alphabets.TryGetValue(word, out var aDef) && aDef.CodedSet is { } aSet
-                ? aSet : ctx.Data.NationalAlphabets.TryGetValue(word, out var nDef) ? nDef.CodedSet : null) is { } set)
+        if ((ctx.Data.Alphabets.TryUse(at, word, out var aDef) && aDef.CodedSet is { } aSet
+                ? aSet : ctx.Data.NationalAlphabets.TryUse(at, word, out var nDef) ? nDef.CodedSet : null) is { } set)
         {
             var opnd = operand();
             // ⛔ ITS OWN KIND, NOT THE CLASS-NAME'S. SR3 names alphabet-name-1 beside class-name-1, but SR4 —
@@ -985,7 +987,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         {
             carry.PartialSubject = null;
             carry.Reset();
-            return BindUserWordClassCondition(classWord, not: false, () => ps.Content);
+            return BindUserWordClassCondition(vo!, classWord, not: false, () => ps.Content);
         }
         if (BareOperandAsCondition(vo) is { } sole)
         {
@@ -1023,7 +1025,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 : $"class-name '{classWord}', which forms a class condition only after the identifier it tests — "
                   + "\"identifier-1 IS [NOT] class-name-1\" (ISO §8.8.4.4.2)";
         else if (dref is { } d && d.dataReferenceSuffix().Length == 0 && d.cobolWord()?.GetText() is { } word
-                 && ctx.Mnemonics.Of(d).TryGetValue(word, out var mnemonicRow) && mnemonicRow.Kind == SystemNameKind.Switch)
+                 && ctx.Mnemonics.TryPeek(d, word, out var mnemonicRow) && mnemonicRow.Kind == SystemNameKind.Switch)
             what = $"the mnemonic-name '{word}' of a switch; a switch-status condition is written with a condition-name "
                 + "the SPECIAL-NAMES paragraph associates with the switch's ON or OFF status (ISO §8.8.4.6.1; the §8.8.4.6.2 format is condition-name-1)";
         else if (dref is { } dd && ctx.Refs.Probe(dd) is { } probe)
