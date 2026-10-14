@@ -180,8 +180,8 @@ internal static class AreaPlacementPass
 
         public override object? VisitLevelNumber(Core.LevelNumberContext ctx)
         {
-            // A level-number is written with one digit or two, so 1 and 01 are the same level.
-            if (int.TryParse(ctx.Start.Text, out int level) && level is 1 or 77)
+            // A level-number is a word of one digit or two, so level 1 is spelled 1 or 01 and level 77 only 77.
+            if (ctx.Start.Text is "1" or "01" or "77")
                 Head(ctx.Start, $"level-number {ctx.Start.Text}");
             else
                 EitherArea.Add(ctx.Start.TokenIndex);
