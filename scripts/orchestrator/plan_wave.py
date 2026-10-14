@@ -19,9 +19,11 @@ cost the orchestrator a hand-written groups.json; this computes it.
    kb/Work PB2575), a DONE report whose branch review stamped FINDINGS (kb/Work PB3027: the finisher answers each
    finding), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
    name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
-   branch. A FINDINGS report whose lead note the fix lane cannot see (a `process_only` note, or an owner task's note
-   that exists only on its own branch, read from there) gets its finisher too, unless another DONE branch carries
-   its branch (kb/Work PB3150).
+   branch. The lead of a FINDINGS report that the fix lane cannot see (a `process_only` note, or an owner task's
+   note that exists only on its own branch, read from there) is decided by the same rule as an open note: its newest
+   report naming it, on any branch (its review finisher's later report supersedes the FINDINGS one); a FINDINGS
+   branch that another DONE branch merely contains still gets its finisher, whose pred names that carrier (kb/Work
+   PB3150).
 3. CLUSTERS from fix_clusters.py --json (the public submodule's view of kb/Work), minus the notes above, ranked by
    inventory rows claimed (the sum of each note's `inventory_rows`), then harm. A finisher on a cluster's primary
    file absorbs that cluster's notes up to the cap of five.
@@ -655,9 +657,12 @@ def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: li
         return (f"FINISH-FIRST: the branch review of {rep.slug} ({rep.lead}) found {rep.review.findings} finding(s) at "
                 f"head {rep.review.sha}: the records of kind `finding` in {rep.review.file} "
                 f"(`python scripts/orchestrator/review_findings.py show {rep.review.file}`). Its branch {rep.branch} "
-                f"(worktree {rep.worktree or 'removed'}) is {cls}: `git merge {rep.branch}` into your branch, read "
-                f"{rep.path} and its \"For the next implementer\" section, then answer EVERY finding by its id: fix it at "
-                f"its root (a regression test or golden with it) or answer `no_change_needed` with the reason, one line "
+                f"(worktree {rep.worktree or 'removed'}) is {cls}: `git merge {rep.branch}` into your branch"
+                + (f" (it is also contained in {carried_by}, whose report does not answer these findings and which may "
+                   f"land its commits first: merge {rep.branch} only, never {carried_by}; kb/Work PB3150)"
+                   if carried_by else "")
+                + f", read {rep.path} and its \"For the next implementer\" section, then answer EVERY finding by its "
+                f"id: fix it at its root (a regression test or golden with it) or answer `no_change_needed` with the reason, one line "
                 f"each in your report's `## Review findings` section; re-gate; your branch is reviewed again when it "
                 f"returns DONE (kb/Work PB3027).")
     where = (f"Its branch {rep.branch} (worktree {rep.worktree or 'removed'}, head {rep.head or '?'}) is {cls}: "
@@ -701,14 +706,24 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     note_file = {n["id"]: c["file"] for c in clusters + half_clusters for n in c["notes"]}
     note_files = {n["id"]: c.get("files", []) for c in clusters + half_clusters for n in c["notes"]}
 
+    def findings(r: Report, cls: str) -> bool:
+        return cls not in LANDED_CLASSES and r.status == "DONE" and bool(r.review) and r.review.verdict == "FINDINGS"
+
+    # THE LEADS THE REPORTS DECIDE: every open note the fix lane sees, and the lead of a live FINDINGS report that the
+    # fix lane cannot see (a `process_only` note, or an owner task's note main does not have yet: branch_lead_notes),
+    # which no cluster holds, so its finisher was never planned and its branch sat as a DECISION row
+    # (license-product-name, PB3146: kb/Work PB3150). ONE rule for both: each takes its NEWEST report naming it, on any
+    # branch, through the same arms below. A later report about the lead (its review finisher's SPLIT, DONE or
+    # FINDINGS, on that finisher's own branch) supersedes the FINDINGS report; a branch that merely contains it
+    # (branch_carrier) does not, and is named in its finisher's pred instead (review R1-1, R1-2).
+    leads = open_ids | {r.lead for r in reports if r.review and r.review.verdict == "FINDINGS" and
+                        r.lead not in open_ids and r.lead in notes and
+                        findings(r, classify(r.branch) if r.branch else "ABSENT")}
     newest: dict[str, Report] = {}
     for r in reports:  # sorted oldest first, so the last write wins
         for i in r.ids:
-            if i in open_ids:
+            if i in leads:
                 newest[i] = r
-
-    def findings(r: Report, cls: str) -> bool:
-        return cls not in LANDED_CLASSES and r.status == "DONE" and bool(r.review) and r.review.verdict == "FINDINGS"
 
     def drained(branch: str | None, cls: str) -> str | None:
         """Why the drain plans no finisher for unfinished work on this branch, or None when the work is started and
@@ -737,15 +752,6 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
                 finisher_by_rep.setdefault(r.path, []).append(nid)
         elif cls not in LANDED_CLASSES:
             awaiting.setdefault(r.branch or str(r.path), []).append(nid)
-    # A FINDINGS report whose lead the fix lane cannot see (a `process_only` note, or a note main does not have yet:
-    # branch_lead_notes) never reached `newest`, so its finisher was never planned and the branch sat as a DECISION
-    # row (license-product-name, PB3146: kb/Work PB3150). Only the newest report of its branch, and never one whose
-    # branch another DONE branch carries: that one answers it.
-    newest_of_branch = {r.branch: r for r in reports if r.branch}
-    for b, r in sorted(newest_of_branch.items()):
-        if r.lead not in open_ids and r.lead in notes and r.path not in finisher_by_rep and r.review and \
-                r.review.verdict == "FINDINGS" and findings(r, classify(b)) and not carrier(b):
-            finisher_by_rep[r.path] = [r.lead]
 
     taken: set[str] = {i for ids in awaiting.values() for i in ids} | set(waiting)
     # A note an unreported dispatch holds is another agent's, or a planned wave's not launched yet (kb/Work PB2806).
@@ -765,7 +771,7 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         rep = rep_by_path[path]
         ids = sorted(set(ids) - taken, key=lambda s: int(s[2:]))
         cls = classify(rep.branch) if rep.branch else "ABSENT"
-        by = carrier(rep.branch) if rep.branch and cls in ("UNLANDED", "CHECK") and rep.status != "DONE" else None
+        by = carrier(rep.branch) if rep.branch and cls in ("UNLANDED", "CHECK") else None
         for k in range(0, len(ids), cap):
             chunk = ids[k:k + cap]
             groups.append(Group("finisher", chunk, note_file.get(chunk[0], ""),

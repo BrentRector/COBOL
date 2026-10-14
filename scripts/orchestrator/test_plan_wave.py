@@ -235,7 +235,9 @@ check("mid-prose `branch:` above the Branch field does not pre-empt it", rv3["w1
 #        w1074a first, whose finisher would have started PB3101 (never started) and cherry-picked `…-e99-1` again
 #        though `…-e99-4` merged it, and never planned license-product-name's review finisher: its lead PB3146 is
 #        process_only and existed only on its branch. --drain plans the finishers of STARTED work only; a FINDINGS
-#        report whose lead the fix lane cannot see gets its finisher in every mode, unless a DONE branch carries it.
+#        report whose lead the fix lane cannot see gets its finisher in every mode, decided by the same rule as an
+#        open note (its newest report naming it, on any branch), and a DONE branch that merely contains it is named in
+#        its pred, never a reason to drop it (review R1-1, R1-2).
 DR = TMP / "reports-drain"
 DR.mkdir()
 for name, first, hdr in (
@@ -283,7 +285,7 @@ def dr_plan(drain):
 
 pd = dr_plan(True)
 check("drain: only the finishers of started work", sorted(sorted(g.notes) for g in pd["groups"]),
-      [["PB6"], ["PB7"], ["PB77"], ["PB9"]])
+      [["PB6"], ["PB7"], ["PB77"], ["PB79"], ["PB9"]])
 check("drain: every group is a finisher whose pred says DRAIN",
       all(g.kind == "finisher" and "DRAIN" in g.pred for g in pd["groups"]), True)
 check("drain: a SPLIT branch another DONE branch merged waits, with its carrier named",
@@ -294,13 +296,55 @@ check("drain: the clusters' notes wait, counted", ("PB2" in pd["drain_not_starte
       (True, True))
 check("an unseen lead's branch with a finisher is no judgment row", pd["unlanded_without_note"], [])
 pn = dr_plan(False)
-check("every mode: an unseen lead's FINDINGS gets its finisher, a carried one does not",
-      (any(g.notes == ["PB77"] for g in pn["groups"]), any("PB79" in g.notes for g in pn["groups"])), (True, False))
+check("every mode: an unseen lead's FINDINGS gets its finisher", any(g.notes == ["PB77"] for g in pn["groups"]), True)
+# R1-2: PB79's branch is contained in worktree-wf_dr-2, PB7's DONE branch, whose report never answers PB79's findings:
+# the carried FINDINGS branch still gets its finisher (the drop was silent: no group, no waiting entry, no judgment row),
+# which merges PB79's own branch only and is told the carrier may land its commits first.
+for mode, pm in (("every mode", pn), ("drain", pd)):
+    g79 = next((g for g in pm["groups"] if g.notes == ["PB79"]), None)
+    check(f"{mode}: a carried unseen-lead FINDINGS gets its finisher, its pred naming the carrier (R1-2)",
+          bool(g79) and ("git merge worktree-wf_dr-5" in g79.pred, "contained in worktree-wf_dr-2" in g79.pred,
+                         "never worktree-wf_dr-2" in g79.pred, "review_findings.py show E:/s/r79.jsonl" in g79.pred),
+          (True, True, True, True))
 g5n = next((g for g in pn["groups"] if "PB5" in g.notes), None)
 check("every mode: a carried SPLIT's finisher merges its carrier, never cherry-picks it",
       bool(g5n) and "git merge worktree-wf_dr-2" in g5n.pred and "cherry-pick its unlanded" not in g5n.pred, True)
 check("without --drain nothing waits on the drain", (pn["drain_not_started"], any("DRAIN" in g.pred for g in pn["groups"])),
       ([], False))
+# R1-1: the review finisher of owner-task's FINDINGS works on its OWN branch, and its later report about the same
+# unseen lead supersedes the FINDINGS report, as for an open note: a SPLIT is resumed from its own branch (never the
+# findings answered again from scratch, its branch never a judgment row); an unreviewed DONE awaits landing; a newer
+# FINDINGS stamp on the finisher's branch gets the next finisher from that report.
+SU = TMP / "reports-successor"
+SU.mkdir()
+(SU / "w1074z-PB77-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 enqueue-review-owner-task-r1 5050505ee E:/s/review-owner-task.jsonl\n"
+    "Branch: owner-task\nHEAD: 5050505ee\n\n## X\n", encoding="utf-8", newline="\n")
+SU_CLASS = {"owner-task": "UNLANDED", "worktree-wf_f-1": "UNLANDED"}
+for successor, carried, want in (
+        ("Status: SPLIT\nBranch: worktree-wf_f-1\nHEAD: 7070707aa", {}, "SPLIT"),
+        ("Status: DONE\nBranch: worktree-wf_f-1\nHEAD: 7070707aa", {"owner-task": "worktree-wf_f-1"}, "DONE"),
+        ("Status: DONE\n**Review:** FINDINGS 2 enqueue-review-wf_f-1-r1 7070707aa E:/s/review-wf_f-1.jsonl\n"
+         "Branch: worktree-wf_f-1\nHEAD: 7070707aa", {"owner-task": "worktree-wf_f-1"}, "FINDINGS")):
+    (SU / "w1075a-PB77-report.md").write_text(successor + "\n\n## X\n", encoding="utf-8", newline="\n")
+    for drain in (False, True):
+        ps = pw.plan(dr_notes, CLUSTERS, HALF, pw.load_reports(SU), lambda b: SU_CLASS.get(b, "ABSENT"),
+                     {"owner-task": [], "worktree-wf_f-1": []}, RULES, budget_points=100, drain=drain,
+                     carrier=carried.get)
+        g77 = [g for g in ps["groups"] if "PB77" in g.notes]
+        mode = f"{want} successor{' (drain)' if drain else ''}"
+        if want == "SPLIT":
+            check(f"{mode}: the finisher resumes the successor's branch, never the stale FINDINGS report (R1-1)",
+                  [("w1075a" in g.pred, "worktree-wf_f-1" in g.pred, "review-owner-task.jsonl" in g.pred) for g in g77],
+                  [(True, True, False)])
+            check(f"{mode}: the successor's branch is no judgment row", "worktree-wf_f-1" in ps["unlanded_without_note"],
+                  False)
+        elif want == "DONE":
+            check(f"{mode}: an unreviewed successor awaits landing, no finisher (R1-1)",
+                  (g77, ps["awaiting_landing"].get("worktree-wf_f-1")), ([], ["PB77"]))
+        else:
+            check(f"{mode}: the successor's own FINDINGS gets the next finisher (R1-1)",
+                  [("review-wf_f-1.jsonl" in g.pred, "git merge worktree-wf_f-1" in g.pred) for g in g77], [(True, True)])
 
 # 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
 #     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.

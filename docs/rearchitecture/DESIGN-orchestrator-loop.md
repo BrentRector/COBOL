@@ -667,16 +667,19 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    `NOT STARTED`, whatever its branch's state (a `land` unit lands only `DONE` branches, so an unlanded `SPLIT` branch
    held for one was stranded; kb/Work PB2575), or says `DONE` with a branch review stamped `Review: FINDINGS` (kb/Work
    PB3027: the landing step never fixes a finding; the finisher's `pred` names the findings file and asks for every
-   finding answered by its id): one finisher group per predecessor report. A `FINDINGS` report whose lead note the
-   fix lane cannot see (a `process_only` note, or an owner task's note that exists only on its own branch, read from
-   that branch: `branch_lead_notes`) gets its finisher too, from the newest report of its branch (kb/Work PB3150). (b) The half
+   finding answered by its id): one finisher group per predecessor report. The lead of a live `FINDINGS` report that
+   the fix lane cannot see (a `process_only` note, or an owner task's note that exists only on its own branch, read
+   from that branch: `branch_lead_notes`) is decided by the same rule as an open note: its newest report naming it, on
+   any branch, so its review finisher's later report on the finisher's own branch (`SPLIT`, `DONE` or `FINDINGS`)
+   supersedes the `FINDINGS` one (kb/Work PB3150, review R1-1). (b) The half
    clusters, one finisher group each. (c) An `UNLANDED` branch whose commit subjects name an open note no report
    covers. Each finisher's `pred` is a fixed paragraph naming the predecessor report, branch, worktree, head and the
    branch's class (cherry-pick if unlanded, orient from the report if landed). **A carried branch** is the exception:
    when another `DONE` report's branch, not on main, contains it (`branch_carrier`, `git merge-base --is-ancestor`: a
    same-file successor merged its predecessor), its finisher merges that carrier instead of cherry-picking, because the
-   commits would otherwise land twice; and a carried `FINDINGS` branch whose lead the fix lane cannot see gets no
-   finisher of its own: its work lands through the carrier. A finisher on a primary file absorbs the notes of the open clusters on that file up to the cap of five.
+   commits would otherwise land twice. A carried `FINDINGS` branch still gets its finisher, seen lead or not: only a
+   newer report naming its lead answers its findings, so its `pred` names the carrier (which may land the branch's
+   commits first) and merges the `FINDINGS` branch alone (review R1-2). A finisher on a primary file absorbs the notes of the open clusters on that file up to the cap of five.
 
    **`--drain`** (the owner's drain of 2026-10-13: "do not schedule new work items but continue all necessary work to
    get in-process work to main"; kb/Work PB3150) keeps only the finishers of STARTED work: every review-`FINDINGS`
