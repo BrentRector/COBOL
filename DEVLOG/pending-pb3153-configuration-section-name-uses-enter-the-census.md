@@ -60,3 +60,5 @@ Golden `2014/pb3153_inherited_names_yield_to_own_items` runs both readings of ea
 `OUT Y < Z`). The finisher then classified every configuration-name lookup in `src`; none other admits a second
 reading without asking the own reading first, and two configuration-section names of different types cannot meet
 across elements, because neither a contained program nor a method has a configuration section (§12.3.3 SR1, SR2).
+The finisher's gate, run 20261014T225418Z-18b752: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`
+(Conformance 6,172/11,701, Unit 33,090/33,652, Characterization 6/36 in leg 1; leg 2 left to CI); semgrep verify PASS.
