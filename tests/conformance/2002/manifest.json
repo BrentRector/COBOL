@@ -847,7 +847,10 @@
   "pb2967_float_result_wide_binary_receiver_size_error",
   "pb2498_length_odo_bit_national_group",
   "pb2589_repository_function_keyword_omitted",
-  "pb2937_skeleton_bodies_bind_as_themselves"
+  "pb2937_skeleton_bodies_bind_as_themselves",
+  "pb3120_group_formal_pointer_type",
+  "pb3120_group_formal_template_pointer_signature",
+  "pb3120_universal_type_subject_key"
   ],
   "pending": []
 }

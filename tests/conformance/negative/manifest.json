@@ -2661,7 +2661,11 @@
   "pb2017-binary-operator-no-space-after",
   "pb2017-unary-operator-no-space-after",
   "pb2017-operator-in-subscript",
-  "pb2017-operator-touches-comma-decimal-point"
+  "pb2017-operator-touches-comma-decimal-point",
+  "pb3120-group-formal-pointer-type-below-2002",
+  "pb3120-group-formal-pointer-signature-mismatch",
+  "pb3120-group-formal-data-pointer-declaration-mismatch",
+  "pb3120-group-formal-template-pointer-signature-mismatch"
  ],
  "pending": []
 }

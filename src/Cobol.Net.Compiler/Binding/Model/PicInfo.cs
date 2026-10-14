@@ -397,7 +397,7 @@ public sealed record PicInfo(
     /// pass, so the template's own nested TYPE references are already expanded). Null when the item carries no
     /// restriction, and when the name resolves to no type declaration in this source element.
     /// <para>It exists because §8.5.3.1's "same type" is declaration EQUIVALENCE, of which the type-name is one
-    /// conjunct: within a source element §13.18.58 makes the type-name unique, so the name alone decides, but
+    /// conjunct: within a source element §8.3.2.2 makes the type-name one type of user-defined word, so the name alone decides, but
     /// two source elements may declare non-equivalent types under one name and a restriction compared by name
     /// only would admit the crossing the restriction exists to forbid (kb/Work PB427). Read ONLY through
     /// <c>StrongTypeModel.PointerRestriction</c> / <c>SameRestriction</c>; deliberately excluded from the
