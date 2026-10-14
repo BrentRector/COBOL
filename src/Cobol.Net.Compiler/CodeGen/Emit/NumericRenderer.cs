@@ -267,12 +267,12 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         // the extent then rounds up to whole characters — the rounding the group's image channel takes
         // (RuntimeApi.TableOdoExtentChars), the identity when the positions ARE characters or are the answer.
         string extent = n.PositionsPerCharacter == 1
-            ? RuntimeApi.TableOdoExtent(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs, n.FixedWidth, n.ElemWidth)
+            ? RuntimeApi.TableOdoExtentTrimmed(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs, n.FixedWidth, n.ElemWidth, n.TrailingWidth)
             : RuntimeApi.TableOdoExtentChars(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs,
                 n.FixedWidth, n.ElemWidth, n.PositionsPerCharacter);
         // A BASED entry not associated with actual data answers GR8b's maximum (§15.50.4 r4a / §15.14.4 r2a —
         // kb/Work PB80); the null test comes FIRST, before data-name-1 (possibly inside the entry) is read.
-        long maximum = (n.FixedWidth + (long)n.MaxOccurs * n.ElemWidth + n.PositionsPerCharacter - 1) / n.PositionsPerCharacter;
+        long maximum = (n.FixedWidth + (long)n.MaxOccurs * n.ElemWidth - n.TrailingWidth + n.PositionsPerCharacter - 1) / n.PositionsPerCharacter;
         return new(n.BasedAddress is { } addr
             ? $"({RuntimeApi.PtrIsNull(addr)} ? (long){maximum} : {extent})"
             : extent, 0);
