@@ -67,7 +67,7 @@
            MOVE R TO E
            DISPLAY "POWER=" E
       *> a negated function value: 13.2 + (-4) = 9.2
-           COMPUTE R = A + (-FUNCTION SQRT(16))
+           COMPUTE R = A + (- FUNCTION SQRT(16))
            MOVE R TO E
            DISPLAY "NEGATED=" E
       *> two function values in one expression: 13.2 + 4 + 0.2 = 17.4

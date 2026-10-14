@@ -486,6 +486,13 @@ public sealed class Frontend
         var tree = ReservationGateRewriter.ParseToFixpoint(parser, tokens, retypes, diagnostics,
             (bag, witness) => ParsePass(parser, tokens, bag, witness, sourcePath));
 
+        // ISO §8.7.1 — the arithmetic operators' own separator context, decided from the characters beside each operator
+        // the PARSE TREE found (only the tree says binary, unary or no operator at all) and reported the same way
+        // (kb/Work PB2017). The two operator clauses that need no tree (§8.7.3, §8.7.4) were asked with the rest above.
+        foreach (var v in SeparatorRule.ArithmeticOperatorViolations(text, tree))
+            sr7.SyntaxError(TextWriter.Null, null!, v.Token, v.Token.Line, v.Token.Column,
+                $"[{v.Descriptor.Code}] {v.Message}", null!);
+
         return (tree, parser.NumberOfSyntaxErrors == 0, sourceDebuggingLines);
     }
 

@@ -766,7 +766,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// conversion (the shortest round-trip decimal, ≤17 digits, always exact in the 34-digit significand).</summary>
     // ⛔ THE LIFT OF AN OPERAND THAT MAY OUTGROW THE LANE IS THE ROUNDING ONE, IN EVERY MODE (kb/Work PB2918).
     // §8.8.1.5.2 r1: "If the operand value cannot be expressed exactly in an SDIDI, the value is rounded according to
-    // the rules in 11.9.11" — and a 16-byte binary container (COMP-5, BINARY-DOUBLE, …) owns 39 digits, so its
+    // the rules in 11.9.11" — and a 16-byte binary container (a COMP-5 of 19 or more digits; BINARY-DOUBLE is 8 bytes and lifts exactly) owns 39 digits, so its
     // NumX.Digits bound is past the SDIDI's 34 (and an operand of unknown bound, Digits 0, may be anything). The exact
     // `CobolDec.From` put such a significand INTO the intermediate unrounded, past the 34-digit invariant every
     // CobolDec operation assumes, and the next operation took Int128.MinValue's magnitude and raised a size error for
@@ -779,22 +779,29 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     // An UNSIGNED-WIDE operand takes the same rule through its own twin (CobolDec.FromUnsigned): its range [0, 2^128)
     // is past the Int128 the arithmetic funnel (DeU / Widen, DOC-A.1-179 (2)) admits, but this method is also the
     // lift of a RELATION's operand and of a function argument, which compare and convert the VALUE.
-    public string DecOperand(NumX x) => x switch
-    {
-        { U: true } u => RuntimeApi.DecLiftRoundedUnsigned(u.Expr, u.Scale, IntermediateMode),
-        _ when !LiftRounds(x) => DecOperandExact(x),
-        _ => RuntimeApi.DecLiftRounded(x.Expr, x.Scale, IntermediateMode),
-    };
+    // ⛔ ONE PREDICATE DECIDES, FOR EVERY CARRIER (kb/Work PB3018). The unsigned-wide arm used to rewrite the question
+    // ("an unsigned-wide operand rounds") ahead of LiftRounds, which was then made to agree by a `x.U ||` of its own: two
+    // statements of one rule. The carrier now picks only the TWIN that rounds (FromUnsigned / FromParsed); WHETHER the
+    // lift rounds is LiftRounds' answer from the operand's digit bound, so an unsigned operand whose bound is provably
+    // within ExactLiftDigits would lift exactly like a signed one. None does today, by the container's own bound: a
+    // 16-byte unsigned container owns [0, 2^128), 39 digits (PicInfo.UnscaledDigitBound), and a signed one owns 39 as
+    // well - which is why a 36-digit value in `PIC 9(31) COMP-5` and in `PIC S9(31) COMP-5` both round to 34 digits on
+    // the native Dec lane (the pb3018 golden pins the pair), where a DISPLAY item's exact bound (at most 31) never
+    // rounds. DOC-A.1-82 carries the determination.
+    public string DecOperand(NumX x) =>
+        !LiftRounds(x) ? DecOperandExact(x)
+        : x.U ? RuntimeApi.DecLiftRoundedUnsigned(x.Expr, x.Scale, IntermediateMode)
+        : RuntimeApi.DecLiftRounded(x.Expr, x.Scale, IntermediateMode);
 
     /// <summary>Does lifting <paramref name="x"/> into the SDIDI ROUND it (§8.8.1.5.2 r1)? The ONE answer to that
     /// question: <see cref="DecOperand"/> acts on it and the intrinsic renderer asks it of a function's argument
     /// (<c>IntrinsicRenderer.ArgumentRoundsAtLift</c>, kb/Work PB2965), so a function whose equivalent arithmetic
     /// expression lifts its argument is routed to the SDIDI exactly when the lift would change the value. A Dec, a
     /// float and a wide intermediate are already SDIDI-bound (the float's conversion is §8.8.1.5.1's, not a rounding
-    /// of an exact value); an unsigned-wide operand and a fixed-point operand whose digit bound is past
-    /// <see cref="ExactLiftDigits"/> or unknown (Digits 0, nothing provable) round.</summary>
+    /// of an exact value); a fixed-point operand, signed or UNSIGNED-WIDE alike, whose digit bound is past
+    /// <see cref="ExactLiftDigits"/> or unknown (Digits 0, nothing provable) rounds.</summary>
     internal bool LiftRounds(NumX x) =>
-        x.U || (!x.Dec && !x.Real && !x.Wide && !(x.Digits >= 1 && x.Digits <= ExactLiftDigits));
+        !x.Dec && !x.Real && !x.Wide && !(x.Digits >= 1 && x.Digits <= ExactLiftDigits);
 
     /// <summary>The widest digit bound <see cref="DecOperand"/> lifts EXACTLY. Under STANDARD-DECIMAL it is the SDIDI's
     /// own 34 (§8.8.1.5.2 r1 rounds every wider operand). Under NATIVE arithmetic the Dec lane (DOC-A.1-82) carries an
@@ -1025,9 +1032,10 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// COMP-2 operand; PB13 widened it by keeping a receiver-less FLOAT-FAMILY result in binary64 too, so the
     /// arm is landed at the ONE choke point rather than at each of the forty-odd call sites
     /// (feedback_change_the_dispatch_not_the_callers). A float lands through the same
-    /// <c>CobolFloat.ToScaledSaturating</c> — the INTERMEDIATE landing (kb/Work PB2967: a STORE takes the checked
-    /// one, which raises past the carrier), which lands AT the requested scale, so an out-of-range magnitude stays
-    /// a huge sentinel for the caller's range test instead of being rescaled back into range. TRUNCATION matches this helper's existing contract (alignment
+    /// <c>CobolFloat.ToScaledIntermediate</c> — the INTERMEDIATE landing (kb/Work PB2967, PB3019: a STORE takes the checked
+    /// one, which raises past the carrier too) lands AT the requested scale and RAISES EC-SIZE-OVERFLOW (§14.7.5 5)) for a
+    /// magnitude the carrier cannot hold, as the Dec arm below does: no sentinel for a later range test, comparison or
+    /// selection to mistake for a value. TRUNCATION matches this helper's existing contract (alignment
     /// is not a ROUNDED transfer; §14.7.7 rule 3 NOTE 1 gives ROUNDED only to the final transfer).</para></summary>
     /// <para>⛔ AND THE <c>Dec</c> ARM IS THE ONE IT WAS MISSING (fix-queue PB32/PB14). The paragraph above
     /// declares this helper TOTAL over the carrier kinds; <see cref="NumX"/> has THREE — exact scaled
@@ -1053,8 +1061,9 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// general rules of the ADD statement … or, in the case of an arithmetic expression, the COMPUTE statement",
     /// and GR4 gives that computation the clause's ROUNDED phrase (kb/Work PB852).</param>
     public static string Align(NumX x, int toScale, CobolRounding mode = CobolRounding.Truncation) =>
-        // CHECKED: an intermediate consumer has no capacity check downstream, so a value past the carrier stays the
-        // loud sentinel here — never the low-order digits a STORE may take (kb/Work PB77; the Dec arm below raises).
+        // CHECKED: an intermediate consumer has no capacity check downstream, so a value past the carrier RAISES here —
+        // never the low-order digits a STORE may take (kb/Work PB77) and never a saturated sentinel a comparison or a
+        // selection would take for a value (kb/Work PB3019); the Dec arm below raises the same condition.
         x.Real ? RuntimeApi.FloatToScaledIntermediate(x.Expr, $"{toScale}", mode)
         // A Dec that the Int128 carrier cannot hold at this scale is a SIZE ERROR condition (EC-SIZE-OVERFLOW —
         // §14.7.5 case 5, A.1 item 179 "checked"; kb/Work PB69), never the low-order-digits landing a STORE may
@@ -1091,8 +1100,8 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     /// negative or zero expression to the unsuccessful path before the rounded value is used — so the choice is
     /// behaviour-neutral at both of today's sites and simply correct at the next one.</para>
     /// <para>The lane structure mirrors <see cref="Align"/> exactly, including its checked landings: an
-    /// intermediate consumer has no capacity check downstream, so a value past the carrier stays the loud
-    /// sentinel here rather than becoming the low-order digits a STORE may take (kb/Work PB77/PB69/PB65).</para>
+    /// intermediate consumer has no capacity check downstream, so a value past the carrier RAISES EC-SIZE-OVERFLOW
+    /// here rather than becoming the low-order digits a STORE may take (kb/Work PB77/PB69/PB65/PB3019).</para>
     /// <para>NOTE — ALLOCATE's NATIVE-FLOAT lane does NOT come through here, and that is not an oversight:
     /// <c>CobolPtr.AllocateReal</c> fuses GR1's <c>Math.Ceiling</c> with GR2's ≤ 0 ⇒ NULL and with the
     /// storage-not-available outcomes that only the ALLOCATE statement defines, so a NaN or an over-wide request
@@ -1332,10 +1341,12 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
     }
 
     /// <summary><see cref="Landed"/> for a consumer that computes ONLY in the exact <c>Int128</c> lane and has no
-    /// float arm of its own — the DIVIDE … REMAINDER subsidiary-quotient kernel (§14.9.12.4 GR7 — kb/Work PB85: a
+    /// float arm of its own — the NATIVE DIVIDE … REMAINDER subsidiary-quotient kernel (§14.9.12.4 GR7 — kb/Work PB85: a
     /// FLOAT-LONG dividend was a Roslyn error). A native float lands TRUNCATED at the receiver's float working scale
-    /// (<see cref="ReceiverContext.FloatWorkingScale"/> — the D16 quantizer's one rule); an unsigned-wide read
-    /// funnels through <see cref="DeU"/>; everything else is <see cref="Landed"/>.</summary>
+    /// (<see cref="ReceiverContext.FloatWorkingScale"/> — the D16 quantizer's one rule), through <see cref="Align"/>'s
+    /// intermediate landing, which RAISES EC-SIZE-OVERFLOW past the carrier (kb/Work PB3019); an unsigned-wide read
+    /// funnels through <see cref="DeU"/>; everything else is <see cref="Landed"/>. The standard-decimal lane does NOT
+    /// use this: its kernel is the SDIDI's, which no Int128 landing may narrow (kb/Work PB3017).</summary>
     public NumX FixedLane(NumX x, ReceiverContext rcv) =>
         x.Real && !StandardDecimal ? new NumX(Align(x, rcv.FloatWorkingScale), rcv.FloatWorkingScale)
         : Landed(DeU(x), rcv);

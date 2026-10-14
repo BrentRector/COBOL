@@ -294,10 +294,14 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    length (§14.8.2.3.2 "Additionally" b) / c)) on both lanes, and no group of another length (EC-OO-METHOD, not
    EC-OO-UNIVERSAL); a slice whose length is a run-time value takes
    §14.8.2.2 rule 1 at compile time on its MAXIMUM extent (docs/CONFORMANCE.md D-RM1, the occurs-depending model of
-   §14.8.2.2) and the evaluated length at the boundary — on the universal lane through the box's evaluated description
-   (EC-OO-UNIVERSAL when it is shorter than the formal), on the typed lane through the carrier: such a slice states no
-   storage AREA (`CallEmitter.AreaOf`), so the group formal holds the slice padded to the formal's width and the
-   write-back splices through the slice, truncated to it; the 3 e) ANY LENGTH item is read through §14.8.2.3.2
+   §14.8.2.2) — identifier-1's bound, `RefModPlace.MaximumInnerPositions`: its static positions, a DYNAMIC LENGTH
+   item's §8.5.1.10.1 maximum size, and for an ANY LENGTH item, whose description fixes none (§13.18.2.4 GR1 b)), the
+   carrier's ceiling, which every group formal fits (kb/Work PB3128) — and the evaluated length at the boundary — on
+   the universal lane through the box's evaluated description (EC-OO-UNIVERSAL when it is shorter than the formal), on
+   the typed lane through the carrier: such a slice states its storage AREA with its evaluated length
+   (`CallEmitter.AreaOf` over `PlaceRenderer.SliceLength`, `CellPointer.Extent`), so a group formal is laid over a slice
+   at least as long as itself and holds a SHORTER one padded to the formal's width, the write-back splicing through the
+   slice, truncated to it; the 3 e) ANY LENGTH item is read through §14.8.2.3.2
    "Additionally" d)/e) on BOTH lanes (`ActivationDescription.AnyLengthClauses`: the argument compared as if it were
    described with ANY LENGTH — only the length is relaxed), so a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal
    and, through a universal receiver, is then refused by GR7 c) (EC-OO-UNIVERSAL), while a slice matches no ANY LENGTH

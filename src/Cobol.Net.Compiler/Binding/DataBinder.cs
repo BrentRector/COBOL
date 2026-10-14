@@ -5222,7 +5222,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     isDynamicLength = true;
                     dynLengthStructureName = dl.cobolWord()?.GetText();
                     // ⛔ integer-1 is read WIDE and bounded LATER, by CobolDynString.MaxSizeOf: §8.5.1.10.1 makes
-                    // the item's maximum size "the smallest of" this phrase and the implementor maximum, so a
+                    // the item's maximum size the smallest of this phrase and the implementor maximum, so a
                     // literal past `int` is not "unparseable", it is simply larger than the maximum. Narrowing it
                     // HERE is what let such a LIMIT fall through to -1 — "no bound at all" — and take the same
                     // wrapping path as an item with no LIMIT phrase (kb/Work PB463). A literal too wide even for
@@ -6091,7 +6091,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         item.IsDynamicLength = isDynamicLength;
         if (isDynamicLength)
         {
-            // §8.5.1.10.1 — the item's MAXIMUM SIZE is "the smallest of" the LIMIT phrase value, the largest
+            // §8.5.1.10.1 — the item's MAXIMUM SIZE "is smallest of" the LIMIT phrase value, the largest
             // integer storable in the PREFIXED usage, and the maximum permitted by the implementor. The PREFIXED
             // candidate is the length field of the dynamic-length-structure-name the clause names, when that
             // structure has a PREFIXED phrase (kb/Work PB829). The rule is written ONCE, in
