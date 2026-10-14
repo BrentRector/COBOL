@@ -449,8 +449,9 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         int savedLine = StatementLine, savedActivations = data.OperandEvaluations;
         StatementLine = s.Start.Line;
         data.OperandEvaluations = 0;
-        int errorMark = data.Edition.ErrorsRecorded, refusalMark = data.Edition.RefusalsBound;
+        int errorMark = data.Edition.ErrorsRecorded, refusalMark = data.Edition.RefusalMark;
         int unbuiltMark = data.Edition.UnbuiltMark;
+        int deferredMark = data.Edition.ExpansionDeferredMark;
         int controlStoreMark = _controlStoreReports;
         // ISO §13.4.6.3 SR4 (kb/Work PB1291) — asked HERE, of every input-output statement, because this is the one
         // funnel every statement passes through: a new operand position in any of the eight is screened without a
@@ -471,12 +472,21 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
             && Rw.CheckControlDataStores(core))
             _controlStoreReports++;
         bool drewError = data.Edition.ErrorsRecorded != errorMark;
+        // ⛔ A STATEMENT AN EXPANSION OWNS (kb/Work PB2937): a site of this statement met a question only an expansion of
+        // the parameterized definition being bound as itself can answer (EditionContext.NoteExpansionDeferred). Its own
+        // operands' rules were asked and reported as usual; what the verb binder built over the deferred part is not a
+        // refusal and not a gap, so neither ledger check below speaks for it. What it built is KEPT inside the deferral
+        // (review R1-2): the statements nested in it — an IF's branches under a condition read through a formal — are
+        // the same in every expansion, so the edition pass walks them in the skeleton as in any class.
+        string? deferred = data.Edition.TakeExpansionDeferredSince(deferredMark);
+        if (deferred is not null && core is not BoundDeferredToExpansion) core = new BoundDeferredToExpansion(deferred, core);
         // ⛔ THE REFUSAL LEDGER'S CHECK (kb/Work PB1029). A refusal node — a BoundRejected, or a refused operand or
         // condition — says the SOURCE is wrong and that its site reported why. If this statement bound one and
         // drew no error, the site lied, and the node would compile clean and abort the run unit when reached: fail
         // the compile instead. The factories' own backstop only sees "no error ANYWHERE", which an unrelated
-        // earlier error satisfies; this is the per-statement answer.
-        if (!drewError && data.Edition.RefusalsBound != refusalMark)
+        // earlier error satisfies; this is the per-statement answer. TAKEN, like the two ledgers beside it: a nested
+        // statement already answered for its own refusals, so they are never this statement's (review R1-1).
+        if (data.Edition.TakeRefusalsSince(refusalMark) && !drewError && deferred is null)
             data.Edition.Error(DiagnosticCatalog.UnreportedRefusal,
                 EditionContext.UnreportedRefusalMessage($"a {s.Start.Text.ToUpperInvariant()} statement"));
         // An UNBUILT operand is the operand-level BoundUnsupported: announced (below) unless the statement drew an
@@ -503,7 +513,7 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
         // is what tells the two apart. A statement whose bind already drew an error is a refused statement: the
         // compile fails anyway, and announcing a gap in WiseOwl COBOL on top of it (`INSPECT A(1) …` on a non-table
         // item used to draw COBOLNET2096 AND "not implemented") sends the user after the wrong party.
-        if (!drewError && (core is BoundUnsupported { Feature: var f } ? f : unbuiltOperand) is { } gap)
+        if (!drewError && deferred is null && (core is BoundUnsupported { Feature: var f } ? f : unbuiltOperand) is { } gap)
             data.Edition.Warning(DiagnosticCatalog.StatementNotImplemented,
                 $"{gap} — not implemented; reaching this statement aborts the run unit "
                 + "(COBOLNET_DESIGN §1.4)");
