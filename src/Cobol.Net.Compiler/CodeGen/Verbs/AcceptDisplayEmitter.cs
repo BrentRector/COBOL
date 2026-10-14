@@ -91,13 +91,13 @@ internal sealed class AcceptDisplayEmitter(EmitContext ctx, NumericRenderer num,
         // as-if PICTURE 1(m) length, the same units RefModPlace.Category and the write-side pad already use.
         if (target is RefModPlace rm)
         {
-            // The transfer width is a host `int` (AcceptSource.Device), so it is the ONE saturating narrowing of the
-            // ref-mod length (RuntimeApi.RefModLength through HostInt32 — kb/Work PB1033); the omitted-length width is
-            // computed in `long` so a saturated start cannot overflow it, and floored at zero — the slice write below
-            // raises EC-BOUND-REF-MOD for that start or length (§8.4.3.3.4 item 5c), naming the position's exact value.
-            string len = rm.Length is { } l
-                ? RuntimeApi.HostInt32(RuntimeApi.RefModLength(l))
-                : $"(int)global::System.Math.Max(0L, {rm.Inner.Item.OperandPic?.Length ?? rm.Inner.Item.ImageWidth} - (long)({RuntimeApi.RefModStart(rm.Start)}) + 1)";
+            // The transfer width is a host `int` (AcceptSource.Device): the slice's evaluated length, the ONE renderer
+            // (PlaceRenderer.SliceLength) a CALL / INVOKE argument's area extent takes too — identifier-1's positions
+            // through the ONE reader, never re-spelled here as its PICTURE length (kb/Work PB3128: one position for a
+            // DYNAMIC LENGTH or ANY LENGTH identifier-1, whose length is a run-time value, and one short of a SIGN
+            // SEPARATE item). The slice write below raises EC-BOUND-REF-MOD for an out-of-range start or length
+            // (§8.4.3.3.4 item 5c), naming the position's exact value.
+            string len = PlaceRenderer.SliceLength(rm);
             w.Line(PlaceRenderer.Write(target, $"AcceptSource.Device({len})"));
             return;
         }

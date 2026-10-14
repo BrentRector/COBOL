@@ -4,8 +4,8 @@
       *> (STRUCTURE and IS un-underlined; PREFIXED/DELIMITED in choice indicators - one or more, any
       *> order).  It had no grammar at all: `DYNAMIC LENGTH STRUCTURE DLS1 IS PREFIXED.` was COBOL0001,
       *> and a DYNAMIC LENGTH clause naming a structure was refused as "not yet supported".
-      *> What the declaration decides is OBSERVABLE: ISO 8.5.1.10.1 makes an item's maximum size "the
-      *> smallest of" its LIMIT phrase, "the largest integer that can be stored in an item of the usage
+      *> What the declaration decides is OBSERVABLE: ISO 8.5.1.10.1 makes an item's maximum size the
+      *> smallest of its LIMIT phrase, "the largest integer that can be stored in an item of the usage
       *> specified in the PREFIXED phrase", and the implementor maximum; 12.3.7.4 GR18 sizes the length
       *> field (SHORT PREFIXED 65535, SIGNED SHORT PREFIXED 32767, PREFIXED / SIGNED PREFIXED past any
       *> 70000).  A 70000-character sender therefore stores 65535, 32767, all 70000 (DELIMITED has no
