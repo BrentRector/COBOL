@@ -164,14 +164,17 @@ public sealed partial class DataBinder
     /// <c>BinderDriver.BindUnitData</c> from <c>BoundUnit.IsFunction</c>.</summary>
     public bool UnitIsFunction { get; init; }
 
-    /// <summary>The unit's own name, for the SELF leg of the two prototype-name scope rules: ISO §8.4.6.6 admits
-    /// "the user-function-name of the containing function definition" as a function-prototype-name, and §8.4.6.8
-    /// admits "the program-name of a containing program definition" as a program-prototype-name — so a
-    /// self-referential <c>USAGE FUNCTION-POINTER TO «this function»</c> declaration is conforming without a
-    /// REPOSITORY entry. The PROCEDURE-phase twin is <c>StatementBinder.UdfSelfName</c>; this is the DATA-phase
-    /// half, because the USAGE clause's restriction operand binds here. Set by <c>BinderDriver.BindUnitData</c>
-    /// from <c>BoundUnit.Name</c>. kb/Work PB452/PB817.</summary>
-    public string? UnitSelfName { get; init; }
+    /// <summary>The names of the definitions CONTAINING this source element — its own and, for a contained program,
+    /// every program containing it; all of the unit's own kind (<see cref="UnitIsFunction"/>) — the no-specifier leg
+    /// of the two prototype-name scope rules: ISO §8.4.6.6 admits "the user-function-name of the containing function
+    /// definition" as a function-prototype-name and §8.4.6.8 "the program-name of a containing program definition"
+    /// as a program-prototype-name, so a <c>USAGE {FUNCTION|PROGRAM}-POINTER TO</c> naming one is conforming without
+    /// a REPOSITORY entry. This is the DATA-phase copy of the ONE set the registries read
+    /// (<c>BinderDriver.ContainingDefinitions</c>, which seeds it from <c>BindUnitData</c>), so the TO-phrase screen
+    /// and the signature the restriction resolves to cannot disagree (kb/Work PB3121). Empty for a class, factory or
+    /// interface forest: a class is neither definition kind. kb/Work PB452/PB817.</summary>
+    public IReadOnlySet<string> ContainingDefinitionNames { get; init; } = EmptyNames;
+    private static readonly IReadOnlySet<string> EmptyNames = new HashSet<string>(CobolNames.Comparer);
 
     /// <summary>The PROCEDURE DIVISION USING formals, positional (ISO §14.2.3 GR2). (READ-ONLY view — P6 Step 5.)</summary>
     public IReadOnlyList<LinkageFormal> LinkageFormals => _linkageFormals;

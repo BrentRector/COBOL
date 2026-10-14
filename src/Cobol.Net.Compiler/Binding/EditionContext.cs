@@ -154,8 +154,23 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// dropped as the same fact) still counts as "this statement drew an error".</summary>
     public int ErrorsRecorded { get; private set; }
 
-    /// <summary>Refusal nodes bound so far (kb/Work PB1029) — see <see cref="NoteRefusal"/>.</summary>
-    public int RefusalsBound { get; private set; }
+    /// <summary>Refusal nodes bound and not yet answered for by a statement (kb/Work PB1029) — see <see cref="NoteRefusal"/>.</summary>
+    private int _refusalsBound;
+
+    /// <summary>The refusal ledger's high-water mark, taken by the funnel before a statement binds.</summary>
+    internal int RefusalMark => _refusalsBound;
+
+    /// <summary>Whether a refusal node was bound since <paramref name="mark"/>, and the ledger cut back to it — a
+    /// statement answers for its own refusals once, as for its unbuilt operands and its deferrals (kb/Work PB2937,
+    /// review R1-1). A nested statement's refusals were answered by its own funnel — reported, or the shadow of a
+    /// deferral it took — so the statement enclosing it never answers for them again: before this, a compound statement
+    /// (IF, EVALUATE, an inline PERFORM) around a deferred object property drew a false COBOLNET2362.</summary>
+    internal bool TakeRefusalsSince(int mark)
+    {
+        bool any = _refusalsBound > mark;
+        _refusalsBound = mark;
+        return any;
+    }
 
     private readonly List<string> _unbuilt = [];
 
@@ -165,8 +180,10 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// descriptor) rather than let the node reach the generated program.</summary>
     internal void NoteRefusal(DiagnosticDescriptor unreported, string feature)
     {
-        RefusalsBound++;
-        if (ErrorsRecorded == 0) Error(unreported, UnreportedRefusalMessage(feature));
+        _refusalsBound++;
+        // A refusal node a verb binder built over an operand an expansion owns (an open deferral, below) is the
+        // deferral's shadow, and the funnel defers its statement; it reported nothing because nothing is wrong yet.
+        if (ErrorsRecorded == 0 && _expansionDeferred.Count == 0) Error(unreported, UnreportedRefusalMessage(feature));
     }
 
     /// <summary>The ONE wording of the internal-error net, shared by <see cref="NoteRefusal"/> and the funnel.</summary>
@@ -177,6 +194,31 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// <summary>Record an operand shape WiseOwl COBOL has not BUILT (not a source error) — announced once per
     /// statement by the funnel as COBOLNET1756, exactly as a statement-level <c>BoundUnsupported</c> is.</summary>
     internal void NoteUnbuilt(string feature) => _unbuilt.Add(feature);
+
+    private readonly List<string> _expansionDeferred = [];
+
+    /// <summary>⛔ THE EXPANSION-DEFERRAL LEDGER (kb/Work PB2937). A site binding a parameterized definition AS ITSELF
+    /// (OO deep-dive D12 determination 6) that meets a question only an expansion can answer — a method selected through a
+    /// parameter-name, the description of what it returns — records it here and answers with no diagnostic, because
+    /// ISO §9.3.8.2.4 asks it "as if the actual parameter classes or interfaces were substituted", and every expansion
+    /// re-binds the line with its actual. The funnel (<c>StatementBinder.BindStatement</c>) takes the entry and keeps a
+    /// <c>BoundDeferredToExpansion</c> for the statement; the refusal ledger's checks stand aside for it (the verb binder
+    /// may have built a refusal node over the deferred operand). Reachable only from a formal description
+    /// (<c>ObjectRefDescriptor.Formal</c>), which only a skeleton's own binders produce.</summary>
+    internal void NoteExpansionDeferred(string construct) => _expansionDeferred.Add(construct);
+
+    /// <summary>The expansion-deferral ledger's high-water mark, taken by the funnel before a statement binds.</summary>
+    internal int ExpansionDeferredMark => _expansionDeferred.Count;
+
+    /// <summary>The first deferral recorded since <paramref name="mark"/> (or null), and the ledger cut back to it — a
+    /// statement answers for its own deferrals once, as for its unbuilt operands.</summary>
+    internal string? TakeExpansionDeferredSince(int mark)
+    {
+        if (_expansionDeferred.Count <= mark) return null;
+        string first = _expansionDeferred[mark];
+        _expansionDeferred.RemoveRange(mark, _expansionDeferred.Count - mark);
+        return first;
+    }
 
     /// <summary>The unbuilt-operand ledger's high-water mark, taken by the funnel before a statement binds.</summary>
     internal int UnbuiltMark => _unbuilt.Count;

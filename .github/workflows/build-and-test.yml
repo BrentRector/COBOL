@@ -125,9 +125,12 @@ jobs:
             reason="event=$EVENT — a dispatch run is always the full matrix"
           else
             if [ "$EVENT" = "merge_group" ]; then
-              # The group's base is the main it was built on, so base..sha is every PR in the group: a group whose
-              # PRs are all docs-only skips the matrix exactly as a docs-only landing did before the queue. With no
-              # resolvable base the matrix runs (below).
+              # The group's base is the head of the group queued AHEAD of it (main itself only for the first), so
+              # base..sha is this pull request's own change: the groups ahead were tested by their own runs, and the
+              # queue merges a group only after every group ahead of it passed (kb/Work PB3107/PB3123 measured it: run
+              # 38360587401's base held entry 1996 before that pull request reached main). A docs-only pull request
+              # skips the matrix exactly as a docs-only landing did before the queue. With no resolvable base the
+              # matrix runs (below).
               if [ -n "${GROUP_BASE:-}" ] && git cat-file -e "${GROUP_BASE}^{commit}" 2>/dev/null; then
                 BASE="$GROUP_BASE"
               fi

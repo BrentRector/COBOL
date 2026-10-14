@@ -693,15 +693,40 @@ through the same `NewClassSymbol` / `NewInterfaceSymbol` and roster collection t
 `ParameterizedClasses` / `ParameterizedInterfaces` and out of every name lookup, and asks it the header rules every
 definition is asked (CLASS-ID / INTERFACE-ID / METHOD-ID AS literal, duplicate METHOD-ID, the INHERITS and IMPLEMENTS
 REPOSITORY rules). `OoDriver.BindParameterized` then binds its environment and data divisions and its method
-headers as itself, after every emitted class, and drops the result. A parameter-name resolves through the one
+headers as itself, after every emitted class, and KEEPS the forests (`OoDriver.SkeletonClasses` /
+`SkeletonInterfaceData`, carried on `GroupBindContext` outside `AllBinders`): no pass that produces code sees
+them, and the edition pass's data gates (`VersionConformancePass.GateData`) read them as they read every emitted
+class's, together with every INTERFACE's prototype forest, which no gate read either (kb/Work PB2937) — so a
+`USAGE FLOAT-BINARY-64` in an unexpanded skeleton, or on an interface prototype's formal, is COBOLNET0900 below
+2014. A parameter-name resolves through the one
 funnel as a FORMAL (`OoNameResolution.Result.IsFormal`, from the scope's own USING clause, asked before any group
-class of the same spelling), and a reference typed by a formal takes the universal description: what it names is
-known only in an expansion, where §9.3.8.2.4 asks every conformance question "as if the actual parameter classes or
-interfaces were substituted". The PROCEDURE statements of the definition bind only in its expansions: a statement
-through a formal-typed reference (a literal INVOKE argument, `SUPER` over a formal base, a formal as INVOKE's
-class-name) obeys rules that differ between the universal description and the typed one an expansion binds, so
-binding them here needs a description kind of its own (a FORMAL object-reference kind beside universal, class,
-interface and ACTIVE-CLASS) — the open half, outside this decision's current text.
+class of the same spelling). §11.3.4 GR6 lets it stand "only where an object-class-name or an interface-name is
+permitted", so a reference typed by it takes the alternative its REPOSITORY specifier declares, marked FORMAL
+(`ObjectRefDescriptor.Formal` — an AXIS of the object-class-name / interface-name alternative, not a fifth kind,
+because the formal IS that alternative; the measured universal stand-in drew five false refusals, kb/Work PB2937).
+§9.3.8.2.4 treats the definition "as if the actual parameter classes or interfaces were substituted", so the rule is:
+**a question that turns on WHICH class or interface the formal names is each expansion's; every other question is
+asked of the skeleton.** Concretely: (a) a SET-style pair (§14.9.39.3, the BY CONTENT and RETURNING conformances that
+are "as if a SET") is asked with the formal side standing for the actual MOST FAVOURABLE to the pair
+(`OoClassTable.SetOperands`), so only what no actual can change is refused — the FACTORY and ONLY axes (SR12 a)1./a)3.:
+`SET ONE TO X` with ONE `T ONLY` and X `T` is refused in every expansion), a universal sender into a formal-typed
+receiver, a formal-typed sender into ACTIVE-CLASS (SR14), an interface formal into a class-typed receiver; two
+references to the SAME parameter-name are one class (opaque identity). (b) An identical-description question
+(§9.3.8.2.3 rule 2 through `DescriptionMismatch`) is admitted when the two sides differ only in a name a formal may
+take (`ObjectRefDescriptor.TurnsOnFormal`). (c) A statement that SELECTS A METHOD through a formal — an INVOKE whose
+receiver is a formal-typed reference or a formal class-name, SELF of a method the definition does not define while
+its superclass is a formal (`OoClassSymbol.FormalBaseName`), SUPER or `B OF SUPER` over a formal superclass, an inline
+invocation or object property through a formal, `SET … TO` a formal class-name — binds the operands whose rules do
+not read the method (an undefined argument name is §8.4.2.1's refusal in every expansion) and is then the
+expansion's: the site records it on the EXPANSION-DEFERRAL ledger (`EditionContext.NoteExpansionDeferred`) and the
+statement funnel keeps a `BoundDeferredToExpansion` (never emitted; the refusal ledger stands aside for it). The
+node KEEPS what the verb binder built (`Bound`), so the statements nested in a deferred compound statement — an IF's
+branches under a condition read through a formal — are the same in every expansion and are walked by the edition
+pass like any others; and each statement takes its own refusals off the ledger (`EditionContext.TakeRefusalsSince`),
+so a compound statement never answers for a nested statement's deferral shadow. So
+`OoDriver.BindClassBody` runs over every skeleton after the emitted classes (`BinderDriver.Bind`), their forests take
+part in `ResolvePointerRestrictions`, and the edition pass walks their bound trees as well as their data. A
+skeleton's WRITTEN superclass is its `Base` as an ordinary class's is, so SUPER binds against it.
 
 **Diagnostics.** COBOLNET2239 — the definition's own rules (§11.3.3 SR8/SR9, §11.6.3 SR4/SR7, §11.3.4 GR6 /
 §11.6.4 GR4, §12.3.8.3 SR3), reported on the skeleton whether or not anything expands it. COBOLNET2240 — the
