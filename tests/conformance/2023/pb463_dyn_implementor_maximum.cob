@@ -1,7 +1,7 @@
       *> The MAXIMUM SIZE of a dynamic-length elementary item written with NO LIMIT phrase (ISO 8.5.1.10.1 -
-      *> "the maximum size ... is smallest of: the value declared in the LIMIT phrase; the largest integer that
-      *> can be stored in an item of the usage specified in the PREFIXED phrase; the maximum permitted by the
-      *> implementor", with 13.18.19.4 GR2 making the absent phrase implementor-defined). The maximum is REAL
+      *> "The maximum size of a dynamic-length elementary item is smallest of:" "the value declared in the LIMIT
+      *> phrase", "the largest integer that can be stored in an item of the usage specified in the PREFIXED
+      *> phrase", "the maximum permitted by the implementor", with 13.18.19.4 GR2 making the absent phrase implementor-defined). The maximum is REAL
       *> (docs/CONFORMANCE.md section 7 row DOC-A.1-62), which is what bounds SET SIZE's 14.9.39.4 GR38 clamp -
       *> and it does not interfere with ordinary lengths, which is what this program pins. kb/Work PB463: the
       *> absent phrase used to mean "no bound at all", so a request past 2**32 wrapped to its low bits and one

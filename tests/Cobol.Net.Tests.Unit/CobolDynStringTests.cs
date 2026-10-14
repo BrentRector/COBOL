@@ -55,7 +55,7 @@ public sealed class CobolDynStringTests
     public void Store_NoLimitPhrase_StoresInFullUnderTheImplementorMaximum(string value)
         => Assert.Equal(value, CobolDynString.Store(value, CobolDynString.MaxSizeOf(null)));
 
-    // ── §8.5.1.10.1 — THE maximum size, "the smallest of" ──────────────────────────────────────────────────────
+    // ── §8.5.1.10.1 — THE maximum size, "is smallest of" ──────────────────────────────────────────────────────
 
     /// <summary>No LIMIT phrase ⇒ the implementor maximum (§13.18.19.4 GR2), never "no maximum".</summary>
     [Fact]
@@ -97,7 +97,7 @@ public sealed class CobolDynStringTests
     }
 
     /// <summary>§8.5.1.10.1's PREFIXED candidate (kb/Work PB829): the length field of the item's
-    /// dynamic-length-structure-name bounds the maximum size — "the smallest of" the three — so a SHORT PREFIXED
+    /// dynamic-length-structure-name bounds the maximum size — the smallest of the three — so a SHORT PREFIXED
     /// field (65535, §12.3.7.4 GR18) beats an absent or larger LIMIT, a smaller LIMIT beats the field, and a
     /// 32-bit field never raises the implementor maximum.</summary>
     [Theory]

@@ -838,10 +838,11 @@ internal static class RuntimeApi
         $"{nameof(CobolFloat)}.{(checkedLanding ? nameof(CobolFloat.ToScaled) : nameof(CobolFloat.ToScaledUnchecked))}({value}, {scale}, {RoundingText(mode)})";
 
     /// <summary>A floating-point operand landed for an INTERMEDIATE consumer — an alignment, an argument, a subscript
-    /// (<c>NumericRenderer.Align</c> / <c>AlignRoundedUp</c>): <c>CobolFloat.ToScaledSaturating</c>, the landing that
-    /// saturates past the carrier because no store follows to be fooled by the sentinel (kb/Work PB77, PB2967).</summary>
+    /// (<c>NumericRenderer.Align</c> / <c>AlignRoundedUp</c>): <c>CobolFloat.ToScaledIntermediate</c>, the landing that
+    /// raises EC-SIZE-OVERFLOW past the carrier, as the SDIDI's <c>DecToUnscaledIntermediate</c> does — never a
+    /// sentinel a later comparison or selection would mistake for a value (kb/Work PB77, PB2967, PB3019).</summary>
     public static string FloatToScaledIntermediate(string value, string scale, CobolRounding mode) =>
-        $"{nameof(CobolFloat)}.{nameof(CobolFloat.ToScaledSaturating)}({value}, {scale}, {RoundingText(mode)})";
+        $"{nameof(CobolFloat)}.{nameof(CobolFloat.ToScaledIntermediate)}({value}, {scale}, {RoundingText(mode)})";
 
     /// <summary>An arithmetic value transferred into a FLOATING-POINT resultant identifier under the receiver's
     /// §14.7.4.3 mode — <c>FloatResultant</c>'s entry for the value's carrier (binary64, SDIDI, scaled signed or
@@ -1109,7 +1110,8 @@ internal static class RuntimeApi
     // implicitly, and NO narrowing to `int` happens before the runtime's range test. An omitted length renders the
     // distinct sentinel above rather than −1. Both rules live HERE and nowhere else: a ref-mod attaches to a storage
     // PLACE (PlaceRenderer, readable and writable), to a ref-modified FUNCTION RESULT (IntrinsicRenderer, read-only —
-    // §8.4.3.3.3 SR2) and to a ref-modified ACCEPT receiver's transfer width (AcceptDisplayEmitter), and they must agree.
+    // §8.4.3.3.3 SR2) and to a slice's evaluated length (PlaceRenderer.SliceLength — an ACCEPT receiver's transfer
+    // width and a CALL / INVOKE argument's area extent), and they must agree.
 
     /// <summary>The leftmost-position argument of the runtime's range-checked reference modification, from the typed
     /// start position (§8.4.3.3.4 item 5b). A value past the carrier saturates inside the position read, so it stays
@@ -2578,6 +2580,11 @@ internal static class RuntimeApi
     /// at the GIVING receiver's digit capacity, the §14.7.5 no-phrase store's own disposition.</summary>
     public static string NumCapDigits(string expr, int digits) =>
         $"{nameof(CobolNum)}.{nameof(CobolNum.CapDigits)}({expr}, {digits})";
+
+    /// <summary>The SDIDI lane's subsidiary quotient (§14.9.12.4 6) c), kb/Work PB3017) - the SDIDI quotient truncated at the
+    /// GIVING receiver's scale and capped at its digit count, <see cref="NumCapDigits"/>'s twin on <c>CobolDec</c>.</summary>
+    public static string DecSubsidiaryQuotient(string quotient, int scale, int digits) =>
+        $"{nameof(CobolDec)}.{nameof(CobolDec.SubsidiaryQuotient)}({quotient}, {scale}, {digits})";
 
     /// <summary>The COMPILE-TIME WHEN-COMPILED stamp format (a typed passthrough like <see cref="EditCompose"/>):
     /// the §15.99.3 r2 compilation timestamp is baked as a constant with the SAME runtime formatter the

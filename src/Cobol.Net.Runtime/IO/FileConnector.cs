@@ -915,6 +915,9 @@ public abstract class FileConnector
         try { s = CloseCore(); }
         catch (UnauthorizedAccessException) { s = FileStatusCode.PermanentError; }
         catch (IOException) { s = FileStatusCode.PermanentError; }
+        // A persist composes the whole store image in one allocation (RecordFraming.ComposeStore), so a CLOSE owing one
+        // maps an allocation the host refuses to the same '30' as OPEN and CompleteStatement (kb/Work PB2842).
+        catch (OutOfMemoryException) { s = FileStatusCode.PermanentError; }
         ReleaseRunUnitFileLock();   // §9.1.15 — "The file lock is removed by an explicit or implicit CLOSE statement"
         _openMode = false;
         // §9.1.13.1 / Annex A.1 item 105 — THE CORRECTION TECHNIQUE: a completed CLOSE ends a permanent error in

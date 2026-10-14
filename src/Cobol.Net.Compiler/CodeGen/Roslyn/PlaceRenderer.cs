@@ -1049,6 +1049,29 @@ internal static class PlaceRenderer
         : p.Item.GroupUsage is GroupUsage.Bit ? LengthExpr(p)
         : NatLengthExpr(p);
 
+    /// <summary>⛔ THE C# <c>int</c> EXPRESSION OF A SLICE'S EVALUATED LENGTH — §8.4.3.3.4 GR5 c): the specified length,
+    /// through the ONE saturating narrowing of a reference modifier's length (kb/Work PB1033), or for the omitted form
+    /// "up to and including the rightmost position of the data item referenced by identifier-1" from the leftmost one,
+    /// computed in <c>long</c> so a saturated start cannot overflow it and floored at zero (the slice's own read or write
+    /// raises EC-BOUND-REF-MOD for a leftmost position out of range, naming its exact value). identifier-1's positions are
+    /// its static count (<see cref="RefModPlace.StaticInnerPositions"/>: a SIGN SEPARATE position and a bit group's
+    /// as-if positions included) or, for an item whose length is a run-time value, its current one: a
+    /// DYNAMIC LENGTH item's (§8.5.1.10.4 "is treated as a fixed-length data item whose length is the dynamic-length
+    /// elementary item's current length") and an ANY LENGTH item's, its argument's (§13.18.2.4 GR1 b)), both the length
+    /// of the read (the ANY LENGTH width idiom, <c>ReceivingStore.AnyLengthWidth</c>). The ACCEPT transfer and a CALL /
+    /// INVOKE argument's area extent both take it, so the two cannot measure one slice two ways (kb/Work PB3128: ACCEPT
+    /// re-spelled identifier-1's positions as its PICTURE length, one position for both run-time-length shapes and one
+    /// short of a SIGN SEPARATE item).</summary>
+    public static string SliceLength(RefModPlace r) =>
+        r.Length is { } length ? RuntimeApi.HostInt32(RuntimeApi.RefModLength(length))
+        : $"(int)global::System.Math.Max(0L, {InnerPositionsExpr(r)} - (long)({RmStart(r)}) + 1)";
+
+    /// <summary>identifier-1's positions as a C# expression, at execution when its length is a run-time value (see
+    /// <see cref="SliceLength"/>).</summary>
+    private static string InnerPositionsExpr(RefModPlace r) =>
+        r.StaticInnerPositions is { } size ? size.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        : $"{Read(r.Inner)}.Length";
+
     /// <summary>A receiving store over an occurs-depending GROUP operand's CURRENT extent (GR8a — depending-outside):
     /// splice the stored prefix over the live image, leaving positions past the count unmodified. A zero current
     /// extent (OCCURS 0 TO n DEPENDING at count 0, §13.18.38 GR8a) is a no-op store, NOT a reference-modification

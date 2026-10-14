@@ -69,9 +69,10 @@ static CobolNet.Runtime.ObjectReferenceOperand.operator ==(CobolNet.Runtime.Obje
 static CobolNet.Runtime.ObjectReferenceSet.Refusal(CobolNet.Runtime.ObjectReferenceOperand send, CobolNet.Runtime.ObjectReferenceOperand recv, bool activeClassSenderAdmitted = true) -> string?
 ~override CobolNet.Runtime.ObjectReferenceOperand.Equals(object obj) -> bool
 ~override CobolNet.Runtime.ObjectReferenceOperand.ToString() -> string
-static CobolNet.Runtime.CobolFloat.ToScaledSaturating(double v, int scale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
+static CobolNet.Runtime.CobolFloat.ToScaledIntermediate(double v, int scale, CobolNet.Runtime.CobolRounding mode) -> System.Int128
 static CobolNet.Runtime.ExternalizedNames.FormInEdition(string? value, int dialectLevel) -> string!
 static CobolNet.Runtime.CobolNames.HasEditionSpelling(int dialectLevel) -> bool
+static CobolNet.Runtime.CobolDec.SubsidiaryQuotient(CobolNet.Runtime.CobolDec quotient, int scale, int digits) -> CobolNet.Runtime.CobolDec
 CobolNet.Runtime.ActivationDescription.AnyLengthClauses.get -> string?
 CobolNet.Runtime.ActivationDescription.AnyLengthClauses.init -> void
 CobolNet.Runtime.ActivationDescription.ClausePhrases.get -> string![]?
