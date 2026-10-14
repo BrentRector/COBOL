@@ -414,6 +414,17 @@ as the keyword again. `TokenRetypes` (the `>>COBOL-WORDS` map plus the freed wor
 `FragmentParse` exactly as `LexAndParse` applies it — which also gives the fragments the `>>COBOL-WORDS` retype
 they lacked.
 
+⛔ **A GATED WORD A FORMAT STILL SPELLS AS A KEYWORD, WHILE §8.9 LEAVES IT FREE, READS ITS KEYWORD POSITION THROUGH A
+RULE THAT ACCEPTS THE RETYPED SPELLING (kb/Work PB2623).** The retype is by WORD, so a program that declares the word
+also turns the keyword occurrences of that word into `IDENTIFIER`. The one live case is METHOD at COBOL-2023: the
+printed §8.9 list does not contain it (it names METHOD-ID; the generator's old "OCR omission" line was a false
+claim, PDF printed page 206), so `01 METHOD PIC X.` is legal there, yet the END METHOD marker (§10.7.2) and the
+EXIT METHOD statement (the 2002 and 2014 statement, removed at 2023 by Annex E.2 item 1, read under `--permissive`) still spell the word. Both go through
+`methodKeyword : METHOD | {wordAhead("METHOD")}? IDENTIFIER` (`CobolOO.g4`), the keyword position being where the
+format spells the word, through the one `wordAhead` comparison. A word dropped by 2023 §8.9 that no 2023 format
+spells (CLOCK-UNITS, EVERY, POSITION, PROCEDURES, PROCEED, REFERENCES: their constructs are 1985-only) needs no such
+rule.
+
 ⛔ **NO LEXER TOKEN MAY COST THE USER A WORD ISO LEAVES FREE (kb/Work PB655).** A word the lexer tokenizes never
 reaches `IDENTIFIER` by itself, so without a `nameSlot` row it is refused as a user-defined word at every edition.
 `CobolWordsDriftTests.LexerWordTokens_Cost_The_User_No_Word_Iso_Leaves_Free` joins the COMPILED lexer vocabulary
@@ -700,7 +711,7 @@ a zero-length literal-1 (structurally: contiguous delimiters, never "decodes to 
 constant-name standing for a numeric literal — and every §8.8.3.2 rule of a concatenated literal-1; the
 per-position diagnostic dedup keeps a figurative read at two sites to one report. The version pass's
 `VisitFigurativeConstant` keeps only the statement-scoped 2002 gate for a national/boolean literal-1 (the `&` gate is
-`VisitConcatenationExpression`'s, on recognition); the §8.3.3 literal-token rules are LiteralScreenPass's. The rules
+`VisitConcatenationExpression`'s, on recognition); the §8.3.3 literal-token rules are LiteralScreen's. The rules
 moved to the binder because they need the program's constant-names, which the parse walk has not got (the version
 pass used to ask them over a quoted-only operand list — kb/Work PB1393's arm, PB1627).
 
@@ -848,7 +859,7 @@ reference formats, and the only place source comments are recognized. Its model:
   resultant unit per physical position, and `TextSite.Spans` ends a span at each tab and at each supplementary-plane
   character, so `LineOrigin.Locate` needs no knowledge of the text. The indicator-column gates (`FixedFormLine.IndicatorColumn`)
   need no site: a tab written in positions 1–7 fills through position 8, so an indicator that is not a space is
-  always at position 7 (kb/Work PB2982).
+  always at position 7 (kb/Work PB2982). Text a later stage WRITES (a REPLACE replacement, COPY ... REPLACING text) gets the same conversion from `OriginWriter.Append`, which ends its span at each supplementary-plane character exactly as `TextSite.Spans` does, so a column the parser reports inside written text is a character position too (kb/Work PB3031; `CharacterPositions` lives in `Common` beside the writer, not in the preprocessor).
 - **The format is STATE of an in-order walk** (`FormatSegments`, kb/Work PB1361): each line is asked whether it is a
   directive in the program-text area of the format in effect (`DirectiveText` — positions 8 to margin R of a source
   line in fixed form, the whole line in free form; §7.3.3 SR2/SR3), `>>SOURCE` and a format-changing `>>POP` update the
@@ -1456,7 +1467,7 @@ and the parser does not), not immediately followed by a space → COBOLNET2631, 
 DECIMAL-POINT IS COMMA decimal point (a digit after, a digit / sign / '(' / space before), which the numeric-literal
 rules own; rule 3 — a DOT not followed by a space → COBOLNET2632 (a period inside a numeric literal or PICTURE
 string is part of that token); rule 5 — every literal token of either mode (`LiteralTokens.Types`, the one set
-`LiteralScreenPass` also reads) whose opening delimiter is not preceded by a space, '(' or '==' or whose closing
+`LiteralScreen` also reads) whose opening delimiter is not preceded by a space, '(' or '==' or whose closing
 delimiter is not followed by a space, ',', ';', '.', ')' or '==' → COBOLNET2633, touching literals reported once.
 The operator clauses that state their own separator context are decided at the same site (kb/Work PB1430): §8.7.3's
 concatenation operator '&' and §8.7.4's invocation operator '::' "shall be immediately preceded and followed by a
@@ -1469,12 +1480,14 @@ already a SUBSCRIPT-mode token of the main lex.
 
 **A prefixed literal is delimited whatever its content (kb/Work PB1441).** `X"`, `N"`, `B"`, `NX"` and `BX"` are
 opening delimiters (§8.3.5 5)), so every prefixed body fragment is `<prefix> STR_BODY`; the §8.3.3 content
-repertoires (hexadecimal digits for X / NX / BX, '0'/'1' for B) are `LiteralScreenPass`'s COBOLNET2630, never the
+repertoires (hexadecimal digits for X / NX / BX, '0'/'1' for B) are `LiteralScreen`'s COBOLNET2630, never the
 lexer's — a body that spelled its repertoire fell back to IDENTIFIER + Format 1 literal on the first bad character,
 which beside a data item of the prefix's name compiled as two operands. The literal rules have one ordered entry,
 `CobolLiteral.SyntaxViolation` (repertoire, then grouping, then length), asked of the unit's tree by
-`LiteralScreenPass` and of a compiler-directive operand — lexed apart from the unit — by
-`CompileTimeExpressionEvaluator`. A lexer action that ends a token early does
+`LiteralScreen` alone — over the unit's tree (`BinderDriver`) and over each compiler-directive operand's fragment, which
+is lexed apart from the unit and so never on that tree (the conditional-compilation stage's three fragment funnels,
+kb/Work PB1616: the literal rules, and in a compiled branch the edition gates of a literal's format, are COBOLNET0814 /
+1635 / 2630 / 0900 there exactly as in the program text). A lexer action that ends a token early does
 so through `CutTokenTo(length)`, which restores the column with the input position (kb/Work PB1728).
 
 ### 3.13 The characters of a COBOL word, and the ONE fold that compares words (kb/Work PB1402)

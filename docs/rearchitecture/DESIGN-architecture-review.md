@@ -93,7 +93,8 @@ Every finding is a `kb/Work` note (CLAUDE.md rule 8), never a list in this docum
   refuses to write a record on any difference. Reachability is a semantic walk confirmed by `SymbolFinder`, with
   every exclusion a stated rule the record carries. `ArchCensusDriftTests` keeps the newest record whole and the
   script's policy arms firing. Its findings are filed as kb/Work notes by a clerk, never kept as a list.
-- **The oracle** (§4.1) is recorded at the baseline commit: `python scripts/arch/capture_oracle.py --record`.
+- **The oracle** (§4.1) is captured at the baseline commit: `python scripts/arch/capture_oracle.py` (nothing is
+  committed; a wave compares against the capture of its own base commit, kb/Work PB3107).
 - **Performance baseline** (`brent-tools:performance-diagnosis`): the compile-throughput benchmark and the
   whole-population gate time, so no refactor regresses speed unseen. The instrument is
   `scripts/arch/perf_baseline.py` (kb/Work PB2117, which is also kb/Work A6's): warm compile throughput and the
@@ -350,13 +351,17 @@ A refactor is proven neutral by ALL of these, compared case by case, never by to
 
 ### 4.1 The oracle of items 1 and 2 (kb/Work PB2116)
 
-**What is recorded is a manifest of hashes, not the emitted C#.** Thousands of programs at up to four editions would
-put tens of megabytes of generated C# into the repository on every re-baseline, so the committed record is one
-manifest, `docs/rearchitecture/evidence/arch-oracle/<commit12>.manifest.json`: one line per case with the SHA-256
-of its emitted C# (null when the backend never ran) and of its diagnostic stream. The blobs themselves go to the
-gitignored `TestResults/arch-oracle/<commit12>/` (`<id>.g.cs`, `<id>.diag.txt`), so a difference is diffed locally.
-That directory holds exactly one manifest, the current baseline; re-recording replaces it and git history keeps the
-old one.
+**What is captured is a manifest of hashes, and NOTHING IS COMMITTED (kb/Work PB3107).** A capture writes
+`TestResults/arch-oracle/<commit12>/` (gitignored): `manifest.json`, one line per case with the SHA-256 of its
+emitted C# (null when the backend never ran) and of its diagnostic stream, beside the blobs themselves (`<id>.g.cs`,
+`<id>.diag.txt`), so a difference is diffed locally. Two captures of one commit are identical (below), so a capture
+is a pure function of its commit and the baseline of a comparison is the capture of the change's own BASE commit,
+made on demand. Until PB3107 one manifest was committed under `docs/rearchitecture/evidence/arch-oracle/` and every
+landing that changed an input re-recorded it; GitHub's merge queue builds each pull request into a tree no branch
+recorded (its group sits on every group queued ahead of it), so two such landings queued together left two
+manifests, or one behind the other's inputs, and bounced (nine merge-group runs on 2026-10-13), and the loop had to
+serialize every re-record by hand. A committed record cannot describe a tree that only the queue builds; a capture
+of a commit can be made whenever it is needed.
 
 **The population is the suites' own, by construction.** The cases and their compiles live in the Conformance
 assembly (`tests/Cobol.Net.Tests.Conformance/ArchOracle.cs`), beside the theory families they mirror. Each case comes
@@ -390,21 +395,20 @@ as probed (`K1FDA.CPY` on Windows, the on-disk `K1FDA.cpy` on Linux), which affe
 first baseline. So the manifest records its `platform`, `compare_oracle.py` prints a NOTE when the two differ, and
 a wave compares captures from one platform.
 
-**Commands.** `python scripts/arch/capture_oracle.py --record` records the baseline (a clean tree only). It is run
-once in R0 and again after each landed fix-lane train, because a fix legitimately changes emitted C#. The oracle is
-re-based by that script, never by hand. A wave runs `python scripts/arch/compare_oracle.py`, which captures the
-current tree and compares it with the recorded baseline case by case, printing `CSHARP`, `DIAGNOSTICS`, `ADDED`
-or `REMOVED` per case and the verdict line `=== ARCH-ORACLE: IDENTICAL|DIFFERENT …`. Add `--diff` for unified
-diffs: the recorded baseline is hashes only, so when this machine never captured the baseline commit, `--diff`
-captures it first, running that commit's own `capture_oracle.py` in a detached worktree of it, and keeps the blobs
-under `TestResults/arch-oracle/<commit12>/`; a capture that does not reproduce the recorded hashes diffs nothing
-(kb/Work PB2152, where the first explanation of a difference needed that capture by hand). The wave's DEVLOG entry shows the IDENTICAL line or explains every listed case. The host process is
+**Commands.** A wave runs `python scripts/arch/compare_oracle.py [--base REV]`. It captures the baseline, the
+change's base commit (default: the merge base of HEAD and origin/main), by running THAT commit's own
+`capture_oracle.py` in a detached worktree of it (its host, its population), and keeps the capture under
+`TestResults/arch-oracle/<commit12>/`, where a later comparison against the same base finds it; then it captures the
+current tree and compares the two case by case, printing `CSHARP`, `DIAGNOSTICS`, `ADDED` or `REMOVED` per case and
+the verdict line `=== ARCH-ORACLE: IDENTICAL|DIFFERENT …`. `--diff` adds a unified diff of each differing case from
+the two captures' blobs (kb/Work PB2152 first needed the baseline's blobs by hand). Two existing captures compare as
+`compare_oracle.py <baseline manifest.json> <new manifest.json>`. The wave's DEVLOG entry shows the IDENTICAL line or
+explains every listed case; a fix-lane landing, which legitimately changes emitted C#, records nothing. The host process is
 `tests/Cobol.Net.ArchOracle`, a member of the solution that holds no logic of its own.
 
 **Drift.** `ArchOracleDriftTests` holds every `[PartitionedRowSource]` of the Conformance assembly enrolled, every
-non-sentinel row a case, no two rows one case, an observation free of machine paths and the clock, and the recorded
-baseline one well-formed manifest. It pins the enumerator, not the recorded manifest, which every golden-adding fix
-outgrows until the next re-record.
+non-sentinel row a case, no two rows one case, and an observation free of machine paths and the clock. It pins the
+enumerator; no capture is committed for it to pin (kb/Work PB3107, `LandingPipelineDriftTests` keeps it so).
 
 **Item 3 is not yet built.** The token-stream and parse-tree differential for grammar changes is the next step, and
 kb/Work PB2113 and PB2114 are its first consumers. It needs a capture of the lexer's token stream and the parse
@@ -516,7 +520,7 @@ only gate between restructuring waves and fix-lane trains; zero GAP stays v1.0's
 > `docs/rearchitecture/evidence/arch-census/a02b165dae86b674e16399468144e1386171236b.json` (commit `a02b165da`,
 > 2026-10-07; its findings file carries the `R0-nnnn` ids) by a field or an id, a `file:line`, or a number that record
 > computes; a count the census does not yet compute is marked *text scan, provisional* and §8.2 makes the census compute
-> it. Every claim about COBOL cites the standard through `cite.py --check`. The oracle (`arch-oracle/f620ccf6d43d`) and
+> it. Every claim about COBOL cites the standard through `cite.py --check`. The oracle (§4.1, against each wave's base) and
 > the baseline (`perf-baseline/354c79ef3312`) bound every wave below. **This section holds shapes only**: the work
 > (each wave's order, blockers and sites) is the `kb/Work` notes that cite it (CLAUDE.md rule 8).
 

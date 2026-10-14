@@ -55,7 +55,7 @@ Fixed-point = native `long` holding the UNSCALED value; scale is compile-time me
 
 == 7. LEVELS 66 (RENAMES) and 88 (condition-names) ==
   • 88 condition-name: NOT a storage item — a named boolean predicate over its parent (the conditional variable). DECISION: emit each 88 as a C# `static bool` PROPERTY (or a method) over the parent Place: `private static bool LvlOk => CobolCond.In(Parent.Read(), <value-or-range-set>);` where the value set comes from the (possibly multi-valued, THRU-ranged) VALUE clause. SET cond TO TRUE → assign the parent its first/low value (ISO §14.9.39.4 GR6). The binder captures 88 entries as `Condition88` records on their conditional variable (IMPLEMENTED — `DataBinder.Conditions` multimap); ensure the captured VALUE list covers THRU ranges + multiple literals.
-  • 66 RENAMES: a re-grouping alias. Without THROUGH it forwards to data-name-2's place (§13.18.45.4 GR1); with THROUGH it is a `RenamesPlace` that concatenates on read, and splits on write, the STORAGE IMAGES of the parts that tile its window (GR2: "an alphanumeric group item"). Resolution is a post-build pass (`DataBinder`'s RENAMES resolution, `RenamesOwners()`).
+  • 66 RENAMES: a re-grouping alias. Without THROUGH it forwards to data-name-2's place (§13.18.45.4 GR1); with THROUGH it is a `RenamesPlace` that concatenates on read, and splits on write, the STORAGE IMAGES of the parts that tile its window (GR2: "an alphanumeric group item"). Resolution is a post-build pass (`DataBinder`'s RENAMES resolution, `RenamesOwners()`). An alias rides `Renames66`, not `Children`, so the child walks of `RecordLayout` never meet it: its byte POSITION is data-name-2's (`FirstOccurrenceOffsetOf`, `OffsetInRecord` and the variable-length key walk each forward to `Renames.From`), its WIDTH is its own `Pic` (THROUGH) or data-name-2's `ByteWidth` (no THROUGH, a group), and its group kind and operand category are data-name-2's (`ItemCategory.GroupKindsOf`; `DataItem.AsIfPic` / `IsAsIfElementary` forward a no-THROUGH alias, so a national-group alias is a national operand) — so an alias is a legal RECORD KEY / ALTERNATE RECORD KEY / SORT key like the item it names (kb/Work PB2502; §12.4.5.12.3 SR2, §14.9.40.3 SR6).
     A THROUGH alias answers two DIFFERENT questions from two fields, and each rule asks the one it means: its STORAGE
     (`RenamesInfo.Span` — the record's storage BYTES tiled once each by whichever leaves cover them, a REDEFINES view's
     leaves included, a leaf under an OCCURS group once per occurrence of that group, `RenamesSpanPart.Outer`, kb/Work
@@ -1891,6 +1891,33 @@ prunes TYPE-clone subtrees — so one predicate over it covers all four routes, 
 that must change (a weak typedef's pointer member is reported ONCE at the template, not once per `TYPE` use), and
 screens a fifth route added later for free.
 
+⛔ **The pruning has ONE blind spot, the TYPE entry itself, and it is closed for EVERY screen by the same helpers, not
+copies (kb/Work PB3129 and its review R1-1).** The forest prunes the TYPE entry ITSELF with its clone subtree. For a
+GROUP type that is right for a rule the TEMPLATE alone decides, but an ELEMENTARY
+pointer-class type declaration (`01 PT IS TYPEDEF USAGE POINTER.`) is a legal level-1 entry, while
+`01 G. 05 A TYPE PT.` is, by §13.18.57.4 GR1, "as though the data description identified by type-name-1 had been
+coded in place of the TYPE clause" — the level-05 spelling SR14 forbids, and the exact twin of the SAME AS copy
+(§13.18.49.4 GR1, the same words), which was always rejected. That spelling compiled clean and its group then failed
+at a CALL or a program prototype pair with a carrier diagnostic (COBOLNET1688 / COBOLNET1513) naming no rule it
+broke. So `CheckUsageDeclarations`' second loop — the composed-entry loop that already asks the EXTERNAL and BASED
+class rules of each entry carrying a TYPE clause (PB1212) — asks SR14's elementary arm
+(`ScreenSr14ElementaryPlacement`, the one helper both loops call) of every WRITTEN entry that carries a TYPE clause:
+a site entry or a TYPE entry written inside a template, never a clone composed beneath one.
+
+The blind spot is a property of the FOREST, not of SR14, so it held for every first-loop rule whose subject a TYPE
+clause composes, and the review of PB3129 measured two more: §13.18.60.3 SR4 (`01 CR CONSTANT RECORD. 05 A TYPE IT.`,
+IT a USAGE INDEX type, compiled and ran; a pointer type there was reported under SR14 instead of SR4) and
+§13.18.5.3 SR2 (`01 G TYPE VT BASED.`, VT a group type with a DYNAMIC LENGTH member, compiled and ran). Each first-loop
+screen is now one helper (`ScreenConstantRecordUsage`, `ScreenExternalClassItem`, `ScreenBasedClassObjectItem`,
+`ScreenBasedSubjectShape`, `ScreenSr14ElementaryPlacement`), and the composed-entry loop asks all of them, in the
+first loop's order, so SR4 still names a CONSTANT RECORD pointer before SR14 does. SR4 asks a TYPE entry for its whole
+composed subtree and reports ONCE at the TYPE entry, naming the first item that carries a barred phrase: the type
+declaration may be legal, and the TYPE clause is what must change. Two first-loop arms have no TYPE twin there:
+§13.18.60.3 SR15, whose TYPE twin is its own rule (§13.18.57.3 SR8, COBOLNET2960), and SR14 arm A, whose subject is
+a group's own written USAGE clause. `UsageDeclarationPlacementDriftTests.EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo`
+reads both loops from the source and fails on a new first-loop screen until the second loop asks it too or the test
+records why it need not.
+
 **Two determinations recorded here rather than left implicit.**
 1. **A level-77 entry SATISFIES SR14's "at level 1" arm.** §8.5.1.3.2 places a 77 entry outside the level system
    ("three types of entries exist for which there is no true concept of level"), and §13.11.1 declares the level-1
@@ -1905,7 +1932,8 @@ screens a fifth route added later for free.
 **Consequence for the storage model, worth stating because it bounds other subsystems' input.** On conforming
 source, the ONLY way to write a GROUP containing a pointer/object-class leaf is inside a `TYPEDEF STRONG`
 template. Everything else — an ordinary group member, a weak typedef member, a SAME AS copy into a group, a
-group-level pointer USAGE — is now rejected at the declaration. That is what makes `ComputeTier`'s nested
+TYPE entry of an elementary pointer-class type below level 1 (PB3129), a group-level pointer USAGE — is now
+rejected at the declaration. That is what makes `ComputeTier`'s nested
 pointer/object Tier-D backstop (D5 / `COBOLNET_REDEFINES_DESIGN.md`) unreachable-by-construction on conforming
 source; the backstop is kept as the recovery-path guard, never deleted.
 

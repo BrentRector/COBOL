@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Linq;
 using CobolNet.Frontend.Diagnostics;
+using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Preprocessor;
 using Xunit;
 

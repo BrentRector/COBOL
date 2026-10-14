@@ -554,8 +554,13 @@ public static class OoConformance
     /// described (<see cref="InvokedWith"/>). An ACTIVE-CLASS formal's rule — §14.8.2.3.2 rule 4 — is a statement
     /// about the invocation as much as about the argument, so it is decided only when this is supplied; without it
     /// (the override / implements / prototype PAIR, §9.3.8.2.3 rule 2 d)) the two descriptions are compared.</param>
+    /// <param name="prototypes">SIGNATURE comparison only (<see cref="PrototypeSignatures.Same"/>): the prototype pairs
+    /// that comparison has assumed to have the same signature, so a restricted program- or function-pointer pair is
+    /// decided by the signatures its restrictions name (<see cref="PrototypeSignatures.SameType"/>; kb/Work PB2495).
+    /// Without it the pair is decided by the signature classes that comparison built.</param>
     public static string? DescriptionMismatch(DataItem formal, DataItem arg, bool byRefGroupPrefix = false,
-        bool anyLengthActivationRelax = false, ObjectRefDescriptor? invokedWith = null)
+        bool anyLengthActivationRelax = false, ObjectRefDescriptor? invokedWith = null,
+        PrototypeBisimulation? prototypes = null)
     {
         // ⛔ THE STRONGLY-TYPED SENTENCE FIRST, and it governs every crossing this comparator answers for.
         // ONE sentence written three times: §14.8.2.2 "If either the formal parameter or the corresponding
@@ -717,7 +722,7 @@ public static class OoConformance
         // nothing — and a DPC class returning Z9,99 into a non-DPC Z9,99 receiver ran, the receiver reading 1234
         // for 12.34. An ANY LENGTH formal's one-symbol picture has no length of its own (§14.8.2.3.2
         // "Additionally" d)), so for it only the SYMBOL must agree.
-        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal, invokedWith) is { } armWhy) return armWhy;
+        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal, invokedWith, prototypes) is { } armWhy) return armWhy;
         return f.Clause is { } fc && a.Clause is { } ac
             ? anyLengthFormal ? PictureClauseIdentity.MismatchAtAnyLength(fc, ac) : PictureClauseIdentity.Mismatch(fc, ac)
             : null;
@@ -728,7 +733,7 @@ public static class OoConformance
     /// digit profile, JUSTIFIED, the LOCALE phrase, lengths and the pointer restrictions. The PICTURE clause's
     /// identity is compared by the caller after this, for every category alike.</summary>
     private static string? CategoryArmMismatch(DataItem formal, DataItem arg, PicInfo f, PicInfo a, bool anyLengthFormal,
-        ObjectRefDescriptor? invokedWith)
+        ObjectRefDescriptor? invokedWith, PrototypeBisimulation? prototypes)
     {
         switch (f.Category)
         {
@@ -745,7 +750,10 @@ public static class OoConformance
                 // rule cannot see.
                 if (fd.Kind is ObjectRefKind.ActiveClass && invokedWith is { } iw)
                     return ActiveClassFormalMismatch(null, fd, ad, iw, byReference: true);
-                return fd.SameDescriptionAs(ad) ? null
+                // A parameter-name of the definition bound as itself on one side, naming something other than the
+                // other side's parameter-name: identical in an expansion whose actual IS the other side's class or
+                // interface, and not in another — the expansion's question (§9.3.8.2.4; kb/Work PB2937).
+                return fd.SameDescriptionAs(ad) || fd.TurnsOnFormal(ad) ? null
                     : $"object-reference description mismatch (formal {fd.Spelled}, argument {ad.Spelled} — "
                       + "§9.3.8.2.3 rule 2 requires the same kind, name, FACTORY presence and ONLY presence)";
             case PicCategory.Numeric:
@@ -838,9 +846,10 @@ public static class OoConformance
                         + "restricted pointer, both shall be restricted and of the same type)";
                 // A restricted PROGRAM- or FUNCTION-pointer is typed by the SIGNATURE of its prototype (§13.18.60.4 GR25 /
                 // GR26), so "the same type" is the same signature class — never the prototype's NAME, which would refuse
-                // two differently named prototypes of one signature (kb/Work PB2464).
-                if (!string.Equals(PrototypeSignatures.RestrictionIdentity(formal), PrototypeSignatures.RestrictionIdentity(arg),
-                        StringComparison.Ordinal))
+                // two differently named prototypes of one signature (kb/Work PB2464). Inside a signature comparison the
+                // class is what that comparison is building, so there the pair is decided by the signatures the two
+                // restrictions name, as the greatest fixed point (kb/Work PB2495) — one relation, PrototypeSignatures.SameType.
+                if (!PrototypeSignatures.SameType(formal, arg, prototypes))
                     return $"restricted pointer mismatch (formal {PointerRestrictionText(f.RestrictedPrototypeName, "prototype")}, "
                         + $"argument {PointerRestrictionText(a.RestrictedPrototypeName, "prototype")} — §14.8.2.3.2: if either "
                         + "is a restricted pointer, both shall be restricted and of the same type, and a prototype pointer's "
@@ -911,7 +920,8 @@ public static class OoConformance
                 return null;
             if (arg is { Kind: ObjectRefKind.ObjectClass, Only: true } && arg.Factory == formal.Factory
                 && InvokedThroughOnlyClass(invokedWith)
-                && CobolNames.Same(arg.Name, invokedWith.Name))
+                // A parameter-name may be substituted by that very class (§9.3.8.2.4; kb/Work PB2937).
+                && (arg.Formal || CobolNames.Same(arg.Name, invokedWith.Name)))
                 return null;
             return $"the formal parameter is described ACTIVE-CLASS ({factory} FACTORY) and the argument is "
                 + $"{arg.Spelled}, invoked with {invokedWith.Spelled} — BY REFERENCE the argument shall be a) an "
@@ -1243,7 +1253,11 @@ public static class OoConformance
     /// PicInfo, bool)"/>.</summary>
     public static string? ObjectRefAssignmentMismatch(OoClassTable table, ObjectRefDescriptor send,
         ObjectRefDescriptor recv, bool activeClassSenderAdmitted = true)
-        => ObjectReferenceSet.Refusal(table.SetOperand(send), table.SetOperand(recv), activeClassSenderAdmitted);
+    {
+        // A formal side stands for the actual most favourable to the pair (OoClassTable.SetOperands; kb/Work PB2937).
+        var (s, r) = table.SetOperands(send, recv);
+        return ObjectReferenceSet.Refusal(s, r, activeClassSenderAdmitted);
+    }
 
     /// <summary>
     /// Which §14.9.39.3 syntax rule governs a SET format-5 statement whose sender is <b>object-class-name-1</b>

@@ -4,7 +4,7 @@
       *> never an arithmetic expression, and §8.3.3.3.2 2) puts a sign INSIDE a literal only
       *> as its leftmost character — `- .5` separated by a space is not the literal -.5.
       *> The grammar's `signedNumericLiteral : (PLUS | MINUS)? numericLiteralCore` read it
-      *> as -0.50 through GetText(); LiteralScreenPass now refuses it, COBOLNET2155.
+      *> as -0.50 through GetText(); LiteralScreen now refuses it, COBOLNET2155.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1445MV.
        DATA DIVISION.

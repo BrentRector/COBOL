@@ -37,6 +37,12 @@ internal sealed partial class OoBinder
             bool isSuper = po.SUPER() is not null;
             if (OoPredefinedSearchRoot(isSuper, superQualifier, "the object-property object", report: !probe) is not { } root)
                 return null;
+            // SUPER over a formal superclass: the accessor is the actual's (kb/Work PB2937), each expansion's question.
+            if (root.SearchRoot is null)
+            {
+                if (!probe) ctx.Edition.NoteExpansionDeferred($"an object property of {(superQualifier is null ? "SUPER" : superQualifier.GetText() + " OF SUPER")}");
+                return null;
+            }
             // §14.9.23.3 SR4 f)–i): a factory method's SELF / SUPER resolve over the FACTORY interface.
             return new(isSuper ? InvokeForm.Super : InvokeForm.Self, null, root.SearchRoot, null, host.OoInFactory);
         }

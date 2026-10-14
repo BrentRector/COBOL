@@ -375,6 +375,7 @@ registered by this change (open decision D2).
 | the 5-hour session window runs out mid-unit | a unit killed at the limit | `hold-session` at the soft stop (`session_soft_stop_pct`, 97 % since 2026-10-07) before a unit starts |
 | two sessions allocate the same id or code | a renumbering pass (five collisions in one day, 2026-09) | `alloc.py`: one lock, reservations outside every worktree |
 | two landers (the loop's and an attended one, or two trains) rebase and gate at once | the one that pushes second rebases, renumbers its DEVLOG entry and re-gates (≈ 30 min of the whole machine each time); the R1 lander lost three times on 2026-10-07 and ended SPLIT with nothing landed | GitHub's merge queue orders main, and `enqueue.py land` merges a moved main in without a second gate (section 4.7) |
+| two pull requests queued together stack in the other order, or both change what a landing check reads | the second merge group fails a check that passed on each branch alone (12 of 39 runs on 2026-10-13: the arch-oracle baseline doubled, the DEVLOG number below the group's base), and each bounce costs a finisher, a review round and a merge-group cycle | no landing check depends on what else is queued: nothing commits a record of one tree, and a DEVLOG number is held to the tree it was stamped on (section 4.7; kb/Work PB3107, PB3123) |
 | a landing reopens a closed inventory row | silent conformance regression | `inventory_ratchet.py` (section 7) |
 | the owner wants it stopped | losing agent work if the process were killed | `STOP` (`stop.ps1`): a graceful wind-down of the running unit and its fleet, a kill only after the grace period |
 | a unit's model ends a turn with a fleet in flight | a one-shot `claude -p` terminates background tasks 600 s later and the fleet dies (wave 1017) | the supervisor holds stdin open and closes it only when idle with no background task |
@@ -416,6 +417,18 @@ DEVLOG entry and re-gate; on 2026-10-07 the R1 lander lost to trains 1034 and 10
 nothing on main (owner 19:30 PDT: "this is stupid. we cannot keep running r1 repeatedly for zero gain"). The landing
 lease (PB2537, 2026-10-07) serialized landers for that; the queue made the race impossible, and the lease, its drift
 test and the direct-push landing script were deleted by PB3024's closing change (2026-10-11).
+
+**Concurrent landings need no serialization (kb/Work PB3107, PB3123; owner 2026-10-13).** The queue builds each pull
+request's merge group on every group queued ahead of it, in the order GitHub picks, so nothing the loop does may
+depend on landing one branch at a time. Two landing checks did: the arch-oracle baseline (each input-changing branch
+re-recorded its own, and two queued together left two in the stacked tree) and the DEVLOG number (held above the
+group's base, which carries the higher numbers of groups ahead). The enqueue unit serialized oracle re-records by
+hand, one finisher, review and landing cycle each, and 12 of 39 merge-group runs still failed in one night. Both
+checks were redesigned so a branch's verdict does not depend on what else is queued (DESIGN-test-build-ci.md §3.17.2
+step 4): the oracle commits nothing (a wave compares against the capture of its own base commit, so there is no
+ORACLE stop, no exit 7 and no re-record for the enqueue unit to dispatch), and a DEVLOG entry keeps the number it was
+stamped with (the landing lane never re-stamps a bounced branch). The landing lane therefore launches every WAITING TO
+LAND branch the moment it is ready, whatever it changes.
 
 ### 4.8 Steering the loop: the operator (kb/Work PB2596)
 
@@ -464,7 +477,9 @@ said in the supervisor's log, a failure said and the unit continuing. A tick:
    branch whose last attempt the lane may retry with its tip still that attempt's end head, and every branch the
    enqueue unit re-armed at its current tip (a BOUNCED one included), `land_lane.decide` says
    whether to start `enqueue.py land <branch> --worktree <wt>`, DETACHED (its own process group, out of the
-   supervisor's job where Windows allows it), its output in `logs\land-lane-<branch>-<stamp>.log`:
+   supervisor's job where Windows allows it, and on Windows its own console with no window, `CREATE_NO_WINDOW`,
+   which every program it starts inherits: under `DETACHED_PROCESS` each of them opened a window that took the
+   desktop's focus, kb/Work PB3117), its output in `logs\land-lane-<branch>-<stamp>.log`:
 
 | The branch's last attempt | The lane |
 |---|---|
@@ -583,7 +598,7 @@ as `audit_witness_loss.py`, whose `rows_at` it reuses).
 - Exit 0 green, 1 with the offending row ids printed, 2 when the inventory does not exist at `base`.
 
 **Wiring (described, not done here):** the landing runs it as one of `enqueue.py checks` (beside
-`landing_oracle.py`, before the pull request), and CI's `audits` job runs it with the `changes`
+`devlog.py check`, before the pull request), and CI's `audits` job runs it with the `changes`
 job's `BASE`, exactly as it runs `audit_witness_loss.py`. The orchestrator decides when to turn it on (open decision
 D5), because it changes the landing contract.
 
@@ -824,7 +839,8 @@ against the retired train records, kb/Work PB3028; `LandingMeasureDriftTests` al
 in survey order and only once; a planted exit 3 is retried at its head only once the overlap is gone; an exit 5 is
 never relaunched at its head and a new head is eligible again; an exit 2 or 9 is retried once; a DIED runner is reaped
 and retried once; an exit 8 stops every attempt and names the operator until `clear-halt`; STOP-UNIT, STOP and the
-global stop start nothing; the agent work `next_unit.py` reads; a real detached runner records its outcome). The
+global stop start nothing; the agent work `next_unit.py` reads; a real detached runner records its outcome; on
+Windows a spawned runner owns a console with no visible window). The
 supervisor's self-test is twelve parallel parts,
 `scripts/orchestrator/test_orchestrate_*.ps1`, sharing the harness `testdata/orchestrate_test_lib.ps1`: they drive the
 loop with a fake `-ClaudeExe` (`testdata/fake-claude.ps1`) and `open-watchers.ps1` with a fake `wt.exe`

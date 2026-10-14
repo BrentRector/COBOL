@@ -156,11 +156,11 @@ public sealed partial class DataBinder
         // ancestor walk starts from.
         var resolved = Compiler.Oo.OoNameResolution.Resolve(OoClasses, Edition, site, name,
             Compiler.Oo.OoNameResolution.Want.Either, where, "COBOLNET0813", resolveRule);
-        // A PARAMETER-NAME of the parameterized definition being bound as itself (kb/Work PB2051): it names whatever
-        // each expansion passes, so here the least-constrained description stands for it — the universal object
-        // reference, which every conformance rule admits; each expansion binds the actual's own description and asks
-        // them all (§9.3.8.2.4, §12.3.8.4 GR5). Nothing emits from this description.
-        // A formal's kind is its own REPOSITORY specifier's, so an interface formal is still the bare-name alternative.
+        // A PARAMETER-NAME of the parameterized definition being bound as itself (kb/Work PB2051, PB2937): it stands where
+        // an object-class-name or an interface-name is permitted (§11.3.4 GR6), so the description takes the alternative
+        // its own REPOSITORY specifier declares — an interface formal is the bare-name alternative — marked FORMAL: what it
+        // names is each expansion's actual (§9.3.8.2.4, §12.3.8.4 GR5), so a question that turns on which class it is
+        // waits for the expansion, and every other one is asked here (ObjectRefDescriptor.Formal). Nothing emits from it.
         bool isInterface = resolved.Interface is not null
             || resolved.IsFormal && !Compiler.Oo.OoNameResolution.Lookup(OoClasses, site, name,
                 Compiler.Oo.OoNameResolution.Want.Class).IsFormal;
@@ -172,7 +172,7 @@ public sealed partial class DataBinder
                 + (factory && only ? "the FACTORY OF and ONLY phrases" : factory ? "the FACTORY OF phrase" : "the ONLY phrase")
                 + " — those phrases belong to the object-class-name-1 alternative of the general format; the "
                 + $"interface-name-1 alternative carries neither ({interfaceRule})");
-        if (resolved.IsFormal) return ObjectRefDescriptor.Universal;
+        if (resolved.IsFormal) return ObjectRefDescriptor.FormalParameter(name, isInterface, factory, only);
         if (!resolved.Ok)
             // The funnel has already reported WHICH of the two failures this is (defined in the group but out
             // of scope vs. defined nowhere). Keep the name so every later diagnostic about this item still

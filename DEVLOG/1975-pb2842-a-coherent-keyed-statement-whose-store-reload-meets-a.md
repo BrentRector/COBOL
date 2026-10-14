@@ -63,8 +63,8 @@ statement entry bullet. Semgrep counts unchanged. No diagnostic codes used (COBO
 Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 5,129/11,488 - Unit 32,741/33,474 -
 Characterization 36/36 cases in leg 1).
 
-
-Arch oracle (landing refusal, exit 7, after main moved to baseline `4dfb26c315bf`): `compare_oracle.py` reads
-`=== ARCH-ORACLE: IDENTICAL — 7786 cases (baseline 4dfb26c315bf, new 964c4928e73e) ===`, as expected for a runtime-only
-change (the four `src/Cobol.Net.Runtime/IO` connectors alter no emitted C# and no diagnostic); the baseline is re-recorded
-as `964c4928e73e`, replacing `4dfb26c315bf`.
+Arch oracle: `compare_oracle.py` reads `=== ARCH-ORACLE: IDENTICAL — 7786 cases (baseline 4dfb26c315bf, new
+964c4928e73e) ===`, as expected for a runtime-only change (the four `src/Cobol.Net.Runtime/IO` connectors alter no
+emitted C# and no diagnostic). An earlier finisher re-recorded the committed baseline after a landing refusal (exit 7);
+kb/Work PB3107 has since landed (the oracle commits nothing and no landing check reads a baseline), so the merge of main
+drops that manifest along with main's deletion of the whole `evidence/arch-oracle` record.

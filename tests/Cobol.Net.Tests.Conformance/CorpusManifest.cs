@@ -39,7 +39,7 @@ public sealed record CorpusRow(string Name, string Suite, string Status, string[
 public static class CorpusManifest
 {
     /// <summary>The NIST tree every NIST compile reads from (the manifest and the programs): the one spelling of the
-    /// path, which the architecture oracle also records as an input (<see cref="ArchOracle.RowSource"/>).</summary>
+    /// path.</summary>
     internal static string Root { get; } = TestRepo.Nist();
 
     private static string ManifestPath => Path.Combine(Root, "corpus.tsv");

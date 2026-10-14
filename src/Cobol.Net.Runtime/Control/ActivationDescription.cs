@@ -140,6 +140,16 @@ public sealed record ActivationDescription
     /// identity (<see cref="LocaleExternal"/>).</summary>
     public string Clauses { get; init; } = "";
 
+    /// <summary>The <see cref="Clauses"/> as a reader spells them: one phrase per clause the item is described with,
+    /// in the words of its data description entry (<c>PICTURE 9(6)</c>, <c>USAGE PACKED-DECIMAL</c>, <c>JUSTIFIED</c>,
+    /// <c>USAGE POINTER TO T-REC</c>, …), the source element's <c>DECIMAL-POINT IS COMMA</c> and currency string
+    /// among them (§9.3.6 match rule 3 e) 1. / 2.). Never compared — <see cref="Clauses"/> is the identity. A refusal
+    /// quotes the description (<see cref="ToString"/>) and names the clause that differs
+    /// (<see cref="ActivationRelations.MatchViolation"/>) with these, so no identity key — a type declaration's
+    /// layout, a PICTURE identity's packed fields — reaches a user's diagnostic (kb/Work PB2077 review). Null for a
+    /// shape that is described by no clause.</summary>
+    public string[]? ClausePhrases { get; init; }
+
     /// <summary>ISO §9.3.6 match rule 3 e) 3. b.: the external identification of the PICTURE clause's LOCALE phrase —
     /// the external-locale-name or literal value as written — or null for a LOCALE phrase without a locale-name and
     /// for a picture with no LOCALE phrase (the presence and SIZE of the phrase are in <see cref="Clauses"/>).</summary>
@@ -152,6 +162,16 @@ public sealed record ActivationDescription
     /// <summary>True when the item is described with the ANY LENGTH clause (§13.18.2) — §14.9.23.4 GR7 c) bars it from
     /// a method bound through a universal receiver.</summary>
     public bool AnyLength { get; init; }
+
+    /// <summary>The <see cref="Clauses"/> this elementary item would carry were it described with the ANY LENGTH clause —
+    /// its PICTURE the one symbol its character-string repeats (§13.18.2.3 SR1) and its length unstated — or null when
+    /// the character-string repeats no single symbol, so that no ANY LENGTH item has its PICTURE clause. ISO §14.8.2.3.2
+    /// "Additionally" d) makes an ANY LENGTH formal's length "considered to match the length of the corresponding
+    /// argument", and every other clause is still compared, so §9.3.6 match rule 3 e)'s ANY LENGTH item
+    /// (<see cref="ActivationRelations.MatchViolation"/>) compares this with the ANY LENGTH formal's <see cref="Clauses"/>
+    /// (kb/Work PB2077; docs/CONFORMANCE.md D-RM1 b)). Null in a description an older compiler built, which reproduces
+    /// the literal reading that description was compiled under.</summary>
+    public string? AnyLengthClauses { get; init; }
 
     /// <summary>The item's CHARACTER positions: an alphanumeric group's image width (§14.8.2.2 rule 1 / §14.8.3.2 compare
     /// it), a bit / national group's boolean / national positions (§14.8.2.3.2 "Additionally" b) / c)). Zero for every
@@ -222,7 +242,8 @@ public sealed record ActivationDescription
     /// which is BY REFERENCE (§14.9.23.3 SR6; §9.3.6 match rule 3 a)).</summary>
     public bool ByValue { get; init; }
 
-    /// <summary>How the description reads in an EC-OO-UNIVERSAL message.</summary>
+    /// <summary>How the description reads in a refusal — an EC-OO-UNIVERSAL or CALL-lane message at run time and the
+    /// typed INVOKE's compile-time COBOLNET0828, which quote one relation's text (kb/Work PB2077).</summary>
     public override string ToString() => Shape switch
     {
         ActivationShape.Omitted => "OMITTED",
@@ -240,6 +261,10 @@ public sealed record ActivationDescription
         ActivationShape.Literal => $"a {Category} literal",
         ActivationShape.Expression => "an arithmetic expression",
         ActivationShape.PredefinedNull => "NULL",
-        _ => $"{Category} {Clauses}",
+        // A reference-modified operand (§8.4.3.3.4 GR6) is elementary and described by no clause at all. The clauses are
+        // spelled as the entry spells them, never as their identity key.
+        _ => Clauses.Length == 0 ? $"an elementary {Category} item described by no PICTURE clause"
+            : ClausePhrases is not { Length: > 0 } phrases ? $"an elementary {Category} item"
+            : $"an elementary {Category} item described with {string.Join(" ", phrases)}",
     };
 }

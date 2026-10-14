@@ -68,7 +68,7 @@ the `wf_r2_review.js` fleet, launched by the attended operator in three commands
 ## The oracle (the design's §4) — what "behavior-neutral" means here
 
 1. **Emitted C#.** For every program the suites compile (corpus goldens, NIST CCVS, version-matrix construct
-   samples, at every edition), the emitted C# is byte-identical to the R0 capture (PB2116), or each difference is
+   samples, at every edition), the emitted C# is byte-identical to the capture of the wave's base commit (PB2116; nothing is committed, PB3107), or each difference is
    listed and explained.
 2. **Diagnostics.** Every negative fixture and diagnostic golden gives the same codes, severities, positions and
    messages.

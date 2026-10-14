@@ -4432,11 +4432,11 @@
   "subject": "Alphanumeric literals",
   "rule-digest": "5d34f280ee4c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation",
-  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; unit:LiteralScreenDriftTests.LiteralRule_HasOneReportingSite",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ParseOperandFragment",
+  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; unit:LiteralScreenDriftTests.LiteralRule_HasOneReportingSite; conformance-test:DirectiveLiteralScreenTests.LiteralLength_IsScreenedAtEveryDirectivePosition",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.2.3 \"The length of an alphanumeric literal, excluding the separators that delimit the literal, shall\" -> OK SR1. The rule is asked of EVERY literal token (DEFAULT-mode and SUBSCRIPT-mode twins) by LiteralScreenPass -> COBOLNET0814: MOVE, VALUE (Format 1 and X\"...\" hex, 8,192 pairs), VALUE ALL, CONSTANT all rejected at 8,192 and accepted at 8,191 (LiteralScreenTests). Before: only the national/boolean procedure-operand arms checked any length; an over-long alphanumeric literal compiled clean everywhere.",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.2.3 \"The length of an alphanumeric literal, excluding the separators that delimit the literal, shall\" -> OK SR1. The rule is asked of EVERY literal token (DEFAULT-mode and SUBSCRIPT-mode twins) by LiteralScreenPass -> COBOLNET0814: MOVE, VALUE (Format 1 and X\"...\" hex, 8,192 pairs), VALUE ALL, CONSTANT all rejected at 8,192 and accepted at 8,191 (LiteralScreenTests). Before: only the national/boolean procedure-operand arms checked any length; an over-long alphanumeric literal compiled clean everywhere. retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4492,11 +4492,11 @@
   "subject": "Alphanumeric literals",
   "rule-digest": "aeae82f35659",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY",
-  "test-ref": "conformance:negative/w73a-hex-literal-non-hex-digit; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule; unit:SeparatorRuleTests.PrefixedLiteral_IsOneTokenWhateverItsContent",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs#Screen; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ParseOperandFragment",
+  "test-ref": "conformance:negative/w73a-hex-literal-non-hex-digit; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule; unit:SeparatorRuleTests.PrefixedLiteral_IsOneTokenWhateverItsContent; conformance-test:DirectiveLiteralScreenTests.LiteralRepertoire_IsScreenedInAnOmittedBranch",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "SR5 (cite.py --check 8.3.3.2.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK 5)); 3.98 hexadecimal digit, A-F equivalent to a-f (cite.py OK). kb/Work PB1394/PB1441 LANDED (wave 73 group A): HEX_BODY is now [x] STR_BODY, so X\"GG\" is one HEXLIT and never IDENTIFIER X + \"GG\"; LiteralScreenPass asks CobolLiteral.RepertoireViolation of every literal token and reports COBOLNET2630 naming the character and SR5 (before the grouping rule, which declines such a literal); every hex decoder answers \"\" for it instead of throwing. Negative: DISPLAY X\"GG\" beside 01 X -> COBOLNET2630 at 2002/2014/2023 (it used to print ZZZGG).",
+  "notes": "SR5 (cite.py --check 8.3.3.2.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK 5)); 3.98 hexadecimal digit, A-F equivalent to a-f (cite.py OK). kb/Work PB1394/PB1441 LANDED (wave 73 group A): HEX_BODY is now [x] STR_BODY, so X\"GG\" is one HEXLIT and never IDENTIFIER X + \"GG\"; LiteralScreenPass asks CobolLiteral.RepertoireViolation of every literal token and reports COBOLNET2630 naming the character and SR5 (before the grouping rule, which declines such a literal); every hex decoder answers \"\" for it instead of throwing. Negative: DISPLAY X\"GG\" beside 01 X -> COBOLNET2630 at 2002/2014/2023 (it used to print ZZZGG). retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4507,11 +4507,11 @@
   "subject": "Alphanumeric literals",
   "rule-digest": "e6c0e2b977bc",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEXLIT",
-  "test-ref": "conformance:negative/r03-hex-literal-digit-grouping; conformance:negative/pb1393-concat-operand-hex-grouping; conformance-test:LiteralScreenTests.HexGrouping_IsScreenedAtEveryPosition; conformance:2002/pb1393_hex_literal_positions",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEXLIT; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs; src/Cobol.Net.Frontend/Preprocessor/ConditionalCompilationProcessor.cs#ParseOperandFragment",
+  "test-ref": "conformance:negative/r03-hex-literal-digit-grouping; conformance:negative/pb1393-concat-operand-hex-grouping; conformance-test:LiteralScreenTests.HexGrouping_IsScreenedAtEveryPosition; conformance:2002/pb1393_hex_literal_positions; conformance:negative/pb1616-define-hex-odd; conformance:negative/pb1616-omitted-branch-hex-odd; conformance-test:DirectiveLiteralScreenTests.HexGrouping_IsScreenedAtEveryDirectivePosition",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.2.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal\" -> OK SR6 (implementor's number: two, DOC-A.1-9). The refuter's hole is closed: \"Z\" & X\"4\" (a concatOperand), ALL \"A\" & X\"4\" and the keyword-omitted LENGTH(X\"414\") are each rejected COBOLNET1635 once; the screen is on the literal TOKEN (LiteralScreenPass), and the keyword-omitted capture's X\"...\" now lexes as the SUBSCRIPT-mode twin SUB_HEXLIT so the screen sees it. Well-formed values unchanged (pb1393_hex_literal_positions: LENGTH(X\"4142\")=2). retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_HEXLIT (kb/Work PB2113 deleted the SUBSCRIPT lexer mode; a literal inside a subscript or keyword-omitted argument list is the ordinary HEXLIT token)",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.2.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal\" -> OK SR6 (implementor's number: two, DOC-A.1-9). The refuter's hole is closed: \"Z\" & X\"4\" (a concatOperand), ALL \"A\" & X\"4\" and the keyword-omitted LENGTH(X\"414\") are each rejected COBOLNET1635 once; the screen is on the literal TOKEN (LiteralScreenPass), and the keyword-omitted capture's X\"...\" now lexes as the SUBSCRIPT-mode twin SUB_HEXLIT so the screen sees it. Well-formed values unchanged (pb1393_hex_literal_positions: LENGTH(X\"4142\")=2). retired-witness: src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#SUB_HEXLIT (kb/Work PB2113 deleted the SUBSCRIPT lexer mode; a literal inside a subscript or keyword-omitted argument list is the ordinary HEXLIT token) retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4612,11 +4612,11 @@
   "subject": "Numeric literals",
   "rule-digest": "35ef2124318d",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignAbuts; src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignedLiteralViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#ScreenSign; src/Cobol.Net.Compiler/Binding/DataBinder.cs#IsLiteralValueOperand; src/Cobol.Net.Frontend/Expressions/SoleOperand.cs#NumericLiteral; src/Cobol.Net.Compiler/Binding/SignedIntegerLiteral.cs#Read",
+  "code-location": "src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignAbuts; src/Cobol.Net.Frontend/Expressions/ArithmeticFormationRules.cs#SignedLiteralViolation; src/Cobol.Net.Compiler/Binding/DataBinder.cs#IsLiteralValueOperand; src/Cobol.Net.Frontend/Expressions/SoleOperand.cs#NumericLiteral; src/Cobol.Net.Compiler/Binding/SignedIntegerLiteral.cs#Read; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs#ScreenSign",
   "test-ref": "conformance:negative/pb1445-value-double-sign; conformance:negative/pb1445-condition-value-separated-sign; conformance:negative/pb1445-move-separated-sign; conformance:85/pb1445_signed_literal_forms; conformance:85/pb1445_signed_literal_leftmost_sign; conformance:negative/pb1445-add-decimal-sign-separated; conformance:negative/pb1445-display-sign-separated; conformance:negative/pb1445-value-mixed-signs; conformance:negative/pb1445-value-sign-separated",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1445: ONE contiguity test (ArithmeticFormationRules.SignAbuts, on the tokens' stream indices, never GetText) answers rule 2 everywhere. LiteralScreenPass screens every signed literal slot of the tree (signedNumericLiteral — MOVE/ADD/DISPLAY literal operands — and signedIntegerLiteral), so `MOVE - 5`, `ADD - 5`, `DISPLAY - 5`, `MOVE - .5` draw COBOLNET2155 instead of reading -5; the VALUE clause (every format writes literal-n, §13.18.63.2) accepts a signed operand only when SoleOperand.NumericLiteral calls it ONE literal, so `VALUE --5` (was CS1059 in the backend), `+-5`, `- 5`, a sign split across lines and `88 C1 VALUE - 5` draw COBOLNET2155 naming the broken sentence. `-5`, `+4`, `MOVE -3`, `ADD -2` stay literals and `IF A = - 5` / `COMPUTE A = - 5 * 2` stay unary operators in an expression (85/pb1445_signed_literal_forms).",
+  "notes": "kb/Work PB1445: ONE contiguity test (ArithmeticFormationRules.SignAbuts, on the tokens' stream indices, never GetText) answers rule 2 everywhere. LiteralScreenPass screens every signed literal slot of the tree (signedNumericLiteral — MOVE/ADD/DISPLAY literal operands — and signedIntegerLiteral), so `MOVE - 5`, `ADD - 5`, `DISPLAY - 5`, `MOVE - .5` draw COBOLNET2155 instead of reading -5; the VALUE clause (every format writes literal-n, §13.18.63.2) accepts a signed operand only when SoleOperand.NumericLiteral calls it ONE literal, so `VALUE --5` (was CS1059 in the backend), `+-5`, `- 5`, a sign split across lines and `88 C1 VALUE - 5` draw COBOLNET2155 naming the broken sentence. `-5`, `+4`, `MOVE -3`, `ADD -2` stay literals and `IF A = - 5` / `COMPUTE A = - 5 * 2` stay unary operators in an expression (85/pb1445_signed_literal_forms). retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#ScreenSign (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4732,11 +4732,11 @@
   "subject": "Boolean literals",
   "rule-digest": "b40cdd5515b3",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation",
-  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; conformance-test:NationalBooleanLiteralTests.BooleanLiteral_Over8191Positions_Rejects0814",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs",
+  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; conformance-test:NationalBooleanLiteralTests.BooleanLiteral_Over8191Positions_Rejects0814; conformance-test:DirectiveLiteralScreenTests.LiteralLength_IsScreenedForEveryClass",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.4.3 \"The length of a boolean literal, excluding the separators that delimit the literal, shall\" -> OK SR1. Measured in boolean positions of the decoded value, so BX\"<2048 digits>\" is 8,192 (8.3.3.4.4 GR5 maps each digit to four boolean characters). VALUE, BX VALUE, level-88 VALUE, MOVE ALL B\"...\" and DISPLAY B\"...\" each rejected COBOLNET0814 exactly once at 8,192, accepted at 8,191.",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.4.3 \"The length of a boolean literal, excluding the separators that delimit the literal, shall\" -> OK SR1. Measured in boolean positions of the decoded value, so BX\"<2048 digits>\" is 8,192 (8.3.3.4.4 GR5 maps each digit to four boolean characters). VALUE, BX VALUE, level-88 VALUE, MOVE ALL B\"...\" and DISPLAY B\"...\" each rejected COBOLNET0814 exactly once at 8,192, accepted at 8,191. retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4747,11 +4747,11 @@
   "subject": "Boolean literals",
   "rule-digest": "91afd79ef573",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY",
-  "test-ref": "conformance:negative/w73a-boolean-literal-non-boolean-character; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs#Screen",
+  "test-ref": "conformance:negative/w73a-boolean-literal-non-boolean-character; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule; conformance-test:DirectiveLiteralScreenTests.LiteralRepertoire_IsScreenedInAnOmittedBranch",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "SR2 (cite.py --check 8.3.3.4.3 \"Boolean-character-1 shall be a boolean character, '0' or '1'\" OK 2)). kb/Work PB1394 LANDED (wave 73 group A): BOOL_BODY Format 1 is now 'B' STR_BODY, so B\"012\" is one BOOLLIT and LiteralScreenPass reports COBOLNET2630 naming '2' and SR2 in every position; beside an item B it no longer compiles as B + \"012\" (refuter's silent split). Negative: DISPLAY B\"012\" beside 01 B -> COBOLNET2630 at 2002/2014/2023.",
+  "notes": "SR2 (cite.py --check 8.3.3.4.3 \"Boolean-character-1 shall be a boolean character, '0' or '1'\" OK 2)). kb/Work PB1394 LANDED (wave 73 group A): BOOL_BODY Format 1 is now 'B' STR_BODY, so B\"012\" is one BOOLLIT and LiteralScreenPass reports COBOLNET2630 naming '2' and SR2 in every position; beside an item B it no longer compiles as B + \"012\" (refuter's silent split). Negative: DISPLAY B\"012\" beside 01 B -> COBOLNET2630 at 2002/2014/2023. retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4762,11 +4762,11 @@
   "subject": "Boolean literals",
   "rule-digest": "23f400d67b05",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#BOOL_BODY; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs#Screen",
   "test-ref": "conformance:negative/w73a-hex-boolean-literal-non-hex-digit; conformance:2002/w73a_prefix_literal_beside_named_item; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule; unit:SeparatorRuleTests.InRepertoire_IsNotAViolation",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "SR3 (cite.py --check 8.3.3.4.3 \"Hexadecimal-digit-1 shall be a hexadecimal digit\" OK 3)). kb/Work PB1394 LANDED (wave 73 group A): BOOL_BODY Format 2 is 'BX' STR_BODY, BX\"G1\" is one BOOLLIT, and LiteralScreenPass reports COBOLNET2630 naming 'G' and SR3; the NOTE half (zero length) still holds (BX\"\" is in the repertoire) and no grouping rule is imposed on BX. Negative: DISPLAY BX\"G1\" beside 01 BX -> COBOLNET2630 at 2002/2014/2023; positive: BX\"A\" -> 1010 beside the item BX.",
+  "notes": "SR3 (cite.py --check 8.3.3.4.3 \"Hexadecimal-digit-1 shall be a hexadecimal digit\" OK 3)). kb/Work PB1394 LANDED (wave 73 group A): BOOL_BODY Format 2 is 'BX' STR_BODY, BX\"G1\" is one BOOLLIT, and LiteralScreenPass reports COBOLNET2630 naming 'G' and SR3; the NOTE half (zero length) still holds (BX\"\" is in the repertoire) and no grouping rule is imposed on BX. Negative: DISPLAY BX\"G1\" beside 01 BX -> COBOLNET2630 at 2002/2014/2023; positive: BX\"A\" -> 1010 beside the item BX. retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4882,11 +4882,11 @@
   "subject": "National literals",
   "rule-digest": "95492ee31c56",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation",
-  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; conformance-test:NationalBooleanLiteralTests.NationalLiteral_Over8191Positions_Rejects0814",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#LengthViolation; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs",
+  "test-ref": "conformance-test:LiteralScreenTests.LiteralLength_IsScreenedAtEveryPosition; conformance-test:NationalBooleanLiteralTests.NationalLiteral_Over8191Positions_Rejects0814; conformance-test:DirectiveLiteralScreenTests.LiteralLength_IsScreenedForEveryClass",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.5.3 \"The length of a national literal, excluding the separators that delimit the literal, shall\" -> OK SR1. VALUE N\"<8192>\" (formerly compiled clean) and DISPLAY N\"<8192>\" rejected COBOLNET0814 once each; 8,191 accepted. One screen for every class and position (LiteralScreenPass).",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.5.3 \"The length of a national literal, excluding the separators that delimit the literal, shall\" -> OK SR1. VALUE N\"<8192>\" (formerly compiled clean) and DISPLAY N\"<8192>\" rejected COBOLNET0814 once each; 8,191 accepted. One screen for every class and position (LiteralScreenPass). retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4927,11 +4927,11 @@
   "subject": "National literals",
   "rule-digest": "82982ec04a01",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NAT_BODY",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#RepertoireViolation; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#NAT_BODY; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs#Screen",
   "test-ref": "conformance:negative/w73a-hex-national-literal-non-hex-digit; conformance:2002/w73a_prefix_literal_beside_named_item; unit:SeparatorRuleTests.OutsideRepertoire_NamesTheCharacterAndTheRule",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "SR4 (cite.py --check 8.3.3.5.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK 4)). kb/Work PB1441 LANDED (wave 73 group A): NAT_BODY Format 2 is 'NX' STR_BODY, so NX\"00G1\" is one NATLIT (never IDENTIFIER NX + \"00G1\"), and LiteralScreenPass reports COBOLNET2630 naming 'G' and SR4. Negative: MAX(NX\"00G1\") beside 01 NX -> COBOLNET2630 at 2002/2014/2023 (it used to print [ZZZZ], the item's value).",
+  "notes": "SR4 (cite.py --check 8.3.3.5.3 \"Hex-character-sequence-1 shall be composed of hexadecimal digits\" OK 4)). kb/Work PB1441 LANDED (wave 73 group A): NAT_BODY Format 2 is 'NX' STR_BODY, so NX\"00G1\" is one NATLIT (never IDENTIFIER NX + \"00G1\"), and LiteralScreenPass reports COBOLNET2630 naming 'G' and SR4. Negative: MAX(NX\"00G1\") beside 01 NX -> COBOLNET2630 at 2002/2014/2023 (it used to print [ZZZZ], the item's value). retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#Screen (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -4942,11 +4942,11 @@
   "subject": "National literals",
   "rule-digest": "fae30fea2708",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation",
-  "test-ref": "conformance-test:LiteralScreenTests.HexGrouping_IsScreenedAtEveryPosition; conformance:2002/pb1393_hex_literal_positions",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs",
+  "test-ref": "conformance-test:LiteralScreenTests.HexGrouping_IsScreenedAtEveryPosition; conformance:2002/pb1393_hex_literal_positions; conformance-test:DirectiveLiteralScreenTests.HexGrouping_IsScreenedAtEveryDirectivePosition",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.5.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal\" -> OK SR5 (four, DOC-A.1-122). The keyword-omitted LENGTH(NX\"041\") (formerly 0000, silent) and the concatenation operand N\"Z\" & NX\"041\" are rejected COBOLNET1635 once each: SUB_NATLIT is screened in the main tree. LENGTH(NX\"00410042\") keyword-omitted = 2 (golden).",
+  "notes": "kb/Work PB1393 (w61g). cite.py --check 8.3.3.5.3 \"Each hex-character-sequence-1 shall consist of the number of hexadecimal\" -> OK SR5 (four, DOC-A.1-122). The keyword-omitted LENGTH(NX\"041\") (formerly 0000, silent) and the concatenation operand N\"Z\" & NX\"041\" are rejected COBOLNET1635 once each: SUB_NATLIT is screened in the main tree. LENGTH(NX\"00410042\") keyword-omitted = 2 (golden). retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -12292,11 +12292,11 @@
   "subject": "CLASS-ID paragraph",
   "rule-digest": "acfe1a044c39",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoExpansion.cs#AddSkeleton; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#SubstitutedTokens",
-  "test-ref": "conformance:2002/pb759_parameterized_class; conformance-test:ParameterizedClassTests.ParameterNameAsADataName_2239",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoExpansion.cs#AddSkeleton; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#SubstitutedTokens; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#FormalParameter; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#SetOperands",
+  "test-ref": "conformance:2002/pb759_parameterized_class; conformance-test:ParameterizedClassTests.ParameterNameAsADataName_2239; conformance:2002/pb2937_skeleton_bodies_bind_as_themselves; conformance:negative/pb2937-skeleton-only-receiver",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work/PB759.md landed w46i3. The formal is honoured in object-class-name positions (USAGE OBJECT REFERENCE, INVOKE receiver, INHERITS - golden PB759LOUD INHERITS B USING B) by GR5 token substitution; a formal written in a DECLARATION slot (data/condition/paragraph/section/method/file/report/screen/property-name) -> COBOLNET2239, since substitution would silently rename it; a data REFERENCE fails downstream as an undefined name.",
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work/PB759.md landed w46i3; PB2051 (w1053a), PB2937 (w1072b). cite.py --check 11.3.4 'Parameter-name-1 may be specified within this class definition only where an object-class-name or an interface-name is permitted' -> OK §11.3.4 6). In an EXPANSION the formal is honoured in object-class-name positions (USAGE OBJECT REFERENCE, INVOKE receiver, INHERITS - golden PB759LOUD INHERITS B USING B) by GR5 token substitution; a formal written in a DECLARATION slot -> COBOLNET2239. In a definition nothing expands, bound as itself (OO deep-dive D12 determination 6), a reference typed by the formal takes the alternative its REPOSITORY specifier declares, marked FORMAL (ObjectRefDescriptor.FormalParameter), and the formal is honoured in every statement position as well: INVOKE through a formal-typed reference or the formal class-name, SUPER / B OF SUPER over a formal superclass, SET TO the formal class-name, an inline invocation or object property through a formal - each selects its method in the expansion (BoundDeferredToExpansion; 9.3.8.2.4), while a SET pair is asked with the formal standing for the most favourable actual (OoClassTable.SetOperands), so SET ONE TO X with ONE 'T ONLY' and X 'T' is COBOLNET0867 in the skeleton (SR12 a)1.: every expansion refuses it). Golden 2002/pb2937_skeleton_bodies_bind_as_themselves compiles every such position clean and prints PI-OK / PB2937-OK.",
   "state": "OK"
  },
  {
@@ -15262,11 +15262,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "cf26fa78eb27",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#SpecifiesItself; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf",
+  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ContainingDefinitions",
   "test-ref": "conformance:2002/pb1084_repository_self_function_specifier",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1084 (w68z). cite.py --check 12.3.8.3 'references to function-prototype-name-1 are to that function definition and this function-specifier is ignored' -> OK §12.3.8.3 11). ONE self-specifier rule (BinderDriver.SpecifiesItself) is asked by both prototype arms: UserFunctionsOf (SR11) and ProgramPrototypesOf (SR15). A FUNCTION-ID FACT whose REPOSITORY writes FUNCTION FACT AS \"OTHERF\" now resolves its recursive FACT(n-1) to itself (the self signature is registered last) instead of OTHERF's two-formal signature (COBOLNET1506); the golden prints FACT5=0120 and, as a control, a non-self FUNCTION ALIAS AS \"OTHERF\" still reaches OTHERF (ALIAS=1000).",
+  "notes": "kb/Work PB1084 (w68z), PB3121 (w1071e). cite.py --check 12.3.8.3 'this function-specifier is ignored' -> OK §12.3.8.3 11). UserFunctionsOf skips a function-specifier naming the function definition it is written in (the function member of BinderDriver.ContainingDefinitions) and registers that definition's own signature LAST, so a FUNCTION-ID FACT whose REPOSITORY writes FUNCTION FACT AS \"OTHERF\" resolves its recursive FACT(n-1) to itself instead of OTHERF's two-formal signature (COBOLNET1506); the golden prints FACT5=0120 and, as a control, a non-self FUNCTION ALIAS AS \"OTHERF\" still reaches OTHERF (ALIAS=1000). The program twin (SR15) is ProgramPrototypesOf's overwrite over the same set. retired-witness: src/Cobol.Net.Compiler/Binding/BinderDriver.cs#SpecifiesItself (kb/Work PB3121 deleted SpecifiesItself: the self-naming specifier is now skipped in UserFunctionsOf against the function member of BinderDriver.ContainingDefinitions, the one containing-definition set the program registry and the DATA-phase scope screen read too)",
   "state": "OK"
  },
  {
@@ -15322,11 +15322,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "1a20c6d5df72",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf",
-  "test-ref": "conformance:2002/l1c24_repository_self_program_specifier",
+  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ContainingDefinitions",
+  "test-ref": "conformance:2002/l1c24_repository_self_program_specifier; conformance:2002/pb3121_containing_definition_scope",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Rule (cite.py --check 12.3.8.3 'references to program-prototype-name-1 are to the named program definition and this program-specifier is ignored' -> OK §12.3.8.3 15)). Code: ProgramPrototypesOf registers every specifier, then OVERWRITES map[u.Name] with SelfPrototype(u) for every containing program definition and, when a specifier names the unit itself, map[unit.Name] = SelfPrototype(unit) - so the specifier (including its AS literal-3) is discarded and the reference activates the named definition by its own externalized name. Probe out/probe/repo/sr15.cob (--std 2023): PROGRAM-ID. SR15P RECURSIVE whose REPOSITORY writes 'PROGRAM SR15P AS \"SR15OTH\"', with a program SR15OTH in the group; CALL SR15P recurses into itself (DEPTH=1, DEPTH=2) and never reaches SR15OTH - correct. The containing-program half is structurally the same overwrite (a contained program cannot carry its own REPOSITORY, §12.3.3 SR1, so the case arises through the inherited container specifier). conformance:2002/pb237_program_prototype's CONTAINER-BLOCKED line exercises §8.4.6.8's NO-specifier spelling, not a written self/container specifier, so no spec-derived test pins SR15 itself -> test-ref empty.",
+  "notes": "Rule (cite.py --check 12.3.8.3 'references to program-prototype-name-1 are to the named program definition and this program-specifier is ignored' -> OK §12.3.8.3 15)). Code: ProgramPrototypesOf registers every specifier, then OVERWRITES map[u.Name] with SelfPrototype(u) for every program in BinderDriver.ContainingDefinitions(unit) - the unit itself and each program containing it (kb/Work PB3121: §8.4.6.8's 'containing program definition' includes the element's own, so the self entry no longer waits on a written specifier) - so a self- or container-naming specifier (including its AS literal-3) is discarded and the reference activates the named definition by its own externalized name. Probe out/probe/repo/sr15.cob (--std 2023): PROGRAM-ID. SR15P RECURSIVE whose REPOSITORY writes 'PROGRAM SR15P AS \"SR15OTH\"', with a program SR15OTH in the group; CALL SR15P recurses into itself (DEPTH=1, DEPTH=2) and never reaches SR15OTH - correct. conformance:2002/l1c24_repository_self_program_specifier pins the written self specifier; conformance:2002/pb3121_containing_definition_scope pins the specifier-free self and container spellings the same overwrite serves.",
   "state": "OK"
  },
  {
@@ -19747,11 +19747,11 @@
   "subject": "BASED clause",
   "rule-digest": "35dd2aaf3eb6",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#CheckUsageDeclarations; src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs#DynamicLengthOrVariableLengthGroup",
-  "test-ref": "conformance:negative/pb1213-based-variable-length-group; conformance:2014/pb1213_varlen_neighbours",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#CheckUsageDeclarations; src/Cobol.Net.Compiler/Binding/Model/VariableLengthCompatibility.cs#DynamicLengthOrVariableLengthGroup; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#ScreenBasedSubjectShape",
+  "test-ref": "conformance:negative/pb1213-based-variable-length-group; conformance:2014/pb1213_varlen_neighbours; conformance:negative/pb3129-type-based-variable-length-group; unit:UsageDeclarationPlacementDriftTests.EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "kb/Work PB1213: a BASED subject that is a variable-length group (a dynamic-length elementary item or dynamic-capacity table subordinate, at any depth) is refused COBOLNET2560 in the post-forest declaration pass, for written and TYPE/SAME AS-composed BASED alike, asked of the SHAPE through the one screen of the pair; the elementary spelling is refused by §13.16.3 SR18 (COBOLNET1563). The BASED fixed-length group still allocates. Dynamic items do not exist below 2014.",
+  "notes": "kb/Work PB1213: a BASED subject that is a variable-length group (a dynamic-length elementary item or dynamic-capacity table subordinate, at any depth) is refused COBOLNET2560 in the post-forest declaration pass, for a written BASED clause, asked of the SHAPE through the one screen of the pair; the elementary spelling is refused by §13.16.3 SR18 (COBOLNET1563). The BASED fixed-length group still allocates. Dynamic items do not exist below 2014. || kb/Work PB3129 review R1-1: the row claimed the TYPE-composed spelling was screened, and it was not: ConformanceForest prunes every entry carrying a TYPE clause, so `01 G TYPE VT BASED.` (VT a group type with a DYNAMIC LENGTH member, so G is a variable-length group by 13.18.57.4 GR1) compiled and printed A=ABC D=HELLO. CheckUsageDeclarations' composed-entry loop now asks the same screen (ScreenBasedSubjectShape) of the TYPE entry: measured COBOLNET2560 at G.",
   "state": "OK"
  },
  {
@@ -29062,11 +29062,11 @@
   "subject": "USAGE clause",
   "rule-digest": "9440999c8aff",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs",
-  "test-ref": "conformance:negative/pb183-usage-index-constant-record; conformance:2023/pb183_usage_index_in_group_ok; conformance:negative/pb544-usage-message-tag-in-constant-record; unit:UsageDeclarationPlacementDriftTests.Sr4ListIsExactlySr14ListPlusIndex",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#ScreenConstantRecordUsage",
+  "test-ref": "conformance:negative/pb183-usage-index-constant-record; conformance:2023/pb183_usage_index_in_group_ok; conformance:negative/pb544-usage-message-tag-in-constant-record; unit:UsageDeclarationPlacementDriftTests.Sr4ListIsExactlySr14ListPlusIndex; conformance:negative/pb3129-type-index-in-constant-record; conformance:negative/pb3129-type-group-pointer-in-constant-record; conformance:2002/pb3129_type_in_constant_record_ok; unit:UsageDeclarationPlacementDriftTests.EveryWrittenEntryScreenIsAskedOfTheTypeEntryToo",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "RE-VERDICTED ON A MEASUREMENT, not re-implemented (kb/Work PB544). The screen is kb/Work PB183's and is unchanged: five of SR4's six phrases were already enforced on both reaches (POINTER, OBJECT REFERENCE, PROGRAM-POINTER, FUNCTION-POINTER and INDEX inside `01 CFG CONSTANT RECORD.` are each COBOLNET1726 naming SR4; the 'or in any item subordinate to' reach is a subtree walk, so a depth-2 member is caught too; the level-1 spelling reports the direct wording), and the anti-over-rejection pin holds -- SR4's list has SIX phrases where SR14's has FIVE, INDEX is the difference, `Sr4PhraseOf` is written as `Sr14PhraseOf` UNION INDEX, and a unit drift test asserts `Sr4 \\ Sr14 == {INDEX}`. The row was PARTIAL for ONE phrase only: MESSAGE-TAG was absent from the grammar, so `05 Q USAGE MESSAGE-TAG.` was COBOL0001 and SR4's message-tag arm had no reachable subject. THAT GAP CLOSED with kb/Work PB487's `usageKeyword` alternative. MEASURED on this worktree's build at --std 2023: `01 CFG CONSTANT RECORD. 05 Q USAGE MESSAGE-TAG.` reports COBOLNET1726 naming SR4, beside the COBOLNET1943 non-support decline -- the arm fires and is now witnessed by conformance:negative/pb544-usage-message-tag-in-constant-record.",
+  "notes": "RE-VERDICTED ON A MEASUREMENT, not re-implemented (kb/Work PB544). The screen is kb/Work PB183's and is unchanged: five of SR4's six phrases were already enforced on both reaches (POINTER, OBJECT REFERENCE, PROGRAM-POINTER, FUNCTION-POINTER and INDEX inside `01 CFG CONSTANT RECORD.` are each COBOLNET1726 naming SR4; the 'or in any item subordinate to' reach is a subtree walk, so a depth-2 member is caught too; the level-1 spelling reports the direct wording), and the anti-over-rejection pin holds -- SR4's list has SIX phrases where SR14's has FIVE, INDEX is the difference, `Sr4PhraseOf` is written as `Sr14PhraseOf` UNION INDEX, and a unit drift test asserts `Sr4 \\ Sr14 == {INDEX}`. The row was PARTIAL for ONE phrase only: MESSAGE-TAG was absent from the grammar, so `05 Q USAGE MESSAGE-TAG.` was COBOL0001 and SR4's message-tag arm had no reachable subject. THAT GAP CLOSED with kb/Work PB487's `usageKeyword` alternative. MEASURED on this worktree's build at --std 2023: `01 CFG CONSTANT RECORD. 05 Q USAGE MESSAGE-TAG.` reports COBOLNET1726 naming SR4, beside the COBOLNET1943 non-support decline -- the arm fires and is now witnessed by conformance:negative/pb544-usage-message-tag-in-constant-record. || kb/Work PB3129 review R1-1 closed the TYPE route: 13.18.57.4 GR1 makes `05 A TYPE IT` (IT an elementary USAGE INDEX type declaration, a legal level-1 entry) as though `05 A USAGE INDEX` were written inside the CONSTANT RECORD, and a TYPE of a group type composes its members there. ConformanceForest prunes every entry carrying a TYPE clause, so the TYPE spelling compiled clean (measured: `01 CR CONSTANT RECORD. 05 A TYPE IT.` ran, and `05 A TYPE DT` with DT a pointer type was reported under SR14 rather than SR4). CheckUsageDeclarations' composed-entry loop now asks the same screen (ScreenConstantRecordUsage) of every WRITTEN entry carrying a TYPE clause, first, as the written-entry loop does, and reports ONCE at the TYPE entry naming the first composed item that carries a barred phrase. Measured COBOLNET1726 for an elementary INDEX / POINTER type, a weak and a STRONG group type at level 05 and at level 1 (`01 CR CONSTANT RECORD TYPE GT.`), and a nested TYPE inside the group type; a TYPE of a PIC X type and of a group type with no barred phrase stay legal in a CONSTANT RECORD, and a TYPE USAGE INDEX entry stays legal in an ordinary group.",
   "state": "OK"
  },
  {
@@ -29212,11 +29212,11 @@
   "subject": "USAGE clause",
   "rule-digest": "3b2018ce15a2",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#Sr14PhraseOf",
-  "test-ref": "conformance:negative/pb183-usage-pointer-in-group; conformance:2023/pb183_usage_pointer_placement_ok; conformance:negative/pb544-usage-message-tag-group; conformance:negative/pb544-usage-function-pointer-elementary; conformance:2023/pb183_usage_index_in_group_ok; conformance:negative/pb183-usage-objref-in-group; conformance:negative/pb183-usage-pointer-group-usage; conformance:negative/pb183-usage-pointer-in-weak-typedef; conformance:negative/pb183-usage-pointer-same-as; conformance:negative/pb183-usage-progptr-in-group; unit:UsageDeclarationPlacementDriftTests.Sr14PermittedLevelAdmitsLevel1AndLevel77Only; conformance:negative/pb819-usage-message-tag-elementary; conformance-test:UsageDeclarationPlacementMatrixTests.EveryPhrase_IsRefusedBelowLevel1_OnBothSpellings; unit:UsageDeclarationPlacementDriftTests.Sr14PhraseReaderAgreesWithTheClassPredicate_ExceptWhereTheUsageIsRefused",
+  "code-location": "src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#Sr14PhraseOf; src/Cobol.Net.Compiler/Binding/DataBinder.UsageDeclaration.cs#ScreenSr14ElementaryPlacement",
+  "test-ref": "conformance:negative/pb183-usage-pointer-in-group; conformance:2023/pb183_usage_pointer_placement_ok; conformance:negative/pb544-usage-message-tag-group; conformance:negative/pb544-usage-function-pointer-elementary; conformance:2023/pb183_usage_index_in_group_ok; conformance:negative/pb183-usage-objref-in-group; conformance:negative/pb183-usage-pointer-group-usage; conformance:negative/pb183-usage-pointer-in-weak-typedef; conformance:negative/pb183-usage-pointer-same-as; conformance:negative/pb183-usage-progptr-in-group; unit:UsageDeclarationPlacementDriftTests.Sr14PermittedLevelAdmitsLevel1AndLevel77Only; conformance:negative/pb819-usage-message-tag-elementary; conformance-test:UsageDeclarationPlacementMatrixTests.EveryPhrase_IsRefusedBelowLevel1_OnBothSpellings; unit:UsageDeclarationPlacementDriftTests.Sr14PhraseReaderAgreesWithTheClassPredicate_ExceptWhereTheUsageIsRefused; conformance:negative/pb3129-type-pointer-in-weak-group; conformance:2002/pb3129_type_pointer_placement_ok",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "RE-VERDICTED ON A MEASUREMENT, not re-implemented (kb/Work PB544). kb/Work PB183's two-arm screen is unchanged -- arm A reports at the GROUP entry the programmer must change (13.18.60.4 GR1 pushes the usage onto every leaf) and arm B at an ELEMENTARY item of one of SR14's five classes however it acquired the usage, over ONE enumeration covering all four acquisition routes (a written clause, GR1 inheritance, a TYPE clone, a SAME AS copy), each with its own negative golden; the level-77 reading is a recorded determination held in one named predicate. The row was PARTIAL for TWO arms that could not be verified, and BOTH are now reachable, MEASURED on this worktree's build at --std 2023: (a) MESSAGE-TAG -- `01 G USAGE MESSAGE-TAG. 05 M PIC X(3).` reports COBOLNET1724 naming SR14 (the phrase joined `usageKeyword` with kb/Work PB487); (b) FUNCTION-POINTER at elementary level -- `01 G. 05 F USAGE FUNCTION-POINTER TO proto.` reports COBOLNET1724 naming SR14, because USAGE FUNCTION-POINTER went LIVE with kb/Work PB452 + PB817 and no longer leaves `Pic` null for `Sr14PlacementClass` to miss. Both now carry witnesses. || Editions narrowed from '85,2002,2014,2023' to '2002,2014,2023': every one of SR14's five phrases is post-1985 and each is COBOLNET0900 at --std 85, so the rule has no 85 population.",
+  "notes": "RE-VERDICTED ON A MEASUREMENT, not re-implemented (kb/Work PB544). kb/Work PB183's two-arm screen is unchanged -- arm A reports at the GROUP entry the programmer must change (13.18.60.4 GR1 pushes the usage onto every leaf) and arm B at an ELEMENTARY item of one of SR14's five classes however it acquired the usage, over ONE enumeration covering all four acquisition routes (a written clause, GR1 inheritance, a TYPE clone, a SAME AS copy), each with its own negative golden; the level-77 reading is a recorded determination held in one named predicate. The row was PARTIAL for TWO arms that could not be verified, and BOTH are now reachable, MEASURED on this worktree's build at --std 2023: (a) MESSAGE-TAG -- `01 G USAGE MESSAGE-TAG. 05 M PIC X(3).` reports COBOLNET1724 naming SR14 (the phrase joined `usageKeyword` with kb/Work PB487); (b) FUNCTION-POINTER at elementary level -- `01 G. 05 F USAGE FUNCTION-POINTER TO proto.` reports COBOLNET1724 naming SR14, because USAGE FUNCTION-POINTER went LIVE with kb/Work PB452 + PB817 and no longer leaves `Pic` null for `Sr14PlacementClass` to miss. Both now carry witnesses. || Editions narrowed from '85,2002,2014,2023' to '2002,2014,2023': every one of SR14's five phrases is post-1985 and each is COBOLNET0900 at --std 85, so the rule has no 85 population. kb/Work PB3129 closed the TYPE route: 13.18.57.4 GR1 makes `05 A TYPE PT` (PT an elementary pointer-class type declaration, a legal level-1 entry) as though `05 A USAGE POINTER` were written there -- the twin of the SAME AS copy (13.18.49.4 GR1, same words), which arm B always rejected. ConformanceForest prunes every entry carrying a TYPE clause, so the site escaped and compiled clean; CheckUsageDeclarations' composed-entry loop now asks arm B (ScreenSr14ElementaryPlacement) of every WRITTEN entry carrying a TYPE clause (site entries and TYPE entries inside a template, never clones). Measured: COBOLNET1724 at the site, at a weak template's TYPE member, and at a SAME AS copy of a TYPE-pointer item; level 1, level 77 and a TYPE member of a STRONG template stay legal.",
   "state": "OK"
  },
  {
@@ -57382,11 +57382,11 @@
   "subject": "Alphanumeric literals",
   "rule-digest": "8eef1f14d8a9",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#nonNumericLiteral; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#GateFormat",
-  "test-ref": "conformance:2023/r03_hexadecimal_national_and_boolean_literals; conformance:2002/pb1545_hex_alphanumeric_literal; conformance:negative/pb1545-hex-alphanumeric-literal-below-2002",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#STR_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolLexer.g4#HEX_BODY; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#nonNumericLiteral; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs#GateFormat",
+  "test-ref": "conformance:2023/r03_hexadecimal_national_and_boolean_literals; conformance:2002/pb1545_hex_alphanumeric_literal; conformance:negative/pb1545-hex-alphanumeric-literal-below-2002; conformance-test:DirectiveLiteralScreenTests.LiteralFormatEdition_IsGatedInACompiledBranchOnly",
   "derivation": "",
   "editions": "2014, 2023, 85, 2002",
-  "notes": "Format 1 quote/apostrophe with character-1 optional (STR_BODY `(...)*`), Format 2 X\"...\"/X'...' with the hex sequence optional (HEXDIGITS `*`, caseInsensitive so x\"4a\" also lexes; 3.98 makes A-F equivalent to a-f). cite.py --check 8.3.3.2.2 \"hexadecimal-alphanumeric\" OK. Probe p1 (probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/anlit): 'it''s', \"a\"\"b\", X'4142', x\"4a4b\", X\"\" all lex and decode ([it's][a\"b][AB][JK][    ]). r03 golden rows 13/15/17/18 pin X\"\", X\"4142\", X'', X'4142' (both delimiters of Format 2, zero length); Format 1 apostrophe/quote parity is also pinned by conformance-test:ApostropheValueDifferentialTests.EmbeddedDelimiter_DecodesToOneCharacter_PerForm. The X\"GG\" (non-hex body) lexing hole is SR5's defect, recorded there. || editions as written by the adjudicator: 2014, 2023 (Annex E itemizes the 2014->2023 delta and lists no change to 8.3.3.2, so the rule stands in both; the 1985/2002 edge is NOT derivable in-repo -- no 2002 or 1985 text is held)",
+  "notes": "Format 1 quote/apostrophe with character-1 optional (STR_BODY `(...)*`), Format 2 X\"...\"/X'...' with the hex sequence optional (HEXDIGITS `*`, caseInsensitive so x\"4a\" also lexes; 3.98 makes A-F equivalent to a-f). cite.py --check 8.3.3.2.2 \"hexadecimal-alphanumeric\" OK. Probe p1 (probe dir E:/Temp/claude/E--CobolSharp/a700c052-f9e4-4942-84ff-a13c7505d6ec/scratchpad/adj-d2/out/probe/anlit): 'it''s', \"a\"\"b\", X'4142', x\"4a4b\", X\"\" all lex and decode ([it's][a\"b][AB][JK][    ]). r03 golden rows 13/15/17/18 pin X\"\", X\"4142\", X'', X'4142' (both delimiters of Format 2, zero length); Format 1 apostrophe/quote parity is also pinned by conformance-test:ApostropheValueDifferentialTests.EmbeddedDelimiter_DecodesToOneCharacter_PerForm. The X\"GG\" (non-hex body) lexing hole is SR5's defect, recorded there. || editions as written by the adjudicator: 2014, 2023 (Annex E itemizes the 2014->2023 delta and lists no change to 8.3.3.2, so the rule stands in both; the 1985/2002 edge is NOT derivable in-repo -- no 2002 or 1985 text is held) retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs#GateFormat (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {
@@ -62002,11 +62002,11 @@
   "subject": "Alphanumeric literals (number of hexadecimal digits that map to an alphanumeric character)",
   "rule-digest": "f48066e43558",
   "verdict": "CONFORMS",
-  "code-location": "docs/CONFORMANCE.md#DOC-A.1-9; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs",
+  "code-location": "docs/CONFORMANCE.md#DOC-A.1-9; src/Cobol.Net.Frontend/Common/CobolLiteral.cs#HexGroupViolation; src/Cobol.Net.Frontend/Parsing/LiteralScreen.cs",
   "test-ref": "conformance:negative/r03-hex-literal-digit-grouping; conformance:negative/pb1393-concat-operand-hex-grouping; conformance:2002/pb1393_hex_literal_positions",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1393 (w61g). The determination (two hexadecimal digits per alphanumeric character, 8.3.3.2.3 SR6) is written in CONFORMANCE.md 7 and now holds at every position a literal is written: the concatenation-operand and keyword-omitted-argument holes the adjudicator found are closed (LiteralScreenPass; COBOLNET1635), and the CONFORMANCE row's open-PB1393 caveat is removed.",
+  "notes": "kb/Work PB1393 (w61g). The determination (two hexadecimal digits per alphanumeric character, 8.3.3.2.3 SR6) is written in CONFORMANCE.md 7 and now holds at every position a literal is written: the concatenation-operand and keyword-omitted-argument holes the adjudicator found are closed (LiteralScreenPass; COBOLNET1635), and the CONFORMANCE row's open-PB1393 caveat is removed. retired-witness: src/Cobol.Net.Compiler/Validation/LiteralScreenPass.cs (kb/Work PB1616 moved LiteralScreenPass (Compiler/Validation) to LiteralScreen (Frontend/Parsing) so the directive lane asks the same body; the witness is the same code at its new path)",
   "state": "OK"
  },
  {

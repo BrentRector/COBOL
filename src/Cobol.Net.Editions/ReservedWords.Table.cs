@@ -273,7 +273,7 @@ public static partial class ReservedWords
         new("MERGE", true, true, true, true, "high", "continuous since 1985 (GnuCOBOL 85/2002/2014 lists; ISO 2023 §8.9)"),
         new("MESSAGE", true, true, false, false, "high", "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"),
         new("MESSAGE-TAG", false, false, false, true, "high", "added 2023 (ISO Annex E.2 item 25 = VCR row 32)"),
-        new("METHOD", false, true, true, true, "high", "added 2002 (GnuCOBOL 2002 list; ISO 2023 §8.9)"),
+        new("METHOD", false, true, true, false, "high", "added 2002 (GnuCOBOL 2002 list; dropped by 2023 §8.9)"),
         new("METHOD-ID", false, true, true, true, "high", "added 2002 (GnuCOBOL 2002 list; ISO 2023 §8.9)"),
         new("MINUS", false, true, true, true, "high", "added 2002 (GnuCOBOL 2002 list; ISO 2023 §8.9)"),
         new("MODE", true, true, true, true, "high", "continuous since 1985 (GnuCOBOL 85/2002/2014 lists; ISO 2023 §8.9)"),

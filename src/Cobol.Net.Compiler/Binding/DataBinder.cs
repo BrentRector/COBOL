@@ -3587,27 +3587,38 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 item.Pic = item.Pic with { RestrictedTypeDecl = decl };
     }
 
-    /// <summary>⛔ Attach to every restricted PROGRAM- or FUNCTION-pointer this forest declares the TYPE its
-    /// <c>TO prototype-name-1</c> gives it (kb/Work PB2464): the signature class of the prototype
-    /// (<see cref="DataItem.PointerRestrictionIdentity"/>; ISO §13.18.60.4 GR25 / GR26 type the pointer by the
-    /// prototype's SIGNATURE, not its name). The prototype tables exist only once the group's REPOSITORY has resolved
-    /// (<c>BinderDriver.ProgramPrototypesOf</c> / <c>UserFunctionsOf</c>, after every unit's DATA has bound), so this
-    /// is the prototype twin of <see cref="ResolveRestrictedTypes"/> run at the point those tables are built —
-    /// <c>BinderDriver.ResolvePointerRestrictions</c>, over every forest that declares pointers (a method's LINKAGE
-    /// roots are on its class's). A name the table does not hold resolves to nothing, and the pointer keeps its own name
-    /// as its identity (<see cref="PrototypeSignatures.RestrictionIdentity"/>).</summary>
+    /// <summary>⛔ Attach to every restricted PROGRAM- or FUNCTION-pointer this forest declares the prototype its
+    /// <c>TO prototype-name-1</c> names (<see cref="DataItem.RestrictedPrototype"/>; kb/Work PB2495): ISO §13.18.60.4
+    /// GR25 / GR26 type the pointer by that prototype's SIGNATURE, not its name. The prototype tables exist only once the
+    /// group's REPOSITORY has resolved (<c>BinderDriver.ProgramPrototypesOf</c> / <c>UserFunctionsOf</c>, after every
+    /// unit's DATA has bound), so this is the prototype twin of <see cref="ResolveRestrictedTypes"/> run at the point
+    /// those tables are built — <c>BinderDriver.ResolvePointerRestrictions</c>, over every forest that declares pointers
+    /// (a method's LINKAGE roots are on its class's). A name the table does not hold resolves to nothing, and the pointer
+    /// keeps its own name as its identity (<see cref="PrototypeSignatures.RestrictionIdentity"/>). The first of two
+    /// passes: <see cref="ClassifyRestrictedPrototypes"/> runs only once EVERY forest has been through this one, because
+    /// classifying a prototype follows its formals' restrictions into other forests.</summary>
     internal void ResolveRestrictedPrototypes(
-        IReadOnlyDictionary<string, ProgramPrototype> programs,
-        IReadOnlyDictionary<string, UserFunctionSignature> functions, PrototypeSignatureClasses classes)
+        IReadOnlyDictionary<string, ProgramPrototype> programs, IReadOnlyDictionary<string, UserFunctionSignature> functions)
     {
         foreach (var item in AllItems())
             if (item.Pic is { RestrictedPrototypeName: { } name } pic)
-                item.PointerRestrictionIdentity = pic.Category switch
+                item.RestrictedPrototype = pic.Category switch
                 {
-                    PicCategory.ProgramPointer when programs.TryGetValue(name, out var program) => classes.ProgramIdentity(program),
-                    PicCategory.FunctionPointer when functions.TryGetValue(name, out var function) => classes.FunctionIdentity(function),
+                    PicCategory.ProgramPointer when programs.TryGetValue(name, out var program) => RestrictedPrototype.Of(program),
+                    PicCategory.FunctionPointer when functions.TryGetValue(name, out var function) => RestrictedPrototype.Of(function),
                     _ => null,
                 };
+    }
+
+    /// <summary>⛔ Give every restricted PROGRAM- or FUNCTION-pointer this forest declares the TYPE its resolved
+    /// prototype gives it (kb/Work PB2464): the identity of the prototype's signature class
+    /// (<see cref="DataItem.PointerRestrictionIdentity"/>), the second pass of <c>BinderDriver.ResolvePointerRestrictions</c>
+    /// after <see cref="ResolveRestrictedPrototypes"/> has run over every forest.</summary>
+    internal void ClassifyRestrictedPrototypes(PrototypeSignatureClasses classes)
+    {
+        foreach (var item in AllItems())
+            if (item.RestrictedPrototype is { } prototype)
+                item.PointerRestrictionIdentity = classes.Identity(prototype);
     }
 
     /// <summary>The completion state of each of THIS unit's type declarations under <see cref="ExpandTemplate"/>:
@@ -5500,7 +5511,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // function-prototype-name-1") differ only in which namespace the name is resolved in. The SCOPE rules are
         // the same sentence twice as well — §8.4.6.6 for function-prototype-names ("either the user-function-name
         // of the containing function definition or a function-prototype-name declared in the REPOSITORY
-        // paragraph") and §8.4.6.8 for program-prototype-names — so the SELF leg and the REPOSITORY leg are one
+        // paragraph") and §8.4.6.8 for program-prototype-names — so the CONTAINING-DEFINITION leg and the REPOSITORY leg are one
         // lookup parameterized by the carrier. The OPTIONALITY is the only real difference, and it is measured on
         // the PRINTED general format (folio 503): FUNCTION-POINTER's TO phrase carries NO brackets while
         // PROGRAM-POINTER's does, so every function-pointer is restricted and a bare one is nonconforming.
@@ -5579,10 +5590,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // of the containing function definition or a function-prototype-name declared in the REPOSITORY
         // paragraph") and §8.4.6.8 for a program-prototype-name, which is the same sentence over the other
         // namespace. A name in neither leg names no signature, so the GR25/GR26 restriction would be
-        // unverifiable — and a restriction nothing can check is the a_dead_lookup_is_also_unverified shape.
+        // unverifiable — and a restriction nothing can check is the a_dead_lookup_is_also_unverified shape. The
+        // containing-definition leg is the set the registries read (ContainingDefinitionNames, kb/Work PB3121).
         if (restrictedPrototypeName is not null
-            && !(CobolNames.Same(UnitSelfName, restrictedPrototypeName)
-                 && UnitIsFunction == isFunctionPointer)
+            && !(UnitIsFunction == isFunctionPointer && ContainingDefinitionNames.Contains(restrictedPrototypeName))
             && !(isFunctionPointer
                  ? UserFunctionNames.Contains(restrictedPrototypeName)
                  : ProgramSpecifiers.ContainsKey(restrictedPrototypeName)))
@@ -6506,7 +6517,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         }
         // Signs in front of a numeric literal that do not make ONE literal (`--5`, `+-5`, `- 5`, a sign at the end
         // of a line and its digits on the next): §8.3.3.3.2 rule 2 is the rule broken, so it is the rule named
-        // (kb/Work PB1445) — the same code LiteralScreenPass reports for a separated sign in every other literal slot.
+        // (kb/Work PB1445) — the same code LiteralScreen reports for a separated sign in every other literal slot.
         if (op.unaryExpression() is { } signedShape
             && CobolNet.Frontend.Expressions.ArithmeticFormationRules.SignedLiteralViolation(signedShape) is { } why)
         {

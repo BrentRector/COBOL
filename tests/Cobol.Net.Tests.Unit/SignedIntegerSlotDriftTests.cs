@@ -83,7 +83,7 @@ public sealed class SignedIntegerSlotDriftTests
         // ⛔ ANTLR's GetText() concatenates a node's tokens with the whitespace stripped, so `+ 1` and `+1`
         // both read back as "+1" and §8.3.3.3.2 2)'s adjacency violation is INVISIBLE to any caller that goes
         // straight to the text. SignedIntegerLiteral.Read measures it on the token stream's own indices
-        // (LiteralScreenPass reports it, kb/Work PB1445); this assertion keeps it the only door (kb/Work PB553).
+        // (LiteralScreen reports it, kb/Work PB1445); this assertion keeps it the only door (kb/Work PB553).
         string[] sources = System.IO.Directory.GetFiles(
             TestRepo.Src("Cobol.Net.Compiler"), "*.cs", System.IO.SearchOption.AllDirectories);
         var offenders = new System.Collections.Generic.List<string>();

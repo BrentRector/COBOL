@@ -85,9 +85,19 @@ public sealed class DataItem
         "PICTURE (ISO §13.18.40) — in neither GR-1 exclusion list")]
     public PicInfo? Pic { get; set; }
 
+    /// <summary>The prototype a restricted program- or function-pointer's <see cref="PicInfo.RestrictedPrototypeName"/>
+    /// resolves to through the unit's prototype tables — its namespace, externalized name and signature (kb/Work
+    /// PB2495) — set post-build by <c>DataBinder.ResolveRestrictedPrototypes</c>, for EVERY forest of the group before
+    /// any is classified, so a signature comparison can follow a formal's restriction to the signature it names
+    /// (<c>PrototypeSignatures.SameType</c>) instead of to the class that comparison is still building. Null for a name
+    /// the tables do not hold, for an unrestricted pointer and for every other item.</summary>
+    [DescriptionCopy(DescriptionCopyKind.None,
+        "resolved post-build by DataBinder.ResolveRestrictedPrototypes in the copy's OWN scope (the prototype names resolve through the unit that declares the copy), after every clone exists")]
+    internal RestrictedPrototype? RestrictedPrototype { get; set; }
+
     /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER (kb/Work PB2464): the signature class its
-    /// <see cref="PicInfo.RestrictedPrototypeName"/> belongs to, set post-build by
-    /// <c>DataBinder.ResolveRestrictedPrototypes</c> once the unit's prototype tables exist
+    /// <see cref="RestrictedPrototype"/> belongs to, set post-build by <c>DataBinder.ClassifyRestrictedPrototypes</c>
+    /// once every forest's <see cref="RestrictedPrototype"/> is resolved
     /// (<c>PrototypeSignatureClasses</c>) — the prototype-pointer twin of <see cref="PicInfo.RestrictedTypeDecl"/>.
     /// ISO §13.18.60.4 GR25 / GR26 type such a pointer by SIGNATURE ("shall contain only … the address of a program
     /// with the same signature as that identified by the specified program-prototype-name"), so two pointers
@@ -97,7 +107,7 @@ public sealed class DataItem
     /// so that the PICTURE profile's record text (the §8.5.3.1 same-type key) does not change with the stamping
     /// state. Null before resolution, for an unrestricted pointer and for every non-pointer item.</summary>
     [DescriptionCopy(DescriptionCopyKind.None,
-        "resolved post-build by DataBinder.ResolveRestrictedPrototypes in the copy's OWN scope (the prototype names resolve through the unit that declares the copy), after every clone exists")]
+        "classified post-build by DataBinder.ClassifyRestrictedPrototypes from the copy's OWN RestrictedPrototype (resolved in the copy's own scope), after every clone exists")]
     public string? PointerRestrictionIdentity { get; set; }
 
     /// <summary>GROUP-USAGE (ISO §13.18.29; data-model design D20; kb/Work PB79) — <see cref="Model.GroupUsage.None"/>
@@ -115,7 +125,8 @@ public sealed class DataItem
     /// whose NOTE excludes "a record that is entirely a bit group") or its national positions (<see cref="ImageWidth"/>
     /// of a national group counts national POSITIONS — only an enclosing ALPHANUMERIC group doubles them to the
     /// storage characters they occupy). A pure function of the children, exactly as the width members are.</summary>
-    public PicInfo? AsIfPic => GroupUsage switch
+    public PicInfo? AsIfPic => Renames is { IsAlias: true, From: { } renamed } ? renamed.AsIfPic   // §13.18.45.4 GR1: ALL of data-name-2's attributes (kb/Work PB2502)
+        : GroupUsage switch
     {
         GroupUsage.Bit => new PicInfo(PicCategory.Boolean, Usage.Bit, BitLayout.ExtentBits(this), Digits: 0, Scale: 0, Signed: false),
         GroupUsage.National => new PicInfo(PicCategory.National, Usage.National, ImageWidth, Digits: 0, Scale: 0, Signed: false),
@@ -134,7 +145,8 @@ public sealed class DataItem
     /// <summary>A group that OPERATES as an elementary boolean / national item — GR1b/GR2b (a bit / national group);
     /// false for an alphanumeric group and for every elementary item. The MOVE classifier's, the emitter's and the
     /// comparison's "is this a group operation?" test is <c>IsGroup &amp;&amp; !IsAsIfElementary</c>.</summary>
-    public bool IsAsIfElementary => Pic is null && GroupUsage is not GroupUsage.None;
+    public bool IsAsIfElementary => Renames is { IsAlias: true, From: { } renamed } ? renamed.IsAsIfElementary   // GR1: the no-THROUGH alias of a bit / national group is one (kb/Work PB2502)
+        : Pic is null && GroupUsage is not GroupUsage.None;
 
     /// <summary>The DEFERRED adjudication mark of a PICTURE-less <c>USAGE NATIONAL</c>/<c>BIT</c> entry
     /// (ISO §13.18.60.4): whether it is a legal GROUP header (the usage sheds to subordinates, GR1) or an illegal
@@ -1261,6 +1273,11 @@ public sealed class DataItem
     /// implicit-filler bytes (§15.14.4 r3 is satisfied vacuously).</summary>
     public int ByteWidth =>
         IsElementary ? ElementaryByteWidth
+        // A no-THROUGH level-66 alias of a GROUP item has no PICTURE and no children of its own — "all of the data
+        // attributes of data-name-2 become the data attributes of data-name-1 and the storage area occupied by
+        // data-name-2 becomes the storage area occupied by data-name-1" (§13.18.45.4 GR1) — so it is as wide as
+        // the group it renames. (A THROUGH alias carries a synthesized alphanumeric PICTURE: the arm above.)
+        : Renames is { IsAlias: true, From: { } renamed } ? renamed.ByteWidth
         // D19/PB43 — same reason as ImageWidth: a bit-bearing subtree is LAID OUT, not summed.
         : HasBitDescendant ? BitLayout.Characters(BitLayout.ExtentBits(this))
         : Children.Where(c => c.RedefinesTargetName is null).Sum(c => c.ByteWidth * (c.Occurs ?? 1));

@@ -27,7 +27,9 @@
       *>   TL  LOCALE IS US SIZE 8 into LOCALE IS US2 SIZE 8, both "en-US" (rule 3 e) 3.) -> TL:  $10.00
       *>   TP  8-character group into a 4-character group: match; rule 1 -> TP:ABCD, p=WXYZEFGH
       *>   TW  4-character group into an 8-character group: match; rule 1 violated -> EC-OO-UNIVERSAL
-      *>   TQ  3-position national group into a 4-position one: match; "Additionally" c) violated -> EC-OO-UNIVERSAL
+      *>   TQ  3-position national group into a 4-position one: a national group is "described with PICTURE N(m)"
+      *>       (13.18.29.4 GR2 b), OK 13.18.29.4 2) b)), so N(3) is not N(4): no match (3 e)) -> EC-OO-METHOD
+      *>       (kb/Work PB2077: the typed lane's answer; one relation for both lanes)
       *>   TG  PIC X(4) into a group formal: no match (PICTURE on one side) -> EC-OO-METHOD
       *>   TX  group into a PIC X(4) formal: no match -> EC-OO-METHOD
       *>   TS  strong group of an equivalent type -> TS:WXYZ; a plain group -> EC-OO-METHOD

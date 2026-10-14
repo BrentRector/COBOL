@@ -8,11 +8,14 @@
       *> OK 9.3.6 3) b)), still binds a method GR7 c) forbids: EC-OO-UNIVERSAL, never a crash.
       *> 9.3.6 match rule 1: a trailing OPTIONAL formal with no argument is an equal number of
       *> parameters (OK 9.3.6 1)). Match rule 3 e): "the corresponding parameter has the same ALIGNED,
-      *> ANY LENGTH, ..." clauses (OK 9.3.6 3)), so a PIC X(4) argument does not match an ANY LENGTH
-      *> formal and "6) otherwise, the EC-OO-METHOD exception condition is set to exist" (OK 9.3.6 6)).
+      *> ANY LENGTH, ..." clauses (OK 9.3.6 3)), its ANY LENGTH item read through 14.8.2.3.2
+      *> "Additionally" d): "its length is considered to match the length of the corresponding
+      *> argument" (OK 14.8.2.3.2 2); docs/CONFORMANCE.md D-RM1 b), kb/Work PB2077 - ONE match relation
+      *> for the typed and the universal lane), so a PIC X(4) argument matches the PIC X ANY LENGTH
+      *> formal, and the bound method then violates GR7 c).
       *> Before the fix the two omitted legs threw System.Diagnostics.UnreachableException.
       *> DERIVATION:
-      *>   M USING X        PIC X(4) vs ANY LENGTH: no match         -> HANDLED=EC-OO-METHOD
+      *>   M USING X        PIC X(4) matches ANY LENGTH; GR7 c)      -> HANDLED=EC-OO-UNIVERSAL
       *>   M USING OMITTED  rule 3 b) match; GR7 c) violated         -> HANDLED=EC-OO-UNIVERSAL
       *>   M (no argument)  rule 1 match; GR7 c) violated            -> HANDLED=EC-OO-UNIVERSAL
        >>TURN EC-OO CHECKING ON
