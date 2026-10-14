@@ -981,7 +981,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         long fixedUnits = bits ? BitLayout.StartBitOf(record, table) : RecordLayout.PhysicalWidth(record) - (long)elem * max;
         // The record's size in BYTES at n occurrences (GR13 c) — bits round up to the byte the last one ends in (GR4).
         long BytesAt(long n) => bits
-            ? BitLayout.Characters((int)(fixedUnits + (n == 0 ? 0 : (long)elem * (n - 1) + BitLayout.WidthBits(table))))
+            ? BitLayout.Characters((int)(fixedUnits + BitLayout.TableBits(table, (int)n)))
             : fixedUnits + n * elem;
         long fdMax = file.RecordSizeVaries ? file.VaryMax : file.RecordWidth;
         long limit = max;

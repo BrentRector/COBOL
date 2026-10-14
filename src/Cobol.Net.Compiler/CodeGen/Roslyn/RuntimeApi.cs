@@ -1224,6 +1224,13 @@ internal static class RuntimeApi
     public static string TableOdoExtent(string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtent)}({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits})";
 
+    /// <summary>The same extent where the LAST occurrence's <paramref name="trailingUnits"/> of filler (an ALIGNED bit
+    /// table's, §13.18.1.4 GR2) is not counted — <c>CobolTable.OdoExtentTrimmed</c>, the extent in POSITIONS the bit
+    /// channel and FUNCTION LENGTH of a bit group read (kb/Work PB3156).</summary>
+    public static string TableOdoExtentTrimmed(string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits,
+        int trailingUnits) =>
+        $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtentTrimmed)}({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {trailingUnits})";
+
     /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand — <see cref="TableOdoExtent"/>
     /// rounded up to whole characters (<c>CobolTable.OdoExtentChars</c>). Identity when the positions ARE characters,
     /// so the image channel has ONE arm rather than a units branch (kb/Work PB173).</summary>
@@ -2525,6 +2532,11 @@ internal static class RuntimeApi
     /// <summary>One member's slice of an unpacked run carrier — <c>CobolBits.Slice</c>.</summary>
     public static string BitsSlice(string carrierExpr, string offsetExpr, string countExpr) =>
         $"{nameof(CobolBits)}.{nameof(CobolBits.Slice)}({carrierExpr}, {offsetExpr}, {countExpr})";
+
+    /// <summary>The carrier of a table of bit occurrences laid <paramref name="strideExpr"/> bits apart —
+    /// <c>CobolBits.Strided</c>.</summary>
+    public static string BitsStrided(string occurrencesExpr, string strideExpr) =>
+        $"{nameof(CobolBits)}.{nameof(CobolBits.Strided)}({occurrencesExpr}, {strideExpr})";
 
     /// <summary>Repeat an element image for a table initializer — <c>CobolString.Repeat</c>.</summary>
     public static string StrRepeat(string s, string n) =>

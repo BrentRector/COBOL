@@ -417,7 +417,14 @@ the subtraction leaves the fixed part exactly; a dynamic-capacity table of bit e
 ceil(n / 8) element length (CONFORMANCE.md DOC-A.1-61). An ODO table in such a group is counted in BIT positions —
 `BitLayout.StartBitOf` + `StrideBits`, the unit `OdoModel.WrapGroup` counts the group's image in — and
 `BoundOdoExtent.PositionsPerCharacter` rounds it up to whole characters (8; §15.50.4 r9 / §15.14.4 r4) or leaves it
-as the answer (1; a bit GROUP's LENGTH is its boolean positions, r1). A national GROUP's LENGTH is its national
+as the answer (1; a bit GROUP's LENGTH is its boolean positions, r1). **An ALIGNED table's occurrences are a stride
+apart (§13.18.1.4 GR2) and the LAST one's padding is no part of the extent** (§8.5.1.6.3 generates filler "as needed to
+advance alignment to a required natural boundary for the next item"; a table that has no occurrence at all contributes
+nothing, while the filler in front of it is an item of its own and stays): the extent at `c` occurrences is
+`BitLayout.TableBits(table, c)` = `stride × (c − 1) + width`, the number the same table fixed at `c` occurrences has,
+so `BoundOdoExtent.TrailingWidth` gives the padding back once an occurrence exists (`CobolTable.OdoExtentTrimmed`;
+kb/Work PB3156). The bit group's `AsBits()` / `FromBits` and the image seed place the occurrences by the same stride
+(`CobolBits.Strided`). A national GROUP's LENGTH is its national
 positions (r2), built the same way. An ODO group inside a BASED entry
 or a REDEFINES-class record is never wrapped as an `OdoGroupPlace` by the resolver, so its r4 extent (and its GR8
 sending slice) is not applied — kb/Work PB80. PHYSICAL (§15.50.4 r8 / §15.14.4 r7) is accepted on both functions

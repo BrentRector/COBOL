@@ -120,6 +120,24 @@ public static class CobolBits
         offset >= carrier.Length ? new string('0', count)
         : carrier.Substring(offset, System.Math.Min(count, carrier.Length - offset)).PadRight(count, '0');
 
+    /// <summary>The carrier of a TABLE of bit occurrences whose occurrences sit <paramref name="stride"/> bits apart:
+    /// each occurrence's own carrier, padded with zero filler bits to <paramref name="stride"/> except the last —
+    /// §13.18.1.4 GR2 ("An ALIGNED clause specified for a multiple-occurrence data item applies to each occurrence of
+    /// that item") puts every occurrence at the first bit of a byte, and §8.5.1.6.3 generates filler only "as needed to
+    /// advance alignment to a required natural boundary for the next item", so the last occurrence has none after it
+    /// (<c>BitLayout.TableBits</c>). With every occurrence exactly <paramref name="stride"/> bits wide (no ALIGNED
+    /// clause) it is the plain concatenation.</summary>
+    public static string Strided(string[] occurrences, int stride)
+    {
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < occurrences.Length; i++)
+        {
+            sb.Append(occurrences[i]);
+            if (i < occurrences.Length - 1 && occurrences[i].Length < stride) sb.Append('0', stride - occurrences[i].Length);
+        }
+        return sb.ToString();
+    }
+
     /// <summary>The UTF-16BE byte serialization of a NATIONAL string — one char per BYTE, two bytes (high-order
     /// first) per national position (D-N1: national is UTF-16, one code unit per character position). ⛔ THE ONE
     /// national→bytes reduction: <c>CobolIntrinsics.Convert</c>'s NAT source arm and the compiler-emitted CONVERT

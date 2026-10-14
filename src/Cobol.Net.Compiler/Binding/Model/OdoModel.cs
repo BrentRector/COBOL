@@ -106,8 +106,12 @@ public sealed class OccursSpec
 /// <summary>Where an OCCURS DEPENDING table lies in the group that holds it as its trailing storage
 /// (<see cref="OdoModel.GeometryOf"/>): <paramref name="FixedUnits"/> before the table, <paramref name="ElemUnits"/> per
 /// occurrence, the §13.18.38.4 GR7 bounds, in units of which <paramref name="PositionsPerCharacter"/> make one
-/// character of the group's image — 1 (the unit IS a character, bytes on the physical basis) or 8 (bits, §8.5.1.6.3).</summary>
-public readonly record struct OdoGeometry(int FixedUnits, int ElemUnits, int MinOccurs, int MaxOccurs, int PositionsPerCharacter)
+/// character of the group's image — 1 (the unit IS a character, bytes on the physical basis) or 8 (bits, §8.5.1.6.3).
+/// <paramref name="TrailingUnits"/> is the padding of the LAST occurrence that its <paramref name="ElemUnits"/> stride
+/// counts and its extent does not (<see cref="BitLayout.TrailingFillerBits"/>: an ALIGNED bit table's, §13.18.1.4 GR2),
+/// so the extent at <c>c</c> occurrences is <c>FixedUnits + c × ElemUnits − (c &gt; 0 ? TrailingUnits : 0)</c>.</summary>
+public readonly record struct OdoGeometry(int FixedUnits, int ElemUnits, int MinOccurs, int MaxOccurs, int PositionsPerCharacter,
+    int TrailingUnits)
 {
     /// <summary>The extent is counted in BITS (a USAGE BIT leaf lies in the subtree).</summary>
     public bool InBits => PositionsPerCharacter > 1;
@@ -183,7 +187,7 @@ public static class OdoModel
     {
         var g = GeometryOf(group, table);
         return new OdoGroupPlace(inner, depending, g.FixedUnits, g.ElemUnits, g.MinOccurs, g.MaxOccurs,
-            IsWithin(depending.Item, group), g.PositionsPerCharacter);
+            IsWithin(depending.Item, group), g.PositionsPerCharacter, g.TrailingUnits);
     }
 
     /// <summary>⛔ THE ONE GEOMETRY OF AN OCCURS DEPENDING TABLE IN THE GROUP THAT HOLDS IT AS ITS TRAILING STORAGE
@@ -216,7 +220,8 @@ public static class OdoModel
         int fixedUnits = bitUnits
             ? BitLayout.StartBitOf(group, table)
             : Model.RecordLayout.PhysicalWidth(group) - elem * max;            // SR22 — the variable tail is trailing
-        return new OdoGeometry(fixedUnits, elem, min, max, bitUnits ? BitLayout.BitsPerCharacter : 1);
+        return new OdoGeometry(fixedUnits, elem, min, max, bitUnits ? BitLayout.BitsPerCharacter : 1,
+            bitUnits ? BitLayout.TrailingFillerBits(table) : 0);
     }
 
     /// <summary>The member of <paramref name="group"/> whose image holds <paramref name="table"/> as its trailing
