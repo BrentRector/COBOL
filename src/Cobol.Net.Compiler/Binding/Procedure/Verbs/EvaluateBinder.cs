@@ -121,12 +121,12 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
     /// would only read the same mistake a second time.</para></summary>
     private bool ScreenObjectNegation(Core.EvaluateWhenItemContext item)
     {
-        if (item.NOT() is not { } not) return true;
+        if (item.NOT() is not { } negation) return true;
         string? word = item.ANY() is not null ? "ANY"
             : item.booleanLiteral() is { } literal ? (literal.TRUE_() is not null ? "TRUE" : "FALSE")
             : null;
         if (word is null) return true;
-        using var _ = ctx.Edition.At(not.Symbol);
+        using var _ = ctx.Edition.At(negation.Symbol);
         ctx.Edition.Error(DiagnosticCatalog.EvaluateObjectNegationNotPermitted,
             $"the selection object '{DataBinder.WrittenText(item)}' writes NOT before the word {word}; ISO §14.9.13.2 "
             + "admits the bracketed NOT only before identifier-2, literal-2, arithmetic-expression-2, "

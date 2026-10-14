@@ -93,6 +93,24 @@ consumes).
    screen. `RequiredFormatPhraseDriftTests` re-derives the whole set from the transcription — today RETURN's AT
    END (screened) and SEARCH's WHEN (already `+` in the grammar) — so a transcription repair or a new format
    fails until its phrase is screened or adjudicated.
+9. **⛔ A PREFIX STANDS ON THE ALTERNATIVES THAT PRINT IT — NEVER HOISTED OVER AN ALTERNATIVE THAT OWNS THE SAME
+   WORD.** Invariants 7 and 8 bound a rule's repetition and optionality; this one bounds its *factoring*. Lifting a
+   bracketed word the format prints on SOME alternatives out in front of the whole brace (`NOT? item` over
+   `item : a | b | condition`) is not a harmless superset when another alternative can itself begin with that word:
+   ANTLR enters a greedy `?` whenever both readings are viable, so the hoisted prefix takes the word from the
+   alternative that owns it, and the parse tree hands the binder a different program. The parse-wide/bind-narrow
+   doctrine licenses superset operand SHAPES; it never licenses moving a token from one construct to another.
+   **Worked example (kb/Work PB2722).** §14.9.13.2's selection object prints `[ NOT ]` on five alternatives only —
+   the figure note: "The bracketed `NOT` applies only to the first five alternatives, exactly as stacked" — while
+   condition-2 owns the NOT of a negated condition (§8.8.4.10.1) and partial-expression-1 the NOT of its relational
+   operator or class / sign condition (§14.9.13.3 SR5). The grammar was `evaluateWhenGroup : NOT? evaluateWhenItem`,
+   so `EVALUATE TRUE WHEN NOT A > B AND A > B` bound as NOT (A > B AND A > B) — the opposite of §8.8.4.11.3's
+   precedence — and `EVALUATE X WHEN NOT > 5 AND < 2` likewise: clean compiles, wrong arm selected. The words the
+   format prints WITHOUT the prefix (ANY, TRUE, FALSE) took it silently too. `evaluateWhenItem` now writes `NOT?` on
+   each alternative that prints it, and on the two words only as invariant 8's parse-wide half of a named screen
+   (COBOLNET3710); `EvaluateSelectionObjectArityDriftTests` pins which alternatives carry it.
+   **The check, when writing or reviewing a `?`-prefix in front of a sub-rule: can any alternative of that sub-rule
+   begin with the same token?** If so, the prefix belongs on the alternatives, not in front of the rule.
 
 ---
 
