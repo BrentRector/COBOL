@@ -2263,6 +2263,18 @@ public static class DiagnosticCatalog
         + "— \"a space indicates an invalid combination\". Most often this is a value object written against a "
         + "TRUE/FALSE subject, whose only permissible objects are a condition, TRUE/FALSE, or ANY.",
         "ISO §14.9.13.3 SR10 (Table 15)");
+    // kb/Work PB2722. A GENERAL-FORMAT violation, so a compile-time indication (§4.2.2): `WHEN NOT ANY` used to compile
+    // clean and bind to the negation of GR4 a) 1.'s constant true, so the arm could never run and nothing said so.
+    public static readonly DiagnosticDescriptor EvaluateObjectNegationNotPermitted = new(
+        "COBOLNET3710", "evaluate-object-negation-not-permitted", EditionSeverity.Error,
+        "NOT is written before ANY, TRUE or FALSE in an EVALUATE selection object. ISO §14.9.13.2 prints the bracketed "
+        + "NOT on five selection-object alternatives only — \"The bracketed `NOT` applies only to the first five "
+        + "alternatives, exactly as stacked\": identifier-2, literal-2, arithmetic-expression-2, boolean-expression-2 "
+        + "and range-expression. ANY, TRUE and FALSE take no NOT. `WHEN NOT ANY` could never be selected; for "
+        + "`WHEN NOT TRUE` against a TRUE/FALSE subject write the other word (`WHEN FALSE`). A NOT that begins a "
+        + "condition (`WHEN NOT A > B`) or a partial expression (`WHEN NOT > 5`, `WHEN NOT NUMERIC`) is not this "
+        + "NOT and is admitted.",
+        "ISO §14.9.13.2 (selection-object)");
     // R03. A SYNTAX RULE violation that used to produce a SILENT WRONG ANSWER rather than any diagnostic: the hex
     // decoders answer "" for a malformed digit count and every caller took that as the literal's value, so
     // `FUNCTION LENGTH(X"414")` said 1. Three formats state the grouping rule and they differ — §8.3.3.2.3 r6
