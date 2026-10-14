@@ -31,9 +31,9 @@ public enum StandardMethod
 /// <c>object reference active-class</c>) and BaseInterface (the instance method <c>FactoryObject</c>, returning
 /// <c>object reference factory of active-class</c>) — and its NOTE says "The standard class BASE need not be
 /// implemented in COBOL". It is not: its implementation is the runtime pair <c>CobolNet.Runtime.BASE</c> /
-/// <c>BASE__FACTORY</c>, whose names are exactly the ones the emitted-type convention
+/// <c>__FACTORY_BASE</c>, whose names are exactly the ones the emitted-type convention
 /// (<see cref="ObjectRefDescriptor.ClrTypeName"/>: sanitize + uppercase, plus
-/// <see cref="NamingConvention.FactorySuffix"/>) gives the class-name BASE — so a class inheriting it, a typed
+/// <see cref="NamingConvention.FactoryClassName"/>) gives the class-name BASE — so a class inheriting it, a typed
 /// <c>USAGE OBJECT REFERENCE BASE</c> and a <c>FACTORY OF BASE</c> all name the runtime types with no special
 /// case anywhere in the emitter.</para>
 ///
@@ -56,6 +56,10 @@ public static class OoStandardClasses
     /// <summary>The name of the standard class (§16.1). Case-insensitive like every class-name (§8.3.2.2).</summary>
     public const string BaseName = "BASE";
 
+    /// <summary>The runtime type of BASE's factory object, <c>CobolNet.Runtime.__FACTORY_BASE</c> — the emitted-type
+    /// convention's name for the class-name BASE, never a second spelling of it.</summary>
+    public static readonly string BaseFactoryCsName = NamingConvention.FactoryClassName(DataItem.WordIdentifier(BaseName));
+
     /// <summary>The method-name of BaseFactoryInterface's factory method, as §16.2 spells it (method-names compare
     /// case-insensitively, §8.3.2.2, so <c>INVOKE C "NEW"</c> names it).</summary>
     public const string NewMethodName = "New";
@@ -63,7 +67,7 @@ public static class OoStandardClasses
     /// <summary>The method-name of BaseInterface's instance method, as §16.2 spells it.</summary>
     public const string FactoryObjectMethodName = "FactoryObject";
 
-    /// <summary>The runtime member that implements New: the virtual <c>__New()</c> of <c>BASE__FACTORY</c>, which
+    /// <summary>The runtime member that implements New: the virtual <c>__New()</c> of <c>__FACTORY_BASE</c>, which
     /// creates through the covariant <c>__Create</c> every BASE-derived factory class overrides (OO deep-dive D4). It is
     /// NOT the uppercase method-name: a COBOL <c>METHOD-ID. NEW OVERRIDE.</c> in a BASE subclass adopts it as a C#
     /// <c>override</c> (the override takes its base slot's CsName, <c>OoClassTable.ResolveOverrides</c>), while a factory

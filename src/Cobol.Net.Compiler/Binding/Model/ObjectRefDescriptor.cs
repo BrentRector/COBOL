@@ -136,13 +136,13 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// <summary>The emitted C# type of a reference with this description, WITHOUT the trailing <c>?</c>.
     /// Universal → <c>CobolObject</c> (D-U1). Otherwise the name mapping the ClassUnit emission convention
     /// uses (<c>DataItem.WordIdentifier</c> — two spellings of one COBOL word are one class, §8.1.3.2 GR3), plus
-    /// <c>NamingConvention.FactorySuffix</c> when FACTORY OF was written, because a factory object's emitted
+    /// behind <c>NamingConvention.FactoryClassName</c> when FACTORY OF was written, because a factory object's emitted
     /// type is the sibling singleton class (design D11), not the instance class. ACTIVE-CLASS emits its
     /// CONTAINING class: GR22 e) admits that class or, through inheritance of the method, a subclass — both of
     /// which are assignable to it, so the containing class is the sound static bound.</summary>
     public string ClrTypeName => Kind is ObjectRefKind.Universal || Name is null
         ? UniversalClrName
-        : DataItem.WordIdentifier(Name) + (Factory ? NamingConvention.FactorySuffix : "");
+        : Factory ? NamingConvention.FactoryClassName(DataItem.WordIdentifier(Name)) : DataItem.WordIdentifier(Name);
 
     /// <summary>The emitted C# type of a universal object reference (D-U1) — the runtime root every emitted class derives
     /// from. The ONE spelling <see cref="ClrTypeName"/> and the method ABI's return-type projection

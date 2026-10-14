@@ -142,6 +142,38 @@ public sealed class CobolVarGroupContiguousTests
         Assert.Equal("H", taken.Fixed);
     }
 
+    // ── kb/Work PB3030: a table counted in BITS (ISO §8.5.1.6.3 puts each USAGE BIT occurrence at the next bit
+    // position, so occurrences share bytes). Member H = B PIC 1 USAGE BIT · TB PIC 1 USAGE BIT OCCURS 1 TO 8: the table
+    // starts at bit 1 of H's first character (Lead 1), one bit per occurrence, and H is ceiling(9 / 8) = 2 characters.
+
+    private static readonly OdoTail BitTail = new(1, 8, Lead: 1, PositionsPerCharacter: 8);
+
+    [Fact]
+    public void BitOdoTail_CutsTheCeilingOfItsBits_AndLaysOutAsOneCharacterPerUnit()
+    {
+        Assert.Equal(2, BitTail.Width);                 // 1 + 8 bits
+        Assert.Equal(0, BitTail.CutAt(8));
+        Assert.Equal(1, BitTail.CutAt(7));              // 1 + 7 = 8 bits: one character (§15.50.4 rule 9)
+        Assert.Equal(1, BitTail.CutAt(2));              // 1 + 2 = 3 bits: still one character
+        Assert.Equal(1, BitTail.CutAt(0));              // B alone shares the table's first character
+        Assert.Equal(1, BitTail.CutAt(-3));             // clamped to 0, as the declared group's count is
+        Assert.Equal((1, 2), (BitTail.RecordUnit, BitTail.RecordMaxUnits));
+        var chars = new OdoTail(2, 3);                  // the character arm is unchanged: one element per unit
+        Assert.Equal((6, 4, 2, 3), (chars.Width, chars.CutAt(1), chars.RecordUnit, chars.RecordMaxUnits));
+    }
+
+    [Fact]
+    public void BitOdoTail_KeepUnused_SplicesAtTheFirstUnusedOccurrencesBit()
+    {
+        // §13.18.38.4 GR8 a): a receiving count of 2 uses B, TB(1) and TB(2) — bits 0..2 — from the sender and keeps
+        // every later bit of the receiver's own image, inside the shared first character too.
+        string received = CobolBits.Pack("010" + "00000" + "00000000");
+        string current = CobolBits.Pack("111" + "11111" + "10000000");
+        Assert.Equal("010" + "11111" + "10000000", CobolBits.Unpack(BitTail.KeepUnused(received, current, 2), 16));
+        Assert.Equal(received, BitTail.KeepUnused(received, current, 8));   // the maximum stores it all
+        Assert.Equal("Hay", new OdoTail(1, 2).KeepUnused("Hab", "Hxy", 1));   // the character arm: whole elements
+    }
+
     // ── kb/Work PB244 shape (b), the CELL-BACKED half: the same record in a storage cell ───────────────────────────
     // Window H X(1) · D dynamic (max 5, ordinal 0 at window offset 1) · T X(1) OCCURS 1 TO 3 DEPENDING, held at its
     // maximum (3 positions) as the window's trailing storage: Ref "Hxyz", D "abc".

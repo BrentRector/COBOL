@@ -77,3 +77,11 @@ CobolNet.Runtime.ActivationDescription.AnyLengthClauses.init -> void
 CobolNet.Runtime.ActivationDescription.ClausePhrases.get -> string![]?
 CobolNet.Runtime.ActivationDescription.ClausePhrases.init -> void
 static CobolNet.Runtime.ActivationRelations.MatchViolation(CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal) -> string?
+static CobolNet.Runtime.CobolBits.NatFromStorage(string! image) -> string!
+CobolNet.Runtime.OdoTail.KeepUnused(string! received, string! current, int count) -> string!
+CobolNet.Runtime.OdoTail.Lead.get -> int
+CobolNet.Runtime.OdoTail.Lead.init -> void
+CobolNet.Runtime.OdoTail.PositionsPerCharacter.get -> int
+CobolNet.Runtime.OdoTail.PositionsPerCharacter.init -> void
+CobolNet.Runtime.OdoTail.RecordMaxUnits.get -> int
+CobolNet.Runtime.OdoTail.RecordUnit.get -> int

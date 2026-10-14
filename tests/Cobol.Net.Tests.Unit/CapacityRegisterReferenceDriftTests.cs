@@ -91,10 +91,10 @@ public sealed class CapacityRegisterReferenceDriftTests
         Assert.True(enumBody.Success, "CapacityRefFault enum not found in ReferenceResolver.cs");
         var members = Regex.Matches(enumBody.Groups["body"].Value, @"^\s{8}(?<name>[A-Z]\w*),", RegexOptions.Multiline)
             .Select(m => m.Groups["name"].Value).ToList();
-        Assert.Equal(new[] { "None", "Subscripted", "RefModified", "Qualifiers", "UnderATable" }, members);
+        Assert.Equal(new[] { "None", "Subscripted", "RefModified", "Qualifiers", "Ambiguous", "UnderATable" }, members);
 
         string place = MethodBody(text, "CapacityPlaceOf");
-        // None never reaches the switch — its Place is non-null by construction. Every other member is a case.
+        // None never reaches the switch (CapacityPlaceOf returns its Place first). Every other member is a case.
         foreach (string m in members.Where(m => m != "None"))
             Assert.True(place.Contains($"case CapacityRefFault.{m}:", StringComparison.Ordinal),
                 $"CapacityRefFault.{m} has no diagnostic arm in CapacityPlaceOf.");

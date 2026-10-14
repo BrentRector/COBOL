@@ -8,17 +8,35 @@ namespace CobolNet.Compiler.Oo;
 /// <summary>
 /// The ONE home for every OO C# / file-key naming convention (P9 R8 — kills the four scattered
 /// <c>__GET_</c>/<c>__SET_</c> accessor-name builders and the loose <c>__FACTORY</c>/band strings).
-/// The <c>__</c> prefix cannot appear in a COBOL-derived name (§8.3.2.1: a user word never begins with a hyphen
-/// or underscore, so <see cref="DataItem.Sanitize"/> never yields a leading <c>__</c>), so none of these collide with user
-/// names — the §8.4.5/§11.7.4 GR1a implementor-defined externalized-name license.
+/// A LEADING <c>__</c> cannot begin a COBOL-derived name (§8.3.2.1: "The hyphen or underscore shall not appear as the
+/// first or last character in such words", so <see cref="DataItem.Sanitize"/> never yields a leading <c>__</c>), so a
+/// name that BEGINS with one of these tags never collides with a user name — the §8.4.5/§11.7.4 GR1a
+/// implementor-defined externalized-name license. ⛔ A <c>__</c> INSIDE or AT THE END of a name is no such guarantee:
+/// the word mapping writes each hyphen as an underscore, so <c>X--FACTORY</c> is <c>X__FACTORY</c> (kb/Work PB2921).
+/// Every name synthesized from a user word is therefore a PREFIX family, never a suffix.
 /// NOTE — the <c>::EXT::</c> band is a WIRE CONTRACT with the runtime: <c>CobolFile.Register*</c> and
 /// <c>ExternalStore</c> recognize the prefix on the emitted key (ISO §13.18.22.4 GR4a run-unit sharing), so the
 /// runtime carries its own copy of that spelling; change either side only with the other.
 /// </summary>
 public static class NamingConvention
 {
-    /// <summary>The factory singleton class suffix (brief D11 — <c>FOO__FACTORY</c>, a REAL sibling class).</summary>
-    public const string FactorySuffix = "__FACTORY";
+    /// <summary>The factory singleton class of the class whose C# name is <paramref name="classCsName"/> (brief D11 —
+    /// <c>__FACTORY_FOO</c>, a REAL sibling class; the runtime's standard class BASE is <c>__FACTORY_BASE</c>). A
+    /// prefix family, so no class-name can spell it: the suffix form <c>FOO__FACTORY</c> it replaced was also the
+    /// spelling of the legal class-name <c>FOO--FACTORY</c> (kb/Work PB2921).</summary>
+    public static string FactoryClassName(string classCsName) => FactoryClassPrefix + classCsName;
+
+    /// <summary>The <see cref="FactoryClassName"/> family's tag.</summary>
+    public const string FactoryClassPrefix = "__FACTORY_";
+
+    /// <summary>The C# name of a METHOD-ID spelled like its own CLASS-ID (a C# member may not be named like its
+    /// enclosing type, CS0542; the method-name and the class-name sit in different source elements, so the COBOL is
+    /// legal — <c>OoClassTable.AddMethods</c>). A prefix family: the <c>_M</c> suffix it replaced was also the
+    /// spelling of the method-name <c>FOO-M</c> beside it (CS0111; kb/Work PB2921).</summary>
+    public static string ClassNamedMethodName(string methodCsName) => ClassNamedMethodPrefix + methodCsName;
+
+    /// <summary>The <see cref="ClassNamedMethodName"/> family's tag.</summary>
+    public const string ClassNamedMethodPrefix = "__method_";
 
     /// <summary>The factory singleton field (§9.3.14.2 — "created before it is first referenced").</summary>
     public const string FactoryInstanceField = "__Instance";
@@ -58,7 +76,7 @@ public static class NamingConvention
     public static readonly IReadOnlyList<string> CobolWordDerivedPrefixes =
     [
         FormalParameterPrefix, AddressCarrierPrefix, InstanceFileKeyPrefix, CapacityRegisterPrefix,
-        DebugRegisterPrefix, SumCounterPrefix, "__GET_", "__SET_",
+        DebugRegisterPrefix, SumCounterPrefix, "__GET_", "__SET_", FactoryClassPrefix, ClassNamedMethodPrefix,
     ];
 
     /// <summary>A method formal's C# <c>ref</c> parameter (the carrier; the body reads the capturable LOCAL
