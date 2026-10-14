@@ -1,4 +1,4 @@
-## PB2586: UNSTRING SR2 refuses category alphabetic (PIC A), and admits the slice of a numeric item
+## Entry 2014 — 2026-10-13 21:14 PDT — PB2586: UNSTRING SR2 refuses category alphabetic (PIC A), and admits the slice of a numeric item
 
 ISO 14.9.48.3 SR2 (`cite.py --check` OK): "Identifier-1, identifier-2, identifier-3, and identifier-5 shall reference data
 items of category alphanumeric or national." Category alphabetic is a category of its own (8.5.2.1 Table 2). The binder's
@@ -44,3 +44,4 @@ exhaustive exception list, PB73). Goldens: negatives `pb2586-unstring-alphabetic
 `pb2586-move-concat-alphabetic-slices-to-boolean` (COBOLNET0819), and golden leg T5 (a CONCAT mixing a PIC A slice with a
 PIC X slice is alphanumeric, a legal sender). Sibling found, not fixed here: `IntrinsicArgumentRules.ClassOfPlace` still
 classes a PIC A slice as class alphanumeric (a function-argument class screen), a lead for a note.
+
