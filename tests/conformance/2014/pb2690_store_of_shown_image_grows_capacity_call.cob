@@ -33,6 +33,11 @@
       *>   GK  the formal passed on BY REFERENCE to a program of
       *>       the same description, which stores the default
       *>       into FE (3): one storage area throughout         = 3
+      *>   GE  the formal passed on BY REFERENCE to a program
+      *>       whose formal is ELEMENTARY (PIC X(7)), which
+      *>       stores "Q" into its position 2 (FE (1), inside the
+      *>       capacity): no occurrence past the capacity is
+      *>       referenced, so none is created                   = Qb, 1
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2690SG.
        DATA DIVISION.
@@ -83,6 +88,11 @@
           05 KTB OCCURS DYNAMIC CAPACITY IN CK FROM 1 INITIALIZED.
              10 KE PIC X VALUE "a".
              10 KF PIC X VALUE "b".
+       01 GE.
+          05 EX PIC X VALUE "x".
+          05 ETB OCCURS DYNAMIC CAPACITY IN CE FROM 1 INITIALIZED.
+             10 EE PIC X VALUE "a".
+             10 EF PIC X VALUE "b".
        PROCEDURE DIVISION.
        MAIN.
            CALL "PB2690SA" AS NESTED USING GA
@@ -116,6 +126,9 @@
            CALL "PB2690SK" AS NESTED USING GK
            MOVE CK TO WS-C
            DISPLAY "GK=" WS-C
+           CALL "PB2690SE" AS NESTED USING GE
+           MOVE CE TO WS-C
+           DISPLAY "GE=[" EE (1) EF (1) "] " WS-C
            STOP RUN.
 
        IDENTIFICATION DIVISION.
@@ -223,4 +236,30 @@
            CALL "PB2690SA" USING LK
            GOBACK.
        END PROGRAM PB2690SK.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SE.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LE.
+          05 LEX PIC X.
+          05 TE OCCURS 3.
+             10 LEE PIC X.
+             10 LEF PIC X.
+       PROCEDURE DIVISION USING LE.
+       MAIN.
+           CALL "PB2690SX" USING LE
+           GOBACK.
+       END PROGRAM PB2690SE.
+
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB2690SX IS COMMON.
+       DATA DIVISION.
+       LINKAGE SECTION.
+       01 LX7 PIC X(7).
+       PROCEDURE DIVISION USING LX7.
+       MAIN.
+           MOVE "Q" TO LX7 (2:1)
+           GOBACK.
+       END PROGRAM PB2690SX.
        END PROGRAM PB2690SG.

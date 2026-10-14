@@ -26,9 +26,9 @@ crossing arm or description changed. Docs: `docs/CONFORMANCE.md` D-VGB (the know
 
 **Goldens.** `2014/pb2690_store_of_shown_image_grows_capacity_call` (the probe, a direct store, SPACES into a table without
 INITIALIZED, occurrence 2 only, a read-only callee, a variable-length formal, the nested element arm, BY CONTENT, a formal
-passed on to a program of the same description) and `_invoke` (typed, variable formal, universal, SPACES, BY CONTENT);
+passed on to a program of the same description, and one passed on to an elementary formal that stores only inside the capacity, which creates nothing) and `_invoke` (typed, variable formal, universal, SPACES, BY CONTENT);
 negative `pb2690-store-of-shown-image-grows-capacity-below-2014` (COBOLNET0900); unit
 `BoundaryGroupCorrespondenceTests.AStoreOfTheShownImagePastTheCapacity_CreatesTheOccurrence_ByTheReceivingReference`.
 No inventory row claimed or closed (kb/Work PB2690 `closes_rows_reason`); PB2690 flipped to landed.
 
-**Gate.** GATE_VERDICT_PLACEHOLDER
+**Gate.** Recorded below once the gate has run.
