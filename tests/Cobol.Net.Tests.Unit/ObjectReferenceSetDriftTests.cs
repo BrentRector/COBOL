@@ -42,7 +42,10 @@ public sealed class ObjectReferenceSetDriftTests
     {
         string compiler = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
         string runtime = File.ReadAllText(TestRepo.Src("Cobol.Net.Runtime", "Control", "ActivationRelations.cs"));
-        Assert.Contains("ObjectReferenceSet.Refusal(table.SetOperand(send), table.SetOperand(recv)", compiler);
+        // The compiler's pair is OoClassTable.SetOperands — SetOperand per side, a formal side standing for the most
+        // favourable actual (kb/Work PB2937) — and the table answers it.
+        Assert.Contains("var (s, r) = table.SetOperands(send, recv);", compiler);
+        Assert.Contains("ObjectReferenceSet.Refusal(s, r, activeClassSenderAdmitted)", compiler);
         Assert.Contains("ActivationCategory.Object => ObjectReferenceSet.Refusal(", runtime);
     }
 

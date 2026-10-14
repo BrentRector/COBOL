@@ -12292,11 +12292,11 @@
   "subject": "CLASS-ID paragraph",
   "rule-digest": "acfe1a044c39",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Oo/OoExpansion.cs#AddSkeleton; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#SubstitutedTokens",
-  "test-ref": "conformance:2002/pb759_parameterized_class; conformance-test:ParameterizedClassTests.ParameterNameAsADataName_2239",
+  "code-location": "src/Cobol.Net.Compiler/Oo/OoExpansion.cs#AddSkeleton; src/Cobol.Net.Compiler/Oo/OoExpansion.cs#SubstitutedTokens; src/Cobol.Net.Compiler/Binding/Model/ObjectRefDescriptor.cs#FormalParameter; src/Cobol.Net.Compiler/Oo/OoClassTable.cs#SetOperands",
+  "test-ref": "conformance:2002/pb759_parameterized_class; conformance-test:ParameterizedClassTests.ParameterNameAsADataName_2239; conformance:2002/pb2937_skeleton_bodies_bind_as_themselves; conformance:negative/pb2937-skeleton-only-receiver",
   "derivation": "",
-  "editions": "2002,2014,2023",
-  "notes": "kb/Work/PB759.md landed w46i3. The formal is honoured in object-class-name positions (USAGE OBJECT REFERENCE, INVOKE receiver, INHERITS - golden PB759LOUD INHERITS B USING B) by GR5 token substitution; a formal written in a DECLARATION slot (data/condition/paragraph/section/method/file/report/screen/property-name) -> COBOLNET2239, since substitution would silently rename it; a data REFERENCE fails downstream as an undefined name.",
+  "editions": "2002, 2014, 2023",
+  "notes": "kb/Work/PB759.md landed w46i3; PB2051 (w1053a), PB2937 (w1072b). cite.py --check 11.3.4 'Parameter-name-1 may be specified within this class definition only where an object-class-name or an interface-name is permitted' -> OK §11.3.4 6). In an EXPANSION the formal is honoured in object-class-name positions (USAGE OBJECT REFERENCE, INVOKE receiver, INHERITS - golden PB759LOUD INHERITS B USING B) by GR5 token substitution; a formal written in a DECLARATION slot -> COBOLNET2239. In a definition nothing expands, bound as itself (OO deep-dive D12 determination 6), a reference typed by the formal takes the alternative its REPOSITORY specifier declares, marked FORMAL (ObjectRefDescriptor.FormalParameter), and the formal is honoured in every statement position as well: INVOKE through a formal-typed reference or the formal class-name, SUPER / B OF SUPER over a formal superclass, SET TO the formal class-name, an inline invocation or object property through a formal - each selects its method in the expansion (BoundDeferredToExpansion; 9.3.8.2.4), while a SET pair is asked with the formal standing for the most favourable actual (OoClassTable.SetOperands), so SET ONE TO X with ONE 'T ONLY' and X 'T' is COBOLNET0867 in the skeleton (SR12 a)1.: every expansion refuses it). Golden 2002/pb2937_skeleton_bodies_bind_as_themselves compiles every such position clean and prints PI-OK / PB2937-OK.",
   "state": "OK"
  },
  {
@@ -15262,11 +15262,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "cf26fa78eb27",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#SpecifiesItself; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf",
+  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#UserFunctionsOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ContainingDefinitions",
   "test-ref": "conformance:2002/pb1084_repository_self_function_specifier",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1084 (w68z). cite.py --check 12.3.8.3 'references to function-prototype-name-1 are to that function definition and this function-specifier is ignored' -> OK §12.3.8.3 11). ONE self-specifier rule (BinderDriver.SpecifiesItself) is asked by both prototype arms: UserFunctionsOf (SR11) and ProgramPrototypesOf (SR15). A FUNCTION-ID FACT whose REPOSITORY writes FUNCTION FACT AS \"OTHERF\" now resolves its recursive FACT(n-1) to itself (the self signature is registered last) instead of OTHERF's two-formal signature (COBOLNET1506); the golden prints FACT5=0120 and, as a control, a non-self FUNCTION ALIAS AS \"OTHERF\" still reaches OTHERF (ALIAS=1000).",
+  "notes": "kb/Work PB1084 (w68z), PB3121 (w1071e). cite.py --check 12.3.8.3 'this function-specifier is ignored' -> OK §12.3.8.3 11). UserFunctionsOf skips a function-specifier naming the function definition it is written in (the function member of BinderDriver.ContainingDefinitions) and registers that definition's own signature LAST, so a FUNCTION-ID FACT whose REPOSITORY writes FUNCTION FACT AS \"OTHERF\" resolves its recursive FACT(n-1) to itself instead of OTHERF's two-formal signature (COBOLNET1506); the golden prints FACT5=0120 and, as a control, a non-self FUNCTION ALIAS AS \"OTHERF\" still reaches OTHERF (ALIAS=1000). The program twin (SR15) is ProgramPrototypesOf's overwrite over the same set. retired-witness: src/Cobol.Net.Compiler/Binding/BinderDriver.cs#SpecifiesItself (kb/Work PB3121 deleted SpecifiesItself: the self-naming specifier is now skipped in UserFunctionsOf against the function member of BinderDriver.ContainingDefinitions, the one containing-definition set the program registry and the DATA-phase scope screen read too)",
   "state": "OK"
  },
  {
@@ -15322,11 +15322,11 @@
   "subject": "REPOSITORY paragraph",
   "rule-digest": "1a20c6d5df72",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf",
-  "test-ref": "conformance:2002/l1c24_repository_self_program_specifier",
+  "code-location": "src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ProgramPrototypesOf; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#ContainingDefinitions",
+  "test-ref": "conformance:2002/l1c24_repository_self_program_specifier; conformance:2002/pb3121_containing_definition_scope",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "Rule (cite.py --check 12.3.8.3 'references to program-prototype-name-1 are to the named program definition and this program-specifier is ignored' -> OK §12.3.8.3 15)). Code: ProgramPrototypesOf registers every specifier, then OVERWRITES map[u.Name] with SelfPrototype(u) for every containing program definition and, when a specifier names the unit itself, map[unit.Name] = SelfPrototype(unit) - so the specifier (including its AS literal-3) is discarded and the reference activates the named definition by its own externalized name. Probe out/probe/repo/sr15.cob (--std 2023): PROGRAM-ID. SR15P RECURSIVE whose REPOSITORY writes 'PROGRAM SR15P AS \"SR15OTH\"', with a program SR15OTH in the group; CALL SR15P recurses into itself (DEPTH=1, DEPTH=2) and never reaches SR15OTH - correct. The containing-program half is structurally the same overwrite (a contained program cannot carry its own REPOSITORY, §12.3.3 SR1, so the case arises through the inherited container specifier). conformance:2002/pb237_program_prototype's CONTAINER-BLOCKED line exercises §8.4.6.8's NO-specifier spelling, not a written self/container specifier, so no spec-derived test pins SR15 itself -> test-ref empty.",
+  "notes": "Rule (cite.py --check 12.3.8.3 'references to program-prototype-name-1 are to the named program definition and this program-specifier is ignored' -> OK §12.3.8.3 15)). Code: ProgramPrototypesOf registers every specifier, then OVERWRITES map[u.Name] with SelfPrototype(u) for every program in BinderDriver.ContainingDefinitions(unit) - the unit itself and each program containing it (kb/Work PB3121: §8.4.6.8's 'containing program definition' includes the element's own, so the self entry no longer waits on a written specifier) - so a self- or container-naming specifier (including its AS literal-3) is discarded and the reference activates the named definition by its own externalized name. Probe out/probe/repo/sr15.cob (--std 2023): PROGRAM-ID. SR15P RECURSIVE whose REPOSITORY writes 'PROGRAM SR15P AS \"SR15OTH\"', with a program SR15OTH in the group; CALL SR15P recurses into itself (DEPTH=1, DEPTH=2) and never reaches SR15OTH - correct. conformance:2002/l1c24_repository_self_program_specifier pins the written self specifier; conformance:2002/pb3121_containing_definition_scope pins the specifier-free self and container spellings the same overwrite serves.",
   "state": "OK"
  },
  {

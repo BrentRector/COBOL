@@ -37,6 +37,7 @@
   "pb2464_prototype_pointer_signature_type",
   "pb2495_recursive_prototype_signature",
   "pb2495_pointer_type_in_signature_checks",
+  "pb3121_containing_definition_scope",
   "pb1670_replacing_partial_word_copy_replace",
   "pb1042_redefines_national_table_initialize",
   "pb643_report_file_connector_properties",
@@ -841,7 +842,8 @@
   "pb2548_template_counter_unused_elsewhere",
   "pb2967_float_result_wide_binary_receiver_size_error",
   "pb2498_length_odo_bit_national_group",
-  "pb2589_repository_function_keyword_omitted"
+  "pb2589_repository_function_keyword_omitted",
+  "pb2937_skeleton_bodies_bind_as_themselves"
   ],
   "pending": []
 }
