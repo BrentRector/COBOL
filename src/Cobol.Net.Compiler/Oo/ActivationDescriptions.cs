@@ -176,10 +176,10 @@ public static class ActivationDescriptions
     /// <summary>Why <paramref name="item"/> has no description (<see cref="Of"/> answered null), for the refusal of a
     /// bind-time lane that asks a relation of it: a group with no crossing form names its Tier-C leaf
     /// (<see cref="TierCIsland.Reason(DataItem, string, string?)"/>), any other item its missing PICTURE clause.
-    /// <paramref name="formal"/> says which side of the pair the item is.</summary>
-    public static string NoDescriptionReason(DataItem item, bool formal) =>
-        item.IsGroup ? TierCIsland.Reason(item, formal ? "formal group" : "argument group")
-        : formal ? "the formal parameter has no PICTURE description" : "the argument has no PICTURE description";
+    /// <paramref name="role"/> names the side of the pair the item is (<c>argument</c>, <c>formal parameter</c>,
+    /// <c>returning item</c>, <c>receiving item</c>).</summary>
+    public static string NoDescriptionReason(DataItem item, string role) =>
+        item.IsGroup ? TierCIsland.Reason(item, role + " group") : $"the {role} has no PICTURE description";
 
     /// <summary>The description of a PLACE an activation names — an argument or a RETURNING item: a reference-modified
     /// operand is the unique data item §8.4.3.3.4 GR5 creates (<see cref="OfReferenceModification"/>), any other place

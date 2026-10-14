@@ -100,8 +100,11 @@ public static class ActivationRelations
     /// the argument has no ANY LENGTH form (<see cref="ActivationDescription.AnyLengthClauses"/> null: a PICTURE that
     /// repeats no one symbol, or no PICTURE clause at all), where the PICTURE clause IS what differs. Two data-
     /// pointers spelled alike are restricted to two type declarations of one type-name that are not equivalent
-    /// (§8.5.3.1). The empty string when the phrases name no difference.</summary>
-    private static string ClauseDifference(ActivationDescription argument, ActivationDescription formal)
+    /// (§8.5.3.1). The empty string when the phrases name no difference. <paramref name="argumentRole"/> /
+    /// <paramref name="formalRole"/> name the two sides (a returning pair's receiving item stands where the argument
+    /// stands, its ANY LENGTH-relaxed sending item where the formal does).</summary>
+    private static string ClauseDifference(ActivationDescription argument, ActivationDescription formal,
+        string argumentRole = "argument", string formalRole = "formal parameter")
     {
         string[] a = [.. (argument.ClausePhrases ?? []).Except(formal.ClausePhrases ?? [], StringComparer.Ordinal)];
         string[] f = [.. (formal.ClausePhrases ?? []).Except(argument.ClausePhrases ?? [], StringComparer.Ordinal)];
@@ -112,10 +115,10 @@ public static class ActivationRelations
         }
         return (a.Length, f.Length) switch
         {
-            ( > 0, > 0) => $": the argument is described with {string.Join(" ", a)} where the formal parameter is "
+            ( > 0, > 0) => $": the {argumentRole} is described with {string.Join(" ", a)} where the {formalRole} is "
                 + $"described with {string.Join(" ", f)}",
-            ( > 0, 0) => $": the argument is described with {string.Join(" ", a)} and the formal parameter is not",
-            (0, > 0) => $": the formal parameter is described with {string.Join(" ", f)} and the argument is not",
+            ( > 0, 0) => $": the {argumentRole} is described with {string.Join(" ", a)} and the {formalRole} is not",
+            (0, > 0) => $": the {formalRole} is described with {string.Join(" ", f)} and the {argumentRole} is not",
             _ when formal.Category == ActivationCategory.DataPointer && argument.Category == ActivationCategory.DataPointer
                 => ": the two are restricted to type declarations that are not equivalent (ISO §8.5.3.1, §14.8.2.3.2 rule 4)",
             _ => "",
@@ -399,21 +402,25 @@ public static class ActivationRelations
     /// the pair conforms, else the reason.</summary>
     public static string? CallReturningViolation(ActivationDescription receiving, ActivationDescription sending)
     {
+        // §14.8.3.3's "Additionally" 4) / 5) are rules of an ELEMENTARY pair; opposite a group, §14.8.3.2 governs, where
+        // an ANY LENGTH sending item is as long as its receiver by §13.18.2.4 GR1 b) (ReturningConformance).
+        bool elementary = IsElementaryData(receiving) && IsElementaryData(sending);
         // 4) "If the receiving operand is described with the ANY LENGTH clause, the sending operand shall also be
         // described with the ANY LENGTH clause."
-        if (receiving.AnyLength && !sending.AnyLength)
+        if (elementary && receiving.AnyLength && !sending.AnyLength)
             return $"the receiving item ({receiving}) is described with the ANY LENGTH clause and the returning item "
                 + $"({sending}) is not (ISO §14.8.3.3 \"Additionally\" 4))";
         // 5) "If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is
         // considered to match the length of the receiving operand" — the LENGTH and nothing else: the receiving item is
         // compared as if it were described with ANY LENGTH, every other clause still compared (kb/Work PB3127, the
         // sibling of §14.8.2.3.2 "Additionally" d)). The sending item stands where the relaxed formal stands there.
-        if (sending.AnyLength && !receiving.AnyLength)
+        if (elementary && sending.AnyLength && !receiving.AnyLength)
             return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
                    && SameClausesAtFormalLength(receiving, sending)
                 ? null
                 : $"the returning item ({sending}) and the receiving item ({receiving}) are not described with the same "
-                  + "clauses (ISO §14.8.3.3, \"Additionally\" 5))" + ClauseDifference(receiving, sending);
+                  + "clauses (ISO §14.8.3.3, \"Additionally\" 5))"
+                  + ClauseDifference(receiving, sending, "receiving item", "returning item");
         return ReturningConformance(receiving, sending);
     }
 
@@ -563,10 +570,12 @@ public static class ActivationRelations
         if (receiving.Shape is ActivationShape.VariableLengthGroup || sending.Shape is ActivationShape.VariableLengthGroup)
             return VariableLengthViolation(receiving, sending, "receiving item", "returning item");
         // §14.8.3.2: an alphanumeric group opposite "an alphanumeric group item or an elementary item of category
-        // alphanumeric", and "the receiving operand shall be of the same length as the sending operand".
+        // alphanumeric", and "the receiving operand shall be of the same length as the sending operand" — which an ANY
+        // LENGTH sending item is by construction: §13.18.2.4 GR1 b) gives it "n repetitions of the picture symbol …,
+        // where n is the length of the corresponding argument or returning item of the activating runtime element".
         if (receiving.Shape is ActivationShape.AlphanumericGroup || sending.Shape is ActivationShape.AlphanumericGroup)
             return IsAlphanumericGroupPartner(receiving) && IsAlphanumericGroupPartner(sending)
-                   && receiving.Positions == sending.Positions
+                   && (sending.AnyLength || receiving.Positions == sending.Positions)
                 ? null
                 : $"the returning item ({sending}) and the receiving item ({receiving}) are not two alphanumeric items "
                   + "of the same length (ISO §14.8.3.2)";

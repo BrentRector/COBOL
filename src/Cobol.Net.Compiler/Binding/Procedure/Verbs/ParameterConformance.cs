@@ -114,9 +114,9 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     private string? ByReferenceViolation(Place argument, DataItem formal)
     {
         if (CobolNet.Compiler.Oo.ActivationDescriptions.OfPlace(argument, host.OoClasses) is not { } a)
-            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(argument.Item, formal: false);
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(argument.Item, "argument");
         if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(formal, host.OoClasses) is not { } f)
-            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(formal, formal: true);
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(formal, "formal parameter");
         return ActivationRelations.CallArgumentViolation(CobolPassMode.Reference, a, f, specifiedProgram: true);
     }
 
@@ -134,9 +134,10 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// has no invocation, and a program's returning item cannot be ACTIVE-CLASS, so rule 1 is its whole rule.
     /// This is NOT §9.3.8.2.3's identity comparison, which CALL used to ask here and which refused every legal
     /// widening.</item>
-    /// <item>Everything else — the description comparison (§14.8.3.2 groups, §14.8.3.3 elementary items), in
-    /// ACTIVATION mode (rules 4/5, the ANY LENGTH relaxation). No prefix latitude: §14.8.3.2 asks for "the same
-    /// length".</item>
+    /// <item>Everything else — the run-time CALL lane's relation over the two descriptions
+    /// (<see cref="ActivationRelations.CallReturningViolation"/>; kb/Work PB3101): §14.8.3.2 groups (no prefix
+    /// latitude — "the same length"), §14.8.3.3's elementary identity and its "Additionally" 4) / 5) ANY LENGTH
+    /// rules.</item>
     /// </list>
     /// A function-identifier asks nothing: its result temporary IS a clone of the RETURNING item (§8.4.3.2.4 GR1), so
     /// the pair conforms by construction. Null when conformant.</summary>
@@ -154,7 +155,13 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                       + "item into the activating one)"
                     : null
                 : null;
-        return CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(activated, receiving, anyLengthActivationRelax: true);
+        // Everything else is the run-time CALL lane's relation over the two descriptions (kb/Work PB3101): §14.8.3.2's
+        // groups, §14.8.3.3's elementary identity and its "Additionally" 4) / 5) ANY LENGTH rules.
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(activated, host.OoClasses) is not { } sending)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(activated, "returning item");
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(receiving, host.OoClasses) is not { } receivingItem)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(receiving, "receiving item");
+        return ActivationRelations.CallReturningViolation(receivingItem, sending);
     }
 
     /// <summary>The CALL lane's twin of <see cref="CheckArgument"/>'s carrier residue for the RETURNING item (kb/Work

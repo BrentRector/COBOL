@@ -538,29 +538,23 @@ public static class OoConformance
             + "clauses)";
     }
 
-    /// <summary>The ONE strict IDENTICAL-DESCRIPTION check — §14.8.2.3.2 (BY REFERENCE parameters ONLY; BY
-    /// CONTENT follows §14.8.2.3.3 COMPUTE/MOVE/SET rules in the binder mode dispatch) and §9.3.8.2
-    /// override-signature validation. Identical = same category, the same ALIGNED / DYNAMIC LENGTH clauses
+    /// <summary>The PAIR-MODE IDENTICAL-DESCRIPTION check of two descriptions compiled together — §9.3.8.2.3's
+    /// override / implements / interface conformance, §13.7.3 SR2's prototype against its definition and the MOVE
+    /// identity conversion. No ACTIVATION asks it: an argument or a returning item is asked
+    /// <see cref="ActivationRelations"/> over its <see cref="ActivationDescription"/> on every lane (kb/Work PB3101;
+    /// this pair half is the next step, <c>SameSignature</c>). Identical = same category, the same ALIGNED / DYNAMIC LENGTH clauses
     /// (<see cref="DescriptionClauses"/>), the per-category clauses (numeric: USAGE + SIGN representation + BLANK
     /// WHEN ZERO + digits + scale + sign; alphanumeric: length + JUSTIFIED; LOCALE phrase; object reference: the
     /// whole descriptor), and the same PICTURE clause by its ONE identity (<see cref="PictureClauseIdentity"/> —
     /// the character-string, currency strings and DECIMAL-POINT IS COMMA; kb/Work PB1166); a bit / national group
     /// is an elementary item (<c>AsIfElementaryGroupMismatch</c>); an alphanumeric group: image crossing with equal
-    /// character length (except the §14.8.2.2 rule-1 BY
-    /// REFERENCE prefix case — <paramref name="byRefGroupPrefix"/> allows a SMALLER formal). Null when
-    /// conformant. This strictness keeps BY REFERENCE marshaling TYPE-PRESERVING (the slice-2 design fact);
-    /// CONTENT conversions qualify the owner class internal profiles instead.</summary>
-    /// <param name="invokedWith">ACTIVATION through INVOKE only: how the object the method is activated ON is
-    /// described (<see cref="InvokedWith"/>). An ACTIVE-CLASS formal's rule — §14.8.2.3.2 rule 4 — is a statement
-    /// about the invocation as much as about the argument, so it is decided only when this is supplied; without it
-    /// (the override / implements / prototype PAIR, §9.3.8.2.3 rule 2 d)) the two descriptions are compared.</param>
+    /// character length. An ACTIVE-CLASS pair is §9.3.8.2.3 rule 2 d)'s: the two descriptions are compared. Null when
+    /// identical.</summary>
     /// <param name="prototypes">SIGNATURE comparison only (<see cref="PrototypeSignatures.Same"/>): the prototype pairs
     /// that comparison has assumed to have the same signature, so a restricted program- or function-pointer pair is
     /// decided by the signatures its restrictions name (<see cref="PrototypeSignatures.SameType"/>; kb/Work PB2495).
     /// Without it the pair is decided by the signature classes that comparison built.</param>
-    public static string? DescriptionMismatch(DataItem formal, DataItem arg, bool byRefGroupPrefix = false,
-        bool anyLengthActivationRelax = false, ObjectRefDescriptor? invokedWith = null,
-        PrototypeBisimulation? prototypes = null)
+    public static string? DescriptionMismatch(DataItem formal, DataItem arg, PrototypeBisimulation? prototypes = null)
     {
         // ⛔ THE STRONGLY-TYPED SENTENCE FIRST, and it governs every crossing this comparator answers for.
         // ONE sentence written three times: §14.8.2.2 "If either the formal parameter or the corresponding
@@ -574,21 +568,14 @@ public static class OoConformance
         // X(4).` argument crossed BY REFERENCE into a `01 LF TYPE CT-T.` strong formal of the same width and
         // ran, defeating exactly the data integrity §8.5.3.3's restrictions exist to protect.
         if (StrongTypeMismatch(formal, arg, prototypes) is { } strongWhy) return strongWhy;
-        // ANY LENGTH (ISO §13.18.2). PAIR mode (the default — override/implements signatures; the §9.3.8.2/§14.8.2 conformance tables :12177/:12247/:12335/:12383 list ANY LENGTH among
-        // the clauses that shall be THE SAME between corresponding items): the clause must match between the
-        // sides, and when both carry it the length compare is void — both lengths track the same runtime
-        // argument (GR1). ACTIVATION mode (<paramref name="anyLengthActivationRelax"/> — INVOKE arguments
-        // §14.8.2.3.2 rules d/e (:25375-25377), BY CONTENT (:25414 rule c), and RETURNING delivery §14.8.3.3
-        // rules 4/5 (:25503-25505)): parameter 1 (the formal / the sending returning item) being ANY LENGTH
-        // makes its length "considered to match" the other side's; the OTHER side being ANY LENGTH alone stays
-        // a mismatch (rule e / rule 4 — the pairing must be declared on the formal/receiver too).
-        if (!anyLengthActivationRelax && formal.IsAnyLength != arg.IsAnyLength)
+        // ANY LENGTH (ISO §13.18.2): a signature lists it among the clauses that shall be THE SAME between
+        // corresponding items (§9.3.8.2.3 rule 3), so the clause must match between the sides. (An activation's
+        // "Additionally" d) / e) relaxation is the run-time relation's, ActivationRelations.)
+        if (formal.IsAnyLength != arg.IsAnyLength)
             return "ANY LENGTH mismatch (the corresponding items shall have the same ANY LENGTH clause — "
-                + "ISO §14.8.2/§9.3.8.2 conformance tables)";
-        if (anyLengthActivationRelax && arg.IsAnyLength && !formal.IsAnyLength)
-            return "the argument/receiver is described with ANY LENGTH — the corresponding formal/sender shall "
-                + "be described with ANY LENGTH too (ISO §14.8.2.3.2 rule e / §14.8.3.3 rule 4)";
-        // Relaxes ONLY the length compares below; category and JUSTIFIED checks stay (the §14.8.2 table row).
+                + "ISO §9.3.8.2.3 rule 3)";
+        // Both sides ANY LENGTH: both lengths track the activation's argument (§13.18.2.4 GR1), so only the length
+        // compares below are void; every other clause is still compared.
         bool anyLengthFormal = formal.IsAnyLength;
 
         // A bit / national group is an ELEMENTARY item here (§14.8.2.1 / §14.8.3.1 NOTE) — its own arm, before the
@@ -628,29 +615,11 @@ public static class OoConformance
                 return TierCIsland.Reason(formal, "formal group");
             // ⛔ A VARIABLE-LENGTH PAIR HAS NO LENGTH OF ITS OWN TO COMPARE (kb/Work PB965) — the collapsed
             // ImageWidth below counts a dynamic-capacity table as one element, a convention §8.5.1.12.3 grants only
-            // to two MATCHING dynamic-capacity tables. Which size rule applies is the activation mode's:
-            //  • RETURNING (§14.8.3.2): the length sentence governs only when "neither of them is strongly typed
-            //    or a variable length group" — compatibility, checked above, is the WHOLE rule.
-            //  • BY REFERENCE (§14.8.2.2 rule 1): it binds only an ALPHANUMERIC group item, which a variable-length
-            //    group is not (§3.11 "alphanumeric group item": "group item except for … a variable-length group
-            //    item"). Two variable-length groups: compatibility is the whole rule. A fixed-length group opposite
-            //    one: rule 1 binds the fixed side, measured in the lengths §8.5.1.12.3 sentence 3 gives the PAIR
-            //    ("the dynamic-capacity table is considered to be the same length as the corresponding table").
-            //  • Override/prototype SIGNATURE equality (§9.3.8.2.3 — neither flag): unchanged, strict equality.
+            // to two MATCHING dynamic-capacity tables. (An ACTIVATION's size rules — §14.8.2.2 rule 1's prefix,
+            // §14.8.3.2's length — are the run-time relation's, ActivationRelations, which every bind-time
+            // activation lane asks: kb/Work PB3101.)
             if (VariableLengthCompatibility.IsVariableLength(formal) || VariableLengthCompatibility.IsVariableLength(arg))
             {
-                if (byRefGroupPrefix)
-                {
-                    if (VariableLengthCompatibility.IsVariableLength(formal)
-                        && VariableLengthCompatibility.IsVariableLength(arg))
-                        return null;
-                    var (fw, aw) = VariableLengthCompatibility.PairCharWidths(formal, arg)!.Value;
-                    return fw > aw
-                        ? $"the formal ({fw} character positions) exceeds the argument ({aw}) (ISO §14.8.2.2 "
-                          + "rule 1, in the lengths §8.5.1.12.3 gives the pair — the formal shall not be larger)"
-                        : null;
-                }
-                if (anyLengthActivationRelax) return null;
                 // ⛔ PAIR MODE — override / implements / prototype SIGNATURE equality (kb/Work PB1519, wave 59 H).
                 // §9.3.5.3 item 7 makes the variable-length-group information PART OF THE METHOD RESOLUTION
                 // SIGNATURE ("If the parameter is a variable-length group, sufficient information to determine if
@@ -668,17 +637,10 @@ public static class OoConformance
                         + "ISO §9.3.5.3 item 7 makes a variable-length group's matching information part of the "
                         + "method resolution signature, so the two signatures differ";
             }
-            // §14.8.2.2 rule 1 (BY REFERENCE): the formal may be SMALLER than (a prefix of) the argument —
-            // the callee sees the leading formal-width character positions; the tail survives write-back.
-            // Override signatures and RETURNING pairs keep strict equality.
-            return byRefGroupPrefix
-                ? (formal.ImageWidth > arg.ImageWidth
-                    ? $"the formal ({formal.ImageWidth} character positions) exceeds the argument "
-                      + $"({arg.ImageWidth}) (ISO §14.8.2.2 rule 1 — the formal shall not be larger)"
-                    : null)
-                : arg.ImageWidth != formal.ImageWidth
-                    ? $"character length mismatch (formal {formal.ImageWidth}, argument {arg.ImageWidth})"
-                    : null;
+            // A signature's two groups are the same description only at the same length.
+            return arg.ImageWidth != formal.ImageWidth
+                ? $"character length mismatch (formal {formal.ImageWidth}, argument {arg.ImageWidth})"
+                : null;
         }
         if (formal.Pic is not { } f)
             return "the formal parameter has no resolvable description (PICTURE-less item — a later slice)";
@@ -692,15 +654,9 @@ public static class OoConformance
             // fixed-length group — is a mismatch, and it is that sentence that says so, not the Tier-C island.
             if (VariableLengthCompatibility.Mismatch(formal, arg) is { } vlWhy) return vlWhy;
             if (!arg.BoundaryImageCapable) return "the argument group has no character image (Tier-C)";
-            if (anyLengthFormal) return null;   // §14.8.2.3.2 rule d — the formal's length matches the argument's
-            return byRefGroupPrefix
-                ? (f.Length > arg.ImageWidth
-                    ? $"the formal ({f.Length} character positions) exceeds the argument "
-                      + $"({arg.ImageWidth}) (ISO §14.8.2.2 rule 1)"
-                    : null)
-                : arg.ImageWidth != f.Length
-                    ? $"character length mismatch (formal {f.Length}, argument {arg.ImageWidth})"
-                    : null;
+            return arg.ImageWidth != f.Length
+                ? $"character length mismatch (formal {f.Length}, argument {arg.ImageWidth})"
+                : null;
         }
         if (arg.Pic is not { } a)
             return "the argument has no resolvable description (PICTURE-less item — a later slice)";
@@ -722,7 +678,7 @@ public static class OoConformance
         // nothing — and a DPC class returning Z9,99 into a non-DPC Z9,99 receiver ran, the receiver reading 1234
         // for 12.34. An ANY LENGTH formal's one-symbol picture has no length of its own (§14.8.2.3.2
         // "Additionally" d)), so for it only the SYMBOL must agree.
-        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal, invokedWith, prototypes) is { } armWhy) return armWhy;
+        if (CategoryArmMismatch(formal, arg, f, a, anyLengthFormal, prototypes) is { } armWhy) return armWhy;
         return f.Clause is { } fc && a.Clause is { } ac
             ? anyLengthFormal ? PictureClauseIdentity.MismatchAtAnyLength(fc, ac) : PictureClauseIdentity.Mismatch(fc, ac)
             : null;
@@ -733,7 +689,7 @@ public static class OoConformance
     /// digit profile, JUSTIFIED, the LOCALE phrase, lengths and the pointer restrictions. The PICTURE clause's
     /// identity is compared by the caller after this, for every category alike.</summary>
     private static string? CategoryArmMismatch(DataItem formal, DataItem arg, PicInfo f, PicInfo a, bool anyLengthFormal,
-        ObjectRefDescriptor? invokedWith, PrototypeBisimulation? prototypes)
+        PrototypeBisimulation? prototypes)
     {
         switch (f.Category)
         {
@@ -745,11 +701,6 @@ public static class OoConformance
                 // FACTORY OF or ONLY difference passed as identical.
                 var fd = f.ObjectRef ?? ObjectRefDescriptor.Universal;
                 var ad = a.ObjectRef ?? ObjectRefDescriptor.Universal;
-                // ⛔ An ACTIVE-CLASS formal of an ACTIVATION is §14.8.2.3.2 rule 4's, not rule 2 d)'s (kb/Work PB1112):
-                // it admits an ONLY-described argument the pair rule refuses, and constrains the invocation the pair
-                // rule cannot see.
-                if (fd.Kind is ObjectRefKind.ActiveClass && invokedWith is { } iw)
-                    return ActiveClassFormalMismatch(null, fd, ad, iw, byReference: true);
                 // A parameter-name of the definition bound as itself on one side, naming something other than the
                 // other side's parameter-name: identical in an expansion whose actual IS the other side's class or
                 // interface, and not in another — the expansion's question (§9.3.8.2.4; kb/Work PB2937).
@@ -773,8 +724,8 @@ public static class OoConformance
                 if (formal.Justified != arg.Justified)
                     return "JUSTIFIED mismatch (§14.8.2.3.2 rule 2)";
                 // The PICTURE clause — alphabetic vs alphanumeric, edited vs plain — was compared above, through
-                // its one identity. ANY LENGTH: the length is considered to match (§14.8.2.3.2 rule d / §14.8.3.3 rule 5 in
-                // activation mode; both-sides-varying in pair mode — the top-of-function match rule).
+                // its one identity. ANY LENGTH on both sides (the top-of-function rule): both lengths vary, so neither
+                // is compared.
                 return !anyLengthFormal && f.Length != a.Length
                     ? $"length mismatch (formal X({f.Length}), argument X({a.Length}))"
                     : null;

@@ -1890,9 +1890,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         ObjectRefDescriptor invokedWith)
     {
         if (ActivationDescriptions.OfPlace(argument, classes) is not { } a)
-            return ActivationDescriptions.NoDescriptionReason(argument.Item, formal: false);
+            return ActivationDescriptions.NoDescriptionReason(argument.Item, "argument");
         if (ActivationDescriptions.OfFormal(formal, classes) is not { } f)
-            return ActivationDescriptions.NoDescriptionReason(formal.Item, formal: true);
+            return ActivationDescriptions.NoDescriptionReason(formal.Item, "formal parameter");
         if (CobolNet.Runtime.ActivationRelations.MatchViolation(a, f) is { } noMatch) return noMatch;
         if (formal.Item.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass)
             return OoConformance.ActiveClassFormalMismatch(null, activeClass,

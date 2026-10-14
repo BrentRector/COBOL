@@ -98,12 +98,9 @@ public sealed class ActivationConformanceDriftTests
     {
         // OoBinder is INVOKE's lane over the BY CONTENT comparators (§14.9.23.3); its BY REFERENCE arguments ask the
         // ActivationRelations (kb/Work PB2077, TypedAndUniversalInvokeVerdictsAgreeDriftTests). ParameterConformance is
-        // the shared one. The ARGUMENT use of DescriptionMismatch is the one carrying §14.8.2.2 rule 1's byRefGroupPrefix; the
-        // RETURNING use (§14.8.3.2 — "the same length", no prefix latitude) is a different rule and stays where
-        // the CALL statement's RETURNING phrase binds.
+        // the shared one.
         string[] allowed = ["ParameterConformance.cs", "OoBinder.cs"];
-        var argumentComparator = new Regex(
-            @"OoConformance\s*\.\s*(DescriptionMismatch\s*\([^;]*byRefGroupPrefix|Content\w*Mismatch\s*\()");
+        var argumentComparator = new Regex(@"OoConformance\s*\.\s*Content\w*Mismatch\s*\(");
         var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
             .Where(f => !allowed.Contains(Path.GetFileName(f)))
             .Where(f => argumentComparator.IsMatch(CodeOf(f)))
@@ -112,6 +109,33 @@ public sealed class ActivationConformanceDriftTests
         Assert.True(offenders.Count == 0,
             "A verb binder calls the §14.8.2 argument comparators directly instead of through "
             + "ParameterConformance.CheckArgument (kb/Work PB1418): " + string.Join(", ", offenders));
+    }
+
+    /// <summary>⛔ A BY REFERENCE ARGUMENT AND A RETURNING ITEM ARE ASKED THE ONE RUN-TIME RELATION AT BIND TIME (kb/Work
+    /// PB3101, PB3127). The pair-mode comparator <c>OoConformance.DescriptionMismatch</c> re-derived §14.8.2.3.2 rule 2 and
+    /// §14.8.3 from <c>DataItem</c> fields while the run-time CALL lane asked <c>ActivationRelations</c> over the
+    /// <c>ActivationDescription</c>s, and the two disagreed where the standard does not: a reference-modified argument BY
+    /// REFERENCE into a prototyped CALL's or a function's elementary formal ran (it has no PICTURE clause, docs/CONFORMANCE.md
+    /// D-RM1), and the run-time lane's ANY LENGTH arm compared category and usage only. So the activation entry asks
+    /// <c>CallArgumentViolation</c> / <c>CallReturningViolation</c>, and no verb binder asks the pair comparator for an
+    /// activation — <c>MoveBinder</c>'s identity-conversion test is a pair question, not an activation.</summary>
+    [Fact]
+    public void ActivationConformance_AsksTheRunTimeRelations_NotThePairComparator()
+    {
+        string code = Verb("ParameterConformance.cs");
+        foreach (string call in new[] { "ActivationRelations.CallArgumentViolation(", "ActivationRelations.CallReturningViolation(" })
+            Assert.True(code.Contains(call, System.StringComparison.Ordinal),
+                $"ParameterConformance no longer asks {call.TrimEnd('(')} — the bind-time activation lane would answer a "
+                + "pair the run-time CALL lane answers differently (kb/Work PB3101).");
+        string[] pairAskers = ["MoveBinder.cs"];
+        var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !pairAskers.Contains(Path.GetFileName(f)))
+            .Where(f => Regex.IsMatch(CodeOf(f), @"OoConformance\s*\.\s*DescriptionMismatch\s*\("))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "A verb binder asks the pair-mode comparator OoConformance.DescriptionMismatch for an activation instead of "
+            + "ActivationRelations (kb/Work PB3101): " + string.Join(", ", offenders));
     }
 
     /// <summary>⛔ THE RETURNING-ITEM HALF OF §14.8.3 IS ONE ENTRY TOO (kb/Work PB1164). §14.8.3.3 rule 1 makes two
