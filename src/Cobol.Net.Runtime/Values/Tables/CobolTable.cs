@@ -220,7 +220,28 @@ public static class CobolTable
     /// <param name="min">integer-1 of the OCCURS DEPENDING clause — the LOWER bound §13.18.38.4 GR7 requires the
     /// control value to fall within. It was previously absent and the floor hardcoded to 0, so a below-minimum
     /// DEPENDING value silently clamped instead of raising.</param>
-    public static int OdoExtent(Occurrence count, int min, int max, int fixedUnits, int elemUnits)
+    public static int OdoExtent(Occurrence count, int min, int max, int fixedUnits, int elemUnits) =>
+        fixedUnits + (int)CurrentCount(count, min, max) * elemUnits;
+
+    /// <summary>The CURRENT extent, in positions, of an occurs-depending GROUP operand whose occurrences are
+    /// <paramref name="strideUnits"/> apart but whose LAST occurrence ends where its own width does — an ALIGNED bit
+    /// table's (§13.18.1.4 GR2: "applies to each occurrence of that item", so each occurrence starts a byte of its
+    /// own; §8.5.1.6.3 generates filler only "as needed to advance alignment to a required natural boundary for the
+    /// next item", and the last occurrence has no next one). <paramref name="trailingUnits"/> is the filler that pads
+    /// that last occurrence to the stride (<c>stride − width</c>); it is given back once at least one occurrence
+    /// exists: the extent at <c>c</c> occurrences is <c>fixed + c × stride − trailing</c> for <c>c &gt; 0</c> and
+    /// <c>fixed</c> for none, which is the extent the same table fixed at <c>c</c> occurrences has
+    /// (<c>BitLayout.TableBits</c>), and what FUNCTION LENGTH of a bit group counts in boolean positions (§15.50.4
+    /// rule 1). With no trailing filler it is <see cref="OdoExtent"/>.</summary>
+    public static int OdoExtentTrimmed(Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits)
+    {
+        long c = CurrentCount(count, min, max);
+        return fixedUnits + (int)c * strideUnits - (c > 0 ? trailingUnits : 0);
+    }
+
+    /// <summary>The occurrence count an extent is measured at: data-name-1's value, tested against
+    /// integer-1..integer-2 and clamped to 0..integer-2.</summary>
+    private static long CurrentCount(Occurrence count, int min, int max)
     {
         // §13.18.38.4 GR7 — the value "shall fall within the bounds from integer-1 through integer-2. If the
         // value of the data item does not fall within the specified bounds, the EC-BOUND-ODO exception condition
@@ -230,8 +251,7 @@ public static class CobolTable
         if (n < min || n > max)
             ExceptionState.OdoError(
                 $"OCCURS DEPENDING value {count} is outside {min}..{max} (ISO 13.18.38.4 GR7)");
-        long c = n < 0 ? 0 : n > max ? max : n;
-        return fixedUnits + (int)c * elemUnits;
+        return n < 0 ? 0 : n > max ? max : n;
     }
 
     /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand whose positions are counted in

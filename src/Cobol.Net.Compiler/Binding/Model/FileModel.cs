@@ -694,7 +694,7 @@ public sealed class FileModel
         : item.HasBitDescendant && OdoModel.TableUnder(item) is { OccursSpec: { } os } table
                 && BitLayout.StartBitOf(item, table) is >= 0 and var start
             ? BitLayout.Characters(start
-                + (os.Min == 0 ? 0 : BitLayout.StrideBits(table) * (os.Min - 1) + BitLayout.WidthBits(table)))
+                + BitLayout.TableBits(table, os.Min))
         : item.Children.Where(c => c.RedefinesTargetName is null).Sum(c => MinExtent(c) * c.MinimumOccurrences);
 
     /// <summary>Whether an occurs-depending table — the one table in a record whose occurrence count varies —
