@@ -1,4 +1,4 @@
-## An unknown exception-name in an omitted `>>TURN` is refused: §7.3.25.3 SR2 moves from the binder to the directive stage
+## Entry 2033 — 2026-10-14 14:47 PDT — An unknown exception-name in an omitted `>>TURN` is refused: §7.3.25.3 SR2 moves from the binder to the directive stage
 
 `>>IF 1 = 0 / >>TURN EC-NOSUCH CHECKING ON / >>END-IF` compiled clean while the same directive outside the `>>IF` was COBOLNET0711, and `>>TURN EC-EXTERNAL-FORMAT-CONFLICT` at `--std 2002` was clean in the omitted branch and COBOLNET0878 in a compiled one (kb/Work PB2740, an R2 finding against PB2003's omitted-branch check). Both reproduced on the worktree build. The cause was where the rule lived: SR2 and the per-name edition window were checked only in `TurnState.Build`, which folds compiled events, so the omitted-branch check-only entry (`TurnDirectiveProcessor.CheckOperand`, ISO §7.2.1) could not see them. The comment in `Process` claiming `dialectLevel` fed the exception-name edition window was wrong: `ParseTurn` used it only for the §8.3.2.1 word-length rule.
 
@@ -11,3 +11,4 @@
 **Sweep.** Of the other stage-owned directive operands (FLAG-02, FLAG-14, COBOL-WORDS, and the closed-word rows), compiled and omitted lines give the same operand-syntax codes; the only differences measured are the COBOLNET0903 obsolescence warning and the COBOL-WORDS placement error COBOLNET2652, which are not operand syntax.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261014T195206Z-10fbf9`: Conformance 6,071/11,668 · Unit 32,903/33,632 · Characterization 6/36 in leg 1); the four new goldens passed in `leg-1-Conformance.trx` and the 14 `TurnDirectiveExceptionNameTests` cases in `leg-1-Unit.trx`. `semgrep/verify.py` PASS with no count up; `work.py check` and `audit_code_citations.py --check` clean.
+
