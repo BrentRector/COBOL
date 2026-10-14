@@ -296,6 +296,7 @@ public sealed class IndexedConnector : KeyedConnector
     {
         var store = (IndexedStore)into;
         store.Clear();
+        FaultPointReloadFilling();
         long next = Math.Max(releaseMint, 1);
         // A varying file's frames keep their exact stored lengths (§13.18.43 GR15 reports them on READ);
         // fixed frames normalize to the record width.
