@@ -79,7 +79,10 @@ ONCE, in the class's own binder, declaring its REPOSITORY and SPECIAL-NAMES word
 GR1, the contained-program model) before it binds its own environment and data divisions (`OoDriver.OoReparent`).
 A factory or object data item spelled like a class the REPOSITORY names, an alphabet the class's SPECIAL-NAMES
 declares, or the CLASS-ID is therefore legal (§8.4.6.1), until that half itself references the class-name
-(kb/Work PB3154; PB3132's reference census).
+(kb/Work PB3154; PB3132's reference census). A half's data-name (or a method's own data-, condition- or index-name)
+spelled like a SYMBOLIC CHARACTERS name of the class is the item a reference there names (§8.4.6.1): the half hides
+the inherited symbolic after it binds (`DataBinder.DropShadowedConstants`), and a method's names hide it, and an
+object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/Work PB3154 review R1-1).
 
 ## Spec corrections
 

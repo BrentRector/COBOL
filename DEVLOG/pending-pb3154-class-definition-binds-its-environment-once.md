@@ -30,3 +30,22 @@ the methods'. The interface arm already had one element per binder; the method a
 object VALUEs, the native character at ordinal 67, "B", and the class condition true for "123");
 `85/pb3154_contained_symbolic_character`; negative `pb3154-object-data-spells-a-class-it-references` (the object element
 also USES the class-name: COBOLNET2692 at 2002, 2014 and 2023). No inventory row changes verdict.
+
+**Review round 1 (R1-1, fixed).** The branch review found that the new SYMBOLIC CHARACTERS inheritance had no
+shadowing: a bare reference consults the literal aliases (constant, then symbolic) BEFORE data, and only the constant
+twin had a nearer-name check (`DropShadowedConstants`, kb/Work PB1047). So a contained program's `01 S1` spelled like its
+container's symbolic-character, and an OBJECT data item spelled like the class's, read the figurative instead (main
+printed `INNER Z`, the branch `INNER B`; §8.4.6.1 "even when it is a different type of user-defined word, is to the item
+which that source element describes"). Fix: each inherited symbolic carries its containment distance
+(`InheritConfiguration`), and `DropShadowedConstants` (a symbolic-character defines a figurative CONSTANT, §12.3.7.4
+GR11 a) now hides every inherited constant or symbolic a nearer data-, condition- or index-name declares, through one
+predicate, `DeclaredNearerThan` (§8.4.6.2.1 3) b)). A shadowed symbolic is hidden, never removed: a contained unit
+inherits the whole table one level at a time, and a middle program's LOCAL `S1` hides nothing from the program it
+contains. The OO halves run the same step after they bind. Sibling arm swept and fixed: a METHOD's own data-, condition-
+or index-name hid neither the class's symbolic nor the object's constant-name (pre-existing on main; `MOVE K` in a method
+declaring `01 K` read the object's `CONSTANT K`); both literal-alias lookups (`FindConstant`, `SymbolicOf`) now ask
+`ActiveMethodDeclares` first (§8.4.6.2.1 3) a)). Goldens `85/pb3154_contained_symbolic_shadowed` (local, index-name,
+middle GLOBAL and middle-local tiers) and `2002/pb3154_half_data_hides_class_symbolic` (object, factory and method tiers);
+both differ from the pre-fix build. Left as a lead, a different mechanism: a method's own CONSTANT entries live in the
+class binder's one table, so a sibling method reads them and two methods declaring the same constant-name with
+different values are refused COBOLNET1547.

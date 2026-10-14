@@ -856,7 +856,8 @@
   "pb2921_data_named_like_method",
   "pb546_national_leaf_one_width",
   "pb3132_contained_program_word_it_never_references",
-  "pb3154_half_data_named_like_class_words"
+  "pb3154_half_data_named_like_class_words",
+  "pb3154_half_data_hides_class_symbolic"
   ],
   "pending": []
 }

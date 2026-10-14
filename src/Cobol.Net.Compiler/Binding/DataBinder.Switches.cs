@@ -250,12 +250,27 @@ public sealed partial class DataBinder
     /// <summary>The symbolic character a BARE (unqualified, unsubscripted) data reference names, or null — the
     /// twin of <c>ConstantOf</c> (one shape for "a word that stands for a literal").</summary>
     internal (string Value, bool National)? SymbolicOf(Core.DataReferenceContext dref) =>
-        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w
-        && SymbolicCharacters.TryGetValue(w.GetText(), out var def) ? def : null;
+        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w ? SymbolicOf(w.GetText()) : null;
 
-    /// <summary>The symbolic character named by a bare word, or null (the FigurativeOperand ALL-form lookup).</summary>
+    /// <summary>The symbolic character named by a bare word, or null (the FigurativeOperand ALL-form lookup, and the
+    /// one lookup <see cref="SymbolicOf(Core.DataReferenceContext)"/> asks). A symbolic-character a nearer
+    /// declaration of the spelling hides is not one here (§8.4.6.1, §8.4.6.2.1 3); kb/Work PB3154 review R1-1):
+    /// an inherited one a nearer source element's data-, condition- or index-name hides
+    /// (<see cref="DropShadowedConstants"/>), or any one the method being bound declares a name of
+    /// (<see cref="ActiveMethodDeclares"/>).</summary>
     internal (string Value, bool National)? SymbolicOf(string word) =>
-        SymbolicCharacters.TryGetValue(word, out var def) ? def : null;
+        SymbolicCharacters.TryGetValue(word, out var def) && !_shadowedSymbolics.Contains(word)
+        && !ActiveMethodDeclares(word) ? def : null;
+
+    /// <summary>The containment distance of each INHERITED symbolic-character — 1 for the direct container's own
+    /// SPECIAL-NAMES entry, one more per level it came down (<see cref="InheritConfiguration"/>); a name absent here is
+    /// this unit's own. The tier <see cref="DropShadowedConstants"/> weighs against a same-spelled name's.</summary>
+    private readonly Dictionary<string, int> _inheritedSymbolics = new(CobolNames.Comparer);
+
+    /// <summary>The inherited symbolic-characters a nearer declaration hides (<see cref="DropShadowedConstants"/>).
+    /// Hidden from <see cref="SymbolicOf(string)"/>, never removed from <see cref="SymbolicCharacters"/>: a contained
+    /// unit inherits the whole table from this one, and this unit's local name hides nothing from it.</summary>
+    private readonly HashSet<string> _shadowedSymbolics = new(CobolNames.Comparer);
 
     /// <summary>SPECIAL-NAMES <c>ORDER TABLE</c> ordering-names (case-insensitive) → the DECODED literal-9 that
     /// identifies the cultural ordering table (ISO §12.3.7.2's last clause; §12.3.7.4 GR17 — "When ORDER TABLE is
@@ -450,7 +465,9 @@ public sealed partial class DataBinder
     /// (kb/Work PB60 / AR-15.67.3-5). The SYMBOLIC CHARACTERS figurative constants were the one SPECIAL-NAMES
     /// table still missing: a contained program's <c>MOVE SYM-A TO Y</c> naming its container's symbolic-character
     /// was COBOLNET1639 "not defined" (kb/Work PB3154's sweep; §8.4.6.1 lists symbolic-character among the names a
-    /// configuration section declares for "any source element contained within that source element").
+    /// configuration section declares for "any source element contained within that source element"). Each one
+    /// carries its containment distance (<see cref="_inheritedSymbolics"/>), so a nearer declaration of the spelling
+    /// hides it (<see cref="DropShadowedConstants"/>; kb/Work PB3154 review R1-1).
     /// §11.9.4 GR1's OPTIONS inheritance rides the same call.
     /// <para>⚠ One sibling still lives elsewhere: EVERY SPECIAL-NAMES mnemonic-name — the switch mnemonics SET reads
     /// as much as the device and feature mnemonics DISPLAY UPON / ACCEPT FROM / WRITE ADVANCING read (kb/Work
@@ -472,7 +489,9 @@ public sealed partial class DataBinder
         foreach (var (k, v) in container.OrderTables) OrderTables.TryAdd(k, v);
         foreach (var (k, v) in container.DynamicLengthStructures) DynamicLengthStructures.TryAdd(k, v);   // §8.4.6.1
         foreach (var (k, v) in container.Locales) Locales.TryAdd(k, v);   // §12.3.7.4 GR1 — locale-names reach contained units
-        foreach (var (k, v) in container.SymbolicCharacters) SymbolicCharacters.TryAdd(k, v);   // §8.4.6.1 (kb/Work PB3154)
+        foreach (var (k, v) in container.SymbolicCharacters)   // §8.4.6.1 (kb/Work PB3154), each with its tier
+            if (SymbolicCharacters.TryAdd(k, v))
+                _inheritedSymbolics[k] = container._inheritedSymbolics.GetValueOrDefault(k) + 1;
         // OBJECT-COMPUTER … PROGRAM COLLATING SEQUENCE (§12.3.6 GR9–GR11) and CHARACTER CLASSIFICATION (GR1 — every
         // OBJECT-COMPUTER clause applies to the contained units)
         Collating = container.Collating;
