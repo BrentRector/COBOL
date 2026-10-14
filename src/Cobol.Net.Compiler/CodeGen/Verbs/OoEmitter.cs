@@ -937,7 +937,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
     /// here; <c>UniversalCrossingShapeDriftTests</c> holds the pair together shape by shape.</summary>
     private static string OoUnivCallerRead(Place p) =>
         p is RefModPlace ? PlaceRenderer.Read(p)
-        : CallEmitter.CallPlaceIsVarGroup(p) ? PlaceRenderer.VarGroupBoundaryImage(p, "INVOKE argument")
+        // Every universal argument is BY REFERENCE (§14.9.23.3 SR6), so the box reads the argument's STORAGE (kb/Work PB2690).
+        : CallEmitter.CallPlaceIsVarGroup(p) ? PlaceRenderer.VarGroupBoundaryImage(p, "INVOKE argument", storage: true)
         : OoClassTable.LeafCarried(p.Item) ? PlaceRenderer.GroupLeaves(p)
         : p.Item.IsGroup ? CallEmitter.CallStringRead(p)
         : OoUnivImageBridged(p.Item) ? PlaceRenderer.Read(new NumericImagePlace(p))
@@ -1640,16 +1641,17 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     ? FixedArgumentShapes(vgp, a.Formal) is (var argImageShape, var formalShapeOfFixed)
                         ? RuntimeApi.VarGroupFromImage(CallEmitter.CallStringRead(vgp), Atoms(argImageShape), Atoms(formalShapeOfFixed))
                         : VarGroupShapes(vgp, a.Formal) is (var argShape, var formalShape)
-                            ? RuntimeApi.VarGroupReshape(PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument"),
+                            ? RuntimeApi.VarGroupReshape(PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument", storage: a.WriteBack),
                                 Atoms(argShape), Atoms(formalShape))
-                            : PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument")
+                            : PlaceRenderer.VarGroupBoundaryImage(vgp, "INVOKE argument", storage: a.WriteBack)
                     : RuntimeApi.VarGroupEmpty);
             }
             else if (a.Source is { } vsp && VarPlaceShapes(vsp, a.Formal) is (var vsArg, var vsFormal))
                 // ⛔ A VARIABLE-length group argument into a FIXED-length group formal (§14.8.2.2; kb/Work PB965):
                 // the formal reads the argument's carrier in its own shape, each corresponding table fitted to the
-                // formal's occurrence count (§8.5.1.12.3 sentence 3).
-                Decl("string", RuntimeApi.VarGroupToImage(PlaceRenderer.VarGroupBoundaryImage(vsp, "INVOKE argument"), Atoms(vsArg), Atoms(vsFormal), a.Formal.ImageWidth));
+                // formal's occurrence count (§8.5.1.12.3 sentence 3) — BY REFERENCE the argument's STORAGE, whose
+                // tables show the occurrences past their capacity as they create them (kb/Work PB2690).
+                Decl("string", RuntimeApi.VarGroupToImage(PlaceRenderer.VarGroupBoundaryImage(vsp, "INVOKE argument", storage: a.WriteBack), Atoms(vsArg), Atoms(vsFormal), a.Formal.ImageWidth));
             // ⛔ A BY CONTENT VALUE INTO A FLOATING-POINT FORMAL OF ANOTHER DESCRIPTION (kb/Work PB1114). §14.8.2.3.3 2)
             // a) — "the same as for a COMPUTE statement" — and §14.2.3 GR9's "a COMPUTE statement without the ROUNDED
             // phrase" have no floating-point exemption, so a fixed-point or other-usage float sender, a literal-2 or an
@@ -1905,7 +1907,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // PB480; §14.2.3 GR8).
                 : VarGroupShapes(src, a.Formal) is (var argShape, var formalShape)
                     ? PlaceRenderer.WriteVarGroupImage(src,
-                        RuntimeApi.VarGroupOverlay(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), value,
+                        RuntimeApi.VarGroupOverlay(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into", storage: true), value,
                             Atoms(argShape), Atoms(formalShape)),
                         "INVOKE copy-out into")
                 : PlaceRenderer.WriteVarGroupImage(src, value, "INVOKE copy-out into");
@@ -1913,7 +1915,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
             // …and its write-back OVERLAYS the argument's storage (§14.2.3 GR8): the argument's tables keep
             // their current capacities and its material past the formal survives (kb/Work PB965).
             return PlaceRenderer.WriteVarGroupImage(src,
-                RuntimeApi.VarGroupOverlayImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into"), Atoms(wvArg), value, Atoms(wvFormal)),
+                RuntimeApi.VarGroupOverlayImage(PlaceRenderer.VarGroupBoundaryImage(src, "INVOKE copy-out into", storage: true), Atoms(wvArg), value, Atoms(wvFormal)),
                 "INVOKE copy-out into");
         else if (OoClassTable.LeafCarried(a.Formal))
             return PlaceRenderer.WriteGroupLeaves(src, value);   // the leaf vector's copy-back (kb/Work PB1116)

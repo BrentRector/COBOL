@@ -291,6 +291,20 @@ public sealed class CobolDynTable<T>
         return outp;
     }
 
+    /// <summary>The element a statement creates at a 1-based occurrence number (§8.5.1.9.3, seeded by §8.5.1.9.5's
+    /// INITIALIZED recipe when the phrase is written — the same seed <see cref="RefReceiving"/> grows with) as the
+    /// carrier <paramref name="carrierOf"/> makes of it: what a variable-length group carrier of this table's storage
+    /// states as its creation (<see cref="CobolVarGroup.Created"/>, kb/Work PB2690), so a BY REFERENCE formal whose FIXED
+    /// table reaches past the current capacity sees and creates the occurrences this table would. A table whose elements
+    /// are variable-length groups maps each to its own carrier.</summary>
+    public Func<int, CobolVarGroup> CreatedAs(Func<T, CobolVarGroup> carrierOf) =>
+        occurrence => carrierOf(_createdAt(occurrence));
+
+    /// <summary><see cref="CreatedAs(Func{T, CobolVarGroup})"/> for a table of fixed-length elements, each rendered by
+    /// <paramref name="imageOf"/> (the lambda <see cref="CurrentImage"/> concatenates) and carried as its image.</summary>
+    public Func<int, CobolVarGroup> CreatedAs(Func<T, string> imageOf) =>
+        occurrence => CobolVarGroup.OfImage(imageOf(_createdAt(occurrence)));
+
     /// <summary>The write half of <see cref="CurrentImage"/> — distribute a carried current-extent image back
     /// into the table (kb/Work PB204). The capacity BECOMES the number of whole
     /// <paramref name="elementWidth"/>-wide occurrences the content holds (raised to the FROM minimum by

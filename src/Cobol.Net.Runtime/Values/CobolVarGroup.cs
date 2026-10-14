@@ -45,7 +45,18 @@ namespace CobolNet.Runtime;
 /// <param name="Elements">Null when no component is nested; otherwise one entry per component of
 /// <paramref name="Dynamic"/>: for a dynamic-capacity table of variable-length group elements, its occurrences' own
 /// carriers in occurrence order up to its current capacity, and null for every other component.</param>
-public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup[]?[]? Elements = null)
+/// <param name="Created">Null unless the carrier describes STORAGE; otherwise one entry per component of
+/// <paramref name="Dynamic"/>: for a dynamic-capacity table, the element a statement creates in it at a 1-based occurrence
+/// number (its <c>CobolDynTable</c>'s creation seed, the §8.5.1.9.5 INITIALIZED default when the phrase is written) as a
+/// carrier in the table's ELEMENT shape, and null for every other component (kb/Work PB2690). The storage builders state
+/// it (the emitted <c>AsVarImage</c>, <c>StorageCell.VarGroupAt</c>) and the structural rebuilds of the same storage keep
+/// it (<see cref="Slice"/>, <see cref="Concat"/>, <see cref="SplitTail"/>, <see cref="JoinTail"/>); a conversion's result
+/// (<see cref="Reshape"/>, <see cref="Overlay"/>) is a value and states none. The builders state it only for a BY
+/// REFERENCE crossing (their <c>storage</c> argument), never for a MOVE's sender or a BY CONTENT copy, so the carrier
+/// itself says which it is: <see cref="Reshape"/> shows a storage table's occurrences past its capacity as they would be
+/// created, and <see cref="Overlay"/> creates the ones the callee stored into from it.</param>
+public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup[]?[]? Elements = null,
+    Func<int, CobolVarGroup>?[]? Created = null)
 {
     /// <summary>The empty carrier — an absent / OMITTED argument's value (ISO §14.9.4.4 GR11 hands out a
     /// carrier whose accessors raise; this is the shape those accessors return when checking is off).</summary>
@@ -73,6 +84,15 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// <summary><see cref="Elements"/> as one entry per component, null for every plain one — what an enclosing group
     /// splices in place when it flattens this carrier into its own (the emitted <c>AsVarImage</c>).</summary>
     public CobolVarGroup[]?[] ElementList => Elements ?? new CobolVarGroup[]?[Dynamic.Length];
+
+    /// <summary>Component <paramref name="i"/>'s element creation (<see cref="Created"/>) when it is a dynamic-capacity
+    /// table of storage, else null.</summary>
+    public Func<int, CobolVarGroup>? CreatedAt(int i) => Created is { } c && (uint)i < (uint)c.Length ? c[i] : null;
+
+    /// <summary><see cref="Created"/> as one entry per component, null for every other one — what an enclosing group
+    /// splices in place beside <see cref="ElementList"/> when it flattens this carrier into its own (the emitted
+    /// <c>AsVarImage</c>).</summary>
+    public Func<int, CobolVarGroup>?[] CreatedList => Created ?? new Func<int, CobolVarGroup>?[Dynamic.Length];
 
     /// <summary>⛔ THE OCCURRENCE CARRIERS A NESTED RECEIVER STORES (kb/Work PB2496): component <paramref name="i"/>'s
     /// <see cref="ElementsAt"/>, or the empty list when the component was carried EMPTY (a sender whose table had no
@@ -108,7 +128,13 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
             e = new CobolVarGroup[]?[d.Length];
             for (int k = 0; k < e.Length; k++) e[k] = ElementsAt(dynAt + k);
         }
-        return new CobolVarGroup(f, d, e);
+        Func<int, CobolVarGroup>?[]? c = null;
+        if (Created is not null)
+        {
+            c = new Func<int, CobolVarGroup>?[d.Length];
+            for (int k = 0; k < c.Length; k++) c[k] = CreatedAt(dynAt + k);
+        }
+        return new CobolVarGroup(f, d, e, c);
     }
 
     /// <summary>The carrier of a fixed-OCCURS table of variable-length group elements (kb/Work PB244): each
@@ -120,15 +146,21 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
         var fixedRun = new System.Text.StringBuilder();
         var dyn = new List<string>();
         var elements = new List<CobolVarGroup[]?>();
-        bool nested = false;
+        var created = new List<Func<int, CobolVarGroup>?>();
+        bool nested = false, creates = false;
         foreach (var o in occurrences)
         {
             fixedRun.Append(o.Fixed);
             dyn.AddRange(o.Dynamic);
-            for (int k = 0; k < o.Dynamic.Length; k++) elements.Add(o.ElementsAt(k));
+            for (int k = 0; k < o.Dynamic.Length; k++)
+            {
+                elements.Add(o.ElementsAt(k));
+                created.Add(o.CreatedAt(k));
+            }
             nested |= o.Elements is not null;
+            creates |= o.Created is not null;
         }
-        return new CobolVarGroup(fixedRun.ToString(), [.. dyn], nested ? [.. elements] : null);
+        return new CobolVarGroup(fixedRun.ToString(), [.. dyn], nested ? [.. elements] : null, creates ? [.. created] : null);
     }
 
     /// <summary>This carrier with the group's TRAILING fixed material cut off the fixed run and appended as one
@@ -139,13 +171,13 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// <paramref name="tailAt"/> is where the table starts in the fixed run.</summary>
     public CobolVarGroup SplitTail(int tailAt) =>
         new(CobolString.Store(Fixed, tailAt), [.. Dynamic, Fixed.Length > tailAt ? Fixed[tailAt..] : ""],
-            Elements is null ? null : [.. Elements, null]);
+            Elements is null ? null : [.. Elements, null], Created is null ? null : [.. Created, null]);
 
     /// <summary>The inverse of <see cref="SplitTail"/>: the LAST component rejoins the fixed run at
     /// <paramref name="tailAt"/>.</summary>
     public CobolVarGroup JoinTail(int tailAt) =>
         Dynamic.Length == 0 ? this
-        : new(CobolString.Store(Fixed, tailAt) + Dynamic[^1], Dynamic[..^1], Elements?[..^1]);
+        : new(CobolString.Store(Fixed, tailAt) + Dynamic[^1], Dynamic[..^1], Elements?[..^1], Created?[..^1]);
 
     // ── The §8.5.1.12 LAYOUT of a group (kb/Work PB965) ───────────────────────────────────────────────────────────
     //
@@ -207,7 +239,8 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// (<see cref="Overlay"/>): each of its tables is written OVER the argument's current occurrences, and the argument's
     /// material past the formal's last character survives. A formal whose table has a FIXED occurrence count states no
     /// capacity of its own, so a store reaching the argument's dynamic-capacity table past its capacity creates the
-    /// occurrence (§8.5.1.9.3, <see cref="OverlaidTable"/>) and one that does not leaves the capacity as it was.</summary>
+    /// occurrence (§8.5.1.9.3, <see cref="OverlaidTable"/>) and one that does not leaves the capacity as it was. The image
+    /// stored back is the one <see cref="ToImage"/> showed of the argument's storage, with the callee's stores in it.</summary>
     public static CobolVarGroup OverlayImage(CobolVarGroup current, GroupAtom[] currentShape, string image,
         GroupAtom[] imageShape) => Overlay(current, OfImage(image), currentShape, imageShape);
 
@@ -242,6 +275,14 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     ///   each occurrence is reshaped from the one element's shape into the other's, §14.6.9.2's "Correspondingly
     ///   numbered elements are moved according to the rules of the MOVE statement"; a fixed table's occurrences are
     ///   its characters cut at its element width, each a fixed-length element's carrier.</item>
+    /// <item>⛔ a carrier of STORAGE (one stating <see cref="Created"/>: a BY REFERENCE argument, which only the activation
+    ///   boundary builds so, kb/Work PB2690) is not a MOVE's sender but the storage a formal VIEWS (§14.2.3 GR8: the formal
+    ///   "occupies the same storage area as the argument"), so a fixed table opposite its dynamic-capacity table shows each
+    ///   occurrence past the capacity as the table would hold it once a store there created it (§8.5.1.9.3) — the creation
+    ///   seed, for an INITIALIZED table §8.5.1.9.5's "INITIALIZE … WITH FILLER ALL TO VALUE THEN TO DEFAULT" — where a
+    ///   MOVE's remaining elements are "space filled" (§14.6.9.2 2)). The §8.5.1.9.5 NOTE licenses the view ("functionally
+    ///   identical to one where the intermediate occurrences are physically allocated and, if specified, initialized"),
+    ///   and <see cref="Overlay"/> recognises a store by a difference from that same image (determination D-VGB).</item>
     /// </list>
     /// A pair the walk does not find compatible never reaches here — the bind-time screen or the run-time relation
     /// (<see cref="ActivationRelations.ParameterViolation"/>) refused it first — so one is an internal fault, raised
@@ -262,11 +303,20 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
             fixedRun.Append(CobolString.Store(src.FixedSlice(v, prevA, pa), dst.FixedChars(prevB, pb)));
             if (k == pairs.Count) break;
             GroupAtom a = from[pa], b = to[pb];
+            // A view of STORAGE shows a fixed table's occurrences past the dynamic table's capacity as it would create them.
+            var create = a.IsComponent && !b.IsComponent ? v.CreatedAt(src.Ordinal[pa]) : null;
             if (IsNested(a) || IsNested(b))
             {
                 // The element-by-element move (§14.6.9.2): every occurrence the sender has, in the receiver's element shape.
                 var moved = src.Occurrences(v, pa) is { } occ ? Reshaped(occ, ElementShape(a), ElementShape(b)) : null;
-                if (!b.IsComponent) fixedRun.Append(CobolString.Store(moved is null ? "" : FixedImages(moved), b.Chars));
+                if (!b.IsComponent)
+                {
+                    var run = new System.Text.StringBuilder(moved is null ? "" : FixedImages(moved), b.Chars);
+                    if (create is not null && moved is not null && b.ElementChars > 0)
+                        for (int n = moved.Length + 1; run.Length + b.ElementChars <= b.Chars; n++)
+                            run.Append(Reshape(create(n), ElementShape(a), ElementShape(b)).Fixed);
+                    fixedRun.Append(CobolString.Store(run.ToString(), b.Chars));
+                }
                 else if (moved is not null)
                 {
                     dyn.Add(IsNested(b) ? "" : FixedImages(moved));
@@ -282,20 +332,42 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
                     elements.Add(null);
                 }
             }
-            else fixedRun.Append(CobolString.Store(src.Content(v, pa) ?? "", b.Chars));
+            else
+            {
+                string? content = src.Content(v, pa);
+                fixedRun.Append(CobolString.Store(create is null || content is null ? content ?? ""
+                    : content + CreatedImages(create, content.Length / a.ElementChars, b.Chars - content.Length, a.ElementChars),
+                    b.Chars));
+            }
             (prevA, prevB) = (pa + 1, pb + 1);
         }
         return new CobolVarGroup(fixedRun.ToString(), [.. dyn], AnyNested(elements));
     }
 
     /// <summary>Each of <paramref name="occurrences"/> rebuilt from the element shape <paramref name="from"/> in
-    /// <paramref name="to"/> — §14.6.9.2's element-by-element move.</summary>
+    /// <paramref name="to"/> — §14.6.9.2's element-by-element move (or, for occurrences of storage, the view of each).</summary>
     private static CobolVarGroup[] Reshaped(CobolVarGroup[] occurrences, GroupAtom[] from, GroupAtom[] to)
     {
         var outp = new CobolVarGroup[occurrences.Length];
         for (int i = 0; i < outp.Length; i++) outp[i] = Reshape(occurrences[i], from, to);
         return outp;
     }
+
+    /// <summary>The image of the occurrences a dynamic-capacity table of fixed-length elements would create after its
+    /// <paramref name="have"/> current ones, as many whole <paramref name="elementChars"/>-wide elements as fit in
+    /// <paramref name="room"/> positions (<see cref="Reshape"/>'s view of storage).</summary>
+    private static string CreatedImages(Func<int, CobolVarGroup> create, int have, int room, int elementChars)
+    {
+        if (elementChars <= 0 || room < elementChars) return "";
+        var sb = new System.Text.StringBuilder(room);
+        for (int n = have + 1; sb.Length + elementChars <= room; n++) sb.Append(CreatedImage(create, n, elementChars));
+        return sb.ToString();
+    }
+
+    /// <summary>Occurrence <paramref name="n"/> as the table creates it, at its element's width — the space fill when
+    /// the carrier states no creation (a fixed-length element's carrier has only its fixed run).</summary>
+    private static string CreatedImage(Func<int, CobolVarGroup>? create, int n, int elementChars) =>
+        CobolString.Store(create is null ? "" : create(n).Fixed, elementChars);
 
     /// <summary>⛔ A VIEW'S STORE BACK INTO THE STORAGE IT VIEWS — the BY REFERENCE write-back of
     /// <see cref="Reshape"/> (ISO §14.2.3 GR8: "the activated runtime element operates as if the formal parameter occupies
@@ -309,12 +381,14 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     ///     formal's length or capacity IS the argument's;</item>
     ///   <item>a FIXED table of the formal opposite the argument's dynamic-capacity table is written OVER the argument's
     ///     current occurrences and creates the ones past its capacity that the callee stored into
-    ///     (<see cref="OverlaidTable"/>, §8.5.1.9.3), and a component of the formal opposite the argument's fixed table is
+    ///     (<see cref="OverlaidTable"/>, §8.5.1.9.3), each the element the table creates (<see cref="Created"/>,
+    ///     §8.5.1.9.5) with the callee's stores in it, and a component of the formal opposite the argument's fixed table is
     ///     fitted to it — it cannot grow;</item>
     ///   <item>a pair of tables at least one of which holds VARIABLE-LENGTH ELEMENTS (kb/Work PB2496) takes the same rules
     ///     one level down: each occurrence of the view overlays the argument's occurrence of the same number, because the
-    ///     formal's element occupies that element's storage; an occurrence the argument did not have is the view's element
-    ///     seen in the argument's element shape;</item>
+    ///     formal's element occupies that element's storage; an occurrence a FIXED table of the formal creates is the
+    ///     created element with the view's element stored over it, and one a variable table of the formal brings is the
+    ///     view's element seen in the argument's element shape;</item>
     ///   <item>every component of the argument the formal does not reach (beyond its last character) survives.</item>
     /// </list></summary>
     public static CobolVarGroup Overlay(CobolVarGroup current, CobolVarGroup view, GroupAtom[] currentShape,
@@ -346,7 +420,7 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
                 else if (ord < dyn.Length && seen is not null)
                 {
                     var now = OverlaidOccurrences(arg.Occurrences(current, pa) ?? [], seen, resize: b.IsComponent,
-                        ElementShape(a), ElementShape(b));
+                        ElementShape(a), ElementShape(b), current.CreatedAt(ord));
                     dyn[ord] = IsNested(a) ? "" : FixedImages(now);
                     elements[ord] = IsNested(a) ? now : null;
                 }
@@ -357,7 +431,7 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
                 if (!a.IsComponent)
                     fixedRun.Append(CobolString.Store(now ?? arg.Content(current, pa) ?? "", a.Chars));
                 else if (ord < dyn.Length && now is not null)
-                    dyn[ord] = b.IsComponent ? now : OverlaidTable(dyn[ord], now, a.ElementChars);
+                    dyn[ord] = b.IsComponent ? now : OverlaidTable(dyn[ord], now, a.ElementChars, current.CreatedAt(ord));
             }
             (prevA, prevB) = (pa + 1, pb + 1);
         }
@@ -368,16 +442,19 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// argument's element shape <paramref name="wasShape"/>): each of the view's occurrences overlays the argument's of
     /// the same number. <paramref name="resize"/> — the view's table is variable too — makes its capacity the argument's
     /// (an occurrence the argument lacked is the view's, reshaped); otherwise the view is a FIXED table written over the
-    /// argument's current occurrences, creating those past its capacity that it stored into
-    /// (<see cref="GrownCount"/>, <see cref="OverlaidTable"/>'s determination).</summary>
+    /// argument's current occurrences, creating those past its capacity that it stored into (<see cref="GrownCount"/>,
+    /// <see cref="OverlaidTable"/>'s determination): each created occurrence is the element the table creates
+    /// (<paramref name="create"/>, §8.5.1.9.5) with the view's element stored over it, exactly as an occurrence the
+    /// argument had is overlaid.</summary>
     private static CobolVarGroup[] OverlaidOccurrences(CobolVarGroup[] was, CobolVarGroup[] seen, bool resize,
-        GroupAtom[] wasShape, GroupAtom[] seenShape)
+        GroupAtom[] wasShape, GroupAtom[] seenShape, Func<int, CobolVarGroup>? create)
     {
-        var now = new CobolVarGroup[resize ? seen.Length : GrownCount(was.Length, seen)];
+        var now = new CobolVarGroup[resize ? seen.Length : GrownCount(was.Length, seen, wasShape, seenShape, create)];
         for (int i = 0; i < now.Length; i++)
             now[i] = i >= seen.Length ? was[i]
                 : i < was.Length ? Overlay(was[i], seen[i], wasShape, seenShape)
-                : Reshape(seen[i], seenShape, wasShape);
+                : resize || create is null ? Reshape(seen[i], seenShape, wasShape)
+                : Overlay(create(i + 1), seen[i], wasShape, seenShape);
         return now;
     }
 
@@ -392,22 +469,22 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     /// (<see cref="Overlaid"/>); an occurrence PAST the argument's capacity that the callee stored into is created —
     /// §14.2.3 GR8 makes the formal occupy the argument's storage, so the store is a receiving reference to the dynamic
     /// table with a subscript that "exceeds the current capacity of the table", and §8.5.1.9.3 then creates "a new
-    /// element" and raises the capacity "to the value given by the subscript" (intermediate occurrences too, space
-    /// filled). ⚠ DETERMINATION (the rest is §8.5.1.12.3 sentence 3, which makes the pair the same length only "for
-    /// purposes of determining compatibility"): the boundary hands a copy of the occurrences the argument lacks as
-    /// space-filled occurrences (<see cref="Reshape"/>) and sees only the finished view, so a store is recognised by its
-    /// effect — the capacity becomes the highest occurrence whose image is not all spaces. A callee that only READS the
-    /// occurrences past the capacity leaves it alone, and one that stores spaces there leaves the table as it was
-    /// (the stored image and the absent occurrence are the same characters). ⚠ KNOWN DEPARTURE (kb/Work PB2690,
-    /// REMAINING): the created occurrences' items the callee did not store, and the intermediate occurrences, are the
-    /// space fill, where §8.5.1.9.5 initializes them from the INITIALIZED default; the carrier does not yet carry the table's
-    /// default element, which only the argument's own description knows.</summary>
-    private static string OverlaidTable(string was, string now, int elementChars)
+    /// element" and raises the capacity "to the value given by the subscript" (intermediate occurrences too).
+    /// ⚠ DETERMINATION D-VGB (docs/CONFORMANCE.md §3; the rest is §8.5.1.12.3 sentence 3, which makes the pair the same
+    /// length only "for purposes of determining compatibility"): the view showed each occurrence the argument lacks as the
+    /// table creates it (<see cref="Reshape"/>: its <paramref name="create"/> image, §8.5.1.9.5's INITIALIZED default when the
+    /// phrase is written; the space fill when the carrier states no creation), and only the finished view comes back, so a
+    /// store is recognised by its effect — the capacity becomes the highest occurrence whose image differs from the one
+    /// the view showed. The created occurrences therefore keep the default in every item the callee did not store, and the
+    /// intermediate ones are the default whole, as §8.5.1.9.5 requires. A callee that only READS the occurrences past the
+    /// capacity leaves it alone, and one that stores into an occurrence exactly the image the table creates leaves the
+    /// capacity as it was (the content is the same either way).</summary>
+    private static string OverlaidTable(string was, string now, int elementChars, Func<int, CobolVarGroup>? create)
     {
         if (elementChars <= 0 || now.Length <= was.Length) return Overlaid(was, now);
         int kept = was.Length;
         for (int end = now.Length / elementChars * elementChars; end > kept; end -= elementChars)
-            if (now.AsSpan(end - elementChars, elementChars).IndexOfAnyExcept(' ') >= 0)
+            if (!now.AsSpan(end - elementChars, elementChars).SequenceEqual(CreatedImage(create, end / elementChars, elementChars)))
             {
                 kept = end;
                 break;
@@ -417,13 +494,39 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
 
     /// <summary>The occurrence count a FIXED table of the formal leaves the argument's dynamic-capacity table of
     /// variable-length elements with (<see cref="OverlaidTable"/>'s rule one level up): the argument's
-    /// <paramref name="current"/> count, or the highest occurrence of <paramref name="seen"/> past it that holds
-    /// anything but the space fill — a fixed-length element's carrier with a blank fixed run and no components.</summary>
-    private static int GrownCount(int current, CobolVarGroup[] seen)
+    /// <paramref name="current"/> count, or the highest occurrence of <paramref name="seen"/> past it that differs from
+    /// what the view showed there — the created element (<paramref name="create"/>) seen in the formal's element shape
+    /// <paramref name="seenShape"/> (<see cref="Reshape"/>), or, when the carrier states no creation, the space fill: a
+    /// fixed-length element's carrier with a blank fixed run and no components.</summary>
+    private static int GrownCount(int current, CobolVarGroup[] seen, GroupAtom[] wasShape, GroupAtom[] seenShape,
+        Func<int, CobolVarGroup>? create)
     {
         for (int end = seen.Length; end > current; end--)
-            if (seen[end - 1].Dynamic.Length > 0 || seen[end - 1].Fixed.AsSpan().IndexOfAnyExcept(' ') >= 0) return end;
+        {
+            var s = seen[end - 1];
+            bool shown = create is null
+                ? s.Dynamic.Length == 0 && !s.Fixed.AsSpan().ContainsAnyExcept(' ')
+                : SameContent(s, Reshape(create(end), wasShape, seenShape));
+            if (!shown) return end;
+        }
         return current;
+    }
+
+    /// <summary>Whether two carriers of one shape hold the same content: the same fixed run, the same components and
+    /// the same occurrences of every nested one.</summary>
+    private static bool SameContent(CobolVarGroup x, CobolVarGroup y)
+    {
+        if (x.Fixed != y.Fixed || !x.Dynamic.AsSpan().SequenceEqual(y.Dynamic)) return false;
+        for (int k = 0; k < x.Dynamic.Length; k++)
+        {
+            CobolVarGroup[]? ex = x.ElementsAt(k), ey = y.ElementsAt(k);
+            if (ex is null != ey is null) return false;
+            if (ex is null) continue;
+            if (ex.Length != ey!.Length) return false;
+            for (int i = 0; i < ex.Length; i++)
+                if (!SameContent(ex[i], ey[i])) return false;
+        }
+        return true;
     }
 
     /// <summary>The pair plans already worked out, keyed by the two atom arrays' REFERENCES (weakly: a plan lives as long as
