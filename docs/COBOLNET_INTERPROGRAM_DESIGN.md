@@ -604,7 +604,7 @@ whose variable-carrier arm reads the argument through `ToImage`; the typed INVOK
 (`CobolVarGroup.OverlayImage`, §14.2.3 GR8): the occurrences the argument has are written, one past its capacity that
 the callee STORED INTO is created (§8.5.1.9.3: a receiving reference "exceeds the current capacity", so "a new element is
 automatically created" and the capacity is raised to the subscript; `CobolVarGroup.OverlaidTable` / `GrownCount`
-recognise the store by its effect, an image that differs from the one the view showed), one past the formal's count is
+take the store from the callee's recorded receiving references, below), one past the formal's count is
 untouched, and material past a prefix formal survives. Goldens
 `2014/pb965_vlg_into_fixed_boundary`, `2014/pb965_vlg_into_fixed_invoke`; negative
 `pb965-vlg-into-larger-fixed-formal`.
@@ -618,11 +618,24 @@ of two carriers and two atom arrays, neither of which knew the table's default e
 (`CobolDynTable.CreatedAs`, the same seed `RefReceiving` grows with), in the table's element shape — a nested element's
 carrier states its own inner creations. ⛔ Only a table that writes INITIALIZED states one (the emitted constructor
 passes the INITIALIZED seed exactly when the phrase is written, `ValueInitializer.DynTableNew`): without it §8.5.1.9.5
-leaves the created content "undefined", and the view keeps the space fill, which the write-back's effect test needs to
-see a store of the element's own VALUE (a numeric zero) at all (branch review finding R1-1). ⚠ The effect test's one
-residue is a known departure, kb/Work PB2690 REMAINING: a store of exactly the image the view showed (the INITIALIZED
-default, or SPACES without the phrase) leaves the CAPACITY unraised; closing it needs the callee's receiving references
-at the boundary, which a finished image does not carry. ⛔ ONE SIGNAL, ON THE DATA: only a BY REFERENCE crossing's builder states it
+leaves the created content "undefined", and the view keeps the space fill (branch review finding R1-1).
+**Which occurrences the callee STORED INTO is its RECEIVING REFERENCES, recorded where they are made (kb/Work PB2690, last
+half).** The formal's fresh area is a `StorageCell`, and every store through a view of a class located by a data-address
+pointer (a LINKAGE item, a BASED item: `RedefinesClass.BasedPointerField`) is followed by `StorageCell.Received(offset,
+width)` over the view's window (`PlaceRenderer.Received`, wrapping every Tier-B view store: `Write`'s `RedefViewPlace` arm
+and the national group image store) — a null test unless a boundary watches the cell. The boundary starts the record once
+the area is filled (`ManagedPointer<T>.Watch(area)`, emitted after each area formal's copy-in, program and method), so the
+filling is no reference; a view over storage a store can GROW (`ManagedPointer<T>.OverStorage`: `CobolArgAdapt.Text`'s and
+`VarGroup`'s variable-argument arms, the typed INVOKE's overlaying argument store, the universal box's `WriteBackFixed` /
+`WriteBackVariable`) hands the record (`ReceivingReferences`, in the positions of the formal's STORAGE: its fixed run with
+each dynamic-capacity table's one-element reservation, `Geometry.StorageAt`) to `CobolVarGroup.Overlay`, and
+`OverlaidTable` / `GrownCount` raise the capacity to the highest occurrence the callee referenced as a receiving item,
+whatever image it stored there (§8.5.1.9.3). ⛔ A BOUNDARY COPY records nothing: a formal's copy-in and the write half of a
+BY REFERENCE argument's view of a GROUP (`CallEmitter.BoundaryCopyWrite` → `PlaceRenderer.WriteGroupCopy`) store the whole
+image whichever positions the activated element touched, so recording them would make one store a reference to every
+occurrence; a store that reaches the area only so (a further activation's non-aliased copy) is still recognised by its
+effect, an occurrence whose image differs from the one the view showed. Goldens
+`2014/pb2690_store_of_shown_image_grows_capacity_call` and `_invoke`. ⛔ ONE SIGNAL, ON THE DATA: only a BY REFERENCE crossing's builder states it
 (the emitted `AsVarImage(__byReference: true)`, `StorageCell.VarGroupAt(byReference: true)`, reached through
 `PlaceRenderer.VarGroupBoundaryImage(…, byReference: true)` from `CallEmitter.RefCarrier`, the typed INVOKE's write-back
 argument and copy-out, and the universal box), and the structural rebuilds of the same storage keep it (`Slice`, `Concat`,

@@ -274,9 +274,12 @@ internal static class PlaceRenderer
     /// So every store through such a view states its window, and the cell records it while a boundary watches it
     /// (<c>ManagedPointer.Watch</c>) — a null test otherwise. Only a class located by a data-address pointer (a LINKAGE
     /// item, a BASED item: <c>RedefinesClass.BasedPointerField</c>) can lie over a boundary's fresh area, and only its own
-    /// cell (not a dynamic-capacity table's element cell) is that area.</summary>
+    /// cell (not a dynamic-capacity table's element cell) is that area. And only a description holding a table of a fixed
+    /// (or DEPENDING) occurrence count can face a dynamic-capacity table (§8.5.1.12.1: such a table corresponds to a
+    /// table), so a store through a description with none records nothing and costs nothing.</summary>
     private static string Received(RedefViewPlace v, string store) =>
-        v is { Cell: { Segments: [RootFieldSegment] } cell, ViewItem.Root.Class.BasedPointerField: not null }
+        v is { Cell: { Segments: [RootFieldSegment] } cell, ViewItem.Root: { Class.BasedPointerField: not null } root }
+        && DataItem.DescendantsOf(root).Any(static d => d.Occurs is not null && !d.IsDynamicTable)
             ? $"{store} {RenderPath(cell, AccessDir.Sending)}.{nameof(StorageCell.Received)}({PositionRenderer.Render(v.Offset)}, {v.Width});"
             : store;
 
