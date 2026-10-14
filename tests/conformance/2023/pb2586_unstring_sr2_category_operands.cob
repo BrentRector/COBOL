@@ -11,6 +11,10 @@
       *>   receiver is legal (T2) - the rule SR2 must not be confused with.
       *> - 8.5.2.1: an alphanumeric group is category alphanumeric whatever its leaves
       *>   are, so a group holding a PIC A leaf is a legal sender (T3).
+      *> - 15.18.4 r3 / 8.4.3.3.4 GR6: FUNCTION CONCAT is alphabetic only when every argument is
+      *>   class alphabetic, and an alphabetic slice stays alphabetic (kb/Work PB73), so a CONCAT
+      *>   mixing a PIC A slice with a PIC X slice is alphanumeric and a legal sender (T5); the
+      *>   all-alphabetic twin is the negative pb2586-unstring-alphabetic-function-slice-sender.
       *> Expected values are the GR positions: characters are examined left to right
       *> until the delimiter, the examined characters are moved to the receiver (MOVE
       *> alphanumeric-to-alphanumeric pads with spaces) and the delimiter goes to DELIMITER IN.
@@ -45,4 +49,8 @@
            MOVE SPACES TO R1 R2 R3.
            UNSTRING SRC2 DELIMITED BY NUM(1:1) INTO R1 R2 R3.
            DISPLAY "T4 [" R1 "][" R2 "][" R3 "]".
+      *> T5 - CONCAT(GA(1:1) SRC3(1:2)) is "XAB" (alphanumeric), delimiter "B": R1 "XA".
+           MOVE SPACES TO R1.
+           UNSTRING FUNCTION CONCAT(GA(1:1) SRC3(1:2)) DELIMITED BY "B" INTO R1.
+           DISPLAY "T5 [" R1 "]".
            STOP RUN.

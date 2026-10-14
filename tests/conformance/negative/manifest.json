@@ -1455,6 +1455,8 @@
   "pb2586-unstring-alphabetic-delimiter-in",
   "pb2586-unstring-alphabetic-slice-sender",
   "pb2586-unstring-alphabetic-function-sender",
+  "pb2586-unstring-alphabetic-function-slice-sender",
+  "pb2586-move-concat-alphabetic-slices-to-boolean",
   "pb155-unstring-numeric-delimiter",
   "pb157-compute-all-literal",
   "pb157-compute-bool-arith-rhs",
