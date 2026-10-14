@@ -44,3 +44,12 @@ a nine-bit leader, a GROUP-USAGE BIT holder continuing a run, a GR8 a) MOVE and 
 by hand; it fails on the reviewed head. The PB3030 golden's comment cited GR8 b) for a sending group whose data-name-1
 lies outside it, which GR8 a) governs; corrected. Gate run `20261014T064005Z-0faf96`: `=== BUILD-LOCAL GATE: LEG 1 ONLY
 (batched gating, PB2515): GREEN`, both PB3030 goldens Passed in leg 1; semgrep verify PASS.
+
+Finisher (landing attempt 20261014T065404523254Z, `ENQUEUE: GATE RED`): the landing's gate ran
+`SpecTraceabilityInventoryDriftTests.EveryCodeLocation_ResolvesInTheTree` in leg 1 and it was red. Review round 2's
+per-method census deleted `OoDriver.DeclareMethodWords`, but inventory row SR-12.3.8.3-12 still named it as a
+code-location; the branch's own gate had left that case in leg 2 (its `not-run-Unit.txt` lists it), so nothing local saw
+it (kb/Work PB3131). The row is re-sited by a `record_verdicts.py` batch to `DataBinder.Oo.cs#OoBindMethodData`, which
+now declares the METHOD-ID (or the property-name it names) through `DeclareUserWord` inside the method's own census,
+and retires the deleted member with its reason; a sweep of every inventory code-location against the tree finds no
+other dangling member, and the branch deleted no other method declaration.
