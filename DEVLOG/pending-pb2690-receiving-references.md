@@ -31,4 +31,4 @@ negative `pb2690-store-of-shown-image-grows-capacity-below-2014` (COBOLNET0900);
 `BoundaryGroupCorrespondenceTests.AStoreOfTheShownImagePastTheCapacity_CreatesTheOccurrence_ByTheReceivingReference`.
 No inventory row claimed or closed (kb/Work PB2690 `closes_rows_reason`); PB2690 flipped to landed.
 
-**Gate.** Recorded below once the gate has run.
+**Gate.** Run 20261014T194320Z-7a8a00: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,089, Unit 32,991, Characterization 6 cases in leg 1). The first run (20261014T193710Z-12a96f) was RED on the boundary-layout pin, moved again by the copy-in change, and on the `filter_population.py` self-test (MSB4236, an SDK not resolved during a dotnet first-run in its scrubbed environment; it passes alone and passed in the re-gate). Self-review: the record is emitted only for descriptions holding a table of a fixed or DEPENDING count (a table-less LINKAGE record pays nothing), and a whole-group boundary copy records nothing (golden lane GE).
