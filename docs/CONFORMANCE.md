@@ -1510,7 +1510,11 @@ of an unsupported facility.
   (EC-OO-METHOD) alike; an elementary formal takes it BY CONTENT (§9.3.6 4 d)). Two readings the text leaves open:
   **(a)** a slice whose length is a run-time value is measured for the compile-time rule 1 by its MAXIMUM extent — the
   model §14.8.2.2 gives an occurs-depending group ("the maximum length is used"): identifier-1's positions from a
-  static leftmost position on, or all of them — and by its evaluated length at the boundary: the universal lane raises
+  static leftmost position on, or all of them, where identifier-1's positions are at their bound when its own length
+  is a run-time value — a DYNAMIC LENGTH item's §8.5.1.10.1 maximum size (so a slice of a `LIMIT 3` item never fits a
+  4-byte group formal), and for an ANY LENGTH item, whose description fixes no bound (§13.18.2.4 GR1 b): its length
+  is the argument's), the largest character string the run time holds, so every group formal is admitted (kb/Work
+  PB3128) — and by its evaluated length at the boundary: the universal lane raises
   EC-OO-UNIVERSAL when it is shorter than the group formal; the typed lane's formal holds the slice padded to the
   formal's width and writes back through the slice, truncated to it. Such a slice states its storage area WITH its
   evaluated length (`CellPointer.Extent`), so a formal is laid over a slice at least as long as itself (§14.2.3 GR8: a
@@ -1522,7 +1526,8 @@ of an unsupported facility.
   bound method is then refused by §14.9.23.4 GR7 c) (EC-OO-UNIVERSAL, not EC-OO-METHOD); a slice matches no ANY LENGTH
   formal (it has no PICTURE clause). GnuCOBOL 3.2 gives no answer: its prototype conformance check reads identifier-1's
   description and ignores the modifier (measured). Witnesses: `conformance:2002/pb480_universal_refmod_evaluated_length`,
-  `conformance:2002/pb2077_refmod_argument_both_lanes`, `conformance:2002/pb480_universal_any_length_omitted`.
+  `conformance:2002/pb2077_refmod_argument_both_lanes`, `conformance:2002/pb480_universal_any_length_omitted`,
+  `conformance:2002/pb3128_refmod_any_length_argument`, `conformance:2014/pb3128_refmod_dynamic_length_argument`.
 - **D-N8 — a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; decision PB3099, 2026-10-12).
   §14.9.25.4 GR4 makes the move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's. An odd
   byte count cannot be national content (D-N1: two bytes per position), so the last position is completed with the

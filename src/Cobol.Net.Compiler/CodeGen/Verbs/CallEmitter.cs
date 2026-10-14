@@ -681,11 +681,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // lets the boundary (CobolArgAdapt.Area) give a SHORTER slice a fresh copy instead: the slice padded to the
             // formal's width, written back through the slice's own receiving store, truncated to it. A slice that states
             // no area at all broke GR8 for every run-time-length argument on the CALL and the INVOKE lanes alike.
-            if (rm.StaticLength(rm.StaticInnerPositions) is null)
-            {
-                if (SliceExtent(rm) is not { } e) return null;
-                extent = e;
-            }
+            if (rm.StaticLength(rm.StaticInnerPositions) is null) extent = PlaceRenderer.SliceLength(rm);
             start = PositionRenderer.Render(rm.Start);
             p = rm.Inner;
         }
@@ -714,17 +710,6 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
                 : null;
         return RuntimeApi.ArgArea(PlaceRenderer.RenderPath(cell, AccessDir.Sending), offset, extent: extent);
     }
-
-    /// <summary>The C# <c>int</c> expression of a run-time-length slice's EVALUATED length (§8.4.3.3.4 GR5 c)): the
-    /// specified length, or for the omitted "to the end" form identifier-1's positions from the leftmost one on (floored
-    /// at zero; the slice's own read raises EC-BOUND-REF-MOD for a leftmost position out of range). Null when the
-    /// omitted form runs to the end of an identifier-1 whose length is itself a run-time value, which no expression
-    /// here can state: that slice states no area and its formal holds a copy.</summary>
-    private static string? SliceExtent(RefModPlace rm) =>
-        rm.Length is { } length ? RuntimeApi.HostInt32(RuntimeApi.RefModLength(length))
-        : rm.StaticInnerPositions is { } size
-            ? $"(int)global::System.Math.Max(0L, {size} - (long)({RuntimeApi.RefModStart(rm.Start)}) + 1)"
-            : null;
 
     /// <summary>The area expression of a BY REFERENCE argument for any activation lane: a whole formal of the current
     /// source element passes on the area it occupies (<c>CallUnitState.WholeFormalArea</c>), any other operand its own

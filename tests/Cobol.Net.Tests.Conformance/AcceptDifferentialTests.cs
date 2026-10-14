@@ -494,6 +494,63 @@ public sealed class AcceptDifferentialTests
             stdin: "101010\n101010\n10101010\n",
             dialect: 2023);
 
+    // kb/Work PB3128 — the same omitted-length width over a SIGN SEPARATE numeric receiver. §8.4.3.3.4 GR5c runs
+    // the slice "up to and including the rightmost position of the data item referenced by identifier-1", and GR2
+    // operates on a numeric display item as if it were alphanumeric, so its positions are its CHARACTER positions,
+    // the separate sign's included: S PIC S9(4) SIGN LEADING SEPARATE holds "-0012", five positions, and S(2:) is the
+    // four digit positions, exactly its explicit twin S2(2:4). The emitter read the PICTURE length (4, the digits),
+    // so (2:) transferred three characters and left the last digit position a space (measured: -0009).
+    [Fact]
+    public void Device_OmittedLengthSignSeparateSlice_CountsTheSignPosition()
+        => AssertOutputs(
+            Program("ACCPB3128", """
+                01 S  PIC S9(4) SIGN LEADING SEPARATE VALUE -12.
+                01 S2 PIC S9(4) SIGN LEADING SEPARATE VALUE -12.
+                """, """
+                ACCEPT S(2:).
+                ACCEPT S2(2:4).
+                DISPLAY S "]" S2 "]".
+            """),
+            expected: "-0099]-0099]",
+            stdin: "0099\n0099\n");
+
+    // kb/Work PB3128 — the omitted-length width over an identifier-1 whose length is a RUN-TIME value. A
+    // reference-modified DYNAMIC LENGTH item "is treated as a fixed-length data item whose length is the
+    // dynamic-length elementary item's current length" (§8.5.1.10.4), and an ANY LENGTH formal is n repetitions of
+    // its symbol, "where n is the length of the corresponding argument" (§13.18.2.4 GR1 b)). So D(3:) over the
+    // ten-character D is eight positions (D keeps its length: the store is into a slice) and L(2:) over the
+    // six-character argument X6 is five. The emitter read the PICTURE length (1) for both, so each slice took no
+    // characters and was space-filled (measured: AB        ]10]A     ]).
+    [Fact]
+    public void Device_OmittedLengthRunTimeLengthSlice_RunsToTheCurrentEnd()
+        => AssertOutputs("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. ACCPB3128R.
+            DATA DIVISION.
+            WORKING-STORAGE SECTION.
+            01 D  PIC X DYNAMIC LENGTH.
+            01 X6 PIC X(6) VALUE "ABCDEF".
+            PROCEDURE DIVISION.
+                MOVE "ABCDEFGHIJ" TO D.
+                ACCEPT D(3:).
+                CALL "ACCPB3128L" USING X6.
+                DISPLAY D "]" FUNCTION LENGTH(D) "]" X6 "]".
+                STOP RUN.
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. ACCPB3128L.
+            DATA DIVISION.
+            LINKAGE SECTION.
+            01 L PIC X ANY LENGTH.
+            PROCEDURE DIVISION USING L.
+                ACCEPT L(2:).
+                GOBACK.
+            END PROGRAM ACCPB3128L.
+            END PROGRAM ACCPB3128R.
+            """,
+            expected: "ABKLMNOPQR]10]Aqrstu]",
+            stdin: "KLMNOPQRSTUV\nqrstuvwx\n",
+            dialect: 2014);
+
     // §14.9.1.4 GR3: "If a device is capable of transferring data of the same size as the receiving data
     // item, the transferred data is stored in the receiving data item." This implementation's transfer size
     // is one 80-character card-image record (GR2 — "the implementor shall define, for each device, the size
