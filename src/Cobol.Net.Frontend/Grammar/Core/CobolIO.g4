@@ -478,8 +478,16 @@ closeOption
 // This rule is the superset of both formats (the format is DECIDED at bind time from the file's organization
 // and access mode — §14.9.30.3 SR6/SR8/SR9 in KeyedIoBinder.BindRead), which is why one ordering has to serve
 // both; the two formats agree on the order of every phrase they share, so the superset is unambiguous.
+//
+// ⛔ THE FILE NAME IS BARE: BOTH FORMATS PRINT `READ file-name-1`, AND NO EDITION PRINTS `READ FILE file-name-1`.
+// The `{ record-name-1 | FILE file-name-1 }` choice belongs to WRITE (§14.9.51.2) and REWRITE (§14.9.35.2) alone,
+// where it is Annex A.4.13's declined element and SequentialIoBinder.DeclinedFilePhrase refuses it by name
+// (COBOLNET1706). This rule carried a copy of that two-arm head, `READ (fileName | FILE fileName)`, that nothing
+// refused, so `READ FILE F1` compiled clean at every --std and ran as a plain READ (kb/Work PB2728). Without the
+// arm, FILE (a reserved word, never a fileName) is a syntax error here: §5.2.1 admits only the words a general
+// format prints, "in the sequence given in the general format", and neither READ format prints FILE.
 readStatement
-    : READ (fileName | FILE fileName)
+    : READ fileName
       readDirection?
       RECORD?
       readInto?
