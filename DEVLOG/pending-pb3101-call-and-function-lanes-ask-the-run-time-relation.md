@@ -1,4 +1,4 @@
-## PB3127 + PB3101 (BY REFERENCE and RETURNING halves): the CALL and function lanes ask the run-time relation at bind time
+## PB3127 + PB3101 (BY REFERENCE, BY CONTENT and RETURNING): every activation lane asks the run-time relation at bind time
 
 **What was wrong.** A Format-2 CALL (a program prototype or the NESTED phrase) and a user-defined function checked
 their BY REFERENCE arguments and RETURNING items with `OoConformance.DescriptionMismatch`, a comparator over `DataItem`
@@ -39,3 +39,26 @@ produce their outputs.
 `OneRelationDriftTests` named in its note and in docs/COBOLNET_OO_DESIGN.md D6 item 7.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261014T195501Z-c8027a`; Conformance 6,097/11,669, Unit 32,911/33,618, Characterization 6/36 in leg 1; every added golden and negative passed in leg 1). LINUX GATE: the lander's (batched gating).
+
+**Wave 1078 (the BY CONTENT / BY VALUE arm).** Wave 1077's four commits were cherry-picked onto `c29af1704` and re-gated
+GREEN first (run `20261014T214044Z-9d057d`). The bind-time BY CONTENT copy was the `OoConformance` comparator family
+(`ContentMismatch`, `ContentValueMismatch`, two literal arms). Re-probed on this build, it disagreed with the run-time
+relation in both directions. It refused a group argument BY CONTENT into a `PIC 9(4)` formal, which §14.8.2.2 rule 2's
+MOVE admits. The run-time relation let a strongly-typed group into a `PIC X` formal, because §14.8.2.2's strongly-typed
+sentence was asked only BY REFERENCE. Neither copy asked §14.9.25.3 SR6 / SR7 of a figurative argument, so ZERO ran into
+a `PIC A(4)` formal and SPACE into a `PIC 1(4)` one. `ParameterConformance.ContentConformanceReason` now describes the
+argument (`ActivationDescriptions.OfCallArgument` / `OfValue`) and asks `ActivationRelations.CallArgumentViolation`. CALL
+Format 2, functions and every INVOKE BY CONTENT shape ask it, and the comparator family and its `ContentValue` input are
+deleted. Two object references stay with the class table (`OoConformance.ObjectReferenceContentMismatch`). The
+compile-time SET reads their class facts as a pair, and an ACTIVE-CLASS formal's alternatives depend on the invocation.
+This is a design correction, recorded in OO D6 item 7. The relation gained `StrongTypeViolation` (both modes) and SR6 /
+SR7 (`MoveValidity.FigurativeRefusal`, which `MoveTable16` now asks too, so it is one copy).
+`MayMove` became `MoveViolation`, which names the rule a MOVE breaks. New tests: the golden
+`conformance:2002/pb3101_content_one_relation`, the negatives `pb3101-content-zero-into-alphabetic` (SR6) and
+`pb3101-content-space-into-boolean` (SR7), and the drift test
+`ActivationConformanceDriftTests.TheContentArgumentRule_IsTheRunTimeRelation_AskedThroughOneEntry`. Six inventory rows
+had their witnesses re-sited through two record_verdicts batches; GAP is unchanged at 101. A sweep found 479 positives,
+172 negatives and 442 run-time goldens clean. Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`
+(run `20261014T222439Z-6cb31b`; Conformance 6,173/11,679, Unit 33,056/33,636, Characterization 6/36 in leg 1; every added
+golden, negative and drift test passed). LINUX GATE: the lander's (batched gating). PB3101 stays open. Still to do: GR8
+once (PB613), pair mode on `SameSignature`, the `DescriptionMismatch` deletions and `OneRelationDriftTests`.
