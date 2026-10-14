@@ -125,6 +125,7 @@ internal sealed class OoDriver(BindSession session)
         data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(
             cls.Symbol.Ctx.objectParagraph()?.optionsParagraph(), edition, clsOptions));
         var synthetic = OoReparentClassData(cls.Symbol.Ctx);
+        data.ReserveMethodMemberNames(cls.Symbol.Methods);   // one C# class holds the object data AND the methods
         data.BindDeclarations(synthetic);
         using (edition.At(cls.Symbol.Ctx)) data.DeclareUserWord(cls.Name, UserWordKind.ObjectClassName);
         foreach (var m in cls.Symbol.Methods.ToList())   // snapshot — property synthesis appends accessors
@@ -143,6 +144,7 @@ internal sealed class OoDriver(BindSession session)
         fdata.CallInheritOptions(Binding.OptionsBinder.BindParagraph(
             cls.Symbol.Ctx.factoryParagraph()?.optionsParagraph(), edition, clsOptions));   // §11.9.4 GR1 (kb/Work PB135)
         var fsynthetic = OoReparentFactoryData(cls.Symbol.Ctx);
+        fdata.ReserveMethodMemberNames(cls.Symbol.FactoryMethods);   // the factory class holds both, likewise
         fdata.BindDeclarations(fsynthetic);
         foreach (var m in cls.Symbol.FactoryMethods.ToList())
             fdata.OoBindMethodData(m);

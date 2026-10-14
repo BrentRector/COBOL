@@ -3456,8 +3456,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// a FUNCTION-ID paragraph (§8.3.2.2) — once the REPOSITORY in scope is known: the unit's own paragraph and, for a
     /// contained program, its container's (inherited by <c>InheritConfiguration</c>; §12.3.4 GR1 — "the entries
     /// explicitly or implicitly specified in the configuration section of a source unit that contains other source
-    /// units apply to each directly or indirectly contained source unit"). A class, interface or method
-    /// is declared by the OO driver, whose units reach this binder as synthetic contexts with no identification
+    /// units apply to each directly or indirectly contained source unit"). A class or interface is declared by the OO
+    /// driver (<c>OoDriver.BindClassData</c> / <c>BindInterface</c>), a method's METHOD-ID by <see cref="OoBindMethodData"/>
+    /// into the method's own census; their units reach this binder as synthetic contexts with no identification
     /// division.</summary>
     private void DeclareUnitName(Core.ProgramUnitContext program)
     {
@@ -3467,7 +3468,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>The user-defined word a unit's own identification paragraph declares, and its type — null for a
     /// unit with no PROGRAM-ID / FUNCTION-ID paragraph (a class, interface or method reaches this binder as a synthetic
-    /// context; the OO driver declares those). The IS PROTOTYPE format declares a prototype-name instead (§11.10.2
+    /// context; <see cref="DeclareUnitName"/> names who declares those). The IS PROTOTYPE format declares a prototype-name instead (§11.10.2
     /// Format 2, §11.5.2 Format 2). ONE reading, asked by <see cref="DeclareUnitName"/> and by the REPOSITORY
     /// walk, which must not declare a specifier that names the unit itself (§12.3.8.3 SR11 / SR15: "this specifier
     /// is ignored").</summary>
