@@ -42,4 +42,8 @@ national table. Performance: one dictionary operation per committed use; the add
 name matched. Duplication: the two-map "is an alphabet-name" test that four sites spelled out now calls
 `IsAlphabetName`.
 
-**Gate.** (filled at the gate)
+**Gate.** The first gate (run 20261014T222553Z-2f9d3a) was RED on one case:
+`LiteralAliasResolutionDriftTests` reads `LiteralAliasOf`'s body up to its first semicolon, and the new §8.4.6.1
+comment inside that expression carried one; the comment now uses a comma. The re-gate, run 20261014T223239Z-4450f2:
+`=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,174/11,694, Unit 33,048/33,637,
+Characterization 6/36 in leg 1; leg 2 left to CI). `scripts/semgrep/verify.py` PASS, every count unchanged.
