@@ -37,3 +37,13 @@ bracket with no ellipsis", false for a choice-indicator list; the message and CO
 **Self-review.** Architecture: one reader per rule (the binder lost its copy). Code: the row cites the figure it
 implements; the 2023 figure's `Sequence` is null because §5.2.6.4 frees the order. Performance: one dictionary lookup per
 clause, as before. Duplication: none left. The gate's verdict is recorded in the branch's report.
+
+**Branch review, round 1 (wave 1073 B).** The reviewer found two defects, both fixed. R1-1: four current-state doc
+sites still named the deleted COBOLNET1652 (`DESIGN-frontend-grammar.md` 3.3e, `CONFORMANCE.md` CHARACTER
+CLASSIFICATION, `DESIGN-locale-facility.md` twice); they now name COBOLNET2423 and the `ClauseCardinalities` row, and the
+two inventory rows whose notes carried the old code (FMT-12.3.6.2, RV-15.57.4-3) were restated through one
+`record_verdicts` batch (no verdict moved, GAP 103 to 103) that also adds the PB3133 goldens and the table's file to
+FMT-12.3.6.2's witnesses. R1-2: the PB3132 negative's header named the scratch word XB; it names PB3132X. Re-probed on the
+merged build: both PB3133 repros are refused at `--std 85` (COBOLNET2423, COBOLNET2987) and the PB3132 negative is
+COBOLNET2692. A sweep of `docs/` for diagnostic codes absent from the catalog finds many older stale names (design docs
+that quote placeholders or retired codes); a guard over them is a redesign beyond this slice and is reported as a lead.

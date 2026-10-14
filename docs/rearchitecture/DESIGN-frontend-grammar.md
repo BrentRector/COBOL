@@ -735,7 +735,7 @@ operand model: its concatenation IS this rule (kb/Work PB1627).
 **3.3e The computer paragraphs (kb/Work PB78, 2026-08-18).** `objectComputerParagraph : OBJECT_COMPUTER DOT
 (({!objectComputerClauseAhead()}? computerName)? objectComputerClause* DOT)?` — ISO §12.3.6.2's `[computer-name-1]`
 is optional and the two clauses (`programCollatingSequenceClause | characterClassificationClause`) may follow the
-period in any order (each at most once, §5.2.6.4 — a duplicate is COBOLNET1652 in the binder). Two load-bearing
+period in any order (each at most once, §5.2.6.4 — a duplicate is COBOLNET2423, counted by the `ClauseCardinalities` row described under PB3133 below, not by the binder). Two load-bearing
 decisions: (1) the X3.23-1985 clauses ISO 2002 deleted are MODELLED — `memorySizeClause` and `segmentLimitClause`
 are `objectComputerClause` alternatives, `debuggingModeClause` hangs off SOURCE-COMPUTER's name — and each is
 gated at its own node (`VisitMemorySizeClause` / `VisitSegmentLimitClause` / `VisitDebuggingModeClause`, the last one

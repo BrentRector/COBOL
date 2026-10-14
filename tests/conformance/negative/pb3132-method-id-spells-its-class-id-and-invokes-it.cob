@@ -1,9 +1,9 @@
       *> reject-at: 2002 2014 2023
       *> kb/Work PB3132 - ISO 8.3.2.2: "Within a source element, a given
       *>   user-defined word may be used as only one type of user-defined
-      *>   word". XB below is the object-class-name of its class AND the
+      *>   word". PB3132X below is the object-class-name of its class AND the
       *>   method-name of a method of that class whose body also USES the
-      *>   class-name (INVOKE XB). The one declaration funnel refuses the
+      *>   class-name (INVOKE PB3132X). The one declaration funnel refuses the
       *>   second declaration COBOLNET2692; the word is not exempt (the
       *>   exceptions are a compilation-variable-name, a level-number
       *>   that matches a paragraph-name or section-name, and the
