@@ -1335,9 +1335,10 @@ of an unsupported facility.
   when identifier-4 is an identifier that is permitted as a receiving operand"` → OK 20); SR17 makes every identifier
   in it a sending operand. The token-level tie is broken by the text too: a sign "shall appear as the leftmost
   character of the literal" (§8.3.3.3.2 SR2, OK) and an arithmetic operator is "preceded by a space and followed by
-  a space" (§8.7.1, OK), so a `+` or `-` after an operand is the BINARY operator. **Determination (whitespace is
-  skipped by the lexer, so spacing is not consulted further):** an argument is the LONGEST arithmetic expression that
-  starts at it — `USING N + 1`, `USING N - 1`, `USING N -1`, `USING 5 + 1`, `USING BY CONTENT N + 1` and
+  a space" (§8.7.1, OK), so a `+` or `-` after an operand is the BINARY operator. **Determination (the lexer skips
+  whitespace, so the parse does not consult spacing; §8.7.1's spacing is then asked of the parsed operator, COBOLNET2993,
+  kb/Work PB2017 — `USING N -1` is the expression `N - 1` and is refused for its missing space):** an argument is the
+  LONGEST arithmetic expression that starts at it — `USING N + 1`, `USING N - 1`, `USING 5 + 1`, `USING BY CONTENT N + 1` and
   `O :: "M" (N + 1)` are each one argument, evaluated before the call and passed BY CONTENT (§14.9.4.4 GR9 a) 2,
   §14.9.23.4 GR6 a) 2); an argument that is a SOLE identifier or literal stays an identifier or literal
   (§14.9.4.4 GR8). A second argument that is a signed literal is written first or after a BY phrase — `USING +1 N`,

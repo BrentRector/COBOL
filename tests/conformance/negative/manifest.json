@@ -2640,7 +2640,12 @@
   "pb2623-method-reserved-at-2002-2014",
   "pb1616-define-hex-odd",
   "pb1616-omitted-branch-hex-odd",
-  "pb1616-define-zero-length-below-2014"
+  "pb1616-define-zero-length-below-2014",
+  "pb2017-binary-operator-no-spaces",
+  "pb2017-binary-operator-no-space-after",
+  "pb2017-unary-operator-no-space-after",
+  "pb2017-operator-in-subscript",
+  "pb2017-operator-touches-comma-decimal-point"
  ],
  "pending": []
 }
