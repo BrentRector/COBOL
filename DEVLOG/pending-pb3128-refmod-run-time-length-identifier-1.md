@@ -29,3 +29,5 @@ GR1 intermediate, the universal lane), `conformance:2014/pb3128_refmod_dynamic_l
 `negative/pb3128-refmod-dynamic-limit-below-group-formal` (a `LIMIT 3` slice into a 4-byte group formal is still
 COBOLNET0828 on its maximum), and two `AcceptDifferentialTests` facts (SIGN SEPARATE at 85; DYNAMIC LENGTH and ANY
 LENGTH at 2014). No inventory row was open on the mechanism (`closes_rows: []` with its reason). No diagnostic code used.
+
+Gate: `TestResults/build-local/20261014T005204Z-760695` — `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 5,591/11,548 · Unit 32,405/33,496 · Characterization 6/36 in leg 1; leg 2 left to CI). Its first run went RED on two source-pinning Unit tests that read the deleted ACCEPT re-spelling (`ReceivingStoreDriftTests` exempts the slice arm only as `{len}`; `BoundaryImageChannelTests` now pins `PlaceRenderer.SliceLength`). The self-review also corrected a comment that claimed a COMP item can be reference-modified (§8.4.3.3.3 SR1 admits only usage display or national numeric items).
