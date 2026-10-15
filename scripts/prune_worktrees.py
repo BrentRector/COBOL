@@ -80,7 +80,8 @@ never a worktree with an uncommitted edit or an untracked file, never UNLANDED o
 to accidentally lose useful work"). The classification IS that protection; nothing is archived (owner 2026-10-08 00:52
 PDT: "Archiving to a bundle serves no use and wastes disk space"). A branch that is not landed is deleted only when it
 is ABANDONED: `--apply --abandon <branch>` removes a clean, idle DECISION row only when a kb/Work note already records
-the decision (a line naming the branch and the word ABANDONED, with the reason). Each removed branch's `origin/<branch>`
+the decision (a line where the word ABANDONED directly follows the branch's name, with the reason; the word abandons
+that branch, never a successor the line names). Each removed branch's `origin/<branch>`
 goes with it unless it holds commits the local branch did not (drop_remote). --include-locked also takes a landed
 worktree locked by hand (no pid). A DETACHED worktree (a read-only fleet's pin)
 has no branch: it is listed with its lifecycle and never removed here. On Windows a worktree can refuse to delete
@@ -640,15 +641,29 @@ def landing_order(rows: list[Row], rank: Callable[[str], tuple[int, int]]) -> li
                   key=lambda r: (*rank(r.report.lead), -r.report.age_min, r.name))
 
 
-ABANDONED = re.compile(r'(?i)(?<!not )\babandoned\b')   # "not abandoned" records the opposite decision
+#: What may stand between a branch's name and the word ABANDONED in its record: markup and punctuation, one
+#: parenthetical ("(wave 1077 group E, SPLIT)"), and the copula or the noun the record puts there ("branch `x` is
+#: ABANDONED"). Any other word, above all another branch's name, means the word is about something else; so does
+#: `not`, which is why "not abandoned" (the opposite decision) cannot match.
+RECORD_GAP = r'(?:[\s`*_:,;"\'’]|\([^()]*\)|\b(?:is|was|are|now|branch|worktree)\b)*'
+
+
+def branch_name(branch: str) -> re.Pattern[str]:
+    """`branch` as a whole word: no name character (word, `.`, `-`) on either side, nor a path separator before it."""
+    return re.compile(r'(?<![\w.\-/\\])' + re.escape(branch) + r'(?![\w.\-])')
 
 
 def abandon_record(branch: str, work_dir: pathlib.Path) -> str | None:
-    """The kb/Work note that records the decision to abandon `branch`: a line naming the branch (as a whole word) and
-    the word ABANDONED. None when no note says so (the owner's rule: the decision is recorded BEFORE the delete)."""
-    name = re.compile(r'(?<![\w.\-/\\])' + re.escape(branch) + r'(?![\w.\-])')
+    """The kb/Work note that records the decision to abandon `branch`: a line where the word ABANDONED directly
+    follows the branch (as a whole word), with only `RECORD_GAP` between them. A record names a successor too ("`old`
+    ABANDONED, superseded by `new`", or "`new` carries it, so `old` is ABANDONED"), and that line must not pass for a
+    decision to abandon `new`. The rule reads the line alone: a version that asked the survey which other names were
+    branches stopped refusing once `old` itself was deleted, because the next survey no longer knew `old` (kb/Work
+    PB3161, review finding R1-1). None when no note says so (the owner's rule: the decision is recorded BEFORE the
+    delete)."""
+    record = re.compile(branch_name(branch).pattern + RECORD_GAP + r'\babandoned\b', re.I)
     for p in sorted(work_dir.glob('*.md')):
-        if any(name.search(l) and ABANDONED.search(l) for l in p.read_text(encoding='utf-8', errors='replace').splitlines()):
+        if any(record.search(l) for l in p.read_text(encoding='utf-8', errors='replace').splitlines()):
             return p.stem
     return None
 
@@ -686,8 +701,8 @@ def apply(rows: list[Row], *, repo=REPO, include_locked: bool = False, abandon: 
             say(f'not abandoned: {b} is {"no branch" if r is None else r.state + (" with uncommitted edits" if r and r.dirty else "")}'
                 ' (only a clean DECISION row can be abandoned)')
         elif not (note := abandon_record(b, work_dir)):
-            say(f'not abandoned: no kb/Work note records the decision to abandon {b} (a line naming it and the word '
-                f'ABANDONED, with the reason); record it there first')
+            say(f'not abandoned: no kb/Work note records the decision to abandon {b} (a line where the word ABANDONED '
+                f'directly follows its name, with the reason); record it there first')
         else:
             say(f'abandoning {b}: decision recorded in kb/Work/{note}.md')
             doomed.append(r)
@@ -1041,8 +1056,10 @@ def self_test() -> int:
         # archives nothing (owner 2026-10-08 00:52 PDT), and loses nothing else
         notes = tmp / 'Work'
         notes.mkdir()
-        (notes / 'PB8.md').write_text('---\nid: PB8\n---\nThe orphan branch: ABANDONED 2026-10-08, the approach was '
-                                      'replaced by PB9.\nsplit-branch: not abandoned, a finisher takes it.\n', encoding='utf-8', newline="\n")
+        # the record names a successor before and after the word: neither passes for a decision to abandon it
+        (notes / 'PB8.md').write_text('---\nid: PB8\n---\nsplit-branch carries the rest, so the orphan branch: ABANDONED '
+                                      '2026-10-08, the approach was replaced by PB9 on split-branch.\nsplit-branch: not '
+                                      'abandoned, a finisher takes it.\n', encoding='utf-8', newline="\n")
         out = []
         n = apply(list(rows.values()), repo=repo, abandon=['orphan', 'split-branch', 'fresh', 'dirty-merged'],
                   work_dir=notes, say=out.append)
@@ -1055,6 +1072,20 @@ def self_test() -> int:
               'an --abandon with no recorded decision is refused, said so')
         check(any('fresh is IN FLIGHT' in l for l in out) and any('uncommitted' in l for l in out),
               'an --abandon of an IN FLIGHT or dirty branch is refused, said so')
+        # the guard reads the line alone: with `orphan` already deleted (nothing in the survey names it), the record
+        # that abandoned it still does not abandon the branch it names (review finding R1-1)
+        check(abandon_record('orphan', notes) == 'PB8' and abandon_record('split-branch', notes) is None,
+              'a record abandons the branch the word follows, not the successor it names, with no survey to ask')
+        shapes = tmp / 'Shapes'
+        shapes.mkdir()
+        (shapes / 'PB1.md').write_text(
+            '**2026-10-10, lander: branch `old-a` (wave 1, SPLIT) ABANDONED,** superseded by `new-a`.\n'
+            '`new-b` carries it, so `old-b` is ABANDONED.\n'
+            '`old-c` (successor `new-c`) ABANDONED: replaced.\n'
+            'Branch `old-d` is not abandoned: `new-d` ABANDONED instead.\n', encoding='utf-8', newline='\n')
+        got = {b: abandon_record(b, shapes) for b in ('old-a', 'new-a', 'old-b', 'new-b', 'old-c', 'new-c', 'old-d', 'new-d')}
+        check(got == {'old-a': 'PB1', 'new-a': None, 'old-b': 'PB1', 'new-b': None, 'old-c': 'PB1', 'new-c': None,
+                      'old-d': None, 'new-d': 'PB1'}, f'record shapes: {got}')
         check(not list(tmp.rglob('*.bundle')), 'nothing was archived')
         check((wt / 'dirty-merged' / 'scratch.txt').exists(), 'an uncommitted file survived')
         check((wt / 'unreadable' / 'precious.txt').exists(), 'a file in an unmeasurable worktree survived')
