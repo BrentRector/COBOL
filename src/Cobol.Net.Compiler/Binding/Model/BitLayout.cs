@@ -105,7 +105,7 @@ internal static class BitLayout
         if (!anyBit) return BitRunMap.Empty;
         // ⛔ A REDEFINING SIBLING IS TRANSPARENT TO ADJACENCY, exactly as it is to the placement walk (Walk keeps
         // `prev` across it): "immediately following" (§8.5.1.6.3) is asked of the next entry that OCCUPIES storage,
-        // because a REDEFINES "causes the same computer storage area to be described by different data description
+        // because a REDEFINES "allows the same computer storage area to be described by different data description
         // entries" (§13.18.44.1) and adds none. The scan used to break the run AT the redefiner and start a new one
         // after it, so `05 B PIC 1(6). 05 B2 REDEFINES B PIC 1(2). 05 C PIC 1(2).` laid C at bit 6 (the walk, so
         // FUNCTION LENGTH and every window) but seeded and imaged it as the leader of a run of its own, a byte
