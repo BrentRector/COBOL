@@ -330,20 +330,18 @@ public sealed class RelativeConnector : KeyedConnector
     {
         image = BlankRecordArea();
         if (SequentialReadGuard() is { } pre) return Status = pre;   // '47'/'46'/'10' — FileConnector
-        if (!_fpiValid) return Status = FileStatusCode.NoValidNextRecord;              // '46' §9.1.13.7 6a (failed START)
+        if (!_fpiValid) { InvalidateFilePosition(); return Status = FileStatusCode.NoValidNextRecord; }   // '46' §9.1.13.7 6a (failed START) + §14.9.30.4 GR18
 
         if (SelectSequentialSlot(previous) is not { } s)
         {
-            LastReadUnsuccessful = true;
-            _fpiValid = false;                                             // §14.9.30 GR24b
+            InvalidateFilePosition();                                      // §14.9.30 GR24b
             return Status = FileStatusCode.AtEnd;
         }
         if (_keyDigits > 0 && s.ToString().Length > _keyDigits)
         {
             // §14.9.30 GR21 relative rule d: significant digits of the RRN exceed the RELATIVE KEY item → '14',
             // the at-end condition, FPI invalidated.
-            LastReadUnsuccessful = true;
-            _fpiValid = false;
+            InvalidateFilePosition();
             return Status = FileStatusCode.RelativeKeyOverflow;
         }
         _fpi = s; _fpiValid = true; _inclusive = false;   // GR21 rule f + rule c's exclusive bound
@@ -359,11 +357,11 @@ public sealed class RelativeConnector : KeyedConnector
     public string ReadRandom(out string image)
     {
         image = BlankRecordArea();
-        if (ReadOpenModeGuard() is { } notOpen) return Status = notOpen;                  // '47' §14.9.30.4 GR2
+        if (RandomReadOpenModeGuard() is { } notOpen) return Status = notOpen;            // '47' §14.9.30.4 GR2 + GR18
         if (RandomReadAbsentOptionalGuard() is { } absent) return Status = absent;        // '23' §9.1.13.5 3 b)
         if (!_slots.TryGetValue(_pendingKey, out StoredFrame rec))
         {
-            LastReadUnsuccessful = true;
+            InvalidateFilePosition();                                      // §14.9.30.4 GR18
             return Status = FileStatusCode.RecordNotFound;                 // '23' §9.1.13.5 3a
         }
         _fpi = _pendingKey; _fpiValid = true; _inclusive = false;

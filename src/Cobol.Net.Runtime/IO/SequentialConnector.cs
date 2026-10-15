@@ -1493,7 +1493,7 @@ public sealed class SequentialConnector : FileConnector
     {
         image = BlankRecordArea();
         if (SequentialReadGuard() is { } guard) { Status = guard; return false; }   // '47'/'46'/'10' — FileConnector
-        if (_reader is null) { Status = FileStatusCode.ReadNotOpenForInput; return false; }
+        if (_reader is null) { InvalidateFilePosition(); Status = FileStatusCode.ReadNotOpenForInput; return false; }   // '47' + GR18
 
         // §14.9.30.4 GR21, "When the file is a sequential file": the direction selects the record NUMBER, so a
         // backward read is a REPOSITION to that ordinal followed by the ordinary physical read. Rule e) — "If no
@@ -1504,12 +1504,12 @@ public sealed class SequentialConnector : FileConnector
         if (MovesBackward(previous))
         {
             long target = TargetReadOrdinal(previous);   // the STATEMENT's phrase — MovesBackward owns the XOR
-            if (target < 1) { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }   // GR21 e
+            if (target < 1) { InvalidateFilePosition(); Status = FileStatusCode.AtEnd; return false; }   // GR21 e + GR24 b)
             // §14.9.30.4 GR20 — "If the PREVIOUS phrase is specified, the physical file associated with the file
             // connector referenced by file-name-1 shall be a single reel/unit mass storage file." A stream that
             // cannot be positioned is not one; report the permanent error rather than silently reading something
             // else (the same posture the non-seekable REWRITE arm below takes).
-            if (!SeekToOrdinal(target)) { Status = FileStatusCode.PermanentError; return false; }
+            if (!SeekToOrdinal(target)) return ReadFailed();   // '30' + GR18
         }
 
         // §14.9.30 GR14 (READ) / §9.1.13.2 item 3: a RECORD-sequential physical record whose length is outside the file's
@@ -1532,7 +1532,7 @@ public sealed class SequentialConnector : FileConnector
                 _lastReadLinePartial = true;   // a served remainder is only PART of its physical line (§14.9.35 GR17a)
             }
             else if (NextFrame(out _, out _) is { } physical) line = physical;
-            else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
+            else { InvalidateFilePosition(); Status = FileStatusCode.AtEnd; return false; }   // GR24 b)
             // The bound is the maximum size the RECORD DESCRIPTIONS specify (GR15's own words), which is the
             // record area's width except for a variable-length record (MaxRecordSize — kb/Work PB981).
             if (line.Length > MaxRecordSize)
@@ -1568,7 +1568,7 @@ public sealed class SequentialConnector : FileConnector
             // OPEN.
             shortLong = IsVarying ? data.Length < VaryMin || data.Length > VaryMax : data.Length < RecordWidth;
         }
-        else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
+        else { InvalidateFilePosition(); Status = FileStatusCode.AtEnd; return false; }   // GR24 b)
         _readOrdinal++;   // the record just made available is ordinal N+1 (§9.1.16 lock identity)
         ReadSucceeded(lineBadChar ? FileStatusCode.LineRecordInvalidCharRead   // '09' §14.9.30.4 GR16 — stated after GR15, so it wins over '06'
             : lineTooLong ? FileStatusCode.LineRecordTooLong

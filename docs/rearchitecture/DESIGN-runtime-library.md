@@ -222,9 +222,14 @@ public abstract class FileConnector
     // The READ preconditions, written ONCE for every organization (kb/Work PB336). Order IS the rule inside
     // SequentialReadGuard: §14.9.30.4 GR2 '47', then GR21's '46' poison, then §9.1.13.4 1c's '10' — which is
     // "first time" only BECAUSE its own arm arms the poison. Random side: §9.1.13.5 3b's '23', never '46'.
+    // Every failing arm of a side-effecting guard applies §14.9.30.4 GR18 / §14.9.41.4 GR7 through the virtual
+    // InvalidateFilePosition (kb/Work PB359); ReadOpenModeGuard alone is pure, for the pre-read record identity.
     protected string? ReadOpenModeGuard();
     protected string? SequentialReadGuard();
+    protected string? RandomReadOpenModeGuard();
     protected string? RandomReadAbsentOptionalGuard();
+    protected string? StartOpenModeGuard();
+    protected virtual void InvalidateFilePosition();          // keyed connectors also clear their FPI validity bit
     protected abstract string OpenCore(FileOpenMode mode, FilePresence presence);   // takes the ONE presence probe
     //   (Open also answers GR3/'37', GR10/'39' and GR16's write capability/'37' before OpenCore is reached)
     protected abstract bool ReadNext(out string image);        // sequential retrieval

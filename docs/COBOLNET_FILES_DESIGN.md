@@ -2446,6 +2446,17 @@ A process-wide registry keyed by external name (with an Area discriminator for r
   indicator alone. A keyed connector overrides `InvalidateFilePosition` to clear its FPI VALIDITY BIT as well —
   its indicator is a key value plus a bit, where the sequential connector's is the stream position — and each
   connector's `StartFail` is that invalidation plus the invalid key condition's '23'.
+- **Every unsuccessful READ invalidates through the same virtual** (kb/Work PB359). §14.9.30.4 GR18 is GR7's READ
+  twin ("Unless otherwise specified, at the completion of any unsuccessful execution of a READ statement, … the
+  file position indicator is set to indicate that no valid record position has been established"), so
+  `SequentialReadGuard` applies it once on every failing arm ('47', '46', '10'), `RandomReadOpenModeGuard` is the
+  random READ's side-effecting twin of `StartOpenModeGuard`, `RandomReadAbsentOptionalGuard` applies it on its '23',
+  and every other unsuccessful READ exit in a connector (a random READ's invalid key '23', an at-end '10', a
+  relative '14', a sequential '30') calls `InvalidateFilePosition` rather than setting `LastReadUnsuccessful` or
+  clearing a keyed `_fpiValid` by hand — which had skipped the keyed connectors' validity bit on half of those
+  exits. `ReadOpenModeGuard` stays PURE: only the pre-read record identity (`PeekSequentialRecordId` /
+  `PeekRandomReadRecordId`), which executes no READ, asks it directly. The structural gate is
+  `FilePositionInvalidationDriftTests`; the witness is `tests/conformance/85/pb359_unsuccessful_read_start_position`.
 - SAME AREA buffer-only and SAME SORT-MERGE AREA are no-ops in a managed runtime (pure memory-layout optimizations with no observable behavior).
 
 ## Per-edition gating (G1 — four compilers in one `cobol.exe`)

@@ -503,13 +503,12 @@ public sealed class IndexedConnector : KeyedConnector
     {
         image = BlankRecordArea();
         if (SequentialReadGuard() is { } pre) return Status = pre;   // '47'/'46'/'10' — FileConnector
-        if (!_fpiValid) return Status = FileStatusCode.NoValidNextRecord;
+        if (!_fpiValid) { InvalidateFilePosition(); return Status = FileStatusCode.NoValidNextRecord; }   // '46' + §14.9.30.4 GR18
 
         var seq = Ordered(_refKey);
         if (SelectSequentialRecord(previous, seq, out int foundIdx) is not { } found)
         {
-            LastReadUnsuccessful = true;
-            _fpiValid = false;                                             // §14.9.30 GR24b
+            InvalidateFilePosition();                                      // §14.9.30 GR24b
             return Status = FileStatusCode.AtEnd;
         }
         // §14.9.30 GR27 — '02' look-ahead: alternate key of reference and the adjacent record duplicates it.
@@ -540,13 +539,13 @@ public sealed class IndexedConnector : KeyedConnector
     public string ReadRandom(int keyIndex, string keyedRecordImage, out string image, RecordExtents? areaExtents = null)
     {
         image = BlankRecordArea();
-        if (ReadOpenModeGuard() is { } notOpen) return Status = notOpen;                  // '47' §14.9.30.4 GR2
+        if (RandomReadOpenModeGuard() is { } notOpen) return Status = notOpen;            // '47' §14.9.30.4 GR2 + GR18
         _refKey = keyIndex;                                                // GR30/GR31
         if (RandomReadAbsentOptionalGuard() is { } absent) return Status = absent;        // '23' §9.1.13.5 3 b)
         string value = AreaKey(keyedRecordImage, areaExtents, keyIndex);
         if (FindRandom(keyIndex, value) is not { } found)   // §14.9.30.4 GR32 + §12.4.5.6.4 GR6 — the ONE copy
         {
-            LastReadUnsuccessful = true;
+            InvalidateFilePosition();                                      // §14.9.30.4 GR18
             return Status = FileStatusCode.RecordNotFound;                 // '23' GR32
         }
         // GR32 sets the FPI "to the value in the key of reference" — the key VALUE the program supplied; the

@@ -450,15 +450,36 @@ public abstract class FileConnector
     // and all three carried the SAME ordering defect: the absent-OPTIONAL arm was tested BEFORE GR21's '46',
     // so every sequential READ after the first on an absent optional file re-reported '10' — although the arm
     // itself had already armed the '46' the next READ owed. Order here is the rules' own order.
+    //
+    // ⛔ AND EVERY UNSUCCESSFUL READ GOES THROUGH InvalidateFilePosition (kb/Work PB359, the READ twin of the START
+    // section below). §14.9.30.4 GR18 — "Unless otherwise specified, at the completion of any unsuccessful
+    // execution of a READ statement, … the file position indicator is set to indicate that no valid record
+    // position has been established" — is unconditional on the KIND of failure, and the keyed connectors' FPI
+    // is a key value plus a validity bit that only the virtual clears. Exits that wrote the base flag by hand,
+    // or returned '47' with nothing, kept GR18 only by an argument about OpenCore's current shape.
+    // FilePositionInvalidationDriftTests keeps the flag's one writer the virtual.
 
     /// <summary>The open-mode precondition every READ shares (ISO §14.9.30.4 GR2: "The open mode of the file
     /// connector referenced by file-name-1 shall be input or I-O. If it is any other value, the execution of the
     /// READ statement is unsuccessful and the I-O status value for file-name-1 is set to '47'."; §9.1.13.7 item
     /// 7). Returns the failing status, or <see langword="null"/> when the READ may proceed. Assigns nothing —
-    /// the caller owns the single <see cref="Status"/> assignment, so the '43' gate drops exactly once.</summary>
+    /// the caller owns the single <see cref="Status"/> assignment, so the '43' gate drops exactly once.
+    /// <para>PURE, and so never a READ entry's own guard: a READ entry asks <see cref="SequentialReadGuard"/> or
+    /// <see cref="RandomReadOpenModeGuard"/>, which apply §14.9.30.4 GR18 on the way out. Only a question asked
+    /// WITHOUT executing a READ (the pre-read record identity below) asks this one directly.</para></summary>
     protected string? ReadOpenModeGuard() =>
         PermanentErrorReplay()   // §9.1.13.1 — a permanent error in effect answers first (kb/Work PB1541)
         ?? (!IsOpen || Mode is FileOpenMode.Output or FileOpenMode.Extend ? FileStatusCode.ReadNotOpenForInput : null);
+
+    /// <summary>The open-mode precondition of a RANDOM (format-2) READ: <see cref="ReadOpenModeGuard"/>'s answer
+    /// with §14.9.30.4 GR18's invalidation applied on the way out, because the refused READ is an unsuccessful
+    /// one — the READ twin of <see cref="StartOpenModeGuard"/> (kb/Work PB359). Assigns nothing.</summary>
+    protected string? RandomReadOpenModeGuard()
+    {
+        if (ReadOpenModeGuard() is not { } notOpen) return null;
+        InvalidateFilePosition();   // GR18
+        return notOpen;
+    }
 
     /// <summary>The preconditions of a SEQUENTIAL READ, in the standard's own order: GR2's open mode ('47');
     /// then ISO §14.9.30.4 GR21's first sentence — "For a sequential READ statement, if the previous READ or
@@ -467,14 +488,24 @@ public abstract class FileConnector
     /// scopes to "a sequential READ statement … attempted FOR THE FIRST TIME on a file described as optional and
     /// the physical file is not present" ('10'). GR21 shall be tested FIRST: it is what makes '10' first-time-
     /// only, because the '10' arm is itself an unsuccessful READ and arms the poison for its successor.
-    /// Returns the failing status, or <see langword="null"/> when the READ may proceed.</summary>
+    /// Returns the failing status, or <see langword="null"/> when the READ may proceed. Every failing arm is an
+    /// unsuccessful READ, so the guard applies §14.9.30.4 GR18 (<see cref="InvalidateFilePosition"/>) to each
+    /// before it returns — once, here, never per arm.</summary>
     protected string? SequentialReadGuard()
+    {
+        string? failed = SequentialReadFailure();
+        if (failed is not null) InvalidateFilePosition();   // GR18
+        return failed;
+    }
+
+    /// <summary>The arms of <see cref="SequentialReadGuard"/>, in the standard's order, with no side effect.</summary>
+    private string? SequentialReadFailure()
     {
         if (ReadOpenModeGuard() is { } notOpen) return notOpen;                     // '47' GR2
         if (LastReadUnsuccessful) return FileStatusCode.NoValidNextRecord;          // '46' GR21 / §9.1.13.7 6
-        // This READ is itself unsuccessful, so it arms GR21 for its successor — that is what makes '10'
-        // first-time-only, and why the two arms shall be written in this order.
-        if (OptionalAbsent) { LastReadUnsuccessful = true; return FileStatusCode.AtEnd; }   // '10' §9.1.13.4 1 c)
+        // This READ is itself unsuccessful, so the guard's GR18 invalidation arms GR21 for its successor — that
+        // is what makes '10' first-time-only, and why the two arms shall be written in this order.
+        if (OptionalAbsent) return FileStatusCode.AtEnd;                            // '10' §9.1.13.4 1 c)
         return null;
     }
 
@@ -536,7 +567,9 @@ public abstract class FileConnector
     /// <summary>ISO §14.9.41.4 GR7 — <i>"Following the unsuccessful execution of a START statement, the file
     /// position indicator is set to indicate that no valid record position has been established."</i> On this
     /// base that state is the '46' poison §9.1.13.7 item 6 a) reads back on the next sequential READ; a keyed
-    /// connector, whose FPI is a key VALUE plus a validity bit, overrides to clear the bit as well.</summary>
+    /// connector, whose FPI is a key VALUE plus a validity bit, overrides to clear the bit as well. The same state
+    /// is §14.9.30.4 GR18's for an unsuccessful READ, so every unsuccessful READ and START sets it through here and
+    /// this is the one writer of <see cref="LastReadUnsuccessful"/>'s <see langword="true"/>.</summary>
     protected virtual void InvalidateFilePosition() => LastReadUnsuccessful = true;
 
     /// <summary>The START statement's open-mode precondition (ISO §14.9.41.4 GR1: <i>"The open mode of the file
@@ -569,7 +602,7 @@ public abstract class FileConnector
     /// the indexed connector establishes its key of reference (GR30/GR31) between the two.</summary>
     protected string? RandomReadAbsentOptionalGuard()
     {
-        if (OptionalAbsent) { LastReadUnsuccessful = true; return FileStatusCode.RecordNotFound; }   // '23' 3 b)
+        if (OptionalAbsent) { InvalidateFilePosition(); return FileStatusCode.RecordNotFound; }   // '23' 3 b) + §14.9.30.4 GR18
         return null;
     }
 
