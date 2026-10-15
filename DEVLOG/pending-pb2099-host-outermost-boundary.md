@@ -209,3 +209,10 @@ every decode in `__TryGet` is `HostLanding.TryDecode` or a nested record's. No r
 table's loop bound. The parameter and return types are the records. A compile sweep built all 335 corpus programs that
 declare formals or a RETURNING item, with `--source-format auto` and their edition. 29 of them now publish records,
 and none failed.
+
+**Gate (part 4).** The first gate (`20261015T013921Z-c4ffb9`) was RED on `SortNumericKeyLaneTests`, which did not yet
+name the published record among the image codecs; the self-review fix above followed. The re-gate,
+`TestResults/build-local/20261015T014717Z-6f1cf9` (HEAD ef95b6cb8): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
+PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,549 · Unit 471 · Characterization 30 …
+Conformance 6,129/11,678 · Unit 33,195/33,666 · Characterization 6/36 cases ran (skipped 0) in 1 of 2 leg(s)`. Both
+`HostEntryTests` cases and `HostEntryShapeDriftTests` passed in leg 1. Semgrep verify passed with no rule count up.
