@@ -128,13 +128,23 @@ data required between literal-1 or the data item referenced by identifier-1 and 
 implementor" (Annex A.1 item 56). Two conforming compilers print a signed numeric DISPLAY item as `01E` and `+01.5`.
 So:
 
-- **A portability lint the generator enforces**: a portable test DISPLAYs only literals, alphanumeric and national
-  items, and numeric-edited items; never an un-edited numeric item, a function result or an arithmetic expression. A
-  test that must show a number MOVEs it to a numeric-edited item first.
-- **`implementor-defined`** names Annex A.1 items whose values the standard enumerates (for example the sign
-  convention of items 177 and 178, which today's `*> options: sign-encoding=ascii` encodes). Such a test carries one
-  expected output per value, `<id>.<item>=<value>.out`, and each compiler's profile (§4) states its value. An A.1
-  item whose values the standard does not enumerate cannot be an expectation: that test is WiseOwl-only.
+- **A portability lint the generator enforces**: a portable test DISPLAYs only alphanumeric literals, alphanumeric
+  items and numeric-edited items; never an un-edited numeric item, a function result, an arithmetic expression or a
+  national operand. GR 1 makes the conversion of EVERY operand to the device implementor-defined, and the national
+  operand is where it shows: for `PIC N(3) VALUE N"ABC"` at 2002 WiseOwl prints `A B C` and GnuCOBOL 3.2 prints the
+  UTF-16BE bytes (NUL `A` NUL `B` NUL `C`), both conforming (branch review R1-2). A test that must show a number
+  MOVEs it to a numeric-edited item first; a test of national data compares it inside the program (IF, or MOVE to
+  an alphanumeric item) and DISPLAYs an alphanumeric literal naming the outcome.
+- **`implementor-defined`** names Annex A.1 items whose values the standard enumerates. The example is item 148,
+  "RECORD clause (whether fixed or variable records produced for fixed-or-variable-length format)": §13.18.43.4 GR 17
+  "It is implementor defined whether format 3 of the RECORD clause produces fixed-length records or variable-length
+  records" names exactly two values. Such a test carries one expected output per value, `<id>.<item>=<value>.out`
+  (`<id>.148=fixed.out`, `<id>.148=variable.out`), and each compiler's profile (§4) states its value. An A.1 item
+  whose values the standard does not enumerate cannot be an expectation: that test is WiseOwl-only. The sign
+  convention is such an item: §13.18.52.4 GR 4 "The implementor shall specify the position and representation of
+  the operational sign" and GR 5 b) "The implementor defines what constitutes valid signs for data items" (items 177
+  and 178) enumerate nothing, so the tests that encode it today (`*> options: sign-encoding=ascii`) go to
+  `wiseowl/cases/` (branch review R1-1).
 
 ## 4. The tree, the generator and where it lives
 
@@ -347,7 +357,9 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   before it lands: the move is its output), the moved tree, `wiseowl/cases/` and `wiseowl/diagnostics.json`, the
   inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the
   skills and the open notes, `CorpusRunnerTests`/`CorpusManifest`/`tests/conformance/` deleted, and the neutrality
-  proof's evidence in the note. `tests/conformance/README.md`'s authoring guide moves to `conformance-suite/README.md`.
+  proof's evidence in the note. `tests/conformance/README.md`'s authoring guide moves to `conformance-suite/README.md`,
+  and `docs/VERSION_TEST_MATRIX_DESIGN.md` §5 (the corpus layout and its replacement paragraph) is rewritten to
+  describe the moved tree (CLAUDE.md rule 6).
   **It lands at a quiet point, so no branch crosses it.** A branch cut before the move that adds a test under
   `tests/conformance/` would merge without a conflict (the directory is gone) and its test would silently never run.
   Which branches those are is known when the move is ready, so the move is sequenced around them, never left for a

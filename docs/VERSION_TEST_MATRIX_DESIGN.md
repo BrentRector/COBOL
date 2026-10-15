@@ -131,9 +131,11 @@ they cover ~70% of real dialect collisions and exercise all five gating patterns
   editions that must reject it on its first line (`*> reject-at: 2002 2014 2023`); `CorpusRunnerTests` compiles it at
   each named edition and asserts the diagnostic. `tests/conformance/README.md` is the authoring guide.
 - **Behavior-variant:** the same snippet with a per-edition `.out` (only where INV-3 actually applies).
-- **PROPOSED replacement:** `docs/rearchitecture/DESIGN-conformance-suite.md` (kb/Work PB3160, for the owner's
-  review): one tree of compiler-neutral tests filed by ISO clause, generated into four complete per-edition suites
-  that any COBOL compiler can run. This section describes the corpus until that design is approved and built.
+- **Replacement (approved by the owner 2026-10-14):** `docs/rearchitecture/DESIGN-conformance-suite.md` (kb/Work
+  PB3160): one tree of compiler-neutral tests filed by ISO clause, generated into four complete per-edition suites
+  that any COBOL compiler can run. This section describes the corpus until slice S2 (kb/Work PB3177) moves
+  `tests/conformance/` into it and deletes the tree; PB3177 rewrites this section in the same landing (it names
+  the consumers of the old paths).
 
 ## 6. Harness design
 
