@@ -881,9 +881,11 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// <c>--permissive</c> brings a floating-point item, an SDIDI-carried literal or a fixed-point item with fraction
     /// digits to such a position — and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means: an integer when its
     /// value has no nonzero fraction digit, otherwise EC-ARGUMENT-FUNCTION with checking on and the TRUNCATED integer
-    /// with it off. That is a property of the POSITION, so it is taken here, ONCE, through the ONE type-6 intake
-    /// (<see cref="IntegerIntake"/>, at the total width: a bounded body narrows the integer again through
-    /// <see cref="IntArg"/> and keeps its own range raise), before any arm or lane predicate sees the operand.</para>
+    /// with it off. That is a property of the POSITION, so it is taken here, ONCE, before any arm or lane predicate
+    /// sees the operand: an exact carrier through the type-6 intake at the total width (<see cref="IntegerIntake"/>),
+    /// a binary64 one through <c>CobolIntrinsics.IntegerArgTotalReal</c>, which saturates past the Int128 carrier
+    /// instead of raising. Neither decides range: a bounded body narrows the integer again through
+    /// <see cref="IntArg"/> and keeps its own range raise.</para>
     /// <para>⛔ BEFORE THIS, THE ARMS EACH DECIDED, AND THREE DECIDED WRONG — measured by
     /// <c>IntrinsicIntegerPositionPermissiveDriftTests</c> over every verified type-6 position: MOD's scaled arm aligned
     /// 7.5 and answered MOD(7.5, 3) = 1.5 where the integer 7 answers 1; a float at COMBINED-DATETIME's argument-1
