@@ -183,23 +183,80 @@ public sealed class UserWordDeclarationDriftTests
     /// only the data item, so STANDARD-COMPARE's argument-4, WRITE ADVANCING's integer-1 and an EVALUATE object
     /// claimed an own constant-name as the inherited ordering-name, mnemonic-name or class-name and refused legal source
     /// COBOLNET2692. So no expression pairs a configuration-section-name lookup with a raw probe: it asks
-    /// <c>ReferenceResolver.DescribesOwnItem</c>, and the next two-reading position gets both halves.</summary>
+    /// <c>ReferenceResolver.DescribesOwnItem</c>, and the next two-reading position gets both halves.
+    /// <para>The table names are read off the <c>ConfigurationNames</c> declarations, never listed by hand: a
+    /// hand-written list once named a <c>Symbolics</c> table that does not exist and missed <c>SwitchConditions</c>
+    /// (kb/Work PB3153 review w1085d R1-1).</para></summary>
     [Fact]
     public void AConfigurationNameLookup_AsksTheOneOwnItemTest_NeverARawProbe()
     {
-        var raw = CompilerSources().SelectMany(s => Regex.Matches(s.Text,
+        var sources = CompilerSources();
+        string tables = string.Join("|", ConfigurationTableNames(sources));
+        var raw = sources.SelectMany(s => Regex.Matches(s.Text,
                 @"(?:IsClassConditionWord|IsAlphabetName|NamesSymbolic|Mnemonics\.TryPeek|Mnemonics\.TryUse"
-                + @"|(?:Locales|OrderTables|Alphabets|Classes|Symbolics)\.(?:Declares|TryUse|TryPeek))\([^;{}]*?Refs\.Probe\(")
-            .Select(m => $"{s.Name}:{s.Text[..m.Index].Count(c => c == '\n') + 1}")).ToList();
+                + $@"|\b(?:{tables})\.(?:Declares|TryUse|TryPeek))\([^;{{}}]*?Refs\.Probe\(")
+            .Select(m => $"{s.Name}:{LineOf(s.Text, m.Index)}")).ToList();
         Assert.True(raw.Count == 0, "a configuration-section-name lookup is paired with a raw Refs.Probe, which misses an "
             + "own constant-name (" + string.Join(", ", raw) + "): ask ReferenceResolver.DescribesOwnItem (§8.4.6.1, kb/Work PB3153)");
-        string resolver = CompilerSources().Single(s => s.Name == "ReferenceResolver.cs").Text;
+        string resolver = sources.Single(s => s.Name == "ReferenceResolver.cs").Text;
         Assert.Matches(@"public bool DescribesOwnItem\(Core\.DataReferenceContext dref\) =>\s+"
             + @"data\.ConstantOf\(dref\) is not null \|\| Probe\(dref\) is not null;", resolver);
     }
 
-    private static List<(string Name, string Text)> CompilerSources() =>
-        [.. Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
+    /// <summary>⛔ A PROCEDURE-DIVISION MEMBER THAT TAKES A DATA REFERENCE AS AN INHERITABLE CONFIGURATION-SECTION NAME
+    /// ASKS THE OWN-ITEM TEST (kb/Work PB3153 review w1085d R1-1). A word the grammar parsed as a data reference is a
+    /// position whose format also admits an operand, so §8.4.6.1 makes the referring element's own item of that spelling
+    /// the referent. The raw-probe guard above cannot see a member that asks NO own-item test at all: the bare-operand
+    /// switch-status arm (<c>SetAlterBinder.SwitchCondOf</c>) resolved <c>IF SWON</c> through
+    /// <c>SwitchConditions.TryUse</c> over a contained program's own <c>01 SWON PIC 1</c> and refused legal source
+    /// COBOLNET2692. So every member under <c>Binding/Procedure</c> that resolves a configuration-section name
+    /// (<c>TryUse</c> on a <c>ConfigurationNames</c> table or the mnemonic registry) and handles a data reference
+    /// (a <c>DataReferenceContext</c>, <c>dataReference()</c> or <c>SoleDataRef…</c>) asks
+    /// <c>DescribesOwnItem</c>. A member whose word arrives as a dedicated name token (ACCEPT FROM, the class
+    /// condition's class-name, SET Format 3) handles no data reference, so the rule does not reach it.</summary>
+    [Fact]
+    public void AProcedureDataReferenceTakenAsAConfigurationName_AsksTheOwnItemTest()
+    {
+        var sources = CompilerSources(TestRepo.Src("Cobol.Net.Compiler", "Binding", "Procedure"));
+        string tables = string.Join("|", ConfigurationTableNames(CompilerSources()));
+        var lookup = new Regex($@"\b(?:(?:{tables})|Mnemonics)\.TryUse\(");
+        var member = new Regex(@"^    (?:public|private|internal|protected)\b", RegexOptions.Multiline);
+        var dataReference = new Regex(@"DataReferenceContext\b|\.dataReference\(\)|\bSoleDataRef\w*\(");
+        int lookups = 0;
+        var missing = new List<string>();
+        foreach (var (name, text) in sources)
+        {
+            var starts = member.Matches(text).Select(m => m.Index).Append(text.Length).ToArray();
+            for (int i = 0; i + 1 < starts.Length; i++)
+            {
+                string body = text[starts[i]..starts[i + 1]];
+                if (!lookup.IsMatch(body)) continue;
+                lookups++;
+                if (dataReference.IsMatch(body) && !body.Contains("Refs.DescribesOwnItem(", StringComparison.Ordinal))
+                    missing.Add($"{name}:{LineOf(text, starts[i])}");
+            }
+        }
+        Assert.True(lookups >= 5, $"found only {lookups} configuration-name resolutions under Binding/Procedure — re-derive this guard");
+        Assert.True(missing.Count == 0, "a member resolves a data reference as an inherited configuration-section name "
+            + "without asking ReferenceResolver.DescribesOwnItem (" + string.Join(", ", missing) + "): the element's own "
+            + "item of that spelling is the referent (§8.4.6.1, kb/Work PB3153)");
+    }
+
+    /// <summary>The <c>ConfigurationNames</c> tables the compiler declares, read off their declarations.</summary>
+    private static string[] ConfigurationTableNames(List<(string Name, string Text)> sources)
+    {
+        var names = sources.SelectMany(s => Regex.Matches(s.Text, @"ConfigurationNames<[^>]+>\s+(\w+)\s*=>")
+            .Select(m => m.Groups[1].Value)).Distinct().Order(StringComparer.Ordinal).ToArray();
+        Assert.Contains("SwitchConditions", names);   // the scan found the declarations at all
+        return names;
+    }
+
+    private static int LineOf(string text, int index) => text[..index].Count(c => c == '\n') + 1;
+
+    private static List<(string Name, string Text)> CompilerSources() => CompilerSources(TestRepo.Src("Cobol.Net.Compiler"));
+
+    private static List<(string Name, string Text)> CompilerSources(string root) =>
+        [.. Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
             .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f)))];
 
