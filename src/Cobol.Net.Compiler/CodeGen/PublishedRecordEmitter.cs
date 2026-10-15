@@ -29,17 +29,42 @@ namespace CobolNet.CodeGen;
 /// fields, so the elementary formals and the record members share one declaration list).</param>
 internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
 {
-    /// <summary>Whether this slice publishes a record for <paramref name="group"/>: a fixed group with no member the
-    /// record image does not hold — a pointer or object reference (a managed slot), a
-    /// dynamic-length item or dynamic-capacity table (the cell's variable part), an OCCURS DEPENDING ON table.
-    /// <para>⚠ WIP (kb/Work PB2099, wave 1080 checkpoint): those shapes cross as the CALL lane's cell-area and
+    /// <summary>Whether this slice publishes a record for <paramref name="group"/>: a group with no member the record
+    /// image does not hold — a pointer or object reference (a managed slot), a dynamic-length item or dynamic-capacity
+    /// table (the cell's variable part). An OCCURS DEPENDING ON table is held: its storage is the maximum allocation
+    /// (ISO §8.5.1.8), the image the CALL lane's text crossing carries.
+    /// <para>⚠ WIP (kb/Work PB2099): the managed-slot and variable-length shapes cross as the CALL lane's cell-area and
     /// variable-length carriers (§4.3's last table row), which the published record renders in the slice's next step;
     /// until then a unit with such a formal publishes no host entry.</para></summary>
     internal static bool Renders(DataItem group) =>
         group.IsGroup && DataItem.DescendantsOf(group).Where(Occupies).All(d =>
             !SlotWindow.CarriedBySlot(d) && !DynSlotWindow.CarriedBySlot(d)
-            && !VarGroupWindow.Applies(d) && !d.IsDynamicTable && !d.TableBoundsPending
-            && d.OccursSpec?.DependingName is null && !d.IsDynamicLength && !d.IsAnyLength);
+            && !VarGroupWindow.Applies(d) && !d.IsDynamicTable && !d.IsDynamicLength && !d.IsAnyLength);
+
+    /// <summary>The DEPENDING ON item of an OCCURS DEPENDING ON member <paramref name="table"/> whose count the record
+    /// <paramref name="root"/> itself holds — data-name-1 inside the record, which §13.18.38.3 20) places before the
+    /// table — or null: a fixed table, or one whose data-name-1 is outside the record, whose property then holds the
+    /// table's whole area, every occurrence the storage has (§8.5.1.8; the image the boundary carries).</summary>
+    private static DataItem? DependingInRecord(DataItem root, DataItem table) =>
+        table.OccursSpec is { DependingName: not null, Depending: { } dep } && RelativeBits(root, dep) >= 0 ? dep : null;
+
+    /// <summary>The bit offset of <paramref name="item"/> from the start of its ancestor <paramref name="ancestor"/>
+    /// (0 for the ancestor itself), summed along the parent chain over the one placement walk
+    /// (<see cref="BitLayout.StartBitWithin"/>); -1 when <paramref name="item"/> is not under it. Asked only of a
+    /// DEPENDING ON item and of a group holding an OCCURS DEPENDING ON table, neither of which lies in a table
+    /// (§13.18.38.3 2) and 1) b)), so each is one place.</summary>
+    private static int RelativeBits(DataItem ancestor, DataItem item)
+    {
+        int bits = 0;
+        for (DataItem? d = item; d is not null; d = d.Parent)
+        {
+            if (ReferenceEquals(d, ancestor)) return bits;
+            int at = d.Parent is null ? -1 : BitLayout.StartBitWithin(d.Parent, d);
+            if (at < 0) return -1;
+            bits += at;
+        }
+        return -1;
+    }
 
     /// <summary>An entry that occupies storage of the record: a group or elementary item, never a condition-name or a
     /// RENAMES entry.</summary>
@@ -52,17 +77,25 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
     /// <summary>The width of the record's image in characters, one per byte of its storage.</summary>
     internal static int Width(DataItem group) => group.ByteWidth;
 
-    /// <summary>One member as the struct presents it.</summary>
-    private sealed record Member(DataItem Item, string Name, HostType Type, string? Record)
+    /// <summary>One member as the struct presents it. <paramref name="Depending"/> is the DEPENDING ON item of an OCCURS
+    /// DEPENDING ON table whose count the record holds (<see cref="DependingInRecord"/>): the array then has that many
+    /// entries; every other table's array has its <see cref="DataItem.Occurs"/> (the maximum, for a DEPENDING ON item
+    /// outside the record).</summary>
+    private sealed record Member(DataItem Item, string Name, HostType Type, string? Record, DataItem? Depending)
     {
         public int Occurs => Item.Occurs ?? 0;
+        public int Minimum => Depending is null ? Occurs : Item.OccursSpec!.Min;
         public string Element => Record ?? Type.CsType!;
         public string PropertyType => Occurs > 0 ? $"{Element}[]" : Element;
     }
 
     /// <summary>Emit the published record struct of <paramref name="group"/>, named <paramref name="name"/>, as a nested
     /// type at the writer's position.</summary>
-    internal void Emit(DataItem group, string name, CodeWriter w)
+    internal void Emit(DataItem group, string name, CodeWriter w) => Emit(group, group, name, w);
+
+    /// <summary>Emit the record struct of <paramref name="group"/>, a subordinate (or the whole) of the published record
+    /// <paramref name="root"/>, whose DEPENDING ON items it places.</summary>
+    private void Emit(DataItem root, DataItem group, string name, CodeWriter w)
     {
         var scope = CsNameScope.RecordStruct();
         scope.Reserve([name]);   // a member never spells its enclosing type (CS0542)
@@ -72,8 +105,15 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             string word = DataItem.Sanitize(m.CobolName!);
             string prop = CsNames.Allocate(word, scope);
             HostType type = HostSurface.TypeOf(m);
-            members.Add(new Member(m, prop, type, type.Kind is HostTypeKind.Group ? CsNames.Allocate($"{word}_Record", scope) : null));
+            members.Add(new Member(m, prop, type, type.Kind is HostTypeKind.Group ? CsNames.Allocate($"{word}_Record", scope) : null,
+                DependingInRecord(root, m)));
         }
+        // A DEPENDING ON item this struct presents, with the fewest occurrences of the table it counts: the constructor
+        // gives it that count, so `new R()` is a whole record whose table has its minimum number of entries.
+        var counts = new Dictionary<DataItem, int>(ReferenceEqualityComparer.Instance);
+        foreach (var t in DataItem.DescendantsOf(root))
+            if (DependingInRecord(root, t) is { } dep)
+                counts[dep] = Math.Max(counts.GetValueOrDefault(dep), t.OccursSpec!.Min);
         int width = Width(group);
         w.Line($"/// <summary>{group.Level:00} {group.CobolName ?? "FILLER"} — the published record of the description (ISO "
             + "§14.2.3 13), DESIGN-external-repository §4.3): one property per named subordinate, landed exactly into the "
@@ -85,7 +125,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             w.Line($"/// <summary>A record whose text members are empty (spaces in the image), whose numbers are zero and "
                 + "whose tables have their declared occurrences.</summary>");
             using (w.Block($"public {name}()"))
-                foreach (var m in members) EmitInitial(m, w);
+                foreach (var m in members) EmitInitial(m, counts, w);
             foreach (var m in members)
             {
                 w.Line($"/// <summary>{m.Item.Level:00} {m.Item.CobolName}{(m.Occurs > 0 ? $" OCCURS {m.Occurs}" : "")}.</summary>");
@@ -110,20 +150,20 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
                 w.Line("return new string(__b);");
             }
             using (w.Block("internal readonly void __Put(char[] __b, int __at, string __parameter, string __path)"))
-                foreach (var m in members) EmitPut(group, m, w);
+                foreach (var m in members) EmitPut(root, group, m, w);
             using (w.Block($"internal static bool __TryGet(string __s, int __at, string __name, ref global::System.FormatException? __bad, out {name} __r)"))
             {
                 w.Line($"__r = new {name}();");
                 if (!BitLayout.IsBitItem(group))
                     w.Line($"__r.__image = __s.Substring(__at / 8, {width});");
                 w.Line("bool __ok = true;");
-                foreach (var m in members) EmitGet(group, m, w);
+                foreach (var m in members) EmitGet(root, group, m, w);
                 w.Line("return __ok;");
             }
             foreach (var m in members.Where(m => m.Record is not null))
             {
                 w.Line();
-                Emit(m.Item, m.Record!, w);
+                Emit(root, m.Item, m.Record!, w);
             }
         }
     }
@@ -137,15 +177,21 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         _ => $"new string(' ', {width})",
     };
 
-    private static void EmitInitial(Member m, CodeWriter w)
+    /// <summary>One member's initial value in the parameterless constructor; <paramref name="counts"/> gives each DEPENDING
+    /// ON item the record holds the count its table starts with (its fewest occurrences), and that table as many
+    /// entries.</summary>
+    private static void EmitInitial(Member m, IReadOnlyDictionary<DataItem, int> counts, CodeWriter w)
     {
         bool text = m.Type.Kind is HostTypeKind.Text;
         if (m.Occurs > 0)
         {
-            w.Line($"{m.Name} = new {m.Element}[{m.Occurs}];");
+            int n = m.Depending is { } dep ? counts[dep] : m.Occurs;
+            w.Line($"{m.Name} = new {m.Element}[{n}];");
             if (text) w.Line($"global::System.Array.Fill({m.Name}, \"\");");
-            if (m.Record is not null) w.Line($"for (int __i = 0; __i < {m.Occurs}; __i++) {m.Name}[__i] = new();");
+            if (m.Record is not null) w.Line($"for (int __i = 0; __i < {n}; __i++) {m.Name}[__i] = new();");
         }
+        else if (counts.TryGetValue(m.Item, out int count) && count > 0 && m.Type.Kind is HostTypeKind.Integer)
+            w.Line($"{m.Name} = ({m.Type.CsType}){count};");
         else if (text) w.Line($"{m.Name} = \"\";");
         else if (m.Record is not null) w.Line($"{m.Name} = new();");
     }
@@ -162,7 +208,21 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         return $"__at + {rel}{(occurrence ? $" + __i * {BitLayout.StrideBits(m.Item)}" : "")}";
     }
 
-    private void EmitPut(DataItem group, Member m, CodeWriter w)
+    /// <summary>The character image of a DEPENDING ON item the record holds, read from <paramref name="source"/> — the
+    /// landing's buffer <c>__b</c> (<paramref name="buffer"/>) or the decode's image <c>__s</c> — at its place relative to
+    /// the start of <paramref name="group"/>'s struct (<c>__at</c>).</summary>
+    private static string DependingImage(DataItem root, DataItem group, DataItem dep, string source, bool buffer)
+    {
+        string bytes = $"(__at + {RelativeBits(root, dep) - RelativeBits(root, group)}) / 8";
+        return Characters(dep, buffer ? $"new string({source}, {bytes}, {dep.ByteWidth})" : $"{source}.Substring({bytes}, {dep.ByteWidth})");
+    }
+
+    /// <summary>An elementary item's characters as its host decode reads them from <paramref name="storage"/>, the item's
+    /// own storage characters: a national item's character positions (its UTF-16BE pairs), every other item's storage.</summary>
+    private static string Characters(DataItem leaf, string storage) =>
+        NationalWindow.PositionsOf(leaf) is { } positions ? RuntimeApi.NatReadWindow(storage, "0", $"{positions}") : storage;
+
+    private void EmitPut(DataItem root, DataItem group, Member m, CodeWriter w)
     {
         string path = $"__path + {CsLiteral(m.Name)}";
         if (m.Occurs == 0)
@@ -174,10 +234,16 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         }
         using (w.Block(""))
         {
-            w.Line($"var __a = HostLanding.RequireOccurrences({m.Name}, {m.Occurs}, {m.Occurs}, {m.Occurs}, __parameter, {path});");
+            // A table's array has its occurrences: the DEPENDING ON item's landed value for a count the record holds
+            // (ISO §13.18.38.4 7)), the declared count otherwise.
+            string count = m.Depending is { } dep
+                ? $"HostLanding.LandedOccurrences({DependingImage(root, group, dep, "__b", buffer: true)}, {profileOf(dep)}, "
+                    + $"{m.Minimum}, {m.Occurs}, __parameter, {path}, {CsLiteral(dep.CobolName!)})"
+                : $"{m.Occurs}";
+            w.Line($"var __a = HostLanding.RequireOccurrences({m.Name}, {count}, {m.Minimum}, {m.Occurs}, __parameter, {path});");
             string at = Position(group, m, true);
             string each = $"{path} + \"[\" + __i + \"]\"";
-            w.Line($"for (int __i = 0; __i < {m.Occurs}; __i++) "
+            w.Line($"for (int __i = 0; __i < __a.Length; __i++) "
                 + (m.Record is not null
                     ? $"__a[__i].__Put(__b, {at}, __parameter, {each} + \".\");"
                     : PutLeaf(m.Item, m.Type, "__a[__i]", at, each)));
@@ -218,7 +284,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         }
     }
 
-    private void EmitGet(DataItem group, Member m, CodeWriter w)
+    private void EmitGet(DataItem root, DataItem group, Member m, CodeWriter w)
     {
         string name = $"__name + {CsLiteral(m.Name)}";
         if (m.Occurs == 0)
@@ -226,8 +292,17 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             w.Line(GetMember(m, $"__r.{m.Name}", Position(group, m, false), name));
             return;
         }
-        w.Line($"for (int __i = 0; __i < {m.Occurs}; __i++) "
-            + GetMember(m, $"__r.{m.Name}[__i]", Position(group, m, true), $"{name} + \"[\" + __i + \"]\""));
+        string each = GetMember(m, $"__r.{m.Name}[__i]", Position(group, m, true), $"{name} + \"[\" + __i + \"]\"");
+        if (m.Depending is not { } dep)
+        {
+            w.Line($"for (int __i = 0; __i < {m.Occurs}; __i++) {each}");
+            return;
+        }
+        // The table's current occurrences are the DEPENDING ON item's content, decoded by the validity rule and within
+        // the table's bounds (ISO §13.18.38.4 7)); the occurrences past them are undefined there and are not decoded.
+        w.Line($"{{ if (HostLanding.TryOccurrences({DependingImage(root, group, dep, "__s", buffer: false)}, {profileOf(dep)}, "
+            + $"{m.Minimum}, {m.Occurs}, {name}, {CsLiteral(dep.CobolName!)}, ref __bad, out int __n)) "
+            + $"{{ __r.{m.Name} = new {m.Element}[__n]; for (int __i = 0; __i < __n; __i++) {each} }} else __ok = false; }}");
     }
 
     private string GetMember(Member m, string target, string at, string name) =>
@@ -241,9 +316,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
     {
         PicInfo pic = leaf.Pic!;
         string bytes = $"({at}) / 8";
-        string chars = NationalWindow.PositionsOf(leaf) is { } positions
-            ? RuntimeApi.NatReadWindow("__s", bytes, $"{positions}")
-            : $"__s.Substring({bytes}, {leaf.ByteWidth})";
+        string chars = Characters(leaf, $"__s.Substring({bytes}, {leaf.ByteWidth})");
         return type.Kind switch
         {
             HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec =>

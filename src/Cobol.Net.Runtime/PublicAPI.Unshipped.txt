@@ -135,9 +135,11 @@ static CobolNet.Runtime.HostLanding.Land(System.Int128 value, in CobolNet.Runtim
 static CobolNet.Runtime.HostLanding.Land(System.UInt128 value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
 static CobolNet.Runtime.HostLanding.Land(decimal value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
 static CobolNet.Runtime.HostLanding.Land(long value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
+static CobolNet.Runtime.HostLanding.LandedOccurrences(string! image, in CobolNet.Runtime.NumProfile depending, int minimum, int maximum, string! parameter, string! member, string! dependingName) -> int
 static CobolNet.Runtime.HostLanding.LandText(string? value, int positions, bool justified, bool boolean, string! parameter, string? member) -> string!
 static CobolNet.Runtime.HostLanding.LandVariable(string? value, int maximum, bool boolean, string! parameter, string? member) -> string!
 static CobolNet.Runtime.HostLanding.RequireOccurrences<T>(T[]? array, long occurrences, int minimum, int maximum, string! parameter, string! member) -> T[]!
 static CobolNet.Runtime.HostLanding.SharesStorage(bool sameVariable, bool sameDescription, string! first, string! second) -> bool
+static CobolNet.Runtime.HostLanding.TryOccurrences(string! image, in CobolNet.Runtime.NumProfile depending, int minimum, int maximum, string! member, string! dependingName, ref System.FormatException? failure, out int occurrences) -> bool
 static CobolNet.Runtime.HostLanding.TryDecode(string? image, in CobolNet.Runtime.NumProfile item, string! name, ref System.FormatException? failure, out System.Int128 unscaled) -> bool
 static CobolNet.Runtime.HostLanding.TryDec(System.UInt128 unscaled, int scale, string! name, ref System.FormatException? failure, out CobolNet.Runtime.CobolDec value) -> bool

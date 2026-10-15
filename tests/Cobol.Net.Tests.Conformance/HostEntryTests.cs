@@ -396,6 +396,114 @@ public sealed class HostEntryTests
         finally { CutRunner.TryDelete(dir); }
     }
 
+    /// <summary>Programs whose group formals hold OCCURS DEPENDING ON tables: one counted by an item of the record (in a
+    /// subordinate group, so another record struct presents it), one counted by an item outside the record, and one
+    /// whose count the activated program sets past the table's bounds.</summary>
+    private const string OdoPrograms = """
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H3ODO.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-HREC.
+           05 LK-HDR.
+              10 LK-CNT PIC 9(2).
+           05 LK-NAME PIC X(3).
+           05 LK-ITEM OCCURS 1 TO 4 DEPENDING ON LK-CNT.
+              10 LK-CODE PIC X(2).
+              10 LK-QTY PIC 9(3).
+        01 LK-N PIC 9.
+        01 LK-EXT.
+           05 LK-E PIC X(2) OCCURS 0 TO 3 DEPENDING ON LK-N.
+        PROCEDURE DIVISION USING LK-HREC LK-N LK-EXT.
+        P1.
+            DISPLAY "ODO " LK-CNT " " LK-CODE(1) LK-QTY(1) " " LK-CODE(LK-CNT) LK-QTY(LK-CNT)
+            ADD 1 TO LK-CNT
+            MOVE "NW" TO LK-CODE(LK-CNT)
+            MOVE 7 TO LK-QTY(LK-CNT)
+            MOVE "Z" TO LK-NAME
+            DISPLAY "EXT " LK-N " [" LK-EXT "]"
+            MOVE "QQ" TO LK-E(1)
+            GOBACK.
+        END PROGRAM H3ODO.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H3BIG.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-B.
+           05 LK-BC PIC 9.
+           05 LK-BT PIC X OCCURS 0 TO 2 DEPENDING ON LK-BC.
+        PROCEDURE DIVISION USING LK-B.
+        P1.
+            MOVE 9 TO LK-BC
+            GOBACK.
+        END PROGRAM H3BIG.
+        """;
+
+    private const string OdoHost = """
+        using System;
+        using Cobol.H3PROGS;
+
+        public static class H3HostProgram
+        {
+            public static int Main()
+            {
+                var h = new H3ODO.LK_HREC_Record();
+                Console.WriteLine($"NEW {h.LK_HDR.LK_CNT} {h.LK_ITEM.Length} {new H3ODO.LK_EXT_Record().LK_E.Length}");
+                h.LK_HDR = h.LK_HDR with { LK_CNT = 2 };
+                h.LK_ITEM = [new() { LK_CODE = "AA", LK_QTY = 1 }, new() { LK_CODE = "BB", LK_QTY = 2 }];
+                h.LK_NAME = "ABC";
+                long n = 2;
+                var e = new H3ODO.LK_EXT_Record();
+                e.LK_E[0] = "X1";
+                e.LK_E[1] = "X2";
+                H3ODO.Call(ref h, ref n, ref e);
+                Console.WriteLine($"OUT {h.LK_HDR.LK_CNT} {h.LK_ITEM.Length} {h.LK_ITEM[2].LK_CODE}{h.LK_ITEM[2].LK_QTY} [{h.LK_NAME}] [{string.Join(",", e.LK_E)}]");
+                try { var bad = h with { LK_ITEM = new H3ODO.LK_HREC_Record.LK_ITEM_Record[2] }; H3ODO.Call(ref bad, ref n, ref e); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentException x) { Console.WriteLine($"OCC {x.ParamName} {x.Message.Contains("has 3 entries")}"); }
+                try { var bad = h with { LK_HDR = h.LK_HDR with { LK_CNT = 5 } }; H3ODO.Call(ref bad, ref n, ref e); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentException x) { Console.WriteLine($"BOUNDS {x.ParamName} {x.Message.Contains("1 to 4")}"); }
+                string image = h.AsImage();
+                var back = H3ODO.LK_HREC_Record.FromImage(image);
+                Console.WriteLine($"RT {back.AsImage() == image} {back.LK_ITEM.Length} {image.Length}");
+
+                var b = new H3BIG.LK_B_Record();
+                try { H3BIG.Call(ref b); Console.WriteLine("DECODED"); }
+                catch (FormatException x) { Console.WriteLine($"ODOBAD {b.LK_BC} {b.LK_BT.Length} {x.Message.Contains("'LK_B.LK_BT'")}"); }
+                return 0;
+            }
+        }
+        """;
+
+    /// <summary>A host passes groups holding OCCURS DEPENDING ON tables (DESIGN-external-repository §4.3): a table counted
+    /// by an item of the record is an array of the DEPENDING ON value's entries, "the current number of occurrences"
+    /// (ISO §13.18.38.4 7), cite.py OK), so an array of another length, or a count outside the table's bounds, is refused
+    /// before anything is activated, and the write-back decodes as many entries as the activated program's count says;
+    /// a table counted by an item outside the record is its whole area; a count the activated program left outside the
+    /// bounds leaves the host's variable unchanged.</summary>
+    [Fact]
+    public void AHost_PassesOccursDependingTables_AsArraysOfTheirCurrentOccurrences()
+    {
+        string dir = CutRunner.NewTempDir("h3host");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "H3PROGS", OdoPrograms);
+            NonCobolElement.CompileCSharp(dir, "H3HOST", OdoHost, "H3PROGS", "H3PROGS");
+            var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "H3HOST.dll"), dir);
+            Assert.Equal(
+                "NEW 1 1 3\n" +
+                "ODO 02 AA001 BB002\n" +
+                "EXT 2 [X1X2]\n" +
+                "OUT 3 3 NW7 [Z  ] [QQ,X2,  ]\n" +
+                "OCC LK_HREC True\n" +
+                "BOUNDS LK_HREC True\n" +
+                "RT True 3 25\n" +
+                "ODOBAD 0 0 True", stdout);
+            Assert.Equal(0, exit);
+            Assert.Equal("", stderr);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
+
     [Fact]
     public void AHost_CallsTheGeneratedEntries_LandingExactlyAndDecodingByTheValidityRule()
     {

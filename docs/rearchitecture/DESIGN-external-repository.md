@@ -552,7 +552,7 @@ emitter (this slice) and the decoder (slice 4) hold the same input and nothing i
 | POINTER / PROGRAM-POINTER / FUNCTION-POINTER | `ManagedPointer` / `ProgramPointer` / `FunctionPointer` |
 | OBJECT REFERENCE | the referenced class's or interface's public CLR type; `CobolObject` when universal |
 | message-tag (§14.2.2 SR2 admits it BY VALUE) | none: the A.4 message-control facility is not provided and the DATA DIVISION refuses a message-tag item (`docs/CONFORMANCE.md` §4), so no formal has that class |
-| fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`), the DEPENDING ON value as the array's length for OCCURS DEPENDING ON; a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
+| fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`); for OCCURS DEPENDING ON whose data-name-1 is in the record (§13.18.38.3 20) places it before the table), the array's length is the DEPENDING ON value, "the current number of occurrences" (§13.18.38.4 7)), and for one whose data-name-1 is outside the record the array is the table's whole area, every occurrence the storage holds (§8.5.1.8); a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
 | strongly-typed group with an object-reference or pointer leaf | the published record struct with those members; packed as the CALL lane's carrier for that shape (PB2087's cell area with managed slots) |
 
 The published record struct is rendered from the DESCRIPTION by `PublishedRecordEmitter` (corrected 2026-10-15, kb/Work
@@ -1822,10 +1822,11 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    validity fixtures, and `HostSurface.TypeOf(DataItem)` in the binder's model, pinned by `HostSurfaceTests`; and
    `HostEntryEmitter` emits `Call` and `Cancel` for every outermost unit, witnessed by the host harness `HostEntryTests`
    and pinned by `HostEntryShapeDriftTests`; a GROUP formal or RETURNING item is its published record struct
-   (`PublishedRecordEmitter`, §4.3) for every fixed group whose members the record image holds, and a unit with a group
-   holding a pointer or object leaf, a dynamic-length item, a dynamic-capacity table or an OCCURS DEPENDING ON table —
-   the CALL lane's cell-area and variable-length carriers — publishes no entry until the next step renders those
-   shapes (`PublishedRecordEmitter.Renders`). Settled
+   (`PublishedRecordEmitter`, §4.3) for every group whose members the record image holds, an OCCURS DEPENDING ON table
+   included (an array of the DEPENDING ON value's entries, `HostLanding.LandedOccurrences`/`TryOccurrences`, witnessed by
+   `HostEntryTests`' OCCURS DEPENDING Fact), and a unit with a group holding a pointer or object leaf, a dynamic-length
+   item or a dynamic-capacity table — the CALL lane's cell-area and variable-length carriers — publishes no entry until
+   the next step renders those shapes (`PublishedRecordEmitter.Renders`). Settled
    2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
    binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,

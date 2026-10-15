@@ -186,6 +186,50 @@ public static class HostLanding
         return array;
     }
 
+    /// <summary>The current number of occurrences of an OCCURS DEPENDING ON table in a record a host is landing: "The value
+    /// of the data item referenced by data-name-1 represents the current number of occurrences of the subject of the
+    /// entry" (ISO §13.18.38.4 7)), so it is the DEPENDING item's content in the record image — <paramref name="image"/>,
+    /// the item's own character image, already landed — decoded by the validity rule, and it "shall fall within the
+    /// bounds from integer-1 through integer-2" (the same rule). The caller then requires the table's array to have that
+    /// many entries (<see cref="RequireOccurrences{T}"/>).</summary>
+    /// <exception cref="ArgumentException">The DEPENDING item's content is not a valid representation of its description
+    /// (it is no member the host lands: FILLER, or a REDEFINES view), or its value lies outside the table's bounds.</exception>
+    public static int LandedOccurrences(string image, in NumProfile depending, int minimum, int maximum, string parameter,
+        string member, string dependingName)
+    {
+        FormatException? bad = null;
+        if (!TryOccurrences(image, depending, minimum, maximum, member, dependingName, ref bad, out int occurrences))
+            throw new ArgumentException(bad!.Message, parameter, bad);
+        return occurrences;
+    }
+
+    /// <summary>The current number of occurrences of an OCCURS DEPENDING ON table in a record image being decoded (ISO
+    /// §13.18.38.4 7)): the DEPENDING item's content (<paramref name="image"/>) decoded by the validity rule
+    /// (<see cref="TryDecode"/>) and within the table's bounds. Otherwise the record holds no table a .NET array can
+    /// present — a reference to it in COBOL would set EC-BOUND-ODO — so the method returns false, the first such
+    /// refusal is kept in <paramref name="failure"/>, and the record is not decoded.</summary>
+    public static bool TryOccurrences(string image, in NumProfile depending, int minimum, int maximum, string member,
+        string dependingName, ref FormatException? failure, out int occurrences)
+    {
+        occurrences = 0;
+        if (!TryDecode(image, depending, dependingName, ref failure, out Int128 unscaled))
+            return false;
+        // Data-name-1 describes an integer (§13.18.38.3 17)); its P positions, if any, scale it up, and the scaling stops
+        // once the value is past the bounds, so no product overflows.
+        Int128 value = unscaled;
+        for (int p = -depending.FractionScale; p > 0 && Int128.Abs(value) <= maximum; p--)
+            value *= 10;
+        if (value < minimum || value > maximum)
+        {
+            failure ??= new FormatException($"'{member}' is a table of {minimum} to {maximum} entries, and its DEPENDING ON "
+                + $"item '{dependingName}' holds {value}, outside those bounds (ISO §13.18.38.4 7)), so it was not decoded "
+                + "and its .NET variable is unchanged (DESIGN-external-repository §4.3).");
+            return false;
+        }
+        occurrences = (int)value;
+        return true;
+    }
+
     /// <summary>Require a record image a host hands a published record's <c>FromImage</c> to be the record's whole
     /// storage, <paramref name="width"/> characters (one per byte, the group image every COBOL record image is); returns
     /// the image. A shorter or longer string is not an image of that description: padding or cutting it would invent or
