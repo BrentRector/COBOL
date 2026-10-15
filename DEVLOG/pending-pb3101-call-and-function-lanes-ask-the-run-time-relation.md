@@ -62,3 +62,24 @@ had their witnesses re-sited through two record_verdicts batches; GAP is unchang
 (run `20261014T222439Z-6cb31b`; Conformance 6,173/11,679, Unit 33,056/33,636, Characterization 6/36 in leg 1; every added
 golden, negative and drift test passed). LINUX GATE: the lander's (batched gating). PB3101 stays open. Still to do: GR8
 once (PB613), pair mode on `SameSignature`, the `DescriptionMismatch` deletions and `OneRelationDriftTests`.
+
+**Wave 1079 (the GR8 reduction written once; PB613 landed).** Waves 1077-1078's six commits were cherry-picked onto
+`de8cf80db` and re-gated GREEN first (run `20261015T002536Z-f59672`). §14.9.4.4 GR8 and its INVOKE twin §14.9.23.4 GR4
+("An argument that consists merely of a single identifier or literal is regarded as an identifier or literal rather than
+an arithmetic or boolean expression") were reduced twice over the parse tree: `CallBinder.Gr8Classify` and an inline block
+in `OoBinder.OoBindInvocationArg`. They are now one reduction, `ConditionBinder.ReduceArgument`, asked by every CALL
+spelling and every INVOKE argument. Writing it once exposed a wrong answer. CALL dispatched a keyword-less argument on its
+parse node before reducing it, so in `CALL "S" AS NESTED USING N B1 B-AND B2` (N lands in a boolean node on the second
+argument's B-AND) the boolean arm passed N BY CONTENT and the callee's `MOVE 42 TO X` never reached it: measured
+`N=0001`, where GR8 with GR9 a) 1. requires BY REFERENCE (`N=0042`). INVOKE was already right. The keyword-less argument
+is now reduced once, before its shape is dispatched: a recovered identifier takes the identifier arm and GR9's mode, a
+recovered literal takes GR9's mode and is asked §14.9.4.3 SR23 when its formal is BY VALUE (it was not asked before), and
+a recovered numeric literal crosses as literal-2. New tests: the golden `conformance:2002/pb613_gr8_one_reduction` (CALL
+and INVOKE, BY REFERENCE, BY VALUE and BY CONTENT, and PB613's `USING 7 "AB" N` twin), the negative
+`pb613-bare-literal-by-value-formal` (SR23) and `ActivationConformanceDriftTests.TheArgumentReduction_IsWrittenOnce`.
+GR-14.9.4.4-8's code-location moved from the deleted `Gr8Classify` to `ReduceArgument` (batch
+`w1079a-pb613-gr8-one-reduction`, GAP 101 -> 101). PB3101's item 3 turned out to be a design question: a restricted
+prototype-pointer's description carries its signature-class identity, and `PrototypeSignatures` computes those classes,
+so a description-level `SameSignature` cannot be asked from inside that computation without a decision on how the
+identity is supplied. The note records the two shapes. PB3101 stays open for item 3, the remaining deletions and
+`OneRelationDriftTests`.

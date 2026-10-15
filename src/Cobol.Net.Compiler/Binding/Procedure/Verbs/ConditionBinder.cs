@@ -372,14 +372,59 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// (<c>IF A B-SHIFT-L 1 = B"1000"</c>) was taken for a bare operand and refused (kb/Work PB1412).</summary>
     private static bool HasBoolOp(Antlr4.Runtime.Tree.IParseTree t) => BooleanOperatorTokens.ContainsOperator(t);
 
+    /// <summary>One activation argument's operand after <see cref="ReduceArgument"/>: at most one of the shapes is the
+    /// operand's meaning, and the consumer reads them in its own order.</summary>
+    /// <param name="Literal">The <c>literal</c> alternative as written.</param>
+    /// <param name="NonNumericLiteral">The nonnumeric literal the operand consists of: the written one, or the one an
+    /// operator-free boolean node held.</param>
+    /// <param name="SoleNumericLiteral">The text of the numeric literal (sign included) the arithmetic operand consists
+    /// of, else null. <see cref="Arith"/> still carries the node, so a consumer that binds it as an expression keeps
+    /// it.</param>
+    /// <param name="Reference">The identifier the operand consists of: the written <c>dataReference</c>, or the sole one
+    /// of the arithmetic operand.</param>
+    /// <param name="Bool">A genuine boolean expression (one that carries a boolean operator), else null.</param>
+    /// <param name="Arith">The arithmetic operand, the one an operator-free boolean node held included.</param>
+    internal readonly record struct ArgumentOperand(
+        Core.LiteralContext? Literal, Core.NonNumericLiteralContext? NonNumericLiteral, string? SoleNumericLiteral,
+        Core.DataReferenceContext? Reference, Core.BooleanExpressionContext? Bool, Core.ArithmeticExpressionContext? Arith);
+
+    /// <summary>⛔ THE ONE PARSE-TREE REDUCTION OF AN ACTIVATION ARGUMENT, ISO §14.9.4.4 GR8 (CALL) and §14.9.23.4 GR4
+    /// (INVOKE), the same sentence: "An argument that consists merely of a single identifier or literal is regarded as
+    /// an identifier or literal rather than an arithmetic or boolean expression". Every CALL spelling (BY CONTENT, BY
+    /// VALUE, keyword-less) and every INVOKE argument asks it (kb/Work PB613, PB3101).
+    /// <para>The parse node an operand lands in is not its meaning. <c>arithmeticExpression</c> subsumes a
+    /// <c>dataReference</c> and every numeric literal, and the <c>{boolExprAhead()}?</c>-gated
+    /// <c>booleanExpression</c> subsumes both, its leaf being <c>valueOperand</c> (<c>arithmeticExpression |
+    /// nonNumericLiteral</c>). The predicate's scan runs to the statement's period, so in <c>USING BY CONTENT "AB"
+    /// BY CONTENT B1 B-AND B2</c> the first argument reaches the boolean node on the second one's operator. A boolean
+    /// node with no boolean operator therefore reduces to its bare <c>valueOperand</c> (<see cref="UnwrapBareBool"/>),
+    /// BOTH legs: the CALL copy once recovered only the arithmetic leg, and "AB" then bound as nothing (PB238).</para>
+    /// <para>It used to be written twice, <c>CallBinder.Gr8Classify</c> and an inline block in
+    /// <c>OoBinder.OoBindInvocationArg</c>, and only the INVOKE copy folded a sole numeric literal. Pure: it reads
+    /// parse contexts, resolves nothing and reports nothing. The BOUND-tree twin, a literal recovered from a bound
+    /// expression (<c>BY VALUE -1.5E-3</c> arrives as a negation), is <see cref="Gr8ArgumentLiteral"/>.</para></summary>
+    internal static ArgumentOperand ReduceArgument(Core.LiteralContext? literal, Core.DataReferenceContext? reference,
+        Core.BooleanExpressionContext? boolExpr, Core.ArithmeticExpressionContext? arith)
+    {
+        var nonNumeric = literal?.nonNumericLiteral();
+        if (boolExpr is not null && UnwrapBareBool(boolExpr) is { } bare)
+        {
+            boolExpr = null;
+            arith = bare.arithmeticExpression();
+            nonNumeric = bare.nonNumericLiteral();
+        }
+        string? soleNumeric = arith is not null ? SoleNumLiteral(arith) : null;
+        return new(literal, nonNumeric, soleNumeric, reference ?? SoleDataReference(arith), boolExpr, arith);
+    }
+
     /// <summary>The single leaf <c>valueOperand</c> of a B-op-FREE boolean expression (walking single-child
     /// tiers and paren groups), for re-binding as a normal operand; null if the shape is not a bare operand.</summary>
     /// <remarks>THE discriminator for every <c>{boolExprAhead()}?</c>-gated alternative, not just this one:
     /// the predicate's scan is condition-shaped and may fire on a B-operator that belongs elsewhere in the
     /// statement, so a parse tree reaching a boolean alternative is not proof of a boolean expression. A
     /// non-null result means "this operand carries NO boolean operator and is a bare operand" — reduce it and
-    /// bind it through the ordinary channel. Also read by <c>OoBinder</c>'s INVOKE BY CONTENT operand
-    /// normalization (fix-queue PB46).</remarks>
+    /// bind it through the ordinary channel. Every activation argument reaches it through
+    /// <see cref="ReduceArgument"/> (fix-queue PB46, kb/Work PB613).</remarks>
     internal static Core.ValueOperandContext? UnwrapBareBool(Core.BooleanExpressionContext ctx)
     {
         var xor = ctx.booleanXorTerm();

@@ -340,8 +340,10 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    `MethodConformanceMismatches` (override, implements, interface), the property accessor check,
    `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SameSignature`. There is NO
    `DataItem` comparator: `OoConformance.DescriptionMismatch`, `ContentMismatch`, `ContentValueMismatch`, the literal
-   arms, `CallBinder.Gr8Classify`, `OoBinder`'s GR8 block and `StrongTypeModel.SameElementaryLayout` are deleted with
-   PB3101 (CLAUDE.md rule 4: no shim survives). Drift: `ActivationConformanceDriftTests` (every activation lane asks
+   arms and `StrongTypeModel.SameElementaryLayout` are deleted with PB3101 (CLAUDE.md rule 4: no shim survives). The
+   PARSE-TREE half of §14.9.4.4 GR8 / §14.9.23.4 GR4 (which node an argument's identifier or literal landed in) is one
+   reduction too, `ConditionBinder.ReduceArgument`, asked by every CALL spelling and every INVOKE argument (kb/Work
+   PB613). Drift: `ActivationConformanceDriftTests` (every activation lane asks
    `CheckArgument`), `ActivationDescriptionFieldDriftTests` (every description field is read by a relation) and
    `OneRelationDriftTests` (a Roslyn walk: no member outside the builder reads two `DataItem`s' picture, usage, ANY
    LENGTH or category against each other). Measured before PB3101 (2026-10-12): a reference-modified argument BY
@@ -369,14 +371,17 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    (`MoveValidity.FigurativeRefusal`, the one copy the compiler's MOVE chain asks too; an ALL literal of boolean
    characters is `ActivationCategory.FigurativeBoolean`), and a MOVE refusal that names its rule (`MoveViolation`) —
    and the bind-time copy's one refusal the standard does not make is gone (a group argument BY CONTENT into a numeric
-   formal: §14.8.2.2 rule 2's MOVE admits it). Remaining for PB3101: the GR8 reduction written once (PB613: CallBinder.Gr8Classify
-   and OoBinder's inline block), pair mode on `SameSignature` with `GroupAtom` carrying each leaf's identity, the
+   formal: §14.8.2.2 rule 2's MOVE admits it). Wave 1079 wrote the GR8 reduction once (`ConditionBinder.ReduceArgument`,
+   PB613); reducing a keyword-less CALL argument before dispatching its shape fixed CALL's boolean arm, which passed an
+   identifier that reached a boolean node on a later argument's B-operator BY CONTENT where §14.9.4.4 GR9 a) 1. assumes
+   BY REFERENCE. Remaining for PB3101: pair mode on `SameSignature` with `GroupAtom` carrying each leaf's identity, the
    deletion of `DescriptionMismatch` / `AsIfElementaryGroupMismatch` / `CategoryArmMismatch` /
    `StrongTypeModel.SameElementaryLayout`, and `OneRelationDriftTests`.
    Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`, `conformance:2002/pb3101_content_one_relation`;
    negatives `pb3101-prototype-call-refmod-by-reference`, `pb3101-function-refmod-by-reference`,
    `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`,
-   `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`.
+   `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`; for the reduction,
+   `conformance:2002/pb613_gr8_one_reduction` and negative `pb613-bare-literal-by-value-formal`.
 
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
 

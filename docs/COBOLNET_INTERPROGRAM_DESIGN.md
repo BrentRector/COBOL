@@ -749,10 +749,13 @@ one spelling of one. Two grammar facts make it load-bearing and they are the sam
 `arithmeticExpression` subsumes `dataReference` and every numeric literal, and the `{boolExprAhead()}?`-gated
 `booleanExpression` alternative subsumes both of those in turn (its leaf is `valueOperand`, and the predicate's
 scan runs to the statement's period, so an earlier argument can land in a boolean node on a LATER argument's
-B-operator). `CallBinder.Gr8Classify` is therefore THE reduction, shared by the BY CONTENT arm, the BY VALUE
-arm and both keyword-less arms: it unwraps an operator-free boolean node to its bare `valueOperand` — **both**
-legs, `arithmeticExpression | nonNumericLiteral` — and recovers a sole `dataReference` from an expression node.
-Only the residue binds as an expression.
+B-operator). `ConditionBinder.ReduceArgument` is therefore THE reduction, shared by the BY CONTENT arm, the BY
+VALUE arm, the keyword-less argument (reduced ONCE, before its shape is dispatched) and every INVOKE argument
+(§14.9.23.4 GR4 is the same sentence; kb/Work PB613): it unwraps an operator-free boolean node to its bare
+`valueOperand` — **both** legs, `arithmeticExpression | nonNumericLiteral` — recovers a sole `dataReference` from an
+expression node and names a sole numeric literal. Only the residue binds as an expression. A keyword-less
+identifier or literal that reached the boolean node on a later argument's B-operator therefore takes GR9's mode
+like any other; the boolean arm used to pass such an identifier BY CONTENT.
 
 The MODE then comes from GR9, never from the copy-out: a keyword-less argument that meets §14.9.4.3 SR3 is
 identifier-2 and takes BY REFERENCE (9a1); one that does not — a literal, a constant-name (which §13.10.4 GR1

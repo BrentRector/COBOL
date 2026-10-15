@@ -172,6 +172,31 @@ public sealed class ActivationConformanceDriftTests
             + "checked by a private copy of §14.8.3.3 that the other activating statement does not share.");
     }
 
+    /// <summary>⛔ ISO §14.9.4.4 GR8 AND ITS INVOKE TWIN §14.9.23.4 GR4 ARE ONE PARSE-TREE REDUCTION (kb/Work PB613). "An
+    /// argument that consists merely of a single identifier or literal is regarded as an identifier or literal rather
+    /// than an arithmetic or boolean expression" was written twice: <c>CallBinder.Gr8Classify</c> and an inline block in
+    /// <c>OoBinder.OoBindInvocationArg</c>, which alone folded a sole numeric literal. The CALL copy once recovered only the
+    /// arithmetic leg of an operator-free boolean node (PB238), and CALL's keyword-less boolean arm passed the identifier
+    /// it recovered BY CONTENT where §14.9.4.4 GR9 a) 1. assumes BY REFERENCE. So <c>ConditionBinder.ReduceArgument</c> is
+    /// the one reduction, both activating binders ask it, and no other verb binder unwraps a boolean node to an argument
+    /// operand itself.</summary>
+    [Fact]
+    public void TheArgumentReduction_IsWrittenOnce()
+    {
+        foreach (string file in new[] { "CallBinder.cs", "OoBinder.cs" })
+            Assert.True(Verb(file).Contains("ConditionBinder.ReduceArgument(", System.StringComparison.Ordinal),
+                $"{file} no longer asks ConditionBinder.ReduceArgument — its arguments would be reduced by a private copy "
+                + "of §14.9.4.4 GR8 the other activating statement does not share (kb/Work PB613).");
+        var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f) != "ConditionBinder.cs")
+            .Where(f => Regex.IsMatch(CodeOf(f), @"\bUnwrapBareBool\s*\(|\bGr8Classify\b"))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "A verb binder reduces an argument's boolean node itself instead of asking ConditionBinder.ReduceArgument "
+            + "(kb/Work PB613): " + string.Join(", ", offenders));
+    }
+
     [Fact]
     public void NoOtherVerbBinder_ComparesAReturningItemItself()
     {
