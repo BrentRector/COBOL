@@ -333,16 +333,18 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
 
             // The §15.90/§15.91 date validators — integer verdict chains (year → month → day), scale 0.
             // ⛔ THE WIDE INTAKE, because the two functions are TOTAL (kb/Work PB254 — see IntArgWide):
-            // §15.90.3 r1 / §15.91.3 r1 constrain nothing but integer-ness and r1a is a CATCH-ALL.
+            // §15.90.3 r1 / §15.91.3 r1 constrain nothing but integer-ness and r1a is a CATCH-ALL — which is also
+            // why a binary64 past the Int128 carrier may be clamped here: the verdict past the window never varies.
             case "TestDateYyyymmdd" or "TestDayYyyyddd":
-                return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, IntArgWide(ic, 0)), 0);
+                return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, IntArgWideSaturating(ic, 0)), 0);
 
             case "FindString":                                                  // §15.37 FIND-STRING (2023) — 1-based position of argument-2 in argument-1
                 // Argument-3 also takes the WIDE intake: §15.37.3 r3 places no value constraint and
-                // §15.37.4 r2/r3 answer for every integer — ignore that many matches, else 0 (PB254).
+                // §15.37.4 r2/r3 answer for every integer — ignore that many matches, else 0 (PB254). Past every
+                // match the answer is 0 however large the count, so a binary64 past the carrier is clamped.
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod,
                     $"{Str(ic.Args[0])}, {Str(ic.Args[1])}, {(ic.FindLast ? "true" : "false")}, "
-                    + $"{(ic.Args.Count > 2 ? IntArgWide(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}{AnycaseClassification(ic)}"), 0);
+                    + $"{(ic.Args.Count > 2 ? IntArgWideSaturating(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}{AnycaseClassification(ic)}"), 0);
             case "Ord":                                                         // §15.70 — PCS-relative ordinal (H5: weights only when flagged)
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{Str(ic.Args[0])}{Collate(ic)}"), 0);
             case "Length" or "ByteLength" when ic.OverCurrentImage && ic.Args[0] is BoundFieldOperand { Place: { } vg }:
@@ -882,10 +884,17 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// digits to such a position — and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means: an integer when its
     /// value has no nonzero fraction digit, otherwise EC-ARGUMENT-FUNCTION with checking on and the TRUNCATED integer
     /// with it off. That is a property of the POSITION, so it is taken here, ONCE, before any arm or lane predicate
-    /// sees the operand: an exact carrier through the type-6 intake at the total width (<see cref="IntegerIntake"/>),
-    /// a binary64 one through <c>CobolIntrinsics.IntegerArgTotalReal</c>, which saturates past the Int128 carrier
-    /// instead of raising. Neither decides range: a bounded body narrows the integer again through
-    /// <see cref="IntArg"/> and keeps its own range raise.</para>
+    /// sees the operand, on every carrier through the ONE type-6 intake at the total width (<see cref="IntegerIntake"/>),
+    /// which keeps the operand's VALUE or says it cannot: every exact carrier's integer fits the <c>Int128</c> carrier
+    /// (an SDIDI holds 34 digits), and a binary64 one past it (±1.7e38) raises EC-ARGUMENT-FUNCTION as outside what
+    /// the implementation can represent (<c>CobolIntrinsics.IntegerArgWideReal</c>). A bounded body narrows the integer
+    /// again through <see cref="IntArg"/> and keeps its own range raise.</para>
+    /// <para>⛔ IT NEVER SATURATES (kb/Work PB651 review R1-2). Clamping a binary64 past the carrier to
+    /// <see cref="Int128.MaxValue"/> answers for a DIFFERENT integer, so every function whose value depends on its
+    /// argument's value answered silently wrong — MOD(1.0E39, 7) = 1 where the integer 10³⁹'s binary64 value answers
+    /// 5, ANNUITY(0, 1.0E39) = 1 / 1.7e38. The clamp is right only where the function's answer is CONSTANT past a
+    /// bound, and that is the arm's knowledge, not the position's: such an arm takes <see cref="IntArgWideSaturating"/>
+    /// instead.</para>
     /// <para>⛔ BEFORE THIS, THE ARMS EACH DECIDED, AND THREE DECIDED WRONG — measured by
     /// <c>IntrinsicIntegerPositionPermissiveDriftTests</c> over every verified type-6 position: MOD's scaled arm aligned
     /// 7.5 and answered MOD(7.5, 3) = 1.5 where the integer 7 answers 1; a float at COMBINED-DATETIME's argument-1
@@ -895,19 +904,41 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// call to the binary64 lane at all: <see cref="AnyRealArgument"/> reads this, so the lane is entered only through a
     /// type-10 (numeric) position, where §15.4.1's licence is an approximation of the equivalent arithmetic expression's
     /// own binary64 operand.</para>
-    /// </remarks>
-    /// <remarks>INTAKE(EXACT) — the operand on its OWN carrier at its OWN scale, nothing rescaled, converted or truncated —
+    /// <para>INTAKE(EXACT) — the operand on its OWN carrier at its OWN scale, nothing rescaled, converted or truncated —
     /// EXCEPT at a §15.3 type-6 position, where it is INTEGRAL: a float, an SDIDI or a fractional fixed-point operand
-    /// lands at scale 0 through the type-6 intake (an exact integer on any carrier passes as it stands), a float one
-    /// saturating past the Int128 carrier rather than raising.</remarks>
+    /// lands at scale 0 through the type-6 intake (an exact integer on any carrier passes as it stands), a float past
+    /// the Int128 carrier raising rather than changing its value.</para>
+    /// </remarks>
     private NumX RawArg(BoundIntrinsicCall ic, int i)
     {
         NumX x = num.AsNum(ic.Args[i], num.Receiver);
         if (!(x.Real || x.Dec || x.Scale != 0) || !IntrinsicArgumentRules.IsIntegerPosition(ic.Sig.Name, i)) return x;
-        // A binary64 operand saturates past the Int128 carrier rather than raising (IntegerArgTotalReal): this intake
-        // must not decide RANGE — a total body answers every integer, and a partial body's own narrowing still raises
-        // on the saturated value. The exact carriers take the shared wide intake, whose integrality test is the same.
-        return new NumX(x.Real ? RuntimeApi.IntegerArgTotalReal(x.Expr) : IntegerIntake(x, wide: true), 0);
+        return new NumX(IntegerIntake(x, wide: true), 0);
+    }
+
+    /// <summary>
+    /// ⛔ THE WIDE INTEGER INTAKE FOR AN ARGUMENT WHOSE FUNCTION ANSWERS THE SAME PAST A BOUND — the one place a binary64
+    /// operand past the <c>Int128</c> carrier is CLAMPED to the carrier's extreme of its sign
+    /// (<c>CobolIntrinsics.IntegerArgSaturatingReal</c>) instead of raising (kb/Work PB254, PB651 review R1-2).
+    /// </summary>
+    /// <remarks>
+    /// <para>The clamp substitutes one integer for another, so it is correct exactly where the returned value cannot tell
+    /// them apart. Members, each with its runtime witness in
+    /// <c>IntrinsicCarrierAgreementDriftTests.TheTotalArguments_AnswerPastLong_AndRaiseNothingUnderChecking</c>:
+    /// TEST-DATE-YYYYMMDD / TEST-DAY-YYYYDDD argument-1 (§15.90.4 r1a / §15.91.4 r1a — a CATCH-ALL verdict for every
+    /// integer outside the window, however far) and FIND-STRING argument-3 (§15.37.4 r2/r3 — ignoring at least as many
+    /// matches as exist answers 0, and a negative count ignores none). Both functions are TOTAL, so a raise there would be
+    /// manufactured (§15.3 has no incorrect argument to key on). A function whose value DEPENDS on the integer — MOD,
+    /// RANDOM's seed, ANNUITY's periods, BOOLEAN-OF-INTEGER's bit configuration — never takes it:
+    /// <c>IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates</c> holds the arm
+    /// set closed.</para>
+    /// <para>INTAKE(INTEGRAL) — the operand as an integer on the <c>Int128</c> carrier: an exact carrier through
+    /// <see cref="AsIntWide"/>, a binary64 one integrality-tested (DOC-A.1-124) and clamped past the carrier.</para>
+    /// </remarks>
+    private string IntArgWideSaturating(BoundIntrinsicCall ic, int i)
+    {
+        NumX x = num.AsNum(ic.Args[i], num.Receiver);
+        return x.Real ? RuntimeApi.IntegerArgSaturatingReal(x.Expr) : AsIntWide(x);
     }
 
     /// <summary>Every argument as its position takes it (<see cref="RawArg"/>), in order — what a lane predicate asks.</summary>

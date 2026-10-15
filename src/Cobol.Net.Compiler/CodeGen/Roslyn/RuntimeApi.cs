@@ -509,11 +509,11 @@ internal static class RuntimeApi
     public static string IntegerArg(string value) =>
         $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArg)}({value})";
 
-    /// <summary>The §15.3 type-6 POSITION intake of a binary64 operand (kb/Work PB651) — <c>CobolIntrinsics.IntegerArgTotalReal</c>:
-    /// its integer on the <c>Int128</c> carrier, saturated rather than raised past the carrier, so the body's own intake
-    /// still decides range (<c>IntrinsicRenderer.RawArg</c>).</summary>
-    public static string IntegerArgTotalReal(string value) =>
-        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgTotalReal)}({value})";
+    /// <summary>The CLAMPING binary64 intake of a total integer argument whose function answers the same past a bound —
+    /// <c>CobolIntrinsics.IntegerArgSaturatingReal</c>: its integer on the <c>Int128</c> carrier, clamped rather than
+    /// raised past the carrier. Only <c>IntrinsicRenderer.IntArgWideSaturating</c> may emit it (kb/Work PB254, PB651).</summary>
+    public static string IntegerArgSaturatingReal(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgSaturatingReal)}({value})";
 
     /// <summary>The §15.3 type-6 intake for a value on ONE of the operand carriers, keyed by carrier KIND — the ONE
     /// family of landings the renderer's bounded (<c>long</c>) and total (<c>Int128</c>) integer arguments share,

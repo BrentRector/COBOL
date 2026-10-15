@@ -299,42 +299,52 @@ public sealed class IntrinsicCarrierAgreementDriftTests
     /// <c>case "A" or "B":</c> and the expression form <c>"A" or "B" =&gt;</c>, with or without a
     /// <c>when</c> clause. Anchoring on the head (rather than on the intake call) is what lets the guard say
     /// WHICH function is mis-rendered.</summary>
+    /// <remarks>⛔ A HEAD STARTS ITS LINE. Unanchored, the pattern also matched the C# conditional
+    /// <c>{(ic.FindLast ? "true" : "false")}</c> inside FIND-STRING's arm as an arm named <c>true</c>, so the intake that
+    /// follows it was attributed to <c>true</c> and the FIND-STRING arm was never examined at all (found by the PB651
+    /// review finisher; <see cref="EveryTotalIntegerArgument_TakesTheWideIntake"/> now asserts which arms it examined).</remarks>
     private static readonly Regex ArmHead = new(
-        """(?:case\s+)?"(?<n>[A-Za-z][A-Za-z0-9]*)"(?<more>(?:\s+or\s+"[A-Za-z][A-Za-z0-9]*")*)\s*(?:when\b[^\n]*?)?(?::|=>)""",
-        RegexOptions.Compiled);
+        """^[ \t]*(?:case\s+)?"(?<n>[A-Za-z][A-Za-z0-9]*)"(?<more>(?:\s+or\s+"[A-Za-z][A-Za-z0-9]*")*)\s*(?:when\b[^\n]*?)?(?::|=>)""",
+        RegexOptions.Compiled | RegexOptions.Multiline);
 
     private static readonly Regex NarrowIntake = new(@"\b(?:IntArg|ArgInt)\(", RegexOptions.Compiled);
-    private static readonly Regex WideIntake = new(@"\b(?:IntArgWide|ArgIntWide)\(", RegexOptions.Compiled);
+    private static readonly Regex WideIntake = new(@"\b(?:IntArgWide|IntArgWideSaturating|ArgIntWide)\(", RegexOptions.Compiled);
 
-    /// <summary>The detector, shared by the guard and its self-test. Each arm chunk runs from its head to the
-    /// next head; an arm that renders no integer intake at all is not this rule's business.</summary>
-    private static List<string> IntakeWidthOffenders(string rendererSource, IReadOnlyDictionary<string, bool> wide)
+    /// <summary>The renderer's dispatch arms — every name an arm head carries, with the arm's text from its head to the
+    /// next head. Comments are stripped for the same reason the PB32 guard strips them: the remarks on IntArg and
+    /// AsIntWide NAME both helpers, so raw text would report the documentation as the defect.</summary>
+    private static IEnumerable<(string Name, string Arm)> Arms(string rendererSource)
     {
-        // Comments are stripped for the same reason the PB32 guard strips them: the remarks on IntArg and
-        // AsIntWide NAME both helpers, so raw text would report the documentation as the defect.
         string src = Regex.Replace(Regex.Replace(rendererSource, @"/\*.*?\*/", "", RegexOptions.Singleline), @"//[^\n]*", "");
         var heads = ArmHead.Matches(src).ToList();
-        var offenders = new List<string>();
         for (int k = 0; k < heads.Count; k++)
         {
             int end = k + 1 < heads.Count ? heads[k + 1].Index : src.Length;
             string arm = src[heads[k].Index..end];
+            yield return (heads[k].Groups["n"].Value, arm);
+            foreach (Match more in Regex.Matches(heads[k].Groups["more"].Value, "\"([A-Za-z][A-Za-z0-9]*)\""))
+                yield return (more.Groups[1].Value, arm);
+        }
+    }
+
+    /// <summary>The detector, shared by the guard and its self-test; an arm that renders no integer intake at all is
+    /// not this rule's business. <paramref name="examined"/> collects every paired arm it judged.</summary>
+    private static List<string> IntakeWidthOffenders(string rendererSource, IReadOnlyDictionary<string, bool> wide,
+        ICollection<string>? examined = null)
+    {
+        var offenders = new List<string>();
+        foreach (var (name, arm) in Arms(rendererSource))
+        {
             bool narrow = NarrowIntake.IsMatch(arm), broad = WideIntake.IsMatch(arm);
             if (!narrow && !broad) continue;                                // renders no integer argument
-            foreach (string name in Names(heads[k]))
-            {
-                if (!wide.TryGetValue(name, out bool wantWide)) continue;    // no unambiguous body to pair with
-                if (wantWide && (!broad || narrow))
-                    offenders.Add($"{name}: body declares Int128 (a TOTAL §15 integer argument) but the arm narrows");
-                else if (!wantWide && broad)
-                    offenders.Add($"{name}: body declares long (a BOUNDED argument) but the arm takes the wide intake");
-            }
+            if (!wide.TryGetValue(name, out bool wantWide)) continue;        // no unambiguous body to pair with
+            examined?.Add(name);
+            if (wantWide && (!broad || narrow))
+                offenders.Add($"{name}: body declares Int128 (a TOTAL §15 integer argument) but the arm narrows");
+            else if (!wantWide && broad)
+                offenders.Add($"{name}: body declares long (a BOUNDED argument) but the arm takes the wide intake");
         }
         return offenders;
-
-        static IEnumerable<string> Names(Match m) =>
-            [m.Groups["n"].Value, .. Regex.Matches(m.Groups["more"].Value, "\"([A-Za-z][A-Za-z0-9]*)\"")
-                                          .Select(x => x.Groups[1].Value)];
     }
 
     /// <summary>⛔ THE GUARD MUST FAIL ON THE DEFECT IT EXISTS FOR (feedback_green_gates_arent_evidence). Input
@@ -373,8 +383,13 @@ public sealed class IntrinsicCarrierAgreementDriftTests
         Assert.True(wide.GetValueOrDefault("Random"), "Random is not paired as a wide body");
         Assert.False(wide.GetValueOrDefault("Factorial", true), "Factorial is not paired as a narrow body");
 
+        var examined = new HashSet<string>(StringComparer.Ordinal);
         var offenders = IntakeWidthOffenders(
-            File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Emit", "IntrinsicRenderer.cs")), wide);
+            File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Emit", "IntrinsicRenderer.cs")), wide, examined);
+        // ... and the guard is worthless for an arm it never JUDGED: the four total arms must each have been examined
+        // (FIND-STRING's was not, while a mid-line "true" : "false" passed for an arm head).
+        foreach (string arm in new[] { "TestDateYyyymmdd", "TestDayYyyyddd", "FindString", "Random" })
+            Assert.True(examined.Contains(arm), $"the {arm} arm was not examined — the arm splitter lost it");
 
         Assert.True(offenders.Count == 0,
             "A renderer arm's integer intake disagrees with the runtime body's declared carrier (kb/Work PB254). "
@@ -382,6 +397,44 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             + "on the VALUE, so §15.3 has no incorrect argument to raise on and the arm must use IntArgWide / "
             + "ArgIntWide; long means the argument rules bound it, so the arm must use IntArg / ArgInt and keep "
             + "the §15.3 landing. Offenders: " + string.Join("; ", offenders));
+    }
+
+    /// <summary>
+    /// ⛔ ONLY AN ARGUMENT WHOSE FUNCTION ANSWERS THE SAME PAST A BOUND MAY CLAMP A BINARY64 PAST THE <c>Int128</c> CARRIER
+    /// (kb/Work PB651 review R1-2). The clamp answers for a DIFFERENT integer: when the type-6 position intake clamped
+    /// every float, <c>FUNCTION MOD(F 7)</c> over a COMP-2 holding 1.0E39 answered 1 (the remainder of
+    /// <see cref="Int128.MaxValue"/>) where the operand's integer answers 5, with no exception condition. The members
+    /// are exactly the arms whose runtime witness
+    /// (<see cref="TheTotalArguments_AnswerPastLong_AndRaiseNothingUnderChecking"/>) proves the clamped extremes answer
+    /// as every integer past the bound does; a new arm joins only with such a witness, and the RawArg intake itself
+    /// must never clamp.
+    /// </summary>
+    [Fact]
+    public void OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates()
+    {
+        string raw = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "Emit", "IntrinsicRenderer.cs"));
+        // A CALL passes the bound call (`ic`); the member's own declaration does not, so it is never counted as an arm's.
+        var clamping = new SortedSet<string>(
+            Arms(raw).Where(a => a.Arm.Contains("IntArgWideSaturating(ic", StringComparison.Ordinal)).Select(a => a.Name),
+            StringComparer.Ordinal);
+        Assert.Equal(new[] { "FindString", "TestDateYyyymmdd", "TestDayYyyyddd" }, clamping);
+
+        // The clamping runtime intake is emitted from ONE renderer member, and the type-6 position intake is not it.
+        string src = Regex.Replace(Regex.Replace(raw, @"/\*.*?\*/", "", RegexOptions.Singleline), @"//[^\n]*", "");
+        Assert.Single(Regex.Matches(src, @"RuntimeApi\.IntegerArgSaturatingReal\("));
+        var rawArg = Regex.Match(src, @"private NumX RawArg\(BoundIntrinsicCall ic, int i\)\s*\{(?<body>.*?)\n    \}",
+            RegexOptions.Singleline);
+        Assert.True(rawArg.Success, "IntrinsicRenderer.RawArg was not found — the guard is reading the wrong file");
+        Assert.DoesNotContain("Saturat", rawArg.Groups["body"].Value, StringComparison.Ordinal);
+
+        // ... and the intake every other type-6 operand takes keeps the value or raises: never a clamp.
+        UnderChecking(() =>
+        {
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgWideReal(1e39));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgWideReal(-1e39));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgWideReal(double.PositiveInfinity));
+        });
+        Assert.Equal((Int128)1e30, CobolIntrinsics.IntegerArgWideReal(1e30));   // inside the carrier: the exact integer
     }
 
     /// <summary>
@@ -465,16 +518,22 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             Assert.Equal(1, CobolDate.TestDayYyyyddd(past));                 // §15.91.4 r1a — > 9 999 999
             Assert.Equal(1, CobolDate.TestDateYyyymmdd(-past));              // r1a's LOWER half
             Assert.Equal(1, CobolDate.TestDayYyyyddd(-past));
-            // A binary64 argument reaches the ONE body through the type-6 position intake (kb/Work PB651), which
-            // saturates past the carrier rather than raising — once 0, "valid", on its own binary64 body (PB254).
-            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgTotalReal(1e19)));
-            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgTotalReal(1e19)));
-            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgTotalReal(1e40)));
-            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgTotalReal(double.PositiveInfinity)));
-            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgTotalReal(double.NegativeInfinity)));
+            // A binary64 argument reaches the ONE body through the clamping intake (IntrinsicRenderer.IntArgWideSaturating,
+            // kb/Work PB651), which clamps past the carrier rather than raising — once 0, "valid", on its own binary64
+            // body (PB254). These asserts are the witness that the clamp cannot change the answer for its members.
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgSaturatingReal(1e19)));
+            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgSaturatingReal(1e19)));
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgSaturatingReal(1e40)));
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgSaturatingReal(double.PositiveInfinity)));
+            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgSaturatingReal(double.NegativeInfinity)));
             // §15.37.4 r3 — argument-3 ignores every match, so none is left and the answer is 0, not a position.
             Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", false, past, false));
             Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", true, past, false));
+            // ... and the clamped extremes answer as every count past the matches (0) and every negative count (the
+            // first match) does.
+            Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", false, CobolIntrinsics.IntegerArgSaturatingReal(1e39), false));
+            Assert.Equal(1, CobolIntrinsics.FindString("abcabc", "abc", false, CobolIntrinsics.IntegerArgSaturatingReal(-1e39), false));
+            Assert.Equal(1, CobolIntrinsics.FindString("abcabc", "abc", false, -1, false));
         });
         // The in-window verdicts are unchanged by the widening (the r1a guard makes the int narrowing exact).
         Assert.Equal(0, CobolDate.TestDateYyyymmdd(20240229));

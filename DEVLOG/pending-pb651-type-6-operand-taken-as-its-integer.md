@@ -21,9 +21,16 @@ float subscript, reference-modifier bound and `CALL … BY VALUE` argument all a
 **The fix.** `IntrinsicRenderer.RawArg` is now the one indexed argument entry. `Arg`, `Dbl`, `DecArg`, `IntArg`,
 `LeadArg` and the lane predicates (through `Operands`) all read it. At a verified type-6 position
 (`IntrinsicArgumentRules.IsIntegerPosition`), it lands a float, SDIDI or fractional fixed-point operand at scale 0
-through the type-6 intake. A float goes through the new `CobolIntrinsics.IntegerArgTotalReal`, which saturates past
-Int128 rather than raising, so the body's own intake still decides range. That extends PB254's total-argument
-determination to every position.
+through the shared wide type-6 intake, which keeps the value or raises. A float past Int128 (±1.7e38) raises
+EC-ARGUMENT-FUNCTION. The first cut clamped it to the carrier's extreme instead, and the branch review measured what
+that did: `MOD(1.0E39, 7)` answered 1, the remainder of 2^127 − 1, where the operand's integer answers 5, and
+`ANNUITY(0, 1.0E39)` answered 1/1.7e38, both silently. A clamp is right only where the function answers the same for
+every integer past a bound: TEST-DATE-YYYYMMDD and TEST-DAY-YYYYDDD argument-1 (the r1a catch-all) and FIND-STRING
+argument-3 (0 once every match is ignored). Those arms alone take `IntArgWideSaturating`, and
+`IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates` keeps the set closed.
+The same review fix found that the intake-width guard's arm splitter took FIND-STRING's `"true" : "false"`
+conditional for an arm head, so FIND-STRING's arm had never been examined. Heads are now anchored at the start of a
+line, and the guard asserts which arms it judged.
 
 An integer has no binary64-ness, so a float at a type-6 position no longer enters the binary64 lane. The following
 code became unreachable and was deleted:

@@ -826,11 +826,14 @@ type 6 admits "an integer data item or an always-integral arithmetic expression"
 neither), so it arrives only under `--permissive`, and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means:
 the integer it holds, or the truncated integer with EC-ARGUMENT-FUNCTION checking off. That is a property of the
 POSITION, so `IntrinsicRenderer.RawArg` — the one indexed argument entry every intake and lane predicate reads —
-takes it there, before a lane is chosen: a float through `CobolIntrinsics.IntegerArgTotalReal`, which saturates a
-magnitude past `Int128` (±∞ included) to the corresponding extreme rather than raising (verdict-preserving for a
-total body, whose catch-all arm depends on being outside the window and not on how far; a partial body's own
-bounded intake still raises on the saturated value), and an SDIDI or a fractional fixed-point operand through the
-shared wide intake. An integer has no binary64-ness, so a float at a type-6 position never moves a call to the
+takes it there, before a lane is chosen, on every carrier through the shared wide intake, which keeps the VALUE or
+says it cannot: every exact carrier's integer fits `Int128`, and a float past it (±1.7e38, ±∞ included) raises
+EC-ARGUMENT-FUNCTION through `CobolIntrinsics.IntegerArgWideReal`. ⛔ The position intake never CLAMPS: a clamp
+answers for a different integer, so `MOD(1.0E39, 7)` answered 1 where the operand's integer answers 5 (PB651 review
+R1-2). Clamping is right only where the function answers the same for every integer past a bound — TEST-DATE-YYYYMMDD
+/ TEST-DAY-YYYYDDD argument-1 (the r1a catch-all) and FIND-STRING argument-3 (0 once every match is ignored) — and
+those arms alone take `IntrinsicRenderer.IntArgWideSaturating` (`CobolIntrinsics.IntegerArgSaturatingReal`);
+`IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates` keeps the set closed. An integer has no binary64-ness, so a float at a type-6 position never moves a call to the
 binary64 lane: the integer-only functions (MOD, FACTORIAL, the date family, the TEST- validators, the windowing
 trio) have no `…Real` body, and `IntrinsicRealArgDriftTests.NoRealBody_ServesAFunctionWhoseEveryPositionIsType6`
 keeps it so. A mixed row keeps its twin for its type-10 position (`CombinedDatetimeReal`, reached by a float

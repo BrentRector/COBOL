@@ -265,23 +265,25 @@ public static partial class CobolIntrinsics
     }
 
     /// <summary>
-    /// ⛔ THE §15.3 TYPE-6 POSITION INTAKE OF A BINARY64 OPERAND — the integer it holds, on the <c>Int128</c> carrier,
-    /// WITHOUT a range raise (kb/Work PB651). The renderer takes every type-6 operand's integer here before any lane is
-    /// chosen (<c>IntrinsicRenderer.RawArg</c>), and the body's own intake narrows it again afterwards, so this one
-    /// must not decide range for any of them: a PARTIAL body still raises through its own bounded intake on the
-    /// saturated value, and a TOTAL one — §15.90.3 r1 / §15.91.3 r1 / §15.37.3 r3 / §15.75.3 r2 constrain nothing but
-    /// integer-ness — answers its verdict for every integer, however large.
+    /// ⛔ THE CLAMPING BINARY64 INTAKE OF A TOTAL INTEGER ARGUMENT WHOSE FUNCTION ANSWERS THE SAME PAST A BOUND — the
+    /// integer the operand holds, on the <c>Int128</c> carrier, CLAMPED past it instead of raised (kb/Work PB254,
+    /// PB651). Its members are TEST-DATE-YYYYMMDD / TEST-DAY-YYYYDDD argument-1 (§15.90.4 r1a / §15.91.4 r1a, a
+    /// CATCH-ALL verdict) and FIND-STRING argument-3 (§15.37.4 r2/r3, 0 once every match is ignored); the renderer
+    /// emits it from <c>IntrinsicRenderer.IntArgWideSaturating</c> alone.
     /// </summary>
     /// <remarks>
+    /// ⛔ A CLAMP ANSWERS FOR A DIFFERENT INTEGER, so it is wrong for every function whose value depends on its argument's
+    /// value — MOD(1.0E39, 7) answered 1 through it, where the operand's integer answers 5. Such an argument, and every
+    /// other §15.3 type-6 operand, takes <see cref="IntegerArgWideReal"/>, which keeps the value or raises.
     /// The integrality test is the one every carrier shares (<see cref="RequireIntegralReal"/>, kb/Work PB1526): with
     /// EC-ARGUMENT-FUNCTION checking off a fraction truncates toward zero (docs/CONFORMANCE.md DOC-A.1-124). A finite
     /// magnitude inside the carrier converts exactly; a larger one, ±∞ included, SATURATES to the extreme of its sign —
-    /// verdict-preserving for a total body, whose answer past any bound it states depends on being outside it, never on
-    /// how far (the determination kb/Work PB254 made for the TEST- validators). The 1.7e38 bound is
-    /// <see cref="FromDouble"/>'s saturation constant, below <see cref="Int128.MaxValue"/>, so the boundary value cannot
-    /// slip through the cast. A NaN is the value of no integer: §15.3's EC-ARGUMENT-FUNCTION, and 0 with checking off.
+    /// verdict-preserving for these members only, whose answer past the bound they state depends on being outside it,
+    /// never on how far. The 1.7e38 bound is <see cref="FromDouble"/>'s saturation constant, below
+    /// <see cref="Int128.MaxValue"/>, so the boundary value cannot slip through the cast. A NaN is the value of no
+    /// integer: §15.3's EC-ARGUMENT-FUNCTION, and 0 with checking off.
     /// </remarks>
-    public static Int128 IntegerArgTotalReal(double v)
+    public static Int128 IntegerArgSaturatingReal(double v)
     {
         RequireIntegralReal(v);
         if (double.IsNaN(v))
