@@ -1,4 +1,4 @@
-## PB3180: the landing check charges a merge commit only with what it introduced
+## Entry 2046 — 2026-10-15 11:17 PDT — PB3180: the landing check charges a merge commit only with what it introduced
 
 `landing_check.py` attributes R3 work per commit (PB2703), and it read each commit as `sha^..sha`. For a merge commit
 `sha^` is the first parent, so a review finisher's `Merge <predecessor> for the review finisher` (first parent main)
@@ -18,3 +18,4 @@ warnings were the same smear. The sibling sweep found no other per-commit first-
 say how a merge is attributed. Found on the way and reported, not fixed: the landing arm's per-commit rule
 under-attributes an R3 branch whose code commits are `WIP checkpoint:` and whose status flip is a separate commit,
 while the in-flight arm classifies a branch whole.
+
