@@ -368,11 +368,26 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                 w.Line(dispatchState.F3HandlerBasePc is not null
                     ? $"int __tok = __id < {decls} ? ExceptionState.EnterDeclarative(__useActive) : -1;   // the declarative's activation record (§14.6.13.1.2 1))"
                     : "int __tok = ExceptionState.EnterDeclarative(__useActive);   // the declarative's activation record (§14.6.13.1.2 1))");
+                w.Line("int __act;");
                 w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc);"
-                    + " return ExceptionState.DeclarativeNotNormal(__tok) ? DispatchResult.NotNormal : DispatchResult.Normal; }"
+                    + " __act = ExceptionState.DeclarativeNotNormal(__tok) ? DispatchResult.NotNormal : DispatchResult.Normal; }"
                     + "   // fell off its end: normal completion unless a fatal exception occurred within its scope (§14.6.13.1.2 1))");
-                w.Line("catch (ResumeSignal __rs) { return __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
+                w.Line("catch (ResumeSignal __rs) { __act = __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
                 w.Line("finally { ExceptionState.LeaveDeclarative(__tok); __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
+                // ⛔ §14.9.40.4 GR17 (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT statement is
+                // active does not complete normally, the SORT statement is terminated." A declarative invoked by a
+                // statement of the SORT's INPUT or OUTPUT PROCEDURE is in that procedure's range (GR10, GR13) and runs
+                // below the procedure's nested dispatch, so no raise site can jump to the statement's end. The question
+                // is therefore asked HERE, the one place every selection path reaches a declarative through, after the
+                // declarative has finished: CobolSort.AfterUseProcedure throws SortTerminationSignal when the completion
+                // was not normal and a SORT that registered this scope is active, and SortEmitter's landing ends the
+                // statement — one mechanism for every USE procedure the rule reaches, implicit transfers included. Only
+                // a DECLARATIVE id asks: the exception-checking PERFORM's handlers are not USE procedures (§14.9.28.4
+                // GR17 selects them), and their RESUME keeps the §14.9.33.4 GR2 a) landing at the raise site.
+                string gr17 = RuntimeApi.SortAfterUseProcedure("__useActive", "__act");
+                w.Line(dispatchState.F3HandlerBasePc is not null
+                    ? $"return __id < {decls} ? {gr17} : __act;   // §14.9.40.4 GR17 — a SORT procedure's USE procedure that did not complete normally terminates the SORT"
+                    : $"return {gr17};   // §14.9.40.4 GR17 — a SORT procedure's USE procedure that did not complete normally terminates the SORT");
             }
             else
             {

@@ -51,6 +51,14 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// spelled ONCE here rather than at both (kb/Work PB367b).</summary>
     public bool UnitHasDispatchFunnel => ecState.UnitHasF3 || ecState.UnitHasF3Perform;
 
+    /// <summary>The declarative scope a format 1 SORT registers at <c>CobolSort.Init</c> for §14.9.40.4 GR17
+    /// (kb/Work PB1177): the emitted <c>__useActive</c> exactly when this scope's <c>__RunUse</c> asks
+    /// <c>CobolSort.AfterUseProcedure</c> — the EC-model form over at least one DECLARATIVE id
+    /// (<c>DispatchEmitter.EmitRunUseBody</c>) — else null. Without an EC-model declarative no USE procedure can
+    /// return having completed not normally: RESUME and the fatal-in-scope mark are EC-model facts, and EXIT PROGRAM,
+    /// GOBACK and STOP unwind through the SORT statement's <c>finally</c>, which ends it.</summary>
+    public string? SortUseScope => ecState.Active && dispatch.DeclCount > 0 ? "__useActive" : null;
+
     /// <summary>The <c>__EcObjDispatch</c> invocation (or the no-declarative constant when this unit has no
     /// Format-4 declaratives) — the §14.9.49.4 GR14 exception-OBJECT selector (the EC-OO wave).</summary>
     public string ObjDispatchExpr(string objExpr) =>

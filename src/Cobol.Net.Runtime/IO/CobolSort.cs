@@ -98,14 +98,18 @@ public static class CobolSort
     /// statements, the EC-SORT-MERGE-ACTIVE exception condition is set to exist"), GR13 and §14.9.24.4 GR8 (the
     /// output procedure's MERGE, RELEASE or format 1 SORT) all forbid a SORT/MERGE while any procedure of an
     /// executing SORT/MERGE runs — whatever file it names, in THIS run unit (kb/Work PB1570). A raise therefore leaves an enclosing statement on the
-    /// same file intact. With checking off the results are undefined (GR10) and the statement runs.</para></summary>
-    public static void Init(string name, CobolCollation? collation, CobolCollation? national)
+    /// same file intact. With checking off the results are undefined (GR10) and the statement runs.</para>
+    /// <para><paramref name="useScope"/> is the executing scope's declarative guard array (<c>__useActive</c>), passed
+    /// by a format 1 SORT whose scope has EC-model USE procedures, and only by one: §14.9.40.4 GR17 terminates that
+    /// SORT when one of them, invoked while it is active, does not complete normally (<see cref="AfterUseProcedure"/>;
+    /// kb/Work PB1177). A MERGE passes none — §14.9.24.4 has no such rule.</para></summary>
+    public static void Init(string name, CobolCollation? collation, CobolCollation? national, object? useScope = null)
     {
-        try { InitCore(name, collation, national); }
+        try { InitCore(name, collation, national, useScope); }
         catch (CobolFatalException e) when (RaisedByTheStatement(e)) { }
     }
 
-    private static void InitCore(string name, CobolCollation? collation, CobolCollation? national)
+    private static void InitCore(string name, CobolCollation? collation, CobolCollation? national, object? useScope)
     {
         if (ExceptionState.SortMergeActiveChecking && Stores.AnyInPhase([ProcedurePhase.Input, ProcedurePhase.Output]))
             ExceptionState.SortMergeActiveError($"SORT/MERGE on {name}: executed within the range of an input or "
@@ -119,6 +123,7 @@ public static class CobolSort
         f.Collation = collation?.Snapshot();
         f.NatCollation = national?.Snapshot();
         f.Phase = ProcedurePhase.None;
+        f.UseScope = useScope;
         f.AtEndReached = false;
     }
 
@@ -130,6 +135,24 @@ public static class CobolSort
         var f = Get(name);
         f.Phase = output ? ProcedurePhase.Output : ProcedurePhase.Input;
         f.AtEndReached = false;
+    }
+
+    /// <summary>⛔ §14.9.40.4 GR17, ASKED AFTER EVERY DECLARATIVE (kb/Work PB1177): "If a USE procedure invoked while a
+    /// format 1 SORT statement is active does not complete normally, the SORT statement is terminated." The generated
+    /// <c>__RunUse</c> hands every DECLARATIVE's action here once the declarative has finished. When the action is a
+    /// completion that is not normal (<see cref="DispatchResult.CompletedNotNormally"/>: a RESUME, or a fall-off
+    /// §14.6.13.1.2 1) marks) and a format 1 SORT that registered the same declarative scope (<paramref name="useScope"/>,
+    /// at <see cref="Init(string, CobolCollation?, CobolCollation?, object?)"/>) is executing, the SORT is terminated:
+    /// <see cref="SortTerminationSignal"/> unwinds to the statement's landing, whatever invoked the procedure — an
+    /// implicit USING/GIVING transfer, a statement of the input or output procedure (GR10, GR13: their range includes
+    /// "all statements in declarative procedures that are executed as a result of the execution of statements in the
+    /// range"), or another USE procedure running within either. Otherwise the action goes back to the raise site
+    /// unchanged.</summary>
+    public static int AfterUseProcedure(object useScope, int action)
+    {
+        if (DispatchResult.CompletedNotNormally(action) && Stores.SortOfScope(useScope) is { } name)
+            throw new SortTerminationSignal(name, action);
+        return action;
     }
 
     /// <summary>The RELEASE STATEMENT (ISO §14.9.32.4). GR1: "A RELEASE statement may be executed only when it is

@@ -1627,9 +1627,11 @@ internal static class RuntimeApi
     // ── SORT / MERGE (CobolSort; ISO §14.9.40 / §14.9.24) ──
 
     /// <summary>Initialize the per-SD image store — <c>CobolSort.Init</c> — with the statement's collating sequence,
-    /// snapshotted at statement start (ISO §14.6.6 r5: a locale switch during the SORT/MERGE has no effect on it).</summary>
-    public static string SortInit(string sd, string weights, string natWeights) =>
-        $"{nameof(CobolSort)}.{nameof(CobolSort.Init)}({sd}, {weights}, {natWeights})";
+    /// snapshotted at statement start (ISO §14.6.6 r5: a locale switch during the SORT/MERGE has no effect on it).
+    /// <paramref name="useScope"/> is the declarative scope a format 1 SORT registers for §14.9.40.4 GR17 (kb/Work
+    /// PB1177; <c>EcEmitter.SortUseScope</c>), null for none.</summary>
+    public static string SortInit(string sd, string weights, string natWeights, string? useScope = null) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.Init)}({sd}, {weights}, {natWeights}{(useScope is null ? "" : $", useScope: {useScope}")})";
 
     /// <summary>The implicit USING release of one record image — <c>CobolSort.Release</c>, with the size the
     /// record had when READ and the sort-merge file's record range (the EC-SORT-MERGE-RELEASE test, §14.9.40.4
@@ -1665,6 +1667,17 @@ internal static class RuntimeApi
     /// (<c>output: true</c>) — <c>CobolSort.EnterProcedure</c>, the phase the two verbs' GR1 test.</summary>
     public static string SortEnterProcedure(string sd, bool output) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.EnterProcedure)}({sd}, output: {(output ? "true" : "false")})";
+
+    /// <summary>§14.9.40.4 GR17's question after a declarative ends — <c>CobolSort.AfterUseProcedure</c>: the action
+    /// back, or the SORT termination signal when a not-normal completion happened while a SORT that registered
+    /// <paramref name="useScope"/> is active (kb/Work PB1177).</summary>
+    public static string SortAfterUseProcedure(string useScope, string action) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.AfterUseProcedure)}({useScope}, {action})";
+
+    /// <summary>The C# type a format 1 SORT statement's landing catches — <c>SortTerminationSignal</c> (§14.9.40.4 GR17),
+    /// fully qualified so the emission does not depend on the conditional <c>using</c> (the PB922 reason).</summary>
+    public static string SortTerminationSignalType { get; } =
+        $"global::CobolNet.Runtime.Exceptions.{nameof(Runtime.Exceptions.SortTerminationSignal)}";
 
     /// <summary>The sequence phase — <c>CobolSort.Sort</c> (stable; GR8).</summary>
     public static string SortSort(string sd, string keys, string dupsInOrder) =>

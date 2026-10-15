@@ -108,3 +108,9 @@ CobolNet.Runtime.StorageCell.Received(long at, int width) -> void
 CobolNet.Runtime.StorageCell.Received(System.ReadOnlySpan<long> path, long at, int width) -> void
 static CobolNet.Runtime.CobolBits.Strided(string![]! occurrences, int stride) -> string!
 static CobolNet.Runtime.CobolTable.OdoExtentTrimmed(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits) -> int
+CobolNet.Runtime.Exceptions.SortTerminationSignal
+CobolNet.Runtime.Exceptions.SortTerminationSignal.SortTerminationSignal(string! file, int action) -> void
+CobolNet.Runtime.Exceptions.SortTerminationSignal.File.get -> string!
+CobolNet.Runtime.Exceptions.SortTerminationSignal.Action.get -> int
+static CobolNet.Runtime.Exceptions.DispatchResult.CompletedNotNormally(int result) -> bool
+static CobolNet.Runtime.IO.CobolSort.AfterUseProcedure(object! useScope, int action) -> int

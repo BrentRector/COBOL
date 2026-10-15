@@ -31,6 +31,11 @@ internal sealed class SortStore
     /// <see cref="CobolSort.Init(string, CobolCollation?, CobolCollation?)"/> and <see cref="CobolSort.Close"/>, so
     /// "no store" is "no statement executing".</summary>
     public ProcedurePhase Phase;
+    /// <summary>The declarative scope (the emitted <c>__useActive</c> of the program instance or method invocation that
+    /// executes the statement) whose USE procedure, not completing normally while the statement is active, terminates
+    /// it — set at <c>Init</c> by a format 1 SORT only (§14.9.40.4 GR17; kb/Work PB1177), null for a MERGE, whose rules
+    /// have no such sentence, and for a SORT in a scope with no EC-model declaratives.</summary>
+    public object? UseScope;
     /// <summary>§14.9.34.4 GR3's latch: the at end condition has occurred for this file in the current output
     /// procedure, so a further RETURN is EC-SORT-MERGE-RETURN.</summary>
     public bool AtEndReached;
@@ -73,5 +78,17 @@ public sealed class SortFileTable
             if (phases.Contains(store.Phase))
                 return true;
         return false;
+    }
+
+    /// <summary>The file-name of the executing format 1 SORT that registered the declarative scope
+    /// <paramref name="useScope"/> (<see cref="SortStore.UseScope"/>), else null — the statement §14.9.40.4 GR17
+    /// terminates when one of that scope's USE procedures does not complete normally. A store exists only while its
+    /// statement executes, so a registered store IS an active SORT.</summary>
+    internal string? SortOfScope(object useScope)
+    {
+        foreach (var (name, store) in _stores)
+            if (ReferenceEquals(store.UseScope, useScope))
+                return name;
+        return null;
     }
 }
