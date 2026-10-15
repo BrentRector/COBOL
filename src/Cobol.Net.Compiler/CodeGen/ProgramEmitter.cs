@@ -683,11 +683,15 @@ internal sealed class ProgramEmitter
                         w.Line(PlaceRenderer.WriteVarGroupImage(place, $"{copyCarrier}.Value",
                             "LINKAGE formal copy-in of", formalStorage: true));
                     else if (crossing is CallCrossing.Text)
-                        w.Line(CallEmitter.CallStringWrite(place, $"{copyCarrier}.Value"));
+                        w.Line(CallEmitter.BoundaryCopyWrite(place, $"{copyCarrier}.Value"));
                     else
                         // Native AND Managed write the storage's own value — for a managed slot that is the
                         // reference itself (kb/Work PB663), never an image of it.
                         w.Line(PlaceRenderer.Write(place, $"{copyCarrier}.Value"));
+                    // The filled fresh area records the receiving references made through it from now on, which a view
+                    // over storage a store can grow takes back at return (ManagedPointer.Watch; kb/Work PB2690).
+                    if (f.IsArea && !f.ByValue && place is not null)
+                        w.Line($"{copyCarrier}.{nameof(ManagedPointer<string>.Watch)}({f.CarrierField});");
                 }
             }
             // An ANY LENGTH RETURNING item (§13.18.2.3 SR3 b)) has no length of its own: §13.18.2.4 GR1 b) makes it

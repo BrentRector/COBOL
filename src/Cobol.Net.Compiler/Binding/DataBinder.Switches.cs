@@ -267,18 +267,42 @@ public sealed partial class DataBinder
     /// twin of <c>ConstantOf</c> (one shape for "a word that stands for a literal"). A resolution: the word is
     /// recorded as used as a symbolic-character (§8.3.2.2; kb/Work PB3153).</summary>
     internal (string Value, bool National)? SymbolicOf(Core.DataReferenceContext dref) =>
-        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w
-        && SymbolicCharacters.TryUse(dref, w.GetText(), out var def) ? def : null;
+        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w ? SymbolicOf(dref, w.GetText()) : null;
 
-    /// <summary>Does a BARE data reference spell a symbolic character? The predicate twin of
+    /// <summary>Does a BARE data reference spell a symbolic character visible here? The predicate twin of
     /// <see cref="SymbolicOf(Core.DataReferenceContext)"/>, recording no use.</summary>
     internal bool NamesSymbolic(Core.DataReferenceContext dref) =>
-        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w && SymbolicCharacters.Declares(w.GetText());
+        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w && NamesSymbolic(w.GetText());
+
+    /// <summary>Does the bare word <paramref name="word"/> name a symbolic character visible here (one
+    /// <see cref="HidesSymbolic"/> does not hide)? The predicate twin of
+    /// <see cref="SymbolicOf(Antlr4.Runtime.RuleContext, string)"/>, recording no use.</summary>
+    internal bool NamesSymbolic(string word) => SymbolicCharacters.Declares(word) && !HidesSymbolic(word);
 
     /// <summary>The symbolic character the word <paramref name="word"/> written at <paramref name="site"/> names, or
-    /// null (the FigurativeOperand ALL-form lookup, a concatenation operand). A resolution, recorded as a use.</summary>
+    /// null (the FigurativeOperand ALL-form lookup, a concatenation operand). A resolution, recorded as a use
+    /// (§8.3.2.2; kb/Work PB3153) — only when the symbolic-character is visible: one a nearer declaration of the
+    /// spelling hides (<see cref="HidesSymbolic"/>) is not what the word references, so it is neither resolved nor
+    /// recorded.</summary>
     internal (string Value, bool National)? SymbolicOf(Antlr4.Runtime.RuleContext site, string word) =>
-        SymbolicCharacters.TryUse(site, word, out var def) ? def : null;
+        !HidesSymbolic(word) && SymbolicCharacters.TryUse(site, word, out var def) ? def : null;
+
+    /// <summary>Whether a nearer declaration of <paramref name="word"/> hides the symbolic-character of that spelling
+    /// (§8.4.6.1, §8.4.6.2.1 3); kb/Work PB3154 review R1-1): an inherited one a nearer source element's data-,
+    /// condition- or index-name hides (<see cref="DropShadowedConstants"/>), or any one the method being bound
+    /// declares a name of (<see cref="ActiveMethodDeclares"/>). Asked by every symbolic lookup, the resolving and the
+    /// predicate alike, so they cannot disagree.</summary>
+    private bool HidesSymbolic(string word) => _shadowedSymbolics.Contains(word) || ActiveMethodDeclares(word);
+
+    /// <summary>The containment distance of each INHERITED symbolic-character — 1 for the direct container's own
+    /// SPECIAL-NAMES entry, one more per level it came down (<see cref="InheritConfiguration"/>); a name absent here is
+    /// this unit's own. The tier <see cref="DropShadowedConstants"/> weighs against a same-spelled name's.</summary>
+    private readonly Dictionary<string, int> _inheritedSymbolics = new(CobolNames.Comparer);
+
+    /// <summary>The inherited symbolic-characters a nearer declaration hides (<see cref="DropShadowedConstants"/>).
+    /// Hidden by <see cref="HidesSymbolic"/>, never removed from <see cref="SymbolicCharacters"/>: a contained
+    /// unit inherits the whole table from this one, and this unit's local name hides nothing from it.</summary>
+    private readonly HashSet<string> _shadowedSymbolics = new(CobolNames.Comparer);
 
     /// <summary>SPECIAL-NAMES <c>ORDER TABLE</c> ordering-names (case-insensitive) → the DECODED literal-9 that
     /// identifies the cultural ordering table (ISO §12.3.7.2's last clause; §12.3.7.4 GR17 — "When ORDER TABLE is
@@ -466,11 +490,20 @@ public sealed partial class DataBinder
     /// switch and is entitled to inherit every one of them. Called by <c>BinderDriver.BindUnitData</c> for every
     /// contained unit BEFORE <see cref="Bind"/> (the SPECIAL-NAMES state must be in place before the containee's
     /// first literal or PICTURE binds); the container itself inherited from ITS container first (units bind
-    /// container-first), so one level carries the whole ancestry. ONE method, the WHOLE configuration-derived
+    /// container-first), so one level carries the whole ancestry. A class definition's factory and instance
+    /// definitions inherit the class definition's configuration by the same call (<c>OoDriver.BindClassData</c>;
+    /// kb/Work PB3154): they are contained source units (§3.165), so the class's names are INHERITED, never declared
+    /// in their own §8.3.2.2 census. ONE method, the WHOLE configuration-derived
     /// state (feedback_model_the_rule_shape_not_one_case): before this landed only the REPOSITORY sets were
     /// inherited, and inside a contained program of a DECIMAL-POINT IS COMMA unit NUMVAL("123,45") valued 0
     /// while NUMVAL("123.45") valued 123.45 — the exact inversion of §15.67.3 r5, with no diagnostic
-    /// (kb/Work PB60 / AR-15.67.3-5). §11.9.4 GR1's OPTIONS inheritance rides the same call.
+    /// (kb/Work PB60 / AR-15.67.3-5). The SYMBOLIC CHARACTERS figurative constants were the one SPECIAL-NAMES
+    /// table still missing: a contained program's <c>MOVE SYM-A TO Y</c> naming its container's symbolic-character
+    /// was COBOLNET1639 "not defined" (kb/Work PB3154's sweep; §8.4.6.1 lists symbolic-character among the names a
+    /// configuration section declares for "any source element contained within that source element"). Each one
+    /// carries its containment distance (<see cref="_inheritedSymbolics"/>), so a nearer declaration of the spelling
+    /// hides it (<see cref="DropShadowedConstants"/>; kb/Work PB3154 review R1-1).
+    /// §11.9.4 GR1's OPTIONS inheritance rides the same call.
     /// <para>⚠ One sibling still lives elsewhere: EVERY SPECIAL-NAMES mnemonic-name — the switch mnemonics SET reads
     /// as much as the device and feature mnemonics DISPLAY UPON / ACCEPT FROM / WRITE ADVANCING read (kb/Work
     /// PB454 moved the switch ones there rather than keep a second copy here) — inherits through
@@ -490,7 +523,8 @@ public sealed partial class DataBinder
         UserClasses.InheritFrom(container.UserClasses);
         Alphabets.InheritFrom(container.Alphabets);
         NationalAlphabets.InheritFrom(container.NationalAlphabets);
-        SymbolicCharacters.InheritFrom(container.SymbolicCharacters);
+        SymbolicCharacters.InheritFrom(container.SymbolicCharacters,   // §8.4.6.1 (kb/Work PB3154), each with its tier
+            k => _inheritedSymbolics[k] = container._inheritedSymbolics.GetValueOrDefault(k) + 1);
         OrderTables.InheritFrom(container.OrderTables);
         DynamicLengthStructures.InheritFrom(container.DynamicLengthStructures);
         Locales.InheritFrom(container.Locales);   // §12.3.7.4 GR1 — locale-names reach contained units
@@ -845,8 +879,7 @@ public sealed partial class DataBinder
         // The names THIS source element declares — a containing element's inherited names may be re-declared
         // (§8.4.6.1: each source element "may use identical user-defined words"), its own may not (§8.4.2.1).
         var ownDls = new HashSet<string>(CobolNames.Comparer);
-        foreach (var para in EnvDivisions(program)
-                     .SelectMany(env => env.configurationSection()?.configurationParagraph() ?? []))
+        foreach (var para in program.environmentDivision()?.configurationSection()?.configurationParagraph() ?? [])
         {
             // OBJECT-COMPUTER … PROGRAM COLLATING SEQUENCE (ISO §12.3.6 — the 85 single-name IS form, the 2002
             // two-name IS form, and the 2002 FOR ALPHANUMERIC/FOR NATIONAL forms; resolved AFTER the walk). The

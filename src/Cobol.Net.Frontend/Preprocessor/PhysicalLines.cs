@@ -112,7 +112,13 @@ public static class PhysicalLines
 /// <param name="Columns">The map from an index of <paramref name="Text"/> to the character position the file holds it at,
 /// present only when the line held a tab or a supplementary-plane character — on any other line the index IS the
 /// position.</param>
-public readonly record struct PhysicalLine(int Number, string Text, ColumnMap? Columns);
+public readonly record struct PhysicalLine(int Number, string Text, ColumnMap? Columns)
+{
+    /// <summary>The 0-based physical column — the character position the file holds it at — of the character at 0-based
+    /// index <paramref name="index"/> of <see cref="Text"/>: the ONE conversion from an expanded index to the column a
+    /// diagnostic and a source map name (kb/Work PB1801, PB2983).</summary>
+    public static int ColumnOf(ColumnMap? columns, int index) => columns is null ? index : columns.ToPhysical(index);
+}
 
 /// <summary>The lines of one file, in order — what EVERY reference-format consumer reads instead of the raw text.</summary>
 public sealed class PhysicalLineSet(PhysicalLine[] lines)

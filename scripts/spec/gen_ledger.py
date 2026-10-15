@@ -144,8 +144,8 @@ CLAUSE_TITLE = {
 # measurement
 # ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
-def git(*args: str) -> str:
-    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True,
+def git(*args: str, stdin: str | None = None) -> str:
+    return subprocess.run(["git", *args], cwd=REPO, capture_output=True, text=True, input=stdin,
                           encoding="utf-8", errors="replace").stdout.strip()
 
 
@@ -442,8 +442,14 @@ def register_counts_at(sha: str) -> dict | None:
     return ledger_plan.register_counts(notes_at(sha), {r["rule-id"] for r in rows if r.get("state") == "GAP"})
 
 
+def recorded_commits(pts: list[dict]) -> list[str]:
+    """The full shas of the recorded points that exist in this clone (a point's sha may never have reached it)."""
+    checked = git("cat-file", "--batch-check=%(objectname) %(objecttype)", stdin="\n".join(p["sha"] for p in pts) + "\n")
+    return [line.split()[0] for line in checked.splitlines() if line.endswith(" commit")]
+
+
 def missed_points(pts: list[dict]) -> list[dict]:
-    """The measurement-moving commits since the series' last point that no generator run recorded.
+    """The measurement-moving commits that no generator run recorded: reachable from HEAD and from no recorded point.
 
     ⛔ A generator run measures ONE tree, so a session that landed three trains between runs recorded one point
     for three landings (2026-10-04: trains 1011 and 1012 were missing until the owner noticed the page stale).
@@ -455,8 +461,13 @@ def missed_points(pts: list[dict]) -> list[dict]:
     last = pts[-1] if pts else None
     if last is None or not git("rev-parse", "--verify", "--quiet", last["sha"]):
         return []
-    log = git("log", "--reverse", "--format=%h|%cI", "--abbrev=8", f"{last['sha']}..HEAD", "--",
-              INVENTORY_REL, "kb/Work")
+    # ⛔ "Since the last point" is "reachable from HEAD and from NO recorded point", not `last..HEAD`: in a merge DAG
+    # `last..HEAD` also lists commits older than `last` that are not its ancestors (a branch merged after the point
+    # was taken), and those were walked when an earlier point was recorded (kb/Work PB3161, review finding R1-2: nine
+    # shas appeared twice in the frozen series).
+    revs = ["HEAD", *(f"^{sha}" for sha in recorded_commits(pts))]
+    log = git("log", "--reverse", "--format=%h|%cI", "--abbrev=8", "--stdin", "--", INVENTORY_REL, "kb/Work",
+              stdin="\n".join(revs) + "\n")
     out: list[dict] = []
     for line in filter(None, log.splitlines()):
         sha, _, iso = line.partition("|")
@@ -1173,7 +1184,7 @@ TEMPLATE = """<title>{title}</title>
       <tbody>
         <tr><td>Annex A.3 — processor-dependent ({a3_rows} rows)</td><td class="dim"><span class="num">{a3_claimed}</span> claimed · <span class="num">{a3_partial}</span> partial · <span class="num">{a3_not}</span> not claimed · <span class="num">{a3_na}</span> n/a</td></tr>
         <tr><td>Annex A.4 — optional modules ({a4_rows})</td><td class="dim"><span class="num">{a4_claimed}</span> claimed — {a4_claimed_list} · <span class="num">{a4_partial}</span> partial — {a4_partial_list} · <span class="num">{a4_not}</span> not claimed — {a4_not_list}</td></tr>
-        <tr><td>Documented non-support ({facilities_n} facilities)</td><td class="dim">{facilities} — each with a named compile-time warning, exactly the posture §4.2.6 ¶3 requires and D13 permits</td></tr>
+        <tr><td>Documented non-support ({facilities_n} facilities)</td><td class="dim">{facilities} — each named by a compile-time diagnostic (a warning, or an error where the facility is refused): the mechanism §4.2.6 ¶3 requires for processor-dependent elements (A.3), the posture §4.2.7's user documentation states for optional modules (A.4); D13 permits both</td></tr>
         <tr><td>Annex A.1 — implementor-defined register</td><td>{a1_state}</td></tr>
         <tr><td>Version-change ledger anchors</td><td class="dim"><span class="num">{vcr_done}</span> of {vcr_total} dispositioned ({vcr_pct}%): {vcr_gated} gated · {vcr_ref} ref-only · {vcr_pin} pinned-to-spec · <span class="num">{vcr_todo}</span> todo; the matrix registry stands at {constructs} constructs</td></tr>
       </tbody>
@@ -1323,6 +1334,32 @@ def self_test() -> int:
         got = register_counts_at("HEAD")
         want = {"compiler_open": 1, "defects": 1, "wrong_answer": 1, "crashes": 0, "gap_holders": 1}
         check("the register is read from a commit's own tree (git cat-file --batch)", got == want, f"{got}")
+
+        # missed_points in a merge DAG (review finding R1-2): a branch merged AFTER the last point was recorded is
+        # not an ancestor of it, but its commits were recorded earlier; `last..HEAD` listed them again.
+        def run(*args: str, check_rc: bool = True) -> str:
+            return subprocess.run(["git", "-c", "user.email=t@t", "-c", "user.name=t", *args], cwd=REPO, check=check_rc,
+                                  capture_output=True, text=True, encoding="utf-8").stdout.strip()
+
+        def commit(gap_rows: int, msg: str) -> str:
+            (REPO / INVENTORY_REL).write_text(json.dumps([{"rule-id": f"R-{i}", "state": "GAP", "verdict": "PARTIAL"}
+                                                          for i in range(gap_rows)]), encoding="utf-8", newline="\n")
+            run("add", ".")
+            run("commit", "-q", "-m", msg)
+            return run("rev-parse", "--short=8", "HEAD")
+
+        base_sha = run("rev-parse", "--short=8", "HEAD")
+        run("checkout", "-q", "-b", "side")
+        side = commit(1, "side: closes a row")
+        run("checkout", "-q", "main")
+        tip = commit(2, "main: moves on")
+        run("merge", "-q", "--no-ff", "side", check_rc=False)   # both sides changed the inventory: resolved by hand
+        merged = commit(3, "merge side")
+        recorded = [{"sha": side, "date": "2026-10-01", "gap": 1, "closed": 0, "dns": 0, "label": "", "battery": None},
+                    {"sha": tip, "date": "2026-10-02", "gap": 2, "closed": 0, "dns": 0, "label": "", "battery": None}]
+        shas = [p["sha"] for p in missed_points(recorded)]
+        check("a commit older than the last point that an earlier point recorded is not measured again",
+              shas == [merged] and base_sha not in shas, f"{shas} want {[merged]} (side {side}, tip {tip})")
     finally:
         REPO, TREND = saved
         import shutil  # noqa: PLC0415

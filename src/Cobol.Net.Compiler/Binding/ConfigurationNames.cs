@@ -60,9 +60,11 @@ internal sealed class ConfigurationNames<T>(UserWordKind kind,
     public bool TryPeek(string name, [MaybeNullWhen(false)] out T value) => _entries.TryGetValue(name, out value);
 
     /// <summary>Take every entry of a CONTAINING element's table this one does not declare (§12.3.4 GR1; the
-    /// containee's own declaration, where one is possible, wins).</summary>
-    public void InheritFrom(ConfigurationNames<T> container)
+    /// containee's own declaration, where one is possible, wins). <paramref name="inherited"/>, when given, is told
+    /// each name actually taken (the symbolic-characters' containment tier, kb/Work PB3154).</summary>
+    public void InheritFrom(ConfigurationNames<T> container, Action<string>? inherited = null)
     {
-        foreach (var (k, v) in container._entries) _entries.TryAdd(k, v);
+        foreach (var (k, v) in container._entries)
+            if (_entries.TryAdd(k, v)) inherited?.Invoke(k);
     }
 }

@@ -76,3 +76,14 @@ The round-2 finisher's gate, run 20261014T231215Z-47b403: `=== BUILD-LOCAL GATE:
 GREEN` (Conformance 6,192/11,704, Unit 33,104/33,653, Characterization 6/36 in leg 1; leg 2 left to CI); semgrep
 verify PASS.
 
+
+**Merge of main (PB3154).** Bringing origin/main in conflicted with PB3154, which landed meanwhile: it made a
+contained unit inherit its container's SYMBOLIC CHARACTERS with a containment tier and HID an inherited
+symbolic-character that a nearer data-, condition- or index-name (or the method being bound) declares (§8.4.6.1,
+§8.4.6.2.1 3)). Both intents are kept: the symbolic table stays a `ConfigurationNames` table inherited through
+`InheritFrom` (which now reports each name it takes, so the tier is recorded in the same pass), and ONE hiding test,
+`DataBinder.HidesSymbolic`, guards the resolving lookup `SymbolicOf(site, word)` and the predicates `NamesSymbolic`
+alike. A hidden symbolic-character is therefore neither resolved nor recorded as a §8.3.2.2 use: the word references
+the nearer item. The two predicates this branch had moved to `SymbolicCharacters.Declares` (the VALUE-literal test
+and `LiteralEnvironment.IsSymbolicCharacter`) ask `NamesSymbolic`, so main's hiding reaches them as it did through
+main's `SymbolicOf(string)`.

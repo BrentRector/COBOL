@@ -122,12 +122,20 @@ they cover ~70% of real dialect collisions and exercise all five gating patterns
   each NIST program at 2002/2014/2023 too and
   assert it still compiles (output need not re-match the golden at a later edition unless behavior is edition-invariant,
   which for the nucleus it is — so re-matching the golden is the strong form; start with "still compiles").
-- **Positive — per-edition:** `tests/conformance/<ver>/*.cob` + `.out`, auto-discovered by the legacy `ConformanceTests`
-  (dir → `DialectMode`). The greenfield needs the analogous discovery. Each program compiles/runs at ≥ its edition.
-- **Negative — NEW (the main build):** for each `new-feature-gate` / removed / reserved-word row, a case asserting the
-  **rejection diagnostic** at the wrong edition. Proposed layout: `tests/conformance/<ver>/_negative/<name>.cob` +
-  `<name>.err` (the expected `CBL####`), discovered alongside the positives.
+- **Positive — per-edition:** `tests/conformance/<ver>/*.cob` + `.out`, discovered from each directory's
+  `manifest.json` by `CorpusRunnerTests` (`tests/Cobol.Net.Tests.Conformance/CorpusRunnerTests.cs`). ⚠ A program
+  compiles and runs ONLY at its directory's edition (`ConformanceCorpus.PositiveOptions`): nothing runs an 85
+  program at a later edition and compares its output, so no directory is a complete per-edition suite (kb/Work
+  PB3160).
+- **Negative:** `tests/conformance/negative/<name>.cob` + `<name>.err` (the expected COBOLNET code), each naming the
+  editions that must reject it on its first line (`*> reject-at: 2002 2014 2023`); `CorpusRunnerTests` compiles it at
+  each named edition and asserts the diagnostic. `tests/conformance/README.md` is the authoring guide.
 - **Behavior-variant:** the same snippet with a per-edition `.out` (only where INV-3 actually applies).
+- **Replacement (approved by the owner 2026-10-14):** `docs/rearchitecture/DESIGN-conformance-suite.md` (kb/Work
+  PB3160): one tree of compiler-neutral tests filed by ISO clause, generated into four complete per-edition suites
+  that any COBOL compiler can run. This section describes the corpus until slice S2 (kb/Work PB3177) moves
+  `tests/conformance/` into it and deletes the tree; PB3177 rewrites this section in the same landing (it names
+  the consumers of the old paths).
 
 ## 6. Harness design
 

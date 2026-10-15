@@ -90,7 +90,7 @@ internal sealed class LiteralEnvironment
     /// <summary>Whether <paramref name="word"/> is a symbolic-character name here — in SPECIAL-NAMES, one the
     /// paragraph declares in any clause, since the clauses are order-free (kb/Work PB226).</summary>
     public bool IsSymbolicCharacter(string word) => _data is not null
-        && (_inSpecialNames ? _data.IsSymbolicCharacterName(word) : _data.SymbolicCharacters.Declares(word));
+        && (_inSpecialNames ? _data.IsSymbolicCharacterName(word) : _data.NamesSymbolic(word));
 
     /// <summary>The ONE character a bound symbolic-character stands for (§12.3.7.4 GR11 b/c), or null when
     /// <paramref name="word"/> names none that is bound. A resolution: <paramref name="site"/>'s source element

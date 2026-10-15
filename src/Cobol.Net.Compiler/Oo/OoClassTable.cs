@@ -119,8 +119,8 @@ public sealed class OoClassTable
     /// <summary>⛔ §8.3.2.2 at a REFERENCE (kb/Work PB3132): "Within a source element, a given user-defined word may be
     /// used as only one type of user-defined word". The object-class-names, interface-names and parameter-names a
     /// source element references are often declared by ANOTHER element: a method's by its CLASS (the CLASS-ID, the
-    /// class's REPOSITORY, its USING clause), a contained program's or a factory definition's by a CONTAINING element's
-    /// REPOSITORY (§12.3.4 GR1), none of which is the referring element (§10.5: "A source element is a source unit
+    /// class's REPOSITORY, its USING clause), a contained program's, a factory definition's or an instance definition's
+    /// by a CONTAINING element's REPOSITORY (§12.3.4 GR1), none of which is the referring element (§10.5: "A source element is a source unit
     /// excluding any contained source units"). So the referring element's census (<see cref="CensusOf"/>) learns each
     /// one here, from the one funnel every such reference resolves through (<see cref="OoNameResolution.Lookup"/>),
     /// whatever kind of element refers. A word the element declares itself as the same type is recorded twice, which
@@ -146,16 +146,13 @@ public sealed class OoClassTable
     /// symbol's (<see cref="OoMethodDataScope.Words"/>; kb/Work PB2921), found through <see cref="MethodAt"/>. Every
     /// other element's is kept here by its parse node: a program's (outermost or contained, the node its
     /// identification division hangs from: <c>BinderDriver.BindUnitData</c> passes that division), an interface's,
-    /// a factory definition's, and a class definition's, which its instance definition SHARES because one binder
-    /// declares both elements' words (<c>OoDriver.BindClassData</c>). Null for a site in no source element, or in a
-    /// method that has no symbol (one refused as a duplicate).</summary>
+    /// a class definition's, and its factory and instance definitions', each its own: the class definition's
+    /// environment division and CLASS-ID declare their words in the class's census alone, and the factory and
+    /// instance binders inherit those names, never re-declare them (<c>OoDriver.BindClassData</c>; kb/Work PB3154).
+    /// Null for a site in no source element, or in a method that has no symbol (one refused as a duplicate).</summary>
     internal UserWordCensus? CensusOf(Antlr4.Runtime.RuleContext? site)
     {
-        var element = SourceElementOf(site) switch
-        {
-            Core.ObjectParagraphContext instance => instance.Parent,
-            var other => other,
-        };
+        var element = SourceElementOf(site);
         if (element is null) return null;
         if (element is Core.MethodDefinitionContext) return MethodAt(site)?.DataScope.Words;
         if (!_elementWords.TryGetValue(element, out var words))

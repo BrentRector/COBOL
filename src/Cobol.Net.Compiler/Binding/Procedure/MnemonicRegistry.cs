@@ -62,19 +62,16 @@ internal sealed class MnemonicRegistry(DataBinder data)
             // while the SWITCH map — built from the SAME rule through OoDriver's synthetic reparented unit —
             // resolved. The walk now reads each OO ancestor's own configuration (a method itself may not
             // declare one — §12.3.3 SR2, enforced as COBOLNET1519); TryAdd keeps the nearest scope.
-            var envs = n switch
+            var env = n switch
             {
-                Core.ProgramUnitContext pu => DataBinder.EnvDivisions(pu),
-                Core.ObjectParagraphContext op => op.environmentDivision() is { } e ? [e] : System.Array.Empty<Core.EnvironmentDivisionContext>(),
-                Core.FactoryParagraphContext fp => fp.environmentDivision() is { } e ? [e] : System.Array.Empty<Core.EnvironmentDivisionContext>(),
-                Core.ClassDefinitionContext cd => cd.environmentDivision() is { } e ? [e] : System.Array.Empty<Core.EnvironmentDivisionContext>(),
-                Core.InterfaceDefinitionContext idf => idf.environmentDivision() is { } e ? [e] : System.Array.Empty<Core.EnvironmentDivisionContext>(),
+                Core.ProgramUnitContext pu => pu.environmentDivision(),
+                Core.ObjectParagraphContext op => op.environmentDivision(),
+                Core.FactoryParagraphContext fp => fp.environmentDivision(),
+                Core.ClassDefinitionContext cd => cd.environmentDivision(),
+                Core.InterfaceDefinitionContext idf => idf.environmentDivision(),
                 _ => null,
             };
-            if (envs is null) continue;
-            var paragraphs = envs
-                .SelectMany(env => env.configurationSection()?.configurationParagraph() ?? []);
-            foreach (var para in paragraphs)
+            foreach (var para in env?.configurationSection()?.configurationParagraph() ?? [])
                 foreach (var entry in para.specialNamesParagraph()?.specialNameEntry() ?? [])
                     if (entry.implementorSwitchEntry() is { } e
                         && ImplementorNameEntry.Read(e) is { Unavailable: null, Mnemonic: { } alias, Row: { } row })

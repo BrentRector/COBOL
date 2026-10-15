@@ -1140,7 +1140,7 @@ of an unsupported facility.
   record cannot hold one, §8.5.1.9.1 3), and a LINKAGE one crosses through that same recreation).
   `DynamicCapacityAgreementDriftTests` pins those construction paths. Pinned by `2014/pb1118_dyn_length_agreement`.
 
-- **USAGE BIT — alignment and representation of data (§13.18.60.4 GR5 · §8.5.1.6.3).** Annex A.1 has NO item for USAGE BIT — it runs 208 (COMPUTATIONAL, GR6) straight to 209 (DISPLAY, GR7), and §8.5.1.6.3 is cross-referenced only by item 195 (SYNCHRONIZED) — so this determination is recorded here under §4.2.6 rather than in the A.1 register, where it sat under item 209’s number until 2026-09-03. A `USAGE BIT` item **occupies bits**, as GR5 requires. Bits per character position is **8** — §8.1.2 leaves it implementor-specified, and 8 is what makes it agree with DISPLAY's one byte per character position. Alignment follows §8.5.1.6.3 exactly: a bit item immediately following an elementary bit item **of the same level** takes the next bit position (they share a byte); any other bit item starts at the first bit of the next available byte; implicit filler advances to the next item's natural boundary and fills a trailing partial byte to an integral number of characters, and §15.50.4 r5 counts that filler. In a record image a bit run is **packed high-order bit first** — §8.5.1.6.3 numbers positions from "the first bit position" — with trailing filler bits zero. ⚠ The item's VALUE CARRIER is a `'0'`/`'1'` string, which is not observable to a COBOL program and is not a conformance claim; what is claimed is the SIZE, ALIGNMENT and IMAGE above. A boolean item with **no** USAGE clause is a different case: §13.18.60.3 SR13(b) implies DISPLAY and GR7 makes it one alphanumeric character per boolean position.
+- **USAGE BIT — alignment and representation of data (§13.18.60.4 GR5 · §8.5.1.6.3).** Annex A.1 has NO item for USAGE BIT — it runs 208 (COMPUTATIONAL, GR6) straight to 209 (DISPLAY, GR7), and §8.5.1.6.3 is cross-referenced only by item 195 (SYNCHRONIZED) — so this determination is recorded here under §4.2.6 rather than in the A.1 register, where it sat under item 209’s number until 2026-09-03. A `USAGE BIT` item **occupies bits**, as GR5 requires. Bits per character position is **8** — §8.1.2 leaves it implementor-specified, and 8 is what makes it agree with DISPLAY's one byte per character position. Alignment follows §8.5.1.6.3 exactly: a bit item immediately following an elementary bit item **of the same level** takes the next bit position (they share a byte); any other bit item starts at the first bit of the next available byte; implicit filler advances to the next item's natural boundary and fills a trailing partial byte to an integral number of characters, and §15.50.4 r5 counts that filler. A bit group that follows a same-level bit item begins in the middle of a byte, and the byte boundaries inside it (every "first bit position of the first available byte", and an ALIGNED subject, §13.18.1.4 GR1) are boundaries of the **record**, not of the group (kb/Work PB3158). The standard is silent on a TABLE of such groups whose occurrences are not a whole number of bytes long, where later occurrences begin at other bit positions and no single layout puts an ALIGNED member on a byte boundary in all of them; **WiseOwl COBOL's determination** is that every occurrence is laid out as the first (the stride is uniform), so only the first occurrence's ALIGNED members sit on record byte boundaries. In a record image a bit run is **packed high-order bit first** — §8.5.1.6.3 numbers positions from "the first bit position" — with trailing filler bits zero. ⚠ The item's VALUE CARRIER is a `'0'`/`'1'` string, which is not observable to a COBOL program and is not a conformance claim; what is claimed is the SIZE, ALIGNMENT and IMAGE above. A boolean item with **no** USAGE clause is a different case: §13.18.60.3 SR13(b) implies DISPLAY and GR7 makes it one alphanumeric character per boolean position.
 
 - **NUMVAL-F — a space may not SPLIT the exponent's `n` (§15.69.3 r1/r5 · §15.95.4 r1 b) 1; kb/Work PB256).**
   §15.69.3 r5 says "Leading and trailing spaces in argument-1 are ignored. Embedded spaces in argument-1 are
@@ -1547,7 +1547,7 @@ of an unsupported facility.
   (also the READ of an elementary dynamic-length national record). Witness:
   `conformance:2014/pb546_group_into_national_dynamic`.
 - **D-VGB — a BY REFERENCE formal's FIXED table stored past the capacity of the argument's dynamic-capacity table
-  creates the occurrences the callee stored into (kb/Work PB2690; one known departure, below).** §14.2.3 GR8: "the activated runtime element operates
+  creates the occurrences the callee stored into (kb/Work PB2690).** §14.2.3 GR8: "the activated runtime element operates
   as if the formal parameter occupies the same storage area as the argument". A formal table of a fixed (or DEPENDING)
   occurrence count opposite the argument's dynamic-capacity table is legal when the two correspond and match (§8.5.1.12.1,
   §8.5.1.12.2; §8.5.1.12.3 sentence 3: the dynamic-capacity table "is considered to be the same length as the
@@ -1567,20 +1567,24 @@ of an unsupported facility.
   initialized": the INITIALIZED recipe, the seed a receiving subscript past the capacity grows the table with
   (`CobolDynTable.CreatedAs`); without the phrase, whose created contents §8.5.1.9.5 leaves "undefined", the view shows
   the space fill, chosen because no numeric store matches it, so a store of the element's own VALUE (a zero) is still
-  seen; and (ii) a store past the capacity is recognised by its EFFECT: the capacity becomes the highest occurrence of the
-  formal's table whose image differs from the one the view showed. A callee that only reads such an occurrence creates
-  nothing (§8.5.1.9.3 acts on a receiving reference only), and an INITIALIZED table's callee that stores SPACES there
-  creates it. **Known departure (kb/Work PB2690, REMAINING; a wrong CAPACITY, not latitude):** a callee that stores into
-  an occurrence past the capacity exactly the image the view showed (the INITIALIZED default into an INITIALIZED table,
-  SPACES into one without the phrase) leaves the capacity as it was, where §8.5.1.9.3 raises it to the subscript; the
-  content is the same either way. Only the callee's receiving references can tell such a store from none, and the
-  finished image the boundary sees does not carry them. The creation travels on the argument's
+  seen; and (ii) a store past the capacity is the callee's RECEIVING REFERENCE, recorded where it is made: the formal's
+  fresh area records the window of every store through a view of it (`StorageCell.Received`, emitted after each store
+  through a LINKAGE or BASED view), from the moment the area is filled (`ManagedPointer.Watch`), and the store back
+  (`ManagedPointer.OverStorage` → `CobolVarGroup.Overlay`) raises the capacity to the highest occurrence the callee
+  referenced as a receiving item, whatever it stored there: the INITIALIZED default, SPACES, the element's VALUE. A callee
+  that only reads such an occurrence creates nothing (§8.5.1.9.3 acts on a receiving reference only). A store that reaches
+  the area only through a further activation's boundary copy of the whole group (the copy covers every occurrence, so it
+  records none, whatever the group's shape and whether the further activation is a CALL, a typed INVOKE or a universal
+  one: `CallEmitter.BoundaryCopyWrite`) is recognised by its effect, an occurrence whose image differs from the
+  one the view showed. The creation travels on the argument's
   carrier only for a BY REFERENCE crossing (`CobolVarGroup.Created`, stated by `AsVarImage(__byReference: true)` and
   `StorageCell.VarGroupAt(byReference: true)`): a BY CONTENT formal is a record "allocated by the activating runtime element"
   that does "not occupy the same storage area as the argument" (§14.2.3 GR9), filled as by a MOVE, so past the sending
   capacity its fixed table holds the MOVE's space fill (§14.6.9.2 2)) and nothing returns. The same law holds one level
   down for a dynamic-capacity table nested in an element (a created element is the table's created element, its own inner
-  table at its creation, with the formal's element stored over it), and across an INVOKE, the universal lane included
+  table at its creation, with the formal's element stored over it, whichever of the pair's outer tables is the variable
+  one), including a fixed table nested in an occurrence of the formal's OWN dynamic-capacity table, whose stores are
+  recorded by their subscript path, and across an INVOKE, the universal lane included
   (`CobolVarGroup.Reshape` / `Overlay`'s `OverlaidTable` / `GrownCount` / `OverlaidOccurrences`, shared by the CALL and
   INVOKE boundaries). A fixed-length ARGUMENT cannot grow (it has no more occurrences). The ISO text decides the arm that
   matters, so no vendor behavior was consulted (CLAUDE.md rule 1). Witnesses:
@@ -1588,8 +1592,11 @@ of an unsupported facility.
   `conformance:2014/pb2690_fixed_table_formal_grows_vlg_element_table_call`,
   `conformance:2014/pb2690_fixed_table_formal_grows_dynamic_argument_invoke`, `conformance:2014/pb965_vlg_into_fixed_invoke`,
   `conformance:2014/pb2690_initialized_created_occurrences_call`, `conformance:2014/pb2690_initialized_created_occurrences_invoke`,
+  `conformance:2014/pb2690_store_of_shown_image_grows_capacity_call`,
+  `conformance:2014/pb2690_store_of_shown_image_grows_capacity_invoke`,
   `conformance:negative/pb2690-fixed-table-formal-grows-dynamic-argument-below-2014`,
-  `conformance:negative/pb2690-initialized-created-occurrences-below-2014`.
+  `conformance:negative/pb2690-initialized-created-occurrences-below-2014`,
+  `conformance:negative/pb2690-store-of-shown-image-grows-capacity-below-2014`.
 
 ### 3.1 Implementor behavior in Annex A.2 undefined cases (kb/Work PB1907)
 
@@ -1988,28 +1995,6 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
    ⚠ §13.18.40.4 GR15/GR19 (PICTURE "takes effect during the format validation stage") have no syntax of their
    own; they are general rules about what a supported clause does *inside* a VALIDATE statement, so the
    statement's own COBOLNET1580 is their witness.
-4. **Screen handling** (§13.9, optional §4.2.7 / Annex A.4.2): the SCREEN SECTION, ACCEPT/DISPLAY format-3
-   (screen), and the EC-SCREEN family. Not provided; the section draws **COBOLNET1560**, and the EC-SCREEN
-   names are refused with **COBOLNET1707** wherever they are written — one Error row of the `EcNameResolution`
-   declined-facility table (`kb/Work PB260`).
-
-Beyond these four whole facilities, three **optional items of an otherwise-claimed module** are likewise refused
-by name (Annex **A.4.10**, "Object orientation" — the OO core itself is mandatory surface and is implemented):
-item 1, the repetition of `object-class-name-2` in a `CLASS-ID … INHERITS` clause (§11.3.2 — multiple
-inheritance), **COBOLNET0849**; and item 3, **parametric polymorphism** (§9.3.5.3 — overloading by method
-resolution signature), **COBOLNET0822**. Item 2, the `INTERFACE-ID … INHERITS` repetition (§11.6.2), is
-**implemented** — `INHERITS FROM interface-name-2 …` parses, resolves and enforces §11.6.3 SR2/SR3/SR6
-(COBOLNET0840); the deliberate asymmetry with the class side is that .NET interface lists are native.
-
-⚠ **A warning nothing asserts is a warning that can silently stop firing**, and that is why the WARNING band
-needs assertions the corpora structurally cannot make: the negative corpus matches ERROR codes only and the
-`.out` goldens capture stdout, while a warning rides the non-failing compile channel.
-`DocumentedNonSupportWitnessTests` is where those assertions live — it pins COBOLNET1579 (item 2) and
-COBOLNET1580 (item 3) on the same sources the positive corpus runs, and COBOLNET1578 (item 1, MCS) at both of its
-statements and at every exception-name site (kb/Work PB1198, PB374). Item 4 is no longer exposed to this at
-all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corpus entries
-(`tests/conformance/negative/a42-*`), each `.err` naming the construct as well as the code.
-
 4. **Screen handling** (§13.9, optional §4.2.7; Annex A.4.2): the SCREEN SECTION, every screen description
    entry clause, the SPECIAL-NAMES `CURSOR` and `CRT STATUS` clauses, the OPTIONS `INITIALIZE … SCREEN`
    target, ACCEPT format 3, DISPLAY format 2, `SET … ATTRIBUTE`, and the EC-SCREEN family. Not provided —
@@ -2019,7 +2004,7 @@ all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corp
    the seven source shapes draws a named **Error**: `COBOLNET1560` for the data / environment surface and
    `COBOLNET1707` for the procedure surface, both from the one funnel
    `src/Cobol.Net.Compiler/Binding/ScreenFacility.cs`, whose message names the construct the program actually
-   wrote ("the AUTO clause (ISO §13.18.3)", "the exception-name EC-SCREEN-FIELD-OVERLAP"). Two codes and not
+   wrote ("the AUTO clause (ISO §13.18.3)"). Two codes and not
    one because a Format-3 ACCEPT needs a screen-name and a screen-name needs a SCREEN SECTION: with a single
    code every statement witness would pass on the section's own diagnostic. Witnessed by 41 negative-corpus
    programs `tests/conformance/negative/a42-*` and by `ScreenFacilityConstructDriftTests`, which reads
@@ -2044,8 +2029,27 @@ all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corp
    > sat in `ExceptionCatalog` with no setting site and no diagnostic at all: `>>TURN EC-SCREEN-LINE-NUMBER
    > CHECKING ON` compiled clean against a facility that does not exist. §14.6.13.1.1 licenses raising NO
    > condition for a level-3 name belonging to an optional element, but it does not license ACCEPTING the
-   > name. All six positions now resolve through one EC-name seam and draw `COBOLNET1707`
-   > (`negative/a42-ec-screen-raise`, `-use`, `-turn`, `-perform-when`).
+   > name. All six positions now resolve through the one EC-name seam that serves every declined module,
+   > `EcNameResolution.Advise` over its `DeclinedEcFamilies` table, where this module is one Error row with
+   > descriptor `COBOLNET1707` (not `ScreenFacility.cs`; kb/Work PB374), whose message names the
+   > exception-name and the facility (`negative/a42-ec-screen-raise`, `-use`, `-turn`, `-perform-when`).
+
+Beyond these four whole facilities, three **optional items of an otherwise-claimed module** are likewise refused
+by name (Annex **A.4.10**, "Object orientation" — the OO core itself is mandatory surface and is implemented):
+item 1, the repetition of `object-class-name-2` in a `CLASS-ID … INHERITS` clause (§11.3.2 — multiple
+inheritance), **COBOLNET0849**; and item 3, **parametric polymorphism** (§9.3.5.3 — overloading by method
+resolution signature), **COBOLNET0822**. Item 2, the `INTERFACE-ID … INHERITS` repetition (§11.6.2), is
+**implemented** — `INHERITS FROM interface-name-2 …` parses, resolves and enforces §11.6.3 SR2/SR3/SR6
+(COBOLNET0840); the deliberate asymmetry with the class side is that .NET interface lists are native.
+
+⚠ **A warning nothing asserts is a warning that can silently stop firing**, and that is why the WARNING band
+needs assertions the corpora structurally cannot make: the negative corpus matches ERROR codes only and the
+`.out` goldens capture stdout, while a warning rides the non-failing compile channel.
+`DocumentedNonSupportWitnessTests` is where those assertions live — it pins COBOLNET1579 (item 2) and
+COBOLNET1580 (item 3) on the same sources the positive corpus runs, and COBOLNET1578 (item 1, MCS) at both of its
+statements and at every exception-name site (kb/Work PB1198, PB374). Item 4 is no longer exposed to this at
+all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corpus entries
+(`tests/conformance/negative/a42-*`), each `.err` naming the construct as well as the code.
 
 ⚠ **Three further modules are Not claimed and have no item here** — A.4.8 (FORMAT / SELECT WHEN), A.4.13
 (REWRITE FILE / WRITE FILE) and A.4.10's declined optional items. For those the §5 Annex A.4 row IS the whole of
