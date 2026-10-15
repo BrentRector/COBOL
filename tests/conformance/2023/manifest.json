@@ -854,7 +854,8 @@
   "pb2623_method_is_a_user_word_at_2023",
   "pb3102_report_not_terminated_with_location",
   "pb3102_intrinsic_names_ride_every_statement",
-  "pb2740_omitted_branch_turn_2023_name"
+  "pb2740_omitted_branch_turn_2023_name",
+  "pb656_directive_words_as_user_words"
   ],
  "pending": [
   "pb485_value_only_format1"
