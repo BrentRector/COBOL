@@ -51,7 +51,7 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// spelled ONCE here rather than at both (kb/Work PB367b).</summary>
     public bool UnitHasDispatchFunnel => ecState.UnitHasF3 || ecState.UnitHasF3Perform;
 
-    /// <summary>The declarative scope a format 1 SORT registers at <c>CobolSort.Init</c> for §14.9.40.4 GR17
+    /// <summary>The declarative scope a format 1 SORT registers (<c>CobolSort.RegisterUseScope</c>) for §14.9.40.4 GR17
     /// (kb/Work PB1177): the emitted <c>__useActive</c> exactly when this scope's <c>__RunUse</c> asks
     /// <c>CobolSort.AfterUseProcedure</c> — the EC-model form over at least one DECLARATIVE id
     /// (<c>DispatchEmitter.EmitRunUseBody</c>) — else null. Without an EC-model declarative no USE procedure can

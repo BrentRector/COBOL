@@ -26,7 +26,7 @@ applicable statement and the MERGE continues. Recorded in `docs/CONFORMANCE.md` 
 below the procedure's nested dispatch, so no `goto` can reach the statement's end. The question is asked instead at
 the one place every selection path reaches a declarative through, `__RunUse`, once the declarative has finished:
 
-- A format 1 SORT registers its declarative scope (the emitted `__useActive`) at `CobolSort.Init`
+- A format 1 SORT registers its declarative scope (the emitted `__useActive`) first in its body (`CobolSort.RegisterUseScope`)
   (`EcEmitter.SortUseScope`, set exactly when the scope has the EC-model `__RunUse`).
 - `__RunUse` hands every DECLARATIVE's action to `CobolSort.AfterUseProcedure`.
 - That throws `SortTerminationSignal` when the action is not a normal completion

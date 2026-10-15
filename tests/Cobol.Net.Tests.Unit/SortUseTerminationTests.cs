@@ -27,7 +27,8 @@ public sealed class SortUseTerminationTests
     public void NotNormalCompletion_TerminatesTheRegisteringSort(int action) => RunUnit.Run(_ =>
     {
         object scope = new bool[2];
-        CobolSort.Init(Sd, null, null, scope);
+        CobolSort.Init(Sd);
+        CobolSort.RegisterUseScope(Sd, scope);
         try
         {
             var implicitPhase = Assert.Throws<SortTerminationSignal>(() => CobolSort.AfterUseProcedure(scope, action));
@@ -45,26 +46,31 @@ public sealed class SortUseTerminationTests
     public void NormalCompletion_ReturnsTheAction() => RunUnit.Run(_ =>
     {
         object scope = new bool[1];
-        CobolSort.Init(Sd, null, null, scope);
+        CobolSort.Init(Sd);
+        CobolSort.RegisterUseScope(Sd, scope);
         CobolSort.EnterProcedure(Sd, output: false);
         Assert.Equal(DispatchResult.Normal, CobolSort.AfterUseProcedure(scope, DispatchResult.Normal));
         CobolSort.Close(Sd);
     });
 
     /// <summary>Only the registering scope's declaratives reach the rule: another program instance's (a CALLed
-    /// program's own USE procedure), a MERGE's (its rules, §14.9.24.4, carry no such sentence, so it registers none) and a scope whose SORT
-    /// has ended (no store, no active statement) all get their action back.</summary>
+    /// program's own USE procedure), a MERGE's (its rules, §14.9.24.4, carry no such sentence, so it registers none)
+    /// and a scope whose SORT has ended (no store, no active statement) all get their action back. A store reused by
+    /// the next statement on the file starts unregistered (<c>Init</c> clears the scope).</summary>
     [Fact]
     public void OtherScopes_MergesAndEndedSorts_AreNotTerminated() => RunUnit.Run(_ =>
     {
         object scope = new bool[1], callee = new bool[1];
-        CobolSort.Init(Sd, null, null, scope);
+        CobolSort.Init(Sd);
+        CobolSort.RegisterUseScope(Sd, scope);
         CobolSort.EnterProcedure(Sd, output: false);
         Assert.Equal(DispatchResult.ResumeNext, CobolSort.AfterUseProcedure(callee, DispatchResult.ResumeNext));
         CobolSort.Close(Sd);
         Assert.Equal(DispatchResult.ResumeNext, CobolSort.AfterUseProcedure(scope, DispatchResult.ResumeNext));
 
-        CobolSort.Init(Sd);   // a MERGE's Init — no scope
+        CobolSort.Init(Sd);
+        CobolSort.RegisterUseScope(Sd, scope);
+        CobolSort.Init(Sd);   // the next statement on the same file, a MERGE: it registers nothing, and Init cleared the last
         CobolSort.EnterProcedure(Sd, output: true);
         Assert.Equal(DispatchResult.NotNormal, CobolSort.AfterUseProcedure(scope, DispatchResult.NotNormal));
         CobolSort.Close(Sd);

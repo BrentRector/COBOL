@@ -33,7 +33,7 @@ internal sealed class SortStore
     public ProcedurePhase Phase;
     /// <summary>The declarative scope (the emitted <c>__useActive</c> of the program instance or method invocation that
     /// executes the statement) whose USE procedure, not completing normally while the statement is active, terminates
-    /// it — set at <c>Init</c> by a format 1 SORT only (§14.9.40.4 GR17; kb/Work PB1177), null for a MERGE, whose rules
+    /// it — set by <c>CobolSort.RegisterUseScope</c> for a format 1 SORT only (§14.9.40.4 GR17; kb/Work PB1177), null for a MERGE, whose rules
     /// have no such sentence, and for a SORT in a scope with no EC-model declaratives.</summary>
     public object? UseScope;
     /// <summary>§14.9.34.4 GR3's latch: the at end condition has occurred for this file in the current output

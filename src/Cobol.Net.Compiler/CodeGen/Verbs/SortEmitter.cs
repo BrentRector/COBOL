@@ -38,16 +38,18 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs, Dispa
         string sd = FileKeyExpr(so.File);
         var tx = new Transfer(TerminationLabel(), merge: false);
         // §14.9.40.4 GR17 (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT statement is active does
-        // not complete normally, the SORT statement is terminated." Init registers the scope whose declaratives the
-        // rule reaches; the declarative's __RunUse asks the question once it has finished (CobolSort.AfterUseProcedure)
+        // not complete normally, the SORT statement is terminated." The body registers, first, the scope whose
+        // declaratives the rule reaches; the declarative's __RunUse asks the question once it has finished (CobolSort.AfterUseProcedure)
         // and this statement's catch lands the termination — whatever invoked the procedure: an implicit transfer, a
         // statement of the INPUT or OUTPUT PROCEDURE (which runs in a nested dispatch no raise site can jump out of), or
         // another USE procedure running within either. Null when the scope has no EC-model declarative
         // (EcEmitter.SortUseScope): then nothing can complete not normally and return.
         string? useScope = ec.SortUseScope;
-        w.Line($"{RuntimeApi.SortInit(sd, WeightsExpr(so.Collating), NatWeightsExpr(so.Collating), useScope)};   // SORT {so.File.CobolName} (ISO §14.9.40.4; BOTH GR5 sequences snapshotted — §14.6.6 r5)");
+        w.Line($"{RuntimeApi.SortInit(sd, WeightsExpr(so.Collating), NatWeightsExpr(so.Collating))};   // SORT {so.File.CobolName} (ISO §14.9.40.4; BOTH GR5 sequences snapshotted — §14.6.6 r5)");
         using (StatementBody(sd, useScope is null ? null : TerminationLanding(sd)))
         {
+            if (useScope is not null)
+                w.Line($"{RuntimeApi.SortRegisterUseScope(sd, useScope)};   // §14.9.40.4 GR17 — this scope's USE procedures terminate the SORT when they do not complete normally");
             EmitAssociation(so.File, tx);   // §12.4.5.3 GR3 — at the time of execution, before any phase (kb/Work PB1097)
             // Phase a — release (GR9a). A USING file must not be open when the phase commences (GR9 —
             // EC-SORT-MERGE-FILE-OPEN, tested by the runtime before any implicit OPEN; kb/Work PB1036).

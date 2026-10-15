@@ -3497,7 +3497,7 @@ static CobolNet.Runtime.IO.CobolSort.EnterProcedure(string! name, bool output) -
 static CobolNet.Runtime.IO.CobolSort.FileNotOpen(string! name, string! file) -> void
 static CobolNet.Runtime.IO.CobolSort.FillTo(string! image, int width, bool national, CobolNet.Runtime.RecordExtents? extents = null) -> string!
 static CobolNet.Runtime.IO.CobolSort.Init(string! name) -> void
-static CobolNet.Runtime.IO.CobolSort.Init(string! name, CobolNet.Runtime.CobolCollation? collation, CobolNet.Runtime.CobolCollation? national, object? useScope = null) -> void
+static CobolNet.Runtime.IO.CobolSort.Init(string! name, CobolNet.Runtime.CobolCollation? collation, CobolNet.Runtime.CobolCollation? national) -> void
 static CobolNet.Runtime.IO.CobolSort.Key.operator !=(CobolNet.Runtime.IO.CobolSort.Key left, CobolNet.Runtime.IO.CobolSort.Key right) -> bool
 static CobolNet.Runtime.IO.CobolSort.Key.operator ==(CobolNet.Runtime.IO.CobolSort.Key left, CobolNet.Runtime.IO.CobolSort.Key right) -> bool
 static CobolNet.Runtime.IO.CobolSort.LastReturnedExtents(string! name) -> CobolNet.Runtime.RecordExtents?

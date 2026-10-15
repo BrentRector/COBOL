@@ -727,7 +727,7 @@ terminated" — including one invoked by a statement of the INPUT or OUTPUT PROC
 in declarative procedures that are executed as a result of the execution of statements in the range" inside the
 procedure's range), whose raise site runs below the procedure's nested `__Dispatch` and cannot jump to the
 statement's end (kb/Work PB1177). So GR17 is ONE run-time mechanism: the SORT registers its declarative scope (the
-emitted `__useActive`) at `CobolSort.Init` (`EcEmitter.SortUseScope` — exactly when the scope has the EC-model
+emitted `__useActive`) first in its body (`CobolSort.RegisterUseScope`; `EcEmitter.SortUseScope` — exactly when the scope has the EC-model
 `__RunUse`), the generated `__RunUse` hands every DECLARATIVE's action to `CobolSort.AfterUseProcedure` once the
 declarative has finished, and that throws `SortTerminationSignal` when the action is a completion that is not normal
 (`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off) and a SORT that

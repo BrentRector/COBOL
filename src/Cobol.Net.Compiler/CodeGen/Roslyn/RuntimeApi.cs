@@ -1627,11 +1627,14 @@ internal static class RuntimeApi
     // ── SORT / MERGE (CobolSort; ISO §14.9.40 / §14.9.24) ──
 
     /// <summary>Initialize the per-SD image store — <c>CobolSort.Init</c> — with the statement's collating sequence,
-    /// snapshotted at statement start (ISO §14.6.6 r5: a locale switch during the SORT/MERGE has no effect on it).
-    /// <paramref name="useScope"/> is the declarative scope a format 1 SORT registers for §14.9.40.4 GR17 (kb/Work
-    /// PB1177; <c>EcEmitter.SortUseScope</c>), null for none.</summary>
-    public static string SortInit(string sd, string weights, string natWeights, string? useScope = null) =>
-        $"{nameof(CobolSort)}.{nameof(CobolSort.Init)}({sd}, {weights}, {natWeights}{(useScope is null ? "" : $", useScope: {useScope}")})";
+    /// snapshotted at statement start (ISO §14.6.6 r5: a locale switch during the SORT/MERGE has no effect on it).</summary>
+    public static string SortInit(string sd, string weights, string natWeights) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.Init)}({sd}, {weights}, {natWeights})";
+
+    /// <summary>Register a format 1 SORT's declarative scope for §14.9.40.4 GR17 — <c>CobolSort.RegisterUseScope</c>
+    /// (kb/Work PB1177; <c>EcEmitter.SortUseScope</c>).</summary>
+    public static string SortRegisterUseScope(string sd, string useScope) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.RegisterUseScope)}({sd}, {useScope})";
 
     /// <summary>The implicit USING release of one record image — <c>CobolSort.Release</c>, with the size the
     /// record had when READ and the sort-merge file's record range (the EC-SORT-MERGE-RELEASE test, §14.9.40.4
