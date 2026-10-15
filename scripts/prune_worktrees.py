@@ -588,11 +588,13 @@ def pull_requests(gh=None) -> dict[str, PullRequest]:
 
 def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool]) -> set[str]:
     """The `w<wave><letter>` slugs of the dispatch-ledger wave groups still in flight, by the planner's own liveness rule
-    (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired). A hand entry has no
-    slug (its label is free text); a hand dispatch's worktree is caught by its live lock or its recency instead."""
+    (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired), read from its `meta`
+    (each entry's recorded slug), never parsed back out of an owner label. A dispatch made without a rendered group
+    has no ledger entry (kb/Work PB3186); its worktree is caught by its live lock or its recency instead."""
     import plan_wave  # noqa: PLC0415
-    live = plan_wave.inflight_file_sets(coord_dir=coord_dir, with_git=False, terminal=terminal)
-    return {m.group(1).lower() for o in live if (m := re.match(r'dispatched (w\d+[A-Za-z0-9]+) \(', o))}
+    meta: dict[str, dict] = {}
+    plan_wave.inflight_file_sets(coord_dir=coord_dir, with_git=False, terminal=terminal, meta=meta)
+    return {m['slug'] for m in meta.values() if m.get('slug')}
 
 
 def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset(), min_age: int = 180,
@@ -1195,6 +1197,15 @@ def self_test() -> int:
         check(lifecycle(r0, in_flight_slugs=set(), min_age=180)[0] == 'IN FLIGHT', 'a hand lock (no pid) is live')
         r1 = dataclasses.replace(rows['orphan'], name='w99990-other')
         check(lifecycle(r1, in_flight_slugs={'w9999'}, min_age=180, live=live)[0] == 'DECISION', 'slug w9999 does not bind w99990-…')
+        # the in-flight slugs are the ledger entries' recorded slugs (kb/Work PB3186): a retired hand entry has none
+        sdir = pathlib.Path(tempfile.mkdtemp(prefix='slugs-'))
+        (sdir / 'inflight-groups.json').write_text(json.dumps({'groups': [
+            {'wave': '9998', 'letter': 'B', 'slug': 'w9998b', 'notes': ['PB1'], 'files': ['src/F.cs'], 'at': 1.0},
+            {'wave': '9998', 'letter': 'C', 'notes': ['PB2'], 'files': ['src/G.cs'], 'at': 1.0},
+            {'wave': 'hand', 'letter': '', 'hand': True, 'notes': ['PB3'], 'files': ['src/H.cs'], 'at': 1.0}]}),
+            encoding='utf-8', newline='\n')
+        check(in_flight_slugs(sdir, lambda n: False) == {'w9998b', 'w9998c'},
+              f'in-flight slugs: {in_flight_slugs(sdir, lambda n: False)}')
         # --apply removes exactly the LANDED rows plus the --abandon branches whose decision a kb/Work note records,
         # archives nothing (owner 2026-10-08 00:52 PDT), and loses nothing else
         notes = tmp / 'Work'
