@@ -24,6 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>CallBinder</c> and <c>UdfBinder</c> call them, and INVOKE (<c>OoBinder</c>) asks the same BY CONTENT entry; every
 /// lane asks <c>ActivationRelations</c>, the one copy the run-time CALL lane asks too (kb/Work PB3101).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ActivationConformanceDriftTests
 {
     private static readonly string VerbsDir =
