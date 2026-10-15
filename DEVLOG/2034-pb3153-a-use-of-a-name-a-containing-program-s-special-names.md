@@ -215,3 +215,30 @@ leg 2 left to CI's whole-population run … Conformance 6,130/11,748 · Unit 33,
 ran (skipped 0) in 1 of 2 leg(s) …`. The two new negatives, `2002/pb3164_method_constant_scope`,
 `2014/pb3165_method_capacity_register_scope` and the four `GlobalNameClassDriftTests` facts passed in leg 1.
 
+
+### Review round 4 of PB3153: an inherited switch-status condition-name yields to the element's own item (wave 1085 D)
+
+The reviewer of `86bba07ff` found that the bare-operand switch-status arm skipped the own-item test that every other
+two-reading position asks. `SetAlterBinder.SwitchCondOf`, which `ConditionBinder.AnalyzeBareOperand` calls and SET
+Format 4's diagnostic reaches through `SwitchNameOf`, took an inherited SPECIAL-NAMES switch-status condition-name
+through `SwitchConditions.TryUse` without asking whether the referring element describes an item of that spelling. A
+contained program with its own `01 SWON PIC 1` that wrote `IF SWON` therefore recorded a §8.3.2.2 use of SWON as a
+condition-name and was refused COBOLNET2692 (`E:\tmp\w1085d-review\swb.cob`). origin/main tested the switch instead.
+§8.4.6.1 makes the reference the element's own item, and the probe now prints `OWN-TRUE` / `OWN-FALSE`, as the flat
+control does. The fix asks `Declares`, then `ReferenceResolver.DescribesOwnItem`, then `TryUse`, the shape of
+`SequentialIoBinder.MnemonicOperand`. `SET SWON TO TRUE` over the own item now draws the one-element COBOLNET1639
+instead of COBOLNET2692 plus a message that named SWITCH-1.
+
+The drift guard could not see it. It found only a lookup paired with a raw `Refs.Probe`, and its hand-written table list
+named a nonexistent `Symbolics` and left out `SwitchConditions`. It now reads the table names off the
+`ConfigurationNames` declarations. A new fact, `AProcedureDataReferenceTakenAsAConfigurationName_AsksTheOwnItemTest`,
+requires every `Binding/Procedure` member that calls `TryUse` on a configuration table or on the mnemonic registry and
+handles a data reference to ask `Refs.DescribesOwnItem`; removing the new clause fails it at `SetAlterBinder.cs:184`. The
+other procedure sites either ask already or take a name token that admits no operand. Goldens:
+`2002/pb3153_own_item_hides_switch_condition` and the negative `pb3153-contained-own-item-set-to-true-names-no-switch`
+(2002, 2014, 2023; COBOLNET1639).
+
+Gate (run 20261015T213220Z-be1da6 on `b3c0e87ec`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN —
+leg 2 left to CI's whole-population run … Conformance 6,135/11,750 · Unit 33,249/33,675 · Characterization 6/36 cases
+ran (skipped 0) in 1 of 2 leg(s) …`. The golden, the negative and both `UserWordDeclarationDriftTests` facts passed in
+leg 1.
