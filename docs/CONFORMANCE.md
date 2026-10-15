@@ -1995,28 +1995,6 @@ WHICH annex licenses the decline, and the distinction is normative, not stylisti
    ⚠ §13.18.40.4 GR15/GR19 (PICTURE "takes effect during the format validation stage") have no syntax of their
    own; they are general rules about what a supported clause does *inside* a VALIDATE statement, so the
    statement's own COBOLNET1580 is their witness.
-4. **Screen handling** (§13.9, optional §4.2.7 / Annex A.4.2): the SCREEN SECTION, ACCEPT/DISPLAY format-3
-   (screen), and the EC-SCREEN family. Not provided; the section draws **COBOLNET1560**, and the EC-SCREEN
-   names are refused with **COBOLNET1707** wherever they are written — one Error row of the `EcNameResolution`
-   declined-facility table (`kb/Work PB260`).
-
-Beyond these four whole facilities, three **optional items of an otherwise-claimed module** are likewise refused
-by name (Annex **A.4.10**, "Object orientation" — the OO core itself is mandatory surface and is implemented):
-item 1, the repetition of `object-class-name-2` in a `CLASS-ID … INHERITS` clause (§11.3.2 — multiple
-inheritance), **COBOLNET0849**; and item 3, **parametric polymorphism** (§9.3.5.3 — overloading by method
-resolution signature), **COBOLNET0822**. Item 2, the `INTERFACE-ID … INHERITS` repetition (§11.6.2), is
-**implemented** — `INHERITS FROM interface-name-2 …` parses, resolves and enforces §11.6.3 SR2/SR3/SR6
-(COBOLNET0840); the deliberate asymmetry with the class side is that .NET interface lists are native.
-
-⚠ **A warning nothing asserts is a warning that can silently stop firing**, and that is why the WARNING band
-needs assertions the corpora structurally cannot make: the negative corpus matches ERROR codes only and the
-`.out` goldens capture stdout, while a warning rides the non-failing compile channel.
-`DocumentedNonSupportWitnessTests` is where those assertions live — it pins COBOLNET1579 (item 2) and
-COBOLNET1580 (item 3) on the same sources the positive corpus runs, and COBOLNET1578 (item 1, MCS) at both of its
-statements and at every exception-name site (kb/Work PB1198, PB374). Item 4 is no longer exposed to this at
-all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corpus entries
-(`tests/conformance/negative/a42-*`), each `.err` naming the construct as well as the code.
-
 4. **Screen handling** (§13.9, optional §4.2.7; Annex A.4.2): the SCREEN SECTION, every screen description
    entry clause, the SPECIAL-NAMES `CURSOR` and `CRT STATUS` clauses, the OPTIONS `INITIALIZE … SCREEN`
    target, ACCEPT format 3, DISPLAY format 2, `SET … ATTRIBUTE`, and the EC-SCREEN family. Not provided —
@@ -2026,7 +2004,7 @@ all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corp
    the seven source shapes draws a named **Error**: `COBOLNET1560` for the data / environment surface and
    `COBOLNET1707` for the procedure surface, both from the one funnel
    `src/Cobol.Net.Compiler/Binding/ScreenFacility.cs`, whose message names the construct the program actually
-   wrote ("the AUTO clause (ISO §13.18.3)", "the exception-name EC-SCREEN-FIELD-OVERLAP"). Two codes and not
+   wrote ("the AUTO clause (ISO §13.18.3)"). Two codes and not
    one because a Format-3 ACCEPT needs a screen-name and a screen-name needs a SCREEN SECTION: with a single
    code every statement witness would pass on the section's own diagnostic. Witnessed by 41 negative-corpus
    programs `tests/conformance/negative/a42-*` and by `ScreenFacilityConstructDriftTests`, which reads
@@ -2051,8 +2029,27 @@ all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corp
    > sat in `ExceptionCatalog` with no setting site and no diagnostic at all: `>>TURN EC-SCREEN-LINE-NUMBER
    > CHECKING ON` compiled clean against a facility that does not exist. §14.6.13.1.1 licenses raising NO
    > condition for a level-3 name belonging to an optional element, but it does not license ACCEPTING the
-   > name. All six positions now resolve through one EC-name seam and draw `COBOLNET1707`
-   > (`negative/a42-ec-screen-raise`, `-use`, `-turn`, `-perform-when`).
+   > name. All six positions now resolve through the one EC-name seam that serves every declined module,
+   > `EcNameResolution.Advise` over its `DeclinedEcFamilies` table, where this module is one Error row with
+   > descriptor `COBOLNET1707` (not `ScreenFacility.cs`; kb/Work PB374), whose message names the
+   > exception-name and the facility (`negative/a42-ec-screen-raise`, `-use`, `-turn`, `-perform-when`).
+
+Beyond these four whole facilities, three **optional items of an otherwise-claimed module** are likewise refused
+by name (Annex **A.4.10**, "Object orientation" — the OO core itself is mandatory surface and is implemented):
+item 1, the repetition of `object-class-name-2` in a `CLASS-ID … INHERITS` clause (§11.3.2 — multiple
+inheritance), **COBOLNET0849**; and item 3, **parametric polymorphism** (§9.3.5.3 — overloading by method
+resolution signature), **COBOLNET0822**. Item 2, the `INTERFACE-ID … INHERITS` repetition (§11.6.2), is
+**implemented** — `INHERITS FROM interface-name-2 …` parses, resolves and enforces §11.6.3 SR2/SR3/SR6
+(COBOLNET0840); the deliberate asymmetry with the class side is that .NET interface lists are native.
+
+⚠ **A warning nothing asserts is a warning that can silently stop firing**, and that is why the WARNING band
+needs assertions the corpora structurally cannot make: the negative corpus matches ERROR codes only and the
+`.out` goldens capture stdout, while a warning rides the non-failing compile channel.
+`DocumentedNonSupportWitnessTests` is where those assertions live — it pins COBOLNET1579 (item 2) and
+COBOLNET1580 (item 3) on the same sources the positive corpus runs, and COBOLNET1578 (item 1, MCS) at both of its
+statements and at every exception-name site (kb/Work PB1198, PB374). Item 4 is no longer exposed to this at
+all: a refusal fails the compile, so its 41 witnesses are ordinary negative-corpus entries
+(`tests/conformance/negative/a42-*`), each `.err` naming the construct as well as the code.
 
 ⚠ **Three further modules are Not claimed and have no item here** — A.4.8 (FORMAT / SELECT WHEN), A.4.13
 (REWRITE FILE / WRITE FILE) and A.4.10's declined optional items. For those the §5 Annex A.4 row IS the whole of
