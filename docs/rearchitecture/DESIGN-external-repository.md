@@ -758,19 +758,19 @@ Comparators: `PrototypeSignatures.Same` → `OoConformance.SignatureDifference` 
 `SameElementaryLayout` → `SameEssentialCharacteristics` → `DescriptionClauses.AlignedOrDynamicLengthMismatch` +
 `SameAnalyzedProfile` — `PicInfo` RECORD equality minus `EditingRules`/`RestrictedTypeDecl`, then `EditingRules`
 element-wise; `ActivationDescriptions.Of` (as-if-elementary arm); `VariableLengthCompatibility.*` → `Atoms`; `TierCIsland`;
-`OoClassTable.LeafCarried`; `ActivationDescriptions.ElementaryClauses`; `PictureClauseIdentity.*`); `ConformanceDescriptor`;
+`OoClassTable.LeafCarried`; `ActivationDescriptions.ElementaryClauses`; `PictureClauseIdentity.*`);
 `BitLayout.*`; `DataItem.ImageWidth`/`ByteWidth`.
 | Member read | Read by | Schema field |
 |---|---|---|
 | `IsGroup`, `Children`, `IsElementary` | all walkers | `Children`, `Level`, `Pic` null-ness |
 | `RedefinesTargetName` on subordinates | `ByteWidth`, `ImageWidth`, `Atoms` (§8.5.1.12.1: "any subordinate data items that specify the REDEFINES clause, and all data items subordinate to those data items, are ignored"), `BitLayout` | `RedefinesTarget` |
 | `Occurs`, `OccursSpec.DependingName`, `IsDynamicTable` | `ByteWidth`, `Atoms`, `VariableLengthCompatibility` | `Occurs`, `OccursDepending` (word inside the record, else `"<outside>"`), `OccursDynamic` |
-| `IsDynamicLength`, `DynMaxSize`, `DynStructure` | `DescriptionClauses`, `Atoms`, `TierCIsland`, `IsImageCapable`, `ConformanceDescriptor` | `DynamicLength`, `DynMaxSize`, `DynStructure` → `StructureRecord` (definition) |
-| `IsAnyLength`; `IsAligned`, `Justified`, `BlankWhenZero`, `Synchronized` | `SignatureDifference`, `ActivationDescriptions.AnyLengthClausesOf`, `ConformanceDescriptor`, `DescriptionClauses`, `ActivationDescriptions.ElementaryClauses`, `SameEssentialCharacteristics` | the five booleans |
+| `IsDynamicLength`, `DynMaxSize`, `DynStructure` | `DescriptionClauses`, `Atoms`, `TierCIsland`, `IsImageCapable`, `ActivationDescriptions.Of` | `DynamicLength`, `DynMaxSize`, `DynStructure` → `StructureRecord` (definition) |
+| `IsAnyLength`; `IsAligned`, `Justified`, `BlankWhenZero`, `Synchronized` | `SignatureDifference`, `ActivationDescriptions.AnyLengthClausesOf`, `DescriptionClauses`, `ActivationDescriptions.ElementaryClauses`, `SameEssentialCharacteristics` | the five booleans |
 | `StrongType`, `TypeName`, `IsTypedef`, `DeclaresStrongType`, `IsExternalTypedef`, `ExternalFromType`, the TYPE anchor | `StrongTypeModel.*` | the six facts + `TypeDeclaration`; `TypeDeclarations` |
-| `GroupUsage`, `IsAsIfElementary`, `AsIfPic` | `ActivationDescriptions.Of` (as-if-elementary arm), `ConformanceDescriptor` | `GroupUsage` |
-| `HasBitDescendant`, bit positions; `IsImageCapable`, `BoundaryImageCapable`, `CurrentExtentImageCapable` | `ByteWidth`, `SameType`, `SameElementaryLayout`; Tier-C arms, `ConformanceDescriptor`, `LeafCarried` | derived at decode from the recorded tree |
-| `Pic` — the WHOLE record, including `ObjectRef` (`Kind, Name, Factory, Only`), `RestrictedTypeName/Decl`, `RestrictedPrototypeName`, `_digitPositions`, `EditingRules`, `LocaleEdit`, `Clause` | `SameAnalyzedProfile` (record equality), `ActivationDescriptions.ElementaryClauses` arms, `SameDescriptionAs`, `ClrTypeName`, pointer arm, `ConformanceDescriptor` | `PicRecord`: every member; `ObjectRefIdentity`, `RestrictedTypeDeclaration`, `RestrictedPrototype` as identities (§6.4); `DigitPositions` nullable so the backing round-trips |
+| `GroupUsage`, `IsAsIfElementary`, `AsIfPic` | `ActivationDescriptions.Of` (as-if-elementary arm) | `GroupUsage` |
+| `HasBitDescendant`, bit positions; `IsImageCapable`, `BoundaryImageCapable`, `CurrentExtentImageCapable` | `ByteWidth`, `SameType`, `SameElementaryLayout`; Tier-C arms, `ActivationDescriptions.Of`, `LeafCarried` | derived at decode from the recorded tree |
+| `Pic` — the WHOLE record, including `ObjectRef` (`Kind, Name, Factory, Only`), `RestrictedTypeName/Decl`, `RestrictedPrototypeName`, `_digitPositions`, `EditingRules`, `LocaleEdit`, `Clause` | `SameAnalyzedProfile` (record equality), `ActivationDescriptions.ElementaryClauses` arms (the object-reference and pointer clauses included), `ClrTypeName` | `PicRecord`: every member; `ObjectRefIdentity`, `RestrictedTypeDeclaration`, `RestrictedPrototype` as identities (§6.4); `DigitPositions` nullable so the backing round-trips |
 | `Renames` | `AtomsOf` | not applicable (a formal is level 01/77, §14.2.2 SR1) |
 | `CobolName` | diagnostics; REDEFINES/ODO targets inside the record | `Name` |
 Not recorded (emitter facts): `CsName`, `Uid`, carrier field names, `StoreAsImage`, `RedefinesClass` tiers, VALUEs,
@@ -796,8 +796,8 @@ the group.
   `PicInfo.RestrictedPrototypeName` is replaced by `RestrictedPrototype` (identity) so record equality compares
   identities; the pointer clause of `ActivationDescriptions.ElementaryClauses` and `DataPointerKey`/`ProgramPointerKey` follow.
 - **Dynamic-length structures**: compared by DEFINITION (`StructureRecord` minus name) in `DescriptionClauses` AND in
-  `ConformanceDescriptor`'s key (the definition's canonical text replaces `DynStructure?.Name`), so descriptor equality
-  ⇔ `SignatureDifference == null` stays an invariant.
+  the activation description `ActivationDescriptions.Of` builds (the definition's canonical text replaces
+  `DynStructure?.Name`), which `SignatureDifference` reads, so the compile-time and run-time answers stay one.
 - **RAISING, INHERITS, IMPLEMENTS, expansion actuals, skeleton resolutions**: externalized identities;
   `ClassRaisingCovered` walks from the `RaisingTarget`'s resolved symbol.
 Identity is the externalized name (the Annex C fold): §8.3.2.2 makes one externalized name one instance within a run
@@ -1136,7 +1136,7 @@ replaces the null-`Ctx` test): `CsName` = the TypeDef's full name (namespace inc
 `Base`/`Implements` resolved by identity through the same provider (transitively; the standard class → `StandardBase`;
 unreachable → REPO-11); one `OoMethodSymbol` per `[CobolMethod]` over decoded `DataItem`s; `OverrideOf` re-linked;
 accessors; `Raising`. `OoClassTable.Import(symbol)` registers by IDENTITY (§8.7). Downstream — INVOKE binding,
-`ConformanceDescriptor`, `__CobolInvoke` (virtual on `CobolObject`), typed `OBJECT REFERENCE`, IMPLEMENTS and override
+`ActivationDescriptions.Of`, `__CobolInvoke` (virtual on `CobolObject`), typed `OBJECT REFERENCE`, IMPLEMENTS and override
 checks — reads the symbol as a source one.
 
 ### 10.2 References and Roslyn diagnostics
@@ -1360,7 +1360,7 @@ compile. A host entry always enables the check on its side (§4.3).
 | `ProgramPrototypesOf(…, repository, position)`; `ProgramPrototype(…, CalleeSignature? Signature)`; `PrototypeSignatures.Same` null arm and its "the external repository is the RUN UNIT's registry" remark | resolver-driven; `Signature` non-nullable; null arm and remark DELETED | `CallBinder`, `SetBinder`, `PtrBinder`, CANCEL arm, `CheckPrototypeSignaturePairs` |
 | `ObjectRefDescriptor(Kind, Name, Factory, Only)` | `+ Target`; equality/`SignatureKey`/`ClrTypeName` over `Target` | `PictureAnalyzer`/`DataBinder` (sets `Target`), `OoEmitter.OoReturnClrType`, `OoConformance`, `SetBinder` Format 5 |
 | `PicInfo.RestrictedPrototypeName`; `ActivationDescriptions.Of` (`DynStructure?.Name`; it replaced `OoConformance.ConformanceDescriptor`, kb/Work PB480); `ActivationDescriptions.ElementaryClauses` pointer clause; `ClassRaisingCovered`; `DescriptionClauses` | `RestrictedPrototype` identity; structure DEFINITION key; type-declaration equivalence / prototype identity; `RaisingTarget.Target`; definition compare | `StrongTypeModel`, `OoConformance`, `RaisingTarget` |
-| **landed (kb/Work PB2464):** `DataItem.RestrictedPrototype` and `DataItem.PointerRestrictionIdentity` (stamped in two passes by `DataBinder.ResolveRestrictedPrototypes` / `PrototypeSignatureClasses.Classify` from `BinderDriver.ResolvePointerRestrictions`, before every signature check; kb/Work PB2495), `PrototypeSignatures.RestrictionIdentity` and `SameType`, `PrototypeSignatureClasses` (one per `BindSession`: a group's prototypes partitioned by `PrototypeSignatures.Same`, whose nested restricted-pointer formals compare as the greatest fixed point through `PrototypeBisimulation`; a class's identity its founder's externalized name, `TO name`) — a restricted program- or function-pointer's TYPE is its prototype's SIGNATURE (§13.18.60.4 GR25 / GR26), read by the typed comparator (`OoConformance` pointer arm) and, through `ActivationDescription.Clauses`, by the universal INVOKE's match, conformance and SET validity | the group-local founder is the one thing this design replaces: with the resolver, a prototype's identity comes from its resolved record and `RestrictionIdentity` reads that, so `PrototypeSignatureClasses` is DELETED in slice 7 (`ProgramPrototype.Signature` becomes non-nullable, so the "own class" arm goes with the null-signature state); a universal dispatch between two separately compiled groups then compares record identities | `ActivationDescriptions` (`ElementaryClauses`, `OfAddress`), `OoConformance`, `OoBinder`, `BinderDriver`, `OoDriver` |
+| **landed (kb/Work PB2464):** `DataItem.RestrictedPrototype` and `DataItem.PointerRestrictionIdentity` (stamped in two passes by `DataBinder.ResolveRestrictedPrototypes` / `PrototypeSignatureClasses.Classify` from `BinderDriver.ResolvePointerRestrictions`, before every signature check; kb/Work PB2495), `PrototypeSignatures.RestrictionIdentity` and `SameType`, `PrototypeSignatureClasses` (one per `BindSession`: a group's prototypes partitioned by `PrototypeSignatures.Same` as the coarsest stable partition — refined until a round splits nothing, a nested restricted-pointer formal compared by the class its prototype is in at that round, kb/Work PB3101; a class's identity its founder's externalized name, `TO name`) — a restricted program- or function-pointer's TYPE is its prototype's SIGNATURE (§13.18.60.4 GR25 / GR26), read through `ActivationDescription.Clauses` (the pointer clause of `ActivationDescriptions.ElementaryClauses`) by every relation: the typed and universal INVOKE's match and conformance, the CALL and function lanes, the pair-mode `SignatureDifference` and the SET validity | the group-local founder is the one thing this design replaces: with the resolver, a prototype's identity comes from its resolved record and `RestrictionIdentity` reads that, so `PrototypeSignatureClasses` is DELETED in slice 7 (`ProgramPrototype.Signature` becomes non-nullable, so the "own class" arm goes with the null-signature state); a universal dispatch between two separately compiled groups then compares record identities | `ActivationDescriptions` (`ElementaryClauses`, `OfAddress`), `OoConformance`, `OoBinder`, `BinderDriver`, `OoDriver` |
 | `OoClassTable.Build`; `OoClassSymbol.Ctx`; `OoRepositoryScope` (classes/interfaces) | `+ Import(symbol)` by identity, `IsParameterized` for imported skeletons; `Ctx` → `Origin`; `OoRepositoryScope` → `IdentityScope` (+ prototypes, structures; reverse map) | `OoNameResolution`, `OoEmitter.EmitClassUnit` (skips imported), `ResolveOverrides`, `OoExpansion` |
 | `OoExpansion.Expand(tree, classes, interfaces, edition, words)` | resolver-driven; imported skeletons re-parsed under their recorded `CompileState` with recorded resolutions; the `ExpansionKey`; import by key; placement (4a)/(4b); stale detection (REPO-9 with the referencing assemblies); publishes keys and skeleton records (§10.5) | `BinderDriver`, `FragmentParse.ParseTokens` (a `CompileState` parameter), the binder's option-dependent arms, `CompilerDriver`, `RepositoryReader` (`AssemblyRef` listing) |
 | `DataBinder.BindDeclarations` REPOSITORY loop (never resolved) | `ResolveRepositorySpecifiers` in `BinderDriver.BindUnitData` for every specifier at its position | `BinderDriver`, `OoDriver.BindClassData` |
@@ -1547,7 +1547,7 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
 
 ### 17.2 Round-trip and two-sided schema drift tests
 - For every LINKAGE root of every conformance golden: `Decode(Encode(x))` satisfies `SignatureDifference == null` both
-  ways, `SameElementaryLayout`, `SameType`, equality of `ConformanceDescriptor`, `Signature`, `Layout`, `ImageWidth`,
+  ways, `SameElementaryLayout`, `SameType`, equality of the `ActivationDescriptions.Of` description, `Signature`, `Layout`, `ImageWidth`,
   `ByteWidth`, `ExtentBits`, AND `PicInfo` RECORD EQUALITY (`==`, the synthesized one — so `_digitPositions` and every
   future member are seen) plus `EditingRules` element-wise.
 - The converse: every `PicInfo` constructor parameter and init property (reflection over the type, including init-only
@@ -1575,7 +1575,8 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
   check (a Roslyn-analysis test); every specifier of a bound group is resolved before any body binds.
 - `PrototypeSignatures.Same` and `ProgramPrototype.Signature` have no nullable path.
 - Identity tests: two descriptions with different words and one identity compare equal through `OoConformance.SignatureDifference`,
-  the pointer arm, `ClassRaisingCovered`, `DescriptionClauses` and `ConformanceDescriptor`; one word and two identities
+  the pointer clause of `ActivationDescriptions.ElementaryClauses`, `ClassRaisingCovered` and `DescriptionClauses`; one
+  word and two identities
   do not.
 - **The host entry is a caller:** a Roslyn-analysis test over the emitted corpus asserts that every host-entry `Call`
   body consists of exactly the parts §4.3 lists — `EnsureRegistered` (definitions only), one `HostLanding` landing per

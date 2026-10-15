@@ -72,20 +72,32 @@ internal static class PrototypeSignatures
     /// the strong type, a variable-length group's matching information; a bit / national group is the elementary
     /// <c>PIC 1(m)</c> / <c>N(m)</c> item §13.18.29.4 GR1 b) / GR2 b) treat it as, and an alphanumeric group is never
     /// an elementary item);</item>
-    /// <item>for two GROUPS, their SUBORDINATE entries (kb/Work PB1115, row SR-13.7.3-2): a group's data description
-    /// entry carries no PICTURE, USAGE or length of its own, so what describes it is the entries subordinate to it.
+    /// <item>for two groups that are NOT bit / national groups, their SUBORDINATE entries (kb/Work PB1115, row
+    /// SR-13.7.3-2): such a group's data description entry carries no PICTURE, USAGE or length of its own, so what
+    /// describes it is the entries subordinate to it.
     /// Before this half, <c>01 L-G. 05 PIC 9(2). 05 PIC X(2).</c> in a prototype and
     /// <c>01 L-G. 05 PIC X(2). 05 PIC 9(2).</c> in its definition compared equal by WIDTH alone, and the caller —
     /// checked against the prototype — handed the definition a group it reads with the fields swapped. The
     /// structure is compared by §8.5.3.1's essential characteristics
     /// (<see cref="StrongTypeModel.SameElementaryLayout"/>: each elementary item at the same relative position,
     /// of the same length, with the same eight clauses), the standard's own statement of when two group
-    /// descriptions describe the same data. A bit or national group opposite an elementary item is not asked it: that
-    /// pair is the elementary pair the first half compared.</item>
+    /// descriptions describe the same data. A bit or national group is never asked it, opposite an elementary item OR
+    /// another bit / national group: §13.18.29.4 GR1 b) / GR2 b) make it the elementary <c>PIC 1(m)</c> /
+    /// <c>N(m)</c> item and §13.7.3 states nothing otherwise, so the first half's elementary pair is its whole
+    /// description. ⛔ That is also what keeps this relation an EQUIVALENCE, which "the same signature" is (§13.18.60.4
+    /// GR25 types a restricted pointer by it) and which <see cref="PrototypeSignatureClasses"/>' founder-based
+    /// refinement relies on: were two bit groups of one length still compared by their subordinate split, the
+    /// elementary <c>PIC 1(8)</c> would equal both a 4+4 and a 2+6 bit group while those two differed, and a SET
+    /// between the 4+4 and the 2+6 pointer would be refused although two SETs through a <c>PIC 1(8)</c> pointer
+    /// carry the same address there (kb/Work PB3101, review finding R1-1).</item>
     /// </list></summary>
     private static bool SameDescription(DataItem a, DataItem b) =>
         OoConformance.SignatureDifference(a, b, "prototype's item", "definition's item") is null
-        && (!a.IsGroup || !b.IsGroup || StrongTypeModel.SameElementaryLayout(a, b));
+        && (!DescribedBySubordinates(a) || !DescribedBySubordinates(b) || StrongTypeModel.SameElementaryLayout(a, b));
+
+    /// <summary>A group whose description is its subordinate entries' — the "is this a group operation?" test
+    /// (<see cref="DataItem.IsAsIfElementary"/>'s remarks): a group that is not a bit / national group.</summary>
+    private static bool DescribedBySubordinates(DataItem item) => item.IsGroup && !item.IsAsIfElementary;
 
     /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER ITEM (kb/Work PB2464) — the one reader of
     /// <see cref="DataItem.PointerRestrictionIdentity"/>: <c>TO name</c> of the signature class
