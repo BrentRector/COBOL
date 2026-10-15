@@ -40,4 +40,9 @@ committed tables byte for byte.
 - `conformance:2002/pb656_padding_character_obsolete_2002` runs with the warning.
 - `negative/user-word-receive` and `negative/user-word-end-receive` now reject at 85, 2002 and 2023.
 
+**Drift test.** `ReservedWordsDriftTests.Provenance_AgreesWithTheFlagsItDescribes` checks each label's claim about
+an edition against that edition's flag. Its predicate flags 35 rows on the previous table and none on the
+regenerated one. `Table_SanityInvariants` had encoded the old 2002 override. It now counts the item-25 words as those
+unreserved at 2014 and the three re-reservations as reserved at 85 and 2002.
+
 Row SR-8.3.2.1-2 moved from PARTIAL to CONFORMS, and GAP went from 101 to 100.
