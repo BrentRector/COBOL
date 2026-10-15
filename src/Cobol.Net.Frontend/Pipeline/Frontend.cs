@@ -78,6 +78,11 @@ public sealed class Frontend
     /// PB1066 — the front end places them, because the conditional-compilation driver's state needs them too).</summary>
     public DirectiveResults Directives { get; private set; } = DirectiveResults.None;
 
+    /// <summary>Where each position of the last parsed source stands with respect to the areas of a fixed-form line
+    /// (kb/Work PB3147) — its resultant-line map composed with the reference-format map of every text it read, the main
+    /// source and each copybook — for the COBOL-85 area-placement rules (<c>AreaPlacementPass</c>).</summary>
+    public FixedFormAreas Areas { get; private set; } = FixedFormAreas.None;
+
     /// <summary>
     /// Preprocess and parse a COBOL source file. Returns the parse tree, or <see langword="null"/> if a fatal
     /// syntax error was reported (collected into <paramref name="diagnostics"/>).
@@ -160,6 +165,7 @@ public sealed class Frontend
                 foreach (var d in passDiagnostics.Diagnostics) diagnostics.Add(d);
                 diagnostics.AddCompileOutput(passDiagnostics.CompileOutput);
                 Directives = directives.WithStackOps(ops);
+                Areas = new FixedFormAreas(passLineMap, formats);
                 return tree;
             }
             if (pass > SpeculationBound(encounters, formats))

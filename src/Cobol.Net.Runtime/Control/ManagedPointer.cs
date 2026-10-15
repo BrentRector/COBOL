@@ -59,11 +59,40 @@ public sealed class ManagedPointer<T> : ManagedPointer
 
     private readonly bool _omittedArgument;
 
-    private ManagedPointer(Func<T> get, Action<T> set, bool omittedArgument = false)
+    /// <summary>The store of a view over STORAGE that a store through the formal can grow (<see cref="OverStorage"/>),
+    /// which takes the receiving references the activated element made; null for every other carrier.</summary>
+    private readonly Action<T, ReceivingReferences?>? _overStorage;
+
+    /// <summary>The fresh area this view's value was copied into (<see cref="Watch"/>), whose receiving references the
+    /// store hands to <see cref="_overStorage"/>.</summary>
+    private CellPointer? _watched;
+
+    private ManagedPointer(Func<T> get, Action<T> set, bool omittedArgument = false,
+        Action<T, ReceivingReferences?>? overStorage = null)
     {
         _get = get;
         _set = set;
         _omittedArgument = omittedArgument;
+        _overStorage = overStorage;
+    }
+
+    /// <summary>⛔ A BY REFERENCE VIEW OF THE ARGUMENT'S STORAGE WHOSE STORE CAN CREATE STORAGE (kb/Work PB2690): a fixed
+    /// table of the formal opposite a dynamic-capacity table of the argument, where a store through an occurrence past the
+    /// capacity creates it (ISO §8.5.1.9.3; §14.2.3 GR8). <paramref name="store"/> receives the value AND the receiving
+    /// references the activated element made in the fresh area the value was copied into (<see cref="Watch"/>), or null
+    /// when nothing recorded them (the view stored into directly).</summary>
+    public static ManagedPointer<T> OverStorage(Func<T> get, Action<T, ReceivingReferences?> store) =>
+        new(get, v => store(v, null), overStorage: store);
+
+    /// <summary>The activated element has filled the fresh area <paramref name="area"/> from this view (<c>CobolArgAdapt.Area</c>;
+    /// §14.2.3 GR8 realized by a copy): from now on the area records the receiving references made through it, and the
+    /// store back hands them to the view. A no-op for a view that cannot create storage — every carrier but
+    /// <see cref="OverStorage"/>'s.</summary>
+    public void Watch(ManagedPointer area)
+    {
+        if (_overStorage is null || area is not CellPointer cell) return;
+        cell.Cell.WatchReceiving();
+        _watched = cell;
     }
 
     /// <summary>True for the omitted-argument carrier (ISO §14.9.4.4 GR11; kb/Work PB133 wave C): the
@@ -101,6 +130,10 @@ public sealed class ManagedPointer<T> : ManagedPointer
     public T Value
     {
         get => _get();
-        set => _set(value);
+        set
+        {
+            if (_watched is { } area) _overStorage!(value, area.Cell.ReceivedFrom(area.Offset, area.DynBase));
+            else _set(value);
+        }
     }
 }

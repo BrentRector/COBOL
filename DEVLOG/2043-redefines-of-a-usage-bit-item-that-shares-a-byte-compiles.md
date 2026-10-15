@@ -18,7 +18,7 @@ PIC 1(2). 05 C PIC 1(2) VALUE B"11".` therefore laid C at bit 6 for LENGTH and w
 its VALUE (C read 00, the byte 0xA8 instead of 0xAB). `RunsOf` now scans the non-redefining siblings only.
 
 Goldens: `2002/pb3166_redefines_bit_item_in_shared_byte` (values derived from 13.18.44.1/.4 and 8.5.1.6.3, not from a run),
-`negative/pb3166-redefines-bit-item-below-2002`; `BitRunImageDriftTests` rows BRD09 and BRD10. Design doc updated
+`negative/pb3166-redefines-bit-item-below-2002`; `BitRunImageDriftTests` rows BRD11 and BRD12. Design doc updated
 (`COBOLNET_DATA_MODEL_DESIGN.md`, the run section). No inventory row claimed or closed. Sibling sweep: the OCCURS DEPENDING
 holder, a table element struct and an FD record round trip were probed and agree.
 

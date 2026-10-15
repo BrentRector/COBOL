@@ -155,6 +155,8 @@ public static class CompilerDriver
             // EXCEPTION-LOCATION) name the file and line the USER edits, through the frontend's origin map.
             LineMap = frontend.LineMap,
             SourceFile = options.SourcePath,
+            // kb/Work PB3147: the COBOL-85 area-placement rules read where each token begins its fixed-form line.
+            Areas = frontend.Areas,
             // kb/Work PB803: the compilation's over-punch convention travels to the emitter on the SAME
             // per-compilation object the edition does (DataBinder.Edition → EmitContext.SignEncoding), so every
             // NumProfile and every signed class condition this compile emits states one convention.

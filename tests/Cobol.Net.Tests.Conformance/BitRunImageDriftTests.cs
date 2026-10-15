@@ -80,16 +80,31 @@ public sealed class BitRunImageDriftTests
         "05 M1 PIC 1(4) USAGE BIT VALUE B\"1010\". 05 S5 GROUP-USAGE BIT. 10 Q1 PIC 1(2) USAGE BIT VALUE B\"01\"."
         + " 10 S6 GROUP-USAGE BIT. 15 Q2 PIC 1 USAGE BIT VALUE B\"1\".",
         "M1|Q1|Q2|S6|S5")]
-    // ⛔ PB3166 - a REDEFINES inside a run is TRANSPARENT to it (13.18.44.1: it adds no storage), so M3 follows M2's
+    // ⛔ PB3158 — an ALIGNED member of a bit group that itself begins MID-byte: Q2 is "aligned on the first bit of the
+    // first available byte boundary" (§13.18.1.4 GR1) of the RECORD, bit 8, which is bit 6 of S7 (not bit 8 of S7,
+    // record bit 10). The group-relative round-up put it there, and the seed lane and the struct lane then disagreed
+    // with the offsets the REDEFINES class walk handed out.
+    [InlineData("BRD09", 2,
+        "05 M1 PIC 1(2) USAGE BIT VALUE B\"11\". 05 S7 GROUP-USAGE BIT. 10 Q1 PIC 1 USAGE BIT VALUE B\"1\"."
+        + " 10 Q2 PIC 1(5) USAGE BIT ALIGNED VALUE B\"10101\".",
+        "M1|Q1|Q2|S7")]
+    // The same law two levels down, the ALIGNED member in the innermost group (which begins at bit 5), followed by a
+    // same-level bit member that continues in the byte the ALIGNED one opened.
+    [InlineData("BRD10", 2,
+        "05 M1 PIC 1(2) USAGE BIT VALUE B\"11\". 05 S8 GROUP-USAGE BIT. 10 Q1 PIC 1(3) USAGE BIT VALUE B\"101\"."
+        + " 10 S9 GROUP-USAGE BIT. 15 Q2 PIC 1 USAGE BIT VALUE B\"1\". 15 Q3 PIC 1(2) USAGE BIT ALIGNED VALUE B\"01\"."
+        + " 15 Q4 PIC 1(3) USAGE BIT VALUE B\"110\".",
+        "M1|Q1|Q2|Q3|Q4|S9|S8")]
+    // ⛔ PB3166 - a REDEFINES inside a run is TRANSPARENT to it (§13.18.44.1: it adds no storage), so M3 follows M2's
     // bits in the same byte: the run scan used to end the run at the redefiner and image M3 as the leader of a run of
     // its own, a byte later, dropping its VALUE from the aliased seed. M2 is the Tier-B canonical in the middle of the
-    // run (the record-struct lane reads it through the class backing, 13.18.44.4 GR1).
-    [InlineData("BRD09", 2,
+    // run (the record-struct lane reads it through the class backing, §13.18.44.4 GR1).
+    [InlineData("BRD11", 2,
         "05 M1 PIC 1(2) USAGE BIT VALUE B\"01\". 05 M2 PIC 1(3) USAGE BIT VALUE B\"101\"."
         + " 05 M2R REDEFINES M2 PIC 1(2) USAGE BIT. 05 M3 PIC 1(3) USAGE BIT VALUE B\"110\". 05 M4 PIC X(1) VALUE \"Z\".",
         "M1|M2|M2R|M3|M4")]
     // The canonical LEADS the run and a bit item continues it past the redefiner.
-    [InlineData("BRD10", 1,
+    [InlineData("BRD12", 1,
         "05 M1 PIC 1(6) USAGE BIT VALUE B\"101010\". 05 M1R REDEFINES M1 PIC 1(2) USAGE BIT."
         + " 05 M2 PIC 1(2) USAGE BIT VALUE B\"11\".",
         "M1|M1R|M2")]

@@ -1196,7 +1196,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             PlaceRenderer.VarGroupBoundaryImage(p, "CALL argument", byReference: true),
             PlaceRenderer.WriteVarGroupImage(p, "__v", "CALL boundary copy into")),
         CallCrossing.Text =>
-            $"ManagedPointer<string>.OverField(() => {CallStringRead(p)}, __v => {{ {CallStringWrite(p, "__v")} }})",
+            $"ManagedPointer<string>.OverField(() => {CallStringRead(p)}, __v => {{ {BoundaryCopyWrite(p, "__v")} }})",
         // Native AND Managed share one rendering — the item's own carrier over its own field — because both
         // ARE their storage rather than an image of it (§14.2.3 GR8's "same storage area"). They are two arms
         // rather than one so the callee's matching arms have something to be matched against.
@@ -1393,6 +1393,21 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// answer for the CALL callee's resident carrier and the INVOKE argument / copy-out windows.</summary>
     internal static int ElementaryFormalWindow(DataItem formal) =>
         Math.Max(1, formal.StoreAsImage ? formal.ImageWidth : formal.Pic!.Length);
+
+    /// <summary>⛔ A BOUNDARY COPY of a character image into its storage — the write half of a BY REFERENCE argument's view
+    /// (<see cref="RefCarrier"/>, the typed INVOKE's argument store, the universal box's copy-out) and a formal's copy-in:
+    /// <see cref="CallStringWrite"/>, except that a GROUP of a cell-backed class takes the image as the copy it is, which
+    /// records no receiving reference (<see cref="PlaceRenderer.WriteGroupCopy"/>; kb/Work PB2690). The test is on the
+    /// group's FULL allocation, the storage <see cref="CallStringWrite"/> itself stores into, so every group arm of it is
+    /// covered: a plain group, an occurs-depending group (its <c>OdoGroupPlace</c> wrapper; branch review R1-2), and a bit
+    /// or national group crossing as its elementary value (the as-if arm, whose store is the same view's coded write). A
+    /// group's write half is a whole-image copy at the activated element's return, whichever occurrences it stored into, so
+    /// recording it would make every occurrence a receiving reference; an ELEMENTARY or reference-modified argument's view
+    /// is written per store, so its write half IS the activated element's receiving reference and keeps recording.</summary>
+    internal static string BoundaryCopyWrite(Place p, string value) =>
+        p.Item.IsGroup && FullAllocation(p) is RedefViewPlace v
+            ? PlaceRenderer.WriteGroupCopy(v, value)
+            : CallStringWrite(p, value);
 
     internal static string CallStringWrite(Place p, string value) =>
         // The boundary WRITE half of the §14.2.3 GR8/GR9 full-allocation rule above: a group (including an
