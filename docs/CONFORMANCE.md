@@ -799,8 +799,8 @@ of an unsupported facility.
   followed by a USE that completes normally BYPASSES that file — the other GIVING files are still written), GR12 b)
   (any WRITE exception continues only after a USE that completes normally) and both verbs' write-boundary paragraph
   (the file is closed and the statement goes on). (kb/Work PB993; golden `2002/pb993_sort_merge_transfer_termination`.)
-- **A USE procedure invoked from a SORT's INPUT or OUTPUT PROCEDURE that does not complete normally (§14.9.40.4 GR17,
-  GR10, GR13; §14.9.33.4 GR2 a), GR3; §14.6.13.1.2 1)), spec silent on where control lands**: GR17 — "If a USE
+- **A USE procedure invoked from a SORT's INPUT or OUTPUT PROCEDURE that does not complete normally (§14.6.13.1.2 1);
+  §14.9.33.4 GR2 a), GR3; §14.9.40.4 GR10, GR13, GR17), spec silent on where control lands**: GR17 — "If a USE
   procedure invoked while a format 1 SORT statement is active does not complete normally, the SORT statement is
   terminated" — reaches a USE procedure an explicit statement of either procedure invokes, since GR10/GR13 put "all
   statements in declarative procedures that are executed as a result of the execution of statements in the range" in

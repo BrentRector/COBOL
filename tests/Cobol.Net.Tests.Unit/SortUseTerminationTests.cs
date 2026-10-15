@@ -52,7 +52,7 @@ public sealed class SortUseTerminationTests
     });
 
     /// <summary>Only the registering scope's declaratives reach the rule: another program instance's (a CALLed
-    /// program's own USE procedure), a MERGE's (§14.9.24.4 has no GR17, so it registers none) and a scope whose SORT
+    /// program's own USE procedure), a MERGE's (its rules, §14.9.24.4, carry no such sentence, so it registers none) and a scope whose SORT
     /// has ended (no store, no active statement) all get their action back.</summary>
     [Fact]
     public void OtherScopes_MergesAndEndedSorts_AreNotTerminated() => RunUnit.Run(_ =>

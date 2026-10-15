@@ -738,7 +738,7 @@ rule that leaves a statement inside a terminated SORT's procedure no next statem
 procedure-name transfers as a GO TO (§14.9.33.4 GR3) from the SORT's own dispatcher, not from inside the procedure's.
 A USE procedure invoked by another USE procedure while the SORT is active is reached the same way, so the
 termination happens where the inner one ends. GOBACK / EXIT PROGRAM / STOP unwind by their own signals through the
-same `finally`. MERGE registers nothing — §14.9.24.4 has no GR17 — so a statement of a MERGE output procedure is
+same `finally`. MERGE registers nothing — its rules (§14.9.24.4) carry no such sentence — so a statement of a MERGE output procedure is
 its own applicable statement and its RESUME AT NEXT STATEMENT continues the procedure (docs/CONFORMANCE.md §3). An
 exception-checking PERFORM handler is not a USE procedure, so its RESUME keeps the static landing above. Both labels and the `catch` sit around the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. In an OO method the guard array is a LOCAL, so the method's selection machinery is emitted BEFORE its `__MDispatch` (as a program's is before its `__Dispatch`) — a SORT in the method body names it. Pinned by `conformance:2002/pb1177_sort_procedure_use_not_normal`, `conformance:2002/pb1177_method_sort_use_not_normal`, `conformance:2023/pb367b_sort_use_not_normal` and `unit:SortUseTerminationTests`. The implicit transfers' end label is also where a procedure that DID
 complete normally lands when the verb's own rule terminates the statement: §14.6.13.1.3 2) ("If the executed
