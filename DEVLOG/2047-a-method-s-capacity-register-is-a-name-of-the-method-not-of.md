@@ -1,4 +1,4 @@
-## A method's CAPACITY register is a name of the method, not of the unit (PB3165)
+## Entry 2047 — 2026-10-15 11:25 PDT — A method's CAPACITY register is a name of the method, not of the unit (PB3165)
 
 A table declared in one method with `OCCURS DYNAMIC CAPACITY IN Q2` could be read from a sibling method that declared
 nothing, and the backend then failed with CS0103 because the table is a C# local of the first method only. The
@@ -39,3 +39,4 @@ private `Path.Combine` helper that `drift_rules.py` cannot read, so it was neith
 sweep; it now uses `TestRepo.Src` and carries `[Trait("Sweep", "tree")]` (tier 0c). The one-place scan itself still
 misses tier 0c: the shared timings store holds a single 24.5 s sample of it (about 0.1 s alone), over the planner's
 2 s sweep limit, and a leg-1-only gate never re-measures a case it does not run.
+
