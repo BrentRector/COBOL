@@ -23,3 +23,8 @@ Goldens: `pb3165_method_capacity_register_scope` (2014; SET and reads, same regi
 register shadowed by one method and read by another), negatives `pb3165-method-capacity-register-in-sibling-method`
 and `pb3165-method-capacity-register-duplicates-method-data-name`. No inventory row is claimed or closed. Not fixed
 here: PB3164, the same leak for a method's CONSTANT entries.
+
+Branch review round 1 (R1-1): the lookup applied §11.7.4 GR5's hiding to a method-local DATA-name only, so a method's
+own `INDEXED BY QO` did not hide an object-level `CAPACITY IN QO`, and `SET QO TO 3` in the method resized the object's
+table. `CapacityCandidates` now also yields nothing when the method declares the spelling as an index-name; the golden
+gained a method `SHOWD` that exercises it (its `SET N TO QO` was also refused with COBOLNET2326 before).
