@@ -317,11 +317,11 @@ def git_branch_classifier() -> Callable[[str], str]:
 
 def branch_carrier(reports: list[Report], classify: Callable[[str], str],
                    git: Callable[..., Any]) -> Callable[[str], str | None]:
-    """branch -> the branch of a DONE report, not on main, that contains it (`git merge-base --is-ancestor`), or None.
+    """branch -> the branch of a FINISHED report (Report.finished), not on main, that contains it (`git merge-base --is-ancestor`), or None.
     A predecessor that a successor merged lands THROUGH that successor (MANDATORY-PRACTICES O2): wave 1074's group A
     split on `…-e99-1`, A2 merged it into `…-e99-4`, and a finisher that cherry-picked `…-e99-1` onto main again would
     redo work `…-e99-4` already carries (kb/Work PB3150)."""
-    done = list(dict.fromkeys(r.branch for r in reversed(reports) if r.branch and r.status == "DONE"))
+    done = list(dict.fromkeys(r.branch for r in reversed(reports) if r.branch and r.finished))
     cache: dict[str, str | None] = {}
 
     def carried(branch: str) -> str | None:
@@ -702,7 +702,7 @@ def finisher_pred(rep: Report | None, branch: str | None, cls: str, nid_list: li
                   carried_by: str | None = None) -> str:
     if rep is None:
         return "FINISH-FIRST: " + branch_resume(branch or "?", nid_list)
-    if rep.status == "DONE" and rep.review and rep.review.verdict == "FINDINGS":
+    if rep.finished and rep.review and rep.review.verdict == "FINDINGS":
         return (f"FINISH-FIRST: the branch review of {rep.slug} ({rep.lead}) found {rep.review.findings} finding(s) at "
                 f"head {rep.review.sha}: the records of kind `finding` in {rep.review.file} "
                 f"(`python scripts/orchestrator/review_findings.py show {rep.review.file}`). Its branch {rep.branch} "
@@ -756,7 +756,7 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     note_files = {n["id"]: c.get("files", []) for c in clusters + half_clusters for n in c["notes"]}
 
     def findings(r: Report, cls: str) -> bool:
-        return cls not in LANDED_CLASSES and r.status == "DONE" and bool(r.review) and r.review.verdict == "FINDINGS"
+        return cls not in LANDED_CLASSES and r.finished and bool(r.review) and r.review.verdict == "FINDINGS"
 
     # THE LEADS THE REPORTS DECIDE: every open note the fix lane sees, and the lead of a live FINDINGS report that the
     # fix lane cannot see (a `process_only` note, or an owner task's note main does not have yet: branch_lead_notes),

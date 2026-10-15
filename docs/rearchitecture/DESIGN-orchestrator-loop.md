@@ -179,7 +179,8 @@ lost agent work exceeds that cost. Open decision D3.
 6. AGENT WORK for the enqueue unit → `enqueue` (`land_lane.agent_work`, kb/Work PB3103): the landing lane's survey
    (younger than `land_lane.SURVEY_MAX_AGE_MIN`, 30 min) lists a branch WAITING FOR REVIEW, or BOUNCED while the lane
    is neither landing it nor re-armed to (its finisher resolved it with no commit), or a lane attempt STOPPED or
-   ENQUEUED is not yet collected (its finisher or reviewer, its leads, its landing record). The
+   ENQUEUED is not yet collected (its finisher or reviewer, its leads, its landing record). A row the survey reads
+   STOPPED counts through that attempt, never by its state: once collected its owner is already dispatched. The
    lane lands every WAITING TO LAND branch itself (section 4.9), so a handoff's `DONE` branches alone start no enqueue
    unit, unless the lane has no current survey (it is not ticking; the enqueue unit's step 3 ticks it)
    (`test_orchestrate_campaign.ps1` 8f). No landing waits for another: GitHub's merge queue orders main (section 4.7).
@@ -471,7 +472,18 @@ said in the supervisor's log, a failure said and the unit continuing. A tick:
 1. REAPS: an attempt whose detached runner is gone without an exit code is DIED; a run that ended QUEUE NOT ACTIVE
    (exit 8) writes `land-lane\HALT` and names it in the operator's mailbox.
 2. SURVEYS: `git fetch`, then `prune_worktrees.survey` and its landing order (imported, never re-parsed from text),
-   written to `land-lane\survey.json`.
+   written to `land-lane\survey.json`. The survey decides a finished branch by ONE rule of three coverages, never by
+   a report's age (kb/Work PB3181, PB3125): its newest report is FINISHED (`plan_wave.Report.finished`: DONE, or
+   DISCHARGED with a HEAD past its base) and its HEAD is the tip or is followed only by mechanical commits
+   (`prune_worktrees.unreviewed_since`, the review stamp's own coverage rule); its review stamp is CLEAN with the same
+   coverage; and this lane's newest attempt AT THE TIP (`land_lane.view`, its head or end head) is read back: STOPPED
+   at the tip reads **STOPPED** (the enqueue unit's; never WAITING TO LAND, so the table's "never relaunched at this
+   head" and the survey agree), exit 0 at the tip reads ENQUEUED, and only a tip with no attempt, a running one or a
+   retryable one (exit 3, 2, 9, 8, or a re-arm) reads WAITING TO LAND. A STOPPED branch carries the predecessors it
+   contains (they read IN FLIGHT). A report that names no HEAD, or that a later non-mechanical commit outdates, is a
+   DECISION with that evidence: its author rewrites it. The rolling wave asks the same predicate before it reviews a
+   return (`plan_wave.py --finished <report>`, through one mechanical `cobol-locator`, since a workflow script runs no
+   process), and `review_findings.py stamp` refuses an unfinished report.
 3. LAUNCHES, unless `HALT`, the loop's `STOP-UNIT` or `STOP`, or the owner's global `scratch\STOP` exists (a running
    `enqueue.py land` finishes either way; it is idempotent): for every WAITING TO LAND row in survey order, every
    branch whose last attempt the lane may retry with its tip still that attempt's end head, and every branch the
