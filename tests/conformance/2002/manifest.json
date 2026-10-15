@@ -862,7 +862,11 @@
   "pb3166_redefines_bit_item_in_shared_byte",
   "pb2722_evaluate_partial_not_ownership",
   "pb2740_omitted_branch_turn_valid_names",
-  "pb3158_aligned_in_mid_byte_bit_group"
+  "pb3158_aligned_in_mid_byte_bit_group",
+  "pb3154_half_data_named_like_class_words",
+  "pb3154_half_data_hides_class_symbolic",
+  "pb3154_sum_counter_hides_symbolic",
+  "pb3154_global_sum_counter_tier"
   ],
   "pending": []
 }

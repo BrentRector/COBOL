@@ -39,12 +39,7 @@ public sealed partial class DataBinder
     /// <see cref="ScreenSameClauses"/> (kb/Work PB1087).</summary>
     private void BindIoControl(Core.ProgramUnitContext program)
     {
-        foreach (var env in EnvDivisions(program)) BindIoControl(env);
-    }
-
-    private void BindIoControl(Core.EnvironmentDivisionContext env)
-    {
-        var io = env.inputOutputSection()?.ioControlParagraph();
+        var io = program.environmentDivision()?.inputOutputSection()?.ioControlParagraph();
         if (io is null) return;
         var sites = new List<SameSite>();
         foreach (var clause in io.ioControlClause())
