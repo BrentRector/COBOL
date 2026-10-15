@@ -99,7 +99,9 @@ RESUME NEXT and GOBACK. `2002/pb1177_sort_called_goback_ec_free` pins the GOBACK
 exception-condition feature, where `__RunUse` keeps its void form. `SortUseTerminationTests` was rewritten for the widened rule, including the
 innermost-of-two case.
 
-**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T215125Z-fbb8c8:
-Conformance 6,116/11,713, Unit 33,268/33,673, Characterization 6/36 in leg 1, with both new goldens and all four
-`SortUseTerminationTests` passing). The two earlier reds were the citation audit, which read "has no GR17" as a
-citation, and the ABI pin above.
+**Gate.** The first landing's gate was `LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T215125Z-fbb8c8);
+its two earlier reds were the citation audit, which read "has no GR17" as a citation, and the ABI pin above. The
+review finisher's gate is `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run
+20261015T223449Z-33efe5: Conformance 6,123/11,716, Unit 33,307/33,679, Characterization 6/36 in leg 1, with the five
+pb1177 goldens and every `SortUseTerminationTests` case passing). Its one red was the citation audit again: "GR4 b)).
+So GR17" and "(§14.6.13.1.2 1)) that the GR17 question" read as phantom GR17 citations of the clause before them.
