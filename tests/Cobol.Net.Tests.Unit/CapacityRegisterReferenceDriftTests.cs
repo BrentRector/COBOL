@@ -40,12 +40,47 @@ public sealed class CapacityRegisterReferenceDriftTests
     /// <summary>⛔ ONE lookup path. The register name tables are <c>DataBinder.CapacityRegisters</c> (the unit's) and
     /// <c>OoMethodDataScope.CapacityRegisters</c> (a method's own, kb/Work PB3165). Only
     /// <c>SymbolTable.CapacityCandidates</c> — the one scope-aware name resolver, where §11.7.4 GR5's
-    /// method-over-object visibility is applied — reads a name in them, and only
-    /// <c>ReferenceResolver.CapacityRegisterFor</c> asks it and turns the candidates into a reference. A second reader outside <c>DataBinder.Odo.cs</c> (the maps' owner: the
-    /// SR30 duplicate-name screen and the one insert) and the codegen profile emitter (which enumerates the VALUES,
-    /// not a name) is the two-arm dispatch this rule already produced once.</summary>
+    /// method-over-object visibility is applied — reads a name in them
+    /// (<see cref="TheOneLookup_HoldsEveryRead_AndHasOneCaller"/>). A reader in any file other than
+    /// <c>DataBinder.Odo.cs</c> (the maps' owner: the SR30 duplicate-name screen and the one insert) and
+    /// <c>SymbolTable.cs</c> — the codegen profile emitter enumerates the VALUES, never a name — is the two-arm
+    /// dispatch this rule already produced once.</summary>
     [Fact]
     public void TheCapacityRegisterNameLookup_IsWrittenInExactlyOnePlace()
+    {
+        // DataBinder.Odo.cs owns the maps (the SR30 duplicate-name screen + the insert); SymbolTable.cs is the ONE
+        // reader that answers a name with them.
+        string[] expected = ["DataBinder.Odo.cs", "SymbolTable.cs"];
+        var unexpected = SrcScan.Value.Sites
+            .Where(s => !expected.Any(e => s.StartsWith(e, StringComparison.Ordinal))).ToList();
+        Assert.True(unexpected.Count == 0,
+            "A CAPACITY register name lookup was added outside the one resolver hook:\n  "
+            + string.Join("\n  ", unexpected));
+    }
+
+    /// <summary>⛔ Inside <c>SymbolTable.cs</c> every register-map read lies in <c>CapacityCandidates</c> — ONE method,
+    /// however many scopes it consults — and that method has ONE caller, <c>ReferenceResolver.CapacityRegisterFor</c>,
+    /// which turns the candidates into a reference. A second caller would be a second reference hook judging the
+    /// name by another rule.</summary>
+    [Fact]
+    public void TheOneLookup_HoldsEveryRead_AndHasOneCaller()
+    {
+        string hook = MethodBody(File.ReadAllText(SymbolTablePath), "CapacityCandidates");
+        int inFile = SrcScan.Value.Sites.Count(s => s.StartsWith("SymbolTable.cs", StringComparison.Ordinal));
+        int inHook = hook.Split('\n').Count(l => IsNameLookup(l.Trim()));
+        Assert.True(inHook > 0, "SymbolTable.CapacityCandidates reads no CAPACITY register map.");
+        Assert.True(inFile == inHook,
+            $"SymbolTable.cs reads a CAPACITY register map {inFile - inHook} time(s) outside CapacityCandidates.");
+
+        string caller = Assert.Single(SrcScan.Value.Callers);
+        Assert.StartsWith("ReferenceResolver.cs", caller, StringComparison.Ordinal);
+        Assert.Contains("Symbols.CapacityCandidates(",
+            MethodBody(File.ReadAllText(ReferenceResolverPath), "CapacityRegisterFor"), StringComparison.Ordinal);
+    }
+
+    /// <summary>One read of every <c>src</c> source line, shared by the two scans: each register-map read and each
+    /// call of <c>CapacityCandidates</c>, as <c>file: line</c>. Comment lines are prose about the rule, not sites.</summary>
+    private static readonly Lazy<(List<string> Sites, List<string> Callers)> SrcScan = new(() =>
     {
         var sites = new List<string>();
         var callers = new List<string>();
@@ -56,40 +91,20 @@ public sealed class CapacityRegisterReferenceDriftTests
             foreach (string line in File.ReadAllLines(file))
             {
                 string t = line.Trim();
-                if (t.StartsWith("//", StringComparison.Ordinal)) continue;   // prose about the rule is not a site
+                if (t.StartsWith("//", StringComparison.Ordinal)) continue;
                 if (IsNameLookup(t)) sites.Add($"{Path.GetFileName(file)}: {t}");
                 if (t.Contains("CapacityCandidates(", StringComparison.Ordinal)
                     && !t.Contains("List<DataItem>? CapacityCandidates(", StringComparison.Ordinal))
                     callers.Add($"{Path.GetFileName(file)}: {t}");
             }
         }
-
-        // DataBinder.Odo.cs owns the maps (the SR30 duplicate-name screen + the insert); SymbolTable.cs is the ONE
-        // reader that answers a name with them.
-        string[] expected = ["DataBinder.Odo.cs", "SymbolTable.cs"];
-        var unexpected = sites.Where(s => !expected.Any(e => s.StartsWith(e, StringComparison.Ordinal))).ToList();
-        Assert.True(unexpected.Count == 0,
-            "A CAPACITY register name lookup was added outside the one resolver hook:\n  "
-            + string.Join("\n  ", unexpected));
-
-        // Inside SymbolTable.cs every read lies in CapacityCandidates: ONE method, however many scopes it consults.
-        string hook = MethodBody(File.ReadAllText(SymbolTablePath), "CapacityCandidates");
-        int inFile = sites.Count(s => s.StartsWith("SymbolTable.cs", StringComparison.Ordinal));
-        int inHook = hook.Split('\n').Count(l => IsNameLookup(l.Trim()));
-        Assert.True(inHook > 0, "SymbolTable.CapacityCandidates reads no CAPACITY register map.");
-        Assert.True(inFile == inHook,
-            $"SymbolTable.cs reads a CAPACITY register map {inFile - inHook} time(s) outside CapacityCandidates.");
-
-        // ...and its ONE caller is the reference hook.
-        string caller = Assert.Single(callers);
-        Assert.StartsWith("ReferenceResolver.cs", caller, StringComparison.Ordinal);
-        Assert.Contains("Symbols.CapacityCandidates(",
-            MethodBody(File.ReadAllText(ReferenceResolverPath), "CapacityRegisterFor"), StringComparison.Ordinal);
-    }
+        return (sites, callers);
+    });
 
     private static bool IsNameLookup(string line) =>
-        Regex.IsMatch(line, @"CapacityRegisters\s*\.\s*(TryGetValue|ContainsKey)\b")
-        || Regex.IsMatch(line, @"CapacityRegisters\s*\[");
+        line.Contains("CapacityRegisters", StringComparison.Ordinal)
+        && (Regex.IsMatch(line, @"CapacityRegisters\s*\.\s*(TryGetValue|ContainsKey)\b")
+            || Regex.IsMatch(line, @"CapacityRegisters\s*\["));
 
     /// <summary>⛔ The hook judges the WRITTEN reference, never the parse shape. A read of
     /// <c>dataReferenceSuffix()</c> back in <c>CapacityRegisterFor</c> (the old façade <c>HasNoSuffix</c> test,

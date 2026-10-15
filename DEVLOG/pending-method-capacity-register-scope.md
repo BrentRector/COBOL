@@ -32,7 +32,10 @@ gained a method `SHOWD` that exercises it (its `SET N TO QO` was also refused wi
 Finisher (the landing's Linux unit leg was RED): `CapacityRegisterReferenceDriftTests` still pinned the one register-name
 lookup to `ReferenceResolver.cs`, and this change had moved it, as it had to, into `SymbolTable.CapacityCandidates`, the
 one scope-aware name resolver, which now reads two maps (the method's own and the unit's). The test now pins that shape:
-every map read outside `DataBinder.Odo.cs` lies inside `CapacityCandidates`, whose one caller is
-`ReferenceResolver.CapacityRegisterFor`. Why the Windows gate never ran it: the class reached `src` through a private
-`Path.Combine` helper that `drift_rules.py` cannot read, so it was neither a specific rule nor a tree-wide sweep; it
-now uses `TestRepo.Src` and carries `[Trait("Sweep", "tree")]`, so every gate runs it (tier 0c).
+no file but `DataBinder.Odo.cs` and `SymbolTable.cs` reads a register map, and the new
+`TheOneLookup_HoldsEveryRead_AndHasOneCaller` holds every `SymbolTable.cs` read inside `CapacityCandidates`, whose one
+caller is `ReferenceResolver.CapacityRegisterFor`. Why the Windows gate never ran it: the class reached `src` through a
+private `Path.Combine` helper that `drift_rules.py` cannot read, so it was neither a specific rule nor a tree-wide
+sweep; it now uses `TestRepo.Src` and carries `[Trait("Sweep", "tree")]` (tier 0c). The one-place scan itself still
+misses tier 0c: the shared timings store holds a single 24.5 s sample of it (about 0.1 s alone), over the planner's
+2 s sweep limit, and a leg-1-only gate never re-measures a case it does not run.
