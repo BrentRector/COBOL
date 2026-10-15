@@ -127,7 +127,7 @@ public sealed class SortFileTable
     /// return has done what a return does (the BY REFERENCE copy-out, the RETURNING delivery), and the
     /// <see cref="SortTerminationSignal"/> unwinds the rest of the range to the statement's landing as a completion
     /// that is not normal. Asked by <c>ProgramTable.CallProgram</c> after every CALL and function activation, and by
-    /// the epilogue of every method that has EC-model declaratives.</summary>
+    /// the epilogue of every method that has declaratives.</summary>
     internal void AfterActivationReturn()
     {
         if (_exitTerminated is not { } name) return;

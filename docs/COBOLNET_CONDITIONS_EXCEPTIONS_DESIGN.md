@@ -728,7 +728,7 @@ in declarative procedures that are executed as a result of the execution of stat
 procedure's range), whose raise site runs below the procedure's nested `__Dispatch` and cannot jump to the
 statement's end (kb/Work PB1177) — and equally one invoked by a statement of a program CALLed or a method INVOKEd in
 that range (GR10/GR13's "all statements that are executed as the result of a transfer of control in the range"),
-including a containing program's GLOBAL declarative (§14.9.49.4 GR4 b)). So GR17 is ONE run-time mechanism: EVERY
+including a containing program's GLOBAL declarative (§14.9.49.4 GR4 b)). So §14.9.40.4 GR17 is ONE run-time mechanism: EVERY
 format 1 SORT registers itself as the run unit's active format 1 SORT first in its body (`CobolSort.RegisterFormat1Sort`,
 with its scope's `__useActive` — `EcEmitter.SortUseScope`, exactly when the scope has the EC-model `__RunUse` — or null),
 the generated `__RunUse` of every EC-model element hands every DECLARATIVE's action, with its own `__useActive`, to
@@ -752,9 +752,10 @@ own signals through the same `finally`. In ANOTHER element's declarative an EXIT
 return: `__RunUse` notes it with a declining filter on the return signal (`CobolSort.UseProcedureExited`), the return
 completes (copy-out, RETURNING), and the SORT is terminated in the activator (`SortFileTable.AfterActivationReturn`,
 asked by `ProgramTable.CallProgram` after every CALL and function activation and by the epilogue of every method with
-EC-model declaratives). MERGE registers nothing — its rules (§14.9.24.4) carry no such sentence — so a statement of a MERGE output procedure is
+declaratives; the filter is in every EC-model `__RunUse` and in the EC-free one from the 2002 edition on, where GR17
+arrives). MERGE registers nothing — its rules (§14.9.24.4) carry no such sentence — so a statement of a MERGE output procedure is
 its own applicable statement and its RESUME AT NEXT STATEMENT continues the procedure (docs/CONFORMANCE.md §3). An
-exception-checking PERFORM handler is not a USE procedure, so its RESUME keeps the static landing above. Both labels and the `catch` sit around the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. In an OO method the guard array is a LOCAL, so the method's selection machinery is emitted BEFORE its `__MDispatch` (as a program's is before its `__Dispatch`) — a SORT in the method body names it. Pinned by `conformance:2002/pb1177_sort_procedure_use_not_normal`, `conformance:2002/pb1177_method_sort_use_not_normal`, `conformance:2002/pb1177_sort_called_use_not_normal`, `conformance:2002/pb1177_invoke_sort_use_not_normal`, `conformance:2023/pb367b_sort_use_not_normal` and `unit:SortUseTerminationTests`. The implicit transfers' end label is also where a procedure that DID
+exception-checking PERFORM handler is not a USE procedure, so its RESUME keeps the static landing above. Both labels and the `catch` sit around the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. In an OO method the guard array is a LOCAL, so the method's selection machinery is emitted BEFORE its `__MDispatch` (as a program's is before its `__Dispatch`) — a SORT in the method body names it. Pinned by `conformance:2002/pb1177_sort_procedure_use_not_normal`, `conformance:2002/pb1177_method_sort_use_not_normal`, `conformance:2002/pb1177_sort_called_use_not_normal`, `conformance:2002/pb1177_invoke_sort_use_not_normal`, `conformance:2002/pb1177_sort_called_goback_ec_free`, `conformance:2023/pb367b_sort_use_not_normal` and `unit:SortUseTerminationTests`. The implicit transfers' end label is also where a procedure that DID
 complete normally lands when the verb's own rule terminates the statement: §14.6.13.1.3 2) ("If the executed
 statement is a MERGE or SORT statement, then the rules for those statements apply") precedes 5)/7), so these
 sites call `__IoCheckEc(…, __verbRule: true)`, which skips the fatal throw, and dispose of the status from

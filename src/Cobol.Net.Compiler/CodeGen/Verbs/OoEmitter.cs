@@ -1359,8 +1359,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 }
                 // §14.9.40.4 GR17 (kb/Work PB1177): a declarative of this method that ended in EXIT METHOD or GOBACK while
                 // a SORT whose range invoked the method is active terminates that SORT once the return is complete —
-                // CobolSort.UseProcedureExited recorded it on the way out. Only a method with EC-model declaratives can.
-                if (ecState.Active && mDecls.Count > 0)
+                // CobolSort.UseProcedureExited recorded it on the way out (DispatchEmitter.UseProcedureExitFilter — every
+                // method's __RunUse asks, OO being 2002 and later). Only a method with declaratives can.
+                if (mDecls.Count > 0)
                     w.Line($"{RuntimeApi.SortAfterActivationReturn};   // §14.9.40.4 GR17 — a declarative's EXIT METHOD / GOBACK ended a SORT this invocation ran in");
             }
             (ecState.UnitHasF3Perform, ecState.UnitHasF3, ecState.UnitHasF4, dispatch.UseDecls,

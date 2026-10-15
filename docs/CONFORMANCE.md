@@ -827,7 +827,7 @@ of an unsupported facility.
   procedure is its own applicable statement, and its USE procedure's RESUME AT NEXT STATEMENT continues the procedure
   and the MERGE. The ISO text controls; no GnuCOBOL latitude is taken. (kb/Work PB1177; goldens
   `2002/pb1177_sort_procedure_use_not_normal`, `2002/pb1177_sort_called_use_not_normal`,
-  `2002/pb1177_invoke_sort_use_not_normal`.)
+  `2002/pb1177_invoke_sort_use_not_normal`, `2002/pb1177_sort_called_goback_ec_free`.)
 - **D-SMF — the short-record fill of a SORT/MERGE transfer (§14.9.40.4 GR7, GR16; §14.9.24.4 GR2, GR13)**: three
   readings. **(a) Arm b) cannot arise.** "multiple record description entries … and the descriptions include a SELECT
   WHEN clause" needs the SELECT WHEN clause, which Annex A.4.8 declines by name (COBOLNET1705), so a file with several

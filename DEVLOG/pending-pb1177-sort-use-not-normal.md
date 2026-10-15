@@ -83,7 +83,8 @@ rather than record that reading as a determination:
   `AfterUseProcedure`. `__RunUse` now notes it with a declining filter on the return signal
   (`CobolSort.UseProcedureExited`). The return completes, and the SORT is terminated in the activator
   (`SortFileTable.AfterActivationReturn`, asked by `ProgramTable.CallProgram` and by the epilogue of a method with
-  EC-model declaratives).
+  declaratives). The filter is in every EC-model `__RunUse`, and in the EC-free one from the 2002 edition on, since an
+  EC-free declarative still ends not normally by EXIT PROGRAM or GOBACK.
 - An activation the signal unwinds still owes what its end owes. The BY REFERENCE copy-out moved into the
   activation's `finally` and runs when it returned or ended this way (`SortTerminationSignal.EndsActivation`, a
   declining filter). An INITIAL program's implicit CANCEL runs too (`ProgramTable.EndInitialActivation`), so its next
@@ -94,7 +95,8 @@ rather than record that reading as a determination:
 The new goldens are `2002/pb1177_sort_called_use_not_normal` and `2002/pb1177_invoke_sort_use_not_normal`. The
 first has seven legs: control, RESUME NEXT, RESUME AT, the output procedure, GOBACK, an INITIAL program run twice,
 and the container's GLOBAL declarative for a SORT with no declaratives. The second covers an INVOKEd method: control,
-RESUME NEXT and GOBACK. `SortUseTerminationTests` was rewritten for the widened rule, including the
+RESUME NEXT and GOBACK. `2002/pb1177_sort_called_goback_ec_free` pins the GOBACK arm in a group with no
+exception-condition feature, where `__RunUse` keeps its void form. `SortUseTerminationTests` was rewritten for the widened rule, including the
 innermost-of-two case.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T215125Z-fbb8c8:

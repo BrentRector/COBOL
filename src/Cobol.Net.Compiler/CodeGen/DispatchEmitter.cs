@@ -375,13 +375,10 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                     + "   // fell off its end: normal completion unless a fatal exception occurred within its scope (§14.6.13.1.2 1))");
                 w.Line("catch (ResumeSignal __rs) { __act = __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
                 // EXIT PROGRAM / GOBACK (and an automatic propagation's return) leave the declarative by the element's
-                // return signal — a completion that is not normal (§14.6.13.1.2 1)) that the GR17 question below never
-                // sees. The filter asks it on the way out and declines (CobolSort.UseProcedureExited): another element's
-                // active SORT is then terminated once this activation has returned (kb/Work PB1177).
-                string exitAsk = RuntimeApi.SortUseProcedureExited("__useActive");
-                w.Line($"catch ({(inMethod ? "MethodReturn" : "ProgramReturn")}) when ("
-                    + (dispatchState.F3HandlerBasePc is not null ? $"__id < {decls} && " : "")
-                    + $"{exitAsk}) {{ throw; }}   // §14.9.40.4 GR17 — the filter declines (never runs): the return goes on");
+                // return signal — a completion that is not normal (§14.6.13.1.2 1)) that the §14.9.40.4 GR17 question
+                // below never sees. The filter asks it on the way out and declines (CobolSort.UseProcedureExited):
+                // another element's active SORT is then terminated once this activation has returned (kb/Work PB1177).
+                w.Line(UseProcedureExitFilter(inMethod, dispatchState.F3HandlerBasePc is not null ? $"__id < {decls} && " : ""));
                 w.Line("finally { ExceptionState.LeaveDeclarative(__tok); __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
                 // ⛔ §14.9.40.4 GR17 (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT statement is
                 // active does not complete normally, the SORT statement is terminated." A declarative invoked by a
@@ -409,9 +406,28 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                 w.Line("return DispatchResult.Normal;   // the handler completed (§14.6.13.1.2: only declaratives carry the fatal-in-scope half)");
             }
         }
+        else if (ctx.Data.Edition.DialectLevel >= 2002)
+        {
+            // An EC-FREE group's declarative completes not normally only by EXIT PROGRAM / GOBACK / STOP — RESUME and
+            // the fatal-in-scope mark are EC-model facts — and the first two are §14.9.40.4 GR17's question when another
+            // element's SORT is active (kb/Work PB1177). GR17 arrives with the 2002 exception model, so a 1985 program's
+            // void form keeps its shape.
+            w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }}");
+            w.Line(UseProcedureExitFilter(inMethod, ""));
+            w.Line("finally { __useActive[__id] = false; }");
+        }
         else
             w.Line($"try {{ {dispatchState.DispatchName}(__startPc, __endPc); }} finally {{ __useActive[__id] = false; }}");
     }
+
+    /// <summary>The declining exception filter a declarative's <c>__RunUse</c> puts on its element's return signal —
+    /// <c>MethodReturn</c> in a method, <c>ProgramReturn</c> otherwise — for §14.9.40.4 GR17 (kb/Work PB1177): an EXIT
+    /// PROGRAM, EXIT METHOD or GOBACK leaves the declarative not normally (§14.6.13.1.2 1)), and
+    /// <c>CobolSort.UseProcedureExited</c> records it when another element's format 1 SORT is active, which is then
+    /// terminated once this activation has returned. <paramref name="idTest"/> limits it to DECLARATIVE ids.</summary>
+    private static string UseProcedureExitFilter(bool inMethod, string idTest) =>
+        $"catch ({(inMethod ? "MethodReturn" : "ProgramReturn")}) when ({idTest}{RuntimeApi.SortUseProcedureExited("__useActive")}) "
+        + "{ throw; }   // §14.9.40.4 GR17 — the filter declines (never runs): the return goes on";
 
     /// <summary>Emit a paragraph body SENTENCE by sentence. When the paragraph contains a NEXT SENTENCE anywhere,
     /// each inter-sentence boundary gets a label (`__sentP_K:`) — the §14.9.19.4 GR4/GR6 implicit CONTINUE after the
