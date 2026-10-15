@@ -101,6 +101,36 @@ public sealed class SortUseTerminationTests
         CobolSort.Close(Sd);
     });
 
+    /// <summary>An EXIT PROGRAM or GOBACK in a USE procedure leaves it by the element's return signal, which the
+    /// generated <c>__RunUse</c> notes with <see cref="CobolSort.UseProcedureExited"/> (a declining filter, always
+    /// false). Another element's: the active SORT is terminated once that activation has returned, exactly once, as a
+    /// not-normal completion. The SORT's own: its return leaves the SORT statement through its <c>finally</c>, so
+    /// nothing is recorded. A SORT that ends first takes its pending termination with it.</summary>
+    [Fact]
+    public void ExitFromAUseProcedure_TerminatesAnotherElementsSortAtTheActivationsReturn() => RunUnit.Run(_ =>
+    {
+        object scope = new bool[1], callee = new bool[1];
+        CobolSort.Init(Sd);
+        CobolSort.RegisterFormat1Sort(Sd, scope);
+        CobolSort.EnterProcedure(Sd, output: false);
+        try
+        {
+            Assert.False(CobolSort.UseProcedureExited(scope));
+            CobolSort.AfterActivationReturn();   // the SORT's own: nothing pending
+
+            Assert.False(CobolSort.UseProcedureExited(callee));
+            var signal = Assert.Throws<SortTerminationSignal>(CobolSort.AfterActivationReturn);
+            Assert.Equal((Sd, DispatchResult.NotNormal), (signal.File, signal.Action));
+            CobolSort.AfterActivationReturn();   // taken once
+
+            Assert.False(CobolSort.UseProcedureExited(callee));
+        }
+        finally { CobolSort.Close(Sd); }
+        CobolSort.AfterActivationReturn();   // the SORT ended: its pending termination went with it
+        Assert.False(CobolSort.UseProcedureExited(callee));   // and with no SORT active nothing is recorded
+        CobolSort.AfterActivationReturn();
+    });
+
     /// <summary>A SORT executed within another's procedure (EC-SORT-MERGE-ACTIVE, undefined when unchecked — GR10/GR13):
     /// the INNERMOST active SORT is the one terminated, and once it has ended the outer one is active again.</summary>
     [Fact]
