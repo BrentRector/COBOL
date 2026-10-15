@@ -1,4 +1,4 @@
-## PB2099 parts 1-5: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry, the published record struct, OCCURS DEPENDING and reference members, and the library output kind
+## PB2099 parts 1-6: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry, the published record struct, OCCURS DEPENDING and reference members, the library output kind and the one host surface
 
 Wave 1077 group E took kb/Work PB2099, slice 3 of DESIGN-external-repository: the typed host entry and the one host
 surface. Two earlier waves had left it unstarted. The re-probe at a6744fa4d found none of the slice in the tree:
@@ -252,3 +252,50 @@ code's ABI. DOC-A.1-141 is now design §9.4's determination, with `UInt128` adde
 the entry. The rest is the next implementer's: DOC-A.1-116 with its witness, converting the host tests to the entries,
 §17.3's host-route drift test, and the variable-length shapes. The manual's host chapter has no home yet, because
 `docs/manual/` does not exist (kb/Work PB1610).
+
+### Part 6 (wave 1085 group A): the one host surface, one renderer, the published names
+
+Wave 1085 group A cherry-picked wave 1082 B's 22 commits onto main f5fec711b with no conflict. The build was 0/0, and the
+ABI pins and the host-entry shape test passed on the merged tree before any new work.
+
+**The untyped host route is retired.** The four tests that hosted COBOL through `ProgramRegistry.CallProgram`,
+`ProgramRegistry.RunMain` and a reflective `EnsureRegistered` now compile their hosts against the COBOL modules and call
+the generated entries: `NonCobolActivatorReturnTests`, `NonCobolActivatorLinkageTests`, `HostRunUnitEndingTests` and
+`DefaultLocaleDeterminationTests` (whose run units are now `RunUnit.Run` bodies). The linkage witness lost its
+main-entry arm, because no host route reaches `ICobolProgram.Activate` any more. The operating system's activation,
+which §13.7.4 3) leaves undefined, stays pinned by the golden `pb2671_omitted_formal_category_default`. The re-probe
+also corrected the witness itself: my first rewrite asserted that the RETURNING item starts as spaces, and the program
+showed RRRR, the value its instance kept from the last call. §14.2.3 7) says "The initial value of the returning item,
+data-name-2, is undefined", so the test no longer asserts it. DOC-A.1-116 now states the entry's determination: access
+is guaranteed, each formal starts as the host's landed value, a `null` OPTIONAL parameter is OMITTED, and the RETURNING
+item is the return value. The same sweep found five more user-facing rows that described the old route or the old
+registrar: §3's return-to-a-non-COBOL-activator determination, DOC-A.1-64 (which also gave `ICobolProgram.Call` a wrong
+signature), DOC-A.1-13 (`__CobolModule.Register`), and DOC-A.1-134 and -136 (a host's `RunMain`). All five now name the
+entry. `ProgramTable.RunModule`'s remark no longer tells a host to enter through `RunMain`. The renamed witness was
+re-sited on GR-13.7.4-3, GR-13.7.4-5 and DOC-A.1-116 with a retirement record (batch
+`w1085a-PB2099-host-entry-witnesses`); GAP stays at 101.
+
+**`OneHostSurfaceDriftTests`** is §17.3's one-host-surface scan. It reads every test file's code as Roslyn tokens, so
+comments are skipped and the C# hosts a test compiles are scanned. It also reads the user documents (`README.md`,
+`docs/CONFORMANCE.md`, `docs/manual/`, `samples/`). Either kind fails when it names an untyped route. The ABI's own
+tests are listed with their reasons, and a listed test that names no route is red as a stale exemption. A probe copy
+of the old `NonCobolActivatorReturnTests` made it fail on `ProgramRegistry.CallProgram`.
+
+**One renderer.** The host entry built its argument's `Length:` and `Description:` itself. Now
+`CallEmitter.Described(built, length, description)` renders what an argument states for §14.9.4.4 3) d), for a CALL
+statement and a host entry alike. The entry's arguments now take the with-expression form, so the ABI fixture's
+boundary hash is re-pinned. The `CobolArg` fields are unchanged, so `CallAbi` stays 1.
+`HostEntryShapeDriftTests.AHostEntryArgument_IsStatedByTheCallLanesRenderer` pins the shared renderer.
+
+**Names.** A collision fixture (AsImage, FromImage, Equals, ToString and GetHashCode as data-names, a word twice in one
+record, a member spelling its record's type, and a program whose host class spells a formal's record type) compiles
+with every name allocated (`AsImage_2`, `S1_Record_2`, `L_G_Record_2`), and two compiles agree
+(`ThePublishedNames_AreAllocated_…`).
+
+**Found on the way.** `ProgramEmitter`'s `EmitMain` summary had been left above `MainUnit` as an orphan; it is back on
+`EmitMain`. `ProgramRegistry.RunMain` has no caller now, but removing a public member is a runtime-major bump, which is
+a tree-wide change, so it is a lead rather than part of this slice.
+
+**Still open.** The variable-length shapes `PublishedRecordEmitter.Renders` refuses (a dynamic-length item, a
+dynamic-capacity table: the §8.5.1.12 carrier), and the manual's host chapter, which has no home until kb/Work PB1610
+creates `docs/manual/`.

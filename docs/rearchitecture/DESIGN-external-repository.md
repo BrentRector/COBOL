@@ -1839,7 +1839,9 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    holding a dynamic-length item or a dynamic-capacity table — the CALL lane's variable-length carrier — publishes no
    entry until the next step renders those shapes (`PublishedRecordEmitter.Renders`); and a group with no main program
    is a library (`ProgramEmitter.MainUnit` null: `OutputKind.DynamicallyLinkedLibrary`, no `Main`, no
-   `runtimeconfig.json`, §7.2; witnessed in `HostEntryTests`). Settled
+   `runtimeconfig.json`, §7.2; witnessed in `HostEntryTests`); and the untyped host route is retired — every host test
+   calls the generated entries, DOC-A.1-65/-116/-141/-167 describe the entry, and `OneHostSurfaceDriftTests`,
+   `HostEntryShapeDriftTests`' one-renderer and names Facts are §17.3's remaining drift tests. Settled
    2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
    binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
