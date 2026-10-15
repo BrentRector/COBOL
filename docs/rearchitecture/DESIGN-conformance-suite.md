@@ -263,7 +263,9 @@ conformance-suite/
 
 ## 9. Drift tests
 
-- The generator's refusals (§4) run in every gate.
+- The generator's refusals (§4) run in every gate as an audit (`generate.py --check`, one entry of
+  `run_gate_legs.py`'s AUDITS and a command of CI's `audits` job), before the gate slot and the build, so a refused
+  test costs a red in seconds, never a build.
 - Every inventory `test-ref` naming a suite test resolves to a file; every test's `rules` exist in the inventory.
 - Every `accept`/`flag` list agrees with `constructs.json`; every flagged test's control exists and is accepted at
   the same editions.
@@ -328,7 +330,8 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   refuter checks each decision.
 - **S1a — the generator (PB3174).** `conformance-suite/harness/generate.py`: the one header parser (fixed and free
   form), every refusal of §4, the per-edition manifests and the `wiseowl` manifest, the completeness report by witness
-  kind (§4), `--self-test` (discovered by `scripts/self_tests.py`). Built and proved on a seed of tests written from
+  kind (§4), `--check` (the refusals only, writing nothing) as a gate audit (§9), `--self-test` (discovered by
+  `scripts/self_tests.py`). Built and proved on a seed of tests written from
   the standard into `cases/` (an accepted test, a per-edition output, a flag test with its control, an A.1-valued
   test, a test with a copybook), never on the old corpus.
 - **S1b — the harness (PB3175).** `conformance-suite/harness/run.py` with the adapter, profile and baseline formats
@@ -345,9 +348,17 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the
   skills and the open notes, `CorpusRunnerTests`/`CorpusManifest`/`tests/conformance/` deleted, and the neutrality
   proof's evidence in the note. `tests/conformance/README.md`'s authoring guide moves to `conformance-suite/README.md`.
-  A drift test refuses any file under the old `tests/conformance/` path: a fix-lane branch in flight across the move
-  that adds a test there merges without a conflict (the directory is gone), and without the refusal its test would
-  silently never run; with it, that branch's gate is red and its finisher moves the test into `cases/`.
+  **It lands at a quiet point, so no branch crosses it.** A branch cut before the move that adds a test under
+  `tests/conformance/` would merge without a conflict (the directory is gone) and its test would silently never run.
+  Which branches those are is known when the move is ready, so the move is sequenced around them, never left for a
+  gate to find: once the move's branch is reviewed, the operator steers the loop's drain (`plan_wave.py --drain`: no
+  new fix wave starts, the started branches land); the move's branch then merges main, re-runs its converter on the
+  merged tree (the converter stays on the branch until this point), repeats the neutrality proof, and is reviewed for
+  that delta and landed; the drain ends and every later branch is cut from a main that has only `cases/`. The cost
+  is the fix lane's idle time between the drain and the landing, never a gate spent on a known failure. The move also
+  adds one refusal to the generator, a file under the removed `tests/conformance/` path, for a branch the drain does
+  not hold (an attended or Mythos branch): it is a gate audit (§9), so such a branch is red in seconds, before the
+  build, and the fix is moving the file into `cases/`.
 - **S3 — the pilot (PB3178).** §8: clause 11, §14.9.8 and `pb355_start_length_past_operand` through §6 steps 2-4 at
   all four editions on WiseOwl and GnuCOBOL; GnuCOBOL's baseline recorded; the cost per test and the share of each of
   step 2's three outcomes measured and written into PB3160 and §8, with the estimate for the remaining clauses.
