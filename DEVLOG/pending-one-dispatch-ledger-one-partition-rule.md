@@ -54,3 +54,5 @@ it passes; a hand entry and a non-numeric wave are no dispatch; K3 reworked with
 **Docs.** MANDATORY-PRACTICES O9, the workstream SKILL's Specs bullet, the architecture-review SKILL, DESIGN-architecture-review
 section 8.7, DESIGN-orchestrator-loop section 9 (item 1b, new) and its coordination table describe the current
 writers and the one partition rule.
+
+**Gate.** === BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN === (run TestResults/build-local/20261015T210113Z-619d82; the changed self-tests test_plan_wave, test_dispatch_guard, landing_check, prune_worktrees, enqueue GREEN); semgrep verify.py PASS. LINUX GATE: the lander's (batched gating). `work.py check` green. PB2807 and PB3186 landed, `closes_rows: []` (process tooling).
