@@ -1,0 +1,8 @@
+## Entry 2045 — 2026-10-15 10:55 PDT — Waves 1079-1080 planner defects filed: a cherry-picked predecessor is re-planned (PB3170); a lower-case --release selector releases nothing (PB3171); PB3152 and PB2699 extended
+
+New note: PB3170. `plan_wave.py` planned PB3127 again from `worktree-wf_84f0c364-28e-2` (w1077b, SPLIT). That report had finished PB3127, and `worktree-wf_15ec6338-3a0-2` replays all four of its commits. `branch_carrier` treats a branch as carried only when it is an ancestor of a DONE report's branch, while the planner's own FINISH-FIRST pred tells every SPLIT successor to cherry-pick its predecessor, never merge it. The wave-1079 unit released the wave and re-planned with `--max-groups 2` (finishers for PB3101 and PB2099 only).
+
+Extended: PB3152 (a newer landed clerk report that mentions PB3147 masks PB3147's own branch, which was DONE, reviewed CLEAN and waiting to land, so origin/main's planner would have planned PB3147 as new work) and PB2699 (the stale main checkout ran a stale planner: the PB3150 arm that plans a FINDINGS review finisher for a non-cluster lead was missing, so the `notes-w1078-abandon-28e` review finisher went unplanned).
+
+Wave 1080's unit added to the same branch. New note: PB3171 (`plan_wave.py --release` compares a group selector case-sensitively with the ledger's upper-case letters, so the lower-case form its help documents releases nothing). PB3170 gained a wave-1080 section: the planner planned PB3127 behind PB3101 again, and the unit dropped the group by hand. The branch also carries the ledger trend's seven backfilled points (a842e2c6 to bb61722d), rendered from main `11f757593` after PB3161's `missed_points` fix landed.
+
