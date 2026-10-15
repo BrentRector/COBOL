@@ -231,7 +231,7 @@ public static class ActivationRelations
     /// usage, and its <see cref="ActivationDescription.Clauses"/> carry that picture (<c>ActivationDescriptions.Of</c>).</item>
     /// <item>An alphanumeric group carries none of rule 3's clauses, and an elementary item carries its PICTURE clause, so
     /// a group is never the same description as an elementary item, whatever their lengths; two groups are the same
-    /// description at the same length (the comparator this replaced compared that much).</item>
+    /// description at the same length, as pair mode compared them before it asked this relation (kb/Work PB3101).</item>
     /// <item>A variable-length group's matching information is part of the method resolution signature (§9.3.5.3 item 7:
     /// "If the parameter is a variable-length group, sufficient information to determine if this group would match the
     /// group is specified in the invoke statement"), so it is never the same description as a fixed-length group, and two
