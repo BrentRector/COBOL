@@ -137,6 +137,13 @@ internal sealed class ProgramEmitter
         foreach (var unit in units)
             if (unit.Parent is null && !unit.IsPrototype)   // a prototype has no body (§10.6.2 SR4f) — no class
                 EmitProgramClass(unit, w);
+        // The .NET host surface (DESIGN-external-repository §4.3; kb/Work PB2099): one public class per outermost unit, named
+        // in the module namespace's type scope beside every type the module already declares there.
+        new HostEntryEmitter(Current.Ctx.SignEncoding, comp.OoClasses).Emit(units,
+            units.Where(u => u.Parent is null).Select(u => u.ClassName)
+                .Concat(comp.OoClasses.Classes.SelectMany(c => c.FactoryOrInstanceCsTypes))
+                .Concat(comp.OoClasses.Interfaces.Select(i => i.CsName))
+                .Append(ModuleNamespace.RegistrarClass).Append("Program").Append(GroupAtomTable.ClassName), w);
         EmitEntryWrapper(units, w, anyFiles, ns);
         _atoms.Emit(w);   // every §8.5.1.12 atom array a unit named, once (kb/Work PB2690)
         return w.ToString();

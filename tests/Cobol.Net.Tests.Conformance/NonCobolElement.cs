@@ -32,8 +32,10 @@ internal static class NonCobolElement
     /// framework and the WiseOwl COBOL runtime. A HOST (<paramref name="runtimeConfigOf"/> names a COBOL module in
     /// <paramref name="dir"/>) is a console application and takes that module's runtime configuration, because it is
     /// a framework-dependent app like the modules beside it; a LIBRARY (<paramref name="runtimeConfigOf"/> null) is a
-    /// class library.</summary>
-    public static void CompileCSharp(string dir, string assemblyName, string source, string? runtimeConfigOf)
+    /// class library. <paramref name="cobolModules"/> names the COBOL modules in <paramref name="dir"/> the element
+    /// references at compile time — a host that calls their generated host entries (DESIGN-external-repository §4.3).</summary>
+    public static void CompileCSharp(string dir, string assemblyName, string source, string? runtimeConfigOf,
+        params string[] cobolModules)
     {
         var tpa = ((string)AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES")!).Split(Path.PathSeparator);
         var refs = tpa
@@ -41,6 +43,7 @@ internal static class NonCobolElement
                 or "System.Console" or "System.Reflection" or "netstandard")
             .Select(p => (MetadataReference)MetadataReference.CreateFromFile(p))
             .Append(MetadataReference.CreateFromFile(typeof(CobolNet.Runtime.ProgramRegistry).Assembly.Location))
+            .Concat(cobolModules.Select(m => MetadataReference.CreateFromFile(Path.Combine(dir, m + ".dll"))))
             .ToList();
         var compilation = CSharpCompilation.Create(assemblyName, [CSharpSyntaxTree.ParseText(source)], refs,
             new CSharpCompilationOptions(runtimeConfigOf is null ? OutputKind.DynamicallyLinkedLibrary : OutputKind.ConsoleApplication,
