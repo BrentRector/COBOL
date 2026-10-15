@@ -2109,6 +2109,17 @@ public sealed partial class ReferenceResolver(DataBinder data)
                     + "first, and by the report-name last (ISO §8.4.2.2.3 SR4, §8.4.2.2.2 Format 1).");
             return null;
         }
+        // §8.4.6.2.1 3) b) ACROSS NAME CLASSES (kb/Work PB3154 review R3-1): a counter of a container's GLOBAL report
+        // is a global name of THAT container (§13.18.27.4 GR1), so a same-spelled name a NEARER source element
+        // declares — a nearer container's GLOBAL data item, condition-name or index-name — is the referenced item, and
+        // ordinary resolution takes it. (This element's own declarations never reach here: InheritGlobalReport keeps
+        // a counter its own data hides out of SumCounters.) Every candidate left shares one report depth.
+        int counterDepth = data.ReportDepth(matches[0].Report);
+        if (counterDepth > 0
+            && (qualifiers.Count == 0
+                ? data.DeclaredNearerThan(name, counterDepth)
+                : ResolveQualified(name, qualifiers) is { } nearer && data.DeclaringDepth(nearer) < counterDepth))
+            return null;
         if (matches.Count > 1)
         {
             if (report && _diagnosed.Add(dref))

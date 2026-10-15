@@ -106,25 +106,32 @@ internal static class BitLayout
     /// <c>FUNCTION BYTE-LENGTH</c> — the extent walk — counted two (kb/Work PB1569's sibling sweep).</para></summary>
     public static BitRunMap RunsOf(IEnumerable<DataItem> siblings)
     {
-        var list = siblings as IList<DataItem> ?? siblings.ToList();
         // ⛔ THE NO-BIT-MEMBER FAST PATH, and it is the same discipline the class header states for the whole
         // walk: without a USAGE BIT member there are no sub-byte runs, so the map is empty BY CONSTRUCTION and
         // the composers behave exactly as they did before runs existed. Both callers run over EVERY sibling list
         // of EVERY program (the physical-field walk and the image seed), and the overwhelming majority of them
         // hold no bit item at all — allocating a dictionary and a set to say so is a cost with nothing to show.
-        int first = -1;
-        for (int i = 0; i < list.Count; i++)
-            if (RunMember(list[i]) && list[i].RedefinesTargetName is null) { first = i; break; }
-        if (first < 0) return BitRunMap.Empty;
+        bool anyBit = false;
+        foreach (var s in siblings)
+            if (RunMember(s) && s.RedefinesTargetName is null) { anyBit = true; break; }
+        if (!anyBit) return BitRunMap.Empty;
+        // ⛔ A REDEFINING SIBLING IS TRANSPARENT TO ADJACENCY, exactly as it is to the placement walk (Walk keeps
+        // `prev` across it): "immediately following" (§8.5.1.6.3) is asked of the next entry that OCCUPIES storage,
+        // because a REDEFINES "allows the same computer storage area to be described by different data description
+        // entries" (§13.18.44.1) and adds none. The scan used to break the run AT the redefiner and start a new one
+        // after it, so `05 B PIC 1(6). 05 B2 REDEFINES B PIC 1(2). 05 C PIC 1(2).` laid C at bit 6 (the walk, so
+        // FUNCTION LENGTH and every window) but seeded and imaged it as the leader of a run of its own, a byte
+        // later — C's VALUE fell off the end of the group's image (kb/Work PB3166's sibling sweep).
+        var list = new List<DataItem>();
+        foreach (var s in siblings)
+            if (s.RedefinesTargetName is null) list.Add(s);
         var start = new Dictionary<DataItem, IReadOnlyList<DataItem>>(ReferenceEqualityComparer.Instance);
         var inRun = new HashSet<DataItem>(ReferenceEqualityComparer.Instance);
-        for (int i = first; i < list.Count; i++)
+        for (int i = 0; i < list.Count; i++)
         {
-            if (!RunMember(list[i]) || list[i].RedefinesTargetName is not null || inRun.Contains(list[i])) continue;
+            if (!RunMember(list[i]) || inRun.Contains(list[i])) continue;
             var run = new List<DataItem> { list[i] };
-            for (int j = i + 1; j < list.Count && RunMember(list[j])
-                                && list[j].RedefinesTargetName is null
-                                && SharesByteWith(list[j - 1], list[j]); j++)
+            for (int j = i + 1; j < list.Count && RunMember(list[j]) && SharesByteWith(list[j - 1], list[j]); j++)
                 run.Add(list[j]);
             foreach (var m in run) inRun.Add(m);
             start[list[i]] = run;

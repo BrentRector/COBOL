@@ -56,6 +56,21 @@ public sealed partial class DataBinder
     /// <c>StatementBinder.BindClassBody</c>; null while binding program/object-level code).</summary>
     public OoMethodDataScope? ActiveMethodScope { get; set; }
 
+    /// <summary>Whether the method whose statements are being bound declares <paramref name="word"/> as a data-name,
+    /// a condition-name or an index-name of its own — the NEAREST tier a reference made in that method can reach, so
+    /// such a declaration hides every constant-name and symbolic-character of the spelling the class's binder holds
+    /// (ISO §8.4.6.2.1 3) a) "If the name is declared in source element B, the item in source element B is the
+    /// referenced item"; §8.4.6.1 "even when it is a different type of user-defined word"; kb/Work PB3154 review
+    /// R1-1). Asked by the two literal-alias lookups, <see cref="FindConstant"/> and <see cref="SymbolicOf(string)"/>;
+    /// always false outside a method's statements.</summary>
+    internal bool ActiveMethodDeclares(string word) =>
+        ActiveMethodScope is { } m
+        && (m.ByName.ContainsKey(word) || m.Conditions.ContainsKey(word) || m.IndexNames.Declares(word)
+            // A method table's named CAPACITY register is the method's data-name too (§13.18.38.3 SR30), but it lives
+            // in the class binder's register index, not in the method's ByName (kb/Work PB3154 review R2-1).
+            || (_capacityRegisters.TryGetValue(word, out var tables)
+                && tables.Exists(t => OoRootOwner.TryGetValue(t.Root, out var owner) && owner.DataScope == m)));
+
     /// <summary>True when this binder binds a CLASS unit (per-binder-instance configuration, set ONCE at
     /// construction by <c>Oo/OoDriver</c> — init-only since P9 Step 6, so a mid-bind mutation cannot compile): a root
     /// that is NOT method-scoped is then OBJECT data — §14.9.23.3 SR 10 bans it from crossing an INVOKE
@@ -298,14 +313,17 @@ public sealed partial class DataBinder
         public void Dispose() => binder._bindingMethodScope = null;
     }
 
-    /// <summary>Reserve the C# member names of the methods emitted into the same C# class as this binder's data (the
-    /// instance methods beside the object data, the factory methods beside the factory data), BEFORE the data
-    /// division binds, so a data root spelled like one of them takes a distinct field name (<c>PQ_2</c>) instead of a
-    /// second member <c>PQ</c> (CS0102). The COBOL is legal: the METHOD-ID's method-name belongs to the method's own
-    /// source element (§8.4.6.5, §10.5), and §8.3.2.2 bars one word as two types only within one source element
-    /// (kb/Work PB2921). The data root is private, so its C# name is free to move; the method's is its contract.</summary>
-    internal void ReserveMethodMemberNames(IEnumerable<OoMethodSymbol> methods) =>
-        _rootNames.Reserve(methods.Select(static m => m.CsName));
+    /// <summary>Reserve the names the C# class this binder's data is emitted into already holds, BEFORE the data
+    /// division binds: its own type name <paramref name="classCsName"/> (the instance class beside the object data,
+    /// the factory singleton class beside the factory data) and the C# member names of the methods emitted into it.
+    /// A data root spelled like one of them takes a distinct field name (<c>PQ_2</c>) instead of a member named like
+    /// its enclosing type (CS0542) or a second member <c>PQ</c> (CS0102). The COBOL is legal: the METHOD-ID's
+    /// method-name belongs to the method's own source element (§8.4.6.5, §10.5; kb/Work PB2921) and the CLASS-ID's
+    /// object-class-name to the class definition's (kb/Work PB3154), and §8.3.2.2 bars one word as two types only
+    /// within one source element. The data root is private, so its C# name is free to move; the type's and the
+    /// methods' are their contract.</summary>
+    internal void ReserveClassMemberNames(string classCsName, IEnumerable<OoMethodSymbol> methods) =>
+        _rootNames.Reserve([classCsName, .. methods.Select(static m => m.CsName)]);
 
     /// <summary>True when <paramref name="item"/> is OBJECT data of a class unit (§14.9.23.3 SR 10): its 01/77
     /// root is not method-scoped. Always false outside a class unit.</summary>
