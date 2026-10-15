@@ -57,3 +57,10 @@ a temporary that keeps the value on the carrier the renderer chooses, and that i
 reported as a lead.
 
 No inventory row is re-verdicted (`closes_rows: []`, with its reason). No diagnostic codes were used.
+
+**Review round 1.** R1-1: `IsIntegerPosition` had been inserted between `ArgumentRunIsAllNumeric` and its doc
+block, so it carried two summaries while `ArgumentRunIsAllNumeric` had none; it was moved. The same displaced-doc shape
+appears at about forty other sites across the tree. Those sites predate this branch and are reported as a lead for a
+tree-wide sweep with a drift test. R1-2 is the clamp described above. The finisher's gate:
+`=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T222413Z-d30b2a). semgrep verify
+PASS, no count rose.
