@@ -8,6 +8,7 @@ selection whatever the harm flags, the blocked_by order, site clustering per dep
 waits (blockers in two chains, the owner, a frontier model), and work.py check's topology rules.
 Run: python scripts/orchestrator/test_plan_wave.py   (no build, no git; the campaign section needs the
 tools/claude-skills submodule, and its absence is a FAIL)."""
+import dataclasses
 import pathlib
 import re
 import subprocess
@@ -231,6 +232,124 @@ check("mid-prose `branch:` is not a field: with no field the branch word wins, n
       "worktree-wf_rv-6")
 check("mid-prose `branch:` above the Branch field does not pre-empt it", rv3["w1062k"].branch, "worktree-wf_rv-7")
 
+# 6b'''. THE DRAIN AND THE UNSEEN LEAD (kb/Work PB3150). Wave 1075's drain plan (`--max-groups 2`) put the SPLIT of
+#        w1074a first, whose finisher would have started PB3101 (never started) and cherry-picked `…-e99-1` again
+#        though `…-e99-4` merged it, and never planned license-product-name's review finisher: its lead PB3146 is
+#        process_only and existed only on its branch. --drain plans the finishers of STARTED work only; a FINDINGS
+#        report whose lead the fix lane cannot see gets its finisher in every mode, decided by the same rule as an
+#        open note (its newest report naming it, on any branch), and a DONE branch that merely contains it is named in
+#        its pred, never a reason to drop it (review R1-1, R1-2).
+DR = TMP / "reports-drain"
+DR.mkdir()
+for name, first, hdr in (
+        ("w1074a-PB5-report.md", "SPLIT", "# PB5 group (PB12 not started)\n**branch:** `worktree-wf_dr-1` · **HEAD:** `1010101aa`"),
+        ("w1074b-PB7-report.md", "Status: DONE", "**Review:** FINDINGS 1 w1074b-review-r1 2020202bb E:/s/review-w1074-b.jsonl\n"
+                                                 "Branch: worktree-wf_dr-2\nHEAD: 2020202bb"),
+        ("w1074c-PB6-report.md", "SPLIT", "# PB6 group\n**branch:** `worktree-wf_dr-3` · **HEAD:** `3030303cc`"),
+        ("w1074d-PB10-report.md", "SPLIT", "# PB10 group\n**branch:** `worktree-wf_dr-4` · **HEAD:** `4040404dd`"),
+        ("w1074z-PB77-report.md", "Status: DONE", "**Review:** FINDINGS 1 enqueue-review-owner-task-r1 5050505ee "
+                                                  "E:/s/review-owner-task.jsonl\nBranch: owner-task\nHEAD: 5050505ee"),
+        ("w1074y-PB79-report.md", "Status: DONE", "**Review:** FINDINGS 1 enqueue-review-r1 6060606ff E:/s/r79.jsonl\n"
+                                                  "Branch: worktree-wf_dr-5\nHEAD: 6060606ff")):
+    (DR / name).write_text(f"{first}\n{hdr}\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
+DR_CLASS = {"worktree-wf_dr-1": "UNLANDED", "worktree-wf_dr-2": "UNLANDED", "worktree-wf_dr-3": "UNLANDED",
+            "worktree-wf_dr-4": "LANDED", "owner-task": "UNLANDED", "worktree-wf_dr-5": "UNLANDED",
+            "worktree-wf_dr-6": "UNLANDED", "worktree-wf_dr-7": "UNLANDED"}
+DR_CARRIER = {"worktree-wf_dr-1": "worktree-wf_dr-2", "worktree-wf_dr-5": "worktree-wf_dr-2",
+              "worktree-wf_dr-6": "worktree-wf_dr-2"}
+dr_reports = pw.load_reports(DR)
+
+
+class _Shown:
+    def __init__(self, rc, out=""):
+        self.returncode, self.stdout = rc, out
+
+
+def _show(*args, cwd=None):
+    if args[:2] == ("show", "owner-task:kb/Work/PB77.md"):
+        return _Shown(0, '---\ntitle: "PB77 — an owner task"\nid: PB77\nkind: defect\nstatus: landed\narea: process\n'
+                         "process_only: true\n---\n\n# PB77\n")
+    return _Shown(128)
+
+
+dr_notes = dict(notes)
+dr_notes.update(pw.branch_lead_notes(dr_reports, dr_notes, {"wrong_answer": 8}, _show))
+check("an unseen lead is read from its own branch, and only there", sorted(set(dr_notes) - set(notes)), ["PB77"])
+dr_notes["PB79"] = pw.Note("PB79", "open", "process", "PB79 — carried", [], "", 0)
+# unlanded_branch_notes is unfiltered (every id the subjects name); plan() keeps its leads (review R2-1)
+DR_UNLANDED = {"owner-task": ["PB77"], "worktree-wf_dr-6": ["PB11"], "worktree-wf_dr-7": ["PB9"]}
+
+
+def dr_plan(drain):
+    return pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                   budget_points=100, drain=drain, carrier=DR_CARRIER.get)
+
+
+pd = dr_plan(True)
+check("drain: only the finishers of started work", sorted(sorted(g.notes) for g in pd["groups"]),
+      [["PB6"], ["PB7"], ["PB77"], ["PB79"], ["PB9"]])
+check("drain: every group is a finisher whose pred says DRAIN",
+      all(g.kind == "finisher" and "DRAIN" in g.pred for g in pd["groups"]), True)
+check("drain: a SPLIT branch another DONE branch merged waits, with its carrier named",
+      {i: "worktree-wf_dr-2" in pd["waiting"].get(i, "") for i in ("PB5", "PB12", "PB11")},
+      {"PB5": True, "PB12": True, "PB11": True})
+check("drain: a SPLIT whose branch landed left only unstarted work", "never started" in pd["waiting"].get("PB10", ""), True)
+check("drain: the clusters' notes wait, counted", ("PB2" in pd["drain_not_started"], "PB4" in pd["drain_not_started"]),
+      (True, True))
+check("an unseen lead's branch with a finisher is no judgment row", pd["unlanded_without_note"], [])
+pn = dr_plan(False)
+check("every mode: an unseen lead's FINDINGS gets its finisher", any(g.notes == ["PB77"] for g in pn["groups"]), True)
+# R1-2: PB79's branch is contained in worktree-wf_dr-2, PB7's DONE branch, whose report never answers PB79's findings:
+# the carried FINDINGS branch still gets its finisher (the drop was silent: no group, no waiting entry, no judgment row),
+# which merges PB79's own branch only and is told the carrier may land its commits first.
+for mode, pm in (("every mode", pn), ("drain", pd)):
+    g79 = next((g for g in pm["groups"] if g.notes == ["PB79"]), None)
+    check(f"{mode}: a carried unseen-lead FINDINGS gets its finisher, its pred naming the carrier (R1-2)",
+          bool(g79) and ("git merge worktree-wf_dr-5" in g79.pred, "contained in worktree-wf_dr-2" in g79.pred,
+                         "never worktree-wf_dr-2" in g79.pred, "review_findings.py show E:/s/r79.jsonl" in g79.pred),
+          (True, True, True, True))
+g5n = next((g for g in pn["groups"] if "PB5" in g.notes), None)
+check("every mode: a carried SPLIT's finisher merges its carrier, never cherry-picks it",
+      bool(g5n) and "git merge worktree-wf_dr-2" in g5n.pred and "cherry-pick its unlanded" not in g5n.pred, True)
+check("without --drain nothing waits on the drain", (pn["drain_not_started"], any("DRAIN" in g.pred for g in pn["groups"])),
+      ([], False))
+# R1-1: the review finisher of owner-task's FINDINGS works on its OWN branch, and its later report about the same
+# unseen lead supersedes the FINDINGS report, as for an open note: a SPLIT is resumed from its own branch (never the
+# findings answered again from scratch, its branch never a judgment row); an unreviewed DONE awaits landing; a newer
+# FINDINGS stamp on the finisher's branch gets the next finisher from that report.
+SU = TMP / "reports-successor"
+SU.mkdir()
+(SU / "w1074z-PB77-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 enqueue-review-owner-task-r1 5050505ee E:/s/review-owner-task.jsonl\n"
+    "Branch: owner-task\nHEAD: 5050505ee\n\n## X\n", encoding="utf-8", newline="\n")
+SU_CLASS = {"owner-task": "UNLANDED", "worktree-wf_f-1": "UNLANDED"}
+for successor, carried, want in (
+        ("Status: SPLIT\nBranch: worktree-wf_f-1\nHEAD: 7070707aa", {}, "SPLIT"),
+        ("Status: DONE\nBranch: worktree-wf_f-1\nHEAD: 7070707aa", {"owner-task": "worktree-wf_f-1"}, "DONE"),
+        ("Status: DONE\n**Review:** FINDINGS 2 enqueue-review-wf_f-1-r1 7070707aa E:/s/review-wf_f-1.jsonl\n"
+         "Branch: worktree-wf_f-1\nHEAD: 7070707aa", {"owner-task": "worktree-wf_f-1"}, "FINDINGS")):
+    (SU / "w1075a-PB77-report.md").write_text(successor + "\n\n## X\n", encoding="utf-8", newline="\n")
+    for drain in (False, True):
+        ps = pw.plan(dr_notes, CLUSTERS, HALF, pw.load_reports(SU), lambda b: SU_CLASS.get(b, "ABSENT"),
+                     {"owner-task": ["PB77"], "worktree-wf_f-1": ["PB77"]}, RULES, budget_points=100, drain=drain,
+                     carrier=carried.get)
+        g77 = [g for g in ps["groups"] if "PB77" in g.notes]
+        mode = f"{want} successor{' (drain)' if drain else ''}"
+        if want == "SPLIT":
+            check(f"{mode}: the finisher resumes the successor's branch, never the stale FINDINGS report (R1-1)",
+                  [("w1075a" in g.pred, "worktree-wf_f-1" in g.pred, "review-owner-task.jsonl" in g.pred) for g in g77],
+                  [(True, True, False)])
+            # R2-1: the superseded FINDINGS branch names the unseen lead, which a newer report covers: skipped, as an
+            # open note's stale branch is, never a judgment row (unlanded_branch_notes once kept only open notes)
+            check(f"{mode}: neither the successor's nor the superseded FINDINGS branch is a judgment row (R2-1)",
+                  [b for b in ("worktree-wf_f-1", "owner-task") if b in ps["unlanded_without_note"]], [])
+        elif want == "DONE":
+            check(f"{mode}: an unreviewed successor awaits landing, no finisher (R1-1)",
+                  (g77, ps["awaiting_landing"].get("worktree-wf_f-1")), ([], ["PB77"]))
+        else:
+            check(f"{mode}: the successor's own FINDINGS gets the next finisher (R1-1)",
+                  [("review-wf_f-1.jsonl" in g.pred, "git merge worktree-wf_f-1" in g.pred) for g in g77], [(True, True)])
+
 # 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
 #     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.
 #     A report written since the dispatch answers it (steps 1 and 2 govern), a terminal note is never held, and a hand
@@ -259,6 +378,44 @@ p6 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), U
 check("a held note is planned in no group and waits naming its dispatch",
       (any("PB5" in g.notes for g in p6["groups"]), "w1045a" in p6["waiting"].get("PB5", "")), (False, True))
 check("its cluster's other notes are still planned", any("PB2" in g.notes for g in p6["groups"]), True)
+# R2-1 (kb/Work PB3150): an UNSEEN lead (PB77, process_only, its FINDINGS on owner-task) is held exactly as an open note
+# is. Wave 1075 dispatched its review finisher, which has not reported: the next plan, normal or --drain, must not
+# plan a second finisher on the same findings (the hold once read `open_ids`, so PB77 was planned again).
+for drain in (False, True):
+    ph = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                 budget_points=100, drain=drain, carrier=DR_CARRIER.get, held={"PB77": "dispatch w1075a", "PB7": "dispatch w1075b"})
+    mode = "drain" if drain else "normal"
+    check(f"{mode}: a held unseen lead and a held open note both wait naming their dispatch, neither planned (R2-1)",
+          [(any(i in g.notes for g in ph["groups"]), f"held by dispatch {w}" in ph["waiting"].get(i, ""))
+           for i, w in (("PB77", "w1075a"), ("PB7", "w1075b"))], [(False, True), (False, True)])
+    check(f"{mode}: the held unseen lead's branch is no judgment row (R2-1)", "owner-task" in ph["unlanded_without_note"],
+          False)
+# The frontier-model hold reads the leads too: an unseen lead whose body needs Mythos under the owner's approval waits.
+fm_notes = dict(dr_notes)
+fm_notes["PB77"] = dataclasses.replace(dr_notes["PB77"], body="This needs Mythos, under the owner's per-dispatch approval.")
+pf = pw.plan(fm_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+             budget_points=100, carrier=DR_CARRIER.get)
+check("an unseen lead that needs the owner's frontier-model approval waits (R2-1)",
+      (any("PB77" in g.notes for g in pf["groups"]), "owner's approval" in pf["waiting"].get("PB77", "")), (False, True))
+# unlanded_branch_notes is unfiltered: an id that is no lead (a landed note, a typo) leaves its branch a judgment row
+pj = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"),
+             {**DR_UNLANDED, "worktree-wf_dr-8": ["PB4242"]}, RULES, budget_points=100, carrier=DR_CARRIER.get)
+check("a branch naming no lead is a judgment row, its non-lead ids never planned",
+      ("worktree-wf_dr-8" in pj["unlanded_without_note"], any("PB4242" in g.notes for g in pj["groups"])), (True, False))
+# ...and unlanded_branch_notes itself keeps every id the subjects name: it once kept only the open notes, so a
+# superseded FINDINGS branch naming only its unseen lead (owner-task: PB77) reached plan() empty, a judgment row.
+import prune_worktrees  # noqa: E402
+_saved = (prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git)
+_subjects = {"owner-task": "PB77: an owner task\nPB77: answer review R1-1", "worktree-wf_x": "PB2, PB11: fix"}
+prune_worktrees.main_names = lambda: set()
+prune_worktrees.classify = lambda b, _names: ("UNLANDED",)
+prune_worktrees.git = lambda *a, **_k: _Shown(0, "main\n" + "\n".join(_subjects) if a[0] == "branch"
+                                              else _subjects[a[-1].split("..")[1]])
+try:
+    check("unlanded_branch_notes names every id, an unseen lead's too (R2-1)", pw.unlanded_branch_notes(),
+          {"owner-task": ["PB77"], "worktree-wf_x": ["PB2", "PB11"]})
+finally:
+    prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git = _saved
 
 # 7. the group JSON renders through the real template and passes check_practices' same-file rule
 gjson = [pw.as_group_json(g, "77", notes, "COBOLNET0001-COBOLNET0003") for g in p["groups"]]
