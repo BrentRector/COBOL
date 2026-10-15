@@ -1,4 +1,4 @@
-## PB3154: the class definition binds its environment division once, and its factory and object definitions inherit it
+## Entry 2040 — 2026-10-14 17:23 PDT — PB3154: the class definition binds its environment division once, and its factory and object definitions inherit it
 
 **Mechanism.** A class definition, its FACTORY and its OBJECT definition are three source elements (§10.5 "A source
 element is a source unit excluding any contained source units"; §3.165, Annex D.6.1.1), and §8.3.2.2's one-type-per-word
@@ -84,3 +84,4 @@ Windows gate planned the case into leg 2 (`not-run-Unit.txt` of runs 20261014T21
 rows (to `OoDriver.OoReparent` and `BindClassData`; to `DataBinder.BindDeclarations` and `BindFileControl`) and retires
 the deleted witnesses with their reason; GAP 101 to 101, `audit_witness_loss.py --check` GREEN, and a sweep of every
 inventory code-location against the tree finds 0 unresolved.
+
