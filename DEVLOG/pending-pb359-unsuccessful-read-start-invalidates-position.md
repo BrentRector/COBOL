@@ -45,3 +45,5 @@ specified" was checked against the READ rules. GR10 a) (record operation conflic
 registry handles it before any connector step. GR29/GR32 set the indicator during execution, and GR18 applies at
 completion. Performance: no allocation added. Duplication: the hand-written `LastReadUnsuccessful = true; _fpiValid
 = false;` pairs are gone.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T205400Z-4fad7d: Conformance 6,068/11,709, Unit 33,158/33,671, Characterization 6/36 in leg 1; no failures). The golden and all four drift tests ran in leg 1 and passed. The Linux gate runs at the landing.
