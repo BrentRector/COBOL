@@ -4,6 +4,7 @@
     python scripts/orchestrator/plan_wave.py --budget-points 3 --dry-run          # --wave defaults to next
     python scripts/orchestrator/plan_wave.py --wave 1016 --from-budget --scratch <dir> [--reports <dir>]
     python scripts/orchestrator/plan_wave.py --cluster PB2108 --budget-points 3 --dry-run     # a campaign wave
+    python scripts/orchestrator/plan_wave.py --finished <report>   # exit 0 finished, 1 not, 2 unreadable (PB3181)
 
 Design: docs/rearchitecture/DESIGN-orchestrator-loop.md section 9 (kb/Work PB1981 item 3). Waves 1011-1015 each
 cost the orchestrator a hand-written groups.json; this computes it.
@@ -113,7 +114,29 @@ BRANCH_FIELD = re.compile(r"(?im)(?:^|·)[ \t]*\**branch:\**\s*`?([A-Za-z0-9_][A
 #: `land-review-<branch>-r1` names the branch with a suffix, so the branch, worktree and head are read around it.
 REVIEW_LINE = re.compile(r"^\**Review:", re.I)
 WORKTREE = re.compile(r"([A-Za-z]:\\[^\s`*]*?\\worktrees\\[A-Za-z0-9_.\-]+)")
-HEAD = re.compile(r"\bHEAD\b[:*`\s]*([0-9a-f]{7,40})\b|\bhead ([0-9a-f]{7,40})\b")
+
+
+def sha_field(word: str) -> tuple[re.Pattern[str], re.Pattern[str]]:
+    """(the FIELD, the fallback) for a header's `word <sha>` field, read like BRANCH_FIELD: first at a field position
+    (a line's start, or after the template's ` · ` or a ` | ` separator: `HEAD: x`, `**head:** `x``, `· head x`), and
+    only when no field holds it, the first `word <sha>` anywhere in the header (`Base x  Head y`), any case. Prose
+    before the field must not win: w1080f's header says "(reviewed head db7e19186 merged in) · head 5df3c56a3", and the
+    unanchored first match read the predecessor's head as the report's (kb/Work PB3181; measured over the 360 reports
+    on disk 2026-10-15: this rule changes that one and reads 17 the old one missed, 12 name no head)."""
+    return (re.compile(r"(?im)(?:^|[·|])[ \t]*\**" + word + r"\b:?\**[ \t]*`?([0-9a-f]{7,40})\b"),
+            re.compile(r"(?i)\b" + word + r"\b[:*`\s]*([0-9a-f]{7,40})\b"))
+
+
+#: The header's HEAD (the branch tip the report describes: the branch survey admits a report only when this head, or a
+#: head followed only by mechanical commits, is the branch's tip) and its BASE (the commit the branch was cut from: a
+#: DISCHARGED report whose HEAD is its base produced no branch work, Report.finished).
+HEAD, BASE = sha_field("head"), sha_field("base")
+
+
+def header_sha(fields: tuple[re.Pattern[str], re.Pattern[str]], header: str) -> str | None:
+    m = fields[0].search(header) or fields[1].search(header)
+    return m.group(1) if m else None
+
 # THE BRANCH REVIEW'S STAMP (kb/Work PB3027; DESIGN-test-build-ci.md section 3.17.2 step 2). The read-only reviewer of a
 # DONE branch writes ONE line into its report's header, through `review_findings.py stamp` and never by hand:
 #   **Review:** CLEAN <reviewer> <head sha>                              the branch at that head may land
@@ -174,6 +197,21 @@ class Report:
     worktree: str | None
     head: str | None
     review: Review | None = None
+    base: str | None = None
+
+    @property
+    def finished(self) -> bool:
+        """THE ONE "FINISHED REPORT" PREDICATE (kb/Work PB3181): DONE, or DISCHARGED with branch work (a HEAD past its
+        base: the note's retirement and its DEVLOG entry). The rolling wave asks it through `--finished` before it
+        reviews a return, and the branch survey (prune_worktrees.lifecycle) admits only such a report to the landing
+        states. A SPLIT, BLOCKED or NOT STARTED report, or a header with no status line, is unfinished."""
+        return self.status == "DONE" or (self.status == "DISCHARGED" and bool(self.head)
+                                         and not same_commit(self.head, self.base))
+
+
+def same_commit(a: str | None, b: str | None) -> bool:
+    """Two shas name one commit: equal, or one an abbreviation of the other (a report writes 9 or 12 characters)."""
+    return bool(a) and bool(b) and (a.startswith(b) or b.startswith(a))
 
 
 def harm_weights() -> dict[str, int]:
@@ -217,18 +255,27 @@ def branch_lead_notes(reports: list[Report], notes: dict[str, Note], harm_weight
     return out
 
 
+def header_lines(lines: list[str]) -> list[str]:
+    """A report's HEADER: its lines above the first `## ` heading (a heading on the first line does not end it). The
+    one definition this planner, the branch survey and review_findings.py stamp read."""
+    return lines[:next((i for i, line in enumerate(lines) if i > 0 and line.startswith("## ")), len(lines))]
+
+
+def status_line(header: list[str]) -> tuple[int, str] | None:
+    """(index, status) of the header's STATUS LINE: the first of its first six lines that STATUS_WORD reads
+    (`Status: DONE`, `**Status:** DONE · …`, or the bare word), or None when it has none. review_findings.py stamps the
+    review right under it, and refuses a header without one (kb/Work PB3181 shape 3)."""
+    return next(((i, s.group("s").upper()) for i, l in enumerate(header[:6]) if (s := STATUS_WORD.match(l.strip()))),
+                None)
+
+
 def parse_report(p: pathlib.Path) -> Report | None:
     m = REPORT_NAME.match(p.name)
     if not m:
         return None
-    lines = p.read_text(encoding="utf-8", errors="replace").splitlines()
-    header = []
-    for i, line in enumerate(lines):
-        if i > 0 and line.startswith("## "):
-            break
-        header.append(line)
+    header = header_lines(p.read_text(encoding="utf-8", errors="replace").splitlines())
     text = "\n".join(header)
-    status = next((s.group("s").upper() for l in header[:6] if (s := STATUS_WORD.match(l.strip()))), "")
+    status = s[1] if (s := status_line(header)) else ""
     if not status and re.search(r"\bSPLIT\b", text):
         status = "SPLIT"
     # The branch is the header's own field, never a word of the review stamp (kb/Work PB3077): review_findings.py
@@ -236,12 +283,11 @@ def parse_report(p: pathlib.Path) -> Report | None:
     # `land-review-worktree-…-r1` was the header's first `worktree-…` word — a branch that does not exist, ABSENT,
     # so every reviewed branch read as landed and wave 1064's finishers were told to merge `worktree-…-r1`.
     unstamped = "\n".join(l for l in header if not REVIEW_LINE.match(l.strip()))
-    h = HEAD.search(unstamped)
     b, w = BRANCH_FIELD.search(unstamped) or BRANCH.search(unstamped), WORKTREE.search(unstamped)
     ids = list(dict.fromkeys(PB.findall(text) + [m.group("lead")]))
     return Report(p, int(m.group("wave")), f"w{m.group('wave')}{m.group('letter')}", m.group("lead"), status, ids,
                   bool(re.search(r"(?i)not\s+started", text)), b.group(1) if b else None, w.group(1) if w else None,
-                  (h.group(1) or h.group(2)) if h else None, parse_review(text))
+                  header_sha(HEAD, unstamped), parse_review(text), header_sha(BASE, unstamped))
 
 
 def load_reports(reports_dir: pathlib.Path | None) -> list[Report]:
@@ -972,6 +1018,24 @@ def next_wave(repo: pathlib.Path, reports: list[Report], coord_dir: pathlib.Path
     return max(seen, default=0) + 1
 
 
+def finished_main(path: pathlib.Path) -> int:
+    """`--finished REPORT`: the one finished-report predicate (Report.finished) as an exit code, for the rolling wave,
+    which has no Python of its own: 0 finished, 1 not (a SPLIT, BLOCKED or NOT STARTED report, a header with no status
+    line, a DISCHARGED report whose HEAD is its base or names none), 2 unreadable (missing, or not a fix-lane report
+    name: plan_wave.REPORT_NAME)."""
+    try:
+        rep = parse_report(path)
+    except OSError as e:
+        print(f"=== REPORT: UNREADABLE {path}: {e} ===")
+        return 2
+    if rep is None:
+        print(f"=== REPORT: UNREADABLE {path}: not a fix-lane report name (w<wave><letter>-PB<lead>-report.md) ===")
+        return 2
+    print(f"=== REPORT: {'FINISHED' if rep.finished else 'NOT FINISHED'} status={rep.status or '(none)'} "
+          f"head={rep.head or '(none)'} base={rep.base or '(none)'} ({path.name}) ===")
+    return 0 if rep.finished else 1
+
+
 def record_dispatch_main(a: argparse.Namespace) -> int:
     """--record-dispatch: the named notes that are open register notes, with their computed file sets, into the
     dispatch ledger. Unknown or terminal notes are skipped; nothing to record is not an error."""
@@ -1027,6 +1091,9 @@ def main(argv: list[str] | None = None) -> int:
                     "the dispatch ledger (their computed file sets) and exit: scripts/hooks/dispatch_guard.py runs it")
     ap.add_argument("--release", metavar="SEL", help="drop the dispatch-ledger entries of an ABORTED dispatch and exit: "
                     "a wave (1040), a group (1040a) or a note id (PB2249); exit 1 when nothing matched")
+    ap.add_argument("--finished", metavar="REPORT", help="is this fix-lane report FINISHED (Report.finished: DONE, or "
+                    "DISCHARGED with a HEAD past its base)? Prints its status, head and base and exits 0 finished, 1 "
+                    "not, 2 unreadable: the rolling wave's one test before it reviews a return (kb/Work PB3181)")
     ap.add_argument("--label", default="hand dispatch", help="with --record-dispatch: who was dispatched")
     ap.add_argument("--coord", help=f"coordination directory (default ${coord.ENV} or {coord.DEFAULT})")
     ap.add_argument("--no-index-regenerate", action="store_true", help="with --cluster: refuse (never regenerate) "
@@ -1036,6 +1103,8 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     except AttributeError:
         pass
+    if a.finished:
+        return finished_main(pathlib.Path(a.finished))
     if a.record_dispatch:
         return record_dispatch_main(a)
     if a.release:

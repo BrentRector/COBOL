@@ -854,6 +854,40 @@ with tempfile.TemporaryDirectory() as td:
                        lambda i: False)
     check("next_wave counts a dispatched wave with no report", pw.next_wave(tdir, [], tdir), 1046)
 
+# PB3181: THE ONE "FINISHED REPORT" PREDICATE (Report.finished) and its `--finished` arm, which the rolling wave asks
+# before it reviews a return; the header's HEAD and BASE fields are read field-first.
+with tempfile.TemporaryDirectory() as td:
+    fdir = pathlib.Path(td)
+    full = "0123456789abcdef0123456789abcdef01234567"
+    for name, text in (("w9f1a-PB1-report.md", "Status: DONE\nBranch: b\nHEAD: 1111111\nBase: 2222222\n"),
+                       ("w9f1b-PB1-report.md", "**Status:** DISCHARGED · **branch:** `b` · **base:** `2222222` · "
+                                               "**HEAD:** `3333333`\n"),
+                       ("w9f1c-PB1-report.md", f"DISCHARGED\nBase {full}  Head {full[:9]}\n"),
+                       ("w9f1d-PB1-report.md", "Status: DISCHARGED\nBase: 2222222\n"),
+                       ("w9f1e-PB1-report.md", "Status: SPLIT\nHEAD: 1111111\n"),
+                       ("w9f1f-PB1-report.md", "\n**Review:** CLEAN r1 1111111\n# a report with no status line\n"
+                                               "Branch: b · head 1111111\n"),
+                       ("w9f1g-PB1-report.md", "Status: DONE\nBranch: b · base 2222222 (reviewed head 4444444 merged in)"
+                                               " · head 5555555\n")):
+        (fdir / name).write_text(text + "\n## Rule\nHEAD: 9999999 below the header binds nothing\n", encoding="utf-8",
+                                 newline="\n")
+    got = {n[4]: (r.status, r.head, r.base, r.finished) for n in sorted(p.name for p in fdir.iterdir())
+           if (r := pw.parse_report(fdir / n))}
+    check("Report.finished: DONE, or DISCHARGED with a HEAD past its base; never SPLIT, no status, head == base or none",
+          {k: v[3] for k, v in got.items()},
+          {"a": True, "b": True, "c": False, "d": False, "e": False, "f": False, "g": True})
+    check("the template's base and HEAD fields are read", got["b"][1:3], ("3333333", "2222222"))
+    check("a field-position head beats a head named in prose before it (w1080f's header)", got["g"][1], "5555555")
+    check("an abbreviated head names its full base: one commit (same_commit)", pw.same_commit(full[:9], full), True)
+    for letter, want in (("a", 0), ("b", 0), ("c", 1), ("d", 1), ("f", 1)):
+        check(f"--finished w9f1{letter}: exit {want}", pw.main(["--finished", str(fdir / f"w9f1{letter}-PB1-report.md")]),
+              want)
+    check("--finished on a missing report: exit 2", pw.main(["--finished", str(fdir / "w9f1z-PB1-report.md")]), 2)
+    (fdir / "notes.md").write_text("Status: DONE\n", encoding="utf-8", newline="\n")
+    check("--finished on a name that is not a fix-lane report: exit 2", pw.main(["--finished", str(fdir / "notes.md")]), 2)
+    check("status_line finds the bare word and its index; None without one",
+          (pw.status_line(["# title", "DONE"]), pw.status_line(["# title", "Branch: b"])), ((1, "DONE"), None))
+
 for f in fails:
     print("FAIL:", f)
 print(f"plan_wave self-test: {len(checked) - len(fails)}/{len(checked)} checks OK")
