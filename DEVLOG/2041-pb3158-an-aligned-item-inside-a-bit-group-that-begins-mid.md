@@ -1,4 +1,4 @@
-## PB3158: an ALIGNED item inside a bit group that begins mid-byte is aligned to a byte of the record, not of the group
+## Entry 2041 — 2026-10-14 17:23 PDT — PB3158: an ALIGNED item inside a bit group that begins mid-byte is aligned to a byte of the record, not of the group
 
 **Re-probe.** Both repros of `kb/Work/PB3158` reproduced on a fresh build. `01 BG GROUP-USAGE BIT. 05 BA PIC 1(2). 05 SUB
 GROUP-USAGE BIT. 10 SA PIC 1. 10 TA PIC 1(5) ALIGNED OCCURS 1 TO 3 DEPENDING ON N.` answered `FUNCTION LENGTH` 31 (29 is
@@ -29,3 +29,4 @@ unit `BitGroupPhaseDriftTests`. Rows re-verdicted: none (the note claimed none).
 
 **Found, left open.** `05 R2 REDEFINES R1 GROUP-USAGE BIT` over a GROUP-USAGE BIT group does not compile (CS0103: the
 redefined group's name does not exist in the generated C#), with or without ALIGNED, on an older build too.
+
