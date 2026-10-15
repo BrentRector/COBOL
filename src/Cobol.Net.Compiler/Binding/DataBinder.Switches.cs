@@ -31,8 +31,8 @@ public sealed partial class DataBinder
     /// §12.3.7 GR2; §8.4.4.2 Format 1 SR1 — the condition-name shall be associated with a switch-name in
     /// SPECIAL-NAMES). Consulted by the condition binder AFTER level-88 resolution (NC211A defines a name as BOTH;
     /// the level-88 wins).</summary>
-    public Dictionary<string, (string ImplementorName, bool IsOn)> SwitchConditions { get; } =
-        new(CobolNames.Comparer);
+    internal ConfigurationNames<(string ImplementorName, bool IsOn)> SwitchConditions =>
+        field ??= new(UserWordKind.ConditionName, RecordConfigurationNameUse);
 
     /// <summary>User-defined CLASS names (case-insensitive) → the EXPANDED member-character set (ISO §12.3.7
     /// class-name clause: each literal lists its characters; a THRU pair contributes every character between the
@@ -43,7 +43,8 @@ public sealed partial class DataBinder
     /// native sets are the same UTF-16 repertoire today (implementor item 188), so the members coincide — the flag
     /// is recorded so that a native alphanumeric set that is ever NOT that repertoire cannot silently resolve a
     /// national class's ordinals in the wrong set.</para></summary>
-    public Dictionary<string, UserClassDef> UserClasses { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<UserClassDef> UserClasses =>
+        field ??= new(UserWordKind.ClassName, RecordConfigurationNameUse);
 
     /// <summary>ALPHANUMERIC alphabet names (case-insensitive) → what the name references (ISO §12.3.7 GR7): the
     /// built collating table of a literal phrase, the LOCALE arm of an <c>IS LOCALE</c> phrase, the identity
@@ -52,7 +53,8 @@ public sealed partial class DataBinder
     /// <see cref="ImplementorCodeNames"/>: ASCII, identity like STANDARD-1; EBCDIC, whose 256-entry table the row
     /// carries). An <c>ALPHABET … FOR NATIONAL</c> clause registers in <see cref="NationalAlphabets"/>
     /// instead — the two classes are disjoint reference domains (§12.3.6 SR1/SR2, §14.9.40 GR5).</summary>
-    public Dictionary<string, AlphabetDef> Alphabets { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<AlphabetDef> Alphabets =>
+        field ??= new(UserWordKind.AlphabetName, RecordConfigurationNameUse);
 
     /// <summary>NATIONAL alphabet names (case-insensitive) → what the name references (ISO §12.3.7 GR7 b/d2/f/g/h/k
     /// + Table 6): a null-table identity for NATIVE and the coded-set names (UCS-4 collates in ISO 10646 order,
@@ -60,18 +62,27 @@ public sealed partial class DataBinder
     /// <see cref="NationalAlphabetDef"/> for the §8.5.1.4 derivation; UTF-8/UTF-16 name coded character sets ONLY),
     /// or the sparse <see cref="CollatingTable"/> of a literal phrase (the SAME record the alphanumeric arm
     /// builds - one §12.3.7.4 GR7 k model for both classes).</summary>
-    public Dictionary<string, NationalAlphabetDef> NationalAlphabets { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<NationalAlphabetDef> NationalAlphabets =>
+        field ??= new(UserWordKind.AlphabetName, RecordConfigurationNameUse);
 
     /// <summary>Is <paramref name="name"/> an alphabet-name of EITHER class (ISO §12.3.7 ALPHABET clause)? The
     /// question a trailing <c>IN word</c> after a THROUGH range's identifier asks (kb/Work PB843): §8.3.2.2 makes an
     /// alphabet-name a different type of user-defined word from every name a qualifier can be, so a declared
-    /// alphabet-name there is §14.9.13.2's <c>IN alphabet-name-1</c> phrase and never a qualifier.</summary>
-    public bool IsAlphabetName(string name) => Alphabets.ContainsKey(name) || NationalAlphabets.ContainsKey(name);
+    /// alphabet-name there is §14.9.13.2's <c>IN alphabet-name-1</c> phrase and never a qualifier. A predicate, so
+    /// it records no §8.3.2.2 use: the caller that takes the word as an alphabet-name resolves it through
+    /// <see cref="ConfigurationNames{T}.TryUse"/> (kb/Work PB3153).</summary>
+    public bool IsAlphabetName(string name) => Alphabets.Declares(name) || NationalAlphabets.Declares(name);
+
+    /// <summary>Take <paramref name="name"/>, written at <paramref name="site"/>, as a REFERENCE to an alphabet-name of
+    /// either class, recording the §8.3.2.2 use (kb/Work PB3153) — the site that names an alphabet whose definition a
+    /// later screen or resolver reads (a COLLATING SEQUENCE phrase). False when no alphabet is named so.</summary>
+    internal bool UseAlphabetName(Antlr4.Runtime.RuleContext site, string name) =>
+        Alphabets.TryUse(site, name, out _) || NationalAlphabets.TryUse(site, name, out _);
 
     /// <summary>Is <paramref name="name"/> one of the class condition's user-defined-word alternatives — a
     /// class-name-1 or an alphabet-name-1 (ISO §8.8.4.4.2)? The symbol test that separates a bare EVALUATE object
     /// naming a class from identifier-2 (kb/Work PB843).</summary>
-    public bool IsClassConditionWord(string name) => UserClasses.ContainsKey(name) || IsAlphabetName(name);
+    public bool IsClassConditionWord(string name) => UserClasses.Declares(name) || IsAlphabetName(name);
 
     /// <summary>⛔ THE per-TYPE runtime carriers a THROUGH range's <c>IN alphabet-name-1</c> phrase needs (ISO
     /// §14.7.8 rule 2 — "the collating sequence used for range evaluation is the collating sequence defined by that
@@ -128,7 +139,8 @@ public sealed partial class DataBinder
     internal void GateRangeAlphabetPhrase(string where) =>
         ConstructRegistry.Check(Edition.Edition, Edition.Sink, Constructs.RangeInAlphabet2002, where);
 
-    public bool TryResolveRangeAlphabet(string alphabetName, CollatingClass rangeClass, string where)
+    public bool TryResolveRangeAlphabet(Antlr4.Runtime.RuleContext site, string alphabetName, CollatingClass rangeClass,
+        string where)
     {
         // The TYPE first: a word that names no alphabet at all is not alphabet-name-1, whatever the range's class —
         // and since IN is an optional word (kb/Work PB983), a stray trailing word after a THROUGH range reaches here
@@ -159,7 +171,7 @@ public sealed partial class DataBinder
         bool national = rangeClass is CollatingClass.National;
         if (national)
         {
-            if (NationalAlphabets.TryGetValue(alphabetName, out var nd))
+            if (NationalAlphabets.TryUse(site, alphabetName, out var nd))
             {
                 // §12.3.7.4 Table 6 — UTF-8 / UTF-16 name a coded character set only; their collating-sequence
                 // column is empty, so they define no sequence this phrase could use.
@@ -174,7 +186,7 @@ public sealed partial class DataBinder
                 return true;
             }
         }
-        else if (Alphabets.TryGetValue(alphabetName, out var ad))
+        else if (Alphabets.TryUse(site, alphabetName, out var ad))
         {
             RegisterRangeCollation(alphabetName, ad);
             return true;
@@ -209,20 +221,23 @@ public sealed partial class DataBinder
     /// Such an alphabet defines a collating sequence only (§12.3.7.4 GR7, Table 6: the LOCALE row names no coded
     /// character set), so the ONE question every site that needs a CODED CHARACTER SET asks is this one (kb/Work PB64
     /// T5 — the class condition's alphabet-name-1 today; the CLASS / SYMBOLIC CHARACTERS <c>IN</c> phrases and CODE-SET
-    /// when they bind, kb/Work PB110). An undeclared name is not a locale alphabet — its own diagnostic is elsewhere.</summary>
+    /// when they bind, kb/Work PB110). An undeclared name is not a locale alphabet — its own diagnostic is elsewhere.
+    /// A predicate, recording no §8.3.2.2 use (kb/Work PB3153): a true answer is a refusal at every asker.</summary>
     public bool IsLocaleAlphabet(string alphabetName)
-        => (Alphabets.TryGetValue(alphabetName, out var a) && a.Locale is not null)
-        || (NationalAlphabets.TryGetValue(alphabetName, out var n) && n.Locale is not null);
+        => (Alphabets.TryPeek(alphabetName, out var a) && a.Locale is not null)
+        || (NationalAlphabets.TryPeek(alphabetName, out var n) && n.Locale is not null);
 
     /// <summary>⛔ THE ONE resolver of an alphabet-name referenced where a CODED CHARACTER SET is required (ISO
     /// §12.3.7.4 GR7 Table 6; kb/Work PB110 — the class condition's alphabet-name-1, SYMBOLIC CHARACTERS … IN,
     /// CLASS … IN, CODE-SET): the set of the named alphabet of either class, with the two refusals every site
     /// shares — a LOCALE alphabet defines a collating sequence only (Table 6's blank row → COBOLNET1669, citing
-    /// <paramref name="rule"/>), and an undeclared name is COBOLNET0898 naming the site. Null on either refusal.</summary>
-    internal CodedCharacterSet? CodedCharacterSetOf(string alphabetName, string site, string rule)
+    /// <paramref name="rule"/>), and an undeclared name is COBOLNET0898 naming the site. Null on either refusal.
+    /// <paramref name="at"/> is the reference, whose element's §8.3.2.2 census records the use (kb/Work PB3153).</summary>
+    internal CodedCharacterSet? CodedCharacterSetOf(Antlr4.Runtime.RuleContext at, string alphabetName, string site,
+        string rule)
     {
-        AlphabetDef? a = Alphabets.TryGetValue(alphabetName, out var av) ? av : null;
-        NationalAlphabetDef? n = NationalAlphabets.TryGetValue(alphabetName, out var nv) ? nv : null;
+        AlphabetDef? a = Alphabets.TryUse(at, alphabetName, out var av) ? av : null;
+        NationalAlphabetDef? n = a is null && NationalAlphabets.TryUse(at, alphabetName, out var nv) ? nv : null;
         if (a is null && n is null)
         {
             Edition.Error("COBOLNET0898", $"{site}: '{alphabetName}' is not an alphabet-name declared by a "
@@ -245,22 +260,39 @@ public sealed partial class DataBinder
     /// integer-1 of the native or IN-alphabet coded character set) and its class. Substituted wherever a figurative
     /// constant may stand — the reference seams consult <see cref="SymbolicOf"/> exactly as they consult the
     /// §13.10 constant table, and the value fills like every figurative (§8.3.3.6.4 GR2 / GR10).</summary>
-    public Dictionary<string, (string Value, bool National)> SymbolicCharacters { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<(string Value, bool National)> SymbolicCharacters =>
+        field ??= new(UserWordKind.SymbolicCharacter, RecordConfigurationNameUse);
 
     /// <summary>The symbolic character a BARE (unqualified, unsubscripted) data reference names, or null — the
-    /// twin of <c>ConstantOf</c> (one shape for "a word that stands for a literal").</summary>
+    /// twin of <c>ConstantOf</c> (one shape for "a word that stands for a literal"). A resolution: the word is
+    /// recorded as used as a symbolic-character (§8.3.2.2; kb/Work PB3153).</summary>
     internal (string Value, bool National)? SymbolicOf(Core.DataReferenceContext dref) =>
-        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w ? SymbolicOf(w.GetText()) : null;
+        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w ? SymbolicOf(dref, w.GetText()) : null;
 
-    /// <summary>The symbolic character named by a bare word, or null (the FigurativeOperand ALL-form lookup, and the
-    /// one lookup <see cref="SymbolicOf(Core.DataReferenceContext)"/> asks). A symbolic-character a nearer
-    /// declaration of the spelling hides is not one here (§8.4.6.1, §8.4.6.2.1 3); kb/Work PB3154 review R1-1):
-    /// an inherited one a nearer source element's data-, condition- or index-name hides
-    /// (<see cref="DropShadowedConstants"/>), or any one the method being bound declares a name of
-    /// (<see cref="ActiveMethodDeclares"/>).</summary>
-    internal (string Value, bool National)? SymbolicOf(string word) =>
-        SymbolicCharacters.TryGetValue(word, out var def) && !_shadowedSymbolics.Contains(word)
-        && !ActiveMethodDeclares(word) ? def : null;
+    /// <summary>Does a BARE data reference spell a symbolic character visible here? The predicate twin of
+    /// <see cref="SymbolicOf(Core.DataReferenceContext)"/>, recording no use.</summary>
+    internal bool NamesSymbolic(Core.DataReferenceContext dref) =>
+        dref.dataReferenceSuffix().Length == 0 && dref.cobolWord() is { } w && NamesSymbolic(w.GetText());
+
+    /// <summary>Does the bare word <paramref name="word"/> name a symbolic character visible here (one
+    /// <see cref="HidesSymbolic"/> does not hide)? The predicate twin of
+    /// <see cref="SymbolicOf(Antlr4.Runtime.RuleContext, string)"/>, recording no use.</summary>
+    internal bool NamesSymbolic(string word) => SymbolicCharacters.Declares(word) && !HidesSymbolic(word);
+
+    /// <summary>The symbolic character the word <paramref name="word"/> written at <paramref name="site"/> names, or
+    /// null (the FigurativeOperand ALL-form lookup, a concatenation operand). A resolution, recorded as a use
+    /// (§8.3.2.2; kb/Work PB3153) — only when the symbolic-character is visible: one a nearer declaration of the
+    /// spelling hides (<see cref="HidesSymbolic"/>) is not what the word references, so it is neither resolved nor
+    /// recorded.</summary>
+    internal (string Value, bool National)? SymbolicOf(Antlr4.Runtime.RuleContext site, string word) =>
+        !HidesSymbolic(word) && SymbolicCharacters.TryUse(site, word, out var def) ? def : null;
+
+    /// <summary>Whether a nearer declaration of <paramref name="word"/> hides the symbolic-character of that spelling
+    /// (§8.4.6.1, §8.4.6.2.1 3); kb/Work PB3154 review R1-1): an inherited one a nearer source element's data-,
+    /// condition- or index-name hides (<see cref="DropShadowedConstants"/>), or any one the method being bound
+    /// declares a name of (<see cref="ActiveMethodDeclares"/>). Asked by every symbolic lookup, the resolving and the
+    /// predicate alike, so they cannot disagree.</summary>
+    private bool HidesSymbolic(string word) => _shadowedSymbolics.Contains(word) || ActiveMethodDeclares(word);
 
     /// <summary>The containment distance of each INHERITED symbolic-character — 1 for the direct container's own
     /// SPECIAL-NAMES entry, one more per level it came down (<see cref="InheritConfiguration"/>); a name absent here is
@@ -268,7 +300,7 @@ public sealed partial class DataBinder
     private readonly Dictionary<string, int> _inheritedSymbolics = new(CobolNames.Comparer);
 
     /// <summary>The inherited symbolic-characters a nearer declaration hides (<see cref="DropShadowedConstants"/>).
-    /// Hidden from <see cref="SymbolicOf(string)"/>, never removed from <see cref="SymbolicCharacters"/>: a contained
+    /// Hidden by <see cref="HidesSymbolic"/>, never removed from <see cref="SymbolicCharacters"/>: a contained
     /// unit inherits the whole table from this one, and this unit's local name hides nothing from it.</summary>
     private readonly HashSet<string> _shadowedSymbolics = new(CobolNames.Comparer);
 
@@ -282,13 +314,15 @@ public sealed partial class DataBinder
     /// <para>⚠ The literal is stored DECODED, not as source text: §12.3.7.3 SR10 admits a national literal
     /// (<c>N"…"</c>) as well as an alphanumeric one, and the runtime resolver matches ordering-table NAMES, not
     /// COBOL literal spellings.</para></summary>
-    public Dictionary<string, string> OrderTables { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<string> OrderTables =>
+        field ??= new(UserWordKind.OrderingName, RecordConfigurationNameUse);
 
     /// <summary>SPECIAL-NAMES <c>DYNAMIC LENGTH STRUCTURE</c> declarations (case-insensitive
     /// dynamic-length-structure-name → its layout; ISO §12.3.7.2; kb/Work PB829), read by the DYNAMIC LENGTH clause's
     /// dynamic-length-structure-name-1 (§13.18.19.3 SR2 / SR4). Configuration-section names reach contained source
     /// elements (§8.4.6.1), so the dictionary inherits with its siblings.</summary>
-    public Dictionary<string, DynamicLengthStructure> DynamicLengthStructures { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<DynamicLengthStructure> DynamicLengthStructures =>
+        field ??= new(UserWordKind.DynamicLengthStructureName, RecordConfigurationNameUse);
 
     /// <summary>SPECIAL-NAMES <c>LOCALE locale-name-1 IS {external-locale-name-1 | literal-4}</c> declarations
     /// (case-insensitive locale-name → the symbol; ISO §12.3.7.2; DESIGN-locale-facility seam S1, T1): the locale-name
@@ -296,7 +330,8 @@ public sealed partial class DataBinder
     /// LOCALE (§14.9.39.3 SR26), and — in later increments — the LOCALE phrases of PICTURE format 2, LOCALE-COMPARE /
     /// -DATE / -TIME, UPPER-CASE / LOWER-CASE and CHARACTER CLASSIFICATION. The symbol holds the EXTERNAL IDENTIFICATION
     /// only (§8.1.5 — the locale is "determined at runtime"); it inherits into contained units (§12.3.7.4 GR1).</summary>
-    public Dictionary<string, LocaleSymbol> Locales { get; } = new(CobolNames.Comparer);
+    internal ConfigurationNames<LocaleSymbol> Locales =>
+        field ??= new(UserWordKind.LocaleName, RecordConfigurationNameUse);
 
     /// <summary>The OBJECT-COMPUTER <c>CHARACTER CLASSIFICATION</c> clause (ISO §12.3.6.2; §12.3.6.4 GR5–GR8; kb/Work PB64
     /// T5), or null when none is specified and no containing unit specifies one (GR6 — the coded character set's
@@ -482,16 +517,17 @@ public sealed partial class DataBinder
         foreach (var (k, v) in container._currencySigns) _currencySigns.TryAdd(k, v);
         _explicitCurrencyStrings.UnionWith(container._explicitCurrencyStrings);
         _dollarSpecified = container._dollarSpecified;
-        foreach (var (k, v) in container.SwitchConditions) SwitchConditions.TryAdd(k, v);
-        foreach (var (k, v) in container.UserClasses) UserClasses.TryAdd(k, v);
-        foreach (var (k, v) in container.Alphabets) Alphabets.TryAdd(k, v);
-        foreach (var (k, v) in container.NationalAlphabets) NationalAlphabets.TryAdd(k, v);
-        foreach (var (k, v) in container.OrderTables) OrderTables.TryAdd(k, v);
-        foreach (var (k, v) in container.DynamicLengthStructures) DynamicLengthStructures.TryAdd(k, v);   // §8.4.6.1
-        foreach (var (k, v) in container.Locales) Locales.TryAdd(k, v);   // §12.3.7.4 GR1 — locale-names reach contained units
-        foreach (var (k, v) in container.SymbolicCharacters)   // §8.4.6.1 (kb/Work PB3154), each with its tier
-            if (SymbolicCharacters.TryAdd(k, v))
-                _inheritedSymbolics[k] = container._inheritedSymbolics.GetValueOrDefault(k) + 1;
+        // The names it declares (§8.4.6.1's configuration-section list), each a ConfigurationNames table whose every
+        // resolution records a §8.3.2.2 use in the referring element's census (kb/Work PB3153).
+        SwitchConditions.InheritFrom(container.SwitchConditions);
+        UserClasses.InheritFrom(container.UserClasses);
+        Alphabets.InheritFrom(container.Alphabets);
+        NationalAlphabets.InheritFrom(container.NationalAlphabets);
+        SymbolicCharacters.InheritFrom(container.SymbolicCharacters,   // §8.4.6.1 (kb/Work PB3154), each with its tier
+            k => _inheritedSymbolics[k] = container._inheritedSymbolics.GetValueOrDefault(k) + 1);
+        OrderTables.InheritFrom(container.OrderTables);
+        DynamicLengthStructures.InheritFrom(container.DynamicLengthStructures);
+        Locales.InheritFrom(container.Locales);   // §12.3.7.4 GR1 — locale-names reach contained units
         // OBJECT-COMPUTER … PROGRAM COLLATING SEQUENCE (§12.3.6 GR9–GR11) and CHARACTER CLASSIFICATION (GR1 — every
         // OBJECT-COMPUTER clause applies to the contained units)
         Collating = container.Collating;
@@ -991,14 +1027,14 @@ public sealed partial class DataBinder
             if (CollatingAlphabetFault(alnumName, national: false) is { } fault)
                 Edition.Error("COBOLNET0898", CollatingAlphabetViolation("PROGRAM COLLATING SEQUENCE", alnumName,
                     national: false, fault, "ISO §12.3.6.3 SR1"));
-            else if (Alphabets.TryGetValue(alnumName, out var def)) Collating = def.IsIdentity ? null : def;
+            else if (Alphabets.TryUse(pcs, alnumName, out var def)) Collating = def.IsIdentity ? null : def;
         }
         if (natName is not null)
         {
             if (CollatingAlphabetFault(natName, national: true) is { } fault)
                 Edition.Error("COBOLNET0898", CollatingAlphabetViolation("PROGRAM COLLATING SEQUENCE FOR NATIONAL",
                     natName, national: true, fault, "ISO §12.3.6.3 SR2"));
-            else if (NationalAlphabets.TryGetValue(natName, out var def))
+            else if (NationalAlphabets.TryUse(pcs, natName, out var def))
                 NationalCollating = def.IsIdentity ? null : def;   // null for NATIVE/UCS-4 — the identity fast path (D-N3)
         }
     }
@@ -1019,33 +1055,33 @@ public sealed partial class DataBinder
         if (alnumFor is not null || natFor is not null)
         {
             if (alnumFor is not null
-                && (alphanumeric = ClassificationPhrase(alnumFor.localePhrase().GetText(), national: false)) is null) return;
+                && (alphanumeric = ClassificationPhrase(alnumFor.localePhrase(), alnumFor.localePhrase().GetText(), national: false)) is null) return;
             if (natFor is not null
-                && (national = ClassificationPhrase(natFor.localePhrase().GetText(), national: true)) is null) return;
+                && (national = ClassificationPhrase(natFor.localePhrase(), natFor.localePhrase().GetText(), national: true)) is null) return;
         }
         else
         {
             var phrases = cc.localePhrase();   // [0] = locale-phrase-1, [1] = locale-phrase-2
             if (phrases.Length < 1) return;    // a malformed shape already drew a parse error
-            alphanumeric = ClassificationPhrase(phrases[0].GetText(), national: false);
+            alphanumeric = ClassificationPhrase(phrases[0], phrases[0].GetText(), national: false);
             if (alphanumeric is null) return;
             if (phrases.Length > 1)
             {
-                national = ClassificationPhrase(phrases[1].GetText(), national: true);
+                national = ClassificationPhrase(phrases[1], phrases[1].GetText(), national: true);
                 if (national is null) return;
             }
         }
         Classification = new ClassificationSpec(alphanumeric, national);
     }
 
-    private LocalePhrase? ClassificationPhrase(string word, bool national)
+    private LocalePhrase? ClassificationPhrase(Antlr4.Runtime.RuleContext at, string word, bool national)
     {
         // >>COBOL-WORDS (ISO §7.3.10.4 GR2/GR3/GR4; kb/Work PB250): a §8.9/§8.10 word the lexer does not
         // tokenize is reached ONLY through the map; a raw text test here is inert to the directive both ways.
         if (CobolWords.Is(word, "LOCALE")) return new LocalePhrase(Runtime.Globalization.LocalePhraseKind.Current, null);
         if (CobolWords.Is(word, "SYSTEM-DEFAULT")) return new LocalePhrase(Runtime.Globalization.LocalePhraseKind.SystemDefault, null);
         if (CobolWords.Is(word, "USER-DEFAULT")) return new LocalePhrase(Runtime.Globalization.LocalePhraseKind.UserDefault, null);
-        var sym = ResolveLocaleName(word, $"CHARACTER CLASSIFICATION{(national ? " FOR NATIONAL" : "")} {word}",
+        var sym = ResolveLocaleName(at, word, $"CHARACTER CLASSIFICATION{(national ? " FOR NATIONAL" : "")} {word}",
             $"ISO §12.3.6.3 SR3 — locale-name-{(national ? 2 : 1)} shall be a locale name defined in the SPECIAL-NAMES paragraph");
         return sym is null ? null : new LocalePhrase(Runtime.Globalization.LocalePhraseKind.Named, sym);
     }
@@ -1104,18 +1140,19 @@ public sealed partial class DataBinder
         if (!Locales.TryAdd(name, symbol))
         {
             Edition.Error("COBOLNET1665", $"LOCALE {name}: the locale-name is already declared in this SPECIAL-NAMES paragraph "
-                + $"(as {Locales[name]}); a user-defined word is unique within its scope (ISO §8.3.2.2 / §12.3.7.2)");
+                + $"(as {(Locales.TryPeek(name, out var first) ? first : null)}); a user-defined word is unique within its scope (ISO §8.3.2.2 / §12.3.7.2)");
         }
     }
 
     /// <summary>Resolve a locale-name reference (ISO §12.3.7.3 SR24 for the ALPHABET clause; §14.9.39.3 SR26 for SET
     /// LOCALE; the later increments' sites) to its symbol, or null after COBOLNET1664 — the ONE undeclared-locale-name
     /// diagnostic, with the citing site named (DESIGN-locale-facility §7 rule a).</summary>
-    internal LocaleSymbol? ResolveLocaleName(string name, string site, string rule)
+    /// <param name="at">The reference, whose source element's §8.3.2.2 census records the use (kb/Work PB3153).</param>
+    internal LocaleSymbol? ResolveLocaleName(Antlr4.Runtime.RuleContext at, string name, string site, string rule)
     {
-        if (Locales.TryGetValue(name, out var sym)) return sym;
+        if (Locales.TryUse(at, name, out var sym)) return sym;
         Edition.Error("COBOLNET1664", $"{site}: '{name}' is not a locale-name declared by a SPECIAL-NAMES LOCALE clause ({rule})"
-            + (Locales.Count == 0 ? "; no LOCALE clause is in scope" : $"; declared: {string.Join(", ", Locales.Keys)}"));
+            + (Locales.Count == 0 ? "; no LOCALE clause is in scope" : $"; declared: {string.Join(", ", Locales.Names)}"));
         return null;
     }
 
@@ -1261,7 +1298,7 @@ public sealed partial class DataBinder
                 + "paragraph, so no reference to it could uniquely identify one layout (ISO §8.4.2.1)");
             return;
         }
-        DynamicLengthStructures[name] = declared;   // replaces an INHERITED same-named structure (§8.4.6.1)
+        DynamicLengthStructures.Set(name, declared);   // replaces an INHERITED same-named structure (§8.4.6.1)
     }
 
     private void OrderTableBind(Core.OrderTableClauseContext ot)
@@ -1286,10 +1323,10 @@ public sealed partial class DataBinder
         {
             Edition.Error("COBOLNET0898", $"ORDER TABLE {name}: the ORDER TABLE clause may be specified only once "
                 + "in a SPECIAL-NAMES paragraph — its general format brackets it without an ellipsis, unlike the "
-                + $"repeatable clauses (ISO §12.3.7.2); '{OrderTables.Keys.First()}' is already declared");
+                + $"repeatable clauses (ISO §12.3.7.2); '{OrderTables.Names.First()}' is already declared");
             return;
         }
-        OrderTables[name] = text;
+        OrderTables.Set(name, text);
         // GR17's implementor half, checked against the ONE resolver the runtime uses (§15.85.4 r2 owns the outcome).
         // A site collation file that cannot be used is that resolver's typed failure, named here with its file, never
         // a crash of the compile (kb/Work PB2773).
@@ -1347,7 +1384,7 @@ public sealed partial class DataBinder
             var locale = LocaleCollatingSpec.CurrentLocale;
             if (localePhrase.cobolWord() is { } localeName)
             {
-                var sym = ResolveLocaleName(localeName.GetText(), $"ALPHABET {name}{(national ? " FOR NATIONAL" : "")} IS LOCALE {localeName.GetText()}",
+                var sym = ResolveLocaleName(localeName, localeName.GetText(), $"ALPHABET {name}{(national ? " FOR NATIONAL" : "")} IS LOCALE {localeName.GetText()}",
                     "ISO §12.3.7.3 SR24 — locale-name-2 shall be a locale-name defined by the LOCALE clause");
                 if (sym is not null) locale = new LocaleCollatingSpec(new LocaleRef(sym));
             }
@@ -1971,7 +2008,7 @@ public sealed partial class DataBinder
     /// SYMBOLIC CHARACTERS clause, read syntactically because the clauses are order-free (kb/Work PB226), or already
     /// bound. The ONE recognition §12.3.7.3 SR11 asks, of a bare operand and of a concatenation operand alike.</summary>
     internal bool IsSymbolicCharacterName(string word) =>
-        _paragraphSymbolicNames.Contains(word) || SymbolicCharacters.ContainsKey(word);
+        _paragraphSymbolicNames.Contains(word) || SymbolicCharacters.Declares(word);
 
     /// <summary>The literal environment of a position OUTSIDE the SPECIAL-NAMES paragraph (kb/Work PB1406).</summary>
     internal LiteralEnvironment LiteralEnv => LiteralEnvironment.Program(this);
@@ -2063,7 +2100,7 @@ public sealed partial class DataBinder
         if (cd.cobolWord().Length > 1)
         {
             string inName = cd.cobolWord(1).GetText();
-            inSet = CodedCharacterSetOf(inName, $"CLASS {name} … IN {inName}",
+            inSet = CodedCharacterSetOf(cd.cobolWord(1), inName, $"CLASS {name} … IN {inName}",
                 "ISO §12.3.7.3 SR17 d — alphabet-name-4 shall not reference an alphabet specified with the LOCALE phrase");
             if (inSet is null) return;
             // SR17 b1/c1 — "When the IN phrase is specified, alphabet-name-4 shall reference an alphabet that defines
@@ -2195,7 +2232,7 @@ public sealed partial class DataBinder
         CodedCharacterSet? inSet = null;
         if (sc.cobolWord() is { } inWord && inWord is not null)
         {
-            inSet = CodedCharacterSetOf(inWord.GetText(), $"SYMBOLIC CHARACTERS … IN {inWord.GetText()}",
+            inSet = CodedCharacterSetOf(inWord, inWord.GetText(), $"SYMBOLIC CHARACTERS … IN {inWord.GetText()}",
                 "ISO §12.3.7.3 SR16 g — alphabet-name-3 shall not reference an alphabet specified with the LOCALE phrase");
             if (inSet is null) return;
             if (inSet.National != national)
