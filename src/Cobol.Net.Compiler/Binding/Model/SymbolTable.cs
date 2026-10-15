@@ -166,7 +166,7 @@ public sealed class SymbolTable
     /// DYNAMIC <c>CAPACITY IN</c> register a written <paramref name="name"/> can reach in <paramref name="scope"/>, or
     /// <see langword="null"/> when it reaches none. The register is a data-name of its entry's source element
     /// (§13.18.38.3 SR30), so it has the data-name's visibility (§11.7.4 GR5): a method sees its OWN registers first,
-    /// and they REPLACE the object's; a method-local DATA-name of the spelling hides an object-level register (the
+    /// and they REPLACE the object's; a method-local DATA-name or INDEX-name of the spelling hides an object-level register (the
     /// object's declaration is "inaccessible to this method"); a sibling method's registers are not in the scope at
     /// all. Else the unit's map, nearest declaring element first (<see cref="DataBinder.CapacityRegisters"/>).</summary>
     public List<DataItem>? CapacityCandidates(string name, Scope scope)
@@ -175,6 +175,7 @@ public sealed class SymbolTable
         {
             if (m.CapacityRegisters.TryGetValue(name, out var own)) return own;
             if (m.ByName.TryGetValue(name, out var mlist) && mlist.Count > 0) return null;   // the method data-name wins
+            if (m.IndexNames.Declares(name)) return null;   // so does a method-local index-name (GR5 covers every name class)
         }
         return _data.CapacityRegisters.TryGetValue(name, out var tables) ? tables : null;
     }

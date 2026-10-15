@@ -14,7 +14,7 @@ object-level data-name was a false duplicate (§11.7.4 GR5: the object's declara
 Fix shape: the register has the visibility of the entry that implicitly defines it. A method's registers live in
 `OoMethodDataScope.CapacityRegisters`; `DynamicResolve` registers into the owning scope and judges the duplicate and
 the one-type-per-word census there; `SymbolTable.CapacityCandidates` is the one scope-aware lookup (a method's
-registers replace the unit's, a method data-name hides an object-level register) and
+registers replace the unit's, a method data-name or index-name hides an object-level register) and
 `ReferenceResolver.CapacityRegisterFor` reads it. `DeclaredCapacityRegisterTables` still yields the method tables, so
 the class still emits their profiles. No new diagnostic code was needed: the sibling reference is the ordinary
 COBOLNET1639 and the same-method duplicate is still COBOLNET1523.

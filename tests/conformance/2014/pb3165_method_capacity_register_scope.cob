@@ -11,6 +11,9 @@
       *>     this method" -> OK  11.7.4 5)
       *> SHOWA and SHOWB both declare Q2 (legal: two source elements, each its own SR30 scope); SHOWC
       *> declares QO, shadowing the object's QO, while SHOWB (which declares no QO) reads the object's.
+      *> SHOWD declares an INDEX-name QO that hides the object's QO register the same way (11.7.4 GR5 is about the
+      *> word, whatever its name class): SET QO TO 3 moves SHOWD's own index, and the trailing SHOWB shows the
+      *> object's register still at its minimum capacity (branch review finding R1-1).
       *> ISO 14.6.2.3.2 item 6: each dynamic-capacity table starts at the FROM (minimum) capacity.
       *>   cite.py --check 14.6.2.3.2 "the capacity of the table is set to the minimum capacity specified
       *>     in the corresponding OCCURS clause" -> OK  14.6.2.3.2 6)
@@ -29,6 +32,8 @@
            INVOKE OBJ "SHOWA"
            INVOKE OBJ "SHOWB"
            INVOKE OBJ "SHOWC"
+           INVOKE OBJ "SHOWD"
+           INVOKE OBJ "SHOWB"
            STOP RUN.
        END PROGRAM PB3165P.
 
@@ -71,5 +76,17 @@
        PROCEDURE DIVISION.
            DISPLAY "C " QO.
        END METHOD SHOWC.
+       METHOD-ID. SHOWD.
+       DATA DIVISION.
+       LOCAL-STORAGE SECTION.
+       01 T.
+          05 G PIC 9 OCCURS 5 INDEXED BY QO.
+       01 N PIC 9.
+       PROCEDURE DIVISION.
+           SET QO TO 3
+           MOVE 7 TO G(QO)
+           SET N TO QO
+           DISPLAY "D " G(QO) " " G(3) " " N.
+       END METHOD SHOWD.
        END OBJECT.
        END CLASS PB3165C.
