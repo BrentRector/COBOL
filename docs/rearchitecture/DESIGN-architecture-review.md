@@ -987,10 +987,11 @@ Draft 6 re-modelled them from the code after the fifth refuter, G2):
   governs contained PROGRAMS only. A class definition's OBJECT and FACTORY halves are the second producer the seed must
   cover (the sixth refuter, H2): a half MAY carry its own configuration section, limited to SPECIAL-NAMES (§12.3.3
   SR3: "The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be specified in a factory definition
-  or an instance definition"), and its own OPTIONS paragraph. `OoDriver` builds a half's configuration by reparenting
-  the half's own ENVIRONMENT DIVISION before the class definition's into one synthetic unit (`OoReparentClassData` and
-  `OoReparentFactoryData`, `OoDriver.cs:176-196`), which `DataBinder.EnvDivisions` (`DataBinder.cs:1109-1117`) reads
-  outermost first, so the half's entries override the class's clause by clause; it builds the half's OPTIONS by
+  or an instance definition"), and its own OPTIONS paragraph. `OoDriver.BindClassData` binds the class definition's
+  own ENVIRONMENT DIVISION once, in a binder of the class's own source element (§10.5), and seeds each half from it
+  through the same `InheritConfiguration` before the half binds its own division (`OoDriver.OoReparent` hands a binder
+  only its own element's divisions; kb/Work PB3154, which made the class's names inherited by the halves rather than
+  declared in their §8.3.2.2 censuses); it builds the half's OPTIONS by
   overlaying the half's paragraph on the class's (`OoDriver.cs:99-101` for the OBJECT half, `:119-120` for the
   FACTORY half; an INTERFACE binds its own paragraph over none, `:41`), and `CallInheritOptions`
   (`DataBinder.cs:294`) writes the same `_inheritedOptions` field `InheritConfiguration` writes
@@ -1042,8 +1043,8 @@ none (§12.3.3 SR1) and takes the container's frozen `DataBindResult` (§12.3.4 
 FACTORY half takes its class definition's configuration (§12.3.4 GR1: the class contains the half) overlaid clause by
 clause by the half's own SPECIAL-NAMES, the one configuration paragraph §12.3.3 SR3 leaves it. The class definition
 binds no data, so it has no `DataBindResult`: its arm's source is a `ClassConfiguration` value, bound once per class by
-the same step from the class's own section and OPTIONS paragraph and handed to both halves, which replaces the synthetic
-reparent units' environment children and `EnvDivisions`' reverse order (the override becomes the arm's overlay, written
+the same step from the class's own section and OPTIONS paragraph and handed to both halves, which replaces the class
+binder `OoDriver.BindClassData` builds for the purpose today (kb/Work PB3154) (the seed becomes the arm's overlay, written
 once). A method is not a configuration unit (§12.3.3 SR2): it reads its half's slice. The OPTIONS slice is produced by
 the same step and the same three arms from the baseline the arm names (none for Own; the container's for Contained;
 the class definition's for ClassHalf) overlaid by the unit's own OPTIONS paragraph clause by clause (§11.9.4 GR1), so
