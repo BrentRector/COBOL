@@ -725,9 +725,10 @@ a DEVLOG entry per landing on main (kb/Work PB2605); commit AND push every check
   deferred to it; the mechanism map is at `docs/rearchitecture/pb59-mechanism-map-2026-08-09.md`) and
   the BASECONVERT screen set (AR-15.12.3-1 legs b–f).
   **OWNER-RESERVED, ask one at a time when he is at the keyboard:** PB67 (the four standard-binary
-  rows → DOCUMENTED-NON-SUPPORT?) · CURRENT-DATE's +14:00 spec hole (RV-15.21.3-1) · PB55's
-  IMPLEMENTATION is decided (rule-is-the-unit, 2026-08-08) and still needs its transcription
-  re-indent + 234-row absorption campaign.
+  rows → DOCUMENTED-NON-SUPPORT?) · CURRENT-DATE's +14:00 spec hole (RV-15.21.3-1). (PB55's
+  rule-is-the-unit absorption LANDED 2026-10-15: the 51 nested lists the transcription had flattened
+  were measured on the PDF and indented, their 152 rows folded into 36 parent rules; the 17 sub-lists
+  left are peer lists measured at their block's margin.)
   **HAZARDS THIS CAMPAIGN KEEPS HITTING:** the one-of-two-callers/two-arm shape (found again 4× —
   always ask which arm); pre-PB56 triage rows may already be fixed (probe before fixing); MOVE
   renders sources under ReceiverContext.None by design (its 39-digit receiverless-selection escape
@@ -1229,8 +1230,8 @@ the single origin of every numeric argument. Measure the WHOLE population after 
      same place without the inference, added 2026-08-31). ✅ **CLOSED 2026-08-31, SUPERSEDED by PB64 T6.**
      ⛔ **The two sentences that stood here until 2026-08-31 had become FALSE and are struck**: they said the
      eight rows were "DOCUMENTED-NON-SUPPORT and now CLOSED" and that "`COBOLNET1518` rejects the phrase at bind
-     time". **T6 (2026-08-28) IMPLEMENTED the keyword on BOTH functions**: rows `AR-15.68.3-L2.1…L2.7` are
-     **CONFORMS and OK** on `2002/pb64t6_numvalc_locale` + the `NumvalCLocaleScan*` unit tests, and
+     time". **T6 (2026-08-28) IMPLEMENTED the keyword on BOTH functions**: rows `AR-15.68.3-L2.1…L2.7` (since
+     kb/Work PB55 the body of `AR-15.68.3-5`, its b) 1.–7.) are **CONFORMS and OK** on `2002/pb64t6_numvalc_locale` + the `NumvalCLocaleScan*` unit tests, and
      **COBOLNET1518 was DELETED with the claim** (its code is never reallocated). The determination did not
      become wrong — its ROLE changed: it licensed documented non-support while the keyword was unimplemented,
      and now licenses the CLAIM, since an element must be optional-and-claimed for T6 to complete the A.4.9

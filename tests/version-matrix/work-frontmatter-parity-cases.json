@@ -115,10 +115,10 @@
   },
   {
    "name": "quoted and bare members, stray spaces and a trailing comma",
-   "text": "---\nid: PB3\nkind: defect\nstatus: landed\ncloses_rows: [ \"GR-4.2.10-1\" ,GR-7.2.3.4-L2.1,  , DOC-A.1-206, ]\n---\nbody\n",
+   "text": "---\nid: PB3\nkind: defect\nstatus: landed\ncloses_rows: [ \"GR-4.2.10-1\" ,GR-9.3.6-L4.1,  , DOC-A.1-206, ]\n---\nbody\n",
    "expect": {
     "note": true, "id": "PB3", "kind": "defect", "status": "landed", "inventory_rows": [],
-    "closes_rows": ["GR-4.2.10-1", "GR-7.2.3.4-L2.1", "DOC-A.1-206"],
+    "closes_rows": ["GR-4.2.10-1", "GR-9.3.6-L4.1", "DOC-A.1-206"],
     "closes_rows_reason": "", "errors": []
    }
   },

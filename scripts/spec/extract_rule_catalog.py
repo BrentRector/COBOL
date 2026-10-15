@@ -38,6 +38,9 @@ from collections import Counter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from cite import CORRECTION_NOTE  # noqa: E402  — ONE definition of what an editorial correction note looks like
+# The PRINTED level of every sub-list, measured on the PDF (kb/Work PB55) — the key and the opening-item rule are
+# the measuring tool's own, so the recorder and this checker cannot disagree about what a sub-list is.
+from measure_sublist_levels import DATA as SUBLIST_LEVELS, openings as sublist_openings, sublist_key  # noqa: E402
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 SPEC = REPO / "specs" / "ISO_COBOL.md"
@@ -107,8 +110,9 @@ GROUP_LABEL = re.compile(r"^(?:#{1,6}\s+)?(?P<label>[A-Z][A-Z0-9 \-/&,]*)\s*$")
 # optional here so the catalog reads both forms: this regex is the DENOMINATOR of the P14 traceability
 # inventory, and a silent zero-rule extraction would read as "no rules in this clause" rather than as a break.
 # ⛔ The DELIMITER FORM (")" vs ".") is captured because it is load-bearing (fix-queue PB39): §15.68.3 writes its
-# top-level rules `1\)` … and its nested list `1.` …, and the form — not any arithmetic on the ordinals — is what
-# separates them. DEVLOG 1167 proved every ordinal-only heuristic wrong on that clause.
+# top-level rules `1\)` … and wrote its nested list `1.` … at column 0, and the form — not any arithmetic on the
+# ordinals — is what separated them. DEVLOG 1167 proved every ordinal-only heuristic wrong on that clause. (PB55
+# has since indented that list at its printed level; the form rule stays the segmenter's evidence for the next.)
 ORDINAL = re.compile(r"^(?P<n>\d+)\\?(?P<form>[.)])\s+(?P<text>.*)$")
 
 # An INDENTED numbered item inside a rule's body — the standard's nested lists ("GR 4 a) 1. 2. 3. …").
@@ -116,9 +120,12 @@ ORDINAL = re.compile(r"^(?P<n>\d+)\\?(?P<form>[.)])\s+(?P<text>.*)$")
 # ⛔ THE ROW SHAPE, DECIDED FOR THE WHOLE CATALOG BY THE OWNER (kb/Work PB55, 2026-08-08, "THE RULE IS THE
 # UNIT"): **one row per TOP-LEVEL numbered rule of a rule block; every sub-item — lettered `a)`, or numbered
 # under one, at any depth — is FOLDED into its parent rule's text and is addressed by CITATION PATH, never by a
-# row of its own.** ⚠ That decision's WAVE (absorbing the 200-odd remaining `L` rows of lists the transcription
-# flattened whole) is owner-scheduled for AFTER the defect burn-down, and this file does not run it: what is
-# enforced here is only that an indentation ACCIDENT can no longer decide the shape (kb/Work PB698). Three
+# row of its own.** The transcription prints every nested list at its MEASURED level — the 23 page-break tails
+# by kb/Work PB698, the 51 lists it had flattened whole (152 fragment rows) by PB55 — and the shape is held two
+# ways: a flattened TAIL is folded here and reported (below), and a flattened WHOLE list, which no markdown
+# evidence can tell from a peer list, fails `--check` unless the PDF measurement `measure_sublist_levels.py`
+# recorded in `data/sublist-levels.json` puts it at the block's own margin. A sub-list that survives is a PEER
+# list — printed at the margin under its own prose lead-in, its items rules in their own right. Three
 # independent things said the same as the owner and the extractor was the only dissenter:
 #   · the standard's own cross-references address a sub-item as a PATH ON ITS PARENT — "General rule 12c)",
 #     "General rule 4b)", 21 such citations — and never renumber one into the top-level sequence;
@@ -368,7 +375,7 @@ def main() -> int:
     # not use (SR-12.3.7.3-L7.18 for what the standard calls "§12.3.7.3 syntax rule 18"). The mechanism, read
     # from the transcription itself:
     #   · whatever delimiter form a run opened with is that level's form; a change of form opens a NEST
-    #     (§15.68.3: `1\)..5\)`, nested `1...7.`, then `6\) 7\)` returning to the top level);
+    #     (§15.68.3 as PB39 found it: `1\)..5\)`, nested `1...7.`, then `6\) 7\)` returning to the top level);
     #   · EXCEPT that the transcription also drifts form mid-run — §13.18.40.3 writes SR 1-5 as `N.` and SR 6-37
     #     as `N\)` — so an ordinal that STRICTLY CONTINUES an open level's run (n == last+1) belongs to that
     #     level regardless of form, preferring a form-matched level when two continue with the same n (§9.3.6);
@@ -796,6 +803,26 @@ def main() -> int:
         for sec, ln, n, text in flattened_tails:
             print(f"      §{sec}  line {ln}  '{n}. {text}'")
 
+    # ⛔ A SUB-LIST IS A ROW FAMILY ONLY WHEN THE PRINTED PAGE SAYS SO (kb/Work PB55, "THE RULE IS THE UNIT").
+    # A column-0 list that restarts at 1 is either a PEER list the standard prints at the block's own margin
+    # (§14.7.5's "The size error condition exists in the following cases:") — rules of their own — or a NESTED
+    # list the transcription flattened, which is its parent rule's body. The markdown cannot tell the two apart:
+    # 51 nested lists sat at column 0 and held 152 fragment rows until PB55 measured every one on the PDF. So
+    # every sub-list must be RECORDED in `data/sublist-levels.json` as measured at level 0; one that is not is a
+    # flattened nested list (indent it at its printed level) or a new peer list (measure it with
+    # `measure_sublist_levels.py --write`, which needs the PDF). The PDF never reaches CI; the measurement does.
+    measured_peers = ({m["key"] for m in json.loads(SUBLIST_LEVELS.read_text(encoding="utf-8"))["sublists"]
+                       if m["level"] == 0} if SUBLIST_LEVELS.exists() else set())
+    unmeasured = [r for r in sublist_openings(rules) if sublist_key(r["section"], r["text"]) not in measured_peers]
+    if unmeasured:
+        print(f"\n⛔ {len(unmeasured)} SUB-LIST(S) not MEASURED as printed at the block's own margin (PB55) — each one")
+        print("   is a flattened NESTED list (indent its items at their printed level in specs/ISO_COBOL.md) or a")
+        print("   peer list nobody has measured (python scripts/spec/measure_sublist_levels.py --write):")
+        for r in unmeasured:
+            print(f"      {r['id']}  '{r['text'][:70]}'")
+    else:
+        print(f"✓ every sub-list is a measured peer list ({len(measured_peers)} recorded) — no nested list holds rows")
+
     by_kind = Counter(r["kind"] for r in rules)
     top = Counter(r["section"].split(".")[0] for r in rules)
 
@@ -890,13 +917,30 @@ def main() -> int:
     else:
         print("✓ every general-format row carries a diagram or a Format label")
 
+    # ⛔ THE COMMITTED CATALOG IS THIS RUN'S OUTPUT, OR IT IS STALE (kb/Work PB55). The inventory, every drift
+    # test and every derived-verdict selector read the COMMITTED catalog, never the transcription; three landings
+    # (PB1221, PB1374, PB351+PB1146+PB937) corrected general-format text in specs/ISO_COBOL.md without regenerating it, and the
+    # catalog carried the old text of FMT-7.3.15.2, FMT-13.18.35.2 and FMT-14.9.38.2 until PB55's rebuild found it.
+    # `--check` compared the transcription with the manifests and never with the file it writes.
+    stale: list[str] = []
+    if OUT.exists():
+        committed = {r["id"]: r for r in json.loads(OUT.read_text(encoding="utf-8"))["rules"]}
+        fresh = {r["id"]: r for r in rules}
+        stale = sorted(i for i in committed.keys() | fresh.keys() if committed.get(i) != fresh.get(i))
+    if stale:
+        print(f"\n⛔ THE COMMITTED CATALOG IS STALE — {len(stale)} rule(s) differ from what the transcription yields now:")
+        for rid in stale[:10]:
+            print(f"      {rid}")
+        print("   Regenerate it in the same change as the transcription edit: python scripts/spec/extract_rule_catalog.py")
+        print("   (then python scripts/spec/build_inventory.py, whose rule-digest check names any verdict on changed text).")
+
     if args.check:
         return 1 if (gaps or unrecognised or added or removed or changed or unexplained
-                     or heading_labels or flattened_tails or fmt_undrawn) else 0
+                     or heading_labels or flattened_tails or unmeasured or stale or fmt_undrawn) else 0
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
-        "generated_from": str(SPEC.relative_to(REPO)),
+        "generated_from": SPEC.relative_to(REPO).as_posix(),
         "rule_count": len(rules),
         "blocks": len(blocks_seen),
         "parse_gaps": [{"section": s, "kind": k} for s, k in gaps],
