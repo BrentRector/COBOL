@@ -484,7 +484,14 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
 - **Diagnostics band:** COBOLNET0710 (RAISE of a non-level-3), 0711 (unknown exception-name), 0712/0713/
   0714 (RESUME SR1/SR2/SR3), 0715/0716 (USE F3 SR13/SR14), 0717 (RAISING SR2 ¶27403), 0718/0719 (TURN SR3/SR1+SR4),
   0875–0879 (the 2002+ edition gates: TURN / RAISE+RESUME / USE F3 / per-name edition window / SET LAST EXCEPTION+
-  RAISING).
+  RAISING), 3803 (Warning, kb/Work PB2505: a `RAISE EXCEPTION` of a NONFATAL name whose checking is off at that
+  statement raises nothing — §14.6.13.1.1, §14.6.13.1.4 — so `EcBinder.BindRaise` advises it from the SAME
+  `BoundRaise.Enabled` fold `EcEmitter.EmitRaise` emits from; checking is lexical, §7.3.25.4 GR6 and the
+  §14.9.28.4 GR14 implicit TURN, so the fold is exact and the advisory has no false positive. A fatal name is not
+  advised: with checking off it terminates, the §14.6.13.1.3 8) implementor arm. The standard's own Annex D.2.5
+  sample program writes eleven `RAISE EXCEPTION EC-USER-FATAL-ERROR` and no TURN, so it runs past every one of
+  its fatal errors on a conforming implementation: a candidate defect report against the standard, the same class
+  as kb/Work PB312's two Annex D examples, never a reason to raise without checking (kb/Work PB867)).
 - **Verification:** `ExceptionConditionConformanceTests` (48 spec-pinned facts — TURN scoping/expansion, RAISE
   fatal/nonfatal × enabled/off, RESUME both forms, F3 tier selection, the SIZE/OVERFLOW/I-O/PROGRAM/
   ARGUMENT-FUNCTION bridges, RAISING propagation both verbs, the EXCEPTION-* functions, the edition gates, the

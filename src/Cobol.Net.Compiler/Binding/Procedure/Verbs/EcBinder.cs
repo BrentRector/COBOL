@@ -3,6 +3,7 @@
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;
 using CobolNet.Compiler.Oo;
+using CobolNet.Editions.Diagnostics;
 using CobolNet.Frontend.Generated;
 using CobolNet.Runtime.Exceptions;
 
@@ -94,6 +95,16 @@ internal sealed partial class EcBinder(BinderContext ctx, StatementBinder host)
         ctx.EcState.Raise = true;
         int line = r.Start.Line;
         bool enabled = ctx.EcState.Turn.Enabled(info.Name, null, line);
+        // kb/Work PB2505: a nonfatal name raised with checking off raises nothing (§14.6.13.1.1, §14.6.13.1.4) and the
+        // emitter writes no code for it (EcEmitter.EmitRaise reads this same bool), so the statement is a CONTINUE the
+        // source does not look like. Say so. A fatal name is not advised: with checking off it terminates (PB2504).
+        if (!enabled && !info.IsFatal)
+        {
+            ctx.Edition.Warning(DiagnosticCatalog.RaiseCheckingNotEnabled,
+                $"RAISE EXCEPTION {info.Name}: checking for {info.Name} is not enabled at this statement, so the RAISE "
+                + "raises nothing and execution continues as if the exception did not occur (ISO §14.6.13.1.1, "
+                + $"§14.6.13.1.4); write >>TURN {info.Name} CHECKING ON before it if it is meant to raise");
+        }
         bool withLoc = enabled && ctx.EcState.Turn.WithLocation(info.Name, null, line);
         return new BoundRaise(info.Name, info.IsFatal, enabled, withLoc, EcLocation(line));
     }
