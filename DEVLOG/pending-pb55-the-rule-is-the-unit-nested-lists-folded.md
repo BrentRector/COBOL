@@ -61,4 +61,6 @@ fails on a catalog that differs from the extractor's own output.
 
 **Gate:** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` (run 20261015T210626Z-6e7548). Some
 cases of the touched drift-test classes were in leg 2, so they were also run on the gate's binaries: 59/59 passed,
-plus 138/138 in the other spec-reading drift classes.
+plus 138/138 in the other spec-reading drift classes. After the review fixes: `=== BUILD-LOCAL GATE: LEG 1 ONLY
+(batched gating, PB2515): GREEN ===` (run 20261015T212248Z-052d86), and `CitationAuditSelfTestDriftTests` (leg 2,
+so run on that gate's binaries with `SelfTestDiscoveryDriftTests`) passed 8/8.
