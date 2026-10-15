@@ -299,3 +299,5 @@ a tree-wide change, so it is a lead rather than part of this slice.
 **Still open.** The variable-length shapes `PublishedRecordEmitter.Renders` refuses (a dynamic-length item, a
 dynamic-capacity table: the §8.5.1.12 carrier), and the manual's host chapter, which has no home until kb/Work PB1610
 creates `docs/manual/`.
+
+**Gate.** `TestResults/build-local/20261015T210923Z-d4c692` at fe2ec5ef1: `LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,103/11,713, Unit 33,229/33,688, Characterization 6/36 in leg 1). Leg 1 did not hold the changed `NonCobolActivatorReturnTests`, `DefaultLocaleDeterminationTests` or the re-pinned `RuntimeAbiPinDriftTests.TheCallAbi_IsPinnedBesideTheBoundaryLayout`, because the gate puts only added tests in tier 0a; each passed in a direct run on the same build, and the whole Characterization assembly (36) passed. Semgrep verify: PASS, no count moved.
