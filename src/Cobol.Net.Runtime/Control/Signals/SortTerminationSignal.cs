@@ -32,7 +32,7 @@ public sealed class SortTerminationSignal(string file, int action) : Exception
     /// kb/Work PB2659): sets <paramref name="ended"/> and returns false, so the signal passes through untouched while the
     /// boundary's <c>finally</c> knows the activation ended with the terminated SORT's range rather than by a condition
     /// that terminates the run unit — and so still owes what an activation's end owes: the BY REFERENCE copy-out
-    /// (§14.2.3 GR8) and an INITIAL program's implicit CANCEL (§14.9.18 GR2).</summary>
+    /// (§14.2.3 GR8) and an INITIAL program's implicit CANCEL (§14.9.18.4 GR2).</summary>
     public static bool EndsActivation(ref bool ended)
     {
         ended = true;

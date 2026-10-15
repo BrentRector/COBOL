@@ -44,11 +44,12 @@
       *>      L2-ARG=Y L2-AFTER (never L2-SUB-LANDED).
       *>  L3  output procedure, RESUME AT NEXT STATEMENT => L3-OUT=A
       *>      L3-SUB-USE=35 L3-ARG=Y L3-AFTER.
-      *>  L4  input procedure, GOBACK => L4-SUB-USE=35 L4-ARG=Y L4-AFTER.
+      *>  L4  input procedure, GOBACK => L4-SUB-USE=35 L4-ARG=Y
+      *>      L4-AFTER.
       *>  L5  an INITIAL program (twice): L5-INI-OPEN=00 L5-INI-USE=35
       *>      L5-AFTER - its activation ended with the SORT's range, and
-      *>      the next activation opens the same file again (14.9.18 GR2
-      *>      closed it).
+      *>      the next activation opens the same file again
+      *>      (14.9.18.4 GR2 closed it).
       *>  L6  the containing program's GLOBAL USE procedure, for a
       *>      contained program's SORT with no declaratives of its own
       *>      (14.9.49.4 GR4 b)) => L6-G-USE=35 L6-G-END L6-AFTER.

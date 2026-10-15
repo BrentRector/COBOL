@@ -26,15 +26,16 @@ applicable statement and the MERGE continues. Recorded in `docs/CONFORMANCE.md` 
 below the procedure's nested dispatch, so no `goto` can reach the statement's end. The question is asked instead at
 the one place every selection path reaches a declarative through, `__RunUse`, once the declarative has finished:
 
-- A format 1 SORT registers its declarative scope (the emitted `__useActive`) first in its body
-  (`CobolSort.RegisterUseScope`; `EcEmitter.SortUseScope`, set exactly when the scope has the EC-model `__RunUse`).
+- Every format 1 SORT registers itself as the run unit's active format 1 SORT first in its body, with its
+  declarative scope (the emitted `__useActive`, or null) (`CobolSort.RegisterFormat1Sort`; `EcEmitter.SortUseScope`,
+  set exactly when the scope has the EC-model `__RunUse`).
   It is a new runtime member rather than a parameter added to `CobolSort.Init`: the gate's `RuntimeAbiPinDriftTests`
   caught that changing the shipped `Init` would have been an incompatible runtime change, raising the major and
   stranding every compiled module.
 - `__RunUse` hands every DECLARATIVE's action to `CobolSort.AfterUseProcedure`.
-- That throws `SortTerminationSignal` when the action is not a normal completion
-  (`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off) and a SORT that
-  registered the scope is active.
+- That throws `SortTerminationSignal` for the innermost active format 1 SORT when the action is not a normal
+  completion (`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off). It carries
+  the action for the SORT's own declaratives and `NotNormal` for any other element's.
 - The SORT statement's `catch` (`SortEmitter.TerminationLanding`) lands the signal after the `finally` has released
   the store. RESUME AT procedure-name then transfers from the SORT's own dispatcher.
 
@@ -64,9 +65,37 @@ Also `2002/pb1177_method_sort_use_not_normal` (the method arm), `unit:SortUseTer
 `pb1122_declarative_fatal_in_scope_merge` and `pb1036_sort_merge_statement_ec` were re-run unchanged. Row
 `GR-14.9.40.4-17` went from PARTIAL to CONFORMS, and the GAP from 101 to 100.
 
-**Left as a lead.** A USE GLOBAL declarative of a CONTAINING program runs in the container's instance through
-`__RunGlobalUse`, which returns only "ran". When one is invoked from a contained program's SORT procedure and does
-not complete normally (GR1 RESUME-as-CONTINUE), the contained SORT is not terminated.
+**Review finding R1-1: the rule reaches every element's USE procedure.** The first version answered GR17 only for
+the declaratives of the program instance executing the SORT: it matched the declarative's `__useActive` against the
+one scope the SORT registered. The reviewer's probe CALLed a contained program from the input procedure; its USE
+procedure ended in RESUME AT NEXT STATEMENT, and the run printed `SUB-USE=35 / SUB-AFTER-OPEN / IN-AFTER-CALL /
+SORTED=A / SORTED=B / AFTER-SORT`. A containing program's GLOBAL declarative (the first implementer's lead, probe p9)
+and an INVOKEd method's declarative behaved the same way. GR17 names "a USE procedure invoked while a format 1 SORT
+statement is active", and GR10/GR13 put "all statements that are executed as the result of a transfer of control in
+the range" inside the range, so the narrower reading had no text behind it. The finisher widened the mechanism
+rather than record that reading as a determination:
+
+- Every format 1 SORT now registers and emits its landing, including one whose own scope has no declaratives. The
+  runtime terminates the innermost active one, whichever element's declarative asks.
+- Another element's RESUME AT procedure-name names a procedure of an activation the termination ends, so it lands as
+  `NotNormal` at the SORT's end (determination in `docs/CONFORMANCE.md` §3).
+- An EXIT PROGRAM or GOBACK in another element's USE procedure is that element's return, and it never reaches
+  `AfterUseProcedure`. `__RunUse` now notes it with a declining filter on the return signal
+  (`CobolSort.UseProcedureExited`). The return completes, and the SORT is terminated in the activator
+  (`SortFileTable.AfterActivationReturn`, asked by `ProgramTable.CallProgram` and by the epilogue of a method with
+  EC-model declaratives).
+- An activation the signal unwinds still owes what its end owes. The BY REFERENCE copy-out moved into the
+  activation's `finally` and runs when it returned or ended this way (`SortTerminationSignal.EndsActivation`, a
+  declining filter). An INITIAL program's implicit CANCEL runs too (`ProgramTable.EndInitialActivation`), so its next
+  activation can open the same file. A condition that terminates the run unit owes neither.
+- `RuntimeAbiPinDriftTests`' boundary hash was re-pinned alone. The callee's copy-out moved into the `finally`, and
+  what crosses the boundary (carriers, descriptions, profiles) did not change.
+
+The new goldens are `2002/pb1177_sort_called_use_not_normal` and `2002/pb1177_invoke_sort_use_not_normal`. The
+first has seven legs: control, RESUME NEXT, RESUME AT, the output procedure, GOBACK, an INITIAL program run twice,
+and the container's GLOBAL declarative for a SORT with no declaratives. The second covers an INVOKEd method: control,
+RESUME NEXT and GOBACK. `SortUseTerminationTests` was rewritten for the widened rule, including the
+innermost-of-two case.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T215125Z-fbb8c8:
 Conformance 6,116/11,713, Unit 33,268/33,673, Characterization 6/36 in leg 1, with both new goldens and all four

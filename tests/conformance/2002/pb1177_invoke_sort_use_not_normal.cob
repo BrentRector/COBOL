@@ -3,9 +3,9 @@
       *> procedure invoked while a format 1 SORT statement is active
       *> does not complete normally, the SORT statement is terminated."
       *> GR10 puts the method's statements, and the USE procedures they
-      *> invoke, in the input procedure's range; 14.6.13.1.2 1) makes a
-      *> RESUME or a GOBACK in the USE procedure a completion that is not
-      *> normal. The SORT program has no declaratives of its own.
+      *> invoke, in the input procedure's range; 14.6.13.1.2 1) makes
+      *> a RESUME or a GOBACK in the USE procedure a completion that is
+      *> not normal. The SORT program has no declaratives of its own.
       *> 14.2.3 GR8: the BY REFERENCE formal "occupies the same storage
       *> area as the argument" (=> In-ARG=Y however the SORT ended).
       *> EXPECTED (computed from the rules, not from a run):

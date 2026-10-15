@@ -726,21 +726,35 @@ procedure invoked while a format 1 SORT statement is active does not complete no
 terminated" — including one invoked by a statement of the INPUT or OUTPUT PROCEDURE (GR10/GR13 put "all statements
 in declarative procedures that are executed as a result of the execution of statements in the range" inside the
 procedure's range), whose raise site runs below the procedure's nested `__Dispatch` and cannot jump to the
-statement's end (kb/Work PB1177). So GR17 is ONE run-time mechanism: the SORT registers its declarative scope (the
-emitted `__useActive`) first in its body (`CobolSort.RegisterUseScope`; `EcEmitter.SortUseScope` — exactly when the scope has the EC-model
-`__RunUse`), the generated `__RunUse` hands every DECLARATIVE's action to `CobolSort.AfterUseProcedure` once the
-declarative has finished, and that throws `SortTerminationSignal` when the action is a completion that is not normal
-(`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off) and a SORT that
-registered the scope is active. The SORT statement's `catch` (`SortEmitter.TerminationLanding`) lands it after the
+statement's end (kb/Work PB1177) — and equally one invoked by a statement of a program CALLed or a method INVOKEd in
+that range (GR10/GR13's "all statements that are executed as the result of a transfer of control in the range"),
+including a containing program's GLOBAL declarative (§14.9.49.4 GR4 b)). So GR17 is ONE run-time mechanism: EVERY
+format 1 SORT registers itself as the run unit's active format 1 SORT first in its body (`CobolSort.RegisterFormat1Sort`,
+with its scope's `__useActive` — `EcEmitter.SortUseScope`, exactly when the scope has the EC-model `__RunUse` — or null),
+the generated `__RunUse` of every EC-model element hands every DECLARATIVE's action, with its own `__useActive`, to
+`CobolSort.AfterUseProcedure` once the declarative has finished, and that throws `SortTerminationSignal` for the
+innermost active format 1 SORT (`SortFileTable.ActiveFormat1Sort`) when the action is a completion that is not normal
+(`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off). The signal carries the
+action only for the SORT's OWN declaratives (the registered scope); another element's lands as `NotNormal`, because its
+RESUME AT procedure-name names a procedure of an activation the termination ends. The SORT statement's `catch`
+(`SortEmitter.TerminationLanding`; a bare end when the scope has no EC-model declarative) lands it after the
 `finally` has released the store: RESUME AT NEXT STATEMENT and the not-normal fall-off end at the end of the SORT —
 §14.9.33.4 GR2 a)'s "unless general rules associated with the applicable statement specify otherwise", GR17 being the
 rule that leaves a statement inside a terminated SORT's procedure no next statement to run — and RESUME AT
 procedure-name transfers as a GO TO (§14.9.33.4 GR3) from the SORT's own dispatcher, not from inside the procedure's.
 A USE procedure invoked by another USE procedure while the SORT is active is reached the same way, so the
-termination happens where the inner one ends. GOBACK / EXIT PROGRAM / STOP unwind by their own signals through the
-same `finally`. MERGE registers nothing — its rules (§14.9.24.4) carry no such sentence — so a statement of a MERGE output procedure is
+termination happens where the inner one ends. Every activation boundary the signal crosses ends with the range: the
+CALL boundary (`ProgramTable.CallProgram`, which also runs an INITIAL program's implicit CANCEL) and the method
+epilogue unwind as for any signal, and the callee's BY REFERENCE copy-out runs in its activation's `finally` when the
+activation returned OR ended this way (`SortTerminationSignal.EndsActivation`, a declining filter — a condition that
+terminates the run unit owes no copy-out). GOBACK / EXIT PROGRAM / STOP in the SORT's own declarative unwind by their
+own signals through the same `finally`. In ANOTHER element's declarative an EXIT PROGRAM or GOBACK is that element's
+return: `__RunUse` notes it with a declining filter on the return signal (`CobolSort.UseProcedureExited`), the return
+completes (copy-out, RETURNING), and the SORT is terminated in the activator (`SortFileTable.AfterActivationReturn`,
+asked by `ProgramTable.CallProgram` after every CALL and function activation and by the epilogue of every method with
+EC-model declaratives). MERGE registers nothing — its rules (§14.9.24.4) carry no such sentence — so a statement of a MERGE output procedure is
 its own applicable statement and its RESUME AT NEXT STATEMENT continues the procedure (docs/CONFORMANCE.md §3). An
-exception-checking PERFORM handler is not a USE procedure, so its RESUME keeps the static landing above. Both labels and the `catch` sit around the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. In an OO method the guard array is a LOCAL, so the method's selection machinery is emitted BEFORE its `__MDispatch` (as a program's is before its `__Dispatch`) — a SORT in the method body names it. Pinned by `conformance:2002/pb1177_sort_procedure_use_not_normal`, `conformance:2002/pb1177_method_sort_use_not_normal`, `conformance:2023/pb367b_sort_use_not_normal` and `unit:SortUseTerminationTests`. The implicit transfers' end label is also where a procedure that DID
+exception-checking PERFORM handler is not a USE procedure, so its RESUME keeps the static landing above. Both labels and the `catch` sit around the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. In an OO method the guard array is a LOCAL, so the method's selection machinery is emitted BEFORE its `__MDispatch` (as a program's is before its `__Dispatch`) — a SORT in the method body names it. Pinned by `conformance:2002/pb1177_sort_procedure_use_not_normal`, `conformance:2002/pb1177_method_sort_use_not_normal`, `conformance:2002/pb1177_sort_called_use_not_normal`, `conformance:2002/pb1177_invoke_sort_use_not_normal`, `conformance:2023/pb367b_sort_use_not_normal` and `unit:SortUseTerminationTests`. The implicit transfers' end label is also where a procedure that DID
 complete normally lands when the verb's own rule terminates the statement: §14.6.13.1.3 2) ("If the executed
 statement is a MERGE or SORT statement, then the rules for those statements apply") precedes 5)/7), so these
 sites call `__IoCheckEc(…, __verbRule: true)`, which skips the fatal throw, and dispose of the status from
