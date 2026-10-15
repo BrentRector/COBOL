@@ -1,4 +1,4 @@
-## PB2099 parts 1-2: the host's outermost activation boundary, R48's run-unit-ended result, the host type table and the door rules
+## PB2099 parts 1-3: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules and the host entry
 
 Wave 1077 group E took kb/Work PB2099, slice 3 of DESIGN-external-repository: the typed host entry and the one host
 surface. Two earlier waves had left it unstarted. The re-probe at a6744fa4d found none of the slice in the tree:
@@ -100,3 +100,49 @@ pin it. Semgrep verify passed with no rule count up.
 (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,500 · Unit 618 ·
 Characterization 30 … Conformance 6,172/11,672 · Unit 33,030/33,648 · Characterization 6/36 cases ran (skipped 0) in 1
 of 2 leg(s)`. The 11 `HostLandingTests`, `HostSurfaceTests` and `HostRunUnitEndingTests` passed in leg 1.
+
+### Part 3: the host entry for elementary formals (wave 1079 group B)
+
+Wave 1079 group B cherry-picked wave 1078 C's seven commits onto main (no conflicts) and re-gated them GREEN
+(`20261015T002520Z-3592f5`). The re-probe at that head found `HostSurface` and `HostLanding` in the tree and no
+`HostEntryEmitter`: a compiled module still offered a host only `ProgramRegistry.CallProgram`.
+
+**The mechanism.** `HostEntryEmitter` writes one `public static class` per outermost unit into the module namespace,
+named by `CsNames.Allocate` over a type scope seeded with every name the module already declares there. Its `Call` is
+the .NET counterpart of a CALL statement and holds exactly §4.3's parts. `__CobolModule.EnsureRegistered()` comes first
+(a definition's entry only). Each host value is then landed through `HostLanding` into a detached storage of the
+formal's description, before anything is activated. One variable passed to two `ref` parameters of one description is
+one storage (§14.2.3 8)), and of two descriptions an `ArgumentException`. One `CobolArg` per formal states what a CALL
+site that checks EC-PROGRAM-ARG-MISMATCH states. The one `ProgramRegistry.CallProgram(name, null, …,
+siteArgMismatchChecking: true)` follows, with a `finally` that decodes every BY REFERENCE variable, then the RETURNING
+decode. `Cancel` is `ProgramRegistry.Cancel(name, null)`; a function has none. The detached storage of a fixed-point
+formal is its record image under its `NumProfile`, so the write-back sees the content the activated program left (a
+REDEFINES view can leave non-numeric content, which no native cell could hold) and decodes it only when the class test
+NUMERIC is true of it (§8.8.4.4.4 3) n)). A float or index formal crosses in its native cell, a pointer or object
+reference in its slot, and a character formal as its image. The length and profile each argument states are now one
+rule with the CALL lane's: `CallEmitter.ArgumentLength`, `BoundaryLength` and `BoundaryProfile` gained item-level forms
+that the place forms call. A unit with a GROUP formal or RETURNING item publishes no entry yet
+(`HostEntryEmitter.ElementaryOnly`): the published record struct is the next step.
+
+**Witnesses.** `HostEntryTests` is the §17.1 host harness: a C# host compiled against two modules and run out of
+process. Every expected line comes from the standard. 100.25 lands exactly (§14.2.3 9)), and 1.234 into two fraction
+positions, 12345678 into seven integer positions and an 11-character name into X(10) are each refused with the
+parameter named. The count of the activations that did run shows nothing was activated. A BY VALUE COMP-5 flag adds
+into the amount. An omitted OPTIONAL formal's condition is true (§14.9.4.4 11)). WORKING-STORAGE keeps its count
+across calls until `Cancel()` (§14.9.5). `Call(ref a, ref a, ref c)` shows `B=0005`, and one variable given to `PIC
+9(4)` and `PIC 9(8)` formals is refused. A REDEFINES view's `ABCD` leaves the host's `long` at 7, writes the other
+formal back and throws `FormatException` naming `LK_N`. 18- and 20-digit integers (`long`, `Int128`) round-trip, a
+null data pointer reaches the program as NULL, and a function's entry returns its RETURNING item.
+`HostEntryShapeDriftTests` reads the emitted C# of a fixture covering every elementary landing row and asserts
+§17.3's "the host entry is a caller" (only §4.3's statements; one `CallProgram`; no catch, instance, `ICobolProgram`,
+`ProgramTable` or EC-name test; `Cancel` one `ProgramRegistry.Cancel`) and "the door rules are one function" (each
+landed storage is a `HostLanding` call, with no inline comparison). It also checks that the parameter types are
+`HostSurface.TypeOf`'s rows. The 14 characterization snapshots gained their modules' entry classes. A compile sweep of
+the 487 corpus programs that declare formals or a RETURNING item gave 121 entries with landings, and no failure came
+from an entry. Its 32 failures were sources the sweep compiled without their manifest's options.
+
+**Self-review (part 3).** Code review found that a .NET null passed for a data pointer would have reached the program
+as a null reference. It now lands as `ManagedPointer.Null`, the value the predefined address NULL denotes, and the
+harness pins it.
+The duplication review found that the entry restated the CALL lane's argument-length rule; that rule is now one
+function. Semgrep verify passed with no rule count up.

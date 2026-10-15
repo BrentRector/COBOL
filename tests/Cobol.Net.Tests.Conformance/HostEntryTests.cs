@@ -97,6 +97,18 @@ public sealed class HostEntryTests
             DISPLAY "U=" LK-U
             GOBACK.
         END PROGRAM H1WIDE.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H1PTR.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-P USAGE POINTER.
+        PROCEDURE DIVISION USING LK-P.
+        P1.
+            IF LK-P = NULL
+                DISPLAY "P NULL"
+            END-IF
+            GOBACK.
+        END PROGRAM H1PTR.
         """;
 
     /// <summary>A function unit: its entry returns the RETURNING item and has no Cancel (CANCEL names programs).</summary>
@@ -159,6 +171,11 @@ public sealed class HostEntryTests
                 try { H1WIDE.Call(ref l, ref w, -1); Console.WriteLine("ACTIVATED"); }
                 catch (ArgumentOutOfRangeException e) { Console.WriteLine($"SIGN {e.ParamName}"); }
 
+                // A .NET null for a data pointer is the pointer NULL, never a null reference in the program.
+                CobolNet.Runtime.ManagedPointer p = null!;
+                H1PTR.Call(ref p);
+                Console.WriteLine($"PTR {ReferenceEquals(p, CobolNet.Runtime.ManagedPointer.Null)}");
+
                 long x = 21;
                 Console.WriteLine($"FN {H1FN.Call(ref x)}");
                 return 0;
@@ -200,6 +217,8 @@ public sealed class HostEntryTests
                 "W 999999999999999998 99999999999999999999\n" +
                 "WIDE LK_L\n" +
                 "SIGN LK_U\n" +
+                "P NULL\n" +
+                "PTR True\n" +
                 "FN 42", stdout);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);

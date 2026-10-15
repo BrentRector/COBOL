@@ -1,6 +1,5 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Compiler.Oo;
 using CobolNet.Runtime;
@@ -121,7 +120,7 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     private void EmitCallBody(BoundUnit unit, List<Item> formals, Item? returning, CodeWriter w)
     {
         if (!unit.IsPrototype)
-            w.Line($"{ModuleNamespace.RegistrarClass}.EnsureRegistered();   // this assembly's programs, once per run unit (§11.2)");
+            w.Line($"{ModuleNamespace.RegistrarClass}.EnsureRegistered();   // this assembly's programs, once per run unit (DESIGN-external-repository §11.2)");
         // 1. Landing, before anything is activated: each host value into a detached storage of its formal's description,
         //    exactly or refused (HostLanding); one variable given to two formals of one description is one storage.
         for (int i = 0; i < formals.Count; i++)
@@ -186,6 +185,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         {
             HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec =>
                 $"ManagedPointer<string>.Cell({RuntimeApi.NumFormatImage(Unsigned16(pic, $"HostLanding.Land({value}, {f.Profile}, {CsLiteral(f.Name)}, {member})"), f.Profile!)})",
+            // A data pointer's NULL is the runtime's Null singleton (the value the predefined address NULL denotes),
+            // never a .NET null reference, which the activated program's pointer reads would dereference.
+            HostTypeKind.Pointer when pic.Category is PicCategory.Pointer =>
+                $"ManagedPointer<{pic.ClrType}>.Cell({value} ?? ManagedPointer.Null)",
             HostTypeKind.Float or HostTypeKind.Index or HostTypeKind.Pointer or HostTypeKind.ObjectReference =>
                 $"ManagedPointer<{pic.ClrType}>.Cell({value})",
             HostTypeKind.Text when d.IsAnyLength =>
@@ -216,6 +219,7 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         {
             HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec =>
                 $"ManagedPointer<string>.Cell({RuntimeApi.NumFormatImage("(Int128)0", r.Profile!)})",
+            HostTypeKind.Pointer when pic.Category is PicCategory.Pointer => $"ManagedPointer<{pic.ClrType}>.Cell(ManagedPointer.Null)",
             HostTypeKind.Float or HostTypeKind.Index or HostTypeKind.Pointer or HostTypeKind.ObjectReference =>
                 $"ManagedPointer<{pic.ClrType}>.Cell(default!)",
             HostTypeKind.Text when d.IsAnyLength || d.IsDynamicLength => "ManagedPointer<string>.Cell(\"\")",

@@ -89,7 +89,7 @@ public static class CHAR_CONDITIONALS
 {
     public static void Call()
     {
-        __CobolModule.EnsureRegistered();   // this assembly's programs, once per run unit (§11.2)
+        __CobolModule.EnsureRegistered();   // this assembly's programs, once per run unit (DESIGN-external-repository §11.2)
         ProgramRegistry.CallProgram("CHAR-CONDITIONALS", null, global::System.Array.Empty<CobolArg>(), null, siteArgMismatchChecking: true);
     }
     /// <summary>CANCEL CHAR-CONDITIONALS (ISO §14.9.5) in the current run unit.</summary>

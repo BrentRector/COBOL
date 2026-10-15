@@ -72,7 +72,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             Assert.DoesNotContain("ICobolProgram", body);
             Assert.DoesNotContain("ProgramTable", body);
             Assert.DoesNotContain("_PRG_", body);   // no program class, so no instance
-            // The only exception-name an entry names is the function arm's not-found condition (§8.4.6.3).
+            // The only exception-name an entry names is the function arm's not-found condition (DESIGN-external-repository §4.3).
             Assert.All(call.Body.DescendantNodes().OfType<LiteralExpressionSyntax>()
                     .Where(l => l.Token.ValueText.StartsWith("EC-", StringComparison.Ordinal)),
                 l => Assert.Equal("EC-FUNCTION-NOT-FOUND", l.Token.ValueText));
