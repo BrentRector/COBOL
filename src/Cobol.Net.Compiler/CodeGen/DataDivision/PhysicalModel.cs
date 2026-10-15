@@ -151,8 +151,25 @@ internal sealed class PhysicalModel(EmitContext ctx)
                 // The whole redefines class is ONE string backing (the canonical's VALUE seeds it, SR9); every member
                 // is a window over it. A non-canonical Tier-B member yields no field.
                 if (c.IsCanonical)
-                    yield return new Physical(cls.BackingCsName, "string", cls.Width, false,
-                        RuntimeApi.StrStore(Codec.ImageInitOf(c, subs: subs, recipe: recipe), $"{cls.Width}"), $"REDEFINES backing for {c.CobolName}");
+                {
+                    string backingInit = RuntimeApi.StrStore(Codec.ImageInitOf(c, subs: subs, recipe: recipe), $"{cls.Width}");
+                    // ⛔ A BIT ITEM THAT SHARES ITS BYTE (§8.5.1.6.3) STAYS IN ITS RUN, whoever stores it. The class is
+                    // one string backing of the canonical's own bits (§13.18.44.4 GR1 — the subject's storage starts
+                    // "at the first bit of the data item referenced by data-name-2"), so the backing is the run
+                    // MEMBER's field: it leads the run's slice when it leads the run, and contributes none when it
+                    // continues one (GroupImageCodec.BitCarrierOf / EmitRunMemberFromBits read the bits out of and
+                    // back into it). Yielding it as a byte field of its own while the run still counted the item
+                    // made the group's image one byte wider than its storage and named a field the run packer
+                    // did not have (kb/Work PB3166).
+                    if (runs.IsInRun(c))
+                    {
+                        var run = runs.RunLedBy(c);
+                        yield return new Physical(cls.BackingCsName, "string", run is null ? 0 : BitLayout.RunCharacters(run), false,
+                            backingInit, $"REDEFINES backing for {c.CobolName}", 0, null, run);
+                    }
+                    else
+                        yield return new Physical(cls.BackingCsName, "string", cls.Width, false, backingInit, $"REDEFINES backing for {c.CobolName}");
+                }
                 continue;
             }
             if (c.Class is { Tier: RedefinesTier.Alias } && !c.IsCanonical)

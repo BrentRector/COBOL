@@ -88,6 +88,11 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// <summary>The main source file — the identity origin when no <see cref="LineMap"/> is set.</summary>
     public string SourceFile { get; set; } = "<source>";
 
+    /// <summary>Where each token of the unit being bound stands with respect to the areas of a fixed-form line (kb/Work
+    /// PB3147); the driver sets it from the frontend (<c>Frontend.Areas</c>), beside <see cref="LineMap"/>, whose map it
+    /// composes. Null = no source text was read (a unit-test bind without a frontend), so no position has an area.</summary>
+    public Frontend.Preprocessor.FixedFormAreas? Areas { get; set; }
+
     /// <summary>The compilation's DISPLAY over-punch convention — the CLI's <c>--sign-encoding</c> (kb/Work PB803,
     /// owner decision 2026-09-09; Annex A.1 items 177/178, ISO §13.18.52.4 GR4 / GR5 b). NOT a dialect axis: every
     /// edition leaves the representation to the implementor, so the option is orthogonal to <see cref="Edition"/>

@@ -1,0 +1,4 @@
+## Entry 2048 — 2026-10-15 11:26 PDT — Enqueue-unit leads filed: three new tooling notes and four recurrences
+
+Filed the leads from the PB3165 and PB3180 reports and the survey findings of 2026-10-15. New notes: PB3181 (the branch survey's report admission misses DISCHARGED reports and DONE branches with only enqueue.py commits after them), PB3182 (100 drift-test classes unreadable to drift_rules.py, about 10 untraited tree sweeps), PB3184 (a Linux-gate red is not a previous red for the next Windows gate). Recurrences appended to PB3084 (prose bullet read as a branch field), PB3112 (a slow sweep sample is never re-timed), PB2429 (the false-negative arm of the WIP-checkpoint attribution) and PB3125 (cross-link to PB3181). PB3183 and PB3185 were allocated and stayed unused. No code changed.
+
