@@ -100,4 +100,6 @@ and `pb3101-property-accessors-group-and-elementary` (COBOLNET2727). Drift tests
 over every elementary pair with the comparator the prototype comparison still asks. PB3101's item 3 design question is
 settled in docs/COBOLNET_OO_DESIGN.md D6 item 7: the signature classes become a partition refinement, so the relation
 needs no compile-time hook, and `PrototypeSignatures` moves to it next with the `GroupAtom` leaf identity. The
-comparator's deletion and `OneRelationDriftTests` follow.
+comparator's deletion and `OneRelationDriftTests` follow. The first gate was RED on one negative,
+`l1c09-factory-implements-nonconforming-method`, whose `.err` pinned the comparator's wording; it now pins the
+relation's. Gate run `20261015T012455Z-4e90c2`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
