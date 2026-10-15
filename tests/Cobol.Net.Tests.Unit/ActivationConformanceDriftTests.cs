@@ -133,8 +133,9 @@ public sealed class ActivationConformanceDriftTests
     /// <c>ActivationDescription</c>s, and the two disagreed where the standard does not: a reference-modified argument BY
     /// REFERENCE into a prototyped CALL's or a function's elementary formal ran (it has no PICTURE clause, docs/CONFORMANCE.md
     /// D-RM1), and the run-time lane's ANY LENGTH arm compared category and usage only. So the activation entry asks
-    /// <c>CallArgumentViolation</c> / <c>CallReturningViolation</c>, and no verb binder asks the pair comparator for an
-    /// activation — <c>MoveBinder</c>'s identity-conversion test is a pair question, not an activation.</summary>
+    /// <c>CallArgumentViolation</c> / <c>CallReturningViolation</c>, and no verb binder asks the pair comparator at all
+    /// (<c>MoveBinder</c>'s identity-conversion test, a pair question, asks the pair-mode relation:
+    /// <see cref="PairMode_AsksTheDescriptionRelation_ThroughOneEntry"/>).</summary>
     [Fact]
     public void ActivationConformance_AsksTheRunTimeRelations_NotThePairComparator()
     {
@@ -143,9 +144,7 @@ public sealed class ActivationConformanceDriftTests
             Assert.True(code.Contains(call, System.StringComparison.Ordinal),
                 $"ParameterConformance no longer asks {call.TrimEnd('(')} — the bind-time activation lane would answer a "
                 + "pair the run-time CALL lane answers differently (kb/Work PB3101).");
-        string[] pairAskers = ["MoveBinder.cs"];
         var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !pairAskers.Contains(Path.GetFileName(f)))
             .Where(f => Regex.IsMatch(CodeOf(f), @"OoConformance\s*\.\s*DescriptionMismatch\s*\("))
             .Select(Path.GetFileName)
             .ToList();
@@ -195,6 +194,45 @@ public sealed class ActivationConformanceDriftTests
         Assert.True(offenders.Count == 0,
             "A verb binder reduces an argument's boolean node itself instead of asking ConditionBinder.ReduceArgument "
             + "(kb/Work PB613): " + string.Join(", ", offenders));
+    }
+
+    /// <summary>⛔ PAIR MODE ASKS THE ONE DESCRIPTION RELATION THROUGH ONE ENTRY (kb/Work PB3101; COBOLNET_OO_DESIGN D6
+    /// item 7). ISO §9.3.8.2.3 rules 2, 3, 6 and 7 state the identity of two corresponding items once, and §11.7.3 SR9
+    /// (OVERRIDE), §9.3.11 (IMPLEMENTS), interface conformance and §8.4.3.9.3 SR7 (a property's accessors) import it. The
+    /// compiler answered them with a <c>DataItem</c> comparator (<c>OoConformance.DescriptionMismatch</c>) while the §9.3.6
+    /// match and the activation conformance read <c>ActivationDescription</c>s, and the copies disagreed: the comparator,
+    /// carrying §14.8.2.2 rule 1's activation reading, called a 4-byte alphanumeric group and a <c>PIC X(4)</c> the same
+    /// description, so such an override compiled where rule 3 refuses it (the group has no PICTURE clause). So
+    /// <c>OoConformance.SignatureDifference</c> is the one entry — it describes both items through the one builder and asks
+    /// <c>ActivationRelations.SignatureDifference</c> — the override, IMPLEMENTS, property and MOVE-element askers call
+    /// it, and the comparator's one remaining caller is the prototype signature comparison, which moves with the signature
+    /// classes' design.</summary>
+    [Fact]
+    public void PairMode_AsksTheDescriptionRelation_ThroughOneEntry()
+    {
+        string oo = CodeOf(TestRepo.Src("Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
+        Assert.True(Regex.IsMatch(oo, @"ActivationRelations\s*\.\s*SignatureDifference\s*\("),
+            "OoConformance.SignatureDifference no longer asks ActivationRelations.SignatureDifference — pair mode would "
+            + "answer from a copy of the description identity the match and the activations do not share (kb/Work PB3101).");
+        // The entry's definition and its call to the relation, then its three askers in OoConformance: the formals and
+        // the RETURNING item of MethodConformanceMismatches, and the property accessors.
+        Assert.True(Regex.Matches(oo, @"\bSignatureDifference\s*\(").Count >= 5,
+            "OoConformance's pair-mode askers (the formals and the RETURNING item of MethodConformanceMismatches, the "
+            + "property accessors) no longer all ask SignatureDifference (kb/Work PB3101).");
+        Assert.Contains("OoConformance.SignatureDifference(", Verb("MoveBinder.cs"));
+
+        // The comparator's callers: its own definition, and the prototype signature comparison alone.
+        string compiler = TestRepo.Src("Cobol.Net.Compiler");
+        string sep = Path.DirectorySeparatorChar.ToString();
+        var callers = Directory.EnumerateFiles(compiler, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(sep + "obj" + sep) && !f.Contains(sep + "bin" + sep))
+            .Where(f => Regex.Matches(CodeOf(f), @"\bDescriptionMismatch\s*\(").Count
+                        > (Path.GetFileName(f) == "OoConformance.cs" ? 1 : 0))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(callers.SequenceEqual(["PrototypeSignatures.cs"]),
+            "OoConformance.DescriptionMismatch has a pair-mode caller besides the prototype signature comparison: "
+            + string.Join(", ", callers) + " — ask OoConformance.SignatureDifference (kb/Work PB3101).");
     }
 
     [Fact]

@@ -283,9 +283,9 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    lane answers statically by §14.8.2.3.2 rule 4 with `invokedWith`) and
    `ActivationRelations.ParameterViolation` (§14.8.2.2's group rules; GR7 c)'s ANY LENGTH ban bans the bound METHOD's
    description, not a pair, so it is the universal switch's unconditional stop and never the typed lane's). A BY REFERENCE INVOKE argument has NO second comparator; a reference-modified argument BY CONTENT takes
-   §14.8.2.3.3's MOVE rules like any operand (§9.3.6 4 d)). This item is the INVOKE step of item 7: pair mode
-   (override, implements, property, RETURNING) asks `OoConformance.DescriptionMismatch` only until PB3101 deletes the
-   comparator and sends pair mode to `SameSignature`. What the one relation settles by
+   §14.8.2.3.3's MOVE rules like any operand (§9.3.6 4 d)). This item is the INVOKE step of item 7, whose pair mode
+   (override, implements, property, RETURNING) asks `ActivationRelations.SignatureDifference` over the same
+   descriptions. What the one relation settles by
    construction: a reference-modified argument is §8.4.3.3.4 GR6's PICTURE-less elementary item
    (`OfReferenceModification`), so BY REFERENCE it matches an alphanumeric group formal of no more bytes and never an
    elementary one (3 e)) — the typed lane used to accept `X(1:5)` into `PIC X(5)` and refuse the group; a whole
@@ -331,14 +331,17 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    `Runtime/Control/ActivationRelations` holds every relation over it — `Matches` / `MatchViolation` /
    `ReturningMatches` (§9.3.6), `ParameterViolation` / `ReturningViolation` (§14.8.2 / §14.8.3 for a method),
    `CallArgumentViolation` / `CallReturningViolation` (a program or function: rule 1's length or rule 2's identity,
-   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MoveViolation` / `MaySet`, §14.8.2.2) and `SameSignature` (the
-   symmetric identity of §9.3.8.2.3 rules 1-6, §11.7.3 SR3/SR4 and §13.7.3 SR2). `ParameterConformance.CheckArgument`
+   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MoveViolation` / `MaySet`, §14.8.2.2) and `SignatureDifference`
+   (the symmetric identity of §9.3.8.2.3 rules 2, 3, 6 and 7, which §11.7.3 SR9, §9.3.11, §8.4.3.9.3 SR7 and §13.7.3
+   SR2 import; null when the two are the same description). `ParameterConformance.CheckArgument`
    is the ONE bind-time entry: CALL Format 2, a function reference and INVOKE build the argument's description
    (`OfCallArgument` / `OfPlace` / `OfValue`, the §14.9.4.4 GR8 reduction written once) and the formal's, and ask
    `CallArgumentViolation` (program, function) or `MatchViolation` then `ParameterViolation`
    (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
    `MethodConformanceMismatches` (override, implements, interface), the property accessor check,
-   `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SameSignature`. There is NO
+   `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SignatureDifference` through
+   ONE entry, `OoConformance.SignatureDifference(DataItem, DataItem, …)`, which describes both items with
+   `ActivationDescriptions.Of` (an item with no description is the same as nothing). There is NO
    `DataItem` comparator: `OoConformance.DescriptionMismatch`, `ContentMismatch`, `ContentValueMismatch`, the literal
    arms and `StrongTypeModel.SameElementaryLayout` are deleted with PB3101 (CLAUDE.md rule 4: no shim survives). The
    PARSE-TREE half of §14.9.4.4 GR8 / §14.9.23.4 GR4 (which node an argument's identifier or literal landed in) is one
@@ -374,14 +377,43 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    formal: §14.8.2.2 rule 2's MOVE admits it). Wave 1079 wrote the GR8 reduction once (`ConditionBinder.ReduceArgument`,
    PB613); reducing a keyword-less CALL argument before dispatching its shape fixed CALL's boolean arm, which passed an
    identifier that reached a boolean node on a later argument's B-operator BY CONTENT where §14.9.4.4 GR9 a) 1. assumes
-   BY REFERENCE. Remaining for PB3101: pair mode on `SameSignature` with `GroupAtom` carrying each leaf's identity, the
-   deletion of `DescriptionMismatch` / `AsIfElementaryGroupMismatch` / `CategoryArmMismatch` /
-   `StrongTypeModel.SameElementaryLayout`, and `OneRelationDriftTests`.
-   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`, `conformance:2002/pb3101_content_one_relation`;
-   negatives `pb3101-prototype-call-refmod-by-reference`, `pb3101-function-refmod-by-reference`,
-   `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`,
-   `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`; for the reduction,
-   `conformance:2002/pb613_gr8_one_reduction` and negative `pb613-bare-literal-by-value-formal`.
+   BY REFERENCE. Wave 1080 moved pair mode OUTSIDE the prototype signature classification to the relation:
+   `MethodConformanceMismatches` (every formal and a non-object RETURNING), the property accessors and
+   `MoveBinder.ElementMovesOf` ask `OoConformance.SignatureDifference`, and an object-reference description carries
+   `ObjectNameIsParameter` (a skeleton's parameter-name, kb/Work PB2937; §9.3.8.2.4 makes its identity each expansion's
+   question, so a pair that turns on it is admitted as `ObjectRefDescriptor.TurnsOnFormal` admits it). The relation
+   settled one difference the comparator carried from §14.8.2.2 rule 1's activation reading: a 4-byte alphanumeric group
+   and a `PIC X(4)` were "the same description" at equal width, so such an override, IMPLEMENTS pair or property
+   compiled, where §9.3.8.2.3 rule 3 refuses it (a group has no PICTURE clause; §8.4.3.9.3 SR7 likewise). A bit /
+   national group stays the same description as the elementary `PIC 1(m)` / `N(m)` item of its usage (§13.18.29.4 GR1
+   b) / GR2 b)); two fixed groups are the same description at the same length, two variable-length groups when
+   compatible at the same collapsed length (§9.3.5.3 item 7 keeps a variable-length group apart from a fixed one).
+   **⚠ DESIGN DECISION (wave 1080): the signature classes are a PARTITION REFINEMENT, so the relation needs no hook.**
+   A restricted program- or function-pointer's description carries its signature CLASS (`Clauses` = `TO` the class,
+   and inside a strong group's `StrongType` key), and the classes are what `PrototypeSignatures.Same` computes (the
+   greatest fixed point over mutually recursive prototypes, `PrototypeBisimulation`, kb/Work PB2495), so asking a
+   description relation inside that computation is circular. Two shapes were weighed. (a) A restriction-equivalence
+   parameter on `SignatureDifference`, the prototype NAME standing as a provisional identity: rejected, because the
+   identity is embedded in the `StrongType` key and would be embedded in a group's leaf layout, so the hook would have to
+   reach inside both, and a run-time relation would carry a compile-time-only callback. (b) CHOSEN: `PrototypeSignatureClasses`
+   computes the coarsest stable partition — every resolved prototype starts in one block per namespace; each round stamps
+   every restricted pointer item with its prototype's CURRENT block (`DataItem.PointerRestrictionIdentity`) and splits each
+   block by its members' signature descriptions (each formal's and the returning item's `ActivationDescription`, with BY
+   VALUE and OPTIONAL); a round that splits nothing is the greatest fixed point the bisimulation computes today, and it
+   does not depend on the order prototypes are presented in. Then `PrototypeSignatures.Same` is `SignatureDifference` per
+   formal with plain identity equality, `PrototypeBisimulation` and the `prototypes` parameters of `StrongTypeModel` go,
+   and §13.7.3 SR2 asks the same relation; its subordinate-layout half (kb/Work PB1115) needs the group description to
+   carry each leaf's identity (`GroupAtom` gains the leaf's `Category` and `Clauses`), which is when
+   `StrongTypeModel.SameElementaryLayout` goes, and whether §9.3.8.2.3 rule 3 then compares two groups' layouts or only
+   their lengths is settled there. Remaining for PB3101: that step, the deletion of `DescriptionMismatch` /
+   `AsIfElementaryGroupMismatch` / `CategoryArmMismatch` / `StrongTypeModel.SameElementaryLayout`, and
+   `OneRelationDriftTests`.
+   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`, `conformance:2002/pb3101_content_one_relation`,
+   `conformance:2002/pb3101_pair_mode_one_relation`; negatives `pb3101-prototype-call-refmod-by-reference`,
+   `pb3101-function-refmod-by-reference`, `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`,
+   `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`, `pb3101-override-group-for-elementary-formal`,
+   `pb3101-property-accessors-group-and-elementary`; for the reduction, `conformance:2002/pb613_gr8_one_reduction` and
+   negative `pb613-bare-literal-by-value-formal`.
 
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
 

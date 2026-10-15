@@ -228,6 +228,14 @@ public sealed record ActivationDescription
     /// <summary>The ONLY phrase of an object reference.</summary>
     public bool Only { get; init; }
 
+    /// <summary>True when <see cref="ObjectName"/> is a PARAMETER-NAME of the parameterized class or interface definition
+    /// being bound as itself (kb/Work PB2937), not a class-name or interface-name: ISO §9.3.8.2.4 makes each expansion
+    /// "treated as if the actual parameter classes or interfaces were substituted for the parameters throughout the class
+    /// definition", so whether such a description names the same class as another one is each expansion's question. Only
+    /// a skeleton's own binders describe one, and nothing emits a skeleton, so no run-time description carries it; the
+    /// pair-mode identity reads it (<see cref="ActivationRelations.SignatureDifference"/>).</summary>
+    public bool ObjectNameIsParameter { get; init; }
+
     /// <summary>The CLASSES an object-reference description's objects belong to, as ISO §14.9.39.3 SR12 a) 2. / b) 2. and
     /// SR10 relate them (<see cref="ObjectReferenceOperand.Classes"/>): the class the description names — for
     /// ACTIVE-CLASS, "the class containing the data item" — followed by every class it inherits from, folded. Null for a

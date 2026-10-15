@@ -210,6 +210,89 @@ public static class ActivationRelations
             _ => false,
         };
 
+    /// <summary>⛔ THE PAIR-MODE IDENTITY OF TWO DESCRIPTIONS (kb/Work PB3101; COBOLNET_OO_DESIGN D6 item 7): do
+    /// <paramref name="first"/> and <paramref name="second"/> describe one parameter or returning item the same, as ISO
+    /// §9.3.8.2.3 asks of two interfaces' corresponding items? Rule 2 for an object reference (2 c): "described with the
+    /// same object-class-name, and the presence or absence of the FACTORY and ONLY phrases is the same in both
+    /// interfaces"); rule 3 for any other formal parameter, rule 6 for a returning item: "the same ALIGNED, ANY LENGTH,
+    /// BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses", exceptions a) / b) and the LOCALE
+    /// sentence carried by <see cref="ActivationDescription.Clauses"/> and <see cref="ActivationDescription.LocaleExternal"/>;
+    /// rule 7: "If either of the corresponding formal parameters or returning items in interface-1 or interface-2 is a
+    /// strongly-typed group item, both are of the same type". The askers import it: §11.7.3 SR9 (an override, through
+    /// §9.3.8.2.3), §9.3.11 (IMPLEMENTS), interface-to-interface conformance, §8.4.3.9.3 SR7 ("The data description of the
+    /// item specified in the RETURNING phrase of the get property method shall be the same as the data description of the
+    /// item specified as the USING parameter of the set property method") and the identity conversion of a
+    /// variable-length MOVE's corresponding elementary tables. Unlike the activation relations, whose two sides are an
+    /// argument and a formal, it is SYMMETRIC; <paramref name="firstRole"/> and <paramref name="secondRole"/> only name the
+    /// sides in its reason. Null when the two are the same description.
+    /// <list type="bullet">
+    /// <item>A bit / national group is "treated as though it were an elementary data item … described with PICTURE 1(m)"
+    /// / "N(m)" (§13.18.29.4 GR1 b) / GR2 b)), so it is the same description as the elementary item of that picture and
+    /// usage, and its <see cref="ActivationDescription.Clauses"/> carry that picture (<c>ActivationDescriptions.Of</c>).</item>
+    /// <item>An alphanumeric group carries none of rule 3's clauses, and an elementary item carries its PICTURE clause, so
+    /// a group is never the same description as an elementary item, whatever their lengths; two groups are the same
+    /// description at the same length (the comparator this replaced compared that much).</item>
+    /// <item>A variable-length group's matching information is part of the method resolution signature (§9.3.5.3 item 7:
+    /// "If the parameter is a variable-length group, sufficient information to determine if this group would match the
+    /// group is specified in the invoke statement"), so it is never the same description as a fixed-length group, and two
+    /// are the same when compatible (§8.5.1.12) at the same collapsed length.</item>
+    /// </list></summary>
+    public static string? SignatureDifference(ActivationDescription first, ActivationDescription second,
+        string firstRole = "item", string secondRole = "corresponding item")
+    {
+        string Both() => $"the {firstRole} ({first}) and the {secondRole} ({second})";
+        if (first.Shape is ActivationShape.ObjectReference || second.Shape is ActivationShape.ObjectReference)
+        {
+            if (first.Shape is not ActivationShape.ObjectReference || second.Shape is not ActivationShape.ObjectReference)
+                return $"{Both()} are not both object references (ISO §9.3.8.2.3 rules 2 / 3)";
+            // A parameter-name of the skeleton bound as itself opposite another name, agreeing on every other axis: the
+            // two are the same description in an expansion whose actual IS that name, and in no other — each
+            // expansion's question (§9.3.8.2.4), so the skeleton admits it.
+            if (TurnsOnParameterName(first, second)) return null;
+            return first.ObjectNameIsParameter == second.ObjectNameIsParameter && SameObjectReferenceDescription(first, second)
+                ? null
+                : $"{Both()} are not described with the same object-reference phrases — the same kind, the same "
+                  + "class-name or interface-name, and the same FACTORY and ONLY phrases (ISO §9.3.8.2.3 rule 2)";
+        }
+        if (first.Shape is ActivationShape.StrongGroup || second.Shape is ActivationShape.StrongGroup)
+            return first.StrongType is not null && string.Equals(first.StrongType, second.StrongType, StringComparison.Ordinal)
+                ? null
+                : $"{Both()} are not of the same type — a strongly-typed group item is the same description only as a "
+                  + "strongly-typed group item of an equivalent type declaration (ISO §9.3.8.2.3 rule 7; §8.5.3.1)";
+        if (first.Shape is ActivationShape.VariableLengthGroup || second.Shape is ActivationShape.VariableLengthGroup)
+        {
+            if (first.Shape is not ActivationShape.VariableLengthGroup || second.Shape is not ActivationShape.VariableLengthGroup)
+                return $"{Both()}: one is a variable-length group and the other is not, and a variable-length group's "
+                    + "matching information is part of the method resolution signature (ISO §9.3.5.3 item 7)";
+            if (VariableLengthViolation(first, second, firstRole, secondRole) is { } vlWhy) return vlWhy;
+            int firstLength = AtomsOf(first).Sum(a => a.Chars), secondLength = AtomsOf(second).Sum(a => a.Chars);
+            return firstLength == secondLength ? null
+                : $"{Both()} are of different lengths ({firstLength} and {secondLength} character positions, as their "
+                  + "group layouts count them)";
+        }
+        if (first.Shape is ActivationShape.AlphanumericGroup || second.Shape is ActivationShape.AlphanumericGroup)
+            return first.Shape is ActivationShape.AlphanumericGroup && second.Shape is ActivationShape.AlphanumericGroup
+                ? first.Positions == second.Positions ? null
+                    : $"{Both()} are groups of different lengths"
+                : $"{Both()}: a group carries none of the ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, "
+                  + "PICTURE, SIGN and USAGE clauses an elementary item is described with, so the two are not described "
+                  + "the same (ISO §9.3.8.2.3 rules 3 / 6)";
+        return first.AnyLength == second.AnyLength && SameElementaryClauses(first, second)
+            ? null
+            : $"{Both()} are not described with the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, "
+              + "PICTURE, SIGN and USAGE clauses (ISO §9.3.8.2.3 rules 3 / 6)"
+              + ClauseDifference(first, second, firstRole, secondRole);
+    }
+
+    /// <summary>True when the identity of two object-reference descriptions differs between the expansions of the
+    /// skeleton being bound as itself (ISO §9.3.8.2.4): one names a parameter-name, the two do not name one
+    /// parameter-name, and they agree on the kind and the FACTORY and ONLY phrases — so an actual that IS the other's
+    /// class or interface makes them the same description and another does not (kb/Work PB2937).</summary>
+    private static bool TurnsOnParameterName(ActivationDescription a, ActivationDescription b) =>
+        (a.ObjectNameIsParameter || b.ObjectNameIsParameter)
+        && !(a.ObjectNameIsParameter && b.ObjectNameIsParameter && CobolNames.Same(a.ObjectName, b.ObjectName))
+        && a.ObjectKind == b.ObjectKind && a.Factory == b.Factory && a.Only == b.Only;
+
     /// <summary>⛔ ISO §14.8.2.2 FOR A PARAMETER PASSED BY REFERENCE, the one copy both lanes ask (a universal INVOKE's
     /// bound method, <see cref="ParameterViolation"/>, and a CALL, <see cref="CallArgumentViolation"/>): "If either the
     /// formal parameter or the corresponding argument is a strongly-typed group item, both shall be of the same type"

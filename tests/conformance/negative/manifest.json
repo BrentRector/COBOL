@@ -7,6 +7,8 @@
   "pb3101-prototype-call-refmod-by-reference",
   "pb3101-function-refmod-by-reference",
   "pb3101-nested-refmod-into-any-length",
+  "pb3101-override-group-for-elementary-formal",
+  "pb3101-property-accessors-group-and-elementary",
   "pb3127-nested-any-length-clause-differs",
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",

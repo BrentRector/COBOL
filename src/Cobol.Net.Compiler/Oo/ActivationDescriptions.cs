@@ -109,6 +109,7 @@ public static class ActivationDescriptions
                 ObjectName = d.IsActiveClass || d.Name is null ? null : CobolNames.Fold(d.Name),
                 Factory = d.Factory,
                 Only = d.Only,
+                ObjectNameIsParameter = d.Formal,
                 ObjectClasses = Folded(facts?.Classes),
                 ObjectInterfaces = Folded(facts?.Interfaces),
             };

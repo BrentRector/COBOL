@@ -53,9 +53,9 @@ public static class OoConformance
     /// data description of the item specified in the RETURNING phrase of the get property method shall be the same as
     /// the data description of the item specified as the USING parameter of the set property method." Nothing
     /// compared them, so a GET RETURNING PIC 9(5) with a SET USING PIC X(3) compiled and the §8.4.3.9.4 temp (modelled
-    /// on the GET's item) crossed a SET formal of another description. The comparison is the ONE strict
-    /// identical-description check (<see cref="DescriptionMismatch"/>, pair mode — the relation the override and
-    /// IMPLEMENTS signatures use, §9.3.8.2.3 rules 2/3 and 6), asked of each (GET, SET) pair AS THE CLASS SEES IT:
+    /// on the GET's item) crossed a SET formal of another description. The comparison is the ONE pair-mode identity
+    /// (<see cref="SignatureDifference"/> — the relation the override and IMPLEMENTS signatures use, §9.3.8.2.3 rules 2/3
+    /// and 6), asked of each (GET, SET) pair AS THE CLASS SEES IT:
     /// the roster lookup walks INHERITS (§9.3.6), so a GET inherited from a superclass and a SET written in the
     /// subclass form a pair at the subclass, and a pair already complete in a superclass is the superclass's own.
     /// Runs AFTER every class's data has bound (the formals resolve at data-bind time). The instance and the
@@ -77,13 +77,13 @@ public static class OoConformance
                 if (find(NamingConvention.GetAccessorName(prop)) is not { Binding.Returning: { } returning } get
                     || find(NamingConvention.SetAccessorName(prop)) is not { Binding.Formals: [{ } setFormal] } set)
                     continue;   // a missing accessor is §8.4.3.9.3 SR3/SR4's, decided where the polarity is known
-                if (DescriptionMismatch(setFormal.Item, returning) is not { } why) continue;
+                if (SignatureDifference(returning, setFormal.Item, "RETURNING item of the get property method",
+                        "USING parameter of the set property method") is not { } why) continue;
                 // The diagnostic stands at the accessor THIS class wrote, the later of the pair when it wrote both.
                 using var at = edition.At((set.Owner == cls ? set : get).Ctx ?? accessor.Ctx);
                 edition.Error(DiagnosticCatalog.PropertyAccessorDescriptionMismatch,
-                    $"class '{cls.Name}', property '{prop}': the RETURNING item of the get property method "
-                    + $"('{get.Owner.Name}') and the USING parameter of the set property method ('{set.Owner.Name}') are "
-                    + $"not described the same — {why} (ISO §8.4.3.9.3 SR7)");
+                    $"class '{cls.Name}', property '{prop}' (get property method of '{get.Owner.Name}', set property "
+                    + $"method of '{set.Owner.Name}'): {why} (ISO §8.4.3.9.3 SR7)");
             }
         }
     }
@@ -161,12 +161,13 @@ public static class OoConformance
     /// <paramref name="counterpart"/> in the messages — "the 'I' prototype", "the overridden method of class 'B'")?
     /// Yields one rule-cited message per violation; empty ⇔ the pair conforms. Rules carried: 1) the parameter
     /// count AND the passing mode of each pair of formals ("consistent BY REFERENCE and BY VALUE specifications" —
-    /// <see cref="OoFormal.ByValue"/>, kb/Work PB1051); 2)/3) identical formal
-    /// descriptions (<see cref="DescriptionMismatch"/>); 4) RETURNING presence; 5) the object-reference RETURNING
+    /// <see cref="OoFormal.ByValue"/>, kb/Work PB1051); 2)/3) identical formal descriptions
+    /// (<see cref="SignatureDifference"/>, the run-time relation's pair-mode identity); 4) RETURNING presence; 5) the
+    /// object-reference RETURNING
     /// (covariant — <see cref="ObjectRefAssignmentMismatch(OoClassTable, ObjectRefDescriptor, ObjectRefDescriptor, bool)"/>
     /// with rule 5's closed ACTIVE-CLASS list); 6) identical non-object RETURNING descriptions; 7) strongly-typed
-    /// groups of the same type (inside <see cref="DescriptionMismatch"/>, <c>StrongTypeMismatch</c>, for every
-    /// formal and a non-object RETURNING); 8) the OPTIONAL phrase (<see cref="OptionalMismatch"/>); 9) the RAISING
+    /// groups of the same type (inside <see cref="SignatureDifference"/>, for every formal and a non-object RETURNING);
+    /// 8) the OPTIONAL phrase (<see cref="OptionalMismatch"/>); 9) the RAISING
     /// phrase (<see cref="RaisingMismatches"/>); and the clause's closing sentence, the mutual-reference ban between
     /// the two RETURNING descriptions (<see cref="ReturningCircularity"/>, kb/Work PB1498 — which is why the askers name
     /// <paramref name="interface1"/> and <paramref name="interface2"/>).
@@ -199,9 +200,10 @@ public static class OoConformance
                 yield return $"formal #{i + 1}: {(m1.Binding!.Formals[i].ByValue ? "BY VALUE" : "BY REFERENCE")} here but "
                     + $"{(m2.Binding!.Formals[i].ByValue ? "BY VALUE" : "BY REFERENCE")} on the corresponding parameter of "
                     + $"{counterpart} (ISO §9.3.8.2.3 rule 1 — consistent BY REFERENCE and BY VALUE specifications)";
-            if (DescriptionMismatch(m2.Binding!.Formals[i].Item, m1.Binding!.Formals[i].Item) is { } err)
-                yield return $"formal #{i + 1}: {err} (ISO §9.3.8.2.3 rules 2/3 vs {counterpart} — "
-                    + "identical descriptions; the C# projection cannot check this)";
+            // Rules 2 / 3 / 7, which the C# projection cannot check: PIC 9(4) and PIC 9(8) both cross as a long.
+            if (SignatureDifference(m1.Binding!.Formals[i].Item, m2.Binding!.Formals[i].Item, "formal parameter",
+                    $"corresponding parameter of {counterpart}") is { } err)
+                yield return $"formal #{i + 1}: {err}";
             if (OptionalMismatch(m1.Binding!.Formals[i], m2.Binding!.Formals[i]) is { } oerr)
                 yield return $"formal #{i + 1}: {oerr} vs {counterpart} (ISO §9.3.8.2.3 rule 8)";
         }
@@ -217,8 +219,8 @@ public static class OoConformance
                     yield return $"RETURNING: {werr} (ISO §9.3.8.2.3 "
                         + $"{(prp.ObjectRef is { Kind: ObjectRefKind.ActiveClass } ? "rule 5 d)" : "rules 5a/5c2")})";
             }
-            else if (DescriptionMismatch(pr, r) is { } rerr)
-                yield return $"RETURNING: {rerr} (ISO §9.3.8.2.3 rule 6)";
+            else if (SignatureDifference(r, pr, "returning item", $"returning item of {counterpart}") is { } rerr)
+                yield return $"RETURNING: {rerr}";
         }
     }
 
@@ -511,11 +513,34 @@ public static class OoConformance
             + "clauses)";
     }
 
-    /// <summary>The PAIR-MODE IDENTICAL-DESCRIPTION check of two descriptions compiled together — §9.3.8.2.3's
-    /// override / implements / interface conformance, §13.7.3 SR2's prototype against its definition and the MOVE
-    /// identity conversion. No ACTIVATION asks it: an argument or a returning item is asked
-    /// <see cref="ActivationRelations"/> over its <see cref="ActivationDescription"/> on every lane (kb/Work PB3101;
-    /// this pair half is the next step, <c>SameSignature</c>). Identical = same category, the same ALIGNED / DYNAMIC LENGTH clauses
+    /// <summary>⛔ THE PAIR-MODE ENTRY (kb/Work PB3101; COBOLNET_OO_DESIGN D6 item 7): are <paramref name="first"/> and
+    /// <paramref name="second"/> described the same, as ISO §9.3.8.2.3 rules 2, 3, 6 and 7 ask of two interfaces'
+    /// corresponding items? It describes both through the ONE builder (<see cref="ActivationDescriptions.Of"/>) and asks
+    /// the ONE relation over the descriptions (<see cref="ActivationRelations.SignatureDifference"/>), the description
+    /// identity the §9.3.6 match and the activation conformance read too, so a pair-mode rule cannot mean one thing here
+    /// and another there. An item with no description (a group with no crossing form, a PICTURE-less item) is the same
+    /// description as nothing (<see cref="ActivationDescriptions.NoDescriptionReason"/>). Asked by every pair-mode asker
+    /// outside the prototype signature classification: <see cref="MethodConformanceMismatches"/> (override, IMPLEMENTS,
+    /// interface to interface), <see cref="ValidatePropertyAccessorPairs"/> (§8.4.3.9.3 SR7) and the identity conversion
+    /// of a variable-length MOVE's corresponding elementary tables (<c>MoveBinder.ElementMovesOf</c>). Null when the two
+    /// are the same description, else the difference with the two sides named by <paramref name="firstRole"/> and
+    /// <paramref name="secondRole"/>.</summary>
+    public static string? SignatureDifference(DataItem first, DataItem second, string firstRole, string secondRole)
+    {
+        if (ActivationDescriptions.Of(first, classes: null) is not { } a)
+            return ActivationDescriptions.NoDescriptionReason(first, firstRole);
+        if (ActivationDescriptions.Of(second, classes: null) is not { } b)
+            return ActivationDescriptions.NoDescriptionReason(second, secondRole);
+        return ActivationRelations.SignatureDifference(a, b, firstRole, secondRole);
+    }
+
+    /// <summary>The identical-description check the PROTOTYPE SIGNATURE comparison still asks (§13.7.3 SR2's prototype
+    /// against its definition, and the signature classes of restricted prototype pointers, <see cref="PrototypeSignatures.Same"/>)
+    /// — its one remaining asker. No activation asks it (an argument or a returning item is asked
+    /// <see cref="ActivationRelations"/> over its <see cref="ActivationDescription"/> on every lane), and no other pair-mode
+    /// asker does (<see cref="SignatureDifference"/>; kb/Work PB3101): the signature comparison moves to the description
+    /// relation with the classification's design (COBOLNET_OO_DESIGN D6 item 7), and this comparator is deleted then.
+    /// Identical = same category, the same ALIGNED / DYNAMIC LENGTH clauses
     /// (<see cref="DescriptionClauses"/>), the per-category clauses (numeric: USAGE + SIGN representation + BLANK
     /// WHEN ZERO + digits + scale + sign; alphanumeric: length + JUSTIFIED; LOCALE phrase; object reference: the
     /// whole descriptor), and the same PICTURE clause by its ONE identity (<see cref="PictureClauseIdentity"/> —

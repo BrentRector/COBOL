@@ -131,4 +131,45 @@ public sealed class PictureClauseIdentityDriftTests
             }
         Assert.True(pairs > 300, $"only {pairs} pairs — the population no longer exercises the invariant");
     }
+
+    /// <summary>The pair-mode identity (<see cref="OoConformance.SignatureDifference"/> over the descriptions, kb/Work
+    /// PB3101) agrees with the comparator the prototype signature comparison still asks, over every ordered pair of
+    /// ELEMENTARY items of the population above plus the ANY LENGTH and as-if-elementary shapes — so moving the override,
+    /// IMPLEMENTS, property and MOVE-element askers to the relation changed no elementary verdict. Where the two
+    /// deliberately differ, the relation follows ISO §9.3.8.2.3 rule 3: a group carries no PICTURE clause, so a 4-byte
+    /// alphanumeric group is not the same description as a <c>PIC X(4)</c>, which the comparator (carrying §14.8.2.2
+    /// rule 1's activation reading) called identical at equal width — pinned end to end by the negatives
+    /// <c>pb3101-override-group-for-elementary-formal</c> and <c>pb3101-property-accessors-group-and-elementary</c>.</summary>
+    [Fact]
+    public void PairModeIdentity_AgreesWithTheComparator_OverEveryElementaryPair()
+    {
+        var usd = new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") };
+        DataItem AnyLength(string picture)
+        {
+            var item = Item(picture);
+            item.IsAnyLength = true;
+            return item;
+        }
+        var items = new List<DataItem>
+        {
+            Item("X(5)"), Item("XXXXX"), Item("A(5)"), Item("X(4)"), Item("XBX"), Item("9(4)"), Item("S9(4)"),
+            Item("9(2)V99", dpc: true), Item("9(4)", usage: Usage.Binary), Item("N(4)", usage: Usage.National),
+            Item("1(4)"), Item("1(4)", usage: Usage.Bit), Item("ZZ9.99"), Item("$$9.99", currencies: usd),
+            AnyLength("X"), AnyLength("A"), AnyLength("N"),
+        };
+        int pairs = 0;
+        foreach (var first in items)
+            foreach (var second in items)
+            {
+                pairs++;
+                bool comparator = OoConformance.DescriptionMismatch(second, first) is null;
+                bool relation = OoConformance.SignatureDifference(first, second, "item", "corresponding item") is null;
+                Assert.True(comparator == relation,
+                    $"PIC {first.PictureText}{(first.IsAnyLength ? " ANY LENGTH" : "")} vs PIC {second.PictureText}"
+                    + $"{(second.IsAnyLength ? " ANY LENGTH" : "")}: the comparator says {(comparator ? "same" : "differs")}"
+                    + $" but the pair-mode relation says {(relation ? "same" : "differs")}");
+                Assert.Equal(relation, OoConformance.SignatureDifference(second, first, "item", "corresponding item") is null);
+            }
+        Assert.True(pairs > 250, $"only {pairs} pairs — the population no longer exercises the invariant");
+    }
 }

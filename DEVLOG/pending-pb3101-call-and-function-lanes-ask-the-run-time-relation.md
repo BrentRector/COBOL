@@ -83,3 +83,21 @@ prototype-pointer's description carries its signature-class identity, and `Proto
 so a description-level `SameSignature` cannot be asked from inside that computation without a decision on how the
 identity is supplied. The note records the two shapes. PB3101 stays open for item 3, the remaining deletions and
 `OneRelationDriftTests`.
+
+**Wave 1080 (group A): pair mode outside the signature classification asks the description relation.** The w1077b-w1079a
+commits were cherry-picked onto `2b60d9fa9` and re-gated GREEN (run `20261015T010311Z-2ae3a9`). The re-probe found a
+wrong answer in the pair-mode comparator: an OVERRIDE whose base formal (or returning item) was `PIC X(4)` and whose
+override's was a 4-byte alphanumeric group compiled, and so did a property whose get method returned such a group and
+whose set method took a `PIC X(4)`. `OoConformance.DescriptionMismatch` had carried §14.8.2.2 rule 1's activation
+reading (a group opposite an alphanumeric item of its width) into pair mode, where §9.3.8.2.3 rules 3 / 6 and
+§8.4.3.9.3 SR7 ask for the same clauses and a group has no PICTURE clause. `ActivationRelations.SignatureDifference` is
+now the pair-mode identity over two descriptions (§9.3.8.2.3 rules 2, 3, 6 and 7, §9.3.5.3 item 7), and
+`OoConformance.SignatureDifference` its one bind-time entry. The override / IMPLEMENTS / interface rule set, the property
+accessors and the variable-length MOVE's element-identity test ask it. An object-reference description gained
+`ObjectNameIsParameter` (PB2937's skeleton parameter-name, whose identity §9.3.8.2.4 leaves to each expansion). Golden
+`conformance:2002/pb3101_pair_mode_one_relation`, negatives `pb3101-override-group-for-elementary-formal` (COBOLNET0829)
+and `pb3101-property-accessors-group-and-elementary` (COBOLNET2727). Drift tests pin the one entry, and the agreement
+over every elementary pair with the comparator the prototype comparison still asks. PB3101's item 3 design question is
+settled in docs/COBOLNET_OO_DESIGN.md D6 item 7: the signature classes become a partition refinement, so the relation
+needs no compile-time hook, and `PrototypeSignatures` moves to it next with the `GroupAtom` leaf identity. The
+comparator's deletion and `OneRelationDriftTests` follow.

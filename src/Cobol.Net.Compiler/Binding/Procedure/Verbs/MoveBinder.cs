@@ -213,8 +213,9 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// <list type="bullet">
     ///   <item>a GROUP element pair — §14.9.25.4 GR4 makes a fixed-length group move an alphanumeric move
     ///     "without conversion", and §8.5.1.12.3's matching made the two elements the same byte length;</item>
-    ///   <item>an elementary pair with IDENTICAL descriptions (<see cref="OoConformance.DescriptionMismatch"/>, the
-    ///     ONE identical-description check) — the conversion is then the identity.</item>
+    ///   <item>an elementary pair with IDENTICAL descriptions (<see cref="OoConformance.SignatureDifference"/>, the
+    ///     ONE pair-mode identity, over the descriptions every relation reads) — the conversion is then the
+    ///     identity.</item>
     /// </list>
     /// <para>Every other elementary pair — any category pair §14.9.25.3 admits, since §8.5.1.12.3 compares only
     /// the elements' byte lengths ("Two corresponding tables match when the byte length of their elements is equal
@@ -231,7 +232,8 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             foreach (var (sSite, rSite) in VariableLengthCompatibility.CorrespondingTables(send.Item, targets[t].Item))
             {
                 if (sSite.Table.IsGroup || rSite.Table.IsGroup) continue;                         // GR4: the image IS the move
-                if (OoConformance.DescriptionMismatch(sSite.Table, rSite.Table) is null) continue;  // identity conversion
+                if (OoConformance.SignatureDifference(sSite.Table, rSite.Table, "sending element", "receiving element")
+                    is null) continue;                                                              // identity conversion
                 (moves ??= []).Add(ElementMove(t, send, sSite, targets[t], rSite));
             }
         }
