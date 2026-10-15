@@ -1,4 +1,4 @@
-## PB2099 parts 1-4: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry and the published record struct
+## PB2099 parts 1-5: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry, the published record struct, OCCURS DEPENDING and reference members, and the library output kind
 
 Wave 1077 group E took kb/Work PB2099, slice 3 of DESIGN-external-repository: the typed host entry and the one host
 surface. Two earlier waves had left it unstarted. The re-probe at a6744fa4d found none of the slice in the tree:
@@ -216,3 +216,39 @@ name the published record among the image codecs; the self-review fix above foll
 PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,549 · Unit 471 · Characterization 30 …
 Conformance 6,129/11,678 · Unit 33,195/33,666 · Characterization 6/36 cases ran (skipped 0) in 1 of 2 leg(s)`. Both
 `HostEntryTests` cases and `HostEntryShapeDriftTests` passed in leg 1. Semgrep verify passed with no rule count up.
+
+### Part 5 (wave 1082 group B): OCCURS DEPENDING, reference members, the library, the retirement begun
+
+Wave 1080 B's branch had not landed, so its sixteen commits were cherry-picked onto main. One conflict came up, in
+`RuntimeAbiPinDriftTests`. Main had raised the runtime major to 4 with its own pins, so both hashes were re-pinned. The
+runtime hash moved only because of the `callerPath` nullable relaxation. The boundary hash moved because the fixture
+module now carries host-entry classes, which is a pure addition in the callee's own module. The earlier gates never ran
+that pin: it sat in leg 2. A whole Unit and Characterization run on the merged tree passed before any new work.
+
+**OCCURS DEPENDING ON.** `PublishedRecordEmitter.Renders` now admits an OCCURS DEPENDING ON table. Its storage is the
+maximum allocation (§8.5.1.8), the image the CALL lane's text crossing already carries. Data-name-1 may sit inside the
+record, where §13.18.38.3 20) places it before the table. The array then has as many entries as the DEPENDING ON value,
+which §13.18.38.4 7) makes "the current number of occurrences". At landing, `HostLanding.LandedOccurrences` reads the
+landed count from the image through the validity rule and the bounds, and `RequireOccurrences` holds the array to it.
+The decode reads the count with `HostLanding.TryOccurrences` and decodes that many entries. A count the program left
+outside the bounds leaves the host's variable unchanged, with a `FormatException`. A table counted outside the record
+is its whole area. `new R()` gives the DEPENDING ON item the table's minimum and gives the array that many entries.
+
+**References.** A strongly-typed group holding pointer or object-reference members (§13.18.60.3 14)) crosses as the
+CALL lane's cell area, the same way a COBOL caller's cell-backed group does (`CallEmitter.AreaOf`). The record's
+`__Area` is a `StorageCell` holding the image, with each reference in its managed slot (`CobolPtr.SlotWrite`). The
+argument states `Area: new CellPointer(cell, 0)`, so the formal occupies that storage (§14.2.3 8)). `__TryGet` reads each
+slot back. The witness passes a data pointer the program set back into it, and the program reads its storage through
+that pointer.
+
+**Library.** `ProgramEmitter.MainUnit` is the one answer to whether a group has a main program, and `EmitMain` and the
+backend both read it. A group without one has no `Main` and is compiled as `OutputKind.DynamicallyLinkedLibrary`, with
+no `runtimeconfig.json`. `cobol --run` refuses a library. The dead null arm of `RunModule` went with the old library
+`Main`. `CompiledProgramCache` entries now carry `Library` (format 3).
+
+**Retirement, begun.** `ProgramRegistry` is now `[EditorBrowsable(Never)]`, and its remarks call it the generated
+code's ABI. DOC-A.1-141 is now design §9.4's determination, with `UInt128` added to the integer row and
+`HostEntryTests` as its witness. DOC-A.1-65 and -167 name the host entry as the route. INTERPROGRAM's host bullet names
+the entry. The rest is the next implementer's: DOC-A.1-116 with its witness, converting the host tests to the entries,
+§17.3's host-route drift test, and the variable-length shapes. The manual's host chapter has no home yet, because
+`docs/manual/` does not exist (kb/Work PB1610).

@@ -103,13 +103,17 @@ public sealed class CobolCallException(string message, string ecName = "EC-PROGR
 }
 
 /// <summary>
-/// The static facade over the run unit's <see cref="ProgramTable"/> (the emitted surface — generated run-unit
-/// drivers call <c>ProgramRegistry.Reset()/RunModule(...)</c> (a host: <c>RunMain(...)</c>), a module's <c>__CobolModule.EnsureRegistered()</c> calls
-/// <c>RegisterModule(...)</c> and its private registrar <c>Register(...)</c>, and call sites emit
-/// <c>CallProgram/Cancel</c>; kept name-stable pre-G8, DESIGN-runtime-library §2.1). Every member forwards to
-/// <c>RunUnit.Current.Programs</c>; <see cref="Reset"/> is the run-unit lifecycle's BEGIN
-/// (<see cref="RunUnit.Begin"/>), keeping the emitted driver's name byte-stable.
+/// ⛔ THE GENERATED CODE'S ABI OVER THE AMBIENT RUN UNIT'S <see cref="ProgramTable"/> — not a host API
+/// (DESIGN-external-repository §4.3 "ONE host surface", §4.4; kb/Work PB2099). Generated code calls it: the entry wrapper
+/// <c>Reset()</c>/<c>RunModule(...)</c>, a module's <c>__CobolModule.EnsureRegistered()</c> <c>RegisterModule(...)</c>
+/// and its private registrar <c>Register(...)</c>, a CALL or CANCEL statement and a generated host entry
+/// <c>CallProgram</c>/<c>Cancel</c>. It is public because generated code in OTHER assemblies must be able to call it, and
+/// it carries no contract for a hand-written caller: a .NET host activates a program through the program's generated
+/// host entry, <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call</c> and <c>Cancel</c>, which lands every value exactly and
+/// decodes every result by its description (docs/CONFORMANCE.md DOC-A.1-141). Each member runs on
+/// <c>RunUnit.Current.Programs</c>; <see cref="Reset"/> is the run-unit lifecycle's BEGIN (<see cref="RunUnit.Begin"/>).
 /// </summary>
+[System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
 public static class ProgramRegistry
 {
     /// <summary>Run-unit start — the emitted driver's first statement: begin a NEW run unit and make it the ambient

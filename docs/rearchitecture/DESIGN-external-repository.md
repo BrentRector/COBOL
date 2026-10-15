@@ -1126,7 +1126,7 @@ crosses (§14.9.4.4 GR3), and, for a program, a static `Cancel` method (§14.9.5
 **Parameter matching:** positional (§14.2.3 GR2), one `Call` parameter per USING formal in order; the C# compiler
 checks the count and the types; a prototype library's `Call` against a changed definition is EC-PROGRAM-ARG-MISMATCH
 when the definition enables that checking. **Data type representation:** a numeric item without decimal places is
-`long`, or `Int128` when its storage can hold more than `long` can; one with decimal places is `decimal` (the
+`long`, or `Int128` (`UInt128` for an unsigned 16-byte binary item) when its storage can hold more than `long` can; one with decimal places is `decimal` (the
 runtime's `CobolDec` beyond 28 digits or 28 places); a floating-point item is its own CLR type; an alphanumeric,
 national, boolean or edited item is `string`; an index is `long`; pointers are `ManagedPointer`, `ProgramPointer`,
 `FunctionPointer`; an object reference is its class's CLR type; a group is a generated record struct with
