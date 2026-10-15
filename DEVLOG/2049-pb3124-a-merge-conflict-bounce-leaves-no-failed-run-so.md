@@ -1,0 +1,4 @@
+## Entry 2049 — 2026-10-15 12:00 PDT — PB3124: a merge-conflict bounce leaves no failed run, so complete refuses the record
+
+PR #75 was removed from the merge queue once with reason `merge_conflict` and merged on its second entry. A `merge_conflict` removal builds no merge group, so `landing_measure.py complete`, which derives `bounces` from failed merge-group runs, counted 0 and refused the record because one bounce cause was named. PB3124 now records the arm: the fix shape counts every non-`merged` removal reason from RemovedFromMergeQueueEvent as a bounce, not only `failed_checks`, and notes `scripts/prune_worktrees.py` as a second reading of the same fact.
+
