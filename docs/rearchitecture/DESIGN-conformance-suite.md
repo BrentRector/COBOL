@@ -131,7 +131,7 @@ So:
 - **A portability lint the generator enforces**: a portable test DISPLAYs only alphanumeric literals, alphanumeric
   items and numeric-edited items; never an un-edited numeric item, a function result, an arithmetic expression or a
   national operand. GR 1 makes the conversion of EVERY operand to the device implementor-defined, and the national
-  operand is where it shows: for `PIC N(3) VALUE N"ABC"` at 2002 WiseOwl prints `A B C` and GnuCOBOL 3.2 prints the
+  operand is where it shows: for `PIC N(3) VALUE N"ABC"` at 2002 WiseOwl prints `ABC` (bytes 41 42 43) and GnuCOBOL 3.2 prints the
   UTF-16BE bytes (NUL `A` NUL `B` NUL `C`), both conforming (branch review R1-2). A test that must show a number
   MOVEs it to a numeric-edited item first; a test of national data compares it inside the program (IF, or MOVE to
   an alphanumeric item) and DISPLAYs an alphanumeric literal naming the outcome.
