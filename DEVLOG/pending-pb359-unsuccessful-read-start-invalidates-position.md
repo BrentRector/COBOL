@@ -49,4 +49,12 @@ registry handles it before any connector step. GR29/GR32 set the indicator durin
 completion. Performance: no allocation added. Duplication: the hand-written `LastReadUnsuccessful = true; _fpiValid
 = false;` pairs are gone.
 
-**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T205400Z-4fad7d: Conformance 6,068/11,709, Unit 33,158/33,671, Characterization 6/36 in leg 1; no failures). The golden and all four drift tests ran in leg 1 and passed. The Linux gate runs at the landing.
+**Branch review (w1084e R1-1).** The first version of the drift test matched three literal texts: the flag set by
+hand, the validity bit cleared by hand, and `ReadOpenModeGuard() is { } … return Status =`. It could not see a
+bare `Status = X; return false;` or `return Status = X;` exit with no invalidation, which was one of the three
+shapes this note named, nor a deleted `InvalidateFilePosition()` inside a side-effecting guard. The finisher fixed
+the shape rather than the matcher. The guards became pure, and the one failure terminal, `Unsuccessful`, carries
+the invalidation. The gate is now a Roslyn rule over every READ/START entry: no entry assigns `Status`. Reverting
+`SequentialConnector.ReadRecord`'s `_reader is null` arm to its old bare form turns the gate red and names the arm.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T211153Z-8627d3: Conformance 6,085/11,709, Unit 33,216/33,672, Characterization 6/36 in leg 1; no failures). The golden, the five drift tests and the PB352 START goldens ran in leg 1 and passed. Semgrep verify: PASS. The Linux gate runs at the landing.
