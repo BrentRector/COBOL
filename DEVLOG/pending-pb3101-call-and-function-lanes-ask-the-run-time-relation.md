@@ -122,4 +122,4 @@ now compiles and runs (`B=11110000`, `N=XYZ`); this is golden `conformance:2002/
 and negative `pb3101-prototype-bit-group-positions` pins the length difference (COBOLNET1513). The design is corrected
 in D6 item 7. `GroupAtom` does not gain leaf identity: §13.7.3 SR2's group layout is §8.5.3.1's structural walk, which
 already lives once in `StrongTypeModel`, and copying it into the runtime atoms would write it twice. Batch
-`w1082a-pb3101-comparator-resite` moved the code-location of 26 CONFORMS rows off the deleted members (GAP 101 → 101).
+`w1082a-pb3101-comparator-resite` moved the code-location of 26 CONFORMS rows off the deleted members (GAP 101 → 101). Gate run `20261015T194430Z-f29348`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
