@@ -272,4 +272,6 @@ public static class Constructs
     public const string IdentificationHeaderOptional2002 = "identification-header-optional-2002";
     public const string ComputerNameOptional2002 = "computer-name-optional-2002";
     public const string SetNumericContent2014 = "set-numeric-content-2014";
+    public const string FixedFormAreaAItemOutsideAreaA2002 = "fixed-form-area-a-item-outside-area-a-2002";
+    public const string FixedFormTextInAreaA2002 = "fixed-form-text-in-area-a-2002";
 }

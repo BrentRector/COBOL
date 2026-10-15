@@ -20,11 +20,27 @@ public sealed class ReferenceFormatMap
 
     private readonly int[] _directiveLines;
 
+    // Per 0-based physical line read in FIXED form: where its program text begins — the physical column of the first
+    // character of the program-text area that is not a space, and whether that is in area A (FixedFormLine.BeginsInAreaA);
+    // null for a line read in free form or one whose program-text area holds only spaces (kb/Work PB3147).
+    private readonly (int Column, bool InAreaA)?[] _textStarts;
+
     private ReferenceFormatMap((int FromLine, bool Fixed, bool Detected)[] changes, int[] directiveLines,
-        string[] physicalText)
+        ReadOnlySpan<PhysicalLine> lines)
     {
         _changes = changes;
         _directiveLines = directiveLines;
+        var physicalText = new string[lines.Length];
+        _textStarts = new (int, bool)?[lines.Length];
+        for (int i = 0; i < lines.Length; i++)
+        {
+            physicalText[i] = lines[i].Text;
+            if (!At(i + 1).Fixed) continue;
+            var fixedLine = new FixedFormLine(lines[i].Text);
+            if (fixedLine.ProgramTextStart is var start and >= 0)
+                _textStarts[i] = (PhysicalLine.ColumnOf(lines[i].Columns, fixedLine.ProgramTextIndex + start),
+                    fixedLine.BeginsInAreaA);
+        }
         PhysicalText = physicalText;
     }
 
@@ -53,11 +69,25 @@ public sealed class ReferenceFormatMap
     /// directive or COPY statement stated it — and then in each format of <paramref name="changes"/> (a directive
     /// states each) from its 1-based physical line on (<paramref name="changes"/> ascending).
     /// <paramref name="directiveLines"/> are the lines of its written format directives (<see cref="DirectiveLines"/>) and
-    /// <paramref name="physicalText"/> the text of each of its physical lines (<see cref="PhysicalText"/>).</summary>
+    /// <paramref name="lines"/> its physical lines, as the line-entry stage settled them (<see cref="PhysicalText"/>,
+    /// <see cref="PlacementAt"/>).</summary>
     public static ReferenceFormatMap Create(bool initialFixed, bool detected, IEnumerable<(int FromLine, bool Fixed)> changes,
-        IEnumerable<int> directiveLines, IEnumerable<string> physicalText)
+        IEnumerable<int> directiveLines, ReadOnlySpan<PhysicalLine> lines)
         => new([(1, initialFixed, detected), .. changes.Select(c => (c.FromLine, c.Fixed, false))], [.. directiveLines],
-            [.. physicalText]);
+            lines);
+
+    /// <summary>Where the text at 0-based physical <paramref name="column"/> of 1-based physical <paramref name="line"/>
+    /// stands with respect to COBOL-85's areas (kb/Work PB3147): it BEGINS its fixed-form line, in area A or in area B,
+    /// or it follows other text of the line; <see cref="AreaPlacement.None"/> when the line was read in free form (which
+    /// has no areas, §6.4.1) or is not a line of this text. The column is the one a source map names
+    /// (<see cref="Common.LineOrigin.Locate"/>), so a token's location answers the question directly.</summary>
+    public AreaPlacement PlacementAt(int line, int column)
+    {
+        if (line < 1 || line > _textStarts.Length || !At(line).Fixed) return AreaPlacement.None;
+        return _textStarts[line - 1] is { } start && start.Column == column
+            ? start.InAreaA ? AreaPlacement.BeginsLineInAreaA : AreaPlacement.BeginsLineInAreaB
+            : AreaPlacement.WithinLine;
+    }
 
     /// <summary>The initial reference format of library text copied by a COPY statement at 1-based physical line
     /// <paramref name="line"/> of this text — §7.3.24.3 3)'s "reference format that was in effect for the COPY

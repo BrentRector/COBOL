@@ -880,6 +880,8 @@ paragraphDefinition
 // The header can only follow a separator period here: `sentence : statement+ DOT` ends every sentence on its period,
 // so a word a statement left unconsumed is a syntax error, never a phantom paragraph — the reason an
 // IsAtLineStart() predicate once stood on both alternatives (DEVLOG 0063, the WRITE … LINES token the lexer now has).
+// COBOL-85's own placement of a header — area A, beginning its fixed-form line — is not a parse rule either: it is the
+// reference format's, asked of every token at --std 85 by AreaPlacementPass (kb/Work PB3147; ISO §6.3.1 has no areas).
 paragraphName
     : procedureName
     | reservedGatedWord

@@ -7150,6 +7150,32 @@ public static class DiagnosticCatalog
         "ISO §13.18.63.3 SR26");
 
 
+    /// <summary>COBOLNET3734 — at COBOL-85, an AREA-A ITEM of a fixed-form line that does not begin in area A (kb/Work
+    /// PB3147): a division, section or paragraph header, a level indicator (FD, SD, RD), level-number 01 or 77,
+    /// DECLARATIVES, END DECLARATIVES or an end marker that is not the first text of its line or begins in area B.
+    /// ANSI X3.23-1985's reference format places each of them in area A (positions 8–11); ISO/IEC 1989:2002 removed the
+    /// areas (ISO §6.3.1), so the rule is the <c>fixed-form-area-a-item-outside-area-a-2002</c> construct row's.</summary>
+    public static readonly DiagnosticDescriptor AreaAItemOutsideAreaA = new(
+        "COBOLNET3734", "area-a-item-outside-area-a", EditionSeverity.Error,
+        "COBOL-85 fixed-form reference format places a division, section or paragraph header, a level indicator, "
+        + "level-number 01 or 77, DECLARATIVES, END DECLARATIVES and an end marker in area A: each begins its line, in "
+        + "character positions 8-11. Begin the item on a line of its own in area A, or target COBOL-2002 or later, "
+        + "whose program-text area has no areas (ISO §6.3.1).",
+        "ANSI X3.23-1985 reference format (area A); ISO §6.3.1");
+
+    /// <summary>COBOLNET3735 — at COBOL-85, fixed-form program text that begins its line in AREA A but is not an
+    /// area-A item or a level-number (kb/Work PB3147): a statement, a sentence, a clause or entry continued on a new
+    /// line, a period. ANSI X3.23-1985 writes everything else in area B (positions 12 to margin R); ISO/IEC 1989:2002
+    /// removed the areas (ISO §6.3.5 continues an entry "in the program-text area of a subsequent line"), so the rule is
+    /// the <c>fixed-form-text-in-area-a-2002</c> construct row's.</summary>
+    public static readonly DiagnosticDescriptor ProgramTextInAreaA = new(
+        "COBOLNET3735", "program-text-in-area-a", EditionSeverity.Error,
+        "COBOL-85 fixed-form reference format reserves area A (character positions 8-11) for division, section and "
+        + "paragraph headers, level indicators, level-numbers, DECLARATIVES, END DECLARATIVES and end markers: a "
+        + "sentence, a statement, and an entry or clause continued on a subsequent line begin in area B (position 12 or "
+        + "later). Indent the text into area B, or target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
+        "ANSI X3.23-1985 reference format (area B); ISO §6.3.1, §6.3.5");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)
