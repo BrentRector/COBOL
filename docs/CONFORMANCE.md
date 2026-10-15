@@ -1512,7 +1512,7 @@ of an unsupported facility.
   `conformance:negative/pb2618-string-into-property-no-set`, `conformance:2002/pb1275_property_set_formats` (the
   WITH NO GET case, filled whole).
 
-- **D-RM1 — a reference-modified argument passed BY REFERENCE to a method, a prototyped program or a function**
+- **D-RM1 — a reference-modified argument passed BY REFERENCE to a method, a prototyped program, a program the NESTED phrase activates or a function**
   (kb/Work PB2077; decision PB3098, 2026-10-12). §8.4.3.3.4 GR5/GR6 define the unique data item with class, category,
   usage and no JUSTIFIED clause — and no PICTURE clause; §9.3.6 match rule 3 e) and §14.8.2.3.2 rule 2 require "the
   same … PICTURE … clauses". So BY REFERENCE the slice matches and conforms only to an alphanumeric group formal of no
@@ -1537,7 +1537,7 @@ of an unsupported facility.
   formal (it has no PICTURE clause). GnuCOBOL 3.2 gives no answer: its prototype conformance check reads identifier-1's
   description and ignores the modifier (measured). Witnesses: `conformance:2002/pb480_universal_refmod_evaluated_length`,
   `conformance:2002/pb2077_refmod_argument_both_lanes`, `conformance:2002/pb480_universal_any_length_omitted`,
-  `conformance:2002/pb3128_refmod_any_length_argument`, `conformance:2014/pb3128_refmod_dynamic_length_argument`.
+  `conformance:2002/pb3128_refmod_any_length_argument`, `conformance:2014/pb3128_refmod_dynamic_length_argument`; the CALL and function lanes ask the same relation at bind time (kb/Work PB3101): `conformance:2002/pb3101_activation_lanes_one_relation` and the negatives `pb3101-prototype-call-refmod-by-reference`, `pb3101-function-refmod-by-reference`, `pb3101-nested-refmod-into-any-length`.
 - **D-N8 — a group sender into a national DYNAMIC LENGTH receiver** (kb/Work PB546; decision PB3099, 2026-10-12).
   §14.9.25.4 GR4 makes the move a byte copy and §8.5.1.10.4 sets the receiver's new length to the content's. An odd
   byte count cannot be national content (D-N1: two bytes per position), so the last position is completed with the

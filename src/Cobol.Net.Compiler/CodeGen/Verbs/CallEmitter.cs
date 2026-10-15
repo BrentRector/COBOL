@@ -827,7 +827,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // PB164 waves 1–2 + the R40 INDEX pin) — the wording matches the predicate actually tested.
             // ⛔ THE PREDICATE IS BoundaryImageCapable, NOT IsImageCapable (kb/Work PB204). §14.8.2.2 admits a
             // VARIABLE-LENGTH group across a Format-2 boundary "subject to compatibility as described in
-            // 8.5.1.12" — an admission, checked at bind by OoConformance.DescriptionMismatch — so staging it
+            // 8.5.1.12" — an admission, checked at bind by ActivationRelations (kb/Work PB3101) — so staging it
             // loud here refused conforming source. Only a group with NO boundary image at all (a
             // pointer/object-class leaf, or a variable-length shape outside the current-extent gate) is loud.
             // Asked of the OPERAND (Place.BoundaryImageCapable — a subscripted dynamic-table element has an image

@@ -96,24 +96,29 @@ public static class ActivationRelations
     /// are a type declaration's layout or a PICTURE identity's packed fields (kb/Work PB2077 review). Opposite an ANY
     /// LENGTH formal, whose "length is considered to match the length of the corresponding argument" (§14.8.2.3.2
     /// "Additionally" d)), the PICTURE and ANY LENGTH phrases are named only when no other clause differs, so the
-    /// refusal names the clause that differs (JUSTIFIED, USAGE, …) and not the one length the rule relaxes. Two data-
+    /// refusal names the clause that differs (JUSTIFIED, USAGE, …) and not the one length the rule relaxes — unless
+    /// the argument has no ANY LENGTH form (<see cref="ActivationDescription.AnyLengthClauses"/> null: a PICTURE that
+    /// repeats no one symbol, or no PICTURE clause at all), where the PICTURE clause IS what differs. Two data-
     /// pointers spelled alike are restricted to two type declarations of one type-name that are not equivalent
-    /// (§8.5.3.1). The empty string when the phrases name no difference.</summary>
-    private static string ClauseDifference(ActivationDescription argument, ActivationDescription formal)
+    /// (§8.5.3.1). The empty string when the phrases name no difference. <paramref name="argumentRole"/> /
+    /// <paramref name="formalRole"/> name the two sides (a returning pair's receiving item stands where the argument
+    /// stands, its ANY LENGTH-relaxed sending item where the formal does).</summary>
+    private static string ClauseDifference(ActivationDescription argument, ActivationDescription formal,
+        string argumentRole = "argument", string formalRole = "formal parameter")
     {
         string[] a = [.. (argument.ClausePhrases ?? []).Except(formal.ClausePhrases ?? [], StringComparer.Ordinal)];
         string[] f = [.. (formal.ClausePhrases ?? []).Except(argument.ClausePhrases ?? [], StringComparer.Ordinal)];
-        if (formal.AnyLength && !argument.AnyLength)
+        if (formal.AnyLength && !argument.AnyLength && argument.AnyLengthClauses is not null)
         {
             string[] aOther = [.. a.Where(p => !IsLengthPhrase(p))], fOther = [.. f.Where(p => !IsLengthPhrase(p))];
             if (aOther.Length + fOther.Length > 0) (a, f) = (aOther, fOther);
         }
         return (a.Length, f.Length) switch
         {
-            ( > 0, > 0) => $": the argument is described with {string.Join(" ", a)} where the formal parameter is "
+            ( > 0, > 0) => $": the {argumentRole} is described with {string.Join(" ", a)} where the {formalRole} is "
                 + $"described with {string.Join(" ", f)}",
-            ( > 0, 0) => $": the argument is described with {string.Join(" ", a)} and the formal parameter is not",
-            (0, > 0) => $": the formal parameter is described with {string.Join(" ", f)} and the argument is not",
+            ( > 0, 0) => $": the {argumentRole} is described with {string.Join(" ", a)} and the {formalRole} is not",
+            (0, > 0) => $": the {formalRole} is described with {string.Join(" ", f)} and the {argumentRole} is not",
             _ when formal.Category == ActivationCategory.DataPointer && argument.Category == ActivationCategory.DataPointer
                 => ": the two are restricted to type declarations that are not equivalent (ISO §8.5.3.1, §14.8.2.3.2 rule 4)",
             _ => "",
@@ -205,6 +210,89 @@ public static class ActivationRelations
             _ => false,
         };
 
+    /// <summary>⛔ THE PAIR-MODE IDENTITY OF TWO DESCRIPTIONS (kb/Work PB3101; COBOLNET_OO_DESIGN D6 item 7): do
+    /// <paramref name="first"/> and <paramref name="second"/> describe one parameter or returning item the same, as ISO
+    /// §9.3.8.2.3 asks of two interfaces' corresponding items? Rule 2 for an object reference (2 c): "described with the
+    /// same object-class-name, and the presence or absence of the FACTORY and ONLY phrases is the same in both
+    /// interfaces"); rule 3 for any other formal parameter, rule 6 for a returning item: "the same ALIGNED, ANY LENGTH,
+    /// BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses", exceptions a) / b) and the LOCALE
+    /// sentence carried by <see cref="ActivationDescription.Clauses"/> and <see cref="ActivationDescription.LocaleExternal"/>;
+    /// rule 7: "If either of the corresponding formal parameters or returning items in interface-1 or interface-2 is a
+    /// strongly-typed group item, both are of the same type". The askers import it: §11.7.3 SR9 (an override, through
+    /// §9.3.8.2.3), §9.3.11 (IMPLEMENTS), interface-to-interface conformance, §8.4.3.9.3 SR7 ("The data description of the
+    /// item specified in the RETURNING phrase of the get property method shall be the same as the data description of the
+    /// item specified as the USING parameter of the set property method") and the identity conversion of a
+    /// variable-length MOVE's corresponding elementary tables. Unlike the activation relations, whose two sides are an
+    /// argument and a formal, it is SYMMETRIC; <paramref name="firstRole"/> and <paramref name="secondRole"/> only name the
+    /// sides in its reason. Null when the two are the same description.
+    /// <list type="bullet">
+    /// <item>A bit / national group is "treated as though it were an elementary data item … described with PICTURE 1(m)"
+    /// / "N(m)" (§13.18.29.4 GR1 b) / GR2 b)), so it is the same description as the elementary item of that picture and
+    /// usage, and its <see cref="ActivationDescription.Clauses"/> carry that picture (<c>ActivationDescriptions.Of</c>).</item>
+    /// <item>An alphanumeric group carries none of rule 3's clauses, and an elementary item carries its PICTURE clause, so
+    /// a group is never the same description as an elementary item, whatever their lengths; two groups are the same
+    /// description at the same length, as pair mode compared them before it asked this relation (kb/Work PB3101).</item>
+    /// <item>A variable-length group's matching information is part of the method resolution signature (§9.3.5.3 item 7:
+    /// "If the parameter is a variable-length group, sufficient information to determine if this group would match the
+    /// group is specified in the invoke statement"), so it is never the same description as a fixed-length group, and two
+    /// are the same when compatible (§8.5.1.12) at the same collapsed length.</item>
+    /// </list></summary>
+    public static string? SignatureDifference(ActivationDescription first, ActivationDescription second,
+        string firstRole = "item", string secondRole = "corresponding item")
+    {
+        string Both() => $"the {firstRole} ({first}) and the {secondRole} ({second})";
+        if (first.Shape is ActivationShape.ObjectReference || second.Shape is ActivationShape.ObjectReference)
+        {
+            if (first.Shape is not ActivationShape.ObjectReference || second.Shape is not ActivationShape.ObjectReference)
+                return $"{Both()} are not both object references (ISO §9.3.8.2.3 rules 2 / 3)";
+            // A parameter-name of the skeleton bound as itself opposite another name, agreeing on every other axis: the
+            // two are the same description in an expansion whose actual IS that name, and in no other — each
+            // expansion's question (§9.3.8.2.4), so the skeleton admits it.
+            if (TurnsOnParameterName(first, second)) return null;
+            return first.ObjectNameIsParameter == second.ObjectNameIsParameter && SameObjectReferenceDescription(first, second)
+                ? null
+                : $"{Both()} are not described with the same object-reference phrases — the same kind, the same "
+                  + "class-name or interface-name, and the same FACTORY and ONLY phrases (ISO §9.3.8.2.3 rule 2)";
+        }
+        if (first.Shape is ActivationShape.StrongGroup || second.Shape is ActivationShape.StrongGroup)
+            return first.StrongType is not null && string.Equals(first.StrongType, second.StrongType, StringComparison.Ordinal)
+                ? null
+                : $"{Both()} are not of the same type — a strongly-typed group item is the same description only as a "
+                  + "strongly-typed group item of an equivalent type declaration (ISO §9.3.8.2.3 rule 7; §8.5.3.1)";
+        if (first.Shape is ActivationShape.VariableLengthGroup || second.Shape is ActivationShape.VariableLengthGroup)
+        {
+            if (first.Shape is not ActivationShape.VariableLengthGroup || second.Shape is not ActivationShape.VariableLengthGroup)
+                return $"{Both()}: one is a variable-length group and the other is not, and a variable-length group's "
+                    + "matching information is part of the method resolution signature (ISO §9.3.5.3 item 7)";
+            if (VariableLengthViolation(first, second, firstRole, secondRole) is { } vlWhy) return vlWhy;
+            int firstLength = AtomsOf(first).Sum(a => a.Chars), secondLength = AtomsOf(second).Sum(a => a.Chars);
+            return firstLength == secondLength ? null
+                : $"{Both()} are of different lengths ({firstLength} and {secondLength} character positions, as their "
+                  + "group layouts count them)";
+        }
+        if (first.Shape is ActivationShape.AlphanumericGroup || second.Shape is ActivationShape.AlphanumericGroup)
+            return first.Shape is ActivationShape.AlphanumericGroup && second.Shape is ActivationShape.AlphanumericGroup
+                ? first.Positions == second.Positions ? null
+                    : $"{Both()} are groups of different lengths"
+                : $"{Both()}: a group carries none of the ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, "
+                  + "PICTURE, SIGN and USAGE clauses an elementary item is described with, so the two are not described "
+                  + "the same (ISO §9.3.8.2.3 rules 3 / 6)";
+        return first.AnyLength == second.AnyLength && SameElementaryClauses(first, second)
+            ? null
+            : $"{Both()} are not described with the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, "
+              + "PICTURE, SIGN and USAGE clauses (ISO §9.3.8.2.3 rules 3 / 6)"
+              + ClauseDifference(first, second, firstRole, secondRole);
+    }
+
+    /// <summary>True when the identity of two object-reference descriptions differs between the expansions of the
+    /// skeleton being bound as itself (ISO §9.3.8.2.4): one names a parameter-name, the two do not name one
+    /// parameter-name, and they agree on the kind and the FACTORY and ONLY phrases — so an actual that IS the other's
+    /// class or interface makes them the same description and another does not (kb/Work PB2937).</summary>
+    private static bool TurnsOnParameterName(ActivationDescription a, ActivationDescription b) =>
+        (a.ObjectNameIsParameter || b.ObjectNameIsParameter)
+        && !(a.ObjectNameIsParameter && b.ObjectNameIsParameter && CobolNames.Same(a.ObjectName, b.ObjectName))
+        && a.ObjectKind == b.ObjectKind && a.Factory == b.Factory && a.Only == b.Only;
+
     /// <summary>⛔ ISO §14.8.2.2 FOR A PARAMETER PASSED BY REFERENCE, the one copy both lanes ask (a universal INVOKE's
     /// bound method, <see cref="ParameterViolation"/>, and a CALL, <see cref="CallArgumentViolation"/>): "If either the
     /// formal parameter or the corresponding argument is a strongly-typed group item, both shall be of the same type"
@@ -216,13 +304,21 @@ public static class ActivationRelations
     private static string? ReferenceGroupViolation(ActivationDescription argument, ActivationDescription formal)
     {
         if (formal.Shape is ActivationShape.StrongGroup || argument.Shape is ActivationShape.StrongGroup)
-            return formal.StrongType is not null
-                   && string.Equals(formal.StrongType, argument.StrongType, StringComparison.Ordinal)
-                ? null
-                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — two type "
-                  + "declarations of one type-name are the same type only when equivalent (ISO §14.8.2.2; §8.5.3.1)";
+            return StrongTypeViolation(argument, formal);
         if (formal.Shape is ActivationShape.VariableLengthGroup || argument.Shape is ActivationShape.VariableLengthGroup)
-            return VariableLengthViolation(argument, formal, "argument", "formal parameter");
+        {
+            // Compatibility is the whole rule for two variable-length groups (§3.11: a variable-length group is no
+            // "alphanumeric group item"). Opposite a FIXED alphanumeric group, rule 1 binds that side too, measured in
+            // the lengths §8.5.1.12.3 gives the PAIR ("the dynamic-capacity table is considered to be the same length
+            // as the corresponding table") — the tally the one walk keeps (kb/Work PB965's rule, PB3101).
+            var widths = new GroupCharTally();
+            if (VariableLengthViolation(argument, formal, "argument", "formal parameter", widths) is { } vlWhy) return vlWhy;
+            return (formal.Shape is ActivationShape.AlphanumericGroup || argument.Shape is ActivationShape.AlphanumericGroup)
+                   && widths.Second > widths.First
+                ? $"the formal parameter ({widths.Second} character positions, as §8.5.1.12.3 measures the pair) is "
+                  + $"larger than the argument ({widths.First}) (ISO §14.8.2.2 rule 1)"
+                : null;
+        }
         if (formal.Shape is not ActivationShape.AlphanumericGroup && argument.Shape is not ActivationShape.AlphanumericGroup)
             return null;
         if (!IsAlphanumericGroupPartner(formal) || !IsAlphanumericGroupPartner(argument))
@@ -232,6 +328,20 @@ public static class ActivationRelations
             : $"the formal parameter ({formal.Positions} character positions) is larger than the argument "
               + $"({argument.Positions}) (ISO §14.8.2.2 rule 1)";
     }
+
+    /// <summary>§14.8.2.2's strongly-typed sentence, which carries no passing-mode qualification — it follows rules 1 (BY
+    /// REFERENCE) and 2 (BY CONTENT) and governs both: "If either the formal parameter or the corresponding argument is a
+    /// strongly-typed group item, both shall be of the same type" (§8.5.3.1's equivalence,
+    /// <see cref="ActivationDescription.StrongType"/>). Null when neither side is strongly typed, or both are of one type.</summary>
+    private static string? StrongTypeViolation(ActivationDescription argument, ActivationDescription formal) =>
+        formal.Shape is not ActivationShape.StrongGroup && argument.Shape is not ActivationShape.StrongGroup
+        || formal.StrongType is not null && string.Equals(formal.StrongType, argument.StrongType, StringComparison.Ordinal)
+            ? null
+            : formal.Shape is ActivationShape.StrongGroup && argument.Shape is ActivationShape.StrongGroup
+                ? $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — two type "
+                  + "declarations of one type-name are the same type only when equivalent (ISO §14.8.2.2; §8.5.3.1)"
+                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same type — a "
+                  + "strongly-typed group item conforms only to a strongly-typed group item of its type (ISO §14.8.2.2)";
 
     /// <summary>⛔ ISO §14.8.2 FOR ONE ARGUMENT OF A CALL whose activated program is located by name at run time (kb/Work
     /// PB165): a dynamic Format-1 CALL, or a program-prototype whose details §12.3.8.4 GR10 c) takes from the external
@@ -304,19 +414,16 @@ public static class ActivationRelations
             return $"the argument ({argument}) is described with the ANY LENGTH clause and the formal parameter is not "
                 + "(ISO §14.8.2.3.2 \"Additionally\" e))";
         // "Additionally" d): an ANY LENGTH formal's "length is considered to match the length of the corresponding
-        // argument" — its one-symbol PICTURE has no length of its own (§13.18.2), so what remains comparable is the class
-        // and category and the usage. (§13.18.2.3 SR2 confines ANY LENGTH to a function, a contained program or a method,
-        // none of which a CALL reaches through a program-specifier: this arm is completeness, not a common path.)
-        if (formal.AnyLength)
-            return string.Equals(formal.Category, argument.Category, StringComparison.Ordinal)
-                   && string.Equals(formal.Usage, argument.Usage, StringComparison.Ordinal)
-                ? null
-                : $"the formal parameter ({formal}) and the argument ({argument}) are not of the same category and usage "
-                  + "(ISO §14.8.2.3.2 rule 2, \"Additionally\" d))";
-        return SameElementaryClauses(argument, formal) ? null
+        // argument" — the LENGTH and nothing else, so the argument is compared as if it were described with ANY LENGTH
+        // and every other clause of rule 2 (JUSTIFIED, SIGN, BLANK WHEN ZERO, USAGE, …) is still compared: the reading
+        // match rule 3 e) gives the same pair (SameClausesAtFormalLength; kb/Work PB3127). An ANY LENGTH formal is
+        // reached by a function and by a contained program the NESTED phrase activates (§13.18.2.3 SR2).
+        return string.Equals(argument.Category, formal.Category, StringComparison.Ordinal)
+               && SameClausesAtFormalLength(argument, formal)
+            ? null
             : $"the formal parameter ({formal}) and the argument ({argument}) are not described with the same ALIGN, "
-              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2)"
-              + ClauseDifference(argument, formal);
+              + "BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN and USAGE clauses (ISO §14.8.2.3.2 rule 2"
+              + (formal.AnyLength ? ", \"Additionally\" d))" : ")") + ClauseDifference(argument, formal);
     }
 
     /// <summary>§14.8.2.3.3, Elementary items passed by content or by value — and §14.8.2.2 rule 2 for a group.</summary>
@@ -334,10 +441,14 @@ public static class ActivationRelations
         if (argument.Shape is ActivationShape.PredefinedNull)
             return "NULL is a sending operand only of a SET into a data item of class pointer or object reference, and the "
                 + $"formal parameter ({formal}) is neither (ISO §14.8.2.3.3; §8.4.3.10.3)";
+        // §14.8.2.2's strongly-typed sentence governs BY CONTENT as it governs BY REFERENCE: a strongly-typed group argument
+        // reaches only a formal of its type, whatever a MOVE of the pair would allow (MOVE's SR2 keys only the RECEIVING
+        // side, so a strongly-typed group argument into a PIC X formal used to conform here; kb/Work PB3101).
+        if (StrongTypeViolation(argument, formal) is { } strongWhy) return strongWhy;
         // §14.8.2.2 rule 2: "If the argument is passed by content, the conformance rules are the same as for a MOVE
         // statement with the argument as the sending operand and the corresponding formal parameter as the receiving
-        // operand" — a strongly-typed group and a variable-length group included (their sentences are MOVE's SR2 / SR9
-        // too), and an arithmetic expression has no character image for a group move to copy (§14.9.25.4 GR4).
+        // operand" — a variable-length group included (its sentence is MOVE's SR9 too), and an arithmetic expression has
+        // no character image for a group move to copy (§14.9.25.4 GR4).
         if (IsGroup(formal) || IsGroup(argument))
             return argument.Shape is ActivationShape.Expression
                 ? $"an arithmetic expression has no character image for the group move into the formal parameter ({formal}) "
@@ -362,20 +473,25 @@ public static class ActivationRelations
     }
 
     /// <summary>The MOVE question of §14.8.2.2 rule 2 / §14.8.2.3.3 rule 2 d) with the argument as the sending operand:
-    /// <see cref="MayMove"/> for an argument with storage or a literal of a known category, and for a figurative constant
-    /// or an ALL literal, whose category the receiving context chooses (§8.3.3.6.4 GR1), a MOVE valid under ANY of the three
-    /// categories it can take — the reading the compiler's own screen gives the same argument when it knows the formal
-    /// (<c>OoConformance.ContentAlphanumericLiteralMismatch</c>).</summary>
+    /// <see cref="MoveViolation"/> for an argument with storage or a value of a known category, and for a figurative
+    /// constant or an ALL literal, whose category the receiving context chooses (§8.3.3.6.4 GR1), a MOVE valid under ANY
+    /// of the three categories it can take — every bind-time lane asks this too (<c>ParameterConformance</c>; kb/Work
+    /// PB3101).</summary>
     private static string? ContentMoveViolation(ActivationDescription argument, ActivationDescription formal)
     {
-        bool valid = argument.Category is ActivationCategory.Figurative or ActivationCategory.FigurativeZero
-            && argument.Shape is ActivationShape.Literal
-            ? FigurativeCategories.Any(c => MayMove(argument with { Table16 = c }, formal))
-            : MayMove(argument, formal);
-        return valid ? null
-            : $"the argument ({argument}) is not a valid sending operand of a MOVE to the formal parameter ({formal}) "
-              + "(ISO §14.8.2.3.3 rule 2 d) / §14.8.2.2 rule 2; §14.9.25.3)";
+        string? why = IsFigurative(argument)
+            ? FigurativeCategories.Select(c => MoveViolation(argument with { Table16 = c }, formal))
+                .Aggregate((first, next) => first is null || next is null ? null : first)
+            : MoveViolation(argument, formal);
+        return why is null ? null
+            : $"the argument ({argument}) is not a valid sending operand of a MOVE to the formal parameter ({formal}): {why} "
+              + "(ISO §14.8.2.3.3 rule 2 d) / §14.8.2.2 rule 2)";
     }
+
+    /// <summary>A figurative constant or an ALL literal written as an argument.</summary>
+    private static bool IsFigurative(ActivationDescription d) =>
+        d.Shape is ActivationShape.Literal && d.Category is ActivationCategory.Figurative
+            or ActivationCategory.FigurativeZero or ActivationCategory.FigurativeBoolean;
 
     /// <summary>The Table 16 rows a figurative constant or an ALL literal can stand in (§8.3.3.6.4 GR1).</summary>
     private static readonly Table16Category[] FigurativeCategories =
@@ -388,19 +504,25 @@ public static class ActivationRelations
     /// the pair conforms, else the reason.</summary>
     public static string? CallReturningViolation(ActivationDescription receiving, ActivationDescription sending)
     {
+        // §14.8.3.3's "Additionally" 4) / 5) are rules of an ELEMENTARY pair; opposite a group, §14.8.3.2 governs, where
+        // an ANY LENGTH sending item is as long as its receiver by §13.18.2.4 GR1 b) (ReturningConformance).
+        bool elementary = IsElementaryData(receiving) && IsElementaryData(sending);
         // 4) "If the receiving operand is described with the ANY LENGTH clause, the sending operand shall also be
         // described with the ANY LENGTH clause."
-        if (receiving.AnyLength && !sending.AnyLength)
+        if (elementary && receiving.AnyLength && !sending.AnyLength)
             return $"the receiving item ({receiving}) is described with the ANY LENGTH clause and the returning item "
                 + $"({sending}) is not (ISO §14.8.3.3 \"Additionally\" 4))";
         // 5) "If the sending operand is described with the ANY LENGTH clause, the length of the sending operand is
-        // considered to match the length of the receiving operand" — what remains comparable is the category and usage.
-        if (sending.AnyLength && !receiving.AnyLength)
+        // considered to match the length of the receiving operand" — the LENGTH and nothing else: the receiving item is
+        // compared as if it were described with ANY LENGTH, every other clause still compared (kb/Work PB3127, the
+        // sibling of §14.8.2.3.2 "Additionally" d)). The sending item stands where the relaxed formal stands there.
+        if (elementary && sending.AnyLength && !receiving.AnyLength)
             return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
-                   && string.Equals(receiving.Usage, sending.Usage, StringComparison.Ordinal)
+                   && SameClausesAtFormalLength(receiving, sending)
                 ? null
-                : $"the returning item ({sending}) and the receiving item ({receiving}) are not of the same category and "
-                  + "usage (ISO §14.8.3.3 \"Additionally\" 5))";
+                : $"the returning item ({sending}) and the receiving item ({receiving}) are not described with the same "
+                  + "clauses (ISO §14.8.3.3, \"Additionally\" 5))"
+                  + ClauseDifference(receiving, sending, "receiving item", "returning item");
         return ReturningConformance(receiving, sending);
     }
 
@@ -411,7 +533,7 @@ public static class ActivationRelations
     private static bool IsGroup(ActivationDescription d) =>
         d.Shape is ActivationShape.AlphanumericGroup or ActivationShape.StrongGroup or ActivationShape.VariableLengthGroup;
 
-    /// <summary>§14.8.2.3.2 rule 2 / §14.8.3.3 / §9.3.6 match rule 3 e): the same class and category, the same clause
+    /// <summary>§14.8.3.3's elementary identity of two returning items: the same class and category, the same clause
     /// identity (<see cref="ActivationDescription.Clauses"/> — ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE
     /// with its currency and DECIMAL-POINT IS COMMA facets, SIGN, USAGE and the LOCALE phrase's SIZE) and the same LOCALE
     /// external identification ("Additionally" a)).</summary>
@@ -423,13 +545,13 @@ public static class ActivationRelations
     /// <summary>ISO §9.3.6 match rules 6 and 7, split on the INVOCATION's returning item <paramref name="receiving"/>:
     /// when it is "usage OBJECT REFERENCE, POINTER or INDEX" the method's returning item <paramref name="sending"/> "may
     /// be a sending item in a SET statement with the returning item as the receiving item" (rule 6,
-    /// <see cref="MaySet"/>), otherwise it "may be a sending item in a MOVE statement" (rule 7, <see cref="MayMove"/>).
+    /// <see cref="MaySet"/>), otherwise it "may be a sending item in a MOVE statement" (rule 7, <see cref="MoveViolation"/>).
     /// "May be" is the statement's VALIDITY — its syntax rules over the two descriptions — not only which statement
     /// applies: a method returning <c>PIC 9V99</c> does not match an invocation returning <c>PIC X(4)</c> (Table 16:
     /// Numeric Noninteger → Alphanumeric is "No"), so the search goes on up the INHERITS chain and ends in EC-OO-METHOD
     /// (§9.3.6 6)) rather than binding the method and failing its §14.8.3 conformance (kb/Work PB2076).</summary>
     public static bool ReturningMatches(ActivationDescription receiving, ActivationDescription sending) =>
-        SetClass(receiving) is { } setClass ? MaySet(setClass, receiving, sending) : MayMove(sending, receiving);
+        SetClass(receiving) is { } setClass ? MaySet(setClass, receiving, sending) : MoveViolation(sending, receiving) is null;
 
     /// <summary>The class a SET statement receives a description into (§9.3.6 rule 6's "usage OBJECT REFERENCE,
     /// POINTER or INDEX"; POINTER read as the class, §8.5.2.1 Table 2's three pointer categories, since a
@@ -488,24 +610,33 @@ public static class ActivationRelations
                 : d.ObjectName,
             d.Factory, d.Only, d.ObjectClasses, d.ObjectInterfaces);
 
-    /// <summary>§9.3.6 rule 7: is a MOVE of <paramref name="sending"/> to <paramref name="receiving"/> valid by ISO
-    /// §14.9.25.3? Its syntax rules over two data items, in SR order: SR1 (neither of class index, object or pointer —
-    /// the receiving side is not, or rule 6 would apply), SR2 (a strongly-typed group receiver takes only a group of the
-    /// same type), SR8 (a binary-char/-short/-long/-double sender needs a numeric or numeric-edited receiver), SR9
-    /// (a variable-length group only to or from a compatible group, §8.5.1.12) and SR10 (Table 16). SR8 and SR10 are
-    /// the ONE copy the compiler's MOVE screens read (<see cref="MoveValidity"/>).</summary>
-    private static bool MayMove(ActivationDescription sending, ActivationDescription receiving)
+    /// <summary>§9.3.6 rule 7 and §14.8.2.3.3 rule 2 d): is a MOVE of <paramref name="sending"/> to
+    /// <paramref name="receiving"/> valid by ISO §14.9.25.3? Its syntax rules over two descriptions, in SR order: SR1
+    /// (neither of class index, object or pointer — the receiving side is not, or rule 6 would apply), SR2 (a
+    /// strongly-typed group receiver takes only a group of the same type), SR6 / SR7 (a figurative constant into an
+    /// alphabetic or a boolean receiver), SR8 (a binary-char/-short/-long/-double sender needs a numeric or
+    /// numeric-edited receiver), SR9 (a variable-length group only to or from a compatible group, §8.5.1.12) and SR10
+    /// (Table 16). SR6 / SR7, SR8 and SR10 are the ONE copy the compiler's MOVE screens read (<see cref="MoveValidity"/>).
+    /// Null when the move is valid, else the rule it breaks.</summary>
+    private static string? MoveViolation(ActivationDescription sending, ActivationDescription receiving)
     {
-        if (SetClass(sending) is not null) return false;                                                    // SR1
+        if (SetClass(sending) is not null)                                                                    // SR1
+            return "the sending operand is of class index, object or pointer, which no MOVE sends (ISO §14.9.25.3 SR1)";
         if (receiving.Shape is ActivationShape.StrongGroup
             && (sending.Shape is not ActivationShape.StrongGroup
                 || !string.Equals(receiving.StrongType, sending.StrongType, StringComparison.Ordinal)))
-            return false;                                                                                     // SR2
-        if (MoveValidity.BinaryWidthRefusal(sending.BinaryWidth, receiving.Table16) is not null) return false; // SR8
+            return "the sending operand shall be a group item of the same type (ISO §14.9.25.3 SR2 / §8.5.3.3)"; // SR2
+        if (IsFigurative(sending)                                                                             // SR6 / SR7
+            && MoveValidity.FigurativeRefusal(sending.Category is ActivationCategory.FigurativeZero,
+                sending.Category is ActivationCategory.FigurativeZero or ActivationCategory.FigurativeBoolean,
+                receiving.Table16) is { } figurativeWhy)
+            return figurativeWhy;
+        if (MoveValidity.BinaryWidthRefusal(sending.BinaryWidth, receiving.Table16) is { } binaryWhy)       // SR8
+            return binaryWhy;
         if ((sending.Shape is ActivationShape.VariableLengthGroup || receiving.Shape is ActivationShape.VariableLengthGroup)
-            && VariableLengthViolation(sending, receiving, "sending item", "receiving item") is not null)
-            return false;                                                                                     // SR9
-        return MoveValidity.Table16Refusal(sending.Table16, receiving.Table16) is null;                       // SR10
+            && VariableLengthViolation(sending, receiving, "sending item", "receiving item") is { } lengthWhy)
+            return lengthWhy + " (ISO §14.9.25.3 SR9)";                                                      // SR9
+        return MoveValidity.Table16Refusal(sending.Table16, receiving.Table16);                               // SR10
     }
 
     /// <summary>ISO §14.8.3 for the returning item of a method §9.3.6 has BOUND (§14.9.23.4 GR7 c)):
@@ -550,10 +681,12 @@ public static class ActivationRelations
         if (receiving.Shape is ActivationShape.VariableLengthGroup || sending.Shape is ActivationShape.VariableLengthGroup)
             return VariableLengthViolation(receiving, sending, "receiving item", "returning item");
         // §14.8.3.2: an alphanumeric group opposite "an alphanumeric group item or an elementary item of category
-        // alphanumeric", and "the receiving operand shall be of the same length as the sending operand".
+        // alphanumeric", and "the receiving operand shall be of the same length as the sending operand" — which an ANY
+        // LENGTH sending item is by construction: §13.18.2.4 GR1 b) gives it "n repetitions of the picture symbol …,
+        // where n is the length of the corresponding argument or returning item of the activating runtime element".
         if (receiving.Shape is ActivationShape.AlphanumericGroup || sending.Shape is ActivationShape.AlphanumericGroup)
             return IsAlphanumericGroupPartner(receiving) && IsAlphanumericGroupPartner(sending)
-                   && receiving.Positions == sending.Positions
+                   && (sending.AnyLength || receiving.Positions == sending.Positions)
                 ? null
                 : $"the returning item ({sending}) and the receiving item ({receiving}) are not two alphanumeric items "
                   + "of the same length (ISO §14.8.3.2)";
@@ -564,9 +697,7 @@ public static class ActivationRelations
                   + "\"Additionally\" 2) / 3))";
         // §14.8.3.3: "the receiving operand shall have the same ALIGN, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED,
         // PICTURE, SIGN, and USAGE clauses" (the class-pointer restriction is its USAGE clause's TO phrase).
-        return string.Equals(receiving.Category, sending.Category, StringComparison.Ordinal)
-               && string.Equals(receiving.Clauses, sending.Clauses, StringComparison.Ordinal)
-               && SameLocaleIdentification(receiving, sending)
+        return SameElementaryClauses(receiving, sending)
             ? null
             : $"the returning item ({sending}) and the receiving item ({receiving}) are not described with the same "
               + "clauses (ISO §14.8.3.3)";
@@ -595,15 +726,16 @@ public static class ActivationRelations
     /// in 8.5.1.12" — the ONE §8.5.1.12 walk (<see cref="GroupCompatibility.Walk"/>, the walk the compiler's bind-time
     /// screen asks) over the atoms both descriptions carry. A variable-length group is compatible only with a GROUP
     /// (§8.5.1.12.1: "unless the other operand is a compatible group"). A fixed-length partner is converted over the two
-    /// shapes by the same walk (<see cref="CobolVarGroup.Reshape"/>, kb/Work PB2690), so the walk is the whole question.
-    /// Null when compatible.</summary>
+    /// shapes by the same walk (<see cref="CobolVarGroup.Reshape"/>, kb/Work PB2690), so the walk is the whole
+    /// compatibility question; <paramref name="widths"/>, when not null, receives the pair-relative character lengths
+    /// (<paramref name="a"/>'s first) that §14.8.2.2 rule 1 compares opposite a fixed group. Null when compatible.</summary>
     private static string? VariableLengthViolation(ActivationDescription a, ActivationDescription b, string aRole,
-        string bRole)
+        string bRole, GroupCharTally? widths = null)
     {
         string Refusal(string why) => $"the {aRole} ({a}) and the {bRole} ({b}) are not compatible: {why}";
         if (!IsGroupPartner(a) || !IsGroupPartner(b))
             return Refusal("a variable-length group is compatible only with a group (ISO §8.5.1.12.1)");
-        if (GroupCompatibility.Walk(AtomsOf(a), AtomsOf(b)) is { } why)
+        if (GroupCompatibility.Walk(AtomsOf(a), AtomsOf(b), tally: widths) is { } why)
             return Refusal($"{GroupMismatchText(why)} (ISO §8.5.1.12)");
         return null;
     }

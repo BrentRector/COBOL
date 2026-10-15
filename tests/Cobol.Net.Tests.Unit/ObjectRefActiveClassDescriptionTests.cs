@@ -2,6 +2,7 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 
 using CobolNet.Binding.Model;
+using CobolNet.Compiler.Oo;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -15,30 +16,43 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 public sealed class ObjectRefActiveClassDescriptionTests
 {
+    /// <summary>Two object-reference items are the same description when the ONE pair-mode relation says so
+    /// (<see cref="OoConformance.SignatureDifference"/> over the descriptions <c>ActivationDescriptions.Of</c> builds;
+    /// kb/Work PB3101 deleted the descriptor-level copy of this question).</summary>
+    private static bool Same(ObjectRefDescriptor a, ObjectRefDescriptor b) =>
+        OoConformance.SignatureDifference(Item(a), Item(b), "item", "corresponding item") is null;
+
+    private static DataItem Item(ObjectRefDescriptor d) => new()
+    {
+        Level = 1, CobolName = "R", CsName = "R",
+        Pic = new PicInfo(PicCategory.ObjectReference, Usage.ObjectReference, Length: 0, Digits: 0, Scale: 0, Signed: false)
+            { ObjectRef = d },
+    };
+
     [Fact]
     public void TwoActiveClassDescriptions_AgreeWhateverClassesTheyWereWrittenIn()
     {
         var inA = ObjectRefDescriptor.ActiveClass("A");
         var inB = ObjectRefDescriptor.ActiveClass("B");
         var ownerless = ObjectRefDescriptor.ActiveClass(null);   // an interface method prototype's formal
-        Assert.True(inA.SameDescriptionAs(inB));
-        Assert.True(inA.SameDescriptionAs(ownerless));
-        Assert.True(ownerless.SameDescriptionAs(inB));
+        Assert.True(Same(inA, inB));
+        Assert.True(Same(inA, ownerless));
+        Assert.True(Same(ownerless, inB));
     }
 
     [Fact]
     public void TheFactoryPresence_StaysPartOfTheDescription()
     {
-        Assert.False(ObjectRefDescriptor.ActiveClass("A", factory: true).SameDescriptionAs(ObjectRefDescriptor.ActiveClass("A")));
-        Assert.True(ObjectRefDescriptor.ActiveClass(null, factory: true).SameDescriptionAs(ObjectRefDescriptor.ActiveClass("B", factory: true)));
+        Assert.False(Same(ObjectRefDescriptor.ActiveClass("A", factory: true), ObjectRefDescriptor.ActiveClass("A")));
+        Assert.True(Same(ObjectRefDescriptor.ActiveClass(null, factory: true), ObjectRefDescriptor.ActiveClass("B", factory: true)));
     }
 
     [Fact]
     public void AnObjectClassDescription_StillComparesItsName()
     {
-        Assert.True(ObjectRefDescriptor.ObjectClass("A").SameDescriptionAs(ObjectRefDescriptor.ObjectClass("a")));
-        Assert.False(ObjectRefDescriptor.ObjectClass("A").SameDescriptionAs(ObjectRefDescriptor.ObjectClass("B")));
-        Assert.False(ObjectRefDescriptor.ActiveClass("A").SameDescriptionAs(ObjectRefDescriptor.ObjectClass("A")));
+        Assert.True(Same(ObjectRefDescriptor.ObjectClass("A"), ObjectRefDescriptor.ObjectClass("a")));
+        Assert.False(Same(ObjectRefDescriptor.ObjectClass("A"), ObjectRefDescriptor.ObjectClass("B")));
+        Assert.False(Same(ObjectRefDescriptor.ActiveClass("A"), ObjectRefDescriptor.ObjectClass("A")));
     }
 
     [Fact]

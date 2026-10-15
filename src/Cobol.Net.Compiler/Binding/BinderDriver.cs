@@ -856,7 +856,7 @@ internal sealed class BinderDriver
         foreach (var (data, unit, position) in forests)
             data.ResolveRestrictedPrototypes(
                 ProgramPrototypesOf(data, unit, repository, position), UserFunctionsOf(data, unit, repository, position));
-        foreach (var (data, _, _) in forests) data.ClassifyRestrictedPrototypes(session.SignatureClasses);
+        session.SignatureClasses.Classify([.. forests.SelectMany(f => f.Data.RestrictedPrototypePointers())]);
     }
 
     /// <summary>The PROCEDURE half of unit binding (phase 2): every unit's DATA is already bound

@@ -1668,7 +1668,7 @@ internal sealed class StatementValidation(DataBinder data)
         DataItem? sr = right is BoundFieldOperand fr ? fr.Place.Item : null;
         if ((sl is { } && StrongTypeModel.IsStrongGroup(sl)) || (sr is { } && StrongTypeModel.IsStrongGroup(sr)))
         {
-            if (sl is null || sr is null || !StrongTypeModel.SameType(sl, sr, prototypes: null))
+            if (sl is null || sr is null || !StrongTypeModel.SameType(sl, sr))
                 data.Edition.Error(DiagnosticCatalog.StrongCompareMismatch, "a strongly-typed group may be compared only with a group of the "
                     + "same type (ISO §8.8.4.2.3 SR1 / §8.5.3.3)");
             // §8.8.4.2.3 SR4: "Strongly-typed group items that contain elementary items of class boolean,
