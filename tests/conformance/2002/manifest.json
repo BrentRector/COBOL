@@ -858,7 +858,8 @@
   "pb3132_contained_program_word_it_never_references",
   "pb3156_aligned_odo_bit_table_extent",
   "pb2722_evaluate_partial_not_ownership",
-  "pb2740_omitted_branch_turn_valid_names"
+  "pb2740_omitted_branch_turn_valid_names",
+  "pb3164_method_constant_scope"
   ],
   "pending": []
 }

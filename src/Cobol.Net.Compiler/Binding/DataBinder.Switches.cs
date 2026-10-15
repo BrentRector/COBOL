@@ -1953,7 +1953,7 @@ public sealed partial class DataBinder
     /// <summary>Does <paramref name="word"/> name a constant here — one of this unit's constant entries (bound, bindable
     /// or refused) or an inherited GLOBAL one? The question a position whose word alternative has a meaning of its own
     /// (an ALPHABET code-name, an external-locale-name) asks before taking that meaning.</summary>
-    private bool NamesConstant(string word) => _declaredConstants.ContainsKey(word) || FindConstant(word) is not null;
+    private bool NamesConstant(string word) => IsDeclaredConstant(word) || FindConstant(word) is not null;
 
     /// <summary>⛔ THE ONE CONSTANT-NAME READING OF A WORD AT A SPECIAL-NAMES LITERAL POSITION (kb/Work PB1942): literal-1
     /// … literal-9 of §12.3.7.2. ISO §13.10.3 SR2 — "Except in a compiler directive, constant-name-1 may be used anywhere
