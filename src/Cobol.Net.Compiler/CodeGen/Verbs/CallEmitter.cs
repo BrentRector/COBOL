@@ -630,6 +630,17 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             : a.Place is RefModPlace slice
                 ? $"({RuntimeApi.ActivationDescriptionNew(d)} with {{ Positions = {OperandText.FieldImage(slice)}.Length }})"
                 : RuntimeApi.ActivationDescriptionNew(d);
+        return Described(built, length, description);
+    }
+
+    /// <summary>⛔ THE ONE RENDERER OF WHAT AN ARGUMENT STATES for §14.9.4.4 GR3 d)'s comparison: the <c>CobolArg</c>
+    /// <paramref name="built"/> with its storage <paramref name="length"/> (unless unstated) and its
+    /// <paramref name="description"/> (the rendered <c>ActivationDescription</c>, or null). A CALL statement's argument and
+    /// a generated host entry's argument (<c>HostEntryEmitter</c>, the .NET counterpart of a CALL, DESIGN-external-repository
+    /// §4.3, §17.3 "One renderer") are both stated here, so the two activating elements cannot describe one formal's
+    /// storage two ways.</summary>
+    internal static string Described(string built, int length, string? description)
+    {
         var facts = new List<string>(2);
         if (length != RuntimeApi.UnstatedBoundaryLength) facts.Add($"Length = {length}");
         if (description is not null) facts.Add($"Description = {description}");

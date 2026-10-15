@@ -1634,12 +1634,17 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
   call (no inline range test); `HostLanding.Land` refuses every row of a loss fixture (high order, low order, sign, P
   positions, each binary capacity, string length, boolean characters) and accepts the exact boundary values; the
   validity decode agrees with `CobolNum.IsNumericImage` on a fixture of valid and invalid images per byte form.
-- **Names:** for every LINKAGE root of the corpus plus a collision fixture (duplicate words, words equal to the
-  enclosing type, to `AsImage`/`FromImage`/`Equals`/`ToString`, to `Call`/`Cancel`, `F` beside `F-2`), the internal
-  and published record structs and the host class compile with no CS0102/CS0542/CS0111, every name is produced by
-  `CsNames.Allocate`, and two compiles give the same names.
-- **One renderer:** the `CobolArg` a host entry renders for a formal equals the one `CallEmitter` renders for a BY
-  CONTENT argument of the formal's description (a unit test over every LINKAGE root of the corpus).
+- **Names** (`HostEntryShapeDriftTests.ThePublishedNames_AreAllocated_…`): for every LINKAGE root of the corpus (each
+  compiled by its own golden, which a CS0102/CS0542/CS0111 in its entry classes fails) plus a collision fixture (a word
+  twice in one record, words equal to the enclosing type, to `AsImage`/`FromImage`/`Equals`/`ToString`/`GetHashCode`,
+  a program whose host class spells a formal's record type, `F` beside `F-2`; `Call` and `Cancel` are reserved words and
+  cannot be data-names), the internal and published record structs and the host class compile, every name is produced
+  by `CsNames.Allocate`, and two compiles give the same names.
+- **One renderer** (`HostEntryShapeDriftTests.AHostEntryArgument_IsStatedByTheCallLanesRenderer`): what a host entry's
+  argument states for §14.9.4.4 GR3 d) — its storage length and its description — is rendered by the CALL lane's
+  `CallEmitter.Described`, from the builders a CALL argument's facts come from (`CallEmitter.ArgumentLength`,
+  `ActivationDescriptions.Of`); the entry composes neither fact itself, and every described argument of the emitted
+  fixture is in that renderer's form.
 - **One registration set:** `__CobolModule.EnsureRegistered` is every module's only public registration member,
   `RegisterModule` is the only writer of the registration set, and a module carrying an already-registered outermost
   name, or another runtime major or call ABI, registers nothing.

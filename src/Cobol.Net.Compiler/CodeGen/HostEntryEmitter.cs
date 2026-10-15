@@ -300,24 +300,22 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     /// <summary>⛔ THE ARGUMENT OVER THE DETACHED STORAGE, stating what a CALL site that checks EC-PROGRAM-ARG-MISMATCH
     /// states for storage of this description (<c>CallEmitter</c>'s carried description, kb/Work PB873/PB165): a numeric
     /// item's <c>NumProfile</c>, the fixed storage length (§14.8.2.3.2 1)), and the §14.8.2 description, so §14.9.4.4 3) d)
-    /// compares it with the activated program's formal when that program enables the check.</summary>
+    /// compares it with the activated program's formal when that program enables the check. The length and the description
+    /// are stated by the CALL lane's own renderer, <see cref="CallEmitter.Described(string, int, string?)"/>
+    /// (DESIGN-external-repository §17.3 "One renderer").</summary>
     private string ArgOver(Item f, CobolPassMode mode)
     {
-        var facts = new List<string>(2);
-        int length = StorageLength(f);
-        if (length != RuntimeApi.UnstatedBoundaryLength) facts.Add($"Length: {length}");
-        if (ActivationDescriptions.Of(f.Description, classes) is { } d)
-            facts.Add($"Description: {RuntimeApi.ActivationDescriptionNew(d)}");
         // A record holding references crosses as a COBOL argument of cell-backed storage does (CallEmitter.AreaOf): its
         // characters, and the cell area the activated program's formal is laid over (ISO §14.2.3 8)).
-        string carrier = f.Cell;
+        string carrier = f.Cell, area = "";
         if (f.Type.Kind is HostTypeKind.Group && PublishedRecordEmitter.HoldsSlots(f.Description))
         {
             carrier = $"ManagedPointer<string>.OverField(() => {f.Cell}.Ref, __v => {{ {f.Cell}.Ref = __v; }})";
-            facts.Add($"Area: {RuntimeApi.ArgArea(f.Cell, "0")}");
+            area = $", Area: {RuntimeApi.ArgArea(f.Cell, "0")}";
         }
-        return $"new CobolArg({RuntimeApi.PassModeText(mode)}, {carrier}, {f.Profile ?? "null"}"
-            + string.Concat(facts.Select(x => ", " + x)) + ")";
+        string built = $"new CobolArg({RuntimeApi.PassModeText(mode)}, {carrier}, {f.Profile ?? "null"}{area})";
+        string? description = ActivationDescriptions.Of(f.Description, classes) is { } d ? RuntimeApi.ActivationDescriptionNew(d) : null;
+        return CallEmitter.Described(built, StorageLength(f), description);
     }
 
     /// <summary>The fixed storage length the argument states: the CALL lane's own rule

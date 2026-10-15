@@ -175,4 +175,104 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                 i => Assert.Matches(@"^(HostLanding\.TryDecode\(|HostLanding\.TryOccurrences\(|\w+_Record\.__TryGet\()", i.Condition.ToString()));
         }
     }
+
+    /// <summary>⛔ ONE RENDERER (DESIGN-external-repository §17.3): what a host entry's argument states for §14.9.4.4 3) d) —
+    /// its storage length and its description — is rendered by the CALL lane's <c>CallEmitter.Described</c>, the renderer a
+    /// CALL statement's argument is stated by, from the builders a CALL argument's facts come from
+    /// (<c>CallEmitter.ArgumentLength</c>, <c>ActivationDescriptions.Of</c>). The entry composes neither fact itself, and the
+    /// emitted fixture shows every described argument in that renderer's form.</summary>
+    [Fact]
+    public void AHostEntryArgument_IsStatedByTheCallLanesRenderer()
+    {
+        // The emitter's code without its comments: every token's text, string literals included.
+        string src = string.Concat(CSharpSyntaxTree.ParseText(File.ReadAllText(
+                CobolNet.Tests.Shared.TestRepo.Src("Cobol.Net.Compiler", "CodeGen", "HostEntryEmitter.cs"))).GetRoot()
+            .DescendantTokens().Select(t => t.Text));
+        Assert.Contains("CallEmitter.Described(", src);
+        Assert.Contains("CallEmitter.ArgumentLength(", src);
+        Assert.Contains("ActivationDescriptions.Of(", src);
+        Assert.DoesNotContain("Length:", src);
+        Assert.DoesNotContain("Length =", src);
+        Assert.DoesNotContain("Description:", src);
+        Assert.DoesNotContain("Description =", src);
+
+        var (ok, _, detail) = CompileAndRun(Fixture, dialectLevel: 2023);
+        Assert.True(ok, detail);
+        var root = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(TempDir, "prog.g.cs"))).GetRoot();
+        var rows = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single(c => c.Identifier.Text == "H2ROWS");
+        var args = rows.DescendantNodes().OfType<ObjectCreationExpressionSyntax>()
+            .Where(o => o.Type.ToString() == "CobolArg" && !o.ToString().Contains("ManagedPointer.Null", StringComparison.Ordinal))
+            .ToList();
+        Assert.Equal(12, args.Count);   // eleven formals and the RETURNING item
+        Assert.All(args, a => Assert.True(a.Parent is WithExpressionSyntax w && w.Initializer.ToString().Contains("Description =", StringComparison.Ordinal),
+            $"a host-entry argument not stated by CallEmitter.Described: {a}"));
+    }
+
+    /// <summary>The §17.3 collision fixture: words a published name could collide with — a word twice in one record
+    /// (F in S1 and S2, beside the record's own F), F beside F-2, words spelling the record's own members
+    /// (<c>AsImage</c>, <c>FromImage</c>, <c>Equals</c>, <c>ToString</c>, <c>GetHashCode</c>), a member spelling its
+    /// enclosing record type (S1-Record in S1), and a program whose host class spells a formal's record type
+    /// (L-G-Record beside L-G).</summary>
+    private const string NameFixture = """
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. NMMAIN.
+               PROCEDURE DIVISION.
+                   DISPLAY "MAIN"
+                   GOBACK.
+               END PROGRAM NMMAIN.
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. L-G-Record.
+               DATA DIVISION.
+               LINKAGE SECTION.
+               01 L-G.
+                  05 F PIC X.
+                  05 F-2 PIC X.
+                  05 AsImage PIC X.
+                  05 FromImage PIC X.
+                  05 Equals PIC X.
+                  05 ToString PIC X.
+                  05 S1.
+                     10 F PIC X.
+                     10 S1-Record PIC X.
+                  05 S2.
+                     10 F PIC X.
+               01 L-G-2.
+                  05 X PIC X.
+               01 GetHashCode PIC X.
+               PROCEDURE DIVISION USING L-G L-G-2 GetHashCode.
+                   GOBACK.
+               END PROGRAM L-G-Record.
+               """;
+
+    /// <summary>⛔ THE PUBLISHED NAMES ARE ALLOCATED (DESIGN-external-repository §17.3 "Names"). Every name of a host class,
+    /// its record structs and their members comes from <c>CsNames.Allocate</c> over its scope, so the collision fixture
+    /// compiles — Roslyn would refuse a CS0102, CS0542 or CS0111 — and two compiles give the same names. Every LINKAGE root
+    /// of the corpus is compiled by its own golden, whose entry classes fail that golden on the same errors.</summary>
+    [Fact]
+    public void ThePublishedNames_AreAllocated_SoACollisionFixtureCompiles_AndTwoCompilesAgree()
+    {
+        string[] Names()
+        {
+            var (ok, stdout, detail) = CompileAndRun(NameFixture, dialectLevel: 2023);
+            Assert.True(ok, detail);
+            Assert.Equal("MAIN", stdout);
+            var root = CSharpSyntaxTree.ParseText(File.ReadAllText(Path.Combine(TempDir, "prog.g.cs"))).GetRoot();
+            var host = root.DescendantNodes().OfType<ClassDeclarationSyntax>().Single(c => c.Identifier.Text == "L_G_Record");
+            return host.DescendantNodes().OfType<RecordDeclarationSyntax>().Select(r => "type " + r.Identifier.Text)
+                .Concat(host.DescendantNodes().OfType<PropertyDeclarationSyntax>().Select(p => "member " + p.Identifier.Text))
+                .Concat(host.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "Call")
+                    .ParameterList.Parameters.Select(p => "parameter " + p.Identifier.Text))
+                .ToArray();
+        }
+        string[] first = Names();
+        Assert.Equal(first, Names());
+        // The allocator, not the fixture's spelling, decided each colliding name: none equals its enclosing type or a
+        // record member, and no record declares one name twice.
+        Assert.Contains("type L_G_Record_2", first);
+        Assert.Contains("member S1_Record_2", first);
+        Assert.Contains("member AsImage_2", first);
+        Assert.Contains("member F_2", first);
+        Assert.DoesNotContain("member AsImage", first);
+        Assert.DoesNotContain("member ToString", first);
+    }
 }
