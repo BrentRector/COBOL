@@ -1,4 +1,4 @@
-## A run unit no longer writes its host process's exit code (PB3163)
+## Entry 2051 — 2026-10-15 13:45 PDT — A run unit no longer writes its host process's exit code (PB3163)
 
 kb/Work PB3163 reported that a run unit writes the HOST process's exit code. Re-probe on a Debug build: a Roslyn-compiled
 C# host that set `Environment.ExitCode = 5` and ran `STOP RUN WITH ERROR STATUS 24` through `ProgramRegistry.RunMain` read
@@ -20,3 +20,4 @@ a process exit of 5). `RunUnitStateDriftTests.EveryMember_IsFreshInTheNextRunUni
 instead of the old restated 0. `StopGobackExitCodeTests` (standalone and cross-assembly status) stay green. DESIGN (three
 sites) and CONFORMANCE §4.2.16 describe the delivery boundary. No inventory row closes. A sibling host-process mutation of
 another kind (`StandardStreams.EnsureUtf8` replaces Console.Out/Error on every `RunMain`) is a lead, not part of this change.
+
