@@ -185,11 +185,11 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         return f.Type.Kind switch
         {
             HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec =>
-                $"ManagedPointer<string>.Cell(CobolNum.FormatImage({Unsigned16(pic, $"HostLanding.Land({value}, {f.Profile}, {CsLiteral(f.Name)}, {member})")}, {f.Profile}))",
+                $"ManagedPointer<string>.Cell({RuntimeApi.NumFormatImage(Unsigned16(pic, $"HostLanding.Land({value}, {f.Profile}, {CsLiteral(f.Name)}, {member})"), f.Profile!)})",
             HostTypeKind.Float or HostTypeKind.Index or HostTypeKind.Pointer or HostTypeKind.ObjectReference =>
                 $"ManagedPointer<{pic.ClrType}>.Cell({value})",
             HostTypeKind.Text when d.IsAnyLength =>
-                $"ManagedPointer<string>.Cell(HostLanding.LandVariable({value}, CobolArg.Unstated, {Bool(pic.Category is PicCategory.Boolean)}, {CsLiteral(f.Name)}, {member}))",
+                $"ManagedPointer<string>.Cell(HostLanding.LandVariable({value}, {RuntimeApi.UnstatedBoundaryLength},{Bool(pic.Category is PicCategory.Boolean)}, {CsLiteral(f.Name)}, {member}))",
             HostTypeKind.Text when d.IsDynamicLength =>
                 $"ManagedPointer<string>.Cell(HostLanding.LandVariable({value}, {d.DynMaxSize}, {Bool(pic.Category is PicCategory.Boolean)}, {CsLiteral(f.Name)}, {member}))",
             HostTypeKind.Text =>
@@ -215,7 +215,7 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         return r.Type.Kind switch
         {
             HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec =>
-                $"ManagedPointer<string>.Cell(CobolNum.FormatImage((Int128)0, {r.Profile}))",
+                $"ManagedPointer<string>.Cell({RuntimeApi.NumFormatImage("(Int128)0", r.Profile!)})",
             HostTypeKind.Float or HostTypeKind.Index or HostTypeKind.Pointer or HostTypeKind.ObjectReference =>
                 $"ManagedPointer<{pic.ClrType}>.Cell(default!)",
             HostTypeKind.Text when d.IsAnyLength || d.IsDynamicLength => "ManagedPointer<string>.Cell(\"\")",
