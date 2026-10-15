@@ -345,6 +345,9 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the
   skills and the open notes, `CorpusRunnerTests`/`CorpusManifest`/`tests/conformance/` deleted, and the neutrality
   proof's evidence in the note. `tests/conformance/README.md`'s authoring guide moves to `conformance-suite/README.md`.
+  A drift test refuses any file under the old `tests/conformance/` path: a fix-lane branch in flight across the move
+  that adds a test there merges without a conflict (the directory is gone), and without the refusal its test would
+  silently never run; with it, that branch's gate is red and its finisher moves the test into `cases/`.
 - **S3 — the pilot (PB3178).** §8: clause 11, §14.9.8 and `pb355_start_length_past_operand` through §6 steps 2-4 at
   all four editions on WiseOwl and GnuCOBOL; GnuCOBOL's baseline recorded; the cost per test and the share of each of
   step 2's three outcomes measured and written into PB3160 and §8, with the estimate for the remaining clauses.
