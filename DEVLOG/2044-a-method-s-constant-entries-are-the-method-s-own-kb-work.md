@@ -1,4 +1,4 @@
-## A method's CONSTANT entries are the method's own (kb/Work PB3164)
+## Entry 2044 — 2026-10-14 18:42 PDT — A method's CONSTANT entries are the method's own (kb/Work PB3164)
 
 **Re-probe (w1080e build, base 2b60d9fa9).** The note's repro p10 printed `A A` / `B A`: method SHOWA's
 `01 K CONSTANT AS "A"` replaced the object's data item K in its sibling SHOWB. p11 (each method its own K) drew a false
@@ -43,3 +43,4 @@ name maps, so it measures the object's item instead of the method's (`A 3` where
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T011512Z-416a78; Conformance
 6,105/11,677 · Unit 33,146/33,650 · Characterization 6/36 in leg 1). The golden and the negative both passed in leg 1.
 `semgrep/verify.py` PASS with no count raised. The Linux gate is the lander's (batched gating).
+
