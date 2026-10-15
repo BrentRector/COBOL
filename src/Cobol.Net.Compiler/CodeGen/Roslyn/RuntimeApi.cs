@@ -1683,9 +1683,11 @@ internal static class RuntimeApi
         $"{nameof(CobolSort)}.{nameof(CobolSort.UseProcedureExited)}({useScope})";
 
     /// <summary>§14.9.40.4 GR17's question at an INVOKE site once the method has returned and its RETURNING item is
-    /// delivered — <c>CobolSort.AfterActivationReturn</c> (kb/Work PB1177; a CALL's is <c>ProgramTable.CallProgram</c>'s).</summary>
+    /// delivered — <c>CobolSort.AfterActivationReturn</c> (kb/Work PB1177; a CALL's is <c>ProgramTable.CallProgram</c>'s).
+    /// Fully qualified, as <see cref="SortTerminationSignalType"/> is: every INVOKE asks it, and a group whose classes
+    /// declare no file has no <c>using</c> of the I-O namespace (the PB922 reason).</summary>
     public static string SortAfterActivationReturn { get; } =
-        $"{nameof(CobolSort)}.{nameof(CobolSort.AfterActivationReturn)}()";
+        $"global::CobolNet.Runtime.IO.{nameof(CobolSort)}.{nameof(CobolSort.AfterActivationReturn)}()";
 
     /// <summary>The declining filter an activation's end notes a SORT termination with —
     /// <c>SortTerminationSignal.EndsActivation</c> over the local <paramref name="flag"/> (kb/Work PB1177).</summary>
