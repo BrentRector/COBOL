@@ -255,11 +255,14 @@ public sealed class ProgramTable
 
     /// <summary>Run the run unit's MAIN program (the first program of the compilation group), owning the run-unit
     /// TERMINATION epilogue: the §14.6.12 abnormal-termination surface (a fatal EC escaping the run unit → the
-    /// documented diagnostic + a nonzero process exit) and the §14.6.11 implicit CLOSE of ALL open run-unit
-    /// connectors. Both are RUN-UNIT-scoped (not main-compilation-group-scoped), so each applies even when the fatal
+    /// documented diagnostic + the run unit's nonzero <see cref="RunUnit.ExitStatus"/>) and the §14.6.11 implicit CLOSE of
+    /// ALL open run-unit connectors. Both are RUN-UNIT-scoped (not main-compilation-group-scoped), so each applies even when the fatal
     /// EC or the open file originates in a SEPARATELY-COMPILED CALLed module whose descriptors the main group's
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
-    /// boundary; the STOP status itself is flushed run-unit-side by the <see cref="RunUnit.ExitStatus"/> setter).
+    /// boundary; the STOP status itself is the run unit's <see cref="RunUnit.ExitStatus"/>, written by the STOP statement
+    /// wherever in the run unit it executes). This is the HOST entry: it never writes the host process's exit code
+    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/>. The standalone executable's entry,
+    /// which IS the process, is <see cref="RunModule"/>.
     /// <para>The whole of it runs on the run unit's own thread (<see cref="ActivationStack.RunOnRunUnitThread"/>,
     /// kb/Work PB2659), whose stack is sized for COBOL activation frames, so a RECURSIVE program reaches a realistic
     /// depth and the activation past the last one the stack can hold is §14.9.4.4 GR3c's EC-PROGRAM-RESOURCES rather
@@ -273,12 +276,19 @@ public sealed class ProgramTable
     /// refuses (a module built against another runtime major or call ABI, or one carrying an already-registered
     /// outermost name; PB2097) is a <see cref="CobolCallException"/> that reaches the same §14.6.12 abnormal-termination
     /// surface as any other fatal condition, because no statement of the entry runs outside the boundary that owns it.
-    /// A host that registers its modules itself enters through <see cref="RunMain"/>.</summary>
+    /// A host that registers its modules itself enters through <see cref="RunMain"/>.
+    /// <para>This is the boundary that IS the process (DOC-A.1-167: "A standalone <c>cobol</c> executable IS its own
+    /// host"), so it alone delivers the run unit's termination status to the process exit code, once, when the run unit
+    /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the
+    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163).</para></summary>
     /// <param name="ensureRegistered">The module's registration member.</param>
     /// <param name="mainPath">The main program's path, or null for a module with no main program (a callable library of
     /// functions or prototypes, §8.3.1): it registers and ends.</param>
     public void RunModule(Action ensureRegistered, string? mainPath)
-        => ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath));
+    {
+        try { ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath)); }
+        finally { Environment.ExitCode = CobolNum.Position32(_owner.ExitStatus); }   // StopRun unwinds through here too
+    }
 
     private void RunOnThisThread(Action? ensureRegistered, string? path)
     {
@@ -343,12 +353,14 @@ public sealed class ProgramTable
     }
 
     /// <summary>The §14.6.12 abnormal-run-unit-termination indication (§14.6.11 CLOSE is the caller's finally): the
-    /// OS "shall indicate an abnormal termination" — this implementation writes the diagnostic to stderr and sets a
-    /// nonzero exit code (Annex A ERROR ⇒ 1; the settled §18.16 implementor choice).</summary>
-    private static void AbnormalTermination(string message)
+    /// OS "shall indicate an abnormal termination" — this implementation writes the diagnostic to stderr and sets the run
+    /// unit's termination status to the nonzero ERROR value (Annex A ERROR ⇒ 1; the settled §18.16 implementor choice),
+    /// which the entry that is the process delivers as its exit code (<see cref="RunModule"/>) and a host reads from
+    /// <see cref="RunUnit.ExitStatus"/>; it overrides a STATUS an earlier STOP RUN wrote, as the exit code always did.</summary>
+    private void AbnormalTermination(string message)
     {
         Console.Error.WriteLine("abnormal run-unit termination: " + message);
-        Environment.ExitCode = 1;
+        _owner.ExitStatus = 1;
     }
 
     /// <summary>
