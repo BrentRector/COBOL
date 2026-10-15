@@ -82,8 +82,8 @@ rather than record that reading as a determination:
 - An EXIT PROGRAM or GOBACK in another element's USE procedure is that element's return, and it never reaches
   `AfterUseProcedure`. `__RunUse` now notes it with a declining filter on the return signal
   (`CobolSort.UseProcedureExited`). The return completes, and the SORT is terminated in the activator
-  (`SortFileTable.AfterActivationReturn`, asked by `ProgramTable.CallProgram` and by the epilogue of a method with
-  declaratives). The filter is in every EC-model `__RunUse`, and in the EC-free one from the 2002 edition on, since an
+  (`SortFileTable.AfterActivationReturn`, asked by `ProgramTable.CallProgram` and by every INVOKE site after its
+  RETURNING delivery). The filter is in every EC-model `__RunUse`, and in the EC-free one from the 2002 edition on, since an
   EC-free declarative still ends not normally by EXIT PROGRAM or GOBACK.
 - An activation the signal unwinds still owes what its end owes. The BY REFERENCE copy-out moved into the
   activation's `finally` and runs when it returned or ended this way (`SortTerminationSignal.EndsActivation`, a
@@ -105,3 +105,23 @@ review finisher's gate is `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2
 20261015T223449Z-33efe5: Conformance 6,123/11,716, Unit 33,307/33,679, Characterization 6/36 in leg 1, with the five
 pb1177 goldens and every `SortUseTerminationTests` case passing). Its one red was the citation audit again: "GR4 b)).
 So GR17" and "(§14.6.13.1.2 1)) that the GR17 question" read as phantom GR17 citations of the clause before them.
+
+**Review round 2 (R2-1).** The INVOKE arm of the EXIT/GOBACK termination fired in the method's own epilogue, ahead of
+the `return` of its RETURNING item, so the termination unwound past the invoker's store: `INVOKE T "FAIL" RETURNING
+W-RI` left W-RI at `N` while the same shape through CALL delivered `Y` (§14.9.23.4 GR8, §14.9.4.4 GR4). The question
+moved to the invoker. `OoEmitter.EmitInvocationReturned` is the one tail every INVOKE form emits after its RETURNING
+delivery: instance, SELF, SUPER, factory, universal and New. Inline invocations and property accesses are INVOKEs
+bound as pre-ops, so they get it too. It asks GR17 first and then picks up a propagated condition, the order
+`ProgramTable.CallProgram` and the CALL site use. It is unconditional, because the method may belong to another
+compilation group.
+
+The sibling sweep found a second defect in the same tail. `EmitNew` had no propagation pickup, on the old premise
+that New runs no user statements. Since PB1582, INVOKE SELF "NEW" reaches a subclass's NEW OVERRIDE, and that
+override's GOBACK RAISING was never raised in the activating factory method (§14.9.18.4 GR1 b)). Before the fix
+the probe printed no `MAKE-DECL`.
+
+`2002/pb1177_invoke_sort_use_not_normal` gained four legs: a typed reference, a universal reference, an inline
+invocation and a NEW OVERRIDE. The reviewed build printed `I3-RET=N`, `I4-RET=N` and `I6-NEW=NULL`; this build
+prints `Y`, `Y` and `SET`. In the inline leg the MOVE is in the terminated range, so it never stores and the leg
+prints `I5-RET=N` on both builds. The new `2002/pb1177_invoke_self_new_raising` pins the sibling.
+`EcCheckingProfileDriftTests` now looks for the helper's new name.

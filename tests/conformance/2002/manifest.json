@@ -6,6 +6,7 @@
   "pb1177_sort_called_use_not_normal",
   "pb1177_invoke_sort_use_not_normal",
   "pb1177_sort_called_goback_ec_free",
+  "pb1177_invoke_self_new_raising",
   "pb3102_set_entry_not_found_declared",
   "pb2720_paragraph_header_mid_line",
   "pb3129_type_in_constant_record_ok",

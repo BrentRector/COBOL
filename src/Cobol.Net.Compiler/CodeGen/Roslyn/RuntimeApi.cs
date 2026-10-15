@@ -1682,8 +1682,8 @@ internal static class RuntimeApi
     public static string SortUseProcedureExited(string useScope) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.UseProcedureExited)}({useScope})";
 
-    /// <summary>§14.9.40.4 GR17's question once a method's return has completed — <c>CobolSort.AfterActivationReturn</c>
-    /// (kb/Work PB1177; a CALL's is <c>ProgramTable.CallProgram</c>'s).</summary>
+    /// <summary>§14.9.40.4 GR17's question at an INVOKE site once the method has returned and its RETURNING item is
+    /// delivered — <c>CobolSort.AfterActivationReturn</c> (kb/Work PB1177; a CALL's is <c>ProgramTable.CallProgram</c>'s).</summary>
     public static string SortAfterActivationReturn { get; } =
         $"{nameof(CobolSort)}.{nameof(CobolSort.AfterActivationReturn)}()";
 
