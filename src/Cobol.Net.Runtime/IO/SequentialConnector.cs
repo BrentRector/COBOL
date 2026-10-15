@@ -1480,7 +1480,8 @@ public sealed class SequentialConnector : FileConnector
     /// already answered with a status. The READ is unsuccessful, so §14.9.30.4 GR18 sets the file position
     /// indicator to "no valid record position" (the next sequential READ is then '46', §9.1.13.7 item 6); the
     /// status reaches the §9.1.13.1 exception path (USE procedures, the Annex A.1 item 103 action) like any
-    /// other '30'.</summary>
+    /// other '30'. It is also the terminal of the one '30' a READ decides without an exception — a PREVIOUS
+    /// read on a stream that cannot be positioned (§14.9.30.4 GR20) — so that arm invalidates the same way.</summary>
     private bool ReadFailed()
     {
         InvalidateFilePosition();
