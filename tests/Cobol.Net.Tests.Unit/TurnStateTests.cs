@@ -88,14 +88,14 @@ public sealed class TurnStateTests
         Assert.False(ts.WithLocation("EC-SIZE-TRUNCATION", null, 12));   // re-enabled WITHOUT location
     }
 
-    [Fact]   // §7.3.25.3 SR2: an invalid exception-name in a TURN event is diagnosed and contributes no toggle.
-    public void UnknownName_DiagnosedAndIgnored()
+    [Fact]   // §7.3.25.3 SR2 is the DIRECTIVE STAGE's (TurnDirectiveExceptionNameTests; kb/Work PB2740): a name that reaches
+             // the fold unresolved is a broken hand-off, never a user error, so it throws and reports no COBOLNET0711.
+    public void UnresolvedName_IsABrokenHandOff()
     {
         var edition = new EditionContext(2023);
-        var ts = TurnState.Build(
-            [new TurnEvent(5, [("EC-NOT-A-NAME", null)], On: true, WithLocation: false)], edition);
-        Assert.Contains(edition.Diagnostics, d => d.Contains("COBOLNET0711"));
-        Assert.False(ts.AnyEnabled);
+        Assert.Throws<InvalidOperationException>(() => TurnState.Build(
+            [new TurnEvent(5, [("EC-NOT-A-NAME", null)], On: true, WithLocation: false)], edition));
+        Assert.Empty(edition.Diagnostics);
     }
 }
 

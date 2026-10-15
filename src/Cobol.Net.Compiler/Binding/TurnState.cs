@@ -54,10 +54,13 @@ public sealed class TurnState
 
     private TurnState() { }
 
-    /// <summary>Build the state from the frontend's directive events, validating each exception-name against
-    /// the catalog (§7.3.25.3 SR2 — a name shall be a §14.6.13.1 name or a user-/implementor-defined one) and
-    /// the per-name edition window (the 2023-only families — VERSION_CHANGE_REFERENCE rows 40/61 — are
-    /// diagnosed at --std 2002/2014; the directive itself is 2002-gated upstream).</summary>
+    /// <summary>Build the state from the frontend's directive events. The names in an event are ALREADY resolved:
+    /// §7.3.25.3 SR2 (a name shall be one of the §14.6.13.1 names, here or in an edition that has it) is a syntax
+    /// rule of the directive, asked by the directive stage for a compiled line and an omitted-branch line alike
+    /// (<c>TurnDirectiveProcessor</c> through <see cref="ExceptionNameRule"/>; kb/Work PB2740), so this fold reports
+    /// no COBOLNET0711/0878. What it still asks is the policy half of the funnel
+    /// (<see cref="EcNameResolution.AdviseResolved"/>): a declined module's names are refused, the width advisory is
+    /// raised.</summary>
     public static TurnState Build(IReadOnlyList<TurnEvent>? events, EditionContext edition)
     {
         if (events is null || events.Count == 0) return Empty;
@@ -67,13 +70,13 @@ public sealed class TurnState
         {
             var ev = timeline[k];
             // Position every diagnostic of this directive at ITS line (the event's resultant-text line, which the
-            // sink maps to the source file and line): a bad name in `>>TURN` was reported with no location at all
-            // (kb/Work PB1531's sibling — COBOLNET0711 printed `error COBOLNET0711: >>TURN: …` with no file(line,col)).
+            // sink maps to the source file and line): the declined-module and width diagnostics of `>>TURN` were
+            // reported with no location at all (kb/Work PB1531's sibling).
             using var _ = edition.At(ev.Line, 0);
             foreach (var (ec, file) in ev.Names)
             {
-                // Resolution + the 0711/0878/1636 diagnostics live in the ONE funnel (kb/Work R05).
-                if (!EcNameResolution.TryResolve(edition, ec, ">>TURN", out var info)) continue;
+                // The 1636 width advisory and the declined-module postures live in the ONE funnel (kb/Work R05).
+                if (!EcNameResolution.AdviseResolved(edition, ec, ">>TURN", out var info)) continue;
                 s._events.Add(new Ev(ev.Line, info.Name, file, ev.On, ev.WithLocation, RevokedAt: timeline.RevokedAt(k)));
             }
         }
