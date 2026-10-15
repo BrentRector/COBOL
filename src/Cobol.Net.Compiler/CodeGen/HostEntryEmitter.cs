@@ -37,13 +37,13 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     internal static IEnumerable<BoundUnit> EntryUnits(IReadOnlyList<BoundUnit> units) =>
         units.Where(u => u.Parent is null && !(u.IsPrototype && units.Any(d => d is { Parent: null, IsPrototype: false }
             && d.IsFunction == u.IsFunction && string.Equals(d.ExternalizedName, u.ExternalizedName, StringComparison.Ordinal)))
-            && ElementaryOnly(u));
+            && Published(u));
 
-    /// <summary>WIP (kb/Work PB2099, wave 1079 checkpoint): a unit with a GROUP formal or RETURNING item publishes its
-    /// entry with the published record struct (DESIGN-external-repository §4.3's last table row), the slice's next step;
-    /// until then only units whose every formal and RETURNING item is elementary publish one.</summary>
-    private static bool ElementaryOnly(BoundUnit u) =>
-        u.Data.LinkageFormals.All(f => !f.Item.IsGroup) && u.Data.LinkageReturning is not { IsGroup: true };
+    /// <summary>Whether every GROUP formal and RETURNING item of the unit has a published record this slice renders
+    /// (<see cref="PublishedRecordEmitter.Renders"/>; its WIP remark names the shapes still to come).</summary>
+    private static bool Published(BoundUnit u) =>
+        u.Data.LinkageFormals.Select(f => (DataItem?)f.Item).Append(u.Data.LinkageReturning)
+            .All(d => d is not { IsGroup: true } || PublishedRecordEmitter.Renders(d));
 
     /// <summary>Emit the host-entry class of every <see cref="EntryUnits"/> unit, each named by the one allocator in the
     /// module namespace's type scope (<paramref name="moduleTypes"/> — the names the module already declares there).</summary>
@@ -57,8 +57,9 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         }
     }
 
-    /// <summary>One formal (or the RETURNING item) as the entry handles it.</summary>
-    private sealed record Item(DataItem Description, HostType Type, string Name, string Cell, string? Profile,
+    /// <summary>One formal (or the RETURNING item) as the entry handles it; <paramref name="CsType"/> is its host type's
+    /// C# spelling — for a group, its published record struct.</summary>
+    private sealed record Item(DataItem Description, HostType Type, string CsType, string Name, string Cell, string? Profile,
         bool ByValue, bool Optional);
 
     private void EmitEntry(BoundUnit unit, string className, CodeWriter w)
@@ -67,6 +68,18 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         var parameters = members.Nested();
         int serial = 0;
         var profiles = new List<(string Field, string Init)>();
+        var memberProfiles = new Dictionary<DataItem, string>(ReferenceEqualityComparer.Instance);
+        // A numeric member of a published record: its description's profile, one field per member however often the
+        // record's landing and decode name it.
+        string MemberProfile(DataItem leaf)
+        {
+            if (memberProfiles.TryGetValue(leaf, out var field)) return field;
+            field = $"__hm{memberProfiles.Count}";
+            memberProfiles.Add(leaf, field);
+            profiles.Add((field, leaf.Pic!.ProfileInitializer(signEncoding)));
+            return field;
+        }
+        var records = new List<(DataItem Group, string Name)>();
         Item Describe(DataItem description, string name, bool byValue, bool optional)
         {
             int n = serial++;
@@ -77,7 +90,15 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
                 profile = $"__hp{n}";
                 profiles.Add((profile, init));
             }
-            return new Item(description, type, name, $"__hc{n}", profile, byValue, optional);
+            string csType = type.CsType ?? Record(description);
+            return new Item(description, type, csType, name, $"__hc{n}", profile, byValue, optional);
+        }
+        // A group formal's published record struct, named `<word>_Record` in the class's member scope (§4.3 "Names").
+        string Record(DataItem group)
+        {
+            string name = CsNames.Allocate($"{DataItem.Sanitize(group.CobolName ?? "FILLER")}_Record", members);
+            records.Add((group, name));
+            return name;
         }
 
         var formals = unit.Data.LinkageFormals
@@ -85,6 +106,14 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
                 f.ByValue, f.Optional))
             .ToList();
         Item? returning = unit.Data.LinkageReturning is { } r ? Describe(r, "__hr", false, false) : null;
+        // The records render first, so every member profile they name is declared with the formals' own.
+        var recordText = new CodeWriter();
+        var published = new PublishedRecordEmitter(MemberProfile);
+        foreach (var (group, name) in records)
+        {
+            recordText.Line();
+            published.Emit(group, name, recordText);
+        }
 
         string kind = unit.IsFunction ? "FUNCTION-ID" : "PROGRAM-ID";
         w.Line($"/// <summary>{kind} {unit.Name} (ISO §14.2.3 13), DESIGN-external-repository §4.3): activates the "
@@ -94,7 +123,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         {
             foreach (var (field, init) in profiles)
                 w.Line($"private static readonly NumProfile {field} = {init};");
-            string returnType = returning is null ? "void" : returning.Type.CsType!;
+            if (records.Count > 0)
+                foreach (string line in recordText.ToString().TrimEnd('\n').Split('\n'))
+                    w.Line(line);
+            string returnType = returning is null ? "void" : returning.CsType;
             string signature = string.Join(", ", formals.Select(ParameterText));
             using (w.Block($"public static {returnType} Call({signature})"))
                 EmitCallBody(unit, formals, returning, w);
@@ -110,11 +142,11 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     /// activated program's stores reach, ISO §14.2.3 8)), and nullable when the formal is OPTIONAL (null is the omitted
     /// argument, §14.9.4.4 11)).</summary>
     private static string ParameterText(Item f) =>
-        $"{(f.ByValue ? "" : "ref ")}{f.Type.CsType}{(f.Optional && !f.Type.CsType!.EndsWith('?') ? "?" : "")} {f.Name}";
+        $"{(f.ByValue ? "" : "ref ")}{f.CsType}{(f.Optional && !f.CsType.EndsWith('?') ? "?" : "")} {f.Name}";
 
     /// <summary>Whether the host type is a value type, so an OPTIONAL formal's parameter is a <see cref="Nullable{T}"/>.</summary>
     private static bool IsValueType(HostType t) =>
-        t.Kind is HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec or HostTypeKind.Float or HostTypeKind.Index
+        t.Kind is HostTypeKind.Group or HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec or HostTypeKind.Float or HostTypeKind.Index
         || t is { Kind: HostTypeKind.Pointer, CsType: "ProgramPointer" or "FunctionPointer" };
 
     private void EmitCallBody(BoundUnit unit, List<Item> formals, Item? returning, CodeWriter w)
@@ -135,7 +167,7 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
                     var e = formals[j];
                     // Only two ref parameters of one CLR type can refer to one variable (§4.3 "One storage for one
                     // variable passed twice").
-                    if (e.ByValue || e.Type != f.Type || (e.Optional != f.Optional && IsValueType(e.Type))) continue;
+                    if (e.ByValue || e.CsType != f.CsType || (e.Optional != f.Optional && IsValueType(e.Type))) continue;
                     bool same = OoConformance.DescriptionMismatch(e.Description, f.Description) is null
                         && OoConformance.DescriptionMismatch(f.Description, e.Description) is null;
                     aliases += $"HostLanding.SharesStorage(global::System.Runtime.CompilerServices.Unsafe.AreSame(ref {e.Name}, "
@@ -167,7 +199,7 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         else w.Line(call);
         if (returning is not null)
         {
-            w.Line($"{returning.Type.CsType} __hres = default;");
+            w.Line($"{returning.CsType} __hres = default;");
             w.Line(Decode(returning, "__hres"));
         }
         if (decodes) w.Line("if (__hbad is not null) throw __hbad;");
@@ -179,6 +211,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     {
         string value = f.Optional && IsValueType(f.Type) ? $"{f.Name}.GetValueOrDefault()" : f.Name;
         DataItem d = f.Description;
+        // A group: its published record's image, every member landed exactly (PublishedRecordEmitter), crossing as the
+        // CALL lane's TEXT crossing of a group of its description.
+        if (f.Type.Kind is HostTypeKind.Group)
+            return $"ManagedPointer<string>.Cell({GroupCrossing(d, $"{value}.__Land({CsLiteral(f.Name)})")})";
         PicInfo pic = d.Pic ?? throw Unsupported(f);
         string member = "null";
         return f.Type.Kind switch
@@ -201,19 +237,37 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         };
     }
 
+    /// <summary>A group's record image (<paramref name="image"/>, one character per byte) as the CALL lane's TEXT crossing
+    /// of a group of <paramref name="group"/>'s description carries it (<c>CallEmitter.CallStringRead</c>): the image
+    /// itself, except that a bit or national group crosses as the elementary item it is treated as (ISO §14.8.2.1's NOTE,
+    /// kb/Work PB1166) — its boolean or national character positions.</summary>
+    private static string GroupCrossing(DataItem group, string image) =>
+        !group.IsAsIfElementary ? image
+        : group.GroupUsage is GroupUsage.National ? RuntimeApi.NatReadWindow(image, "0", $"{group.AsIfPic!.Length}")
+        : RuntimeApi.BitsReadWindow(image, "0", $"{group.AsIfPic!.Length}");
+
+    /// <summary>The inverse of <see cref="GroupCrossing"/>: the record image a group's crossing text carries.</summary>
+    private static string GroupImage(DataItem group, string crossing) =>
+        !group.IsAsIfElementary ? crossing
+        : group.GroupUsage is GroupUsage.National ? RuntimeApi.NatBytes(crossing)
+        : RuntimeApi.BitsPack(crossing, $"{group.AsIfPic!.Length}");
+
     /// <summary>An UNSIGNED 16-byte binary item's landed value is its container's BITS (<c>HostLanding.Land</c>), which the
     /// image is formatted from as the unsigned value it is (<see cref="CobolNum.FormatImage(UInt128, in NumProfile)"/>).</summary>
-    private static string Unsigned16(PicInfo pic, string landed) =>
+    internal static string Unsigned16(PicInfo pic, string landed) =>
         IsUnsigned16(pic) ? $"unchecked((UInt128){landed})" : landed;
 
     private static bool IsUnsigned16(PicInfo pic) =>
         pic is { Truncation: NumericTruncation.BinaryCapacity, Signed: false, StorageWidth: 16 };
 
     /// <summary>The RETURNING item's storage, allocated by the entry as an activating COBOL element allocates it (ISO
-    /// §14.2.3 6) NOTE 1): the initial content of its description's storage form.</summary>
+    /// §14.2.3 6) NOTE 1): the initial content of its description's storage form — for a group, the image of a record
+    /// the host would construct (text members spaces, numbers zero).</summary>
     private static string ReceiverSeed(Item r)
     {
         DataItem d = r.Description;
+        if (r.Type.Kind is HostTypeKind.Group)
+            return $"ManagedPointer<string>.Cell({GroupCrossing(d, $"new {r.CsType}().__Land({CsLiteral(r.CsType)})")})";
         PicInfo pic = d.Pic ?? throw Unsupported(r);
         return r.Type.Kind switch
         {
@@ -273,28 +327,41 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     /// unchanged. Decoding never narrows: the host type holds every value the storage can (<see cref="HostSurface"/>).</summary>
     private static string Decode(Item f, string target)
     {
+        string word = f.Name == "__hr" ? f.Description.CobolName ?? "RETURNING" : f.Name;
+        if (f.Type.Kind is HostTypeKind.Group)
+            return $"{{ if ({f.CsType}.__TryGet({GroupImage(f.Description, $"{f.Cell}.Value")}, 0, {CsLiteral(word + ".")}, "
+                + $"ref __hbad, out var __hg)) {target} = __hg; }}";
         PicInfo pic = f.Description.Pic ?? throw Unsupported(f);
-        string name = CsLiteral(f.Name == "__hr" ? f.Description.CobolName ?? "RETURNING" : f.Name);
+        return f.Type.Kind is HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec
+            ? NumericDecode(f.Type, pic, $"{f.Cell}.Value", f.Profile!, CsLiteral(word), target, "__hbad", "")
+            : $"{target} = {f.Cell}.Value;";
+    }
+
+    /// <summary>⛔ THE ONE NUMERIC DECODE of a fixed-point item's record image <paramref name="image"/> into
+    /// <paramref name="target"/> of its host type — an elementary formal's storage and a published record's member alike:
+    /// <see cref="HostLanding.TryDecode"/>'s validity rule (the first refusal kept in <paramref name="failure"/>, the
+    /// target unchanged and <paramref name="onFail"/> run), then the host type's exact conversion.</summary>
+    internal static string NumericDecode(HostType type, PicInfo pic, string image, string profile, string name, string target,
+        string failure, string onFail)
+    {
         string scale = $"{pic.Scale}";
-        string? convert = f.Type.Kind switch
+        string tryDecode = $"HostLanding.TryDecode({image}, {profile}, {name}, ref {failure}, out Int128 __hu)";
+        if (type.Kind is HostTypeKind.Dec && IsUnsigned16(pic))
+            return $"{{ if ({tryDecode} && HostLanding.TryDec(unchecked((UInt128)__hu), {scale}, {name}, ref {failure}, "
+                + $"out CobolDec __hd)) {target} = __hd;{onFail} }}";
+        string convert = type.Kind switch
         {
-            HostTypeKind.Integer => f.Type.CsType switch
+            HostTypeKind.Integer => type.CsType switch
             {
                 "UInt128" => "unchecked((UInt128)__hu)",
                 "Int128" => $"HostLanding.Integer(__hu, {scale})",
                 _ => $"(long)HostLanding.Integer(__hu, {scale})",
             },
             HostTypeKind.Decimal => $"HostLanding.Decimal(__hu, {scale})",
-            HostTypeKind.Dec when IsUnsigned16(pic) => null,
             HostTypeKind.Dec => $"HostLanding.Dec(__hu, {scale})",
-            _ => null,
+            _ => throw new InvalidOperationException($"HostEntryEmitter.NumericDecode: {type.Kind} is not a fixed-point row"),
         };
-        if (f.Type.Kind is HostTypeKind.Dec && IsUnsigned16(pic))
-            return $"{{ if (HostLanding.TryDecode({f.Cell}.Value, {f.Profile}, {name}, ref __hbad, out Int128 __hu) "
-                + $"&& HostLanding.TryDec(unchecked((UInt128)__hu), {scale}, {name}, ref __hbad, out CobolDec __hd)) {target} = __hd; }}";
-        if (convert is not null)
-            return $"{{ if (HostLanding.TryDecode({f.Cell}.Value, {f.Profile}, {name}, ref __hbad, out Int128 __hu)) {target} = {convert}; }}";
-        return $"{target} = {f.Cell}.Value;";
+        return $"{{ if ({tryDecode}) {target} = {convert};{onFail} }}";
     }
 
     private static string Bool(bool b) => b ? "true" : "false";

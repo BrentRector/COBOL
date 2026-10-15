@@ -186,6 +186,22 @@ public static class HostLanding
         return array;
     }
 
+    /// <summary>Require a record image a host hands a published record's <c>FromImage</c> to be the record's whole
+    /// storage, <paramref name="width"/> characters (one per byte, the group image every COBOL record image is); returns
+    /// the image. A shorter or longer string is not an image of that description: padding or cutting it would invent or
+    /// drop content, so it is refused.</summary>
+    /// <exception cref="ArgumentNullException"><paramref name="image"/> is null.</exception>
+    /// <exception cref="ArgumentException"><paramref name="image"/> is not <paramref name="width"/> characters.</exception>
+    public static string RequireImage(string? image, int width, string parameter)
+    {
+        if (image is null)
+            throw new ArgumentNullException(parameter, $"The record image for '{parameter}' is null.");
+        if (image.Length != width)
+            throw new ArgumentException($"The record '{parameter}' is {width} character(s) of storage, and the image has "
+                + $"{image.Length} (DESIGN-external-repository §4.3).", parameter);
+        return image;
+    }
+
     // ── Decodes: the formal's storage → the host type (exact by HostSurface.TypeOf's construction) ───────────────────
 
     /// <summary>The host integer of a fixed-point item with no fraction positions: <paramref name="unscaled"/> at

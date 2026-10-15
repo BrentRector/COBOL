@@ -125,6 +125,8 @@ static CobolNet.Runtime.Exceptions.SortTerminationSignal.EndsActivation(ref bool
 CobolNet.Runtime.IO.FileConnector.StartPositioned() -> string!
 CobolNet.Runtime.IO.FileConnector.Unsuccessful(string! status) -> string!
 CobolNet.Runtime.HostLanding
+static CobolNet.Runtime.CobolBits.WriteWindowInto(char[]! buffer, int startBit, string! bits) -> void
+static CobolNet.Runtime.HostLanding.RequireImage(string? image, int width, string! parameter) -> string!
 static CobolNet.Runtime.HostLanding.Dec(System.Int128 unscaled, int scale) -> CobolNet.Runtime.CobolDec
 static CobolNet.Runtime.HostLanding.Decimal(System.Int128 unscaled, int scale) -> decimal
 static CobolNet.Runtime.HostLanding.Integer(System.Int128 unscaled, int scale) -> System.Int128

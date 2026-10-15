@@ -183,6 +183,194 @@ public sealed class HostEntryTests
         }
         """;
 
+    /// <summary>Programs with GROUP formals and RETURNING items, which a host passes as published record structs
+    /// (DESIGN-external-repository §4.3's group rows): nested groups, fixed tables of leaves and of groups, FILLER, a
+    /// REDEFINES view (no member), COMP-3 and COMP members; national and USAGE BIT members (two bit members share a
+    /// byte, §8.5.1.6.3); a validity witness; an OPTIONAL group; and a function whose RETURNING item is a group.</summary>
+    private const string GroupPrograms = """
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H2REC.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-REC.
+           05 LK-ID PIC 9(4).
+           05 FILLER PIC X(2).
+           05 LK-NAME PIC X(10).
+           05 LK-AMT PIC S9(5)V99 COMP-3.
+           05 LK-SUB.
+              10 LK-X PIC S9(4) COMP.
+              10 LK-Y PIC X(3).
+           05 LK-TAB PIC 9(2) OCCURS 3.
+           05 LK-PAIR OCCURS 2.
+              10 LK-P1 PIC X.
+              10 LK-P2 PIC 9.
+        01 LK-OUT.
+           05 LK-COUNT PIC 9(3).
+           05 LK-TEXT PIC X(5).
+        PROCEDURE DIVISION USING LK-REC RETURNING LK-OUT.
+        P1.
+            DISPLAY "IN " LK-ID " [" LK-NAME "] [" LK-Y "] " LK-TAB(1) LK-TAB(2) LK-TAB(3) " " LK-P1(2) LK-P2(2)
+            ADD 1 TO LK-ID
+            MOVE "BOB" TO LK-NAME
+            SUBTRACT 1 FROM LK-AMT
+            ADD 1 TO LK-TAB(2)
+            MOVE "Z" TO LK-P1(1)
+            MOVE 123 TO LK-COUNT
+            MOVE "DONE" TO LK-TEXT
+            GOBACK.
+        END PROGRAM H2REC.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H2BAD.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-G.
+           05 LK-N PIC 9(4).
+           05 LK-NX REDEFINES LK-N PIC X(4).
+           05 LK-T PIC X(3).
+        PROCEDURE DIVISION USING LK-G.
+        P1.
+            MOVE "ABCD" TO LK-NX
+            MOVE "XYZ" TO LK-T
+            GOBACK.
+        END PROGRAM H2BAD.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H2NB.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-NB.
+           05 LK-N PIC N(3).
+           05 LK-B PIC 1(3) USAGE BIT.
+           05 LK-C PIC 1(2) USAGE BIT.
+           05 LK-D PIC 9(2).
+        PROCEDURE DIVISION USING LK-NB.
+        P1.
+            DISPLAY "NB " LK-B " " LK-C " " LK-D
+            MOVE N"XY" TO LK-N
+            MOVE B"011" TO LK-B
+            MOVE B"10" TO LK-C
+            GOBACK.
+        END PROGRAM H2NB.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H2OPT.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-O.
+           05 LK-O1 PIC X(2).
+        PROCEDURE DIVISION USING BY REFERENCE OPTIONAL LK-O.
+        P1.
+            IF LK-O IS OMITTED
+                DISPLAY "O OMITTED"
+            ELSE
+                DISPLAY "O [" LK-O1 "]"
+                MOVE "ZZ" TO LK-O1
+            END-IF
+            GOBACK.
+        END PROGRAM H2OPT.
+        """;
+
+    /// <summary>A function whose RETURNING item is a group: its entry returns the published record.</summary>
+    private const string GroupFunction = """
+        IDENTIFICATION DIVISION.
+        FUNCTION-ID. H2FN.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-X PIC 9(3).
+        01 LK-R.
+           05 LK-R1 PIC 9(5).
+           05 LK-R2 PIC X(4).
+        PROCEDURE DIVISION USING LK-X RETURNING LK-R.
+        P1.
+            COMPUTE LK-R1 = LK-X * 2
+            MOVE "FN" TO LK-R2
+            GOBACK.
+        END FUNCTION H2FN.
+        """;
+
+    private const string GroupHost = """
+        using System;
+        using Cobol.H2PROGS;
+        using Cobol.H2FUNC;
+
+        public static class H2HostProgram
+        {
+            public static int Main()
+            {
+                var r = new H2REC.LK_REC_Record { LK_ID = 41, LK_NAME = "ALICE", LK_AMT = -123.45m };
+                r.LK_SUB = new H2REC.LK_REC_Record.LK_SUB_Record { LK_X = -7, LK_Y = "AB" };
+                r.LK_TAB[1] = 9;
+                r.LK_PAIR[1] = new H2REC.LK_REC_Record.LK_PAIR_Record { LK_P1 = "Q", LK_P2 = 5 };
+                var o = H2REC.Call(ref r);
+                Console.WriteLine(FormattableString.Invariant(
+                    $"1 {r.LK_ID} [{r.LK_NAME}] {r.LK_AMT} {r.LK_SUB.LK_X} [{r.LK_SUB.LK_Y}] {string.Join(",", r.LK_TAB)} {r.LK_PAIR[0].LK_P1}{r.LK_PAIR[0].LK_P2} {o.LK_COUNT} [{o.LK_TEXT}]"));
+                try { var bad = r with { LK_AMT = 1.234m }; H2REC.Call(ref bad); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentOutOfRangeException e) { Console.WriteLine($"LOW {e.ParamName} {e.Message.Contains("'LK_AMT'")}"); }
+                try { var bad = r with { LK_TAB = new long[2] }; H2REC.Call(ref bad); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentException e) { Console.WriteLine($"OCC {e.ParamName}"); }
+                try { var bad = r with { LK_NAME = null! }; H2REC.Call(ref bad); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentNullException e) { Console.WriteLine($"NULL {e.ParamName}"); }
+                string image = r.AsImage();
+                string filled = image.Substring(0, 4) + "##" + image.Substring(6);
+                var back = H2REC.LK_REC_Record.FromImage(filled);
+                Console.WriteLine($"RT {back.AsImage() == filled} {back.LK_ID} {image.Substring(4, 2) == "  "}");
+
+                var g = new H2BAD.LK_G_Record { LK_N = 7, LK_T = "AAA" };
+                try { H2BAD.Call(ref g); Console.WriteLine("DECODED"); }
+                catch (FormatException e) { Console.WriteLine($"BAD {g.LK_N} [{g.LK_T}] {e.Message.Contains("'LK_G.LK_N'")}"); }
+
+                var nb = new H2NB.LK_NB_Record { LK_N = "ABC", LK_B = "101", LK_C = "01", LK_D = 12 };
+                H2NB.Call(ref nb);
+                Console.WriteLine($"NB2 [{nb.LK_N}] {nb.LK_B} {nb.LK_C} {nb.LK_D}");
+
+                H2OPT.LK_O_Record? opt = null;
+                H2OPT.Call(ref opt);
+                opt = new H2OPT.LK_O_Record { LK_O1 = "AB" };
+                H2OPT.Call(ref opt);
+                Console.WriteLine($"O2 [{opt.Value.LK_O1}]");
+
+                long x = 21;
+                var fr = H2FN.Call(ref x);
+                Console.WriteLine($"FN {fr.LK_R1} [{fr.LK_R2}]");
+                return 0;
+            }
+        }
+        """;
+
+    /// <summary>A host passes and receives GROUPS as published record structs (DESIGN-external-repository §4.3): each
+    /// member lands exactly into the record image at the place the activated program's description gives it, or the
+    /// call is refused with the member named before anything is activated; the activated program's stores come back
+    /// through the record (§14.2.3 8), cite.py OK); FILLER content round-trips through <c>FromImage</c>/<c>AsImage</c>;
+    /// a record any numeric member of which fails the class test NUMERIC (§8.8.4.4.4 3) n), cite.py OK) is not decoded,
+    /// and the host's variable is unchanged.</summary>
+    [Fact]
+    public void AHost_PassesGroupsAsPublishedRecords_LandingEachMemberExactlyAndDecodingByTheValidityRule()
+    {
+        string dir = CutRunner.NewTempDir("h2host");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "H2PROGS", GroupPrograms);
+            NonCobolElement.CompileCobol(dir, "H2FUNC", GroupFunction);
+            NonCobolElement.CompileCSharp(dir, "H2HOST", GroupHost, "H2PROGS", "H2PROGS", "H2FUNC");
+            var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "H2HOST.dll"), dir);
+            Assert.Equal(
+                "IN 0041 [ALICE     ] [AB ] 000900 Q5\n" +
+                "1 42 [BOB       ] -124.45 -7 [AB ] 0,10,0 Z0 123 [DONE ]\n" +
+                "LOW LK_REC True\n" +
+                "OCC LK_REC\n" +
+                "NULL LK_REC\n" +
+                "RT True 42 True\n" +
+                "BAD 7 [AAA] True\n" +
+                "NB 101 01 12\n" +
+                "NB2 [XY ] 011 10 12\n" +
+                "O OMITTED\n" +
+                "O [AB]\n" +
+                "O2 [ZZ]\n" +
+                "FN 42 [FN  ]", stdout);
+            Assert.Equal(0, exit);
+            Assert.Equal("", stderr);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
+
     [Fact]
     public void AHost_CallsTheGeneratedEntries_LandingExactlyAndDecodingByTheValidityRule()
     {

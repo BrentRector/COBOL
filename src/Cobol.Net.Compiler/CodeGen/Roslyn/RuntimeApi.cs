@@ -2543,6 +2543,12 @@ internal static class RuntimeApi
     public static string BitsWriteWindow(string imageExpr, string startBitExpr, string bitsExpr) =>
         $"{nameof(CobolBits)}.{nameof(CobolBits.WriteWindow)}({imageExpr}, {startBitExpr}, {bitsExpr})";
 
+    /// <summary>The in-place form of <see cref="BitsWriteWindow"/> over a record image held in a mutable buffer —
+    /// <c>CobolBits.WriteWindowInto</c>, which a .NET host entry's published record composes its image with
+    /// (DESIGN-external-repository §4.3).</summary>
+    public static string BitsWriteWindowInto(string bufferExpr, string startBitExpr, string bitsExpr) =>
+        $"{nameof(CobolBits)}.{nameof(CobolBits.WriteWindowInto)}({bufferExpr}, {startBitExpr}, {bitsExpr})";
+
     /// <summary>The national read of a Tier-B window over the class's one byte backing —
     /// <c>CobolBits.NatReadWindow</c> (kb/Work PB231). A national character position occupies TWO bytes of the
     /// byte-addressed backing (ISO §13.18.60.4 GR8 leaves the size to the implementor; D-N1 pins two), so the

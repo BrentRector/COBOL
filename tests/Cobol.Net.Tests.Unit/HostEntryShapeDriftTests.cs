@@ -47,6 +47,21 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                    RETURNING L-RET.
                    GOBACK.
                END PROGRAM H2ROWS.
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. H2GRP.
+               DATA DIVISION.
+               LINKAGE SECTION.
+               01 L-G.
+                  05 L-N PIC 9(3).
+                  05 FILLER PIC X.
+                  05 L-S OCCURS 2.
+                     10 L-T PIC X(2).
+                     10 L-B PIC 1 USAGE BIT.
+               01 L-R.
+                  05 L-R1 PIC S9(3)V9 COMP-3.
+               PROCEDURE DIVISION USING L-G RETURNING L-R.
+                   GOBACK.
+               END PROGRAM H2GRP.
                """;
 
     [Fact]
@@ -60,7 +75,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             .Where(c => c.Members.OfType<MethodDeclarationSyntax>().Any(m => m.Identifier.Text == "Call")
                         && c.Modifiers.Any(SyntaxKind.StaticKeyword))
             .ToList();
-        Assert.Equal(["H2MAIN", "H2ROWS"], entries.Select(e => e.Identifier.Text).Order().ToArray());
+        Assert.Equal(["H2GRP", "H2MAIN", "H2ROWS"], entries.Select(e => e.Identifier.Text).Order().ToArray());
 
         foreach (var entry in entries)
         {
@@ -87,6 +102,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                     || (s is TryStatementSyntax t && t.Catches.Count == 0 && t.Finally is not null
                         && t.Block.Statements.Count == 1 && t.Block.Statements[0].ToString().StartsWith("ProgramRegistry.CallProgram(", StringComparison.Ordinal))
                     || text.StartsWith("{ if (HostLanding.TryDecode(", StringComparison.Ordinal)
+                    || System.Text.RegularExpressions.Regex.IsMatch(text, @"^\{ if \(\w+_Record\.__TryGet\(")
                     || System.Text.RegularExpressions.Regex.IsMatch(text, @"^\S+ __hres = default;$")
                     || text == "if (__hbad is not null) throw __hbad;"
                     || text == "return __hres;";
@@ -95,7 +111,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             // A finally holds only decodes: the validity decode or the storage's own value.
             foreach (var fin in call.Body.DescendantNodes().OfType<FinallyClauseSyntax>())
                 Assert.All(fin.Block.Statements, s => Assert.Matches(
-                    @"^(\{ if \(HostLanding\.TryDecode\(|if \(__hc\d+ is not null\) \{ |\w+ = __hc\d+\.Value;)", s.ToString()));
+                    @"^(\{ if \(HostLanding\.TryDecode\(|\{ if \(\w+_Record\.__TryGet\(|if \(__hc\d+ is not null\) \{ |\w+ = __hc\d+\.Value;)", s.ToString()));
             var cancel = entry.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "Cancel");
             Assert.StartsWith("ProgramRegistry.Cancel(", cancel.ExpressionBody!.Expression.ToString());
         }
@@ -122,5 +138,30 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             "ref double", "ref ManagedPointer", "long", "ref string?",
         }, parameters);
         Assert.Equal("decimal", rows.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "Call").ReturnType.ToString());
+
+        // A group formal or RETURNING item is its published record struct (§4.3's group rows), whose image is composed and
+        // decoded by the same door rules: every member landing in __Put is a HostLanding call (or a nested record's
+        // __Put), every numeric decode in __TryGet is HostLanding.TryDecode, and no record writes an inline range test
+        // (its only comparisons are the loop bounds of a table's occurrences).
+        var grp = entries.Single(e => e.Identifier.Text == "H2GRP");
+        var grpCall = grp.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "Call");
+        Assert.Equal(["ref L_G_Record"], grpCall.ParameterList.Parameters.Select(p => $"{p.Modifiers} {p.Type}".Trim()).ToArray());
+        Assert.Equal("L_R_Record", grpCall.ReturnType.ToString());
+        var records = grp.DescendantNodes().OfType<RecordDeclarationSyntax>().ToList();
+        Assert.Equal(["L_G_Record", "L_R_Record", "L_S_Record"], records.Select(r => r.Identifier.Text).Order().ToArray());
+        foreach (var record in records)
+        {
+            var put = record.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__Put");
+            Assert.All(put.Body!.DescendantNodes().OfType<ExpressionStatementSyntax>().Where(s => s.Parent is not ForStatementSyntax),
+                s => Assert.Matches(@"HostLanding\.|^\w+(\[__i\])?\.__Put\(", s.ToString()));
+            Assert.All(put.Body.DescendantNodes().OfType<ForStatementSyntax>(),
+                f => Assert.Matches(@"HostLanding\.|\.__Put\(", f.Statement.ToString()));
+            Assert.DoesNotContain(record.DescendantNodes().OfType<BinaryExpressionSyntax>(),
+                b => b.Kind() is SyntaxKind.LessThanExpression or SyntaxKind.GreaterThanExpression
+                     && b.Parent is not ForStatementSyntax);
+            var get = record.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__TryGet");
+            Assert.All(get.Body!.DescendantNodes().OfType<IfStatementSyntax>(),
+                i => Assert.Matches(@"^(HostLanding\.TryDecode\(|\w+_Record\.__TryGet\()", i.Condition.ToString()));
+        }
     }
 }
