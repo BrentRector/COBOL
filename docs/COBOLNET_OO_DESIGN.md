@@ -82,7 +82,7 @@ declares, or the CLASS-ID is therefore legal (§8.4.6.1), until that half itself
 (kb/Work PB3154; PB3132's reference census). A half's data-name or named CAPACITY register (or a method's own data-, condition- or
 index-name or register) spelled like a SYMBOLIC CHARACTERS name of the class is the item a reference there names (§8.4.6.1): the half hides
 the inherited symbolic after it binds (`DataBinder.DropShadowedConstants`), and a method's names hide it, and an
-object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/Work PB3154 review R1-1).
+object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/Work PB3154 review R1-1). A method's named CAPACITY register lives in the class binder's one register index, but it is that method's data-name: `ReferenceResolver.CapacityRegisterFor` reaches it only from a reference made in that method (`DataBinder.OwningMethodScope`; kb/Work PB3153's finisher), so a sibling method's reference is COBOLNET1639.
 
 ## Spec corrections
 

@@ -59,8 +59,15 @@ public sealed partial class DataBinder
         && (m.ByName.ContainsKey(word) || m.Conditions.ContainsKey(word) || m.IndexNames.Declares(word)
             // A method table's named CAPACITY register is the method's data-name too (§13.18.38.3 SR30), but it lives
             // in the class binder's register index, not in the method's ByName (kb/Work PB3154 review R2-1).
-            || (_capacityRegisters.TryGetValue(word, out var tables)
-                && tables.Exists(t => OoRootOwner.TryGetValue(t.Root, out var owner) && owner.DataScope == m)));
+            || (_capacityRegisters.TryGetValue(word, out var tables) && tables.Exists(t => OwningMethodScope(t) == m)));
+
+    /// <summary>The scope of the METHOD whose data <paramref name="item"/> belongs to, or null for class-level (object
+    /// or factory) and program data. A method's data-names, its named CAPACITY registers among them (§13.18.38.3 SR30),
+    /// are declared in that method, a contained source unit (§10.3) and so a source element of its own (§3.164), so
+    /// they are visible only to references made in it (§8.4.6.1); asked by <see cref="ActiveMethodDeclares"/> and by
+    /// <c>ReferenceResolver.CapacityRegisterFor</c>, the two readers of the class binder's one register index.</summary>
+    internal OoMethodDataScope? OwningMethodScope(DataItem item) =>
+        OoRootOwner.TryGetValue(item.Root, out var owner) ? owner.DataScope : null;
 
     /// <summary>True when this binder binds a CLASS unit (per-binder-instance configuration, set ONCE at
     /// construction by <c>Oo/OoDriver</c> — init-only since P9 Step 6, so a mid-bind mutation cannot compile): a root

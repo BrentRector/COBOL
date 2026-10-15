@@ -87,3 +87,12 @@ alike. A hidden symbolic-character is therefore neither resolved nor recorded as
 the nearer item. The two predicates this branch had moved to `SymbolicCharacters.Declares` (the VALUE-literal test
 and `LiteralEnvironment.IsSymbolicCharacter`) ask `NamesSymbolic`, so main's hiding reaches them as it did through
 main's `SymbolicOf(string)`.
+The merged tree's leg 1 was GREEN but did not run main's `2014/pb3154_half_capacity_register_hides_symbolic`; run by
+name it failed CS0103 ('U' does not exist). The merge did not cause it, it exposed it: this branch's own-item test
+(`ReferenceResolver.DescribesOwnItem`) asks the resolver first, and `ReferenceResolver.CapacityRegisterFor` read the
+class binder's one register index with no method scope, so method SHOWB's `DISPLAY S2` reached SHOWA's LOCAL-STORAGE
+CAPACITY register instead of the class's symbolic-character. On main the same leak made a sibling method's reference
+to such a register compile to C# that Roslyn refused, where §8.4.6.1 gives COBOLNET1639. A method's register is now
+reached only from that method (`DataBinder.OwningMethodScope`, shared with `ActiveMethodDeclares`), with the
+negative `pb3153-method-reaches-a-sibling-methods-capacity-register`. Sibling sweep: a method's CONSTANT entry has the
+same leak (a sibling method reads it, no diagnostic), reported as a lead: the constant table carries no owning method.

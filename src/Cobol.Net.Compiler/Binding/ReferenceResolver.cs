@@ -1885,7 +1885,13 @@ public sealed partial class ReferenceResolver(DataBinder data)
     internal CapacityRef? CapacityRegisterFor(Core.DataReferenceContext dref)
     {
         DataReferenceCst r = dref;
-        if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var tables)) return null;
+        if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var indexed)) return null;
+        // A METHOD's own register is that method's data-name (§13.18.38.3 SR30; a method is a source element of its
+        // own, §3.164, §10.3), visible only to references made in it (§8.4.6.1): the class binder's one index holds every
+        // method's registers, so a sibling method, or the object's own code, must not reach one (kb/Work PB3153's
+        // finisher: SHOWB's MOVE S2 reached SHOWA's LOCAL-STORAGE register and Roslyn refused CS0103).
+        var tables = indexed.FindAll(t => data.OwningMethodScope(t) is not { } m || m == data.ActiveMethodScope);
+        if (tables.Count == 0) return null;
         var written = ReadWritten(dref);
         var reached = tables.FindAll(t => t.OccursSpec?.CapacityRegister is { } cand
                                           && data.QualifierChainMatches(cand, written.Qualifiers));
