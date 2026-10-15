@@ -47,13 +47,22 @@ public sealed class GlobalNameClassDriftTests
             + "rule 4 and never resolve (kb/Work PB1476) — a derived view of TypeDecls, declaring no name of its own",
         ["_debugRegisters"] = "the X3.23-1985 DEBUG-ITEM special register of the element's own debugging declaratives, "
             + "never declared by a data description entry",
+        ["_constants"] = "a constant entry occupies no storage, so a GLOBAL constant is inherited BEFORE Bind by "
+            + "InheritGlobalConstants (§13.18.27.4 GR1-GR2; kb/Work PB1009), not bridged by InheritGlobalSubtree",
     };
 
     private static IEnumerable<string> NameIndexFields(Type owner)
     {
         foreach (var f in owner.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
-            if (f.FieldType == typeof(IndexNameRegistry)) { yield return MemberName(f); continue; }
+            // A registry type that is itself a name index: the index-names, and an element's constant entries (a
+            // constant-name is a user-defined word its element declares, so it hides a same-spelled word of a
+            // containing element; kb/Work PB3164, PB3153 review round 3).
+            if (f.FieldType == typeof(IndexNameRegistry) || f.FieldType == typeof(DataBinder.ConstantScope))
+            {
+                yield return MemberName(f);
+                continue;
+            }
             if (!f.FieldType.IsGenericType) continue;
             var args = f.FieldType.GetGenericArguments();
             if (f.FieldType.GetInterfaces().Any(i => i.IsGenericType
@@ -137,6 +146,7 @@ public sealed class GlobalNameClassDriftTests
         ["Conditions"] = "Conditions.ContainsKey(",
         ["IndexNames"] = "IndexNames.Declares(",
         ["CapacityRegisters"] = "CapacityRegisters.ContainsKey(",
+        ["Constants"] = "Constants.Declared.ContainsKey(",
     };
 
     /// <summary>⛔ THE METHOD TIER ASKS EVERY NAME INDEX OF THE METHOD (the kb/Work PB3165 merge-queue bounce). A method

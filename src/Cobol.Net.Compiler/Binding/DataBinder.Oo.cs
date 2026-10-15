@@ -41,16 +41,20 @@ public sealed class OoMethodDataScope
     internal UserWordCensus Words { get; } = new();
 
     /// <summary>Whether this method declares <paramref name="word"/> in ANY of its own name indexes — a data-name, a
-    /// condition-name, an index-name or a named CAPACITY register (§13.18.38.3 SR30 makes the register a data-name of
-    /// the method that declares its table). ⛔ EVERY NAME INDEX OF THIS SCOPE, asked here beside the indexes
-    /// themselves: when the registers moved into the method's own scope (kb/Work PB3165), the hand-written list in the
-    /// binder kept asking the class's register index and a method's register stopped hiding a symbolic-character
-    /// (kb/Work PB3154 review R2-1, the PB3165 merge-queue bounce). <c>GlobalNameClassDriftTests</c> finds this
-    /// scope's name indexes by reflection and holds this predicate to every one.</summary>
+    /// condition-name, an index-name, a named CAPACITY register (§13.18.38.3 SR30 makes the register a data-name of
+    /// the method that declares its table) or a constant-name (kb/Work PB3164: the method's constant entries live in
+    /// <see cref="Constants"/>). ⛔ EVERY NAME INDEX OF THIS SCOPE, asked here beside the indexes themselves: when the
+    /// registers moved into the method's own scope (kb/Work PB3165), the hand-written list in the binder kept asking
+    /// the class's register index and a method's register stopped hiding a symbolic-character (kb/Work PB3154 review
+    /// R2-1, the PB3165 merge-queue bounce); and when the constants moved there (PB3164), this list did not ask them,
+    /// so a method's <c>01 X CONSTANT AS 7</c> let <c>IF X</c> test the object's level-88 <c>X</c> (§11.7.4 GR5: "the
+    /// use of that word in this method refers to the declaration in this method"; kb/Work PB3153 review round 3).
+    /// <c>GlobalNameClassDriftTests</c> finds this scope's name indexes by reflection and holds this predicate to
+    /// every one.</summary>
     internal bool Declares(string word)
     {
         return ByName.ContainsKey(word) || Conditions.ContainsKey(word) || IndexNames.Declares(word)
-            || CapacityRegisters.ContainsKey(word);
+            || CapacityRegisters.ContainsKey(word) || Constants.Declared.ContainsKey(word);
     }
 
     /// <summary>The method's own CONSTANT entries, and the other words its data division defines, which hide a constant
@@ -76,7 +80,7 @@ public sealed partial class DataBinder
     public OoMethodDataScope? ActiveMethodScope { get; set; }
 
     /// <summary>Whether the method whose statements are being bound declares <paramref name="word"/> as a data-name,
-    /// a condition-name, an index-name or a CAPACITY register of its own (<see cref="OoMethodDataScope.Declares"/>) —
+    /// a condition-name, an index-name, a CAPACITY register or a constant-name of its own (<see cref="OoMethodDataScope.Declares"/>) —
     /// the NEAREST tier a reference made in that method can reach, so such a declaration hides every constant-name and
     /// symbolic-character of the spelling the class's binder holds (ISO §8.4.6.2.1 3) a) "If the name is declared in
     /// source element B, the item in source element B is the referenced item"; §8.4.6.1 "even when it is a different

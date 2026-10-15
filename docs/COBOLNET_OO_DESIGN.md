@@ -84,7 +84,7 @@ index-name or register) spelled like a SYMBOLIC CHARACTERS name of the class is 
 the inherited symbolic after it binds (`DataBinder.DropShadowedConstants`), and a method's names hide it, and an
 object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/Work PB3154 review R1-1). That method tier is
 `OoMethodDataScope.Declares`, which asks EVERY name index the method's scope holds (`ByName`, `Conditions`, `IndexNames`,
-`CapacityRegisters`); `GlobalNameClassDriftTests.MethodDeclares_AsksEveryMethodNameIndex` finds those indexes by reflection, so an
+`CapacityRegisters`, and the method's constant entries, `Constants`, kb/Work PB3164); `GlobalNameClassDriftTests.MethodDeclares_AsksEveryMethodNameIndex` finds those indexes by reflection (a `DataBinder.ConstantScope` counts as one: a method's `01 X CONSTANT AS 7` that it missed let `IF X` test the object's level-88 `X`, kb/Work PB3153 review round 3), so an
 index added to the scope is asked too (kb/Work PB3165: when a method's registers moved into the method's own scope, a hand-written list
 kept asking the class's register index and the method's register stopped hiding the symbolic). Every `SymbolTable` lookup with a
 method tier asks the same predicate after its own name class's method index: `TryResolve`, `TryResolveCondition`, `IndexCandidates`

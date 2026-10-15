@@ -196,6 +196,17 @@ Q2) is its regression witness, and its header now names the finding. R1-1 (PB316
 register: PB3165's note records which branch carries the fix and that it lands through this one. The CONSTANT lead is
 PB3164, so no duplicate note is filed.
 
+Merging main brought in PB3164, which keeps a method's constant entries in `OoMethodDataScope.Constants`. That exposed
+a gap between the two fixes. `OoMethodDataScope.Declares`, which every `SymbolTable` method tier asks, did not ask the
+method's constants, and the drift fact that holds it to every name index of the scope did not count a `ConstantScope`.
+So a method's own `01 X CONSTANT AS 7` let `IF X` test the object's level-88 `X`, and a method's `01 QI CONSTANT AS 2`
+let `SET QI TO 4` move the object's index-name (`mc5.cob` printed `A COND` / `A 1`). §11.7.4 GR5 makes the word mean the
+method's declaration. `Declares` now asks `Constants.Declared`, and the drift fact counts a `ConstantScope` field as a
+name index (a mutation check removing the new clause fails it, naming `Constants`). The method's references now draw
+the same diagnostics as a program whose only `X` or `QI` is a constant: COBOLNET1639 and COBOLNET1548. New negatives
+`pb3153-method-constant-hides-object-condition-name` and `pb3153-method-constant-hides-object-index-name` (2002, 2014,
+2023); the 2002 golden `pb3164_method_constant_scope` gains ME (`ME 7 2`) and MF (`MF 5`, `MF CX`).
+
 The two stamped entries the merged branches carried (2034 and 2047) are folded into this one, because a landing adds
 exactly one entry.
 

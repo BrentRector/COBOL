@@ -52,7 +52,7 @@ public sealed class SymbolTable
     /// else the unit's global multimap. False when the name is unknown in both. (← <c>LookupData</c> /
     /// <c>LookupDataInScopeOf</c> — the anchor-root-vs-active-method decision is now the caller's explicit
     /// <see cref="Scope"/>.) A method that declares the spelling in ANOTHER name class (a condition-name, an
-    /// index-name, a CAPACITY register — <see cref="OoMethodDataScope.Declares"/>) makes the object's data-name of it
+    /// index-name, a CAPACITY register, a constant-name — <see cref="OoMethodDataScope.Declares"/>) makes the object's data-name of it
     /// inaccessible (§11.7.4 GR5 "the use of that word in this method refers to the declaration in this method"), so
     /// the lookup is false rather than the object's item (kb/Work PB3165 review R2-1's sibling arm).</summary>
     public bool TryResolve(string name, Scope scope, out List<DataItem> items)
@@ -146,7 +146,7 @@ public sealed class SymbolTable
     /// <summary>⛔ THE ONE INDEX-NAME RESOLUTION (kb/Work PB919) — the §8.4.2.2 candidate set of a WRITTEN
     /// index-name reference <c>name [OF|IN q] …</c> (§8.4.2.2.2 Format 3), or <see langword="null"/> when the
     /// spelling names no index-name visible in <paramref name="scope"/> (the reference is then a data-name one).
-    /// Visibility is the data-name's (§8.4.6.2.3): a method-local DATA-name, condition-name or CAPACITY register of the
+    /// Visibility is the data-name's (§8.4.6.2.3): a method-local DATA-name, condition-name, CAPACITY register or constant-name of the
     /// spelling shadows every index-name (§11.7.4 GR5 — the caller must not treat the reference as an index); else the method's own
     /// declarations (§11.7.4 GR5 privacy); else the unit's, where a nearer source element's declaration wins
     /// (§8.4.6.2.1 3), <see cref="IndexNameRegistry.Candidates"/>). The qualifiers are matched from the TABLE
@@ -163,8 +163,8 @@ public sealed class SymbolTable
             if (m.ByName.TryGetValue(name, out var mlist) && mlist.Count > 0) return null;   // the method data-name wins
             if (m.IndexNames.Declares(name))
                 return m.IndexNames.Candidates(name, d => _data.IndexQualifierChainMatches(d, qualifiers));
-            // A method condition-name or CAPACITY register of the spelling hides the object's index-name too (GR5
-            // covers every name class; kb/Work PB3165 review R2-1).
+            // A method condition-name, CAPACITY register or constant-name of the spelling hides the object's
+            // index-name too (GR5 covers every name class; kb/Work PB3165 review R2-1, PB3153 review round 3).
             if (m.Declares(name)) return null;
         }
         if (!_data.IndexNames.Declares(name)) return null;
@@ -183,7 +183,7 @@ public sealed class SymbolTable
     /// <see langword="null"/> when it reaches none. The register is a data-name of its entry's source element
     /// (§13.18.38.3 SR30), so it has the data-name's visibility (§11.7.4 GR5): a method sees its OWN registers first,
     /// and they REPLACE the object's; a method-local name of the spelling in any other class
-    /// (<see cref="OoMethodDataScope.Declares"/>: a data-name, a condition-name, an index-name) hides an object-level register (the
+    /// (<see cref="OoMethodDataScope.Declares"/>: a data-name, a condition-name, an index-name, a constant-name) hides an object-level register (the
     /// object's declaration is "inaccessible to this method"); a sibling method's registers are not in the scope at
     /// all. Else the unit's map, nearest declaring element first (<see cref="DataBinder.CapacityRegisters"/>).</summary>
     public List<DataItem>? CapacityCandidates(string name, Scope scope)
