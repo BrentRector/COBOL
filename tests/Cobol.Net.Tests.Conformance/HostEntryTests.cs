@@ -266,6 +266,24 @@ public sealed class HostEntryTests
             END-IF
             GOBACK.
         END PROGRAM H2OPT.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H2AS.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-NG GROUP-USAGE NATIONAL.
+           05 LK-NG1 PIC N(2).
+           05 LK-NG2 PIC N(1).
+        01 LK-F.
+           05 LK-F1 USAGE FLOAT-LONG.
+           05 LK-F2 USAGE INDEX.
+           05 LK-F3 PIC X(4) JUSTIFIED RIGHT.
+        PROCEDURE DIVISION USING LK-NG LK-F.
+        P1.
+            MOVE N"QR" TO LK-NG1
+            COMPUTE LK-F1 = LK-F1 * 2
+            DISPLAY "F3 [" LK-F3 "]"
+            GOBACK.
+        END PROGRAM H2AS.
         """;
 
     /// <summary>A function whose RETURNING item is a group: its entry returns the published record.</summary>
@@ -327,6 +345,11 @@ public sealed class HostEntryTests
                 H2OPT.Call(ref opt);
                 Console.WriteLine($"O2 [{opt.Value.LK_O1}]");
 
+                var ng = new H2AS.LK_NG_Record { LK_NG1 = "AB", LK_NG2 = "C" };
+                var fl = new H2AS.LK_F_Record { LK_F1 = 1.5, LK_F2 = 4, LK_F3 = "XY" };
+                H2AS.Call(ref ng, ref fl);
+                Console.WriteLine(FormattableString.Invariant($"AS [{ng.LK_NG1}{ng.LK_NG2}] {fl.LK_F1} {fl.LK_F2} [{fl.LK_F3}]"));
+
                 long x = 21;
                 var fr = H2FN.Call(ref x);
                 Console.WriteLine($"FN {fr.LK_R1} [{fr.LK_R2}]");
@@ -364,6 +387,8 @@ public sealed class HostEntryTests
                 "O OMITTED\n" +
                 "O [AB]\n" +
                 "O2 [ZZ]\n" +
+                "F3 [  XY]\n" +
+                "AS [QRC] 3 4 [  XY]\n" +
                 "FN 42 [FN  ]", stdout);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);

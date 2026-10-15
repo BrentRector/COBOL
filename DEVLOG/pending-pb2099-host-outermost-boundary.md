@@ -194,7 +194,15 @@ expected line follows from §14.2.3 8) and 9) and the class test NUMERIC:
   naming `LK_G.LK_N`.
 - National members and two USAGE BIT members that share a byte go in and come back.
 - An OPTIONAL group is omitted, then passed.
+- A national group (GROUP-USAGE NATIONAL) crosses as its national positions and comes back; a FLOAT-LONG member
+  doubles, an INDEX member round-trips and a JUSTIFIED RIGHT member lands right-aligned.
 - A function returns a group.
+
+**Self-review (part 4).** The added witness found a defect: an INDEX member was decoded by the validity rule, whose
+profile has no digits, so every record with an index member came back as `FormatException`. A class condition may not
+be asked of an item of class index (§8.8.4.4.3 1)), so the member is now decoded as the record-struct codec decodes
+it. `SortNumericKeyLaneTests` names `PublishedRecordEmitter` among the codecs allowed to decode an image, and the
+call site says why.
 
 `HostEntryShapeDriftTests` gained a group fixture. Every landing in a record's `__Put` is a `HostLanding` call, and
 every decode in `__TryGet` is `HostLanding.TryDecode` or a nested record's. No record writes a comparison other than a

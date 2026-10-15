@@ -248,8 +248,14 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         {
             HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec =>
                 HostEntryEmitter.NumericDecode(type, pic, chars, profileOf(leaf), name, target, "__bad", " else __ok = false;"),
-            HostTypeKind.Index =>
-                $"{{ if (HostLanding.TryDecode({chars}, {profileOf(leaf)}, {name}, ref __bad, out Int128 __hu)) {target} = (long)__hu; else __ok = false; }}",
+            // An INDEX data item is of class index, of which no class condition may be asked ("Identifier-1 shall not
+            // reference a data item of class index", ISO §8.8.4.4.3 1)), so the validity rule does not apply: its eight
+            // bytes are the value the program stored, and the codec decodes them as the record struct's GroupImageCodec does.
+            HostTypeKind.Index => $"{target} = (long){RuntimeApi.NumParseImage(chars, profileOf(leaf), sending: false)};",
+            // The image codec's own decode (the record struct's GroupImageCodec decodes a float leaf the same way): the
+            // record's bytes are the host's, not a windowed leaf a statement reads, so NumericRenderer.WindowedNum is not
+            // the reader here. A floating-point member's host type is its own carrier (§4.3's table), so the decode is
+            // the codec's, exactly as an elementary floating-point formal's write-back takes its cell's value.
             HostTypeKind.Float =>
                 $"{target} = ({pic.ClrType}){RuntimeApi.NumParseImageFloat(chars, profileOf(leaf), pic.IsSingle)};",
             HostTypeKind.Text when BitLayout.IsBitLeaf(leaf) => $"{target} = {RuntimeApi.BitsReadWindow("__s", at, $"{pic.Length}")};",
