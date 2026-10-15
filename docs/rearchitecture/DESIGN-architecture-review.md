@@ -1660,7 +1660,13 @@ lies outside it stops the landing; and (2) every other in-flight branch's actual
 whole declared set until its notes are terminal, started or not (`inflight_file_sets`), when the shared file is R3
 work on either side. R3 work is attributed PER COMMIT (PB2703): a train is mixed, one commit per cluster, so the
 landing's R3 work is the commits that work on an R3 note and the files those commits change; its fix-lane commits
-neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. A shared file
+neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. Each commit
+is charged only with what it introduced (PB3180): a non-merge commit with its diff against its parent, a MERGE commit
+with the files and note statuses that differ from EVERY parent (its conflict resolutions and evil-merge edits, the
+combined-diff set) and the ids leading its own subject, never with its first-parent diff, which carries the other
+parent's whole history (a merged predecessor's commits, which the walk attributes one by one, or `main`'s own landings
+in a `Merge origin/main`); the first-parent reading charged one commit's R3 status flip to every file a merged
+predecessor changed and stopped PB3154's branch on a note whose only commit changed no code. A shared file
 stops the LATER of the two by dispatch time (the ledger's `at`, one millisecond apart per group so a wave never ties,
 else the branch's first commit), which re-plans and rebases onto the earlier once it lands, and the earlier one lands
 with a warning naming the branch that must rebase. An in-flight branch is R3 work because its DISPATCH says so, never

@@ -970,6 +970,7 @@
   "pb132-call-byref-strong-group",
   "pb132-call-vlg-argument",
   "pb132-call-bit-unaligned",
+  "pb3158-call-bit-unaligned-after-aligned",
   "pb132-call-bit-variable-subscript",
   "pb132-call-byvalue-index-name",
   "pb132-call-byvalue-implied-class",
@@ -2022,6 +2023,7 @@
   "pb590-boolean-class-usage-bit",
   "pb649-national-figurative-below-2002",
   "pb584-mixed-bit-group-below-2002",
+  "pb3166-redefines-bit-item-below-2002",
   "pb664-string-sender-usage",
   "pb664-string-numeric-literal",
   "pb664-string-sender-pointer",
@@ -2635,6 +2637,7 @@
   "pb2690-fixed-group-vlg-element-tables-below-2014",
   "pb2690-fixed-table-formal-grows-dynamic-argument-below-2014",
   "pb2690-initialized-created-occurrences-below-2014",
+  "pb2690-store-of-shown-image-grows-capacity-below-2014",
   "pb1941-constant-length-cycle-open-entry",
   "pb1941-constant-length-report-cycle",
   "pb2051-parameterized-class-body-unexpanded",
@@ -2679,7 +2682,9 @@
   "pb546-group-into-national-dynamic-below-2014",
   "pb2921-method-section-named-like-its-data",
   "pb2740-omitted-branch-turn-unknown-name",
-  "pb2740-omitted-branch-turn-name-below-2023"
+  "pb2740-omitted-branch-turn-name-below-2023",
+  "pb3147-area-a-item-in-area-b-85",
+  "pb3147-statement-in-area-a-85"
  ],
  "pending": []
 }

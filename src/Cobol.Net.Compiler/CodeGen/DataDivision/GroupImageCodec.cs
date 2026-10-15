@@ -1041,6 +1041,13 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     private static void EmitRunMemberFromBits(DataItem m, string carrier, int at, CodeWriter w)
     {
         int per = m.IsGroup ? m.AsIfPic!.Length : m.Pic!.Length;
+        // The receiving twin of BitCarrierOf's backing arm (kb/Work PB3166): the member's bits go into the first `per`
+        // bit positions of the class backing, every other bit of it left as it was.
+        if (BackingOf(m) is { } backing)
+        {
+            w.Line($"{backing} = {RuntimeApi.BitsWriteWindow(backing, "0", RuntimeApi.BitsSlice(carrier, $"{at}", $"{per}"))};");
+            return;
+        }
         if (m.Occurs is { } o)
         {
             // The occurrences are one STRIDE apart (§13.18.1.4 GR2 — an ALIGNED table's, kb/Work PB3156), each `per` wide.
@@ -1069,6 +1076,10 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
     /// every occurrence's carrier (the AsImage run packer read the raw <c>string[]</c> field before, CS1503).</summary>
     private static string BitCarrierOf(DataItem m)
     {
+        // ⛔ A TIER-B CANONICAL HAS NO FIELD OF ITS OWN NAME, only its class's one string backing (§13.18.44.4 GR1 — the
+        // shared area is addressed through the backing; PhysicalModel.BuildPhysicals), so its carrier is its first
+        // WidthBits bits unpacked from that backing (kb/Work PB3166). `m.CsName` named a field that does not exist.
+        if (BackingOf(m) is { } backing) return RuntimeApi.BitsReadWindow(backing, "0", $"{BitLayout.WidthBits(m)}");
         if (m.Occurs is null) return m.IsGroup ? $"{m.CsName}.AsBits()" : m.CsName;
         string occurrences = m.IsGroup ? $"global::System.Array.ConvertAll({m.CsName}, __e => __e.AsBits())" : m.CsName;
         // ⛔ THE OCCURRENCES SIT ONE STRIDE APART, NOT ONE WIDTH (§13.18.1.4 GR2, kb/Work PB3156): an ALIGNED table puts
@@ -1079,6 +1090,16 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
             ? $"string.Concat({occurrences})"
             : RuntimeApi.BitsStrided(occurrences, $"{BitLayout.StrideBits(m)}");
     }
+
+    /// <summary>The C# name of the string backing that STORES bit member <paramref name="m"/> when it is the canonical of a
+    /// Tier-B REDEFINES class (<see cref="RedefinesTier.StringCanonical"/>), else null: such an item is no field of its
+    /// own name, and every composer that reaches it as a §8.5.1.6.3 run member or a bit-group member (the carrier
+    /// face, the distributor, and <c>PhysicalModel.BuildPhysicals</c>' field) reads and writes the backing instead.
+    /// A bit item is never an OCCURS data-name-2 (§13.18.44.3 SR5), so the backing holds exactly one occurrence.</summary>
+    private static string? BackingOf(DataItem m) =>
+        m.IsCanonical && m.Class is { Tier: RedefinesTier.StringCanonical } cls && ReferenceEquals(cls.Canonical, m)
+            ? cls.BackingCsName
+            : null;
 
     private static string AsImageOf(PhysicalModel.Physical f) =>
         // D19/PB43 — a USAGE BIT run images as its PACKED bits (§13.18.60.4 GR5), high-order first, and a run may
