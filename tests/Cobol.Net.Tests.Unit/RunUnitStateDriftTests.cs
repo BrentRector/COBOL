@@ -85,13 +85,14 @@ public sealed class RunUnitStateDriftTests
         {
             first = ru;
             ru.Switches.Set("SWITCH-1", true);             // §12.3.7 GR4 NOTE 1 — run-unit scope
+            int hostExitCode = Environment.ExitCode;
             ru.ExitStatus = 7;                            // a STOP RUN WITH STATUS 7
             ru.Clock = fixedClock;                        // host configuration: carried over
             ru.DebugMode = false;
             _ = ru.FactoryObject<ProbeFactory>();         // §9.3.14.2 — created in THIS run unit
             second = RunUnit.Begin();                     // the emitted driver's ProgramRegistry.Reset()
             Assert.Same(second, RunUnit.Current);
-            Assert.Equal(0, Environment.ExitCode);        // the flushed copy follows the NEW run unit's status
+            Assert.Equal(hostExitCode, Environment.ExitCode);   // a run unit's status is its own: the HOST's exit code is untouched (kb/Work PB3163)
         });
 
         var hostBacking = RunUnit.HostConfiguration.Select(p => $"<{p}>k__BackingField").ToHashSet(StringComparer.Ordinal);

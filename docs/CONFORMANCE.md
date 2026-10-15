@@ -675,9 +675,12 @@ of an unsupported facility.
   no phrase) is 0. When a STATUS value is present it wins regardless of ERROR/NORMAL. A main-program GOBACK
   (§14.9.18.4 GR3) uses the same mapping; a status phrase on a GOBACK executed in a **called** program is inert
   (GR2). Programs with no status phrase leave the exit code at 0 (the abnormal-fatal case still forces item 44's
-  nonzero exit). The status is flushed to `Environment.ExitCode` at the write site by the `RunUnit.ExitStatus`
-  setter (so it crosses assembly boundaries — a separately-compiled module's STOP RUN … WITH STATUS reaches the
-  process exit code). Two host limits apply on top of the value mapping: the exit code is an `Int32`, so a
+  nonzero exit). The status is the run unit's own `RunUnit.ExitStatus`, written by the STOP statement wherever in the
+  run unit it executes (so it crosses assembly boundaries — a separately-compiled module's STOP RUN … WITH STATUS
+  reaches the process exit code) and delivered to `Environment.ExitCode` ONCE, when the run unit has ended, by the
+  boundary that IS the process (`ProgramTable.RunModule`, the generated `Main`'s statement). A run unit embedded in a host
+  (`RunUnit.Run`, `ProgramRegistry.RunMain`) never writes the host's exit code (kb/Work PB3163; DOC-A.1-167): the host
+  reads `RunUnit.ExitStatus`. Two host limits apply on top of the value mapping: the exit code is an `Int32`, so a
   status outside [−2,147,483,648, 2,147,483,647] is **clamped** to the nearer end (`CobolNum.Position32`, the one
   saturating narrowing — see "Integer operands and host carriers" below), never wrapped: before kb/Work PB1178
   `STOP RUN WITH ERROR STATUS 4294967296` wrapped to exit 0, a NORMAL termination reported for an ERROR phrase.
