@@ -1,4 +1,4 @@
-## PB2099 parts 1-3: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules and the host entry
+## PB2099 parts 1-4: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry and the published record struct
 
 Wave 1077 group E took kb/Work PB2099, slice 3 of DESIGN-external-repository: the typed host entry and the one host
 surface. Two earlier waves had left it unstarted. The re-probe at a6744fa4d found none of the slice in the tree:
@@ -122,7 +122,7 @@ NUMERIC is true of it (§8.8.4.4.4 3) n)). A float or index formal crosses in it
 reference in its slot, and a character formal as its image. The length and profile each argument states are now one
 rule with the CALL lane's: `CallEmitter.ArgumentLength`, `BoundaryLength` and `BoundaryProfile` gained item-level forms
 that the place forms call. A unit with a GROUP formal or RETURNING item publishes no entry yet
-(`HostEntryEmitter.ElementaryOnly`): the published record struct is the next step.
+(`HostEntryEmitter.ElementaryOnly`, which part 4 replaced): the published record struct was the next step.
 
 **Witnesses.** `HostEntryTests` is the §17.1 host harness: a C# host compiled against two modules and run out of
 process. Every expected line comes from the standard. 100.25 lands exactly (§14.2.3 9)), and 1.234 into two fraction
@@ -151,3 +151,53 @@ function. Semgrep verify passed with no rule count up.
 (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,456 · Unit 482 ·
 Characterization 30 … Conformance 6,221/11,677 · Unit 33,183/33,665 · Characterization 6/36 cases ran (skipped 0) in 1
 of 2 leg(s)`. `HostEntryTests` and `HostEntryShapeDriftTests` passed in leg 1.
+
+### Part 4: the published record struct (wave 1080 group B)
+
+Wave 1080 group B cherry-picked wave 1079 B's thirteen commits onto main (2b60d9fa9) with no conflicts and re-gated
+them GREEN (`20261015T010318Z-bd98a1`). The re-probe: `HG1`, whose formal is a group with a FILLER, a COMP-3 member,
+a nested group and a table, compiled to a module with no host entry at all, because `ElementaryOnly` refused the unit.
+
+**The design correction.** DESIGN-external-repository §4.3 said the published record struct was a "published mode" of
+`RecordStructEmitter`, sharing the internal record struct's member walk and `GroupImageCodec`. The probe showed that a
+group FORMAL has no internal record struct: the program reads it through windows over its area (`_redef_LK_REC`). So
+there was no member walk to share. What the published struct does share is the storage geometry and the door rules,
+and §4.3 now says so.
+
+**The fix.** `PublishedRecordEmitter` renders the record from the description. Each named, non-redefining subordinate
+becomes a property of its `HostSurface.TypeOf` type. A subordinate group becomes a nested record struct, and an
+OCCURS member becomes an array. Each member's place is `BitLayout.StartBitWithin`, the one §8.5.1.6.3 walk that the
+binder's class offsets and the record-struct codec also use. A first version read `ClassBitOffset`, which exists only
+on an area: a RETURNING group is a record struct, and its unit published no entry. The occurrence stride is
+`BitLayout.StrideBits`. FILLER and a REDEFINES view's tail are not members. The struct keeps the image `FromImage`
+read, so those positions round-trip, and a record the host builds holds spaces there.
+
+Landing goes through `HostLanding` exactly as for an elementary formal: `Land`, `LandText`, `RequireOccurrences`,
+and the new `RequireImage` for `FromImage`. A lossy, null or wrongly sized member is refused with the parameter and the
+member named (`LK_SUB.LK_X`, `LK_TAB[1]`) before anything is activated. Decoding is `HostEntryEmitter.NumericDecode`,
+now the one numeric decode for an elementary formal and a member alike. If any member fails the class test NUMERIC,
+the record is not decoded and the host's variable is unchanged. A bit or national group crosses as the elementary item
+it is treated as (§14.8.2.1's NOTE), which is how the CALL lane carries it. `CobolBits.WriteWindowInto` writes a bit
+member in place with the same `Blit` law. `ElementaryOnly` is gone. `Published` admits a unit when
+`PublishedRecordEmitter.Renders` accepts every group it has. The shapes still refused are those the CALL lane carries
+as a cell area or a variable-length carrier: a pointer or object leaf, a dynamic-length item, a dynamic-capacity
+table, and an OCCURS DEPENDING ON table. They are the next step.
+
+**Witnesses.** `HostEntryTests.AHost_PassesGroupsAsPublishedRecords_…` is the host harness's group case. Every
+expected line follows from §14.2.3 8) and 9) and the class test NUMERIC:
+- A record lands, and the program's stores come back through it: `42 [BOB       ] -124.45 -7 [AB ] 0,10,0 Z0`.
+- A RETURNING group returns as a record.
+- A lossy COMP-3 member, a two-entry array for an OCCURS 3 member and a null text member are each refused before
+  activation.
+- FILLER content survives `FromImage` → `AsImage`.
+- A REDEFINES view's `ABCD` in a numeric member leaves the host's record at `7 [AAA]` and throws `FormatException`
+  naming `LK_G.LK_N`.
+- National members and two USAGE BIT members that share a byte go in and come back.
+- An OPTIONAL group is omitted, then passed.
+- A function returns a group.
+
+`HostEntryShapeDriftTests` gained a group fixture. Every landing in a record's `__Put` is a `HostLanding` call, and
+every decode in `__TryGet` is `HostLanding.TryDecode` or a nested record's. No record writes a comparison other than a
+table's loop bound. The parameter and return types are the records. A compile sweep built all 335 corpus programs that
+declare formals or a RETURNING item, with `--source-format auto` and their edition. 29 of them now publish records,
+and none failed.

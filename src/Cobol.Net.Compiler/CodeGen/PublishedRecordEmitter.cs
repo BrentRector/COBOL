@@ -156,6 +156,9 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
     private static string Position(DataItem group, Member m, bool occurrence)
     {
         int rel = BitLayout.StartBitWithin(group, m.Item);
+        if (rel < 0)   // only a REDEFINES chain can be unplaced, and a redefiner is never a member (MembersOf)
+            throw new InvalidOperationException(
+                $"PublishedRecordEmitter: the member '{m.Item.CobolName}' has no place in '{group.CobolName}'");
         return $"__at + {rel}{(occurrence ? $" + __i * {BitLayout.StrideBits(m.Item)}" : "")}";
     }
 

@@ -555,10 +555,33 @@ emitter (this slice) and the decoder (slice 4) hold the same input and nothing i
 | fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`), the DEPENDING ON value as the array's length for OCCURS DEPENDING ON; a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
 | strongly-typed group with an object-reference or pointer leaf | the published record struct with those members; packed as the CALL lane's carrier for that shape (PB2087's cell area with managed slots) |
 
-The published record struct is rendered from the DESCRIPTION by `RecordStructEmitter` in its published mode — the
-same member/codec walk that renders a program's internal record struct, over the description's host types instead of
-the storage form's fields, with `AsImage`/`FromImage` from the one group image codec (`GroupImageCodec`) and the
-landing and validity rules of `HostLanding`.
+The published record struct is rendered from the DESCRIPTION by `PublishedRecordEmitter` (corrected 2026-10-15, kb/Work
+PB2099: this paragraph used to name a "published mode" of `RecordStructEmitter` and `GroupImageCodec`, but a group
+FORMAL has no internal record struct — the program reads it through windows over its area — so there is no member walk
+to share; what IS shared is the storage geometry and the door rules):
+- **Geometry.** Each member's place in the record image is `BitLayout.StartBitWithin`, the one §8.5.1.6.3 placement walk
+  (in bits, so two USAGE BIT members that share a byte are placed as the program places them, and a national member
+  occupies its two bytes per position) that both the binder's class offsets and the record-struct image codec are laid
+  out by; an occurrence's stride is `BitLayout.StrideBits`. Nothing re-derives an offset.
+- **Members.** One property per named, non-redefining subordinate, in its `HostSurface.TypeOf` type (an array for
+  OCCURS); a nested record struct per subordinate group. A REDEFINES view and FILLER are no members: the positions no
+  member covers keep the image `FromImage` (or the entry's write-back) read, held privately, so an image round-trips; a
+  record the host constructs holds spaces there (a group MOVE SPACES — national spaces in a national group, zero bits in
+  a bit group). The parameterless constructor gives text members `""` (spaces in the image), tables their declared
+  occurrences and nested records their own constructor, so `new R()` is a whole record.
+- **Landing (`AsImage`, and the entry's landing).** Every member goes through `HostLanding` as an elementary formal of
+  its description does — `Land` for a number (written in its storage form under its profile), `LandText` for a
+  character, national or bit member, `RequireOccurrences` for a table — so a lossy member, a null member and an array of
+  the wrong length are refused with `ArgumentException` naming the parameter and the member (`LK_SUB.LK_X`,
+  `LK_TAB[1]`) before anything is activated.
+- **Decoding (`FromImage`, and the write-back).** Every numeric member is decoded by the one validity rule
+  (`HostLanding.TryDecode` through `HostEntryEmitter.NumericDecode`, the decode an elementary formal uses); a record any
+  member of which fails it is not decoded at all — the host's variable is unchanged — and the `FormatException` names
+  the first failing member (`LK_G.LK_N`). `FromImage` refuses an image that is not the record's width
+  (`HostLanding.RequireImage`).
+- **Crossing.** The record image is the group's storage; a bit or national group (§13.18.29.4 GR1b/GR2b) crosses as the
+  elementary item it is treated as, its boolean or national positions, exactly as the CALL lane's text crossing carries
+  it (`CallEmitter.CallStringRead`).
 
 ### 4.4 Why the host entry lives in the program's assembly, and why it is not a shim
 **Placement.** The entry is generated into the assembly that compiled the unit because (1) the repository IS that
@@ -1797,13 +1820,16 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`; the door rules
    and the type table are in the tree too: `HostLanding` in the runtime, pinned by `HostLandingTests` on §17.3's loss and
    validity fixtures, and `HostSurface.TypeOf(DataItem)` in the binder's model, pinned by `HostSurfaceTests`; and
-   `HostEntryEmitter` emits `Call` and `Cancel` for every outermost unit whose formals and RETURNING item are
-   elementary, witnessed by the host harness `HostEntryTests` and pinned by `HostEntryShapeDriftTests`, so the
-   published record struct for a group formal is the next step). Settled
+   `HostEntryEmitter` emits `Call` and `Cancel` for every outermost unit, witnessed by the host harness `HostEntryTests`
+   and pinned by `HostEntryShapeDriftTests`; a GROUP formal or RETURNING item is its published record struct
+   (`PublishedRecordEmitter`, §4.3) for every fixed group whose members the record image holds, and a unit with a group
+   holding a pointer or object leaf, a dynamic-length item, a dynamic-capacity table or an OCCURS DEPENDING ON table —
+   the CALL lane's cell-area and variable-length carriers — publishes no entry until the next step renders those
+   shapes (`PublishedRecordEmitter.Renders`). Settled
    2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
    binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
-   validity decode); `RecordStructEmitter`'s published mode; `HostEntryEmitter` over the CALL lane's renderer with
+   validity decode); the published record struct (`PublishedRecordEmitter`); `HostEntryEmitter` over the CALL lane's renderer with
    `Call` and `Cancel`; `CallProgram`'s and `Cancel`'s nullable `callerPath` and its outermost-boundary arm with R48's
    run-unit-ended exception (the §14.6.11 actions, then the one documented type); `OutputKind` library for a group
    without a main unit; the host harness (§17.1) with its Linux leg; the drift tests of §17.3 for the entry body, the
