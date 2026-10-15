@@ -1,4 +1,4 @@
-## REDEFINES of a USAGE BIT item that shares a byte compiles, and a redefiner no longer splits a bit run (PB3166)
+## Entry 2043 — 2026-10-14 18:42 PDT — REDEFINES of a USAGE BIT item that shares a byte compiles, and a redefiner no longer splits a bit run (PB3166)
 
 The repro `w1078e/p5.cob` (a GROUP-USAGE BIT group redefined by another, after a bit leaf) failed in the Roslyn
 backend with CS0103 "'RSUB' does not exist". The re-probe showed the cause is wider than the note: any redefined USAGE BIT
@@ -21,3 +21,4 @@ Goldens: `2002/pb3166_redefines_bit_item_in_shared_byte` (values derived from 13
 `negative/pb3166-redefines-bit-item-below-2002`; `BitRunImageDriftTests` rows BRD09 and BRD10. Design doc updated
 (`COBOLNET_DATA_MODEL_DESIGN.md`, the run section). No inventory row claimed or closed. Sibling sweep: the OCCURS DEPENDING
 holder, a table element struct and an FD record round trip were probed and agree.
+
