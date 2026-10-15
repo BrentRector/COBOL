@@ -322,6 +322,8 @@
   "pb1264-capacity-register-named-like-a-file",
   "pb1264-capacity-register-named-like-a-paragraph",
   "pb1264-capacity-register-named-like-a-section",
+  "pb3165-method-capacity-register-in-sibling-method",
+  "pb3165-method-capacity-register-duplicates-method-data-name",
   "pb1145-procedure-header-formal-repeated",
   "pb1145-method-header-redefines-formal",
   "pb1145-function-returning-is-a-formal",

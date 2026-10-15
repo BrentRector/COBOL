@@ -218,6 +218,7 @@
   "pb1929_set_function_pointer_function_sender",
   "pb1948_dynamic_length_limit_constant",
   "pb1674_global_capacity_register",
+  "pb3165_method_capacity_register_scope",
   "pb1265_occurs_printed_formats",
   "pb1374_flag02_defaults",
   "pb1073_dynamic_length_member_not_a_key_2014",

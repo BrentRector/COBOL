@@ -1871,7 +1871,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     internal CapacityRef? CapacityRegisterFor(Core.DataReferenceContext dref)
     {
         DataReferenceCst r = dref;
-        if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var tables)) return null;
+        if (r.BaseName is not { } name || data.Symbols.CapacityCandidates(name, data.ActiveScope) is not { } tables) return null;
         var written = ReadWritten(dref);
         var reached = tables.FindAll(t => t.OccursSpec?.CapacityRegister is { } cand
                                           && data.QualifierChainMatches(cand, written.Qualifiers));

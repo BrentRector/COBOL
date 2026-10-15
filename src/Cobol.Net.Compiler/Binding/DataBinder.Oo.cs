@@ -27,6 +27,15 @@ public sealed class OoMethodDataScope
     /// object IX with its OWN cell — never one of the unit's <see cref="DataBinder.IndexNames"/>).</summary>
     public IndexNameRegistry IndexNames { get; } = new();
 
+    /// <summary>The method's own OCCURS DYNAMIC <c>CAPACITY IN data-name-3</c> register-names → the method's dynamic
+    /// tables that declare them (the method twin of <see cref="DataBinder.CapacityRegisters"/>; kb/Work PB3165). The
+    /// register is "treated as though implicitly defined at the same level as the entry containing the OCCURS
+    /// clause" (§13.18.38.3 SR30), so it is a name of the SAME source element and scope as that entry's data-names:
+    /// method-private, shadowing an object-level name of the spelling and invisible to a sibling method (§11.7.4
+    /// GR5). A list per name for the reason the unit's map has one (a TYPE / SAME AS copy of one written entry
+    /// reproduces its register, kb/Work PB2988).</summary>
+    public Dictionary<string, List<DataItem>> CapacityRegisters { get; } = new(CobolNames.Comparer);
+
     /// <summary>The method's own §8.3.2.2 census: a method is a source element of its own (§10.5), so its words may
     /// repeat, as another type, a word of its class or of a sibling method (§8.4.6.1; kb/Work PB2921).</summary>
     internal UserWordCensus Words { get; } = new();

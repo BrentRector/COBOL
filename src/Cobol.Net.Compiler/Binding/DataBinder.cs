@@ -184,9 +184,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>The dynamic tables whose named CAPACITY register THIS source element declares — the registers its
     /// own class emits a profile for. An inherited register's profile is its container's (the contained class is
-    /// nested in the container's and reads it there).</summary>
+    /// nested in the container's and reads it there). A METHOD's registers are declared by this element too — the
+    /// method's own scope holds the NAME (<see cref="OoMethodDataScope.CapacityRegisters"/>, kb/Work PB3165), the
+    /// class still emits the profile, as it does for the method's other numeric items.</summary>
     public IEnumerable<DataItem> DeclaredCapacityRegisterTables =>
-        CapacityRegisters.Values.SelectMany(static t => t).Where(t => DeclaringDepth(t) == 0);
+        CapacityRegisters.Values.SelectMany(static t => t).Where(t => DeclaringDepth(t) == 0)
+            .Concat(_ooBoundMethods.SelectMany(static m => m.DataScope.CapacityRegisters.Values).SelectMany(static t => t));
 
     /// <summary>REPORT SECTION <b>sum counter</b> names (case-insensitive) → every SUM ENTRY that carries the name —
     /// its <see cref="ReportSumFamily"/>, whose occurrences a subscript selects (kb/Work PB1271) — with its owning

@@ -1435,7 +1435,11 @@ resolution) belongs with increments 2/3 where the register becomes a readable it
 (a VIEW over `{tablePath}.Capacity`, synthesized in a `DataBinder.DynamicResolve` post-build pass, indexed by
 `DataBinder.CapacityRegisters`, resolved via an early `ReferenceResolver.Resolve` hook + the new
 `ReferenceResolver.TablePath` whole-table-path helper); an unsigned-integer native-binary `PicInfo` so numeric reads
-hit the plain scale-0 branch, its `NumProfile` emitted (not a field) for the DISPLAY/`FormatDisplay` path. SET Format
+hit the plain scale-0 branch, its `NumProfile` emitted (not a field) for the DISPLAY/`FormatDisplay` path. **Scope (kb/Work
+PB3165):** the register is a name of its entry's source element (§13.18.38.3 SR30), so a METHOD's registers live in
+`OoMethodDataScope.CapacityRegisters`, not the unit map — method-private, shadowing an object-level register or data-name
+(§11.7.4 GR5), invisible to a sibling method, and the SR30 duplicate check is made against the method's own names.
+`SymbolTable.CapacityCandidates` is the one scope-aware lookup `ReferenceResolver.CapacityRegisterFor` reads. SET Format
 14 (TO/UP BY/DOWN BY) reroutes in `BindSetTo`/`BindSetUpDown` on a `CapacityRegisterPlace` first target →
 `BoundSetCapacity` → `SetCapacity`/`CapacityUpBy`/`CapacityDownBy`. Diagnostics: **1523** (register as an ordinary
 receiver — the `ResolveReceiving` chokepoint; and the SR30 implicit-definition name collision in `DynamicResolve`),
