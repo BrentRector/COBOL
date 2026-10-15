@@ -26,8 +26,11 @@ applicable statement and the MERGE continues. Recorded in `docs/CONFORMANCE.md` 
 below the procedure's nested dispatch, so no `goto` can reach the statement's end. The question is asked instead at
 the one place every selection path reaches a declarative through, `__RunUse`, once the declarative has finished:
 
-- A format 1 SORT registers its declarative scope (the emitted `__useActive`) first in its body (`CobolSort.RegisterUseScope`)
-  (`EcEmitter.SortUseScope`, set exactly when the scope has the EC-model `__RunUse`).
+- A format 1 SORT registers its declarative scope (the emitted `__useActive`) first in its body
+  (`CobolSort.RegisterUseScope`; `EcEmitter.SortUseScope`, set exactly when the scope has the EC-model `__RunUse`).
+  It is a new runtime member rather than a parameter added to `CobolSort.Init`: the gate's `RuntimeAbiPinDriftTests`
+  caught that changing the shipped `Init` would have been an incompatible runtime change, raising the major and
+  stranding every compiled module.
 - `__RunUse` hands every DECLARATIVE's action to `CobolSort.AfterUseProcedure`.
 - That throws `SortTerminationSignal` when the action is not a normal completion
   (`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off) and a SORT that
@@ -64,3 +67,8 @@ Also `2002/pb1177_method_sort_use_not_normal` (the method arm), `unit:SortUseTer
 **Left as a lead.** A USE GLOBAL declarative of a CONTAINING program runs in the container's instance through
 `__RunGlobalUse`, which returns only "ran". When one is invoked from a contained program's SORT procedure and does
 not complete normally (GR1 RESUME-as-CONTINUE), the contained SORT is not terminated.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T215125Z-fbb8c8:
+Conformance 6,116/11,713, Unit 33,268/33,673, Characterization 6/36 in leg 1, with both new goldens and all four
+`SortUseTerminationTests` passing). The two earlier reds were the citation audit, which read "has no GR17" as a
+citation, and the ABI pin above.
