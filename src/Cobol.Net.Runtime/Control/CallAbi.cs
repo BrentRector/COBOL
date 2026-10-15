@@ -981,10 +981,10 @@ public static class CobolArgAdapt
         switch (args[i].Carrier)
         {
             case ManagedPointer<CobolVarGroup> vp when VariableToFixedPair(args[i], groupAtoms, width) is { } pair:
-                return ManagedPointer<string>.OverField(
+                return ManagedPointer<string>.OverStorage(
                     () => CobolVarGroup.ToImage(vp.Value ?? CobolVarGroup.Empty, pair.Argument, pair.Formal, width),
-                    v => vp.Value = CobolVarGroup.OverlayImage(vp.Value ?? CobolVarGroup.Empty, pair.Argument,
-                        CobolString.Store(v, width), pair.Formal));
+                    (v, received) => vp.Value = CobolVarGroup.OverlayImage(vp.Value ?? CobolVarGroup.Empty, pair.Argument,
+                        CobolString.Store(v, width), pair.Formal, received));
             case ManagedPointer<string> sp when width < 0:   // ANY LENGTH (§13.18.2 GR1) — the full-string view
                 return ManagedPointer<string>.OverField(
                     () => sp.Value ?? "",
@@ -1133,9 +1133,10 @@ public static class CobolArgAdapt
         {
             ManagedPointer<CobolVarGroup> vp when OtherShape(args[i], formalAtoms) is { } argAtoms =>
                 GroupCompatibility.Walk(argAtoms, formalAtoms) is null
-                    ? ManagedPointer<CobolVarGroup>.OverField(
+                    ? ManagedPointer<CobolVarGroup>.OverStorage(
                         () => CobolVarGroup.Reshape(vp.Value ?? CobolVarGroup.Empty, argAtoms, formalAtoms),
-                        v => vp.Value = CobolVarGroup.Overlay(vp.Value ?? CobolVarGroup.Empty, v, argAtoms, formalAtoms))
+                        (v, received) => vp.Value = CobolVarGroup.Overlay(vp.Value ?? CobolVarGroup.Empty, v, argAtoms,
+                            formalAtoms, received))
                     : Unreadable<CobolVarGroup>(args, i, "a variable-length group formal of an incompatible shape"),
             ManagedPointer<CobolVarGroup> vp => vp,
             ManagedPointer<string> sp when FixedToVariableShape(args[i], sp, formalAtoms) is { } fixedShape =>

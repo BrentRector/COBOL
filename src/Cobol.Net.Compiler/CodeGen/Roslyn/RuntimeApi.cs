@@ -1963,9 +1963,11 @@ internal static class RuntimeApi
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.ToImage)}({carrier}, {from}, {imageShape}, {totalWidth})";
 
     /// <summary>A fixed-length formal's store back over a variable-length argument's storage (§14.2.3 GR8;
-    /// kb/Work PB965) — <c>CobolVarGroup.OverlayImage</c>.</summary>
-    public static string VarGroupOverlayImage(string current, string currentShape, string image, string imageShape) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.OverlayImage)}({current}, {currentShape}, {image}, {imageShape})";
+    /// kb/Work PB965) — <c>CobolVarGroup.OverlayImage</c>; <paramref name="received"/> is the receiving references the
+    /// activated element made through the formal (kb/Work PB2690).</summary>
+    public static string VarGroupOverlayImage(string current, string currentShape, string image, string imageShape,
+        string received) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.OverlayImage)}({current}, {currentShape}, {image}, {imageShape}, {received})";
 
     /// <summary>A variable-length formal's carrier stored back over a fixed-length argument's record image (§14.2.3 GR8;
     /// kb/Work PB2690) — <c>CobolVarGroup.OverlaidImage</c>.</summary>
@@ -1978,9 +1980,9 @@ internal static class RuntimeApi
         $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Reshape)}({carrier}, {from}, {to})";
 
     /// <summary>A variable-length view's store back over the variable-length storage it views (ISO §14.2.3 GR8;
-    /// kb/Work PB480) — <c>CobolVarGroup.Overlay</c>.</summary>
-    public static string VarGroupOverlay(string current, string view, string currentShape, string viewShape) =>
-        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Overlay)}({current}, {view}, {currentShape}, {viewShape})";
+    /// kb/Work PB480) — <c>CobolVarGroup.Overlay</c>; <paramref name="received"/> is <see cref="VarGroupOverlayImage"/>'s.</summary>
+    public static string VarGroupOverlay(string current, string view, string currentShape, string viewShape, string received) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Overlay)}({current}, {view}, {currentShape}, {viewShape}, {received})";
 
     /// <summary>A DETACHED variable-length carrier cell (BY CONTENT / BY VALUE, §14.2.3 GR9/GR10).</summary>
     public static string VarGroupCell(string value) => $"ManagedPointer<{VarGroupType}>.Cell({value})";

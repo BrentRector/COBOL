@@ -242,6 +242,8 @@
   "pb2690_fixed_table_formal_grows_dynamic_argument_invoke",
   "pb2690_initialized_created_occurrences_call",
   "pb2690_initialized_created_occurrences_invoke",
+  "pb2690_store_of_shown_image_grows_capacity_call",
+  "pb2690_store_of_shown_image_grows_capacity_invoke",
   "pb2967_numval_f_wide_binary_receiver_size_error",
   "pb2964_length_bit_variable_group",
   "pb3030_bit_odo_variable_group",
