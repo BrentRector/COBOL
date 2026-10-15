@@ -874,8 +874,10 @@ internal sealed class ProgramEmitter
             // The run-unit TERMINATION surface is owned by the runtime's RunModule boundary
             // (ProgramTable.RunModule): the module's OWN registration (EnsureRegistered, which the run unit may refuse,
             // PB2097 — kb/Work PB2846: it used to run before the boundary, so a version-skew refusal of the main module
-            // escaped as an unhandled .NET exception), the STOP-status flush (§14.9.42.4 GR5, via the
-            // RunUnit.ExitStatus setter), the §14.6.12 abnormal-termination diagnostic + nonzero exit on a fatal EC, and
+            // escaped as an unhandled .NET exception), the delivery of the run unit's STOP status to the process exit code
+            // (§14.9.42.4 GR5: RunModule alone writes Environment.ExitCode, once, when the run unit has ended; the
+            // RunUnit.ExitStatus setter is plain run-unit state and RunMain, the host entry, writes nothing, so a second
+            // process entry must call RunModule, kb/Work PB3163), the §14.6.12 abnormal-termination diagnostic + nonzero exit on a fatal EC, and
             // the §14.6.11 implicit CLOSE of ALL run-unit connectors. Runtime-side so each applies to the WHOLE run unit —
             // incl. a separately-compiled CALLed module whose EC/file descriptors this compilation group never
             // saw — not just this group (SSOT §18.16 keeps the wrapper scaffolding-free). The entry wrapper only

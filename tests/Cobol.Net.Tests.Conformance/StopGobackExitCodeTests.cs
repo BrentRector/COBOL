@@ -353,9 +353,9 @@ public sealed class StopGobackExitCodeTests
     /// <summary>The in-group companion to the cross-assembly case below: a status-free MAIN CALLs a sub whose
     /// <c>STOP RUN … WITH STATUS</c> ends the whole run unit (ISO §14.9.42.4 GR6). STOP RUN passes its status
     /// regardless of whether it runs in the main or a called program (unlike GOBACK, GR2/GR3 — see
-    /// <see cref="CalledSubprogramGobackStatus_IsInert"/>). Locks that the runtime-side flush (the
-    /// <see cref="Runtime.RunUnit.ExitStatus"/> setter) — not a compile-time parse-tree scan — carries the status
-    /// to the exit code (§14.9.42.4 GR5).</summary>
+    /// <see cref="CalledSubprogramGobackStatus_IsInert"/>). Locks that the runtime-side delivery (the
+    /// run unit's <see cref="Runtime.RunUnit.ExitStatus"/>, written to the exit code by <c>ProgramTable.RunModule</c> when
+    /// the run unit ends) — not a compile-time parse-tree scan — carries the status to the exit code (§14.9.42.4 GR5).</summary>
     [Fact]
     public void CalledSubprogram_StopRunWithStatus_SetsExitCode()
     {
@@ -393,9 +393,9 @@ public sealed class StopGobackExitCodeTests
     /// §14.9.42.4 GR6) and its STATUS is "passed to the operating system" (GR5). When the <c>STOP RUN … WITH
     /// STATUS</c> executes in a SEPARATELY-COMPILED CALLed module, the status is the RUN UNIT's, not the main
     /// program's — it must reach the process exit code even though the main program's own compilation group carries
-    /// no status phrase (so a compile-time parse-tree scan of the main group can never see it). The exit-code flush
-    /// is runtime-side (the <see cref="Runtime.RunUnit.ExitStatus"/> setter over the shared ambient run unit), so
-    /// the sub's status crosses the assembly boundary. Regression lock for the pre-fix silent discard-to-0.</summary>
+    /// no status phrase (so a compile-time parse-tree scan of the main group can never see it). The exit-code delivery
+    /// is runtime-side (<c>ProgramTable.RunModule</c> reads <see cref="Runtime.RunUnit.ExitStatus"/> of the shared ambient
+    /// run unit when it ends), so the sub's status crosses the assembly boundary. Regression lock for the pre-fix silent discard-to-0.</summary>
     [Fact]
     public void SeparatelyCompiledModule_StopRunWithStatus_CrossesAssemblyBoundary()
     {
