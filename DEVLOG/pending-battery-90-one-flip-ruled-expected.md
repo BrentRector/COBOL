@@ -14,3 +14,8 @@ case still refuse, each for an ISO reason.
 
 The flip is ruled expected (kb/Work PB3187), and the per-case baseline is re-recorded from a full re-run with that one
 row moved. The script's own verdict was NOT GREEN on the flip alone, a miss against #89's 0-flip bar.
+
+The branch review found the ruling cited §11.10.3 as SR1-SR5. The clause has six syntax rules (SR1 for all formats,
+SR2-SR6 for Format 1; SR6 is the RECURSIVE-in-an-initial-container rule). The note now names all six, checked with
+`cite.py --check 11.10.3` on SR6, and lists §11.10.3 in its `spec_refs`. None of the six constrains a program-name's
+spelling, so the verdict stands.
