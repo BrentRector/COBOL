@@ -1,10 +1,10 @@
 # The per-edition conformance suites — design (kb/Work PB3160)
 
-**Status: PROPOSED, revision 2, for the owner's review (2026-10-14).** Revision 1 (ec8138043) wrote up what the
+**Status: APPROVED by the owner, 2026-10-14 ("approved", revision 2).** Revision 1 (ec8138043) wrote up what the
 owner approved section by section in conversation. Mythos reviewed it at the owner's request
 (`E:/COBOL-coord/scratch/PB3160-design-review-mythos.md`, verdict REVISE) and the operator folded the findings in
-(§12 lists each). Revision 2 changes how a must-reject test is judged (§3.2), which the owner had approved in its
-revision-1 form, so the owner reviews the written whole again. Nothing is built yet. Until it is approved,
+(§12 lists each); revision 2 changed how a must-reject test is judged (§3.2), and the owner approved the written
+whole. Implementation is the slices of §13, each a kb/Work note in the PB3160 campaign. Until slice S2 lands,
 `docs/VERSION_TEST_MATRIX_DESIGN.md` §5 and `tests/conformance/README.md` describe the corpus as it is.
 
 ## 1. The direction and the decisions
@@ -151,6 +151,9 @@ conformance-suite/
   harness/                    the generator and the runner (§5)
   wiseowl/diagnostics.json    WiseOwl's refusals: per test, the editions at which WiseOwl refuses it and the code
                               or message substring it reports (today's reject-at + .err, carried over by §6 step 1)
+  wiseowl/cases/<clause>/     WiseOwl-only regression tests, same format: documented non-support, tests of no
+                              normative rule, tests that cannot be made portable; the generator writes them to a
+                              `wiseowl` manifest only, never to a suite
 ```
 
 - **In this repository**, not a separate one: a compiler fix and its test land in one change and CI runs both. The
@@ -209,7 +212,7 @@ conformance-suite/
    unverified`. Negative programs keep their `reject-at` editions and their `.err` expectation, code or message
    substring, in `wiseowl/diagnostics.json`; they become flagged tests only in their clause pass (step 2), when a
    control is written. **Programs that witness documented non-support** (every citing row DOCUMENTED-NON-SUPPORT, or a
-   non-support diagnostic in the `.err`: the 84 negatives among them) go to WiseOwl's own regression tree, never to
+   non-support diagnostic in the `.err`: the 84 negatives among them) go to `wiseowl/cases/` (§4), never to
    `cases/`; `DocumentedNonSupportWitnessTests` and `DeclinedFacilityTests` keep pinning them there.
    The same change rewrites the inventory's 7,928 `conformance:` citations and the ref grammar in
    `inventory-schema.json`; replaces `CorpusRunnerTests` and `CorpusManifest` with the manifest runner; re-records the
@@ -308,3 +311,44 @@ conformance-suite/
 | F12 — counting rules; "`CutRunner.Normalize` does not exist" | Suggestion | Counting rule adopted (§2). The class claim is wrong: `internal static class CutRunner` with `Normalize` is `tests/Cobol.Net.Tests.Conformance/CompilerUnderTest.cs:12` |
 | F13 — two runners parsing headers | Suggestion | Adopted: the generator's manifests are the only input to both runners, with a verdict drift test (§5) |
 | F14 — free-form header; id and file name | Suggestion | Adopted (§3, §3.1) |
+
+## 13. Implementation slices
+
+Each slice is one kb/Work note in the PB3160 campaign (`cluster: [PB3160]`), ordered by its `blocked_by`; the notes
+hold the status, this section the scope. Every slice ships its own tests and drift tests, gates with
+`build-local.ps1`, and updates this document where it corrects it (CLAUDE.md rules 2, 5, 6).
+
+- **S0a — one spelling for `editions` (PB3172).** Every row's `editions` is the comma-separated ascending list with no
+  spaces (`85,2002,2014,2023`); `scripts/spec/inventory_schema.py`, the one validator, refuses any other spelling,
+  and every writer (`build_inventory.py`, `record_verdicts.py`, `derive_verdict_batch.py`,
+  `grammar_findings_to_batch.py`) writes it. Empty stays legal until S0b.
+- **S0b — the 153 empty `editions` rows decided (PB3173).** For each, the editions at which the rule exists, derived
+  from the standard and the version-change reference (`docs/VERSION_CHANGE_REFERENCE.md`), each with its citation
+  checked by `cite.py`; then the validator refuses an empty field. An adjudication slice: an adjudicator decides, a
+  refuter checks each decision.
+- **S1a — the generator (PB3174).** `conformance-suite/harness/generate.py`: the one header parser (fixed and free
+  form), every refusal of §4, the per-edition manifests and the `wiseowl` manifest, the completeness report by witness
+  kind (§4), `--self-test` (discovered by `scripts/self_tests.py`). Built and proved on a seed of tests written from
+  the standard into `cases/` (an accepted test, a per-edition output, a flag test with its control, an A.1-valued
+  test, a test with a copybook), never on the old corpus.
+- **S1b — the harness (PB3175).** `conformance-suite/harness/run.py` with the adapter, profile and baseline formats
+  of §5, the WiseOwl and GnuCOBOL adapters and profiles, a fresh working directory per test, stdin closed, the
+  verdicts and their JUnit XML and JSON, `--record-baseline` and the CHANGES report; `--self-test` drives a stub
+  compiler (a Python script) through every verdict, so the logic is tested without `cobc`. Runs on Windows and
+  Linux.
+- **S1c — WiseOwl's manifest runner (PB3176).** An xUnit runner in `tests/Cobol.Net.Tests.Conformance` that executes
+  the generator's manifests in-process (accept: compile, run, compare through `CutRunner.Normalize`; flag: the
+  diagnostic at the marked line; `wiseowl/diagnostics.json`: the refusal and its code or message), and the drift
+  tests of §9: equal verdicts with `run.py` on the WiseOwl adapter, and the two normalizations on one shared fixture.
+- **S2 — the move (PB3177).** §6 step 1, in one landing: the converter (committed on the branch for review, deleted
+  before it lands: the move is its output), the moved tree, `wiseowl/cases/` and `wiseowl/diagnostics.json`, the
+  inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the
+  skills and the open notes, `CorpusRunnerTests`/`CorpusManifest`/`tests/conformance/` deleted, and the neutrality
+  proof's evidence in the note. `tests/conformance/README.md`'s authoring guide moves to `conformance-suite/README.md`.
+- **S3 — the pilot (PB3178).** §8: clause 11, §14.9.8 and `pb355_start_length_past_operand` through §6 steps 2-4 at
+  all four editions on WiseOwl and GnuCOBOL; GnuCOBOL's baseline recorded; the cost per test and the share of each of
+  step 2's three outcomes measured and written into PB3160 and §8, with the estimate for the remaining clauses.
+- **S4 — the release archives (PB3179).** §7's CI job, held until the owner chooses the license (kb/Work PB3159).
+
+The remaining clauses are filed as campaign notes from S3's measurement, held until zero GAP and zero known defects
+(§8).
