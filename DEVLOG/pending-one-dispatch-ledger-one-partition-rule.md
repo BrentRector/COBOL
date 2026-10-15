@@ -56,3 +56,20 @@ section 8.7, DESIGN-orchestrator-loop section 9 (item 1b, new) and its coordinat
 writers and the one partition rule.
 
 **Gate.** === BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN === (run TestResults/build-local/20261015T210113Z-619d82; the changed self-tests test_plan_wave, test_dispatch_guard, landing_check, prune_worktrees, enqueue GREEN); semgrep verify.py PASS. LINUX GATE: the lander's (batched gating). `work.py check` green. PB2807 and PB3186 landed, `closes_rows: []` (process tooling).
+
+**Branch review round 1 (two findings, both fixed).** R1-1: the branch fixed the mechanism of three notes that were
+already open (PB2614, the guard recorded every Workflow and lander call; PB2701, identity() bound a worktree to the
+union of its ledger groups; PB3040, hand entries never retired) and left them open with code sites it deleted, so the
+campaign planner still listed PB3040 as work. They are landed now, each with what removed its mechanism, and PB3186
+names them. The sibling sweep of every open note naming the hand ledger found PB2795 (a RETURNED group kept its whole
+declared set in flight at the landing check): the planner had dropped report-answered groups privately in
+`classify_inflight` since this branch, the landing check had not. The rule moved to `inflight_file_sets` source 3
+(`reports=`), the one reader the planner, the landing check and the survey's in-flight slugs share, and PB2795 landed
+with it; PB2974 stays open with a note on why the partition does not close it. R1-2: the planner surveyed branches
+without the open pull requests, so it could never read BOUNCED and read a bounced branch as ENQUEUED (a CONTINUATION)
+where the landing lane read it BOUNCED (wait). `prune_worktrees.live_survey` is now the one production survey (reports,
+in-flight slugs, pull requests), called by `prune_worktrees.py`, `land_lane.survey_rows` and the planner, and
+`survey(prs=)` is required so no caller reads a git-only lifecycle by omission. New self-test checks: live_survey reads
+ENQUEUED and BOUNCED; no orchestrator script calls `prune_worktrees.survey` directly; an answered group is not in flight
+(prune_worktrees), holds no declared file (test_plan_wave), and frees its untouched declared files at the landing check
+(landing_check PB2795).

@@ -37,7 +37,7 @@ STATE, all under `<coord>/land-lane/` (the coordination directory, never a workt
 
 THE TICK, in order:
   1. REAP: an attempt whose runner is gone without an rc is DIED. A run that ended QUEUE NOT ACTIVE writes HALT.
-  2. SURVEY: `git fetch`, then `prune_worktrees.survey` and its landing order (the most harmful lead first, kb/Work
+  2. SURVEY: `git fetch`, then `prune_worktrees.live_survey` and its landing order (the most harmful lead first, kb/Work
      PB2981), written to survey.json. The survey reads these attempts back (`view`, kb/Work PB3125, PB3181): a branch
      whose newest attempt at its tip STOPPED reads STOPPED, one whose attempt there was ENQUEUED reads ENQUEUED, and
      only a tip no attempt stopped at reads WAITING TO LAND.
@@ -273,7 +273,7 @@ def pid_alive(pid: int | None) -> bool:
 
 def survey_rows(repo: pathlib.Path, cdir: pathlib.Path) -> tuple[list[dict[str, Any]], list[str]]:
     """(every surveyed row as {name, state, tip, worktree, why, lead}, the WAITING TO LAND names in landing order) —
-    prune_worktrees' own survey, imported: one lifecycle rule (MANDATORY-PRACTICES O10). The reports and the dispatch
+    prune_worktrees.live_survey, imported: one lifecycle rule (MANDATORY-PRACTICES O10). The reports and the dispatch
     ledger are the TICK's coordination directory's, never the environment's default."""
     import prune_worktrees  # noqa: PLC0415  (scripts/: it imports coord and plan_wave back)
     probe = prune_worktrees.git("rev-parse", "--git-common-dir", cwd=repo)
@@ -282,10 +282,7 @@ def survey_rows(repo: pathlib.Path, cdir: pathlib.Path) -> tuple[list[dict[str, 
     fetch = prune_worktrees.git("fetch", "-q", "origin", cwd=repo)
     if fetch.returncode != 0:
         raise LaneError(f"git fetch origin failed in {repo}: {fetch.stderr.strip()[:200]}")
-    terminal = prune_worktrees.note_terminal()
-    rows = prune_worktrees.survey(repo, reports=prune_worktrees.report_index(coord.reports_dir(str(cdir)), terminal),
-                                  slugs=prune_worktrees.in_flight_slugs(cdir, terminal),
-                                  prs=prune_worktrees.pull_requests(), coord_dir=cdir)
+    rows = prune_worktrees.live_survey(repo, coord_dir=cdir)
     order = [r.name for r in prune_worktrees.landing_order(rows, prune_worktrees.note_rank())]
     return ([{"name": r.name, "state": r.state, "tip": r.tip, "worktree": r.worktree, "why": r.why,
               "lead": r.report.lead if r.report else None} for r in rows], order)

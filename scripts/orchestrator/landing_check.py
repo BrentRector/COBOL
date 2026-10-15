@@ -37,7 +37,8 @@ commit subjects or whose status it flips, else the ONE ledger group that best co
 union of every ledger group its diff met made a fix-lane worktree on a file one R3 group also declared R3 work, and with
 the scraped hand entries the dispatch guard once wrote (six of 303-910 files) it stopped 23 fix-lane landings on
 2026-10-14/15. The ledger is read through plan_wave.ledger_groups, which ignores those retired entries. A dispatch
-entry stays in flight with its whole declared set until its notes are terminal, started or not. A branch this landing
+entry stays in flight with its whole declared set, started or not, until its notes are terminal or its report answers it
+(its agent returned: its work is then its branch's actual diff, kb/Work PB2795). A branch this landing
 contains (it merged it) is the landing's own: only its later, uncommitted edits count; and so is a file whose version
 on another branch IS the landing's (the same work re-committed); anything else that shares a file and was dispatched
 earlier stops it, and the stop names how it was identified and how to bind work it failed to recognise.
@@ -214,7 +215,9 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
                          f"hole: file a kb/Work note), and check them against the in-flight work before landing")
 
     meta: dict[str, dict] = {}
-    busy = plan_wave.inflight_file_sets(git=git, repo=repo, coord_dir=coord_dir, meta=meta, terminal=terminal)
+    # an answered dispatch (its report exists) is read through its branch, never its declared set (PB2795)
+    busy = plan_wave.inflight_file_sets(git=git, repo=repo, coord_dir=coord_dir, meta=meta, terminal=terminal,
+                                        reports=reports)
 
     def contained(their_rev: str, files: set[str]) -> set[str]:
         """The files whose version on `their_rev` IS this landing's: a lander that re-committed or patched a member's
@@ -262,7 +265,7 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
                 shared -= contained(m["rev"], shared - set(m.get("uncommitted", set())))   # is this landing's (K3)
                 if not shared:
                     continue
-        else:                                              # a dispatch-ledger entry: its DECLARED set, started or not
+        else:                                              # an unanswered dispatch: its DECLARED set, started or not
             their_notes, their_at, how = set(m.get("notes", [])), m.get("at", 0.0), "dispatch ledger"
             if their_notes & notes:
                 continue                                   # this landing's own dispatch entry
@@ -504,6 +507,11 @@ def self_test() -> int:
     branch("f-c", "PB9100: fix", {"src/C.cs": "// fixed\n"}, 1_000_500)
     expect("N2: a STARTED R3 wave keeps its untouched declared files: a later fix-lane edit to one STOPS",
            check(repo, "origin/main", "f-c", cdir, items, rules, never, git), 1, 0)
+    (rdir / "w2a-PB9001-report.md").write_text("Status: SPLIT" + chr(10), encoding="utf-8", newline=chr(10))
+    expect("PB2795: ... until its agent RETURNS: a group its report answers (SPLIT residue included) is read through "
+           "its branch, so its untouched declared files are free",
+           check(repo, "origin/main", "f-c", cdir, items, rules, never, git,
+                 reports=plan_wave.load_reports(rdir)), 0, 0)
     sh("branch", "-D", "f-c")
     drop("wt-start")
 

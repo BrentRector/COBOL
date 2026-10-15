@@ -1668,7 +1668,8 @@ through one reader, `plan_wave.changed_files`) with
 admitted, read from the FULL ledger (the landing flips its own notes to terminal, and that declaration stays its
 authority), or the set computed now for a note never recorded; a file an R3 commit changed that existed on `main` and
 lies outside it stops the landing; and (2) every other in-flight branch's actual diff and every dispatched group's
-whole declared set until its notes are terminal, started or not (`inflight_file_sets`), when the shared file is R3
+whole declared set, started or not, until its notes are terminal or its report answers it (`inflight_file_sets`;
+a returned group is read through its branch, kb/Work PB2795), when the shared file is R3
 work on either side. R3 work is attributed PER COMMIT (PB2703): a landing can be mixed (a branch that merged a
 predecessor; before kb/Work PB3023, a train of one commit per cluster), so the
 landing's R3 work is the commits that work on an R3 note and the files those commits change; its fix-lane commits

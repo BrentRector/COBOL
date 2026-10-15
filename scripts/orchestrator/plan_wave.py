@@ -89,7 +89,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Callable
+from typing import Any, Callable, Sequence
 
 HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
@@ -396,15 +396,19 @@ def _still_differs(git: Callable[..., Any], rev: str, cwd: Any) -> set[str]:
 
 def inflight_file_sets(*, git: Callable[..., Any] | None = None, repo: pathlib.Path = REPO,
                        coord_dir: pathlib.Path | None = None, terminal: Callable[[str], bool] | None = None,
-                       with_git: bool = True, meta: dict[str, dict] | None = None) -> dict[str, set[str]]:
+                       with_git: bool = True, meta: dict[str, dict] | None = None,
+                       reports: Sequence[Report] = ()) -> dict[str, set[str]]:
     """{in-flight owner: the files it changes}: THE in-flight file set of the partition (module doc), read from
     sources that cannot miss started work, never from a branch classification (PB2118 Draft 7):
       1. every worktree but this checkout: `_still_differs(HEAD)` plus its uncommitted and untracked files (an agent's
          first edits precede its first commit);
       2. every local branch with no worktree whose tip is not on origin/main: `_still_differs(branch)`;
       3. every group in the dispatch ledger (<coord>/inflight-groups.json, read through ledger_groups) with a note that
-         is not terminal: the files the group was planned on, which exist before the agent has a worktree or a
-         commit. Its writers are structured (kb/Work PB3186): the planner's record of a planned wave and the spec
+         is not terminal and that no report in `reports` ANSWERS (a report whose slug is the group's, `w<wave><letter>`:
+         its agent returned, so its work is its branch's, which sources 1-2 read by their actual diff, and a SPLIT
+         group's unstarted residue holds no file; kb/Work PB2795): the files the group was planned on, which exist
+         before the agent has a worktree or a commit. The planner, the landing check and the survey's in-flight slugs
+         all pass their reports, so the three read one rule. Its writers are structured (kb/Work PB3186): the planner's record of a planned wave and the spec
          renderer's record of every group it renders (record_dispatch, through make_dispatch_specs.py), each with the
          group's exact file set. An attended dispatch made without a rendered group (a direct Agent call) is in flight
          from its worktree's first edit (sources 1-2), and the landing check is the guarantee behind it.
@@ -456,8 +460,9 @@ def inflight_file_sets(*, git: Callable[..., Any] | None = None, repo: pathlib.P
                 out[f"branch {b}"] = files
                 if meta is not None:
                     meta[f"branch {b}"] = {"rev": b, "uncommitted": set(), "path": None, "branch": b}
+    answered = {r.slug.lower() for r in reports}
     for g in ledger_groups(coord_dir or coord.coord_dir()):
-        if terminal is not None and all(terminal(i) for i in g.get("notes", [])):
+        if (terminal is not None and all(terminal(i) for i in g.get("notes", []))) or ledger_slug(g) in answered:
             continue
         if files := {f.replace(chr(92), "/") for f in g.get("files", [])}:
             owner = f"dispatched {ledger_slug(g)} ({', '.join(g.get('notes', [])[:3])})"
@@ -594,13 +599,13 @@ def classify_inflight(busy: dict[str, set[str]], meta: dict[str, dict], reports:
                       states: dict[str, str], branch_notes: dict[str, list[str]] | None = None) -> dict[str, InFlight]:
     """THE planner's reading of the in-flight set (inflight_file_sets and its `meta`), ONE rule for the fix lane and
     a campaign (kb/Work PB2807), keyed on the branch survey's lifecycle `states` ({branch: state},
-    prune_worktrees.survey, the one lifecycle rule):
+    prune_worktrees.live_survey, the one lifecycle rule, the open pull requests included):
       - a worktree or unlanded branch the survey reads WAITING FOR REVIEW, WAITING TO LAND or ENQUEUED is FINISHED
         work (CONTINUED_STATES): it carries the newest report whose branch field names it, and a group meeting it is
         planned as its CONTINUATION (plan(): merge it first);
       - one the survey reads LANDED is dropped (its work is on main);
-      - a dispatch-ledger group that a report answers (the report's slug is the group's, `w<wave><letter>`) is
-        dropped: its work is its branch's, which sources 1-2 read by their actual diff;
+      - a dispatch-ledger group a report answers never reaches it (inflight_file_sets drops it at source 3, the one
+        rule the landing check shares), so every dispatch owner here is DISPATCHED, NO REPORT YET;
       - everything else is RUNNING, and a group meeting it waits: a dispatch with no report yet, a branch IN FLIGHT
         (locked by a live agent, touched within the survey's --min-age, a dispatch's or an in-flight branch's), one
         STOPPED or BOUNCED at its landing (its finisher works on it next), one undecided (DECISION: unlanded work no
@@ -609,7 +614,6 @@ def classify_inflight(busy: dict[str, set[str]], meta: dict[str, dict], reports:
     `branch_notes` ({branch: the note ids its commit subjects name}, unlanded_branch_notes) and each branch's newest
     report's ids are the branch's notes: plan() never defers a group for work on its OWN notes."""
     by_branch: dict[str, Report] = {}
-    slugs = {r.slug.lower() for r in reports}
     for r in reports:   # oldest first: the last write is the newest
         if r.branch:
             by_branch[r.branch] = r
@@ -617,8 +621,7 @@ def classify_inflight(busy: dict[str, set[str]], meta: dict[str, dict], reports:
     for owner, files in busy.items():
         m = meta.get(owner, {})
         if m.get("slug"):
-            if m["slug"] not in slugs:
-                out[owner] = InFlight(set(files), notes=set(m.get("notes", [])), state="DISPATCHED, NO REPORT YET")
+            out[owner] = InFlight(set(files), notes=set(m.get("notes", [])), state="DISPATCHED, NO REPORT YET")
             continue
         branch = m.get("branch")
         state = states.get(branch or "", "RUNNING")
@@ -1265,17 +1268,17 @@ def main(argv: list[str] | None = None) -> int:
     # THE FILE-SET PARTITION, for EVERY plan (kb/Work PB2807): the in-flight work (worktrees, branches, dispatched
     # groups) read once and classified once, and the open external-repository slices
     meta: dict[str, dict] = {}
-    raw = inflight_file_sets(coord_dir=cdir, terminal=terminal, with_git=not a.no_branches, meta=meta)
+    raw = inflight_file_sets(coord_dir=cdir, terminal=terminal, with_git=not a.no_branches, meta=meta, reports=reports)
     # the slices gate the R3 campaign only (PB2118 Draft 7, R69 section 2): the fix lane is never held for them
     if a.cluster and any(work.EXTERNAL_SLICE_TITLE.match(i.get("title") or "")
                          and i.get("status") not in work.TERMINAL_STATUSES for i in items):
         raw["the open external-repository slices"] = work.slice_file_set()
     states: dict[str, str] = {}
-    if not a.no_branches:   # the branch survey's lifecycle state of every branch: THE lifecycle rule (O10)
+    if not a.no_branches:   # the branch survey's lifecycle state of every branch: THE lifecycle rule (O10), pull
+        # requests included (ENQUEUED and BOUNCED are read from them), exactly as the landing lane reads it
         import prune_worktrees  # noqa: PLC0415
-        states = {r.name: r.state for r in prune_worktrees.survey(
-            reports=prune_worktrees.report_index(reports_dir, terminal),
-            slugs=prune_worktrees.in_flight_slugs(cdir, terminal), coord_dir=cdir)}
+        states = {r.name: r.state for r in prune_worktrees.live_survey(coord_dir=cdir, reports_dir=reports_dir,
+                                                                       terminal=terminal)}
     busy = classify_inflight(raw, meta, reports, states, unlanded)
     p = plan(notes, clusters, half_clusters, reports, classify, unlanded, rules, budget_points,
              a.max_groups or rules["wave"]["max_groups"], deps=deps, busy=busy,

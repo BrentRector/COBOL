@@ -471,7 +471,8 @@ said in the supervisor's log, a failure said and the unit continuing. A tick:
 
 1. REAPS: an attempt whose detached runner is gone without an exit code is DIED; a run that ended QUEUE NOT ACTIVE
    (exit 8) writes `land-lane\HALT` and names it in the operator's mailbox.
-2. SURVEYS: `git fetch`, then `prune_worktrees.survey` and its landing order (imported, never re-parsed from text),
+2. SURVEYS: `git fetch`, then `prune_worktrees.live_survey` (the one production survey, open pull requests included;
+   `prune_worktrees.py` and the planner's partition call the same function) and its landing order (imported, never re-parsed from text),
    written to `land-lane\survey.json`. The survey decides a finished branch by ONE rule of three coverages, never by
    a report's age (kb/Work PB3181, PB3125): its newest report is FINISHED (`plan_wave.Report.finished`: DONE, or
    DISCHARGED with a HEAD past its base) and its HEAD is the tip or is followed only by mechanical commits
@@ -680,8 +681,9 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    Mythos session) a fix-lane group could be planned on a file another session's running group was changing for a
    different note; the partition once gated a campaign only. Now every group's files are checked against the
    in-flight set (`inflight_file_sets`: worktrees, unlanded branches, the ledger's still-open groups), each owner read
-   ONCE through the branch survey's lifecycle state (`classify_inflight`, `prune_worktrees.survey`, the one lifecycle
-   rule, MANDATORY-PRACTICES O10): a group meeting FINISHED work (WAITING FOR REVIEW, WAITING TO LAND, ENQUEUED) is
+   ONCE through the branch survey's lifecycle state (`classify_inflight`, `prune_worktrees.live_survey`, the one
+   lifecycle rule, MANDATORY-PRACTICES O10, read with the open pull requests exactly as the landing lane reads it, so
+   ENQUEUED and BOUNCED mean the same to both): a group meeting FINISHED work (WAITING FOR REVIEW, WAITING TO LAND, ENQUEUED) is
    planned as its CONTINUATION, its `pred` telling it to merge each such branch first (no `after:`: the branch is not
    in this wave); a group meeting RUNNING work (a ledger group with no report yet, a branch IN FLIGHT, STOPPED,
    BOUNCED or undecided as DECISION) waits, the collision and the owner's state named, so an undecided branch is

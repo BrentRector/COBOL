@@ -633,7 +633,6 @@ CI_META = {"worktree a (worktree-done)": {"branch": "worktree-done", "rev": "x"}
            "worktree c (worktree-findings)": {"branch": "worktree-findings", "rev": "z"},
            "worktree d (worktree-live)": {"branch": "worktree-live", "rev": "v"},
            "branch worktree-landed": {"branch": "worktree-landed", "rev": "worktree-landed"},
-           "dispatched w1090c (PB66)": {"notes": ["PB66"], "at": 1.0, "slug": "w1090c"},
            "dispatched w1092a (PB67)": {"notes": ["PB67"], "at": 1.0, "slug": "w1092a"}}
 SPL = dataclasses.replace(FIN, path=TMP / "w1090d-PB68-report.md", slug="w1090d", lead="PB68", status="SPLIT",
                           ids=["PB68"], branch="worktree-split")
@@ -644,8 +643,8 @@ CI_STATES = {"worktree-done": "WAITING TO LAND", "worktree-split": "DECISION", "
              "worktree-live": "IN FLIGHT", "worktree-landed": "LANDED"}
 ci = pw.classify_inflight({o: {"src/A.cs"} for o in CI_META} | {"the open external-repository slices": {"src/S.cs"}},
                           CI_META, [FIN, SPL, FND], CI_STATES, {"worktree-live": ["PB70"]})
-check("classify_inflight: WAITING TO LAND continues; DECISION, IN FLIGHT, an unanswered dispatch and an unnamed owner "
-      "run; LANDED and an answered dispatch are gone",
+check("classify_inflight: WAITING TO LAND continues; DECISION, IN FLIGHT, a dispatch (answered ones never reach it: "
+      "inflight_file_sets drops them, PB2795) and an unnamed owner run; LANDED is gone",
       {o: (x.finished.slug if x.finished else x.state) for o, x in ci.items()},
       {"worktree a (worktree-done)": "w1090c", "worktree b (worktree-split)": "DECISION",
        "worktree c (worktree-findings)": "DECISION", "worktree d (worktree-live)": "IN FLIGHT",
@@ -773,6 +772,10 @@ check("a recorded group is in flight before its agent edits a file, until its no
       ({f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False).values() for f in fs}
        >= {"src/Hand.cs", "src/More.cs"},
        pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: True, with_git=False)), (True, {}))
+check("an ANSWERED group (its report exists, SPLIT residue included) holds no declared file, for every reader (PB2795)",
+      {f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False,
+                                         reports=[dataclasses.replace(FIN, slug="w1061B", status="SPLIT")]).values()
+       for f in fs} & {"src/B.cs", "src/Hand.cs"}, {"src/Hand.cs"})
 pw.record_dispatch(HL, "1062", [], lambda i: i == "PB962")
 check("an entry whose notes all landed is dropped at the next record",
       [g["wave"] for g in coord.read_json(HL / pw.DISPATCH_LEDGER, {})["groups"]], ["1061", "1061"])

@@ -586,22 +586,41 @@ def pull_requests(gh=None) -> dict[str, PullRequest]:
     return prs
 
 
-def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool]) -> set[str]:
+def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool],
+                    reports_dir: pathlib.Path | None = None) -> set[str]:
     """The `w<wave><letter>` slugs of the dispatch-ledger wave groups still in flight, by the planner's own liveness rule
-    (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired), read from its `meta`
-    (each entry's recorded slug), never parsed back out of an owner label. A dispatch made without a rendered group
-    has no ledger entry (kb/Work PB3186); its worktree is caught by its live lock or its recency instead."""
+    (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired and that no report in
+    `reports_dir` answers, kb/Work PB2795), read from its `meta` (each entry's recorded slug), never parsed back out of
+    an owner label. A dispatch made without a rendered group has no ledger entry (kb/Work PB3186); its worktree is
+    caught by its live lock or its recency instead."""
     import plan_wave  # noqa: PLC0415
     meta: dict[str, dict] = {}
-    plan_wave.inflight_file_sets(coord_dir=coord_dir, with_git=False, terminal=terminal, meta=meta)
+    plan_wave.inflight_file_sets(coord_dir=coord_dir, with_git=False, terminal=terminal, meta=meta,
+                                 reports=plan_wave.load_reports(reports_dir) if reports_dir else ())
     return {m['slug'] for m in meta.values() if m.get('slug')}
 
 
-def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset(), min_age: int = 180,
-           stale_hours: float = 24, live: Callable[[str | None], bool] = live_lock,
-           prs: dict[str, PullRequest] | None = None, coord_dir: pathlib.Path | None = None) -> list[Row]:
+def live_survey(repo=REPO, *, coord_dir: pathlib.Path | None = None, reports_dir: pathlib.Path | None = None,
+                terminal: Callable[[str], bool] | None = None, min_age: int = 180, stale_hours: float = 24,
+                live: Callable[[str | None], bool] = live_lock, gh=None) -> list[Row]:
+    """THE lifecycle as every production reader takes it: this module's main, the landing lane (land_lane.survey) and
+    the planner's file-set partition (plan_wave.main) all call this, never `survey` with arguments of their own, so
+    each reads the fix-lane reports, the dispatch ledger's in-flight slugs and the OPEN PULL REQUESTS the same way. A
+    reader that surveyed without the pull requests could never see ENQUEUED from GitHub or BOUNCED at all, and would
+    plan over a branch the merge queue rejected as if it were still queued (kb/Work PB2807, branch review R1-2).
+    `gh`: pull_requests' runner (a self-test fake). The caller fetches origin first when it needs a current main."""
+    terminal = terminal or note_terminal()
+    rdir = reports_dir or coord.reports_dir(str(coord_dir) if coord_dir else None)
+    return survey(repo, reports=report_index(rdir, terminal), slugs=in_flight_slugs(coord_dir, terminal, rdir),
+                  min_age=min_age, stale_hours=stale_hours, live=live, prs=pull_requests(gh), coord_dir=coord_dir)
+
+
+def survey(repo=REPO, *, prs: dict[str, PullRequest], reports: list[Report] = (), slugs: set[str] = frozenset(),
+           min_age: int = 180, stale_hours: float = 24, live: Callable[[str | None], bool] = live_lock,
+           coord_dir: pathlib.Path | None = None) -> list[Row]:
     """Every local branch but main, and every detached worktree, measured and given its lifecycle state. `prs`:
-    {branch: its open pull request into main} (pull_requests)."""
+    {branch: its open pull request into main} (pull_requests), REQUIRED so no caller reads a git-only lifecycle by
+    omission; production readers call live_survey, and a self-test passes its own (`{}` is an explicit offline)."""
     names = main_names(repo)
     trees = worktrees(repo)
     by_branch = {t.branch: t for t in trees if t.branch}
@@ -818,10 +837,7 @@ def main(argv=None):
         return self_test()
     if not a.no_fetch:
         git('fetch', '-q', 'origin')
-    terminal = note_terminal()
-    rows = survey(reports=report_index(a.reports or coord.reports_dir(), terminal),
-                  slugs=in_flight_slugs(None, terminal), min_age=a.min_age, stale_hours=a.stale_hours,
-                  prs=pull_requests())
+    rows = live_survey(reports_dir=a.reports, min_age=a.min_age, stale_hours=a.stale_hours)
     order = landing_order(rows, note_rank())
     if a.json:
         print(json.dumps({'verdict': verdict(rows), 'rows': [dataclasses.asdict(r) for r in rows],
@@ -1083,7 +1099,7 @@ def self_test() -> int:
         live = lambda reason: live_lock(reason, alive=lambda pid: alive.get(pid))  # noqa: E731
         terminal = lambda n: n == 'PB4'  # noqa: E731
         rows = {r.name: r for r in survey(repo, reports=report_index(rdir, terminal), slugs={'w9999a'}, min_age=180,
-                                          stale_hours=24, live=live, coord_dir=landed_coord)}
+                                          stale_hours=24, live=live, coord_dir=landed_coord, prs={})}
         want = {'merged': 'LANDED', 'landed-content': 'LANDED', 'orphan': 'DECISION', 'done-branch': 'WAITING TO LAND',
                 'split-branch': 'DECISION', 'w9999a-ledger': 'IN FLIGHT', 'fresh': 'IN FLIGHT', 'superseded': 'DECISION',
                 'stale-done': 'DECISION', 'resumed': 'DECISION',
@@ -1170,6 +1186,17 @@ def self_test() -> int:
               and 'FAILED_CHECKS' in pr_rows['succ'].why and '#17' in pr_rows['done-branch'].why,
               f'the merge queue states: a queued or auto-merge PR is ENQUEUED, a removed one at the tip BOUNCED with '
               f'its reason, a moved tip reads by its report, a predecessor of a bounced branch lands through it: {got}')
+        # THE ONE PRODUCTION SURVEY (kb/Work PB2807 review R1-2): live_survey reads the open pull requests itself, so
+        # every reader (main, the landing lane, the planner's partition) sees the queue states; and no production
+        # reader calls survey directly with arguments of its own (the planner once omitted `prs` and never saw BOUNCED)
+        live_rows = {r.name: r.state for r in live_survey(repo, coord_dir=landed_coord, reports_dir=rdir,
+                                                           terminal=terminal, live=live, gh=fake_gh)}
+        check({b: live_rows.get(b) for b in ('done-branch', 'succ', 'fnd-fix')}
+              == {'done-branch': 'ENQUEUED', 'succ': 'BOUNCED', 'fnd-fix': 'WAITING TO LAND'},
+              f'live_survey reads the pull requests (ENQUEUED, BOUNCED): {live_rows}')
+        direct = [p.name for p in (REPO / 'scripts' / 'orchestrator').glob('*.py')
+                  if re.search(r'prune_worktrees\.survey\(', p.read_text(encoding='utf-8'))]
+        check(not direct, f'production readers call prune_worktrees.live_survey, never survey: {direct}')
 
         def offline_gh(args):
             import ruleset  # noqa: PLC0415
@@ -1206,6 +1233,11 @@ def self_test() -> int:
             encoding='utf-8', newline='\n')
         check(in_flight_slugs(sdir, lambda n: False) == {'w9998b', 'w9998c'},
               f'in-flight slugs: {in_flight_slugs(sdir, lambda n: False)}')
+        # a group its report answers (it returned, SPLIT included) is no longer in flight by slug (kb/Work PB2795)
+        (srep := sdir / 'reports').mkdir()
+        (srep / 'w9998b-PB1-report.md').write_text('# PB1\n\n**Status:** SPLIT\n', encoding='utf-8', newline='\n')
+        check(in_flight_slugs(sdir, lambda n: False, srep) == {'w9998c'},
+              f'an answered group is not in flight: {in_flight_slugs(sdir, lambda n: False, srep)}')
         # --apply removes exactly the LANDED rows plus the --abandon branches whose decision a kb/Work note records,
         # archives nothing (owner 2026-10-08 00:52 PDT), and loses nothing else
         notes = tmp / 'Work'
