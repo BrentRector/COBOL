@@ -48,4 +48,6 @@ self-test case. The committed catalog was also stale: three landings (PB1374, PB
 corrected the diagram text of FMT-7.3.15.2, FMT-13.18.35.2 and FMT-14.9.38.2 without regenerating it. `--check` now
 fails on a catalog that differs from the extractor's own output.
 
-**Gate:** see the branch report (wave 1084 D).
+**Gate:** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` (run 20261015T210626Z-6e7548). Some
+cases of the touched drift-test classes were in leg 2, so they were also run on the gate's binaries: 59/59 passed,
+plus 138/138 in the other spec-reading drift classes.
