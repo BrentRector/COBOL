@@ -464,7 +464,14 @@ public static class ACCT_UPDATE
   that detached storage, with the mode set to the formal's (`Reference` / `Value`). One renderer serves both
   (`ArgText`); a change to the CALL lane's carrier for a shape (PB2087's cell areas) is the host entry's change by
   construction. A BY VALUE value, already landed exactly, reaches `CobolArgAdapt.LandForFormal` in range, so that
-  function's own size check never fires from a host call.
+  function's own size check never fires from a host call. The detached storage of a FIXED-POINT formal is
+  IMAGE-STORED — its record image under its `NumProfile`, the TEXT crossing a COBOL CALL renders for an image-stored
+  numeric argument — so the write-back sees the content the activated program left, including content no native cell
+  could hold, and the validity rule below decides it; a floating-point or index formal crosses in its own native cell,
+  a pointer or object-reference formal in its managed slot, a character formal as its character image. The fixed
+  storage length and the §14.8.2 description each argument states are the CALL lane's own
+  (`CallEmitter.ArgumentLength(DataItem, CallCrossing)`, `ActivationDescriptions.Of`), stated as at a CALL site that
+  checks EC-PROGRAM-ARG-MISMATCH.
 - **One storage for one variable passed twice.** Two `ref` parameters that refer to the same variable
   (`Unsafe.AreSame`; only parameters of one CLR type can) are given ONE storage when their formals' descriptions are
   the same (`OoConformance.DescriptionMismatch` is null both ways), so `Call(ref a, ref a)` is the host's `CALL …
@@ -1789,7 +1796,10 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    outermost boundary, `RunUnit.EndForHost` performs the §14.6.11 actions and replaces the host's ambient run unit, and
    `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`; the door rules
    and the type table are in the tree too: `HostLanding` in the runtime, pinned by `HostLandingTests` on §17.3's loss and
-   validity fixtures, and `HostSurface.TypeOf(DataItem)` in the binder's model, pinned by `HostSurfaceTests`). Settled
+   validity fixtures, and `HostSurface.TypeOf(DataItem)` in the binder's model, pinned by `HostSurfaceTests`; and
+   `HostEntryEmitter` emits `Call` and `Cancel` for every outermost unit whose formals and RETURNING item are
+   elementary, witnessed by the host harness `HostEntryTests` and pinned by `HostEntryShapeDriftTests`, so the
+   published record struct for a group formal is the next step). Settled
    2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
    binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,

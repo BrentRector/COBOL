@@ -73,10 +73,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
             int n = serial++;
             HostType type = HostSurface.TypeOf(description);
             string? profile = null;
-            if (description.Pic is { Category: PicCategory.Numeric, Usage: not Usage.Index } pic)
+            if (CallEmitter.BoundaryProfile(description, signEncoding) is { } init)
             {
                 profile = $"__hp{n}";
-                profiles.Add((profile, pic.ProfileInitializer(signEncoding)));
+                profiles.Add((profile, init));
             }
             return new Item(description, type, name, $"__hc{n}", profile, byValue, optional);
         }
@@ -249,15 +249,18 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
             + string.Concat(facts.Select(x => ", " + x)) + ")";
     }
 
-    /// <summary>The fixed storage length the argument states (<c>CallEmitter.ArgumentLength</c>'s rule for storage of this
-    /// description): a fixed-length character item's positions, a fixed-point or floating-point numeric item's
-    /// BYTE-LENGTH; none for an index, pointer or object-reference item, a DYNAMIC LENGTH or an ANY LENGTH item.</summary>
-    private static int StorageLength(Item f) => f.Type.Kind switch
+    /// <summary>The fixed storage length the argument states: the CALL lane's own rule
+    /// (<see cref="CallEmitter.ArgumentLength(DataItem, CallCrossing)"/>) for the detached storage's crossing.</summary>
+    private static int StorageLength(Item f) => CallEmitter.ArgumentLength(f.Description, Crossing(f.Type));
+
+    /// <summary>The crossing of the detached storage (see the class remarks): a fixed-point or character formal its
+    /// (record) image, a floating-point or index formal its native cell, a pointer or object reference its managed
+    /// slot.</summary>
+    private static CallCrossing Crossing(HostType t) => t.Kind switch
     {
-        HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec or HostTypeKind.Float => f.Description.ImageWidth,
-        HostTypeKind.Text when !f.Description.IsAnyLength && !f.Description.IsDynamicLength
-            => CallEmitter.BoundaryImageWidth(f.Description),
-        _ => RuntimeApi.UnstatedBoundaryLength,
+        HostTypeKind.Float or HostTypeKind.Index => CallCrossing.Native,
+        HostTypeKind.Pointer or HostTypeKind.ObjectReference => CallCrossing.Managed,
+        _ => CallCrossing.Text,
     };
 
     /// <summary>⛔ THE ONE VALIDITY RULE (DESIGN-external-repository §4.3 "Write-back and RETURNING"): the storage's content
