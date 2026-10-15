@@ -581,7 +581,12 @@ to share; what IS shared is the storage geometry and the door rules):
   (`HostLanding.RequireImage`).
 - **Crossing.** The record image is the group's storage; a bit or national group (§13.18.29.4 GR1b/GR2b) crosses as the
   elementary item it is treated as, its boolean or national positions, exactly as the CALL lane's text crossing carries
-  it (`CallEmitter.CallStringRead`).
+  it (`CallEmitter.CallStringRead`). A record holding a pointer or object-reference member (a strongly-typed group,
+  §13.18.60.3 SR14) crosses as the CALL lane's cell area (kb/Work PB2087, `CallEmitter.AreaOf`): its storage is a
+  `StorageCell` holding the image and each reference in its managed slot (`__Area`, `__PutSlots` through
+  `CobolPtr.SlotWrite`), the argument states `Area: new CellPointer(cell, 0)` so the activated program's formal occupies
+  that storage (§14.2.3 8)), and the write-back reads each slot back (`CobolPtr.SlotRead`). An image alone
+  (`AsImage`/`FromImage`) holds no reference: `FromImage` leaves those members in their null state.
 
 ### 4.4 Why the host entry lives in the program's assembly, and why it is not a shim
 **Placement.** The entry is generated into the assembly that compiled the unit because (1) the repository IS that
@@ -1824,9 +1829,10 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    and pinned by `HostEntryShapeDriftTests`; a GROUP formal or RETURNING item is its published record struct
    (`PublishedRecordEmitter`, §4.3) for every group whose members the record image holds, an OCCURS DEPENDING ON table
    included (an array of the DEPENDING ON value's entries, `HostLanding.LandedOccurrences`/`TryOccurrences`, witnessed by
-   `HostEntryTests`' OCCURS DEPENDING Fact), and a unit with a group holding a pointer or object leaf, a dynamic-length
-   item or a dynamic-capacity table — the CALL lane's cell-area and variable-length carriers — publishes no entry until
-   the next step renders those shapes (`PublishedRecordEmitter.Renders`). Settled
+   `HostEntryTests`' OCCURS DEPENDING Fact) and a strongly-typed group holding pointer or object-reference members (the
+   CALL lane's cell area, `PublishedRecordEmitter.HoldsSlots`, witnessed by the pointer Fact), and a unit with a group
+   holding a dynamic-length item or a dynamic-capacity table — the CALL lane's variable-length carrier — publishes no
+   entry until the next step renders those shapes (`PublishedRecordEmitter.Renders`). Settled
    2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
    binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
    `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,

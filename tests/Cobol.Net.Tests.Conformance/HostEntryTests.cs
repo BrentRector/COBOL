@@ -504,6 +504,88 @@ public sealed class HostEntryTests
         finally { CutRunner.TryDelete(dir); }
     }
 
+    /// <summary>A program whose group formal is a strongly-typed group holding a data pointer, a program pointer and a
+    /// table: the first call sets both pointers, the second reads storage through the data pointer the host passed back.</summary>
+    private const string SlotPrograms = """
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H4PTR.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 T TYPEDEF STRONG.
+           05 TA PIC X(3).
+           05 TP USAGE POINTER.
+           05 TQ USAGE PROGRAM-POINTER.
+           05 TN PIC 9(2) OCCURS 2.
+        01 WS-X PIC X(4) VALUE "DATA".
+        LINKAGE SECTION.
+        01 LK-G TYPE T.
+        01 LK-X PIC X(4) BASED.
+        PROCEDURE DIVISION USING LK-G.
+        P1.
+            IF TP OF LK-G = NULL
+                DISPLAY "TP NULL " TA OF LK-G " " TN OF LK-G (2)
+                SET TP OF LK-G TO ADDRESS OF WS-X
+                SET TQ OF LK-G TO ENTRY "H4PTR"
+            ELSE
+                SET ADDRESS OF LK-X TO TP OF LK-G
+                DISPLAY "TP " LK-X
+            END-IF
+            MOVE "XYZ" TO TA OF LK-G
+            ADD 1 TO TN OF LK-G (2)
+            GOBACK.
+        END PROGRAM H4PTR.
+        """;
+
+    private const string SlotHost = """
+        using System;
+        using CobolNet.Runtime;
+        using Cobol.H4PROGS;
+
+        public static class H4HostProgram
+        {
+            public static int Main()
+            {
+                var g = new H4PTR.LK_G_Record { TA = "ABC" };
+                g.TN[1] = 4;
+                H4PTR.Call(ref g);
+                Console.WriteLine($"1 [{g.TA}] {g.TN[1]} {g.TP is { IsNull: false }} {!g.TQ.IsNull}");
+                H4PTR.Call(ref g);
+                Console.WriteLine($"2 [{g.TA}] {g.TN[1]}");
+                var image = H4PTR.LK_G_Record.FromImage(g.AsImage());
+                Console.WriteLine($"IMG [{image.TA}] {image.TP is null || image.TP.IsNull}");
+                try { var bad = g with { TN = new long[1] }; H4PTR.Call(ref bad); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentException x) { Console.WriteLine($"OCC {x.ParamName}"); }
+                return 0;
+            }
+        }
+        """;
+
+    /// <summary>A host passes a strongly-typed group whose pointer members ride managed slots (DESIGN-external-repository
+    /// §4.3's last host-type row): the record crosses as the CALL lane's cell area, so the activated program's formal
+    /// occupies that storage (ISO §14.2.3 8), cite.py OK) — its references as well as its characters — and the pointers
+    /// it sets come back to the host, which can pass them in again.</summary>
+    [Fact]
+    public void AHost_PassesAStrongGroupWithPointers_AsTheCellAreaOfItsReferences()
+    {
+        string dir = CutRunner.NewTempDir("h4host");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "H4PROGS", SlotPrograms);
+            NonCobolElement.CompileCSharp(dir, "H4HOST", SlotHost, "H4PROGS", "H4PROGS");
+            var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "H4HOST.dll"), dir);
+            Assert.Equal(
+                "TP NULL ABC 04\n" +
+                "1 [XYZ] 5 True True\n" +
+                "TP DATA\n" +
+                "2 [XYZ] 6\n" +
+                "IMG [XYZ] True\n" +
+                "OCC LK_G", stdout);
+            Assert.Equal(0, exit);
+            Assert.Equal("", stderr);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
+
     [Fact]
     public void AHost_CallsTheGeneratedEntries_LandingExactlyAndDecodingByTheValidityRule()
     {

@@ -214,7 +214,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         // A group: its published record's image, every member landed exactly (PublishedRecordEmitter), crossing as the
         // CALL lane's TEXT crossing of a group of its description.
         if (f.Type.Kind is HostTypeKind.Group)
-            return $"ManagedPointer<string>.Cell({GroupCrossing(d, $"{value}.__Land({CsLiteral(f.Name)})")})";
+            return PublishedRecordEmitter.HoldsSlots(d)
+                // A record holding references: the CALL lane's cell area (kb/Work PB2087), its image and its slots.
+                ? $"{value}.__Area({CsLiteral(f.Name)})"
+                : $"ManagedPointer<string>.Cell({GroupCrossing(d, $"{value}.__Land({CsLiteral(f.Name)})")})";
         PicInfo pic = d.Pic ?? throw Unsupported(f);
         string member = "null";
         return f.Type.Kind switch
@@ -267,7 +270,9 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     {
         DataItem d = r.Description;
         if (r.Type.Kind is HostTypeKind.Group)
-            return $"ManagedPointer<string>.Cell({GroupCrossing(d, $"new {r.CsType}().__Land({CsLiteral(r.CsType)})")})";
+            return PublishedRecordEmitter.HoldsSlots(d)
+                ? $"new {r.CsType}().__Area({CsLiteral(r.CsType)})"
+                : $"ManagedPointer<string>.Cell({GroupCrossing(d, $"new {r.CsType}().__Land({CsLiteral(r.CsType)})")})";
         PicInfo pic = d.Pic ?? throw Unsupported(r);
         return r.Type.Kind switch
         {
@@ -303,7 +308,15 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         if (length != RuntimeApi.UnstatedBoundaryLength) facts.Add($"Length: {length}");
         if (ActivationDescriptions.Of(f.Description, classes) is { } d)
             facts.Add($"Description: {RuntimeApi.ActivationDescriptionNew(d)}");
-        return $"new CobolArg({RuntimeApi.PassModeText(mode)}, {f.Cell}, {f.Profile ?? "null"}"
+        // A record holding references crosses as a COBOL argument of cell-backed storage does (CallEmitter.AreaOf): its
+        // characters, and the cell area the activated program's formal is laid over (ISO §14.2.3 8)).
+        string carrier = f.Cell;
+        if (f.Type.Kind is HostTypeKind.Group && PublishedRecordEmitter.HoldsSlots(f.Description))
+        {
+            carrier = $"ManagedPointer<string>.OverField(() => {f.Cell}.Ref, __v => {{ {f.Cell}.Ref = __v; }})";
+            facts.Add($"Area: {RuntimeApi.ArgArea(f.Cell, "0")}");
+        }
+        return $"new CobolArg({RuntimeApi.PassModeText(mode)}, {carrier}, {f.Profile ?? "null"}"
             + string.Concat(facts.Select(x => ", " + x)) + ")";
     }
 
@@ -329,8 +342,11 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     {
         string word = f.Name == "__hr" ? f.Description.CobolName ?? "RETURNING" : f.Name;
         if (f.Type.Kind is HostTypeKind.Group)
-            return $"{{ if ({f.CsType}.__TryGet({GroupImage(f.Description, $"{f.Cell}.Value")}, 0, {CsLiteral(word + ".")}, "
-                + $"ref __hbad, out var __hg)) {target} = __hg; }}";
+            return $"{{ if ({f.CsType}.__TryGet("
+                + (PublishedRecordEmitter.HoldsSlots(f.Description)
+                    ? $"{f.Cell}.Ref, {f.Cell}"
+                    : $"{GroupImage(f.Description, $"{f.Cell}.Value")}, null")
+                + $", 0, {CsLiteral(word + ".")}, ref __hbad, out var __hg)) {target} = __hg; }}";
         PicInfo pic = f.Description.Pic ?? throw Unsupported(f);
         return f.Type.Kind is HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec
             ? NumericDecode(f.Type, pic, $"{f.Cell}.Value", f.Profile!, CsLiteral(word), target, "__hbad", "")

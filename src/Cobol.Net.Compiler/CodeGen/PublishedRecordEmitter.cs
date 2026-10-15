@@ -29,17 +29,23 @@ namespace CobolNet.CodeGen;
 /// fields, so the elementary formals and the record members share one declaration list).</param>
 internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
 {
-    /// <summary>Whether this slice publishes a record for <paramref name="group"/>: a group with no member the record
-    /// image does not hold — a pointer or object reference (a managed slot), a dynamic-length item or dynamic-capacity
-    /// table (the cell's variable part). An OCCURS DEPENDING ON table is held: its storage is the maximum allocation
-    /// (ISO §8.5.1.8), the image the CALL lane's text crossing carries.
-    /// <para>⚠ WIP (kb/Work PB2099): the managed-slot and variable-length shapes cross as the CALL lane's cell-area and
-    /// variable-length carriers (§4.3's last table row), which the published record renders in the slice's next step;
-    /// until then a unit with such a formal publishes no host entry.</para></summary>
+    /// <summary>Whether this slice publishes a record for <paramref name="group"/>: a group with no variable-length
+    /// component — a dynamic-length item or a dynamic-capacity table, which ride the cell's variable part. An OCCURS
+    /// DEPENDING ON table is held (its storage is the maximum allocation, ISO §8.5.1.8, the image the CALL lane's text
+    /// crossing carries), and so is a pointer or object reference (its managed slot, <see cref="HoldsSlots"/>).
+    /// <para>⚠ WIP (kb/Work PB2099): the variable-length shapes cross as the CALL lane's variable-length carrier, which
+    /// the published record renders in the slice's next step; until then a unit with such a formal publishes no host
+    /// entry.</para></summary>
     internal static bool Renders(DataItem group) =>
         group.IsGroup && DataItem.DescendantsOf(group).Where(Occupies).All(d =>
-            !SlotWindow.CarriedBySlot(d) && !DynSlotWindow.CarriedBySlot(d)
-            && !VarGroupWindow.Applies(d) && !d.IsDynamicTable && !d.IsDynamicLength && !d.IsAnyLength);
+            !DynSlotWindow.CarriedBySlot(d) && !VarGroupWindow.Applies(d) && !d.IsDynamicTable && !d.IsDynamicLength
+            && !d.IsAnyLength);
+
+    /// <summary>Whether <paramref name="item"/> is or holds a member whose value rides a managed slot of its area rather
+    /// than its bytes — a pointer or object reference (<see cref="SlotWindow.CarriedBySlot"/>, the data model's one
+    /// test) — so a group of it crosses as the CALL lane's cell area (<c>__Area</c>), never as its image alone.</summary>
+    internal static bool HoldsSlots(DataItem item) =>
+        SlotWindow.CarriedBySlot(item) || DataItem.DescendantsOf(item).Any(SlotWindow.CarriedBySlot);
 
     /// <summary>The DEPENDING ON item of an OCCURS DEPENDING ON member <paramref name="table"/> whose count the record
     /// <paramref name="root"/> itself holds — data-name-1 inside the record, which §13.18.38.3 20) places before the
@@ -140,7 +146,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             using (w.Block($"public static {name} FromImage(string image)"))
             {
                 w.Line("global::System.FormatException? __bad = null;");
-                w.Line($"__TryGet(HostLanding.RequireImage(image, {width}, {CsLiteral(name)}), 0, \"\", ref __bad, out var __r);");
+                w.Line($"__TryGet(HostLanding.RequireImage(image, {width}, {CsLiteral(name)}), null, 0, \"\", ref __bad, out var __r);");
                 w.Line("return __bad is null ? __r : throw __bad;");
             }
             using (w.Block("internal readonly string __Land(string __parameter)"))
@@ -151,7 +157,20 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             }
             using (w.Block("internal readonly void __Put(char[] __b, int __at, string __parameter, string __path)"))
                 foreach (var m in members) EmitPut(root, group, m, w);
-            using (w.Block($"internal static bool __TryGet(string __s, int __at, string __name, ref global::System.FormatException? __bad, out {name} __r)"))
+            if (HoldsSlots(group))
+            {
+                // A record whose pointer or object-reference members ride managed slots (§4.3's last table row): its
+                // storage is the CALL lane's cell area (kb/Work PB2087) — the image, and each reference in its slot.
+                using (w.Block("internal readonly StorageCell __Area(string __parameter)"))
+                {
+                    w.Line("var __c = new StorageCell { Ref = __Land(__parameter) };");
+                    w.Line("__PutSlots(__c, 0);");
+                    w.Line("return __c;");
+                }
+                using (w.Block("internal readonly void __PutSlots(StorageCell __c, int __at)"))
+                    foreach (var m in members.Where(m => HoldsSlots(m.Item))) EmitPutSlots(group, m, w);
+            }
+            using (w.Block($"internal static bool __TryGet(string __s, StorageCell? __c, int __at, string __name, ref global::System.FormatException? __bad, out {name} __r)"))
             {
                 w.Line($"__r = new {name}();");
                 if (!BitLayout.IsBitItem(group))
@@ -222,8 +241,26 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
     private static string Characters(DataItem leaf, string storage) =>
         NationalWindow.PositionsOf(leaf) is { } positions ? RuntimeApi.NatReadWindow(storage, "0", $"{positions}") : storage;
 
+    /// <summary>A member's references into the cell area <c>__c</c> (<c>__PutSlots</c>): a pointer or object-reference
+    /// member into its managed slot (<c>CobolPtr.SlotWrite</c>, the store every description of the area reads through), a
+    /// data pointer's .NET null as the NULL address, as for an elementary formal; a nested record's through its own.
+    /// The image walk (<c>__Put</c>) has already required every table to have its occurrences.</summary>
+    private static void EmitPutSlots(DataItem group, Member m, CodeWriter w)
+    {
+        string Put(string value, string at) => m.Record is not null
+            ? $"{value}.__PutSlots(__c, {at});"
+            : RuntimeApi.PtrSlotWrite("__c", $"({at}) / 8", m.Item.Pic!.ClrType,
+                m.Item.Pic.Category is PicCategory.Pointer ? $"{value} ?? ManagedPointer.Null" : value) + ";";
+        w.Line(m.Occurs == 0
+            ? Put(m.Name, Position(group, m, false))
+            : $"for (int __i = 0; __i < {m.Name}.Length; __i++) {Put($"{m.Name}[__i]", Position(group, m, true))}");
+    }
+
     private void EmitPut(DataItem root, DataItem group, Member m, CodeWriter w)
     {
+        // A reference has no image: it lands in its slot (__PutSlots), and a table of them is held to its occurrences here.
+        bool slot = SlotWindow.CarriedBySlot(m.Item);
+        if (slot && m.Occurs == 0) return;
         string path = $"__path + {CsLiteral(m.Name)}";
         if (m.Occurs == 0)
         {
@@ -240,7 +277,13 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
                 ? $"HostLanding.LandedOccurrences({DependingImage(root, group, dep, "__b", buffer: true)}, {profileOf(dep)}, "
                     + $"{m.Minimum}, {m.Occurs}, __parameter, {path}, {CsLiteral(dep.CobolName!)})"
                 : $"{m.Occurs}";
-            w.Line($"var __a = HostLanding.RequireOccurrences({m.Name}, {count}, {m.Minimum}, {m.Occurs}, __parameter, {path});");
+            string require = $"HostLanding.RequireOccurrences({m.Name}, {count}, {m.Minimum}, {m.Occurs}, __parameter, {path});";
+            if (slot)
+            {
+                w.Line(require);
+                return;
+            }
+            w.Line($"var __a = {require}");
             string at = Position(group, m, true);
             string each = $"{path} + \"[\" + __i + \"]\"";
             w.Line($"for (int __i = 0; __i < __a.Length; __i++) "
@@ -307,7 +350,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
 
     private string GetMember(Member m, string target, string at, string name) =>
         m.Record is not null
-            ? $"{{ if ({m.Record}.__TryGet(__s, {at}, {name} + \".\", ref __bad, out var __g)) {target} = __g; else __ok = false; }}"
+            ? $"{{ if ({m.Record}.__TryGet(__s, __c, {at}, {name} + \".\", ref __bad, out var __g)) {target} = __g; else __ok = false; }}"
             : GetLeaf(m.Item, m.Type, target, at, name);
 
     /// <summary>One elementary member decoded from the image <c>__s</c> at bit position <paramref name="at"/>: a numeric
@@ -315,6 +358,11 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
     private string GetLeaf(DataItem leaf, HostType type, string target, string at, string name)
     {
         PicInfo pic = leaf.Pic!;
+        // A pointer or object reference is its managed slot's value (CobolPtr.SlotRead, the read every description of
+        // the area makes); an image alone (FromImage) holds no reference, so the member keeps its null state.
+        if (SlotWindow.CarriedBySlot(leaf))
+            return $"{target} = __c is null ? {pic.DefaultInitializer} : "
+                + $"{RuntimeApi.PtrSlotRead("__c", $"({at}) / 8", pic.ClrType, pic.DefaultInitializer)};";
         string bytes = $"({at}) / 8";
         string chars = Characters(leaf, $"__s.Substring({bytes}, {leaf.ByteWidth})");
         return type.Kind switch

@@ -50,6 +50,10 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                IDENTIFICATION DIVISION.
                PROGRAM-ID. H2GRP.
                DATA DIVISION.
+               WORKING-STORAGE SECTION.
+               01 TS TYPEDEF STRONG.
+                  05 TS-A PIC X.
+                  05 TS-P USAGE POINTER OCCURS 2.
                LINKAGE SECTION.
                01 L-G.
                   05 L-N PIC 9(3).
@@ -57,9 +61,11 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                   05 L-S OCCURS 2.
                      10 L-T PIC X(2).
                      10 L-B PIC 1 USAGE BIT.
+                  05 L-D PIC X OCCURS 0 TO 3 DEPENDING ON L-N.
+               01 L-P TYPE TS.
                01 L-R.
                   05 L-R1 PIC S9(3)V9 COMP-3.
-               PROCEDURE DIVISION USING L-G RETURNING L-R.
+               PROCEDURE DIVISION USING L-G L-P RETURNING L-R.
                    GOBACK.
                END PROGRAM H2GRP.
                """;
@@ -145,10 +151,15 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
         // (its only comparisons are the loop bounds of a table's occurrences).
         var grp = entries.Single(e => e.Identifier.Text == "H2GRP");
         var grpCall = grp.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "Call");
-        Assert.Equal(["ref L_G_Record"], grpCall.ParameterList.Parameters.Select(p => $"{p.Modifiers} {p.Type}".Trim()).ToArray());
+        Assert.Equal(["ref L_G_Record", "ref L_P_Record"], grpCall.ParameterList.Parameters.Select(p => $"{p.Modifiers} {p.Type}".Trim()).ToArray());
         Assert.Equal("L_R_Record", grpCall.ReturnType.ToString());
         var records = grp.DescendantNodes().OfType<RecordDeclarationSyntax>().ToList();
-        Assert.Equal(["L_G_Record", "L_R_Record", "L_S_Record"], records.Select(r => r.Identifier.Text).Order().ToArray());
+        Assert.Equal(["L_G_Record", "L_P_Record", "L_R_Record", "L_S_Record"], records.Select(r => r.Identifier.Text).Order().ToArray());
+        // A record holding references crosses as its cell area (§4.3's last host-type row): its storage is the record's
+        // __Area, its argument states that Area, and only such a record has one.
+        Assert.Equal(["L_P_Record"], records.Where(r => r.Members.OfType<MethodDeclarationSyntax>().Any(m => m.Identifier.Text == "__Area"))
+            .Select(r => r.Identifier.Text).ToArray());
+        Assert.Contains("Area: new CellPointer(__hc1, 0)", grpCall.Body!.ToString());
         foreach (var record in records)
         {
             var put = record.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__Put");
@@ -161,7 +172,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                      && b.Parent is not ForStatementSyntax);
             var get = record.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__TryGet");
             Assert.All(get.Body!.DescendantNodes().OfType<IfStatementSyntax>(),
-                i => Assert.Matches(@"^(HostLanding\.TryDecode\(|\w+_Record\.__TryGet\()", i.Condition.ToString()));
+                i => Assert.Matches(@"^(HostLanding\.TryDecode\(|HostLanding\.TryOccurrences\(|\w+_Record\.__TryGet\()", i.Condition.ToString()));
         }
     }
 }
