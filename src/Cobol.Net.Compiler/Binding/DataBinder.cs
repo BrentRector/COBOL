@@ -174,7 +174,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// record (<see cref="InheritGlobalSubtree"/>). This element's own registers come first (one written definition
     /// per spelling: SR30's "shall not be defined elsewhere in the source element", reproduced once per TYPE / SAME AS
     /// copy of its entry, kb/Work PB2988), then each container's, so
-    /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The OWN registers alone are
+    /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The one reader of a
+    /// name in this map is <see cref="Model.SymbolTable.CapacityCandidates"/>. The OWN registers alone are
     /// <see cref="DeclaredCapacityRegisterTables"/>.</para></summary>
     public IReadOnlyDictionary<string, List<DataItem>> CapacityRegisters
     {

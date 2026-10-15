@@ -624,7 +624,8 @@ public sealed partial class DataBinder
             // the numeric pipeline reads {tablePath}.Capacity (a long) as a scale-0 integer; no stored field. The
             // implementor digit count is 10 (unsigned BinaryLong): the CobolDynTable implementor maximum,
             // 0x3FFF_FFFF ≈ 1.07e9, fits in 10 digits (§8.5.1.9.1 — "a number of digits sufficient to hold the
-            // maximum"). Kept off ByName/Roots — reachable ONLY through CapacityRegisters (the resolver hook).
+            // maximum"). Kept off ByName/Roots — reachable ONLY through a register-name map, which only
+            // SymbolTable.CapacityCandidates reads.
             // ⛔ MINTED FOR EVERY DYNAMIC TABLE, NAMED ONLY WHEN `CAPACITY IN data-name-3` IS WRITTEN (kb/Work
             // PB61): the view over the table's current capacity is what FUNCTION LENGTH / BYTE-LENGTH read for a
             // variable-length group (§15.50.4 r7c / §15.14.4 r6c — "based on their current capacity"), whether or

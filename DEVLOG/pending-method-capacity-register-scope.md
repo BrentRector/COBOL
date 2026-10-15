@@ -28,3 +28,11 @@ Branch review round 1 (R1-1): the lookup applied §11.7.4 GR5's hiding to a meth
 own `INDEXED BY QO` did not hide an object-level `CAPACITY IN QO`, and `SET QO TO 3` in the method resized the object's
 table. `CapacityCandidates` now also yields nothing when the method declares the spelling as an index-name; the golden
 gained a method `SHOWD` that exercises it (its `SET N TO QO` was also refused with COBOLNET2326 before).
+
+Finisher (the landing's Linux unit leg was RED): `CapacityRegisterReferenceDriftTests` still pinned the one register-name
+lookup to `ReferenceResolver.cs`, and this change had moved it, as it had to, into `SymbolTable.CapacityCandidates`, the
+one scope-aware name resolver, which now reads two maps (the method's own and the unit's). The test now pins that shape:
+every map read outside `DataBinder.Odo.cs` lies inside `CapacityCandidates`, whose one caller is
+`ReferenceResolver.CapacityRegisterFor`. Why the Windows gate never ran it: the class reached `src` through a private
+`Path.Combine` helper that `drift_rules.py` cannot read, so it was neither a specific rule nor a tree-wide sweep; it
+now uses `TestRepo.Src` and carries `[Trait("Sweep", "tree")]`, so every gate runs it (tier 0c).

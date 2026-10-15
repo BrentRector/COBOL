@@ -1837,7 +1837,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
         NameCandidates<DataItem> Reached);
 
     /// <summary>⛔ THE ONE MATCH OF A WRITTEN REFERENCE AGAINST THE NAMED OCCURS DYNAMIC CAPACITY REGISTERS
-    /// (kb/Work PB457) — a PURE check over <see cref="DataBinder.CapacityRegisters"/> with NO side effects (unlike
+    /// (kb/Work PB457) — a PURE check over the registers the ONE name lookup
+    /// <see cref="Model.SymbolTable.CapacityCandidates"/> reaches in the active scope (the unit's
+    /// <see cref="DataBinder.CapacityRegisters"/>, or a method's own, kb/Work PB3165) with NO side effects (unlike
     /// the full <see cref="Resolve"/> pipeline, which routes an unresolved qualified name through the
     /// property-reference hook and enqueues a pending op). The SET Format 14 reroute peek uses this so it never
     /// mints a spurious property temp/op for a non-capacity target (data-model D9; OCCURS DYNAMIC review #7).
