@@ -77,8 +77,8 @@ recovered literal takes GR9's mode and is asked §14.9.4.3 SR23 when its formal 
 a recovered numeric literal crosses as literal-2. New tests: the golden `conformance:2002/pb613_gr8_one_reduction` (CALL
 and INVOKE, BY REFERENCE, BY VALUE and BY CONTENT, and PB613's `USING 7 "AB" N` twin), the negative
 `pb613-bare-literal-by-value-formal` (SR23) and `ActivationConformanceDriftTests.TheArgumentReduction_IsWrittenOnce`.
-GR-14.9.4.4-8's code-location moved from the deleted `Gr8Classify` to `ReduceArgument` (batch
-`w1079a-pb613-gr8-one-reduction`, GAP 101 -> 101). PB3101's item 3 turned out to be a design question: a restricted
+The code-locations of GR-14.9.4.4-8 and SR-14.9.4.3-17 moved from the deleted `Gr8Classify` to `ReduceArgument`
+(batches `w1079a-pb613-gr8-one-reduction` and `w1079a-pb613-sr17-resite`, GAP 101 -> 101). PB3101's item 3 turned out to be a design question: a restricted
 prototype-pointer's description carries its signature-class identity, and `PrototypeSignatures` computes those classes,
 so a description-level `SameSignature` cannot be asked from inside that computation without a decision on how the
 identity is supplied. The note records the two shapes. PB3101 stays open for item 3, the remaining deletions and
