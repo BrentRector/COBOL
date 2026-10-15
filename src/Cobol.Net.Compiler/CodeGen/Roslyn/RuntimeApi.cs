@@ -1631,10 +1631,10 @@ internal static class RuntimeApi
     public static string SortInit(string sd, string weights, string natWeights) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.Init)}({sd}, {weights}, {natWeights})";
 
-    /// <summary>Register a format 1 SORT's declarative scope for §14.9.40.4 GR17 — <c>CobolSort.RegisterUseScope</c>
-    /// (kb/Work PB1177; <c>EcEmitter.SortUseScope</c>).</summary>
-    public static string SortRegisterUseScope(string sd, string useScope) =>
-        $"{nameof(CobolSort)}.{nameof(CobolSort.RegisterUseScope)}({sd}, {useScope})";
+    /// <summary>Register the statement as the run unit's active format 1 SORT, with its scope's declaratives (or
+    /// <c>null</c>), for §14.9.40.4 GR17 — <c>CobolSort.RegisterFormat1Sort</c> (kb/Work PB1177; <c>EcEmitter.SortUseScope</c>).</summary>
+    public static string SortRegisterFormat1Sort(string sd, string useScope) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.RegisterFormat1Sort)}({sd}, {useScope})";
 
     /// <summary>The implicit USING release of one record image — <c>CobolSort.Release</c>, with the size the
     /// record had when READ and the sort-merge file's record range (the EC-SORT-MERGE-RELEASE test, §14.9.40.4
@@ -1671,11 +1671,26 @@ internal static class RuntimeApi
     public static string SortEnterProcedure(string sd, bool output) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.EnterProcedure)}({sd}, output: {(output ? "true" : "false")})";
 
-    /// <summary>§14.9.40.4 GR17's question after a declarative ends — <c>CobolSort.AfterUseProcedure</c>: the action
-    /// back, or the SORT termination signal when a not-normal completion happened while a SORT that registered
-    /// <paramref name="useScope"/> is active (kb/Work PB1177).</summary>
+    /// <summary>§14.9.40.4 GR17's question after a declarative of the scope <paramref name="useScope"/> ends —
+    /// <c>CobolSort.AfterUseProcedure</c>: the action back, or the SORT termination signal when a not-normal completion
+    /// happened while a format 1 SORT is active (kb/Work PB1177).</summary>
     public static string SortAfterUseProcedure(string useScope, string action) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.AfterUseProcedure)}({useScope}, {action})";
+
+    /// <summary>§14.9.40.4 GR17's question when a declarative of the scope <paramref name="useScope"/> ends in EXIT
+    /// PROGRAM or GOBACK — <c>CobolSort.UseProcedureExited</c>, a declining exception filter (kb/Work PB1177).</summary>
+    public static string SortUseProcedureExited(string useScope) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.UseProcedureExited)}({useScope})";
+
+    /// <summary>§14.9.40.4 GR17's question once a method's return has completed — <c>CobolSort.AfterActivationReturn</c>
+    /// (kb/Work PB1177; a CALL's is <c>ProgramTable.CallProgram</c>'s).</summary>
+    public static string SortAfterActivationReturn { get; } =
+        $"{nameof(CobolSort)}.{nameof(CobolSort.AfterActivationReturn)}()";
+
+    /// <summary>The declining filter an activation's end notes a SORT termination with —
+    /// <c>SortTerminationSignal.EndsActivation</c> over the local <paramref name="flag"/> (kb/Work PB1177).</summary>
+    public static string SortTerminationEndsActivation(string flag) =>
+        $"{SortTerminationSignalType}.{nameof(Runtime.Exceptions.SortTerminationSignal.EndsActivation)}(ref {flag})";
 
     /// <summary>The C# type a format 1 SORT statement's landing catches — <c>SortTerminationSignal</c> (§14.9.40.4 GR17),
     /// fully qualified so the emission does not depend on the conditional <c>using</c> (the PB922 reason).</summary>

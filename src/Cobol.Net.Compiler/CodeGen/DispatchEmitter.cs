@@ -257,9 +257,9 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                 // StopRun/ProgramReturn exception-as-control precedent) and __RunUse converts it to the
                 // action; normal completion is -1 (§14.6.13.1.2). Emitted ONLY when the group uses the
                 // EC model — an EC-free build keeps the void form byte-identical.
-                using (w.Block($"{mod}int __RunUse(int __id, int __startPc, int __endPc)")) EmitRunUseBody(w, ecModel: true);
+                using (w.Block($"{mod}int __RunUse(int __id, int __startPc, int __endPc)")) EmitRunUseBody(w, ecModel: true, inMethod: asLocal);
             else
-                using (w.Block($"{mod}void __RunUse(int __id, int __startPc, int __endPc)")) EmitRunUseBody(w, ecModel: false);
+                using (w.Block($"{mod}void __RunUse(int __id, int __startPc, int __endPc)")) EmitRunUseBody(w, ecModel: false, inMethod: asLocal);
             w.Line();
         }
         if (decls.Any(d => d.EcEntries is not null)) ec.EmitDispatchSelector(decls, w, asLocal);
@@ -310,7 +310,8 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
     /// Renders <see cref="DispatchState.DispatchName"/> — <c>__Dispatch</c> as a class member (a program), <c>__MDispatch</c>
     /// as a method-local function (an OO method's F3 PERFORM, design SSOT §9.10) — so the ONE body serves both scopes
     /// (the C3 correction: the former literal <c>__Dispatch</c> hardcode would name a nonexistent method inside a class).
-    /// <paramref name="ecModel"/> = the int RESUME-returning form (an EC-model group) vs the void form.
+    /// <paramref name="ecModel"/> = the int RESUME-returning form (an EC-model group) vs the void form;
+    /// <paramref name="inMethod"/> = the method-local form, whose EXIT/GOBACK signal is <c>MethodReturn</c>.
     /// <para>⛔ <b>THE GUARD IS THE RAISE SITE</b> (kb/Work PB368). §14.9.49.4 GR2's sole normative content is
     /// the condition, not the decline: "During the execution of a USE procedure, if a statement raises an
     /// exception condition that would cause the execution of a USE procedure that had previously been activated
@@ -326,7 +327,7 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
     /// are the exception-checking PERFORM's imp-2/3/4 handler ranges, which share this array and this invoker but
     /// are selected by §14.9.28.4 GR17 — they are not USE procedures and GR2 does not reach them. An OO method's
     /// method-local <c>__RunUse</c> is ALL handlers (DeclCount 0), so it emits the bare guard unchanged.</para></summary>
-    internal void EmitRunUseBody(CodeWriter w, bool ecModel)
+    internal void EmitRunUseBody(CodeWriter w, bool ecModel, bool inMethod)
     {
         string ret = ecModel ? " DispatchResult.Normal" : "";
         // The void form belongs to an EC-FREE group (EmitUseMachinery picks it on !ecState.Active), and enabling
@@ -373,6 +374,14 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                     + " __act = ExceptionState.DeclarativeNotNormal(__tok) ? DispatchResult.NotNormal : DispatchResult.Normal; }"
                     + "   // fell off its end: normal completion unless a fatal exception occurred within its scope (§14.6.13.1.2 1))");
                 w.Line("catch (ResumeSignal __rs) { __act = __rs.TargetPc; }   // RESUME (§14.9.33) — the resume action");
+                // EXIT PROGRAM / GOBACK (and an automatic propagation's return) leave the declarative by the element's
+                // return signal — a completion that is not normal (§14.6.13.1.2 1)) that the GR17 question below never
+                // sees. The filter asks it on the way out and declines (CobolSort.UseProcedureExited): another element's
+                // active SORT is then terminated once this activation has returned (kb/Work PB1177).
+                string exitAsk = RuntimeApi.SortUseProcedureExited("__useActive");
+                w.Line($"catch ({(inMethod ? "MethodReturn" : "ProgramReturn")}) when ("
+                    + (dispatchState.F3HandlerBasePc is not null ? $"__id < {decls} && " : "")
+                    + $"{exitAsk}) {{ throw; }}   // §14.9.40.4 GR17 — the filter declines (never runs): the return goes on");
                 w.Line("finally { ExceptionState.LeaveDeclarative(__tok); __useActive[__id] = false; ExceptionState.RestoreChecking(__ckU); }");
                 // ⛔ §14.9.40.4 GR17 (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT statement is
                 // active does not complete normally, the SORT statement is terminated." A declarative invoked by a
@@ -380,8 +389,9 @@ internal sealed class DispatchEmitter(EmitContext ctx, DispatchState dispatchSta
                 // below the procedure's nested dispatch, so no raise site can jump to the statement's end. The question
                 // is therefore asked HERE, the one place every selection path reaches a declarative through, after the
                 // declarative has finished: CobolSort.AfterUseProcedure throws SortTerminationSignal when the completion
-                // was not normal and a SORT that registered this scope is active, and SortEmitter's landing ends the
-                // statement — one mechanism for every USE procedure the rule reaches, implicit transfers included. Only
+                // was not normal and a format 1 SORT is active in the run unit — this element's, or one whose range CALLed
+                // or INVOKEd it — and SortEmitter's landing ends the statement: one mechanism for every USE procedure
+                // the rule reaches, implicit transfers and other elements' declaratives included. Only
                 // a DECLARATIVE id asks: the exception-checking PERFORM's handlers are not USE procedures (§14.9.28.4
                 // GR17 selects them), and their RESUME keeps the §14.9.33.4 GR2 a) landing at the raise site.
                 string gr17 = RuntimeApi.SortAfterUseProcedure("__useActive", "__act");

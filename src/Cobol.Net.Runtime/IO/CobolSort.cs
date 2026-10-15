@@ -105,13 +105,16 @@ public static class CobolSort
         catch (CobolFatalException e) when (RaisedByTheStatement(e)) { }
     }
 
-    /// <summary>Register the declarative scope (<c>__useActive</c>) of a format 1 SORT that has just begun on
-    /// <paramref name="name"/> — emitted first in the statement's body, and only by a SORT whose scope has EC-model USE
-    /// procedures: §14.9.40.4 GR17 terminates that SORT when one of them, invoked while it is active, does not complete
-    /// normally (<see cref="AfterUseProcedure"/>; kb/Work PB1177). A MERGE registers none — its rules (§14.9.24.4) carry
-    /// no such sentence. <see cref="Init(string, CobolCollation?, CobolCollation?)"/> clears the registration, so a
-    /// store reused by the next statement on the file starts with none.</summary>
-    public static void RegisterUseScope(string name, object useScope) => Get(name).UseScope = useScope;
+    /// <summary>Register the statement that has just begun on <paramref name="name"/> as a FORMAT 1 SORT, with the
+    /// declarative scope (<c>__useActive</c>) of the program instance or method invocation executing it — null when that
+    /// scope has no EC-model declaratives. Emitted first in the body of EVERY format 1 SORT: §14.9.40.4 GR17 terminates
+    /// the active SORT when ANY USE procedure invoked while it is active does not complete normally
+    /// (<see cref="AfterUseProcedure"/>; kb/Work PB1177), and the procedure may be another element's — a CALLed program's
+    /// or a containing program's GLOBAL one — whatever declaratives the SORT's own scope has. A MERGE registers none — its
+    /// rules (§14.9.24.4) carry no such sentence. <see cref="Init(string, CobolCollation?, CobolCollation?)"/> clears
+    /// the registration, so a store reused by the next statement on the file starts with none.</summary>
+    public static void RegisterFormat1Sort(string name, object? useScope) =>
+        Get(name).Format1 = new Format1SortRegistration(useScope, Stores.NextOrdinal());
 
     private static void InitCore(string name, CobolCollation? collation, CobolCollation? national)
     {
@@ -127,7 +130,7 @@ public static class CobolSort
         f.Collation = collation?.Snapshot();
         f.NatCollation = national?.Snapshot();
         f.Phase = ProcedurePhase.None;
-        f.UseScope = null;
+        f.Format1 = null;
         f.AtEndReached = false;
     }
 
@@ -143,21 +146,47 @@ public static class CobolSort
 
     /// <summary>⛔ §14.9.40.4 GR17, ASKED AFTER EVERY DECLARATIVE (kb/Work PB1177): "If a USE procedure invoked while a
     /// format 1 SORT statement is active does not complete normally, the SORT statement is terminated." The generated
-    /// <c>__RunUse</c> hands every DECLARATIVE's action here once the declarative has finished. When the action is a
-    /// completion that is not normal (<see cref="DispatchResult.CompletedNotNormally"/>: a RESUME, or a fall-off
-    /// §14.6.13.1.2 1) marks) and a format 1 SORT that registered the same declarative scope (<paramref name="useScope"/>,
-    /// <see cref="RegisterUseScope"/>) is executing, the SORT is terminated:
+    /// <c>__RunUse</c> of every EC-model element hands every DECLARATIVE's action here, with its own declarative scope
+    /// (<paramref name="useScope"/>), once the declarative has finished. When the action is a completion that is not
+    /// normal (<see cref="DispatchResult.CompletedNotNormally"/>: a RESUME, or a fall-off §14.6.13.1.2 1) marks) and a
+    /// format 1 SORT is active in the run unit (<see cref="RegisterFormat1Sort"/>), the SORT is terminated:
     /// <see cref="SortTerminationSignal"/> unwinds to the statement's landing, whatever invoked the procedure — an
-    /// implicit USING/GIVING transfer, a statement of the input or output procedure (GR10, GR13: their range includes
-    /// "all statements in declarative procedures that are executed as a result of the execution of statements in the
-    /// range"), or another USE procedure running within either. Otherwise the action goes back to the raise site
-    /// unchanged.</summary>
+    /// implicit USING/GIVING transfer, a statement of the input or output procedure, a statement of a program CALLed or a
+    /// method INVOKEd from either, or another USE procedure running within any of them (GR10, GR13: the range includes
+    /// "all statements that are executed as the result of a transfer of control in the range" and "all statements in
+    /// declarative procedures that are executed as a result of the execution of statements in the range"). The whole
+    /// range ends with the statement, so the activations it entered end too (their boundaries unwind:
+    /// <c>ProgramTable.CallProgram</c>, the method epilogue).
+    /// <para>⚠ DETERMINATION (docs/CONFORMANCE.md §3, kb/Work PB1177): the landing carries the action only for the
+    /// SORT's OWN declaratives (the registered scope). Another element's RESUME AT procedure-name names a procedure of an
+    /// activation the termination has ended, so it lands as <see cref="DispatchResult.NotNormal"/>, at the statement's
+    /// end. Otherwise — no SORT active, or a normal completion — the action goes back to the raise site unchanged.</para></summary>
     public static int AfterUseProcedure(object useScope, int action)
     {
-        if (DispatchResult.CompletedNotNormally(action) && Stores.SortOfScope(useScope) is { } name)
-            throw new SortTerminationSignal(name, action);
-        return action;
+        if (!DispatchResult.CompletedNotNormally(action) || Stores.ActiveFormat1Sort() is not { } active)
+            return action;
+        var (name, sort) = active;
+        throw new SortTerminationSignal(name, ReferenceEquals(sort.UseScope, useScope) ? action : DispatchResult.NotNormal);
     }
+
+    /// <summary>⛔ §14.9.40.4 GR17 FOR A USE PROCEDURE THAT ENDS IN EXIT PROGRAM OR GOBACK (kb/Work PB1177) — a
+    /// completion that is not normal (§14.6.13.1.2 1)) that leaves the declarative by its own signal, so
+    /// <see cref="AfterUseProcedure"/> never sees it. The generated <c>__RunUse</c> asks this as a declining exception
+    /// FILTER on the element's return signal, with its declarative scope (<paramref name="useScope"/>); always false.
+    /// When the active format 1 SORT is the element's OWN (its registered scope), the return leaves the SORT statement
+    /// through its <c>finally</c>, which ends it — nothing to record. When it is another element's — one whose range
+    /// CALLed or INVOKEd this one — the return goes back to the activator inside that range, so the SORT is terminated
+    /// when the activation has returned (<c>SortFileTable.AfterActivationReturn</c>).</summary>
+    public static bool UseProcedureExited(object useScope)
+    {
+        if (Stores.ActiveFormat1Sort() is { } active && !ReferenceEquals(active.Registration.UseScope, useScope))
+            Stores.TerminateOnActivationReturn(active.Name);
+        return false;
+    }
+
+    /// <summary>The method epilogue's §14.9.40.4 GR17 question once the method's return has completed — see
+    /// <c>SortFileTable.AfterActivationReturn</c> (kb/Work PB1177); <c>ProgramTable.CallProgram</c> asks it for a CALL.</summary>
+    public static void AfterActivationReturn() => Stores.AfterActivationReturn();
 
     /// <summary>The RELEASE STATEMENT (ISO §14.9.32.4). GR1: "A RELEASE statement may be executed only when it is
     /// within the range of an input procedure being executed by a SORT statement that references the file-name

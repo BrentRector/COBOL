@@ -114,4 +114,7 @@ CobolNet.Runtime.Exceptions.SortTerminationSignal.File.get -> string!
 CobolNet.Runtime.Exceptions.SortTerminationSignal.Action.get -> int
 static CobolNet.Runtime.Exceptions.DispatchResult.CompletedNotNormally(int result) -> bool
 static CobolNet.Runtime.IO.CobolSort.AfterUseProcedure(object! useScope, int action) -> int
-static CobolNet.Runtime.IO.CobolSort.RegisterUseScope(string! name, object! useScope) -> void
+static CobolNet.Runtime.IO.CobolSort.RegisterFormat1Sort(string! name, object? useScope) -> void
+static CobolNet.Runtime.IO.CobolSort.UseProcedureExited(object! useScope) -> bool
+static CobolNet.Runtime.IO.CobolSort.AfterActivationReturn() -> void
+static CobolNet.Runtime.Exceptions.SortTerminationSignal.EndsActivation(ref bool ended) -> bool

@@ -38,18 +38,19 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs, Dispa
         string sd = FileKeyExpr(so.File);
         var tx = new Transfer(TerminationLabel(), merge: false);
         // §14.9.40.4 GR17 (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT statement is active does
-        // not complete normally, the SORT statement is terminated." The body registers, first, the scope whose
-        // declaratives the rule reaches; the declarative's __RunUse asks the question once it has finished (CobolSort.AfterUseProcedure)
-        // and this statement's catch lands the termination — whatever invoked the procedure: an implicit transfer, a
-        // statement of the INPUT or OUTPUT PROCEDURE (which runs in a nested dispatch no raise site can jump out of), or
-        // another USE procedure running within either. Null when the scope has no EC-model declarative
-        // (EcEmitter.SortUseScope): then nothing can complete not normally and return.
+        // not complete normally, the SORT statement is terminated." The body registers, first, the statement as the
+        // run unit's active format 1 SORT, with this scope's declaratives (null when it has no EC-model one —
+        // EcEmitter.SortUseScope); every declarative's __RunUse asks the question once it has finished
+        // (CobolSort.AfterUseProcedure) and this statement's catch lands the termination — whatever invoked the
+        // procedure: an implicit transfer, a statement of the INPUT or OUTPUT PROCEDURE (which runs in a nested dispatch
+        // no raise site can jump out of), a program CALLed or a method INVOKEd from the range — whose declarative, or a
+        // containing program's GLOBAL one, may be the one that does not complete normally whatever this scope declares —
+        // or another USE procedure running within any of them. So EVERY format 1 SORT registers and lands.
         string? useScope = ec.SortUseScope;
         w.Line($"{RuntimeApi.SortInit(sd, WeightsExpr(so.Collating), NatWeightsExpr(so.Collating))};   // SORT {so.File.CobolName} (ISO §14.9.40.4; BOTH GR5 sequences snapshotted — §14.6.6 r5)");
-        using (StatementBody(sd, useScope is null ? null : TerminationLanding(sd)))
+        using (StatementBody(sd, TerminationLanding(sd, ownDeclaratives: useScope is not null)))
         {
-            if (useScope is not null)
-                w.Line($"{RuntimeApi.SortRegisterUseScope(sd, useScope)};   // §14.9.40.4 GR17 — this scope's USE procedures terminate the SORT when they do not complete normally");
+            w.Line($"{RuntimeApi.SortRegisterFormat1Sort(sd, useScope ?? "null")};   // §14.9.40.4 GR17 — the active format 1 SORT, terminated when a USE procedure invoked while it is active does not complete normally");
             EmitAssociation(so.File, tx);   // §12.4.5.3 GR3 — at the time of execution, before any phase (kb/Work PB1097)
             // Phase a — release (GR9a). A USING file must not be open when the phase commences (GR9 —
             // EC-SORT-MERGE-FILE-OPEN, tested by the runtime before any implicit OPEN; kb/Work PB1036).
@@ -127,12 +128,17 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs, Dispa
     /// stay active under the program's remaining statements.</item>
     /// </list>
     /// EXIT PROGRAM, GOBACK and STOP leave through their own signals and the same <c>finally</c>. The filter names
-    /// this statement's sort file: <see cref="RuntimeApi.SortAfterUseProcedure"/> throws only for the SORT that
-    /// registered the declarative's scope.</summary>
-    private string TerminationLanding(string sd) =>
+    /// this statement's sort file: <see cref="RuntimeApi.SortAfterUseProcedure"/> throws for the run unit's innermost
+    /// active format 1 SORT. A USE procedure of ANOTHER element — a CALLed program's, an INVOKEd method's, a containing
+    /// program's GLOBAL one — ends the range it ran in with the statement: its activations unwind, and it lands as a
+    /// not-normal completion at the statement's end, since its RESUME AT procedure-name names a procedure of an activation
+    /// that has ended (the runtime maps it, <c>CobolSort.AfterUseProcedure</c>). A scope with no EC-model declaratives
+    /// (<paramref name="ownDeclaratives"/> false) has no own action to take, so its landing is the bare end of the
+    /// statement.</summary>
+    private string TerminationLanding(string sd, bool ownDeclaratives) =>
         $"catch ({RuntimeApi.SortTerminationSignalType} __srtSig) when (__srtSig.File == {sd}) "
-        + $"{{ {dispatch.ResumeTransfer("__srtSig.Action", "")} }}"
-        + "   // §14.9.40.4 GR17 — a USE procedure of the input or output procedure did not complete normally: the SORT is terminated";
+        + (ownDeclaratives ? $"{{ {dispatch.ResumeTransfer("__srtSig.Action", "")} }}" : "{ }")
+        + "   // §14.9.40.4 GR17 — a USE procedure invoked while the SORT was active did not complete normally: the SORT is terminated";
 
     /// <summary>The emitted-text scope <see cref="StatementBody"/> hands out: disposing it closes the <c>try</c>
     /// block and emits its optional one-line <c>catch</c> and its one-line <c>finally</c>.</summary>

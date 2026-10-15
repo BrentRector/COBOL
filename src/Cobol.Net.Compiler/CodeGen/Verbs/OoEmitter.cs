@@ -1266,6 +1266,24 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 dispatch.DeclCount = mDecls.Count;
                 dispatch.F3HandlerBasePc = methodF3 ? bound.F3HandlerBasePc : null;
             }
+            // BY REFERENCE copy-out (§14.2.3 GR8). A Tier-B REDEFINES canonical's storage IS its string backing (a
+            // width-correct image), not the suppressed root struct — write that back, else the generated C# names an
+            // undeclared local (review A/emission).
+            var copyOut = new List<string>();
+            foreach (var f in m.Binding!.Formals)
+            {
+                // A BY VALUE formal is a detached copy: "stores must never reach the caller" (§14.2.3 GR10), so there is
+                // no copy-out — the activator's slot is a temporary it discards (kb/Work PB1051). A RESIDENT formal has
+                // nothing to copy: every store already went through the argument's carrier (kb/Work PB2087).
+                if (f.ByValue || f.CarrierResident) continue;
+                // An AREA formal laid over its argument's own cell has no copy; one that took a fresh cell stores it back.
+                // No copy-out for an omitted formal: there is no argument, and the caller's slot is a placeholder.
+                copyOut.Add(f.IsArea
+                    ? $"if (!{f.OmittedFlag} && !ReferenceEquals({f.CarrierLocal}, {f.AreaParam})) {f.ParamName}.Value = {MethodCellFormalLoad(f.Item)};   "
+                        + "// BY REFERENCE store-back of a fresh area (§14.2.3 GR8)"
+                    : $"if (!{f.OmittedFlag}) {f.ParamName}.Value = {MethodBoundaryValue(fields, f.Item, "OO method BY REFERENCE copy-out")};   "
+                        + "// BY REFERENCE copy-out of a formal whose area no cell carries (see DataBinder.CellCanCarry)");
+            }
             if (m.Binding!.EntryPc <= m.Binding!.EndPc || mDecls.Count > 0)
             {
                 // The method's slice of the class's one pc space, as a LOCAL FUNCTION (captures the locals
@@ -1314,37 +1332,45 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     // raises must NOT be intercepted by the ACTIVATOR's WHEN. Raise the floor to the entry depth; on
                     // exit restore it and defensively balance the stack (matching the CALL boundary, ProgramTable).
                     w.Line("int __f3fl = ExceptionState.RaisePerformFloor(); int __f3pd = ExceptionState.PerformDepth;   // §9.10.1-C2 — isolate from the activator's frames");
-                    w.Line($"try {{ __MDispatch({m.Binding!.EntryPc}, {m.Binding!.EndPc}); }} catch (MethodReturn) {{ }} "
-                        + $"finally {{ ExceptionState.RestorePerformFloor(__f3fl); ExceptionState.TrimPerformTo(__f3pd); {restore} }}   "
-                        + "// GOBACK returns HERE (§14.9.18.4 GR4)");
+                    restore = $"ExceptionState.RestorePerformFloor(__f3fl); ExceptionState.TrimPerformTo(__f3pd); {restore}";
                 }
+                string run = $"__MDispatch({m.Binding!.EntryPc}, {m.Binding!.EndPc});";
+                if (copyOut.Count == 0)
+                    w.Line($"try {{ {run} }} catch (MethodReturn) {{ }} finally {{ {restore} }}   "
+                        + "// GOBACK / falling off the last paragraph returns HERE (§14.9.18.4 GR4; deep-dive D8)");
                 else
-                    w.Line($"try {{ __MDispatch({m.Binding!.EntryPc}, {m.Binding!.EndPc}); }} catch (MethodReturn) {{ }} "
-                        + $"finally {{ {restore} }}   // GOBACK / falling off the last paragraph returns HERE (§14.9.18.4 GR4; deep-dive D8)");
+                {
+                    // ⛔ THE ACTIVATION ENDS TWO WAYS THAT OWE THE COPY-OUT (kb/Work PB1177; the CALL twin is
+                    // ProgramEmitter's): it returns, or a USE procedure that did not complete normally terminated the
+                    // format 1 SORT whose range invoked it (§14.9.40.4 GR17), whose signal unwinds it to the statement's
+                    // landing — after which the invoker resumes, and the method's stores through a copied BY REFERENCE
+                    // formal must reach it (§14.2.3 GR8). A condition that terminates the run unit owes nothing.
+                    w.Line("bool __ended = false;   // returned, or ended with a terminated SORT's range (§14.9.40.4 GR17)");
+                    w.Line($"try {{ {run} __ended = true; }} catch (MethodReturn) {{ __ended = true; }}   "
+                        + "// GOBACK / falling off the last paragraph returns HERE (§14.9.18.4 GR4; deep-dive D8)");
+                    w.Line($"catch ({RuntimeApi.SortTerminationSignalType}) when ({RuntimeApi.SortTerminationEndsActivation("__ended")}) {{ throw; }}   // the filter declines (never runs): the signal goes on");
+                    using (w.Block("finally"))
+                    {
+                        w.Line(restore);
+                        using (w.Block("if (__ended)"))
+                            foreach (var line in copyOut) w.Line(line);
+                    }
+                    copyOut.Clear();   // stored back above, whichever way the activation ended
+                }
+                // §14.9.40.4 GR17 (kb/Work PB1177): a declarative of this method that ended in EXIT METHOD or GOBACK while
+                // a SORT whose range invoked the method is active terminates that SORT once the return is complete —
+                // CobolSort.UseProcedureExited recorded it on the way out. Only a method with EC-model declaratives can.
+                if (ecState.Active && mDecls.Count > 0)
+                    w.Line($"{RuntimeApi.SortAfterActivationReturn};   // §14.9.40.4 GR17 — a declarative's EXIT METHOD / GOBACK ended a SORT this invocation ran in");
             }
             (ecState.UnitHasF3Perform, ecState.UnitHasF3, ecState.UnitHasF4, dispatch.UseDecls,
                 dispatch.DeclCount, dispatch.F3HandlerBasePc) = savedSel;
             dispatch.GlobalDeclIds = savedGlobalDecls;
             ecState.Propagation = savedPropagation;
             ecState.PdRaisingObjectCsTypes = savedRaisingTypes;
-            // BY REFERENCE copy-out (§14.2.3 GR8) / RETURNING (§14.9.23.4 GR8). A Tier-B REDEFINES canonical's
-            // storage IS its string backing (a width-correct image), not the suppressed root struct — write that
-            // back / return that, else the generated C# names an undeclared local (review A/emission).
-            foreach (var f in m.Binding!.Formals)
-            {
-                // A BY VALUE formal is a detached copy: "stores must never reach the caller" (§14.2.3 GR10), so there is
-                // no copy-out — the activator's slot is a temporary it discards (kb/Work PB1051). A RESIDENT formal has
-                // nothing to copy: every store already went through the argument's carrier (kb/Work PB2087).
-                if (f.ByValue || f.CarrierResident) continue;
-                // An AREA formal laid over its argument's own cell has no copy; one that took a fresh cell stores it back.
-                // No copy-out for an omitted formal: there is no argument, and the caller's slot is a placeholder.
-                if (f.IsArea)
-                    w.Line($"if (!{f.OmittedFlag} && !ReferenceEquals({f.CarrierLocal}, {f.AreaParam})) {f.ParamName}.Value = {MethodCellFormalLoad(f.Item)};   "
-                        + "// BY REFERENCE store-back of a fresh area (§14.2.3 GR8)");
-                else
-                    w.Line($"if (!{f.OmittedFlag}) {f.ParamName}.Value = {MethodBoundaryValue(fields, f.Item, "OO method BY REFERENCE copy-out")};   "
-                        + "// BY REFERENCE copy-out of a formal whose area no cell carries (see DataBinder.CellCanCarry)");
-            }
+            // A method with no statements to run has no dispatch, so its copy-out is the plain store-back here.
+            foreach (var line in copyOut) w.Line(line);
+            // RETURNING (§14.9.23.4 GR8) — a Tier-B REDEFINES canonical returns its string backing, as above.
             if (m.Binding!.Returning is { } r)
             {
                 string src = MethodBoundaryValue(fields, r, "OO method RETURNING delivery");
