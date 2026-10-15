@@ -23,3 +23,5 @@ floating indicator is rejected, as §6.4.2 requires, but only by the parser's un
 (pseudo-text gets the named COBOLNET2449). The builder cannot name it: it runs before conditional compilation, and an
 unterminated literal in an omitted `>>IF` branch is legal (§7.3.16.4 3); the probe compiles and runs). The named
 diagnostic belongs in the lexer's literal rule; it is in the wave-1084 H report for the registrar.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261015T223531Z-56fd77`; Conformance 6,139/11,711, Unit 33,295/33,667, Characterization 6/36 in leg 1; leg 2 left to CI). Linux gate: the lander's (batched gating).
