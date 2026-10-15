@@ -146,3 +146,8 @@ as a null reference. It now lands as `ManagedPointer.Null`, the value the predef
 harness pins it.
 The duplication review found that the entry restated the CALL lane's argument-length rule; that rule is now one
 function. Semgrep verify passed with no rule count up.
+
+**Gate (part 3).** `TestResults/build-local/20261015T005018Z-521f40` (HEAD 0d945da2f): `=== BUILD-LOCAL GATE: LEG 1 ONLY
+(batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,456 · Unit 482 ·
+Characterization 30 … Conformance 6,221/11,677 · Unit 33,183/33,665 · Characterization 6/36 cases ran (skipped 0) in 1
+of 2 leg(s)`. `HostEntryTests` and `HostEntryShapeDriftTests` passed in leg 1.
