@@ -21,8 +21,9 @@ namespace CobolNet.Tests.Unit;
 /// a second definition would let the DISPLAY format and the crossing disagree about which groups have a defined
 /// current extent — the exact two-arm shape this repo keeps producing.</item>
 /// <item>THE BOUNDARY SCREENS ASK THE BOUNDARY PREDICATE. The two sites that decide whether a group crossing is
-/// admitted (<c>OoConformance.DescriptionMismatch</c>'s two group arms, and <c>CallEmitter.ArgText</c>'s
-/// stage guard) must spell <c>BoundaryImageCapable</c>. Reverting either one to <c>IsImageCapable</c> restores
+/// admitted (<c>ActivationDescriptions.Of</c>'s group arms, which describe a group by both halves of the predicate,
+/// and <c>CallEmitter.ArgText</c>'s stage guard) must ask it, and no <c>DataItem</c> comparator beside the relation
+/// may screen a group again (kb/Work PB3101). Reverting either one to <c>IsImageCapable</c> restores
 /// the defect with no test failing anywhere else — the goldens would still pass, because a REJECTION at bind
 /// looks like any other diagnostic to a corpus runner that never compiles the program.</item>
 /// </list>
@@ -65,30 +66,31 @@ public sealed class VariableLengthBoundaryDriftTests
     [Fact]
     public void BoundaryScreens_AskTheBoundaryPredicate()
     {
-        // OoConformance: the group arms of the pair-mode comparator — the argument-group screen and the formal-group
-        // screen. All must admit a compatible variable-length group. The BY CONTENT argument-group screen (PB165,
-        // closing PB818: it used to ask IsImageCapable) left with the BY CONTENT comparator (kb/Work PB3101): a BY
-        // CONTENT group is described by ActivationDescriptions.Of, whose variable-length arm asks
-        // CurrentExtentImageCapable before IsImageCapable — the two halves of BoundaryImageCapable.
+        // OoConformance holds no group screen of its own: the pair-mode DataItem comparator, whose argument-group and
+        // formal-group arms asked BoundaryImageCapable and VariableLengthCompatibility.Mismatch, is deleted (kb/Work
+        // PB3101). Every activation and pair-mode question describes a group through ActivationDescriptions.Of, whose
+        // variable-length arm asks CurrentExtentImageCapable before IsImageCapable — the two halves of
+        // BoundaryImageCapable — and the §8.5.1.12 compatibility is the run-time relation's walk
+        // (ActivationRelations.VariableLengthViolation over the descriptions' atoms).
         string oo = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
-        Assert.Equal(3, CodeOccurrences(oo, "BoundaryImageCapable"));
+        Assert.Equal(0, CodeOccurrences(oo, "BoundaryImageCapable"));
+        Assert.Equal(0, CodeOccurrences(oo, "VariableLengthCompatibility.Mismatch"));
+        Assert.Equal(0, CodeOccurrences(oo, "IsImageCapable"));
         string descriptions = File.ReadAllText(
             TestRepo.At("src", "Cobol.Net.Compiler", "Oo", "ActivationDescriptions.cs"));
         Assert.True(CodeOccurrences(descriptions, "item.CurrentExtentImageCapable") > 0
                     && CodeOccurrences(descriptions, "item.IsImageCapable") > 0,
             "ActivationDescriptions.Of no longer describes a group by both halves of BoundaryImageCapable — a compatible "
-            + "variable-length group argument BY CONTENT would have no description and be refused (kb/Work PB818).");
-        Assert.Equal(0, CodeOccurrences(oo, "arg.IsImageCapable"));
-        Assert.Equal(0, CodeOccurrences(oo, "formal.IsImageCapable"));
+            + "variable-length group argument would have no description and be refused (kb/Work PB818).");
+        string relations = File.ReadAllText(
+            TestRepo.At("src", "Cobol.Net.Runtime", "Control", "ActivationRelations.cs"));
+        Assert.True(CodeOccurrences(relations, "VariableLengthViolation(") > 1,
+            "ActivationRelations no longer asks its §8.5.1.12 walk — a variable-length group pair would be judged by "
+            + "length alone (kb/Work PB204, PB3101).");
 
         // CallEmitter: the stage guard that used to refuse the crossing outright.
         string call = File.ReadAllText(TestRepo.At("src", "Cobol.Net.Compiler", "CodeGen", "Verbs", "CallEmitter.cs"));
         Assert.Equal(1, CodeOccurrences(call, "BoundaryImageCapable"));
         Assert.Equal(0, CodeOccurrences(call, "p.Item.IsGroup && !p.Item.IsImageCapable"));
-
-        // And the compatibility relation is consulted from the comparator, not re-implemented at a call site
-        // (two consultations: the argument arm and the formal arm; PB165's BY CONTENT arm is the run-time relation's
-        // §8.5.1.12 walk now, ActivationRelations.VariableLengthViolation over the descriptions' atoms, kb/Work PB3101).
-        Assert.Equal(2, CodeOccurrences(oo, "VariableLengthCompatibility.Mismatch"));
     }
 }

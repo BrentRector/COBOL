@@ -306,10 +306,10 @@ public static class ActivationDescriptions
     /// WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses", with 3 e) 1. (currency strings) and 2.
     /// (DECIMAL-POINT IS COMMA) carried by the PICTURE clause's ONE identity (<see cref="PictureClauseIdentity"/>) and
     /// 3. a. (the LOCALE phrase's SIZE) here, 3. b. (its external identification) in
-    /// <see cref="ActivationDescription.LocaleExternal"/>. The same facts <c>OoConformance.DescriptionMismatch</c>
-    /// compares for an elementary pair (its §14.8.2.3.2 rule 2 list is this list without ANY LENGTH), so a pair the
-    /// typed lane finds identical has equal clauses here — held by
-    /// <c>PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair</c>. A
+    /// <see cref="ActivationDescription.LocaleExternal"/>. Every relation reads these facts here and nowhere else (the
+    /// <c>DataItem</c> comparator that compared them a second time is deleted, kb/Work PB3101), so the §9.3.6 match and the
+    /// pair-mode identity agree — held by
+    /// <c>PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithThePairModeRelation_OverEveryElementaryPair</c>. A
     /// class pointer's restriction is its USAGE clause's TO phrase.</summary>
     public static (string Clauses, string[] Phrases) ElementaryClauses(DataItem item)
     {

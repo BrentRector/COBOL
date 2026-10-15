@@ -204,9 +204,9 @@ public sealed class ActivationConformanceDriftTests
     /// carrying §14.8.2.2 rule 1's activation reading, called a 4-byte alphanumeric group and a <c>PIC X(4)</c> the same
     /// description, so such an override compiled where rule 3 refuses it (the group has no PICTURE clause). So
     /// <c>OoConformance.SignatureDifference</c> is the one entry — it describes both items through the one builder and asks
-    /// <c>ActivationRelations.SignatureDifference</c> — the override, IMPLEMENTS, property and MOVE-element askers call
-    /// it, and the comparator's one remaining caller is the prototype signature comparison, which moves with the signature
-    /// classes' design.</summary>
+    /// <c>ActivationRelations.SignatureDifference</c> — the override, IMPLEMENTS, property, MOVE-element and prototype
+    /// signature askers (§13.7.3 SR2, and the signature classes' partition refinement) call it, and the comparator is
+    /// deleted, with the <c>PrototypeBisimulation</c> it threaded.</summary>
     [Fact]
     public void PairMode_AsksTheDescriptionRelation_ThroughOneEntry()
     {
@@ -221,18 +221,22 @@ public sealed class ActivationConformanceDriftTests
             + "property accessors) no longer all ask SignatureDifference (kb/Work PB3101).");
         Assert.Contains("OoConformance.SignatureDifference(", Verb("MoveBinder.cs"));
 
-        // The comparator's callers: its own definition, and the prototype signature comparison alone.
+        // The prototype signature comparison (§13.7.3 SR2, and the signature classes' refinement) asks it too.
+        Assert.Contains("OoConformance.SignatureDifference(",
+            CodeOf(TestRepo.Src("Cobol.Net.Compiler", "Binding", "PrototypeSignatures.cs")));
+
+        // No DataItem comparator survives beside the relation (CLAUDE.md rule 4: deleted, not shimmed).
         string compiler = TestRepo.Src("Cobol.Net.Compiler");
         string sep = Path.DirectorySeparatorChar.ToString();
-        var callers = Directory.EnumerateFiles(compiler, "*.cs", SearchOption.AllDirectories)
+        var comparators = Directory.EnumerateFiles(compiler, "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains(sep + "obj" + sep) && !f.Contains(sep + "bin" + sep))
-            .Where(f => Regex.Matches(CodeOf(f), @"\bDescriptionMismatch\s*\(").Count
-                        > (Path.GetFileName(f) == "OoConformance.cs" ? 1 : 0))
+            .Where(f => Regex.IsMatch(CodeOf(f),
+                @"\b(DescriptionMismatch|AsIfElementaryGroupMismatch|CategoryArmMismatch|PrototypeBisimulation)\b"))
             .Select(Path.GetFileName)
             .ToList();
-        Assert.True(callers.SequenceEqual(["PrototypeSignatures.cs"]),
-            "OoConformance.DescriptionMismatch has a pair-mode caller besides the prototype signature comparison: "
-            + string.Join(", ", callers) + " — ask OoConformance.SignatureDifference (kb/Work PB3101).");
+        Assert.True(comparators.Count == 0,
+            "A DataItem description comparator (or the bisimulation it carried) is back beside the pair-mode relation: "
+            + string.Join(", ", comparators) + " — ask OoConformance.SignatureDifference (kb/Work PB3101).");
     }
 
     [Fact]

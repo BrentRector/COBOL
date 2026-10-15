@@ -381,7 +381,7 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    `MethodConformanceMismatches` (every formal and a non-object RETURNING), the property accessors and
    `MoveBinder.ElementMovesOf` ask `OoConformance.SignatureDifference`, and an object-reference description carries
    `ObjectNameIsParameter` (a skeleton's parameter-name, kb/Work PB2937; §9.3.8.2.4 makes its identity each expansion's
-   question, so a pair that turns on it is admitted as `ObjectRefDescriptor.TurnsOnFormal` admits it). The relation
+   question, so a pair that turns on it is admitted, `ActivationRelations.TurnsOnParameterName`). The relation
    settled one difference the comparator carried from §14.8.2.2 rule 1's activation reading: a 4-byte alphanumeric group
    and a `PIC X(4)` were "the same description" at equal width, so such an override, IMPLEMENTS pair or property
    compiled, where §9.3.8.2.3 rule 3 refuses it (a group has no PICTURE clause; §8.4.3.9.3 SR7 likewise). A bit /
@@ -707,25 +707,25 @@ what the delivery (`CobolObject.NarrowUniversal`) checks. A PROGRAM- or FUNCTION
 class, not its name (§13.18.60.4 GR25 / GR26; kb/Work PB2464): `PrototypeSignatureClasses` partitions a group's
 prototypes by `PrototypeSignatures.Same`, and `BinderDriver.ResolvePointerRestrictions` stamps each pointer item in two
 passes over every forest — `DataBinder.ResolveRestrictedPrototypes` attaches the prototype its `TO` phrase resolves to
-(`DataItem.RestrictedPrototype`), then `DataBinder.ClassifyRestrictedPrototypes` its class
+(`DataItem.RestrictedPrototype`), then `PrototypeSignatureClasses.Classify` its class
 (`DataItem.PointerRestrictionIdentity`) — BEFORE any signature check runs (the §10.6.2 SR2 / SR3 prototype pairs and the
 §9.3.8.2.3 override / implements / interface-inheritance / property-accessor checks run after it, kb/Work PB2495).
-`PrototypeSignatures.SameType` is the one "of the same type" relation over two such pointers: outside a signature
-comparison it compares the classes (`PrototypeSignatures.RestrictionIdentity`, also the `TO <class>` text of
-`ActivationDescription.Clauses`, so the §9.3.6 match, the §14.8.2 / §14.8.3 conformance and rule 6's SET validity all
-agree with the typed comparator's pointer arm); INSIDE `Same`, where a formal is itself a restricted pointer, it compares
-the signatures the two restrictions name as the greatest fixed point (`PrototypeBisimulation`: a pair already being
-compared is assumed equal), so prototypes that name each other or themselves are classified by what they describe and
-never by what they are called (kb/Work PB2495). Two differently named prototypes of one signature are therefore one
+`PrototypeSignatures.SameType` is the one "of the same type" relation over two such pointers: it compares the classes
+(`PrototypeSignatures.RestrictionIdentity`, also the `TO <class>` text of `ActivationDescription.Clauses`, so the §9.3.6
+match, the §14.8.2 / §14.8.3 conformance, rule 6's SET validity and the pair-mode signature relation all agree). The
+classes are the coarsest stable PARTITION (`PrototypeSignatureClasses.Classify`, kb/Work PB3101): every resolved
+prototype starts in one block per namespace, each round stamps every pointer with its prototype's current block and
+splits each block by `PrototypeSignatures.Same` (`ActivationRelations.SignatureDifference` per formal, through
+`OoConformance.SignatureDifference`), and a round that splits nothing is the greatest fixed point, so prototypes that
+name each other or themselves are classified by what they describe and never by what they are called (kb/Work PB2495). Two differently named prototypes of one signature are therefore one
 type on both lanes; the class identity is group-local until the external repository (`DESIGN-external-repository.md`)
 supplies a record's identity. The same relation decides a pointer that is a MEMBER of a group (kb/Work PB3120): a
 strongly-typed group formal is compared through §8.5.3.1's type-declaration equivalence
 (`StrongTypeModel.EquivalentTypeDeclarations` / `SameElementaryLayout`), whose per-item profile compare
 (`SameAnalyzedProfile`) elides `PicInfo.RestrictedPrototypeName` and `RestrictedTypeName` from the record equality and
 asks `PrototypeSignatures.SameType` / `StrongTypeModel.SameRestriction` instead, under one private `Comparison` that
-carries the enclosing signature comparison's `PrototypeBisimulation` (so a group holding a pointer restricted to the
-prototype being compared terminates) and the declaration pairs assumed equivalent while compared (so a type whose
-pointer member is restricted back to it terminates). `StrongTypeModel.TypeIdentityKey` keys such a member the same way
+carries the declaration pairs assumed equivalent while compared (so a type whose pointer member is restricted back to it
+terminates); a pointer member restricted to a prototype still being classified carries that prototype's current block. `StrongTypeModel.TypeIdentityKey` keys such a member the same way
 (the signature class, the folded type-name and the key of the declaration it resolves to, `@depth` for a cycle).
 `PrototypePointerTypeDriftTests` pins that no profile projection leaves either restricted name in the record compare.
 
@@ -793,8 +793,8 @@ are "as if a SET") is asked with the formal side standing for the actual MOST FA
 `SET ONE TO X` with ONE `T ONLY` and X `T` is refused in every expansion), a universal sender into a formal-typed
 receiver, a formal-typed sender into ACTIVE-CLASS (SR14), an interface formal into a class-typed receiver; two
 references to the SAME parameter-name are one class (opaque identity). (b) An identical-description question
-(§9.3.8.2.3 rule 2 through `DescriptionMismatch`) is admitted when the two sides differ only in a name a formal may
-take (`ObjectRefDescriptor.TurnsOnFormal`). (c) A statement that SELECTS A METHOD through a formal — an INVOKE whose
+(§9.3.8.2.3 rule 2 through `OoConformance.SignatureDifference`) is admitted when the two sides differ only in a name a formal may
+take (`ActivationRelations.TurnsOnParameterName`, over `ActivationDescription.ObjectNameIsParameter`). (c) A statement that SELECTS A METHOD through a formal — an INVOKE whose
 receiver is a formal-typed reference or a formal class-name, SELF of a method the definition does not define while
 its superclass is a formal (`OoClassSymbol.FormalBaseName`), SUPER or `B OF SUPER` over a formal superclass, an inline
 invocation or object property through a formal, `SET … TO` a formal class-name — binds the operands whose rules do

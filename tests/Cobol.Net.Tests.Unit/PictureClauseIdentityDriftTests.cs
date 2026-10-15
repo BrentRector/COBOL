@@ -13,21 +13,22 @@ using Xunit;
 namespace CobolNet.Tests.Unit;
 
 /// <summary>
-/// ⛔ "THE SAME PICTURE CLAUSE" HAS ONE IDENTITY, AND EVERY ASKER READS IT (kb/Work PB1166). The standard asks for
+/// ⛔ "THE SAME PICTURE CLAUSE" HAS ONE IDENTITY, AND EVERY ASKER READS IT (kb/Work PB1166, PB3101). The standard asks for
 /// identical elementary descriptions in five places — §8.5.3.1 type equivalence, §9.3.6 method matching, §9.3.8.2.3
 /// interface conformance (overrides, IMPLEMENTS), §14.8.2.3.2 BY REFERENCE arguments, §14.8.3.3 returning items —
 /// each with the same two exceptions: currency symbols match only when their currency STRINGS do, and period /
 /// comma symbols only when DECIMAL-POINT IS COMMA is in effect for both source elements or neither. Before PB1166
-/// the activation / signature comparator (<see cref="OoConformance.DescriptionMismatch"/>) compared a per-category
-/// subset of the picture — the edit mask text, or nothing — so a class under DECIMAL-POINT IS COMMA returned
-/// <c>Z9,99</c> into a non-DPC <c>Z9,99</c> receiver that then read 1234 for 12.34, <c>PIC A(5)</c> passed for
-/// <c>PIC X(5)</c>, and ALIGNED / DYNAMIC LENGTH were compared nowhere.
-/// <para>This pins the properties that keep the identity single: (1) the comparator honours every axis of
-/// <see cref="PictureClauseIdentity"/>, measured over pictures ANALYZED by <see cref="PictureAnalyzer"/> — never
-/// hand-built profiles that could omit the field; (2) the universal-dispatch relation's §9.3.6 match
-/// (<see cref="ActivationRelations.Matches"/> over <see cref="ActivationDescriptions"/>, kb/Work PB480) agrees with
-/// the comparator over every pair of elementary items; (3) the non-PICTURE clauses are read
-/// through the one <see cref="DescriptionClauses"/> predicate the §8.5.3.1 compare reads too.</para>
+/// the activation / signature comparator compared a per-category subset of the picture — the edit mask text, or
+/// nothing — so a class under DECIMAL-POINT IS COMMA returned <c>Z9,99</c> into a non-DPC <c>Z9,99</c> receiver that
+/// then read 1234 for 12.34, <c>PIC A(5)</c> passed for <c>PIC X(5)</c>, and ALIGNED / DYNAMIC LENGTH were compared
+/// nowhere. That comparator is deleted (kb/Work PB3101): every question is asked of the
+/// <see cref="ActivationDescription"/> <see cref="ActivationDescriptions"/> builds, whose clause key carries
+/// <see cref="PictureClauseIdentity"/>.
+/// <para>This pins the properties that keep the identity single: (1) the pair-mode relation
+/// (<see cref="OoConformance.SignatureDifference"/>) honours every axis of <see cref="PictureClauseIdentity"/>, measured
+/// over pictures ANALYZED by <see cref="PictureAnalyzer"/> — never hand-built profiles that could omit the field; (2) the
+/// §9.3.6 match (<see cref="ActivationRelations.Matches"/>) agrees with it over every pair of elementary items; (3) the
+/// pair-mode identity is symmetric and relaxes no ANY LENGTH item.</para>
 /// </summary>
 public sealed class PictureClauseIdentityDriftTests
 {
@@ -58,52 +59,47 @@ public sealed class PictureClauseIdentityDriftTests
         var usdDollar = Item("$$$9.99", new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") });
         var usdU = Item("UUU9.99", new Dictionary<char, CurrencyDefinition> { ['U'] = Alnum("USD") });
         var eurDollar = Item("$$$9.99", new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("EUR") });
-        Assert.Null(OoConformance.DescriptionMismatch(usdDollar, usdU));        // §14.8.2.3.2 rule 2 a): same string
-        Assert.Contains("currency string", OoConformance.DescriptionMismatch(usdDollar, eurDollar));
+        Assert.Null(Difference(usdDollar, usdU));        // §9.3.8.2.3 rule 3 a): the same currency string
+        Assert.NotNull(Difference(usdDollar, eurDollar));
     }
 
     [Fact]
     public void PeriodAndCommaSymbols_MatchOnlyUnderTheSameDecimalPointSetting()
     {
-        Assert.Contains("DECIMAL-POINT IS COMMA",
-            OoConformance.DescriptionMismatch(Item("Z9,99", dpc: true), Item("Z9,99", dpc: false)));
-        Assert.Contains("DECIMAL-POINT IS COMMA",
-            OoConformance.DescriptionMismatch(Item("Z9.99", dpc: true), Item("Z9.99", dpc: false)));
-        Assert.Null(OoConformance.DescriptionMismatch(Item("Z9,99", dpc: true), Item("Z9,99", dpc: true)));
+        Assert.NotNull(Difference(Item("Z9,99", dpc: true), Item("Z9,99", dpc: false)));
+        Assert.NotNull(Difference(Item("Z9.99", dpc: true), Item("Z9.99", dpc: false)));
+        Assert.Null(Difference(Item("Z9,99", dpc: true), Item("Z9,99", dpc: true)));
         // A picture with neither symbol is the same clause under either setting — the rule speaks of those two only.
-        Assert.Null(OoConformance.DescriptionMismatch(Item("ZZ9", dpc: true), Item("ZZ9", dpc: false)));
+        Assert.Null(Difference(Item("ZZ9", dpc: true), Item("ZZ9", dpc: false)));
     }
 
     [Fact]
     public void AlphabeticAndAlphanumeric_AreDifferentPictureClauses_AndRepetitionIsNot()
     {
-        Assert.Contains("PICTURE mismatch", OoConformance.DescriptionMismatch(Item("A(5)"), Item("X(5)")));
-        Assert.Null(OoConformance.DescriptionMismatch(Item("X(3)"), Item("XXX")));
+        Assert.Contains("PICTURE", Difference(Item("A(5)"), Item("X(5)")));
+        Assert.Null(Difference(Item("X(3)"), Item("XXX")));
     }
 
     [Fact]
-    public void AlignedAndDynamicLength_AreComparedThroughTheOneSharedPredicate()
+    public void AlignedAndDynamicLength_AreClausesOfTheIdentity()
     {
         var bit = Item("1(8)", usage: Usage.Bit);
         var aligned = Item("1(8)", usage: Usage.Bit);
         aligned.IsAligned = true;
-        Assert.Contains("ALIGNED", OoConformance.DescriptionMismatch(aligned, bit));
+        Assert.Contains("ALIGNED", Difference(aligned, bit));
         var plain = Item("X");
         var dynamic = Item("X");
         dynamic.IsDynamicLength = true;
-        Assert.Contains("DYNAMIC LENGTH", OoConformance.DescriptionMismatch(dynamic, plain));
-        Assert.Equal(DescriptionClauses.AlignedOrDynamicLengthMismatch(dynamic, plain),
-            OoConformance.DescriptionMismatch(dynamic, plain));
+        Assert.Contains("DYNAMIC LENGTH", Difference(dynamic, plain));
     }
 
-    /// <summary>The universal-dispatch relation agrees with the comparator (kb/Work PB480): over every ordered pair of
+    /// <summary>The two halves of the one description identity agree (kb/Work PB480, PB3101): over every ordered pair of
     /// ELEMENTARY items drawn from a population that varies each axis the identity carries, §9.3.6 match rule 3 e)
     /// (<see cref="ActivationRelations.Matches"/> over the descriptions <see cref="ActivationDescriptions"/> builds)
-    /// holds exactly when the comparator finds the two descriptions identical — the national, boolean and
-    /// numeric-edited categories included, which the string descriptor this replaced could not carry. The population
-    /// asserts it produced pairs at all.</summary>
+    /// holds exactly when the pair-mode relation finds the two descriptions the same — the national, boolean and
+    /// numeric-edited categories included. The population asserts it produced pairs at all.</summary>
     [Fact]
-    public void ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair()
+    public void ActivationMatch_AgreesWithThePairModeRelation_OverEveryElementaryPair()
     {
         var usd = new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") };
         var items = new List<DataItem>
@@ -122,26 +118,22 @@ public sealed class PictureClauseIdentityDriftTests
                 var df = ActivationDescriptions.Of(formal, classes: null)!;
                 var da = ActivationDescriptions.Of(arg, classes: null)!;
                 pairs++;
-                bool identical = OoConformance.DescriptionMismatch(formal, arg) is null;
+                bool same = Difference(formal, arg) is null;
                 bool matches = ActivationRelations.Matches(da, null, df, null!)
                     && ActivationRelations.ParameterViolation(da, df) is null;
-                Assert.True(identical == matches,
-                    $"PIC {formal.PictureText} vs PIC {arg.PictureText}: comparator says {(identical ? "identical" : "differs")}"
-                    + $" but the run-time relation says {(matches ? "matches" : "does not match")} ('{df.Clauses}' / '{da.Clauses}')");
+                Assert.True(same == matches,
+                    $"PIC {formal.PictureText} vs PIC {arg.PictureText}: the pair-mode relation says {(same ? "same" : "differs")}"
+                    + $" but the run-time match says {(matches ? "matches" : "does not match")} ('{df.Clauses}' / '{da.Clauses}')");
             }
         Assert.True(pairs > 300, $"only {pairs} pairs — the population no longer exercises the invariant");
     }
 
-    /// <summary>The pair-mode identity (<see cref="OoConformance.SignatureDifference"/> over the descriptions, kb/Work
-    /// PB3101) agrees with the comparator the prototype signature comparison still asks, over every ordered pair of
-    /// ELEMENTARY items of the population above plus the ANY LENGTH and as-if-elementary shapes — so moving the override,
-    /// IMPLEMENTS, property and MOVE-element askers to the relation changed no elementary verdict. Where the two
-    /// deliberately differ, the relation follows ISO §9.3.8.2.3 rule 3: a group carries no PICTURE clause, so a 4-byte
-    /// alphanumeric group is not the same description as a <c>PIC X(4)</c>, which the comparator (carrying §14.8.2.2
-    /// rule 1's activation reading) called identical at equal width — pinned end to end by the negatives
-    /// <c>pb3101-override-group-for-elementary-formal</c> and <c>pb3101-property-accessors-group-and-elementary</c>.</summary>
+    /// <summary>The pair-mode identity is SYMMETRIC and relaxes nothing (ISO §9.3.8.2.3 rule 3 names ANY LENGTH among the
+    /// clauses that shall be the same, and §14.8.2.3.2 "Additionally" d)'s relaxation is an activation's, never a
+    /// signature's): over the population above plus ANY LENGTH items, an ANY LENGTH item is the same description only
+    /// as an ANY LENGTH item of the same one-symbol picture, and the verdict does not depend on the order of the pair.</summary>
     [Fact]
-    public void PairModeIdentity_AgreesWithTheComparator_OverEveryElementaryPair()
+    public void PairModeIdentity_IsSymmetric_AndRelaxesNoAnyLengthItem()
     {
         var usd = new Dictionary<char, CurrencyDefinition> { ['$'] = Alnum("USD") };
         DataItem AnyLength(string picture)
@@ -162,14 +154,17 @@ public sealed class PictureClauseIdentityDriftTests
             foreach (var second in items)
             {
                 pairs++;
-                bool comparator = OoConformance.DescriptionMismatch(second, first) is null;
-                bool relation = OoConformance.SignatureDifference(first, second, "item", "corresponding item") is null;
-                Assert.True(comparator == relation,
-                    $"PIC {first.PictureText}{(first.IsAnyLength ? " ANY LENGTH" : "")} vs PIC {second.PictureText}"
-                    + $"{(second.IsAnyLength ? " ANY LENGTH" : "")}: the comparator says {(comparator ? "same" : "differs")}"
-                    + $" but the pair-mode relation says {(relation ? "same" : "differs")}");
-                Assert.Equal(relation, OoConformance.SignatureDifference(second, first, "item", "corresponding item") is null);
+                bool same = Difference(first, second) is null;
+                Assert.Equal(same, Difference(second, first) is null);
+                if (first.IsAnyLength || second.IsAnyLength)
+                    Assert.True(same == (first.IsAnyLength && second.IsAnyLength && first.PictureText == second.PictureText),
+                        $"PIC {first.PictureText}{(first.IsAnyLength ? " ANY LENGTH" : "")} vs PIC {second.PictureText}"
+                        + $"{(second.IsAnyLength ? " ANY LENGTH" : "")}: the pair-mode relation says {(same ? "same" : "differs")}");
             }
         Assert.True(pairs > 250, $"only {pairs} pairs — the population no longer exercises the invariant");
     }
+
+    /// <summary>The ONE pair-mode question, <see cref="OoConformance.SignatureDifference"/> (kb/Work PB3101).</summary>
+    private static string? Difference(DataItem first, DataItem second) =>
+        OoConformance.SignatureDifference(first, second, "item", "corresponding item");
 }

@@ -26,9 +26,10 @@ namespace CobolNet.Binding;
 /// COBOL prototype carries is its PROCEDURE DIVISION header: the positional USING formals (their descriptions
 /// and their passing modes, §14.8.2) and the RETURNING item (§14.8.3, whose §14.8.3.1 makes its very presence a
 /// conformance fact — "if and only if"). So this compares exactly those, position by position, through
-/// <see cref="OoConformance.DescriptionMismatch"/> — the ONE description-equality check the whole compiler
-/// already shares with the INVOKE / CALL conformance screens, so a description rule cannot mean one thing here
-/// and another there — and, for a group, through its subordinate entries as well (<c>SameDescription</c>).</para>
+/// <see cref="OoConformance.SignatureDifference"/> — the ONE pair-mode relation over two descriptions
+/// (<c>ActivationRelations.SignatureDifference</c>) that the override, IMPLEMENTS, interface and property-accessor
+/// checks ask too, so a description rule cannot mean one thing here and another there (kb/Work PB3101) — and, for an
+/// alphanumeric group, through its subordinate entries as well (<c>SameDescription</c>).</para>
 /// <para><b>An UNRESOLVED prototype conforms.</b> A prototype whose signature is null took ISO §12.3.8.4 GR10 c)
 /// — "the details are taken from the external repository" — and this implementation's external repository is the
 /// RUN UNIT's registry, resolved at execution. There is nothing to compare at compile time, and answering
@@ -39,12 +40,12 @@ internal static class PrototypeSignatures
 {
     /// <summary>True when the two prototypes have the same signature (see the type remarks for the derivation).
     /// Either side being null — an unresolved / separately-compiled prototype — conforms. A formal that is itself a
-    /// restricted program- or function-pointer is compared by the signature its restriction names, as the greatest
-    /// fixed point (<see cref="PrototypeBisimulation"/>), so two prototypes that name each other or themselves compare
-    /// by what they describe and never by what they are called (kb/Work PB2495).</summary>
-    public static bool Same(CalleeSignature? a, CalleeSignature? b) => Same(a, b, new PrototypeBisimulation());
-
-    private static bool Same(CalleeSignature? a, CalleeSignature? b, PrototypeBisimulation assumed)
+    /// restricted program- or function-pointer is compared by its TYPE, the signature class its prototype belongs to
+    /// (<see cref="RestrictionIdentity"/>), which its description carries; while the classes are being computed that is
+    /// the class of the current round of <see cref="PrototypeSignatureClasses"/>' partition refinement, so two prototypes
+    /// that name each other or themselves compare by what they describe and never by what they are called (kb/Work
+    /// PB2495, PB3101).</summary>
+    public static bool Same(CalleeSignature? a, CalleeSignature? b)
     {
         if (a is null || b is null) return true;   // §12.3.8.4 GR10 c) — resolved by the run unit, not here
         if (a.Formals.Count != b.Formals.Count) return false;
@@ -55,35 +56,36 @@ internal static class PrototypeSignatures
             // and a BY REFERENCE formal of identical description are different prototype information (§14.2.3
             // GR10 copies one and aliases the other), and OPTIONAL changes §14.8.2.1's required count.
             if (fa.ByValue != fb.ByValue || fa.Optional != fb.Optional) return false;
-            if (!SameDescription(fa.Item, fb.Item, assumed)) return false;
+            if (!SameDescription(fa.Item, fb.Item)) return false;
         }
         // §14.8.3.1 — a returning item is present "if and only if"; presence is half the fact, description the other.
         if ((a.Returning is null) != (b.Returning is null)) return false;
-        return a.Returning is null || SameDescription(a.Returning, b.Returning!, assumed);
+        return a.Returning is null || SameDescription(a.Returning, b.Returning!);
     }
 
     /// <summary>ISO §13.7.3 SR2 — a prototype's formal parameter or returning item "shall match the description of
     /// the formal parameters and the returning item in the corresponding function definition or program
     /// definition", the description §8.13 stores as the signature's "description of the parameters". Two halves:
     /// <list type="bullet">
-    /// <item>the item's OWN description — <see cref="OoConformance.DescriptionMismatch"/> in pair mode, the ONE
-    /// identical-description check (category, clauses, PICTURE identity, strong type, variable-length shape,
-    /// width);</item>
-    /// <item>for a GROUP, its SUBORDINATE entries (kb/Work PB1115, row SR-13.7.3-2): a group's data description
-    /// entry carries no PICTURE, USAGE or length of its own, so what describes it is the entries subordinate to
-    /// it. Before this half, <c>01 L-G. 05 PIC 9(2). 05 PIC X(2).</c> in a prototype and
+    /// <item>the item's OWN description — <see cref="OoConformance.SignatureDifference"/>, the ONE pair-mode relation
+    /// (class and category, the clause identity, ANY LENGTH and the LOCALE identification, the object-reference phrases,
+    /// the strong type, a variable-length group's matching information; a bit / national group is the elementary
+    /// <c>PIC 1(m)</c> / <c>N(m)</c> item §13.18.29.4 GR1 b) / GR2 b) treat it as, and an alphanumeric group is never
+    /// an elementary item);</item>
+    /// <item>for two GROUPS, their SUBORDINATE entries (kb/Work PB1115, row SR-13.7.3-2): a group's data description
+    /// entry carries no PICTURE, USAGE or length of its own, so what describes it is the entries subordinate to it.
+    /// Before this half, <c>01 L-G. 05 PIC 9(2). 05 PIC X(2).</c> in a prototype and
     /// <c>01 L-G. 05 PIC X(2). 05 PIC 9(2).</c> in its definition compared equal by WIDTH alone, and the caller —
     /// checked against the prototype — handed the definition a group it reads with the fields swapped. The
     /// structure is compared by §8.5.3.1's essential characteristics
     /// (<see cref="StrongTypeModel.SameElementaryLayout"/>: each elementary item at the same relative position,
     /// of the same length, with the same eight clauses), the standard's own statement of when two group
-    /// descriptions describe the same data — so a group matches only a group, never an elementary item of equal
-    /// width.</item>
+    /// descriptions describe the same data. A bit or national group opposite an elementary item is not asked it: that
+    /// pair is the elementary pair the first half compared.</item>
     /// </list></summary>
-    private static bool SameDescription(DataItem a, DataItem b, PrototypeBisimulation assumed) =>
-        OoConformance.DescriptionMismatch(a, b, prototypes: assumed) is null
-        && (a.IsGroup == b.IsGroup)
-        && (!a.IsGroup || StrongTypeModel.SameElementaryLayout(a, b, assumed));
+    private static bool SameDescription(DataItem a, DataItem b) =>
+        OoConformance.SignatureDifference(a, b, "prototype's item", "definition's item") is null
+        && (!a.IsGroup || !b.IsGroup || StrongTypeModel.SameElementaryLayout(a, b));
 
     /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER ITEM (kb/Work PB2464) — the one reader of
     /// <see cref="DataItem.PointerRestrictionIdentity"/>: <c>TO name</c> of the signature class
@@ -92,34 +94,20 @@ internal static class PrototypeSignatures
     /// by that signature; §14.8.2.3.2 "of the same type"). For a prototype the unit's tables do not hold, and for one
     /// with no compile-time signature, the identity is the prototype's own name (<see cref="UnclassifiedIdentity"/>).
     /// Null for an unrestricted pointer and for any other item. Every relation that asks whether two restricted
-    /// prototype-pointers are of the same type reads THIS: the typed comparator, through <see cref="SameType"/>, and,
-    /// through <c>ActivationDescriptions</c>, the §9.3.6 match, the §14.8.2 / §14.8.3 conformance and the SET validity of
-    /// a universal INVOKE.</summary>
+    /// prototype-pointers are of the same type reads THIS: §8.5.3.1's type-declaration equivalence, through
+    /// <see cref="SameType"/>, and, through <c>ActivationDescriptions</c>, the §9.3.6 match, the §14.8.2 / §14.8.3
+    /// conformance, the pair-mode signature relation and the SET validity of a universal INVOKE.</summary>
     public static string? RestrictionIdentity(DataItem pointer) =>
         pointer.PointerRestrictionIdentity ?? UnclassifiedIdentity(pointer);
 
-    /// <summary>⛔ THE ONE "of the same type" RELATION OVER TWO PROGRAM- OR FUNCTION-POINTERS (ISO §14.8.2.3.2: "If
+    /// <summary>⛔ THE ONE "of the same type" RELATION OVER TWO PROGRAM- OR FUNCTION-POINTER ITEMS (ISO §14.8.2.3.2: "If
     /// either is a restricted pointer, both shall be restricted and of the same type"; §13.18.60.4 GR25 / GR26 make the
-    /// type the prototype's SIGNATURE). One question with two answers, by WHEN it is asked:
-    /// <list type="bullet">
-    /// <item>outside a signature comparison (<paramref name="within"/> null): by the classes <see cref="Same"/> built
-    /// (<see cref="RestrictionIdentity"/>) — the identity a universal INVOKE's run-time descriptions carry too, so the
-    /// typed comparator and the §9.3.6 match agree;</item>
-    /// <item>INSIDE one, where the pair is a formal of two prototypes being compared and the classes are what that
-    /// comparison builds: by the signatures the two restrictions name, under the pairs <paramref name="within"/> has
-    /// already assumed (the greatest fixed point, <see cref="PrototypeBisimulation"/>; kb/Work PB2495). A restriction
-    /// with no compile-time signature (§12.3.8.4 GR10 c) / GR11 c), or a name the unit's tables do not hold) is a class
-    /// of its own, exactly as <see cref="PrototypeSignatureClasses"/> makes it.</item>
-    /// </list></summary>
-    public static bool SameType(DataItem a, DataItem b, PrototypeBisimulation? within)
-    {
-        if (within is null)
-            return string.Equals(RestrictionIdentity(a), RestrictionIdentity(b), StringComparison.Ordinal);
-        if (a.RestrictedPrototype is { Signature: { } sa } pa && b.RestrictedPrototype is { Signature: { } sb } pb
-            && pa.Function == pb.Function)
-            return within.AlreadyAssumed(pa, pb) || Same(sa, sb, within);
-        return string.Equals(UnclassifiedIdentity(a), UnclassifiedIdentity(b), StringComparison.Ordinal);
-    }
+    /// type the prototype's SIGNATURE): their <see cref="RestrictionIdentity"/> values are equal. While
+    /// <see cref="PrototypeSignatureClasses"/> refines its partition each restricted pointer carries its prototype's
+    /// CURRENT class, so this question asked inside the classification is the refinement's own question, and the greatest
+    /// fixed point needs no assumption set (kb/Work PB2495, PB3101).</summary>
+    public static bool SameType(DataItem a, DataItem b) =>
+        string.Equals(RestrictionIdentity(a), RestrictionIdentity(b), StringComparison.Ordinal);
 
     /// <summary>The identity of a restricted pointer whose prototype is a signature class of its own: <c>TO</c> the
     /// prototype's externalized name when the unit's tables resolved it, else <c>TO</c> the restriction's own word —
@@ -139,35 +127,4 @@ internal static class PrototypeSignatures
     /// registry's <c>FormalCount</c>). Zero when the prototype is unresolved, which is also what a zero-formal
     /// unit registers.</summary>
     public static int FormalCount(CalleeSignature? s) => s?.Formals.Count ?? 0;
-}
-
-/// <summary>
-/// ⛔ THE PAIRS OF PROTOTYPES ONE SIGNATURE COMPARISON HAS ASSUMED TO HAVE THE SAME SIGNATURE (kb/Work PB2495).
-/// <para>A prototype's formal may itself be a restricted program- or function-pointer, whose type is the signature of
-/// ANOTHER prototype (ISO §13.18.60.4 GR25: "the address of a program with the same signature as that identified by the
-/// specified program-prototype-name"; GR26, its function twin) — and that prototype may name the first one, or itself,
-/// in turn. "The same signature" is then the GREATEST relation that holds position by position: two prototypes have the
-/// same signature unless some finite path through their formals reaches a difference. So
-/// <see cref="PrototypeSignatures.Same"/> compares the two signatures a pair of restrictions names under the assumption
-/// that the pair is already equal, and a pair met again on the way answers from that assumption instead of looping —
-/// the standard construction for the equality of recursive types. The assumption is sound because the comparison is a
-/// conjunction: a difference anywhere answers false for the whole of it, whatever was assumed on the way.</para>
-/// <para>Before it the nested pair was compared by the prototypes' NAMES (the identity a prototype still being
-/// classified has), so <c>PS1 USING pointer TO PS2</c> and <c>PS2 USING pointer TO PS1</c> — one signature — fell into
-/// two classes and §14.9.39.3 SR22 refused a SET between their pointers.</para>
-/// <para>A pair is keyed by the two prototypes' namespaces (program or function — the two
-/// <see cref="PrototypeSignatureClasses"/> keeps) and externalized names — §8.3.2.2 rule 2: "all instances of a given
-/// name that is externalized to the operating environment shall identify the same kind of entity" — the key that class
-/// memoizes a classification under.</para>
-/// </summary>
-public sealed class PrototypeBisimulation
-{
-    // Allocated on the first restricted-pointer pair: most signatures have none, and Same runs once per founder compared.
-    private HashSet<((bool Function, string Name), (bool Function, string Name))>? _assumed;
-
-    internal PrototypeBisimulation() { }
-
-    /// <summary>True when the pair is already assumed to have the same signature; otherwise assumes it from now on and
-    /// answers false, so the caller compares the two signatures.</summary>
-    internal bool AlreadyAssumed(RestrictedPrototype a, RestrictedPrototype b) => !(_assumed ??= []).Add((a.Key, b.Key));
 }

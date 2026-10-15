@@ -1194,7 +1194,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         // operand against an ANY LENGTH formal/returning item — §14.8.2.3.2 rule e) ("If the argument is
         // described with the ANY LENGTH clause, the corresponding formal parameter shall be described with the
         // ANY LENGTH clause") and §14.8.3.3 rule 4 (the receiving returning item likewise) — and the
-        // activation-mode DescriptionMismatch in the conformance loop below states exactly those. The screen
+        // run-time relation the conformance loop below asks (ActivationRelations, kb/Work PB3101) states exactly those. The screen
         // used to fire for EVERY Format-2 operand, refusing a contained program that forwards its own ANY
         // LENGTH formal `CALL "C" AS NESTED USING BY REFERENCE L` to another ANY LENGTH formal — legal source
         // (§13.18.2.3 SR2/SR3 make such a formal exist only in a contained program, function or method).
@@ -1235,8 +1235,8 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         // with §14.9.4.4 GR3d making the verdict a RUNTIME EC-PROGRAM-ARG-MISMATCH where the callee's
         // description is not statically visible. §14.9.23.3 SR1–SR17 (INVOKE) contains no such prohibition at
         // all; an SR12 clone there would REJECT LEGAL SOURCE. The compatibility relation itself now EXISTS —
-        // VariableLengthCompatibility, applied by OoConformance.DescriptionMismatch at all three Format-2 /
-        // INVOKE boundaries, with the crossing carried by CobolVarGroup (kb/Work PB204) — so this gate stays
+        // the §8.5.1.12 walk ActivationRelations.VariableLengthViolation asks at all three Format-2 / INVOKE
+        // boundaries, with the crossing carried by CobolVarGroup (kb/Work PB204, PB3101) — so this gate stays
         // exactly as narrow as SR12's own sentence.
         if (!isReturning && !formatTwo && item.IsGroup && ReferenceResolver.HasVariableLengthSubordinate(item))
             ctx.Edition.Error(DiagnosticCatalog.CallVariableLengthGroup,

@@ -372,7 +372,7 @@ public static class MoveTable16
     /// because the pairing filter never asked SR2 (kb/Work PB878's sibling sweep).</summary>
     private static string? StrongGroupRefusal(DataItem? sender, DataItem? receiver) =>
         receiver is not null && StrongTypeModel.IsStrongGroup(receiver)
-        && (sender is null || !StrongTypeModel.SameType(sender, receiver, prototypes: null))
+        && (sender is null || !StrongTypeModel.SameType(sender, receiver))
             ? "the sending operand shall be a group item of the same type (ISO §14.9.25.3 SR2 / §8.5.3.3)"
             : null;
 
