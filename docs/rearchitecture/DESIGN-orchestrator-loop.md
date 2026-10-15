@@ -62,7 +62,7 @@ the tools it runs). Contents:
 | `land-lane\` | `land_lane.py` (the supervisor's tick, its detached runners, the enqueue unit's `collect` and `rearm`, the operator's `clear-halt`) | the landing lane's state (section 4.9): `attempts\<id>.json` (one per `enqueue.py land` run: branch, head, log, runner pid, exit code, verdict, end head, collected), `survey.json` (the last tick's branch survey, which `next_unit.py` reads), `rearm\<branch>.json` (the enqueue unit's re-arm of a branch at its tip: one more attempt at an unchanged head), `HALT` (a run ended QUEUE NOT ACTIVE) and `tick.lock` |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
 | `clusters-campaign-<lead>.json` | `plan_wave.py --cluster` | the latest campaign view it planned from: the open and half clusters, `deps` and `waiting` (section 9.1) |
-| `inflight-groups.json` | `plan_wave.py` (without `--dry-run`), and `scripts/hooks/dispatch_guard.py` for every write-capable Agent call and every Workflow call it admits | the dispatch ledger: every group planned or dispatched by hand whose notes are not all landed or retired, with the files it was planned on and when (`at`); the campaign lane's file-set partition reads it, so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `enqueue.py land`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the groups whose declared files its diff meets); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>` (section 9.1; kb/Work PB2118 Drafts 7–10) |
+| `inflight-groups.json` | `make_dispatch_specs.py`, for every group it renders (the planner's waves, which it runs, and a hand-planned wave alike), through `plan_wave.record_dispatch`, an upsert keyed on (wave, letter); `plan_wave.py --release` | the dispatch ledger: every rendered group whose notes are not all landed or retired, with its slug, notes, exact file set and when (`at`); every plan's file-set partition reads it (section 9 item 1b), so a dispatched group is in flight before its agent has a worktree or a commit, and the landing check (`landing_check.py`, run by `enqueue.py land`) reads it for a landing's declared set, its dispatch order and an in-flight branch's identity (the ONE group its report names, else the one that best covers its diff); a wave entry never expires and an aborted one is released with `plan_wave.py --release <wave|group|note>`. It is never written from a scrape of a prompt (kb/Work PB3186: the dispatch guard's retired recorder took every note id a brief mentioned); an entry with `hand: true` or a non-numeric wave is ignored by every reader and dropped by the next record (`plan_wave.ledger_groups`; section 9.1; kb/Work PB2118 Drafts 7–10) |
 | `member-index/<treeKey>.members.json.gz` | `plan_wave.py --cluster` (`member_index.current`) | the member index regenerated for the planner's own tree when no committed record has its `treeKey`: the planner never plans on a stale index (kb/Work PB2118 Draft 9) |
 | `scratch/train<label>-manifest.json` | the retired train landers (none written since kb/Work PB3023) | a past train's members; `prune_worktrees.py` still reads the landed ones (`train_heads`) to classify the branches those trains carried |
 | `units.jsonl` | the supervisor | one line per unit (section 4.5) |
@@ -670,11 +670,26 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
 1. **Awaiting landing.** A note whose newest report is `DONE` and names a branch that is not on `main` yet
    (`prune_worktrees.classify`, reused: `UNLANDED` or `CHECK`) is excluded and listed: re-planning it would dispatch
    work that already exists. The `land` or `resume` unit deals with it first. **Held by a dispatch** (both lanes,
-   `held_by_dispatch`, kb/Work PB2806): a note a dispatch-ledger group names (a planned wave, launched or not, or a
-   hand dispatch within its TTL) that no report written since that dispatch names is excluded too, and waits with the
-   group named; it is in an agent's hands, or in a planned wave the operator has not launched yet. The fix lane read
-   no ledger until then, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched
-   wave 1045 held. An aborted dispatch is released with `--release`.
+   `held_by_dispatch`, kb/Work PB2806): a note a dispatch-ledger group names (a planned or rendered wave, launched
+   or not) that no report written since that dispatch names is excluded too, and waits with the group named; it is in
+   an agent's hands, or in a planned wave the operator has not launched yet. The fix lane read no ledger until then,
+   and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held. An
+   aborted dispatch is released with `--release`.
+
+   1b. **The file-set partition, for every plan** (kb/Work PB2807). With two planners (the loop and an attended or
+   Mythos session) a fix-lane group could be planned on a file another session's running group was changing for a
+   different note; the partition once gated a campaign only. Now every group's files are checked against the
+   in-flight set (`inflight_file_sets`: worktrees, unlanded branches, the ledger's still-open groups), each owner read
+   ONCE through the branch survey's lifecycle state (`classify_inflight`, `prune_worktrees.survey`, the one lifecycle
+   rule, MANDATORY-PRACTICES O10): a group meeting FINISHED work (WAITING FOR REVIEW, WAITING TO LAND, ENQUEUED) is
+   planned as its CONTINUATION, its `pred` telling it to merge each such branch first (no `after:`: the branch is not
+   in this wave); a group meeting RUNNING work (a ledger group with no report yet, a branch IN FLIGHT, STOPPED,
+   BOUNCED or undecided as DECISION) waits, the collision and the owner's state named, so an undecided branch is
+   decided rather than planned over. A group's own work never collides: the branch its `pred` already continues
+   (`Group.continues`), a dispatch of its own notes, a branch whose report or commit subjects name its notes (an
+   earlier attempt). A ledger group a report answers (its slug) is read through its branch, never its declared set; a
+   LANDED branch is gone. The external-repository slices gate the campaign only. The landing check stays the
+   guarantee for R3 work; fix lane against fix lane is never stopped there, and costs at most a conflict finisher.
 2. **Finishers first.** (a) A note whose newest report (by wave, then time; header lines only) says `SPLIT` or
    `NOT STARTED`, whatever its branch's state (a `land` unit lands only `DONE` branches, so an unlanded `SPLIT` branch
    held for one was stranded; kb/Work PB2575), or says `DONE` with a branch review stamped `Review: FINDINGS` (kb/Work
@@ -723,8 +738,8 @@ applies `.agent-fleet.json`'s kind and skip flags), run twice: once over `status
    `devlog.py stamp`, which takes it from `alloc.py devlog` (kb/Work PB3025). `--dry-run` peeks everything and writes
    nothing.
 8. **Outputs** (not in `--dry-run`): `<scratch>\groups.json` in exactly `make_dispatch_specs.py`'s format (each
-   group also carries its `model`), the rendered specs and `check_practices.py`'s verdict (by running
-   `make_dispatch_specs.py`; exit 1 when red), and `<scratch>\wf-args-w<wave>.json` with the rolling wave's args
+   group also carries its `model` and its `file_set`, a list), the rendered specs, the ledger record of every group
+   and `check_practices.py`'s verdict (by running `make_dispatch_specs.py`; exit 1 when red), and `<scratch>\wf-args-w<wave>.json` with the rolling wave's args
    (`scratch, wave, concurrency, train_size, min_final_train, previous_train, lead_id_blocks,
    implementer_model, authorization, groups`).
 9. **Frontier models wait for the owner.** A note whose body says its work needs Fable or Mythos under the owner's
@@ -784,8 +799,9 @@ itself), ordered by `blocked_by:`.
   Several leads are for INDEPENDENT campaigns: a lead that is itself a note of another lead's cluster (PB2119, the
   Delete program, is both a lead and a note of the architecture review PB1754) would be planned twice, once as a
   note of the outer campaign and once as its own lane, so the operator passes the outer lead or the inner one, not
-  both. Between independent lanes the file-set partition still holds: a campaign group whose files meet another
-  lane's dispatched, still-open group (`inflight-groups.json`, `plan_wave.py#inflight_file_sets`) waits.
+  both. Between independent lanes the file-set partition still holds (item 1b, the same rule for every plan): a
+  group whose files meet another lane's dispatched, still-open group (`inflight-groups.json`,
+  `plan_wave.py#inflight_file_sets`) waits.
 - **The handoff names a wave, the supervisor names its lane** (kb/Work PB2522). A unit's handoff is written by the
   model from what it sees, so it may name `wave` every time; the campaign rule therefore applies to a handoff's `wave`
   (or `campaign`) as it does to rule 7, and a ready lead that has waited through more than one wave-type unit is logged

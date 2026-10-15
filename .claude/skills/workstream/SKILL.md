@@ -127,9 +127,13 @@ gathering"; "use this new rolling functionality as it reduces context and token 
   workflow output size with waves 1001 (31,864 bytes) and 1002 (27,210).
 - **Specs.** Render them with `make_dispatch_specs.py <groups.json>`, which takes the same groups plus `slug`,
   `group`, `root`, `files`, `body`, an optional `pred` text (predecessor or resume instructions) and the optional
-  `after` (ignored by the renderer; the workflow uses it). Spec files are keyed on the full letter:
-  `msg-w<wave>-<letter lower-cased>.txt`. `check_practices.py <groups.json>` refuses two groups whose `root` names
-  the same primary `src/` file unless one declares `after:` the other.
+  `after` (ignored by the renderer; the workflow uses it), and `file_set`, the list of files the group changes
+  (`plan_wave.py` writes it; without it the renderer computes the set from the group's notes). Spec files are keyed
+  on the full letter: `msg-w<wave>-<letter lower-cased>.txt`. The renderer also RECORDS every group in the dispatch
+  ledger (`plan_wave.record_dispatch`, an upsert on wave and letter; `--coord DIR`), the ledger's one writer, so the
+  planners' file-set partition and the landing check see a hand-planned wave too (kb/Work PB3186).
+  `check_practices.py <groups.json>` refuses two groups whose `root` names the same primary `src/` file unless one
+  declares `after:` the other.
 
 ⭐ **COMMAND CHAINING — MANDATORY-PRACTICES P14, enforced by the guard hook.** Never chain anything after a verdict
 command (build, test, gate, `enqueue.py land`, battery); capture its status with `; echo "EXIT=$?"` if needed. Independent
