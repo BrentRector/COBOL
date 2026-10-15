@@ -210,3 +210,8 @@ the same diagnostics as a program whose only `X` or `QI` is a constant: COBOLNET
 The two stamped entries the merged branches carried (2034 and 2047) are folded into this one, because a landing adds
 exactly one entry.
 
+Gate (run 20261015T211341Z-691c81 on `3a76cd1c8`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN —
+leg 2 left to CI's whole-population run … Conformance 6,130/11,748 · Unit 33,225/33,674 · Characterization 6/36 cases
+ran (skipped 0) in 1 of 2 leg(s) …`. The two new negatives, `2002/pb3164_method_constant_scope`,
+`2014/pb3165_method_capacity_register_scope` and the four `GlobalNameClassDriftTests` facts passed in leg 1.
+
