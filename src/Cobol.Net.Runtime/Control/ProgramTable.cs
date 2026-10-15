@@ -276,7 +276,9 @@ public sealed class ProgramTable
     /// refuses (a module built against another runtime major or call ABI, or one carrying an already-registered
     /// outermost name; PB2097) is a <see cref="CobolCallException"/> that reaches the same §14.6.12 abnormal-termination
     /// surface as any other fatal condition, because no statement of the entry runs outside the boundary that owns it.
-    /// A host that registers its modules itself enters through <see cref="RunMain"/>.
+    /// A .NET host never enters here: it activates a program through the program's generated host entry,
+    /// <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call</c>, whose activation is <see cref="CallProgram"/>'s outermost arm
+    /// (DESIGN-external-repository §4.3, §4.4).
     /// <para>This is the boundary that IS the process (DOC-A.1-167: "A standalone <c>cobol</c> executable IS its own
     /// host"), so it alone delivers the run unit's termination status to the process exit code, once, when the run unit
     /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the

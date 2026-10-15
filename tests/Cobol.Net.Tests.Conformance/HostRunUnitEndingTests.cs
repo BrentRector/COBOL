@@ -6,9 +6,10 @@ namespace CobolNet.Tests.Conformance;
 
 /// <summary>
 /// The witness for owner decision R48 and Annex A.1 item 167 (<c>docs/CONFORMANCE.md</c> DOC-A.1-167): under a .NET host,
-/// a STOP RUN or a fatal exception condition that terminates the run unit ends the RUN UNIT only. The outermost
-/// activation boundary, <c>ProgramTable.CallProgram</c> with <c>callerPath: null</c> (an activator outside every
-/// program; DESIGN-external-repository §4.1, §4.3 "The exception contract" item 3), performs the §14.6.11 actions and
+/// a STOP RUN or a fatal exception condition that terminates the run unit ends the RUN UNIT only. The host activates
+/// each program through its generated host entry (<c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call()</c>, DESIGN-external-repository
+/// §4.3), whose activation is the outermost boundary, <c>ProgramTable.CallProgram</c> with <c>callerPath: null</c> (an
+/// activator outside every program; §4.1, §4.3 "The exception contract" item 3), which performs the §14.6.11 actions and
 /// hands the host ONE documented exception, <c>RunUnitEndedException</c>, carrying the exit status and whether the
 /// termination was abnormal. The host process continues, and its next activation is in a new run unit that inherits
 /// nothing.
@@ -90,9 +91,9 @@ public sealed class HostRunUnitEndingTests
 
         public static class R48HostProgram
         {
-            private static void Activate(string name)
+            private static void Activate(Action call)
             {
-                try { ProgramRegistry.CallProgram(name, null, Array.Empty<CobolArg>(), null); }
+                try { call(); }
                 catch (RunUnitEndedException ended)
                 {
                     Console.WriteLine($"ENDED STATUS={ended.ExitStatus} ABNORMAL={ended.Abnormal}");
@@ -102,18 +103,18 @@ public sealed class HostRunUnitEndingTests
 
             public static int Main()
             {
-                Activate("R48CNT");
-                Activate("R48CNT");
-                Activate("R48STP");
+                Activate(Cobol.R48CNT.R48CNT.Call);
+                Activate(Cobol.R48CNT.R48CNT.Call);
+                Activate(Cobol.R48STP.R48STP.Call);
                 Console.WriteLine("FILE " + File.ReadAllText("r48out.dat").TrimEnd());
-                Activate("R48CNT");
-                Activate("R48FTL");
-                Activate("R48CNT");
+                Activate(Cobol.R48CNT.R48CNT.Call);
+                Activate(Cobol.R48FTL.R48FTL.Call);
+                Activate(Cobol.R48CNT.R48CNT.Call);
                 RunUnit.Run(_ =>
                 {
-                    Activate("R48CNT");
-                    Activate("R48STP");
-                    Activate("R48CNT");
+                    Activate(Cobol.R48CNT.R48CNT.Call);
+                    Activate(Cobol.R48STP.R48STP.Call);
+                    Activate(Cobol.R48CNT.R48CNT.Call);
                 });
                 Console.WriteLine("HOST DONE");
                 return 0;
@@ -130,7 +131,7 @@ public sealed class HostRunUnitEndingTests
             NonCobolElement.CompileCobol(dir, "R48CNT", Counter);
             NonCobolElement.CompileCobol(dir, "R48STP", Stopper);
             NonCobolElement.CompileCobol(dir, "R48FTL", Fatal);
-            NonCobolElement.CompileCSharp(dir, "R48HOST", Host, runtimeConfigOf: "R48CNT");
+            NonCobolElement.CompileCSharp(dir, "R48HOST", Host, "R48CNT", "R48CNT", "R48STP", "R48FTL");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "R48HOST.dll"), dir);
             Assert.Equal(
                 "COUNT 1\n" +

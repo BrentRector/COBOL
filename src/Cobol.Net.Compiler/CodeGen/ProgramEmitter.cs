@@ -885,8 +885,6 @@ internal sealed class ProgramEmitter
         }
     }
 
-    /// <summary>Emit the run-unit entry, <c>Program.Main</c>: begin the run unit, register this module through its one
-    /// registration member, and run the main program.</summary>
     /// <summary>⛔ THE RUN-UNIT MAIN of a compilation group: its first top-level PROGRAM definition (§8.3.1), or null for a
     /// group with none — a LIBRARY (DESIGN-external-repository §7.2), which the backend builds as
     /// <c>OutputKind.DynamicallyLinkedLibrary</c> with no <c>Main</c> and no <c>runtimeconfig.json</c>, reached through its
@@ -898,6 +896,8 @@ internal sealed class ProgramEmitter
     internal static BoundUnit? MainUnit(IReadOnlyList<BoundUnit> units) =>
         units.FirstOrDefault(u => u is { Parent: null, IsFunction: false, IsPrototype: false });
 
+    /// <summary>Emit the run-unit entry, <c>Program.Main</c>: begin the run unit, register this module through its one
+    /// registration member, and run the main program — nothing for a library (<see cref="MainUnit"/> null).</summary>
     private static void EmitMain(IReadOnlyList<BoundUnit> units, CodeWriter w, bool anyFiles)
     {
         if (MainUnit(units) is not { } mainUnit) return;   // a library: no Main (§7.2)

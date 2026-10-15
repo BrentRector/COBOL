@@ -106,36 +106,33 @@ public sealed class DefaultLocaleDeterminationTests
         finally { CutRunner.TryDelete(dir); }
     }
 
-    /// <summary>The non-COBOL element: a .NET host that sets the process culture, begins a run unit, switches the
-    /// culture while the run unit is active, calls the program again, and finally begins a second run unit.</summary>
+    /// <summary>The non-COBOL element: a .NET host that sets the process culture, begins a run unit
+    /// (<c>RunUnit.Run</c>, which reads the locale from the process at that moment, A.1 item 167), switches the culture
+    /// while the run unit is active, calls the program again through its generated host entry, and finally begins a
+    /// second run unit.</summary>
     private const string Host = """
         using System;
         using System.Globalization;
-        using System.IO;
         using CobolNet.Runtime;
 
         public static class A120Host
         {
-            private static void BeginRunUnit()
-            {
-                ProgramRegistry.Reset();
-                var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "A118LOC.dll"));
-                var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
-                asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
-            }
-
             public static int Main()
             {
                 CultureInfo.CurrentCulture = new CultureInfo("es-ES");
-                BeginRunUnit();
-                Console.WriteLine("RUN UNIT 1, CULTURE es-ES");
-                ProgramRegistry.CallProgram("A118LOC", null, Array.Empty<CobolArg>(), null);
-                CultureInfo.CurrentCulture = new CultureInfo("de-DE");
-                Console.WriteLine("RUN UNIT 1, HOST SWITCHED TO de-DE");
-                ProgramRegistry.CallProgram("A118LOC", null, Array.Empty<CobolArg>(), null);
-                BeginRunUnit();
-                Console.WriteLine("RUN UNIT 2, CULTURE de-DE");
-                ProgramRegistry.CallProgram("A118LOC", null, Array.Empty<CobolArg>(), null);
+                RunUnit.Run(_ =>
+                {
+                    Console.WriteLine("RUN UNIT 1, CULTURE es-ES");
+                    Cobol.A118LOC.A118LOC.Call();
+                    CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+                    Console.WriteLine("RUN UNIT 1, HOST SWITCHED TO de-DE");
+                    Cobol.A118LOC.A118LOC.Call();
+                });
+                RunUnit.Run(_ =>
+                {
+                    Console.WriteLine("RUN UNIT 2, CULTURE de-DE");
+                    Cobol.A118LOC.A118LOC.Call();
+                });
                 return 0;
             }
         }
@@ -148,7 +145,7 @@ public sealed class DefaultLocaleDeterminationTests
         try
         {
             NonCobolElement.CompileCobol(dir, "A118LOC", Program);
-            NonCobolElement.CompileCSharp(dir, "A120HOST", Host, runtimeConfigOf: "A118LOC");
+            NonCobolElement.CompileCSharp(dir, "A120HOST", Host, "A118LOC", "A118LOC");
             // The defaults must come from the process culture, so neither variable may be set; the system default is
             // then the host's installed UI culture, which this test does not control, so the expected SYSTEM lines are
             // not asserted — the first and third lines of each block are.

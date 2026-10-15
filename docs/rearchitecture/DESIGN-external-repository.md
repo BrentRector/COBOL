@@ -1626,10 +1626,14 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
   `ProgramRegistry.CallProgram`, a `finally` of `HostLanding` decodes and the RETURNING decode — with no `catch`
   clause, no `ICobolProgram` or `ProgramTable` member, no instance and no EC-name test; that `Cancel` is one
   `ProgramRegistry.Cancel`; and that its parameter types equal `HostSurface.TypeOf` of the recorded descriptions.
-- **One host surface:** a repository scan fails when a test, sample or document outside `src/Cobol.Net.Runtime` and the
-  compiler's emitters names `ProgramRegistry.CallProgram`, `ProgramRegistry.Cancel`, `ICobolProgram.Call` or
-  `__CobolModule.Register` as a way for a host to activate a program (the runtime's own tests of the boundary are
-  listed in the scan as the ABI's tests).
+- **One host surface** (`OneHostSurfaceDriftTests`): a repository scan fails when a test's code — read as Roslyn tokens,
+  so its comments are not scanned and the C# hosts it compiles are — or a user-facing document (`README.md`,
+  `docs/CONFORMANCE.md`, `docs/manual/`, `samples/`) names an untyped activation route: `ProgramRegistry.CallProgram`,
+  `Cancel`, `RunMain` or `RunModule`, the run unit's `Programs.CallProgram`/`Cancel`/`RunMain`/`RunModule`,
+  `ICobolProgram.Call` or `Activate`, or a module's `__CobolModule.Register` (by name or by `GetMethod("Register")`).
+  The generated code, the runtime and the maintainer design documents describe the ABI and are not scanned; the ABI's
+  own tests (`HostEntryShapeDriftTests`, `RuntimeAbiPinDriftTests`, `OperandActivationDriftTests`) are listed in the
+  scan with their reasons, and a listed test that names no route is a stale exemption, also red.
 - **The door rules are one function:** every landing, alias and validity decision in emitted code is a `HostLanding`
   call (no inline range test); `HostLanding.Land` refuses every row of a loss fixture (high order, low order, sign, P
   positions, each binary capacity, string length, boolean characters) and accepts the exact boundary values; the

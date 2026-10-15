@@ -11,36 +11,25 @@ namespace CobolNet.Tests.Conformance;
 /// by a non-COBOL runtime element, the implementor defines whether access to formal parameters and the returning item
 /// is guaranteed"; §13.7.4 5) (cite.py OK): "If the runtime element containing the linkage section is activated by a
 /// non-COBOL runtime element, the initial value of a linkage section data item is defined by the implementor".
-/// <para>DETERMINATION PINNED, per entry the .NET host (the only non-COBOL activator, item 141) uses:</para>
-/// <list type="bullet">
-/// <item><b>A call</b> (<c>ProgramRegistry.CallProgram</c>, which activates through <c>ICobolProgram.Call</c>): access
-/// IS guaranteed. Each argument maps positionally to its formal, whose initial value is the host's carrier and whose
-/// stores reach it, and the RETURNING item is delivered into the <c>returning</c> carrier. An argument the host omits
-/// (a <c>ManagedPointer.Null</c> carrier, or fewer arguments) makes its formal OMITTED.</item>
-/// <item><b>The main-program entry</b> (<c>ProgramRegistry.RunMain</c>, which activates through
-/// <c>ICobolProgram.Activate</c>): access is NOT guaranteed, as for activation by the operating system. On an
-/// instance's first activation every formal refers to storage private to the instance holding the item's
-/// category-default value — spaces for a character item, zero for a numeric item of any usage, NULL for a pointer, and
-/// for a group each subordinate elementary item's — and is not OMITTED. After an earlier call on the same instance each
-/// formal keeps what that call bound: the host's carrier for an elementary formal, the area that call filled from the
-/// carrier for a group, and OMITTED for a formal that call omitted.</item>
-/// </list>
-/// <para>Expected output, derived from the determination: run unit 1 activates a fresh instance through the main
-/// entry, so LA is four spaces and LN is zero although both carry a VALUE clause (§13.18.63.4 3), cite.py OK: "In the
-/// linkage section, VALUE clauses take effect only during the execution of an explicit or implicit INITIALIZE
-/// statement"), the group LG is its elementary items' defaults (LGA spaces, LGN zero), LB is zero, LP is NULL, the
-/// ADDRESS OF-referenced national LK is national spaces and the floating-point LF is zero. LG, LK and LF are the
-/// formals whose storage is an AREA rather than a carrier (a group, an addressed item, a floating-point item), so they
-/// pin the record-image arm of the unbound value; LK is the one where a carrier-shaped image does not fit (kb/Work
-/// PB2671's refuted first fix: two characters in a four-position cell, EC-BOUND-PTR).
-/// Run unit 2 calls with every argument and then with the optional ones omitted in both ways, and the host reads back the program's stores and the RETURNING value. The
-/// final main entry on the same instance sees the host's new LA content, the group area as the last call left it
-/// (IJ78 after ADD 1 and MOVE "GG" is GG79), LN still the host's 042, and LB, LP, LK and LF OMITTED because the last call
-/// omitted them; its MOVE to LA reaches the host's storage, and its stores to LG reach only that private area.</para>
-/// <para>Before kb/Work PB2671 the main entry broke the determination twice: a group (AREA) formal had no storage, so
-/// its first reference was the fatal EC-DATA-PTR-NULL, and an image-stored binary formal was seeded with spaces, a
-/// nonzero value. The corpus cannot see either: its activator is always the operating system, where §13.7.4 3) makes
-/// access undefined.</para>
+/// <para>DETERMINATION PINNED: the only non-COBOL activator is a .NET host (item 141), and its one interface is the
+/// program's generated host entry, <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call(...)</c> (DESIGN-external-repository §4.3),
+/// which activates the program through the boundary a COBOL CALL crosses, with a USING phrase that names every formal.
+/// Access IS guaranteed, exactly as under a COBOL CALL with a USING phrase: each <c>Call</c> parameter is the formal in
+/// its position, whose initial value is the host's value landed into storage of the formal's description (a group's,
+/// its published record's image) and whose stores reach the host's variable when the call ends; an OPTIONAL formal
+/// whose parameter is <c>null</c> is OMITTED (§14.9.4.4 11), cite.py OK); and the RETURNING item is <c>Call</c>'s
+/// return value. The RETURNING item's initial value is not this item's to define: §14.2.3 7) (cite.py OK) makes it
+/// "undefined" for every activator, so the program below stores into LR before the host reads it.</para>
+/// <para>Expected output, derived from the determination: the first call passes every argument, so each formal shows
+/// the host's value — LA and the group LG (AB12) as given, LN 007, LB nonzero, LP the NULL the host passed, the
+/// national LK the spaces the host passed (read through ADDRESS OF, the AREA arm of kb/Work PB2671), LF zero — and the
+/// host reads back the program's stores (LA ZZZZ, LG GG13 after MOVE "GG" and ADD 1) and the RETURNING value RRRR. The
+/// second call passes <c>null</c> for every OPTIONAL formal, so each is OMITTED. A linkage VALUE clause is not applied
+/// (§13.18.63.4 3), cite.py OK: "In the linkage section, VALUE clauses take effect only during the execution of an
+/// explicit or implicit INITIALIZE statement"): LA shows the host's value, never VVVV.</para>
+/// <para>A program activated by the operating system (the <c>Main</c> of a <c>cobol</c> executable) is the other
+/// §13.7.4 3) case, whose effect is undefined; WiseOwl COBOL gives each formal its category default there, which the
+/// golden <c>conformance:2002/pb2671_omitted_formal_category_default</c> pins.</para>
 /// </summary>
 public sealed class NonCobolActivatorLinkageTests
 {
@@ -114,101 +103,62 @@ public sealed class NonCobolActivatorLinkageTests
         END PROGRAM A116LNK.
         """;
 
-    /// <summary>The non-COBOL activating element: two run units, each begun the way the generated driver begins one
-    /// (<c>ProgramRegistry.Reset</c>, then the module's registrar).</summary>
+    /// <summary>The non-COBOL activating element: a .NET host calling the program's generated host entry.</summary>
     private const string Host = """
         using System;
-        using System.IO;
         using CobolNet.Runtime;
+        using Cobol.A116LNK;
 
         public static class A116Host
         {
-            private static void BeginRunUnit()
-            {
-                ProgramRegistry.Reset();
-                var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "A116LNK.dll"));
-                var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
-                asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
-            }
-
-            private static CobolArg Ref(ManagedPointer carrier) => new(CobolPassMode.Reference, carrier, null);
-
-            private static ManagedPointer<string> Text(string image) => ManagedPointer<string>.Cell(image);
-
             public static int Main()
             {
-                BeginRunUnit();
-                Console.WriteLine("MAIN ENTRY, FRESH INSTANCE");
-                ProgramRegistry.RunMain("A116LNK");
-
-                BeginRunUnit();
                 Console.WriteLine("CALL, EVERY ARGUMENT");
-                var la = Text("ABCD");
-                var lg = Text("AB12");
-                var ret = Text("....");
-                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(la), Ref(lg), Ref(Text("007")) },
-                    new CobolArg(CobolPassMode.Reference, ret, null, Length: 4));
-                Console.WriteLine("HOST LA=" + la.Value + " LG=" + lg.Value + " RETURNING=" + ret.Value);
-                Console.WriteLine("CALL, NULL CARRIER");
-                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(Text("WXYZ")), Ref(Text("CD34")), Ref(ManagedPointer.Null) }, null);
-                Console.WriteLine("CALL, FEWER ARGUMENTS");
-                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(Text("MNOP")), Ref(Text("EF56")) }, null);
-                Console.WriteLine("CALL, LN ONLY");
-                var ld = Text("EFGH");
-                var lgd = Text("IJ78");
-                ProgramRegistry.CallProgram("A116LNK", null, new[] { Ref(ld), Ref(lgd), Ref(Text("042")) }, null);
-                ld.Value = "QQQQ";
-                lgd.Value = "KL90";
-                Console.WriteLine("MAIN ENTRY, SAME INSTANCE");
-                ProgramRegistry.RunMain("A116LNK");
-                Console.WriteLine("HOST LA=" + ld.Value + " LG=" + lgd.Value);
+                string la = "ABCD";
+                var lg = new A116LNK.LG_Record { LGA = "AB", LGN = 12 };
+                long? ln = 7, lb = -5;
+                ManagedPointer? lp = ManagedPointer.Null;
+                string? lk = "  ";
+                double? lf = 0;
+                string r = A116LNK.Call(ref la, ref lg, ref ln, ref lb, ref lp, ref lk, ref lf);
+                Console.WriteLine($"HOST LA={la} LG={lg.LGA}{lg.LGN} LN={ln} RETURNING={r}");
+                Console.WriteLine("CALL, OPTIONAL FORMALS NULL");
+                la = "WXYZ";
+                lg = new A116LNK.LG_Record { LGA = "CD", LGN = 34 };
+                ln = null; lb = null; lp = null; lk = null; lf = null;
+                r = A116LNK.Call(ref la, ref lg, ref ln, ref lb, ref lp, ref lk, ref lf);
+                Console.WriteLine($"HOST LA={la} LG={lg.LGA}{lg.LGN} LN={(ln is null ? "NULL" : ln)} RETURNING={r}");
                 return 0;
             }
         }
         """;
 
-    /// <summary>The four optional formals no host call in this test supplies.</summary>
+    /// <summary>The four optional formals the second call passes as <c>null</c>, after LN.</summary>
     private const string OmittedTail = "LB OMITTED\nLP OMITTED\nLK OMITTED\nLF OMITTED\n";
 
     [Fact]
-    public void ANetHost_CallGuaranteesLinkageAccess_MainEntrySeesCategoryDefaultsOrTheLastCallsBinding()
+    public void ANetHost_CallsTheEntry_WhichGuaranteesLinkageAccessAndOmitsANullOptionalFormal()
     {
         string dir = CutRunner.NewTempDir("a116host");
         try
         {
             NonCobolElement.CompileCobol(dir, "A116LNK", Program);
-            NonCobolElement.CompileCSharp(dir, "A116HOST", Host, runtimeConfigOf: "A116LNK");
+            NonCobolElement.CompileCSharp(dir, "A116HOST", Host, "A116LNK", "A116LNK");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "A116HOST.dll"), dir);
             Assert.Equal(
-                "MAIN ENTRY, FRESH INSTANCE\n" +
-                "LA=[    ] LG=[  00]\n" +
-                "LN=[000]\n" +
-                "LB ZERO\n" +
-                "LP NULL\n" +
-                "LK SPACES\n" +
-                "LF ZERO\n" +
                 "CALL, EVERY ARGUMENT\n" +
                 "LA=[ABCD] LG=[AB12]\n" +
                 "LN=[007]\n" +
-                OmittedTail +
-                "HOST LA=ZZZZ LG=GG13 RETURNING=RRRR\n" +
-                "CALL, NULL CARRIER\n" +
+                "LB NONZERO\n" +
+                "LP NULL\n" +
+                "LK SPACES\n" +
+                "LF ZERO\n" +
+                "HOST LA=ZZZZ LG=GG13 LN=7 RETURNING=RRRR\n" +
+                "CALL, OPTIONAL FORMALS NULL\n" +
                 "LA=[WXYZ] LG=[CD34]\n" +
                 "LN OMITTED\n" +
                 OmittedTail +
-                "CALL, FEWER ARGUMENTS\n" +
-                "LA=[MNOP] LG=[EF56]\n" +
-                "LN OMITTED\n" +
-                OmittedTail +
-                "CALL, LN ONLY\n" +
-                "LA=[EFGH] LG=[IJ78]\n" +
-                "LN=[042]\n" +
-                OmittedTail +
-                "MAIN ENTRY, SAME INSTANCE\n" +
-                "LA=[QQQQ] LG=[GG79]\n" +
-                "LN=[042]\n" +
-                OmittedTail +
-                "HOST LA=ZZZZ LG=KL90", stdout);
+                "HOST LA=ZZZZ LG=GG35 LN=NULL RETURNING=RRRR", stdout);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);
         }
