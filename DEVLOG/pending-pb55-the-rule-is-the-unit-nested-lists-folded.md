@@ -21,6 +21,14 @@ list or nested under a base that exists.
   sub-items of the same parent rules. Each line was located on the printed page and measured at level 1 or deeper
   before it was touched. `cite.py` now reports printed paths it used to get wrong (`--check 7.2.3.4 "Each operand
   and operator of a concatenation expression"` gives `9) c) 2.`).
+- `cite.py#rule_path` (branch review R1-1). The re-indent puts a nested `N.` list at the same indentation as the
+  lettered items around it, and `rule_path` took the nearest `N.` above any letter, so a letter AFTER a nested list
+  reported a path inside its earlier sibling: `--check 7.2.3.4 "If no match occurs"` gave the impossible
+  `9) 6. d)`. Measured over every clause line, 19 such paths existed on main and 102 after the re-indent. A label
+  above is now an ancestor only when its depth (indentation, then style `N)` < `x)` < `N.`) is strictly shallower
+  than the last one accepted. The same measurement now finds 0 on both transcriptions, and no other line's path
+  changed (102 of 102 changed lines were the impossible ones). Three self-test cases pin it (`9) d)`, `17) d)`,
+  and `9) c) 2.` for the nested item itself), and the first two fail on the old walk.
 - The guard. The markdown cannot tell a flattened nested list from a peer list, so the difference is now measured
   data. The new `scripts/spec/measure_sublist_levels.py` records the 17 peer lists in
   `scripts/spec/data/sublist-levels.json`, keyed by text, and `extract_rule_catalog.py --check` (run by CI's guard
@@ -39,7 +47,10 @@ list or nested under a base that exists.
 - The register. 54 notes had their `inventory_rows` and `closes_rows` re-keyed, each with a banner. Four landed
   notes had closed a parent that is now re-opened, and each drops it from `closes_rows` with the reason stated. The
   drift tests that named moved ids (`DerivedVerdictDriftTests`, and the derivation population in
-  `SpecTraceabilityInventoryDriftTests`) and the comments in the code and docs that named them were updated.
+  `SpecTraceabilityInventoryDriftTests`) and the comments in the code and docs that named them were updated. The
+  review (R1-2) found three COBOL conformance sources the first sweep missed, because it stopped at the `.cs` files.
+  A sweep of every tracked file for the 152 retired ids now finds only history (DEVLOG, `adjudication/`, evidence)
+  and lines that already give the new id.
 
 **Found on the way, fixed here.** `extract_annex_a2.py` resolved "General rule N" to every row numbered N in the
 block, so Annex A.2 items 3, 37 and 41 also named six nested items. Its docstring had explained the extra ids as
