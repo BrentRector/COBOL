@@ -264,6 +264,32 @@ public static partial class CobolIntrinsics
                 $"the intrinsic integer argument {v} is outside the range the function can represent (ISO §15.3)");
     }
 
+    /// <summary>
+    /// ⛔ THE §15.3 TYPE-6 POSITION INTAKE OF A BINARY64 OPERAND — the integer it holds, on the <c>Int128</c> carrier,
+    /// WITHOUT a range raise (kb/Work PB651). The renderer takes every type-6 operand's integer here before any lane is
+    /// chosen (<c>IntrinsicRenderer.RawArg</c>), and the body's own intake narrows it again afterwards, so this one
+    /// must not decide range for any of them: a PARTIAL body still raises through its own bounded intake on the
+    /// saturated value, and a TOTAL one — §15.90.3 r1 / §15.91.3 r1 / §15.37.3 r3 / §15.75.3 r2 constrain nothing but
+    /// integer-ness — answers its verdict for every integer, however large.
+    /// </summary>
+    /// <remarks>
+    /// The integrality test is the one every carrier shares (<see cref="RequireIntegralReal"/>, kb/Work PB1526): with
+    /// EC-ARGUMENT-FUNCTION checking off a fraction truncates toward zero (docs/CONFORMANCE.md DOC-A.1-124). A finite
+    /// magnitude inside the carrier converts exactly; a larger one, ±∞ included, SATURATES to the extreme of its sign —
+    /// verdict-preserving for a total body, whose answer past any bound it states depends on being outside it, never on
+    /// how far (the determination kb/Work PB254 made for the TEST- validators). The 1.7e38 bound is
+    /// <see cref="FromDouble"/>'s saturation constant, below <see cref="Int128.MaxValue"/>, so the boundary value cannot
+    /// slip through the cast. A NaN is the value of no integer: §15.3's EC-ARGUMENT-FUNCTION, and 0 with checking off.
+    /// </remarks>
+    public static Int128 IntegerArgTotalReal(double v)
+    {
+        RequireIntegralReal(v);
+        if (double.IsNaN(v))
+            return Exceptions.ExceptionState.ArgumentError(
+                $"the intrinsic integer argument {v} is not the value of any integer (ISO §15.3)");
+        return v >= 1.7e38 ? Int128.MaxValue : v <= -1.7e38 ? Int128.MinValue : (Int128)Math.Truncate(v);
+    }
+
     public static double RealResult(double d) => double.IsNaN(d)
         ? Exceptions.ExceptionState.ArgumentError("floating-point intrinsic argument out of domain (NaN result)")
         : d;

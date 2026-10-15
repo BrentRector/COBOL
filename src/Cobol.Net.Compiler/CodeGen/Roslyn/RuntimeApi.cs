@@ -509,6 +509,12 @@ internal static class RuntimeApi
     public static string IntegerArg(string value) =>
         $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArg)}({value})";
 
+    /// <summary>The §15.3 type-6 POSITION intake of a binary64 operand (kb/Work PB651) — <c>CobolIntrinsics.IntegerArgTotalReal</c>:
+    /// its integer on the <c>Int128</c> carrier, saturated rather than raised past the carrier, so the body's own intake
+    /// still decides range (<c>IntrinsicRenderer.RawArg</c>).</summary>
+    public static string IntegerArgTotalReal(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgTotalReal)}({value})";
+
     /// <summary>The §15.3 type-6 intake for a value on ONE of the operand carriers, keyed by carrier KIND — the ONE
     /// family of landings the renderer's bounded (<c>long</c>) and total (<c>Int128</c>) integer arguments share,
     /// so the integrality rule (kb/Work PB1526) is asked on every carrier and a new carrier is a compile error in

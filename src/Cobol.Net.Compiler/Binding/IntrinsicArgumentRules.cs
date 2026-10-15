@@ -1111,6 +1111,15 @@ internal static class IntrinsicArgumentRules
     /// it incapable of regressing a function whose rule has not been read.
     /// </para>
     /// </remarks>
+    /// <summary>Is operand position <paramref name="position"/> (0-based, the schema's operand convention) of
+    /// <paramref name="functionName"/> a §15.3 type-6 position — "An arithmetic expression that will always result in
+    /// an integer value or an integer data item shall be specified" — on a SPEC-VERIFIED schema? The renderer's
+    /// type-6 intake keys on it (<c>IntrinsicRenderer.RawArg</c>, kb/Work PB651), so it fails CLOSED: a function
+    /// absent from <see cref="Verified"/> or a position its schema does not describe answers false, and its operand
+    /// is taken as it stands, exactly as before the intake existed.</summary>
+    public static bool IsIntegerPosition(string functionName, int position) =>
+        Verified.TryGetValue(functionName, out var schema) && schema.At(position) is { Kind: 'i' };
+
     public static bool ArgumentRunIsAllNumeric(string functionName, int argCount)
     {
         if (!Verified.TryGetValue(functionName, out var schema)) return true;    // unscreened — fail open

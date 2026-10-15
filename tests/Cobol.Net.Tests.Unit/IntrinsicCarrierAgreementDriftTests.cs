@@ -14,8 +14,9 @@ namespace CobolNet.Tests.Unit;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <c>IntrinsicRenderer.RenderNum</c> routes on <c>AnyRealArgument</c>, so every exact-family function has an
-/// exact <see cref="Int128"/> body AND a binary64 one. Its sibling <c>IntrinsicRealArgDriftTests</c> asserts the
+/// <c>IntrinsicRenderer.RenderNum</c> routes on <c>AnyRealArgument</c>, so every exact-family function with a §15.3
+/// type-10 (numeric) position has an exact <see cref="Int128"/> body AND a binary64 one (a type-6 position takes its
+/// integer before the lane is chosen, kb/Work PB651). Its sibling <c>IntrinsicRealArgDriftTests</c> asserts the
 /// second body EXISTS; nothing asserted that the two AGREE, and they did not. MOD's §15.64.3 r2 zero-divisor rule
 /// was written into both bodies and then corrected in only one: <c>ModReal</c> read <c>b == 0 ? 0 : …</c>, a
 /// second independent guard that returned the §15.3 default without ever SETTING EC-ARGUMENT-FUNCTION. Under
@@ -42,11 +43,12 @@ public sealed class IntrinsicCarrierAgreementDriftTests
     }
 
     /// <summary>
-    /// §15.64.3 r2 / §15.77.3 r2: a zero divisor sets EC-ARGUMENT-FUNCTION — from EVERY carrier: the exact
-    /// <see cref="Int128"/> lane, binary64, and the SDIDI decimal carrier (§15.3 argument type 6 — an
-    /// arithmetic-expression argument under ARITHMETIC IS STANDARD-DECIMAL). This is the assertion that was
-    /// missing; <c>ModReal(1, 0)</c> returned 0.0 and raised nothing. The test was named "BothCarriers" while three
-    /// bodies existed, and the third — <c>RemDec</c> — raised under MOD's name and MOD's clause (kb/Work PB304).
+    /// §15.64.3 r2 / §15.77.3 r2: a zero divisor sets EC-ARGUMENT-FUNCTION — from EVERY carrier the function has:
+    /// the exact <see cref="Int128"/> lane, the SDIDI decimal carrier (an arithmetic-expression argument under
+    /// ARITHMETIC IS STANDARD-DECIMAL) and, for REM, binary64. MOD has no binary64 carrier: both its positions are
+    /// §15.3 type 6, so the renderer takes their integers before any lane is chosen (kb/Work PB651). The binary64 arm
+    /// once returned 0.0 and raised nothing, and the test was named "BothCarriers" while three bodies existed, the
+    /// third — <c>RemDec</c> — raising under MOD's name and MOD's clause (kb/Work PB304).
     /// </summary>
     [Theory]
     [InlineData("MOD")]
@@ -58,16 +60,17 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             // The EXACT (Int128) carrier — this arm was already correct.
             var exact = Assert.Throws<CobolFatalException>(() =>
                 fn == "MOD" ? CobolIntrinsics.ModScaled(11, 0) : CobolIntrinsics.RemScaled(11, 0));
-            // The BINARY64 carrier, reached whenever any argument renders as a double — this arm was silent.
-            var real = Assert.Throws<CobolFatalException>(() =>
-                fn == "MOD" ? CobolIntrinsics.ModReal(11d, 0d) : CobolIntrinsics.RemReal(11d, 0d));
 
             // The SDIDI (CobolDec) carrier — this arm named the WRONG function's rule (kb/Work PB304).
             var dec = Assert.Throws<CobolFatalException>(() => fn == "MOD"
                 ? CobolIntrinsics.ModDec(CobolRounding.NearestAwayFromZero, CobolDec.From(11, 0), CobolDec.From(0, 0))
                 : CobolIntrinsics.RemDec(CobolRounding.NearestAwayFromZero, CobolDec.From(11, 0), CobolDec.From(0, 0)));
 
-            foreach (var e in new[] { exact, real, dec })
+            var carriers = new List<CobolFatalException> { exact, dec };
+            // The BINARY64 carrier, reached whenever a type-10 argument renders as a double — this arm was silent.
+            if (fn == "REM") carriers.Add(Assert.Throws<CobolFatalException>(() => CobolIntrinsics.RemReal(11d, 0d)));
+
+            foreach (var e in carriers)
             {
                 Assert.Equal("EC-ARGUMENT-FUNCTION", e.EcName);
                 // One raise site per RULE means one message per rule: the citation cannot drift between carriers.
@@ -89,7 +92,7 @@ public sealed class IntrinsicCarrierAgreementDriftTests
         try
         {
             Assert.Equal(0, (double)CobolIntrinsics.ModScaled(11, 0));
-            Assert.Equal(0, CobolIntrinsics.ModReal(11d, 0d));
+            Assert.Equal(0, CobolIntrinsics.ModDec(CobolRounding.NearestAwayFromZero, CobolDec.From(11, 0), CobolDec.From(0, 0)).ToDouble());
             Assert.Equal(0, (double)CobolIntrinsics.RemScaled(11, 0));
             Assert.Equal(0, CobolIntrinsics.RemReal(11d, 0d));
         }
@@ -158,7 +161,7 @@ public sealed class IntrinsicCarrierAgreementDriftTests
     /// call cannot be written in COBOL (the general formats require at least one argument), so those are
     /// unreachable defensive returns rather than a rule being defaulted.
     /// <para>⚠ IT SCANS CODE ONLY, AND IT PROVED IT NEEDED TO BY FAILING ON ITS OWN FIRST RUN. The prose above
-    /// and the remarks on <c>ModReal</c> both QUOTE the defective form <c>b == 0 ? 0 : …</c> so a later reader
+    /// and the remarks on <c>ModZeroDivisor</c> both QUOTE the defective form <c>b == 0 ? 0 : …</c> so a later reader
     /// knows what was wrong; scanning raw file text therefore reported the fixed code as an offender. Comments
     /// are stripped before matching. A guard that cannot tell a defect from a description of a defect would have
     /// had to be silenced, and a silenced guard is the dead lookup this project keeps finding.</para>
@@ -229,7 +232,9 @@ public sealed class IntrinsicCarrierAgreementDriftTests
                 }
             }
         }
-        Assert.True(bodies >= 6, $"the scan found only {bodies} zero-divisor raise calls — it no longer sees the carriers");
+        // Five: MOD on the exact and SDIDI carriers, REM on those and binary64 — MOD has no binary64 body since kb/Work
+        // PB651 (both its positions are §15.3 type 6, so a float argument arrives an integer).
+        Assert.True(bodies >= 5, $"the scan found only {bodies} zero-divisor raise calls — it no longer sees the carriers");
         Assert.True(offenders.Count == 0, "a MOD/REM body raises the OTHER function's §15 zero-divisor rule: "
             + string.Join("; ", offenders));
     }
@@ -460,10 +465,13 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             Assert.Equal(1, CobolDate.TestDayYyyyddd(past));                 // §15.91.4 r1a — > 9 999 999
             Assert.Equal(1, CobolDate.TestDateYyyymmdd(-past));              // r1a's LOWER half
             Assert.Equal(1, CobolDate.TestDayYyyyddd(-past));
-            Assert.Equal(1, CobolIntrinsics.TestDateYyyymmddReal(1e19));     // the binary64 carrier — was 0, "valid"
-            Assert.Equal(1, CobolIntrinsics.TestDayYyyydddReal(1e19));
-            Assert.Equal(1, CobolIntrinsics.TestDateYyyymmddReal(double.PositiveInfinity));
-            Assert.Equal(1, CobolIntrinsics.TestDayYyyydddReal(double.NegativeInfinity));
+            // A binary64 argument reaches the ONE body through the type-6 position intake (kb/Work PB651), which
+            // saturates past the carrier rather than raising — once 0, "valid", on its own binary64 body (PB254).
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgTotalReal(1e19)));
+            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgTotalReal(1e19)));
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgTotalReal(1e40)));
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgTotalReal(double.PositiveInfinity)));
+            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgTotalReal(double.NegativeInfinity)));
             // §15.37.4 r3 — argument-3 ignores every match, so none is left and the answer is 0, not a position.
             Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", false, past, false));
             Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", true, past, false));
