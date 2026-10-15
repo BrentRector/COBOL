@@ -23,7 +23,11 @@ R3 work is attributed PER COMMIT (PB2703). A train is MIXED: the lander makes on
 work on R3 notes while the rest are fix lane or tooling. The landing's R3 work is the commits that work on an R3 note
 (the ids leading the subject, or an R3 status the commit flips) and the partition files those commits change; a
 fix-lane commit in the same train is fix lane, so its files neither leave the R3 set (1) nor make a shared file R3 (2).
-A squashed commit that names both kinds is R3 whole: it stops rather than land silently.
+A squashed commit that names both kinds is R3 whole: it stops rather than land silently. Each commit is charged only
+with what it ITSELF introduced (commit_work, PB3180): a non-merge commit its diff against its parent; a MERGE commit
+the files and the note statuses that differ from EVERY parent (its conflict resolutions and evil-merge edits) plus the
+ids leading its own subject, never its first-parent diff, which carries the other parent's whole history (a merged
+predecessor's commits, attributed one by one by the same walk, or main's own landings in a `Merge origin/main`).
 
 Draft 10 (the ninth refuter's K1-K3). Every diff is read with --no-renames (plan_wave.changed_files), so a moved file
 counts at its old path too. An in-flight branch is R3 work because its DISPATCH says so, never by its commit wording
@@ -69,6 +73,7 @@ ID_RANGE = re.compile(r"\bPB(\d+)-PB(\d+)\b")                # "PB2478-PB2483: .
 MAX_RANGE = 64
 STATUS_LINE = re.compile(r"^([-+])status:[ ]*(\S*)")   # a frontmatter status line removed or added by a patch
 WORK_DIR = "kb/Work/"
+EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"   # git's empty tree: what a root commit's diff is taken against
 MANIFESTS = "scratch/train*-manifest.json"   # wf_rolling_wave.js writes one per train: each member's branch, worktree, notes
 
 
@@ -98,23 +103,47 @@ def subject_ids(subjects: str) -> set[str]:
     return out
 
 
-def work_notes(git: Callable[..., Any], base: str, rev: str) -> set[str]:
-    """The notes the LANDING `base..rev` works on: the ids that lead a commit subject (the lander re-commits one
-    `PB…: …` commit per cluster) and the notes whose `status` it changes (a landing flips its note in the commit that
-    lands it, CLAUDE.md rule 8). Never every id a message mentions: a design commit that names the notes it re-plans
-    works on none of them. An IN-FLIGHT branch's identity never comes from here alone (identity(), K2)."""
-    out = subject_ids(git("log", "--format=%s", f"{base}..{rev}").stdout)
-    # ONE patch of the register, not two `git show`s per changed note (the ninth refuter's N1: 400 shows were 17 of
-    # the check's 24 s on a real range). A note's status changed when its patch removes one `status:` line and adds a
-    # different one; a note FILED here has no removed line, so it is not worked on here.
+def status_flips(git: Callable[..., Any], *revs: str) -> set[str]:
+    """The notes whose `status` the diff `git diff <revs>` changes. ONE patch of the register, not two `git show`s per
+    changed note (the ninth refuter's N1: 400 shows were 17 of the check's 24 s on a real range). A note's status
+    changed when its patch removes one `status:` line and adds a different one; a note FILED there has no removed line,
+    so it is not worked on there."""
     nid, was = None, {}
-    for line in git("diff", "--no-renames", "-U0", f"{base}...{rev}", "--", WORK_DIR).stdout.splitlines():
+    for line in git("diff", "--no-renames", "-U0", *revs, "--", WORK_DIR).stdout.splitlines():
         if line.startswith("diff --git "):
             stem = pathlib.PurePosixPath(line.rsplit(" b/", 1)[-1]).stem
             nid = stem if PB.fullmatch(stem) else None
         elif nid and (m := STATUS_LINE.match(line)):
             was.setdefault(nid, {})[m.group(1)] = m.group(2)
-    return out | {n for n, s in was.items() if "-" in s and s["-"] != s.get("+")}
+    return {n for n, s in was.items() if "-" in s and s["-"] != s.get("+")}
+
+
+def work_notes(git: Callable[..., Any], base: str, rev: str) -> set[str]:
+    """The notes the LANDING `base..rev` works on: the ids that lead a commit subject (the lander re-commits one
+    `PB…: …` commit per cluster) and the notes whose `status` it changes (a landing flips its note in the commit that
+    lands it, CLAUDE.md rule 8). Never every id a message mentions: a design commit that names the notes it re-plans
+    works on none of them. An IN-FLIGHT branch's identity never comes from here alone (identity(), K2). One COMMIT's
+    notes are commit_work's, never this over `sha^..sha` (PB3180)."""
+    return subject_ids(git("log", "--format=%s", f"{base}..{rev}").stdout) | status_flips(git, f"{base}...{rev}")
+
+
+def commit_work(git: Callable[..., Any], base: str, rev: str) -> list[tuple[set[str], set[str]]]:
+    """THE per-commit attribution (PB2703, PB3180): (the notes it works on, the files it changed) for every commit
+    of `base..rev`, oldest first, each charged only with what the commit ITSELF introduced. A non-merge commit is its
+    diff against its one parent (a root commit's against the empty tree). A MERGE commit is what differs from EVERY
+    parent — the files (combined-diff semantics, as `git diff-tree -c` lists them: its conflict resolutions and
+    evil-merge edits) and the notes whose `status` it changes against each parent — plus the ids leading its OWN
+    subject. Never its first-parent diff: that carries the other parent's whole history (a merged predecessor's
+    commits, which this same walk already attributes one by one, or main's own landings in a `Merge origin/main`), and
+    charging it to the merge smeared one commit's R3 note across other commits' files (the PB3154 false stop)."""
+    out = []
+    for line in git("rev-list", "--reverse", "--parents", f"{base}..{rev}").stdout.splitlines():
+        sha, *parents = line.split()
+        sides = parents or [EMPTY_TREE]
+        notes = subject_ids(git("log", "-1", "--format=%s", sha).stdout)
+        notes |= set.intersection(*(status_flips(git, p, sha) for p in sides))
+        out.append((notes, set.intersection(*(plan_wave.changed_files(git, p, sha) for p in sides))))
+    return out
 
 
 def first_commit_time(git: Callable[..., Any], base: str, rev: str) -> float | None:
@@ -152,13 +181,14 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
     mine = {p for p in plan_wave.changed_files(git, f"{base}...{rev}") if inside(p)}
     notes = work_notes(git, base, rev)
     # R3 work is attributed PER COMMIT (PB2703): a landing can be MIXED — a branch that merged a predecessor, a train
-    # before kb/Work PB3023 — some commits R3 notes, the rest fix lane or tooling — so the R3 work is the commits that work on an R3 note and
-    # the partition files THEY change, never the whole landing's diff. A squashed commit naming both kinds is R3 whole.
+    # before kb/Work PB3023 — some commits R3 notes, the rest fix lane or tooling — so the R3 work is the commits that
+    # work on an R3 note and the partition files THEY change, never the whole landing's diff, and a merge commit is
+    # charged only with what it introduced (commit_work, PB3180). A squashed commit naming both kinds is R3 whole.
     r3_notes, mine_r3_files = set(), set()
-    for sha in git("rev-list", "--reverse", f"{base}..{rev}").stdout.split():
-        if hit := work_notes(git, f"{sha}^", sha) & r3:
+    for worked, changed in commit_work(git, base, rev):
+        if hit := worked & r3:
             r3_notes |= hit
-            mine_r3_files |= {p for p in plan_wave.changed_files(git, f"{sha}^", sha) if inside(p)}
+            mine_r3_files |= {p for p in changed if inside(p)}
     mine_r3 = sorted(r3_notes, key=lambda s: int(s[2:]))
     full_ledger = coord.read_json(coord_dir / plan_wave.DISPATCH_LEDGER, {"groups": []}).get("groups", [])
     ledger = [g for g in full_ledger if not all(terminal(i) for i in g.get("notes", []))]
@@ -491,6 +521,73 @@ def self_test() -> int:
     expect("PB2703d: ONE commit naming an R3 id and a fix-lane id is R3 whole: its file outside the set STOPS",
            check(repo, "origin/main", "squashed", cdir, items, rules, never, git), 1, 0)
     sh("branch", "-D", "squashed")
+    ledger()
+
+    # ── PB3180: a MERGE commit is attributed only what it introduced (the files and statuses that differ from EVERY
+    #    parent), never the diff its first parent sees, which carries the other parent's whole history ──
+    commits("pred", ("WIP checkpoint: land PB9002 in the register", {"kb/Work/PB9002.md":
+                                                                    "---\nid: PB9002\nstatus: landed\n---\n"}, 1_001_000),
+            ("PB9100: fix-lane edit", {"src/B.cs": "// fixed by the predecessor\n"}, 1_001_010))
+    sh("checkout", "-q", "-b", "fin", "origin/main")
+    sh("merge", "-q", "--no-ff", "pred", "-m", "Merge pred for the review finisher", when=1_001_020)
+    sh("checkout", "-q", "main")
+    expect("PB3180a: a branch that MERGES a predecessor (first parent main) is not charged with the predecessor's diff: "
+           "its R3 status flip (no partition file) and its fix-lane code edit stay apart: lands",
+           check(repo, "origin/main", "fin", cdir, items, rules, never, git), 0, 0)
+    for b in ("fin", "pred"):
+        sh("branch", "-D", b)
+
+    ledger(a_set)
+    commits("r-mrg", ("WIP checkpoint: the R3 side", {"src/B.cs": "// r3 side\n"}, 1_001_100))
+    commits("side", ("PB9100: the other side", {"src/B.cs": "// other side\n"}, 1_001_110))
+    def resolve(name: str, text: str) -> None:
+        sh("checkout", "-q", name)
+        subprocess.run(["git", "-C", str(repo), "merge", "-q", "--no-commit", "side"], capture_output=True)
+        write("src/B.cs", text)
+        if text != "// other side\n":
+            write("src/C.cs", "// an evil-merge edit neither parent made\n")
+        sh("add", "-A")
+        sh("commit", "-qm", "PB9001: merge the other side, conflict resolved", when=1_001_120)
+        sh("checkout", "-q", "main")
+    sh("branch", "r-theirs", "r-mrg")
+    resolve("r-mrg", "// resolved by hand\n")
+    got = check(repo, "origin/main", "r-mrg", cdir, items, rules, never, git)
+    expect("PB3180b: an R3 merge whose conflict resolution (and evil-merge edit) changes files outside its declared set "
+           "STOPS", got, 1, 0)
+    expect("PB3180b': ... naming the resolved file and the evil-merge file",
+           ([s for s in got[0] if "src/B.cs" in s and "src/C.cs" in s], []), 1, 0)
+    sh("branch", "-D", "r-mrg")
+    resolve("r-theirs", "// other side\n")
+    expect("PB3180b'': ... while a resolution that takes the other parent's version introduces nothing (that parent's "
+           "own commit is attributed by its own notes): lands",
+           check(repo, "origin/main", "r-theirs", cdir, items, rules, never, git), 0, 0)
+    for b in ("r-theirs", "side"):
+        sh("branch", "-D", b)
+
+    base_sha = git("rev-parse", "main").stdout.strip()
+    commits("f-behind", ("PB9100: a fix-lane branch", {"src/B.cs": "// fixed\n"}, 1_001_200))
+    write("src/C.cs", "// main's own R3 landing, outside PB9001's declared set\n")
+    sh("add", "-A")
+    sh("commit", "-qm", "PB9001: an R3 landing on main", when=1_001_210)
+    sh("update-ref", "refs/remotes/origin/main", "HEAD")
+    sh("checkout", "-q", "f-behind")
+    sh("merge", "-q", "--no-ff", "origin/main", "-m", "Merge origin/main into f-behind", when=1_001_220)
+    sh("checkout", "-q", "main")
+    expect("PB3180c: a `Merge origin/main` commit carrying main's R3 landing is not charged to the branch: lands",
+           check(repo, "origin/main", "f-behind", cdir, items, rules, never, git), 0, 0)
+    sh("branch", "-D", "f-behind")
+    sh("checkout", "-q", "--orphan", "rootless")
+    sh("rm", "-rq", "--cached", ".")
+    write("src/Root.cs", "// a root commit\n")
+    sh("add", "src/Root.cs")
+    sh("commit", "-qm", "PB9001: a root commit", when=1_001_300)
+    sh("checkout", "-q", "-f", "main")
+    walked = commit_work(git, "origin/main", "rootless")
+    expect("PB3180d: a root commit is its diff against the empty tree",
+           ([] if walked == [({"PB9001"}, {"src/Root.cs"})] else [walked], []), 0, 0)
+    sh("branch", "-D", "rootless")
+    sh("reset", "-q", "--hard", base_sha)
+    sh("update-ref", "refs/remotes/origin/main", base_sha)
     ledger()
 
     ids = sorted(subject_ids("PB9000-PB9002: a range" + chr(10) + "PB9100+PB9101: two"))
