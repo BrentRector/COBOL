@@ -329,20 +329,15 @@ public sealed class RelativeConnector : KeyedConnector
     private string ReadSequential(out string image, bool previous)
     {
         image = BlankRecordArea();
-        if (SequentialReadGuard() is { } pre) return Status = pre;   // '47'/'46'/'10' — FileConnector
-        if (!_fpiValid) { InvalidateFilePosition(); return Status = FileStatusCode.NoValidNextRecord; }   // '46' §9.1.13.7 6a (failed START) + §14.9.30.4 GR18
+        if (SequentialReadGuard() is { } pre) return Unsuccessful(pre);   // '47'/'46'/'10' — FileConnector
+        if (!_fpiValid) return Unsuccessful(FileStatusCode.NoValidNextRecord);   // '46' §9.1.13.7 6a (failed START)
 
-        if (SelectSequentialSlot(previous) is not { } s)
-        {
-            InvalidateFilePosition();                                      // §14.9.30 GR24b
-            return Status = FileStatusCode.AtEnd;
-        }
+        if (SelectSequentialSlot(previous) is not { } s) return Unsuccessful(FileStatusCode.AtEnd);   // §14.9.30 GR24b
         if (_keyDigits > 0 && s.ToString().Length > _keyDigits)
         {
             // §14.9.30 GR21 relative rule d: significant digits of the RRN exceed the RELATIVE KEY item → '14',
             // the at-end condition, FPI invalidated.
-            InvalidateFilePosition();
-            return Status = FileStatusCode.RelativeKeyOverflow;
+            return Unsuccessful(FileStatusCode.RelativeKeyOverflow);
         }
         _fpi = s; _fpiValid = true; _inclusive = false;   // GR21 rule f + rule c's exclusive bound
         _lastSlot = s;
@@ -357,13 +352,10 @@ public sealed class RelativeConnector : KeyedConnector
     public string ReadRandom(out string image)
     {
         image = BlankRecordArea();
-        if (RandomReadOpenModeGuard() is { } notOpen) return Status = notOpen;            // '47' §14.9.30.4 GR2 + GR18
-        if (RandomReadAbsentOptionalGuard() is { } absent) return Status = absent;        // '23' §9.1.13.5 3 b)
+        if (ReadOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);            // '47' §14.9.30.4 GR2
+        if (RandomReadAbsentOptionalGuard() is { } absent) return Unsuccessful(absent);  // '23' §9.1.13.5 3 b)
         if (!_slots.TryGetValue(_pendingKey, out StoredFrame rec))
-        {
-            InvalidateFilePosition();                                      // §14.9.30.4 GR18
-            return Status = FileStatusCode.RecordNotFound;                 // '23' §9.1.13.5 3a
-        }
+            return Unsuccessful(FileStatusCode.RecordNotFound);            // '23' §9.1.13.5 3a
         _fpi = _pendingKey; _fpiValid = true; _inclusive = false;
         _lastSlot = _pendingKey;
         NoteRecordRead(rec.Image, rec.Extents);   // §13.18.43 GR15 — the stored frame length
@@ -523,7 +515,7 @@ public sealed class RelativeConnector : KeyedConnector
     /// key '23' with the FPI invalidated (GR7/GR9c). Open mode must be input or I-O (GR1 → '47').</summary>
     public string Start(string op, long operand)
     {
-        if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
+        if (StartOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent) return StartFail();                           // '23' §14.9.41 GR5
         long? found = null;
         switch (op)
@@ -541,7 +533,7 @@ public sealed class RelativeConnector : KeyedConnector
     /// (or absent optional) file → invalid key '23'.</summary>
     public string StartFirstLast(bool last)
     {
-        if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
+        if (StartOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent || _slots.Count == 0) return StartFail();
         return StartAt(last ? _st.Highest : _slots.Keys.Min());
     }
@@ -549,8 +541,7 @@ public sealed class RelativeConnector : KeyedConnector
     private string StartAt(long slot)
     {
         _fpi = slot; _fpiValid = true; _inclusive = true;
-        LastReadUnsuccessful = false;
-        return Status = FileStatusCode.Success;
+        return StartPositioned();
     }
 
     /// <inheritdoc/>  (a keyed FPI is a key VALUE plus a validity bit; §14.9.41.4 GR7 clears the bit too)
@@ -562,10 +553,6 @@ public sealed class RelativeConnector : KeyedConnector
 
     /// <summary>An unsuccessful START whose status is the invalid key condition's '23'
     /// (§9.1.13.5 item 3): §14.9.41.4 GR7's invalidation plus that value.</summary>
-    private string StartFail()
-    {
-        InvalidateFilePosition();
-        return Status = FileStatusCode.RecordNotFound;
-    }
+    private string StartFail() => Unsuccessful(FileStatusCode.RecordNotFound);
 
 }

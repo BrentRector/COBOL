@@ -502,15 +502,12 @@ public sealed class IndexedConnector : KeyedConnector
     private string ReadSequential(out string image, bool previous)
     {
         image = BlankRecordArea();
-        if (SequentialReadGuard() is { } pre) return Status = pre;   // '47'/'46'/'10' — FileConnector
-        if (!_fpiValid) { InvalidateFilePosition(); return Status = FileStatusCode.NoValidNextRecord; }   // '46' + §14.9.30.4 GR18
+        if (SequentialReadGuard() is { } pre) return Unsuccessful(pre);   // '47'/'46'/'10' — FileConnector
+        if (!_fpiValid) return Unsuccessful(FileStatusCode.NoValidNextRecord);   // '46' §9.1.13.7 6a (failed START)
 
         var seq = Ordered(_refKey);
         if (SelectSequentialRecord(previous, seq, out int foundIdx) is not { } found)
-        {
-            InvalidateFilePosition();                                      // §14.9.30 GR24b
-            return Status = FileStatusCode.AtEnd;
-        }
+            return Unsuccessful(FileStatusCode.AtEnd);                     // §14.9.30 GR24b
         // §14.9.30 GR27 — '02' look-ahead: alternate key of reference and the adjacent record duplicates it.
         string status = FileStatusCode.Success;
         if (_refKey >= 0)
@@ -539,15 +536,12 @@ public sealed class IndexedConnector : KeyedConnector
     public string ReadRandom(int keyIndex, string keyedRecordImage, out string image, RecordExtents? areaExtents = null)
     {
         image = BlankRecordArea();
-        if (RandomReadOpenModeGuard() is { } notOpen) return Status = notOpen;            // '47' §14.9.30.4 GR2 + GR18
+        if (ReadOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);            // '47' §14.9.30.4 GR2
         _refKey = keyIndex;                                                // GR30/GR31
-        if (RandomReadAbsentOptionalGuard() is { } absent) return Status = absent;        // '23' §9.1.13.5 3 b)
+        if (RandomReadAbsentOptionalGuard() is { } absent) return Unsuccessful(absent);  // '23' §9.1.13.5 3 b)
         string value = AreaKey(keyedRecordImage, areaExtents, keyIndex);
         if (FindRandom(keyIndex, value) is not { } found)   // §14.9.30.4 GR32 + §12.4.5.6.4 GR6 — the ONE copy
-        {
-            InvalidateFilePosition();                                      // §14.9.30.4 GR18
-            return Status = FileStatusCode.RecordNotFound;                 // '23' GR32
-        }
+            return Unsuccessful(FileStatusCode.RecordNotFound);            // '23' GR32
         // GR32 sets the FPI "to the value in the key of reference" — the key VALUE the program supplied; the
         // duplicate-set position of the record made available is separate state (GR21 e)/f), kb/Work PB342).
         _fpiKey = value; _readOrdinal = Ordinal(found, keyIndex); _fpiValid = true; _positioner = 'R';
@@ -746,7 +740,7 @@ public sealed class IndexedConnector : KeyedConnector
     public string Start(int keyIndex, string op, string keyedRecordImage, StartKeyLength length,
         RecordExtents? areaExtents = null)
     {
-        if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
+        if (StartOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent) return StartFail();                           // '23' GR5
         int keyLength = keyIndex < 0 ? _primeLen : _alts[keyIndex].Len;
         if (!length.TryCompareLength(keyLength, out int compareLength)) return StartFail();   // '23' GR14
@@ -793,7 +787,7 @@ public sealed class IndexedConnector : KeyedConnector
     /// (§12.4.5.6.4 GR6) it additionally hid records the primary-key view must include.</remarks>
     public string StartFirstLast(bool last)
     {
-        if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
+        if (StartOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent || _recs.Count == 0) return StartFail();
         var seq = Ordered(PrimeKey);   // GR18/GR19 — "in the physical file": the PRIME ordering, not the inherited one
         return StartSucceeded(PrimeKey, last ? seq[^1] : seq[0]);
@@ -815,8 +809,7 @@ public sealed class IndexedConnector : KeyedConnector
         _refKey = keyOfReference;
         _fpiKey = KeyOf(found, keyOfReference);
         _fpiValid = true; _positioner = 'S';
-        LastReadUnsuccessful = false;
-        return Status = FileStatusCode.Success;
+        return StartPositioned();
     }
 
     /// <inheritdoc/>  (a keyed FPI is a key VALUE plus a validity bit; §14.9.41.4 GR7 clears the bit too,
@@ -829,11 +822,7 @@ public sealed class IndexedConnector : KeyedConnector
 
     /// <summary>An unsuccessful START whose status is the invalid key condition's '23'
     /// (§9.1.13.5 item 3): §14.9.41.4 GR7's invalidation plus that value.</summary>
-    private string StartFail()
-    {
-        InvalidateFilePosition();
-        return Status = FileStatusCode.RecordNotFound;
-    }
+    private string StartFail() => Unsuccessful(FileStatusCode.RecordNotFound);
 
     // ── Internals ────────────────────────────────────────────────────────────────────────────────────────────
 

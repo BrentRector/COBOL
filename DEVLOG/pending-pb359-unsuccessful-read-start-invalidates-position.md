@@ -1,4 +1,4 @@
-## PB359: every unsuccessful READ and START invalidates the file position through one virtual
+## PB359: every unsuccessful READ and START invalidates the file position through one terminal
 
 **Wave 1084 E, kb/Work PB359.** The note described the `'47'` START in both keyed connectors returning
 `Status = ReadNotOpenForInput` without applying §14.9.41.4 GR7 ("Following the unsuccessful execution of a START
@@ -20,20 +20,23 @@ random READ's `'23'`, both absent-OPTIONAL arms, the keyed at-end and `'14'` exi
 set `LastReadUnsuccessful` by hand, which skipped the keyed connectors' `_fpiValid` bit. The sequential connector's
 non-seekable PREVIOUS arm set `'30'` without invalidating. None of these was observable, for the same reason as
 the START: every route had already invalidated, or forced a reopening OPEN. That reason depends on the current
-shape of OPEN, not on the rule. The fix routes every exit through the virtual:
+shape of OPEN, not on the rule. The fix gives every READ and START one way to fail:
 
-- `SequentialReadGuard` now applies GR18 once, on every failing arm. Its arms moved, in the same order, into a
-  private side-effect-free `SequentialReadFailure`.
-- The new `RandomReadOpenModeGuard` is the random READ's side-effecting twin of `StartOpenModeGuard`.
-  `ReadOpenModeGuard` stays pure because the pre-read record identity (`PeekSequentialRecordId` /
-  `PeekRandomReadRecordId`) asks it without executing a READ.
-- `RandomReadAbsentOptionalGuard` and every other unsuccessful READ exit call `InvalidateFilePosition`. The
-  non-seekable arm calls `ReadFailed`.
+- `FileConnector.Unsuccessful(status)` is the one failure terminal, the twin of `ReadSucceeded`: it calls the
+  virtual `InvalidateFilePosition` and then assigns the status, as one step. `StartPositioned()` is the START
+  success epilogue (`'00'`, the `'46'` poison cleared) that the three organizations' own epilogues now end in.
+- The guards (`ReadOpenModeGuard`, `SequentialReadGuard`, `RandomReadAbsentOptionalGuard`, `StartOpenModeGuard`)
+  are pure: they answer a status and change nothing. `SequentialReadReachesRetrieval`, which the pre-read record
+  identity asks, is now just `SequentialReadGuard() is null` instead of a second copy of its three tests.
+- Every READ and START entry returns its failures through `Unsuccessful` (the sequential connector's `bool`
+  entries through `ReadUnsuccessful`, which wraps it), so no entry assigns `Status` itself.
 
-**Gates and witness.** `FilePositionInvalidationDriftTests` (Unit) checks three things: the virtual is the only
-writer of `LastReadUnsuccessful = true`, the keyed overrides are the only writers of `_fpiValid = false`, and no
-READ entry returns the pure open-mode answer as its own status. A failure-proof test drives each predicate with a
-source that must trip it. The golden `tests/conformance/85/pb359_unsuccessful_read_start_position` gets its expected
+**Gates and witness.** `FilePositionInvalidationDriftTests` (Unit, Roslyn) checks four things: no READ or START
+entry of a connector (a method whose name begins with `Read` or `Start`, other than the terminals) assigns
+`Status`; `Unsuccessful` calls `InvalidateFilePosition` before it assigns the status; the guards assign nothing
+and invalidate nothing; and the virtual and its keyed overrides are the only writers of `LastReadUnsuccessful =
+true` and `_fpiValid = false`. It also checks that it still sees each organization's known entries. A
+failure-proof test drives each predicate with a source that must trip it. The golden `tests/conformance/85/pb359_unsuccessful_read_start_position` gets its expected
 values from the spec. It covers relative, indexed and sequential files: a `47` START or READ, a random `23` then
 `46`, an at-end `10` then `46`, and a failed START `23` then `46`. In each case a repositioning statement clears
 the `46`. Witnesses were added to `GR-14.9.41.4-7` and `GR-14.9.30.4-18`; both were already CONFORMS, so the GAP
