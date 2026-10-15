@@ -18,14 +18,14 @@ Read-only and mechanical roles (refuter, adjudicator, clerk, locator, Explore, g
 applies to Workflow always. Exit 2 blocks the call and returns stderr to the agent. Anything unparseable passes (a
 hook must never wedge a session).
 
-  3. Every Agent call it ADMITS whose role can write (any role but the read-only ones), and every Workflow call it
-     admits, is recorded in the dispatch ledger with the open kb/Work notes it names and their computed file sets
-     (`plan_wave.py --record-dispatch`), so the restructuring planner's file-set partition sees a HAND dispatch (an
-     attended Fable or Mythos author, a direct Agent call, an attended Workflow) before its agent edits a file
-     (kb/Work PB2118 Draft 8, the seventh refuter's J3). The notes are read from the prompt (a Workflow's whole input:
-     script and args) AND from every brief, spec or args file it names, one level deep: a prompt that names only its
-     brief carries its notes there (Draft 9, the eighth refuter's K2). Recording never blocks: a failure to record
-     is silent, like every other hook failure. The landing check (landing_check.py) is the guarantee behind it.
+The hook writes NOTHING (kb/Work PB3186). Its rule 3 once recorded every admitted write-capable dispatch in the
+dispatch ledger from a scrape of every note id the prompt and the files it named mentioned, with the union of their
+computed file sets: six entries of 303-910 files on 2026-10-15, naming reference notes as dispatched work, which bound
+fix-lane worktrees to R3 notes and stopped their landings. The ledger is the planner's and the spec renderer's
+(plan_wave.record_dispatch, through make_dispatch_specs.py), each group recorded with its exact file set; an attended
+dispatch made without a rendered group is in flight from its worktree's first edit, and the landing check
+(landing_check.py) is the guarantee behind the planner's partition.
+
 There is no lander to guard (kb/Work PB3023): a branch lands through `scripts/orchestrator/enqueue.py land`, a script, and
 its rule 4 (a lander dispatch named the loop's state) retired with the role; LandingPipelineDriftTests holds that no other
 file opens or queues a pull request.
@@ -50,9 +50,6 @@ sys.stderr.reconfigure(encoding="utf-8")
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 CHECK = REPO / ".claude" / "skills" / "workstream" / "check_practices.py"
-PLAN_WAVE = REPO / "scripts" / "orchestrator" / "plan_wave.py"
-READ_ONLY_ROLES = {"cobol-refuter", "cobol-adjudicator", "cobol-locator", "cobol-reviewer", "Explore", "Plan", "claude-code-guide",
-                   "statusline-setup"}
 TEMPLATES = REPO / ".claude" / "skills" / "workstream" / "templates"
 JUDGMENT_ROLES = {"cobol-implementer", "cobol-finisher"}
 LOADED = re.compile(
@@ -64,41 +61,6 @@ LOADED = re.compile(
 def block(why: str) -> None:
     print("DISPATCH GUARD: " + why, file=sys.stderr)
     sys.exit(2)
-
-
-PB = re.compile(r"\bPB\d+\b")
-NAMED_FILE = re.compile(r"(?:[A-Za-z]:[\\/]|/)[^\s\"'`<>|,;]+?\.(?:txt|md|json)")
-
-
-def dispatched_ids(text: str) -> list[str]:
-    """The kb/Work ids a dispatch names: in its own text, and in every brief, spec or args file its text names (one
-    level: a prompt that says only "follow msg-w1040-a.txt" carries its notes there; the eighth refuter's K2)."""
-    ids = set(PB.findall(text))
-    for p in dict.fromkeys(NAMED_FILE.findall(text)):
-        try:
-            f = pathlib.Path(p)
-            if f.is_file() and f.stat().st_size < 2_000_000:
-                ids |= set(PB.findall(f.read_text(encoding="utf-8", errors="replace")))
-        except OSError:
-            pass
-    return sorted(ids, key=lambda s: int(s[2:]))
-
-
-def record_hand_dispatch(args: dict, role: str, tool: str = "Agent") -> None:
-    """Rule 3: the admitted write-capable dispatch's named notes into the dispatch ledger (never blocks). An Agent
-    call's text is its prompt; a Workflow call's is its whole input (its script and args: groups, specs, briefs)."""
-    if role in READ_ONLY_ROLES or role.startswith("brent-tools:"):
-        return
-    text = (args.get("prompt", "") or "") if tool == "Agent" else json.dumps(args, ensure_ascii=False)
-    ids = dispatched_ids(text.replace("\\\\", "\\"))
-    if not ids:
-        return
-    label = f"{tool if tool != 'Agent' else (role or 'general-purpose')}: {args.get('description', '') or ''}"[:120]
-    try:
-        subprocess.run([sys.executable, str(PLAN_WAVE), "--record-dispatch", ",".join(ids), "--label", label],
-                       capture_output=True, text=True, timeout=90, encoding="utf-8", errors="replace")
-    except (OSError, subprocess.SubprocessError):
-        pass
 
 
 def skill_loaded(transcript: str) -> bool:
@@ -123,7 +85,6 @@ if (tool == "Workflow" or role in JUDGMENT_ROLES) and os.environ.get(coord.LOOP_
           "exists): launch no fleet. Write the handoff naming the plan (its specs and args file are reusable) and every "
           "branch, then end; a fresh unit launches it (kb/Work PB2597, units/common.md).")
 if tool == "Agent" and role not in JUDGMENT_ROLES:
-    record_hand_dispatch(args, role)
     sys.exit(0)
 
 transcript = data.get("transcript_path") or ""
@@ -150,8 +111,5 @@ if tool == "Agent":
         sys.exit(0)
     if "=== PRACTICES CHECK: GREEN ===" not in out.stdout:
         block("check_practices.py is not GREEN over this brief:\n" + (out.stdout + out.stderr)[-1500:])
-    record_hand_dispatch(args, role)
-else:
-    record_hand_dispatch(args, "", "Workflow")
 
 sys.exit(0)

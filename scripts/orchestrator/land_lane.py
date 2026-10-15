@@ -38,7 +38,9 @@ STATE, all under `<coord>/land-lane/` (the coordination directory, never a workt
 THE TICK, in order:
   1. REAP: an attempt whose runner is gone without an rc is DIED. A run that ended QUEUE NOT ACTIVE writes HALT.
   2. SURVEY: `git fetch`, then `prune_worktrees.survey` and its landing order (the most harmful lead first, kb/Work
-     PB2981), written to survey.json.
+     PB2981), written to survey.json. The survey reads these attempts back (`view`, kb/Work PB3125, PB3181): a branch
+     whose newest attempt at its tip STOPPED reads STOPPED, one whose attempt there was ENQUEUED reads ENQUEUED, and
+     only a tip no attempt stopped at reads WAITING TO LAND.
   3. LAUNCH, unless HALT exists or a stop does (the loop's STOP-UNIT or STOP, or the owner's global scratch\\STOP; a
      running `enqueue.py land` finishes either way: it is idempotent). The candidates are the WAITING TO LAND rows in
      survey order, then the branches whose last attempt a script may retry (below) and whose tip is still that
@@ -458,7 +460,8 @@ def candidates(rows: list[dict[str, Any]], order: list[str], branches: dict[str,
         last = atts[-1]
         if branch in seen or r is None or not finished(last) or classify(last) not in RETRYABLE:
             continue
-        if r["state"] in ("ENQUEUED", "BOUNCED", "LANDED") or r["tip"] != last.get("end_head") or not r["worktree"]:
+        if r["state"] in ("STOPPED", "ENQUEUED", "BOUNCED", "LANDED") or r["tip"] != last.get("end_head") \
+                or not r["worktree"]:
             continue
         out.append(r)
         seen.add(branch)
@@ -615,7 +618,8 @@ def agent_work(cdir: pathlib.Path, now: dt.datetime | None = None) -> AgentWork:
     """What only the enqueue unit's agents (or its clerk and its records) can do: rows WAITING FOR REVIEW or BOUNCED in
     a survey younger than SURVEY_MAX_AGE_MIN (a BOUNCED one only while the lane is neither landing it nor re-armed to:
     its finisher already resolved it), STOPPED attempts not yet collected, and ENQUEUED attempts not yet collected
-    (their leads and landing records)."""
+    (their leads and landing records). A row the survey reads STOPPED is counted through its attempt, never by its
+    state: uncollected, it is the unit's work; collected, the unit has already dispatched its owner (kb/Work PB3125)."""
     lane = view(cdir)
     age = lane.survey_age_min(now)
     reasons = []
@@ -766,6 +770,9 @@ def self_test() -> int:
         collect(c, ["w1a"], say=lambda s: None)
         expect("collect clears it from the agent work, and it stays unlaunched at that head",
                not any("w1a" in r for r in agent_work(c).reasons) and f.tick(c) == [], str(agent_work(c).reasons))
+        f.rows[0] = row("w1a", "STOPPED", "a2")                   # the survey's own reading of that stop (PB3125)
+        expect("a row the survey reads STOPPED is not launched, and once collected is no agent work again",
+               f.tick(c) == [] and not any("w1a" in r for r in agent_work(c).reasons), str(agent_work(c).reasons))
         f.rows[0] = row("w1a", "WAITING TO LAND", "a3")           # the finisher's fix, reviewed CLEAN
         expect("a new head is eligible again", f.tick(c) == ["w1a"], str(f.started))
 
