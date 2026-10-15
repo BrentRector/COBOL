@@ -150,8 +150,9 @@ public sealed partial class DataBinder
     /// containing source element A." A condition-name is placed by its conditional variable.
     /// <para>⛔ EVERY NAME INDEX A DATA DESCRIPTION ENTRY DECLARES INTO, not only <see cref="ByName"/> (kb/Work PB3154
     /// review R2-1): a named OCCURS DYNAMIC CAPACITY register is a data-name (§13.18.38.3 SR30) kept off
-    /// <see cref="ByName"/> in <see cref="_capacityRegisters"/>, placed by its table (a METHOD's own table is the
-    /// method tier, <see cref="ActiveMethodDeclares"/>, so the object half never counts it); a REPORT SECTION sum
+    /// <see cref="ByName"/> in <see cref="_capacityRegisters"/>, placed by its table (a METHOD's own register is never
+    /// in that index: it lives in <see cref="OoMethodDataScope.CapacityRegisters"/>, the method tier
+    /// <see cref="ActiveMethodDeclares"/> asks, kb/Work PB3165); a REPORT SECTION sum
     /// counter is a data-name too (§13.18.54.4 GR5) kept off it in <see cref="_sumCounters"/>, placed by its report
     /// (<see cref="ReportDepth"/>: 0 for this element's own, n for a container's GLOBAL report, §13.18.27.4 GR1), so
     /// a FARTHER container's sum counter never hides a NEARER container's constant (kb/Work PB3154 review R3-1).
@@ -161,8 +162,7 @@ public sealed partial class DataBinder
     {
         if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth)) return true;
         if (Conditions.TryGetValue(name, out var conds) && conds.Any(c => DeclaringDepth(c.Parent) < depth)) return true;
-        if (_capacityRegisters.TryGetValue(name, out var tables)
-            && tables.Any(t => !OoMethodScopedRoots.Contains(t.Root) && DeclaringDepth(t) < depth)) return true;
+        if (_capacityRegisters.TryGetValue(name, out var tables) && tables.Any(t => DeclaringDepth(t) < depth)) return true;
         if (_sumCounters.TryGetValue(name, out var counters) && counters.Any(c => ReportDepth(c.Report) < depth)) return true;
         if (!IndexNames.Declares(name)) return false;
         IndexNames.Candidates(name, static _ => true, out int indexDepth);   // int.MaxValue when none survives

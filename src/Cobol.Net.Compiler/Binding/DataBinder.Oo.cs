@@ -39,6 +39,19 @@ public sealed class OoMethodDataScope
     /// <summary>The method's own §8.3.2.2 census: a method is a source element of its own (§10.5), so its words may
     /// repeat, as another type, a word of its class or of a sibling method (§8.4.6.1; kb/Work PB2921).</summary>
     internal UserWordCensus Words { get; } = new();
+
+    /// <summary>Whether this method declares <paramref name="word"/> in ANY of its own name indexes — a data-name, a
+    /// condition-name, an index-name or a named CAPACITY register (§13.18.38.3 SR30 makes the register a data-name of
+    /// the method that declares its table). ⛔ EVERY NAME INDEX OF THIS SCOPE, asked here beside the indexes
+    /// themselves: when the registers moved into the method's own scope (kb/Work PB3165), the hand-written list in the
+    /// binder kept asking the class's register index and a method's register stopped hiding a symbolic-character
+    /// (kb/Work PB3154 review R2-1, the PB3165 merge-queue bounce). <c>GlobalNameClassDriftTests</c> finds this
+    /// scope's name indexes by reflection and holds this predicate to every one.</summary>
+    internal bool Declares(string word)
+    {
+        return ByName.ContainsKey(word) || Conditions.ContainsKey(word) || IndexNames.Declares(word)
+            || CapacityRegisters.ContainsKey(word);
+    }
 }
 
 /// <summary>
@@ -57,19 +70,14 @@ public sealed partial class DataBinder
     public OoMethodDataScope? ActiveMethodScope { get; set; }
 
     /// <summary>Whether the method whose statements are being bound declares <paramref name="word"/> as a data-name,
-    /// a condition-name or an index-name of its own — the NEAREST tier a reference made in that method can reach, so
-    /// such a declaration hides every constant-name and symbolic-character of the spelling the class's binder holds
-    /// (ISO §8.4.6.2.1 3) a) "If the name is declared in source element B, the item in source element B is the
-    /// referenced item"; §8.4.6.1 "even when it is a different type of user-defined word"; kb/Work PB3154 review
-    /// R1-1). Asked by the two literal-alias lookups, <see cref="FindConstant"/> and <see cref="SymbolicOf(string)"/>;
-    /// always false outside a method's statements.</summary>
-    internal bool ActiveMethodDeclares(string word) =>
-        ActiveMethodScope is { } m
-        && (m.ByName.ContainsKey(word) || m.Conditions.ContainsKey(word) || m.IndexNames.Declares(word)
-            // A method table's named CAPACITY register is the method's data-name too (§13.18.38.3 SR30), but it lives
-            // in the class binder's register index, not in the method's ByName (kb/Work PB3154 review R2-1).
-            || (_capacityRegisters.TryGetValue(word, out var tables)
-                && tables.Exists(t => OoRootOwner.TryGetValue(t.Root, out var owner) && owner.DataScope == m)));
+    /// a condition-name, an index-name or a CAPACITY register of its own (<see cref="OoMethodDataScope.Declares"/>) —
+    /// the NEAREST tier a reference made in that method can reach, so such a declaration hides every constant-name and
+    /// symbolic-character of the spelling the class's binder holds (ISO §8.4.6.2.1 3) a) "If the name is declared in
+    /// source element B, the item in source element B is the referenced item"; §8.4.6.1 "even when it is a different
+    /// type of user-defined word"; kb/Work PB3154 review R1-1). Asked by the two literal-alias lookups,
+    /// <see cref="FindConstant"/> and <see cref="SymbolicOf(string)"/>; always false outside a method's
+    /// statements.</summary>
+    internal bool ActiveMethodDeclares(string word) => ActiveMethodScope?.Declares(word) == true;
 
     /// <summary>True when this binder binds a CLASS unit (per-binder-instance configuration, set ONCE at
     /// construction by <c>Oo/OoDriver</c> — init-only since P9 Step 6, so a mid-bind mutation cannot compile): a root

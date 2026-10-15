@@ -49,13 +49,41 @@ public sealed class CapacityRegisterReferenceDriftTests
     public void TheCapacityRegisterNameLookup_IsWrittenInExactlyOnePlace()
     {
         // DataBinder.Odo.cs owns the maps (the SR30 duplicate-name screen + the insert); SymbolTable.cs is the ONE
-        // reader that answers a name with them.
-        string[] expected = ["DataBinder.Odo.cs", "SymbolTable.cs"];
+        // reader that answers a name with them; the SHADOWING predicates only ask whether the word is declared.
+        string[] expected = ["DataBinder.Odo.cs", "SymbolTable.cs", .. ShadowingPredicates.Select(static p => p.File)];
         var unexpected = SrcScan.Value.Sites
-            .Where(s => !expected.Any(e => s.StartsWith(e, StringComparison.Ordinal))).ToList();
+            .Where(s => !expected.Any(e => s.StartsWith(e + ":", StringComparison.Ordinal))).ToList();
         Assert.True(unexpected.Count == 0,
             "A CAPACITY register name lookup was added outside the one resolver hook:\n  "
             + string.Join("\n  ", unexpected));
+    }
+
+    /// <summary>The two SHADOWING predicates (kb/Work PB3154 review R2-1): a named register is a data-name
+    /// (§13.18.38.3 SR30), so it hides an inherited constant-name or symbolic-character of its spelling (§8.4.6.1), and
+    /// each predicate asks whether a register of the word is DECLARED at its tier — the unit's
+    /// (<c>DataBinder.DeclaredNearerThan</c>) and a method's own (<c>OoMethodDataScope.Declares</c>). Neither answers a
+    /// reference. Their files may read a register map only inside them.</summary>
+    private static readonly (string File, string Method, string Path)[] ShadowingPredicates =
+    [
+        ("DataBinder.Constants.cs", "DeclaredNearerThan", TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.Constants.cs")),
+        ("DataBinder.Oo.cs", "Declares", TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.Oo.cs")),
+    ];
+
+    /// <summary>⛔ A shadowing predicate's file reads a register map ONLY inside the predicate, so a reference lookup
+    /// added beside it is still the second lookup <see cref="TheCapacityRegisterNameLookup_IsWrittenInExactlyOnePlace"/>
+    /// forbids. (The scan is case-insensitive: the unit's map is the private field <c>_capacityRegisters</c>, which a
+    /// case-sensitive scan never saw.)</summary>
+    [Fact]
+    public void AShadowingPredicate_IsItsFilesOnlyRegisterRead()
+    {
+        foreach (var (file, method, path) in ShadowingPredicates)
+        {
+            string body = MethodBody(File.ReadAllText(path), method);
+            int inBody = body.Split('\n').Count(l => !l.Trim().StartsWith("//", StringComparison.Ordinal) && IsNameLookup(l.Trim()));
+            int inFile = SrcScan.Value.Sites.Count(s => s.StartsWith(file + ":", StringComparison.Ordinal));
+            Assert.True(inBody > 0, $"{method} in {file} no longer asks a CAPACITY register map.");
+            Assert.True(inFile == inBody, $"{file} reads a CAPACITY register map {inFile - inBody} time(s) outside {method}.");
+        }
     }
 
     /// <summary>⛔ Inside <c>SymbolTable.cs</c> every register-map read lies in <c>CapacityCandidates</c> — ONE method,
@@ -102,9 +130,9 @@ public sealed class CapacityRegisterReferenceDriftTests
     });
 
     private static bool IsNameLookup(string line) =>
-        line.Contains("CapacityRegisters", StringComparison.Ordinal)
-        && (Regex.IsMatch(line, @"CapacityRegisters\s*\.\s*(TryGetValue|ContainsKey)\b")
-            || Regex.IsMatch(line, @"CapacityRegisters\s*\["));
+        line.Contains("CapacityRegisters", StringComparison.OrdinalIgnoreCase)
+        && (Regex.IsMatch(line, @"CapacityRegisters\s*\.\s*(TryGetValue|ContainsKey)\b", RegexOptions.IgnoreCase)
+            || Regex.IsMatch(line, @"CapacityRegisters\s*\[", RegexOptions.IgnoreCase));
 
     /// <summary>⛔ The hook judges the WRITTEN reference, never the parse shape. A read of
     /// <c>dataReferenceSuffix()</c> back in <c>CapacityRegisterFor</c> (the old façade <c>HasNoSuffix</c> test,

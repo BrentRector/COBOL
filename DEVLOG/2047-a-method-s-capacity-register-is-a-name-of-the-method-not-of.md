@@ -40,3 +40,22 @@ sweep; it now uses `TestRepo.Src` and carries `[Trait("Sweep", "tree")]` (tier 0
 misses tier 0c: the shared timings store holds a single 24.5 s sample of it (about 0.1 s alone), over the planner's
 2 s sweep limit, and a leg-1-only gate never re-measures a case it does not run.
 
+Finisher (the merge queue bounced pull request #81, run 38794330038): both conformance `corpus-nist` shards failed
+`pb3154_half_capacity_register_hides_symbolic` (2014) with `A2 CCC` for `A2 004`. That golden reached main from PB3154
+after this branch's gate, and the failure is the interaction of the two changes, a semantic conflict with no textual
+one. PB3154's method tier, `DataBinder.ActiveMethodDeclares`, found a method's own CAPACITY register in the CLASS's
+register index; this change moved those registers into `OoMethodDataScope.CapacityRegisters`, so the method's register
+`S2` no longer hid the class's `SYMBOLIC CHARACTERS S2` and `MOVE S2` moved the figurative (§8.4.6.1, §8.4.6.2.1 3) a),
+§11.7.4 GR5). The root was a hand-written list of the method's name indexes kept in the binder, away from the scope that
+owns them. The predicate is now `OoMethodDataScope.Declares`, beside the indexes, asking every one of them;
+`ActiveMethodDeclares` and `SymbolTable.CapacityCandidates` (whose own hand list missed condition-names) both ask it, and
+`DeclaredNearerThan` lost its now-dead method-table filter. `GlobalNameClassDriftTests.MethodDeclares_AsksEveryMethodNameIndex`
+finds the scope's name indexes by reflection and holds `Declares` to them. `CapacityRegisterReferenceDriftTests` now
+scans case-insensitively (the unit's private `_capacityRegisters` escaped it) and allows a register-map read only in the
+one resolver and the two shadowing predicates (`AShadowingPredicate_IsItsFilesOnlyRegisterRead`). The golden
+`pb3165_method_capacity_register_scope` gained `SHOWE`, a method condition-name spelled like the object's register.
+`GlobalNameClassDriftTests` reached `src` through `Path.Combine`, which `drift_rules.py` cannot read, so it governed no
+file it scans; it now uses `TestRepo.Src`, the same fix the first finisher made to its sibling above.
+Why no local gate saw the bounce: the golden arrived with main's second merge at the landing, which by design runs no
+second gate (the merge group is the whole population on the moved main).
+

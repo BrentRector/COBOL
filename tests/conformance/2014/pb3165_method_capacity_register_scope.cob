@@ -14,6 +14,10 @@
       *> SHOWD declares an INDEX-name QO that hides the object's QO register the same way (11.7.4 GR5 is about the
       *> word, whatever its name class): SET QO TO 3 moves SHOWD's own index, and the trailing SHOWB shows the
       *> object's register still at its minimum capacity (branch review finding R1-1).
+      *> SHOWE declares a CONDITION-name QO, which hides the object's QO register too (11.7.4 GR5: a
+      *> word "defined in the data division of this method definition"): SET QO TO TRUE sets SHOWE's
+      *> own W to 1, and IF QO tests it (SymbolTable.CapacityCandidates and the literal-alias lookups
+      *> ask OoMethodDataScope.Declares, every method name index; the PB3165 merge-queue bounce).
       *> ISO 14.6.2.3.2 item 6: each dynamic-capacity table starts at the FROM (minimum) capacity.
       *>   cite.py --check 14.6.2.3.2 "the capacity of the table is set to the minimum capacity specified
       *>     in the corresponding OCCURS clause" -> OK  14.6.2.3.2 6)
@@ -33,6 +37,7 @@
            INVOKE OBJ "SHOWB"
            INVOKE OBJ "SHOWC"
            INVOKE OBJ "SHOWD"
+           INVOKE OBJ "SHOWE"
            INVOKE OBJ "SHOWB"
            STOP RUN.
        END PROGRAM PB3165P.
@@ -88,5 +93,14 @@
            SET N TO QO
            DISPLAY "D " G(QO) " " G(3) " " N.
        END METHOD SHOWD.
+       METHOD-ID. SHOWE.
+       DATA DIVISION.
+       LOCAL-STORAGE SECTION.
+       01 W PIC 9 VALUE 0.
+          88 QO VALUE 1.
+       PROCEDURE DIVISION.
+           SET QO TO TRUE
+           IF QO DISPLAY "E " W.
+       END METHOD SHOWE.
        END OBJECT.
        END CLASS PB3165C.

@@ -49,9 +49,9 @@ public sealed class GlobalNameClassDriftTests
             + "never declared by a data description entry",
     };
 
-    private static IEnumerable<string> NameIndexFields()
+    private static IEnumerable<string> NameIndexFields(Type owner)
     {
-        foreach (var f in typeof(DataBinder).GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
+        foreach (var f in owner.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic))
         {
             if (f.FieldType == typeof(IndexNameRegistry)) { yield return MemberName(f); continue; }
             if (!f.FieldType.IsGenericType) continue;
@@ -74,7 +74,7 @@ public sealed class GlobalNameClassDriftTests
     [Fact]
     public void EveryNameIndex_IsInheritedOrExcludedWithItsReason()
     {
-        var found = NameIndexFields().ToHashSet(StringComparer.Ordinal);
+        var found = NameIndexFields(typeof(DataBinder)).ToHashSet(StringComparer.Ordinal);
         var unclassified = found.Where(n => !Inherited.ContainsKey(n) && !NotPerEntryGlobalNames.ContainsKey(n)).ToList();
         Assert.True(unclassified.Count == 0,
             "DataBinder gained a name index that neither InheritGlobalSubtree reaches nor this test excludes — decide "
@@ -87,8 +87,7 @@ public sealed class GlobalNameClassDriftTests
     [Fact]
     public void InheritGlobalSubtree_ReachesEveryInheritedNameIndex()
     {
-        string text = File.ReadAllText(Path.Combine(TestRepo.Root, "src", "Cobol.Net.Compiler", "Binding",
-            "DataBinder.Linkage.cs"));
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.Linkage.cs"));
         var m = Regex.Match(text, @"internal void InheritGlobalSubtree\(DataItem item, int depth\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
         Assert.True(m.Success, "InheritGlobalSubtree not found in DataBinder.Linkage.cs");
@@ -117,8 +116,7 @@ public sealed class GlobalNameClassDriftTests
     public void DeclaredNearerThan_AsksEveryInheritedNameIndex()
     {
         Assert.Equal(Inherited.Keys.Order(StringComparer.Ordinal), AskedByShadowing.Keys.Order(StringComparer.Ordinal));
-        string text = File.ReadAllText(Path.Combine(TestRepo.Root, "src", "Cobol.Net.Compiler", "Binding",
-            "DataBinder.Constants.cs"));
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.Constants.cs"));
         var m = Regex.Match(text, @"internal bool DeclaredNearerThan\(string name, int depth\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
         Assert.True(m.Success, "DeclaredNearerThan not found in DataBinder.Constants.cs");
@@ -130,5 +128,35 @@ public sealed class GlobalNameClassDriftTests
         // NEARER container's constant (kb/Work PB3154 review R3-1). The ask places each counter by its report.
         Assert.True(m.Groups["body"].Value.Contains("ReportDepth(c.Report) < depth", StringComparison.Ordinal),
             "DeclaredNearerThan no longer places a sum counter by its report's depth (ReportDepth).");
+    }
+
+    /// <summary>A METHOD's name index → the text <c>OoMethodDataScope.Declares</c> asks it by.</summary>
+    private static readonly Dictionary<string, string> AskedByMethodShadowing = new()
+    {
+        ["ByName"] = "ByName.ContainsKey(",
+        ["Conditions"] = "Conditions.ContainsKey(",
+        ["IndexNames"] = "IndexNames.Declares(",
+        ["CapacityRegisters"] = "CapacityRegisters.ContainsKey(",
+    };
+
+    /// <summary>⛔ THE METHOD TIER ASKS EVERY NAME INDEX OF THE METHOD (the kb/Work PB3165 merge-queue bounce). A method
+    /// is a source element of its own (§10.5), its names the NEAREST tier a reference in it can reach, so a method's
+    /// declaration of a spelling in ANY name class hides the class's constant-name or symbolic-character of it
+    /// (§8.4.6.1, §8.4.6.2.1 3) a)). When PB3165 moved a method's CAPACITY registers out of the binder's index into
+    /// <see cref="OoMethodDataScope.CapacityRegisters"/>, the binder's hand-written method predicate kept asking the
+    /// old index, and <c>tests/conformance/2014/pb3154_half_capacity_register_hides_symbolic.cob</c> displayed the
+    /// figurative <c>CCC</c> for the method's own register. The scope's name indexes are found by REFLECTION, so an
+    /// index added to the scope must be asked by <c>OoMethodDataScope.Declares</c> too.</summary>
+    [Fact]
+    public void MethodDeclares_AsksEveryMethodNameIndex()
+    {
+        Assert.Equal(AskedByMethodShadowing.Keys.Order(StringComparer.Ordinal),
+            NameIndexFields(typeof(OoMethodDataScope)).Order(StringComparer.Ordinal));
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "DataBinder.Oo.cs"));
+        var m = Regex.Match(text, @"internal bool Declares\(string word\)\s*\{(?<body>.*?)\n    \}", RegexOptions.Singleline);
+        Assert.True(m.Success, "OoMethodDataScope.Declares not found in DataBinder.Oo.cs");
+        foreach (var (index, ask) in AskedByMethodShadowing)
+            Assert.True(m.Groups["body"].Value.Contains(ask, StringComparison.Ordinal),
+                $"OoMethodDataScope.Declares no longer asks the method's name index '{index}' (expected '{ask}').");
     }
 }
