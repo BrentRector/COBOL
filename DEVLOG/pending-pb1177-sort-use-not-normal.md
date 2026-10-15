@@ -125,3 +125,10 @@ invocation and a NEW OVERRIDE. The reviewed build printed `I3-RET=N`, `I4-RET=N`
 prints `Y`, `Y` and `SET`. In the inline leg the MOVE is in the terminated range, so it never stores and the leg
 prints `I5-RET=N` on both builds. The new `2002/pb1177_invoke_self_new_raising` pins the sibling.
 `EcCheckingProfileDriftTests` now looks for the helper's new name.
+
+The round-2 finisher's first gate was RED (run 20261015T225311Z-919174). 38 cases failed with CS0103 on
+`CobolSort`: an OO group whose classes declare no file has no `using` of the I-O namespace, and every INVOKE now asks
+the question. `RuntimeApi.SortAfterActivationReturn` is now fully qualified, as `SortTerminationSignalType` already
+was. The re-gate is `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run
+20261015T225607Z-e044e4: Conformance 6,144/11,717, Unit 33,319/33,679, Characterization 6/36 in leg 1, both
+pb1177_invoke goldens passing).
