@@ -987,10 +987,11 @@ Draft 6 re-modelled them from the code after the fifth refuter, G2):
   governs contained PROGRAMS only. A class definition's OBJECT and FACTORY halves are the second producer the seed must
   cover (the sixth refuter, H2): a half MAY carry its own configuration section, limited to SPECIAL-NAMES (§12.3.3
   SR3: "The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be specified in a factory definition
-  or an instance definition"), and its own OPTIONS paragraph. `OoDriver` builds a half's configuration by reparenting
-  the half's own ENVIRONMENT DIVISION before the class definition's into one synthetic unit (`OoReparentClassData` and
-  `OoReparentFactoryData`, `OoDriver.cs:176-196`), which `DataBinder.EnvDivisions` (`DataBinder.cs:1109-1117`) reads
-  outermost first, so the half's entries override the class's clause by clause; it builds the half's OPTIONS by
+  or an instance definition"), and its own OPTIONS paragraph. `OoDriver.BindClassData` binds the class definition's
+  own ENVIRONMENT DIVISION once, in a binder of the class's own source element (§10.5), and seeds each half from it
+  through the same `InheritConfiguration` before the half binds its own division (`OoDriver.OoReparent` hands a binder
+  only its own element's divisions; kb/Work PB3154, which made the class's names inherited by the halves rather than
+  declared in their §8.3.2.2 censuses); it builds the half's OPTIONS by
   overlaying the half's paragraph on the class's (`OoDriver.cs:99-101` for the OBJECT half, `:119-120` for the
   FACTORY half; an INTERFACE binds its own paragraph over none, `:41`), and `CallInheritOptions`
   (`DataBinder.cs:294`) writes the same `_inheritedOptions` field `InheritConfiguration` writes
@@ -1042,8 +1043,8 @@ none (§12.3.3 SR1) and takes the container's frozen `DataBindResult` (§12.3.4 
 FACTORY half takes its class definition's configuration (§12.3.4 GR1: the class contains the half) overlaid clause by
 clause by the half's own SPECIAL-NAMES, the one configuration paragraph §12.3.3 SR3 leaves it. The class definition
 binds no data, so it has no `DataBindResult`: its arm's source is a `ClassConfiguration` value, bound once per class by
-the same step from the class's own section and OPTIONS paragraph and handed to both halves, which replaces the synthetic
-reparent units' environment children and `EnvDivisions`' reverse order (the override becomes the arm's overlay, written
+the same step from the class's own section and OPTIONS paragraph and handed to both halves, which replaces the class
+binder `OoDriver.BindClassData` builds for the purpose today (kb/Work PB3154) (the seed becomes the arm's overlay, written
 once). A method is not a configuration unit (§12.3.3 SR2): it reads its half's slice. The OPTIONS slice is produced by
 the same step and the same three arms from the baseline the arm names (none for Own; the container's for Contained;
 the class definition's for ClassHalf) overlaid by the unit's own OPTIONS paragraph clause by clause (§11.9.4 GR1), so
@@ -1659,7 +1660,13 @@ lies outside it stops the landing; and (2) every other in-flight branch's actual
 whole declared set until its notes are terminal, started or not (`inflight_file_sets`), when the shared file is R3
 work on either side. R3 work is attributed PER COMMIT (PB2703): a train is mixed, one commit per cluster, so the
 landing's R3 work is the commits that work on an R3 note and the files those commits change; its fix-lane commits
-neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. A shared file
+neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. Each commit
+is charged only with what it introduced (PB3180): a non-merge commit with its diff against its parent, a MERGE commit
+with the files and note statuses that differ from EVERY parent (its conflict resolutions and evil-merge edits, the
+combined-diff set) and the ids leading its own subject, never with its first-parent diff, which carries the other
+parent's whole history (a merged predecessor's commits, which the walk attributes one by one, or `main`'s own landings
+in a `Merge origin/main`); the first-parent reading charged one commit's R3 status flip to every file a merged
+predecessor changed and stopped PB3154's branch on a note whose only commit changed no code. A shared file
 stops the LATER of the two by dispatch time (the ledger's `at`, one millisecond apart per group so a wave never ties,
 else the branch's first commit), which re-plans and rebases onto the earlier once it lands, and the earlier one lands
 with a warning naming the branch that must rebase. An in-flight branch is R3 work because its DISPATCH says so, never
