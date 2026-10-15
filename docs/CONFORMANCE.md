@@ -679,7 +679,7 @@ of an unsupported facility.
   run unit it executes (so it crosses assembly boundaries — a separately-compiled module's STOP RUN … WITH STATUS
   reaches the process exit code) and delivered to `Environment.ExitCode` ONCE, when the run unit has ended, by the
   boundary that IS the process (`ProgramTable.RunModule`, the generated `Main`'s statement). A run unit embedded in a host
-  (`RunUnit.Run`, `ProgramRegistry.RunMain`) never writes the host's exit code (kb/Work PB3163; DOC-A.1-167): the host
+  (`RunUnit.Run`, `ProgramRegistry.RunMain`) never writes the host's exit code (kb/Work PB3163; A.1 item 167): the host
   reads `RunUnit.ExitStatus`. Two host limits apply on top of the value mapping: the exit code is an `Int32`, so a
   status outside [−2,147,483,648, 2,147,483,647] is **clamped** to the nearer end (`CobolNum.Position32`, the one
   saturating narrowing — see "Integer operands and host carriers" below), never wrapped: before kb/Work PB1178
