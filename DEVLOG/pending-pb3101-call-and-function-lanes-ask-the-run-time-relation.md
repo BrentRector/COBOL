@@ -123,3 +123,21 @@ and negative `pb3101-prototype-bit-group-positions` pins the length difference (
 in D6 item 7. `GroupAtom` does not gain leaf identity: §13.7.3 SR2's group layout is §8.5.3.1's structural walk, which
 already lives once in `StrongTypeModel`, and copying it into the runtime atoms would write it twice. Batch
 `w1082a-pb3101-comparator-resite` moved the code-location of 26 CONFORMS rows off the deleted members (GAP 101 → 101). Gate run `20261015T194430Z-f29348`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
+
+
+Branch review round 1 (wave 1082 group A's review finisher) answered three findings. R1-1: "the same signature" was not
+an equivalence. `PrototypeSignatures.SameDescription` compared a bit group to `PIC 1(8)` by its as-if picture
+(§13.18.29.4 GR1 b)) but still compared two bit groups by their subordinate split, so prototypes PA (bit group 4+4),
+PB (`PIC 1(8) USAGE BIT`) and PC (bit group 2+6) gave PA = PB and PB = PC but PA ≠ PC. `SET PTR-C TO PTR-A` was refused
+COBOLNET1959 although two SETs through `PTR-B` carry the same address, and the founder-based partition split by
+presentation order: `CALL Q USING PTR-A` against a formal restricted to PC was refused COBOLNET1688. The subordinate
+layout is now asked only of two groups that are not bit or national groups (`DescribedBySubordinates`), because §13.7.3
+SR2 states nothing that overrides GR1 b) / GR2 b). Golden `conformance:2002/pb3101_bit_group_signature_equivalence`
+prints `SET OK` / `Q GOT NULL`; both errors reproduced on the reviewed head. R1-2: the current-state docs and three
+grammar comments named members that are gone (`PrototypeBisimulation`, `SameDescriptionAs`, `ConformanceDescriptor`,
+`ContentValueMismatch`, `Gr8Classify`, `OoBindInvokeArg`, `IntrinsicBinder.SoleDataReference`); each now names the
+current mechanism. R1-3: a checkpoint had committed eight run-output files from a by-hand corpus run whose working
+directory was the corpus; three older ones were found in the sibling sweep (`2002/PB1226CON.TXT`, `2023/pb63f1e.dat`,
+`2023/pb63loc.txt`). All eleven are removed. The new tree sweep `CorpusRunFileDriftTests` fails on any tracked file in a
+corpus directory that is neither a corpus kind nor library text a program there COPYs, and `.gitignore` now covers the
+corpus `.dat`/`.seq` files. Gate run `20261015T201139Z-533497`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
