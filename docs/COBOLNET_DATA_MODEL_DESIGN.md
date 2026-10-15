@@ -1558,7 +1558,7 @@ element byte length, so `9(4)` 1234 into `99V99` is 34.00, not the image 12.34. 
 `BoundMove.ElementMoves`: per receiving operand that GR9 governs (`MoveClassifier.VariableLengthGroupSender`, the
 antecedent the emitter's transfer asks too) and per corresponding table pair (`VariableLengthCompatibility
 .CorrespondingTables`, the walk that matched them) whose elementary elements differ (`OoConformance
-.DescriptionMismatch`), one `TableElementMove`: the elementary MOVE bound by `BindMoveOf` itself over the two element
+.SignatureDifference`, the pair-mode relation), one `TableElementMove`: the elementary MOVE bound by `BindMoveOf` itself over the two element
 places at a loop-local occurrence number (`MoveBinder.ReachElement`: from each group's resolved place through `PlaceCursor`, and for a table leaf in the span of a level-66 THROUGH alias — a group item with no subordinates, §13.18.45.4 GR2 — as the record's table at the outer occurrences its `RenamesSpanPart` names, kb/Work PB1938), so its
 §14.9.25.3 legality is asked of the element pair (a refusal is a diagnostic at the MOVE), plus the two §14.6.9.1
 current counts (`OccurrenceCounts.Current`, shared with INITIALIZE). `MoveEmitter` renders, after the group transfer

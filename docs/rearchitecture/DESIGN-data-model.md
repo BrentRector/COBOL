@@ -435,7 +435,7 @@ POSITION — the same correspondence this predicate proves — and compares them
 (returning items), §9.3.8.2.3 rule 7 (interface conformance) — for an activation in
 `ActivationRelations.StrongTypeViolation` over the descriptions' `StrongType` identity (the §8.5.3.1 key,
 `StrongTypeModel.TypeIdentityKey`), asked in BOTH modes because §14.8.2.2's sentence qualifies neither (kb/Work
-PB3101), and in pair mode in `OoConformance.StrongTypeMismatch`, reached from `DescriptionMismatch` (override and
+PB3101), and in pair mode in `ActivationRelations.SignatureDifference`'s strong arm, reached from `OoConformance.SignatureDifference` (override and
 prototype signatures). That last one also completes
 §8.5.1.12.1's *"Two fixed-length groups are always compatible, unless they are strongly typed and have different
 type definitions"*, whose strong half `VariableLengthCompatibility` deliberately leaves to its caller.

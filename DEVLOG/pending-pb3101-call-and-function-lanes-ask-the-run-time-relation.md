@@ -103,3 +103,23 @@ needs no compile-time hook, and `PrototypeSignatures` moves to it next with the 
 comparator's deletion and `OneRelationDriftTests` follow. The first gate was RED on one negative,
 `l1c09-factory-implements-nonconforming-method`, whose `.err` pinned the comparator's wording; it now pins the
 relation's. Gate run `20261015T012455Z-4e90c2`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
+
+
+Wave 1082 (group A) finished PB3101, which lands with this entry. It carried the twelve commits of waves 1077 to 1080 onto
+`aba8f0454` and re-gated them green (run `20261015T191148Z-e983e0`). The prototype signature classes are now a partition
+refinement (`PrototypeSignatureClasses.Classify`). Every resolved prototype starts in one block per namespace. Each round
+stamps every restricted program- or function-pointer with its prototype's current block, then splits each block by
+`PrototypeSignatures.Same`. A round that splits nothing is the greatest fixed point that PB2495's bisimulation used to
+compute. `Same` now asks the pair-mode relation (`OoConformance.SignatureDifference`) for each formal and the returning
+item. The bisimulation, `StrongTypeModel`'s `prototypes` parameters and the whole `DataItem` comparator family are
+deleted: `DescriptionMismatch`, `StrongTypeMismatch`, `AsIfElementaryGroupMismatch`, `CategoryArmMismatch`, and the
+`PictureClauseIdentity.Mismatch` and `ObjectRefDescriptor.SameDescriptionAs` comparators they had left orphaned.
+`OneRelationDriftTests` keeps the conformance layer from comparing two items' description facts again. Asking the
+relation changed one verdict. A probe whose prototype had a bit group of 8 positions and a national group of 3, against a
+definition with `PIC 1(8) USAGE BIT` and `PIC N(3)`, was refused COBOLNET1513, because the old comparator required both
+sides to be groups or neither. ISO §13.18.29.4 GR1 b) / GR2 b) treat such a group as that elementary item, so the probe
+now compiles and runs (`B=11110000`, `N=XYZ`); this is golden `conformance:2002/pb3101_prototype_as_if_elementary_group`,
+and negative `pb3101-prototype-bit-group-positions` pins the length difference (COBOLNET1513). The design is corrected
+in D6 item 7. `GroupAtom` does not gain leaf identity: §13.7.3 SR2's group layout is §8.5.3.1's structural walk, which
+already lives once in `StrongTypeModel`, and copying it into the runtime atoms would write it twice. Batch
+`w1082a-pb3101-comparator-resite` moved the code-location of 26 CONFORMS rows off the deleted members (GAP 101 → 101).

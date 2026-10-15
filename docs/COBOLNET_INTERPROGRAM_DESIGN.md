@@ -135,7 +135,7 @@ trims a name expression: the runtime forms it (`ExternalizedNameFormationDriftTe
 
 **The carriers.** `CobolNet.Runtime.FunctionPointer(string? Name)` is shape-for-shape `ProgramPointer`: a readonly record struct over the EXTERNALIZED function-name, which ISO §8.4.3.12.4 GR2 makes the address of a COBOL function outright (*“For a COBOL function, the address is that of the function identified by the externalized function-name in its FUNCTION-ID paragraph”*), resolved through the ONE run-unit `ProgramTable` (`FunctionAddressOf`, the `EntryOf` twin, differing only in the `Node.IsFunction` discriminator §8.4.6.3's first paragraph requires in both directions). ⛔ **Two structs, not one.** §8.4.3.10.4 gives each category its own predefined NULL and §14.9.39.3 SR20/SR21 forbid mixing the two categories in one SET, so a shared struct would make a program-pointer and a function-pointer assignment-compatible in the GENERATED C# — the one place the binder's category screens cannot reach. Alignment / size / representation / allowable languages are published as `docs/CONFORMANCE.md` §7 row **DOC-A.1-210** (§13.18.60.4 GR26 requires it); GR15's “effect of SET on the function” is row **DOC-A.1-174** and the determination is NONE.
 
-**The restriction is one field.** `PicInfo.RestrictedPrototypeName` carries the `TO` operand for BOTH prototype carriers — §13.18.60.4 GR25 (program) and GR26 (function) — because the two general rules are one rule twice and so are their consumers, §14.9.39.3 SR20 and SR22: *“the {function|program}-prototypes associated with identifier-N and identifier-M shall have the same signature”*. The CATEGORY says which namespace resolves the name (§8.4.6.6 vs §8.4.6.8 — themselves the same sentence twice, and screened by one block in `DataBinder`); the RULE over it is `PrototypeSignatures.Same`, which compares the two `CalleeSignature`s position by position through `OoConformance.DescriptionMismatch`, the compiler's ONE description-equality check, and — because a group's description IS its subordinate entries (§13.7.3 SR2, §8.13; kb/Work PB1115) — requires a group to meet a group with the same §8.5.3.1 elementary layout (`StrongTypeModel.SameElementaryLayout`, the structural half of type-declaration equivalence: each elementary item at the same relative position, of the same length, with the same eight clauses; names and intermediate grouping excluded). It is DISTINCT from `RestrictedTypeName` (§13.18.60.4 GR23) because that one names a TYPE, not a prototype. §13.18.60.3 **SR18 and SR19** — the TYPEDEF requirement — are likewise one screen; there is NO function twin of them (measured: §13.18.60.3 stops at SR21 and carries no function-prototype-name sentence), so a level-1 `USAGE FUNCTION-POINTER TO fp` needs no TYPEDEF while `USAGE PROGRAM-POINTER TO pp` does.
+**The restriction is one field.** `PicInfo.RestrictedPrototypeName` carries the `TO` operand for BOTH prototype carriers — §13.18.60.4 GR25 (program) and GR26 (function) — because the two general rules are one rule twice and so are their consumers, §14.9.39.3 SR20 and SR22: *“the {function|program}-prototypes associated with identifier-N and identifier-M shall have the same signature”*. The CATEGORY says which namespace resolves the name (§8.4.6.6 vs §8.4.6.8 — themselves the same sentence twice, and screened by one block in `DataBinder`); the RULE over it is `PrototypeSignatures.Same`, which compares the two `CalleeSignature`s position by position through `OoConformance.SignatureDifference`, the compiler's ONE pair-mode relation (`ActivationRelations.SignatureDifference` over the two items' descriptions), and — because a group's description IS its subordinate entries (§13.7.3 SR2, §8.13; kb/Work PB1115) — requires two groups to share the same §8.5.3.1 elementary layout (`StrongTypeModel.SameElementaryLayout`, the structural half of type-declaration equivalence: each elementary item at the same relative position, of the same length, with the same eight clauses; names and intermediate grouping excluded). It is DISTINCT from `RestrictedTypeName` (§13.18.60.4 GR23) because that one names a TYPE, not a prototype. §13.18.60.3 **SR18 and SR19** — the TYPEDEF requirement — are likewise one screen; there is NO function twin of them (measured: §13.18.60.3 stops at SR21 and carries no function-prototype-name sentence), so a level-1 `USAGE FUNCTION-POINTER TO fp` needs no TYPEDEF while `USAGE PROGRAM-POINTER TO pp` does.
 
 **The CALL consumer of a restricted program-pointer (kb/Work PB609).** §14.9.4.3 SR14 is Format 2 only (`CALL identifier-1 AS program-prototype-name-1`): when identifier-1 is a restricted program-pointer, the signature of the prototype its TYPEDEF names shall equal the AS phrase's. `CallBinder` asks it where it classifies identifier-1 as a program-pointer, through `PrototypeSignatures.Same` over `StatementBinder.ProgramSignatureOf` — the ONE name-to-signature reader the SET program-pointer pairs (SR22) and the address-identifier argument share — and refuses a mismatch as COBOLNET2936. A Format 1 `CALL pp USING …` has no program-prototype-name-1 for SR14 to compare, and §14.9.4.4 GR7 takes the callee's characteristics only from a prototype the statement names, so no signature is imported from the pointer there (Annex D.9.3.2 is informative); the run unit's §14.9.4.4 GR3 d) check still applies at activation.
 
@@ -588,7 +588,7 @@ receiving one ("superfluous elements are not moved"; missing ones are space fill
 
 **⛔ THE REVERSE PAIR, AND THE SIZE RULE A VARIABLE-LENGTH PAIR TAKES (kb/Work PB965, finisher).** A variable-length
 group has no length of its own: its collapsed `ImageWidth` counts a dynamic-capacity table as one element, which
-§8.5.1.12.3 grants only to two MATCHING dynamic-capacity tables. So `OoConformance.DescriptionMismatch` — the one
+§8.5.1.12.3 grants only to two MATCHING dynamic-capacity tables. So `ActivationRelations` — the one relation
 comparator behind COBOLNET1688 (CALL argument), 1736 (CALL RETURNING) and 0828 (INVOKE) — decides the size question
 per activation mode once either side is a variable-length group: a RETURNING pair takes compatibility alone (§14.8.3.2's
 length sentence applies only when "neither of them is strongly typed or a variable length group"); BY REFERENCE,
@@ -684,7 +684,7 @@ quantity; `Reshape` / `Overlay` convert it element by element over the element a
 — **the same** capability the §14.9.11.4 GR7 DISPLAY format uses, so a group that displays is a group that
 crosses. The one crossing-form predicate is `CallEmitter.CallPlaceIsVarGroup` (CALL/RETURNING) and
 `OoEmitter.OoCrossingType` (the INVOKE signature, box lanes and marshaling); the ADMISSION is decided once, at
-bind, by `VariableLengthCompatibility.Mismatch` through `OoConformance.DescriptionMismatch` — the same comparator
+bind, by the §8.5.1.12 walk `ActivationRelations.VariableLengthViolation` asks over the descriptions — the same relation
 the argument, RETURNING and override/implements checks all read.
 
 **Tier-C at the boundary, in BOTH halves.** A group with no boundary image at all (a pointer/object-class leaf,
@@ -905,9 +905,9 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   symbols match iff their currency STRINGS do; period/comma symbols match iff DECIMAL-POINT IS COMMA is in effect
   for both source elements or neither), and both are facts of the DECLARING source element, not of the
   character-string. `PictureAnalyzer.Analyze` attaches `PicInfo.Clause` (`PictureClauseIdentity`) to every analyzed
-  profile; `DescriptionMismatch` compares it for every category (so `PIC A(5)` is not `PIC X(5)`), the §8.5.3.1
+  profile; the activation description's clause key carries it for every category (so `PIC A(5)` is not `PIC X(5)`), the §8.5.3.1
   profile compare gets it through `PicInfo` record equality, and the non-PICTURE clauses ALIGNED / DYNAMIC LENGTH
-  are the one `DescriptionClauses` predicate both read. The LOCALE phrase compares the external identification AS
+  are clauses of that key and of the `DescriptionClauses` predicate the §8.5.3.1 compare reads. The LOCALE phrase compares the external identification AS
   WRITTEN (`LocaleSymbol.SameExternalIdentificationAs` — literal values ordinal, a word case-insensitively), never
   the L1-normalized tag that selects the locale at run time.
   ⛔ The same fact governs how a picture is EDITED across the boundary (kb/Work PB2554, §12.3.7.4 GR14 b)): a formal
@@ -1031,7 +1031,7 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   declared PICTURE length for an activation with no receiver — docs/CONFORMANCE.md D-ALR1). The delivery needs no
   change: `FitToReceiver` already fits to the receiver's stated length (rule 5, "considered to match"), and an ANY LENGTH
   receiver stores at its own length. The binder side is the existing activation-mode relaxation of
-  `OoConformance.DescriptionMismatch` (rule 4 stays: an ANY LENGTH receiver needs an ANY LENGTH sender).
+  `ActivationRelations.CallReturningViolation` (rule 4 stays: an ANY LENGTH receiver needs an ANY LENGTH sender).
 - SET ADDRESS OF on a LINKAGE item re-points the callee's formal mid-execution — the carrier field is reassigned; subsequent refs read the new target.
 
 ## Edition gating (G1 — four per-`--std` compilers in one executable)

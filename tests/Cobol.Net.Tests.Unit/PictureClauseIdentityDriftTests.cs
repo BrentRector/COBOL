@@ -2,7 +2,6 @@
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 
 using System.Collections.Generic;
-using System.Linq;
 using CobolNet.Binding;
 using CobolNet.Binding.Model;
 using CobolNet.Compiler.Oo;
@@ -81,7 +80,7 @@ public sealed class PictureClauseIdentityDriftTests
     }
 
     [Fact]
-    public void AlignedAndDynamicLength_AreClausesOfTheIdentity()
+    public void AlignedAndDynamicLength_AreComparedThroughTheOneSharedPredicate()
     {
         var bit = Item("1(8)", usage: Usage.Bit);
         var aligned = Item("1(8)", usage: Usage.Bit);
