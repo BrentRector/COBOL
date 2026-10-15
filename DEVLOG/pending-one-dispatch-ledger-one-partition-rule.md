@@ -72,4 +72,4 @@ in-flight slugs, pull requests), called by `prune_worktrees.py`, `land_lane.surv
 `survey(prs=)` is required so no caller reads a git-only lifecycle by omission. New self-test checks: live_survey reads
 ENQUEUED and BOUNCED; no orchestrator script calls `prune_worktrees.survey` directly; an answered group is not in flight
 (prune_worktrees), holds no declared file (test_plan_wave), and frees its untouched declared files at the landing check
-(landing_check PB2795).
+(landing_check PB2795).Re-gate after the review fixes: === BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN === (run TestResults/build-local/20261015T212233Z-74273d; Conformance 6,102, Unit 33,266, Characterization 6 passed, 0 failed; the changed self-tests plan_wave, prune_worktrees, landing_check, land_lane, enqueue GREEN); semgrep verify.py PASS; `work.py check` green. PB2614, PB2701, PB3040 and PB2795 landed, `closes_rows: []` (process tooling).
