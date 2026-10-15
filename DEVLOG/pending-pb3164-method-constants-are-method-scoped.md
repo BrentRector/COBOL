@@ -40,4 +40,6 @@ a method's TYPEDEF joins the class's one `TypeDecls` table (a second method's ty
 COBOLNET1529). Second, a constant's `LENGTH OF` operand resolves during the method's data bind against the class-wide
 name maps, so it measures the object's item instead of the method's (`A 3` where `A 5`), or reports "not defined".
 
-**Gate.** See the report: `E:\COBOL-coord\scratch\reports\w1080e-PB3164-report.md`.
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T011512Z-416a78; Conformance
+6,105/11,677 · Unit 33,146/33,650 · Characterization 6/36 in leg 1). The golden and the negative both passed in leg 1.
+`semgrep/verify.py` PASS with no count raised. The Linux gate is the lander's (batched gating).
