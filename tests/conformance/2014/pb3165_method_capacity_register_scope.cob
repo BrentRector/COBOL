@@ -18,6 +18,10 @@
       *> word "defined in the data division of this method definition"): SET QO TO TRUE sets SHOWE's
       *> own W to 1, and IF QO tests it (SymbolTable.CapacityCandidates and the literal-alias lookups
       *> ask OoMethodDataScope.Declares, every method name index; the PB3165 merge-queue bounce).
+      *> SHOWF declares a CAPACITY register QX spelled like the object's INDEX-name QX: COMPUTE N = QX
+      *> reads SHOWF's own register (3, its minimum capacity), not the object's index, which as an
+      *> arithmetic operand would be refused (SymbolTable.IndexCandidates asks OoMethodDataScope.Declares;
+      *> branch review finding R2-1).
       *> ISO 14.6.2.3.2 item 6: each dynamic-capacity table starts at the FROM (minimum) capacity.
       *>   cite.py --check 14.6.2.3.2 "the capacity of the table is set to the minimum capacity specified
       *>     in the corresponding OCCURS clause" -> OK  14.6.2.3.2 6)
@@ -38,6 +42,7 @@
            INVOKE OBJ "SHOWC"
            INVOKE OBJ "SHOWD"
            INVOKE OBJ "SHOWE"
+           INVOKE OBJ "SHOWF"
            INVOKE OBJ "SHOWB"
            STOP RUN.
        END PROGRAM PB3165P.
@@ -54,6 +59,8 @@
        WORKING-STORAGE SECTION.
        01 OU.
           05 F PIC 9(3) OCCURS DYNAMIC CAPACITY IN QO FROM 2 TO 10.
+       01 OV.
+          05 H PIC 9 OCCURS 5 INDEXED BY QX.
        PROCEDURE DIVISION.
        METHOD-ID. SHOWA.
        DATA DIVISION.
@@ -102,5 +109,15 @@
            SET QO TO TRUE
            IF QO DISPLAY "E " W.
        END METHOD SHOWE.
+       METHOD-ID. SHOWF.
+       DATA DIVISION.
+       LOCAL-STORAGE SECTION.
+       01 V.
+          05 K PIC 9 OCCURS DYNAMIC CAPACITY IN QX FROM 3 TO 10.
+       01 N PIC 9(4) VALUE 0.
+       PROCEDURE DIVISION.
+           COMPUTE N = QX
+           DISPLAY "F " N.
+       END METHOD SHOWF.
        END OBJECT.
        END CLASS PB3165C.

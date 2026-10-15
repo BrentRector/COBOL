@@ -51,13 +51,20 @@ public sealed class SymbolTable
     /// <summary>Resolve a DATA-name in <paramref name="scope"/>: the method overlay first (§8.4.6.2.1 rule 3a),
     /// else the unit's global multimap. False when the name is unknown in both. (← <c>LookupData</c> /
     /// <c>LookupDataInScopeOf</c> — the anchor-root-vs-active-method decision is now the caller's explicit
-    /// <see cref="Scope"/>.)</summary>
+    /// <see cref="Scope"/>.) A method that declares the spelling in ANOTHER name class (a condition-name, an
+    /// index-name, a CAPACITY register — <see cref="OoMethodDataScope.Declares"/>) makes the object's data-name of it
+    /// inaccessible (§11.7.4 GR5 "the use of that word in this method refers to the declaration in this method"), so
+    /// the lookup is false rather than the object's item (kb/Work PB3165 review R2-1's sibling arm).</summary>
     public bool TryResolve(string name, Scope scope, out List<DataItem> items)
     {
-        if (scope.Method is { } m && m.ByName.TryGetValue(name, out var mlist) && mlist.Count > 0)
+        if (scope.Method is { } m)
         {
-            items = mlist;
-            return true;
+            if (m.ByName.TryGetValue(name, out var mlist) && mlist.Count > 0)
+            {
+                items = mlist;
+                return true;
+            }
+            if (m.Declares(name)) { items = []; return false; }
         }
         if (_data.ByName.TryGetValue(name, out var list) && list.Count > 0)
         {
@@ -113,13 +120,19 @@ public sealed class SymbolTable
     }
 
     /// <summary>Resolve a level-88 CONDITION-name in <paramref name="scope"/>: the method overlay first, else the
-    /// unit's global multimap (the same §8.4.6.2.1 rule-3a precedence the data-name lookup applies).</summary>
+    /// unit's global multimap (the same §8.4.6.2.1 rule-3a precedence the data-name lookup applies). A method-local
+    /// name of the spelling in any other class hides the object's condition-name (§11.7.4 GR5, as in
+    /// <see cref="TryResolve"/>).</summary>
     public bool TryResolveCondition(string name, Scope scope, out List<Condition88> conds)
     {
-        if (scope.Method is { } m && m.Conditions.TryGetValue(name, out var mlist) && mlist.Count > 0)
+        if (scope.Method is { } m)
         {
-            conds = mlist;
-            return true;
+            if (m.Conditions.TryGetValue(name, out var mlist) && mlist.Count > 0)
+            {
+                conds = mlist;
+                return true;
+            }
+            if (m.Declares(name)) { conds = []; return false; }
         }
         if (_data.Conditions.TryGetValue(name, out var list) && list.Count > 0)
         {
@@ -133,8 +146,8 @@ public sealed class SymbolTable
     /// <summary>⛔ THE ONE INDEX-NAME RESOLUTION (kb/Work PB919) — the §8.4.2.2 candidate set of a WRITTEN
     /// index-name reference <c>name [OF|IN q] …</c> (§8.4.2.2.2 Format 3), or <see langword="null"/> when the
     /// spelling names no index-name visible in <paramref name="scope"/> (the reference is then a data-name one).
-    /// Visibility is the data-name's (§8.4.6.2.3): a method-local DATA-name of the spelling shadows every
-    /// index-name (§11.7.4 GR5 — the caller must not treat the reference as an index); else the method's own
+    /// Visibility is the data-name's (§8.4.6.2.3): a method-local DATA-name, condition-name or CAPACITY register of the
+    /// spelling shadows every index-name (§11.7.4 GR5 — the caller must not treat the reference as an index); else the method's own
     /// declarations (§11.7.4 GR5 privacy); else the unit's, where a nearer source element's declaration wins
     /// (§8.4.6.2.1 3), <see cref="IndexNameRegistry.Candidates"/>). The qualifiers are matched from the TABLE
     /// upward (§8.4.2.2.3 SR6). The COUNT is the caller's verdict — <see cref="DataBinder.UniqueOrReportAmbiguous{T}"/>
@@ -150,6 +163,9 @@ public sealed class SymbolTable
             if (m.ByName.TryGetValue(name, out var mlist) && mlist.Count > 0) return null;   // the method data-name wins
             if (m.IndexNames.Declares(name))
                 return m.IndexNames.Candidates(name, d => _data.IndexQualifierChainMatches(d, qualifiers));
+            // A method condition-name or CAPACITY register of the spelling hides the object's index-name too (GR5
+            // covers every name class; kb/Work PB3165 review R2-1).
+            if (m.Declares(name)) return null;
         }
         if (!_data.IndexNames.Declares(name)) return null;
         var indexes = _data.IndexNames.Candidates(name, d => _data.IndexQualifierChainMatches(d, qualifiers),

@@ -159,4 +159,30 @@ public sealed class GlobalNameClassDriftTests
             Assert.True(m.Groups["body"].Value.Contains(ask, StringComparison.Ordinal),
                 $"OoMethodDataScope.Declares no longer asks the method's name index '{index}' (expected '{ask}').");
     }
+
+    /// <summary>⛔ EVERY SYMBOL-TABLE LOOKUP WITH A METHOD TIER ASKS THE METHOD'S WHOLE DECLARATION (kb/Work PB3165 branch
+    /// review R2-1). ISO §11.7.4 GR5 is about the WORD: a method's declaration of a spelling in any name class makes
+    /// the object's declaration of it, of any class, "inaccessible to this method" (§8.4.6.1 "even when it is a
+    /// different type of user-defined word"). <c>CapacityCandidates</c> asked <see cref="OoMethodDataScope.Declares"/>,
+    /// but <c>IndexCandidates</c>, <c>TryResolve</c> and <c>TryResolveCondition</c> each asked only their own class's
+    /// method index and then fell through to the object's: a method CAPACITY register spelled like an object
+    /// index-name was refused as an index in COMPUTE, and a method condition-name let <c>MOVE X</c> read the object's
+    /// data-name <c>X</c>. Every <see cref="SymbolTable"/> member whose body opens a method tier
+    /// (<c>scope.Method is { } m</c>) must ask <c>m.Declares(name)</c> before it reaches the unit's maps. The
+    /// behavioural half is <c>tests/conformance/2014/pb3165_method_capacity_register_scope.cob</c> (SHOWF) and the
+    /// three <c>negative/pb3165-method-*-hides-object-*</c> cases.</summary>
+    [Fact]
+    public void EverySymbolTableMethodTier_AsksTheMethodsWholeDeclaration()
+    {
+        string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "Model", "SymbolTable.cs"));
+        var members = Regex.Matches(text, @"^    public [^\r\n]*?\b(?<name>\w+)(?:<\w+>)?\((?<rest>.*?)(?=^    public |\z)",
+            RegexOptions.Multiline | RegexOptions.Singleline);
+        var tiered = members.Where(m => m.Groups["rest"].Value.Contains("scope.Method is { } m", StringComparison.Ordinal))
+            .ToList();
+        Assert.True(tiered.Count >= 4, $"expected the four method-tiered lookups in SymbolTable.cs, found {tiered.Count}");
+        foreach (var m in tiered)
+            Assert.True(Regex.IsMatch(m.Groups["rest"].Value, @"\bm\.Declares\(name\)"),
+                $"SymbolTable.{m.Groups["name"].Value} opens a method tier but never asks m.Declares(name): a method-local "
+                + "name of the spelling in another name class would not hide the object's (ISO §11.7.4 GR5).");
+    }
 }
