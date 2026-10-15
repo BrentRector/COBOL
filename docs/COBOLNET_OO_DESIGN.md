@@ -86,8 +86,12 @@ object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/W
 `OoMethodDataScope.Declares`, which asks EVERY name index the method's scope holds (`ByName`, `Conditions`, `IndexNames`,
 `CapacityRegisters`); `GlobalNameClassDriftTests.MethodDeclares_AsksEveryMethodNameIndex` finds those indexes by reflection, so an
 index added to the scope is asked too (kb/Work PB3165: when a method's registers moved into the method's own scope, a hand-written list
-kept asking the class's register index and the method's register stopped hiding the symbolic). `SymbolTable.CapacityCandidates` asks
-the same predicate for a method-local name that hides an object register.
+kept asking the class's register index and the method's register stopped hiding the symbolic). Every `SymbolTable` lookup with a
+method tier asks the same predicate after its own name class's method index: `TryResolve`, `TryResolveCondition`, `IndexCandidates`
+and `CapacityCandidates` each answer from the method when it declares the spelling in their class, and report "not found here" when
+it declares it in another, so a method's word hides the object's declaration of it whatever either's class (§11.7.4 GR5, §8.4.6.1;
+kb/Work PB3165 review R2-1). `GlobalNameClassDriftTests.EverySymbolTableMethodTier_AsksTheMethodsWholeDeclaration` holds every
+method-tiered member of `SymbolTable` to it.
 
 ## Spec corrections
 

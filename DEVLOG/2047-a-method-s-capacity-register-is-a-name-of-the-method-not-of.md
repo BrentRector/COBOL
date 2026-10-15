@@ -59,3 +59,19 @@ file it scans; it now uses `TestRepo.Src`, the same fix the first finisher made 
 Why no local gate saw the bounce: the golden arrived with main's second merge at the landing, which by design runs no
 second gate (the merge group is the whole population on the moved main).
 
+Review finisher (branch review R2-1 at 4d1893ded): `SymbolTable.IndexCandidates` still carried the hand-written method
+tier that the bounce fix had replaced in `CapacityCandidates`. It asked only the method's data-names and index-names and
+then fell through to the object's index-names, so a method CAPACITY register `QI` spelled like an object index-name `QI`
+made `COMPUTE N = QI` draw COBOLNET1637, legal source refused (ISO §11.7.4 GR5: "The declaration in the containing object
+definition is inaccessible to this method"; §8.4.6.1 "even when it is a different type of user-defined word"). The sweep
+of the other method tiers in `SymbolTable` found the same shape twice more, both accepting illegal source: `TryResolve`
+let `MOVE X TO N` read the object's data-name `X` under a method condition-name `X` (printed `X 0007`), and
+`TryResolveCondition` let `IF X` test the object's level-88 `X` under a method data-name `X`; a method condition-name
+`QI` also let `SET QI TO 2` move the object's index. Every method tier now answers from its own class's method index,
+then asks `OoMethodDataScope.Declares` and stops before the unit's maps. The new
+`GlobalNameClassDriftTests.EverySymbolTableMethodTier_AsksTheMethodsWholeDeclaration` requires `m.Declares(name)` in every
+`SymbolTable` member that opens a method tier; with the `TryResolveCondition` line removed it fails naming that member.
+The golden gained `SHOWF` (`F 0003`, the method's own register at its minimum capacity) and three negatives pin the
+siblings: `pb3165-method-condition-name-hides-object-data-name` (COBOLNET1639),
+`pb3165-method-data-name-hides-object-condition-name` (COBOLNET2318) and
+`pb3165-method-condition-name-hides-object-index-name` (COBOLNET1639), rejected at 2002, 2014 and 2023.
