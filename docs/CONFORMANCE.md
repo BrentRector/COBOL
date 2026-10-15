@@ -799,6 +799,24 @@ of an unsupported facility.
   followed by a USE that completes normally BYPASSES that file — the other GIVING files are still written), GR12 b)
   (any WRITE exception continues only after a USE that completes normally) and both verbs' write-boundary paragraph
   (the file is closed and the statement goes on). (kb/Work PB993; golden `2002/pb993_sort_merge_transfer_termination`.)
+- **A USE procedure invoked from a SORT's INPUT or OUTPUT PROCEDURE that does not complete normally (§14.9.40.4 GR17,
+  GR10, GR13; §14.9.33.4 GR2 a), GR3; §14.6.13.1.2 1)), spec silent on where control lands**: GR17 — "If a USE
+  procedure invoked while a format 1 SORT statement is active does not complete normally, the SORT statement is
+  terminated" — reaches a USE procedure an explicit statement of either procedure invokes, since GR10/GR13 put "all
+  statements in declarative procedures that are executed as a result of the execution of statements in the range" in
+  the procedure's range. §14.9.33.4 GR2 a) 1. alone would put a RESUME AT NEXT STATEMENT after that explicit
+  statement, inside the procedure. **Pinned choice: the SORT ends where it is terminated** — nothing more of the
+  procedure, the sequence phase or the output procedure runs, and a RESUME AT NEXT STATEMENT (or a not-normal
+  fall-off) lands after the SORT statement, as it does for the implicit transfers: GR2 a) yields "unless general
+  rules associated with the applicable statement specify otherwise", and the next statement of a terminated SORT's
+  procedure is no longer part of an executing statement (the rejected reading — continue the procedure with the SORT
+  ended — runs RELEASE/RETURN statements that GR1 of each then refuses, and the procedure's inserted return would
+  hand control back into a statement that has ended). A RESUME AT procedure-name is a GO TO (GR3) taken after the
+  SORT has ended, never from inside the procedure with the SORT still active. A USE procedure invoked by another
+  while the SORT is active is itself one GR17 reaches, so its own RESUME terminates the SORT there. **MERGE has no
+  such rule** (§14.9.24.4): a statement of a MERGE output procedure is its own applicable statement, and its USE
+  procedure's RESUME AT NEXT STATEMENT continues the procedure and the MERGE. The ISO text controls; no GnuCOBOL
+  latitude is taken. (kb/Work PB1177; golden `2002/pb1177_sort_procedure_use_not_normal`.)
 - **D-SMF — the short-record fill of a SORT/MERGE transfer (§14.9.40.4 GR7, GR16; §14.9.24.4 GR2, GR13)**: three
   readings. **(a) Arm b) cannot arise.** "multiple record description entries … and the descriptions include a SELECT
   WHEN clause" needs the SELECT WHEN clause, which Annex A.4.8 declines by name (COBOLNET1705), so a file with several
@@ -912,8 +930,8 @@ of an unsupported facility.
   mark reaches every open declarative; **(c) a RESUME that §14.9.33.4 GR1 made a CONTINUE marks only the open
   declaratives of ITS OWN program instance** ("specified in this … program"). The disposition after a declarative falls
   off its end is by FATALITY, not by how it completed, wherever a rule does not key on normal completion (§14.9.49.4
-  GR13, GR7 b)/c), GR12 b)/c)), so only the SORT (§14.9.40.4 GR17) and MERGE (§14.9.24.4 GR7, GR12) implicit transfers
-  tell a not-normal fall-off from a normal one. **(d) A Format 4 (EXCEPTION OBJECT) declarative's not-normal fall-off is
+  GR13, GR7 b)/c), GR12 b)/c)), so only a USE procedure invoked while a format 1 SORT is active (§14.9.40.4 GR17,
+  kb/Work PB1177) and the MERGE (§14.9.24.4 GR7, GR12) implicit transfers tell a not-normal fall-off from a normal one. **(d) A Format 4 (EXCEPTION OBJECT) declarative's not-normal fall-off is
   treated as normal**: §14.6.13.1.5 names only the normal case ("completes normally, execution continues as specified
   in the activating statement for normal execution"). Witnesses `conformance:2002/pb1122_declarative_fatal_in_scope_merge`
   (a MERGE GIVING file whose implicit OPEN fails: a declarative that completes normally BYPASSES the file, one that

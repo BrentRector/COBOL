@@ -1276,6 +1276,18 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // The method's GR4 a) USE BEFORE REPORTING selectors (kb/Work PB1044) — declared BEFORE the dispatch
                 // local function whose GENERATE/TERMINATE statements capture the cached-delegate slot.
                 U.ReportWriter.EmitMethodBeforeReportingSelectors(mDecls, w);
+                if (methodSelects)
+                    // The ONE selection-machinery emitter, as LOCAL FUNCTIONS of this method (they call the local
+                    // __MDispatch and capture the method's data). __useActive is sized to the declaratives plus the
+                    // CLASS total handler count (the ONE HandlerUseId formula). ⛔ EMITTED BEFORE __MDispatch, as a
+                    // program's machinery is emitted before its __Dispatch: the guard array is a LOCAL here, and C#
+                    // refuses a local function body that names a local declared after it (CS0841) — a format 1 SORT
+                    // in the method's body registers it for §14.9.40.4 GR17 (EcEmitter.SortUseScope, kb/Work PB1177).
+                    // The local functions themselves may reference __MDispatch before its declaration.
+                    U.Dispatch.EmitUseMachinery(mDecls,
+                        methodF3 && bound.F3HandlerBasePc is int cb ? bound.Paragraphs.Count - cb : 0,
+                        hasIoChecked: mDecls.Count > 0 && bound.Ec is { HasIoChecked: true },
+                        hasF3Perform: methodF3, w, asLocal: true);
                 if (methodF3)
                     U.Dispatch.EmitDispatchMethod(bound, w, "int __MDispatch(int __startPc, int __exitPc)",
                         m.Binding!.DeclStartPc, m.Binding!.EndPc,
@@ -1283,14 +1295,6 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 else
                     U.Dispatch.EmitDispatchMethod(bound, w, "int __MDispatch(int __startPc, int __exitPc)",
                         m.Binding!.DeclStartPc, m.Binding!.EndPc);
-                if (methodSelects)
-                    // The ONE selection-machinery emitter, as LOCAL FUNCTIONS of this method (they call the local
-                    // __MDispatch and capture the method's data). __useActive is sized to the declaratives plus the
-                    // CLASS total handler count (the ONE HandlerUseId formula).
-                    U.Dispatch.EmitUseMachinery(mDecls,
-                        methodF3 && bound.F3HandlerBasePc is int cb ? bound.Paragraphs.Count - cb : 0,
-                        hasIoChecked: mDecls.Count > 0 && bound.Ec is { HasIoChecked: true },
-                        hasF3Perform: methodF3, w, asLocal: true);
                 dispatch.DispatchName = saved;
                 dispatch.BeforeReportingSelectors.Clear();   // the selectors are this method's locals — no other unit's statement may name them
                 // The ACTIVATION boundary's checking scope (kb/Work PB841 — the INVOKE twin of ProgramTable.CallProgram):
