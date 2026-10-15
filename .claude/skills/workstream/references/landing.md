@@ -51,7 +51,7 @@
   `ci/` landing branches are deleted (kb/Work PB3024's closing change; `LandingPipelineDriftTests` keeps them out).
 - ⛔ **No branch is left undecided (MANDATORY-PRACTICES O10, owner 2026-10-08, kb/Work PB2600).** After every landing,
   `python scripts/prune_worktrees.py` (the lifecycle survey) then `--apply`, which deletes the LANDED branches; a branch
-  that will not land is ABANDONED by a line in its kb/Work note (naming the branch, the word ABANDONED, the reason) and
+  that will not land is ABANDONED by a line in its kb/Work note (the word ABANDONED directly after the branch's name, then the reason) and
   then `--apply --abandon <branch>`. Nothing is archived (owner 00:52: "Archiving to a bundle serves no use and wastes
   disk space").
 - ⭐ **A free implementer slot is filled within the TURN it frees** — mechanically, by the rolling wave (§2,
