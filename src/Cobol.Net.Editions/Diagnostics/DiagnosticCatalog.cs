@@ -7167,13 +7167,16 @@ public static class DiagnosticCatalog
     /// area-A item or a level-number (kb/Work PB3147): a statement, a sentence, a clause or entry continued on a new
     /// line, a period. ANSI X3.23-1985 writes everything else in area B (positions 12 to margin R); ISO/IEC 1989:2002
     /// removed the areas (ISO §6.3.5 continues an entry "in the program-text area of a subsequent line"), so the rule is
-    /// the <c>fixed-form-text-in-area-a-2002</c> construct row's.</summary>
+    /// the <c>fixed-form-text-in-area-a-2002</c> construct row's. Also the text of a CONTINUATION line (a hyphen in the
+    /// indicator area) that begins in area A - X3.23-1985 "Area A of a continuation line must be blank" (kb/Work
+    /// PB3168), reported by the reference format's own gate, <c>ReferenceFormatDiagnostics.OnContinuationTextInAreaA</c>.</summary>
     public static readonly DiagnosticDescriptor ProgramTextInAreaA = new(
         "COBOLNET3735", "program-text-in-area-a", EditionSeverity.Error,
         "COBOL-85 fixed-form reference format reserves area A (character positions 8-11) for division, section and "
         + "paragraph headers, level indicators, level-numbers, DECLARATIVES, END DECLARATIVES and end markers: a "
         + "sentence, a statement, and an entry or clause continued on a subsequent line begin in area B (position 12 or "
-        + "later). Indent the text into area B, or target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
+        + "later), and area A of a continuation line (a hyphen in column 7) is blank. Indent the text into area B, or "
+        + "target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
         "ANSI X3.23-1985 reference format (area B); ISO §6.3.1, §6.3.5");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
