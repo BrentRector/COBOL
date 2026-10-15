@@ -48,4 +48,4 @@ no HEAD, and `resumed` rewritten to a non-mechanical commit after the report. `l
 The owner's release record went into the register on this branch: "Release to Mythos now" (2026-10-15 ~12:45 PDT).
 PB2911 and PB1754 now say that the hold no longer covers the Mythos lane, and PB2119 is unblocked.
 
-Gate: GATE-LINE
+Gate (run `TestResults/build-local/20261015T202819Z-fa373b`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,065/11,708 · Unit 33,128/33,667 · Characterization 6/36 ran; the 28 changed script self-tests GREEN, among them prune_worktrees, land_lane, review_findings, test_plan_wave, landing_measure and enqueue). Linux gate: the landing's (batched gating).
