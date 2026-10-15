@@ -60,6 +60,10 @@ internal sealed class BinderDriver
         // malformed structure can preempt it. The three sibling passes further down run POST-bind only because they
         // consume the bound model; this one has no such reason to wait. kb/Work PB485.
         global::CobolNet.Validation.LevelNumberPass.Run(tree, edition);
+        // COBOL-85's areas A and B (kb/Work PB3147): where each token begins its fixed-form line, against the item it
+        // heads. Pre-bind for the level-number screen's reason — a pure syntax rule over the raw tree — and silent from
+        // COBOL-2002 on, which has no areas (ISO §6.3.1).
+        global::CobolNet.Validation.AreaPlacementPass.Run(tree, edition);
         // ISO §5.5 1) — every integer-n is NONZERO unless an associated rule says otherwise (kb/Work PB859). Pre-bind
         // for the level-number screen's reason: a pure syntax rule over the raw tree, and a zero OCCURS bound left to
         // the binder used to reach Roslyn as CS0029 in generated C#.

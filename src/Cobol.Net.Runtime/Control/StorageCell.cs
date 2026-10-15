@@ -62,6 +62,36 @@ public sealed class StorageCell
     /// a cell with no managed member costs one null field.</para></summary>
     private Dictionary<int, object?>? _slots;
 
+    /// <summary>The receiving-reference record of a formal's fresh area while a boundary watches it (kb/Work PB2690;
+    /// <see cref="ReceivingReferences"/>): one mark per character position of <see cref="Ref"/>, and the record of each
+    /// occurrence of its dynamic-capacity tables the activated element stored into. Null for every other cell, so a store
+    /// through a view of a pointer-located class costs one null test.</summary>
+    private ReceivingReferences.Scope? _received;
+
+    /// <summary>⛔ A STORE THROUGH A VIEW OF THIS CELL (kb/Work PB2690): the activated element referenced the
+    /// <paramref name="width"/> positions from <paramref name="at"/> as a receiving item (ISO §8.5.1.9.3). The emitted
+    /// store through every view of a pointer-located class (a LINKAGE formal, a BASED item) calls it; it records only while
+    /// a boundary watches the cell (<see cref="WatchReceiving"/>).</summary>
+    public void Received(long at, int width) => _received?.Mark([], at, width);
+
+    /// <summary>⛔ A STORE THROUGH A VIEW OF AN OCCURRENCE OF ONE OF THIS CELL'S DYNAMIC-CAPACITY TABLES (kb/Work PB2690):
+    /// <see cref="Received(long, int)"/> in the element cell <paramref name="path"/> reaches (pairs of component ordinal and
+    /// one-based occurrence number, outermost first, each ordinal in its own scope: an element cell numbers its components
+    /// from zero), recorded on THIS cell, the watched area, by subscript (<see cref="ReceivingReferences.Element"/>), so an
+    /// occurrence the activated element's own reference created is recorded like any other.</summary>
+    public void Received(ReadOnlySpan<long> path, long at, int width) => _received?.Mark(path, at, width);
+
+    /// <summary>Start recording the receiving references made through this cell's views (<see cref="Received(long, int)"/>)
+    /// — the boundary calls it once the fresh area is filled from the argument, so the filling itself is no reference.</summary>
+    internal void WatchReceiving() => _received = new ReceivingReferences.Scope(Ref.Length);
+
+    /// <summary>The receiving references recorded since <see cref="WatchReceiving"/>, in the STORAGE positions of the formal
+    /// whose area starts at <paramref name="offset"/> and whose first component is this cell's component
+    /// <paramref name="dynBase"/> (the cell's positions and ordinals: <see cref="ReceivingReferences"/>); null when nothing
+    /// watches the cell.</summary>
+    internal ReceivingReferences? ReceivedFrom(long offset, int dynBase) =>
+        _received is { } scope ? ReceivingReferences.Of(scope, (int)offset, dynBase) : null;
+
     /// <summary>The managed value at <paramref name="byteOffset"/>, or <see langword="null"/> when nothing
     /// has been stored there (ISO §14.9.3.4 GR9's null initial state — see <see cref="_slots"/>).</summary>
     public object? SlotAt(int byteOffset) =>

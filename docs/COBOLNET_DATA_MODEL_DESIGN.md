@@ -791,7 +791,8 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
 1. A **bit item immediately following an elementary bit item or bit group of the SAME LEVEL** → placed at the next
    bit position (**no padding** — this is the only case that shares a byte).
 2. **Any other bit item** → advance the cursor to the next byte boundary, then place. (Covers a bit item after a
-   character item, after a bit item of a *different* level, and the first item of a group.)
+   character item, after a bit item of a *different* level, and a group's first item when it is not a bit item or is
+   ALIGNED — a first bit item begins where its group begins, see 6.)
 3. A **non-bit item** → advance to the next byte boundary (its natural boundary), then place `ByteWidth × 8` bits.
    The implicit filler this generates is §8.5.1.6.3's "as needed to advance alignment to a required natural
    boundary for the next item within that group".
@@ -802,6 +803,15 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
    which is why an **elementary** bit item is not padded and keeps its exact bit count.
 5. **§15.50.4 r5** requires every implicit FILLER position generated above to be COUNTED. It is, by construction:
    the cursor advances through filler.
+6. **Byte boundaries are the RECORD's, not the group's** (kb/Work PB3158). A bit group that follows a same-level bit
+   item begins MID-byte (rule 1), and "the alignment of the start of a group item and the alignment of the first item
+   within that group, when the first item is a bit data item, are at the same bit position in storage": its first
+   child begins where it does, and every later round-up to a byte (rule 2, an ALIGNED subject — §13.18.1.4 GR1) is a
+   byte of the record. `BitLayout.PhaseOf(group)` is where in a byte the group begins (0 for everything but a
+   GROUP-USAGE BIT group that shares its predecessor's byte); the walk starts its cursor there and subtracts it from
+   the extents and starts it reports, which stay group-relative. The walk passes the phase DOWN (the `…At` readers) and
+   never asks `PhaseOf` per child (`BitGroupPhaseDriftTests`). A TABLE of bit groups lays every occurrence out as the
+   first one — the stride must be uniform — so only the first occurrence's byte boundaries are the record's.
 
 **Bits per character position is a pinned implementor choice** (§8.1.2 makes it implementor-specified): **8**,
 consistent with `ByteWidth`'s existing "DISPLAY = 1 byte per character position". Documented in

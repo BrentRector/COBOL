@@ -80,6 +80,21 @@ public sealed class BitRunImageDriftTests
         "05 M1 PIC 1(4) USAGE BIT VALUE B\"1010\". 05 S5 GROUP-USAGE BIT. 10 Q1 PIC 1(2) USAGE BIT VALUE B\"01\"."
         + " 10 S6 GROUP-USAGE BIT. 15 Q2 PIC 1 USAGE BIT VALUE B\"1\".",
         "M1|Q1|Q2|S6|S5")]
+    // ⛔ PB3158 — an ALIGNED member of a bit group that itself begins MID-byte: Q2 is "aligned on the first bit of the
+    // first available byte boundary" (§13.18.1.4 GR1) of the RECORD, bit 8, which is bit 6 of S7 (not bit 8 of S7,
+    // record bit 10). The group-relative round-up put it there, and the seed lane and the struct lane then disagreed
+    // with the offsets the REDEFINES class walk handed out.
+    [InlineData("BRD09", 2,
+        "05 M1 PIC 1(2) USAGE BIT VALUE B\"11\". 05 S7 GROUP-USAGE BIT. 10 Q1 PIC 1 USAGE BIT VALUE B\"1\"."
+        + " 10 Q2 PIC 1(5) USAGE BIT ALIGNED VALUE B\"10101\".",
+        "M1|Q1|Q2|S7")]
+    // The same law two levels down, the ALIGNED member in the innermost group (which begins at bit 5), followed by a
+    // same-level bit member that continues in the byte the ALIGNED one opened.
+    [InlineData("BRD10", 2,
+        "05 M1 PIC 1(2) USAGE BIT VALUE B\"11\". 05 S8 GROUP-USAGE BIT. 10 Q1 PIC 1(3) USAGE BIT VALUE B\"101\"."
+        + " 10 S9 GROUP-USAGE BIT. 15 Q2 PIC 1 USAGE BIT VALUE B\"1\". 15 Q3 PIC 1(2) USAGE BIT ALIGNED VALUE B\"01\"."
+        + " 15 Q4 PIC 1(3) USAGE BIT VALUE B\"110\".",
+        "M1|Q1|Q2|Q3|Q4|S9|S8")]
     public void AliasedGroup_ReadsBackExactlyAsItsUnaliasedTwin(string pid, int width, string members, string reads)
     {
         string aliased = Program(pid + "A", members, reads, $"01 V REDEFINES G PIC X({width}).");

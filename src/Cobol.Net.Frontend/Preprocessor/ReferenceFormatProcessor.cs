@@ -32,10 +32,6 @@ public static partial class ReferenceFormatProcessor
     /// <summary>Minimum percentage of lines that must match fixed-form pattern for detection.</summary>
     private const int FixedFormThresholdPercent = 60;
 
-    /// <summary>Width of Area A (columns 8-11). A division/section/paragraph header begins here;
-    /// continuation/free text of a comment-entry is indented into Area B (column 12+).</summary>
-    private const int AreaAWidth = 4;
-
     /// <summary>
     /// The obsolete IDENTIFICATION DIVISION "comment-entry" paragraphs (ISO 1989:1985 §III; obsolete,
     /// removed in COBOL-2002). Their content is free-form commentary — any characters, including embedded
@@ -122,13 +118,11 @@ public static partial class ReferenceFormatProcessor
         // before the first line that could be a >>SOURCE directive in either reading (kb/Work PB1362).
         bool firstFixed = initialFixed ?? IsFixedForm(lines[..FirstSourceDirectiveCandidate(lines)]);
         var (segments, directiveLines) = FormatSegments(lines, firstFixed, gates, sourcePath, implicitOps ?? []);
-        var physicalText = new string[lines.Length];   // the map keeps what the line-entry stage settled (ReferenceFormatMap.PhysicalText)
-        for (int i = 0; i < physicalText.Length; i++) physicalText[i] = lines[i].Text;
 
         // No format boundary → the whole text is one segment in its initial format.
         if (segments.Count == 0)
         {
-            formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, [], directiveLines, physicalText);
+            formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null, [], directiveLines, lines);
             var (wl, wo) = firstFixed
                 ? new FixedFormConverter(gates, sourcePath, ccvsIndicators, startsInIdentificationDivision).Convert(lines)
                 : ConvertFreeLines(lines, gates, sourcePath);
@@ -142,7 +136,7 @@ public static partial class ReferenceFormatProcessor
         // whole-file path already does.
         // A segment boundary at 0-based line i changes the format from the NEXT line: 1-based line i + 2.
         formats = ReferenceFormatMap.Create(firstFixed, detected: initialFixed is null,
-            segments.Select(s => (s.Index + 2, s.Fixed)), directiveLines, physicalText);
+            segments.Select(s => (s.Index + 2, s.Fixed)), directiveLines, lines);
         var outLines = new List<string>();
         var outOrigins = new List<LineOrigin>();   // where each output line came from (kb/Work PB82, PB1801)
         bool segFixed = firstFixed;
