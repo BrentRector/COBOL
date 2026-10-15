@@ -887,14 +887,20 @@ internal sealed class ProgramEmitter
 
     /// <summary>Emit the run-unit entry, <c>Program.Main</c>: begin the run unit, register this module through its one
     /// registration member, and run the main program.</summary>
+    /// <summary>⛔ THE RUN-UNIT MAIN of a compilation group: its first top-level PROGRAM definition (§8.3.1), or null for a
+    /// group with none — a LIBRARY (DESIGN-external-repository §7.2), which the backend builds as
+    /// <c>OutputKind.DynamicallyLinkedLibrary</c> with no <c>Main</c> and no <c>runtimeconfig.json</c>, reached through its
+    /// host entries (§4.3) and, by a COBOL CALL, through <c>EnsureRegistered()</c> from the sibling probe. A prototype
+    /// precedes every other unit (§10.6.2 SR1), so units[0] may be a prototype; a PROGRAM prototype (§11.10.2 Format 2,
+    /// kb/Work PB894) is not a program definition and has no body (§10.6.2 SR4 f), so it is never the main — the same
+    /// exclusion the Register loop applies. One function, read by <see cref="EmitMain"/> and by the backend's output
+    /// kind, so the two cannot disagree.</summary>
+    internal static BoundUnit? MainUnit(IReadOnlyList<BoundUnit> units) =>
+        units.FirstOrDefault(u => u is { Parent: null, IsFunction: false, IsPrototype: false });
+
     private static void EmitMain(IReadOnlyList<BoundUnit> units, CodeWriter w, bool anyFiles)
     {
-        // The run-unit main is the first top-level PROGRAM unit (§8.3.1). A prototype precedes every other unit
-        // (§10.6.2 SR1), so units[0] may be a prototype; a function/prototype-only module (a callable library —
-        // the cross-assembly UDF-3 target) has no main and is reached through EnsureRegistered() by the sibling probe.
-        // A PROGRAM prototype (§11.10.2 Format 2, kb/Work PB894) is not a program definition and has no body
-        // (§10.6.2 SR4 f), so it is never the main — the same exclusion the Register loop above applies.
-        var mainUnit = units.FirstOrDefault(u => u is { Parent: null, IsFunction: false, IsPrototype: false });
+        if (MainUnit(units) is not { } mainUnit) return;   // a library: no Main (§7.2)
         using (w.Block("internal static class Program"))
         using (w.Block("private static void Main()"))
         {
@@ -910,15 +916,10 @@ internal sealed class ProgramEmitter
             // the §14.6.11 implicit CLOSE of ALL run-unit connectors. Runtime-side so each applies to the WHOLE run unit —
             // incl. a separately-compiled CALLed module whose EC/file descriptors this compilation group never
             // saw — not just this group (SSOT §18.16 keeps the wrapper scaffolding-free). The entry wrapper only
-            // catches StopRun, the normal STOP RUN / main-program-GOBACK unwind boundary. A module with no main
-            // program (a callable library) registers through the same boundary and has no unwind to catch.
+            // catches StopRun, the normal STOP RUN / main-program-GOBACK unwind boundary.
             string ensure = $"{ModuleNamespace.RegistrarClass}.EnsureRegistered";
-            if (mainUnit is not null)
-            {
-                w.Line($"try {{ {RuntimeApi.RunModule(ensure, CsLiteral(mainUnit.Path))}; }}");
-                w.Line("catch (StopRun) { }");
-            }
-            else w.Line($"{RuntimeApi.RunModule(ensure, "null")};");
+            w.Line($"try {{ {RuntimeApi.RunModule(ensure, CsLiteral(mainUnit.Path))}; }}");
+            w.Line("catch (StopRun) { }");
         }
     }
 }

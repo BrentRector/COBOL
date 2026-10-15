@@ -282,15 +282,15 @@ public sealed class ProgramTable
     /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the
     /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163).</para></summary>
     /// <param name="ensureRegistered">The module's registration member.</param>
-    /// <param name="mainPath">The main program's path, or null for a module with no main program (a callable library of
-    /// functions or prototypes, §8.3.1): it registers and ends.</param>
-    public void RunModule(Action ensureRegistered, string? mainPath)
+    /// <param name="mainPath">The main program's path. A module with no main program (a library, DESIGN-external-repository
+    /// §7.2) has no <c>Main</c> and never enters here.</param>
+    public void RunModule(Action ensureRegistered, string mainPath)
     {
         try { ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath)); }
         finally { Environment.ExitCode = CobolNum.Position32(_owner.ExitStatus); }   // StopRun unwinds through here too
     }
 
-    private void RunOnThisThread(Action? ensureRegistered, string? path)
+    private void RunOnThisThread(Action? ensureRegistered, string path)
     {
         // The standard display device writes UTF-8 (fix-queue PB59; CONFORMANCE.md item 59). ⛔ The rule lives in
         // ONE place — CobolNet.Runtime.IO.StandardStreams — because this `if` used to BE that place and the
@@ -302,7 +302,7 @@ public sealed class ProgramTable
             // The module's own registration is a statement of the run unit like any other (kb/Work PB2846): a refusal
             // is a CobolCallException (EC-PROGRAM-NOT-FOUND, §14.9.4.4 GR3 b), and the catches below end the run unit.
             ensureRegistered?.Invoke();
-            if (path is not null) ActivateMain(path);
+            ActivateMain(path);
         }
         // The §14.6.12 abnormal-termination surface for a FATAL condition that reached the run-unit boundary
         // unhandled — every family, so none escapes as a raw CLR crash: the run-unit fatals of EndsRunUnitAbnormally

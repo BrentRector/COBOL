@@ -2232,11 +2232,11 @@ internal static class RuntimeApi
     public static string FileInit() => $"{nameof(CobolFile)}.{nameof(CobolFile.Init)}()";
 
     /// <summary>The entry wrapper's one run-unit statement: <c>ProgramRegistry.RunModule(registrar.EnsureRegistered,
-    /// mainPath)</c> (kb/Work PB2846) — the module's registration member and its main program's path (a literal, or
-    /// <c>null</c> for a module with no main), handed to the runtime boundary that owns the §14.6.11 / §14.6.12 run-unit
-    /// termination, so the module's own registration is inside it.</summary>
-    public static string RunModule(string registrarEnsureRegistered, string mainPathLiteralOrNull) =>
-        $"{nameof(ProgramRegistry)}.{nameof(ProgramRegistry.RunModule)}({registrarEnsureRegistered}, {mainPathLiteralOrNull})";
+    /// mainPath)</c> (kb/Work PB2846) — the module's registration member and its main program's path literal (a module
+    /// with no main is a library and has no entry wrapper, DESIGN-external-repository §7.2), handed to the runtime
+    /// boundary that owns the §14.6.11 / §14.6.12 run-unit termination, so the module's own registration is inside it.</summary>
+    public static string RunModule(string registrarEnsureRegistered, string mainPathLiteral) =>
+        $"{nameof(ProgramRegistry)}.{nameof(ProgramRegistry.RunModule)}({registrarEnsureRegistered}, {mainPathLiteral})";
 
     // ── The module's repository record and its one registration member (DESIGN-external-repository §4.5, §11.2;
     //    kb/Work PB2097). Both state the versions this compiler's runtime declares, as compiled against, so the run unit

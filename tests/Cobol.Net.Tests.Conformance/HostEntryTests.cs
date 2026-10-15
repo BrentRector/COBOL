@@ -586,6 +586,15 @@ public sealed class HostEntryTests
         finally { CutRunner.TryDelete(dir); }
     }
 
+    /// <summary>Whether the module <paramref name="name"/> in <paramref name="dir"/> has an entry point, and whether it
+    /// has a runtime configuration — an executable has both, a library neither.</summary>
+    private static (bool EntryPoint, bool RuntimeConfig) Launchable(string dir, string name)
+    {
+        using var pe = new System.Reflection.PortableExecutable.PEReader(File.OpenRead(Path.Combine(dir, name + ".dll")));
+        return (pe.PEHeaders.CorHeader!.EntryPointTokenOrRelativeVirtualAddress != 0,
+            File.Exists(Path.Combine(dir, name + ".runtimeconfig.json")));
+    }
+
     [Fact]
     public void AHost_CallsTheGeneratedEntries_LandingExactlyAndDecodingByTheValidityRule()
     {
@@ -594,6 +603,10 @@ public sealed class HostEntryTests
         {
             NonCobolElement.CompileCobol(dir, "H1PROGS", Programs);
             NonCobolElement.CompileCobol(dir, "H1FUNC", Function);
+            // A group with no main program is a LIBRARY (DESIGN-external-repository §7.2): no entry point and no runtime
+            // configuration, loaded by the host that calls its entries; a group with one is an executable.
+            Assert.Equal((false, false), Launchable(dir, "H1FUNC"));
+            Assert.Equal((true, true), Launchable(dir, "H1PROGS"));
             NonCobolElement.CompileCSharp(dir, "H1HOST", Host, "H1PROGS", "H1PROGS", "H1FUNC");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "H1HOST.dll"), dir);
             Assert.Equal(

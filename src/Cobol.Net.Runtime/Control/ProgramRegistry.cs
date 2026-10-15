@@ -137,7 +137,7 @@ public static class ProgramRegistry
     public static void RunMain(string path) => RunUnit.Current.Programs.RunMain(path);
 
     /// <inheritdoc cref="ProgramTable.RunModule"/>
-    public static void RunModule(Action ensureRegistered, string? mainPath)
+    public static void RunModule(Action ensureRegistered, string mainPath)
         => RunUnit.Current.Programs.RunModule(ensureRegistered, mainPath);
 
     /// <inheritdoc cref="ProgramTable.CallProgram"/>
