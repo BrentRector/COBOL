@@ -31,10 +31,8 @@ public sealed class EcNameResolutionDriftTests
     private static readonly Dictionary<string, (int Count, string Reason, bool MustAdvise)> Adjudicated =
         new(StringComparer.Ordinal)
     {
-        [Path.Combine("Binding", "EcNameResolution.cs")] =
-            (1, "the funnel itself", false),
         [Path.Combine("Binding", "TurnState.cs")] =
-            (1, "NameMatches — level-2 coverage of names that ALREADY passed TryResolve in Create", false),
+            (1, "NameMatches — level-2 coverage of names the front end's >>TURN stage ALREADY resolved (SR2, kb/Work PB2740)", false),
         // kb/Work PB815/PB814: the PD-header arm (EcBinder) and the METHOD-ID arm (DataBinder.Oo) were two
         // verbatim copies of this partition; both now call RaisingPhrase.Partition, so ONE adjudicated site.
         [Path.Combine("Binding", "RaisingPhrase.cs")] =
@@ -61,17 +59,25 @@ public sealed class EcNameResolutionDriftTests
     public void EveryTryGetCallSite_IsTheFunnel_OrAdjudicated()
     {
         var found = new Dictionary<string, int>(StringComparer.Ordinal);
+        var rule = new Dictionary<string, int>(StringComparer.Ordinal);
         var advises = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (rel, text) in CompilerSources())
         {
             int n = Regex.Matches(text, @"ExceptionCatalog\.TryGet\(").Count;
             if (n > 0) found[rel] = n;
+            int r = Regex.Matches(text, @"ExceptionNameRule\.TryGet\(").Count;
+            if (r > 0) rule[rel] = r;
             if (text.Contains("EcNameResolution.Advise(", StringComparison.Ordinal)) advises.Add(rel);
         }
 
-        // Population: the funnel exists and the scan saw it — a rename must fail loudly, not vacuously.
-        Assert.True(found.ContainsKey(Path.Combine("Binding", "EcNameResolution.cs")),
-            "EcNameResolution.cs is gone or no longer calls ExceptionCatalog.TryGet — this guard must follow it");
+        // Population: the funnel exists and the scan saw it — a rename must fail loudly, not vacuously. The funnel
+        // reaches the catalog through ExceptionNameRule (the §7.3.25.3 SR2 home both it and the front end's >>TURN
+        // stage ask, kb/Work PB2740), so it carries no direct ExceptionCatalog.TryGet of its own, and it is the
+        // compiler's ONLY caller of the rule (TryResolve and AdviseResolved).
+        Assert.True(rule.Count == 1 && rule.GetValueOrDefault(Path.Combine("Binding", "EcNameResolution.cs")) == 2,
+            "the compiler's ExceptionNameRule.TryGet callers are not exactly EcNameResolution.cs (TryResolve + "
+            + "AdviseResolved) — this guard must follow it:\n  "
+            + string.Join("\n  ", rule.Select(kv => $"{kv.Key} ({kv.Value} call(s))")));
 
         var unadjudicated = found.Where(kv =>
             !Adjudicated.TryGetValue(kv.Key, out var a) || a.Count != kv.Value).ToList();
@@ -85,6 +91,43 @@ public sealed class EcNameResolutionDriftTests
             Assert.True(advises.Contains(rel),
                 $"{rel} bypasses TryResolve (adjudicated: {spec.Reason}) but no longer calls "
                 + "EcNameResolution.Advise — the accepted names lose the §15.33 width advisory (kb/Work R05)");
+    }
+
+    /// <summary>The SR2 rule's own home and its callers OUTSIDE the compiler (the front end and the editions assembly
+    /// cannot reference the binder): <c>ExceptionNameRule.TryGet</c> is called by the <c>&gt;&gt;TURN</c> stage alone
+    /// (the binder's callers are pinned above), and the catalog is read directly only by the rule and by the §8.12
+    /// directive-word reservation, which asks whether a word is RESERVED, not whether a written name resolves.</summary>
+    [Fact]
+    public void OutsideTheCompiler_TheSr2RuleIsExceptionNameRule()
+    {
+        var expectedRuleCallers = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [Path.Combine("Cobol.Net.Frontend", "Preprocessor", "TurnDirectiveProcessor.cs")] = 1,
+        };
+        var expectedCatalogCallers = new Dictionary<string, int>(StringComparer.Ordinal)
+        {
+            [Path.Combine("Cobol.Net.Editions", "ExceptionNameRule.cs")] = 1,
+            [Path.Combine("Cobol.Net.Frontend", "Common", "CompilerDirectiveWords.cs")] = 1,
+        };
+        var ruleCallers = new Dictionary<string, int>(StringComparer.Ordinal);
+        var catalogCallers = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (string project in new[] { "Cobol.Net.Frontend", "Cobol.Net.Editions" })
+        {
+            string root = TestRepo.Src(project);
+            foreach (string f in Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories))
+            {
+                string rel = Path.GetRelativePath(root, f);
+                if (rel.StartsWith("obj" + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                    || rel.StartsWith("bin" + Path.DirectorySeparatorChar, StringComparison.Ordinal)) continue;
+                string text = File.ReadAllText(f);
+                int r = Regex.Matches(text, @"ExceptionNameRule\.TryGet\(").Count;
+                if (r > 0) ruleCallers[Path.Combine(project, rel)] = r;
+                int c = Regex.Matches(text, @"ExceptionCatalog\.TryGet\(").Count;
+                if (c > 0) catalogCallers[Path.Combine(project, rel)] = c;
+            }
+        }
+        Assert.Equal(expectedRuleCallers.OrderBy(kv => kv.Key), ruleCallers.OrderBy(kv => kv.Key));
+        Assert.Equal(expectedCatalogCallers.OrderBy(kv => kv.Key), catalogCallers.OrderBy(kv => kv.Key));
     }
 
     [Fact]   // The migrated codes must come from the catalog descriptors — a bare literal is the split-code
