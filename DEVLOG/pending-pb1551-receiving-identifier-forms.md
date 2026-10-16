@@ -65,4 +65,5 @@ list rule one level down, and a theory pins each shape (run over base 59208d8fb'
 first cut flagged 24). New negatives `pb1551-call-by-reference-self`, `pb1551-call-implied-reference-self`,
 `pb1551-invoke-universal-self` (3978), `pb1551-invoke-by-reference-view` (2871), `pb1551-function-address-receiving`
 (3979). A function-identifier or inline invocation written BY REFERENCE is still a parse error, by the computed formats'
-structural exclusion that this entry chose.
+structural exclusion that this entry chose. Gate (run 20261016T201750Z-634ce0): `LEG 1 ONLY (batched gating, PB2515):
+GREEN`; the run before it was red only because the five negatives were not in the manifest.
