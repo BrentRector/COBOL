@@ -38,4 +38,9 @@ note the register calls open and `file_r2` would have merged a later finding int
   file, body included. It is reported as a lead.
 - `file_census_notes.py`'s explicit CRLF writers are kb/Work PB3240's.
 
-**Gate.** See the report: `E:/COBOL-coord/scratch/reports/w1098a-PB3196-report.md`.
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T201910Z-c440a5; Conformance
+6,140 · Unit 33,397 · Characterization 5 ran in leg 1). Leg 1 left the edited parity test and the two self-test drift
+tests to leg 2, so they were run by name on the gate's binaries: 13 of 13 passed, among them
+`TheFrontmatterReader_AgreesWithTheFixtureAndWithPython`, `CensusSelfTest_DrivesEveryPolicyArm` and
+`EachFleetInstrument_PassesItsSelfTest(file_census_notes.py)`. With a wrong `terminal` planted in the fixture, the
+parity test fails.

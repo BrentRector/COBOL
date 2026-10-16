@@ -77,11 +77,12 @@ WORK = REPO / "kb" / "Work"
 KINDS = {"defect", "analysis", "adjudication", "decision"}
 STATUSES = {"open", "half", "landed", "owner", "blocked", "retired"}
 #: The statuses that mean an item is DONE — the ONE vocabulary every reader of the register asks (kb/Work PB3196:
-#: the R0 census and the note generator each kept their own copy, and the census's spelled four statuses `check`
-#: rejects). A view of open work shall exclude every one of them — see :func:`check_base_agrees`, which is what
-#: stops the next one added here from being half-applied. The C# reader's twin, `WorkRegister.TerminalStatuses`,
-#: is held to this tuple by the parity fixture: :func:`parity_view` reports `terminal`, and :func:`parity` refuses a
-#: fixture that leaves any status of STATUSES without a case, so a status added here reaches both engines' answers.
+#: the R0 census and the note generator each read the status their own way, and the census's own copy held four
+#: statuses that `check` rejects). A view of open work shall exclude every one of them — see
+#: :func:`check_base_agrees`, which is what stops the next one added here from being half-applied. The C# reader's
+#: twin, `WorkRegister.TerminalStatuses`, is held to this tuple by the parity fixture: :func:`parity_view` reports
+#: `terminal`, and :func:`parity` refuses a fixture that leaves any status of STATUSES without a case, so a status
+#: added here reaches both engines' answers.
 TERMINAL_STATUSES = ("landed", "retired")
 HARM = {"wrong-answer", "crashes", "silent", "rejects-legal-source", "under-rejects", "process"}
 
@@ -1091,11 +1092,13 @@ def parity(as_json: bool) -> int:
     # EVERY STATUS OF THE VOCABULARY, so the two engines' terminal sets are compared on each one (kb/Work PB3196): a
     # status added to STATUSES or TERMINAL_STATUSES stops this until a case states what it is, and that case is
     # what holds the C# twin to it.
+    stated = {a["status"] for a in answers if a["note"]}
     findings += [f"the parity fixture carries no note whose status is {s!r} — neither engine's `terminal` answer "
-                 f"for it is measured" for s in sorted(STATUSES - {a["status"] for a in answers if a["note"]})]
+                 f"for it is measured" for s in sorted((STATUSES | set(TERMINAL_STATUSES)) - stated)]
     # EVERY FIELD, on every case: a field the fixture leaves unstated is a field the engines may disagree on unseen.
     findings += [f'parity case "{c["name"]}": the fixture states no {k!r} — it must state every field the view '
-                 f'reports' for c, a in zip(fixture["cases"], answers) for k in a if k != "name" and k not in c["expect"]]
+                 f'reports' for c, a in zip(fixture["cases"], answers)
+                 for k in a if k != "name" and k not in c["expect"]]
     if len(fixture["cases"]) < 8:
         findings.append(f'{len(fixture["cases"])} parity case(s) — too few to be measuring the reader')
 
