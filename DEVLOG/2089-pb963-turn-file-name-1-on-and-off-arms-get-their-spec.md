@@ -1,4 +1,4 @@
-## PB963: >>TURN file-name-1 ON and OFF arms get their spec-derived golden
+## Entry 2089 — 2026-10-16 10:14 PDT — PB963: >>TURN file-name-1 ON and OFF arms get their spec-derived golden
 
 kb/Work PB963 (analysis) said that the file-name-1 halves of ISO §7.3.25.4 GR6 ("if file-name-1 is specified, checking
 is enabled only for exception conditions associated with that file-name", `cite.py`: OK §7.3.25.4 6)) and GR8 (the
@@ -26,3 +26,4 @@ halves. Batch `w1095h-pb963` adds the goldens to -3, -5, -6 and -8 (+7 test-ref,
 `w1095h-pb963-notes` corrects the "test-ref left empty" notes on -3 and -5. PB963 is flipped to landed with closes_rows
 -5, -6 and -8. Fixed in passing: the header of `2002/l1c33_turn_level2_file_name` cited §9.1.13 and §14.6.13.1 for
 text those clauses do not contain. It now cites §9.1.13.1, §14.6.13.1.1 and §15.33.3 1), all checked.
+
