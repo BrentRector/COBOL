@@ -398,7 +398,8 @@ EXCLUSIVE_OR    : 'EXCLUSIVE-OR' ;  // COBOL-2023 logical exclusive-or operator,
 // COBOL-2002 BOOLEAN OPERATORS (ISO §8.7.2 / §8.8.2). Maximal-munch safe: `B-ANDER`/`B-ORDER` stay IDENTIFIER
 // by longer match; `B-AND` exact reduces to the keyword by rule order (hyphenated keywords precede IDENTIFIER);
 // BOOLLIT `B"…"` is disjoint (the char after B is a quote). User words at 85 (admitted via cobolWord +
-// _dataNameTokens); the operator meaning is {is2002()}?-gated in the expression tiers.
+// _dataNameTokens); the operator meaning parses at every edition and is introduction-gated post-bind
+// (VersionConformancePass through BooleanOperatorGate) — no parse-time edition read (kb/Work PB2291).
 B_AND           : 'B-AND' ;
 B_OR            : 'B-OR' ;
 B_XOR           : 'B-XOR' ;
@@ -828,7 +829,9 @@ LOWLIGHT    : 'LOWLIGHT' ;
 // ── COBOL-2002 file sharing / record locking (ISO §12.4.5.9 LOCK MODE, §12.4.5.15 SHARING, §14.7.9 RETRY,
 // §14.9.27 OPEN, §14.9.30 READ, §14.9.47 UNLOCK). SHARING/RETRY/
 // UNLOCK are §8.9-reserved since 2002 (funnel-gated); MANUAL/AUTOMATIC/IGNORING/FOREVER/SECONDS/ONLY are
-// §8.10 context-sensitive (user-legal at every edition). The operator meaning is {is2002()}?-gated in CobolIO.g4.
+// §8.10 context-sensitive (user-legal at every edition). The phrases parse at every edition and are
+// introduction-gated post-bind (VersionConformancePass); the one parse-time edition read is OPEN's RETRY word
+// status (CobolIO.g4#openClause; kb/Work PB2291).
 MANUAL      : 'MANUAL' ;
 AUTOMATIC   : 'AUTOMATIC' ;
 IGNORING    : 'IGNORING' ;

@@ -80,7 +80,7 @@ fileControlClauses
     | fileReserveClause
     | paddingCharacterClause
     // COBOL-2002 file sharing / record locking (ISO §12.4.5.15 / §12.4.5.9) — unique leading tokens
-    // (SHARING / LOCK), {is2002()}?-gated, ADDITIVE (the DEVLOG 621/622 lesson).
+    // (SHARING / LOCK), ADDITIVE (the DEVLOG 621/622 lesson).
     | sharingClause   // COBOL-2002; parses at all editions (superset), introduction-gated post-bind by VersionConformancePass ParseArm.VisitSharingClause (rearch 14g.4)
     | lockModeClause   // LOCK MODE (LOCK/MODE hard-reserved) introduction-gated post-bind by VersionConformancePass ParseArm.VisitLockModeClause (rearch 14g.4)
     | fileCollatingSequenceClause   // §12.4.5.7 INDEXED per-key collating; parses at all editions (superset), introduction-gated post-bind by VersionConformancePass
@@ -333,8 +333,10 @@ ioControlClause
     // The DECLINED A.4.3 APPLY COMMIT clause (ISO §12.4.6.3; Grammar/Core/CobolDeclined.g4) — recognized so
     // DataBinder refuses it BY NAME (COBOLNET1709). It must precede unrecognizedClause, which would otherwise
     // match the bare word APPLY and then die on COMMIT with an unnamed error. {is2023()}? because the whole
-    // commit-and-rollback facility is a COBOL-2023 addition (Annex E.3.2 item 2) — below 2023 APPLY and
-    // COMMIT are user-defined words and the clause simply does not exist.
+    // commit-and-rollback facility is a COBOL-2023 addition (Annex E.3.2 item 2). ⚠ kb/Work PB2291 VERDICT: a
+    // CONSTRUCT GATE, not word status — APPLY is §8.10 context-sensitive at every edition and no earlier edition
+    // has an APPLY clause, so `APPLY COMMIT` has no other reading below 2023, and the gate turns what the
+    // conformance pass should name (COBOLNET0900) into a bare COBOL0001. Recorded in EditionReadDriftTests.
     | {is2023()}? applyCommitClause
     | multipleFileClause
     | rerunClause
