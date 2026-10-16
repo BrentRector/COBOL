@@ -432,7 +432,10 @@ public static class ACCT_UPDATE
   with that scope's reserved names: the enclosing type's own name (CS0542), the fixed members (`Call` and `Cancel` in
   the class; `AsImage` and `FromImage` in a record struct) and the record struct's synthesized members (`Equals`,
   `GetHashCode`, `ToString`, `Deconstruct`, `PrintMembers`, `EqualityContract`). A group contributes a property and a
-  nested record-struct type, named `<word>` and `<word>_Record` in the same scope. So `01 CUST. 05 CUST … 05 F … 05 F
+  nested record-struct type, named `<word>` and `<word>_Record` in the same scope. The `Call` parameters are claimed
+  in the CLASS's scope beside its record structs, in source order (a formal's word, then its record's), because the
+  `Call` body names each record type by its simple name and a parameter of that spelling would shadow it: `USING REC
+  REC-Record` with `REC` a group publishes record `REC_Record` and parameters `REC` and `REC_Record_2`. So `01 CUST. 05 CUST … 05 F … 05 F
   … 05 F-2` of a program externalized "CUST" publishes class `CUST`, record `CUST_Record` and members `CUST`, `F`,
   `F_2`, `F_2_2` (r7-names): every legal description publishes a compilable surface, and the order rule makes the
   names deterministic. Names are display only; the COBOL word is in the attribute (§3.6).
@@ -450,8 +453,13 @@ public static class ACCT_UPDATE
   member lands so and every OCCURS array has its declared length (an OCCURS DEPENDING ON array's length is the DEPENDING
   value and lies within its bounds). Anything else is refused with `ArgumentOutOfRangeException` naming the parameter
   (and the member, for a group) BEFORE anything is activated: a host site has no ON SIZE ERROR, and a silently
-  narrowed amount is a wrong answer. One function decides it, `HostLanding.Land(value, description)` in the runtime,
-  so the rule is written once (r7-brk: high-order, sign, low-order, COMP-5 capacity and string length each refused).
+  narrowed amount is a wrong answer. One runtime class decides it, `HostLanding`, so the rule is written once (r7-brk:
+  high-order, sign, low-order, COMP-5 capacity and string length each refused): `HostLanding.Land(value, formal's
+  NumProfile, parameter, member)` for a number, one overload per numeric host type, which runs the runtime's own COMPUTE
+  store (`CobolNum.TryStore`/`TryStoreU`) under `CobolRounding.Prohibited` — so "exact" is the capacity rule every
+  COBOL receiver of that description obeys, and an inexact transfer is refused — and returns the formal's unscaled carrier
+  value; `HostLanding.LandText` (fixed length) and `LandVariable` (DYNAMIC LENGTH up to its LIMIT, ANY LENGTH) for a
+  string, through the MOVE's own alignment (`CobolString.Store`, space fill, zero fill for boolean, ISO §13.18.32.4 2)).
   An edited formal (numeric-edited, alphanumeric-edited) takes the host string as its character content under the
   same fit rule; a host that holds the number formats it.
 - **The arguments are the ones a COBOL CALL renders.** For each formal the entry renders the `CobolArg` that
@@ -459,13 +467,24 @@ public static class ACCT_UPDATE
   that detached storage, with the mode set to the formal's (`Reference` / `Value`). One renderer serves both
   (`ArgText`); a change to the CALL lane's carrier for a shape (PB2087's cell areas) is the host entry's change by
   construction. A BY VALUE value, already landed exactly, reaches `CobolArgAdapt.LandForFormal` in range, so that
-  function's own size check never fires from a host call.
+  function's own size check never fires from a host call. The detached storage of a FIXED-POINT formal is
+  IMAGE-STORED — its record image under its `NumProfile`, the TEXT crossing a COBOL CALL renders for an image-stored
+  numeric argument — so the write-back sees the content the activated program left, including content no native cell
+  could hold, and the validity rule below decides it; a floating-point or index formal crosses in its own native cell,
+  a pointer or object-reference formal in its managed slot, a character formal as its character image. The fixed
+  storage length and the §14.8.2 description each argument states are the CALL lane's own
+  (`CallEmitter.ArgumentLength(DataItem, CallCrossing)`, `ActivationDescriptions.Of`), stated as at a CALL site that
+  checks EC-PROGRAM-ARG-MISMATCH.
 - **One storage for one variable passed twice.** Two `ref` parameters that refer to the same variable
   (`Unsafe.AreSame`; only parameters of one CLR type can) are given ONE storage when their formals' descriptions are
   the same (`OoConformance.SignatureDifference` is null both ways), so `Call(ref a, ref a)` is the host's `CALL …
   USING A A` and §14.2.3 GR8 holds for it (r6-host: `LK-B=0005`). When the descriptions differ — `PIC 9(4)` and
-  `PIC 9(8)`, both `ref long` — one storage cannot be both, and the call is refused with `ArgumentException` naming
-  both parameters before anything is activated (r7-brk). Each formal has its own record-struct type, so two group
+  `PIC 9(8)`, both `ref long`, or an index and a `PIC 99` item, whose storages are not even of one type — one storage
+  cannot be both, and the call is refused with `ArgumentException` naming both parameters before anything is landed or
+  activated (r7-brk): the entry's statements `HostLanding.RequireDistinct(Unsafe.AreSame(ref a, ref b), …)`, one per
+  such pair, all precede the FIRST formal's landing, so a value that a formal would refuse (`123456` for the `PIC 9(4)`
+  one) never reports the call's shape as a value error, while a pair of one description is the landing's own
+  `Unsafe.AreSame(…) ? <first cell> :` arm. Each formal has its own record-struct type, so two group
   formals cannot be passed one host variable: a host cannot express that aliasing, and the restriction is
   DOC-A.1-141's. Distinct host variables are distinct storage in .NET; inside the activation every COBOL reference —
   the callee, its contained programs, a COBOL program it calls back — sees the boundary's storage exactly as for a
@@ -523,13 +542,16 @@ public static class ACCT_UPDATE
   `HostLanding` decodes; the RETURNING decode. No `catch` clause, no `ICobolProgram`, `ProgramTable` or instance
   member, no test or mapping of an EC condition.
 
-**The host type of a description** (`HostSurface.TypeOf(DescriptionRecord)`, one function, used by the emitter and by
-the record decoder for display):
+**The host type of a description** (`HostSurface.TypeOf(DataItem)` in `Binding/Model/HostSurface.cs`, one function,
+used by the emitter, the published record struct and the record decoder; witnessed by `HostSurfaceTests`). It is keyed on
+the BOUND description because §6.3's decoder binds a repository record into a codec-owned forest of `DataItem`s, so the
+emitter (this slice) and the decoder (slice 4) hold the same input and nothing is re-keyed when slice 4 lands (settled
+2026-10-14, §21 item 3). It answers one occurrence; an OCCURS member's property is an array of it.
 
 | COBOL description | Host type |
 |---|---|
-| fixed-point numeric, no positions right of the decimal point (`Scale ≤ 0`) | the first of `long`, `Int128` that holds EVERY value the item's storage can hold: for display, national and packed forms the PICTURE's digits with P positions; for a binary form whose truncation is by capacity (COMP-5, BINARY-CHAR … BINARY-DOUBLE) the byte width's range — so an unsigned 8-byte binary item is `Int128` |
-| fixed-point numeric with `Scale > 0` | `decimal` when `Digits ≤ 28` and `Scale ≤ 28`; otherwise the runtime's `CobolDec` (exact: a fixed-point item's at most 31 digits fit its 34-digit significand at any exponent) |
+| fixed-point numeric, no positions right of the decimal point (`Scale ≤ 0`) | the first of `long`, `Int128`, `UInt128` that holds EVERY value the item's storage can hold: for display, national and packed forms the PICTURE's 9 positions times its P positions' scaling (a P position stores no digit, ISO §13.18.40.4 14)), so `long` to 18 value digits and `Int128` to 38; for a binary form whose truncation is by capacity (COMP-5, BINARY-CHAR … BINARY-DOUBLE) the container's exact range — a signed container of up to 8 bytes and an unsigned one of fewer are `long`, an unsigned 8-byte or a signed 16-byte one `Int128`, an unsigned 16-byte one (`PIC 9(20) COMP-5`, [0, 2^128)) `UInt128`; a 16-byte container with P positions is past 38 digits and takes `CobolDec` |
+| fixed-point numeric with `Scale > 0` | `decimal` when the unscaled value has at most 28 digits (the PICTURE's for display, national and packed forms; the container's for a capacity-truncated binary form, so an 8-byte COMP-5 item's 19) and `Scale ≤ 28`; otherwise the runtime's `CobolDec`, exact for every signed storage (its significand is an `Int128`). ⚠ GR13 RESTRICTION: an UNSIGNED 16-byte capacity container with fraction or P positions reaches 2^128 units, past `CobolDec`'s significand; its content below 2^127 units decodes exactly and content at or above it is refused by the validity decode (`HostLanding.TryDec`, `FormatException`), never narrowed |
 | floating-point (COMP-1/COMP-2, FLOAT-*) | the item's own CLR carrier (`float` / `double` / the decimal-float carrier) |
 | alphanumeric, national, boolean, alphanumeric-edited, numeric-edited; DYNAMIC LENGTH | `string` |
 | ANY LENGTH (a FUNCTION's BY REFERENCE formal only: §13.18.2.3 SR2 allows it in a function, a contained program or a method, and SR4 makes it a function's BY REFERENCE formal) | `string`, whose length is the argument's length (§13.18.2.4 GR1) |
@@ -537,13 +559,56 @@ the record decoder for display):
 | POINTER / PROGRAM-POINTER / FUNCTION-POINTER | `ManagedPointer` / `ProgramPointer` / `FunctionPointer` |
 | OBJECT REFERENCE | the referenced class's or interface's public CLR type; `CobolObject` when universal |
 | message-tag (§14.2.2 SR2 admits it BY VALUE) | none: the A.4 message-control facility is not provided and the DATA DIVISION refuses a message-tag item (`docs/CONFORMANCE.md` §4), so no formal has that class |
-| fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`), the DEPENDING ON value as the array's length for OCCURS DEPENDING ON; a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
+| fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`); for OCCURS DEPENDING ON whose data-name-1 is in the record (where §13.18.38.3 20) places it before the table), the array's length is the DEPENDING ON value, which §13.18.38.4 7) makes "the current number of occurrences", and for one whose data-name-1 is outside the record the array is the table's whole area, every occurrence the storage holds (§8.5.1.8); a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
 | strongly-typed group with an object-reference or pointer leaf | the published record struct with those members; packed as the CALL lane's carrier for that shape (PB2087's cell area with managed slots) |
+| variable-length group — a dynamic-length elementary item or a dynamic-capacity table beneath it (§8.5.1.12), whose current extent composes (`DataItem.CurrentExtentImageCapable`, the CALL lane's own gate) | the published record struct: a dynamic-length member is `string`, a dynamic-capacity table an array of its current capacity (never below its minimum capacity, "Integer-4 is the minimum capacity of the table", §13.18.38.4 16)); crosses as the CALL lane's variable-length carrier (`CobolVarGroup`); no `AsImage`/`FromImage`, because its storage has no single image (a dynamic-length item "may be located elsewhere", §8.5.1.10.3). ⚠ GR13 RESTRICTION: a group holding both such a component and a pointer or object-reference member publishes no entry — the variable-length carrier has no managed slot, and the cell area that has them carries no components |
 
-The published record struct is rendered from the DESCRIPTION by `RecordStructEmitter` in its published mode — the
-same member/codec walk that renders a program's internal record struct, over the description's host types instead of
-the storage form's fields, with `AsImage`/`FromImage` from the one group image codec (`GroupImageCodec`) and the
-landing and validity rules of `HostLanding`.
+The published record struct is rendered from the DESCRIPTION by `PublishedRecordEmitter` (corrected 2026-10-15, kb/Work
+PB2099: this paragraph used to name a "published mode" of `RecordStructEmitter` and `GroupImageCodec`, but a group
+FORMAL has no internal record struct — the program reads it through windows over its area — so there is no member walk
+to share; what IS shared is the storage geometry and the door rules):
+- **Geometry.** Each member's place in the record image is `BitLayout.StartBitWithin`, the one §8.5.1.6.3 placement walk
+  (in bits, so two USAGE BIT members that share a byte are placed as the program places them, and a national member
+  occupies its two bytes per position) that both the binder's class offsets and the record-struct image codec are laid
+  out by; an occurrence's stride is `BitLayout.StrideBits`. Nothing re-derives an offset.
+- **Members.** One property per named, non-redefining subordinate, in its `HostSurface.TypeOf` type (an array for
+  OCCURS); a nested record struct per subordinate group. A REDEFINES view and FILLER are no members: the positions no
+  member covers keep the image `FromImage` (or the entry's write-back) read, held privately, so an image round-trips; a
+  record the host constructs holds spaces there (a group MOVE SPACES — national spaces in a national group, zero bits in
+  a bit group). The parameterless constructor gives text members `""` (spaces in the image), tables their declared
+  occurrences and nested records their own constructor, so `new R()` is a whole record.
+- **Landing (`AsImage`, and the entry's landing).** Every member goes through `HostLanding` as an elementary formal of
+  its description does — `Land` for a number (written in its storage form under its profile), `LandText` for a
+  character, national or bit member, `RequireOccurrences` for a table — so a lossy member, a null member and an array of
+  the wrong length are refused with `ArgumentException` naming the parameter and the member (`LK_SUB.LK_X`,
+  `LK_TAB[1]`) before anything is activated.
+- **Decoding (`FromImage`, and the write-back).** Every numeric member is decoded by the one validity rule
+  (`HostLanding.TryDecode` through `HostEntryEmitter.NumericDecode`, the decode an elementary formal uses); a record any
+  member of which fails it is not decoded at all — the host's variable is unchanged — and the `FormatException` names
+  the first failing member (`LK_G.LK_N`). `FromImage` refuses an image that is not the record's width
+  (`HostLanding.RequireImage`).
+- **Crossing.** The record image is the group's storage; a bit or national group (§13.18.29.4 GR1b/GR2b) crosses as the
+  elementary item it is treated as, its boolean or national positions, exactly as the CALL lane's text crossing carries
+  it (`CallEmitter.CallStringRead`). A record holding a pointer or object-reference member (a strongly-typed group,
+  §13.18.60.3 SR14) crosses as the CALL lane's cell area (kb/Work PB2087, `CallEmitter.AreaOf`): its storage is a
+  `StorageCell` holding the image and each reference in its managed slot (`__Area`, `__PutSlots` through
+  `CobolPtr.SlotWrite`), the argument states `Area: new CellPointer(cell, 0)` so the activated program's formal occupies
+  that storage (§14.2.3 8)), and the write-back reads each slot back (`CobolPtr.SlotRead`). An image alone
+  (`AsImage`/`FromImage`) holds no reference: `FromImage` leaves those members in their null state.
+- **The variable-length carrier.** A record holding dynamic-length items or dynamic-capacity tables (§8.5.1.12) crosses
+  as the CALL lane's carrier of its description, `CobolVarGroup` (`__Var`; `ManagedPointer<CobolVarGroup>`, the
+  `CallCrossing.VarGroup` arm), composed in the description's own shape so the activated program's formal takes it
+  as a COBOL argument of the same description (`CobolArgAdapt.VarGroup`): its fixed run is the landed image with each
+  table's one-element reservation cut out (`CobolVarGroup.RunOf`, the rule a cell-backed group's carrier is built by,
+  `StorageCell.VarGroupAt`), and its components, in the order `CellComponents` numbers them (placed by
+  `CellComponents.InLayout`, the same walk over `BitLayout` — a RETURNING item has no storage class to read offsets
+  from), are each dynamic-length member's content landed by `HostLanding.LandVariable` (refused past the item's
+  maximum size, §8.5.1.10.1) and each dynamic-capacity table's occurrences — their images concatenated, or the
+  occurrences' own carriers for a table whose elements hold components (`CobolVarGroup.Elements`, kb/Work PB2496) —
+  with the table's array required to be a capacity it can have (`HostLanding.RequireCapacity`). The write-back decodes
+  the carrier the activated program left (`__TryGet(CobolVarGroup …)`: the fixed run back into the image by
+  `CobolVarGroup.WindowOf`, then each component, a table one entry per occurrence it carries) by the same validity
+  rule; components no member presents (FILLER) keep what the write-back read, as the image's positions do.
 
 ### 4.4 Why the host entry lives in the program's assembly, and why it is not a shim
 **Placement.** The entry is generated into the assembly that compiled the unit because (1) the repository IS that
@@ -1056,7 +1121,9 @@ both beside your host. Every program and user-defined function has a class `Cobo
 receives what the program stored), a plain parameter for BY VALUE, nullable when OPTIONAL (`null` passes OMITTED) —
 and whose return value is its RETURNING item; a program's class also has `Cancel()`. Numbers are `long` or `Int128`
 when the PICTURE has no decimal places and `decimal` when it has; text is `string`; a group is a nested record struct
-named `<group>_Record`, with `AsImage()` and `FromImage()` for its character image. Run your calls inside
+named `<group>_Record`, with `AsImage()` and `FromImage()` for its character image; in a group holding a DYNAMIC LENGTH item or an
+OCCURS DYNAMIC table that item is a `string` and that table an array as long as its current capacity, and the record has
+no image methods. Run your calls inside
 `RunUnit.Run(ru => { … })`, which begins a run unit and ends it (closing its files) when the body returns; a call
 outside it joins the ambient run unit of your execution context. Every call crosses the same boundary a COBOL CALL
 crosses: the program keeps one WORKING-STORAGE per run unit until you `Cancel()` it, recursion is refused unless the
@@ -1078,18 +1145,24 @@ signature than the one it is called with is detected at run time only when it en
 products: any .NET language, and only as the ACTIVATING element.** No non-COBOL element can be activated: a CALL, a
 program-pointer or `ADDRESS OF PROGRAM` resolves only WiseOwl COBOL programs. **Mechanism:** every outermost program
 and every user-defined function — definition or prototype — has a generated public class `Cobol.<assembly>.<name>`
-in the assembly that compiled it, whose static `Call` method activates it through the same boundary a COBOL CALL
-crosses (§14.9.4.4 GR3), and, for a program, a static `Cancel` method (§14.9.5). This is the only host interface.
+in the assembly that compiled it (except a unit one of whose group formals or RETURNING item holds both a dynamic-length
+item or dynamic-capacity table and a pointer or object reference, which has none), whose static `Call` method activates
+it through the same boundary a COBOL CALL crosses (§14.9.4.4 GR3), and, for a program, a static `Cancel` method
+(§14.9.5). This is the only host interface.
 **Parameter matching:** positional (§14.2.3 GR2), one `Call` parameter per USING formal in order; the C# compiler
 checks the count and the types; a prototype library's `Call` against a changed definition is EC-PROGRAM-ARG-MISMATCH
 when the definition enables that checking. **Data type representation:** a numeric item without decimal places is
-`long`, or `Int128` when its storage can hold more than `long` can; one with decimal places is `decimal` (the
+`long`, or `Int128` (`UInt128` for an unsigned 16-byte binary item) when its storage can hold more than `long` can; one with decimal places is `decimal` (the
 runtime's `CobolDec` beyond 28 digits or 28 places); a floating-point item is its own CLR type; an alphanumeric,
 national, boolean or edited item is `string`; an index is `long`; pointers are `ManagedPointer`, `ProgramPointer`,
 `FunctionPointer`; an object reference is its class's CLR type; a group is a generated record struct with
-`AsImage`/`FromImage`. Values are landed by §14.2.3 GR9/GR10's COMPUTE, SET or MOVE, and a value that the landing
-would change in any way — a digit lost at either end, a sign dropped, a character beyond the item's length — is
-refused with `ArgumentOutOfRangeException` before the program is activated. BY REFERENCE is a C# `ref` parameter:
+`AsImage`/`FromImage`; in a group that holds a dynamic-length item or a dynamic-capacity table (a variable-length
+group, §8.5.1.12) a dynamic-length item is `string` and a dynamic-capacity table an array of its current capacity, and
+the record has no image methods, its storage having no single image (§8.5.1.9.1, §8.5.1.10.3). Values are landed by
+§14.2.3 GR9/GR10's COMPUTE, SET or MOVE, and a value that the landing would change in any way — a digit lost at either
+end, a sign dropped, a character beyond the item's length or a dynamic-length item's LIMIT, a dynamic-capacity table's
+array below its minimum capacity — is refused with `ArgumentOutOfRangeException` (`ArgumentException` for the array)
+before the program is activated. BY REFERENCE is a C# `ref` parameter:
 the program operates on a storage of the formal's description, and the variable receives its content when the call
 ends; two `ref` parameters given one variable share one storage when their formals have one description and are
 refused with `ArgumentException` otherwise. **Return of a value:** the RETURNING item is the return value; numeric
@@ -1584,20 +1657,30 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
   `ProgramRegistry.CallProgram`, a `finally` of `HostLanding` decodes and the RETURNING decode — with no `catch`
   clause, no `ICobolProgram` or `ProgramTable` member, no instance and no EC-name test; that `Cancel` is one
   `ProgramRegistry.Cancel`; and that its parameter types equal `HostSurface.TypeOf` of the recorded descriptions.
-- **One host surface:** a repository scan fails when a test, sample or document outside `src/Cobol.Net.Runtime` and the
-  compiler's emitters names `ProgramRegistry.CallProgram`, `ProgramRegistry.Cancel`, `ICobolProgram.Call` or
-  `__CobolModule.Register` as a way for a host to activate a program (the runtime's own tests of the boundary are
-  listed in the scan as the ABI's tests).
+- **One host surface** (`OneHostSurfaceDriftTests`): a repository scan fails when a test's code — read as Roslyn tokens,
+  so its comments are not scanned and the C# hosts it compiles are — or a user-facing document (`README.md`,
+  `docs/CONFORMANCE.md`, `docs/manual/`, `samples/`) names an untyped activation route: `ProgramRegistry.CallProgram`,
+  `Cancel`, `RunMain` or `RunModule`, the run unit's `Programs.CallProgram`/`Cancel`/`RunMain`/`RunModule`,
+  `ICobolProgram.Call` or `Activate`, or a module's `__CobolModule.Register` (by name or by `GetMethod("Register")`).
+  The generated code, the runtime and the maintainer design documents describe the ABI and are not scanned; the ABI's
+  own tests (`HostEntryShapeDriftTests`, `RuntimeAbiPinDriftTests`, `OperandActivationDriftTests`) are listed in the
+  scan with their reasons, and a listed test that names no route is a stale exemption, also red.
 - **The door rules are one function:** every landing, alias and validity decision in emitted code is a `HostLanding`
   call (no inline range test); `HostLanding.Land` refuses every row of a loss fixture (high order, low order, sign, P
   positions, each binary capacity, string length, boolean characters) and accepts the exact boundary values; the
   validity decode agrees with `CobolNum.IsNumericImage` on a fixture of valid and invalid images per byte form.
-- **Names:** for every LINKAGE root of the corpus plus a collision fixture (duplicate words, words equal to the
-  enclosing type, to `AsImage`/`FromImage`/`Equals`/`ToString`, to `Call`/`Cancel`, `F` beside `F-2`), the internal
-  and published record structs and the host class compile with no CS0102/CS0542/CS0111, every name is produced by
-  `CsNames.Allocate`, and two compiles give the same names.
-- **One renderer:** the `CobolArg` a host entry renders for a formal equals the one `CallEmitter` renders for a BY
-  CONTENT argument of the formal's description (a unit test over every LINKAGE root of the corpus).
+- **Names** (`HostEntryShapeDriftTests.ThePublishedNames_AreAllocated_…`): for every LINKAGE root of the corpus (each
+  compiled by its own golden, which a CS0102/CS0542/CS0111 in its entry classes fails) plus a collision fixture (a word
+  twice in one record, words equal to the enclosing type, to `AsImage`/`FromImage`/`Equals`/`ToString`/`GetHashCode`,
+  a program whose host class spells a formal's record type, a formal that spells another formal's record type,
+  `F` beside `F-2`; `Call` and `Cancel` are reserved words and
+  cannot be data-names), the internal and published record structs and the host class compile, every name is produced
+  by `CsNames.Allocate`, and two compiles give the same names.
+- **One renderer** (`HostEntryShapeDriftTests.AHostEntryArgument_IsStatedByTheCallLanesRenderer`): what a host entry's
+  argument states for §14.9.4.4 GR3 d) — its storage length and its description — is rendered by the CALL lane's
+  `CallEmitter.Described`, from the builders a CALL argument's facts come from (`CallEmitter.ArgumentLength`,
+  `ActivationDescriptions.Of`); the entry composes neither fact itself, and every described argument of the emitted
+  fixture is in that renderer's form.
 - **One registration set:** `__CobolModule.EnsureRegistered` is every module's only public registration member,
   `RegisterModule` is the only writer of the registration set, and a module carrying an already-registered outermost
   name, or another runtime major or call ABI, registers nothing.
@@ -1777,8 +1860,29 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    (subordinates named `AsImage`, `Equals`, `ToString`, `F` beside `F` and `F-2`, a record named `CloseFiles`, and a
    TYPE clone of a type with such members) compiles and runs; `CsNameReservationDriftTests` keeps the seeds total.
    The published scopes of slice 3 reuse the allocator with their own seeds.
-3. **The host entry and the one host surface.** `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
-   validity decode); `RecordStructEmitter`'s published mode; `HostEntryEmitter` over the CALL lane's renderer with
+3. **The host entry and the one host surface (kb/Work PB2099; in progress — its runtime boundary is in the tree:
+   `ProgramTable.CallProgram`/`Cancel` take `string? callerPath`, the null arm `ProgramTable.CallFromHost` is the
+   outermost boundary, `RunUnit.EndForHost` performs the §14.6.11 actions and replaces the host's ambient run unit, and
+   `RunUnitEndedException(ExitStatus, Abnormal)` is R48's result, witnessed by `HostRunUnitEndingTests`; the door rules
+   and the type table are in the tree too: `HostLanding` in the runtime, pinned by `HostLandingTests` on §17.3's loss and
+   validity fixtures, and `HostSurface.TypeOf(DataItem)` in the binder's model, pinned by `HostSurfaceTests`; and
+   `HostEntryEmitter` emits `Call` and `Cancel` for every outermost unit, witnessed by the host harness `HostEntryTests`
+   and pinned by `HostEntryShapeDriftTests`; a GROUP formal or RETURNING item is its published record struct
+   (`PublishedRecordEmitter`, §4.3) for every group whose members the record image holds, an OCCURS DEPENDING ON table
+   included (an array of the DEPENDING ON value's entries, `HostLanding.LandedOccurrences`/`TryOccurrences`, witnessed by
+   `HostEntryTests`' OCCURS DEPENDING Fact) and a strongly-typed group holding pointer or object-reference members (the
+   CALL lane's cell area, `PublishedRecordEmitter.HoldsSlots`, witnessed by the pointer Fact) and a variable-length group
+   (the CALL lane's variable-length carrier, `PublishedRecordEmitter.EmitVar`, witnessed by `HostEntryTests`'
+   variable-length Fact and `HostEntryShapeDriftTests`' H2VAR arm; a group holding both a component and a reference is
+   §4.3's stated GR13 restriction); and a group with no main program
+   is a library (`ProgramEmitter.MainUnit` null: `OutputKind.DynamicallyLinkedLibrary`, no `Main`, no
+   `runtimeconfig.json`, §7.2; witnessed in `HostEntryTests`); and the untyped host route is retired — every host test
+   calls the generated entries, DOC-A.1-65/-116/-141/-167 describe the entry, and `OneHostSurfaceDriftTests`,
+   `HostEntryShapeDriftTests`' one-renderer and names Facts are §17.3's remaining drift tests. Settled
+   2026-10-14: `TypeOf` is keyed on the bound description, not on §6.1's `DescriptionRecord`, because §6.3's decoder
+   binds a record into a throw-away forest of `DataItem`s, so slice 4 adds a producer of that input and re-keys nothing.**
+   `HostSurface.TypeOf`; `HostLanding` (exact landing, alias grouping,
+   validity decode); the published record struct (`PublishedRecordEmitter`); `HostEntryEmitter` over the CALL lane's renderer with
    `Call` and `Cancel`; `CallProgram`'s and `Cancel`'s nullable `callerPath` and its outermost-boundary arm with R48's
    run-unit-ended exception (the §14.6.11 actions, then the one documented type); `OutputKind` library for a group
    without a main unit; the host harness (§17.1) with its Linux leg; the drift tests of §17.3 for the entry body, the
