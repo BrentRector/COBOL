@@ -7176,6 +7176,29 @@ public static class DiagnosticCatalog
         + "later). Indent the text into area B, or target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
         "ANSI X3.23-1985 reference format (area B); ISO §6.3.1, §6.3.5");
 
+    /// <summary>COBOLNET3803 — a <c>RAISE EXCEPTION</c> of a NONFATAL exception-name whose checking is not enabled at
+    /// that statement (kb/Work PB2505), so the statement raises nothing. A quality-of-implementation advisory, never a
+    /// refusal: the source is conforming and does exactly what the standard says (kb/Work PB867), but the outcome is
+    /// one a reader of the source does not expect — the standard's own Annex D.2.5 sample program writes eleven such
+    /// RAISEs and no TURN directive. "Provably" is exact here: checking is lexical (§7.3.25.4 GR6; an exception-checking
+    /// PERFORM's WHEN phrase is an implicit TURN over imperative-statement-1, §14.9.28.4 GR14), so the enablement the
+    /// binder folds at the statement is the one the generated code obeys — the advisory and
+    /// <c>EcEmitter.EmitRaise</c>'s nothing-emitted arm read the SAME <c>BoundRaise.Enabled</c>. A FATAL name with
+    /// checking off is not advised: it terminates the run unit (the §14.6.13.1.3 8) implementor arm, kb/Work PB2504),
+    /// which no reader misses.</summary>
+    public static readonly DiagnosticDescriptor RaiseCheckingNotEnabled = new(
+        "COBOLNET3803", "raise-checking-not-enabled", EditionSeverity.Warning,
+        "A RAISE EXCEPTION statement names a nonfatal exception condition whose checking is not enabled at that "
+        + "statement, so it raises nothing: ISO §14.6.13.1.1, \"when the general rules for a statement indicate that a "
+        + "specific exception condition exists, it is raised only if checking for that exception condition is "
+        + "enabled\", and §14.6.13.1.4, \"If checking is not enabled, execution continues as if the exception did not "
+        + "occur\". No USE declarative or WHEN phrase runs, and the last exception status and EXCEPTION-OBJECT keep "
+        + "their values. Checking is enabled by a >>TURN directive that precedes the statement in the source text "
+        + "(§7.3.25.4 GR6: a directive at a PERFORM does not reach the paragraphs it performs) or by the WHEN phrase "
+        + "of an exception-checking PERFORM whose imperative-statement-1 contains the RAISE (§14.9.28.4 GR14). Write "
+        + ">>TURN <exception-name> CHECKING ON before the statement if the RAISE is meant to raise.",
+        "ISO §14.6.13.1.1; §14.6.13.1.4; §14.9.29.4 GR1");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

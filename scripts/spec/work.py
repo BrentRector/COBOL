@@ -360,7 +360,7 @@ def check_base_agrees() -> list[str]:
 
 
 #: A traceability-inventory rule-id, by SHAPE only — `AR-15.7.3-1`, `SR-13.18.40.3-22`, `FMT-14.9.32.2`,
-#: `GR-7.2.3.4-L2.1`. Whether the id names a row that EXISTS, and whether that row's verdict resolves, is the
+#: `GR-9.3.6-L4.1`. Whether the id names a row that EXISTS, and whether that row's verdict resolves, is the
 #: C# gate's question and is deliberately not asked here (see :func:`closes_rows_shape`).
 RULE_ID_SHAPE = re.compile(r"\A[A-Z]{2,4}-[0-9A-Za-z.]+(?:-[0-9A-Za-z.]+)?\Z")
 
