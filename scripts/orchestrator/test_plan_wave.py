@@ -508,16 +508,18 @@ def cnote(nid, cluster=("PB901",), blocked_by=(), body="", status="open", kind="
         f"blocked_by: [{bb}]\ncluster: [{', '.join(cluster)}]\n---\n\n# {nid}\n\n{body}\n", encoding="utf-8", newline="\n")
 
 
-cnote("PB901", body="Sever `src/Lib/Alpha.cs` from the old engine.")
-cnote("PB902", body="Rewrite scripts/gamma.py's legacy legs.")
-cnote("PB903", blocked_by=("PB901",), body="Then delete `src/Lib/Beta.cs`.")
-cnote("PB904", blocked_by=("PB901", "PB902"), body="Then rename tests/Delta.Tests/DeltaTests.cs.")
-cnote("PB905", blocked_by=("PB903",), body="Then sweep the docs; no code site named.")
+cnote("PB901", body="**Sites:**\n- `src/Lib/Alpha.cs`\n\nSever it from the old engine.")
+cnote("PB902", body="**Code site.** scripts/gamma.py (its legacy legs)\n\nRewrite them.")
+cnote("PB903", blocked_by=("PB901",), body="### Code site\n\n`src/Lib/Beta.cs:12-40`\n\n### Fix\n\nThen delete it.")
+cnote("PB904", blocked_by=("PB901", "PB902"), body="- **Code site:** tests/Delta.Tests/DeltaTests.cs#Rename\n\nThen rename.")
+# PB905 names no site in a site block: what its prose discusses, and its Gate: line, declare nothing (kb/Work PB3242)
+cnote("PB905", blocked_by=("PB903",), body="Then sweep the docs; it discusses `src/Lib/Alpha.cs` and scripts/gamma.py.\n\n"
+                                           "**Gate:** `python scripts/gamma.py --check`")
 cnote("PB906", body="Author = Mythos 5.1, only after the owner's explicit\napproval for this dispatch.", kind="analysis")
-cnote("PB907", cluster=("OTHER",), body="Another campaign: `src/Lib/Alpha.cs`.")
-cnote("PB908", status="landed", body="Landed already: `src/Lib/Alpha.cs`.")
+cnote("PB907", cluster=("OTHER",), body="**Sites:**\n- `src/Lib/Alpha.cs`")
+cnote("PB908", status="landed", body="**Sites:**\n- `src/Lib/Alpha.cs`")
 cnote("PB909", status="owner", body="Waits for the owner.")
-cnote("PB910", cluster=("PB901", "OTHER"), body="In two clusters: `scripts/gamma.py`.")
+cnote("PB910", cluster=("PB901", "OTHER"), body="**Sites:**\n- `scripts/gamma.py#main` (main)")
 citems = [dict(work.parse_frontmatter(p.read_text(encoding="utf-8")), _file=p.name) for p in sorted(CW.glob("*.md"))]
 view = work.cluster_order(citems, "PB901")
 check("cluster members: open, any kind, harm flags or not, in blocked_by order",
@@ -537,7 +539,10 @@ except SystemExit as e:  # the campaign clusters by fix_clusters.py's real index
 if fc:
     cnotes = pw.load_notes(CW, {"wrong_answer": 8})
     ctexts = {i: (CW / f"{i}.md").read_text(encoding="utf-8") for i in cnotes}
-    copen, chalf, cdeps, cwait = pw.campaign_clusters(view, cnotes, ctexts, RULES, fc, TMP / "campaign")
+    # THE declared set (declared_sets) on a policy that refuses to build an index: no note here names a member, so the
+    # index is never read (a fix-lane or sites-only note declares its sites without one)
+    CDECL = pw.declared_sets(TMP / "campaign", pw.IndexPolicy(TMP / "no-cache", regenerate=False))
+    copen, chalf, cdeps, cwait = pw.campaign_clusters(view, cnotes, ctexts, RULES, fc, TMP / "campaign", CDECL)
     # PB904 waits on PB901 (Alpha.cs) and PB902 (gamma.py): their two clusters merge, so PB904 can follow ONE chain
     check("campaign clusters by declared sites, one depth at a time; a dependent's blocker clusters merge",
           [(c["depth"], c["file"], [n["id"] for n in c["notes"]]) for c in copen],
@@ -715,10 +720,10 @@ check("the planner's own checkout is not in flight", any("main" in k for k in fl
 check("the collision names the dispatched owner", pw.file_set_collisions(["src/Dispatched.cs"], fly),
       ["dispatched w1040a (PB70) (src/Dispatched.cs)"])
 
-# 9e. the group's file set (PB2118 Draft 8, the seventh refuter's J2 and J3): every site a note names WHATEVER its
-#     score (Draft 7 kept fix_clusters' >= 2 and dropped a bare type name: "GammaState's" never added GammaState.cs),
-#     plus the callers the member index computes for the note (an injected function here; member_index.py's own
-#     self-test drives the computation); and the dispatch ledger has STRUCTURED writers only (kb/Work PB3186):
+# 9e. the group's file set (kb/Work PB3242; PB2118 Draft 8, the seventh refuter's J2): its notes' DECLARED sets, the
+#     structured sites (a bare type name in prose, "GammaState's", declares nothing) plus the callers the member index
+#     computes for the note (an injected function here; member_index.py's own self-test drives the computation), plus
+#     the primary file; and the dispatch ledger has STRUCTURED writers only (kb/Work PB3186):
 #     record_dispatch upserts on (wave, letter) and drops the retired hand entries, and make_dispatch_specs.py records
 #     every group it renders with its `file_set` list (or the set computed from its notes when a hand-built groups
 #     file carries none).
@@ -729,8 +734,8 @@ if fc:
         (C2 / rel).write_text("// fixture" + NL, encoding="utf-8", newline="\n")
     W2 = C2 / "kb" / "Work"
     W2.mkdir(parents=True)
-    for nid, body in (("PB950", "Fold GammaState's flags into `src/Lib/Alpha.cs`."),
-                      ("PB951", "Move `src/Lib/Beta.cs`'s members (callers computed).")):
+    for nid, body in (("PB950", f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}{NL}Fold GammaState's flags into it."),
+                      ("PB951", f"**Sites:**{NL}- `src/Lib/Beta.cs`{NL}{NL}Move its members (callers computed).")):
         (W2 / f"{nid}.md").write_text(
             f'---{NL}title: "{nid} — step"{NL}id: {nid}{NL}kind: analysis{NL}status: open{NL}area: architecture{NL}'
             f"wrong_answer: false{NL}process_only: true{NL}blocked: false{NL}blocked_by: []{NL}cluster: [PB950]{NL}---"
@@ -739,10 +744,11 @@ if fc:
     view2 = work.cluster_order(items2, "PB950")
     notes2 = pw.load_notes(W2, {"wrong_answer": 8})
     texts2 = {i: (W2 / f"{i}.md").read_text(encoding="utf-8") for i in notes2}
+    D2 = pw.declared_sets(C2, pw.IndexPolicy(TMP / "no-cache", regenerate=False))
     o2, _, _, _ = pw.campaign_clusters(view2, notes2, texts2, RULES, fc, C2,
-                                       callers=lambda text: {"src/Lib/Caller.cs"} if "PB951" in text else set())
+                                       lambda text: D2(text) | ({"src/Lib/Caller.cs"} if "PB951" in text else set()))
     files2 = {n["id"]: c["files"] for c in o2 for n in c["notes"]}
-    check("a bare type name (score 1) is in its group's file set", "src/Lib/GammaState.cs" in files2["PB950"], True)
+    check("a bare type name in prose declares nothing (PB3242)", "src/Lib/GammaState.cs" in files2["PB950"], False)
     check("a note's computed callers are in its group's file set", "src/Lib/Caller.cs" in files2["PB951"], True)
     check("callers never steer the clustering (the primary file is a named site)",
           sorted(c["file"] for c in o2), ["src/Lib/Alpha.cs", "src/Lib/Beta.cs"])
@@ -800,7 +806,7 @@ STALE = TMP / "stale-repo"
 for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
     subprocess.run(["git", *args], cwd=STALE, check=True, capture_output=True)
 try:
-    pw.member_callers(STALE, TMP / "no-cache", regenerate=False)
+    pw.declared_sets(STALE, pw.IndexPolicy(TMP / "no-cache", regenerate=False))("**Moves or changes:** `N.T.M`")
     check("the planner refuses a tree no member index describes", "planned", "refused")
 except SystemExit:
     check("the planner refuses a tree no member index describes", "refused", "refused")
@@ -968,6 +974,117 @@ with tempfile.TemporaryDirectory() as td:
     check("--finished on a name that is not a fix-lane report: exit 2", pw.main(["--finished", str(fdir / "notes.md")]), 2)
     check("status_line finds the bare word and its index; None without one",
           (pw.status_line(["# title", "DONE"]), pw.status_line(["# title", "Branch: b"])), ((1, "DONE"), None))
+
+# 10. A NOTE'S DECLARED FILE SET IS ITS STRUCTURED SITES, READ BY ONE READER (kb/Work PB3242; DESIGN-architecture-review
+#     §8.7). The planner once declared every path a note's prose mentioned (fix_clusters' scored reading), so the R2
+#     and PB3160 campaigns planned zero groups: 57 of PB1754's 63 ready notes DISCUSS plan_wave.py and landing_check.py,
+#     and every PB3160 slice's Gate: line names cite.py.
+DR = TMP / "declared"
+for rel in ("src/Lib/Alpha.cs", "src/Lib/Beta.cs", "tests/Delta.Tests/DeltaTests.cs", "scripts/gamma.py",
+            "scripts/spec/cite.py", "src/Model/DataItem.cs"):
+    (DR / rel).parent.mkdir(parents=True, exist_ok=True)
+    (DR / rel).write_text("// fixture" + NL, encoding="utf-8", newline="\n")
+DDECL = pw.declared_sets(DR, pw.IndexPolicy(TMP / "no-cache", regenerate=False))
+sys.path.insert(0, str(coord.REPO / "scripts" / "arch"))
+import member_index  # noqa: E402
+GATE_ONLY = (f"**Sites:**{NL}- `scripts/gamma.py`{NL}{NL}Probe it with `python scripts/spec/cite.py --check 14.9 \"x\"`."
+             f"{NL}{NL}**Gate:** `python scripts/spec/cite.py --check 14.9 \"x\"` and `pwsh scripts/build-local.ps1`{NL}")
+check("(1) a note whose only mention of cite.py is a Gate: line and prose declares no cite.py",
+      ("scripts/spec/cite.py" in DDECL(GATE_ONLY), sorted(DDECL(GATE_ONLY))), (False, ["scripts/gamma.py"]))
+EVERY_SHAPE = (f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}- `src/Lib/Beta.cs#Run` (Run){NL}"
+               f"- `tests/Delta.Tests/DeltaTests.cs:12-40`{NL}- scripts/gamma.py (main){NL}"
+               f"- `M:N.OoBinder.Err(N.Model.DataItem)~System.String @ src/.../OoBinder.cs:1783`{NL}{NL}"
+               f"**Fix.** It also touches `src/Model/DataItem.cs` in prose.{NL}")
+SITES = ("scripts/gamma.py", "src/Lib/Alpha.cs", "src/Lib/Beta.cs", "tests/Delta.Tests/DeltaTests.cs")
+check("(2) a Sites path, a file#member, a file:line and a scripts/ path each declare their file; a census member id's "
+      "parameter type (PB2423) and a path in prose declare nothing", work.note_sites(EVERY_SHAPE).paths, SITES)
+check("(2) the census member id is a name, its return type dropped",
+      work.note_sites(EVERY_SHAPE).names, ("N.OoBinder.Err(N.Model.DataItem)",))
+for shape, text in (("a bold paragraph label", f"**Code site.** src/Lib/Alpha.cs#Run (the arm){NL}{NL}**Fix.** x"),
+                    ("a heading section", f"## Code sites{NL}{NL}`src/Lib/Alpha.cs:7`, and more:{NL}{NL}"
+                                          f"### Detail{NL}`src/Lib/Beta.cs`{NL}## Fix{NL}`scripts/gamma.py`"),
+                    ("a list-item label", f"- **Code site:** src/Lib/Alpha.cs#Run{NL}- **Fix:** scripts/gamma.py"),
+                    ("a label alone over a loose list", f"**Sites:**{NL}{NL}- `src/Lib/Alpha.cs`{NL}{NL}Prose: "
+                                                        f"scripts/gamma.py")):
+    want = ("src/Lib/Alpha.cs", "src/Lib/Beta.cs") if shape == "a heading section" else ("src/Lib/Alpha.cs",)
+    check(f"(2) the site block as {shape} ends where the block ends", work.note_sites(text).paths, want)
+check("(2) a placeholder, a glob and a bare root are no sites",
+      work.note_sites(f"**Sites:**{NL}- `src/<Project>/X.cs`{NL}- `tests/**/char_*.txt`{NL}- `src/`{NL}").paths, ())
+check("(2) the roots are model_rules.json's campaign roots, never a literal",
+      work.campaign_domain().roots, tuple(RULES["campaign"]["src"]))
+EMPTY_INDEX = {"commit": "c", "uses": {}, "types": {}, "declared": {}, "emitted": {}, "_simple": {}}
+fs_mi = member_index.note_file_set(EVERY_SHAPE, DR, index=lambda: EMPTY_INDEX, drifted=lambda: {})
+check("(3) the member index's declared set of a note with a name: its sites (the name unknown to this index)",
+      (tuple(fs_mi["sites"]), tuple(fs_mi["files"]), fs_mi["unknown"]), (SITES, SITES, ["N.OoBinder.Err(N.Model.DataItem)"]))
+SITES_ONLY = EVERY_SHAPE.replace(f"- `M:N.OoBinder.Err(N.Model.DataItem)~System.String @ src/.../OoBinder.cs:1783`{NL}", "")
+check("(3) the planner, the member index and the register read the same sites for the same note",
+      (tuple(sorted(DDECL(SITES_ONLY))), tuple(member_index.note_file_set(SITES_ONLY, DR)["sites"]),
+       work.note_sites(SITES_ONLY).paths), (SITES, SITES, SITES))
+if fc:
+    CD = TMP / "declared-campaign" / "kb" / "Work"
+    CD.mkdir(parents=True)
+    (CD / "PB990.md").write_text(f"---{NL}id: PB990{NL}status: open{NL}cluster: [PB990]{NL}---{NL}{NL}{SITES_ONLY}",
+                                 encoding="utf-8", newline="\n")
+    citems = [dict(work.parse_frontmatter((CD / "PB990.md").read_text(encoding="utf-8")), _file="PB990.md")]
+    cn = pw.load_notes(CD, {"wrong_answer": 8})
+    o3, _, _, _ = pw.campaign_clusters(work.cluster_order(citems, "PB990"), cn,
+                                       {"PB990": (CD / "PB990.md").read_text(encoding="utf-8")}, RULES, fc, DR, DDECL)
+    check("(3) the planner's campaign group: its primary file is a declared site, its files exactly the declared set",
+          (o3[0]["file"] in SITES, tuple(o3[0]["files"])), (True, SITES))
+FL = TMP / "declared-fix" / "kb" / "Work"
+FL.mkdir(parents=True)
+(FL / "PB991.md").write_text(f"---{NL}id: PB991{NL}---{NL}{NL}{GATE_ONLY}", encoding="utf-8", newline="\n")
+FLC = [{"file": "src/Lib/Alpha.cs", "files": ["src/Lib/Alpha.cs", "scripts/spec/cite.py"], "notes": [{"id": "PB991"}]}]
+pw.declare_fix_lane(FLC, DDECL, FL)
+check("a fix-lane cluster's collision set is its notes' declared sets plus its primary file, never fix_clusters' "
+      "prose sites", FLC[0]["files"], ["scripts/gamma.py", "src/Lib/Alpha.cs"])
+# Branch review R1-2: an R2 defect routed to the fix lane (its wave kind work.FIX_LANE_WAVE, with r2_members) is a
+# fix-lane note: the fix lane's plan declares its sites without reading the member index, so it never regenerates
+# one (DDECL's policy has no cache and refuses to regenerate: a read would raise StaleIndex).
+(FL / "PB992.md").write_text(f"---{NL}id: PB992{NL}---{NL}{NL}r2_members: N.Beta.Run, N.Alpha.Go{NL}{NL}"
+                             f"**Wave kind:** {work.FIX_LANE_WAVE}. **Model:** the fix lane's routing.{NL}{NL}"
+                             f"**Sites:**{NL}- `src/Lib/Beta.cs:10-20` (Beta.Run){NL}", encoding="utf-8", newline="\n")
+FLD = [{"file": "src/Lib/Beta.cs", "files": ["src/Lib/Beta.cs"], "notes": [{"id": "PB992"}]}]
+try:
+    pw.declare_fix_lane(FLD, DDECL, FL)
+    check("R1-2: an R2 fix-lane defect with r2_members declares its sites and reads no index", FLD[0]["files"],
+          ["src/Lib/Beta.cs"])
+except Exception as e:   # noqa: BLE001 — any read of the index (StaleIndex, a git call on a fixture) is the red
+    check("R1-2: an R2 fix-lane defect with r2_members declares its sites and reads no index",
+          f"read the index: {type(e).__name__}: {e}",
+          ["src/Lib/Beta.cs"])
+sys.path.insert(0, str(coord.REPO / "scripts" / "arch"))
+import r2_collect  # noqa: E402
+import file_census_notes  # noqa: E402
+check("R1-2: the fix lane's wave kind is one of the R2 collector's wave kinds (one constant, work.FIX_LANE_WAVE)",
+      work.FIX_LANE_WAVE in r2_collect.WAVES, True)
+# Branch review R1-1: the line file_census_notes writes naming the files ONE STEP edits is a site block, so a step file
+# outside the census finding's Sites (PB2300's IntrinsicCatalog.cs) is declared; the reader reads the writer's line.
+STEP = f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}{NL}{file_census_notes.step_files_line(['src/Lib/Alpha.cs', 'src/Lib/Beta.cs'])}{NL}"
+check("R1-1: the step-files line file_census_notes writes declares its files (reader = planner)",
+      (work.note_sites(STEP).paths, tuple(sorted(DDECL(STEP)))), (("src/Lib/Alpha.cs", "src/Lib/Beta.cs"),) * 2)
+
+
+def note_path_scanners(sources: dict[str, str]) -> list[str]:
+    """(4) the modules that scan text for paths with a regex over the campaign roots (`(?:src|tests…)/`) or call
+    fix_clusters' prose scorer (`.sites(`): only the register's reader (scripts/spec/work.py) may read a note's paths.
+    The other regex shapes read documents that are not notes: drift_rules.py a C# drift test's string literals,
+    audit_evidence_supersession.py the evidence records. A test file's fixtures are no reader."""
+    alts = "|".join(sorted({re.escape(x) for r in RULES["campaign"]["src"] for x in (r, re.escape(r))}))
+    shape = re.compile(r"\((?:\?:)?(?:" + alts + r")\||\.sites\(")
+    exempt = {"scripts/spec/work.py", "scripts/spec/drift_rules.py", "scripts/spec/audit_evidence_supersession.py"}
+    return sorted(p for p, t in sources.items()
+                  if p not in exempt and not pathlib.PurePosixPath(p).name.startswith("test_") and shape.search(t))
+
+
+TREE = {p.relative_to(coord.REPO).as_posix(): p.read_text(encoding="utf-8", errors="replace")
+        for root in ("scripts", ".claude/skills") for p in (coord.REPO / root).rglob("*.py")}
+check("(4) no module outside the reader scans a note's text for paths", note_path_scanners(TREE), [])
+PLANT = "SITE_PATH = re.compile(r\"`((?" + ":src|tests)/[^`]+)\")"
+check("(4) the scan fails on a planted copy of the old whole-text SITE_PATH and on a prose-scorer call",
+      note_path_scanners({"scripts/arch/planted.py": PLANT, "scripts/orchestrator/p2.py": "fc" + ".sites(text, idx, exts)",
+                          "scripts/orchestrator/fine.py": "x = 1"}),
+      ["scripts/arch/planted.py", "scripts/orchestrator/p2.py"])
 
 for f in fails:
     print("FAIL:", f)
