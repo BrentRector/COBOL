@@ -708,24 +708,42 @@ internal sealed class ProgramEmitter
             // modifier reads, so a cell cannot be declared per-activation and never ended.
             string endCells = string.Concat(unit.Data.CellFieldsOf(CellLifetime.Activation)
                 .Select(c => $" {c}.End(StorageEnd.ActivationEnded);"));
-            w.Line($"try {{ __Activate(); }} finally {{ __asCalled = false;{endCells} }}");
-            foreach (var (f, place, crossing, _) in formals)
+            // Store a COPIED formal back into the caller's storage at activation end (§14.2.3 GR8/GR9; a BY CONTENT cell
+            // absorbs it invisibly; a BY VALUE formal is SKIPPED — its stores must never reach the caller, §14.2.3 GR10).
+            // An area formal laid over its argument's own cell has no copy: its local carrier was never set, so its guard
+            // is false (kb/Work PB2087).
+            var copyOuts = formals.Where(x => !x.Formal.CarrierResident && x.Place is not null && !x.Formal.ByValue).ToList();
+            if (copyOuts.Count == 0)
+                w.Line($"try {{ __Activate(); }} finally {{ __asCalled = false;{endCells} }}");
+            else
             {
-                if (f.CarrierResident || place is null || f.ByValue) continue;
-                // Store a COPIED formal back into the caller's storage at activation end (§14.2.3 GR8/GR9; a BY
-                // CONTENT cell absorbs it invisibly; a BY VALUE formal is SKIPPED above — its stores must never reach
-                // the caller, §14.2.3 GR10). An area formal laid over its argument's own cell has no copy: its local
-                // carrier was never set, so the guard below is false (kb/Work PB2087).
-                string copyCarrier = f.IsArea ? AreaCopyCarrier(f) : f.CarrierField;
-                string copyGuard = f.IsArea ? $"{copyCarrier} is not null" : RuntimeApi.ArgAdaptPresent("__args", f.Position);
-                using (w.Block($"if ({copyGuard})"))
-                    w.Line(crossing switch
-                    {
-                        CallCrossing.VarGroup =>
-                            $"{copyCarrier}.Value = {PlaceRenderer.VarGroupBoundaryImage(place, "LINKAGE formal copy-out of")};",
-                        CallCrossing.Text => $"{copyCarrier}.Value = {CallEmitter.CallStringRead(place)};",
-                        _ => $"{copyCarrier}.Value = {PlaceRenderer.Read(place)};",
-                    });
+                // ⛔ THE ACTIVATION ENDS TWO WAYS THAT OWE THE COPY-OUT (kb/Work PB1177): it returns, or a USE procedure
+                // that did not complete normally terminated the format 1 SORT whose range activated it (§14.9.40.4 GR17;
+                // GR10/GR13 put this activation in that range), and the SORT's signal unwinds it to the statement's
+                // landing. The activator resumes after that SORT, so the stores this element made through a copied
+                // BY REFERENCE formal must reach it either way — "the same storage area as the argument" (§14.2.3 GR8).
+                // A condition that terminates the run unit owes nothing, so it is not noted.
+                w.Line("bool __ended = false;   // returned, or ended with a terminated SORT's range (§14.9.40.4 GR17)");
+                w.Line("try { __Activate(); __ended = true; }");
+                w.Line($"catch ({RuntimeApi.SortTerminationSignalType}) when ({RuntimeApi.SortTerminationEndsActivation("__ended")}) {{ throw; }}   // the filter declines (never runs): the signal goes on");
+                using (w.Block("finally"))
+                {
+                    w.Line($"__asCalled = false;{endCells}");
+                    using (w.Block("if (__ended)"))
+                        foreach (var (f, place, crossing, _) in copyOuts)
+                        {
+                            string copyCarrier = f.IsArea ? AreaCopyCarrier(f) : f.CarrierField;
+                            string copyGuard = f.IsArea ? $"{copyCarrier} is not null" : RuntimeApi.ArgAdaptPresent("__args", f.Position);
+                            using (w.Block($"if ({copyGuard})"))
+                                w.Line(crossing switch
+                                {
+                                    CallCrossing.VarGroup =>
+                                        $"{copyCarrier}.Value = {PlaceRenderer.VarGroupBoundaryImage(place!, "LINKAGE formal copy-out of")};",
+                                    CallCrossing.Text => $"{copyCarrier}.Value = {CallEmitter.CallStringRead(place!)};",
+                                    _ => $"{copyCarrier}.Value = {PlaceRenderer.Read(place!)};",
+                                });
+                        }
+                }
             }
             if (_callState.ReturningPlace is { } ret)
                 w.Line($"{ReturningDelivery(ret)};");

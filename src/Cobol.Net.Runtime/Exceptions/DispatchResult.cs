@@ -63,6 +63,13 @@ public static class DispatchResult
     /// <see cref="NotNormal"/>ly fell off its end).</summary>
     public static bool TerminatesSortMerge(int result) => result == ResumeNext || result == NotNormal;
 
+    /// <summary>Did the declarative whose action <c>__RunUse</c> returns NOT complete normally (§14.6.13.1.2 1)) — a
+    /// RESUME of either form (<see cref="ResumeNext"/>, or a RESUME AT procedure-name pc) or a <see cref="NotNormal"/>
+    /// fall-off? The question §14.9.40.4 GR17 asks of a USE procedure invoked while a format 1 SORT is active
+    /// (<c>CobolSort.AfterUseProcedure</c>, kb/Work PB1177). Unlike <see cref="TerminatesSortMerge"/> it counts the
+    /// transfer: it is asked inside <c>__RunUse</c>, before any raise site's landing has left the statement.</summary>
+    public static bool CompletedNotNormally(int result) => result == ResumeNext || result == NotNormal || result >= 0;
+
     /// <summary>Does a raise site that selected a procedure LET THE INTERRUPTED STATEMENT FINISH? True when no RESUME
     /// redirected control: the procedure fell off its end (<see cref="Normal"/>, or <see cref="NotNormal"/> — how it
     /// completed does not matter to a statement whose own rule names the continuation, §14.6.13.1.4 3)) or none

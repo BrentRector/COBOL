@@ -20,7 +20,7 @@ using static CobolNet.CodeGen.Emit.EmitText;
 /// IS the GR11/GR14 compiler-inserted return mechanism. Format 2 sorts the typed element array in place with a
 /// typed comparer (COBOLNET_DESIGN §8.2).
 /// </summary>
-internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
+internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs, DispatchState dispatch,
     SequentialIoEmitter seqIo, MoveEmitter move, ArithmeticEmitter arith, EcEmitter ec)
 {
     /// <summary>The statement dispatcher — property-wired by <see cref="UnitEmitters"/> (the RETURN AT END /
@@ -37,9 +37,20 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
         var w = ctx.Writer;
         string sd = FileKeyExpr(so.File);
         var tx = new Transfer(TerminationLabel(), merge: false);
+        // §14.9.40.4 GR17 (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT statement is active does
+        // not complete normally, the SORT statement is terminated." The body registers, first, the statement as the
+        // run unit's active format 1 SORT, with this scope's declaratives (null when it has no EC-model one —
+        // EcEmitter.SortUseScope); every declarative's __RunUse asks the question once it has finished
+        // (CobolSort.AfterUseProcedure) and this statement's catch lands the termination — whatever invoked the
+        // procedure: an implicit transfer, a statement of the INPUT or OUTPUT PROCEDURE (which runs in a nested dispatch
+        // no raise site can jump out of), a program CALLed or a method INVOKEd from the range — whose declarative, or a
+        // containing program's GLOBAL one, may be the one that does not complete normally whatever this scope declares —
+        // or another USE procedure running within any of them. So EVERY format 1 SORT registers and lands.
+        string? useScope = ec.SortUseScope;
         w.Line($"{RuntimeApi.SortInit(sd, WeightsExpr(so.Collating), NatWeightsExpr(so.Collating))};   // SORT {so.File.CobolName} (ISO §14.9.40.4; BOTH GR5 sequences snapshotted — §14.6.6 r5)");
-        using (StatementBody(sd))
+        using (StatementBody(sd, TerminationLanding(sd, ownDeclaratives: useScope is not null)))
         {
+            w.Line($"{RuntimeApi.SortRegisterFormat1Sort(sd, useScope ?? "null")};   // §14.9.40.4 GR17 — the active format 1 SORT, terminated when a USE procedure invoked while it is active does not complete normally");
             EmitAssociation(so.File, tx);   // §12.4.5.3 GR3 — at the time of execution, before any phase (kb/Work PB1097)
             // Phase a — release (GR9a). A USING file must not be open when the phase commences (GR9 —
             // EC-SORT-MERGE-FILE-OPEN, tested by the runtime before any implicit OPEN; kb/Work PB1036).
@@ -71,11 +82,13 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
                 Statements.EmitProcedureRange(op, "   // OUTPUT PROCEDURE (GR14 — RETURNs request the next sorted record)");
             }
 
-            // §14.9.40.4 GR17's landing point: "the SORT statement is terminated" skips the REMAINING implicit
-            // transfers and the phases after them — terminating the statement is not abandoning the run unit. It
-            // is also where every FATAL implicit-transfer status lands (RuleFor — §9.1.13.1's "control is
-            // transferred to the end of the statement", kb/Work PB993), so any SORT with a USING or GIVING file
-            // jumps here; one with only procedures emits no label. The store's release is StatementBody's finally.
+            // The statement's end: "the SORT statement is terminated" skips the REMAINING implicit transfers and the
+            // phases after them — terminating the statement is not abandoning the run unit. Every FATAL
+            // implicit-transfer status lands here (RuleFor — §9.1.13.1's "control is transferred to the end of the
+            // statement", kb/Work PB993), and so does an exception-checking PERFORM handler's RESUME AT NEXT STATEMENT
+            // (§14.9.33.4 GR2 a) 1.); a USE procedure that does not complete normally (§14.9.40.4 GR17) is landed by
+            // TerminationLanding's catch, after the same finally. One with only procedures emits no label. The store's
+            // release is StatementBody's finally.
             if (tx.Terminable) w.Line($"{tx.EndLabel}: ;");
         }
     }
@@ -89,23 +102,53 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs,
     /// running" — an EC-SORT-MERGE-ACTIVE raised against a program that did nothing wrong. <c>Init</c> stays
     /// OUTSIDE the <c>try</c>: its -ACTIVE raise happens before this statement owns a store, and releasing one
     /// then would discard an enclosing statement's store on the same file.</summary>
-    private FinallyScope StatementBody(string sd)
+    private FinallyScope StatementBody(string sd, string? catchLine = null)
     {
         var w = ctx.Writer;
         w.Line("try");
         w.Line("{");
         w.Indent();
-        return new FinallyScope(w, $"{RuntimeApi.SortClose(sd)};", "the statement ends — whichever way it ends");
+        return new FinallyScope(w, catchLine, $"{RuntimeApi.SortClose(sd)};", "the statement ends — whichever way it ends");
     }
 
+    /// <summary>⛔ §14.9.40.4 GR17's LANDING (kb/Work PB1177): "If a USE procedure invoked while a format 1 SORT
+    /// statement is active does not complete normally, the SORT statement is terminated." The USE procedure may have
+    /// been invoked by an implicit USING/GIVING transfer, or by a statement of the INPUT or OUTPUT PROCEDURE — it is
+    /// then in the procedure's range (GR10, GR13: "all statements in declarative procedures that are executed as a
+    /// result of the execution of statements in the range"), and terminating the SORT ends that range with it, so
+    /// control does not come back to the procedure:
+    /// <list type="bullet">
+    /// <item>RESUME AT NEXT STATEMENT, and a fall-off §14.6.13.1.2 1) marks not normal, end at the end of the SORT
+    /// statement — the catch falls through past the <c>finally</c>. §14.9.33.4 GR2 a) puts the implicit CONTINUE after
+    /// the raising statement "unless general rules associated with the applicable statement specify otherwise", and
+    /// a statement inside a terminated SORT's procedure has no "next statement" left to run: GR17 is the SORT rule
+    /// that says otherwise.</item>
+    /// <item>RESUME AT procedure-name transfers as a GO TO (§14.9.33.4 GR3) — from this statement's dispatcher, after
+    /// the <c>finally</c> has ended the SORT, rather than from the procedure's nested dispatch, where the SORT would
+    /// stay active under the program's remaining statements.</item>
+    /// </list>
+    /// EXIT PROGRAM, GOBACK and STOP leave through their own signals and the same <c>finally</c>. The filter names
+    /// this statement's sort file: <see cref="RuntimeApi.SortAfterUseProcedure"/> throws for the run unit's innermost
+    /// active format 1 SORT. A USE procedure of ANOTHER element — a CALLed program's, an INVOKEd method's, a containing
+    /// program's GLOBAL one — ends the range it ran in with the statement: its activations unwind, and it lands as a
+    /// not-normal completion at the statement's end, since its RESUME AT procedure-name names a procedure of an activation
+    /// that has ended (the runtime maps it, <c>CobolSort.AfterUseProcedure</c>). A scope with no EC-model declaratives
+    /// (<paramref name="ownDeclaratives"/> false) has no own action to take, so its landing is the bare end of the
+    /// statement.</summary>
+    private string TerminationLanding(string sd, bool ownDeclaratives) =>
+        $"catch ({RuntimeApi.SortTerminationSignalType} __srtSig) when (__srtSig.File == {sd}) "
+        + (ownDeclaratives ? $"{{ {dispatch.ResumeTransfer("__srtSig.Action", "")} }}" : "{ }")
+        + "   // §14.9.40.4 GR17 — a USE procedure invoked while the SORT was active did not complete normally: the SORT is terminated";
+
     /// <summary>The emitted-text scope <see cref="StatementBody"/> hands out: disposing it closes the <c>try</c>
-    /// block and emits its one-line <c>finally</c>.</summary>
-    private readonly struct FinallyScope(CodeWriter w, string finallyLine, string comment) : IDisposable
+    /// block and emits its optional one-line <c>catch</c> and its one-line <c>finally</c>.</summary>
+    private readonly struct FinallyScope(CodeWriter w, string? catchLine, string finallyLine, string comment) : IDisposable
     {
         public void Dispose()
         {
             w.Outdent();
             w.Line("}");
+            if (catchLine is not null) w.Line(catchLine);
             w.Line($"finally {{ {finallyLine} }}   // {comment}");
         }
     }
