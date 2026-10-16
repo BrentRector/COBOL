@@ -354,5 +354,8 @@ The parameters are now claimed in the class's one scope beside the records, in s
 `CsNameScope.Nested` is deleted. The collision fixture gains `L-G-2-Record` beside `L-G-2`. A wider sibling stays open
 and is reported as a lead: a COBOL word spelling a runtime or `System` type the generated code names unqualified
 (`HostLanding`, `CobolString`, …) shadows that type in every scope, including the internal program class on main.
+Gate: `TestResults/build-local/20261016T142356Z-cf0513` at db31969fc: `LEG 1 ONLY (batched gating, PB2515): GREEN`
+(Conformance 6,025/11,781, Unit 33,247/33,720, Characterization 6/36 in leg 1; the extended collision fixture passed
+in leg 1). Semgrep verify: PASS.
 
 **Gate (part 7).** `TestResults/build-local/20261016T140250Z-5116d8` at 8c067d41d: `LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,015/11,776, Unit 33,206/33,714, Characterization 6/36 in leg 1; every test this part added or changed ran in leg 1 and passed). The first gate (`20261016T135015Z-7dcf04`) was RED on `RuntimeApiGuardTests` only: three bare `CobolVarGroup.` accesses in `PublishedRecordEmitter`, now routed through `RuntimeApi` (8c067d41d). Semgrep verify: PASS. LINUX GATE: the lander's (batched gating).
