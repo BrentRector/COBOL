@@ -437,8 +437,9 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   `__IoCheck`: same F1 behavior (phrase short-circuits §9.1.13.1, GR3a/b selection, the GR4b outward-GLOBAL walk)
   plus the §9.1.13.1 status→EC raise gated by the per-statement compile-time mask (`ExceptionCatalog.IoMaskNames`
   bit order), the F3 tiers BEHIND the F1 tiers, and the fatal-status default (3x/4x/7x/9x). The GR3g
-  outward-GLOBAL continuation is realized only on this I-O path — F3 declaratives are not yet GLOBAL-walkable
-  (no corpus or conformance driver exercises it; revisit with the OO/2002 wave).
+  outward-GLOBAL continuation is realized only on this I-O path, and that is the whole of it: only Formats 1 and
+  2 of USE admit GLOBAL (§14.9.49.2), so a non-I-O condition has no GLOBAL declarative to find (kb/Work PB3, CA12
+  refuted).
   **⛔ THE RAISED NAME IS NOT DERIVED FROM THE STATUS BY THE HOOK** (kb/Work PB526). §9.1.13.1's
   status→EC correspondence is a DEFAULT: it covers every EC-I-O condition the standard reaches THROUGH a
   status, and it has no entry for the one EC-I-O condition a rule NAMES outright — §13.18.34.4 GR6 b) 2's
@@ -534,9 +535,12 @@ raises it (§14.9.18.4 GR1 b)), so a chain of PROPAGATE ON elements propagates h
 nonfatal and main-program readings are CONFORMANCE.md D-PROP. An element without the directive emits byte-identical
 text.
 
-**Still later waves:** the exception-checking PERFORM WHEN + `>>PROPAGATE` (2023 — VCR row 79/§4808),
-RAISE/RAISING identifier (exception OBJECTS — the OO wave; the `ExceptionState.ExceptionObject` slot exists),
-GLOBAL-walkable F3 declaratives, VALIDATE/EC-VALIDATE (§18.17). *(The national `-N` twins are LIVE — P10 Step 11:
+**Still open:** an exception-OBJECT raise inside an exception-checking PERFORM's imperative-statement-1 (the one
+sub-form D12 keeps staged; `RAISE identifier` itself binds to `BoundRaiseObject` and fills the
+`ExceptionState.ExceptionObject` slot). A Format 3 USE cannot be GLOBAL (the `__IoCheckEc` note above). The
+exception-checking PERFORM WHEN is implemented (D12), and so is `>>PROPAGATE` ("Automatic propagation" above).
+VALIDATE/EC-VALIDATE is not a later wave: Annex A.4.14 is declined, the statement compiles inert with the
+COBOLNET1580 warning, and no EC-VALIDATE condition is raised (docs/CONFORMANCE.md §4 item 3). *(The national `-N` twins are LIVE — P10 Step 11:
 `EcFunctions.FileN`/`LocationN` (§15.29/§15.31) = the base renderings through the ONE `CobolIntrinsics.NationalOf`
 repertoire translator, result category National; golden `exception_file_n`, matrix row `exception-file-n-2002`,
 85-window negative.)*
@@ -1212,6 +1216,6 @@ done).
 
 - SETTLED (§18.16): EC checking ships OFF by default (NIST-faithful, fast, ISO §5000), enabled only by >>TURN/phrases; the conformance corpus drives the EC-on paths.
 - SETTLED (§18.16): an unhandled fatal EC terminates the run unit with a diagnostic + a nonzero exit (the ISO §14.6.13.1.3 implementor choice).
-- PROPAGATE (§4808) and the exception-checking PERFORM WHEN (§14.9.28) are COBOL-2023 constructs (VCR row 79) — in scope for full-2023 (G1: diagnosed at --std=85|2002|2014); they land after the declarative/phrase path (the seams — declarative-returns-ResumeAction, runtime ExceptionState — admit them without rework).
-- SETTLED (§18.17): VALIDATE / EC-VALIDATE is implemented minimally for the conformance corpus and flagged obsolete (2023 Table 13; VCR row 125).
+- `>>PROPAGATE` and the exception-checking PERFORM WHEN (§14.9.28) are COBOL-2023 constructs (VCR row 79), diagnosed at --std=85|2002|2014 (G1) and implemented at 2023: "Automatic propagation" above and D12.
+- SETTLED (§18.17): VALIDATE / EC-VALIDATE is declined (Annex A.4.14, docs/CONFORMANCE.md §4 item 3): the statement compiles inert with the COBOLNET1580 warning, and it is flagged obsolete (2023 Table 13; VCR row 125).
 - Program collating sequence for alphanumeric comparisons / HIGH-VALUE/LOW-VALUE remap is designed but deferred until the CobolNet collating subsystem lands; the API seam CobolString.Compare(a,b,weights?) is fixed now — confirm that seam is acceptable so call sites never change.

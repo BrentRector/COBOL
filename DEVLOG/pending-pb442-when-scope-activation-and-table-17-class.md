@@ -41,3 +41,15 @@ build). Rows GR-14.9.28.4-17, GR-14.9.28.4-1, GR-9.1.12-1 and GR-14.9.25.4-7 wen
 Docs: CONFORMANCE §3 D-F3S, conditions/exceptions design D12 (d), the as-built SSOT §9.2/§9.10.1-C2, the EC-OO
 super-batch summary, STRING_OPS INSPECT entry. Not widened, reported as a lead: the other `Usage.Display`-only
 numeric image marks in DataBinder (whole-group union, Tier-B leaves, reports, linkage).
+
+**Branch review round 1 (three findings, all docs and register).** The as-built SSOT §9.2 code block still showed
+`PerformDepth`/`TrimPerformTo` and a `RunTopFrame` with no activation stop, under a paragraph that said the opposite;
+the block now mirrors the code (the `Activation` stamp in `PushPerformFrame`, the `break` at the first foreign frame).
+The same doc's banner and §9.7 still listed F3-in-a-method, the cross-CALL reach and `>>PROPAGATE` as staged, and
+its §8 scout map and §9.8 increment row described the deleted snapshot; all four now say what is built. The EC design
+doc's "Still later waves" paragraph listed the F3 WHEN and `>>PROPAGATE` as future work; it now names the one staged
+sub-form (an exception-object raise in imp-1). Sweeping that paragraph found two more stale claims, fixed with it:
+"F3 declaratives are not yet GLOBAL-walkable" (a Format 3 USE cannot carry GLOBAL, §14.9.49.2; CA12 was refuted on
+exactly this), and "VALIDATE is implemented minimally" (it is the declined A.4.14 facility, inert with COBOLNET1580),
+which `COBOLNET_DESIGN.md` §18 item 17 also said. The super-batch map and the runtime-library example named the
+deleted members too. kb/Work PB2181 now records that PB442 deleted two of its six sites and its `CobolModule` lead.
