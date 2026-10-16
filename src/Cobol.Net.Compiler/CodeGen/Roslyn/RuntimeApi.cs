@@ -509,6 +509,23 @@ internal static class RuntimeApi
     public static string IntegerArg(string value) =>
         $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArg)}({value})";
 
+    /// <summary>The CLAMPING binary64 intake of a total integer argument whose function answers the same past a bound —
+    /// <c>CobolIntrinsics.IntegerArgSaturatingReal</c>: its integer on the <c>Int128</c> carrier, clamped rather than
+    /// raised past the carrier. Only <c>IntrinsicRenderer.IntArgWideSaturating</c> may emit it (kb/Work PB254, PB651).</summary>
+    public static string IntegerArgSaturatingReal(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgSaturatingReal)}({value})";
+
+    /// <summary>The SDIDI twin of <see cref="IntegerArgSaturatingReal"/> — <c>CobolIntrinsics.IntegerArgSaturatingDec</c>,
+    /// for the same arms and emitted from the same one renderer member.</summary>
+    public static string IntegerArgSaturatingDec(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgSaturatingDec)}({value})";
+
+    /// <summary>The §15.3 type-6 intake of an SDIDI operand that STAYS on the SDIDI — <c>CobolIntrinsics.IntegerArgUnboundedDec</c>:
+    /// the integrality test, then the integer as a <c>CobolDec</c>, never landed on <c>Int128</c> (an SDIDI integer
+    /// reaches far past it). Only <c>IntrinsicRenderer.RawArg</c> emits it (kb/Work PB651).</summary>
+    public static string IntegerArgUnboundedDec(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgUnboundedDec)}({value})";
+
     /// <summary>The §15.3 type-6 intake for a value on ONE of the operand carriers, keyed by carrier KIND — the ONE
     /// family of landings the renderer's bounded (<c>long</c>) and total (<c>Int128</c>) integer arguments share,
     /// so the integrality rule (kb/Work PB1526) is asked on every carrier and a new carrier is a compile error in

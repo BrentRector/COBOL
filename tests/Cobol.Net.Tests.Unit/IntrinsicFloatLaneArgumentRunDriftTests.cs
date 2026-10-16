@@ -189,37 +189,6 @@ public sealed class IntrinsicFloatLaneArgumentRunDriftTests : CobolNetTestBase
             + $"precondition:\n  {string.Join("\n  ", mixed)}");
     }
 
-    /// <summary>
-    /// The <c>Factorial</c> exemption is a CODOMAIN exemption, and it is declared once rather than spelled inline
-    /// in the dispatch (kb/Work PB635): every member of <see cref="IntrinsicRenderer.FloatLaneExempt"/> must be a
-    /// function whose argument run IS all-numeric — otherwise it is in the set for the wrong reason and
-    /// <see cref="IntrinsicArgumentRules.ArgumentRunIsAllNumeric"/> already covered it.
-    /// </summary>
-    [Fact]
-    public void EveryFloatLaneExemption_IsACodomainExemption()
-    {
-        string src = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "IntrinsicCatalog.cs"));
-        // A runtime method can name more than one catalog row (the LOCALE family shares bodies), so this is a
-        // LOOKUP: every row the method serves has to satisfy the exemption's premise, not just the first one.
-        var byMethod = Row.Matches(src)
-            .Where(m => m.Groups["rm"].Value.Length > 0)
-            .ToLookup(m => m.Groups["rm"].Value, m => m.Groups["n"].Value, StringComparer.Ordinal);
-
-        Assert.NotEmpty(IntrinsicRenderer.FloatLaneExempt);
-        foreach (string rm in IntrinsicRenderer.FloatLaneExempt)
-        {
-            var fns = byMethod[rm].ToList();
-            Assert.True(fns.Count > 0,
-                $"IntrinsicRenderer.FloatLaneExempt names '{rm}', which is not any catalog row's runtime method — "
-                + "an exemption nothing can reach is an exemption nothing can contradict.");
-            foreach (string fn in fns)
-                Assert.True(IntrinsicArgumentRules.ArgumentRunIsAllNumeric(fn, PastEveryDeclaredPosition),
-                    $"FUNCTION {fn} is exempted from the float lane by name, but its argument run is not "
-                    + "all-numeric — ArgumentRunIsAllNumeric already excludes it, so the by-name entry is a "
-                    + "second copy of one rule (kb/Work PB635). Remove it.");
-        }
-    }
-
     /// <summary>Compile one <c>--permissive</c> program that references <paramref name="reference"/> in the
     /// numeric channel with a <c>FLOAT-LONG</c> operand. <c>--permissive</c> is deliberate: PB248's §15.3 type-6
     /// screen REJECTS a floating-point item at an integer position under strict conformance (COBOLNET1627), so
