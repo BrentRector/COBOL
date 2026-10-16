@@ -1,4 +1,4 @@
-## PB2730 + PB2719: the generated parser has one generator and one up-to-date decision over every input
+## Entry 2081 — 2026-10-16 08:56 PDT — PB2730 + PB2719: the generated parser has one generator and one up-to-date decision over every input
 
 Wave 1092 C (PB1754 R3), two R2 findings with one root: the ANTLR generation was decided and run in two places.
 
@@ -54,3 +54,4 @@ its cost, because a tier the gate does not check at every gate is a tier on trus
 dear guard and proves it lands in leg 1 (red with the fix removed), and `ThePlan_Orders…` pins the name to
 `nameof(HostWitnessTraitDriftTests)`. Sweep: 185 other sweep cases are over the threshold and stay leg 2 by the
 design's cost rule; the guard is the only one whose rule is the gate's own tier membership.
+
