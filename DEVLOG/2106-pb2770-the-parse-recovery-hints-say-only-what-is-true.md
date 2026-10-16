@@ -1,4 +1,4 @@
-## PB2770: the parse-recovery hints say only what is true
+## Entry 2106 — 2026-10-16 13:11 PDT — PB2770: the parse-recovery hints say only what is true
 
 `CobolErrorStrategy.GuessCobolIntent` carried four hints keyed on a word's spelling that won the message wherever the
 parse happened to fail at that word, and each claimed a limitation the compiler does not have (kb/Work PB2770, an R2
@@ -37,3 +37,4 @@ paragraph name — the parser is treating it as a qualified reference.". The hin
 `ParseRecoveryHintTruthTests` gains the two literal rows (which now read COBOL0001 and the COBOL0307 guess). The doc
 names the one remaining spelling test as what it is, a suppression of the missing-period guess, never a hint added
 because of a spelling.
+
