@@ -13,3 +13,7 @@ Wave 1091 group F. PB1012 was filed on 2026-09-22 as an analysis note. It said t
 **Rows.** Batch `w1091f-pb1012` restates rows 4 and 7 with their current witnesses, so their notes no longer say "test-ref empty", and adds the positive golden to rows 3 and 6. GAP stays at 98. PB1012 is `landed` with `closes_rows: []` and a reason that names the landings that had already closed its rows.
 
 No compiler change, no diagnostic codes used (COBOLNET3854 to 3856 returned).
+
+**Self-review.** The diff adds only goldens, manifest rows, a verdict batch and the note. Each golden comment has its citations re-checked with `cite.py --check`. Each golden has a unique PROGRAM-ID and class names, and each expected output is derived from the source. Each negative refuses with exactly one diagnostic, from the rule it names. Semgrep verify: PASS, no counts changed.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T131204Z-691b30). The three new cases passed in leg 1. Linux gate: the lander's (batched gating).
