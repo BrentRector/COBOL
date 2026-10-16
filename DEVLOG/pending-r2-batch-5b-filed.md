@@ -1,0 +1,7 @@
+## R2 batch 5b filed: 7 PB1754 notes (data binding, data-binding-7 and -8), two tooling notes
+
+R2 batch 5b reviewed shards data-binding-7 and data-binding-8 along the architecture, code, performance, duplication and modern-csharp dimensions at pin 8be230068. All 10 pairs were read complete by 71 agents in one Workflow run (wf_eb2731ff-e57, Mythos lane), which took 10.54 M subagent tokens in 42 minutes. `r2_collect` reported COMPLETE: 10 findings upheld in 9 mechanisms (1 merged as duplicates), 1 refuted, 0 unverified, 30 leads, 2 invalid and 11 already tracked. Seven of the nine mechanisms are filed as new notes, PB3251 to PB3257 (3 defect, 2 extract, 2 unify); two merged into existing notes (data-binding-7--duplication--f1#2 into PB3221, data-binding-8--architecture--f1#1 into PB3214). No finding had a stale path. The batch's cost record is appended to `cost.r2.batches` in scripts/orchestrator/model_rules.json (kb/Work PB2707). Batch 5 continues: 5a and 5c to 5i remain. This branch is cut from the batch-4b notes branch (notes-PB1754-r2b4b-20261016, tip 07e7e04ae) because every batch appends to the same JSON array; it lands through that branch unless it lands first.
+
+Two tooling defect notes were filed with it:
+- PB3258: the implementer dispatch spec never says push: wave 1091 F ended DONE with its branch unpushed.
+- PB3259: r2_collect.same_mechanism merges distinct defects into one note on site overlap.
