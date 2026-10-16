@@ -1291,6 +1291,28 @@ of an unsupported facility.
   document to list, and would refuse a program the standard permits. Pinned by `conformance:2023/pb2623_method_is_a_user_word_at_2023`,
   `negative/pb2623-method-reserved-at-2002-2014` and `MethodUserWordTests`.
 
+- **D-RW3 — the COBOL-85, 2002 and 2014 reservation flags, and how they meet the removed-construct rows (kb/Work
+  PB656).** §8.9 decides the 2023 flags only; the repository holds no 1985, 2002 or 2014 text, so CLAUDE.md rule 1's
+  precedence gives the earlier editions' flags to GnuCOBOL: its per-standard word lists (`scripts/gen-reserved-words.ps1`,
+  facts only) and, for a facility's edition edges, its 3.2 dialect files `cobol2002.conf` / `cobol2014.conf`. ISO
+  Annex E.2 item 25 ("The following reserved words have been added", `cite.py --check E.2 "The following reserved words
+  have been added"` → OK) speaks about one edge only, because E.1 lists "the substantive changes between the previous
+  COBOL standard and this" one (`cite.py --check E.1 "substantive changes between the previous COBOL standard and
+  this"` → OK): its 16 words were user-defined at 2014, which the generator ASSERTS of the 2014 list, and it says
+  nothing about 2002. So SEND, RECEIVE and END-RECEIVE are reserved at 2002, like the rest of the communication
+  facility's vocabulary (CD, DISABLE, ENABLE, PURGE, …), which GnuCOBOL records as obsolete there and removed at 2014;
+  an earlier generator cleared their 2002 flag on the wider reading and left one facility half reserved.
+  A word's reservation and its construct's availability are TWO facts: nothing in the standard ties a reserved word to
+  a construct that spells it, and GnuCOBOL 3.2 at `-std=cobol2002` refuses both the SEGMENT-LIMIT clause ("does not
+  conform to COBOL 2002") and `01 SEGMENT-LIMIT` — so SEGMENT-LIMIT stays reserved at 2002 though the clause left
+  there (VCR row 7.8), and COBOL stays reserved through 2014 (refused as a data-name by `cobc -std=cobol2014` too),
+  a compiler-directive word only at 2023 (§8.3.2.1 2), §8.12). The same source dates the PADDING CHARACTER clause:
+  obsolete 2002 (COBOLNET0903), removed 2014 (VCR row 7.20). ⚠ DETERMINATION (owner may overturn; a 2002 or 2014
+  text overturns any flag in one generator run): pinned by the version-matrix rows `receive-as-user-word`,
+  `end-receive-as-user-word`, `segment-limit-removed-2002`, `padding-character-removed-2014`, the negatives
+  `user-word-receive` / `user-word-end-receive` (85 2002 2023) and
+  `conformance:2002/pb656_padding_character_obsolete_2002`.
+
 - **D-DECLREF — the declaratives reference boundary: an SR4 violation is an error, an SR3 violation is a warning
   (kb/Work PB362).** §14.9.49.3 SR3 ("Within a declarative procedure, there shall be no reference to any
   nondeclarative procedures except in a RESUME statement") and SR4 ("Procedure-names within a declarative section

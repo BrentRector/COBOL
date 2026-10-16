@@ -721,7 +721,9 @@ internal sealed class VersionConformancePass
         /// character, DELETED from the standard: the 2023 file control entry's clauses are §12.4.5.4–§12.4.5.15
         /// and none is PADDING, and the word appears nowhere in the 2023 text (§8.9's list runs PACKED-DECIMAL →
         /// PAGE). Parsed-and-ignored at 85/2002 (a compiler with no blocking model has nothing to pad — the
-        /// MULTIPLE FILE / RERUN posture, and NIST SQ216A/SQ217A both write the clause), gated here from 2014.
+        /// MULTIPLE FILE / RERUN posture, and NIST SQ216A/SQ217A both write the clause), gated here: the registry row
+        /// carries obsolete 2002 (COBOLNET0903) and removed 2014 (COBOLNET0902), GnuCOBOL's edges, the repository
+        /// holding no 2002/2014 text (kb/Work PB656; VCR row 7.20).
         /// <para>⛔ THE ABSENCE OF THIS ARM WAS THE DEFECT (kb/Work PB300): the clause parsed at EVERY edition
         /// with nothing reading the rule, so `--std 2023` accepted a clause the targeted standard does not
         /// contain and said nothing — the one leniency in the compiler that was on neither dialect axis.</para></summary>
