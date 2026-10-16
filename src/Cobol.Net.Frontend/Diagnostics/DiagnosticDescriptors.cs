@@ -26,20 +26,14 @@ public static class DiagnosticDescriptors
         "{0}");
 
     // ══════════════════════════════════════
-    // COBOL0100–0109: Parser — unsupported feature warnings
+    // COBOL0100: Parser — a misplaced OCCURS KEY phrase
     // ══════════════════════════════════════
     public static readonly DiagnosticDescriptor COBOL0100 = new("COBOL0100", DiagnosticSeverity.Warning,
         "ASCENDING/DESCENDING KEY is out of place: in an OCCURS clause the KEY phrases are written before INDEXED BY (ISO §13.18.38.2).");
-    public static readonly DiagnosticDescriptor COBOL0101 = new("COBOL0101", DiagnosticSeverity.Warning,
-        "BLANK WHEN ZERO may not be recognized. Check that it appears as a single clause on the data item.");
-    public static readonly DiagnosticDescriptor COBOL0102 = new("COBOL0102", DiagnosticSeverity.Warning,
-        "This SET form may not be supported. Supported forms: SET identifier TO value, SET condition TO TRUE/FALSE, SET index UP/DOWN BY integer.");
-    public static readonly DiagnosticDescriptor COBOL0103 = new("COBOL0103", DiagnosticSeverity.Warning,
-        "SEARCH statement may not be fully supported.");
-    // COBOL0104 (OCCURS DEPENDING ON), 0105 (INSPECT CONVERTING) and 0106 (INITIALIZE REPLACING)
-    // were "not yet supported" hints for features that now work; removed (DEVLOG 232).
-    public static readonly DiagnosticDescriptor COBOL0107 = new("COBOL0107", DiagnosticSeverity.Warning,
-        "EVALUATE with ALSO (multi-subject) may not be fully supported.");
+    // COBOL0101-0107 were "may not be supported" / "not yet supported" hints keyed on a word's spelling, each
+    // claiming a limitation the compiler does not have: 0104 (OCCURS DEPENDING ON), 0105 (INSPECT CONVERTING) and
+    // 0106 (INITIALIZE REPLACING) were removed by DEVLOG 232; 0101 (BLANK WHEN ZERO), 0102 (SET), 0103 (SEARCH) and
+    // 0107 (EVALUATE ALSO) by kb/Work PB2770.
 
     // ══════════════════════════════════════
     // COBOL0200–0201: Parser — reserved word conflicts

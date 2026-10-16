@@ -152,7 +152,6 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         var stream = (ITokenStream)recognizer.InputStream;
         var prev = GetToken(stream, token.TokenIndex - 1);
         var ruleStack = recognizer.GetRuleInvocationStack().ToArray();
-        string tokenUpper = token.Text?.ToUpperInvariant() ?? "";
 
         // 0. Vendor JSON/XML statements are NOT ISO/IEC 1989 constructs (0 spec occurrences; owner decision 2,
         // DEVLOG 581): the hard-reserved JSON/XML lexer tokens can only surface here as a misplaced vendor statement
@@ -280,11 +279,11 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0304, "Missing period after paragraph name — the parser is treating it as a qualified reference.", 5));
 
         // 5. STATUS where IDENTIFIER expected
-        if (tokenUpper == "STATUS" && expectedTokens?.Contains("IDENTIFIER") == true)
+        if (token.Type == CobolLexer.STATUS && expectedTokens?.Contains("IDENTIFIER") == true)
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0200, "STATUS is a reserved word here. For file status, use 'FILE STATUS IS <data-name>'.", 10));
 
         // 6. PROGRAM where IDENTIFIER expected
-        if (tokenUpper == "PROGRAM" && expectedTokens?.Contains("IDENTIFIER") == true)
+        if (token.Type == CobolLexer.PROGRAM && expectedTokens?.Contains("IDENTIFIER") == true)
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0201, "PROGRAM is a reserved word. If this is a paragraph name, it cannot be named PROGRAM.", 10));
 
         // 7. Unrecognized keyword in SPECIAL-NAMES
@@ -295,40 +294,38 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         // catches is its POSITION: §13.18.38.2 writes the OCCURS clause's KEY phrases BEFORE INDEXED BY, so a KEY phrase
         // after it finds the entry ready to end. The hint used to claim the clause was "not yet supported" and that a
         // table had been created without a key — false on both counts.
-        if ((tokenUpper == "ASCENDING" || tokenUpper == "DESCENDING") &&
-            expectedTokens?.Contains("'.'") == true)
+        if (token.Type is CobolLexer.ASCENDING or CobolLexer.DESCENDING && expectedTokens?.Contains("'.'") == true)
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0100, "ASCENDING/DESCENDING KEY is out of place: in an OCCURS clause the KEY phrases are written before INDEXED BY (ISO §13.18.38.2).", 5));
 
-        // 9. BLANK WHEN ZERO as separate tokens
-        if (tokenUpper == "BLANK" && expectedTokens?.Contains("'.'") == true)
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0101, "BLANK WHEN ZERO may not be recognized. Check that it appears as a single clause on the data item.", 15));
-
-        // 10. SET statement forms
-        if (tokenUpper == "SET" && IsInRule(ruleStack, "procedureDivision"))
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0102, "This SET form may not be supported. Supported forms: SET identifier TO value, SET condition TO TRUE/FALSE, SET index UP/DOWN BY integer.", 15));
-
-        // 11. SEARCH statement
-        if (tokenUpper == "SEARCH" && IsInRule(ruleStack, "procedureDivision"))
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0103, "SEARCH statement may not be fully supported.", 15));
+        // ⛔ NO "MAY NOT BE SUPPORTED" GUESS KEYED ON A WORD'S SPELLING (kb/Work PB2770). The hints that stood here
+        // (COBOL0101 BLANK WHEN ZERO "may not be recognized", COBOL0102 "this SET form may not be supported",
+        // COBOL0103 "SEARCH statement may not be fully supported", and COBOL0107 "EVALUATE with ALSO may not be fully
+        // supported" below) fired on the WORD, wherever the parse happened to fail at it, and each stated a
+        // limitation the compiler does not have: every one of those constructs is implemented, so the claim sent the
+        // user after a cause that does not exist (`MOVE 1 SET X TO 2` lacks MOVE's TO). They are deleted, as DEVLOG
+        // 232 deleted COBOL0104-0106 and COBOL0311; a structural hint above (0a-0f) reads the ATN or the parser state.
 
         // 12. THROUGH/THRU in unexpected context
-        if ((tokenUpper == "THROUGH" || tokenUpper == "THRU") && expectedTokens?.Contains("'.'") == true)
+        if (token.Type is CobolLexer.THROUGH or CobolLexer.THRU && expectedTokens?.Contains("'.'") == true)
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0300, "THROUGH/THRU is not recognized in this context. Check PERFORM or VALUE THROUGH syntax.", 10));
 
-        // 13. Misplaced END-xxx terminators
-        if (tokenUpper.StartsWith("END-"))
-        {
-            string stmt = tokenUpper[4..]; // "IF", "PERFORM", etc.
-            if (!IsInMatchingRule(ruleStack, stmt))
-                hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0306, $"{tokenUpper} appears without a matching {stmt} statement.", 5));
-        }
+        // 13. A misplaced explicit scope terminator (ISO §14.5.3.2), keyed on the token TYPE and on the statement
+        // rules the ATN says can match it (kb/Work PB2770), never on the word's spelling: END-SEARCH closes both SEARCH
+        // rules, and a word that closes no statement (END-OF-PAGE, a user word spelled END-…) is no terminator at all.
+        var terminator = ScopeTerminator(recognizer, token.Type);
+        if (terminator is not null && !ruleStack.Any(terminator.Statements.Contains))
+            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0306,
+                $"{terminator.Word} appears without a matching {terminator.StatementName} statement.", 5));
 
         // 14. Missing period at end of sentence — a GUESS, and the lowest-priority one here, so it is suppressed
         // once a STRUCTURAL diagnosis has already named what the general format requires at this position
         // (priority 0). Otherwise `GO TO DEPENDING ON X.` read "…at least one procedure-name is required. A
         // period may be missing at the end of the previous sentence." — the second sentence contradicting the
-        // first (kb/Work PB412).
-        if (expectedTokens?.Contains("'.'") == true && !tokenUpper.StartsWith("END-")
+        // first (kb/Work PB412). A word SPELLED like a scope terminator is exempt whether or not it is one: whoever
+        // wrote END-INVOKE (no ISO word, kb/Work PB758) or END-OF-PAGE at a sentence end meant to close something,
+        // and a missing period is not what went wrong. Here the spelling is the evidence, so the text is the test.
+        if (expectedTokens?.Contains("'.'") == true
+            && !(token.Text is { } spelled && CobolNames.StartsWith(spelled, "END-"))
             && hints.TrueForAll(h => h.Priority > 0))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0307, "A period may be missing at the end of the previous sentence.", 25));
 
@@ -342,18 +339,14 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0309, "A literal value is expected here, not a data-name.", 20));
 
         // 17. Missing BY in INDEXED BY
-        if (tokenUpper != "BY" && expectedTokens?.Contains("'BY'") == true &&
+        if (token.Type != CobolLexer.BY && expectedTokens?.Contains("'BY'") == true &&
             IsInRule(ruleStack, "dataDescriptionEntry"))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0310, "Missing BY keyword. INDEXED BY requires 'INDEXED BY <index-name>'.", 10));
-
-        // 18. Complex EVALUATE forms
-        if (tokenUpper == "ALSO" && IsInRule(ruleStack, "evaluateStatement"))
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0107, "EVALUATE with ALSO (multi-subject) may not be fully supported.", 10));
 
         // 19. FILE CONTROL / SELECT context errors
         if (IsInRule(ruleStack, "fileControlParagraph") &&
             !IsIdentifier(token) && !IsLiteral(token) &&
-            tokenUpper != "SELECT" && tokenUpper != "ASSIGN" && tokenUpper != "FILE_CONTROL")
+            token.Type is not (CobolLexer.SELECT or CobolLexer.ASSIGN or CobolLexer.FILE_CONTROL))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0312,
                 "Unexpected token in FILE-CONTROL paragraph. Check SELECT/ASSIGN TO syntax.",
                 10));
@@ -556,6 +549,54 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         public void Report(in EditionDiagnostic d) => Message = d.Message;
     }
 
+    // ── The explicit scope terminators (kb/Work PB2770) ──
+
+    /// <summary>An explicit scope terminator (ISO §14.5.3.2): its reserved word, the statement-name it is defined for
+    /// (Table 12 pairs END-x with x), and the grammar's statement rules that match it.</summary>
+    private sealed record ScopeTerminatorInfo(string Word, string StatementName, HashSet<string> Statements);
+
+    private static Dictionary<int, ScopeTerminatorInfo>? _scopeTerminators;
+
+    /// <summary>The scope terminator a token TYPE is, or null — read ONCE from the ATN, never from the token's text:
+    /// a lexer word spelled END-x that some <c>…Statement</c> rule matches in its own body is the terminator of the
+    /// statements those rules spell (END-SEARCH → searchStatement and searchAllStatement). END-OF-PAGE, which only a
+    /// WRITE phrase matches, and a user-defined word spelled END-… (END-INVOKE is no ISO word, kb/Work PB758) are
+    /// no terminator, so the misplaced-terminator hint never names a statement for them. Cached in a static because
+    /// the ATN is a static of the generated parser; a benign race recomputes the same map.</summary>
+    private static ScopeTerminatorInfo? ScopeTerminator(Parser recognizer, int tokenType)
+    {
+        _scopeTerminators ??= BuildScopeTerminators(recognizer);
+        return _scopeTerminators.GetValueOrDefault(tokenType);
+    }
+
+    private static Dictionary<int, ScopeTerminatorInfo> BuildScopeTerminators(Parser recognizer)
+    {
+        const string prefix = "END-";
+        var map = new Dictionary<int, ScopeTerminatorInfo>();
+        foreach (var state in recognizer.Atn.states)
+        {
+            if (state is null) continue;
+            string rule = recognizer.RuleNames[state.ruleIndex];
+            if (!rule.EndsWith("Statement", StringComparison.Ordinal)) continue;
+            for (int i = 0; i < state.NumberOfTransitions; i++)
+            {
+                var t = state.Transition(i);
+                if (t is not (Antlr4.Runtime.Atn.AtomTransition or Antlr4.Runtime.Atn.SetTransition)
+                    || t is Antlr4.Runtime.Atn.NotSetTransition || t.Label is null)
+                    continue;
+                foreach (int type in t.Label.ToIntegerList())
+                {
+                    string? word = recognizer.Vocabulary.GetLiteralName(type)?.Trim('\'');
+                    if (word is null || !word.StartsWith(prefix, StringComparison.Ordinal)) continue;
+                    if (!map.TryGetValue(type, out var info))
+                        map[type] = info = new(word, word[prefix.Length..], new HashSet<string>(StringComparer.Ordinal));
+                    info.Statements.Add(rule);
+                }
+            }
+        }
+        return map;
+    }
+
     // ── The required-imperative test (kb/Work PB396) ──
 
     /// <summary>FIRST(<c>statementBlock</c>) — every token that can begin the grammar's imperative-statement
@@ -709,12 +750,6 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
 
     private static bool IsInRule(string[] ruleStack, string ruleName)
         => ruleStack.Any(r => CobolNames.Same(r, ruleName));
-
-    private static bool IsInMatchingRule(string[] ruleStack, string stmtName)
-    {
-        string ruleName = stmtName.ToLowerInvariant() + "Statement";
-        return ruleStack.Any(r => CobolNames.Same(r, ruleName));
-    }
 
     private static string Truncate(string? text, int max)
     {
