@@ -11,6 +11,7 @@
   "pb3101-property-accessors-group-and-elementary",
   "pb3101-prototype-bit-group-positions",
   "pb3127-nested-any-length-clause-differs",
+  "pb3164-method-duplicate-constant-unequal",
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",
   "pb2532-comment-paragraph-repeated",
