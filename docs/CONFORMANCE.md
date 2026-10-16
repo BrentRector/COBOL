@@ -980,6 +980,33 @@ of an unsupported facility.
   GR17 passes control to imp-4 (WHEN COMMON) "at the completion of the execution of imperative-statement-2"; a RESUME
   (§14.9.33) is a transfer of control OUT of imp-2, so imp-2 does not "complete" and the GR17→imp-4 hand-off is not
   taken. **Pinned choice: a WHEN that RESUMEs (NEXT STATEMENT) does NOT run WHEN COMMON.**
+- **D-F3S — the reach of an exception-checking PERFORM's WHEN phrase: dynamic within the activation, bounded by it
+  (§14.9.28.4 GR1, GR17, GR20; §14.6.13.1.4 2); §9.1.12 1); the clauses word the scope three ways)** (kb/Work PB442).
+  GR17 reads "during the execution of imperative-statement-1", §9.1.12 1) "an active PERFORM statement", §14.6.13.1.4
+  2) "the executed statement is within imperative-statement-1", and GR1 puts in the range "all statements that are
+  executed as the result of a transfer of control in the range", a CALLed program's included. **Pinned reading, which
+  the standard's own propagation rules decide:** (a) **within one activation the reach is the PERFORM's dynamic
+  range** — a condition raised in a paragraph PERFORMed (or reached by GO TO) from imperative-statement-1 selects the
+  WHEN exactly as one written inside it, and GR20's "statement in imperative-statement-1 in which the exception
+  condition occurred" is the statement that raised it, the one §14.9.33.4 GR2 a) 1. names for RESUME NEXT STATEMENT;
+  (b) **it stops at the activation boundary** — an exception status indicator "exists for each function, method, or
+  program" (§14.6.13.1.1), so a condition raised in a CALLed program, an activated function or an INVOKEd method is
+  processed there (its own conditional phrase, its own exception-checking PERFORM, its own USE statements), and it
+  reaches the activator only when propagated: GOBACK / EXIT … RAISING raises it "in the activating runtime element"
+  (§14.9.18.4 GR1 b)), as does `>>PROPAGATE ON` (§14.6.13.1.3 6)), with the CALL or INVOKE as the statement it
+  occurred in (§14.9.33.4 GR2 a) 2.) — and there the activator's WHEN selects it. Reading (b) is also the one the
+  design recorded as the owner's default (`docs/COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN.md` D12 (d)). (c) **Enablement stays
+  lexical and is a separate question**: GR14's implicit TURN is a directive "assumed before the first statement in
+  imperative-statement-1", and a TURN enables checking for the statements "that follow in the compilation group"
+  (§7.3.25.4 GR6), so a raise in a PERFORMed paragraph written outside the PERFORM is raised, and so reaches the WHEN,
+  only where checking is enabled at that paragraph's text; an I-O statement there whose EC-I-O checking is off raises
+  nothing, and §14.9.49.4 GR6 then runs its USE AFTER STANDARD EXCEPTION procedure. Realized by one mechanism: each WHEN
+  frame carries the activation that pushed it, and the frame walk stops at the first frame of another activation
+  (`ExceptionEngine.RunTopFrame`), so every activation mechanism is bounded by the run unit's one activation record.
+  Witnesses `conformance:2023/pb442_f3_when_activation_scope` (the PERFORMed paragraph, a CALLed program holding an
+  exception-checking PERFORM of its own, GOBACK … RAISING), `conformance:2023/pb442_f3_when_method_scope` (an I-O
+  raise in an INVOKEd method of a class holding such a PERFORM) and `conformance:2023/pb442_f3_when_io_enablement`
+  (reading (c): a READ in a PERFORMed paragraph written before, and after, a `>>TURN`).
 - **Exception-checking PERFORM — the implicit POP ALL and the END-PERFORM line's reference format (§14.9.28.4 GR14, the
   spec states the order, not the line)**: "Immediately preceding the END PERFORM phrase, there is an implicit POP ALL",
   and ALL includes SOURCE FORMAT (§7.3.22.4 GR2). A reference format is a property of a physical LINE (§6.5), so the

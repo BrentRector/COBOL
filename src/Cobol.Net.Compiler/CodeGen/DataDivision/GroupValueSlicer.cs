@@ -214,7 +214,7 @@ internal sealed class GroupValueSlicer(EmitContext ctx, PhysicalModel phys)
         var op = FigurativeConstants.Classify(raw);
         if (op.Kind is { } kind)
             return GroupArea.Of("", FigurativeConstants.FillChar(kind, ctx.Data.Collating,
-                group.AsIfPic?.Category ?? PicCategory.Alphanumeric, ctx.Data.NationalCollating).ToString(), width, bits);
+                IntrinsicArgumentRules.CharacterContext(IntrinsicArgumentRules.ClassOfItem(group)), ctx.Data.NationalCollating).ToString(), width, bits);
         if (op.AllLiteral is { } all && CobolLiteral.Decode(all) is { Length: > 0 } unit)
             return GroupArea.Of("", unit, width, bits);
         return CobolLiteral.IsStringLiteral(raw) ? GroupArea.Of(CobolLiteral.Decode(raw), pad, width, bits) : null;

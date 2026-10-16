@@ -1326,14 +1326,8 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                         ? $"new NonfatalSelectorFn(__ec => {U.Ec.EcDispatchExpr("__ec", "\"\"")});"
                         : "NonfatalSelectorFn.None;")
                         + "   // this method's USE selection for a runtime-site nonfatal raise (§14.9.49.4 GR4 a))");
-                if (methodF3)
-                {
-                    // The F3-method entry FLOOR (§9.10.1-C2): a method is a separate source element — its own unmatched
-                    // raises must NOT be intercepted by the ACTIVATOR's WHEN. Raise the floor to the entry depth; on
-                    // exit restore it and defensively balance the stack (matching the CALL boundary, ProgramTable).
-                    w.Line("int __f3fl = ExceptionState.RaisePerformFloor(); int __f3pd = ExceptionState.PerformDepth;   // §9.10.1-C2 — isolate from the activator's frames");
-                    restore = $"ExceptionState.RestorePerformFloor(__f3fl); ExceptionState.TrimPerformTo(__f3pd); {restore}";
-                }
+                // No frame-stack floor here: the method's ModuleStack push is the boundary the exception-checking
+                // PERFORM's WHEN frames stop at, for EVERY method (ExceptionEngine.RunTopFrame; kb/Work PB442).
                 string run = $"__MDispatch({m.Binding!.EntryPc}, {m.Binding!.EndPc});";
                 if (copyOut.Count == 0)
                     w.Line($"try {{ {run} }} catch (MethodReturn) {{ }} finally {{ {restore} }}   "
