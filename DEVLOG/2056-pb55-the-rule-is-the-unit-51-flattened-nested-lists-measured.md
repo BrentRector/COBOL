@@ -1,4 +1,4 @@
-## PB55: the rule is the unit — 51 flattened nested lists measured and indented, 152 fragment rows folded into their rules
+## Entry 2056 — 2026-10-16 04:24 PDT — PB55: the rule is the unit — 51 flattened nested lists measured and indented, 152 fragment rows folded into their rules
 
 **What was wrong.** Whether a numbered item inside a rule became a row of the traceability inventory depended on how
 the transcription happened to indent it. Indented, `extract_rule_catalog.py` folded it into its parent rule;
@@ -64,3 +64,4 @@ cases of the touched drift-test classes were in leg 2, so they were also run on 
 plus 138/138 in the other spec-reading drift classes. After the review fixes: `=== BUILD-LOCAL GATE: LEG 1 ONLY
 (batched gating, PB2515): GREEN ===` (run 20261015T212248Z-052d86), and `CitationAuditSelfTestDriftTests` (leg 2,
 so run on that gate's binaries with `SelfTestDiscoveryDriftTests`) passed 8/8.
+
