@@ -1,5 +1,6 @@
 {
  "enabled": [
+  "pb578_advancing_page_overflow_85",
   "pb370_start_forward_operators",
   "pb370_read_relative_invalid_key",
   "pb370_use_file_beats_mode",

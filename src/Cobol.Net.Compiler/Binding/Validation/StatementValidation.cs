@@ -1528,10 +1528,13 @@ internal sealed class StatementValidation(DataBinder data)
         return false;
     }
 
-    /// <summary>§14.9.51 SR18 — ADVANCING PAGE and END-OF-PAGE shall not both be specified in one WRITE.</summary>
-    public bool CheckWriteEopAdvancingPage(bool advancingPage)
+    /// <summary>§14.9.51 SR18 — <i>"The phrases ADVANCING PAGE and END-OF-PAGE shall not both be specified in a
+    /// single WRITE statement."</i> The END-OF-PAGE phrase is the AT phrase (GR27 b)'s imperative-statement-1);
+    /// SR19 and GR28 name the NOT END-OF-PAGE phrase separately, so the caller passes true only when the WRITE
+    /// carries ADVANCING PAGE AND the AT phrase (kb/Work PB578).</summary>
+    public bool CheckWriteEopAdvancingPage(bool advancingPageWithAtEop)
     {
-        if (!advancingPage) return true;
+        if (!advancingPageWithAtEop) return true;
         data.Edition.Error("COBOLNET0861", "WRITE … ADVANCING PAGE with an END-OF-PAGE phrase: the two "
             + "shall not both be specified in a single WRITE statement (ISO §14.9.51.3 SR18)");
         return false;
