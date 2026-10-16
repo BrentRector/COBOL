@@ -1,4 +1,4 @@
-## PB661: the INVOKE arms of §8.3.2.2 are documented and GR-8.3.2.2-L4.2 is closed
+## Entry 2087 — 2026-10-16 09:52 PDT — PB661: the INVOKE arms of §8.3.2.2 are documented and GR-8.3.2.2-L4.2 is closed
 
 kb/Work PB661 asked for three §8.3.2.2 implementor determinations in `docs/CONFORMANCE.md`: (a) whether extended
 letters may appear in externalized words, (b) how AS-phrase names are formed and mapped, and (c) the mapping when no
@@ -21,3 +21,4 @@ current state: the directive admits only COBOL. The new golden is `2014/w1095g_p
 Its class states `ENTRY-CONVENTION IS COBOL` and declares `METHOD-ID. M2 AS "MixedExt"`. A typed `INVOKE T "MIXEDEXT"`
 and a universal `INVOKE U "mixedext"` both reach M2, and `INVOKE U "M2"` sets EC-OO-METHOD. These expected values come
 from the rules and the documented mapping. No compiler source changed.
+
