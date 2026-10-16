@@ -34731,13 +34731,13 @@
   "ordinal": 2,
   "subject": "COMMIT statement",
   "rule-digest": "7fe9914a2cc2",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindCommitRollback",
-  "test-ref": "conformance:negative/pb137-commit-recursive",
+  "verdict": "DOCUMENTED-NON-SUPPORT",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindCommitRollback; src/Cobol.Net.Compiler/Binding/EcNameResolution.cs; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
+  "test-ref": "conformance:negative/pb137-commit-recursive; conformance:2023/pb259_commit_rollback_under_sort; conformance:2023/pb259_commit_rollback_recursive; conformance:negative/pb137-commit-in-sort-proc; conformance:negative/declined-ec-flow-commit-turn; conformance-test:DeclinedFacilityTests.CommitAndRollback_DrawTheNamedNonSupportWarning_OncePerSite",
   "derivation": "",
   "editions": "2023",
-  "notes": "PARTIALLY LANDED (kb/Work PB137): the rule's STATIC reach is now the bind-time SR1/SR2 rejections (a recursive source element, a SORT/MERGE procedure - both COBOLNET1690, stronger than the runtime EC the rule names). REMAINING, why not CONFORMS: the DYNAMIC half - COMMIT executed 'under the control of' a recursive runtime element or an in-flight SORT/MERGE through a PERFORMed paragraph outside the static ranges - raises no EC-FLOW-COMMIT; with the facility unimplemented (no APPLY COMMIT can exist) the statement is CONTINUE-equivalent there, and 14.6.13.1.1 licenses the unraised condition while checking is not enabled. Documented residue of the A.3 non-support posture, owner-owned like the facility itself (A.4.3).",
-  "state": "GAP"
+  "notes": "CLOSED by kb/Work PB259 (w1033 adjudication, refuter-upheld; landed w1095d). GR2 SETS EC-FLOW-COMMIT when COMMIT is executed under the control of a recursive runtime element or a file SORT/MERGE; that condition is the commit and rollback module's own (§9.1.18.7; Annex A.4.3 item 1, COMMIT itself item 4), which docs/CONFORMANCE.md §5 records Not claimed (§4 item 2), and A.4.1 makes a module's exception conditions optional with it; §14.6.13.1.1 does not require a level-3 condition of an unimplemented element to be raised. Selected by the commit-and-rollback-only derived selector (its EC-FLOW-(COMMIT|ROLLBACK) exclusion is dropped). STATIC reach: §14.9.7.3 SR1/SR2 reject the statement in a recursive source element or a SORT/MERGE procedure at bind (COBOLNET1690, negative/pb137-commit-recursive, pb137-commit-in-sort-proc). DYNAMIC reach: the statement compiles with the named COBOLNET1579 warning and is GR1's CONTINUE with no EC raised even under EC-ALL checking, pinned by conformance:2023/pb259_commit_rollback_under_sort (a paragraph PERFORMed from both SORT procedures) and pb259_commit_rollback_recursive (a separately compiled program called from an active RECURSIVE one). The name itself is refused at the A.4.3 item 3 sites (COBOLNET1710, negative/declined-ec-flow-commit-turn).",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.7.4-3",
@@ -42186,13 +42186,13 @@
   "ordinal": 2,
   "subject": "ROLLBACK statement",
   "rule-digest": "373cffc24578",
-  "verdict": "PARTIAL",
+  "verdict": "DOCUMENTED-NON-SUPPORT",
   "code-location": "src/Cobol.Net.Compiler/Binding/Bound/StatementBinder.cs#BindCommitRollback; src/Cobol.Net.Compiler/Binding/EcNameResolution.cs; src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateSortMergeProcedures",
-  "test-ref": "",
+  "test-ref": "conformance:2023/pb259_commit_rollback_under_sort; conformance:2023/pb259_commit_rollback_recursive; conformance:negative/pb137-rollback-in-function; conformance:negative/pb812-rollback-in-inverted-sort-procedure; conformance:negative/declined-ec-flow-rollback-raise; conformance-test:DeclinedFacilityTests.CommitAndRollback_DrawTheNamedNonSupportWarning_OncePerSite",
   "derivation": "",
   "editions": "2023",
-  "notes": "kb/Work PB259 (registrar 14c). cite.py --check 14.9.36.4 \"the exception condition EC-FLOW-ROLLBACK is set to exist\" -> OK §14.9.36.4 2) ('If this statement is attempted to be executed under the control of a recursive runtime element or a file SORT or MERGE statement ...'). STATIC reach: the SR1/SR2 bind-time COBOLNET1690 rejections (see those rows) make the textual cases unreachable. DYNAMIC half not implemented: out/probe/rollback/rb8_performed_from_sort.cob - ROLLBACK in a paragraph PERFORMed from a SORT INPUT PROCEDURE (outside the static range) compiles, and at run time prints HELPER / SORTED with no EC-FLOW-ROLLBACK; EcNameResolution registers EC-FLOW-ROLLBACK as a DeclinedModuleExceptionName with zero setting sites. Licence in play: §14.6.13.1.1 (--check \"The implementor is not required to raise any exception conditions for level-3 exception-names\" -> OK) excuses level-3 ECs of unimplemented optional elements, and CONFORMANCE.md §5 A.4.3 declines commit/rollback incl. EC-FLOW-ROLLBACK - but the derived selector commit-and-rollback-only EXCLUDES this row by its EC-FLOW-(COMMIT|ROLLBACK) arm, handing the decision to kb/Work PB259, which holds the exact COMMIT twin GR-14.9.7.4-2 (PARTIAL) open as a genuine adjudication yet does not list this row in inventory_rows. Verdict mirrors the twin; the row belongs to PB259's decision, not to a new defect. retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
-  "state": "GAP"
+  "notes": "CLOSED by kb/Work PB259 (w1033 adjudication, refuter-upheld; landed w1095d), the ROLLBACK twin of GR-14.9.7.4-2. GR2 SETS EC-FLOW-ROLLBACK when ROLLBACK is executed under the control of a recursive runtime element or a file SORT/MERGE; that condition is the commit and rollback module's own (§9.1.18.7; Annex A.4.3 item 1, ROLLBACK itself item 5), which docs/CONFORMANCE.md §5 records Not claimed (§4 item 2), and A.4.1 makes a module's exception conditions optional with it; §14.6.13.1.1 does not require a level-3 condition of an unimplemented element to be raised. Selected by the commit-and-rollback-only derived selector (its EC-FLOW-(COMMIT|ROLLBACK) exclusion is dropped). STATIC reach: §14.9.36.3 SR1/SR2 reject the statement in a recursive source element or a SORT/MERGE procedure (COBOLNET1690, negative/pb137-rollback-in-function, pb812-rollback-in-inverted-sort-procedure). DYNAMIC reach: COBOLNET1579 at the site and GR1's CONTINUE with no EC raised even under EC-ALL checking, pinned by conformance:2023/pb259_commit_rollback_under_sort and pb259_commit_rollback_recursive. The name is refused at the A.4.3 item 3 sites (COBOLNET1710, negative/declined-ec-flow-rollback-raise). retired-witness: src/Cobol.Net.Compiler/Validation/VersionConformancePass.cs#GateMergeInSortMergeProc (the method was generalised and renamed GateSortMergeProcedures (kb/Work PB1139); same arm, same site)",
+  "state": "OK"
  },
  {
   "rule-id": "GR-14.9.36.4-3",
