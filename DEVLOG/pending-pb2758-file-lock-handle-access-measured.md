@@ -33,3 +33,12 @@ is, and the CLOSE gives the handle back (§9.1.15 3), checked). To see it fail, 
 `EveryOrganisationsHandleAccessLiesInThatBand` stayed green, which is the scenario the finding described.
 DESIGN-runtime-library.md and COBOLNET_FILES_DESIGN.md name the new member and the test. No inventory row is
 affected (a behavior-neutral restructuring), and no golden is added because nothing a program can observe changed.
+
+**Runtime ABI pin.** The first gate went red on one test,
+`RuntimeAbiPinDriftTests.TheRuntimeMajor_IsPinnedBesideTheShippedSurfaceAndTheCodecImages`, because removing
+`KeyedConnector.Store` changed the shipped public surface. The surface hash is re-pinned (BD194B97DB604BBC to
+623DD4736ADB8680) and the major stays 5. This is the test's "re-pin alone" case: nothing that crosses a module
+boundary changed. `Store` was `protected` on a class with `private protected abstract` members, so no assembly other
+than the runtime could ever subclass `KeyedConnector` and reach it. No compiled module could reference it, and
+raising the major would refuse every module compiled at 5 for no reason. The compare oracle reads IDENTICAL over
+7999 cases, and the semgrep counts are unchanged.
