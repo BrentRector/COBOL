@@ -96,7 +96,7 @@ public sealed class DataItem
     internal RestrictedPrototype? RestrictedPrototype { get; set; }
 
     /// <summary>⛔ THE TYPE OF A RESTRICTED PROGRAM- OR FUNCTION-POINTER (kb/Work PB2464): the signature class its
-    /// <see cref="RestrictedPrototype"/> belongs to, set post-build by <c>DataBinder.ClassifyRestrictedPrototypes</c>
+    /// <see cref="RestrictedPrototype"/> belongs to, set post-build by <c>PrototypeSignatureClasses.Classify</c>
     /// once every forest's <see cref="RestrictedPrototype"/> is resolved
     /// (<c>PrototypeSignatureClasses</c>) — the prototype-pointer twin of <see cref="PicInfo.RestrictedTypeDecl"/>.
     /// ISO §13.18.60.4 GR25 / GR26 type such a pointer by SIGNATURE ("shall contain only … the address of a program
@@ -107,7 +107,7 @@ public sealed class DataItem
     /// so that the PICTURE profile's record text (the §8.5.3.1 same-type key) does not change with the stamping
     /// state. Null before resolution, for an unrestricted pointer and for every non-pointer item.</summary>
     [DescriptionCopy(DescriptionCopyKind.None,
-        "classified post-build by DataBinder.ClassifyRestrictedPrototypes from the copy's OWN RestrictedPrototype (resolved in the copy's own scope), after every clone exists")]
+        "classified post-build by PrototypeSignatureClasses.Classify from the copy's OWN RestrictedPrototype (resolved in the copy's own scope), after every clone exists")]
     public string? PointerRestrictionIdentity { get; set; }
 
     /// <summary>GROUP-USAGE (ISO §13.18.29; data-model design D20; kb/Work PB79) — <see cref="Model.GroupUsage.None"/>

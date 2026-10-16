@@ -1320,8 +1320,8 @@ callUsingPhrase
 // still writable: a literal that opens an argument list or follows a BY phrase is a literal, `USING +1 N` and
 // `USING N BY CONTENT +1` — `N (+ 1)` is N subscripted, never a list.)
 // ⚠ HOW THE GRAMMAR SAYS IT. There is NO bare `dataReference` arm: `arithmeticExpression` subsumes the identifier, so a
-// lone identifier arrives inside an expression node and the binder recovers it (§14.9.4.4 GR8, `Gr8Classify` /
-// `ConditionBinder.SoleDataReference` — the reduction the BY CONTENT / BY VALUE arms already ran), and with no
+// lone identifier arrives inside an expression node and the binder recovers it (§14.9.4.4 GR8, `ConditionBinder.ReduceArgument`
+// over `ConditionBinder.SoleDataReference` — the reduction the BY CONTENT / BY VALUE arms already ran), and with no
 // `dataReference` alternative to win the ambiguity `N + 1` is parsed greedily as the expression. The `literal` arm
 // is the one other operand the expression spine subsumes (a numeric literal), so it carries the
 // `numericLiteralIsLeftOperand()` guard: `5 + 1` is the expression too, while `"AB"`, `ZERO`, `NULL` and a lone
@@ -1374,7 +1374,7 @@ callByReference
 // first, EVERY spelling that parses today parses identically, and the `literal` arm catches exactly the
 // residue the expression spine cannot reach: a NON-numeric literal-2. Its identifier-4 and numeric-literal-2
 // arms need no alternative at all — the spine subsumes both, and CallBinder RECOVERS them before it binds
-// (the GR8 reduction, `Gr8Classify`), which is `callByContent`'s discipline rather than its alternation.
+// (the GR8 reduction, `ConditionBinder.ReduceArgument`), which is `callByContent`'s discipline rather than its alternation.
 callByValue
     : BY? VALUE (addressIdentifier | arithmeticExpression | literal)   // introduction-gated at BIND time (StatementBinder.Call → ConstructRegistry.Check(CallByValue2002))
     ;
@@ -1389,7 +1389,7 @@ callByValue
 // numeric literal that is the left operand of an operator is the expression (`BY CONTENT 5 + 1`, kb/Work PB1135) —
 // because `arithmeticExpression` subsumes numeric literals; `dataReference` deliberately ABSENT because
 // `arithmeticExpression` subsumes it and the identifier case is recovered in the binder from a sole-dataReference
-// expression (Gr8Classify); and the boolean arm behind `{boolExprAhead()}?` because booleanExpression's leaf is
+// expression (`ConditionBinder.ReduceArgument`); and the boolean arm behind `{boolExprAhead()}?` because booleanExpression's leaf is
 // valueOperand and an unguarded alternative is ambiguous with the arithmetic one. ⛔ A bare `dataReference` arm is
 // what made `BY CONTENT N + 1` read as the two arguments N and +1 (ANTLR resolves the ambiguity to the lower
 // alternative); the binder recovers the sole identifier from the expression instead (kb/Work PB1135, decision R59).

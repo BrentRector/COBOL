@@ -184,8 +184,8 @@ invokeUsing
 // identifier path: `BY CONTENT A` began matching the expression arm, losing the §14.9.23.3 SR9/SR10 object-data
 // rules, the §14.8.2.3.2 conformance check and the ref-mod handling — and `BY CONTENT "XY"` stopped binding at
 // all. `literal` is kept because the proven literal arm keys on it; the identifier case is recovered IN THE
-// BINDER from a sole-dataReference expression (OoBinder, the SoleDataReference shape ConditionBinder and
-// IntrinsicBinder already use), because the grammar cannot express "a reference, unless it is part of an
+// BINDER from a sole-dataReference expression (InvocationArg.OfInvokeArgument, through
+// ConditionBinder.SoleDataReference), because the grammar cannot express "a reference, unless it is part of an
 // expression" without the ambiguity that caused the original defect.
 // ⚠ BY VALUE keeps `arithmeticExpression` alone and does NOT gain the boolean arm: the format's BY VALUE branch
 // is `arithmetic-expression-1 | identifier-5 | literal-2` — the two phrases genuinely differ, and only
@@ -212,7 +212,7 @@ invokeUsing
 // (96.2%) all carry one. §8.3.2.4.3. The same shape is already spelled `BY?` in CALL's three phrases
 // (CobolParserCore.g4 callByReference / callByValue / callByContent) and in the procedure-division header
 // (CobolData.g4), so this brings the last copy into line rather than inventing a posture.
-// ⚠ NOTHING DOWNSTREAM KEYS ON `BY`: OoBinder.OoBindInvokeArg selects the passing mode from `arg.VALUE()`,
+// ⚠ NOTHING DOWNSTREAM KEYS ON `BY`: InvocationArg.OfInvokeArgument selects the passing mode from `arg.VALUE()`,
 // `arg.REFERENCE()` and `arg.CONTENT()` — the UNDERLINED words — and VersionConformancePass
 // .VisitInvokeArgument gates the boolean OPERATORS, not the phrase word. Verified by grep, not assumed.
 // ⛔ OMITTED IS A BRACE ALTERNATIVE OUTSIDE THE [BY REFERENCE] BRACKET (kb/Work PB757). §14.9.23.2 prints
@@ -247,7 +247,7 @@ invokeArgument
     // an expression written with no BY is a legal argument (§14.9.23.4 GR6 a) 2 makes it BY CONTENT).
     // ⛔ A KEYWORD-LESS `N + 1` IS ONE ARGUMENT (decision R59, reversing PB130's list reading — see `callArgument`).
     // There is no bare `dataReference` arm: `arithmeticExpression` subsumes the identifier, which the binder recovers
-    // from a sole-dataReference expression (OoBindInvocationArg's `arg.Ref ?? SoleDataReference`, the path BY CONTENT
+    // from a sole-dataReference expression (InvocationArg.OfInvokeArgument's `Ref`, through ConditionBinder.SoleDataReference, the path BY CONTENT
     // already takes), so nothing wins the ambiguity over the greedy expression. The `literal` arm is guarded by
     // `numericLiteralIsLeftOperand()` for the numeric literal the spine also subsumes (`5 + 1`).
     | {boolExprAhead()}? booleanExpression

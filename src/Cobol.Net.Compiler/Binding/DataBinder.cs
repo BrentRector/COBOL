@@ -3612,7 +3612,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// those tables are built — <c>BinderDriver.ResolvePointerRestrictions</c>, over every forest that declares pointers
     /// (a method's LINKAGE roots are on its class's). A name the table does not hold resolves to nothing, and the pointer
     /// keeps its own name as its identity (<see cref="PrototypeSignatures.RestrictionIdentity"/>). The first of two
-    /// passes: <see cref="ClassifyRestrictedPrototypes"/> runs only once EVERY forest has been through this one, because
+    /// passes: <see cref="PrototypeSignatureClasses.Classify"/> runs only once EVERY forest has been through this one, because
     /// classifying a prototype follows its formals' restrictions into other forests. Both passes walk
     /// <see cref="ClauseResolutionForest"/>, the TYPEDEF templates too: a data-pointer restricted to a type is compared
     /// through that type's TEMPLATE, whose own program-pointer members must be typed by their prototype's signature
@@ -3630,15 +3630,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 };
     }
 
-    /// <summary>⛔ Give every restricted PROGRAM- or FUNCTION-pointer this forest declares the TYPE its resolved
-    /// prototype gives it (kb/Work PB2464): the identity of the prototype's signature class
-    /// (<see cref="DataItem.PointerRestrictionIdentity"/>), the second pass of <c>BinderDriver.ResolvePointerRestrictions</c>
-    /// after <see cref="ResolveRestrictedPrototypes"/> has run over every forest.</summary>
-    internal void ClassifyRestrictedPrototypes(PrototypeSignatureClasses classes)
+    /// <summary>⛔ Every restricted PROGRAM- or FUNCTION-pointer this forest declares whose prototype resolved, for the
+    /// second pass of <c>BinderDriver.ResolvePointerRestrictions</c> after <see cref="ResolveRestrictedPrototypes"/> has
+    /// run over every forest: <see cref="PrototypeSignatureClasses.Classify"/> partitions their prototypes into signature
+    /// classes and gives each pointer the TYPE its prototype's class is (<see cref="DataItem.PointerRestrictionIdentity"/>;
+    /// kb/Work PB2464, PB3101).</summary>
+    internal IEnumerable<DataItem> RestrictedPrototypePointers()
     {
         foreach (var item in ClauseResolutionForest())
-            if (item.RestrictedPrototype is { } prototype)
-                item.PointerRestrictionIdentity = classes.Identity(prototype);
+            if (item.RestrictedPrototype is not null)
+                yield return item;
     }
 
     /// <summary>The completion state of each of THIS unit's type declarations under <see cref="ExpandTemplate"/>:
