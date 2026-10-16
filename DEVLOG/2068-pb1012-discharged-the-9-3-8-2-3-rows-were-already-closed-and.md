@@ -1,4 +1,4 @@
-## PB1012 discharged: the §9.3.8.2.3 rows were already closed, and "the same type" for rule 7 is §8.5.3.1 equivalence
+## Entry 2068 — 2026-10-16 06:33 PDT — PB1012 discharged: the §9.3.8.2.3 rows were already closed, and "the same type" for rule 7 is §8.5.3.1 equivalence
 
 Wave 1091 group F. PB1012 was filed on 2026-09-22 as an analysis note. It said the §9.3.8.2.3 rows GR-9.3.8.2.3-1 to -7 were GAP and needed a golden and verdict round, and that rule 7 ("If either of the corresponding formal parameters or returning items in interface-1 or interface-2 is a strongly-typed group item, both are of the same type", cite OK §9.3.8.2.3 7)) first needed an adjudication, because "an interface cannot declare a TYPEDEF".
 
@@ -17,3 +17,4 @@ No compiler change, no diagnostic codes used (COBOLNET3854 to 3856 returned).
 **Self-review.** The diff adds only goldens, manifest rows, a verdict batch and the note. Each golden comment has its citations re-checked with `cite.py --check`. Each golden has a unique PROGRAM-ID and class names, and each expected output is derived from the source. Each negative refuses with exactly one diagnostic, from the rule it names. Semgrep verify: PASS, no counts changed.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T131204Z-691b30). The three new cases passed in leg 1. Linux gate: the lander's (batched gating).
+
