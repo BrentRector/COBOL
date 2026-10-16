@@ -34,9 +34,12 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
     /// was invoked from is not a statement of the program at all, so §14.9.33.4 GR2 a) 1's "the applicable
     /// statement is the one in which the exception condition was raised" is the SORT/MERGE itself, and a
     /// declarative that ends in RESUME AT NEXT STATEMENT has to leave the whole statement rather than fall into
-    /// its next implicit transfer. For SORT §14.9.40.4 GR17 says the same thing outright — "If a USE procedure
-    /// invoked while a format 1 SORT statement is active does not complete normally, the SORT statement is
-    /// terminated" — and §14.6.13.1.2 #1 is what makes a RESUME a completion that is not normal. Returns whether
+    /// its next implicit transfer; MERGE's GR7/GR12 also key on a procedure that "completes normally", so a
+    /// not-normal fall-off lands here too. For SORT §14.9.40.4 GR17 says it outright for every USE procedure — "If a
+    /// USE procedure invoked while a format 1 SORT statement is active does not complete normally, the SORT statement
+    /// is terminated" — and that rule is answered before this arm is reached: the declarative's <c>__RunUse</c>
+    /// throws the SORT's termination signal (<c>CobolSort.AfterUseProcedure</c>, kb/Work PB1177), so for a SORT this
+    /// arm lands only an exception-checking PERFORM handler's RESUME, which is not a USE procedure. Returns whether
     /// that arm was emitted, so the caller emits the label only when something jumps to it.</para>
     /// <para>The hook does NOT tell the selector which verb raised: §14.9.49.4 GR6's tiers are the same for
     /// every I-O statement and at every edition (the determination is on <see cref="UseTierEmitter"/> —
@@ -73,7 +76,7 @@ internal sealed class SequentialIoEmitter(EmitContext ctx, NumericRenderer num, 
         {
             if (notNormalLabel is null) return;
             w.Line($"if (DispatchResult.TerminatesSortMerge(__ior{id})) goto {notNormalLabel};"
-                + "   // the USE procedure did not complete normally (§14.6.13.1.2 #1) — the statement is terminated (§14.9.40.4 GR17; §14.9.33.4 GR2 a) 1.)");
+                + "   // the procedure did not complete normally (§14.6.13.1.2 #1) — the SORT/MERGE statement ends (§14.9.33.4 GR2 a) 1.; §14.9.24.4 GR7, GR12)");
         }
         if (ec.IoMaskFor(file) is not 0 and var mask)
         {

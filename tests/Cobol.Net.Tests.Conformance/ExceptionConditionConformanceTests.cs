@@ -83,6 +83,104 @@ public sealed class ExceptionConditionConformanceTests
                 STOP RUN.
             """, $"S=[{new string(' ', 31)}]");
 
+    // ── kb/Work PB2505: the RAISE that raises nothing is ADVISED (COBOLNET3803, Warning — legal source stays legal).
+    //    The advisory reads the same compile-time enablement EcEmitter.EmitRaise does, so it fires exactly where the
+    //    generated code is the "checking not enabled" comment, and nowhere a RAISE really raises. ─────────────────
+
+    private const string RaiseAdvisory = "COBOLNET3803";
+
+    [Fact]   // The Annex D.2.5 shape: a USE declarative for EC-USER-FATAL-ERROR, RAISEs of it and no TURN anywhere.
+             // §14.6.13.1.1 + §14.6.13.1.4: neither RAISE raises, so each is advised AT ITS OWN statement, and the
+             // program still compiles clean.
+    public void Raise_CheckingOff_Nonfatal_IsAdvisedAtEachStatement()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull(Prog("ECT2505A", "", "", "", """
+            FATAL-ERR SECTION. USE AFTER EXCEPTION CONDITION EC-USER-FATAL-ERROR.
+            FE-P.
+                DISPLAY "DECLARATIVE".
+            """, """
+                DISPLAY "ERROR OPENING FILES".
+                RAISE EXCEPTION EC-USER-FATAL-ERROR.
+                DISPLAY "ERROR READING".
+                RAISE EXCEPTION EC-USER-FATAL-ERROR.
+                STOP RUN.
+            """), 2023);
+        Assert.True(ok, string.Join("\n", errors));
+        var advised = warnings.Where(w => w.Contains(RaiseAdvisory)).ToList();
+        Assert.Equal(2, advised.Count);
+        Assert.All(advised, w => Assert.Contains("RAISE EXCEPTION EC-USER-FATAL-ERROR", w));
+    }
+
+    [Fact]   // Only the RAISE whose checking is off is advised: a level-2 TURN (§7.3.25.4 GR3) and an exception-checking
+             // PERFORM's implicit TURN over imperative-statement-1 (§14.9.28.4 GR14) both enable, and a later
+             // TURN … OFF (GR5/GR6, source order) disables again — one advisory, for EC-USER-A after the OFF.
+    public void Raise_Advisory_FollowsTheStatementsEnablement()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull("""
+            >>TURN EC-USER CHECKING ON
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. ECT2505B.
+            PROCEDURE DIVISION.
+            MAIN-PARA.
+                RAISE EXCEPTION EC-USER-A.
+            >>TURN EC-USER CHECKING OFF
+                PERFORM
+                    RAISE EXCEPTION EC-USER-B
+                WHEN EC-USER-B
+                    CONTINUE
+                END-PERFORM.
+                RAISE EXCEPTION EC-USER-A.
+                STOP RUN.
+            """, 2023);
+        Assert.True(ok, string.Join("\n", errors));
+        var advised = Assert.Single(warnings, w => w.Contains(RaiseAdvisory));
+        Assert.Contains("RAISE EXCEPTION EC-USER-A", advised);
+    }
+
+    [Fact]   // Checking is LEXICAL (§7.3.25.4 GR6: "the procedure division statements … that follow in the compilation
+             // group"): a TURN written before a PERFORM does not reach a paragraph that precedes it in the source, and
+             // one written before a paragraph covers it however it is reached. P-BEFORE is advised; P-AFTER is not.
+             // Same answer at 2002, RAISE's introducing edition.
+    public void Raise_Advisory_IsLexical_NotDynamic()
+    {
+        foreach (int edition in new[] { 2002, 2023 })
+        {
+            var (ok, errors, warnings) = EditionHarness.CompileFull($"""
+                IDENTIFICATION DIVISION.
+                PROGRAM-ID. ECT2505C{edition}.
+                PROCEDURE DIVISION.
+                P-BEFORE.
+                    RAISE EXCEPTION EC-USER-EARLY.
+                MAIN-PARA.
+                >>TURN EC-USER CHECKING ON
+                    PERFORM P-BEFORE.
+                    PERFORM P-AFTER.
+                    STOP RUN.
+                P-AFTER.
+                    RAISE EXCEPTION EC-USER-LATE.
+                """, edition);
+            Assert.True(ok, $"{edition}: " + string.Join("\n", errors));
+            var advised = Assert.Single(warnings, w => w.Contains(RaiseAdvisory));
+            Assert.Contains("EC-USER-EARLY", advised);
+        }
+    }
+
+    [Fact]   // A FATAL name with checking off is not advised: it terminates the run unit (§14.6.13.1.3 8), the
+             // implementor arm Raise_Fatal_CheckingOff_TerminatesLoudly pins), which no reader of the run misses.
+    public void Raise_CheckingOff_Fatal_IsNotAdvised()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull("""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. ECT2505D.
+            PROCEDURE DIVISION.
+            MAIN-PARA.
+                RAISE EXCEPTION EC-SIZE-OVERFLOW.
+                STOP RUN.
+            """, 2023);
+        Assert.True(ok, string.Join("\n", errors));
+        Assert.DoesNotContain(warnings, w => w.Contains(RaiseAdvisory));
+    }
+
     [Fact]   // §7.3.25.4 GR5/GR6: a TURN applies to SUCCEEDING statements until the next toggle — ON…OFF scopes
              // by source order within one paragraph.
     public void Turn_OffMidSource_ScopesBySourceOrder()

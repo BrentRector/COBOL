@@ -92,18 +92,20 @@ public sealed class DispatchResultProtocolDriftTests
     /// <summary>The documented semantics of the predicates, as values (they are emitted into every EC-model program,
     /// so a change here is a change to every generated raise site).</summary>
     [Theory]
-    [InlineData(DispatchResult.Normal, false, false, false)]
-    [InlineData(DispatchResult.ResumeNext, false, true, true)]
-    [InlineData(DispatchResult.NoHandler, false, false, false)]
-    [InlineData(DispatchResult.HandledNonfatal, false, false, false)]
-    [InlineData(DispatchResult.NotNormal, false, false, true)]
-    [InlineData(0, true, true, false)]
-    [InlineData(57, true, true, false)]
-    public void Predicates_AnswerPerTheProtocol(int result, bool transfer, bool suppressesFatal, bool terminatesSortMerge)
+    [InlineData(DispatchResult.Normal, false, false, false, false)]
+    [InlineData(DispatchResult.ResumeNext, false, true, true, true)]
+    [InlineData(DispatchResult.NoHandler, false, false, false, false)]
+    [InlineData(DispatchResult.HandledNonfatal, false, false, false, false)]
+    [InlineData(DispatchResult.NotNormal, false, false, true, true)]
+    [InlineData(0, true, true, false, true)]
+    [InlineData(57, true, true, false, true)]
+    public void Predicates_AnswerPerTheProtocol(int result, bool transfer, bool suppressesFatal, bool terminatesSortMerge,
+        bool completedNotNormally)
     {
         Assert.Equal(transfer, DispatchResult.IsTransfer(result));
         Assert.Equal(suppressesFatal, DispatchResult.SuppressesFatal(result));
         Assert.Equal(terminatesSortMerge, DispatchResult.TerminatesSortMerge(result));
+        Assert.Equal(completedNotNormally, DispatchResult.CompletedNotNormally(result));
     }
 
     [Theory]

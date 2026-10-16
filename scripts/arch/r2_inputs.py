@@ -461,8 +461,10 @@ def self_test():
         print(("PASS  " if cond else "FAIL  ") + name)
         ok = ok and cond
 
-    root = Path(tempfile.gettempdir()) / "r2root"
-    w = ("%s\\src\\A\\X.cs(12,5): warning CA1822: Member 'F' does not access instance data [%s\\src\\A\\A.csproj]\n"
+    # A fixture root only: parse_warnings compares path strings and nothing is read or written there. Under a drive or
+    # filesystem anchor, never a fixed name in the machine-wide temp directory (kb/Work PB2922).
+    root = Path(Path.cwd().anchor) / "r2root"
+    w =("%s\\src\\A\\X.cs(12,5): warning CA1822: Member 'F' does not access instance data [%s\\src\\A\\A.csproj]\n"
          "%s\\src\\A\\X.cs(12,5): warning CA1822: Member 'F' does not access instance data [%s\\src\\A\\A.csproj]\n"
          "C:\\elsewhere\\Y.cs(1,1): warning IDE0005: Using directive is unnecessary.\n"
          "%s\\src\\A\\X.cs(30,1): error CS0001: not a warning\n") % ((str(root),) * 5)

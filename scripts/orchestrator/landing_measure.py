@@ -379,7 +379,7 @@ def done_times(branch: str, reports_dir: pathlib.Path, not_after: str, git: Git,
     under a reused lead note (PB2426 had seven separate records landings; PB3024 lands in phases) would take the FIRST
     landing's finish as its DONE. plan_wave's branch survey applies the same rule: an ancestor of origin/main landed."""
     import plan_wave  # noqa: PLC0415  (THE report reader: status, lead and HEAD are parsed in one place)
-    reps = [r for r in plan_wave.load_reports(reports_dir) if r.status == "DONE" and r.head]
+    reps = [r for r in plan_wave.load_reports(reports_dir) if r.finished and r.head]
     if not reps:
         return []
     rc, log = git(["log", "--format=%B", f"{upstream}..HEAD"])

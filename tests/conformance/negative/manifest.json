@@ -18,6 +18,7 @@
   "pb3132-method-paragraph-spells-a-class-it-references",
   "pb3132-contained-program-paragraph-spells-a-class-it-references",
   "pb2841-continue-after-non-finite-below-2023",
+  "pb241-continue-after-zero-below-2023",
   "pb2729-float-significand-point-value",
   "pb2729-float-significand-point-compute",
   "pb2729-float-significand-point-argument",
@@ -324,6 +325,11 @@
   "pb1264-capacity-register-named-like-a-file",
   "pb1264-capacity-register-named-like-a-paragraph",
   "pb1264-capacity-register-named-like-a-section",
+  "pb3165-method-capacity-register-in-sibling-method",
+  "pb3165-method-capacity-register-duplicates-method-data-name",
+  "pb3165-method-condition-name-hides-object-data-name",
+  "pb3165-method-data-name-hides-object-condition-name",
+  "pb3165-method-condition-name-hides-object-index-name",
   "pb1145-procedure-header-formal-repeated",
   "pb1145-method-header-redefines-formal",
   "pb1145-function-returning-is-a-formal",
@@ -2684,8 +2690,12 @@
   "pb2921-method-section-named-like-its-data",
   "pb2740-omitted-branch-turn-unknown-name",
   "pb2740-omitted-branch-turn-name-below-2023",
+  "pb3153-contained-program-paragraph-spells-an-inherited-class-it-uses",
   "pb3147-area-a-item-in-area-b-85",
-  "pb3147-statement-in-area-a-85"
+  "pb3147-statement-in-area-a-85",
+  "pb3153-method-constant-hides-object-condition-name",
+  "pb3153-method-constant-hides-object-index-name",
+  "pb3153-contained-own-item-set-to-true-names-no-switch"
  ],
  "pending": []
 }

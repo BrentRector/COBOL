@@ -527,12 +527,17 @@ public sealed class ProgramTable
         // program", so a CobolCallException escaping it is marked: GR3i then makes every enclosing CALL site
         // ignore its own ON EXCEPTION phrase and leave the condition to §14.6.13.1 (kb/Work PB233 — before
         // this, a callee's unhandled failure ran the ACTIVATOR's imperative-statement-1 and was swallowed).
-        bool transferred = false;
+        bool transferred = false, returned = false, rangeTerminated = false;
         try
         {
             inst.DescribeExternals();   // GR3e — pre-transfer; inside the try so the finally still balances
             transferred = true;         // GR3g — control is transferred to the called program
             inst.Call(args, returning);
+            returned = true;
+            // §14.9.40.4 GR17 for a USE procedure of the activated element that ended in EXIT PROGRAM or GOBACK (a
+            // completion that is not normal, §14.6.13.1.2 1)) while a SORT whose range activated it is active: the
+            // activation has returned, and the SORT is terminated here, in the activator (kb/Work PB1177).
+            _owner.SortFiles.AfterActivationReturn();
         }
         // ⛔ A FILTER, NEVER A CATCH-AND-RETHROW (kb/Work PB2659). A catch block runs on top of the stack the condition
         // was thrown from, so a `throw;` inside it starts a NESTED dispatch there: a condition crossing N activation
@@ -542,6 +547,15 @@ public sealed class ProgramTable
         catch (CobolCallException cx) when (transferred && MarkBoundaryCrossing(cx))
         {
             throw new System.Diagnostics.UnreachableException("MarkBoundaryCrossing declines every condition");
+        }
+        // §14.9.40.4 GR17 (kb/Work PB1177): a USE procedure invoked while a format 1 SORT is active did not complete
+        // normally, and this activation is in the terminated SORT's range (GR10/GR13 — "all statements that are executed
+        // as the result of a transfer of control in the range"), so it ends with it: the signal passes through to the
+        // SORT statement's landing. Noted by a declining filter, as above, so the INITIAL program's implicit CANCEL
+        // in the finally still runs for an activation that ended this way.
+        catch (SortTerminationSignal) when (SortTerminationSignal.EndsActivation(ref rangeTerminated))
+        {
+            throw new System.Diagnostics.UnreachableException("EndsActivation declines every signal");
         }
         finally
         {
@@ -558,21 +572,7 @@ public sealed class ProgramTable
                 inst.EndStorage(StorageEnd.ActivationEnded);
                 n.Instance = displacedInstance;   // kb/Work PB133 — see above
             }
-        }
-
-        if (n.Initial)
-        {
-            // "If the program … is an initial program, an implicit CANCEL statement referencing that program is
-            // executed upon return" (ISO §14.9.18 GR2): close its files (§14.9.5 GR9), cascade (GR4), drop state.
-            // No `Active == 0` guard (kb/Work PB1507): an INITIAL program is never recursive — §11.10.3 SR5 forbids
-            // the INITIAL clause under a recursive container, so the attribute §11.10.4 GR4 hands down never reaches
-            // one, and SR6/0886 keep the two attributes apart in a single program — hence it can never return
-            // while an outer activation of itself is running (the guard served that nonconforming shape).
-            inst.CloseFiles();
-            CancelContained(n);
-            n.Instance = null;
-            n.CalledSinceCancel = false;   // §14.9.18 GR2 IS a CANCEL — the unit is "at present canceled",
-                                           // so a later explicit CANCEL is GR7's no-op
+            if (n.Initial && (returned || rangeTerminated)) EndInitialActivation(n, inst);
         }
 
         // ⛔ NO BOUNDARY DEFAULT HERE (kb/Work PB892 Arm B). A condition the callee staged with GOBACK / EXIT
@@ -580,6 +580,24 @@ public sealed class ProgramTable
         // ModuleStack identity), so only a pickup emitted in the activating element can take it, and an activator
         // that emitted none never has it raised — §14.9.18.4 GR1 b) for an unchecked activator. A discard here
         // was the CALL-only half of that rule; the INVOKE half had no chokepoint to put one in.
+    }
+
+    /// <summary>The end of an INITIAL program's activation — on return, or when the range of a terminated format 1 SORT
+    /// that activated it ends (§14.9.40.4 GR17; kb/Work PB1177) — whose activation always starts from a fresh instance,
+    /// so the one that ends must not keep its files open.</summary>
+    private void EndInitialActivation(Node n, ICobolProgram inst)
+    {
+        // "If the program … is an initial program, an implicit CANCEL statement referencing that program is
+        // executed upon return" (ISO §14.9.18 GR2): close its files (§14.9.5 GR9), cascade (GR4), drop state.
+        // No `Active == 0` guard (kb/Work PB1507): an INITIAL program is never recursive — §11.10.3 SR5 forbids
+        // the INITIAL clause under a recursive container, so the attribute §11.10.4 GR4 hands down never reaches
+        // one, and SR6/0886 keep the two attributes apart in a single program — hence it can never return
+        // while an outer activation of itself is running (the guard served that nonconforming shape).
+        inst.CloseFiles();
+        CancelContained(n);
+        n.Instance = null;
+        n.CalledSinceCancel = false;   // §14.9.18 GR2 IS a CANCEL — the unit is "at present canceled",
+                                       // so a later explicit CANCEL is GR7's no-op
     }
 
     /// <summary>Mark a <see cref="CobolCallException"/> leaving the called program across its activation boundary

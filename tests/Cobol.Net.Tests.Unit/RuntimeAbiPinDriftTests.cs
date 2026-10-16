@@ -48,7 +48,7 @@ public sealed class RuntimeAbiPinDriftTests
     private const int PinnedMajor = 5;
     private const string PinnedRuntimeHash = "BD194B97DB604BBC";
     private const int PinnedCallAbi = 1;
-    private const string PinnedBoundaryHash = "8F2DCB2FC2C4D94F";
+    private const string PinnedBoundaryHash = "B7BD29ADAB9ED8EE";
 
     /// <summary>The boundary-layout fixture: every elementary category and byte form a Format 1 CALL passes BY
     /// REFERENCE and BY CONTENT, a group and a table, and a RETURNING item, with EC-PROGRAM-ARG-MISMATCH checking on

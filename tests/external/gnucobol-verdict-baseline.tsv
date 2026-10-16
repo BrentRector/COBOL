@@ -18,7 +18,7 @@
 # which adjudication>"`, and writes it as the `# Last recorded:` line below.
 #
 # Tab-separated, sorted by id; a leading # is a comment. Columns: id<TAB>tier<TAB>verdict
-# Last recorded: battery #89 at main ea20c28e3 (2026-10-08): 7 per-case flips, each ruled EXPECTED against the ISO text by the w1039g adjudication (E:/COBOL-coord/scratch/reports/w1039g-PB397-report.md) - listings:1860 (PB397), run_fundamental:1317 + syn_misc:2973 + syn_misc:2995 (PB1508), run_misc:912 (PB1373+PB2003), syn_functions:87 (PB989), syn_redefines:392 (PB2518); kb/Work PB2611
+# Last recorded: battery #90 at main f5fec711b (2026-10-15): 1 per-case flip, syn_definition:37 AGREE_REJECT -> WE_ACCEPT_THEY_REJECT, ruled EXPECTED: PROGRAM-ID. short. is ISO-legal (8.10: SHORT is context-sensitive only in the DYNAMIC LENGTH STRUCTURE clause; 11.10.2 program-name-1; 8.3.2.2.21); at #89 it failed in the C# backend (a rejects-legal-source defect, fixed since); kb/Work PB3187
 configuration:105	ISO_PINNED	AGREE_REJECT
 configuration:126	DEFAULT_DIALECT	AGREE_REJECT
 configuration:147	DEFAULT_DIALECT	WE_REJECT_THEY_ACCEPT
@@ -960,7 +960,7 @@ syn_definition:2629	DEFAULT_DIALECT	AGREE_REJECT
 syn_definition:2734	DEFAULT_DIALECT	AGREE_REJECT
 syn_definition:2853	DEFAULT_DIALECT	AGREE_REJECT
 syn_definition:333	DEFAULT_DIALECT	AGREE_ACCEPT
-syn_definition:37	DEFAULT_DIALECT	AGREE_REJECT
+syn_definition:37	DEFAULT_DIALECT	WE_ACCEPT_THEY_REJECT
 syn_definition:376	DEFAULT_DIALECT	AGREE_ACCEPT
 syn_definition:413	DEFAULT_DIALECT	AGREE_ACCEPT
 syn_definition:442	DEFAULT_DIALECT	AGREE_ACCEPT
