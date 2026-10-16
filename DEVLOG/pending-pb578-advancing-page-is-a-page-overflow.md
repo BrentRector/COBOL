@@ -48,3 +48,7 @@ PB578 landed with `closes_rows` for both of its rows.
 automatically. Full code: the EOP-phrase branch in the emitter reads the connector's flag, so the NOT arm's silence
 follows from the runtime without an emitter change; the sibling arm (a file with no LINAGE clause, GR25 h)'s form
 feed) has no logical page and so no end-of-page condition, and is unchanged. Performance and duplication: nothing.
+
+**Gate** (run `20261016T154846Z-568530`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` —
+Conformance 5,958/11,795 · Unit 33,181/33,699 · Characterization 6/36 cases ran in leg 1; the three new corpus rows
+and the two new LinageConformanceTests passed in it.
