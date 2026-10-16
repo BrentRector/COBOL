@@ -101,7 +101,7 @@ def estimate(now: dt.datetime, readings: list[dict[str, Any]], all_events_for, r
              acct: accounts.Account, borrow_days: int = 0) -> dict[str, Any]:
     """The decision for the account `acct`. `all_events_for(since, until)` yields the telemetry events of EVERY account
     on the machine; injected so the tests need no sink."""
-    q, cal = acct.quota, rules["calibration"]
+    q, cal = acct.quota_at(now), rules["calibration"]
     uuid = acct.uuid
 
     def events_for(since: dt.datetime, until: dt.datetime) -> list[dict[str, Any]]:

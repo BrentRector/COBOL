@@ -21,7 +21,7 @@
     "session_pct_per_weekly_pct_source": "measured 2026-10-07 (kb/Work PB2478): account 2's session moved 0 -> 24 % while its week moved 0 -> 6 % inside one session window (13:34 -> 14:54 PDT); the 5.0 before was a guess (design D7)"
   },
   "accounts": {
-    "_doc": "The Claude accounts the loop runs from (owner 2026-10-07 13:17 PDT: the OPERATOR session on a second Max 20x account, the Mythos work on the first; kb/Work PB2478). account.py resolves the running account from CLAUDE_CONFIG_DIR (unset = the row whose config_dir is null); a config dir no row names is an error. Each row: name, config_dir (~ expands; null = ~/.claude), weekly_reset (Python weekday(): Monday 0 ... Sunday 6), and optionally `quota` keys that differ from the shared quota below. budget.py stamps every reading with the account and reads only that account's readings and telemetry (user.account_uuid).",
+    "_doc": "The Claude accounts the loop runs from (owner 2026-10-07 13:17 PDT: the OPERATOR session on a second Max 20x account, the Mythos work on the first; kb/Work PB2478). account.py resolves the running account from CLAUDE_CONFIG_DIR (unset = the row whose config_dir is null); a config dir no row names is an error. Each row: name, config_dir (~ expands; null = ~/.claude), weekly_reset (Python weekday(): Monday 0 ... Sunday 6), and optionally `quota` keys that differ from the shared quota below, and `quota_overrides`: the owner's dated special cases, each with `until` (and optionally `from`; ISO times with a zone), the quota keys it sets and `_source` (the owner's words), applied by Account.quota_at(now) inside its window only, so it lapses by itself and no second change takes it back (kb/Work PB3305). budget.py stamps every reading with the account and reads only that account's readings and telemetry (user.account_uuid).",
     "list": [
       {
         "name": "account1",
@@ -43,7 +43,14 @@
           "minute": 0,
           "tz": "America/Los_Angeles"
         },
-        "_source": "owner 2026-10-07 13:36 PDT: 'your usage resets on Saturday at 10 AM'; its /usage at 13:34 read 'Resets Oct 10, 9:59am'"
+        "_source": "owner 2026-10-07 13:36 PDT: 'your usage resets on Saturday at 10 AM'; its /usage at 13:34 read 'Resets Oct 10, 9:59am'",
+        "quota_overrides": [
+          {
+            "until": "2026-10-17T10:00:00-07:00",
+            "weekly_cap_pct": 99,
+            "_source": "owner 2026-10-16 ~15:25 PDT, operator session c95c0b86: 'We can run to 100% today, without triggering aborts, as the reset is 10 AM tomorrow and we won't need to work tonight'. 99, not 100: the cap ends the loop only between units, so the last point covers the running unit's spend and the estimate's drift between meter readings (2.6 points under the 15:23 reading). kb/Work PB3305"
+          }
+        ]
       }
     ],
     "seed": {

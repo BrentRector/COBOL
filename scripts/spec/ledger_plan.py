@@ -345,7 +345,7 @@ def measure_pacing() -> dict | None:
                 if r.get("account") == acct.name]
     if not readings:
         return None
-    q = acct.quota
+    q = acct.quota_at(datetime.datetime.now(datetime.timezone.utc))
     newest = max(readings, key=lambda r: datetime.datetime.fromisoformat(r["noted_at"]))
     return {"reading": newest, "account": acct.name, "weekly_cap": q["weekly_cap_pct"],
             "soft": q["session_soft_stop_pct"], "hard": q["session_hard_stop_pct"],
