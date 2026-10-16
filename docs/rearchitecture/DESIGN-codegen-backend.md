@@ -124,6 +124,13 @@ Packaging (runtimeconfig + runtime-dll deploy) is split out of the compile path 
 `RoslynBackend.Compile` step is pure compilation with no packaging/deploy side effects — its only writes are the
 emitted assembly itself and the failed-emit cleanup of that partial output.
 
+**Output kind (DESIGN-external-repository §7.2, kb/Work PB2099):** a compilation group with a main program — its first
+top-level PROGRAM definition, `ProgramEmitter.MainUnit`, the one answer the entry wrapper's `Main` reads too — is
+`OutputKind.ConsoleApplication` with a `runtimeconfig.json`; a group with none (functions, prototypes, classes only) is
+a LIBRARY: `OutputKind.DynamicallyLinkedLibrary`, no `Main`, no `runtimeconfig.json` (`AssemblyPackager.Package`'s
+`library`), reached through its host entries and, from a COBOL CALL, through the sibling probe's `EnsureRegistered()`.
+`BackendArtifact.Library` / `CompilerDriver.Result.Library` carry it, and `cobol --run` refuses a library.
+
 **Deterministic PE (kb/Work PB120, §15.99.3 r3):** `RoslynBackend.Compile` sets `deterministic: true` — the COFF `TimeDateStamp` is a content hash and the MVID is content-derived, so the generated object code provides NO compilation date and time and §15.99.3 r3's “if provided in … the generated object code” condition is not engaged (there is no listing facility either; the only compilation time a produced program carries is WHEN-COMPILED's own baked constant). Identical source + references → a byte-identical assembly (the module name embeds the output FILE name, so “identical” includes the output name). The WHEN-COMPILED stamp itself is COMPILATION-scoped, not process-scoped: `ProgramEmitter` captures it once per `EmitBound` through the injectable `IntrinsicBinder.CompileClock` seam and threads it via `EmitContext.WhenCompiledStamp`, so a container and its contained units bake the SAME constant (§15.99.3 r2) while each successive compilation in a long-lived process gets its own.
 
 ---

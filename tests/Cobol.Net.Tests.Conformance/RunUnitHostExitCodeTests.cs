@@ -9,19 +9,21 @@ namespace CobolNet.Tests.Conformance;
 /// DOC-A.1-167: "STOP RUN, and a fatal exception condition that terminates the run unit (§14.6.12), end the RUN UNIT
 /// ONLY — never the host process"; "A standalone <c>cobol</c> executable IS its own host"). The termination status of a
 /// run unit — STOP's STATUS operand (§14.9.42.4 GR5: the value is "passed to the operating system") or the
-/// abnormal-termination indication (§14.6.12) — is the RUN UNIT's own state (<c>RunUnit.ExitStatus</c>): the process exit code
-/// is the PROCESS's, and only the boundary that IS the process entry (the generated <c>Main</c>'s
-/// <c>ProgramRegistry.RunModule</c>) delivers the status to it. §14.6.1 — "A run unit is an independent entity that may be
-/// executed without communicating with, or being coordinated with, any other run unit" — is the standard's side of it: a
-/// run unit that rewrote a process-wide cell would coordinate with every other run unit, and with the host, through it.
+/// abnormal-termination indication (§14.6.12) — is the RUN UNIT's own state: under a host it travels in the
+/// <c>RunUnitEndedException</c> the outermost boundary throws (owner decision R48), and only the boundary that IS the
+/// process entry (the generated <c>Main</c>) delivers a status to the process exit code. §14.6.1 — "A run unit is an
+/// independent entity that may be executed without communicating with, or being coordinated with, any other run unit" —
+/// is the standard's side of it: a run unit that rewrote a process-wide cell would coordinate with every other run unit,
+/// and with the host, through it.
 /// <para>The host here is a real C# program compiled with Roslyn and run as its own process, exactly as an embedding
-/// host would be. It sets its OWN exit code (5) first, then runs three run units through the host entry
-/// (<c>ProgramRegistry.RunMain</c>): one ending in <c>STOP RUN WITH ERROR STATUS 24</c>, one in a fatal CALL of an
-/// absent program (§14.9.4.4 GR3, §14.6.13.1.3 rule 7 — the abnormal termination), and a status-free one beginning
-/// after them. Each reports the process exit code and the run unit's own status. Expected, derived: the process exit code
-/// stays 5 throughout (the host's own), the run unit's status is 24, then 1 (ERROR ⇒ 1, the item-192 mapping), then 0,
-/// and the host process ends with the exit code it set. Before the fix the first two overwrote it (24, then 1) and a
-/// new run unit's start restated it to 0.</para>
+/// host would be. It sets its OWN exit code (5) first, then activates four programs through their generated host entries
+/// (<c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call</c>, DESIGN-external-repository §4.3, the one host surface of §4.4): one
+/// ending in <c>STOP RUN WITH ERROR STATUS 24</c>, one ending abnormally on a fatal EC-DATA-PTR-NULL (a NULL BASED
+/// reference, §14.6.12), one whose CALL of an absent program fails (§14.9.4.4 GR3 b), which the host receives as the
+/// condition itself and which ends no run unit, and a status-free one. After each it reports the process exit code.
+/// Expected, derived: the process exit code stays 5 throughout (the host's own); the host receives status 24 (normal),
+/// then status 1 (ERROR ⇒ 1, the item-192 mapping; abnormal), then EC-PROGRAM-NOT-FOUND; the run unit current after the
+/// last activation has status 0; and the host process ends with the exit code it set.</para>
 /// </summary>
 public sealed class RunUnitHostExitCodeTests
 {
@@ -36,6 +38,18 @@ public sealed class RunUnitHostExitCodeTests
     private const string FatalProgram = """
         IDENTIFICATION DIVISION.
         PROGRAM-ID. HXFATAL.
+        DATA DIVISION.
+        WORKING-STORAGE SECTION.
+        01 BP PIC X(4) BASED.
+        PROCEDURE DIVISION.
+        P1.
+            DISPLAY BP.
+            GOBACK.
+        """;
+
+    private const string NotFoundProgram = """
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. HXNOTFND.
         PROCEDURE DIVISION.
         P1.
             CALL "HXABSENT".
@@ -52,28 +66,27 @@ public sealed class RunUnitHostExitCodeTests
 
     private const string Host = """
         using System;
-        using System.IO;
         using CobolNet.Runtime;
 
         public static class HxHost
         {
-            private static void Enter(string module, string path)
+            private static void Enter(string name, Action call)
             {
-                ProgramRegistry.Reset();
-                var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, module + ".dll"));
-                var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
-                asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
-                try { ProgramRegistry.RunMain(path); }
-                catch (StopRun) { }
-                Console.WriteLine(path + " process=" + Environment.ExitCode + " run-unit=" + RunUnit.Current.ExitStatus);
+                string outcome;
+                try { call(); outcome = "returned"; }
+                catch (RunUnitEndedException ended) { outcome = $"ended status={ended.ExitStatus} abnormal={ended.Abnormal}"; }
+                catch (CobolCallException failed) { outcome = "call failed " + failed.EcName; }
+                Console.WriteLine(name + " process=" + Environment.ExitCode + " " + outcome);
             }
 
             public static void Main()
             {
                 Environment.ExitCode = 5;
-                Enter("HXSTOP", "HXSTOP");
-                Enter("HXFATAL", "HXFATAL");
-                Enter("HXQUIET", "HXQUIET");
+                Enter("HXSTOP", Cobol.HXSTOP.HXSTOP.Call);
+                Enter("HXFATAL", Cobol.HXFATAL.HXFATAL.Call);
+                Enter("HXNOTFND", Cobol.HXNOTFND.HXNOTFND.Call);
+                Enter("HXQUIET", Cobol.HXQUIET.HXQUIET.Call);
+                Console.WriteLine("run-unit=" + RunUnit.Current.ExitStatus);
             }
         }
         """;
@@ -86,15 +99,18 @@ public sealed class RunUnitHostExitCodeTests
         {
             NonCobolElement.CompileCobol(dir, "HXSTOP", StopProgram);
             NonCobolElement.CompileCobol(dir, "HXFATAL", FatalProgram);
+            NonCobolElement.CompileCobol(dir, "HXNOTFND", NotFoundProgram);
             NonCobolElement.CompileCobol(dir, "HXQUIET", QuietProgram);
-            NonCobolElement.CompileCSharp(dir, "HXHOST", Host, runtimeConfigOf: "HXSTOP");
+            NonCobolElement.CompileCSharp(dir, "HXHOST", Host, "HXSTOP", "HXSTOP", "HXFATAL", "HXNOTFND", "HXQUIET");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "HXHOST.dll"), dir);
             Assert.Equal(
-                "HXSTOP process=5 run-unit=24\n" +
-                "HXFATAL process=5 run-unit=1\n" +
-                "HXQUIET process=5 run-unit=0", stdout);
-            Assert.StartsWith("abnormal run-unit termination: ", stderr);   // §14.6.12 — the diagnostic is the run unit's own output
-            Assert.Equal(5, exit);                                           // the process ends with the exit code its host set
+                "HXSTOP process=5 ended status=24 abnormal=False\n" +    // §14.9.42.4 GR5: the status reaches the host
+                "HXFATAL process=5 ended status=1 abnormal=True\n" +     // §14.6.12: the abnormal termination is indicated
+                "HXNOTFND process=5 call failed EC-PROGRAM-NOT-FOUND\n" + // §14.9.4.4 GR3 b: the host receives the condition
+                "HXQUIET process=5 returned\n" +
+                "run-unit=0", stdout);
+            Assert.Equal("", stderr);    // every ending reached the host as a value, none as a process-level report
+            Assert.Equal(5, exit);       // the process ends with the exit code its host set
         }
         finally { CutRunner.TryDelete(dir); }
     }

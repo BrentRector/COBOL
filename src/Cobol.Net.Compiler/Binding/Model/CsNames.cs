@@ -37,6 +37,13 @@ public static class CsNames
     public static readonly FrozenSet<string> ProgramClassMembers = FrozenSet.ToFrozenSet(
         ["Call", "CloseFiles", "EndStorage", "Activate", "DescribeExternals"], StringComparer.Ordinal);
 
+    /// <summary>The members a generated HOST-ENTRY class carries (<c>HostEntryEmitter</c>; DESIGN-external-repository
+    /// §4.3): <c>Call</c>, the .NET counterpart of a CALL statement, and <c>Cancel</c>, of a CANCEL statement. Its
+    /// published record structs AND the <c>Call</c> parameters are allocated in the same scope — the <c>Call</c> body
+    /// names each record type by its simple name, which a parameter of that spelling would shadow — so a description
+    /// whose word spells any of them is given the next free name.</summary>
+    public static readonly FrozenSet<string> HostEntryMembers = FrozenSet.ToFrozenSet(["Call", "Cancel"], StringComparer.Ordinal);
+
     /// <summary>The namespace every type a module emits lives in (docs/rearchitecture/DESIGN-external-repository.md
     /// §4.5; kb/Work PB2097): <c>Cobol.&lt;S&gt;</c>, where <c>&lt;S&gt;</c> is the assembly simple name made ONE C#
     /// identifier by <see cref="DataItem.Sanitize"/> (each character an identifier cannot hold, <c>.</c> included,
@@ -89,6 +96,16 @@ public sealed class CsNameScope
 
     /// <summary>A program class's member scope (<see cref="CsNames.ProgramClassMembers"/>).</summary>
     public static CsNameScope ProgramClass() => new(CsNames.ProgramClassMembers);
+
+    /// <summary>A host-entry class's member scope (<see cref="CsNames.HostEntryMembers"/>), seeded with the class's
+    /// own name, which no member may spell (CS0542; DESIGN-external-repository §4.3 "Names"). Its <c>Call</c>
+    /// parameters are allocated in it too, so a parameter never shadows a published record type the body names.</summary>
+    public static CsNameScope HostEntry(string className) => new(CsNames.HostEntryMembers.Append(className));
+
+    /// <summary>A module namespace's type scope (DESIGN-external-repository §4.5): the host-entry classes are allocated in
+    /// it, seeded with every type name the module already declares there (<paramref name="reserved"/> — the
+    /// registrar, the entry class, the atom table, the program classes and the OO classes and interfaces).</summary>
+    public static CsNameScope ModuleTypes(IEnumerable<string> reserved) => new(reserved);
 
     /// <summary>Claim names this scope already holds from elsewhere — a container's GLOBAL roots, bridged into this
     /// unit's class under their own member names (kb/Work PB1047).</summary>
