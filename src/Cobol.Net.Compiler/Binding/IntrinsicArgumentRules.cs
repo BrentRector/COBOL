@@ -1108,9 +1108,11 @@ internal static class IntrinsicArgumentRules
     /// <para>
     /// ⛔ IT IS ALSO WHY THE ANSWER IS NOT "are the OPERANDS class numeric". Under <c>--permissive</c> the DA6
     /// leniency admits an ALPHANUMERIC operand at a NUMERIC position and digit-decodes it, so
-    /// <c>FUNCTION MOD(&lt;PIC X item&gt; &lt;COMP-2&gt;)</c> has a non-numeric OPERAND at a position that is
-    /// numeric and must keep riding the float lane. Reading the operand's class would have routed it to the
-    /// exact <c>Int128</c> arm and handed Roslyn a <c>double</c> — the CS1503 fix-queue PB2 closed, reopened.
+    /// <c>FUNCTION REM(&lt;PIC X item&gt; &lt;COMP-2&gt;)</c> has a non-numeric OPERAND at a position that is
+    /// numeric (§15.3 type 10, so the COMP-2 still moves the call to the float lane) and must keep riding it.
+    /// Reading the operand's class would have routed it to the exact <c>Int128</c> arm and handed Roslyn a
+    /// <c>double</c> — the CS1503 fix-queue PB2 closed, reopened. (MOD is not the example: both its positions
+    /// are §15.3 type 6, so its COMP-2 operand is taken as its integer before any lane is chosen.)
     /// </para>
     /// <para>
     /// <b>Fail OPEN, in the same direction and for the same reason as the screen above.</b> A function absent

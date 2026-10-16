@@ -586,7 +586,7 @@ whole licence the lane rests on — is not granted for it.
 function, an undeclared position and the `'p'` negative-list kind all answer *yes*, so it can only ever take a
 call OUT of the lane on the authority of a cited §15.x.3 rule. ⛔ It is a question about the POSITION and
 deliberately not about the operand's class: under `--permissive` the DA6 leniency admits an alphanumeric operand
-at a numeric position and digit-decodes it, so `MOD(<PIC X item> <COMP-2>)` must keep the lane, and reading the
+at a numeric position and digit-decodes it, so `REM(<PIC X item> <COMP-2>)` (type 10 at both positions; MOD is not the example, its positions are type 6) must keep the lane, and reading the
 operand would have reopened PB2's CS1503. The lane's TRIGGER is a binary64 operand at a type-10 position only: a
 §15.3 type-6 operand is taken as its INTEGER before any lane is chosen (`IntrinsicRenderer.RawArg`, kb/Work PB651 —
 docs/CONFORMANCE.md DOC-A.1-124's truncation, on every lane), so an integer-only function such as FACTORIAL, whose

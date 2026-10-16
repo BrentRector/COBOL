@@ -153,8 +153,10 @@ public sealed class IntrinsicCarrierAgreementDriftTests
     /// ⛔ THE GENERAL GUARD: no <c>…Real</c> body may answer a domain guard with a bare literal.
     /// </summary>
     /// <remarks>
-    /// Every legitimately-guarded real body routes to a shared raise site — <c>TryIntegerArg</c> for the §15.3
-    /// type-6 integer family, <c>ModZeroDivisor</c> / <c>RemZeroDivisor</c> for the two division rules. A body
+    /// Every legitimately-guarded real body routes to a shared raise site — <c>RemZeroDivisor</c> for the
+    /// REM division rule (a §15.3 type-6 position has no real body at all: its operand is taken as its integer
+    /// before any lane is chosen, and <c>IntrinsicRealArgDriftTests.NoRealBody_ServesAFunctionWhoseEveryPositionIsType6</c> forbids one;
+    /// MOD's divisor guard is <c>ModZeroDivisor</c>, shared by its exact twin). A body
     /// that instead writes <c>x == 0 ? 0 : …</c> has silently re-implemented an exception condition as a default
     /// value, which is precisely how MOD and REM drifted from their exact twins. The empty-argument
     /// <c>xs.Length == 0 ? 0</c> forms are NOT this defect and are excluded by name: a zero-argument variadic

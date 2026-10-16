@@ -88,3 +88,9 @@ operand through `IntegerArgWideDec`, so `FUNCTION TEST-DATE-YYYYMMDD(10 ** 40)` 
 EC-SIZE-OVERFLOW on conforming source, where §15.90.4 r1a answers 1. It now takes `IntegerArgSaturatingDec`, the
 SDIDI twin of the binary64 clamp, for the same three arms. Lines 14 and 15 of `2014/pb2630_integer_family_beyond_int128`
 witness it.
+
+**Review round 2 (comment accuracy only).** The branch review found two remarks that still described the pre-PB651
+design: the `ArgumentRunIsAllNumeric` remark and its design-doc twin used `MOD(<PIC X item> <COMP-2>)` as the
+example of a call that must keep the float lane, but both MOD positions are type 6 and that call now compiles to the
+exact arm (`IntegerArgWideReal` + `ModScaled`); REM, whose positions are type 10, is the example the rule needs. And
+the `DomainGuardOffenders` remark named the deleted `TryIntegerArg`. Both now state the current design; no behaviour changed.
