@@ -37,7 +37,14 @@ internal static class PreBindConstants
     /// paragraph that carries the word).</summary>
     /// <param name="variables">The compilation group's &gt;&gt;DEFINE timeline, for a FROM constant (§13.10.2).</param>
     public static ConstantReading Read(RuleContext site, string name,
-        DirectiveTimeline<CompilationVariableEvent> variables)
+        DirectiveTimeline<CompilationVariableEvent> variables) => Read(site, name, variables, hops: 0);
+
+    /// <summary>The longest chain of constant entries, each written AS the next one's name, that is read through; a
+    /// longer chain is a circular dependence (ISO §13.10.3 SR5), which the data bind reports at the entry.</summary>
+    private const int MaxHops = 64;
+
+    private static ConstantReading Read(RuleContext site, string name,
+        DirectiveTimeline<CompilationVariableEvent> variables, int hops)
     {
         for (RuleContext? c = site; c is not null; c = c.Parent)
         {
@@ -48,7 +55,7 @@ internal static class PreBindConstants
                     if (!CobolNames.Same(entryName, name)) continue;
                     // A data-name declared in this element is the item the word names (§11.7.4 GR5's nearer
                     // declaration; §8.4.6) — never a constant of an enclosing element.
-                    return body is null ? ConstantReading.NotAConstant : ValueOf(body, line, name, variables);
+                    return body is null ? ConstantReading.NotAConstant : ValueOf(body, line, name, variables, hops);
                 }
             }
             // §11.7.4 GR5: a method sees its factory / object definition's data; every other source element is the
@@ -98,7 +105,7 @@ internal static class PreBindConstants
     /// class numeric; its value is no reader's business here, because every pre-bind position admits only the
     /// alphanumeric and national classes.</summary>
     private static ConstantReading ValueOf(Core.ConstantEntryBodyContext body, int line, string name,
-        DirectiveTimeline<CompilationVariableEvent> variables)
+        DirectiveTimeline<CompilationVariableEvent> variables, int hops)
     {
         string where = $"constant entry '{name}'";
         if (body.cobolWord() is { } variable)   // FROM compilation-variable-name-1, read as of the entry's line
@@ -108,6 +115,15 @@ internal static class PreBindConstants
             return ConstantReading.Of(value.Category == CtCategory.Numeric
                 ? new ConcatFolder.Folded(PicCategory.Numeric, value.Text)
                 : DataBinder.VariableStringValue(value, where));
+        }
+        // An operand written as ONE constant-name is that constant's literal-1 (§13.10.3 SR2, §13.10.4 GR1), whatever its
+        // class - the data bind's DataBinder.ConstantLiteralOperand reading, so the two agree (kb/Work PB780).
+        if (SoleOperand.DataRef(body.constantValue()?.arithmeticExpression()) is { } word
+            && word.dataReferenceSuffix().Length == 0 && word.cobolWord() is { } spelled)
+        {
+            if (hops >= MaxHops) return ConstantReading.Refused;
+            var named = Read(body, spelled.GetText(), variables, hops + 1);
+            if (named.Kind != ConstantReadingKind.NotAConstant) return named;
         }
         if (body.constantValue()?.nonNumericLiteral() is not { } nn)
             return ConstantReading.Of(new ConcatFolder.Folded(PicCategory.Numeric, body.constantValue()?.GetText() ?? ""));

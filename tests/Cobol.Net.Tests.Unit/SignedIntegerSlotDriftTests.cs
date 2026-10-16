@@ -53,10 +53,11 @@ public sealed class SignedIntegerSlotDriftTests
     [Fact]
     public void SignedIntegerLiteral_IsReferencedByExactlyTheSlotsTheStandardSigns()
     {
-        // The §13.18.63.2 Format-2 VALUE clause's FROM/TO subscript lists — and nothing else. A NEW entry here
-        // is a claim that the standard prints that slot as something other than `integer-n`; make the claim in
-        // the rule's comment, cite the syntax rule, and then add the name below.
-        string[] expected = ["valueClauseTablePhrase"];
+        // The §13.18.63.2 Format-2 VALUE clause's FROM/TO subscript lists — and nothing else: valueTableSubscript is
+        // that one slot, a signed integer literal or the integer constant-name standing for it (§13.10.3 SR2, kb/Work
+        // PB780). A NEW entry here is a claim that the standard prints that slot as something other than `integer-n`;
+        // make the claim in the rule's comment, cite the syntax rule, and then add the name below.
+        string[] expected = ["valueTableSubscript"];
 
         var referencing = new System.Collections.Generic.SortedSet<string>(System.StringComparer.Ordinal);
         foreach (string f in GrammarFiles())

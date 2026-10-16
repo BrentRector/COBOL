@@ -237,8 +237,13 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
 
         // The method selector: an alphanumeric/national literal binds statically (§14.9.23.3 SR2);
         // identifier-2 (a method name held in a data item) is legal ONLY through a UNIVERSAL receiver
-        // (§14.9.23.3 SR7) — the D10 dynamic path, live as of the universal wave.
-        if (inv.invokeMethodName().dataReference() is { } mref)
+        // (§14.9.23.3 SR7) — the D10 dynamic path, live as of the universal wave. A constant-name is literal-1, never
+        // identifier-2: it "may be used anywhere that a format specifies a literal" (§13.10.3 SR2), so it is asked of
+        // the ONE literal-alias resolution BEFORE the identifier-2 arm (kb/Work PB780 — `INVOKE C K` drew SR3's
+        // COBOLNET0866 as though K were a data item).
+        var methodRef = inv.invokeMethodName().dataReference();
+        var methodAlias = methodRef is null ? null : host.Expr.LiteralAliasOf(methodRef);
+        if (methodAlias is null && methodRef is { } mref)
         {
             // §14.9.23.3 SR3: "If object-class-name-1 is specified, literal-1 shall be specified" — asked BEFORE the
             // receiver resolves as identifier-1, because a class-name is not a data item and resolving it as one
@@ -283,7 +288,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             }
             return OoBindUniversalInvoke(site, urecv!, methodLiteral: null, methodSource: msrc);
         }
-        string? methodName = OoMethodNameOf(inv.invokeMethodName().literal());
+        string? methodName = methodAlias is { } alias ? OoMethodNameOf(alias) : OoMethodNameOf(inv.invokeMethodName().literal());
         if (methodName is null)
         {
             return BoundRejected.Report(ctx.Edition, "COBOLNET0823",
@@ -1863,6 +1868,15 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
     /// every inline segment agree.</para></summary>
     private string? OoMethodNameOf(Core.LiteralContext? lit) =>
         OoMethodNameValueOf(lit) is { } value ? CobolNames.EditionSpelling(value, ctx.Edition.Edition.Year) : null;
+
+    /// <summary>The method-name a literal-alias word spells where literal-1 stands (ISO §13.10.3 SR2; §13.10.4 GR1 —
+    /// "as if literal-1 … were written"; kb/Work PB780): an alphanumeric or national constant-name's value, written in
+    /// the edition's spelling exactly as <see cref="OoMethodNameOf(Core.LiteralContext?)"/> writes a written literal.
+    /// Null for any other alias — a numeric or boolean constant, or a symbolic-character, which is a figurative
+    /// constant (§12.3.7.4 GR11 a)) — none of them a literal "of class alphanumeric or national" (§14.9.23.3 SR2).</summary>
+    private string? OoMethodNameOf(ExpressionBinder.LiteralAlias alias) =>
+        alias.Constant is { Category: PicCategory.Alphanumeric or PicCategory.National } k
+            ? CobolNames.EditionSpelling(k.Text, ctx.Edition.Edition.Year) : null;
 
     /// <summary>The literal's decoded value, before <see cref="OoMethodNameOf"/> writes it in the edition's spelling.</summary>
     private string? OoMethodNameValueOf(Core.LiteralContext? lit)
