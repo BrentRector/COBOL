@@ -33,7 +33,8 @@ word, and `git_calls` reads every `git` invocation of a step (its global options
 its subcommand). EVERY place either shell takes a command line from is walked as the command line it is:
   - a command substitution, in a word or inside double quotes: Bash `$( … )`, a backquote, `<( … )`, `>( … )`;
     PowerShell `$( … )`, `@( … )`, a `( … )` expression and a `{ … }` script block. Its steps come BEFORE the step
-    whose text holds it (they run first) and carry `substitution=True`; the step's own `words` keep it as one word;
+    whose text holds it (they run first) and carry `substitution`, how many substitutions enclose them (a step of
+    the line itself is 0, a substitution's 1, one inside that 2); the step's own `words` keep it as one word;
   - an interpreter handed a string: `bash|sh -c '…'` (and `-lc`, `-ec` …), `pwsh -Command|-c|-EncodedCommand …`,
     `cmd /c|/k …`, Bash `eval …`, PowerShell `Invoke-Expression|iex …`, also behind a command that runs another
     (`timeout 5 bash -c …`, `env X=1 sh -c …`, `xargs sh -c …`, `wsl -e bash -c …`, PowerShell's `&`);
@@ -103,9 +104,11 @@ class Step:
     heredocs: tuple[str, ...] = ()  # the bodies of the Bash heredocs (`<<DELIM`, `<<-DELIM`) the command introduces, in
                                  # order, each without its delimiter line; a `-c` payload's last step carries the
                                  # bodies that feed the payload (`bash -c '…' <<EOF`)
-    substitution: bool = False   # a step of a command substitution, `<( … )` or PowerShell expression / script block:
-                                 # it runs BEFORE the step whose text holds it (the next step not so marked at a lower
-                                 # depth), and its output is that step's text, not a command of the line
+    substitution: int = 0        # how many command substitutions, `<( … )`s or PowerShell expressions / script blocks
+                                 # enclose the step (0 = none): such a step runs BEFORE the step whose text holds it (the
+                                 # next step at a LOWER level), and its output is that step's text, not a command of the
+                                 # line; the steps of one level that follow each other are that level's own command line
+                                 # (`$(a | b)`: b, at a's level, reads a; a step of b's own substitutions is one deeper)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -435,14 +438,20 @@ class _State:
             other.cwd, other.previous, other.stack, other.variables, other.moved)
 
 
-def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) -> None:
+def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step], upstream: Step | None = None) -> None:
+    """The steps of `command` appended to `out`. `upstream` is the pipeline stage the FIRST command reads from: a group
+    that follows a `|` (`echo x | ( bash )`) hands its first command the stage before the group."""
     began: _State | None = None        # the shell's state when the current and-or list began
     stranded: tuple[str, ...] = ()     # a backgrounded list's location changes, for the next step
+    prev = upstream                    # the stage the next command reads from, when a `|` joins them
     for text, sep, heredocs, subs in _split(command, shell)[0]:
         if began is None:
             began = state.copy()
         first = len(out)
-        _command(text, sep, heredocs, subs, state, shell, depth, out)
+        _command(text, sep, heredocs, subs, state, shell, depth, out, prev)
+        # the next stage reads this command's last step: a group's last step (`( echo x ) | bash`), never a step of its
+        # substitutions (those come before it)
+        prev = out[-1] if sep == "|" and len(out) > first else None
         if stranded and len(out) > first:
             out[first] = dataclasses.replace(out[first], stranded=stranded)
             stranded = ()
@@ -459,33 +468,33 @@ def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) 
 
 
 def _command(text: str, sep: str, heredocs: tuple[str, ...], subs: tuple[str, ...], state: _State, shell: str,
-             depth: int, out: list[Step]) -> None:
-    """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`."""
+             depth: int, out: list[Step], prev: Step | None) -> None:
+    """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`. `prev`
+    is the pipeline stage it reads from when a `|` precedes it (each side of a Bash pipeline runs in a subshell, so its
+    changes do not persist; a background `&` is the whole list's, undone by `_walk`)."""
+    transient = shell == BASH and (sep == "|" or prev is not None)
     grouped = _group(text, shell)
     if grouped is not None:
         bracket, inner = grouped
         # A Bash `( … )` is a subshell: its location changes end at the `)`. A `{ … }` group, and every PowerShell or
-        # cmd.exe bracket (location is per runspace / process), runs in the current shell, so its changes persist.
+        # cmd.exe bracket (location is per runspace / process), runs in the current shell, so its changes persist,
+        # except a Bash `{ … }` that is a pipeline side (a subshell like any other side).
         # Its substitutions are its own commands', found again by this walk.
         child = state.copy()
         before = len(out)
-        _walk(inner, child, shell, depth + 1, out)
+        _walk(inner, child, shell, depth + 1, out, prev)
         if len(out) > before:
             out[-1] = dataclasses.replace(out[-1], sep=sep)
-        if not (shell == BASH and bracket == "("):
+        if not (shell == BASH and (bracket == "(" or transient)):
             state.adopt(child)
         return
-    # the stage this command reads from when it follows a `|` (each side of a Bash pipeline runs in a subshell, so its
-    # changes do not persist; a background `&` is the whole list's, undone by `_walk`)
-    prev = out[-1] if out and out[-1].depth == depth and out[-1].sep == "|" else None
-    transient = shell == BASH and (sep == "|" or prev is not None)
     # its substitutions run first: Bash's in a subshell; a PowerShell expression or script block in this runspace, so
     # one that moves the location leaves the directory undetermined (a script block may or may not have run)
     for inner in subs:
         child = state.copy()
         before = len(out)
         _walk(inner, child, shell, depth + 1, out)
-        out[before:] = [dataclasses.replace(s, substitution=True) for s in out[before:]]
+        out[before:] = [dataclasses.replace(s, substitution=s.substitution + 1) for s in out[before:]]
         if shell == POWERSHELL and len(child.moved) > len(state.moved):
             state.cwd = None
     if shell == POWERSHELL and (m := _ASSIGN_PS.match(text)):

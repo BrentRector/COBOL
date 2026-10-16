@@ -67,3 +67,18 @@ output (`echo`, `printf`, `Write-Output`, `cat` of a heredoc, a PowerShell liter
 part of its command (`echo "EXIT=$? $(date)"` stays a capture), and rule 4 reads the pipe's reader past one.
 `resolve` treats `%X%` and a PowerShell expression as undetermined. Tests: `test_forbidden_commands.py` 160 → 210 (32
 of the new cases fail on the reviewed head abc57f110), `test_shell_location.py` 99 → 120.
+
+Branch review round 2 (R2-1): the round-1 fix taught rule 4 to skip every substitution step when it looked for a filtered
+`dotnet test`'s pipe reader, so a run that was ITSELF inside a substitution never found its reader, a step of that same
+substitution. `$r = (dotnet test … --filter "FullyQualifiedName~Foo" | Select-String Passed)` and
+`r=$(dotnet test … | tail -5)` (also inside `bash -c`) were blocked as unredirected; main and the round-0 head passed
+them. The cause was the model's one bit: `Step.substitution` said only "inside some substitution". It is now the number
+of substitutions that enclose the step, so the steps of one level that follow each other are that level's command line,
+and rule 4's reader is the next step at the run's own level (the reader's own substitutions are one level deeper).
+The sibling sweep found the same stage-structure gap on the other side of a pipe: `_command` found the stage a command
+reads from as "the last step, if it is at my depth", so a group on either side of a `|` broke the link.
+`( echo 'git stash' ) | bash` and `echo 'git stash' | ( bash )` passed, and a Bash `{ cd X; … } | cat` moved the
+calling shell. `_walk` now passes the previous stage forward explicitly: a group hands it to its first command, the next
+stage reads a group's last step, and a Bash `{ … }` pipeline side is a subshell. Rule 5 still treats a substitution
+like a group, as one opaque part of its command. Tests: `test_forbidden_commands.py` 210 → 222 (7 of the new cases fail
+on the reviewed head e24a57545), `test_shell_location.py` 120 → 125.

@@ -217,7 +217,20 @@ with tempfile.TemporaryDirectory() as tmp:
     marked = lambda cmd, shell=B: [(s.text, s.depth, s.substitution) for s in sl.steps(cmd, str(main), shell)]
     exact("a substitution's steps run first, one level down, marked; its own step keeps it as one word",
           marked("x=$(cd /y && git stash) && echo z"),
-          [("cd /y", 1, True), ("git stash", 1, True), ("x=$(cd /y && git stash)", 0, False), ("echo z", 0, False)])
+          [("cd /y", 1, 1), ("git stash", 1, 1), ("x=$(cd /y && git stash)", 0, 0), ("echo z", 0, 0)])
+    # the branch review of PB3198, R2-1: a step's level is how many substitutions enclose it, so a pipe inside one stays
+    # on its level and the reader's own substitution is one deeper (forbidden_commands.py rule 4 finds the reader so)
+    exact("a substitution inside a substitution is one level deeper; a pipe's stages share their level",
+          marked("x=$(a | b $(c))"), [("a", 1, 1), ("c", 2, 2), ("b $(c)", 1, 1), ("x=$(a | b $(c))", 0, 0)])
+    exact("a PowerShell expression's pipe: both stages one level down",
+          marked("$r = (a | Select-String b)", P), [("a", 1, 1), ("Select-String b", 1, 1), ("$r = (a | Select-String b)", 0, 0)])
+    # and a group is a pipeline stage like any other: it reads the stage before it and the next reads its last step
+    exact("a pipe into a grouped shell: echo's words are its script", marked("echo 'git a' | ( bash )"),
+          [("echo 'git a'", 0, 0), ("git a", 2, 0)])
+    exact("a pipe from a group into a shell: the group's last step is the stage", marked("( echo 'git a' ) | bash"),
+          [("echo 'git a'", 1, 0), ("git a", 1, 0)])
+    check("a Bash `{ … }` pipeline side is a subshell: its cd ends at the pipe",
+          dirs_of(f"{{ cd {W}; dotnet build; }} | cat; dotnet test", main, B), [wt, main])
     exact("a backquote and a process substitution", [t for t, _, sub in marked("echo `git a` <(git b)") if sub],
           ["git a", "git b"])
     exact("a substitution inside double quotes, never inside single quotes",

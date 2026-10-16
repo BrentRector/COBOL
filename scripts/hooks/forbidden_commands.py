@@ -179,8 +179,10 @@ for n, st in enumerate(STEPS):
         block(f"filter term(s) {bare} have no property, so they match NOTHING and the run exits 0 — a silent "
               "green. Write `FullyQualifiedName~X` for every term. (A GATE never filters: it is "
               "`scripts/build-local.ps1`, the ordered gate.)")
-    # the reader is the next stage's command; the steps of ITS substitutions run before it and are not the reader
-    nxt = next((s for s in STEPS[n + 1:] if not s.substitution), None) if st.sep == "|" else None
+    # the reader is the next stage's command: the next step at this step's own substitution level (a `dotnet test`
+    # inside `$( … )` pipes to a step of that same substitution); the steps of the READER's substitutions run before
+    # it, one level deeper, and are not the reader (the branch review of PB3198, R2-1)
+    nxt = next((s for s in STEPS[n + 1:] if s.substitution <= st.substitution), None) if st.sep == "|" else None
     reader = nxt.words[:1] if nxt is not None else ()
     piped = bool(reader) and shell_location.program(reader[0]) in _PIPE_READERS
     if not (piped or any(">" in a for a in args)):

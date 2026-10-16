@@ -175,6 +175,18 @@ CASES = [
     ("git commit -m \"$(cat <<'EOF'" + NL + 'say "hi" (and \') too' + NL + "EOF" + NL + ')" && git status', False),
     ("dotnet test x.csproj > t.log 2>&1; echo \"EXIT=$? $(date)\"", False),   # a substitution is its echo's own
     ('dotnet test x.csproj --filter "FullyQualifiedName~X" | tail $(echo -5)', False),   # the reader is still tail
+    # R2-1: a `dotnet test` inside a substitution pipes to the next stage OF THAT SUBSTITUTION, and the reader's own
+    # substitution (one level deeper) is never the reader
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | tail -5)', False),
+    ("bash -c 'r=$(dotnet test x.csproj --filter FullyQualifiedName~Foo | tail -5)'", False),
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | grep $(echo Passed))', False),
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | sort)', True),       # piped, but not to a reader
+    ('r=$(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | sort $(echo x | tail -1))', True),  # tail is sort's
+    ('dotnet test x.csproj --filter "FullyQualifiedName~Foo" | ( tail -5 )', False),    # a grouped reader is a reader
+    # a group is a pipeline stage: it reads the stage before it, and the stage after it reads the group
+    ("( echo 'git stash' ) | bash", True),
+    ("echo 'git stash' | ( bash )", True),
+    ("echo 'git stash list' | ( bash )", False),
     # R1-2: every other way a shell is handed a command line as a string or through stdin
     ('eval "git stash"', True),
     ('eval "git stash list"', False),
@@ -218,6 +230,10 @@ PS_CASES = [
     ("if ($x) { git stash }", True),
     ("$m = (git log -1 --format=%s)", False),
     ("Write-Output 'git stash'", False),
+    # R2-1: a filtered run inside an expression or subexpression pipes to the reader beside it
+    ('$r = (dotnet test x.csproj --filter "FullyQualifiedName~Foo" | Select-String Passed)', False),
+    ('$r = $(dotnet test x.csproj --filter "FullyQualifiedName~Foo" | Select-String Passed)', False),
+    ('$r = (dotnet test x.csproj --filter "FullyQualifiedName~Foo" | Sort-Object)', True),
     # and every interpreter handed a string
     ('Invoke-Expression "git stash"', True),
     ("iex 'git stash'", True),
