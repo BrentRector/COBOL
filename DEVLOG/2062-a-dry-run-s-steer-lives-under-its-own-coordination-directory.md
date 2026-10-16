@@ -1,4 +1,4 @@
-## A dry run's steer lives under its own coordination directory, and no script puts a fixed name in the host's temp directory (PB2922)
+## Entry 2062 — 2026-10-16 05:05 PDT — A dry run's steer lives under its own coordination directory, and no script puts a fixed name in the host's temp directory (PB2922)
 
 At 03:38 PDT on 2026-10-16 ten landings started in the same second, and four of them went GATE RED in the SELF-TESTS
 audit, before any slot or test leg, on one check: `test_orchestrate_steer.ps1` "a dry run leaves no steer behind" got
@@ -50,3 +50,4 @@ unless the script assigns TMP itself), a tuple assignment, and a literal `/tmp/<
 planted cases, every one missed by the reviewed scanner, and three new run-unique ones. On the tree it then found
 exactly render-spec-page.py:16, now a fresh `tempfile.mkdtemp(prefix='spec-pages-')` per run when `--out` is not given
 (`page_workunit.py` passes `--out` and is unchanged); two concurrent renders of page 30 landed in two directories.
+
