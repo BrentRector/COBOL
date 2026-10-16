@@ -45,7 +45,6 @@ import plan_wave  # noqa: E402  (the one reader of the stamp, and the one defini
 
 KINDS = ("start", "finding", "verdict")
 FINDING_FIELDS = ("file", "line", "category", "summary", "failure_scenario")
-STATUS_LINE = re.compile(r"^\**Status:", re.I)
 REVIEW_LINE = plan_wave.REVIEW_LINE   # the planner skips these lines when it reads the branch (kb/Work PB3077)
 
 
@@ -143,22 +142,33 @@ def stamp_line(v: dict, findings_file: pathlib.Path) -> str:
 
 def stamp(report: pathlib.Path, findings_file: pathlib.Path) -> str:
     """Write the newest verdict of `findings_file` into the report's header: replace its Review line, else insert one
-    right under the Status line (the header is everything above the first `## ` heading, as plan_wave reads it)."""
+    right under the status line (plan_wave.header_lines and plan_wave.status_line: the planner's own reading).
+
+    A report that is not FINISHED (plan_wave.Report.finished: DONE, or DISCHARGED with branch work) is REFUSED, a
+    header with no status line among them: the branch survey never admits such a report, so a stamp on it would read as
+    a reviewed branch that nobody lands (kb/Work PB3181 shape 3: w1080f's header began with an empty line and no
+    `Status:`, the stamp went under line 0, and the reviewed, gate-GREEN branch sat in the DECISION rows)."""
     verdicts = [r for r in load(findings_file) if r["kind"] == "verdict"]
     if not verdicts:
         raise RecordError(f"{findings_file} holds no verdict: run `verdict` first")
     if " " in str(findings_file):
         raise RecordError(f"the findings file path must have no space (the stamp reads it as one word): {findings_file}")
+    rep = plan_wave.parse_report(report)
+    if rep is None or not rep.finished:
+        raise RecordError(f"{report} is not a finished fix-lane report ("
+                          + ("not a w<wave><letter>-PB<lead>-report.md name" if rep is None else
+                             f"status {rep.status or 'missing: no status line in the first six header lines'}"
+                             f", head {rep.head or 'none'}, base {rep.base or 'none'}")
+                          + "): its author writes `Status: DONE` (or DISCHARGED with its HEAD) first; nothing stamped")
     line = stamp_line(verdicts[-1], findings_file)
     text = report.read_text(encoding="utf-8")
     lines = text.splitlines()
-    end = next((i for i, l in enumerate(lines) if i > 0 and l.startswith("## ")), len(lines))
+    end = len(plan_wave.header_lines(lines))
     at = next((i for i in range(end) if REVIEW_LINE.match(lines[i].strip())), None)
     if at is not None:
         lines[at] = line
     else:
-        status = next((i for i in range(end) if STATUS_LINE.match(lines[i].strip())), 0)
-        lines.insert(status + 1, line)
+        lines.insert(plan_wave.status_line(lines[:end])[0] + 1, line)
     out = "\n".join(lines) + ("\n" if text.endswith("\n") else "")
     header = "\n".join(lines[:end + (0 if at is not None else 1)])
     got = plan_wave.parse_review(header)
@@ -264,6 +274,20 @@ def self_test() -> int:
         check("arm: a FINDINGS stamp without its file does not parse",
               plan_wave.parse_review("**Review:** FINDINGS 2 x abc1234") is None)
         check("arm: a placeholder does not parse", plan_wave.parse_review("**Review:** pending") is None)
+        # kb/Work PB3181 shape 3: a report that is not FINISHED is refused and left untouched, never stamped under line 0
+        for name, body in (("w9b-PB2-report.md", "\n# w9 group B -- PB2\nBranch: b · head abc1234\n"),   # no status line
+                           ("w9c-PB3-report.md", "Status: SPLIT\nBranch: b · HEAD: abc1234\n"),
+                           ("w9d-PB4-report.md", "Status: DISCHARGED\nBranch: b · base abc1234 · head abc1234\n"),
+                           ("notes-PB5.md", "Status: DONE\nBranch: b\n")):                         # not a report name
+            unfinished = tmp / name
+            unfinished.write_text(body + "\n## Rule\n", encoding="utf-8", newline="\n")
+            check(f"arm: {name} (not a finished report) is refused, unchanged",
+                  refused(stamp, unfinished, f) and unfinished.read_text(encoding="utf-8") == body + "\n## Rule\n")
+        bare = tmp / "w9e-PB6-report.md"
+        bare.write_text("# w9 group E -- PB6\nDONE\nBranch: b · head abc1234\n\n## Rule\n", encoding="utf-8", newline="\n")
+        stamp(bare, f)
+        check("arm: the stamp goes under a bare status word that is not the first line",
+              bare.read_text(encoding="utf-8").splitlines()[2].startswith("**Review:** CLEAN "))
         bad = tmp / "bad.jsonl"
         bad.write_text('{"kind":"start","round":1}\nnot json\n', encoding="utf-8", newline="\n")
         check("arm: a malformed line is an error, never skipped (a lost finding would read CLEAN)", refused(load, bad))

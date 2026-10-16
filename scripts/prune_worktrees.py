@@ -20,24 +20,36 @@ who acts next:
                    ledger, read through plan_wave.inflight_file_sets; the branch name starts with the group's slug
                    `w<wave><letter>`), or it was touched in the last --min-age minutes (its HEAD reflog or STATUS.md).
                    Nobody touches it.
-                   A branch with no report whose tip is contained in a fix-lane branch that is IN FLIGHT or waiting
-                   (a same-file predecessor, a branch a review finisher merged) is IN FLIGHT too: it lands through
-                   that branch, and reads LANDED once it has.
-  WAITING FOR REVIEW  not on main, and its newest fix-lane report says `Status: DONE`, but its header carries no
-                   `Review: CLEAN` stamp at the branch's tip (plan_wave.REVIEW, written by review_findings.py stamp): ONE
-                   read-only cobol-reviewer reviews it (the `review` skill's branch form, kb/Work PB3027). The landing
-                   step never reviews and never fixes a finding. A stamp at an older head is unreviewed work.
-  WAITING TO LAND  not on main, its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py
-                   REPORT_NAME, under coord.reports_dir()) says `Status: DONE`, and its header's review stamp is CLEAN
-                   at the branch's tip, or at an older head followed only by mechanical commits (main merged in
-                   cleanly, the DEVLOG stamp: `unreviewed_since`, the one coverage rule `enqueue.py land` enforces
-                   too): the loop's landing lane runs `enqueue.py land <branch>` on it (land_lane.py, kb/Work PB3103,
-                   PB3023),
-                   one branch at a time, the most harmful lead first (`--brief` lists them in that order, kb/Work
-                   PB2981's ranking). (A stamp that says FINDINGS is a DECISION row: the next wave's finisher answers
-                   them, plan_wave.py.)
+                   A branch with no report whose tip is contained in a fix-lane branch that is IN FLIGHT, waiting or
+                   STOPPED (a same-file predecessor, a branch a review finisher merged) is IN FLIGHT too: it lands
+                   through that branch, and reads LANDED once it has.
+  A FINISHED BRANCH is decided by ONE rule of three coverages, never by a report's age (kb/Work PB3181, PB3125):
+    1. its newest fix-lane report (`w<wave><letter>-PB<lead>-report.md`, plan_wave.py REPORT_NAME, under
+       coord.reports_dir()) is FINISHED (plan_wave.Report.finished: `Status: DONE`, or DISCHARGED with a HEAD past its
+       base) and COVERS the tip: its HEAD is the tip, or every commit after it is mechanical (main merged in cleanly,
+       the DEVLOG stamp: `unreviewed_since`, the one coverage rule the review stamp and `enqueue.py land` read). A
+       report naming no HEAD, or followed by a commit no report describes (an agent resumed after writing it), covers
+       nothing: DECISION, with the count;
+    2. its header's review stamp is CLEAN at the tip, or at an older head the same coverage reaches;
+    3. the landing lane's newest attempt AT THE TIP (land_lane.view: its head, or the end head its run left).
+  WAITING FOR REVIEW  coverage 1 holds, but the header carries no `Review: CLEAN` stamp covering the tip
+                   (plan_wave.REVIEW, written by review_findings.py stamp): ONE read-only cobol-reviewer reviews it (the
+                   `review` skill's branch form, kb/Work PB3027). The landing step never reviews and never fixes a
+                   finding. A stamp at an older head is unreviewed work.
+  WAITING TO LAND  coverages 1 and 2 hold and no attempt stopped at this tip (none ran here, one is running, or its exit
+                   is one the lane retries by itself: 3 once landing_check.py passes, 2 or 9 once, 8 after the halt; or
+                   the enqueue unit re-armed it): the loop's landing lane runs `enqueue.py land <branch>` on it
+                   (land_lane.py, kb/Work PB3103, PB3023), one branch at a time, the most harmful lead first (`--brief`
+                   lists them in that order, kb/Work PB2981's ranking). (A stamp that says FINDINGS is a DECISION row:
+                   the next wave's finisher answers them, plan_wave.py.)
+  STOPPED          coverages 1 and 2 hold and the lane's attempt at this tip STOPPED (land_lane's class: a conflict 4, a
+                   red gate 5, a DEVLOG refusal 6, UNREVIEWED 11, a repeated exit 2 or 9, a runner that DIED twice): the
+                   lane never relaunches it at this head; the enqueue unit sends it to its finisher (or reviewer), whose
+                   new tip is reviewed and landed, or re-arms a stop resolved with no commit. The evidence names the
+                   attempt and land_lane.ACTION's owner. A branch it contains lands through it (IN FLIGHT).
   ENQUEUED         its pull request is open in GitHub's merge queue, or set to join it (auto-merge on): the queue tests it
-                   in a merge group and lands it (kb/Work PB3024). Nobody touches it.
+                   in a merge group and lands it (kb/Work PB3024); offline, the lane's exit-0 attempt at the tip says
+                   the same. Nobody touches it.
   BOUNCED          its pull request is open but the queue REMOVED it (a red merge group, a conflict, a timeout: the
                    reason is GitHub's) and its head is still the branch's tip: the enqueue unit dispatches ONE finisher
                    with the reason named. A finisher that fixes the branch returns DONE and lands nothing: its new tip
@@ -109,6 +121,7 @@ sys.path.insert(0, str(REPO / 'scripts' / 'orchestrator'))
 import coord  # noqa: E402  (the coordination directory, the live-process probe)
 if TYPE_CHECKING:
     from plan_wave import Review  # noqa: E402  (imported lazily at run time: plan_wave imports this module back)
+    from land_lane import Lane  # noqa: E402  (likewise: land_lane imports this module back)
 
 DECL = re.compile(r'^\+\s*(?:(?:public|internal|private|protected|static|sealed|abstract|partial|override|readonly|async|virtual|unsafe|new)\s+)*'
                   r'(?:class|record|struct|enum|interface)\s+(?:struct\s+)?(\w+)')
@@ -116,7 +129,7 @@ METH = re.compile(r'^\+\s*(?:(?:public|internal|private|protected|static|sealed|
                   r'[\w<>\[\],.?()\s]+?\s+(\w+)\s*\(')
 TEST = re.compile(r'^\+\s*public (?:async )?(?:void|Task)\s+(\w+)\s*\(')
 LANDED_CONTENT = ('MERGED', 'LANDED')
-STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'ENQUEUED', 'BOUNCED', 'LANDED', 'DECISION')
+STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'STOPPED', 'ENQUEUED', 'BOUNCED', 'LANDED', 'DECISION')
 LOCK_PID = re.compile(r'\(pid (\d+)\)')
 SETTINGS = ':!.claude/settings.local.json'   # always dirty in an agent's worktree, never work (2026-10-03)
 
@@ -337,6 +350,8 @@ class Row:
     tip: str = ''                   # the branch's tip sha (a review stamp covers exactly one head)
     review_holds: bool = False      # its CLEAN stamp names an older head and every commit since is mechanical
                                     # (unreviewed_since: main's, a clean merge of main, DEVLOG-only)
+    report_since: list[str] | None = None   # unreviewed_since(the report's HEAD, tip): [] = the report covers the tip,
+                                            # None = it names no head of this branch (kb/Work PB3181)
 
 
 def mechanical(commit: str, repo=REPO) -> bool:
@@ -374,15 +389,48 @@ class Report:
     age_min: float                  # minutes since the report was written
     header: str = dataclasses.field(default='', repr=False)
     review: Review | None = None    # the header's branch-review stamp (plan_wave.parse_review, kb/Work PB3027)
+    head: str | None = None         # the header's HEAD: the branch tip the report describes (plan_wave.HEAD)
+    finished: bool = False          # plan_wave.Report.finished: DONE, or DISCHARGED with a HEAD past its base
 
 
-REPORT_SLACK_MIN = 10   # an agent writes its report right after its last STATUS.md rewrite; older than that = resumed since
+def landing_state(row: Row, rep: Report, rv: Review, lane: Lane | None) -> tuple[str, str]:
+    """A report-covered, review-CLEAN-covered branch, by the landing lane's newest attempt AT THIS TIP (its head, or the
+    end head its run left: main merged in, the DEVLOG stamp) — the third coverage of lifecycle() (kb/Work PB3181,
+    PB3125). The lane's own classes (land_lane.classify/effective) and its own ACTION text decide; its status text is
+    never parsed. A STOPPED attempt is never WAITING TO LAND: the lane does not relaunch a stop at the same head, so
+    only a new head (its finisher's) or the enqueue unit's re-arm lands it."""
+    since = '' if rv.covers(row.tip) else ' (later commits mechanical: main merged in, the DEVLOG stamp)'
+    clean = f'{rep.name}: Status {rep.status}, Review CLEAN at {rv.sha[:12]} ({rv.reviewer}){since}'
+    waiting = ('WAITING TO LAND', clean + '; the landing lane lands it (enqueue.py land)')
+    latest = next(((a, c) for a, c in (lane.latest if lane else ()) if a.get('branch') == row.name), None)
+    if latest is None:
+        return waiting
+    import land_lane  # noqa: PLC0415  (scripts/orchestrator: it imports this module back, lazily)
+    att, cls = latest
+    if cls == 'running':
+        return 'WAITING TO LAND', clean + f'; being landed (attempt {att["id"]}, pid {att.get("pid")})'
+    if not any(row.tip and h and (row.tip.startswith(h) or h.startswith(row.tip))
+               for h in (att.get('head'), att.get('end_head'))):
+        return waiting                                  # an attempt at another head: this tip was never tried
+    rearm = (lane.rearms or {}).get(row.name) if lane else None
+    tried = f'landing attempt {att["id"]} {land_lane.outcome(att)} ({att.get("verdict") or "no verdict line"})'
+    if rearm and rearm.get('head') == row.tip:
+        return 'WAITING TO LAND', (f'{clean}; {tried}, re-armed by the enqueue unit at this head '
+                                   f'({rearm.get("why") or "no reason given"}): the lane lands it again')
+    if cls == land_lane.STOPPED:
+        return 'STOPPED', (f'{clean}; {tried}: {land_lane.ACTION[land_lane.STOPPED]}'
+                           + (' [collected: the enqueue unit has dispatched its owner]' if att.get('collected') else ''))
+    if cls == land_lane.DONE:
+        return 'ENQUEUED', (f'{tried} at this tip: its pull request went to the merge queue (no pull-request read '
+                            'says otherwise): it lands when the queue merges it')
+    return 'WAITING TO LAND', f'{clean}; {tried}: {land_lane.ACTION[cls]}'
 
 
 def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours: float = 24,
               live: Callable[[str | None], bool] = live_lock,
-              prs: dict[str, PullRequest] | None = None) -> tuple[str, str]:
-    """THE lifecycle rule (module doc), as a pure function of what the survey measured: (state, the evidence)."""
+              prs: dict[str, PullRequest] | None = None, lane: Lane | None = None) -> tuple[str, str]:
+    """THE lifecycle rule (module doc), as a pure function of what the survey measured: (state, the evidence). `lane`:
+    the landing lane's view (land_lane.view: each branch's newest attempt and its class, the pending re-arms)."""
     if live(row.lock):
         return 'IN FLIGHT', f'worktree locked by a live agent ({row.lock or "locked by hand"})'
     pr = (prs or {}).get(row.name)
@@ -405,26 +453,36 @@ def lifecycle(row: Row, *, in_flight_slugs: set[str], min_age: int, stale_hours:
     if row.content in LANDED_CONTENT and not fresh and not row.dirty:
         return 'LANDED', f'{row.content}{f" ({row.how})" if row.how else ""}: its work is on main; --apply deletes it'
     rep = row.report
-    if row.content not in LANDED_CONTENT and rep and rep.status == 'DONE' and rep.age_min <= row.age_min + REPORT_SLACK_MIN:
+    if row.content not in LANDED_CONTENT and rep and rep.finished:
+        # A FINISHED report (plan_wave.Report.finished) decides the branch only where it COVERS the tip: its HEAD is the
+        # tip, or every commit after it is mechanical (unreviewed_since, the coverage rule of the review stamp and of
+        # `enqueue.py land`). Never the report's age (kb/Work PB3181: enqueue.py's merge and DEVLOG stamp postdate it).
         if rep.lead_terminal:
-            return 'DECISION', (f'{rep.name}: DONE, but {rep.lead} is already landed: superseded (its work reached main '
-                                f'through another branch); confirm nothing unique remains, then delete it; ' + evidence(row))
+            return 'DECISION', (f'{rep.name}: {rep.status}, but {rep.lead} is already landed: superseded (its work '
+                                'reached main through another branch); confirm nothing unique remains, then delete it; '
+                                + evidence(row))
         if rep.age_min > stale_hours * 60:
-            return 'DECISION', (f'{rep.name}: DONE {rep.age_min / 60:.0f} h ago and never landed (over {stale_hours:g} h): '
-                                f'land it or record why not; ' + evidence(row))
+            return 'DECISION', (f'{rep.name}: {rep.status} {rep.age_min / 60:.0f} h ago and never landed (over '
+                                f'{stale_hours:g} h): land it or record why not; ' + evidence(row))
+        uncovered = ('the report names no HEAD, so it describes no commit of the branch' if not rep.head else
+                     f'the report\'s HEAD {rep.head[:12]} is not a commit of this branch' if row.report_since is None else
+                     f'{len(row.report_since)} commit(s) since the report\'s HEAD {rep.head[:12]} that no report '
+                     f'describes (newest {row.report_since[0][:12]}): a resumed agent rewrites its report'
+                     if row.report_since else '')
+        if uncovered:
+            return ('IN FLIGHT', touched) if fresh else ('DECISION', f'{rep.name}: {rep.status}, but {uncovered}; '
+                                                         + evidence(row))
         rv = rep.review
         if rv and rv.verdict == 'CLEAN' and (rv.covers(row.tip) or row.review_holds):
-            since = '' if rv.covers(row.tip) else ' (later commits mechanical: main merged in, the DEVLOG stamp)'
-            return 'WAITING TO LAND', (f'{rep.name}: Status DONE, Review CLEAN at {rv.sha[:12]} ({rv.reviewer}){since}; '
-                                       f'the landing lane lands it (enqueue.py land)')
+            return landing_state(row, rep, rv, lane)
         if rv and rv.verdict == 'FINDINGS' and rv.covers(row.tip):
-            return 'DECISION', (f'{rep.name}: DONE, but its branch review found {rv.findings} finding(s) ({rv.file}): '
-                                f'a finisher answers them, and the next wave plans it (plan_wave.py, kb/Work PB3027); '
-                                + evidence(row))
+            return 'DECISION', (f'{rep.name}: {rep.status}, but its branch review found {rv.findings} finding(s) '
+                                f'({rv.file}): a finisher answers them, and the next wave plans it (plan_wave.py, '
+                                'kb/Work PB3027); ' + evidence(row))
         unreviewed = ('no review stamp' if rv is None else
                       f'Review {rv.verdict} at {rv.sha[:12]}, but the branch is at {row.tip[:12] or "?"}')
-        return 'WAITING FOR REVIEW', (f'{rep.name}: Status DONE, {unreviewed}: one cobol-reviewer reviews it (the review '
-                                      f'skill\'s branch form, kb/Work PB3027)')
+        return 'WAITING FOR REVIEW', (f'{rep.name}: Status {rep.status}, {unreviewed}: one cobol-reviewer reviews it (the '
+                                      'review skill\'s branch form, kb/Work PB3027)')
     if fresh:
         return 'IN FLIGHT', touched
     return 'DECISION', evidence(row)
@@ -461,10 +519,9 @@ def report_index(reports_dir: pathlib.Path | None, terminal: Callable[[str], boo
     import plan_wave  # noqa: PLC0415  (it imports this module back, lazily: no cycle at import time)
     out = []
     for r in plan_wave.load_reports(reports_dir):
-        lines = r.path.read_text(encoding='utf-8', errors='replace').splitlines()
-        head = next((i for i, l in enumerate(lines) if i > 0 and l.startswith('## ')), len(lines))
-        out.append(Report(r.path.name, r.status, r.lead, terminal(r.lead), age_minutes(r.path), '\n'.join(lines[:head]),
-                          r.review))
+        header = plan_wave.header_lines(r.path.read_text(encoding='utf-8', errors='replace').splitlines())
+        out.append(Report(r.path.name, r.status, r.lead, terminal(r.lead), age_minutes(r.path), '\n'.join(header),
+                          r.review, r.head, r.finished))
     return out
 
 
@@ -529,20 +586,41 @@ def pull_requests(gh=None) -> dict[str, PullRequest]:
     return prs
 
 
-def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool]) -> set[str]:
+def in_flight_slugs(coord_dir: pathlib.Path | None, terminal: Callable[[str], bool],
+                    reports_dir: pathlib.Path | None = None) -> set[str]:
     """The `w<wave><letter>` slugs of the dispatch-ledger wave groups still in flight, by the planner's own liveness rule
-    (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired). A hand entry has no
-    slug (its label is free text); a hand dispatch's worktree is caught by its live lock or its recency instead."""
+    (plan_wave.inflight_file_sets, source 3: a group with a note that is not landed or retired and that no report in
+    `reports_dir` answers, kb/Work PB2795), read from its `meta` (each entry's recorded slug), never parsed back out of
+    an owner label. A dispatch made without a rendered group has no ledger entry (kb/Work PB3186); its worktree is
+    caught by its live lock or its recency instead."""
     import plan_wave  # noqa: PLC0415
-    live = plan_wave.inflight_file_sets(coord_dir=coord_dir, with_git=False, terminal=terminal)
-    return {m.group(1).lower() for o in live if (m := re.match(r'dispatched (w\d+[A-Za-z0-9]+) \(', o))}
+    meta: dict[str, dict] = {}
+    plan_wave.inflight_file_sets(coord_dir=coord_dir, with_git=False, terminal=terminal, meta=meta,
+                                 reports=plan_wave.load_reports(reports_dir) if reports_dir else ())
+    return {m['slug'] for m in meta.values() if m.get('slug')}
 
 
-def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset(), min_age: int = 180,
-           stale_hours: float = 24, live: Callable[[str | None], bool] = live_lock,
-           prs: dict[str, PullRequest] | None = None, coord_dir: pathlib.Path | None = None) -> list[Row]:
+def live_survey(repo=REPO, *, coord_dir: pathlib.Path | None = None, reports_dir: pathlib.Path | None = None,
+                terminal: Callable[[str], bool] | None = None, min_age: int = 180, stale_hours: float = 24,
+                live: Callable[[str | None], bool] = live_lock, gh=None) -> list[Row]:
+    """THE lifecycle as every production reader takes it: this module's main, the landing lane (land_lane.survey) and
+    the planner's file-set partition (plan_wave.main) all call this, never `survey` with arguments of their own, so
+    each reads the fix-lane reports, the dispatch ledger's in-flight slugs and the OPEN PULL REQUESTS the same way. A
+    reader that surveyed without the pull requests could never see ENQUEUED from GitHub or BOUNCED at all, and would
+    plan over a branch the merge queue rejected as if it were still queued (kb/Work PB2807, branch review R1-2).
+    `gh`: pull_requests' runner (a self-test fake). The caller fetches origin first when it needs a current main."""
+    terminal = terminal or note_terminal()
+    rdir = reports_dir or coord.reports_dir(str(coord_dir) if coord_dir else None)
+    return survey(repo, reports=report_index(rdir, terminal), slugs=in_flight_slugs(coord_dir, terminal, rdir),
+                  min_age=min_age, stale_hours=stale_hours, live=live, prs=pull_requests(gh), coord_dir=coord_dir)
+
+
+def survey(repo=REPO, *, prs: dict[str, PullRequest], reports: list[Report] = (), slugs: set[str] = frozenset(),
+           min_age: int = 180, stale_hours: float = 24, live: Callable[[str | None], bool] = live_lock,
+           coord_dir: pathlib.Path | None = None) -> list[Row]:
     """Every local branch but main, and every detached worktree, measured and given its lifecycle state. `prs`:
-    {branch: its open pull request into main} (pull_requests)."""
+    {branch: its open pull request into main} (pull_requests), REQUIRED so no caller reads a git-only lifecycle by
+    omission; production readers call live_survey, and a self-test passes its own (`{}` is an explicit offline)."""
     names = main_names(repo)
     trees = worktrees(repo)
     by_branch = {t.branch: t for t in trees if t.branch}
@@ -575,26 +653,32 @@ def survey(repo=REPO, *, reports: list[Report] = (), slugs: set[str] = frozenset
     branches = [b for b in git('branch', '--format=%(refname:short)', cwd=repo).stdout.split() if b != 'main']
     with ThreadPoolExecutor(max_workers=16) as pool:   # subprocess-bound: ~1-3 s a branch, 35 s for 29 one by one
         rows = list(pool.map(measure, branches)) + list(pool.map(measure_detached, [t for t in trees if not t.branch]))
+    import land_lane  # noqa: PLC0415  (scripts/orchestrator: it imports this module back; its attempt reader, never its text)
+    lane = land_lane.view(pathlib.Path(coord_dir) if coord_dir else coord.coord_path())
     for r in rows:
         rv = r.report.review if r.report else None
         if rv and rv.verdict == 'CLEAN' and r.tip and not rv.covers(r.tip):
             r.review_holds = unreviewed_since(rv.sha, r.tip, repo=repo) == []
+        if r.content not in LANDED_CONTENT and r.report and r.report.finished and r.report.head and r.tip:
+            r.report_since = unreviewed_since(r.report.head, r.tip, repo=repo)
         r.state, r.why = lifecycle(r, in_flight_slugs=set(slugs), min_age=min_age, stale_hours=stale_hours, live=live,
-                                   prs=prs)
+                                   prs=prs, lane=lane)
     contained(rows, repo)
     return rows
 
 
-CARRIER_STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'ENQUEUED', 'BOUNCED')
+#: The states whose branch has an owner and lands, so a branch it contains lands through it. STOPPED is one (kb/Work
+#: PB3125): its landing attempt stopped, the enqueue unit's finisher owns it, and its predecessors wait with it.
+CARRIER_STATES = ('IN FLIGHT', 'WAITING FOR REVIEW', 'WAITING TO LAND', 'STOPPED', 'ENQUEUED', 'BOUNCED')
 
 
 def contained(rows: list[Row], repo=REPO) -> None:
     """A branch that lands THROUGH another one is IN FLIGHT, not a decision and not a second landing: its tip is an
-    ancestor of the tip of a fix-lane branch (one a report names) that is IN FLIGHT or waiting. That is a same-file
-    predecessor (MANDATORY-PRACTICES O2: it lands through its successor) and a branch a review finisher merged
-    (kb/Work PB3027: the wave's finisher rewrites the report for its own branch; a later wave's finisher writes a new
-    report and leaves the FINDINGS-stamped one behind). Once the carrier lands, the content test reads
-    it LANDED and --apply deletes it. Two names for one commit carry nothing."""
+    ancestor of the tip of a fix-lane branch (one a report names) that is IN FLIGHT, waiting or STOPPED
+    (CARRIER_STATES). That is a same-file predecessor (MANDATORY-PRACTICES O2: it lands through its successor) and a
+    branch a review finisher merged (kb/Work PB3027: the wave's finisher rewrites the report for its own branch; a
+    later wave's finisher writes a new report and leaves the FINDINGS-stamped one behind). Once the carrier lands, the
+    content test reads it LANDED and --apply deletes it. Two names for one commit carry nothing."""
     carriers = [c for c in rows if c.report and c.tip and c.state in CARRIER_STATES]
     for r in rows:
         findings = bool(r.report and r.report.review and r.report.review.verdict == 'FINDINGS')
@@ -610,7 +694,8 @@ def contained(rows: list[Row], repo=REPO) -> None:
 def verdict(rows: list[Row]) -> str:
     n = {s: sum(1 for r in rows if r.state == s) for s in STATES}
     return (f'=== BRANCH LIFECYCLE: {len(rows)} · {n["IN FLIGHT"]} in flight · {n["WAITING FOR REVIEW"]} waiting for '
-            f'review · {n["WAITING TO LAND"]} waiting to land · {n["ENQUEUED"]} enqueued · {n["BOUNCED"]} bounced · '
+            f'review · {n["WAITING TO LAND"]} waiting to land · {n["STOPPED"]} stopped · {n["ENQUEUED"]} enqueued · '
+            f'{n["BOUNCED"]} bounced · '
             f'{n["LANDED"]} landed (--apply deletes) · {n["DECISION"]} need a DECISION'
             + (' (owner rule 2026-10-08, kb/Work PB2600: land it or abandon it in its kb/Work note, then delete) ===' if n['DECISION'] else ' ==='))
 
@@ -743,7 +828,7 @@ def main(argv=None):
     ap.add_argument('--reports', type=pathlib.Path, help='the fix-lane reports directory (default coord.reports_dir())')
     ap.add_argument('--brief', action='store_true',
                     help='the verdict line and the rows someone must act on: WAITING FOR REVIEW, WAITING TO LAND (in '
-                         'landing order), BOUNCED and DECISION')
+                         'landing order), STOPPED, BOUNCED and DECISION')
     ap.add_argument('--json', action='store_true', help='the survey as JSON: every row with its state and evidence')
     ap.add_argument('--no-fetch', action='store_true')
     ap.add_argument('--self-test', action='store_true')
@@ -752,10 +837,7 @@ def main(argv=None):
         return self_test()
     if not a.no_fetch:
         git('fetch', '-q', 'origin')
-    terminal = note_terminal()
-    rows = survey(reports=report_index(a.reports or coord.reports_dir(), terminal),
-                  slugs=in_flight_slugs(None, terminal), min_age=a.min_age, stale_hours=a.stale_hours,
-                  prs=pull_requests())
+    rows = live_survey(reports_dir=a.reports, min_age=a.min_age, stale_hours=a.stale_hours)
     order = landing_order(rows, note_rank())
     if a.json:
         print(json.dumps({'verdict': verdict(rows), 'rows': [dataclasses.asdict(r) for r in rows],
@@ -814,7 +896,9 @@ def self_test() -> int:
         g('fetch', '-q', 'origin')
         # unlanded with no report (DECISION), unlanded with a DONE report (WAITING TO LAND), a SPLIT report (DECISION),
         # a DONE report whose lead note is already landed (superseded: DECISION), a DONE report 30 h old (stale:
-        # DECISION), a DONE report the branch moved past by an hour (resumed since: not waiting), a ledger slug, a fresh one
+        # DECISION), a DONE report followed by a commit no report describes (resumed since: DECISION, whatever the
+        # report's age, kb/Work PB3181), a ledger slug, a fresh one
+        main_at = g('rev-parse', 'main').stdout.strip()
         for b, f in (('orphan', 'src/C.cs'), ('done-branch', 'src/D.cs'), ('split-branch', 'src/E.cs'),
                      ('w9999a-ledger', 'src/F.cs'), ('fresh', 'src/G.cs'), ('superseded', 'src/H.cs'),
                      ('stale-done', 'src/I.cs'), ('resumed', 'src/J.cs'),
@@ -822,9 +906,23 @@ def self_test() -> int:
                      # stamp at a head the branch has since moved past; `pred` carries no report and lands through
                      # `succ`, which was cut from it and is DONE and reviewed CLEAN
                      ('unreviewed', 'src/N.cs'), ('review-findings', 'src/O.cs'), ('reviewed-moved', 'src/S.cs'),
-                     ('pred', 'src/T.cs'), ('fnd-pred', 'src/W.cs'), ('reviewed-stamped', 'src/Y.cs')):
+                     ('pred', 'src/T.cs'), ('fnd-pred', 'src/W.cs'), ('reviewed-stamped', 'src/Y.cs'),
+                     # ONE RULE FOR A FINISHED BRANCH (kb/Work PB3181, PB3125): the report's coverage, the review's,
+                     # and the landing lane's newest attempt at the tip. `lane-pred` carries no report and lands
+                     # through `lane-stopped`, cut from it; the other `lane-*` are each one attempt's outcome; a
+                     # DISCHARGED report with branch work, one whose HEAD is its base, and a DONE report naming no HEAD
+                     ('lane-pred', 'src/LP.cs'), ('lane-free', 'src/LF.cs'), ('lane-done', 'src/LD.cs'),
+                     ('lane-running', 'src/LR.cs'), ('discharged', 'src/DS.cs'), ('discharged-empty', 'src/DE.cs'),
+                     ('no-head', 'src/NH.cs')):
             g('switch', '-q', '-c', b, 'main')
             commit(f, f'class {b.replace("-", "_").title()}X {{}}\n', b)
+        g('switch', '-q', '-c', 'lane-stopped', 'lane-pred')
+        commit('src/LS.cs', 'class LaneStoppedX {}\n', 'lane-stopped')
+        lane_at = {b: g('rev-parse', b).stdout.strip() for b in ('lane-stopped', 'lane-free', 'lane-done', 'lane-running',
+                                                                  'discharged', 'discharged-empty', 'no-head')}
+        resumed_at = g('rev-parse', 'resumed').stdout.strip()
+        g('switch', '-q', 'resumed')
+        commit('src/J.cs', 'class ResumedX { int AfterTheReport; }\n', 'a commit no report describes')
         reviewed_at = g('rev-parse', 'reviewed-moved').stdout.strip()
         g('switch', '-q', 'reviewed-moved')
         commit('src/S.cs', 'class ReviewedMovedX { int AfterTheReview; }\n', 'a commit after the review')
@@ -837,7 +935,8 @@ def self_test() -> int:
         # `fnd-pred` was reviewed FINDINGS; a later wave's finisher `fnd-fix` merged it and was reviewed CLEAN
         g('switch', '-q', '-c', 'fnd-fix', 'fnd-pred')
         commit('src/W2.cs', 'class FindingsFixedX {}\n', 'the findings answered')
-        tips = {b: g('rev-parse', b).stdout.strip() for b in ('done-branch', 'review-findings', 'succ', 'fnd-pred', 'fnd-fix')}
+        tips = {b: g('rev-parse', b).stdout.strip() for b in ('done-branch', 'review-findings', 'succ', 'fnd-pred', 'fnd-fix',
+                                                                'unreviewed', 'reviewed-moved')}
         # modified-only: an unlanded change to an EXISTING file that declares no new name (train 1039b review: the
         # name test called it LANDED, and --apply would have deleted it)
         g('switch', '-q', '-c', 'modified-only', 'main')
@@ -902,6 +1001,27 @@ def self_test() -> int:
         g('branch', '-D', 'tmp-remote')
         g('push', '-q', 'origin', 'main')
         g('fetch', '-q', 'origin')
+        # `lane-stopped` got what `enqueue.py land` commits before its gate: origin/main merged in cleanly, the DEVLOG
+        # stamp; its attempt then stopped at that tip with exit 5 (GATE RED). The attempts are written by the lane's own
+        # writer (land_lane.launch) and completed in its runner's record shape (run_attempt: rc, verdict, end_head).
+        g('switch', '-q', 'lane-stopped')
+        g('merge', '-q', '--no-edit', 'origin/main')
+        commit('DEVLOG/0043-lane.md', '## Entry 43 — 2026-10-15 12:00 PDT — lane\n\nWhy.\n', 'DEVLOG 43: stamp the entry')
+        g('switch', '-q', 'main')
+        import land_lane  # noqa: PLC0415  (scripts/orchestrator: it imports this module back)
+
+        def attempt(branch: str, head: str, rc: int | None, verdict: str = '', end_head: str | None = None) -> None:
+            rec = land_lane.launch(landed_coord, repo, {'name': branch, 'tip': head, 'worktree': str(repo)}, 'self-test',
+                                   lambda argv, log: 4242)
+            if rc is not None:
+                rec.update(rc=rc, verdict=verdict, ended='2026-10-15T19:00:00+00:00', end_head=end_head or head)
+                land_lane.save(rec)
+        attempt('lane-stopped', lane_at['lane-stopped'], 5, 'GATE RED (Linux) on x',
+                g('rev-parse', 'lane-stopped').stdout.strip())
+        attempt('lane-free', lane_at['lane-free'], 3, 'NOT QUEUED (exit 3, above)')
+        attempt('lane-done', lane_at['lane-done'], 0, 'ENQUEUED')
+        attempt('lane-running', lane_at['lane-running'], None)
+        attempt('done-branch', 'an-older-head', 5, 'GATE RED (Windows) on an-older-head')   # not at this tip: ignored
         wt = tmp / 'worktrees'
         # worktrees: dirty-but-merged (DECISION), locked by a live agent, locked by a dead pid (LANDED), detached
         g('worktree', 'add', '-q', '-b', 'dirty-merged', str(wt / 'dirty-merged'), 'main')
@@ -921,24 +1041,44 @@ def self_test() -> int:
         for name, text, h in (
                 # the attended shape (kb/Work PB2602): Status, Worktree (a Windows path), Branch, HEAD, Base
                 ('w9998a-PB1-report.md', 'Status: DONE\nWorktree: E:\\x\\.claude\\worktrees\\done-wt\n'
-                                         'Branch: `done-branch`\nHEAD: abcdef1\nBase: 1234567\n'
+                                         f'Branch: `done-branch`\nHEAD: {tips["done-branch"][:9]}\nBase: 1234567\n'
                                          f'**Review:** CLEAN w9998a-review-r1 {tips["done-branch"]}\n', 10),
-                ('w9998k-PB12-report.md', 'Status: DONE\nBranch: unreviewed\n', 10),
-                ('w9998l-PB13-report.md', 'Status: DONE\nBranch: review-findings\n**Review:** FINDINGS 2 '
-                                          f'w9998l-review-r1 {tips["review-findings"]} E:/s/review-w9998-l.jsonl\n', 10),
-                ('w9998m-PB14-report.md', 'Status: DONE\nBranch: reviewed-moved\n'
+                ('w9998k-PB12-report.md', f'Status: DONE\nBranch: unreviewed · head {tips["unreviewed"][:12]}\n', 10),
+                ('w9998l-PB13-report.md', f'Status: DONE\nBranch: review-findings\nHEAD: {tips["review-findings"]}\n'
+                                          f'**Review:** FINDINGS 2 w9998l-review-r1 {tips["review-findings"]} '
+                                          'E:/s/review-w9998-l.jsonl\n', 10),
+                # rewritten for the commit after the review: the report covers the tip, the stamp does not
+                ('w9998m-PB14-report.md', f'Status: DONE\nBranch: reviewed-moved\nHEAD: {tips["reviewed-moved"]}\n'
                                           f'**Review:** CLEAN w9998m-review-r1 {reviewed_at[:12]}\n', 10),
-                ('w9998n-PB15-report.md', f'Status: DONE\nBranch: succ\n**Review:** CLEAN w9998n-r1 {tips["succ"]}\n', 10),
-                ('w9998q-PB17-report.md', 'Status: DONE\nBranch: reviewed-stamped\n'
+                ('w9998n-PB15-report.md', f'Status: DONE\nBranch: succ\nHEAD: {tips["succ"]}\n'
+                                          f'**Review:** CLEAN w9998n-r1 {tips["succ"]}\n', 10),
+                ('w9998q-PB17-report.md', f'Status: DONE\nBranch: reviewed-stamped\nHEAD: {stamped_at[:12]}\n'
                                           f'**Review:** CLEAN w9998q-review-r1 {stamped_at[:12]}\n', 10),
-                ('w9998o-PB16-report.md', 'Status: DONE\nBranch: fnd-pred\n**Review:** FINDINGS 1 w9998o-r1 '
-                                          f'{tips["fnd-pred"]} E:/s/review-w9998-o.jsonl\n', 10),
-                ('w9998p-PB16-report.md', f'Status: DONE\nBranch: fnd-fix\n**Review:** CLEAN w9998p-r1 {tips["fnd-fix"]}\n', 10),
+                ('w9998o-PB16-report.md', f'Status: DONE\nBranch: fnd-pred\nHEAD: {tips["fnd-pred"]}\n'
+                                          f'**Review:** FINDINGS 1 w9998o-r1 {tips["fnd-pred"]} E:/s/review-w9998-o.jsonl\n', 10),
+                ('w9998p-PB16-report.md', f'Status: DONE\nBranch: fnd-fix\nHEAD: {tips["fnd-fix"]}\n'
+                                          f'**Review:** CLEAN w9998p-r1 {tips["fnd-fix"]}\n', 10),
+                # kb/Work PB3181, PB3125: the report, the review and the landing lane's attempt at the tip
+                ('w9998r-PB18-report.md', f'Status: DONE\nBranch: lane-stopped · head {lane_at["lane-stopped"][:12]}\n'
+                                          f'**Review:** CLEAN w9998r-r1 {lane_at["lane-stopped"]}\n', 10),
+                ('w9998s-PB19-report.md', f'Status: DONE\nBranch: lane-free\nHEAD: {lane_at["lane-free"]}\n'
+                                          f'**Review:** CLEAN w9998s-r1 {lane_at["lane-free"]}\n', 10),
+                ('w9998t-PB20-report.md', f'Status: DONE\nBranch: lane-done\nHEAD: {lane_at["lane-done"]}\n'
+                                          f'**Review:** CLEAN w9998t-r1 {lane_at["lane-done"]}\n', 10),
+                ('w9998u-PB21-report.md', f'Status: DONE\nBranch: lane-running\nHEAD: {lane_at["lane-running"]}\n'
+                                          f'**Review:** CLEAN w9998u-r1 {lane_at["lane-running"]}\n', 10),
+                ('w9998v-PB22-report.md', f'**Status:** DISCHARGED · **branch:** `discharged` · **base:** `{main_at[:9]}` · '
+                                          f'**HEAD:** `{lane_at["discharged"][:9]}`\n'
+                                          f'**Review:** CLEAN w9998v-r1 {lane_at["discharged"]}\n', 10),
+                ('w9998w-PB23-report.md', f'Status: DISCHARGED\nBranch: discharged-empty · base {main_at} · head {main_at}\n'
+                                          f'**Review:** CLEAN w9998w-r1 {lane_at["discharged-empty"]}\n', 10),
+                ('w9998x-PB24-report.md', 'Status: DONE\nBranch: no-head\n'
+                                          f'**Review:** CLEAN w9998x-r1 {lane_at["no-head"]}\n', 10),
                 ('w9998b-PB2-report.md', 'SPLIT\nBranch: split-branch\n', 10),
                 ('w9998c-PB3-report-v2.md', 'Status: DONE\nBranch: orphan\n', 10),        # suffixed: invisible
                 ('w9998d-PB4-report.md', '**Status:** DONE · **branch:** `superseded`\n', 10),
                 ('w9998e-PB5-report.md', 'DONE\n**worktree:** `E:/x/.claude/worktrees/stale-wt` · branch stale-done\n', 30),
-                ('w9998f-PB6-report.md', 'Status: DONE\nBranch: resumed\n', 11),
+                ('w9998f-PB6-report.md', f'Status: DONE\nBranch: resumed\nHEAD: {resumed_at}\n', 10),
                 ('w9998g-PB7-report.md', 'Status: DONE\nBranch: other\n\n## Notes\nits predecessor was orphan\n', 10),
                 # a header whose branch field names another branch is not about the one it names as its base
                 ('w9998h-PB9-report.md', 'Status: DONE\nWorktree: E:\\x\\worktrees\\zz (branch zz)\nBase: orphan\n', 10),
@@ -959,7 +1099,7 @@ def self_test() -> int:
         live = lambda reason: live_lock(reason, alive=lambda pid: alive.get(pid))  # noqa: E731
         terminal = lambda n: n == 'PB4'  # noqa: E731
         rows = {r.name: r for r in survey(repo, reports=report_index(rdir, terminal), slugs={'w9999a'}, min_age=180,
-                                          stale_hours=24, live=live, coord_dir=landed_coord)}
+                                          stale_hours=24, live=live, coord_dir=landed_coord, prs={})}
         want = {'merged': 'LANDED', 'landed-content': 'LANDED', 'orphan': 'DECISION', 'done-branch': 'WAITING TO LAND',
                 'split-branch': 'DECISION', 'w9999a-ledger': 'IN FLIGHT', 'fresh': 'IN FLIGHT', 'superseded': 'DECISION',
                 'stale-done': 'DECISION', 'resumed': 'DECISION',
@@ -969,10 +1109,31 @@ def self_test() -> int:
                 'picked-lost': 'DECISION', 'unlanded-train': 'DECISION', 'ejected': 'DECISION',
                 'unreviewed': 'WAITING FOR REVIEW', 'review-findings': 'DECISION', 'reviewed-moved': 'WAITING FOR REVIEW',
                 'pred': 'IN FLIGHT', 'succ': 'WAITING TO LAND', 'fnd-pred': 'IN FLIGHT', 'fnd-fix': 'WAITING TO LAND',
-                'reviewed-stamped': 'WAITING TO LAND'}
+                'reviewed-stamped': 'WAITING TO LAND',
+                'lane-stopped': 'STOPPED', 'lane-pred': 'IN FLIGHT', 'lane-free': 'WAITING TO LAND',
+                'lane-done': 'ENQUEUED', 'lane-running': 'WAITING TO LAND', 'discharged': 'WAITING TO LAND',
+                'discharged-empty': 'DECISION', 'no-head': 'DECISION'}
         for name, state in want.items():
             got = rows.get(name)
             check(got is not None and got.state == state, f'{name}: want {state}, got {got.state if got else "no row"} ({got.why if got else ""})')
+        # ONE RULE FOR A FINISHED BRANCH (kb/Work PB3181, PB3125): coverage, never age; the lane's attempt at the tip
+        check('exit 5' in rows['lane-stopped'].why and 'step 4 finisher' in rows['lane-stopped'].why
+              and 'later commits mechanical' in rows['lane-stopped'].why,
+              f'a stopped attempt at a tip of mechanical commits after the report is STOPPED, its owner named: '
+              f'{rows["lane-stopped"].why}')
+        check('contained in lane-stopped (STOPPED)' in rows['lane-pred'].why,
+              f'a predecessor of a STOPPED branch lands through it: {rows["lane-pred"].why}')
+        check('exit 3' in rows['lane-free'].why and 'landing_check.py passes' in rows['lane-free'].why,
+              f'an exit-3 attempt waits with the lane\'s retry rule named: {rows["lane-free"].why}')
+        check('exit 0' in rows['lane-done'].why, f'an exit-0 attempt at the tip reads ENQUEUED offline: {rows["lane-done"].why}')
+        check('being landed' in rows['lane-running'].why, f'a running attempt is said: {rows["lane-running"].why}')
+        check('the landing lane lands it' in rows['done-branch'].why and 'an-older' not in rows['done-branch'].why,
+              f'an attempt at another head does not decide this tip: {rows["done-branch"].why}')
+        check('DISCHARGED' in rows['discharged-empty'].why and 'Review CLEAN' not in rows['discharged-empty'].why,
+              f'a DISCHARGED report whose HEAD is its base is not finished: {rows["discharged-empty"].why}')
+        check('names no HEAD' in rows['no-head'].why, f'a report naming no HEAD covers nothing: {rows["no-head"].why}')
+        check('1 commit(s) since the report' in rows['resumed'].why,
+              f'a commit after the report that no report describes is a DECISION, counted: {rows["resumed"].why}')
         check(rows['landed-content'].content == 'LANDED', 'a branch re-applied on main classifies LANDED by content')
         check('no fix-lane report' in rows['orphan'].why,
               'a suffixed report name is invisible (plan_wave REPORT_NAME), and a name below the header binds nothing')
@@ -1025,6 +1186,17 @@ def self_test() -> int:
               and 'FAILED_CHECKS' in pr_rows['succ'].why and '#17' in pr_rows['done-branch'].why,
               f'the merge queue states: a queued or auto-merge PR is ENQUEUED, a removed one at the tip BOUNCED with '
               f'its reason, a moved tip reads by its report, a predecessor of a bounced branch lands through it: {got}')
+        # THE ONE PRODUCTION SURVEY (kb/Work PB2807 review R1-2): live_survey reads the open pull requests itself, so
+        # every reader (main, the landing lane, the planner's partition) sees the queue states; and no production
+        # reader calls survey directly with arguments of its own (the planner once omitted `prs` and never saw BOUNCED)
+        live_rows = {r.name: r.state for r in live_survey(repo, coord_dir=landed_coord, reports_dir=rdir,
+                                                           terminal=terminal, live=live, gh=fake_gh)}
+        check({b: live_rows.get(b) for b in ('done-branch', 'succ', 'fnd-fix')}
+              == {'done-branch': 'ENQUEUED', 'succ': 'BOUNCED', 'fnd-fix': 'WAITING TO LAND'},
+              f'live_survey reads the pull requests (ENQUEUED, BOUNCED): {live_rows}')
+        direct = [p.name for p in (REPO / 'scripts' / 'orchestrator').glob('*.py')
+                  if re.search(r'prune_worktrees\.survey\(', p.read_text(encoding='utf-8'))]
+        check(not direct, f'production readers call prune_worktrees.live_survey, never survey: {direct}')
 
         def offline_gh(args):
             import ruleset  # noqa: PLC0415
@@ -1044,14 +1216,28 @@ def self_test() -> int:
         check([r.name for r in order] == ['b3', 'b5', 'b2', 'b6', 'b1', 'b7', 'b0', 'b4'],
               f'the landing order is the most harmful lead first, compiler before process, oldest first: '
               f'{[r.name for r in order]}')
-        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 31 · 5 in flight · 2 waiting for review · '
-                                                      '4 waiting to land · 0 enqueued · 0 bounced · 5 landed'),
+        check(verdict(list(rows.values())).startswith('=== BRANCH LIFECYCLE: 39 · 6 in flight · 2 waiting for review · '
+                                                      '7 waiting to land · 1 stopped · 1 enqueued · 0 bounced · 5 landed'),
               f'verdict line: {verdict(list(rows.values()))}')
         # the pure rule: a lock with no pid is honoured; a ledger slug matches only at a word boundary
         r0 = dataclasses.replace(rows['orphan'], lock='')
         check(lifecycle(r0, in_flight_slugs=set(), min_age=180)[0] == 'IN FLIGHT', 'a hand lock (no pid) is live')
         r1 = dataclasses.replace(rows['orphan'], name='w99990-other')
         check(lifecycle(r1, in_flight_slugs={'w9999'}, min_age=180, live=live)[0] == 'DECISION', 'slug w9999 does not bind w99990-…')
+        # the in-flight slugs are the ledger entries' recorded slugs (kb/Work PB3186): a retired hand entry has none
+        sdir = pathlib.Path(tempfile.mkdtemp(prefix='slugs-'))
+        (sdir / 'inflight-groups.json').write_text(json.dumps({'groups': [
+            {'wave': '9998', 'letter': 'B', 'slug': 'w9998b', 'notes': ['PB1'], 'files': ['src/F.cs'], 'at': 1.0},
+            {'wave': '9998', 'letter': 'C', 'notes': ['PB2'], 'files': ['src/G.cs'], 'at': 1.0},
+            {'wave': 'hand', 'letter': '', 'hand': True, 'notes': ['PB3'], 'files': ['src/H.cs'], 'at': 1.0}]}),
+            encoding='utf-8', newline='\n')
+        check(in_flight_slugs(sdir, lambda n: False) == {'w9998b', 'w9998c'},
+              f'in-flight slugs: {in_flight_slugs(sdir, lambda n: False)}')
+        # a group its report answers (it returned, SPLIT included) is no longer in flight by slug (kb/Work PB2795)
+        (srep := sdir / 'reports').mkdir()
+        (srep / 'w9998b-PB1-report.md').write_text('# PB1\n\n**Status:** SPLIT\n', encoding='utf-8', newline='\n')
+        check(in_flight_slugs(sdir, lambda n: False, srep) == {'w9998c'},
+              f'an answered group is not in flight: {in_flight_slugs(sdir, lambda n: False, srep)}')
         # --apply removes exactly the LANDED rows plus the --abandon branches whose decision a kb/Work note records,
         # archives nothing (owner 2026-10-08 00:52 PDT), and loses nothing else
         notes = tmp / 'Work'
