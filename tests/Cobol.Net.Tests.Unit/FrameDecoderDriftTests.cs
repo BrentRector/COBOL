@@ -214,4 +214,54 @@ public sealed class FrameDecoderDriftTests
         var frames = RecordFraming.DecodeStore(image, image.Length, out _);
         Assert.Equal(new string?[] { "HELLO", "WORLD!", null, "AFTER" }, frames.Select(f => f?.Image));
     }
+
+    /// <summary>A stream that counts how often its length is asked — on a file handle that admits other writers
+    /// (every <c>HostFile.OpenAuxiliary</c> handle) each ask is an uncached operating-environment query.</summary>
+    private sealed class LengthCountingStream(byte[] bytes) : MemoryStream(bytes, writable: false)
+    {
+        public int LengthQueries { get; private set; }
+
+        public override long Length { get { LengthQueries++; return base.Length; } }
+    }
+
+    /// <summary>One frame carrying a one-component extent table: the length word with bit 31, the count, one
+    /// (fixed-run offset, length) pair, then the payload.</summary>
+    private static byte[] TableFrame(string payload) =>
+        [.. Word(0x80000000u | (uint)payload.Length), .. Word(1), .. Word(0), .. Word((uint)payload.Length),
+         .. System.Text.Encoding.Latin1.GetBytes(payload)];
+
+    [Fact]
+    public void TheFrameWalk_AsksTheStreamLengthOnce_NotPerFrame()
+    {
+        // kb/Work PB2754 review R1-1: the decoder asked Holds(payload) and the stream medium's TakePayload asked it
+        // again, and a table frame asked a third time — each a length query, so the O(file) walk of the record
+        // count, REVERSED and the first READ PREVIOUS paid 2-3 queries per frame. The walk now snapshots the length.
+        const int Frames = 50;
+        var bytes = new List<byte>();
+        for (int k = 0; k < Frames; k++) bytes.AddRange(k % 2 == 0 ? Frame($"R{k:D3}") : TableFrame($"T{k:D3}"));
+        using var fs = new LengthCountingStream([.. bytes]);
+
+        Assert.Equal(Frames, RecordFraming.FrameStarts(fs).Count);
+        Assert.Equal(1, fs.LengthQueries);
+    }
+
+    [Fact]
+    public void TheFrameWalk_ReadsTheFileAsItStoodWhenTheWalkBegan()
+    {
+        // The snapshot's other face: bytes appended after the walk began lie past its end, so the walk ends where
+        // the file ended when it started, as it does at an append still in progress.
+        using var fs = new MemoryStream();
+        fs.Write(Frame("HELLO"));
+        fs.Position = 0;
+        var walk = new RecordFraming.StreamMedium(fs);
+        long at = fs.Position;
+        fs.Seek(0, SeekOrigin.End);
+        fs.Write(Frame("LATER"));
+        fs.Position = at;
+
+        Assert.True(RecordFraming.ReadStreamFrame(ref walk, out FrameHead first));
+        Assert.Equal(5, first.PayloadLength);
+        Assert.False(RecordFraming.ReadStreamFrame(ref walk, out _));
+        Assert.Equal(9, fs.Position);   // the appended frame's head was not read
+    }
 }

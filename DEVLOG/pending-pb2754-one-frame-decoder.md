@@ -41,4 +41,18 @@ a damaged first frame is not a framed file ('39'), and the store shape keeps a g
 name in `COBOLNET_FILES_DESIGN.md`, and an unused `using System.Buffers`. Lead left open: OPEN EXTEND on a file whose
 data ends at a damaged frame appends PAST it, where no reader reaches.
 
+**Branch review, round 1 (R1-1, efficiency).** The decoder asked `Holds(payload)` and `StreamMedium.TakePayload`
+(and `ImageMedium.TakePayload`) asked it again, and a table frame asked a third time through `ReadExtentTable`. On
+a stream each ask was `fs.Length`, an uncached operating-environment query on any handle that admits other writers
+(every `HostFile.OpenAuxiliary` handle shares `ReadWrite`), so the record count, REVERSED and the first READ
+PREVIOUS paid two or three length queries per frame where the old walk paid one. Fixed at the contract:
+`IFrameMedium.TakePayload` is called only after `Holds(length)` answered true, and the media no longer re-ask; and
+`StreamMedium` snapshots the stream's length once, when the walk begins, bounding `Fill` and `Holds` by it, so a
+walk now asks the length once in all. The snapshot makes the walk a point-in-time read: bytes another run unit
+appends mid-walk end the data there, as an append in progress does, and the frame index and the count were
+point-in-time answers already. Witnesses: `FrameDecoderDriftTests.TheFrameWalk_AsksTheStreamLengthOnce_NotPerFrame`
+(50 frames, half with tables, one length query) and `TheFrameWalk_ReadsTheFileAsItStoodWhenTheWalkBegan`.
+`ChannelMedium` was the sibling arm checked: its `TakePayload` never re-asked and its `Holds` asks the length only
+above 64 KiB.
+
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T155805Z-f7e334; Conformance 6,014 · Unit 33,193 · Characterization 6 ran in leg 1, the new FrameDecoderDriftTests cases among them). The architecture oracle (`compare_oracle.py`) compares emitted C# and diagnostics, which no file of this change reaches (runtime only).

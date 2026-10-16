@@ -70,7 +70,9 @@ internal interface IFrameMedium
     bool Fill(Span<byte> into);
 
     /// <summary>Take the <paramref name="length"/>-byte payload that follows the head and advance past it (a medium
-    /// that needs no payload seeks over it); false when the data ends first.</summary>
+    /// that needs no payload seeks over it); false when the data ends first. ⛔ The decoder calls it only after
+    /// <see cref="Holds"/>(<paramref name="length"/>) answered true, so a medium that can answer Holds does not ask
+    /// it again here: on a stream every ask was a file-length query (kb/Work PB2754, review R1-1).</summary>
     bool TakePayload(int length);
 
     /// <summary>Can <paramref name="bytes"/> more bytes still follow the current position? Asked BEFORE storage sized
@@ -377,8 +379,7 @@ internal static class RecordFraming
 
         public bool TakePayload(int length)
         {
-            if (!Holds(length)) return false;
-            Payload = Encoding.Latin1.GetString(image, At, length);
+            Payload = Encoding.Latin1.GetString(image, At, length);   // ReadFrame asked Holds(length) first
             At += length;
             return true;
         }
@@ -608,19 +609,28 @@ internal static class RecordFraming
     }
 
     /// <summary>A stream-level framed file walked from its current position as a frame medium: the heads are read
-    /// and each payload is SEEKED over, never materialized.</summary>
+    /// and each payload is SEEKED over, never materialized.
+    /// <para>⛔ THE WALK READS THE FILE AS IT STOOD WHEN THE MEDIUM WAS MADE: the stream's length is asked ONCE, here,
+    /// and every <see cref="Holds"/> and <see cref="Fill"/> is bounded by that snapshot. A stream's length is an
+    /// uncached operating-environment query whenever the handle admits other writers, and every bookkeeping handle
+    /// does (<c>HostFile.OpenAuxiliary</c> shares <see cref="FileShare.ReadWrite"/>), so asking it per frame made it
+    /// the dominant cost of an O(file) walk (kb/Work PB2754, review R1-1). Bytes another run unit appends during the
+    /// walk lie past the snapshot and end the data there, as an append that has not completed does; the frame
+    /// index and the record count this walk produces are point-in-time answers already.</para></summary>
     internal readonly struct StreamMedium(Stream fs) : IFrameMedium
     {
-        public bool Fill(Span<byte> into) => FillExactly(fs, into);
+        /// <summary>The stream's length when the walk began: the end of the data this medium reads.</summary>
+        private readonly long _end = fs.Length;
+
+        public bool Fill(Span<byte> into) => Holds(into.Length) && FillExactly(fs, into);
 
         public bool TakePayload(int length)
         {
-            if (!Holds(length)) return false;
-            fs.Seek(length, SeekOrigin.Current);
+            fs.Seek(length, SeekOrigin.Current);   // ReadFrame asked Holds(length) first
             return true;
         }
 
-        public bool Holds(long bytes) => bytes <= fs.Length - fs.Position;
+        public bool Holds(long bytes) => bytes <= _end - fs.Position;
     }
 
     private static bool FillExactly(Stream s, Span<byte> buf) =>
