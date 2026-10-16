@@ -1,4 +1,4 @@
-## PB2758: every connector's file-lock handle is measured against the HostAccess it states
+## Entry 2092 — 2026-10-16 10:28 PDT — PB2758: every connector's file-lock handle is measured against the HostAccess it states
 
 Wave 1092 group G, an R2 unify finding of the PB1754 architecture review (runtime-io-3 duplication).
 `FileConnector.HostAccess` is the one statement of the access a connector's long-lived handle takes of its physical
@@ -44,3 +44,4 @@ raising the major would refuse every module compiled at 5 for no reason. The com
 7999 cases, and the semgrep counts are unchanged.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T164838Z-f92b87; Unit 33,237/33,746 in leg 1, all 24 new cases passed). LINUX GATE: the lander's (batched gating).
+
