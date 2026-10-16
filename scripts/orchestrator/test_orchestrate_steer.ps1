@@ -49,7 +49,16 @@ Check 'a hand-edited invalid steer is set aside loudly' "$($r.out -match 'operat
 Check 'and the loop falls back to the last handoff' ($r.out -match "would run unit 'resume'") $true
 $r = Run-Orch 'unitdry' 'good' @('-DryRun', '-Unit', 'enqueue')
 Check '-Unit is a steer through steer.ps1' ($r.out -match "would run unit 'enqueue' \(the operator: named by orchestrate.ps1 -Unit at start\)") $true
-Check 'a dry run leaves no steer behind' "$(Test-Path (Join-Path $r.coord 'handoff.operator.json')) $(@(Get-ChildItem ([IO.Path]::GetTempPath()) -Filter 'orchestrate-dryrun-*.handoff.operator.json').Count)" 'False 0'
+# A dry run's steer lives under ITS OWN coordination directory (scratch/dryrun-<pid>), so this checks that directory
+# only: never the machine-wide TEMP, where any other dry run on the host, or one killed earlier, was counted (kb/Work PB2922).
+$dryRuns = { param($c) @(Get-ChildItem (Join-Path $c 'scratch') -Directory -Filter 'dryrun-*').Count }
+Check 'a dry run leaves no steer behind' "$(Test-Path (Join-Path $r.coord 'handoff.operator.json')) $(& $dryRuns $r.coord)" 'False 0'
+# The killed dry run (PB2922's second arm): a process-tree kill skips the supervisor's `finally`, so its directory stays.
+# The next start reaps it, and the check above stays green. The pid is one that has exited: a pwsh that printed its own.
+$r = Run-Orch 'drystale' 'good' @('-DryRun', '-Unit', 'enqueue') {
+    param($c) $dead = & pwsh -NoProfile -Command '$PID'; $d = Join-Path $c "scratch/dryrun-$dead"
+    New-Item -ItemType Directory -Force -Path $d | Out-Null; Set-Content -Path (Join-Path $d 'handoff.operator.json') -Value '{"next_unit":"wave"}' }
+Check 'a killed dry run''s directory is reaped, said, and its steer never read' "$($r.out -match "reaped a killed dry run's directory") $($r.out -match "would run unit 'enqueue'") $(& $dryRuns $r.coord)" 'True True 0'
 $r = Run-Orch 'dryopen' 'good' @('-DryRun') { param($c) & $opJson $c 'meter' }
 Check 'a dry run shows a pending steer and does not consume it' "$($r.out -match "would run unit 'meter'") $(Test-Path (Join-Path $r.coord 'handoff.operator.json'))" 'True True'
 
