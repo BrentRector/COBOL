@@ -66,7 +66,10 @@ internal static class OptionsBinder
         if (c.defaultRoundedClause()?.roundingModeName() is { } dr)
             return m with { DefaultRounding = RoundingModes.Map(dr) };
         if (c.entryConventionClause() is { } ec)
-            return m with { EntryConvention = EntryConventionOf(ec, edition) };
+        {
+            ScreenEntryConvention(ec, edition);
+            return m;
+        }
         if (c.floatBinaryClause()?.endiannessPhrase() is { } fb)
             return m with { FloatBinaryEndianness = FloatFormatPhrase.Endianness(fb) };
         if (c.floatDecimalClause() is { } fdc)
@@ -82,6 +85,11 @@ internal static class OptionsBinder
     /// options-bearing production reaches (the <see cref="ArithmeticOf"/> precedent), so the clause is read by
     /// something other than the edition gate (kb/Work PB232).
     ///
+    /// <para>⛔ THE CLAUSE HAS NO MODEL FIELD (kb/Work PB298). A clause that passes this screen says COBOL, which is
+    /// also the convention when the clause is absent (§11.9.7.4 GR4 c), so it can change nothing; the field that
+    /// used to hold the written name was read by nobody. Should an entry-convention-name ever be defined, its field
+    /// arrives WITH its consumer (<c>OptionsModelConsumerDriftTests</c>).</para>
+    ///
     /// <para>§11.9.7.3 SR1 — "The ENTRY-CONVENTION clause may be specified only in a class definition, a function
     /// definition, a function-prototype definition, an interface definition, a program prototype definition, or a
     /// program definition that is not contained within another program." The clause's source element is read off
@@ -94,10 +102,10 @@ internal static class OptionsBinder
     /// with the §8.3.2.2 name mapping (GR2). A name written anyway is refused by name rather than silently activated
     /// with the COBOL convention — a silently-ignored calling convention is a clean compile and a wrong ABI at the
     /// boundary.</para></summary>
-    private static string EntryConventionOf(Core.EntryConventionClauseContext ec, EditionContext? edition)
+    private static void ScreenEntryConvention(Core.EntryConventionClauseContext ec, EditionContext? edition)
     {
+        if (edition is null) return;
         string name = ec.entryConventionName().GetText();
-        if (edition is null) return name;
         using var _ = edition.At(ec);
         if (EntryConventionForbiddenIn(ec) is { } element)
             edition.Error(DiagnosticCatalog.EntryConventionViolation, $"the ENTRY-CONVENTION clause is specified in "
@@ -108,7 +116,6 @@ internal static class OptionsBinder
             edition.Error(DiagnosticCatalog.EntryConventionViolation, $"ENTRY-CONVENTION IS {name}: this "
                 + "implementation defines no entry-convention-name — the meaning of one is implementor-defined "
                 + "(ISO §11.9.7.4 GR3) and the only convention provided is COBOL (Annex A.1 item 64)");
-        return name;
     }
 
     /// <summary>The source element §11.9.7.3 SR1 leaves out that <paramref name="ec"/> is written in, or null when
