@@ -28,6 +28,25 @@ public sealed class FunctionValueLaneDriftTests
     private static readonly Regex Arm = new(
         "^\\s*\"(?<name>\\w+)\"(?<guard>\\s+when\\s+[^=]+?)?\\s*=>", RegexOptions.Compiled);
 
+    /// <summary>The two other function sets the prediction reads off the renderer's own members
+    /// (<c>IntrinsicRenderer.CrossAlignedNativeArms</c>, <see cref="FunctionValueLane.ValueFixedByDefinition"/>) route a call
+    /// to its SDIDI body, so each member needs one in <see cref="FunctionValueLane.NativeSdidiBodies"/> - else the
+    /// prediction would name a lane the renderer cannot take (kb/Work PB3268, review R2-1).</summary>
+    [Fact]
+    public void TheSdidiRoutedSets_AreSubsetsOfNativeSdidiBodies()
+    {
+        var crossAligned = CobolNet.CodeGen.Emit.IntrinsicRenderer.CrossAlignedNativeArms;
+        Assert.True(crossAligned.Count > 0);
+        foreach (string arm in crossAligned)
+            Assert.True(FunctionValueLane.NativeSdidiBodies.Contains(arm),
+                $"CrossAlignedNativeArms names {arm}, which has no native SDIDI body in NativeSdidiBodies");
+        foreach (string arm in new[] { "Numval", "NumvalC" })
+        {
+            Assert.True(FunctionValueLane.ValueFixedByDefinition(arm), $"{arm} is a value-fixed-by-definition function (§15.67.4 r1 / §15.68.4 r1)");
+            Assert.True(FunctionValueLane.NativeSdidiBodies.Contains(arm), $"{arm} has no native SDIDI body in NativeSdidiBodies");
+        }
+    }
+
     [Fact]
     public void NativeSdidiBodies_AreTheArmsOfRenderDec_ThatAreNotStandardDecimalOnly()
     {

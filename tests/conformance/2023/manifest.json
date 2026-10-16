@@ -868,7 +868,8 @@
   "pb656_directive_words_as_user_words",
   "pb3268_function_value_float_receivers",
   "pb3268_function_value_standard_decimal",
-  "pb3268_function_value_lane_matrix"
+  "pb3268_function_value_lane_matrix",
+  "pb3268_function_value_nested_lane"
   ],
  "pending": [
   "pb485_value_only_format1"

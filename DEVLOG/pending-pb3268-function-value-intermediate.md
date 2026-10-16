@@ -81,3 +81,20 @@ an exact value outside 1E-9..1E+12 reaching a COMP-2 beside a fixed item (`MOVE 
 TO F1 N1` stores 0 in F1) needs an SDIDI-carried intermediate item, the same redesign as the values past the `Int128`
 carrier. (3) The COMP-2 description cited §13.18.60.4 GR15 (FLOAT-BINARY-64); the usage is FLOAT-LONG, GR13 (`cite.py
 --check` run on both).
+
+Review round 2 (three findings against the round-1 `FunctionValueLane`). (1) NUMVAL / NUMVAL-C are SDIDI-carried in every
+mode (`RenderNum`'s first arm), so a NUMVAL nested in VARIANCE / ANNUITY / STANDARD-DEVIATION puts that call on the SDIDI;
+the bind-time prediction classified the nested call by its string argument and handed the outer function a COMP-2
+intermediate (`VARIANCE(NUMVAL("0.1") NUMVAL("0.2") NUMVAL("0.4")) TO Q1 Q2` stored `...551083823` where the single MOVE
+stored `...555555`). The value-fixed-by-definition set moved into `FunctionValueLane` and the renderer's arm asks it there.
+The sibling the reviewer named reproduced: a nested SUM / RANGE / MEAN / MEDIAN / MIDRANGE whose aligned arguments may leave
+the `Int128` carrier is SDIDI-carried (PB621), so `AlignmentMayLeaveCarrier` became one reader in `FunctionValueLane` that
+the renderer (from its `NumX` operands) and the prediction (from the bound tree: a field's digit bound, a literal's) both
+ask. (2) A binary64 or fractional operand at a §15.3 type-6 position is already its integer when `RawArg` hands it to the
+lane predicates, so `AtPosition` does the same in the prediction (`COMBINED-DATETIME` of a COMP-2 date, permissive only).
+(3) The `Selections` citation said "the content of" for ORD-MAX / ORD-MIN (§15.71.4 / §15.72.4 return an ordinal number)
+and for MEDIAN (§15.61.1; §15.61.4 r2 makes an even count the arithmetic mean); corrected in the code, the renderer
+comment and the intrinsics design doc. Goldens: `2023/pb3268_function_value_nested_lane` (derived from the equivalent
+arithmetic expressions with exact decimals: 7/450, 0.1/(1-1.1^-3), sqrt(7/450)); the permissive witness is a unit test,
+since strict conformance rejects the float at a type-6 position. Residual: a computed expression as the direct argument of
+a nested wide cross-aligning call has a digit bound only the renderer's arithmetic knows.
