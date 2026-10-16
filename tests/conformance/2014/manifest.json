@@ -1,6 +1,8 @@
 {
  "_comment": "The 2014 positive corpus (COBOL-2014 / M3 surface). PHASE-12 populates it: OCCURS DYNAMIC (dyn_*), the arithmetic-standard/OPTIONS/rounded-mode families, and the DYNAMIC LENGTH elementary items (dynamic_length_*).",
  "enabled": [
+  "pb228_subtract_standard_decimal_order",
+  "pb228_add_standard_decimal",
   "pb3154_capacity_register_hides_alias",
   "pb3154_half_capacity_register_hides_symbolic",
   "pb3128_refmod_dynamic_length_argument",
