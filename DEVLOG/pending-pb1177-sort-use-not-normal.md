@@ -60,7 +60,7 @@ already was.
 7. the MERGE twin
 8. the store released, with -ACTIVE checking on
 
-Also `2002/pb1177_method_sort_use_not_normal` (the method arm), `unit:SortUseTerminationTests`, and a
+Also `2002/pb1177_method_sort_use_not_normal` (the method arm), `SortUseTerminationTests` (six unit tests), and a
 `CompletedNotNormally` column in `DispatchResultProtocolDriftTests`. `pb367b_sort_use_not_normal`,
 `pb1122_declarative_fatal_in_scope_merge` and `pb1036_sort_merge_statement_ec` were re-run unchanged. Row
 `GR-14.9.40.4-17` went from PARTIAL to CONFORMS, and the GAP from 101 to 100.
@@ -132,3 +132,12 @@ the question. `RuntimeApi.SortAfterActivationReturn` is now fully qualified, as 
 was. The re-gate is `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run
 20261015T225607Z-e044e4: Conformance 6,144/11,717, Unit 33,319/33,679, Characterization 6/36 in leg 1, both
 pb1177_invoke goldens passing).
+
+**Landing finisher (Linux gate RED).** The landing's Linux unit leg failed
+`SpecTraceabilityInventoryDriftTests.EveryTestRef_ResolvesToARealTest`: row `GR-14.9.40.4-17` carried the test-ref
+`unit:SortUseTerminationTests`, a bare class where the schema's xUnit forms require `<Class>.<Method>`. The Windows
+leg 1 never planned that drift test. The root cause was in the writer: `record_verdicts.py` validates a record's
+shape, but `inventory_schema.witness_shape_error` checked only the scheme and a non-empty body, so it accepted the
+bare class through three batches. It now refuses an xUnit-form (`test-dir`) body that is not `<Class>.<Method>`; the
+original batch dry-runs to that refusal. Batch `pb1177-finisher` retires the bare class and names the six test
+methods, and the row's notes say the same.

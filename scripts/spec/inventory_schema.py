@@ -116,6 +116,14 @@ def witness_shape_error(field: str, ref: str, schema: "Schema") -> str | None:
         return f"test-ref '{ref}' — unknown form '{scheme}', expected one of {sorted(schema.test_ref_forms)}"
     if ":" not in ref or not ref.split(":", 1)[1].strip():
         return f"test-ref '{ref}' has an empty body after '{scheme}:'"
+    # An xUnit form ('test-dir') names ONE test method: its body is <Class>.<Method>, the shape the battery gate's
+    # resolver splits at the last dot (SpecTraceabilityInventoryDriftTests.UnresolvedTestRefs). A bare class is
+    # malformed, not merely unresolved, so it is refused at record time: GR-14.9.40.4-17 carried
+    # `unit:SortUseTerminationTests` through three batches and was caught only by CI's Linux unit leg (kb/Work PB1177).
+    body = ref.split(":", 1)[1].strip()
+    dot = body.rfind(".")
+    if "test-dir" in schema.test_ref_forms[scheme] and (dot <= 0 or dot == len(body) - 1):
+        return f"test-ref '{ref}' — expected {scheme}:<Class>.<Method>"
     return None
 
 
