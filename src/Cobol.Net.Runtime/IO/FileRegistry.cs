@@ -1,5 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Runtime.ExceptionServices;
+
 namespace CobolNet.Runtime.IO;
 
 /// <summary>
@@ -76,31 +78,34 @@ public sealed class FileRegistry
              || v.Equals("FALSE", StringComparison.OrdinalIgnoreCase)   // not a COBOL word: an environment variable value
              || v.Equals("NO", StringComparison.OrdinalIgnoreCase));   // not a COBOL word: an environment variable value
 
-    /// <summary>Reset the registry (run-unit start): drain GC closes, close the sequential connectors (the
-    /// pre-registry semantics — keyed connectors are dropped without a close, exactly as before), clear
-    /// everything, restart the instance-key sequence, and clear the sharing registries.</summary>
+    /// <summary>Reset the registry (run-unit start): a connector an earlier run unit left open gets that run unit's
+    /// implicit CLOSE (<see cref="CloseAll"/>, every organization alike: the keyed connectors used to be dropped
+    /// still open, their records unpersisted and their §9.1.15 file lock held against every later run unit,
+    /// kb/Work PB603), then everything is cleared, the instance-key sequence restarts and the sharing registries
+    /// empty, whether or not a close failed.</summary>
     public void Reset()
     {
         KeyCheck = ReadKeyCheck();   // a NEW run unit re-reads the environment (see KeyCheckVariable)
-        DrainPendingObjectCloses();
-        foreach (var c in _files.Values)
-            if (c is SequentialConnector s)
-                s.Close();
-        _files.Clear();
-        _locked.Clear();
-        _instSeq = 0;
-        while (_pendingObjectClose.TryDequeue(out _)) { }   // a new run unit starts with a clean queue
-        _connectorShares.Clear();
-        _physical.Clear();
-        _stores.Clear();   // kb/Work PB143 — a new run unit re-reads every physical file
+        try { CloseAll(); }
+        finally
+        {
+            _files.Clear();
+            _locked.Clear();
+            _instSeq = 0;
+            while (_pendingObjectClose.TryDequeue(out _)) { }   // a new run unit starts with a clean queue
+            _connectorShares.Clear();
+            _physical.Clear();
+            _stores.Clear();   // kb/Work PB143 — a new run unit re-reads every physical file
+        }
     }
 
     /// <summary>Request the §9.1.4 deletion-time CLOSE of a per-object connector FROM THE GC FINALIZER THREAD:
     /// only enqueue the key; the mutator thread performs the real close in <see cref="DrainPendingObjectCloses"/>.</summary>
     public void EnqueueInstanceClose(string key) => _pendingObjectClose.Enqueue(key);
 
-    /// <summary>Perform any GC-requested per-object closes on the MUTATOR thread (called at the top of
-    /// Reset / Open / CloseAll — safe points where no other registry mutation is in flight).</summary>
+    /// <summary>Perform any GC-requested per-object closes on the MUTATOR thread (called at the top of Open, a safe
+    /// point where no other registry mutation is in flight; <see cref="CloseAll"/> drains the queue itself, one
+    /// close at a time under its §14.6.11 2) guard).</summary>
     private void DrainPendingObjectCloses()
     {
         while (_pendingObjectClose.TryDequeue(out var k)) CloseAndDrop(k);
@@ -166,19 +171,16 @@ public sealed class FileRegistry
     /// unit behind its static guard, an INITIAL unit's files are implicitly closed at its termination, and
     /// CANCEL closes before its post-CANCEL re-registration — so an open one here was abandoned by an
     /// abnormally-ended activation. Closing flushes its buffered writes and frees the OS handle instead of
-    /// leaking both. The status result is deliberately dropped: this is registry hygiene, not a COBOL CLOSE
-    /// — there is no statement to report to.
-    /// <para>The displaced connector is also dropped from the physical-file table and from the declared-posture
-    /// map: a replacement is a NEW file connector (possibly on another host path and with other clauses), so
-    /// leaving the old one arbitrating (§9.1.15) or its LOCK MODE in force would make the replacement inherit a
-    /// posture no SELECT wrote — the same "the table outlived the connector" shape as kb/Work PB321.</para></summary>
+    /// leaking both. It is the CLOSE dispatch's own close (<see cref="CloseIfOpen"/>, kb/Work PB603), so the
+    /// displaced connector also leaves the physical-file table and gives back its file and record locks exactly
+    /// as a CLOSE would; the status it records dies with the connector, because there is no statement to report to.
+    /// <para>The displaced connector's declared posture goes too: a replacement is a NEW file connector (possibly
+    /// on another host path and with other clauses), so leaving the old one arbitrating (§9.1.15) or its LOCK MODE
+    /// in force would make the replacement inherit a posture no SELECT wrote — the same "the table outlived the
+    /// connector" shape as kb/Work PB321.</para></summary>
     private void CloseDisplaced(string cobolName)
     {
-        if (_files.TryGetValue(cobolName, out var old))
-        {
-            if (old.IsOpen) old.Close();
-            DeregisterFromPhysical(cobolName, old);
-        }
+        CloseIfOpen(cobolName);
         _connectorShares.Remove(cobolName);
     }
 
@@ -404,7 +406,7 @@ public sealed class FileRegistry
         // c) Close file: "Closing operations specified by the implementor are executed." WiseOwl COBOL's are
         // documented at docs/CONFORMANCE.md §7, A.1 item 24 (which makes them a required documented
         // item) — flush/persist/dispose in CloseCore, plus the §14.9.6.4 GR9 lock release here.
-        SharedClose(name);   // no-op for a non-sharing-active connector
+        SharedClose(name, c);   // every connector: every successful OPEN registered it (kb/Work PB321)
         c.Close();
         // g) Optional phrases ignored: "The CLOSE statement is executed as if none of the optional phrases were
         // present. The I-O status indicator for the file connector is set to '07'." — §9.1.13.2 item 6's
@@ -414,8 +416,10 @@ public sealed class FileRegistry
             c.SetStatus(FileStatusCode.PhraseOnNonReelMedium);
     }
 
-    /// <summary>The IMPLICIT close surface (§14.9.5 GR9's "each … file connector that is open"): a closed
-    /// connector is skipped — no '42' stamp, no shared-close bookkeeping — and so is a name the registry
+    /// <summary>The IMPLICIT close surface (§14.9.5 GR9's "each … file connector that is open", §14.6.11 2)'s
+    /// "each file that is in the open mode" through <see cref="CloseAll"/>, and a displaced registration's): an
+    /// open connector gets the plain CLOSE; a closed one is skipped — no '42' stamp, no shared-close
+    /// bookkeeping — and so is a name the registry
     /// does not hold: registration happens at activation, so an activation that raised before registering
     /// leaves a canceled unit's names unregistered, and "never registered" is a fortiori "not open"
     /// (kb/Work PB154 — Require() here turned GR7's no-op into an InvalidOperationException).</summary>
@@ -451,21 +455,39 @@ public sealed class FileRegistry
     /// kind; before that it bound to a plain CLOSE and reported '00').</summary>
     public void CloseNoRewind(string name) => CloseByFormat(name, CloseFormat.NoRewind);
 
-    /// <summary>Close every open file (run-unit termination, ISO §14.6 — flushes print streams; keyed stores
-    /// persist, e.g. NIST RL208A).</summary>
+    /// <summary>⛔ RUN-UNIT TERMINATION'S IMPLICIT CLOSE, ISO §14.6.11 2): <i>"An implicit CLOSE statement without any
+    /// phrases is executed for each file that is in the open mode. These implicit close statements shall be executed
+    /// for all open files in the run unit, even when an error occurs during the execution of one or more of the CLOSE
+    /// statements."</i> (§14.6.12 runs it after an abnormal termination too.) Print streams flush and keyed stores
+    /// persist (NIST RL208A).
+    /// <para>Each file is closed by <see cref="CloseIfOpen"/>, the CLOSE dispatch's own entry, so the implicit CLOSE
+    /// IS the plain CLOSE: Table 14's row, the physical-file deregistration and the §9.1.15 / §9.1.16 lock release
+    /// cannot drift from the explicit statement's, and a file that is not open is not touched (kb/Work PB603: this
+    /// loop used to call each connector's own <c>Close()</c>, stamping '42' on every closed sequential file). No
+    /// exception procedure runs: the emitted CLOSE statement selects USE declaratives, this does not.</para>
+    /// <para>"Even when an error occurs": a close whose failure is an I-O status ('30') is an ordinary completed
+    /// CLOSE. A failure no status describes is a runtime defect, and it must neither stop the closes after it nor
+    /// vanish: every file is closed first, then the failure is rethrown (several as one
+    /// <see cref="AggregateException"/>). Idempotent: a second call finds nothing open.</para></summary>
     public void CloseAll()
     {
-        DrainPendingObjectCloses();
-        foreach (var (name, c) in _files)
+        List<Exception>? failures = null;
+        // §9.1.4's deletion-time closes the GC requested and the mutator has not yet performed: each object's file is
+        // closed and dropped as at its deletion. One that fails stays registered, out of its open mode.
+        while (_pendingObjectClose.TryDequeue(out var key))
         {
-            // The pre-registry semantics, preserved exactly: sequential connectors close unconditionally
-            // (a closed one just re-reports '42' into a cleared registry); keyed connectors close only if open.
-            if (c is SequentialConnector s) s.Close();
-            else if (c.IsOpen) c.Close();
-            // §9.1.15 — an implicit CLOSE removes the file lock too, so the arbitration entry goes with it
-            // (kb/Work PB321: every successful OPEN registers, so every close path must deregister).
-            DeregisterFromPhysical(name, c);
+            try { CloseAndDrop(key); }
+            catch (Exception failure) { (failures ??= []).Add(failure); }
         }
+        foreach (string name in _files.Keys.ToArray())   // a snapshot: a held-line drain runs report-writer code mid-walk
+        {
+            try { CloseIfOpen(name); }
+            catch (Exception failure) { (failures ??= []).Add(failure); }
+        }
+        if (failures is [var only]) ExceptionDispatchInfo.Throw(only);
+        if (failures is not null)
+            throw new AggregateException("the run unit's implicit CLOSE failed for more than one file (ISO §14.6.11 2))",
+                failures);
     }
 
     // ── Sequential-surface verbs (keyed connectors are reached via the keyed entries below) ─────────────────
@@ -1857,16 +1879,10 @@ public sealed class FileRegistry
     /// §14.9.6.4 GR9). ⛔ UNCONDITIONAL: every successful OPEN registers, so every CLOSE must deregister — while
     /// this was gated on <c>_connectorShares</c> a plain connector could not have been registered in the first
     /// place, and making the registration total without making the release total would have left a closed
-    /// connector arbitrating forever (kb/Work PB321).</summary>
-    private void SharedClose(string name)
-    {
-        if (_files.TryGetValue(name, out var c)) DeregisterFromPhysical(name, c);
-    }
-
-    /// <summary>Drop <paramref name="name"/>'s entry in the physical-file table for the connector object
-    /// <paramref name="c"/> and release the record locks it holds. Takes the connector rather than looking it up
-    /// so a DISPLACED registration is deregistered under its OWN host path, not its replacement's.</summary>
-    private void DeregisterFromPhysical(string name, FileConnector c)
+    /// connector arbitrating forever (kb/Work PB321). It runs only inside the CLOSE dispatch, which every close
+    /// path enters (kb/Work PB603), with the connector the dispatch already holds — so a displaced registration is
+    /// deregistered under its OWN host path, before its replacement is stored.</summary>
+    private void SharedClose(string name, FileConnector c)
     {
         if (!_physical.TryGet(c.HostPath, out var st)) return;
         st.Open.Remove(name);
