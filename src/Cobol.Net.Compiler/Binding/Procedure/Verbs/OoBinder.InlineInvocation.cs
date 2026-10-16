@@ -53,7 +53,8 @@ internal readonly record struct InvocationArg(
         // bare `dataReference` arm, so that `USING N + 1` is one expression — the sole-identifier reduction (ISO
         // §14.9.4.4 GR8's INVOKE twin) happens HERE, once, for every consumer of the argument (the typed path and the
         // universal path alike), and it is what `Ref` has always meant.
-        var reference = a.dataReference() ?? (keywordLess ? ConditionBinder.SoleDataReference(a.arithmeticExpression()) : null);
+        // A BY REFERENCE receivingIdentifier that is no data reference never gets here: OoBindInvoke refuses it first.
+        var reference = a.receivingIdentifier()?.dataReference() ?? (keywordLess ? ConditionBinder.SoleDataReference(a.arithmeticExpression()) : null);
         // SELF is identifier-5 under BY CONTENT, BY VALUE or no phrase (kb/Work PB1137), and it arrives as the sole
         // primary of the expression arm (the identifier tier, kb/Work PB1425) — recovered here, once, like `Ref`.
         bool self = IsSoleSelf(a.arithmeticExpression());
@@ -128,7 +129,7 @@ internal sealed class InvocationSite
         {
             Args = args,
             ArgsWritten = inv.invokeUsing() is not null,
-            ReturningRef = inv.invokeReturning()?.dataReference(),
+            ReturningRef = inv.invokeReturning()?.receivingIdentifier().dataReference(),
             Verb = "INVOKE",
         };
     }

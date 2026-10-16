@@ -2209,8 +2209,9 @@ internal sealed class VersionConformancePass
         /// <summary>The object-view (ISO §8.4.3.5, identifier Format 5 — <c>identifier-1 AS …</c>; kb/Work PB1425), gated
         /// on RECOGNITION like its Format-4 sibling above, and for the same three derived reasons: A.4.10's optional OO
         /// list does not name it, Annex E's 2014→2023 delta does not list it, and it re-describes an object reference,
-        /// a 2002 introduction. The receiving superset parse (§8.4.3.5.3 SR2, <c>objectViewReceiver</c>) is the same
-        /// construct written where it is refused, so it is gated alike and a COBOL-85 program is told the edition.</summary>
+        /// a 2002 introduction. The receiving superset parse (§8.4.3.5.3 SR2, a <c>nonReceivableIdentifier</c> carrying
+        /// the AS phrase) is the same construct written where it is refused, so it is gated alike and a COBOL-85 program
+        /// is told the edition.</summary>
         public override object? VisitObjectView(CobolParserCore.ObjectViewContext ctx)
         {
             _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
@@ -2218,9 +2219,10 @@ internal sealed class VersionConformancePass
         }
 
         /// <inheritdoc cref="VisitObjectView"/>
-        public override object? VisitObjectViewReceiver(CobolParserCore.ObjectViewReceiverContext ctx)
+        public override object? VisitNonReceivableIdentifier(CobolParserCore.NonReceivableIdentifierContext ctx)
         {
-            _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
+            if (ctx.objectViewPhrase().Length != 0)
+                _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
             return base.VisitChildren(ctx);
         }
 

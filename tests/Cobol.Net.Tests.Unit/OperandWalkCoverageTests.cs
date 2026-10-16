@@ -49,10 +49,13 @@ public sealed class OperandWalkCoverageTests
 
     /// <summary>The walk's arms, in <c>BindOperandExprCore</c>'s own order. Keep this list in step with that
     /// method — it is the ONE place the two must agree, and the test names the file to edit when they do not.
+    /// <para>The receiving identifier's two non-reference forms (<c>nonReceivableIdentifier</c>, and a
+    /// <c>dataAddressIdentifier</c> under a <c>receivingIdentifier</c>) are an arm because the mixed-role rules read
+    /// them in their Format-2 SENDING role and §8.8.1.1 refuses them there (kb/Work PB1551).</para>
     /// </summary>
     private static readonly string[] WalkArms =
-        ["arithmeticExpression", "functionCall", "inlineMethodInvocation", "nonNumericLiteral",
-         "literal", "dataReference"];
+        ["arithmeticExpression", "functionCall", "inlineMethodInvocation", "nonReceivableIdentifier",
+         "dataAddressIdentifier", "nonNumericLiteral", "literal", "dataReference"];
 
     private static readonly string[] GrammarFiles =
     [
