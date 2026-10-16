@@ -2353,6 +2353,7 @@
   "pb758-invoke-end-invoke-after-using-returning",
   "pb758-sort-end-sort-is-not-a-terminator",
   "pb758-merge-end-merge-is-not-a-terminator",
+  "pb2770-search-all-end-search-no-when",
   "pb1308-method-working-storage-every-edition",
   "pb1251-object-linkage",
   "pb1251-factory-linkage",

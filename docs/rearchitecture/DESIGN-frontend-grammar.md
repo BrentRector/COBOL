@@ -1210,8 +1210,21 @@ target:
   wording (`BailErrorStrategy` inherits `DefaultErrorStrategy.ReportError`), once in `CobolErrorStrategy`'s —
   and reported a FALSE error whenever SLL was merely the weaker predictor. `Frontend.Parse` now attaches
   `CobolErrorListener` inside the LL retry only, so the authoritative pass is the only one that diagnoses.
-- `CobolErrorStrategy` keeps its COBOL-intent heuristics (`GuessCobolIntent`, 19 rules) — these are genuinely
-  useful and not duplicative. It carries no edition logic: edition diagnosis lives in the
+- `CobolErrorStrategy` keeps its COBOL-intent heuristics (`GuessCobolIntent`) — these are genuinely
+  useful and not duplicative. ⛔ **A hint states only what is true, and is keyed on token TYPES and the parser
+  state, never on a word's spelling** (kb/Work PB2770): the "may not be supported" hints COBOL0101-0107 fired on a
+  word wherever the parse failed at it and claimed limitations the compiler does not have, so they are deleted
+  (0104-0106 by DEVLOG 232, 0101-0103 and 0107 by PB2770), and so is COBOL0304 "missing period after paragraph
+  name", keyed on a token's text containing ".MOVE" and its siblings — text no COBOL word can hold (ISO §8.3.2.1),
+  so it fired only on a literal or a PICTURE string. **The one exception is a SUPPRESSION, not a hint:** the
+  missing-period guess (COBOL0307) stays off a word spelled `END-…` (`CobolNames.StartsWith`) whether or not the
+  word is a scope terminator, because whoever wrote `END-INVOKE` (no ISO word, kb/Work PB758) or `END-OF-PAGE` at a
+  sentence end meant to close something; there the spelling is the evidence, and keying it on the token type
+  turns the `pb758-invoke-end-invoke-*` negatives into a false "A period may be missing". No hint is ever ADDED
+  because of a spelling. The misplaced-scope-terminator hint (COBOL0306, ISO
+  §14.5.3.2) reads from the ATN, once, which `…Statement` rules match each END-x token (`ScopeTerminator`):
+  END-SEARCH closes both SEARCH rules, and a word no statement rule matches (END-OF-PAGE, a user word spelled
+  END-…) is no terminator. It carries no edition logic: edition diagnosis lives in the
   `VersionConformancePass` (§3.2), and the recogniser call (`CobolErrorStrategy.cs:113`) is gone with the
   recogniser. It hosts the token-keyed vendor JSON/XML→COBOL0313 hint (§3.4), and the two §3.11 arms.
 - The `[code] message` construction (`CobolErrorStrategy.cs:93-95`) is retargeted to build a structured
