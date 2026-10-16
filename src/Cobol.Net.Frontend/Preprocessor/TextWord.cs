@@ -262,7 +262,8 @@ internal static class TextWordScanner
     /// opening delimiter, which <see cref="CobolSourceText"/> reads, as it reads the content.</summary>
     public static LiteralParts DecomposeLiteral(string literal)
     {
-        _ = CobolSourceText.TryOpeningDelimiterAt(literal, 0, out var opening);
+        if (!CobolSourceText.TryOpeningDelimiterAt(literal, 0, out var opening))
+            throw new ArgumentException($"'{literal}' is not a literal text-word: it begins with no opening delimiter", nameof(literal));
         int q = opening.PrefixLength;
         string content = CobolSourceText.LiteralContent(literal, q, out int closing);
         return new LiteralParts(literal[..q], literal[q], content, Terminated: closing < literal.Length);
