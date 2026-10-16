@@ -25,6 +25,10 @@
       *>       REM agrees because both quotients are positive integers.
       *>   INTEGER(-2.75) = -3, INTEGER(2.75) = 2, INTEGER-PART(-2.75) = -2,
       *>       FRACTION-PART(-2.75) = -0.75: the controls with a fraction.
+      *>   TEST-DATE-YYYYMMDD(10 ** 40) = 1 and TEST-DAY-YYYYDDD(0 - 10 ** 40)
+      *>       = 1: 15.90.4 r1a / 15.91.4 r1a, an integer outside the window,
+      *>       however far (kb/Work PB651 finisher: it was a fatal
+      *>       EC-SIZE-OVERFLOW through an Int128 landing).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2630INT.
        OPTIONS.
@@ -71,4 +75,8 @@
            DISPLAY "12-INTEGER-PART-FRACTION-NEG=" D.
            COMPUTE D = FUNCTION FRACTION-PART(-2.75).
            DISPLAY "13-FRACTION-PART-FRACTION-NEG=" D.
+           COMPUTE R = FUNCTION TEST-DATE-YYYYMMDD(10 ** 40).
+           DISPLAY "14-TEST-DATE-PAST=" R.
+           COMPUTE R = FUNCTION TEST-DAY-YYYYDDD(0 - 10 ** 40).
+           DISPLAY "15-TEST-DAY-PAST=" R.
            STOP RUN.

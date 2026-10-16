@@ -128,9 +128,10 @@ public static partial class CobolIntrinsics
     /// ⛔ THE §15.64.3 r2 ZERO-DIVISOR RULE — ONE RAISE SITE PER RULE, NOT ONE PER CARRIER (fix-queue PB32).
     /// </summary>
     /// <remarks>
-    /// MOD is implemented TWICE — the exact <see cref="ModScaled"/> and the binary64 <c>ModReal</c> that
-    /// <c>IntrinsicRenderer.RenderNum</c>'s <c>AnyRealArgument</c> route reaches — and the rule was written into
-    /// both, then corrected in only one. <c>ModReal</c> read <c>b == 0 ? 0 : …</c>: a SECOND, INDEPENDENT
+    /// MOD is implemented on two carriers — the exact <see cref="ModScaled"/> and the SDIDI <c>ModDec</c>; REM on those
+    /// and binary64 (<c>RemReal</c>). MOD has no binary64 body since kb/Work PB651: both its positions are §15.3 type 6,
+    /// so the renderer takes their integers before a lane is chosen. When MOD had one, the rule was written into both
+    /// bodies and then corrected in only one: the binary64 body read <c>b == 0 ? 0 : …</c>: a SECOND, INDEPENDENT
     /// zero-divisor guard that returned a finite 0.0 and never called <see cref="Exceptions.ExceptionState.ArgumentError"/>,
     /// so the exception condition was not mis-defaulted — it was never SET. Neither screen the renderer relies on
     /// could see it either, because <c>RealResult</c> and <c>FromDouble</c> both test only for NaN. Measured under

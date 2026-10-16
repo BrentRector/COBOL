@@ -1073,6 +1073,16 @@ internal static class IntrinsicArgumentRules
                 + "operand list, so no class screen applies to it",
         };
 
+    /// <summary>Is operand position <paramref name="position"/> (0-based, the schema's operand convention) of
+    /// <paramref name="functionName"/> a §15.3 type-6 position — "An arithmetic expression that will always result in
+    /// an integer value or an integer data item shall be specified" — on a SPEC-VERIFIED schema? The renderer's
+    /// type-6 intake keys on it (<c>IntrinsicRenderer.RawArg</c>, kb/Work PB651), so it fails CLOSED — the opposite
+    /// direction from <see cref="ArgumentRunIsAllNumeric"/>, because a false here leaves the operand as it stands, which
+    /// is exactly what happened before the intake existed: a function absent from <see cref="Verified"/> or a position
+    /// its schema does not describe answers false.</summary>
+    public static bool IsIntegerPosition(string functionName, int position) =>
+        Verified.TryGetValue(functionName, out var schema) && schema.At(position) is { Kind: 'i' };
+
     /// <summary>
     /// Is EVERY operand position of <paramref name="functionName"/>'s argument run — <paramref name="argCount"/>
     /// operands — a §15.3 <b>numeric</b> position, i.e. one whose declared argument type is 6 (Integer) or 10
