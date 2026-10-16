@@ -782,7 +782,12 @@ character no grouped completion admits. The size list has ONE reader, `MonetaryF
 last-size repetition and trailing-0 stop), with `GroupingAdmits` (the scan: prefix or whole) and `GroupingIsExact`
 (the format-2 de-edit: every position, exactly what the edit writes) over it; the edit's own separator placement
 walks the same `GroupSize`, and `MonetaryFactsTests` pins all three against .NET's independent `N0` group-size
-rendering for every host culture. §15.68.4 r3 (`--check` OK) fixes the sign of the
+rendering for every host culture. Argument-1 is compared under DETERMINATION L12's ONE per-character fold
+(`LocaleFacts.TryFoldLocaleChar`, the same fold that normalizes every snapshot string): the scan runs over
+`LocaleFacts.NormalizeLocaleText(text, out origins)`, so a Cf character in the argument is ignorable and
+U+00A0/U+202F/U+2009 is a space wherever a space is admitted, and each position is mapped back to its ordinal in
+the original argument (kb/Work PB2766); `NumvalCLocaleScanTests.EveryHostCulture_RecognizesItsOwnFormattedCurrencyString`
+holds every host culture's own `ToString("C")` to it. §15.68.4 r3 (`--check` OK) fixes the sign of the
 result under the LOCALE keyword. `ANYCASE` under LOCALE folds through the **LC_CTYPE** correspondence of the
 same locale (§15.68.3 r5b.3's second paragraph), which is why §4.5's case mapping must be reachable from here
 — one mechanism, two callers.

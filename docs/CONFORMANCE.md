@@ -2187,7 +2187,12 @@ reallocated).
    > **DETERMINATION L12** (generalizing L10): every LC_TIME pattern and LC_MONETARY string is normalized —
    > Unicode Cf characters removed, U+00A0/U+202F/U+2009 mapped to the plain space (host-ICU stability: monetary
    > strings occupy character positions of a fixed-width item, so a host-varying byte would move EC-LOCALE-SIZE
-   > itself; U+2212 is kept — a real character); recognition matches through the same equivalence. **L12 covers
+   > itself; U+2212 is kept — a real character); recognition matches through the same equivalence — ONE
+   > per-character fold (`LocaleFacts.TryFoldLocaleChar`) normalizes the snapshot strings AND argument-1 of NUMVAL-C /
+   > TEST-NUMVAL-C LOCALE before the §15.68.3 r5 b scan, so a Cf character in the argument is ignorable (an ar-*
+   > culture's own formatted currency string, U+200F after the symbol included, is conforming), U+00A0/U+202F/U+2009
+   > is a space wherever r5 b 7 or a token adjacency admits one, and §15.94.4's positions stay the original
+   > argument's ordinals (kb/Work PB2766). **L12 covers
    > EVERY locale-sourced string a result carries, not only the patterns** (kb/Work PB2764): `TimeFacts` (the LC_TIME
    > snapshot, the twin of `MonetaryFacts`) normalizes the date and time separators, the AM/PM designators, the era, the
    > day and month names and the seconds fraction's decimal point once and renders `d_fmt` / `t_fmt` itself, so ICU's
