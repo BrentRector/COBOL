@@ -327,7 +327,11 @@ public static class CobolLiteral
     /// character whose DISPLAY byte has that bit configuration, so it is imaged by the ONE storage-byte law
     /// (<see cref="StorageByte.ToChar"/>): <c>X"FF"</c> is the byte 0xFF, i.e. U+FFFF, the native HIGH-VALUE and the same
     /// character a binary or packed item's byte 0xFF has through a REDEFINES (kb/Work PB2919); a four-digit group is the
-    /// national character whose UTF-16 code unit is that value. A trailing partial group violates
+    /// national character whose UTF-16 code unit is that value — VERBATIM, including a group with no corresponding
+    /// character (a surrogate half D800–DFFF, a noncharacter FFFE/FFFF), the result §8.3.3.5.4 GR5 leaves to the
+    /// implementor ("The implementor defines the result of specifying a hex-character-sequence-1 for which no
+    /// corresponding character in that coded character set exists"): one character position, no diagnostic, no
+    /// exception condition (docs/CONFORMANCE.md DOC-A.1-97). A trailing partial group violates
     /// §8.3.3.5.3 SR5 (and a non-hexadecimal digit §8.3.3.5.3 SR4 / §8.3.3.2.3 SR5) and yields the empty string:
     /// the literal screen reports the violation (<see cref="HexGroupViolation"/>, <see cref="RepertoireViolation"/>),
     /// so a malformed literal has no value to produce.</summary>
