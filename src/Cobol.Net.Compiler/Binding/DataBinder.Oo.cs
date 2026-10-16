@@ -30,6 +30,12 @@ public sealed class OoMethodDataScope
     /// <summary>The method's own §8.3.2.2 census: a method is a source element of its own (§10.5), so its words may
     /// repeat, as another type, a word of its class or of a sibling method (§8.4.6.1; kb/Work PB2921).</summary>
     internal UserWordCensus Words { get; } = new();
+
+    /// <summary>The method's own CONSTANT entries, and the other words its data division defines, which hide a constant
+    /// of the containing object or factory definition (§11.7.4 GR5; kb/Work PB3164): read first by
+    /// <see cref="DataBinder.FindConstant"/> while the method's data or statements bind, and invisible to every other
+    /// element.</summary>
+    internal DataBinder.ConstantScope Constants { get; } = new();
 }
 
 /// <summary>
