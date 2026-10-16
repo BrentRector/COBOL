@@ -27,7 +27,6 @@
 # `GUARD_GROUP_RUNNER=/tmp/old.sh bash scripts/guard-verify.sh --witnesses`).
 set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
-TMP="${TMPDIR:-/tmp}"
 
 MODE="${1:-all}"
 case "$MODE" in
@@ -297,6 +296,9 @@ if [ "$W_RC" -ne 0 ]; then
 fi
 
 # ── (2) THE EQUIVALENCE PROOF ──────────────────────────────────────────────────────────────────────────────
+# This run's OWN scratch directory (kb/Work PB2922): fixed names (gv_serial.log, ...) directly in the machine-wide temp
+# directory were one file for every run on the host. Removed when the proof is GREEN; kept, and named, when it is not.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/guard-verify.XXXXXX")"
 echo "=== serial scripts/guard.sh ==="
 bash scripts/guard.sh > "$TMP/gv_serial.log" 2>&1; SER=$?
 echo "=== parallel scripts/guard-fast.sh ==="
@@ -338,4 +340,5 @@ else
 fi
 echo "serial guard rc=$SER   fast guard rc=$FAST   unrecognized-verdict-words=$RC_UNKNOWN"
 [ "$SER" -eq 0 ] && [ "$FAST" -eq 0 ] && [ "$RC_UNKNOWN" -eq 0 ] || RC=1
+if [ "$RC" -eq 0 ]; then rm -rf "$TMP"; else echo "=== both guards' logs and verdict lists: $TMP ==="; fi
 exit $RC

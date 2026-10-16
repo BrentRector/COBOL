@@ -492,12 +492,25 @@ $UnitCluster = ''
 
 if (-not (Take-Lock)) { exit 3 }
 $exitCode = 0
-$dryRunSteer = $null
+# A DRY RUN'S STEER lives in this run's own directory under THIS coordination directory, never in the machine-wide TEMP
+# (kb/Work PB2922; design section 4.8): a fixed TEMP name was seen by every other dry run on the host, and one that a killed
+# dry run left behind (a process-tree kill skips the `finally` below) turned every later check of that name RED.
+$dryRunDir = $null
 try {
+    # The lock is held, so no other supervisor of this coordination directory is alive: every dryrun-<pid> directory but
+    # this process's own was left by a dry run killed before its `finally` ran. Every start reaps them.
+    foreach ($stale in @(Get-ChildItem (Join-Path $CoordDir 'scratch') -Directory -Filter 'dryrun-*' | Where-Object { $_.Name -match '^dryrun-\d+$' -and $_.Name -ne "dryrun-$PID" })) {
+        try { Remove-Item $stale.FullName -Recurse -Force; Say "reaped a killed dry run's directory $($stale.FullName)" }
+        catch { Say "could not reap a killed dry run's directory $($stale.FullName): $($_.Exception.Message)" }
+    }
     # -Unit is the operator's steer for the first unit, written through steer.ps1 like any other (one steering path,
-    # kb/Work PB2596). A dry run writes it to a temporary file and reads it from there: it must leave nothing behind.
+    # kb/Work PB2596). A dry run writes it into its own directory and reads it from there: it must leave nothing behind.
     if ($Unit) {
-        if ($DryRun) { $dryRunSteer = Join-Path ([IO.Path]::GetTempPath()) "orchestrate-dryrun-$PID.handoff.operator.json"; $OperatorHandoff = $dryRunSteer }
+        if ($DryRun) {
+            $dryRunDir = Join-Path $CoordDir "scratch/dryrun-$PID"
+            New-Item -ItemType Directory -Force -Path $dryRunDir | Out-Null
+            $OperatorHandoff = Join-Path $dryRunDir 'handoff.operator.json'
+        }
         if (Test-Path $OperatorHandoff) { Say "-Unit $Unit replaces the pending operator steer ($((Get-Content $OperatorHandoff -Raw | ConvertFrom-Json).next_unit_reason))" }
         & pwsh -NoProfile -File $Steer -Unit $Unit -Reason 'named by orchestrate.ps1 -Unit at start' -OutFile $OperatorHandoff | Out-Null
         if ($LASTEXITCODE -ne 0) { throw "steer.ps1 refused -Unit $Unit" }
@@ -698,6 +711,7 @@ try {
     }
 } finally {
     Remove-Item $Lock -Force -ErrorAction SilentlyContinue
-    if ($dryRunSteer) { Remove-Item $dryRunSteer -Force -ErrorAction SilentlyContinue }
+    # Not fatal: a directory this cannot remove is reaped, loudly, by the next start (above).
+    if ($dryRunDir) { Remove-Item $dryRunDir -Recurse -Force -ErrorAction SilentlyContinue }
 }
 exit $exitCode

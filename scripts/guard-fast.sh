@@ -47,7 +47,12 @@ JOBS="${JOBS:-$(nproc)}"
 # Set CJOBS/RJOBS to throttle deliberately on a small machine; the default is every core.
 CJOBS="${CJOBS:-$JOBS}"
 RJOBS="${RJOBS:-$JOBS}"
-TMP="${TMPDIR:-/tmp}"
+# This run's OWN scratch directory (kb/Work PB2922): fixed names (gf_population.txt, gf_results.txt, ...) directly in the
+# machine-wide temp directory were one file for every guard run on the host. It goes when the run ends, unless it holds
+# the forensics of a non-MATCH (below), which the verdict names.
+TMP="$(mktemp -d "${TMPDIR:-/tmp}/guard-fast.XXXXXX")"
+gf_cleanup() { [ -d "${GUARD_FORENSICS:-}" ] && [ "${GUARD_FORENSICS#"$TMP"/}" != "$GUARD_FORENSICS" ] || rm -rf "$TMP"; }
+trap gf_cleanup EXIT
 T0=$(date +%s); el() { echo "[+$(( $(date +%s) - T0 ))s] $*"; }
 
 # ⛔ THE GUARD'S OWN INSTRUMENTS FIRST, every run (kb/Work PB1955). The population reader, the verdict audit and
