@@ -1,4 +1,4 @@
-## PB656: the 2002/2014 reserved-word flags read against GnuCOBOL; SEND/RECEIVE/END-RECEIVE reserved at 2002, PADDING CHARACTER obsolete at 2002
+## Entry 2063 — 2026-10-16 05:08 PDT — PB656: the 2002/2014 reserved-word flags read against GnuCOBOL; SEND/RECEIVE/END-RECEIVE reserved at 2002, PADDING CHARACTER obsolete at 2002
 
 kb/Work PB656 said `reserved-words.json` and the removed-construct rows disagree: SEGMENT-LIMIT is reserved at 2002
 while `segment-limit-removed-2002` removes its clause there. The registrar added that COBOL's provenance ("removed
@@ -46,3 +46,4 @@ regenerated one. `Table_SanityInvariants` had encoded the old 2002 override. It 
 unreserved at 2014 and the three re-reservations as reserved at 85 and 2002.
 
 Row SR-8.3.2.1-2 moved from PARTIAL to CONFORMS, and GAP went from 101 to 100.
+
