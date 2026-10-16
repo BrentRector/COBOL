@@ -235,15 +235,25 @@ def register_cells(line: str) -> list[str]:
 
 
 def register_section(text: str, heading: str, header_cell: str) -> list[list[str]]:
-    """Every data row of ONE `docs/CONFORMANCE.md` register table, as raw cell lists, in document order.
+    """Every data row of ONE `docs/CONFORMANCE.md` register table, as raw cell lists, in document order."""
+    return [cells for _, cells in register_section_at(text, heading, header_cell)]
 
-    ⛔ THE ONE PARSER, and it lives HERE rather than in `audit_annex_a1.py` where it was written, because four
-    readers now need it and a markdown table read four ways is `feedback_one_rule_one_place` waiting to happen:
+
+def register_section_at(text: str, heading: str, header_cell: str) -> list[tuple[int, list[str]]]:
+    """Every data row of ONE `docs/CONFORMANCE.md` register table as `(1-based line in text, cells)`.
+
+    The line is for a reader that meets the document LINE BY LINE and must know which lines are register rows —
+    the Phase-B dossier tags a citing line with its row key (kb/Work PB3209) — so it asks here rather than
+    keeping a second idea of what a register row looks like. Lines are split on `\\n` alone, as the C# twin
+    splits them, so a line number here is a line number in the file.
+
+    ⛔ THE ONE PARSER, and it lives HERE rather than in `audit_annex_a1.py` where it was written, because five
+    readers now need it and a markdown table read five ways is `feedback_one_rule_one_place` waiting to happen:
     the register audit (which CHECKS the rows), `Schema.anchor_obliged` (which asks whether an item has a
-    determination at all), `DerivedSelector` (whose `determination-prefix` arm reads what the determination SAYS)
-    and `Derivation` (which reads §8). The C# twin is `tests/_shared/ConformanceRegister.cs`; that pair is the
-    same two-engines-one-artifact shape as the selector evaluator, and `EveryRowState_IsDerived_NotAsserted`
-    catches them drifting.
+    determination at all), `DerivedSelector` (whose `determination-prefix` arm reads what the determination SAYS),
+    `Derivation` (which reads §8) and the Phase-B dossier (which tags its citing lines). The C# twin is
+    `tests/_shared/ConformanceRegister.cs`; that pair is the same two-engines-one-artifact shape as the selector
+    evaluator, and `EveryRowState_IsDerived_NotAsserted` catches them drifting.
 
     ⛔ IT STOPS AT THE NEXT `## ` HEADING, and that is not tidiness. Until §8 existed §7 was the LAST section, so
     reading to end-of-file was indistinguishable from reading the section — and the moment a second register was
@@ -260,14 +270,15 @@ def register_section(text: str, heading: str, header_cell: str) -> list[list[str
     body = text[start + len(heading):]
     if (nxt := body.find("\n## ")) >= 0:
         body = body[:nxt]
-    rows: list[list[str]] = []
-    for line in body.splitlines():
+    first = text.count("\n", 0, start) + 1     # the heading's own line; `body` begins on it
+    rows: list[tuple[int, list[str]]] = []
+    for offset, line in enumerate(body.split("\n")):
         if not line.startswith("| "):
             continue
         cells = register_cells(line)
         if len(cells) < 2 or cells[0] == header_cell or set(cells[0]) <= set("-: "):
             continue
-        rows.append(cells)
+        rows.append((first + offset, cells))
     return rows
 
 
@@ -277,8 +288,13 @@ def _cell(cells: list[str], i: int) -> str:
 
 def section7_rows(text: str) -> list[Section7Row]:
     """Every data row of the §7 Annex A.1 register, in document order."""
-    return [Section7Row(c[0], c[1], _cell(c, 2), _cell(c, 3))
-            for c in register_section(text, REGISTER_HEADING, REGISTER_HEADER_CELL)]
+    return [row for _, row in section7_rows_at(text)]
+
+
+def section7_rows_at(text: str) -> list[tuple[int, Section7Row]]:
+    """Every data row of the §7 Annex A.1 register with its 1-based line in `text`, in document order."""
+    return [(line, Section7Row(c[0], c[1], _cell(c, 2), _cell(c, 3)))
+            for line, c in register_section_at(text, REGISTER_HEADING, REGISTER_HEADER_CELL)]
 
 
 def plain(cell: str) -> str:
