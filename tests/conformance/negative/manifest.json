@@ -542,6 +542,7 @@
   "pb993-sort-merge-transfer-termination-below-2002",
   "pb892-performed-declarative-resume-below-2002",
   "pb892-operand-activation-below-2002",
+  "pb867-raise-checking-below-2002",
   "pb971-arg-omitted-below-2002",
   "pb972-raising-exception-name-differs",
   "pb972-raising-class-not-in-interface",
