@@ -432,7 +432,10 @@ public static class ACCT_UPDATE
   with that scope's reserved names: the enclosing type's own name (CS0542), the fixed members (`Call` and `Cancel` in
   the class; `AsImage` and `FromImage` in a record struct) and the record struct's synthesized members (`Equals`,
   `GetHashCode`, `ToString`, `Deconstruct`, `PrintMembers`, `EqualityContract`). A group contributes a property and a
-  nested record-struct type, named `<word>` and `<word>_Record` in the same scope. So `01 CUST. 05 CUST … 05 F … 05 F
+  nested record-struct type, named `<word>` and `<word>_Record` in the same scope. The `Call` parameters are claimed
+  in the CLASS's scope beside its record structs, in source order (a formal's word, then its record's), because the
+  `Call` body names each record type by its simple name and a parameter of that spelling would shadow it: `USING REC
+  REC-Record` with `REC` a group publishes record `REC_Record` and parameters `REC` and `REC_Record_2`. So `01 CUST. 05 CUST … 05 F … 05 F
   … 05 F-2` of a program externalized "CUST" publishes class `CUST`, record `CUST_Record` and members `CUST`, `F`,
   `F_2`, `F_2_2` (r7-names): every legal description publishes a compilable surface, and the order rule makes the
   names deterministic. Names are display only; the COBOL word is in the attribute (§3.6).
@@ -1664,7 +1667,8 @@ Folded-name comparison over the enumerated listing; CI's Linux legs run the mult
 - **Names** (`HostEntryShapeDriftTests.ThePublishedNames_AreAllocated_…`): for every LINKAGE root of the corpus (each
   compiled by its own golden, which a CS0102/CS0542/CS0111 in its entry classes fails) plus a collision fixture (a word
   twice in one record, words equal to the enclosing type, to `AsImage`/`FromImage`/`Equals`/`ToString`/`GetHashCode`,
-  a program whose host class spells a formal's record type, `F` beside `F-2`; `Call` and `Cancel` are reserved words and
+  a program whose host class spells a formal's record type, a formal that spells another formal's record type,
+  `F` beside `F-2`; `Call` and `Cancel` are reserved words and
   cannot be data-names), the internal and published record structs and the host class compile, every name is produced
   by `CsNames.Allocate`, and two compiles give the same names.
 - **One renderer** (`HostEntryShapeDriftTests.AHostEntryArgument_IsStatedByTheCallLanesRenderer`): what a host entry's

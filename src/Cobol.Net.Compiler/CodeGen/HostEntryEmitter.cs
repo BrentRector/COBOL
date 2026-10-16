@@ -64,8 +64,9 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
 
     private void EmitEntry(BoundUnit unit, string className, CodeWriter w)
     {
+        // ONE scope for the records and the Call parameters, claimed in source order: the Call body names each record
+        // type by its simple name, so a parameter spelled like one would shadow it (§4.3 "Names"; review w1093b R1-1).
         var members = CsNameScope.HostEntry(className);
-        var parameters = members.Nested();
         int serial = 0;
         var profiles = new List<(string Field, string Init)>();
         var memberProfiles = new Dictionary<DataItem, string>(ReferenceEqualityComparer.Instance);
@@ -102,7 +103,7 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         }
 
         var formals = unit.Data.LinkageFormals
-            .Select(f => Describe(f.Item, CsNames.Allocate(DataItem.Sanitize(f.Item.CobolName ?? "FILLER"), parameters),
+            .Select(f => Describe(f.Item, CsNames.Allocate(DataItem.Sanitize(f.Item.CobolName ?? "FILLER"), members),
                 f.ByValue, f.Optional))
             .ToList();
         Item? returning = unit.Data.LinkageReturning is { } r ? Describe(r, "__hr", false, false) : null;

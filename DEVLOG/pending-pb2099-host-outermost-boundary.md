@@ -346,4 +346,13 @@ INVOKE half. The five R3 notes that waited on PB2099 now wait on PB2100.
 **Still open, not this slice's.** The manual's host chapter belongs to kb/Work PB1610, which creates `docs/manual/`; its
 text is design §9.4's. `ProgramRegistry.RunMain` has no caller, and removing it is a runtime-major bump.
 
+**Review round 1 (w1093b R1-1).** The `Call` parameters were named in a copy of the class's member scope taken before
+any `<word>_Record` was allocated, and neither scope saw the other's later claims. So `USING REC REC-Record`, with `REC`
+a group, named both the record struct and the second parameter `REC_Record`, the parameter shadowed the type in the
+`Call` body, and Roslyn refused the generated write-back (CS1061 on `string.__TryGet`, exit 70): legal COBOL rejected.
+The parameters are now claimed in the class's one scope beside the records, in source order (`REC_Record_2`), and
+`CsNameScope.Nested` is deleted. The collision fixture gains `L-G-2-Record` beside `L-G-2`. A wider sibling stays open
+and is reported as a lead: a COBOL word spelling a runtime or `System` type the generated code names unqualified
+(`HostLanding`, `CobolString`, …) shadows that type in every scope, including the internal program class on main.
+
 **Gate (part 7).** `TestResults/build-local/20261016T140250Z-5116d8` at 8c067d41d: `LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,015/11,776, Unit 33,206/33,714, Characterization 6/36 in leg 1; every test this part added or changed ran in leg 1 and passed). The first gate (`20261016T135015Z-7dcf04`) was RED on `RuntimeApiGuardTests` only: three bare `CobolVarGroup.` accesses in `PublishedRecordEmitter`, now routed through `RuntimeApi` (8c067d41d). Semgrep verify: PASS. LINUX GATE: the lander's (batched gating).

@@ -257,8 +257,9 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
     /// <summary>The §17.3 collision fixture: words a published name could collide with — a word twice in one record
     /// (F in S1 and S2, beside the record's own F), F beside F-2, words spelling the record's own members
     /// (<c>AsImage</c>, <c>FromImage</c>, <c>Equals</c>, <c>ToString</c>, <c>GetHashCode</c>), a member spelling its
-    /// enclosing record type (S1-Record in S1), and a program whose host class spells a formal's record type
-    /// (L-G-Record beside L-G).</summary>
+    /// enclosing record type (S1-Record in S1), a program whose host class spells a formal's record type
+    /// (L-G-Record beside L-G), and a formal spelling another formal's record type (L-G-2-Record beside L-G-2: the
+    /// <c>Call</c> body names that record type, so the parameter may not shadow it; review w1093b R1-1).</summary>
     private const string NameFixture = """
                IDENTIFICATION DIVISION.
                PROGRAM-ID. NMMAIN.
@@ -285,7 +286,8 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                01 L-G-2.
                   05 X PIC X.
                01 GetHashCode PIC X.
-               PROCEDURE DIVISION USING L-G L-G-2 GetHashCode.
+               01 L-G-2-Record PIC X.
+               PROCEDURE DIVISION USING L-G L-G-2 GetHashCode L-G-2-Record.
                    GOBACK.
                END PROGRAM L-G-Record.
                """;
@@ -316,6 +318,9 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
         // record member, and no record declares one name twice.
         Assert.Contains("type L_G_Record_2", first);
         Assert.Contains("member S1_Record_2", first);
+        Assert.Contains("type L_G_2_Record", first);
+        Assert.Contains("parameter L_G_2_Record_2", first);
+        Assert.DoesNotContain("parameter L_G_2_Record", first);
         Assert.Contains("member AsImage_2", first);
         Assert.Contains("member F_2", first);
         Assert.DoesNotContain("member AsImage", first);
