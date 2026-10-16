@@ -1,0 +1,6 @@
+S01=[DB 25DB ] LEN=8 GROUP LEN=9
+R=[DB 25DB |   ]
+S01 -5=[ DB 5DB ]
+S01 +5=[    5   ]
+S02=[ ((12((] LEN=7
+S02 +7=[    7  ]
