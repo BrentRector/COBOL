@@ -197,6 +197,57 @@ public sealed class AcceptDifferentialTests
             expected: "4567",
             clock: "2026-06-10T14:30:45.67");
 
+    // §14.9.1.4 GR11: TIME "behaves as if it had been described as an unsigned elementary integer data item of
+    // usage display eight digits in length" — positions 1-2 the hours past midnight "in the range 00 through 23",
+    // 3-4 the minutes 00-59, 5-6 the seconds (00-59: no LEAP-SECOND directive is in effect), 7-8 the
+    // "hundredths of a second past the second in the range 00 through 99". An EXACT-width receiver shows the
+    // whole conceptual image, through both arms of GR6's MOVE: PIC 9(8) (numeric) and PIC X(8) (alphanumeric).
+    // 09:05:03.07 pins the leading-zero hour and every positional weight; 00:00:00.00 and 23:59:59.99 the range
+    // endpoints; 45.679 s pins that HUNDREDTHS truncate (679 ms is 67 hundredths, never a rounded 68).
+    [Theory]
+    [InlineData("2026-06-10T09:05:03.07", "09050307]09050307]")]
+    [InlineData("2026-06-10T00:00:00.00", "00000000]00000000]")]
+    [InlineData("2026-06-10T23:59:59.99", "23595999]23595999]")]
+    [InlineData("2026-06-10T14:30:45.679", "14304567]14304567]")]
+    public void Time_ExactWidthReceiver_ShowsTheEightDigitImage(string clock, string expected)
+        => AssertOutputs(
+            Program("ACCTIM3", """
+                01 WS-N PIC 9(8).
+                01 WS-X PIC X(8).
+                """, """
+                ACCEPT WS-N FROM TIME.
+                ACCEPT WS-X FROM TIME.
+                DISPLAY WS-N "]" WS-X "]".
+            """),
+            expected: expected,
+            clock: clock);
+
+    // §14.9.1.4 GR7-GR10, the date siblings of GR11's image: DATE is six digits YYMMDD, DATE YYYYMMDD eight,
+    // DAY five (YYDDD, the day of the year "in the range 001 through 366"), DAY YYYYDDD seven — each position
+    // zero-padded. Exact-width alphanumeric receivers show each conceptual image whole. 2005-01-05 pins the
+    // leading zeros (year 05, month 01, day 05, day-of-year 005); 2004-12-31 (a leap year) the upper endpoints
+    // (month 12, day 31, day-of-year 366). The YYYY phrases are 2002+ (GR8, GR10).
+    [Theory]
+    [InlineData("2005-01-05T09:00:00", "050105]20050105]05005]2005005]")]
+    [InlineData("2004-12-31T09:00:00", "041231]20041231]04366]2004366]")]
+    public void Date_ExactWidthReceivers_ShowEachZeroPaddedImage(string clock, string expected)
+        => AssertOutputs(
+            Program("ACCDZP1", """
+                01 WS-D6 PIC X(6).
+                01 WS-D8 PIC X(8).
+                01 WS-Y5 PIC X(5).
+                01 WS-Y7 PIC X(7).
+                """, """
+                ACCEPT WS-D6 FROM DATE.
+                ACCEPT WS-D8 FROM DATE YYYYMMDD.
+                ACCEPT WS-Y5 FROM DAY.
+                ACCEPT WS-Y7 FROM DAY YYYYDDD.
+                DISPLAY WS-D6 "]" WS-D8 "]" WS-Y5 "]" WS-Y7 "]".
+            """),
+            expected: expected,
+            clock: clock,
+            dialect: 2002);
+
     // §14.9.1.4 GR6 + GR9: into an ALPHANUMERIC receiver the MOVE rules apply alphanumerically — the conceptual
     // DAY image "26161" (YYDDD; 2026-06-10 is day 161) left-justifies and truncates on the RIGHT into X(4).
     [Fact]

@@ -81,13 +81,13 @@ internal sealed partial class ControlFlowBinder
     private BoundPerformControl BindVarying(Core.PerformVaryingContext v)
     {
         var levels = new List<VaryingLevel>();
-        if (BindVaryingLevel(v.dataReference(), v.valueOperand(), v.performUntilTarget(), firstLevel: true) is not { } head)
-            return Unsupported($"PERFORM VARYING induction variable '{v.dataReference().GetText()}'");
+        if (BindVaryingLevel(v.receivingIdentifier(), v.valueOperand(), v.performUntilTarget(), firstLevel: true) is not { } head)
+            return Unsupported($"PERFORM VARYING induction variable '{v.receivingIdentifier().GetText()}'");
         levels.Add(head);
         foreach (var a in v.performVaryingAfter())
         {
-            if (BindVaryingLevel(a.dataReference(), a.valueOperand(), a.performUntilTarget(), firstLevel: false) is not { } level)
-                return Unsupported($"PERFORM VARYING AFTER induction variable '{a.dataReference().GetText()}'");
+            if (BindVaryingLevel(a.receivingIdentifier(), a.valueOperand(), a.performUntilTarget(), firstLevel: false) is not { } level)
+                return Unsupported($"PERFORM VARYING AFTER induction variable '{a.receivingIdentifier().GetText()}'");
             levels.Add(level);
         }
         // §14.9.28.4 GR3: an index-name varied/AFTER from an IDENTIFIER FROM whose value is non-positive raises
@@ -147,9 +147,16 @@ internal sealed partial class ControlFlowBinder
     /// <summary>One induction level: the variable is a SET-style target (index-name or data item); the operand
     /// array is [FROM] or [FROM, BY].</summary>
     private VaryingLevel? BindVaryingLevel(
-        Core.DataReferenceContext dref, Core.ValueOperandContext[] ops, Core.PerformUntilTargetContext until,
+        Core.ReceivingIdentifierContext varied, Core.ValueOperandContext[] ops, Core.PerformUntilTargetContext until,
         bool firstLevel)
     {
+        // identifier-2 / identifier-5 is augmented — a RECEIVING operand, so an identifier format that is never one
+        // (SELF, NULL, a view, an address-identifier) is refused by its own rule at the chokepoint (kb/Work PB1551).
+        if (varied.dataReference() is not { } dref)
+        {
+            _ = host.Expr.ResolveReceiving(varied);
+            return null;
+        }
         if (host.Set.SetTargetOf(dref) is not { } var) return null;
         // §14.9.28.4 GR12: "Item identification for identifier-2, identifier-5, index-name-1, or index-name-3 is done each
         // time the content of the data item referenced by the identifier ... is set or augmented", so ControlFlowEmitter

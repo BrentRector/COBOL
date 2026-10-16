@@ -275,7 +275,7 @@ public sealed partial class DataBinder
             {
                 foreach (var ia in invokeUsing.invokeArgument())
                 {
-                    IParseTree? operand = ia.REFERENCE() is not null ? ia.dataReference()
+                    IParseTree? operand = ia.REFERENCE() is not null ? ia.receivingIdentifier()?.dataReference()
                         : ia.CONTENT() is null && ia.VALUE() is null ? ia.arithmeticExpression() : null;
                     if (operand is not null && OperandIdentifier(operand) is { } ih) yield return (ih.Name, ih.Qualifiers, true, false);
                 }
@@ -290,7 +290,8 @@ public sealed partial class DataBinder
             }
             if (node is Core.CallReturningPhraseContext ret)
             {
-                if (HeadOf(ret.dataReference()) is { } rh) yield return (rh.Name, rh.Qualifiers, false, true);
+                if (ret.receivingIdentifier().dataReference() is { } rd && HeadOf(rd) is { } rh)
+                    yield return (rh.Name, rh.Qualifiers, false, true);
                 continue;
             }
             if (node is not Core.CallUsingPhraseContext phrase) continue;
@@ -299,7 +300,7 @@ public sealed partial class DataBinder
             foreach (var arg in phrase.callArgument())
             {
                 IParseTree? operand;
-                if (arg.callByReference() is { } r) { byReference = true; operand = r.dataReference(); }
+                if (arg.callByReference() is { } r) { byReference = true; operand = r.receivingIdentifier()?.dataReference(); }
                 else if (arg.callByContent() is { } c) { byReference = false; operand = c.arithmeticExpression(); }
                 else if (arg.callByValue() is not null) { byReference = null; operand = null; }
                 else operand = byReference is null ? null : arg.arithmeticExpression();

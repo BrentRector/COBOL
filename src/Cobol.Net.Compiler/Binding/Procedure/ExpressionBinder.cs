@@ -748,7 +748,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     // Receiving references resolve through ResolveReceiving below — the ONE
     // receiving-side chokepoint: a report counter receiver is rejected at bind (LINE-COUNTER illegal per ISO
     // §8.4.3.15 SR3; PAGE-COUNTER staged loud) instead of being SILENTLY dropped by .OfType<Place>() (§1.4).
-    public List<Place> ResolveTargets(IEnumerable<Core.DataReferenceContext> targets) =>
+    public List<Place> ResolveTargets(IEnumerable<Core.ReceivingIdentifierContext> targets) =>
         targets.Select(ResolveReceiving).OfType<Place>().ToList();
 
     // ── ROUNDED phrase → rounding mode + receiver resolution (ISO §14.7.4) ───────────────────────────────────
@@ -860,6 +860,72 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         }
     }
 
+    /// <summary>Resolve a <c>receivingIdentifier</c> — the grammar's ONE receiving operand (kb/Work PB1551): a data
+    /// reference resolves through <see cref="ResolveReceiving(Core.DataReferenceContext)"/>, and every identifier
+    /// format the position parses only so that it can be refused (an object-view, SELF, SUPER, NULL, an
+    /// address-identifier) is refused HERE by the row of <see cref="ReceivingOperandForms"/> that names its rule. Null
+    /// means reported, exactly as for a data reference — and for a receiving identifier with no alternative at all,
+    /// which only the parser's error recovery builds and the parser has already reported.</summary>
+    public Place? ResolveReceiving(Core.ReceivingIdentifierContext r) =>
+        r.dataReference() is { } d ? ResolveReceiving(d)
+        : r.nonReceivableIdentifier() is { } n ? RefuseNonReceivable(n)
+        : r.dataAddressIdentifier() is { } a ? RefuseNonReceivable(NonReceivableForm.DataAddress, a)
+        : null;
+
+    /// <summary>SET's twin of <see cref="ResolveReceiving(Core.ReceivingIdentifierContext)"/> (its receiving identifier
+    /// has no data-address alternative: Format 7 spells <c>ADDRESS OF data-name-1</c> as a receiver of its own).</summary>
+    public Place? ResolveReceiving(Core.SetReceivingIdentifierContext r) =>
+        r.dataReference() is { } d ? ResolveReceiving(d)
+        : r.nonReceivableIdentifier() is { } n ? RefuseNonReceivable(n)
+        : null;   // error recovery's empty alternative — the parser reported it
+
+    /// <summary>The receiving data references of a list of <c>receivingIdentifier</c>s, each non-receivable one refused
+    /// by its own rule on the way — the list form of <see cref="ResolveReceiving(Core.ReceivingIdentifierContext)"/>
+    /// for the binders that read the references themselves before resolving them.</summary>
+    internal List<Core.DataReferenceContext> ReceivingReferences(IEnumerable<Core.ReceivingIdentifierContext> receivers)
+    {
+        var refs = new List<Core.DataReferenceContext>();
+        foreach (var r in receivers)
+            if (r.dataReference() is { } d) refs.Add(d);
+            else _ = ResolveReceiving(r);
+        return refs;
+    }
+
+    /// <summary>Refuse a <c>nonReceivableIdentifier</c> by its form's rule. Null: reported.</summary>
+    internal Place? RefuseNonReceivable(Core.NonReceivableIdentifierContext n) =>
+        RefuseNonReceivable(ReceivingOperandForms.FormOf(n), n);
+
+    /// <summary>⛔ A WORD §8.9 LEAVES FREE IS AN UNDECLARED USER WORD, NOT THE PREDEFINED IDENTIFIER (kb/Work PB655's
+    /// determination, the class-condition precedent in ConditionBinder). SELF, SUPER, NULL and ADDRESS are
+    /// reservation-gated: a program that DECLARES one at an edition where §8.9 leaves it free has every occurrence
+    /// retyped to a user-defined word before this parse, so a keyword token that still reaches a receiving position
+    /// there names nothing the program declared — the §8.4.2.1 undefined reference (COBOLNET1639), never a rule about a
+    /// predefined identifier the edition does not have (COBOL-85 has no SELF, NULL or address-identifier).</summary>
+    internal Place? RefuseNonReceivable(NonReceivableForm form, Antlr4.Runtime.ParserRuleContext written)
+    {
+        if (written.Start.Type is CobolLexer.SELF or CobolLexer.SUPER or CobolLexer.NULL_ or CobolLexer.ADDRESS
+            && CobolNames.UpperFold(written.Start.Text) is var head
+            && !Editions.ReservedWordSet.Default.RejectsAt(head, ctx.Edition.Edition.Year))
+        {
+            ctx.Edition.Error(DiagnosticCatalog.UndefinedReference, $"'{head}' is not defined — no declaration in this "
+                + $"source element gives the name '{head}', and §8.9 does not reserve the word at this edition, so it is "
+                + "no predefined identifier here (ISO §8.4.2.1: \"a statement shall contain a reference that uniquely "
+                + "identifies that resource\"). Check the spelling, or declare the item.");
+            return null;
+        }
+        var bar = Bar(form, written);
+        ctx.Edition.Error(bar.Code, bar.Message);
+        return null;
+    }
+
+    /// <summary>The <see cref="ReceivingBar"/> of a <see cref="NonReceivableForm"/> — its table row, naming the operand as
+    /// written (rendered only here, once a prohibition applies: the screens run on every receiver).</summary>
+    private static ReceivingBar Bar(NonReceivableForm form, Antlr4.Runtime.ParserRuleContext written)
+    {
+        var rule = ReceivingOperandForms.Rules[form];
+        return new(rule.Descriptor.Code, rule.Message(DataBinder.WrittenText(written)));
+    }
+
     /// <summary>Whether <paramref name="dref"/>, already resolved (as a SENDING operand) to <paramref name="place"/>,
     /// is "an identifier that is permitted as a receiving operand" — the test ISO §8.4.3.2.4 GR5 a)/b) choose a
     /// function argument's passing manner by. Asks the SAME prohibitions <see cref="ResolveReceiving"/> reports,
@@ -874,18 +940,13 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// input-output control system owns, the predefined EXCEPTION-OBJECT, and a constant-name (a literal).</summary>
     private ReceivingBar? ReceivingFormBar(Core.DataReferenceContext dref)
     {
-        if (dref.LINE_COUNTER() is not null)
-            return new(DiagnosticCatalog.ReportLineCounterReceiving.Code,
-                "LINE-COUNTER shall not be referenced as a receiving operand (ISO §8.4.3.15.3 SR3)");
+        if (dref.LINE_COUNTER() is not null) return Bar(NonReceivableForm.LineCounter, dref);
         // ⛔ THE THIRD ARM OF THE SAME DISPATCH (kb/Work PB489). LINE-COUNTER above is rejected by rule and
         // PAGE-COUNTER is a receiving-capable place (ResolveReceiving resolves it); LINAGE-COUNTER — the only one of the three
         // that is flatly ILLEGAL as a receiver — had no arm at all and fell through to the generic
         // recognized-not-implemented catch-all, so permanently illegal source was reported as a promise. The
         // rule that forbids it appeared nowhere in the compiler (feedback_two_arm_dispatch).
-        if (dref.LINAGE_COUNTER() is not null)
-            return new(DiagnosticCatalog.LinageCounterReceiving.Code,
-                "LINAGE-COUNTER shall not be referenced as a receiving operand (ISO §8.4.3.14.3 SR2); "
-                + "only the input-output control system may change its value (ISO §13.18.34.4 GR7 b)");
+        if (dref.LINAGE_COUNTER() is not null) return Bar(NonReceivableForm.LinageCounter, dref);
         // ⛔ THE FOURTH ARM OF THE SAME DISPATCH (kb/Work PB922). ISO §8.4.3.6.3 SR1 — "EXCEPTION-OBJECT shall
         // not be specified as a receiving operand" — is a rule about EVERY receiving operand in the language,
         // not about SET, which is the one statement that had an arm for it. The name RESOLVES now (the resolver
@@ -896,17 +957,11 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // other, and neither of them the rule the program broke.
         // ⛔ THE RESOLVER'S OWN PREDICATE, NOT A SECOND SPELLING TEST: it carries the §8.9/2002 edition gate, so
         // a '85 program that legally declares `01 EXCEPTION-OBJECT PIC X(4).` keeps its ordinary receiving path.
-        if (ctx.Refs.IsExceptionObjectRegister(dref))
-            return new(DiagnosticCatalog.ExceptionObjectReceiving.Code,
-                "EXCEPTION-OBJECT shall not be specified as a receiving operand (ISO §8.4.3.6.3 SR1) — it is "
-                + "the predefined object reference for the CURRENT exception object (§8.4.3.6.4 GR1), set by the "
-                + "run unit when an exception is raised");
+        if (ctx.Refs.IsExceptionObjectRegister(dref)) return Bar(NonReceivableForm.ExceptionObject, dref);
         // §8.4.3.5.3 SR2 — "An object-view shall not be specified as a receiving operand" — for the view of a qualified data
         // item the grammar spells as one chain (`A OF G AS C`, kb/Work PB1425); the property of a view (`P OF U AS C`) is
-        // a property and receivable (§8.4.3.9.3 SR6), and a view of a plain name parses as `objectViewReceiver`.
-        if (ctx.Refs.IsObjectViewOfQualifiedItem(dref))
-            return new(DiagnosticCatalog.ObjectViewReceiving.Code, $"'{DataBinder.WrittenText(dref)}' is written as a "
-                + "receiving operand: an object-view shall not be specified as a receiving operand (ISO §8.4.3.5.3 SR2)");
+        // a property and receivable (§8.4.3.9.3 SR6), and a view of a plain name parses as a `nonReceivableIdentifier`.
+        if (ctx.Refs.IsObjectViewOfQualifiedItem(dref)) return Bar(NonReceivableForm.ObjectView, dref);
         // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) and a symbolic-character IS one, a
         // figurative constant (§12.3.7.4 GR11 a)) — a literal can never be a receiving operand; without this the name
         // would fall to Refs.Resolve and fail as merely "unresolved" (a symbolic-character did, kb/Work PB1544).
@@ -1008,15 +1063,15 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// (<paramref name="editedOk"/> — GIVING-style positions admit numeric-edited, in-place ones do not);
     /// an unresolvable or rejected reference is dropped after its diagnostic.</summary>
     public List<Receiver> Receivers(IEnumerable<Core.ReceivingArithmeticOperandContext> ops, bool editedOk, string clause) =>
-        ops.Select(o => ResolveReceiving(o.dataReference()) is { } p
-                && ScreenResultant(p, o.dataReference().GetText(), editedOk, clause) is { } sp
+        ops.Select(o => ResolveReceiving(o.receivingIdentifier()) is { } p
+                && ScreenResultant(p, o.receivingIdentifier().GetText(), editedOk, clause) is { } sp
                 ? ReceiverOf(sp, o.roundedPhrase()) : null)
            .OfType<Receiver>().ToList();
 
     /// <summary>Resolve the in-place <c>MULTIPLY … BY</c> receivers (<c>multiplyByOperand</c> = receiving operand +
     /// optional ROUNDED), each carrying its own mode; a literal BY operand (only valid in a GIVING form) is dropped.</summary>
     public List<Receiver> Receivers(IEnumerable<Core.MultiplyByOperandContext> ops) =>
-        ops.Select(o => o.receivingOperand()?.dataReference() is { } d && ResolveReceiving(d) is { } p
+        ops.Select(o => o.receivingOperand()?.receivingIdentifier() is { } d && ResolveReceiving(d) is { } p
                 && ScreenResultant(p, d.GetText(), editedOk: false, "§14.9.26.3 SR1") is { } sp
                 ? ReceiverOf(sp, o.roundedPhrase()) : null)
            .OfType<Receiver>().ToList();
@@ -1024,8 +1079,8 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// <summary>Resolve the <c>COMPUTE</c> Format-1 resultants (<c>computeStore</c> = data reference + optional
     /// ROUNDED) — §14.9.8.3 SR1 admits elementary numeric or numeric-edited.</summary>
     public List<Receiver> Receivers(IEnumerable<Core.ComputeStoreContext> stores) =>
-        stores.Select(s => ResolveReceiving(s.dataReference()) is { } p
-                && ScreenResultant(p, s.dataReference().GetText(), editedOk: true, "§14.9.8.3 SR1") is { } sp
+        stores.Select(s => ResolveReceiving(s.receivingIdentifier()) is { } p
+                && ScreenResultant(p, s.receivingIdentifier().GetText(), editedOk: true, "§14.9.8.3 SR1") is { } sp
                 ? ReceiverOf(sp, s.roundedPhrase()) : null)
               .OfType<Receiver>().ToList();
 
@@ -1387,6 +1442,18 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     public BoundExpr BindIndexNameWindowOperandExpr(IParseTree node, string? positionRule = null) =>
         BindOperandExprCore(node, OperandContext.ArithmeticIndexNameWindow, positionRule);
 
+    /// <summary>§8.8.1.1's refusal of a <c>receivingIdentifier</c> written in an arithmetic statement's SENDING role that
+    /// is not a data reference — an object-view, SELF, SUPER or NULL (class object, or the predefined address), or an
+    /// address-identifier (class pointer): none is "an identifier referencing a numeric data item".</summary>
+    private BoundExpr NotNumericIdentifier(Antlr4.Runtime.ParserRuleContext written)
+    {
+        string what = $"'{DataBinder.WrittenText(written)}'";
+        ctx.Edition.Error("COBOLNET0844", $"{what} is not a numeric operand: ISO §8.8.1.1 admits only an identifier "
+            + "referencing a NUMERIC data item, a numeric literal, or the figurative constant ZERO in an arithmetic "
+            + "expression, and it is an object reference, the predefined NULL or an address.");
+        return BoundExprError.Refused(ctx.Edition, $"{what} in an arithmetic expression (ISO §8.8.1.1)");
+    }
+
     /// <inheritdoc cref="BindOperandExpr"/>
     private BoundExpr BindOperandExprCore(IParseTree node, OperandContext context, string? positionRule = null)
     {
@@ -1412,6 +1479,15 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 // the call UNSCREENED, digit-decoding an alphanumeric function COMPUTE rejected).
                 if (c is Core.FunctionCallContext or Core.InlineMethodInvocationContext)
                     return BindIdentifierOperand((Antlr4.Runtime.ParserRuleContext)c, context);
+                // ⛔ A RECEIVING IDENTIFIER THAT IS NO DATA REFERENCE, READ IN ITS SENDING ROLE (kb/Work PB1551). The
+                // mixed arithmetic rules (ADD / SUBTRACT / DIVIDE's TO / FROM / INTO operand, MULTIPLY's BY operand) are
+                // a `receivingIdentifier` in Format 1 and identifier-2's SENDING operand in Format 2, so a GIVING
+                // statement reads the object-view, SELF, SUPER, NULL or address-identifier the receiving superset
+                // parses. It CONTAINS a data reference (a view's subject, ADDRESS OF's identifier-1), so without this
+                // arm the walk would bind `ADD 1 TO ADDRESS OF X GIVING Y` as plain X. None of them is numeric.
+                if (c is Core.NonReceivableIdentifierContext
+                    || (c is Core.DataAddressIdentifierContext && c.Parent is Core.ReceivingIdentifierContext))
+                    return NotNumericIdentifier((Antlr4.Runtime.ParserRuleContext)c);
                 // ⛔ THE BARE nonNumericLiteral ARM (kb/Work PB171), BEFORE the LiteralContext arm and for a
                 // reason the tree hides: `valueOperand : arithmeticExpression | nonNumericLiteral` names
                 // `nonNumericLiteral` DIRECTLY, bypassing the `literal : numericLiteral | nonNumericLiteral`

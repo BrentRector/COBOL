@@ -16,4 +16,11 @@ if [ "$#" -ne 0 ]; then
     exit 2
 fi
 cd "$(dirname "$0")/.."
-python scripts/run_gate_legs.py
+# THE ONE INTERPRETER (scripts/python-resolve.sh; kb/Work PB1637, PB3197): a bare `python` died `command not found`
+# (exit 127, no verdict line) on a host that has only `python3`. Resolved in a subshell, so a host with no runnable
+# Python ends on the gate's own verdict line, NOT RUN with exit 2 as the driver's NOT RUN does, the reason above it.
+if ! PY="$(. scripts/python-resolve.sh && printf '%s' "$PY")"; then
+    echo "=== BUILD-LOCAL GATE: NOT RUN — python-resolve.sh found no runnable Python (its reason is printed above) ==="
+    exit 2
+fi
+"$PY" scripts/run_gate_legs.py
