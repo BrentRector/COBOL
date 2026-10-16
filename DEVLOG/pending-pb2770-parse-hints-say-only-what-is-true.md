@@ -27,3 +27,13 @@ two misplaced terminators that name their statement), the negative `pb2770-searc
 editions, COBOL0001), and the two `pb758-invoke-end-invoke-*` negatives re-baselined from COBOL0306 to COBOL0001,
 which is what their own headers already said the answer is. No inventory row: no ISO clause governs a diagnostic's
 wording, and every trigger is an illegal program refused both before and after.
+
+Branch review round 1 (finding R1-1) found the design doc's new rule overstated: it said every hint is keyed on token
+types, while hint 4 (COBOL0304) and hint 14's END- exemption still read a token's text. Hint 4 was probed rather than
+documented: it fired when a token's text contained ".MOVE", ".ADD", ".SUBTRACT", ".PERFORM" or ".IF", text no COBOL
+word can hold (ISO §8.3.2.1; `MAIN-PARA.MOVE` lexes as three tokens and the separator rule reports COBOLNET2632), so
+it fired only on literals: `MOVE W-N "A.MOVE"` and `GO TO "PARA.PERFORM".` both read COBOL0304 "Missing period after
+paragraph name — the parser is treating it as a qualified reference.". The hint and its descriptor are deleted, and
+`ParseRecoveryHintTruthTests` gains the two literal rows (which now read COBOL0001 and the COBOL0307 guess). The doc
+names the one remaining spelling test as what it is, a suppression of the missing-period guess, never a hint added
+because of a spelling.

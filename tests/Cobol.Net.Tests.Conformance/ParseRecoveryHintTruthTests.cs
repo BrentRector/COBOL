@@ -33,8 +33,25 @@ public sealed class ParseRecoveryHintTruthTests
         EditionHarness.AssertNoDiagnostic(diagnostics, "COBOL0306");
     }
 
+    /// <summary>
+    /// A literal whose text spells a verb after a period is a literal, not a paragraph name run into a statement: no COBOL
+    /// word can carry a period (ISO §8.3.2.1), so the deleted COBOL0304 hint, keyed on a token's text containing ".MOVE"
+    /// and its siblings, could only ever fire on a literal or a PICTURE string, and there it was false.
+    /// </summary>
     [Theory]
-    [InlineData("PBHT11", "MOVE 1 TO W-N END-IF", "END-IF appears without a matching IF statement.")]
+    [InlineData("PBHT21", "MOVE W-N \"A.MOVE\"")]
+    [InlineData("PBHT22", "GO TO \"PARA.PERFORM\"")]
+    public void ALiteralSpellingPeriodVerb_IsNeverToldAParagraphPeriodIsMissing(string pid, string statement)
+    {
+        var (ok, diagnostics) = EditionHarness.Compile(Program(pid, statement), 2023);
+        Assert.False(ok, $"{pid}: '{statement}' is outside its general format, and it compiled");
+        EditionHarness.AssertNoDiagnostic(diagnostics, "COBOL0304");
+        EditionHarness.AssertNoDiagnostic(diagnostics, "paragraph name");
+        EditionHarness.AssertNoDiagnostic(diagnostics, "qualified reference");
+    }
+
+    [Theory]
+    [InlineData("PBHT11","MOVE 1 TO W-N END-IF", "END-IF appears without a matching IF statement.")]
     [InlineData("PBHT12", "MOVE 1 TO W-N END-SEARCH", "END-SEARCH appears without a matching SEARCH statement.")]
     public void AScopeTerminatorOutsideItsStatement_NamesTheStatement(string pid, string statement, string message)
     {

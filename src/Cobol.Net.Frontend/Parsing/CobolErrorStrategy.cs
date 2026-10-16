@@ -273,10 +273,13 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         if (IsInRule(ruleStack, "moveStatement") && IsIdentifier(token) && prev != null && IsLiteral(prev))
             hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0303, "In a MOVE statement, did you forget TO before the target?", 10));
 
-        // 4. Missing period after paragraph name (shows as qualified name)
-        if (token.Text is { } text && (CobolNames.Contains(text, ".MOVE") || CobolNames.Contains(text, ".ADD")
-            || CobolNames.Contains(text, ".SUBTRACT") || CobolNames.Contains(text, ".PERFORM") || CobolNames.Contains(text, ".IF")))
-            hints.Add(new(Diagnostics.DiagnosticDescriptors.COBOL0304, "Missing period after paragraph name — the parser is treating it as a qualified reference.", 5));
+        // ⛔ NO "MISSING PERIOD AFTER PARAGRAPH NAME" GUESS KEYED ON A TOKEN'S TEXT (kb/Work PB2770, review R1-1). The
+        // COBOL0304 hint that stood here fired when a token's TEXT contained ".MOVE", ".ADD", ".SUBTRACT", ".PERFORM" or
+        // ".IF". No COBOL word can carry a period (ISO §8.3.2.1 limits its characters to letters, digits, hyphen and
+        // underscore, and NAME_BODY lexes exactly that), so `MAIN-PARA.MOVE` is three tokens and the separator rule
+        // reports the unspaced period (COBOLNET2632); the only tokens whose text could match were literals and
+        // PICTURE strings, where `GO TO "PARA.PERFORM".` answered "the parser is treating it as a qualified
+        // reference" — false twice over. The hint is deleted.
 
         // 5. STATUS where IDENTIFIER expected
         if (token.Type == CobolLexer.STATUS && expectedTokens?.Contains("IDENTIFIER") == true)

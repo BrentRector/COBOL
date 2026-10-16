@@ -50,8 +50,8 @@ public static class DiagnosticDescriptors
         "THROUGH/THRU is not recognized in this context. Check PERFORM or VALUE THROUGH syntax.");
     public static readonly DiagnosticDescriptor COBOL0303 = new("COBOL0303", DiagnosticSeverity.Warning,
         "In a MOVE statement, did you forget TO before the target?");
-    public static readonly DiagnosticDescriptor COBOL0304 = new("COBOL0304", DiagnosticSeverity.Warning,
-        "Missing period after paragraph name — the parser is treating it as a qualified reference.");
+    // COBOL0304 ("Missing period after paragraph name") was keyed on a token's text containing ".MOVE" and its
+    // siblings, which only a literal or a PICTURE string can contain; it was deleted by kb/Work PB2770.
     public static readonly DiagnosticDescriptor COBOL0305 = new("COBOL0305", DiagnosticSeverity.Warning,
         "Unexpected token in SPECIAL-NAMES. Check implementor-name or mnemonic-name syntax.");
     public static readonly DiagnosticDescriptor COBOL0306 = new("COBOL0306", DiagnosticSeverity.Warning,
