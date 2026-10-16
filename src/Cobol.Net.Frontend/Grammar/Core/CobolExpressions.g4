@@ -733,7 +733,7 @@ argumentList
 // ⛔ THE ORDER IS THE `invokeArgument` BY-CONTENT ORDER, AND FOR THE SAME MEASURED REASON (CobolOO.g4's PB46
 // note): `arithmeticExpression` SUBSUMES `dataReference` and every numeric literal, so identifier-2 is NOT a
 // separate alternative here — it is recovered IN THE BINDER from a sole-dataReference expression
-// (ConditionBinder.SoleDataReference, the shape OoBindInvokeArg already uses), because the grammar cannot
+// (ConditionBinder.SoleDataReference, the reduction InvocationArg.OfInvokeArgument also asks), because the grammar cannot
 // express "a reference, unless it is part of an expression" without the ambiguity that caused PB46. `literal`
 // precedes it so a non-numeric literal-2 keeps the literal arm — and a numeric literal that is the LEFT OPERAND of an
 // operator does not (`{!numericLiteralIsLeftOperand()}?`, kb/Work PB1135 / decision R59: `O :: "M" (5 + 1)` is ONE
