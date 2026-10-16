@@ -1,4 +1,4 @@
-## PB3168: text of a fixed-form continuation line in area A is refused at --std 85 (COBOLNET3735) — the logical conversion asks, as a front-end error
+## Entry 2070 — 2026-10-16 06:53 PDT — PB3168: text of a fixed-form continuation line in area A is refused at --std 85 (COBOLNET3735) — the logical conversion asks, as a front-end error
 
 **Re-probe (w1085f, base f5fec711b).** `E:/COBOL-coord/scratch/w1078f/probe/pc.cob` (a continued literal whose opening
 quotation symbol stands in column 11) compiled at `--std 85`; so did a hyphen line holding only a period in column 10
@@ -53,3 +53,4 @@ the pass's doc comment and the note now give the real reason. `ContinuationLineH
 also asserts `Outcome.FrontendError`, so the once-only claim is pinned to the mechanism that provides it. Sibling found
 while there: the reference-format detector spelled the hyphen indicator `'-'` a second time and now reads
 `FixedFormLine.ContinuationIndicator`.
+
