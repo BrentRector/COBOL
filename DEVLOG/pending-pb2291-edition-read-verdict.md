@@ -69,4 +69,6 @@ this entry said the rule finds 17 parser superclass reads; the first round's `Re
 included the `DialectLevel` setter shim, which the round-1 fix deleted, so the pin has recorded 16 since. Both texts
 now say 16, and the note names `RecordedMembers` as the list of record (checked: 16 parser, 4 lexer and 3 retype names
 and 23 site keys in `EditionReadDriftTests.cs`). No code or test changed: the test computes the set and compares it
-with the record itself, so a second copy of the count in a test would only be one more place to go stale.
+with the record itself, so a second copy of the count in a test would only be one more place to go stale. Merging main brought PB3022's
+`[Trait("Sweep", "tree")]` rule, and `drift_rules.py --sweeps` lists `EditionReadDriftTests` (it scans every C#
+member of `src/` and every grammar), so the class now carries the trait and the gate's tier 0c runs it on every change.

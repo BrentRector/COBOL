@@ -58,6 +58,7 @@ namespace CobolNet.Tests.Unit;
 /// Removing one is a change to this table, which is the point: the table is the verdict, and the test keeps it equal
 /// to the code.</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class EditionReadDriftTests
 {
     /// <summary>PB2291's two outcomes for a site.</summary>
