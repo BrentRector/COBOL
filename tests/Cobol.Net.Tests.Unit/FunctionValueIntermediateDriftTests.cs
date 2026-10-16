@@ -30,6 +30,7 @@ namespace CobolNet.Tests.Unit;
 /// <c>FUNCTION LENGTH</c> measures and IN-ARITHMETIC-RANGE tests, DOC-A.1-92), so only those two readers may ask for
 /// it; a statement-level intermediate that reads it again is this defect again.</para>
 /// </remarks>
+[Trait("Sweep", "tree")]
 public sealed class FunctionValueIntermediateDriftTests : CobolNetTestBase
 {
     /// <summary>The generated C# field an intermediate result item is declared as — the type is the carrier.</summary>

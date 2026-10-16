@@ -165,7 +165,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     {
         if (IntrinsicResultType.IsIntegerOperand(c)) return IntegerFunctionValuePic;
         var receivers = use.Receivers;
-        if (ReturnsBinary64(c) || receivers is { Count: > 0 } && receivers.All(r => r is not RefModPlace && r.Item.OperandPic is { IsFloat: true }))
+        if (ReturnsBinary64(c) || receivers is { Count: > 0 } && receivers.All(r => r.DenotedItem is not null && r.Item.OperandPic is { IsFloat: true }))
             return Binary64ReturnedValuePic;
         return receivers is { Count: > 0 } ? ShapedPic(receivers) : use.AsText ? FunctionValuePic : ValueOperandPic;
     }
@@ -210,8 +210,9 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         {
             // A reference-modified receiver is the elementary ALPHANUMERIC unique data item of §8.4.3.3.4 GR6, never
             // the numeric item under it; an index or object receiver has no description to size by.
-            var pic = receiver is RefModPlace ? null : receiver.Item.OperandPic;
-            if (receiver is not RefModPlace && pic is null) continue;
+            bool slice = receiver.DenotedItem is null;
+            var pic = slice ? null : receiver.Item.OperandPic;
+            if (!slice && pic is null) continue;
             sized = true;
             if (pic is null) { scale = Math.Max(scale, ReturnedFractionDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
             else if (pic.IsFloat) { scale = Math.Max(scale, PicInfo.ScaledCarrierDigits - ReturnedIntegerDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
