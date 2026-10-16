@@ -1041,7 +1041,6 @@ CobolNet.Runtime.Exceptions.ExceptionEngine.ProgramArgOmittedChecking.set -> voi
 CobolNet.Runtime.Exceptions.ExceptionEngine.ProgramArgOmittedError(string! detail) -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.PushAllCheckingOff() -> CobolNet.Runtime.Exceptions.CheckingFlags
 CobolNet.Runtime.Exceptions.ExceptionEngine.PushPerformFrame(CobolNet.Runtime.Exceptions.PerformFrame! f) -> void
-CobolNet.Runtime.Exceptions.ExceptionEngine.RaisePerformFloor() -> int
 CobolNet.Runtime.Exceptions.ExceptionEngine.RangeIndexChecking.get -> bool
 CobolNet.Runtime.Exceptions.ExceptionEngine.RangeIndexChecking.set -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.RangeIndexError(string! detail) -> void
@@ -1084,7 +1083,6 @@ CobolNet.Runtime.Exceptions.ExceptionEngine.ReportVaryingChecking.get -> bool
 CobolNet.Runtime.Exceptions.ExceptionEngine.ReportVaryingChecking.set -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.ReportVaryingError(string! detail) -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.RestoreChecking(CobolNet.Runtime.Exceptions.CheckingFlags saved) -> void
-CobolNet.Runtime.Exceptions.ExceptionEngine.RestorePerformFloor(int floor) -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.RunTopFrame(string! ec, string? file, out bool handled) -> int
 CobolNet.Runtime.Exceptions.ExceptionEngine.SaveChecking() -> CobolNet.Runtime.Exceptions.CheckingFlags
 CobolNet.Runtime.Exceptions.ExceptionEngine.Set(string! name, bool fatal, string? statement = null, string? location = null) -> void
@@ -2811,8 +2809,6 @@ static CobolNet.Runtime.CobolLocaleEdit.DeEdit(string! content, string! picture,
 static CobolNet.Runtime.CobolLocaleEdit.Format(System.Int128 unscaled, int valueScale, string! picture, string? localeTag, int size, bool blankWhenZero = false) -> string!
 static CobolNet.Runtime.CobolLocaleEdit.TryFormat(System.Int128 unscaled, int valueScale, string! picture, string? localeTag, int size, out string! edited, bool blankWhenZero = false) -> bool
 static CobolNet.Runtime.CobolModule.Name(int kind) -> string!
-static CobolNet.Runtime.CobolModule.Pop() -> void
-static CobolNet.Runtime.CobolModule.Push(string! name, string! outermost, bool isNested) -> void
 static CobolNet.Runtime.CobolModule.Stack.get -> CobolNet.Runtime.ModuleStack!
 static CobolNet.Runtime.CobolNames.Comparer.get -> System.StringComparer!
 static CobolNet.Runtime.CobolNames.Contains(System.ReadOnlySpan<char> text, System.ReadOnlySpan<char> part) -> bool
@@ -3262,7 +3258,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.OoUniversalChecking.set -> voi
 static CobolNet.Runtime.Exceptions.ExceptionState.OrderNotSupportedChecking.get -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.OrderNotSupportedChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.OrderNotSupportedError(string! detail) -> void
-static CobolNet.Runtime.Exceptions.ExceptionState.PerformDepth.get -> int
 static CobolNet.Runtime.Exceptions.ExceptionState.PerformVaryingChecking.get -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.PerformVaryingChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.PerformVaryingIndexError(long value, string! detail) -> void
@@ -3272,7 +3267,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.ProgramArgOmittedChecking.set 
 static CobolNet.Runtime.Exceptions.ExceptionState.ProgramArgOmittedError(string! detail) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.PushAllCheckingOff() -> CobolNet.Runtime.Exceptions.CheckingFlags
 static CobolNet.Runtime.Exceptions.ExceptionState.PushPerformFrame(CobolNet.Runtime.Exceptions.PerformFrame! f) -> void
-static CobolNet.Runtime.Exceptions.ExceptionState.RaisePerformFloor() -> int
 static CobolNet.Runtime.Exceptions.ExceptionState.RangeIndexChecking.get -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.RangeIndexChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.RangeIndexError(string! detail) -> void
@@ -3314,7 +3308,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.ReportVaryingChecking.get -> b
 static CobolNet.Runtime.Exceptions.ExceptionState.ReportVaryingChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.ReportVaryingError(string! detail) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.RestoreChecking(CobolNet.Runtime.Exceptions.CheckingFlags saved) -> void
-static CobolNet.Runtime.Exceptions.ExceptionState.RestorePerformFloor(int floor) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.RunTopFrame(string! ec, string? file, out bool handled) -> int
 static CobolNet.Runtime.Exceptions.ExceptionState.SaveChecking() -> CobolNet.Runtime.Exceptions.CheckingFlags
 static CobolNet.Runtime.Exceptions.ExceptionState.Set(string! name, bool fatal, string? statement = null, string? location = null) -> void
@@ -3348,7 +3341,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.StorageNotAvailError(string! d
 static CobolNet.Runtime.Exceptions.ExceptionState.SubscriptError(string! detail) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.TakePropagatedObject(out CobolNet.Runtime.CobolObject? obj) -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.TakeRaisedPropagation(string! activatorChecking, out string! name, out bool fatal) -> bool
-static CobolNet.Runtime.Exceptions.ExceptionState.TrimPerformTo(int depth) -> void
 static CobolNet.Runtime.ExternalDescriptor.operator !=(CobolNet.Runtime.ExternalDescriptor? left, CobolNet.Runtime.ExternalDescriptor? right) -> bool
 static CobolNet.Runtime.ExternalDescriptor.operator ==(CobolNet.Runtime.ExternalDescriptor? left, CobolNet.Runtime.ExternalDescriptor? right) -> bool
 static CobolNet.Runtime.ExternalStore.Cell(string! name, System.Func<CobolNet.Runtime.StorageCell!>! create) -> CobolNet.Runtime.StorageCell!

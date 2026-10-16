@@ -501,11 +501,8 @@ public sealed class ProgramTable
         var exc = excState;
         int savedActivator = exc.ActivatorExternalMask;
         exc.ActivatorExternalMask = activatingExternalMask;   // captured before resolution (GR3e)
-        // Per-activation scope for the Format-3 exception-checking PERFORM interceptor (ISO §14.9.28.4): snapshot
-        // the frame-stack depth so a called program's raise is NOT intercepted by the caller's active WHEN frame
-        // (the cross-activation GR1 "in range" reading is a documented STAGED item). TrimPerformTo on return also
-        // balances the stack if the callee unwound abnormally past its own pops.
-        int savedPerformDepth = exc.PerformDepth;
+        // The exception-checking PERFORM's WHEN frames need nothing here: the Modules.Push above IS their boundary
+        // (ExceptionEngine.RunTopFrame stops at a frame another activation pushed; kb/Work PB442).
         // Per-activation scope for the §14.6.13.1.4 #3 selector of a NONFATAL condition raised at a RUNTIME site
         // (kb/Work PB367b): the declaratives that qualify are the ACTIVATED element's (§14.9.49.4 GR3 analyzes
         // "the USE statements in the source element", GR4 a) "the source element that contains the statement that
@@ -561,7 +558,6 @@ public sealed class ProgramTable
         {
             n.Active--; _owner.Modules.Pop();
             exc.ActivatorExternalMask = savedActivator;
-            exc.TrimPerformTo(savedPerformDepth);
             exc.NonfatalDispatcher = savedNonfatalDispatcher;
             exc.RestoreChecking(savedChecking);
             if (freshInstance)

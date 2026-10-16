@@ -13,9 +13,10 @@ contiguous free block 1597-1617 (batch 2 used 1585-1596). -->
 > ## ⚙ FULLY IMPLEMENTED — the RUNTIME INTERCEPTOR LANDED 2026-07-22 (DEVLOG 970); §9 IS THE AS-BUILT SSOT (READ IT FIRST)
 > Both halves are DONE. The front half landed 2026-07-20 (recognize/validate/diagnose/gate, DEVLOG 940); the **pc-range
 > RUNTIME interceptor landed 2026-07-22** (the F3 PERFORM compiles and runs — GR17-22; the 0899 program-path staging is
-> lifted). **§9 below is the decision-complete AS-BUILT design (the implementation SSOT).** The residual staged sub-GAPs
-> (each a loud COBOLNET0899, never silent) are: the open-mode WHEN operand form, F3-PERFORM-inside-a-method, the
-> cross-CALL GR1 "in range" reading, the `>>PROPAGATE` directive, and an exception-OBJECT raise inside imp-1 (§9.7). EC-FLOW-USE left that list when kb/Work PB368 gave §14.9.49.4 GR2 its raise site.
+> lifted). **§9 below is the decision-complete AS-BUILT design (the implementation SSOT).** One sub-form stays
+> staged, loudly: an exception-OBJECT raise inside imp-1 (§9.7). The open-mode WHEN operand, F3-PERFORM-inside-a-method,
+> EC-FLOW-USE (kb/Work PB368) and `>>PROPAGATE` have landed, and the WHEN's reach across a CALL or INVOKE is decided
+> rather than staged: it stops at the activation boundary (§9.2; kb/Work PB442, docs/CONFORMANCE.md §3 D-F3S).
 > An 8-agent scout of the actual tree surfaced several places the original plan under-specified reality — each reconciled
 > from the spec, not improvised. The **current-state design home is `COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN.md` D12**;
 > the body below is the original front-half plan, corrected by these notes (point 6 below is SUPERSEDED by §9):
@@ -470,6 +471,11 @@ Full legacy guard (`scripts/guard-fast.sh`) green before each commit (shared `.g
 
 ## 8. AS-BUILT RUNTIME SEAM MAP (2026-07-21 runtime scout `wf_ddb8dd1e-0f7` — persisted for the Track-③ resume; trust over re-derivation)
 
+> ⚠ **The F3 frame stack below is the pre-interceptor scout, SUPERSEDED BY §9.2.** Its `Stack<PerformFrame>`, the
+> matcher's `fatal` parameter and the `ProgramTable.CallProgram` depth snapshot (`PerformDepth`/`TrimPerformTo`, "§3"
+> and "§4" below) were not built as written: §9.2 is the as-built runtime, and kb/Work PB442 replaced the snapshot
+> with the activation boundary. The seams it maps outside the frame stack (the raise-site funnel, `__RunUse`) stand.
+
 > The binder is COMPLETE; the emitter `ControlFlowEmitter.EmitExceptionPerform` (`:64`) is a STUB (imp1 + FINALLY only). The interceptor's central seam is the ONE funnel below. The two findings that survived the scout (raise-site funnel + the F3-frame-stack home) are the two load-bearing ones; the dispatch protocol / ResumeSignal / `__RunUse` / BoundExceptionPerform shape are documented in §5.2 + §5.5 above and read directly this session.
 
 ### Dispatch protocol + __RunUse/ResumeSignal
@@ -843,38 +849,43 @@ public sealed class PerformFrame
     /// or NoMatch when no WHEN/OTHER selects (ec,file). file==null for a non-I-O condition. (ISO §14.9.28.4 GR17-19.)
     public required Func<string /*ec*/, string? /*file*/, int> Matcher { get; init; }
     public bool Handling { get; set; }                   // GR21 transparency
-    public const int NoMatch = int.MinValue;             // distinct from -1/-2/-3 and any pc
+    internal long Activation { get; set; }               // stamped by PushPerformFrame — the activation boundary
+    public const int NoMatch = int.MinValue;             // distinct from every DispatchResult action and any pc
 }
 ```
 
-**`ExceptionEngine` additions** (`ExceptionState.cs`) — a List-backed stack (so `RunTopFrame` can index it) + the
-nesting-correct top-down walk:
+**`ExceptionEngine` additions** (`ExceptionState.cs`) — a List-backed stack (so `RunTopFrame` can index it), the
+push that stamps the activation, and the nesting-correct top-down walk that stops at the activation boundary:
 ```csharp
 private readonly List<PerformFrame> _perform = new();
-public void PushPerformFrame(PerformFrame f) => _perform.Add(f);
-public void PopPerformFrame()               => _perform.RemoveAt(_perform.Count - 1);
-internal int  PerformDepth => _perform.Count;
-internal void TrimPerformTo(int d) { while (_perform.Count > d) _perform.RemoveAt(_perform.Count - 1); }
+public void PushPerformFrame(PerformFrame f)
+{
+    f.Activation = _activations?.CurrentActivation ?? 0;   // ModuleStack.CurrentActivation — never the emitted code
+    _perform.Add(f);
+}
+public void PopPerformFrame() => _perform.RemoveAt(_perform.Count - 1);
 
 /// Select and run the innermost matching WHEN handler (ISO §14.9.28.4 GR17 — the closest exception-checking PERFORM
-/// whose imperative-statement-1 is executing; GR21 — a frame is transparent to ECs raised while it is handling).
-/// Frames tried in THIS resolution stay marked Handling until it completes, so an EC raised inside a selected
-/// (outer) handler is not re-caught by a skipped inner frame whose imp-1 is suspended.
+/// whose imperative-statement-1 is executing in THIS activation; GR21 — a frame is transparent to ECs raised while
+/// it is handling). Frames tried in THIS resolution stay marked Handling until it completes, so an EC raised inside
+/// a selected (outer) handler is not re-caught by a skipped inner frame whose imp-1 is suspended.
 public int RunTopFrame(string ec, string? file, out bool handled)
 {
     handled = false;
     var marked = new List<PerformFrame>(4);              // per-raise (EC path is rare); re-entrancy-safe
+    long running = _activations?.CurrentActivation ?? 0;
     try
     {
-        for (int i = _perform.Count - 1; i >= 0; i--)    // innermost → outermost
+        for (int i = _perform.Count - 1; i >= 0; i--)    // innermost → the running activation's outermost frame
         {
             var f = _perform[i];
+            if (f.Activation != running) break;          // the activator's frames: reached only by propagation
             if (f.Handling) continue;                    // GR21 — its own imp-1/handler is transparent
             f.Handling = true; marked.Add(f);            // deferred clear ⇒ stays Handling for the whole walk
             int a = f.Matcher(ec, file);                 // runs imp-2 (+COMMON) synchronously iff it matches
             if (a != PerformFrame.NoMatch) { handled = true; return a; }
         }
-        return PerformFrame.NoMatch;                      // → caller falls to __EcDispatch (USE) / -3
+        return PerformFrame.NoMatch;                      // → caller falls to __EcDispatch (USE) / NoHandler
     }
     finally { foreach (var f in marked) f.Handling = false; }
 }
@@ -890,10 +901,13 @@ public int RunTopFrame(string ec, string? file, out bool handled)
 public sealed class ExitPerformSignal(int id) : Exception { public int Id { get; } = id; }
 ```
 
-**CALL boundary** (`ProgramTable.CallProgram`, mirroring `ExternalCheckMask` at `ProgramTable.cs:152-161`):
-`int __d = exc.PerformDepth;` before `inst.Call(...)`, `exc.TrimPerformTo(__d);` in the `finally`. Per-activation
-scope (safe default; cross-CALL GR1 "in range" stays STAGED). A propagated EC at a CALL site in imp-1 still hits the
-intact caller frame (§14.9.33.4 GR2a2).
+**Activation boundary** (kb/Work PB442, superseding the depth snapshot and the method floor first built here; the
+`Activation` stamp and the `break` in the block above): `ExceptionEngine.PushPerformFrame` stamps each frame with `ModuleStack.CurrentActivation`, and `RunTopFrame`
+stops at the first frame another activation pushed. Every activation mechanism (CALL, function activation, nested
+CALL, every method) pushes a ModuleStack frame, so none can forget the boundary; `ProgramTable.CallProgram` and the
+method body carry no frame-stack code. A propagated EC at a CALL site in imp-1 is raised in the activator after the
+callee's frame is popped, so it meets the caller's frame (§14.9.33.4 GR2a2). The reading is docs/CONFORMANCE.md §3
+D-F3S: dynamic within the activation, bounded by it.
 
 ### 9.3 Generated emit shapes (literal C#)
 
@@ -1123,13 +1137,13 @@ walled; every bounded `__RunUse`/PERFORM passes its own `__exitPc`, so PERFORM o
 ✅ **The open-mode WHEN operand form LANDED** (`WHEN EXCEPTION INPUT|OUTPUT|I-O|EXTEND` — GR3b, tier 1: matches an
 EC-I-O whose file is currently open in that mode via `CobolFile.OpenModeOf(__f)`; an OPEN-failure's mode is
 best-effort). ✅ **F3 PERFORM inside an OO method LANDED** (the pc-slice wiring, §9.10 IMPLEMENTED — the
-`F3StagedInMethodStub` 0899 is lifted). Remaining staged (kept explicit): cross-CALL / cross-INVOKE GR1 "in range"
-(the per-activation `TrimPerformTo`/frame-FLOOR default isolates the callee from the activator's frames — the
-cross-activation "in range" reading is the future opt-in, §5.4-2 / §9.10.1-C2);
-`>>PROPAGATE` (§5.4-4 — ✅ **its EC-FLOW-USE half LANDED**, kb/Work PB368: §14.9.49.4 GR2 now raises from
-the ONE `__RunUse` guard through `EcDispatchExpr`, which is `__EcPerform` in an F3 unit, so the condition meets
-the active frames under GR17 before the USE declaratives — only the `>>PROPAGATE` DIRECTIVE is still
-unimplemented); exception-OBJECT raise inside imp-1 (`ObjDispatchExpr`/`__EcObjDispatch` untouched, §5.4-5). NOTE: editing the single `EcDispatchExpr` funnel DOES
+`F3StagedInMethodStub` 0899 is lifted). The cross-CALL / cross-INVOKE reach is DECIDED, not staged (kb/Work PB442; docs/CONFORMANCE.md §3 D-F3S): the
+WHEN stops at the activation boundary, which every frame records (the activation-boundary paragraph in §9.2).
+✅ **`>>PROPAGATE` LANDED** (§5.4-4): its EC-FLOW-USE half is kb/Work PB368 — §14.9.49.4 GR2 raises from the ONE
+`__RunUse` guard through `EcDispatchExpr`, which is `__EcPerform` in an F3 unit, so the condition meets the active
+frames under GR17 before the USE declaratives — and the directive itself is the "Automatic propagation" design in
+`docs/COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN.md`. Remaining staged (kept explicit): exception-OBJECT raise inside
+imp-1 (`ObjDispatchExpr`/`__EcObjDispatch` untouched, §5.4-5). NOTE: editing the single `EcDispatchExpr` funnel DOES
 sweep the `PtrEmitter`/`CallEmitter` sibling sites through the frame — reconcile the §8 doc to record them as SWEPT
 (more correct than §5.4-2's "un-swept" claim).
 
@@ -1137,7 +1151,7 @@ sweep the `PtrEmitter`/`CallEmitter` sibling sites through the frame — reconci
 
 | # | Increment | Lands | Gate |
 |---|---|---|---|
-| **1** | **Runtime-additive** | `PerformFrame`; `ExceptionEngine._perform` (List) + `Push/Pop/RunTopFrame/PerformDepth/TrimPerformTo`; `ExceptionState` delegators; `ExitPerformSignal`; `ProgramTable.CallProgram` snapshot+`TrimPerformTo`. | Runtime unit tests (`RunTopFrame` walk: innermost-wins, GR21 transparency, deferred-clear nesting, NoMatch on empty). Byte-identity trivial (nothing emitted references them). |
+| **1** | **Runtime-additive** | `PerformFrame`; `ExceptionEngine._perform` (List) + `Push/Pop/RunTopFrame/PerformDepth/TrimPerformTo`; `ExceptionState` delegators; `ExitPerformSignal`; `ProgramTable.CallProgram` snapshot+`TrimPerformTo`. (The snapshot, `PerformDepth` and `TrimPerformTo` are deleted: kb/Work PB442 replaced them with §9.2's activation boundary.) | Runtime unit tests (`RunTopFrame` walk: innermost-wins, GR21 transparency, deferred-clear nesting, NoMatch on empty). Byte-identity trivial (nothing emitted references them). |
 | **2** | **Gating flag flow** | `EcFeatures.HasF3Perform` (+`.Any`), `BuildFeatures`, `EcState.UnitHasF3Perform`, `ProgramEmitter`/`OoEmitter` wiring; `BoundProgram.F3HandlerBasePc`/`F3HandlerOwners` (always null yet). | Characterization byte-identity (flag unused). |
 | **3** | **Funnel + `__EcPerform` + `__IoCheckEc` frame-first**, behind `UnitHasF3Perform`; outer+inner `EmitUseMachinery` gate widening; `__EcPerform`/`__RunF3` emission; `__useActive` sizing. All dead (no F3 accepted). | Characterization byte-identity + a hand-written USE-F3-declarative fixture proving the non-F3 funnel/`__IoCheckEc` text is unchanged. |
 | **4** | **pc-range synthesis + tier matcher + un-reject (program path)** | `AddF3Handler`/side-list; `StatementBinder` append + `F3HandlerBasePc`/`Owners`; node reshape (`BoundExceptionMatch`+`Imp2Pc`, `Other/CommonPc`, `PerformId`, `HandlerHasExit`); `EcBindExceptionPerform` redirect + drop 0899 (program) + `F3StagedInMethodStub` (OO); `EmitExceptionPerform` frame install + tier-sorted matcher + **the F3Region/BoundExitPerform machinery** (fold Incr 6 in to avoid the bare-`break` infinite-loop hazard); the wall; `UsageCollectionPass`/`BoundStores` reconciliation. | Behavior tests: WHEN name-list match; **tier precedence** (`WHEN EC-ALL … WHEN EC-SIZE`→EC-SIZE; `WHEN EC-BOUND … WHEN EC-BOUND-SUBSCRIPT`→L3); OTHER; COMMON after imp-2 and imp-3; nonfatal resume-in-place; fatal terminate; **I/O WHEN preempts a matching USE**; GR21 re-raise-in-handler→USE; nested F3 outer-handles-inner; EXIT PERFORM (imp-1/handler/FINALLY + nested inline PERFORM breaks inner loop). **Full legacy guard + GnuCOBOL differential.** Characterization byte-identity for non-F3. |
@@ -1346,7 +1360,10 @@ the referenced local function to a closure method; per-activation ref-captured l
   floor — the cross-CALL "in range" reading stays the documented STAGED item, §5.4-2, unchanged). NEW probe P6: an F3
   method whose imp-1 INVOKEs a second F3 method that raises an EC the inner's WHEN does not match — confirm the inner's
   EC does NOT reach the outer method's WHEN (falls to the inner's own default), and confirm a raise in the inner F3
-  method's ORDINARY code (outside any imp-1) sees no frame.
+  method's ORDINARY code (outside any imp-1) sees no frame. **SUPERSEDED (kb/Work PB442):** the floor under-realized the same default it was built for — only a method
+  holding an F3 PERFORM raised it, so a CALLed program and an ordinary method still ran the activator's WHEN whenever
+  their raise sites consulted the stack. Each frame now records its activation and `RunTopFrame` stops at the first
+  foreign one (§9.2's activation-boundary paragraph); the floor and `TrimPerformTo` are deleted.
 - **C3 (MINOR — see the M2/M3 emitter-changes note above):** the scope-parameterized `__RunUse` must render
   `dispatch.DispatchName`, not the hardcoded literal `__Dispatch`.
 

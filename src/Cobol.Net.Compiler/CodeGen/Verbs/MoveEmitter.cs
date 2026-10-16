@@ -128,15 +128,16 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // space-padded (kb/Work PB1655). The figurative word's fill char is category-aware
                 // (national/boolean = the D-N3 pin, not the PCS extreme).
                 var rmp = (RefModPlace)target;
-                // ⛔ OperandPic, NOT raw `Pic` — THE SECOND ARM of kb/Work PB173's pad defect (its twin is
-                // PlaceRenderer.Write's RefModPlace boolean pad). `Pic` is null for any GROUP, so a
+                // ⛔ The slice's CLASS, NOT the inner item's raw `Pic` — THE SECOND ARM of kb/Work PB173's pad defect
+                // (its twin is PlaceRenderer.Write's RefModPlace boolean pad). `Pic` is null for any GROUP, so a
                 // figurative fill into a BIT-GROUP slice chose the alphanumeric SPACE instead of the boolean
-                // zero §14.6.8.6 requires. `OperandPic` answers the as-if PICTURE 1(m) of §13.18.29.4 GR1b —
-                // the ONE category reader, the same one RefModPlace.Category uses.
+                // zero §14.6.8.6 requires. ClassOfPlace reads RefModPlace.Category, which answers the as-if
+                // PICTURE 1(m) of §13.18.29.4 GR1b, and CharacterContext projects the class (kb/Work PB442).
                 ctx.Writer.Line(source switch
                 {
                     BoundFigurative fig => PlaceRenderer.WriteFill(rmp,
-                        FigurativeConstants.FillText(fig.Kind, ctx.Data.Collating, rmp.Inner.Item.OperandPic?.Category, ctx.Data.NationalCollating)),
+                        FigurativeConstants.FillText(fig.Kind, ctx.Data.Collating,
+                            IntrinsicArgumentRules.CharacterContext(IntrinsicArgumentRules.ClassOfPlace(rmp)), ctx.Data.NationalCollating)),
                     BoundAllLiteral all => PlaceRenderer.WriteFill(rmp, CsLiteral(all.Literal)),
                     _ => PlaceRenderer.Write(rmp, OperandText.AsString(source, num)),
                 });
@@ -707,6 +708,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         CobolRounding rounding = CobolRounding.Truncation)
     {
         var pic = target.OperandPic!;   // an elementary receiver's picture, or a bit / national group's as-if picture (D20/PB79)
+        // The figurative's CATEGORY is the receiver's character context — §14.9.25.4 GR7 Table 17, i.e. its Table 2
+        // CLASS (kb/Work PB442): a numeric-edited USAGE NATIONAL receiver makes HIGH-/LOW-VALUE NATIONAL.
+        var figContext = IntrinsicArgumentRules.CharacterContext(IntrinsicArgumentRules.ClassOfItem(target));
         // A DYNAMIC LENGTH receiver (ISO §8.5.1.10.4 / §13.18.19): store the sender's DISPLAY image, replacing the
         // old content, with the new length = the SENDING length TRUNCATED ON THE RIGHT to the LIMIT and NO padding
         // (the minimum length is zero, §13.18.19.4 GR1). A figurative constant OTHER THAN `ALL literal` has a
@@ -736,7 +740,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             // Category-aware fill: a national/boolean receiver's HIGH/LOW-VALUE reads its OWN sequence — the
             // explicit national PCS extremes when declared, else the D-N3 pin — never the ALPHANUMERIC
             // program collating sequence's extreme (§8.3.3.6 GR6/GR7 over the national sequence).
-            return $"new string({FigurativeConstants.Fill(f.Kind, ctx.Data.Collating, pic.Category, ctx.Data.NationalCollating)}, {wN})";
+            return $"new string({FigurativeConstants.Fill(f.Kind, ctx.Data.Collating, figContext, ctx.Data.NationalCollating)}, {wN})";
         // ALL "literal" repeats the literal to the receiver width (ISO §8.3.3.6.4 GR2). An ANY LENGTH
         // receiver's width exists only at runtime — repeat at runtime, then width-fit (§13.18.2 GR1).
         if (source is BoundAllLiteral a && pic.Category is not PicCategory.Numeric && !pic.IsCharacterEdited)
@@ -762,7 +766,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             string aeSrc = source switch
             {
                 BoundFigurative ff =>
-                    $"new string({FigurativeConstants.Fill(ff.Kind, ctx.Data.Collating, pic.Category, ctx.Data.NationalCollating)}, {pic.Length})",
+                    $"new string({FigurativeConstants.Fill(ff.Kind, ctx.Data.Collating, figContext, ctx.Data.NationalCollating)}, {pic.Length})",
                 BoundAllLiteral al => CsLiteral(EmitText.RepeatToWidth(al.Literal, pic.Length)),
                 _ => OperandText.AsString(source, num, deSign: true),
             };
