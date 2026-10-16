@@ -27,7 +27,7 @@ public static partial class ReferenceFormatProcessor
     /// reserved for process-internal use and never in interchanged text — so no comment a programmer writes can be
     /// mistaken for a debugging line (kb/Work PB1350: the printable <c>*&gt; DEBUG:</c> carrier made a genuine
     /// <c>*&gt; DEBUG: …</c> comment take part in matching).</summary>
-    public static readonly string DebugLineCarrier = "*>" + (char)0xFDD0 + "DEBUG ";
+    public static readonly string DebugLineCarrier = CobolSourceText.CommentIndicator + (char)0xFDD0 + "DEBUG ";
 
     /// <summary>Minimum percentage of lines that must match fixed-form pattern for detection.</summary>
     private const int FixedFormThresholdPercent = 60;
