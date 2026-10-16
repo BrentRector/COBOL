@@ -80,6 +80,7 @@ from __future__ import annotations
 
 import argparse
 import dataclasses
+import functools
 import importlib.util
 import json
 import math
@@ -528,43 +529,60 @@ def release_dispatch(coord_dir: pathlib.Path, selector: str) -> list[dict[str, A
     return gone
 
 
-def note_file_set(text: str, fc: Any, idx: dict, exts: list[str], callers: Callable[[str], set[str]] | None) -> set[str]:
-    """ONE note's file set: every site its text names (paths, bare file names, Type.Member and bare type names,
-    whatever the score) plus the callers the member index computes for it (PB2118 Draft 8, J2)."""
-    return set(fc.sites(text, idx, exts)) | (callers(text) if callers else set())
+@dataclasses.dataclass(frozen=True)
+class IndexPolicy:
+    """WHICH member index a declared file set is computed on: THE index of the tree (member_index.current: a committed
+    or cached record whose treeKey is the tree's, else one regenerated into `cache_dir`, else, with `regenerate` off, a
+    refusal). One policy for every reader, passed explicitly (kb/Work PB3203): the planner's admission and the landing
+    check's guarantee are the same quantity, and the landing check's copy once read the newest COMMITTED index, which
+    cannot see a file or type a landing added (PB2118 Draft 9, the eighth refuter's K1 (3)). Regenerating costs a
+    solution build plus the census host (110 s measured on a cold worktree, 2026-10-16), paid at most once per tree."""
+    cache_dir: pathlib.Path
+    regenerate: bool = True
+
+    @classmethod
+    def of(cls, coord_dir: pathlib.Path, regenerate: bool = True) -> "IndexPolicy":
+        """The coordination directory's cache, `<coord>/member-index` (DESIGN-architecture-review §8.7)."""
+        return cls(coord_dir / "member-index", regenerate)
 
 
-def member_callers(repo: pathlib.Path = REPO, cache_dir: pathlib.Path | None = None,
-                   regenerate: bool = True) -> Callable[[str], set[str]]:
-    """scripts/arch/member_index.py's computation as a function of a note's text (the index loaded and the drifted
-    files read once). With `cache_dir` (the planner) the index is THE index of this tree (member_index.current: found,
-    regenerated into `cache_dir`, or refused when `regenerate` is off): a stale index cannot see a file or type a
-    landing added (PB2118 Draft 9, the eighth refuter's K1 (3)). Without it (computed_file_set: the landing check's
-    and the spec renderer's fallback) the newest committed index plus drift and folder expansion. A missing index is
-    a refusal."""
+def declared_sets(repo: pathlib.Path, policy: IndexPolicy) -> Callable[[str], set[str]]:
+    """THE declared file set of a note, as a function of its text (DESIGN-architecture-review §8.7; kb/Work PB3242,
+    PB3203): its STRUCTURED sites (work.note_sites, the one reader) and every caller the member index finds of the
+    names it moves or changes (member_index.note_file_set), on the index `policy` names. The index and the drifted files
+    are read once, and only when a note needs them (a note that names what it moves or changes, or a restructuring
+    note): a fix-lane plan whose notes declare only sites never builds one. A missing or refused index is a refusal."""
     sys.path.insert(0, str(HERE.parent / "arch"))   # this script's own member_index, whatever tree it measures
     import member_index  # noqa: PLC0415
-    index = (member_index.current(repo, cache_dir, regenerate) if cache_dir is not None
-             else member_index.load(repo))
-    drifted = member_index.drifted_files(index, repo)
+
+    @functools.cache
+    def index() -> dict:
+        return member_index.current(repo, policy.cache_dir, policy.regenerate)
+
+    @functools.cache
+    def drifted() -> dict[str, str]:
+        return member_index.drifted_files(index(), repo)
+
     return lambda text: set(member_index.note_file_set(text, repo, index, drifted)["files"])
 
 
-def computed_file_set(repo: pathlib.Path, ids: list[str]) -> set[str]:
-    """The file set of these notes COMPUTED NOW (note_file_set over the newest committed member index, no cache): the
-    declared set of work the ledger never recorded (landing_check.py) and of a rendered group whose groups file
-    carries no `file_set` (make_dispatch_specs.py). The one computation; a note that is not a kb/Work file adds
-    nothing."""
-    cfg = coord.rules()["campaign"]
-    fc = load_fix_clusters()
-    exts = [e.strip() for e in cfg["ext"].split(",") if e.strip()]
-    idx = fc.source_index([repo / s for s in cfg["src"] if (repo / s).is_dir()], exts, cfg["exclude_dir"], repo)
-    callers = member_callers(repo)
+def computed_file_set(repo: pathlib.Path, ids: list[str], policy: IndexPolicy) -> set[str]:
+    """The declared file set of these notes computed NOW (declared_sets over their kb/Work files): the set of work the
+    dispatch ledger never recorded (landing_check.py) and of a rendered group whose groups file carries no `file_set`
+    (make_dispatch_specs.py). A note that is not a kb/Work file adds nothing."""
+    declared = declared_sets(repo, policy)
     out: set[str] = set()
     for i in ids:
         if (f := repo / "kb" / "Work" / f"{i}.md").is_file():
-            out |= note_file_set(f.read_text(encoding="utf-8", errors="replace"), fc, idx, exts, callers)
+            out |= declared(f.read_text(encoding="utf-8", errors="replace"))
     return out
+
+
+def collision_set(primary: str, declared: list[set[str]]) -> list[str]:
+    """A group's file set, the one the partition checks (kb/Work PB3242): its notes' declared sets plus its primary
+    file, for the fix lane and a campaign alike. The fix lane's prose-scored sites (fix_clusters' `files`) rank and
+    group its notes and never enter it."""
+    return sorted(set().union(*declared) | ({primary} - {""}))
 
 
 def file_set_collisions(files: list[str] | set[str], busy: dict[str, set[str]]) -> list[str]:
@@ -657,6 +675,17 @@ def run_fix_clusters(status: str, out: pathlib.Path, rules: dict[str, Any]) -> d
     return json.loads(out.read_text(encoding="utf-8"))
 
 
+def declare_fix_lane(clusters: list[dict[str, Any]], declared: Callable[[str], set[str]], work_dir: pathlib.Path) -> None:
+    """Give each fix-lane cluster its collision set (kb/Work PB3242): fix_clusters.py's `files` are the sites its
+    scored reading of the notes' prose found (every path and Type.Member a note mentions), which rank and group the
+    lane's notes; the partition checks the notes' DECLARED sets plus the cluster's primary file instead
+    (collision_set), so a note that discusses a file it does not change never holds a group back."""
+    for c in clusters:
+        texts = [(work_dir / f"{n['id']}.md") for n in c["notes"]]
+        c["files"] = collision_set(c["file"], [declared(f.read_text(encoding="utf-8", errors="replace"))
+                                              for f in texts if f.is_file()])
+
+
 def load_fix_clusters() -> Any:
     """The public submodule's fix_clusters.py as a module: a campaign reuses its site index and clustering (never a
     fork of them) over a wider tree than .agent-fleet.json gives the fix lane."""
@@ -669,21 +698,22 @@ def load_fix_clusters() -> Any:
 
 
 def campaign_clusters(view: dict[str, Any], notes: dict[str, Note], texts: dict[str, str], rules: dict[str, Any],
-                      fc: Any, repo: pathlib.Path, callers: Callable[[str], set[str]] | None = None
+                      fc: Any, repo: pathlib.Path, declared: Callable[[str], set[str]]
                       ) -> tuple[list[dict], list[dict], dict[str, list[str]], dict[str, str]]:
     """A campaign's plannable notes as fix_clusters-shaped clusters: `(open, half, deps, waiting)`.
 
     `view` is work.cluster_order(): every open note of the cluster in blocked_by order. A note is PLANNABLE when it is
     ready, or when every note it waits on is plannable (then plan() runs it after them, `deps`); every other note is
-    `waiting`, with the reason. Plannable notes are clustered by the code sites their text names (fix_clusters'
-    `sites` and `cluster`, over model_rules.json `campaign.src` / `ext` / `exclude_dir`), one topological depth at a
-    time so a cluster never mixes a blocker with what it blocks; a note naming no site is a group of its own, ordered
-    by its blocked_by chain. A cluster's `files`, the set the partition checks, is every site of its notes whatever
-    its score (fix_clusters keeps only scores of 2 and up, which dropped a bare type name: the seventh refuter, J3)
-    plus each note's computed callers (`callers(text)`, member_index; PB2118 Draft 8, J2), which never steer the
-    clustering itself. The clusters holding one dependent's blockers merge when they share a depth and fit the
-    cap, so the dependent can follow one successor chain. `texts` is {note: its file text}."""
-    cfg, cap = rules["campaign"], rules["wave"]["max_notes_per_group"]
+    `waiting`, with the reason. Plannable notes are clustered on their DECLARED sites (kb/Work PB3242: the files of
+    their site blocks, work.note_sites, each at fix_clusters' path weight, through fix_clusters' `cluster`), never on
+    what their prose mentions (57 of PB1754's 63 ready notes DISCUSS plan_wave.py and landing_check.py, and the prose
+    scan planned zero groups), one topological depth at a time so a cluster never mixes a blocker with what it blocks;
+    a note declaring no site file is a group of its own, ordered by its blocked_by chain. A cluster's `files`, the set
+    the partition checks, is collision_set: its notes' declared sets (`declared(text)`, declared_sets: the sites plus
+    the member index's callers of what each note moves or changes; PB2118 Draft 8, J2), which never steer the
+    clustering itself, plus its primary file. The clusters holding one dependent's blockers merge when they share a
+    depth and fit the cap, so the dependent can follow one successor chain. `texts` is {note: its file text}."""
+    cap = rules["wave"]["max_notes_per_group"]
     plannable: dict[str, dict] = {}
     waiting: dict[str, str] = {}
     for r in view["notes"]:  # topological order: every blocker is decided before what it blocks
@@ -693,14 +723,11 @@ def campaign_clusters(view: dict[str, Any], notes: dict[str, Note], texts: dict[
             plannable[r["id"]] = r
         else:
             waiting[r["id"]] = "waiting on " + ", ".join(w for w in r["waiting_on"] if w not in plannable)
-    exts = [e.strip() for e in cfg["ext"].split(",") if e.strip()]
-    roots = [repo / s for s in cfg["src"] if (repo / s).is_dir()]
-    idx = fc.source_index(roots, exts, cfg["exclude_dir"], repo) if plannable else {}
     tiers: dict[str, dict[int, list[dict]]] = {"open": {}, "half": {}}
     for nid, r in plannable.items():
         entry = {"id": nid, "area": r["area"], "harm": notes[nid].harm, "title": r["title"][:140],
-                 "sites": fc.sites(texts[nid], idx, exts),
-                 "fileset": note_file_set(texts[nid], fc, idx, exts, callers)}
+                 "sites": {p: 3 for p in work.note_sites(texts[nid]).paths if (repo / p).is_file()},
+                 "fileset": declared(texts[nid])}
         tiers["half" if r["status"] == "half" else "open"].setdefault(r["depth"], []).append(entry)
     out: dict[str, list[dict]] = {"open": [], "half": []}
     for key, by_depth in tiers.items():
@@ -709,7 +736,7 @@ def campaign_clusters(view: dict[str, Any], notes: dict[str, Note], texts: dict[
             cl = fc.cluster([n for n in ns if n["sites"]], cap)
             cl += [{"file": "", "harm": n["harm"], "files": [], "notes": [n]} for n in ns if not n["sites"]]
             for c in cl:
-                c["files"] = sorted(set().union(*(n["fileset"] for n in c["notes"])) | ({c["file"]} - {""}))
+                c["files"] = collision_set(c["file"], [n["fileset"] for n in c["notes"]])
                 c["depth"] = d
                 c["notes"] = [{k: n[k] for k in ("id", "area", "harm", "title")} for n in c["notes"]]
             out[key] += cl
@@ -1229,6 +1256,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_fix_clusters(status, cdir / f"clusters-{status}.json", rules)["clusters"]
 
     deps, waiting, campaign = None, {}, ""
+    # THE declared set of a note, one index policy for every plan (kb/Work PB3203): THE index of this tree
+    declared = declared_sets(REPO, IndexPolicy.of(cdir, regenerate=not a.no_index_regenerate))
     if a.cluster:
         view = work.cluster_order(work.load(), a.cluster)
         if not view["named"]:
@@ -1239,9 +1268,8 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         texts = {r["id"]: f.read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n")
                  for r in view["notes"] if (f := REPO / "kb" / "Work" / f"{r['id']}.md").is_file()}
-        clusters, half_clusters, deps, waiting = campaign_clusters(
-            view, notes, texts, rules, load_fix_clusters(), REPO,
-            callers=member_callers(REPO, cdir / "member-index", regenerate=not a.no_index_regenerate))
+        clusters, half_clusters, deps, waiting = campaign_clusters(view, notes, texts, rules, load_fix_clusters(), REPO,
+                                                                   declared)
         coord.write_json(cdir / f"clusters-campaign-{a.cluster}.json",
                          {"cluster": a.cluster, "open": clusters, "half": half_clusters, "deps": deps, "waiting": waiting})
         campaign = f" — CAMPAIGN {a.cluster}"
@@ -1250,6 +1278,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         clusters = fix_clusters("open", a.clusters_json)
         half_clusters = fix_clusters("half", a.half_clusters_json)
+        declare_fix_lane(clusters + half_clusters, declared, REPO / "kb" / "Work")
     reports_dir = pathlib.Path(a.reports) if a.reports else coord.reports_dir(a.coord)
     reports = load_reports(reports_dir)
     if a.no_branches:

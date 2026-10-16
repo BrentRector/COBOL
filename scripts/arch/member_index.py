@@ -17,17 +17,21 @@ programs call), the authored files that write its name as C# TEXT (`emitted`: th
 This script records that at one commit as frozen evidence (`docs/rearchitecture/evidence/arch-census/<sha>.members.json.gz`,
 with every walked file's git blob id), and answers queries against the CURRENT tree:
 
-  * a note's NAMES: every name on its `**Moves or changes:**` line and every documentation id in a code span
-    (`M:Ns.T.Member(...)`, the Delete notes' sites), PLUS every word of its target paragraph that is a member of a
-    type the note names or its sites declare (`Options` in PB2296's target is `DataBinder.Options`: a hand-listed
-    line missed it, the eighth refuter's K1); a note naming none falls back to every type DECLARED in the files and
-    folders its sites name (a Move/rename note's folder, an Extract note's class files) — the conservative set;
+  * a note's SITES and NAMES, read by ONE reader, `scripts/spec/work.py` `note_sites` (kb/Work PB3242): the paths of
+    its site blocks (Code site / Site / Sites), and every name on its `**Moves or changes:**` line, its `r2_members:`
+    line and every documentation id in a site block (`M:Ns.T.Member(...)`, the Delete notes' sites); never a path in
+    its prose. PLUS every word of its target paragraph that is a member of a type the note names or its sites declare
+    (`Options` in PB2296's target is `DataBinder.Options`: a hand-listed line missed it, the eighth refuter's K1); a
+    RESTRUCTURING note (a `**Wave kind:**`) naming none falls back to every type DECLARED in the files and folders its
+    sites name (a Move/rename note's folder, an Extract note's class files) — the conservative set; a fix-lane note
+    naming none declares its sites only (its fix goes there; it renames nothing);
   * their CALLERS: the index's files for each name (a type with its nested types and declaring files; a member with
-    its type's declaring files; the emitters writing either as text), plus every tracked file under a FOLDER a site
-    names, on the current tree, plus DRIFT: every tracked `.cs` under src/ or tests/ whose blob differs from the
-    index's (or that is new since) is scanned for each name's last segment as a whole word and included on a hit;
-    files deleted since drop out. Drift widens the callers of a name the index KNOWS; it cannot see a type a landing
-    ADDED (the index never named it), which is why the planner never plans on a stale index;
+    its type's declaring files; the emitters writing either as text), plus every tracked code file under a FOLDER a
+    site names, on the current tree, plus DRIFT: every tracked `.cs` under src/ or tests/ whose blob differs from the
+    index's (or that is new since) is scanned for each KNOWN name's last segment as a whole word and included on a
+    hit; files deleted since drop out. Drift widens the callers of a name the index KNOWS (an unknown name has none);
+    it cannot see a type a landing ADDED (the index never named it), which is why the planner never plans on a stale
+    index;
   * a name the index does not know is UNKNOWN and reported (a typo or a renamed member is a failure, not a smaller set).
 
 CURRENCY (the eighth refuter's K1 (3): PB833 added `IO/Sharing/OfdRegionLocks.cs` inside PB2251's site folder after
@@ -39,10 +43,10 @@ cache directory (the coordination directory's `member-index/`), or, with regener
 GUARANTEE is the landing check (`scripts/orchestrator/landing_check.py`, run by `enqueue.py land`), which compares each
 landing's ACTUAL diff with its declared set and with every in-flight branch (DESIGN-architecture-review §8.7).
 
-Callers: `plan_wave.py --cluster` adds a note's callers to its sites before the collision check (`file_set_collisions`),
-`file_census_notes.py` renders them as the note's "files this step edits", `work.py check` fails an open PB2119
-note whose names are unknown, and the dispatch guard's hand-dispatch record uses `load()` (the newest committed
-record plus drift and folder expansion: fast, and widening only; a hook has 90 seconds).
+Callers: `plan_wave.declared_sets` (the planner's collision check, `file_set_collisions`, the spec renderer's and the
+landing check's computed set, all on THE index of the tree: kb/Work PB3203) returns `note_file_set`'s `files`, and
+`work.py check` fails an open PB2119 note whose names are unknown (on `load()`: the newest committed record, a check
+bounded by time).
 
 Usage:
     python scripts/arch/member_index.py --record            # build Cobol.Net.sln, run the host, write the record for HEAD
@@ -64,6 +68,9 @@ from pathlib import Path
 from typing import Callable
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.append(str(Path(__file__).resolve().parents[1] / "spec"))
+import work  # noqa: E402  (note_sites: THE reader of a note's structured sites and names, kb/Work PB3242)
+
 RECORD_DIR = Path("docs/rearchitecture/evidence/arch-census")
 SUFFIX = ".members.json.gz"   # gzip: the index names every symbol (about 4.5 MB as text)
 HOST = Path("tools/ArchCensus")
@@ -76,17 +83,8 @@ FROZEN = ("⛔ FROZEN EVIDENCE — the member index of ONE commit, recorded by s
           "describes the tree `treeKey` names and no other: the planner plans only on the index of its own tree "
           "(member_index.current); drift re-scanning widens the callers of the names it knows but cannot see a type "
           "added since (the eighth refuter's K1).")
-MOVES_LINE = re.compile(r"^\*\*Moves or changes:\*\*(.*)$", re.M)
 TARGET_PARA = re.compile(r"^\*\*This note's target[^*]*\*\*(.*)$", re.M)
 TARGET_WORD = re.compile(r"(?<![A-Za-z0-9_])([A-Z][A-Za-z0-9_]+)(?![A-Za-z0-9_])")
-CODE_SPAN = re.compile(r"`([^`]+)`")
-DOC_ID = re.compile(r"`[MPFETN]:([^`\s@]+)")
-SITE_PATH = re.compile(r"`((?:src|tests)/[^`\s:#]+)")
-
-
-def name_of_doc_id(text: str) -> str:
-    """`Ns.T.M(args)~Ret` (after the `M:` prefix) → `Ns.T.M(args)`, the index's key form (one entry per overload)."""
-    return text.split("~", 1)[0]
 
 
 def simple(name: str) -> str:
@@ -251,14 +249,14 @@ def types_declared_in(index: dict, paths: list[str]) -> list[str]:
                   if any(f == r or f.startswith(r + "/") for f in _files(index, "types", t) for r in roots))
 
 
-def target_names(text: str, index: dict, named: list[str]) -> list[str]:
+def target_names(text: str, index: dict, named: list[str], sites: tuple[str, ...]) -> list[str]:
     """The members a note's TARGET paragraph names: every capitalized word of it that is a member of a SUBJECT type
-    (a type the note's names are members of, or are, or a type its sites declare). Mechanical, so a hand-listed Moves
+    (a type the note's names are members of, or are, or a type its `sites` declare). Mechanical, so a hand-listed Moves
     line cannot leave out what the target says moves (PB2296's `Options`, the eighth refuter's K1 (1))."""
     m = TARGET_PARA.search(text)
     if not m:
         return []
-    subjects = set(types_declared_in(index, sorted(set(SITE_PATH.findall(text)))))
+    subjects = set(types_declared_in(index, list(sites)))
     for n in named:
         for k in keys_for(index, n):
             base = simple(k)
@@ -270,28 +268,38 @@ def target_names(text: str, index: dict, named: list[str]) -> list[str]:
     return out
 
 
-def note_names(text: str, index: dict) -> tuple[list[str], str]:
-    """(the names a note moves or changes, how they were found): its `**Moves or changes:**` line and the
-    documentation ids in its code spans, plus the members its target paragraph names (target_names); else every type
-    declared in the files and folders its sites name."""
-    names = []
-    if m := MOVES_LINE.search(text):
-        names += [s.strip() for s in CODE_SPAN.findall(m.group(1))]
-    names += [name_of_doc_id(d) for d in DOC_ID.findall(text)]
+def needs_index(sites: work.NoteSites) -> bool:
+    """Whether a note's declared set reads the index at all: it names what it moves or changes, or it is a
+    restructuring note (a `**Wave kind:**`) whose sites declare the types it moves. A fix-lane note's sites are only
+    where its fix goes, so its set is its sites and never every caller of every type declared there."""
+    return bool(sites.names) or bool(sites.wave and sites.paths)
+
+
+def note_names(text: str, index: dict, sites: work.NoteSites | None = None) -> tuple[list[str], str]:
+    """(the names a note moves or changes, how they were found): the names its structured fields declare
+    (work.note_sites: its `**Moves or changes:**` line, its `r2_members:` line and the documentation ids of its site
+    blocks), plus the members its target paragraph names (target_names); else, for a restructuring note, every type
+    declared in the files and folders its sites name; else none."""
+    sites = sites or work.note_sites(text)
+    names = list(sites.names)
     if names:
         have = {simple(n) for n in names}
-        derived = [n for n in target_names(text, index, names) if n not in have]
+        derived = [n for n in target_names(text, index, names, sites.paths) if n not in have]
         return sorted(dict.fromkeys(names + derived)), "declared" + (" and its target" if derived else "")
-    return types_declared_in(index, sorted(set(SITE_PATH.findall(text)))), "types declared in its sites"
+    if sites.wave:
+        return types_declared_in(index, list(sites.paths)), "types declared in its sites"
+    return [], "no names (a fix-lane note: its sites only)"
 
 
-def folder_files(text: str, repo: Path = REPO) -> set[str]:
-    """Every tracked .cs file under a FOLDER the note's sites name, on the current tree: a file a landing added inside
-    a site folder belongs to the note whatever the index knew (PB2251's OfdRegionLocks.cs, the eighth refuter's K1)."""
-    folders = [p.rstrip("/") for p in dict.fromkeys(SITE_PATH.findall(text)) if (repo / p).is_dir()]
+def folder_files(sites: tuple[str, ...], repo: Path = REPO) -> set[str]:
+    """Every tracked CODE file (the campaign domain's, coord.CampaignDomain.partitioned) under a FOLDER among a note's
+    `sites`, on the current tree: a file a landing added inside a site folder belongs to the note whatever the index
+    knew (PB2251's OfdRegionLocks.cs, the eighth refuter's K1)."""
+    folders = [p for p in sites if (repo / p).is_dir()]
     if not folders:
         return set()
-    return {p for p in git("ls-files", "--", *folders, cwd=repo).splitlines() if p.endswith(".cs")}
+    code = work.campaign_domain().partitioned
+    return {p for p in git("ls-files", "--", *folders, cwd=repo).splitlines() if code(p)}
 
 
 def drift_hits(names: list[str], drifted: dict[str, str]) -> set[str]:
@@ -315,21 +323,34 @@ def drifted_files(index: dict, repo: Path = REPO) -> dict[str, str]:
 
 def callers(index: dict, names: list[str], repo: Path = REPO, drifted: dict[str, str] | None = None
             ) -> tuple[set[str], list[str]]:
-    """(every file a change to `names` must edit, on the CURRENT tree; the unknown names)."""
+    """(every file a change to `names` must edit, on the CURRENT tree; the unknown names). Drift widens only the names
+    the index KNOWS: an unknown name (a typo, or a script's dotted name the C# index never holds) has no callers to
+    widen, and its last segment (`main`) read as a word in every drifted file was a caller of nothing."""
     files, unknown = resolve(index, names)
     drifted = drifted_files(index, repo) if drifted is None else drifted
-    files |= drift_hits(names, drifted)
+    files |= drift_hits([n for n in names if n not in unknown], drifted)
     return {f for f in files if (repo / f).is_file()}, unknown
 
 
-def note_file_set(text: str, repo: Path = REPO, index: dict | None = None,
-                  drifted: dict[str, str] | None = None) -> dict:
-    """{names, how, unknown, files} of one note: what plan_wave adds to its sites, what file_census_notes renders."""
-    index = load(repo) if index is None else index
-    names, how = note_names(text, index)
-    files, unknown = callers(index, names, repo, drifted)
-    files |= folder_files(text, repo)
-    return {"names": names, "how": how, "unknown": unknown, "files": sorted(files), "index": index["commit"]}
+def note_file_set(text: str, repo: Path = REPO, index: dict | Callable[[], dict] | None = None,
+                  drifted: dict[str, str] | Callable[[], dict[str, str]] | None = None) -> dict:
+    """{sites, names, how, unknown, files, index} of one note: its DECLARED file set (DESIGN-architecture-review §8.7;
+    kb/Work PB3242), what plan_wave.declared_sets returns and file_census_notes renders. `files` is its structured
+    sites (work.note_sites: the files they name, and every tracked code file under a folder they name) plus every
+    caller the index finds of the names it moves or changes. The index (`index`, or a function returning it, called only
+    when needs_index; default the newest committed record) is read only for a note that names what it moves or
+    changes, or a restructuring note; `drifted` likewise (default drifted_files)."""
+    sites = work.note_sites(text)
+    files = {p for p in sites.paths if not (repo / p).is_dir()} | folder_files(sites.paths, repo)
+    names, how, unknown, commit = [], "no names (a fix-lane note: its sites only)", [], None
+    if needs_index(sites):
+        idx = index() if callable(index) else (load(repo) if index is None else index)
+        names, how = note_names(text, idx, sites)
+        found, unknown = callers(idx, names, repo, drifted() if callable(drifted) else drifted)
+        files |= found
+        commit = idx["commit"]
+    return {"sites": list(sites.paths), "names": names, "how": how, "unknown": unknown, "files": sorted(files),
+            "index": commit}
 
 
 # ── self-test ──────────────────────────────────────────────────────────────────────────────────────────────────
@@ -365,31 +386,45 @@ def self_test() -> int:
     check("every overload", resolve(idx, ["N.Sym.Go"])[0], {"src/A/Sym.cs", "src/A/Use.cs"})
     # an unknown name is reported, never silently dropped
     check("unknown", resolve(idx, ["N.Binder.Typo"]), (set(), ["N.Binder.Typo"]))
-    # the explicit line and documentation ids win over the fallback
-    text = "**Moves or changes:** `N.Binder.Pending`, `N.Sym.Flag`\n- `M:N.Binder.Inner.X(System.Int32)~N.T @ src/A/Binder.cs:1`"
+    # the explicit line and the site blocks' documentation ids win over the fallback; a doc id in prose is no name
+    text = ("**Wave kind:** delete.\n\n**Sites:**\n- `M:N.Binder.Inner.X(System.Int32)~N.T @ src/A/Binder.cs:1`\n\n"
+            "**Moves or changes:** `N.Binder.Pending`, `N.Sym.Flag`\n\nAs `M:N.Sym.Unused` showed, prose names nothing.")
     check("declared", note_names(text, idx), (["N.Binder.Inner.X(System.Int32)", "N.Binder.Pending", "N.Sym.Flag"],
                                               "declared"))
-    # the fallback: types declared in the site files and folders
-    check("fallback-file", note_names("- `src/A/Binder.cs:12`", idx), (["N.Binder", "N.Binder.Inner"],
-                                                                     "types declared in its sites"))
-    check("fallback-folder", note_names("- folder `src/A`", idx)[0], ["N.Binder", "N.Binder.Inner", "N.Sym"])
+    # the fallback, for a RESTRUCTURING note only: types declared in the site files and folders
+    move = "**Wave kind:** move.\n\n**Sites:**\n"
+    check("fallback-file", note_names(move + "- `src/A/Binder.cs:12`", idx), (["N.Binder", "N.Binder.Inner"],
+                                                                            "types declared in its sites"))
+    check("fallback-folder", note_names(move + "- folder `src/A`", idx)[0], ["N.Binder", "N.Binder.Inner", "N.Sym"])
+    # a fix-lane note (no wave kind, no names) declares its sites only and never reads the index (PB3242): the
+    # callers of every type declared in its site would make every fix-lane group collide
+    def no_index():
+        raise AssertionError("a fix-lane note read the member index")
+    fs = note_file_set("**Code site.** `src/A/Binder.cs#Pending` (the arm)", root, index=no_index, drifted=no_index)
+    check("fix-lane-sites-only", (fs["files"], fs["names"], fs["index"]), (["src/A/Binder.cs"], [], None))
     # drift: a file changed since the index that names a member is included; a deleted file drops out
     files, unknown = callers(idx, ["N.Sym.Flag"], root, drifted={"src/A/Use.cs": "x.Flag = 1;", "src/B/New.cs": "Flagged"})
     check("drift", (files, unknown), ({"src/A/Sym.cs", "src/B/Emit.cs", "src/A/Use.cs"}, []))
+    # drift widens KNOWN names only: an unknown name's last segment (a script's `main`) is a caller of nothing (PB3242)
+    check("drift-unknown", callers(idx, ["scripts.orchestrator.plan_wave.main"], root,
+                                   drifted={"src/A/Use.cs": "static void main() {}"}),
+          (set(), ["scripts.orchestrator.plan_wave.main"]))
     # emitted text (K1 (2)): an emitter writing a runtime type's or member's name as C# text is a caller of it
     idx["emitted"] = {"N.Binder.Inner": [3], "N.Sym.Flag": [4]}
     check("emitted-type", "src/B/Emit.cs" in resolve(idx, ["N.Binder.Inner"])[0], True)
     check("emitted-nested", "src/B/Emit.cs" in resolve(idx, ["N.Binder"])[0], True)
     check("emitted-member", "tests/T.cs" in resolve(idx, ["N.Sym.Flag"])[0], True)
     # the target paragraph (K1 (1)): a member of a subject type the target names joins the hand-listed line
-    text = ("- `src/A/Sym.cs`" + chr(10) + "**This note's target (§8.3), step 1 of 2:** the scoped Flag moves; Unused "
+    text = ("**Sites:**" + chr(10) + "- `src/A/Sym.cs`" + chr(10) + chr(10) + "**This note's target (§8.3), step 1 of 2:** the scoped Flag moves; Unused "
             "stays; Pending is another type's" + chr(10) + "**Moves or changes:** `N.Sym.Go`")
     check("target", note_names(text, idx), (["N.Sym.Flag", "N.Sym.Go", "N.Sym.Unused"], "declared and its target"))
     # folder sites expand on the current tree (K1 (3)): a file added under a site folder after the index joins
     (root / "src/A/Added.cs").write_text("// new", encoding="utf-8", newline="\n")
     subprocess.run(["git", "init", "-q"], cwd=root, check=True)
     subprocess.run(["git", "add", "-A"], cwd=root, check=True)
-    check("folder", "src/A/Added.cs" in folder_files("- folder `src/A`", root), True)
+    check("folder", "src/A/Added.cs" in folder_files(("src/A",), root), True)
+    fs = note_file_set("**Sites:**\n- folder `src/A/`", root, index=no_index, drifted=no_index)
+    check("folder-declared", "src/A/Added.cs" in fs["files"] and "src/A" not in fs["files"], True)
     # currency (K1 (3)): the planner's index is the one whose treeKey is this tree's, else regenerated, else refused
     subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c0"], cwd=root, check=True)
     key = tree_key(root)
@@ -417,7 +452,8 @@ def self_test() -> int:
         check("landing-makes-stale", "no refusal", "refusal")
     except StaleIndex:
         check("landing-makes-stale", True, True)
-    check("docid", name_of_doc_id("N.T.M``1(System.Int32)~N.R"), "N.T.M``1(System.Int32)")
+    check("docid", work.note_sites("**Sites:**\n- `M:N.T.M(System.Int32)~N.R @ src/A/T.cs:3`").names,
+          ("N.T.M(System.Int32)",))
     check("simple", simple("N.T`1.M``1(System.Int32)"), "N.T.M")
     print(f"=== MEMBER INDEX SELF-TEST: PASS ({len(checks)} checks: {', '.join(checks)}) ===")
     return 0

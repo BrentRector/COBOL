@@ -8,6 +8,7 @@ directory).
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import json
 import os
 import pathlib
@@ -34,6 +35,30 @@ RULES_PATH = pathlib.Path(__file__).resolve().with_name("model_rules.json")
 def rules(path: pathlib.Path | None = None) -> dict[str, Any]:
     """model_rules.json: the routing, cost and quota constants budget.py and plan_wave.py share."""
     return json.loads((path or RULES_PATH).read_text(encoding="utf-8"))
+
+
+@dataclasses.dataclass(frozen=True)
+class CampaignDomain:
+    """model_rules.json `campaign`, parsed ONCE (kb/Work PB3203): the code roots a note's sites may name
+    (work.note_sites reads a site path only under one of them), the extensions, and the directories that hold corpora
+    or generated output. `partitioned` is the file-set partition's domain (landing_check.py): a CODE file under a
+    root (an extension but `.md`: a document both sides edit is a text merge) outside every excluded directory."""
+    roots: tuple[str, ...]
+    exts: tuple[str, ...]
+    exclude_dir: frozenset[str]
+
+    def partitioned(self, path: str) -> bool:
+        return (path.startswith(tuple(r + "/" for r in self.roots))
+                and path.endswith(tuple(e for e in self.exts if e != ".md"))
+                and not self.exclude_dir & set(path.split("/")[:-1]))
+
+
+def campaign(rules_doc: dict[str, Any] | None = None) -> CampaignDomain:
+    """THE campaign domain of model_rules.json (or of an already-read `rules_doc`)."""
+    cfg = (rules_doc or rules())["campaign"]
+    return CampaignDomain(tuple(r.strip("/") for r in cfg["src"]),
+                          tuple(e.strip() for e in cfg["ext"].split(",") if e.strip()),
+                          frozenset(cfg["exclude_dir"]))
 
 
 def family(model: str) -> str:
