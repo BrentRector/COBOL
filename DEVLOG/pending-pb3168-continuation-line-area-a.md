@@ -33,3 +33,11 @@ hyphen line (checked with the period case). Free form has no areas and no hyphen
 spelled in the line classifier and is now `FixedFormLine.ContinuationIndicator`. Semgrep counts unchanged.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,627 · Unit 497 · Characterization 30 … Conformance 6,083/11,710 · Unit 33,176/33,673 · Characterization 6/36 cases ran (skipped 0) in 1 of 2 leg(s)` (run `20261015T205724Z-624491`).
+
+**Review finding R1-1 (citation).** The branch review found that the unit test helper `FirstPartOfContinuedLiteral`
+cited §6.3.5 2) for its continuation line; item 2) is the FLOATING indicator case, and the test continues the literal
+with a FIXED hyphen, which is item 1). The doc comment now cites §6.3.5 1) for the fixed indicator and quotes the
+paragraph common to both items for the continuation line ("the next line that is not a comment line or a blank line is
+the continuation line", `cite.py --check 6.3.5` OK). The same misnumbering stands at about 40 older sites that cite
+§6.3.5's unnumbered paragraphs as item 2), because `cite.py`'s printed rule path assigns a paragraph that follows the
+list to its last item; that sweep is filed as a lead, not widened into this landing.

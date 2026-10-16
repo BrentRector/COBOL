@@ -157,7 +157,9 @@ public sealed class AreaPlacementPassTests
     private static string C(string programText) => "      -" + programText;
 
     /// <summary>The first 52 characters of a literal: positions 21-72 of a line whose DISPLAY stands in position 12, so the
-    /// literal runs to margin R and its continuation line is the one that §6.3.5 2) names.</summary>
+    /// literal runs to margin R without a closing delimiter and the next line continues it with a FIXED continuation
+    /// indicator (§6.3.5 1)); that next line is the continuation line, by §6.3.5's paragraph common to both indicators:
+    /// "the next line that is not a comment line or a blank line is the continuation line".</summary>
     private const string FirstPartOfContinuedLiteral = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
     private static string ContinuedLiteral(string continuation) => Source(
