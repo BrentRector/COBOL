@@ -1,4 +1,4 @@
-## PB1551 + PB1008: every receiving position parses the identifier formats that are never a receiving operand, and one form table refuses each by its own rule
+## Entry 2111 — 2026-10-16 14:15 PDT — PB1551 + PB1008: every receiving position parses the identifier formats that are never a receiving operand, and one form table refuses each by its own rule
 
 **The defect (kb/Work PB1551, re-probed on 59208d8fb).** ISO §8.4.3 writes each receiving-operand exclusion into the
 identifier FORMAT, not into a statement: §8.4.3.7.3 SR1 "NULL shall not be specified as a receiving operand",
@@ -82,3 +82,4 @@ so their statements' receiving slots stay guarded: `sendingOperand` (INSPECT CON
 `setAddressSender` (SET Format 7's identifier-6, §14.9.39.3 SR19) and `setLocaleSource` (SET Format 11's identifier-10,
 §14.9.39.3 SR25). The fourth is `usingByReference`, the PROCEDURE DIVISION header's formal parameter (§14.2.2 SR1).
 Eleven theory cases pin the new shapes, and three converted shapes pin the complement.
+
