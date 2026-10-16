@@ -345,3 +345,5 @@ INVOKE half. The five R3 notes that waited on PB2099 now wait on PB2100.
 
 **Still open, not this slice's.** The manual's host chapter belongs to kb/Work PB1610, which creates `docs/manual/`; its
 text is design §9.4's. `ProgramRegistry.RunMain` has no caller, and removing it is a runtime-major bump.
+
+**Gate (part 7).** `TestResults/build-local/20261016T140250Z-5116d8` at 8c067d41d: `LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,015/11,776, Unit 33,206/33,714, Characterization 6/36 in leg 1; every test this part added or changed ran in leg 1 and passed). The first gate (`20261016T135015Z-7dcf04`) was RED on `RuntimeApiGuardTests` only: three bare `CobolVarGroup.` accesses in `PublishedRecordEmitter`, now routed through `RuntimeApi` (8c067d41d). Semgrep verify: PASS. LINUX GATE: the lander's (batched gating).
