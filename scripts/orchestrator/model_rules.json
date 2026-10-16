@@ -145,6 +145,22 @@
           "agents": 425,
           "measured": "2026-10-10",
           "source": "r2_cost.py --measure batch-2 over its seven Workflow runs: wf_4c432e36-5b7 (the first launch, stopped at 52 of 65 pairs' finders) and the six hand-split relaunches wf_197c5609-ca5, wf_5bba5907-8be, wf_996b0c5b-192, wf_b15e9b16-1f5, wf_eecbb59e-80f, wf_fa8e3b6b-4f1 (kb/Work PB2707)"
+        },
+        {
+          "batch": "3",
+          "pin": "8be23006851a",
+          "line_dimensions": 92106,
+          "findings": 113,
+          "verdicts": 339,
+          "nulls": 0,
+          "finder_tokens": 6882187,
+          "skeptic_tokens": 8071420,
+          "null_tokens": 0,
+          "duplication_pass_tokens": null,
+          "workflow_runs": 1,
+          "agents": 128,
+          "measured": "2026-10-15",
+          "source": "r2_cost.py --measure batch-3 over its one Workflow run wf_a7c279ce-665 (account 1, 2026-10-15)"
         }
       ]
     },
