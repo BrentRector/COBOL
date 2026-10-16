@@ -32,8 +32,8 @@ namespace CobolNet.Tests.Unit;
 /// — and the two lanes gave opposite verdicts: a slice into an equal-length <c>PIC X(5)</c> ran on one and raised
 /// EC-OO-METHOD on the other, a slice into a smaller group formal the reverse.
 /// <list type="bullet">
-/// <item>STRUCTURAL: <c>OoBinder</c> calls no <c>DescriptionMismatch</c> (pair mode keeps it elsewhere until kb/Work
-/// PB3101 deletes it), its BY REFERENCE verdict asks the two relations and names no <c>RefModPlace</c>, and no
+/// <item>STRUCTURAL: <c>OoBinder</c> calls no <c>DescriptionMismatch</c> (deleted everywhere by kb/Work
+/// PB3101; <c>OneRelationDriftTests</c>), its BY REFERENCE verdict asks the two relations and names no <c>RefModPlace</c>, and no
 /// <c>if</c> of <c>OoBindInvocationArg</c> tests for one.</item>
 /// <item>BEHAVIORAL: over every elementary pair the comparator's own drift test enumerates, plus reference-modified and
 /// ANY LENGTH sides, the binder's verdict is the relation's; and PB3098's rows compile to the verdicts the table

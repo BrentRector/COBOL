@@ -68,7 +68,11 @@ public static class ActivationDescriptions
                 Table16 = Table16Operand.Of(item).Heading,
             };
         }
-        if (item.IsGroup)
+        // ⛔ The CATEGORY question "is this a group item?" (ItemCategory.IsGroupItem), never the structural IsGroup: a
+        // level-66 THROUGH alias has no subordinate entries and carries a composed alphanumeric PICTURE for its carrier,
+        // yet §13.18.45.4 GR2 makes it "an alphanumeric group item" — so it is described, matched and conformed as one
+        // (its atoms are the elementary items it includes, VariableLengthCompatibility.GroupAtoms; kb/Work PB3101).
+        if (ItemCategory.IsGroupItem(item))
         {
             // §8.5.2.1: "an alphanumeric group item has class and category alphanumeric". A group carries none of the
             // §9.3.6 3 e) clauses, so its Clauses are empty: two groups match whatever their sizes, and a group never
@@ -105,6 +109,7 @@ public static class ActivationDescriptions
                 ObjectName = d.IsActiveClass || d.Name is null ? null : CobolNames.Fold(d.Name),
                 Factory = d.Factory,
                 Only = d.Only,
+                ObjectNameIsParameter = d.Formal,
                 ObjectClasses = Folded(facts?.Classes),
                 ObjectInterfaces = Folded(facts?.Interfaces),
             };
@@ -169,6 +174,14 @@ public static class ActivationDescriptions
     /// is, so a rendered description spells one name one way.</summary>
     private static string[]? Folded(IReadOnlyList<string>? names) => names?.Select(CobolNames.Fold).ToArray();
 
+    /// <summary>Why <paramref name="item"/> has no description (<see cref="Of"/> answered null), for the refusal of a
+    /// bind-time lane that asks a relation of it: a group with no crossing form names its Tier-C leaf
+    /// (<see cref="TierCIsland.Reason(DataItem, string, string?)"/>), any other item its missing PICTURE clause.
+    /// <paramref name="role"/> names the side of the pair the item is (<c>argument</c>, <c>formal parameter</c>,
+    /// <c>returning item</c>, <c>receiving item</c>).</summary>
+    public static string NoDescriptionReason(DataItem item, string role) =>
+        item.IsGroup ? TierCIsland.Reason(item, role + " group") : $"the {role} has no PICTURE description";
+
     /// <summary>The description of a PLACE an activation names — an argument or a RETURNING item: a reference-modified
     /// operand is the unique data item §8.4.3.3.4 GR5 creates (<see cref="OfReferenceModification"/>), any other place
     /// the item it denotes (<see cref="Of"/>). Null for a place that denotes no item and is not reference-modified.</summary>
@@ -194,11 +207,12 @@ public static class ActivationDescriptions
     }
 
     /// <summary>The description of a BY CONTENT / BY VALUE argument that has NO STORAGE, as the sending operand ISO
-    /// §14.8.2.3.3 rule 2 names — the same readings the compiler's own screen gives each shape when it knows the formal
-    /// (<c>ParameterConformance.ContentConformanceReason</c>): a nonnumeric literal is its category's Table 16 row; a
+    /// §14.8.2.3.3 rule 2 names — the one description the relation (<c>ActivationRelations.CallArgumentViolation</c>) is
+    /// asked of, at bind time (<c>ParameterConformance.ContentConformanceReason</c>) and at run time alike: a nonnumeric literal is its category's Table 16 row; a
     /// numeric literal (and a BY VALUE literal bound as an expression, §14.9.4.4 GR8) the numeric row of its own digits;
     /// a figurative constant or an ALL literal an alphanumeric value of any category, ZERO also a numeric COMPUTE sender
-    /// (§8.8.1.1); a character-valued intrinsic function its §15.2 type's row; a numeric function or an arithmetic
+    /// (§8.8.1.1), and the two §14.9.25.3 SR6 / SR7 read apart (ZERO; an ALL literal of boolean characters); a
+    /// character-valued intrinsic function its §15.2 type's row; a numeric function or an arithmetic
     /// expression a numeric value with no character image, of its function's row or — for an expression, which carries
     /// no compile-time integer guarantee — the noninteger row (kb/Work PB1946); NULL a SET sender only. Null for a shape
     /// none of these names.</summary>
@@ -207,7 +221,10 @@ public static class ActivationDescriptions
         BoundPredefinedNull => new ActivationDescription { Shape = ActivationShape.PredefinedNull },
         BoundFigurative f => Value(ActivationShape.Literal,
             f.Kind == 'Z' ? ActivationCategory.FigurativeZero : ActivationCategory.Figurative, Table16Category.None),
-        BoundAllLiteral => Value(ActivationShape.Literal, ActivationCategory.Figurative, Table16Category.None),
+        // §14.9.25.3 SR7 reads an ALL literal's characters: one of '0' and '1' only may move to a boolean receiver.
+        BoundAllLiteral all => Value(ActivationShape.Literal,
+            MoveTable16.HasBooleanCharacters(all) ? ActivationCategory.FigurativeBoolean : ActivationCategory.Figurative,
+            Table16Category.None),
         BoundStringLiteral s => Value(ActivationShape.Literal, CategoryName(s.Category), MoveTable16.SenderPosition(s).Heading),
         BoundNumericLiteral n => Value(ActivationShape.Literal, ActivationCategory.Numeric, MoveTable16.SenderPosition(n).Heading),
         BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } text =>
@@ -289,10 +306,10 @@ public static class ActivationDescriptions
     /// WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses", with 3 e) 1. (currency strings) and 2.
     /// (DECIMAL-POINT IS COMMA) carried by the PICTURE clause's ONE identity (<see cref="PictureClauseIdentity"/>) and
     /// 3. a. (the LOCALE phrase's SIZE) here, 3. b. (its external identification) in
-    /// <see cref="ActivationDescription.LocaleExternal"/>. The same facts <c>OoConformance.DescriptionMismatch</c>
-    /// compares for an elementary pair (its §14.8.2.3.2 rule 2 list is this list without ANY LENGTH), so a pair the
-    /// typed lane finds identical has equal clauses here — held by
-    /// <c>PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair</c>. A
+    /// <see cref="ActivationDescription.LocaleExternal"/>. Every relation reads these facts here and nowhere else (the
+    /// <c>DataItem</c> comparator that compared them a second time is deleted, kb/Work PB3101), so the §9.3.6 match and the
+    /// pair-mode identity agree — held by
+    /// <c>PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithThePairModeRelation_OverEveryElementaryPair</c>. A
     /// class pointer's restriction is its USAGE clause's TO phrase.</summary>
     public static (string Clauses, string[] Phrases) ElementaryClauses(DataItem item)
     {

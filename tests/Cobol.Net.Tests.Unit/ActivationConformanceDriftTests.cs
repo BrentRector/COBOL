@@ -21,9 +21,10 @@ namespace CobolNet.Tests.Unit;
 /// <para>The shape that keeps the NEXT activation from repeating it: the per-argument conformance
 /// (<c>ParameterConformance.CheckArgument</c>), the BY VALUE class answer (<c>ValueArgumentClass</c>) and the
 /// bit-alignment proof (<c>ScreenBitAlignment</c>) are DEFINED in <c>ParameterConformance</c> alone, both
-/// <c>CallBinder</c> and <c>UdfBinder</c> call them, and no other verb binder except INVOKE's own lane
-/// (<c>OoBinder</c>) reaches the §14.8.2 comparators in <c>OoConformance</c> directly.</para>
+/// <c>CallBinder</c> and <c>UdfBinder</c> call them, and INVOKE (<c>OoBinder</c>) asks the same BY CONTENT entry; every
+/// lane asks <c>ActivationRelations</c>, the one copy the run-time CALL lane asks too (kb/Work PB3101).</para>
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class ActivationConformanceDriftTests
 {
     private static readonly string VerbsDir =
@@ -93,25 +94,64 @@ public sealed class ActivationConformanceDriftTests
             + "CALL and function activations would drift apart again (kb/Work PB1418):\n" + string.Join("\n", offenders));
     }
 
+    /// <summary>⛔ A BY CONTENT / BY VALUE ARGUMENT IS ASKED THE ONE RUN-TIME RELATION TOO (kb/Work PB3101). The BY CONTENT
+    /// comparator family (<c>OoConformance.ContentMismatch</c>, <c>ContentValueMismatch</c> and the two literal arms)
+    /// re-derived §14.8.2.3.3 from <c>DataItem</c> fields while the run-time CALL lane asked
+    /// <c>ActivationRelations.CallArgumentViolation</c>, and the two disagreed: a group argument into a numeric formal was
+    /// refused at bind (§14.8.2.2 rule 2's MOVE admits it), the run-time lane let a strongly-typed group argument reach a
+    /// <c>PIC X</c> formal, and ZERO into a <c>PIC A</c> formal and SPACE into a <c>PIC 1</c> one ran on both (§14.9.25.3
+    /// SR6 / SR7). The family is deleted: <c>OoConformance</c> answers a BY CONTENT argument only for the object-reference
+    /// pair, which reads the class table as a pair, and every verb binder reaches the rule through
+    /// <c>ParameterConformance.ContentConformanceReason</c>.</summary>
     [Fact]
-    public void NoOtherVerbBinder_ReachesTheArgumentComparatorsDirectly()
+    public void TheContentArgumentRule_IsTheRunTimeRelation_AskedThroughOneEntry()
     {
-        // OoBinder is INVOKE's lane over the BY CONTENT comparators (§14.9.23.3); its BY REFERENCE arguments ask the
-        // ActivationRelations (kb/Work PB2077, TypedAndUniversalInvokeVerdictsAgreeDriftTests). ParameterConformance is
-        // the shared one. The ARGUMENT use of DescriptionMismatch is the one carrying §14.8.2.2 rule 1's byRefGroupPrefix; the
-        // RETURNING use (§14.8.3.2 — "the same length", no prefix latitude) is a different rule and stays where
-        // the CALL statement's RETURNING phrase binds.
-        string[] allowed = ["ParameterConformance.cs", "OoBinder.cs"];
-        var argumentComparator = new Regex(
-            @"OoConformance\s*\.\s*(DescriptionMismatch\s*\([^;]*byRefGroupPrefix|Content\w*Mismatch\s*\()");
+        var comparator = new Regex(@"^(Content\w*|MoveContent)Mismatch$");
+        var copies = typeof(CobolNet.Compiler.Oo.OoConformance)
+            .GetMethods(System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.NonPublic)
+            .Select(m => m.Name)
+            .Where(n => comparator.IsMatch(n))
+            .Distinct()
+            .ToList();
+        Assert.True(copies.Count == 0,
+            "OoConformance defines a BY CONTENT argument comparator again (" + string.Join(", ", copies) + ") — a second "
+            + "copy of §14.8.2.3.3 beside ActivationRelations.CallArgumentViolation (kb/Work PB3101).");
+        Assert.Contains("ActivationRelations.CallArgumentViolation(arg.Mode", Verb("ParameterConformance.cs"));
+        var direct = new Regex(@"OoConformance\s*\.\s*\w*Content\w*Mismatch\s*\(");
         var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
-            .Where(f => !allowed.Contains(Path.GetFileName(f)))
-            .Where(f => argumentComparator.IsMatch(CodeOf(f)))
+            .Where(f => Path.GetFileName(f) != "ParameterConformance.cs" && direct.IsMatch(CodeOf(f)))
             .Select(Path.GetFileName)
             .ToList();
         Assert.True(offenders.Count == 0,
-            "A verb binder calls the §14.8.2 argument comparators directly instead of through "
-            + "ParameterConformance.CheckArgument (kb/Work PB1418): " + string.Join(", ", offenders));
+            "A verb binder asks an OoConformance BY CONTENT comparator directly instead of "
+            + "ParameterConformance.ContentConformanceReason (kb/Work PB1418, PB3101): " + string.Join(", ", offenders));
+    }
+
+    /// <summary>⛔ A BY REFERENCE ARGUMENT AND A RETURNING ITEM ARE ASKED THE ONE RUN-TIME RELATION AT BIND TIME (kb/Work
+    /// PB3101, PB3127). The pair-mode comparator <c>OoConformance.DescriptionMismatch</c> re-derived §14.8.2.3.2 rule 2 and
+    /// §14.8.3 from <c>DataItem</c> fields while the run-time CALL lane asked <c>ActivationRelations</c> over the
+    /// <c>ActivationDescription</c>s, and the two disagreed where the standard does not: a reference-modified argument BY
+    /// REFERENCE into a prototyped CALL's or a function's elementary formal ran (it has no PICTURE clause, docs/CONFORMANCE.md
+    /// D-RM1), and the run-time lane's ANY LENGTH arm compared category and usage only. So the activation entry asks
+    /// <c>CallArgumentViolation</c> / <c>CallReturningViolation</c>, and no verb binder asks the pair comparator at all
+    /// (<c>MoveBinder</c>'s identity-conversion test, a pair question, asks the pair-mode relation:
+    /// <see cref="PairMode_AsksTheDescriptionRelation_ThroughOneEntry"/>).</summary>
+    [Fact]
+    public void ActivationConformance_AsksTheRunTimeRelations_NotThePairComparator()
+    {
+        string code = Verb("ParameterConformance.cs");
+        foreach (string call in new[] { "ActivationRelations.CallArgumentViolation(", "ActivationRelations.CallReturningViolation(" })
+            Assert.True(code.Contains(call, System.StringComparison.Ordinal),
+                $"ParameterConformance no longer asks {call.TrimEnd('(')} — the bind-time activation lane would answer a "
+                + "pair the run-time CALL lane answers differently (kb/Work PB3101).");
+        var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => Regex.IsMatch(CodeOf(f), @"OoConformance\s*\.\s*DescriptionMismatch\s*\("))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "A verb binder asks the pair-mode comparator OoConformance.DescriptionMismatch for an activation instead of "
+            + "ActivationRelations (kb/Work PB3101): " + string.Join(", ", offenders));
     }
 
     /// <summary>⛔ THE RETURNING-ITEM HALF OF §14.8.3 IS ONE ENTRY TOO (kb/Work PB1164). §14.8.3.3 rule 1 makes two
@@ -130,6 +170,74 @@ public sealed class ActivationConformanceDriftTests
         Assert.True(code.Contains("Params.ReturningConformanceReason(", System.StringComparison.Ordinal),
             $"{file} no longer asks ParameterConformance.ReturningConformanceReason — its RETURNING item would be "
             + "checked by a private copy of §14.8.3.3 that the other activating statement does not share.");
+    }
+
+    /// <summary>⛔ ISO §14.9.4.4 GR8 AND ITS INVOKE TWIN §14.9.23.4 GR4 ARE ONE PARSE-TREE REDUCTION (kb/Work PB613). "An
+    /// argument that consists merely of a single identifier or literal is regarded as an identifier or literal rather
+    /// than an arithmetic or boolean expression" was written twice: <c>CallBinder.Gr8Classify</c> and an inline block in
+    /// <c>OoBinder.OoBindInvocationArg</c>, which alone folded a sole numeric literal. The CALL copy once recovered only the
+    /// arithmetic leg of an operator-free boolean node (PB238), and CALL's keyword-less boolean arm passed the identifier
+    /// it recovered BY CONTENT where §14.9.4.4 GR9 a) 1. assumes BY REFERENCE. So <c>ConditionBinder.ReduceArgument</c> is
+    /// the one reduction, both activating binders ask it, and no other verb binder unwraps a boolean node to an argument
+    /// operand itself.</summary>
+    [Fact]
+    public void TheArgumentReduction_IsWrittenOnce()
+    {
+        foreach (string file in new[] { "CallBinder.cs", "OoBinder.cs" })
+            Assert.True(Verb(file).Contains("ConditionBinder.ReduceArgument(", System.StringComparison.Ordinal),
+                $"{file} no longer asks ConditionBinder.ReduceArgument — its arguments would be reduced by a private copy "
+                + "of §14.9.4.4 GR8 the other activating statement does not share (kb/Work PB613).");
+        var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f) != "ConditionBinder.cs")
+            .Where(f => Regex.IsMatch(CodeOf(f), @"\bUnwrapBareBool\s*\(|\bGr8Classify\b"))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "A verb binder reduces an argument's boolean node itself instead of asking ConditionBinder.ReduceArgument "
+            + "(kb/Work PB613): " + string.Join(", ", offenders));
+    }
+
+    /// <summary>⛔ PAIR MODE ASKS THE ONE DESCRIPTION RELATION THROUGH ONE ENTRY (kb/Work PB3101; COBOLNET_OO_DESIGN D6
+    /// item 7). ISO §9.3.8.2.3 rules 2, 3, 6 and 7 state the identity of two corresponding items once, and §11.7.3 SR9
+    /// (OVERRIDE), §9.3.11 (IMPLEMENTS), interface conformance and §8.4.3.9.3 SR7 (a property's accessors) import it. The
+    /// compiler answered them with a <c>DataItem</c> comparator (<c>OoConformance.DescriptionMismatch</c>) while the §9.3.6
+    /// match and the activation conformance read <c>ActivationDescription</c>s, and the copies disagreed: the comparator,
+    /// carrying §14.8.2.2 rule 1's activation reading, called a 4-byte alphanumeric group and a <c>PIC X(4)</c> the same
+    /// description, so such an override compiled where rule 3 refuses it (the group has no PICTURE clause). So
+    /// <c>OoConformance.SignatureDifference</c> is the one entry — it describes both items through the one builder and asks
+    /// <c>ActivationRelations.SignatureDifference</c> — the override, IMPLEMENTS, property, MOVE-element and prototype
+    /// signature askers (§13.7.3 SR2, and the signature classes' partition refinement) call it, and the comparator is
+    /// deleted, with the <c>PrototypeBisimulation</c> it threaded.</summary>
+    [Fact]
+    public void PairMode_AsksTheDescriptionRelation_ThroughOneEntry()
+    {
+        string oo = CodeOf(TestRepo.Src("Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
+        Assert.True(Regex.IsMatch(oo, @"ActivationRelations\s*\.\s*SignatureDifference\s*\("),
+            "OoConformance.SignatureDifference no longer asks ActivationRelations.SignatureDifference — pair mode would "
+            + "answer from a copy of the description identity the match and the activations do not share (kb/Work PB3101).");
+        // The entry's definition and its call to the relation, then its three askers in OoConformance: the formals and
+        // the RETURNING item of MethodConformanceMismatches, and the property accessors.
+        Assert.True(Regex.Matches(oo, @"\bSignatureDifference\s*\(").Count >= 5,
+            "OoConformance's pair-mode askers (the formals and the RETURNING item of MethodConformanceMismatches, the "
+            + "property accessors) no longer all ask SignatureDifference (kb/Work PB3101).");
+        Assert.Contains("OoConformance.SignatureDifference(", Verb("MoveBinder.cs"));
+
+        // The prototype signature comparison (§13.7.3 SR2, and the signature classes' refinement) asks it too.
+        Assert.Contains("OoConformance.SignatureDifference(",
+            CodeOf(TestRepo.Src("Cobol.Net.Compiler", "Binding", "PrototypeSignatures.cs")));
+
+        // No DataItem comparator survives beside the relation (CLAUDE.md rule 4: deleted, not shimmed).
+        string compiler = TestRepo.Src("Cobol.Net.Compiler");
+        string sep = Path.DirectorySeparatorChar.ToString();
+        var comparators = Directory.EnumerateFiles(compiler, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains(sep + "obj" + sep) && !f.Contains(sep + "bin" + sep))
+            .Where(f => Regex.IsMatch(CodeOf(f),
+                @"\b(DescriptionMismatch|AsIfElementaryGroupMismatch|CategoryArmMismatch|PrototypeBisimulation)\b"))
+            .Select(Path.GetFileName)
+            .ToList();
+        Assert.True(comparators.Count == 0,
+            "A DataItem description comparator (or the bisimulation it carried) is back beside the pair-mode relation: "
+            + string.Join(", ", comparators) + " — ask OoConformance.SignatureDifference (kb/Work PB3101).");
     }
 
     [Fact]

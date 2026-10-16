@@ -13,11 +13,11 @@ namespace CobolNet.Binding.Model;
 public static class DescriptionClauses
 {
     /// <summary>ALIGNED (§13.18.1) and DYNAMIC LENGTH with its LIMIT phrase and structure-name (§13.18.19), asked of
-    /// both sides; null when they agree. kb/Work PB1166: the activation / signature comparator
-    /// (<c>OoConformance.DescriptionMismatch</c>) compared neither, so <c>PIC 1(8) USAGE BIT ALIGNED</c> crossed BY
-    /// REFERENCE into <c>PIC 1(8) USAGE BIT</c>, and <c>PIC X DYNAMIC LENGTH</c> overrode <c>PIC X</c>, while the
-    /// §8.5.3.1 profile compare (<see cref="StrongTypeModel"/>) kept its own copy of the same conjuncts. Both now
-    /// read THIS predicate, so the two lists cannot drift apart.</summary>
+    /// both sides; null when they agree. kb/Work PB1166: the activation / signature comparator of the day compared
+    /// neither, so <c>PIC 1(8) USAGE BIT ALIGNED</c> crossed BY REFERENCE into <c>PIC 1(8) USAGE BIT</c>, and
+    /// <c>PIC X DYNAMIC LENGTH</c> overrode <c>PIC X</c>. That comparator is deleted (kb/Work PB3101): the activation and
+    /// pair-mode relations read both clauses from the description's clause key (<c>ActivationDescriptions</c>), and this
+    /// predicate is the §8.5.3.1 profile compare's (<see cref="StrongTypeModel"/>).</summary>
     /// <param name="x">The formal parameter (or the sending returning item / one type's item).</param>
     /// <param name="y">The argument (or the receiving returning item / the other type's item).</param>
     public static string? AlignedOrDynamicLengthMismatch(DataItem x, DataItem y)

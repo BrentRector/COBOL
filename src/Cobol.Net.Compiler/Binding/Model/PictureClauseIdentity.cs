@@ -34,8 +34,9 @@ namespace CobolNet.Binding.Model;
 /// <para>Computed ONCE, by <c>PictureAnalyzer.Analyze</c> — the one place the character-string, the unit's
 /// CURRENCY SIGN set and its DECIMAL-POINT IS COMMA state are all in hand — and carried on
 /// <see cref="PicInfo.Clause"/>. Being a value-equality record it is part of <see cref="PicInfo"/>'s own record
-/// equality, so the §8.5.3.1 profile compare (<c>StrongTypeModel</c>) and the activation / signature comparator
-/// (<c>OoConformance.DescriptionMismatch</c>) read the same identity by construction.</para>
+/// equality, so the §8.5.3.1 profile compare (<c>StrongTypeModel</c>) and every activation and signature relation
+/// (<c>ActivationRelations</c>, over the <see cref="Key"/> an activation description's clauses carry) read the same
+/// identity by construction.</para>
 /// </summary>
 /// <param name="CharacterString">The expanded, uppercased character-string with the currency symbol canonicalized
 /// to <c>$</c>.</param>
@@ -73,47 +74,8 @@ public sealed record PictureClauseIdentity(string CharacterString, string? Curre
         : string.Join(";", rules.Select(r =>
             $"{r.Char1}:{r.Neg}:{r.Pos}:{(r.SimpleInsertion ? 'S' : '-')}{(r.Floating ? 'F' : '-')}"));
 
-    /// <summary>Why <paramref name="formal"/> and <paramref name="arg"/> are NOT the same PICTURE clause, or null
-    /// when they are. The message names the axis that differs, so a currency-string or DECIMAL-POINT IS COMMA
-    /// difference is never reported as a character-string difference it is not.</summary>
-    public static string? Mismatch(PictureClauseIdentity formal, PictureClauseIdentity arg)
-    {
-        if (!string.Equals(formal.CharacterString, arg.CharacterString, StringComparison.Ordinal))
-            return $"PICTURE mismatch (formal '{formal.CharacterString}', argument '{arg.CharacterString}' — the "
-                + "corresponding items shall have the same PICTURE clause)";
-        if (!string.Equals(formal.CurrencyString, arg.CurrencyString, StringComparison.Ordinal))
-            return $"currency string mismatch (the formal's currency symbol stands for \"{formal.CurrencyString}\", "
-                + $"the argument's for \"{arg.CurrencyString}\" — currency symbols match if and only if the "
-                + "corresponding currency strings are the same: ISO §14.8.2.3.2 rule 2 a), §14.8.3.3 exception 1), "
-                + "§9.3.8.2.3 rule 3 a))";
-        if (formal.DecimalPointIsComma != arg.DecimalPointIsComma)
-            return "DECIMAL-POINT IS COMMA mismatch (it is in effect for the "
-                + $"{(formal.DecimalPointIsComma == true ? "formal's" : "argument's")} source element and not for the "
-                + $"{(formal.DecimalPointIsComma == true ? "argument's" : "formal's")} — period and comma picture "
-                + "symbols match if and only if the clause is in effect for both or for neither: ISO §14.8.2.3.2 "
-                + "rule 2 b), §14.8.3.3 exceptions 2)/3), §9.3.8.2.3 rule 3 b))";
-        if (!string.Equals(formal.Editing, arg.Editing, StringComparison.Ordinal))
-            return "PICTURE EDITING phrase mismatch (the corresponding items shall have the same PICTURE clause, and "
-                + "its EDITING phrases are part of it — ISO §13.18.40.2)";
-        return null;
-    }
-
-    /// <summary>The PICTURE compare for an ANY LENGTH formal (or sending returning item): §13.18.2.3 SR1 gives it
-    /// a one-symbol picture (<c>X</c>, <c>N</c> or <c>1</c>) and §14.8.2.3.2 "Additionally" d) makes "its length
-    /// … considered to match the length of the corresponding argument" — so the other side is the same PICTURE
-    /// clause exactly when it is that symbol repeated, at whatever length. Null when it is.</summary>
-    public static string? MismatchAtAnyLength(PictureClauseIdentity anyLength, PictureClauseIdentity other)
-    {
-        char symbol = anyLength.CharacterString.Length == 1 ? anyLength.CharacterString[0] : '\0';
-        return symbol != '\0' && other.CharacterString.Length > 0 && other.CharacterString.All(c => c == symbol)
-            ? null
-            : $"PICTURE mismatch (the ANY LENGTH item is described '{anyLength.CharacterString}', the other "
-              + $"'{other.CharacterString}' — only the length is considered to match: ISO §14.8.2.3.2 "
-              + "\"Additionally\" d))";
-    }
-
     /// <summary>The identity as one key, for the universal-dispatch activation description
-    /// (<c>ActivationDescriptions.ElementaryClauses</c>) — equal keys ⇔ <see cref="Mismatch"/> is null. The character-string
+    /// (<c>ActivationDescriptions.ElementaryClauses</c>) — equal keys ⇔ the same PICTURE clause. The character-string
     /// holds picture symbols only (never '|'), the currency string is length-prefixed and the free-text editing rules
     /// come last, so no two identities share a key.</summary>
     public string Key =>
