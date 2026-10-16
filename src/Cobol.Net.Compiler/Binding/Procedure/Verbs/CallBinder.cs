@@ -44,8 +44,8 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         // changes meaning: a word that names a data item stays identifier-1.
         bool asNested = false;
         ProgramPrototype? prototype = null;
-        // literal-1, as written or spelled by a constant-name (ISO §13.10.3 SR2), asked ONCE: SR15's presence test, the
-        // NESTED scope lookup and the static target all read it (kb/Work PB780).
+        // literal-1, as written or spelled by a constant-name (ISO §13.10.3 SR2), asked ONCE: §14.9.4.3 SR15's
+        // presence test, the NESTED scope lookup and the static target all read it (kb/Work PB780).
         var target = call.callTarget();
         ProgramNameOperand? literal1 = Literal1Of(target?.literal(), target?.dataReference());
         if (call.callAsPhrase() is { } asPhrase)
