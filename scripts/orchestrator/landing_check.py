@@ -12,7 +12,8 @@ ACTUALLY changed with
 
   1. its DECLARED file set, for the R3 work it lands: the set the dispatch ledger recorded for those notes when they
      were planned, read from the FULL ledger (a landing flips its own notes to terminal, and that declaration is
-     still the authority for it), or, for a note no entry records, the set computed now. A file an R3 commit changed
+     still the authority for it), or, for a note no entry records, the set computed now (plan_wave.computed_file_set,
+     on the planner's own index policy, THE index of this tree: kb/Work PB3203). A file an R3 commit changed
      that existed on main and lies outside that set STOPS the landing: the wave touched a file nothing protected;
   2. every OTHER in-flight branch's actual changes (plan_wave.inflight_file_sets: worktrees, unlanded branches, the
      dispatch ledger's declared sets), when the shared file is R3 work on either side. A shared file stops the LATER
@@ -69,7 +70,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "spec"))
 import coord  # noqa: E402
-import plan_wave  # noqa: E402  (inflight_file_sets: THE in-flight enumeration; note_file_set: THE declared set)
+import plan_wave  # noqa: E402  (inflight_file_sets: THE in-flight enumeration; computed_file_set: THE declared set)
 import work  # noqa: E402
 
 PB = re.compile(r"\bPB\d+\b")
@@ -86,15 +87,6 @@ def _git(repo: pathlib.Path) -> Callable[..., Any]:
         return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, encoding="utf-8",
                               errors="replace")
     return run
-
-
-def partitioned(rules: dict[str, Any]) -> Callable[[str], bool]:
-    """Whether a path is in the partition's domain: a code file under the campaign's roots (module doc)."""
-    cfg = rules["campaign"]
-    roots = tuple(r.rstrip("/") + "/" for r in cfg["src"])
-    exts = tuple(e.strip() for e in cfg["ext"].split(",") if e.strip() and e.strip() != ".md")
-    skip = set(cfg["exclude_dir"])
-    return lambda p: p.startswith(roots) and p.endswith(exts) and not skip & set(p.split("/")[:-1])
 
 
 def subject_ids(subjects: str) -> set[str]:
@@ -176,7 +168,7 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
     ledger does not hold; `reports` are the fix-lane reports (plan_wave.load_reports), which bind an in-flight branch
     to its own dispatch first (identity)."""
     git = git or _git(repo)
-    inside = partitioned(rules)
+    inside = coord.campaign(rules).partitioned   # the partition's domain: a code file under a campaign root
     r3 = {i.get("id") for i in items if r3_lead in (i.get("cluster") or [])}
     status = {i.get("id"): i.get("status") for i in items}
     terminal = lambda n: status.get(n) in work.TERMINAL_STATUSES  # noqa: E731
@@ -644,8 +636,10 @@ def main(argv: list[str] | None = None) -> int:
         return self_test()
     repo = pathlib.Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
                                        check=True).stdout.strip())
-    stops, warnings = check(repo, a.base, a.rev, coord.coord_dir(a.coord), work.load(repo / "kb" / "Work"),
-                            coord.rules(), lambda ids: plan_wave.computed_file_set(repo, ids),
+    cdir = coord.coord_dir(a.coord)
+    policy = plan_wave.IndexPolicy.of(cdir)   # the planner's policy: THE index of this tree (kb/Work PB3203)
+    stops, warnings = check(repo, a.base, a.rev, cdir, work.load(repo / "kb" / "Work"),
+                            coord.rules(), lambda ids: plan_wave.computed_file_set(repo, ids, policy),
                             reports=plan_wave.load_reports(coord.reports_dir(a.coord)))
     for w in warnings:
         print(f"⚠ landing check: {w}")

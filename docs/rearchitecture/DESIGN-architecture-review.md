@@ -1609,12 +1609,30 @@ slice in `blocked_by`), PB2151 and PB2129 where a note's sites need them, and v1
 is COMPUTED, never listed (PB2118 Draft 8; the seventh refuter, J2, found PB2296's hand list missing 16 callers and
 naming a file that does not exist, and Draft 7's "the brief computes callers with the rewriter's dry run and
 `where.py`" was no mechanism: `where.py` maps spec clauses to files, and the brief is rendered after the check). It is
-every site its notes name, whatever the score (a bare type name included; Draft 7 kept only `fix_clusters`' scores of
-2 and up, J3), plus every file under a folder its sites name, on the current tree, plus every file the MEMBER INDEX
-finds using or emitting what a note moves or changes: the note's `**Moves or changes:**` names, the documentation ids
-in its code spans, and every word of its target paragraph that is a member of a type the note names or its sites
-declare (Draft 9: PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use;
-the eighth refuter, K1), else every type its Sites declare (a folder, a class's files). The index is the census's own
+the union of its notes' DECLARED sets plus the group's primary file (`plan_wave.collision_set`, the fix lane's groups
+and a campaign's alike), and a note's declared set is its STRUCTURED sites only, read by ONE reader, the register's
+`work.note_sites` (kb/Work PB3242), which the planner, the member index, the spec renderer and the landing check all
+call: the paths of its Code site / Site / Sites blocks (a bold label's paragraph and the list under it, or a heading's
+section; `:line`, `#member` and `(member)` suffixes dropped) and of the `**The files this step edits**` line
+`file_census_notes` writes into a multi-step note (`work.STEP_FILES_LABEL`: a step's files can lie outside the census
+finding's Sites, as PB2300's `IntrinsicCatalog.cs` does) under the campaign roots of `model_rules.json` (never a
+literal list: `scripts/` was a root the register's own reader ignored), plus every tracked code file under a folder
+its sites name, on the current tree, plus every file the MEMBER INDEX finds using or emitting what the note moves or
+changes: the names on its `**Moves or changes:**` and `r2_members:` lines, the documentation ids in its site blocks,
+and every word of its target paragraph that is a member of a type the note names or its sites declare (Draft 9:
+PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use; the eighth refuter,
+K1), else, for a restructuring note (one with a `**Wave kind:**`), every type its sites declare (a folder, a class's
+files); a fix-lane note declares its sites only: one that names no member, and an R2 defect routed to the fix lane
+(`**Wave kind:** defect-for-fix-lane`, `work.FIX_LANE_WAVE`) whatever its `r2_members:` line names, since those say
+where the defect lives, not what a restructuring moves. A path its prose mentions, a `Gate:` line, a
+tool command and a bare type name declare NOTHING: Drafts 7-10 read every site the note's text named through
+`fix_clusters`' scored heuristic (whatever the score, so a bare type name counted, J3): 57 of PB1754's 63 ready R2
+notes DISCUSS `plan_wave.py` and `landing_check.py` and every PB3160 slice names `cite.py`, so on 2026-10-16 the
+PB1754 dry run planned one campaign group and the PB3160 run one, and with the structured reading six and the whole
+seven-slice chain, every remaining wait a file real in-flight work changes (kb/Work PB3242); the same reading made a
+census member id's parameter type a site (PB2423) and indexed an ignored benchmark report (PB2678).
+`fix_clusters`' scored prose sites still rank and group the fix lane's notes, which carry no site block, and never
+enter a declared set; a campaign clusters on the declared sites. The index is the census's own
 Roslyn walk (`tools/ArchCensus --member-index`, recorded by `scripts/arch/member_index.py --record` as frozen evidence
 `<sha>.members.json.gz`: per symbol, the authored product and test files that use it; per type and member, the files
 that declare it; and, for every type and member of the EMITTED SURFACE, the authored files whose string or
@@ -1624,12 +1642,19 @@ of `src/` and `tests/`, and the host's sources), and the planner plans only on T
 (`member_index.current`: a committed or cached record with that key, else one regenerated into
 `<coord>/member-index/`, else a refusal with `--no-index-regenerate`): a stale index cannot see a type or file a
 landing added (PB833's `OfdRegionLocks.cs` inside PB2251's site folder; K1), and Draft 8's "an older index only widens
-a set" was false. The readers bounded by time (`work.py check`, and `plan_wave.computed_file_set`: the landing
-check's set for unrecorded work and the spec renderer's for a groups file that carries no file set) use the newest
-committed record plus a text re-scan of every file changed since it and the folder expansion. For PB2296 step 1 the planner's
-set is 73 files (Draft 8: 66), and holds every one of `DataBinder.Options`'s six users the refuter found outside it
-(`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`, `IntrinsicRenderer.cs`,
-`NumericRenderer.cs`); PB2249's holds the nine code-generation files that write the runtime signals as text. The dispatcher, `scripts/orchestrator/plan_wave.py` (`file_set_collisions`, the ONE
+a set" was false. ONE function computes a declared set, `plan_wave.declared_sets`, on ONE explicit index policy
+(`plan_wave.IndexPolicy`: THE index of the tree, cached in `<coord>/member-index/`; kb/Work PB3203), and the planner,
+the spec renderer (`computed_file_set`, for a groups file that carries no file set) and the landing check (the same, for
+unrecorded R3 work) all pass it: the admission and the guarantee are one quantity, where the landing check's copy once
+read the newest committed record, which cannot see what a landing added. Regenerating costs a solution build plus the
+census host (110 s measured on a cold worktree, 2026-10-16), paid once per tree and, at a landing, only for R3 work no
+ledger entry records; the index is read at all only for a note that names what it moves or changes, or a restructuring
+note, never a fix-lane note (`member_index.needs_index`), so a fix-lane plan never builds one. Only `work.py check`'s unknown-name rule, bounded by time, reads the newest
+committed record plus a text re-scan of every file changed since it. For PB2296 step 1 the declared set is 69 files
+(Draft 8: 66; Draft 9's 73 counted prose sites), and holds every one of `DataBinder.Options`'s six users the refuter
+found outside it (`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`,
+`IntrinsicRenderer.cs`, `NumericRenderer.cs`); PB2249's holds the code-generation files that write the runtime signals
+as text. The dispatcher, `scripts/orchestrator/plan_wave.py` (`file_set_collisions`, the ONE
 implementation; for EVERY plan, the fix lane's too since kb/Work PB2807), checks it against (a) the in-flight work,
 read from sources a branch classification cannot drop (`inflight_file_sets`): every worktree's changed files, committed
 or not, and every unlanded branch's, each counted only while it still differs from `origin/main`, plus every group of
