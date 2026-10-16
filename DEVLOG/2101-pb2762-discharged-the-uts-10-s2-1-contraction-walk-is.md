@@ -1,4 +1,4 @@
-## PB2762 discharged: the UTS #10 S2.1 contraction walk is already written once
+## Entry 2101 — 2026-10-16 12:17 PDT — PB2762 discharged: the UTS #10 S2.1 contraction walk is already written once
 
 kb/Work PB2762 (wave 1096 F, the PB1754 cluster) was an R2 duplication finding read at 8be230068: the run-time
 `CollationElementIterator` and the CLDR builder's `CloseOverComposites` each wrote the S2.1 walk (longest contiguous
@@ -20,3 +20,4 @@ tailored contraction inside them (bn, kn and sa traditional, my, dz, bo, root em
 the walk takes and the whole-key lookup misses (bal), and 48 that are not in NFD (ar, bn and kn traditional).
 Changing it changes tables, so it is a defect lead for the fix lane under the PB2119 wave contract, recorded in the
 wave report rather than fixed here. No source file changed on this branch.
+
