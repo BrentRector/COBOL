@@ -1,4 +1,4 @@
-## PB1804 closed: the one logical-line builder both reference formats feed is complete
+## Entry 2060 — 2026-10-16 04:58 PDT — PB1804 closed: the one logical-line builder both reference formats feed is complete
 
 Wave 1084 H was dispatched on the analysis note PB1804, which proposed ONE `LogicalLineBuilder` for the §6.5 logical
 conversion, fed by a per-line classifier for each reference format, so that the floating literal continuation (PB1359),
@@ -25,3 +25,4 @@ unterminated literal in an omitted `>>IF` branch is legal (§7.3.16.4 3); the pr
 diagnostic belongs in the lexer's literal rule; it is in the wave-1084 H report for the registrar.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261015T223531Z-56fd77`; Conformance 6,139/11,711, Unit 33,295/33,667, Characterization 6/36 in leg 1; leg 2 left to CI). Linux gate: the lander's (batched gating).
+
