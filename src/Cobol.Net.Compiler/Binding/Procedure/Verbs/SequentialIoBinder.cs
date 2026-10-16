@@ -217,17 +217,21 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             winvalid = keyedIo.KeyedInvalidPhrase(wik.statementBlock(), PhraseBlocks.StartsWithNot(wik));
         }
 
-        // END-OF-PAGE phrases (ISO §14.9.51 GR27b/GR28): blocks[0] = AT EOP, blocks[1] = NOT AT EOP — the grammar
-        // rule `writeAtEndOfPage : AT? (END_OF_PAGE|EOP) statementBlock (NOT AT? (END_OF_PAGE|EOP) statementBlock)?`
-        // fixes that order (the readAtEnd block shape).
+        // END-OF-PAGE phrases (ISO §14.9.51 GR27b/GR28): the grammar rule `writeAtEndOfPage` admits either phrase
+        // first (the readAtEnd block shape), and PhraseBlocks reads the order off the leading NOT.
         List<BoundStatement>? atEop = null, notAtEop = null;
         if (w.writeAtEndOfPage() is { } eop)
         {
+            var (blocks, notFirst) = (eop.statementBlock(), PhraseBlocks.StartsWithNot(eop));
             // SR19 (the silent-drop bug class): the END-OF-PAGE / NOT END-OF-PAGE phrase requires a LINAGE clause
             // in the file's file description entry — a bind-time rejection, never a dropped branch.
             ctx.Validation.CheckWriteEopLinage(file);                                     // SR19 — pure check
-            ctx.Validation.CheckWriteEopAdvancingPage(AnyAdvancePage(adv));   // SR18 — pure check
-            (atEop, notAtEop) = PhraseBlocks.Split(eop.statementBlock(), PhraseBlocks.StartsWithNot(eop), b => host.BindBlocks([b]));
+            // SR18 names the END-OF-PAGE phrase — the AT phrase, imperative-statement-1's (GR27 b) — and SR19 names
+            // it and the NOT END-OF-PAGE phrase separately, so a NOT-only phrase beside ADVANCING PAGE is legal
+            // (and its imperative never runs: ADVANCING PAGE is a page overflow, GR7 c) 1 → GR26 a), kb/Work PB578).
+            ctx.Validation.CheckWriteEopAdvancingPage(
+                AnyAdvancePage(adv) && PhraseBlocks.HasOnBranch(blocks, notFirst));   // SR18 — pure check
+            (atEop, notAtEop) = PhraseBlocks.Split(blocks, notFirst, b => host.BindBlocks([b]));
         }
         // SR13: with a LINAGE clause, the ADVANCING phrase shall not name a SPECIAL-NAMES mnemonic (the
         // implementor positioning rules and the logical-page model are mutually exclusive).

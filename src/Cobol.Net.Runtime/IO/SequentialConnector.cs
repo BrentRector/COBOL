@@ -701,10 +701,19 @@ public sealed class SequentialConnector : FileConnector
     /// does and where the device goes in the SAME sentence. <paramref name="lines"/> &lt; 0 = ADVANCING PAGE.
     /// Rules:
     /// <list type="bullet">
-    /// <item>ADVANCING PAGE resets the counter to 1 (§13.18.34 GR7c1) and repositions the device — §14.9.51.4
-    ///   GR25 g), <i>"The repositioning is to the first line that may be written on the next logical page as
-    ///   specified in the LINAGE clause"</i>. ⛔ NOT a form feed: GR25 h) is the form-feed arm and it is the
-    ///   NO-LINAGE case. No observable end-of-page (§14.9.51 SR18 bars PAGE+EOP in one statement).</item>
+    /// <item>⛔ ADVANCING PAGE IS A PAGE OVERFLOW (kb/Work PB578). §13.18.34.4 GR7 c) 1 resets the counter to one
+    ///   and says how: <i>"During the resetting of LINAGE-COUNTER to the value one, the value of LINAGE-COUNTER
+    ///   is implicitly incremented to exceed the value specified by integer-1 or the data item referenced by
+    ///   data-name-1"</i> — the counter passes the page size, which is §14.9.51.4 GR26 a)'s trigger (<i>"This
+    ///   occurs when the associated LINAGE-COUNTER is equal to or exceeds the page size"</i>), and GR27 a) names
+    ///   the condition EC-I-O-EOP-OVERFLOW. So ADVANCING PAGE takes the overflow arm below and has no arm of its
+    ///   own: one transition (GR25 g)'s destination IS GR26 a)'s, <i>"the first line that may be written on the
+    ///   next logical page"</i>), one reset (GR7 c) 1 / c) 4) and one end-of-page condition — which an
+    ///   EC-I-O-EOP-OVERFLOW declarative, an exception-checking PERFORM's WHEN phrase and FUNCTION
+    ///   EXCEPTION-STATUS see, and which keeps a NOT END-OF-PAGE imperative from running (GR28). §14.9.51.3 SR18
+    ///   bars only the AT END-OF-PAGE phrase beside ADVANCING PAGE (docs/CONFORMANCE.md §4, "DETERMINATION —
+    ///   WRITE ADVANCING PAGE on a logical page is a page overflow"). ⛔ NOT a form feed: GR25 h) is the
+    ///   form-feed arm and it is the NO-LINAGE case.</item>
     /// <item>ADVANCING n travels n lines and adds n (GR7c2/GR25a); a plain WRITE travels 1 and adds 1 (GR7c3 —
     ///   the caller passes 1). n = 0 is GR25 c)'s "no repositioning".</item>
     /// <item>Counter past the page body ⇒ page overflow (§14.9.51 GR26a): the device is <i>"repositioned to the
@@ -739,24 +748,21 @@ public sealed class SequentialConnector : FileConnector
         // The device is on the page body only once this page's top margin is behind it (GR4); every travel and
         // every presentation materializes it first, so the two call sites agree by construction.
         EmitTopMarginIfPending();
-        if (lines < 0)
-        {
-            // ADVANCING PAGE (§14.9.51.4 GR25 g) + §13.18.34 GR7c1): the device is repositioned to the first
-            // line that may be written on the next logical page — never GR25 h)'s form feed, which is the arm
-            // for a file with NO LINAGE clause.
-            return BeginNextLogicalPage(page);   // GR6 b) 2 — the re-evaluation may break the page
-        }
-        // ADVANCING n (n >= 0) or plain WRITE (n = 1): the counter is incremented (GR7c2/c3) and the device
-        // travels the same n lines (GR25 a); n = 0 is GR25 c)'s "no repositioning ... is performed").
-        if (LinageCounter + lines > _pageBody)
+        // ADVANCING PAGE (lines < 0) is the page-overflow arm, not one of its own: §13.18.34.4 GR7 c) 1 increments
+        // the counter "to exceed the value specified by integer-1" while resetting it (kb/Work PB578), which is
+        // GR26 a)'s trigger, and GR25 g)'s destination is GR26 a)'s. Otherwise ADVANCING n (n >= 0) or plain
+        // WRITE (n = 1): the counter is incremented (GR7c2/c3) and the device travels the same n lines (GR25 a);
+        // n = 0 is GR25 c)'s "no repositioning ... is performed").
+        if (lines < 0 || LinageCounter + lines > _pageBody)
         {
             // Page overflow (§14.9.51 GR26a): the line does not fit in the page body — the device repositions
-            // to the first writable line of the succeeding page and the counter resets to 1 (GR7c4).
+            // to the first writable line of the succeeding page and the counter resets to 1 (GR7c4, and GR7c1
+            // for ADVANCING PAGE) — never GR25 h)'s form feed, which is the arm for a file with NO LINAGE clause.
             // ⚖ STRICT `>`, NOT `>=` — the adjudicated boundary (docs/CONFORMANCE.md §4, kb/Work PB686). GR26a
             // as printed says "equal to or exceeds the page size"; `>=` here would push a record that lands on
             // the LAST body line onto the next page and make that line unwritable forever, against §13.18.34
             // GR2. The doc comment above carries the full derivation and the survey.
-            if (!BeginNextLogicalPage(page)) return false;   // GR6 b) 3's re-evaluation broke the page
+            if (!BeginNextLogicalPage(page)) return false;   // GR6 b) 2 / b) 3's re-evaluation broke the page
             _endOfPage = Exceptions.ExceptionCatalog.IoEopOverflow;   // §14.9.51.4 GR27 a) — caused by GR26 a)
             return true;
         }
