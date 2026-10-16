@@ -53,3 +53,15 @@ sub-form (an exception-object raise in imp-1). Sweeping that paragraph found two
 exactly this), and "VALIDATE is implemented minimally" (it is the declined A.4.14 facility, inert with COBOLNET1580),
 which `COBOLNET_DESIGN.md` §18 item 17 also said. The super-batch map and the runtime-library example named the
 deleted members too. kb/Work PB2181 now records that PB442 deleted two of its six sites and its `CobolModule` lead.
+
+**The finisher's first gate was RED on a drift inventory the branch had not updated.** On the merged tree
+`DisplayUsageUnionDriftTests.HandRolledDisplayUnion_IsTheKnownInventory` still listed MoveBinder's two image marks
+as DISPLAY-only, the column PB646 chose for carriage marks. The implementer's leg 1 had not reached that case.
+`IsCharacterImageNumeric` now asks the display/national pair, which is the PB442 crash fix, so the inventory records
+it as one PAIR site. The reason is §13.18.60.4 GR8: a national numeric item HAS the character cells both marks
+write. PicInfo's IMAGE-vs-CARRIAGE comment now names which carriage sites admit national and which stay
+DISPLAY-only. PB646's warning that promotion corrupts a group-to-group MOVE was about the whole-group promotion,
+so it was probed for the single-leaf mark. Group MOVEs ran between two alphanumeric groups of national numerics and
+between two GROUP-USAGE NATIONAL groups, with both leaves forced, one forced, and an ALL "7" deposit. Every value
+and class test matched the unforced twin. Golden `2002/pb442_forced_national_leaf_group_move` (§14.9.25.4 GR4)
+pins it.
