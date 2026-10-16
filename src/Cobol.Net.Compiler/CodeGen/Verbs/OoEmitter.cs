@@ -1182,9 +1182,9 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                     // `01 G. 05 P USAGE POINTER. 05 A PIC X(4).` as a formal failed BACKEND compilation with
                     // CS1061 — `RecordStructEmitter` emits the codec for exactly `ElementImageCapable` items and
                     // a POINTER leaf is in neither of its category lists. Nothing invoked the method: the bind
-                    // side (`DataBinder.Oo`) applies no image screen and `OoConformance.DescriptionMismatch`'s
-                    // `!formal.IsImageCapable` arm runs only when an INVOKE or an override/implements PAIR
-                    // exists, so a merely-DECLARED method must not emit uncompilable C#.
+                    // side (`DataBinder.Oo`) applies no image screen and the relations' description of such a
+                    // group (`ActivationDescriptions.Of` answers none) is asked only when an INVOKE or an
+                    // override/implements PAIR exists, so a merely-DECLARED method must not emit uncompilable C#.
                     w.Line($"{type} {root.CsName} = {init};   // LINKAGE formal {root.CobolName} (group — image crossing)");
                     w.Line($"if (!{formal.OmittedFlag}) {{ " + (OoVarGroupCarried(root)
                         // §8.5.1.12's component carrier (kb/Work PB204) — the variable-length twin of the
@@ -1389,7 +1389,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
 
     /// <summary>The C# (return-type, parameter-list) of a method or prototype — ONE builder shared by class
     /// method emission, interface member emission, and the covariant adapters, so the three can never drift
-    /// (the same reasoning as the ONE DescriptionMismatch).</summary>
+    /// (the same reasoning as the ONE pair-mode relation, <c>OoConformance.SignatureDifference</c>).</summary>
     private static (string RetType, string Sig) OoSignatureOf(OoMethodSymbol m)
     {
         string retType = OoReturnClrType(m);
@@ -1671,7 +1671,7 @@ internal sealed class OoEmitter(DispatchState dispatch, EcState ecState, CallUni
                 // §14.8.2.2's variable-length sentence at the INVOKE boundary (kb/Work PB204): the carrier is
                 // the group's §8.5.1.12 components, not a width-fitted image — there is no width to fit, and
                 // the receiving side's own FromVarImage re-fits both halves. Bind has already run the
-                // compatibility relation (OoBinder → DescriptionMismatch), so the pairing is sound here.
+                // compatibility relation (OoBinder → ActivationRelations.ParameterViolation), so the pairing is sound here.
                 // ⛔ A FIXED-length group argument is admitted too (§8.5.1.12.1 "only one of the operands may be
                 // a variable-length group"; kb/Work PB965): its image is a carrier in its OWN shape, reshaped into the
                 // formal's by the same two-shape conversion a MOVE uses (kb/Work PB2690), element by element where the

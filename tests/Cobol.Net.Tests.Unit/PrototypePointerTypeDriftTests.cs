@@ -22,12 +22,12 @@ namespace CobolNet.Tests.Unit;
 /// named prototypes of one signature, and §14.8.2.3.2 ("If either is a restricted pointer, both shall be restricted
 /// and of the same type") is the same question at an argument. The relations that have a unit's prototype tables in
 /// hand ask <c>PrototypeSignatures.Same</c>; the ones that do not — the §9.3.6 match of a UNIVERSAL INVOKE, whose two
-/// descriptions travel to run time, and the typed comparator <c>OoConformance.DescriptionMismatch</c> — compared
+/// descriptions travel to run time, and the typed comparator (since deleted, kb/Work PB3101) — compared
 /// <c>PicInfo.RestrictedPrototypeName</c> instead, which refused two prototypes of one signature in the first and
 /// rejected legal source in the second. Both now read the pointer's resolved TYPE,
-/// <c>PrototypeSignatures.RestrictionIdentity</c> (the signature class <c>DataBinder.ClassifyRestrictedPrototypes</c>
-/// attached; inside a signature comparison, <c>PrototypeSignatures.SameType</c> follows the restriction to the signature
-/// it names, kb/Work PB2495), and this test keeps the NEXT relation from comparing the name again: no source line may compare
+/// <c>PrototypeSignatures.RestrictionIdentity</c> (the signature class <c>PrototypeSignatureClasses.Classify</c>
+/// attached; while the classes are refined it is the prototype's current block, kb/Work PB2495 / PB3101), and this
+/// test keeps the NEXT relation from comparing the name again: no source line may compare
 /// <c>RestrictedPrototypeName</c>. Behaviour is pinned by <c>conformance:2002/pb2464_prototype_pointer_signature_type</c>,
 /// <c>conformance:2014/pb2464_function_pointer_signature_type</c> and the negative
 /// <c>pb2464-typed-pointer-signature-mismatch</c>.</para>
@@ -271,7 +271,7 @@ public sealed class PrototypePointerTypeDriftTests
         // The repaired line, and the readers that legitimately name the property, are not caught.
         Assert.DoesNotMatch(NameComparison,
             "if (!string.Equals(PrototypeSignatures.RestrictionIdentity(formal), PrototypeSignatures.RestrictionIdentity(arg), StringComparison.Ordinal))");
-        Assert.DoesNotMatch(NameComparison, "if (!PrototypeSignatures.SameType(formal, arg, prototypes))");
+        Assert.DoesNotMatch(NameComparison, "&& !PrototypeSignatures.SameType(a, b)) return false;");
         Assert.DoesNotMatch(NameComparison,
             "? OwnIdentity(pointer.RestrictedPrototype?.ExternalizedName ?? name)");
         Assert.DoesNotMatch(NameComparison, "string? targetProto = receiver.Pic.RestrictedPrototypeName;");

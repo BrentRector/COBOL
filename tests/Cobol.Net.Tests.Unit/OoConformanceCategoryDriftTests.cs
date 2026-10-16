@@ -12,9 +12,10 @@ namespace CobolNet.Tests.Unit;
 
 /// <summary>
 /// ⛔ THE ARM THIS PINS REJECTED LEGAL SOURCE FOR FIVE WHOLE PICTURE CATEGORIES, SILENTLY AND FOR AS LONG AS
-/// THE FUNCTION HAS EXISTED (fix-queue PB46). <see cref="OoConformance.DescriptionMismatch"/> — the ONE
-/// §14.8.2.3.2 identical-description check every INVOKE argument and every override signature goes through —
-/// switched on the formal's category with arms for object-reference, numeric and alphanumeric and a
+/// THE FUNCTION HAS EXISTED (fix-queue PB46). The identical-description check every INVOKE argument and every
+/// override signature then went through (a <c>DataItem</c> comparator, deleted with kb/Work PB3101: the pair-mode
+/// question is now <see cref="OoConformance.SignatureDifference"/> over two activation descriptions) switched on the
+/// formal's category with arms for object-reference, numeric and alphanumeric and a
 /// <c>default:</c> that answered "formal category {c} is not yet carried across INVOKE". So a category-boolean,
 /// category-national, numeric-edited, pointer or program-pointer FORMAL PARAMETER was impossible in every
 /// passing mode — BY REFERENCE, BY CONTENT and bare alike — while the marshaling arms had carried all of them
@@ -30,8 +31,8 @@ namespace CobolNet.Tests.Unit;
 public sealed class OoConformanceCategoryDriftTests
 {
     /// <summary>Every <see cref="PicCategory"/> that can describe an ELEMENTARY item. <see cref="PicCategory.Group"/>
-    /// is excluded by construction, not by omission: a group item has no <see cref="PicInfo"/> at all and
-    /// <c>DescriptionMismatch</c> returns through its <c>formal.IsGroup</c> branch before the switch.</summary>
+    /// is excluded by construction, not by omission: a group item has no <see cref="PicInfo"/> at all and is described
+    /// by its group shape, never by a PICTURE category.</summary>
     public static IEnumerable<object[]> ElementaryCategories =>
         Enum.GetValues<PicCategory>().Where(c => c is not PicCategory.Group).Select(c => new object[] { c });
 
@@ -72,7 +73,7 @@ public sealed class OoConformanceCategoryDriftTests
     [MemberData(nameof(ElementaryCategories))]
     public void IdenticalDescriptions_Conform_InEveryCategory(PicCategory category)
     {
-        string? why = OoConformance.DescriptionMismatch(Item(category), Item(category));
+        string? why = OoConformance.SignatureDifference(Item(category), Item(category), "formal", "argument");
         Assert.True(why is null,
             $"category {category} does not conform to ITSELF under §14.8.2.3.2 rule 2: {why}");
     }
@@ -99,7 +100,7 @@ public sealed class OoConformanceCategoryDriftTests
                 Digits = formal.Pic.Digits == 0 ? 0 : formal.Pic.Digits + 2,
             },
         };
-        Assert.NotNull(OoConformance.DescriptionMismatch(formal, wider));
+        Assert.NotNull(OoConformance.SignatureDifference(formal, wider, "formal", "argument"));
     }
 
     /// <summary>USAGE is a rule-2 clause in its own right, and for a BOOLEAN item it is genuinely free: PIC 1
@@ -114,7 +115,7 @@ public sealed class OoConformanceCategoryDriftTests
             Level = 1, CobolName = "Q", CsName = "Q",
             Pic = bit.Pic! with { Usage = Usage.Display },
         };
-        Assert.NotNull(OoConformance.DescriptionMismatch(bit, display));
+        Assert.NotNull(OoConformance.SignatureDifference(bit, display, "formal", "argument"));
     }
 
     /// <summary>An EDITED picture's identity is its editing character-string: two numeric-edited items of the
@@ -128,6 +129,6 @@ public sealed class OoConformanceCategoryDriftTests
             Level = 1, CobolName = "Q", CsName = "Q",
             Pic = zz9.Pic! with { EditMask = "**9", Clause = PictureClauseIdentity.Of("**9", '$', "$", decimalPointIsComma: false) },
         };
-        Assert.NotNull(OoConformance.DescriptionMismatch(zz9, starred));
+        Assert.NotNull(OoConformance.SignatureDifference(zz9, starred, "formal", "argument"));
     }
 }

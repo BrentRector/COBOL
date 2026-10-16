@@ -1780,7 +1780,7 @@ src/Cobol.Net.Frontend/
   Common/          SourceLocation.cs, SourceLineMap.cs, TextSpan.cs, CobolLiteral.cs, NumericLiteral.cs, CobolWordRule.cs,
                    CompilerDirectiveWords.cs
   ANTLR4/          antlr-4.13.2-complete.jar
-  GenerateIfNewer.ps1, Invoke-Antlr4CSharp.ps1
+  Invoke-Antlr4CSharp.ps1   (the one ANTLR generator, run by the csproj's EnsureGeneratedFiles target)
   Pipeline/        Frontend.cs        (the orchestrator — MOVED from src/CobolNet/Frontend/, the one client of all of the above)
 
 src/Cobol.Net.Compiler/
@@ -1834,7 +1834,7 @@ The new `Cobol.Net.Frontend.csproj`:
 - Inherits TFM/lang from `Directory.Build.props` (net10.0 / C# 14) — **do not** re-declare.
 - `<PackageReference Include="Antlr4.Runtime.Standard" />` — **no `Version`** (central package management via `Directory.Packages.props`). It needs `Antlr4.Runtime`; it does **not** need `Mono.Cecil`.
 - No `ProjectReference` (the front-end is self-contained).
-- Carries the ANTLR generation: the `EnsureGeneratedFiles` + `CleanGenerated` targets and the `<None Include="Grammar\…">`/jar items live in its csproj; the `Inputs`/`Outputs` paths are relative.
+- Carries the ANTLR generation: the `WriteAntlrGenerationStamp` + `EnsureGeneratedFiles` + `CleanGenerated` targets, the `AntlrGrammar` item (`Grammar/**/*.g4`) and the `AntlrNamespace`/`AntlrJar`/`AntlrGenerator` properties live in its csproj; `EnsureGeneratedFiles` is the one up-to-date decision over every generation input (kb/Work PB2719), and its `Inputs`/`Outputs` paths are relative.
 - `<InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />` if any internals need testing.
 
 **Namespaces.** The five front-end sub-namespaces are `CobolNet.Frontend.{Common,Diagnostics,Generated,Parsing,Preprocessor}` (rearchitecture PHASE 01, `docs/rearchitecture/PHASE-01-mechanical-rename-deadcode.md`); the legacy tree that once shared them is deleted.

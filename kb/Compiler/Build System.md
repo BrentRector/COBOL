@@ -2,14 +2,14 @@
 title: Build System
 area: compiler
 status: draft
-last_updated: 2026-07-23
+last_updated: 2026-10-16
 related_files:
   - Directory.Build.props
   - Directory.Packages.props
   - global.json
   - nuget.config
   - Cobol.Net.sln
-  - src/Cobol.Net.Frontend/GenerateIfNewer.ps1
+  - src/Cobol.Net.Frontend/Cobol.Net.Frontend.csproj
   - src/Cobol.Net.Frontend/Invoke-Antlr4CSharp.ps1
   - scripts/guard.sh
   - scripts/guard-fast.sh
@@ -32,12 +32,17 @@ backend), `Microsoft.CodeAnalysis.CSharp 4.14.0` (Roslyn), `System.CommandLine 2
 
 ## ANTLR regen at build
 `Generated/` is a **gitignored build output** — a fresh checkout always regenerates, so **`java` + `pwsh` are build
-prerequisites** on every platform. The csproj `EnsureGeneratedFiles` target (`BeforeTargets=CoreCompile`) runs
-`GenerateIfNewer.ps1 -PackageName $(AntlrNamespace)`; the namespace `CobolNet.Frontend.Generated` is single-sourced
-from the csproj `<AntlrNamespace>` property.
-- **`GenerateIfNewer.ps1`** — staleness check: regenerates when any `Grammar/**/*.g4` is newer than the generated
-  lexer/parser (or they're absent). A failed generation **fails the build** (no stale-parser fallback).
-- **`Invoke-Antlr4CSharp.ps1`** — runs `antlr-4.13.2-complete.jar` with `-Dlanguage=CSharp -no-listener -visitor`.
+prerequisites** on every platform.
+- **The csproj `EnsureGeneratedFiles` target** (`BeforeTargets=CoreCompile`) is the ONE up-to-date decision
+  (kb/Work PB2719): it runs when `Generated/` is absent or any generation input is newer — every `Grammar/**/*.g4`
+  (the `AntlrGrammar` item), the generator script, the `<AntlrJar>`, and `obj/antlr-generation.stamp`, which the
+  `WriteAntlrGenerationStamp` target rewrites only when the namespace or jar path changes. So a warm tree regenerates
+  on a namespace, jar or tool-flag change exactly as a fresh checkout does. The namespace `CobolNet.Frontend.Generated`
+  is single-sourced from the csproj `<AntlrNamespace>` property. `AntlrGenerationDriftTests` pins all of it.
+- **`Invoke-Antlr4CSharp.ps1`** — the one generator, run once per regeneration with mandatory `-PackageName`, `-JarPath`
+  and `-OutputDir` (no defaults); runs the jar with `-Dlanguage=CSharp -no-listener -visitor -encoding UTF-8`.
+  It empties `Generated/` before generating and again on any failure, and a failed generation **fails the build**
+  (no stale-parser fallback).
   Portability fix: each grammar is generated **from its own directory with a bare filename** (ANTLR mirrors relative
   dirs using the *platform* separator). Lexer generates first; the parser's `-lib` inputs (imported `Core/*.g4` +
   `CobolLexer.tokens`) stage under `obj/antlr-lib/`.

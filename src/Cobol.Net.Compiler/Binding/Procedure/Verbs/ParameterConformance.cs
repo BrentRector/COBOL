@@ -32,8 +32,8 @@ internal sealed record ActivationSite(string Callee, string ImportingRule, Diagn
 /// object reference crossed into a formal of a different object-reference description — each one a diagnostic on
 /// the CALL side and a silent run on the function side. The rule lives here so the two activations cannot drift
 /// again; <c>ActivationConformanceDriftTests</c> pins that both lanes ask it. INVOKE's third lane is
-/// <c>OoBinder</c>'s, over the SAME comparators in <see cref="CobolNet.Compiler.Oo.OoConformance"/>, and it asks this
-/// type for everything its statement words like CALL's (kb/Work PB1137): the storage-section rule and the keyword-less
+/// <c>OoBinder</c>'s, which asks the same run-time relations (<see cref="ActivationRelations"/>; kb/Work PB2077, PB3101),
+/// and it asks this type for everything its statement words like CALL's (kb/Work PB1137): the storage-section rule and the keyword-less
 /// mode test built on it (<see cref="ScreenSection"/>, <see cref="MeetsByReferenceRules"/> — §14.9.23.3 SR9/SR11 and
 /// §14.9.23.4 GR6 a), CALL's §14.9.4.3 SR3/SR7 and §14.9.4.4 GR9 a)), the bit-alignment proof (SR12, CALL's SR6/SR8)
 /// and the literal-2 verdict (<see cref="ContentConformanceReason"/>).</para>
@@ -46,11 +46,12 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// <list type="bullet">
     /// <item>An ADDRESS-IDENTIFIER (kb/Work PB239) is a pointer value with no storage behind it; its law is the
     /// class-pointer paragraph both passing regimes share.</item>
-    /// <item>BY REFERENCE: §14.8.2.3.2 / §14.8.2.2 rule 1 — the same-description comparator, in ACTIVATION mode
-    /// (rules d/e: an ANY LENGTH formal takes the argument's length), plus the class-pointer paragraph's last
-    /// sentence: "If either is a restricted pointer, both shall be restricted and of the same type."</item>
+    /// <item>BY REFERENCE: §14.8.2.3.2 / §14.8.2.2 rule 1 — the run-time CALL lane's relation over the two
+    /// descriptions (<see cref="ByReferenceViolation"/>): rule 2's clause identity, "Additionally" d) / e) for ANY
+    /// LENGTH, the class-pointer paragraph with its restricted-pointer sentence, the object-reference rules and the
+    /// group rules.</item>
     /// <item>BY CONTENT / BY VALUE: §14.8.2.3.3 / §14.8.2.2 rule 2 — the COMPUTE / SET / MOVE regime per formal
-    /// category.</item>
+    /// category, asked of the same relation (<see cref="ContentConformanceReason"/>).</item>
     /// </list></summary>
     internal void CheckArgument(DataItem formal, BoundCallArg arg, int position, ActivationSite site)
     {
@@ -80,28 +81,10 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
         }
         if (arg.Mode is CobolPassMode.Reference && arg.Place is { } ap)
         {
-            if (CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(formal, ap.Item,
-                    byRefGroupPrefix: true,
-                    // §14.8.2.3.2 rules d/e — ACTIVATION mode, the INVOKE twin's (OoBinder) setting. PAIR mode
-                    // demanded the same ANY LENGTH clause on both sides, so a plain argument meeting an ANY LENGTH
-                    // formal — the clause's whole purpose, rule d: "its length is considered to match the length
-                    // of the corresponding argument" — was refused at every AS NESTED call (kb/Work PB240).
-                    anyLengthActivationRelax: true) is { } why)
+            if (ByReferenceViolation(ap, formal) is { } why)
                 ctx.Edition.Error(site.Conformance,
                     $"{site.Callee} argument {position} ('{ap.Item.CobolName}') does not conform to formal "
                     + $"parameter '{formal.CobolName}': {why} (ISO §14.8.2 via {site.ImportingRule})");
-            // ⛔ THE `asNested` SCOPING IS GONE, AND ITS PREMISE WITH IT (kb/Work PB427). §8.5.3.1's equivalence
-            // is decided from the DECLARATIONS themselves — StrongTypeModel.SameRestriction resolves each
-            // restriction to its own source element's type declaration and compares them structurally — so a
-            // separately-declared activated element is exactly the case the rule is FOR (kb/Work PB153).
-            var argR = StrongTypeModel.PointerRestriction(ap.Item);
-            var formalR = StrongTypeModel.PointerRestriction(formal);
-            if ((argR.IsRestricted || formalR.IsRestricted) && !StrongTypeModel.SameRestriction(argR, formalR))
-                ctx.Edition.Error(site.Conformance,
-                    $"{site.Callee} argument {position} ('{ap.Item.CobolName}') and formal parameter "
-                    + $"'{formal.CobolName}': one is a RESTRICTED data-pointer and the other is not restricted to "
-                    + $"the same type (argument: {argR}; formal: {formalR}) — ISO §14.8.2.3.2 requires that if either "
-                    + "is a restricted pointer, both shall be restricted and of the same type");
             return;
         }
         // §14.8.2.3.3 (BY CONTENT / BY VALUE) + §14.8.2.2 rule 2 — the OTHER ARM OF THE SAME DISPATCH (kb/Work
@@ -119,6 +102,24 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                 + $"(ISO §14.8.2 via {site.ImportingRule})");
     }
 
+    /// <summary>⛔ ISO §14.8.2.3.2 / §14.8.2.2 FOR A BY REFERENCE ARGUMENT, ASKED OF THE ONE RELATION (kb/Work PB3101,
+    /// PB3127): <see cref="ActivationRelations.CallArgumentViolation"/> — the copy a CALL located by name at run time
+    /// asks (§14.9.4.4 GR3 d)) — over the descriptions <see cref="CobolNet.Compiler.Oo.ActivationDescriptions"/> builds
+    /// for both sides, so the bind-time and the run-time lanes cannot answer one pair differently. Every activation
+    /// this entry serves is one §14.8.2.3.2 rule 2 governs: "a program for which there is a program-specifier in the
+    /// REPOSITORY paragraph", "a program and the NESTED phrase is specified on the CALL statement", "a function" — so
+    /// the rule-2 clause identity, never rule 1's length. A reference-modified argument is the unique data item
+    /// §8.4.3.3.4 GR5 creates, which has no PICTURE clause (docs/CONFORMANCE.md D-RM1, decision PB3098): it conforms to
+    /// an alphanumeric group formal of no more bytes and to no elementary formal. Null when the pair conforms.</summary>
+    private string? ByReferenceViolation(Place argument, DataItem formal)
+    {
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.OfPlace(argument, host.OoClasses) is not { } a)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(argument.Item, "argument");
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(formal, host.OoClasses) is not { } f)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(formal, "formal parameter");
+        return ActivationRelations.CallArgumentViolation(CobolPassMode.Reference, a, f, specifiedProgram: true);
+    }
+
     /// <summary>⛔ THE ONE RETURNING-ITEM HALF OF ISO §14.8.3 — for every activation whose activated element's returning
     /// item is known when the activating statement binds (kb/Work PB1164): a Format-2 CALL (§14.9.4.3 SR25) and an
     /// INVOKE (§14.9.23.4 GR7 c)). §14.8.3.1 makes "the returning item in the activated element the sending
@@ -133,9 +134,10 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
     /// has no invocation, and a program's returning item cannot be ACTIVE-CLASS, so rule 1 is its whole rule.
     /// This is NOT §9.3.8.2.3's identity comparison, which CALL used to ask here and which refused every legal
     /// widening.</item>
-    /// <item>Everything else — the description comparison (§14.8.3.2 groups, §14.8.3.3 elementary items), in
-    /// ACTIVATION mode (rules 4/5, the ANY LENGTH relaxation). No prefix latitude: §14.8.3.2 asks for "the same
-    /// length".</item>
+    /// <item>Everything else — the run-time CALL lane's relation over the two descriptions
+    /// (<see cref="ActivationRelations.CallReturningViolation"/>; kb/Work PB3101): §14.8.3.2 groups (no prefix
+    /// latitude — "the same length"), §14.8.3.3's elementary identity and its "Additionally" 4) / 5) ANY LENGTH
+    /// rules.</item>
     /// </list>
     /// A function-identifier asks nothing: its result temporary IS a clone of the RETURNING item (§8.4.3.2.4 GR1), so
     /// the pair conforms by construction. Null when conformant.</summary>
@@ -153,7 +155,13 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
                       + "item into the activating one)"
                     : null
                 : null;
-        return CobolNet.Compiler.Oo.OoConformance.DescriptionMismatch(activated, receiving, anyLengthActivationRelax: true);
+        // Everything else is the run-time CALL lane's relation over the two descriptions (kb/Work PB3101): §14.8.3.2's
+        // groups, §14.8.3.3's elementary identity and its "Additionally" 4) / 5) ANY LENGTH rules.
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(activated, host.OoClasses) is not { } sending)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(activated, "returning item");
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(receiving, host.OoClasses) is not { } receivingItem)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(receiving, "receiving item");
+        return ActivationRelations.CallReturningViolation(receivingItem, sending);
     }
 
     /// <summary>The CALL lane's twin of <see cref="CheckArgument"/>'s carrier residue for the RETURNING item (kb/Work
@@ -188,134 +196,41 @@ internal sealed class ParameterConformance(BinderContext ctx, StatementBinder ho
             ? new BoundNumericLiteral("0")
             : value;
 
-    /// <summary>ISO §14.8.2.3.3's conformance verdict for ONE bound BY CONTENT / BY VALUE argument, dispatched
-    /// on the argument's SHAPE onto the rules that live with their BY REFERENCE sibling in
-    /// <see cref="CobolNet.Compiler.Oo.OoConformance"/> (kb/Work PB165). Null when conformant.
-    /// <para>Each shape takes the clause the standard names for it: an identifier the per-formal-category rule
-    /// (2a COMPUTE / 2b SET / 2c ANY LENGTH / 2d MOVE, plus the class-pointer and object-reference SET paragraph);
-    /// a boolean expression or boolean literal Table 16's BOOLEAN row (rule 2d); an arithmetic expression rule
-    /// 2a's COMPUTE into a numeric formal and, into any other, rule 2d's MOVE asked of its numeric VALUE (kb/Work PB1946);
-    /// an alphanumeric literal rule 2d's MOVE; a numeric literal whichever of 2a/2d its value can
-    /// satisfy; an intrinsic function-identifier the rule for a data item of its RESULT category (§15.4 — "The
-    /// evaluation of a function produces a returned value in a temporary elementary data item"). A CONSTANT-NAME
-    /// argument arrives already substituted as its literal (§13.10.4 GR1), so it needs no arm of its own.</para>
-    /// </summary>
-    internal string? ContentConformanceReason(DataItem formal, BoundCallArg arg)
+    /// <summary>⛔ ISO §14.8.2.3.3 / §14.8.2.2 rule 2 FOR ONE BY CONTENT / BY VALUE ARGUMENT, ASKED OF THE ONE RELATION
+    /// (kb/Work PB3101): <see cref="ActivationRelations.CallArgumentViolation"/> — the copy a CALL located by name at run
+    /// time asks (§14.9.4.4 GR3 d)) — over the descriptions <see cref="CobolNet.Compiler.Oo.ActivationDescriptions"/>
+    /// builds for both sides: an identifier as the place it is (a reference-modified one as the unique data item
+    /// §8.4.3.3.4 GR5 creates), and a value with no storage as the sending operand rule 2 names
+    /// (<see cref="CobolNet.Compiler.Oo.ActivationDescriptions.OfValue"/>: a literal of its category, a figurative constant
+    /// or an ALL literal of any, a numeric literal by its own digits — a BY VALUE literal bound as an expression too,
+    /// §14.9.4.4 GR8 —, an intrinsic function by its §15.4 result, an arithmetic expression as a numeric COMPUTE sender
+    /// with no character image, a boolean value, NULL). So the bind-time and the run-time lanes cannot answer one pair
+    /// differently. Every activation this entry serves is one §14.8.2.3.3 rule 2 governs ("a program for which there is a
+    /// program-specifier …", "… the NESTED phrase …", "a method", "a function"), so the COMPUTE / SET / MOVE regime, never
+    /// rule 1's length; §14.8.2.2's strongly-typed and variable-length sentences govern this mode as they govern BY
+    /// REFERENCE. A CONSTANT-NAME argument arrives already substituted as its literal (§13.10.4 GR1).
+    /// <para>⛔ ONE PAIR STAYS WITH THE CLASS TABLE: two object references. §14.8.2.3.3's SET paragraph over them is the
+    /// §14.9.39.3 table both phases ask (<see cref="ObjectReferenceSet"/>), but the compile-time pair reads the class facts
+    /// AS A PAIR (<see cref="CobolNet.Compiler.Oo.OoClassTable.SetOperands"/>: a formal of a parameterized class stands for
+    /// the actual most favourable to the pair, kb/Work PB2937), and an ACTIVE-CLASS formal's two alternatives are
+    /// conditions on how the method is INVOKED (<paramref name="invokedWith"/>), which no description carries — the same
+    /// split <see cref="ReturningConformanceReason"/> makes.</para>
+    /// Null when conformant, and when the argument is a shape no description names (its binder has already reported
+    /// whatever refused to bind).</summary>
+    /// <param name="invokedWith">INVOKE only: how the method is invoked (§14.8.2.3.3's ACTIVE-CLASS alternatives).</param>
+    internal string? ContentConformanceReason(DataItem formal, BoundCallArg arg, ObjectRefDescriptor? invokedWith = null)
     {
-        if (arg.ContentBool is not null)
-            return CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Boolean);
-        if (arg.Place is { } p)
-            return CobolNet.Compiler.Oo.OoConformance.ContentMismatch(host.OoClasses, host.Set.PointerAssignmentReason, formal, p);
-        return arg.Value switch
-        {
-            // ⛔ NULL IS AN IDENTIFIER OF CLASS POINTER OR OBJECT, NOT A FIGURATIVE LITERAL (kb/Work PB1630). §8.4.3.1.2
-            // lists it as Format 8 (predefined-address) and Format 6 (predefined-object); §8.4.3.10.1: "NULL is a
-            // predefined address of class pointer", §8.4.3.7.3 SR2: "class object and category object reference". So it
-            // is asked the question for an identifier of that class: §14.8.2.3.3's SET paragraph for a formal of class
-            // pointer or object reference — and a SET of any such receiver TO NULL is valid (§14.9.39) —
-            // and, for every other formal, the COMPUTE / SET-index / MOVE rule its class takes, none of which admits a
-            // pointer or object operand (§14.9.25.3 SR1 for the MOVE, which §14.8.2.2 rule 2 also asks of a group
-            // formal). The alphanumeric-figurative arm below used to answer it, so NULL crossed into a PIC X formal as
-            // a one-character fill and into a pointer formal as a string the slot adapter refused at run time.
-            BoundPredefinedNull => SlotWindow.CarriedBySlot(formal) ? null
-                : "NULL is the predefined address of class pointer (ISO §8.4.3.10.1) or the predefined object reference "
-                + "of class object (§8.4.3.7.3 SR2); §14.8.2.3.3 transfers it only into a formal parameter of class "
-                + "pointer or object reference, by the SET rules, and a formal of any other class takes its argument by a "
-                + "MOVE or COMPUTE, whose operands shall not be of class object or pointer (§14.9.25.3 SR1)",
-            // ⛔ A GROUP FORMAL ASKS THE WHOLE MOVE QUESTION (kb/Work PB1617). §14.8.2.1 sends every pair that is not
-            // elementary-to-elementary to §14.8.2.2, whose rule 2 makes a BY CONTENT argument's conformance "the same as
-            // for a MOVE statement with the argument as the sending operand and the corresponding formal parameter as
-            // the receiving operand" — and a MOVE into a group is more than Table 16: SR2 refuses anything but a
-            // same-type group into a strongly-typed one, and SR9 / §8.5.1.12.1 refuse any operand but a compatible
-            // group into a VARIABLE-LENGTH one ("may not undergo … a move operation … unless the other operand is a
-            // compatible group"). The literal arms below answered every group formal with "conformant", so a
-            // figurative constant reached a variable-length group formal and died at run time as
-            // EC-PROGRAM-ARG-MISMATCH (or crossed silently), and an integer literal — which MOVEs to an
-            // alphanumeric group — was refused. The literal is the sender exactly as the written MOVE binds it, so
-            // MoveTable16.Validity (kb/Work PB878: "the WHOLE question, never Table 16 alone") answers it.
-            // ⛔ A FORMAL OF CLASS POINTER OR OBJECT REFERENCE TAKES THE SET PARAGRAPH (kb/Work PB1617). §14.8.2.3.3: "If
-            // the formal parameter is of class pointer or an object reference described without the ACTIVE-CLASS
-            // phrase, the conformance rules shall be the same as if a SET statement were performed … with the argument
-            // as the sending operand", and no SET format sends a nonnumeric, numeric or ALL literal, or a figurative
-            // constant other than NULL, to such a receiver. The literal arms below asked Table 16 instead and admitted
-            // SPACE, which then reached the callee's managed slot as a string (run-time EC-PROGRAM-ARG-MISMATCH on the
-            // CALL lane, a backend CS1503 on the INVOKE lane once INVOKE carried figuratives). NULL is the one
-            // figurative such a SET admits, and it is left to the lanes that carry it.
-            BoundStringLiteral or BoundAllLiteral or BoundFigurative or BoundNumericLiteral
-                when SlotWindow.CarriedBySlot(formal) =>
-                "§14.8.2.3.3 transfers a value into a formal parameter of class pointer or object reference by the SET "
-                + "rules, and a literal or a figurative constant other than NULL is not a sending operand of any SET format",
-            BoundStringLiteral or BoundAllLiteral or BoundFigurative or BoundNumericLiteral when formal.IsGroup =>
-                MoveTable16.Validity(arg.Value, Table16Operand.Of(formal), formal) is { } move
-                    ? $"§14.8.2.2 rule 2 transfers the argument into the group formal parameter by the MOVE rules: {move.Reason}"
-                    : null,
-            // ⛔ RULE 2a FIRST: "If the formal parameter is numeric, the conformance rules are the same as for a
-            // COMPUTE statement", and a COMPUTE's sending operands are numeric — §8.8.1.1 admits "a numeric literal,
-            // the figurative constant ZERO" and no other literal. So a nonnumeric literal, an ALL literal or any
-            // other figurative has no conforming crossing into a numeric formal, whatever Table 16 would say of a
-            // MOVE of the same pair (kb/Work PB1418: `FUNCTION F("ABCD")` into a PIC 9(4) formal ran as 0000, and
-            // the Format-2 CALL's BY CONTENT twin with it — rule 2d's MOVE question was being asked instead).
-            BoundStringLiteral or BoundAllLiteral or BoundFigurative { Kind: not 'Z' }
-                when formal is { IsGroup: false, Pic.Category: PicCategory.Numeric } =>
-                "§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and a "
-                + "nonnumeric literal, an ALL literal or a figurative constant other than ZERO is not a numeric "
-                + "sending operand (ISO §8.8.1.1)",
-            // A written nonnumeric literal carries its CATEGORY (alphanumeric — plain or hexadecimal —, national or
-            // boolean), so rule 2d's MOVE question is asked of that sender exactly (kb/Work PB1137: a national literal
-            // at an alphanumeric formal is Table 16's "No").
-            BoundStringLiteral s =>
-                CobolNet.Compiler.Oo.OoConformance.ContentNonNumericLiteralMismatch(formal, s.Category),
-            // A figurative constant and an ALL literal are alphanumeric VALUES whose category the context chooses
-            // (§8.3.3.6.4 GR1), so they take rule 2d's MOVE arm under any literal category.
-            BoundAllLiteral or BoundFigurative =>
-                CobolNet.Compiler.Oo.OoConformance.ContentAlphanumericLiteralMismatch(formal),
-            // A numeric literal, an arithmetic expression and a boolean value (above) are DESCRIBED as the sending
-            // operand they are and asked the ONE value verdict (kb/Work PB1113).
-            BoundNumericLiteral n =>
-                CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Numeric(n)),
-            // A BY VALUE argument binds as a computed operand even when §14.9.4.4 GR8 says it is "merely a single
-            // identifier or literal" — the literal case is recovered so the two spellings of one value get ONE
-            // verdict (the CallEmitter.ArgText discipline, applied to conformance).
-            BoundComputedOperand ce when Gr8ArgumentLiteral.NumericText(ce.Expr) is { } ct =>
-                CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal,
-                    CobolNet.Compiler.Oo.ContentValue.Numeric(new BoundNumericLiteral(ct))),
-            BoundComputedOperand { Expr: BoundIntrinsicCall ic } ce2 => IntrinsicResultMismatch(formal, ce2, ic),
-            BoundComputedOperand =>
-                CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Arithmetic),
-            // No bound value at all (a shape the arms above do not name) is not a conformance verdict to make:
-            // the binder has already reported whatever refused to bind.
-            _ => null,
-        };
-    }
-
-    /// <summary>ISO §14.8.2.3.3 for an INTRINSIC function-identifier argument. §8.4.3.1.2 Format 1 makes a
-    /// function-identifier an IDENTIFIER, and §15.4 produces its returned value "in a temporary elementary data item"
-    /// of the function's category — so the crossing is the one a data item of that category takes. A NUMERIC
-    /// result is a numeric value on the arithmetic channel, and takes the arithmetic-expression verdict unchanged.
-    /// A character-valued result (alphanumeric, national or boolean — the string channel) takes rule 2a's
-    /// COMPUTE into a numeric formal, which it cannot satisfy (a COMPUTE's sending operands are numeric,
-    /// §8.8.1.1), and otherwise rule 2d's MOVE — the WHOLE §14.9.25.3 question (SR1's class screen, then
-    /// <c>MoveTable16.Validity</c>'s SR2/SR8/SR9/Table-16 chain), asked with the function-identifier itself as the
-    /// sender, whose Table-16 row is its §15.2 TYPE (kb/Work PB73).</summary>
-    private static string? IntrinsicResultMismatch(DataItem formal, BoundComputedOperand sender, BoundIntrinsicCall ic)
-    {
-        // A NUMERIC result is a numeric sender. Into a numeric, index, group, pointer or object-reference formal the one
-        // value verdict answers (rules 2a/2b, the group and SET refusals); into any other formal rule 2d's MOVE question
-        // is asked of the function-identifier itself below, whose Table-16 row is its §15.2 type — an INTEGER function
-        // (MAX over integers, INTEGER, ORD) is the Integer row, exactly as the INVOKE lane's identifier arm reads it
-        // (kb/Work PB1946: this arm answered with the expression's conservative noninteger row, so `CALL … BY CONTENT
-        // FUNCTION MAX(A B)` into a PIC X(4) formal was refused where the INVOKE of the same pair compiled).
-        if (ic.ResultCategory is PicCategory.Numeric
-            && (formal.IsGroup || SlotWindow.CarriedBySlot(formal) || formal.Pic is { Category: PicCategory.Numeric }))
-            return CobolNet.Compiler.Oo.OoConformance.ContentValueMismatch(formal, CobolNet.Compiler.Oo.ContentValue.Arithmetic);
-        if (formal.Pic is { Category: PicCategory.Numeric })
-            return "§14.8.2.3.3 rule 2a transfers a value into a numeric formal parameter by the COMPUTE rules, and "
-                + $"the function's {ic.ResultCategory.ToString().ToLowerInvariant()} value is not a numeric sending "
-                + "operand (ISO §8.8.1.1)";
-        return (MoveTable16.SenderClassRefusal(sender)
-                ?? MoveTable16.Validity(sender, Table16Operand.Of(formal), formal)?.Reason) is { } why
-            ? $"§14.8.2.3.3 rule 2d transfers the function's value by the MOVE rules: {why}"
-            : null;
+        if (formal.Pic is { Category: PicCategory.ObjectReference } formalPic
+            && arg.Place?.DenotedItem?.Pic is { Category: PicCategory.ObjectReference } argumentPic)
+            return CobolNet.Compiler.Oo.OoConformance.ObjectReferenceContentMismatch(host.OoClasses, formalPic, argumentPic,
+                invokedWith);
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.OfCallArgument(arg, programRestriction: null, host.OoClasses)
+            is not { } a)
+            return arg.Place is { } p ? CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(p.Item, "argument")
+                : null;
+        if (CobolNet.Compiler.Oo.ActivationDescriptions.Of(formal, host.OoClasses) is not { } f)
+            return CobolNet.Compiler.Oo.ActivationDescriptions.NoDescriptionReason(formal, "formal parameter");
+        return ActivationRelations.CallArgumentViolation(arg.Mode, a, f, specifiedProgram: true);
     }
 
     /// <summary>The ISO §8.5.2.1 Table-2 class of an argument whose corresponding formal is BY VALUE — the question

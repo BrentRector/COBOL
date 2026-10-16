@@ -80,7 +80,11 @@
        PROGRAM-ID. PB173BR.
        DATA DIVISION.
        LINKAGE SECTION.
-       01 LR PIC X(3).
+      *> The slice has no PICTURE clause, so BY REFERENCE through the NESTED phrase it conforms only to an
+      *> alphanumeric group formal of no more bytes (14.8.2.3.2 rule 2, 14.8.2.2 rule 1; docs/CONFORMANCE.md
+      *> D-RM1, kb/Work PB3101) - never to an elementary PIC X(3) formal.
+       01 LR.
+          05 LR1 PIC X(3).
        PROCEDURE DIVISION USING LR.
        P.
            DISPLAY "R-IN=" LR

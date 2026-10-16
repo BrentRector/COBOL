@@ -36,7 +36,7 @@ and share *one* traversal — and we do neither.
 
 | Fact | Number | Source |
 |---|---|---|
-| ANTLR generation flags | `-visitor` **`-no-listener`** | `Invoke-Antlr4CSharp.ps1:71` |
+| ANTLR generation flags | `-visitor` **`-no-listener`** | `Invoke-Antlr4CSharp.ps1` (its ANTLR step) |
 | Uses of ANTLR **listeners** in greenfield | **0** | grep `ParseTreeListener/Walker` = none |
 | Greenfield files that subclass the generated **visitor** | **1** (`VersionConformancePass`, 57 overrides) | grep |
 | Binder statement dispatch | a **50-arm** `_ when s.xStatement() is {}` chain (not the visitor) | `StatementBinder.cs:172` |
