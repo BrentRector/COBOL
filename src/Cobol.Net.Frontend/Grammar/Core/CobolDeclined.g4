@@ -49,6 +49,15 @@
 //       (b). The gate is right either way; the REASON is not interchangeable.)
 // A LEFT-EDGE predicate steers ANTLR's prediction; mid-alternative it would let the alternative be chosen and
 // then throw (DEVLOG: the SET regression).
+// ⚖ kb/Work PB2291 ADJUDICATED THE THREE GATES AGAINST D7 (COBOLNET_DESIGN §1.1) AND FOUND THEM CONSTRUCT GATES.
+// Reason (a) is word status and is sanctioned, but it covers only the arms whose LEADING word is a user word
+// below the edition (DEFAULT, PRESENT, VALIDATE-STATUS, VAL-STATUS, the VALID phrase). Reason (b) — CLASS, and
+// equally DESTINATION, INVALID and VARYING, all reserved at every edition, and APPLY COMMIT, which has no APPLY
+// clause before 2023 — is a construct the parse refuses by edition: below its introduction it draws a bare
+// COBOL0001 where D7 wants VersionConformancePass to name the edition (COBOLNET0900). The edition number on each
+// gate is therefore recorded as a D7 defect in EditionReadDriftTests, to be replaced by a word-status read of the
+// arm's leading word plus a conformance-pass gate once constructs.json can carry a construct that is refused by
+// name AT its introduction (a declined row). Until then the gates stay, and the two reasons stay distinct.
 // ══════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 parser grammar CobolDeclined;

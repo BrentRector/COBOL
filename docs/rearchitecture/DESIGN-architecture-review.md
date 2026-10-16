@@ -1433,12 +1433,14 @@ word status (is this word reserved at this edition, and how is it spelled there)
 comment calls LOCALE and USER-DEFAULT 1985 user words (`CobolParserCoreBase.cs:186-187`) — which the superset parse
 cannot avoid: a
 word that is a user-defined word in an earlier edition must still parse as one there. The grammar's comments give the
-same reason for four of the five spellings (LOCATION, VALID, APPLY and COMMIT, RETRY); the fifth, `validationClause`,
-gates a construct by edition. D7's statement in `COBOLNET_DESIGN.md` ("There is no parse-time `{isXXXX()}?` edition
-predicate") was not what the code does; that document now says what the code does, and kb/Work PB2291 adjudicates
-every member and site the rule finds against D7's purpose (a word-status read the superset parse cannot avoid, or a construct gate that
-belongs in `VersionConformancePass`). Draft 1's "zero" and its correction of §3 R1 and of the `architecture-review`
-skill stay withdrawn; that skill sentence describes the code.
+same reason for four of the five spellings (LOCATION, VALID, APPLY and COMMIT, RETRY), and kb/Work PB2291's verdict
+(landed) holds two of those four: LOCATION and RETRY are word status, while APPLY COMMIT has no other reading below
+2023 and the VALID phrase's INVALID arm none below 2002, so they and the fifth, `validationClause` (whose CLASS,
+DESTINATION, INVALID and VARYING arms are reserved at every edition), gate constructs by edition. D7's statement in
+`COBOLNET_DESIGN.md` ("There is no parse-time `{isXXXX()}?` edition predicate") was not what the code does; that
+document now states the verdict (word status sanctioned, the three construct gates recorded as D7 defects).
+Draft 1's "zero" and its correction of §3 R1 stay withdrawn; the `architecture-review` skill's grammar rule now
+states the verdict too.
 
 **Target: one fragment per division or facility; the core is the compilation group.** The rule: a grammar rule
 lives in the fragment of the clause or statement whose general format defines it, so the `spec-grammar-conformance`
@@ -1464,12 +1466,17 @@ token precedence with the import order; **the lexer stays one grammar**, its mod
 `LexerDfaCacheDriftTests`.
 
 **Kept, each with its pin:** no left-edge semantic predicate in a lexer mode (`LexerDfaCacheDriftTests`); the edition
-reads are what the rule above computes — the grammar drift test APPLIES the rule (it computes the members' fixpoint
-from the superclass's syntax and the call sites from every predicate and action body of the parser grammars and every
-parser listener) and compares the result with the set PB2291's verdict records, per file, so a new read under any
-name (a sixth spelling, a new `reservedHere` site, a new member, a new action or listener call) fails until PB2291's
-verdict records it (PB2291 lands the assertion with its verdict, and PB2333 moves those members as one set, so the pin
-names one type); `Generated/` is a build output,
+reads are what the rule above computes — `EditionReadDriftTests` APPLIES the rule (it computes the members' fixpoint
+from the syntax of the parser superclass, the lexer's `@members` and partials and the retype stage, derives the
+primed lexer fields from the retype stage's setter calls, and finds the call sites in every predicate and action body
+of every grammar and every other C# member of `src/`, every front-end hand-off of the edition to a parser and every
+caller that passes one on) and compares the result with the set PB2291's verdict records,
+per file and per rule, each site with its verdict (§8.9 word status, or a construct gate), so a new read under any
+name (a new spelling, a new `reservedHere` site, a new member, a new action or listener call) fails until it is
+adjudicated and recorded (landed with PB2291's verdict; PB2333 moves those members as one set, so the pin names one
+type). The verdict: every read is word status except three construct gates on the declined A.4 surface
+(`validationClause`, `validateValidPhrase`'s INVALID arm, `applyCommitClause`), which stay recorded as D7 defects until
+a constructs.json row can carry a construct refused by name at its introduction; `Generated/` is a build output,
 never committed (`GenerateIfNewer.ps1`); the generated `CobolWords.g4` is committed because it is an input,
 single-sourced from its JSON; the token-stream and parse-tree differential (§4 item 3, not yet built) is the oracle of
 EVERY grammar wave, so no grammar wave runs before it exists. **The grammar leads, placed:** PB2143 (DISPLAY's inline
