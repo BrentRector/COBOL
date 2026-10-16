@@ -937,37 +937,61 @@ public abstract class FileConnector
     /// failure (a flush that cannot complete, a store that cannot persist) is the §9.1.13.6 item 1 permanent
     /// error '30', where it previously escaped the emitted statement and aborted the run unit (kb/Work
     /// PB140). Successful or not, a completed CLOSE takes the connector out of its open mode (§14.9.6.4 GR8;
-    /// the failure left it BOTH associated and open before). Sets and returns the status.</summary>
+    /// the failure left it BOTH associated and open before). Sets and returns the status.
+    /// <para>⛔ THE CLOSING OPERATIONS RUN WHATEVER ELSE FAILS (kb/Work PB603). A failure no I-O status describes
+    /// (an exception outside the '30' family: a runtime defect, which still propagates to the caller) must not
+    /// leave the connector open, its host handle held or its §9.1.15 file lock standing. §14.6.11 2) runs the run
+    /// unit's implicit CLOSE <i>"for all open files in the run unit, even when an error occurs during the execution
+    /// of one or more of the CLOSE statements"</i>, and a lock that outlived its run unit would refuse the next run
+    /// unit's OPEN with a spurious '61'. So the organization's <see cref="CloseCore"/>, whose own <c>finally</c>
+    /// disposes the handle, runs even when the held-line drain before it throws, and the file lock and the open
+    /// mode end even when either of them throws.</para></summary>
     public string Close()
     {
         if (!IsOpen) return Status = FileStatusCode.FileNotOpen;
-        // A producer that holds its last line back writes it out FIRST — on EVERY close path (the CLOSE statement,
-        // the run unit's implicit CloseAll, a CANCEL), because they all funnel through here. One-shot: the next
-        // OPEN starts with none.
-        if (HeldLineDrain is { } drain)
-        {
-            HeldLineDrain = null;
-            // The held line is a WRITE the program already issued; a CLOSE is the correction technique of a permanent
-            // error in effect (DOC-A.1-105), so the condition is lifted first or the drain's write would be refused
-            // and the line silently lost (kb/Work PB1541). A failure of the drain itself ends here with the CLOSE.
-            _permanentError = null;
-            drain();
-        }
         string s;
-        try { s = CloseCore(); }
-        catch (UnauthorizedAccessException) { s = FileStatusCode.PermanentError; }
-        catch (IOException) { s = FileStatusCode.PermanentError; }
+        try
+        {
+            try { DrainHeldLine(); }
+            finally { s = MappedCloseCore(); }
+        }
+        finally
+        {
+            ReleaseRunUnitFileLock();   // §9.1.15 — "The file lock is removed by an explicit or implicit CLOSE statement"
+            _openMode = false;
+            // §9.1.13.1 / Annex A.1 item 105 — THE CORRECTION TECHNIQUE: a completed CLOSE ends a permanent error in
+            // effect, successful or not (an unsuccessful CLOSE also leaves the connector closed), so the next OPEN
+            // starts clean (kb/Work PB1541, docs/CONFORMANCE.md DOC-A.1-105). A CLOSE that itself fails '30' does not
+            // restart the condition: `_openMode` is already false, which the Status setter's IsOpen test reads.
+            _permanentError = null;
+        }
+        return Status = s;
+    }
+
+    /// <summary>A producer that holds its last line back writes it out FIRST, on EVERY close path (the CLOSE
+    /// statement, the run unit's implicit CloseAll, a CANCEL), because they all funnel through <see cref="Close"/>.
+    /// One-shot: the next OPEN starts with none.</summary>
+    private void DrainHeldLine()
+    {
+        if (HeldLineDrain is not { } drain) return;
+        HeldLineDrain = null;
+        // The held line is a WRITE the program already issued; a CLOSE is the correction technique of a permanent
+        // error in effect (DOC-A.1-105), so the condition is lifted first or the drain's write would be refused
+        // and the line silently lost (kb/Work PB1541).
+        _permanentError = null;
+        drain();
+    }
+
+    /// <summary>The organization's <see cref="CloseCore"/> under the OPEN twin's exception mapping: an OS-level
+    /// close failure is §9.1.13.6 item 1's permanent error '30'.</summary>
+    private string MappedCloseCore()
+    {
+        try { return CloseCore(); }
+        catch (UnauthorizedAccessException) { return FileStatusCode.PermanentError; }
+        catch (IOException) { return FileStatusCode.PermanentError; }
         // A persist composes the whole store image in one allocation (RecordFraming.ComposeStore), so a CLOSE owing one
         // maps an allocation the host refuses to the same '30' as OPEN and CompleteStatement (kb/Work PB2842).
-        catch (OutOfMemoryException) { s = FileStatusCode.PermanentError; }
-        ReleaseRunUnitFileLock();   // §9.1.15 — "The file lock is removed by an explicit or implicit CLOSE statement"
-        _openMode = false;
-        // §9.1.13.1 / Annex A.1 item 105 — THE CORRECTION TECHNIQUE: a completed CLOSE ends a permanent error in
-        // effect, successful or not (an unsuccessful CLOSE also leaves the connector closed), so the next OPEN
-        // starts clean (kb/Work PB1541, docs/CONFORMANCE.md DOC-A.1-105). A CLOSE that itself fails '30' does not
-        // restart the condition: `_openMode` is already false, which the Status setter's IsOpen test reads.
-        _permanentError = null;
-        return Status = s;
+        catch (OutOfMemoryException) { return FileStatusCode.PermanentError; }
     }
 
     /// <summary>The organization-specific OPEN body: reset org state, create/load the physical store, and
