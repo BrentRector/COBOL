@@ -3653,10 +3653,10 @@
   "rule-digest": "7b69221fe585",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Runtime/Exceptions/ExceptionCatalog.cs#DirectiveCovers; src/Cobol.Net.Compiler/Binding/TurnState.cs#Fold",
-  "test-ref": "conformance:2002/l1c33_turn_level2_file_name; conformance:2023/l1c33_turn_io_warning_explicit_only",
+  "test-ref": "conformance:2002/l1c33_turn_level2_file_name; conformance:2023/l1c33_turn_io_warning_explicit_only; conformance:2002/pb963_turn_file_name_arms",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "cite.py --check 7.3.25.4 \"the effect is as if file-name-1 were specified for each of these exception-names\" OK. Level-2 half: DirectiveCovers -> TryGet(level-2) && UnderLevel2(level3); WARNING excluded. File-name half: the Fold keeps the (EC-I-O, F1) event and matches it only for a query naming F1. Probes: TRNF1 '>>TURN EC-I-O F1 CHECKING ON' -> READ F2 AT END: status spaces, READ F1 AT END: EC-I-O-AT-END (expected per GR3 second sentence); TRNO2 '>>TURN EC-I-O CHECKING ON' does not enable EC-I-O-WARNING (status 05 -> spaces). Both halves verified. Test-ref left empty: conformance-test:ExceptionConditionConformanceTests.Turn_Level2_CoversItsChildren and unit:TurnStateTests.Level2_EnablesItsChildrenOnly witness the first sentence only; no spec-derived test witnesses the level-2 + file-name-1 sentence (test-needed). || editions (adjudicator): 2002, 2014, 2023 (the TURN directive is a COBOL-2002 introduction; §7.3 compiler directives)",
+  "notes": "cite.py --check 7.3.25.4 \"the effect is as if file-name-1 were specified for each of these exception-names\" OK. Level-2 half: DirectiveCovers -> TryGet(level-2) && UnderLevel2(level3); WARNING excluded. File-name half: the Fold keeps the (EC-I-O, F1) event and matches it only for a query naming F1. Probes: TRNF1 '>>TURN EC-I-O F1 CHECKING ON' -> READ F2 AT END: status spaces, READ F1 AT END: EC-I-O-AT-END (expected per GR3 second sentence); TRNO2 '>>TURN EC-I-O CHECKING ON' does not enable EC-I-O-WARNING (status 05 -> spaces). Both halves verified. The level-2 + file-name-1 sentence is witnessed by conformance:2002/l1c33_turn_level2_file_name (the ON arm) and conformance:2002/pb963_turn_file_name_arms phase 4 ('EC-I-O F2 CHECKING OFF' disables EC-I-O-AT-END for F2 only; kb/Work PB963). || editions (adjudicator): 2002, 2014, 2023 (the TURN directive is a COBOL-2002 introduction; §7.3 compiler directives)",
   "state": "OK"
  },
  {
@@ -3683,10 +3683,10 @@
   "rule-digest": "8fd1a00844a5",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/TurnState.cs#After; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#Process",
-  "test-ref": "conformance:2002/l1c33_turn_within_statement",
+  "test-ref": "conformance:2002/l1c33_turn_within_statement; conformance:2002/pb963_turn_file_name_arms",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "cite.py --check 7.3.25.4 \"the TURN directive does not apply to any phrase of that statement\" OK. Enablement is keyed on the statement's START line with strict eventLine < statementLine (directive lines are blanked, line-count preserving). Probe TRNG5: 'ADD 1 TO A' / '>>TURN EC-SIZE CHECKING ON' / 'ON SIZE ERROR DISPLAY ... ADD 1 TO B ON SIZE ERROR DISPLAY ...' -> P1 [spaces] (the ADD whose phrase follows the TURN is NOT checked) and P2 [EC-SIZE-TRUNCATION] (the nested ADD inside the phrase, a succeeding statement, IS checked). TRNG5B: OFF written inside an IF disables the nested ADD and the ADD after END-IF (both spaces). Both sentences verified. kb/Work PB963 (open) owns this row's witness debt — test-ref left empty; unit:TurnStateTests.Directive_AppliesToSucceedingStatementsOnly covers only the strict-line half. || editions (adjudicator): 2002, 2014, 2023 (the TURN directive is a COBOL-2002 introduction; §7.3 compiler directives)",
+  "notes": "cite.py --check 7.3.25.4 \"the TURN directive does not apply to any phrase of that statement\" OK. Enablement is keyed on the statement's START line with strict eventLine < statementLine (directive lines are blanked, line-count preserving). Probe TRNG5: 'ADD 1 TO A' / '>>TURN EC-SIZE CHECKING ON' / 'ON SIZE ERROR DISPLAY ... ADD 1 TO B ON SIZE ERROR DISPLAY ...' -> P1 [spaces] (the ADD whose phrase follows the TURN is NOT checked) and P2 [EC-SIZE-TRUNCATION] (the nested ADD inside the phrase, a succeeding statement, IS checked). TRNG5B: OFF written inside an IF disables the nested ADD and the ADD after END-IF (both spaces). Both sentences verified. Witnessed by conformance:2002/l1c33_turn_within_statement (ADD / ON SIZE ERROR) and conformance:2002/pb963_turn_file_name_arms phases 7-8 (a file-name TURN between READ F1 and its AT END leaves that READ unchecked and checks the READ nested in the phrase and the statements after it; kb/Work PB963). || editions (adjudicator): 2002, 2014, 2023 (the TURN directive is a COBOL-2002 introduction; §7.3 compiler directives)",
   "state": "OK"
  },
  {
@@ -3698,7 +3698,7 @@
   "rule-digest": "fcd1b7e39f5a",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/TurnState.cs#EnabledAtHeader; src/Cobol.Net.Compiler/Binding/BinderDriver.cs#BindUnitData; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn",
-  "test-ref": "conformance:2002/pb1381_turn_at_procedure_header; unit:TurnStateTests.LastMatchingEventWins; unit:TurnStateTests.FileScopedEvent_AppliesOnlyToThatFile; conformance:2023/pb1365_turn_checking_implied_on; conformance:2023/pb1365_turn_checking_with_location_implied_on; conformance:2023/pb1365_turn_checking_location_optional_with",
+  "test-ref": "conformance:2002/pb1381_turn_at_procedure_header; unit:TurnStateTests.LastMatchingEventWins; unit:TurnStateTests.FileScopedEvent_AppliesOnlyToThatFile; conformance:2023/pb1365_turn_checking_implied_on; conformance:2023/pb1365_turn_checking_with_location_implied_on; conformance:2023/pb1365_turn_checking_location_optional_with; conformance:2002/pb963_turn_file_name_arms; conformance:2002/l1c33_turn_level2_file_name; conformance:negative/pb963-turn-file-name-below-2002",
   "derivation": "",
   "editions": "2002,2014,2023",
   "notes": "kb/Work PB1365. The printed diagram (PDF page 115, rendered) underlines only OFF and LOCATION: ON and WITH are optional words, so CHECKING alone / CHECKING WITH LOCATION select ON (GR6 'specified or implied').",
@@ -3728,7 +3728,7 @@
   "rule-digest": "0a593cb19461",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/TurnState.cs#EnabledAtHeader; src/Cobol.Net.Compiler/Binding/TurnState.cs#Fold",
-  "test-ref": "conformance:2002/pb1381_turn_at_procedure_header; unit:TurnStateTests.LastMatchingEventWins; unit:TurnStateTests.FileScopedEvent_AppliesOnlyToThatFile",
+  "test-ref": "conformance:2002/pb1381_turn_at_procedure_header; unit:TurnStateTests.LastMatchingEventWins; unit:TurnStateTests.FileScopedEvent_AppliesOnlyToThatFile; conformance:2002/pb963_turn_file_name_arms; conformance:negative/pb963-turn-file-name-below-2002",
   "derivation": "",
   "editions": "2002, 2014, 2023",
   "notes": "kb/Work PB1381 (w68z). cite.py --check 7.3.25.4 'checking is disabled only for exception conditions associated with that file-name' -> OK §7.3.25.4 8). The refuter's DIVERGES was the OFF sibling of GR6's header defect: a TURN ... OFF between the DATA DIVISION and the PROCEDURE DIVISION header did not disable checking for that header. Fixed with GR6 (TurnState.EnabledAtHeader); the golden's B leg (EC-PROGRAM-ARG-MISMATCH OFF just before PB1381B's header) prints IN-B / B OK — not set, the call succeeds. Statement half, file-name half and copybook-resident OFF were verified by the adjudicator/refuter (TRNF2, TRNF3, TRNG5B, TRNO6, RTC2/RTC3).",
