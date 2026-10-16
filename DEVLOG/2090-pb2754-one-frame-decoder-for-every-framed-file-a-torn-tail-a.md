@@ -1,4 +1,4 @@
-## PB2754: one frame decoder for every framed file — a torn tail, a gap word and a huge table count now end the data for every reader
+## Entry 2090 — 2026-10-16 10:15 PDT — PB2754: one frame decoder for every framed file — a torn tail, a gap word and a huge table count now end the data for every reader
 
 **The mechanism.** The varying-frame grammar (length word, gap tag, bit-31 extent flag, extent table, payload) was
 encoded once but DECODED four times — `RecordFraming.DecodeStore`, `FrameStarts`, `StreamFramingParses` and
@@ -67,3 +67,4 @@ ran the case: the tier-0c cost cap planned it into leg 2, the gap kb/Work PB3131
 case in leg 2, so the class was also run on its own: 15/15 passed.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T155805Z-f7e334; Conformance 6,014 · Unit 33,193 · Characterization 6 ran in leg 1, the new FrameDecoderDriftTests cases among them); after the review fix, `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` again (run 20261016T161829Z-130770; Conformance 5,978 · Unit 33,156 · Characterization 6 ran in leg 1, both new walk witnesses Passed). The architecture oracle (`compare_oracle.py`) compares emitted C# and diagnostics, which no file of this change reaches (runtime only).
+
