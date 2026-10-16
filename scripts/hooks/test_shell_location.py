@@ -174,6 +174,9 @@ with tempfile.TemporaryDirectory() as tmp:
           [('python -c "print(1<<2)"', ()), ("echo x", ())])
     exact("no heredoc: a here-string", shape('grep x <<< "a"; echo y'), [('grep x <<< "a"', ()), ("echo y", ())])
     exact("no heredoc: an arithmetic shift", shape("echo $((1<<2)); echo y"), [("echo $((1<<2))", ()), ("echo y", ())])
+    exact("no heredoc: a shift by a NAME inside $(( )) hides no later line",
+          shape("echo $((x<<y))\ngit stash"), [("echo $((x<<y))", ()), ("git stash", ())])
+    exact("no heredoc: an arithmetic command", shape("(( n = m<<k ))\necho y")[-1], ("echo y", ()))
     exact("heredoc in a group: an apostrophe in its body opens no quote, the next line is its own step",
           [s.text for s in sl.steps("( cat <<EOF\ndon't\nEOF\n)\necho z", str(main), B)][-1], "echo z")
     exact("heredoc feeding a -c payload rides on the payload's last step",

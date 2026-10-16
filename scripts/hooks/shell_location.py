@@ -175,6 +175,16 @@ def _split(command: str, shell: str) -> list[tuple[str, str, tuple[str, ...]]]:
             j = command.find("\n", i)
             i = n if j < 0 else j
             continue
+        if shell == BASH and command.startswith("((", i):
+            # arithmetic, `$(( … ))` or `(( … ))`: kept whole, so its `<<` is a shift and never opens a heredoc
+            j, d = i, 0
+            while j < n:
+                d += {"(": 1, ")": -1}.get(command[j], 0)
+                if d == 0:
+                    break
+                j += 1
+            j = min(j + 1, n)
+            buf.append(command[i:j]); i = j; continue
         if shell == BASH and command.startswith("<<", i) and not command.startswith("<<<", i):
             m = _HEREDOC.match(command, i)
             if m:
