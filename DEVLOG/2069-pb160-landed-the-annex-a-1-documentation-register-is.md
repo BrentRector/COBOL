@@ -1,4 +1,4 @@
-## PB160 landed: the Annex A.1 documentation register is complete; GR-8.3.3.5.4-5 closes on its pinned determination
+## Entry 2069 — 2026-10-16 06:46 PDT — PB160 landed: the Annex A.1 documentation register is complete; GR-8.3.3.5.4-5 closes on its pinned determination
 
 Wave 1091 group G (the PB2911 GAP campaign, Opus fix lane). PB160 had been open since batch 8 (2026-08-29) as the
 note that the Annex A.1 documentation register was 169 obligations behind. Re-measured on this tree,
@@ -24,3 +24,4 @@ not a literal"` → OK §8.8.4.2.1 13), and the compiler warned COBOLNET3146. Th
 `WS-N(2:1)` as the subject, and its output is unchanged. The `DecodeHexGroups` comment cited only GR4 (the mapping);
 it now also cites GR5 and DOC-A.1-97, so `where.py 8.3.3.5.4 5` finds the site. Eleven other conformance goldens (besides the deliberate `85/pb1470_relation_of_two_literals_runs`) still
 compare two literals; they are reported as a lead, not fixed here.
+
