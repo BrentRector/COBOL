@@ -58,6 +58,7 @@ the tools it runs). Contents:
 | `handoff.json` | the running unit | its handoff (section 5); the supervisor archives it per unit. One present when a unit STARTS was written by no unit of this run (a hand edit): the supervisor archives it as `logs\<time>-<unit>.handoff.orphan.json` and says so; it steers nothing (section 4.8) |
 | `handoff.last.json` | the supervisor | the newest VALID handoff, which the next unit reads and `next_unit.py` decides from: a unit's own, one the supervisor synthesized for a dead unit (section 5.1), or the operator's steer once its unit starts (section 4.8) |
 | `handoff.operator.json` | the operator (`steer.ps1`) | the operator's pending steer (section 4.8): validated against `handoff.schema.json`, it wins the next choice over every other handoff and is consumed (archived beside the unit's log, copied to `handoff.last.json`) when its unit starts |
+| `scratch\dryrun-<pid>\` | the supervisor under `-DryRun -Unit` | that dry run's own steer (`handoff.operator.json`, section 4.8), never in the machine-wide TEMP (kb/Work PB2922); removed when the run ends, and one a killed run left is reaped by the next supervisor start |
 | `scratch\` | the units and their fleets | the fleet scratch directory (`{SCRATCH}`): specs, `groups.json`, the Workflow args, and `reports\`, which `plan_wave.py` reads for finishers; it persists across units |
 | `land-lane\` | `land_lane.py` (the supervisor's tick, its detached runners, the enqueue unit's `collect` and `rearm`, the operator's `clear-halt`) | the landing lane's state (section 4.9): `attempts\<id>.json` (one per `enqueue.py land` run: branch, head, log, runner pid, exit code, verdict, end head, collected), `survey.json` (the last tick's branch survey, which `next_unit.py` reads), `rearm\<branch>.json` (the enqueue unit's re-arm of a branch at its tip: one more attempt at an unchanged head), `HALT` (a run ended QUEUE NOT ACTIVE) and `tick.lock` |
 | `clusters-open.json`, `clusters-half.json` | `plan_wave.py` | the latest `fix_clusters.py --json` views it planned from |
@@ -212,7 +213,7 @@ seam pointing at a fake that emits canned stream-json, not a wrapper; a `.ps1` o
 shell), `-CoordDir`, `-RepoDir` (default the repository containing the script), `-MaxContextTokens` (the SOFT
 context cap, default 200000) and `-HardContextTokens` (the HARD cap, default 500000; section 4.3), `-MaxUnits` (default unlimited), `-PermissionMode` (default `bypassPermissions`), `-GraceMinutes` (default 30; a `wave` or `campaign`
 unit gets three times this, because a lander train must be allowed to finish), `-BorrowDays` (passed to
-`budget.py`), `-Unit` (the first unit: written as the operator's steer through `steer.ps1`, section 4.8; a dry run writes it to a temporary file it removes), `-Cluster <lead>[,<lead>...]` (the campaign lanes, section 9.1: comma-separated because `pwsh -File` passes `-Cluster A,B` as one string; each validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
+`budget.py`), `-Unit` (the first unit: written as the operator's steer through `steer.ps1`, section 4.8; a dry run writes it into its own directory under the coordination directory, section 4.8), `-Cluster <lead>[,<lead>...]` (the campaign lanes, section 9.1: comma-separated because `pwsh -File` passes `-Cluster A,B` as one string; each validated at start), `-ConfigDir` (the Claude account the loop spends, section 2.1: default `account.py`'s resolution of `CLAUDE_CONFIG_DIR`; an unknown dir exits 2 before anything starts; every child runs with exactly that account's `CLAUDE_CONFIG_DIR`, unset for the default account; the log header and every `units.jsonl` line name the account), `-Watch` (section 13), `-Python`, and the
 test seams `-TelemetryDir` (passed to `budget.py`), `-WorkDir` (the register `next_unit.py` and `work.py` read for `-Cluster`), `-IdleCloseSeconds` (default 20, section 4.6), `-CheckpointSeconds` (default 300, section 5.1), `-LandLaneSeconds` (default 300; 0 runs no landing lane, section 4.9) and `-FastFailSeconds` (default 120; a unit under it fails only without a `done` handoff, because the `meter` unit legitimately takes about 40 s) and `-BackoffBaseSeconds`
 (default 60). Exit codes: 0 stopped (`STOP`, `-MaxUnits`, `stop-week`, `-DryRun`), 3 another instance runs,
 4 circuit breaker, 5 an owner question is waiting, 2 `-Cluster` names no cluster any kb/Work note names (or `-Unit campaign` without `-Cluster`).
@@ -453,6 +454,11 @@ a `land` unit that would have raced the operator's R2 lander for main. There is 
   set aside as `logs\<time>-handoff.operator.invalid.json` with a log line; a `handoff.json` found when a unit starts
   is archived as `.handoff.orphan.json` with a log line. Writing `handoff.last.json` by hand is not a path: the next
   unit to end overwrites it.
+- **A dry run's steer** (`orchestrate.ps1 -DryRun -Unit <u>`) is written to `scratch\dryrun-<pid>\handoff.operator.json`
+  under the run's OWN coordination directory and removed with that directory when the run ends; never to the
+  machine-wide TEMP, whose one shared name every other dry run on the host saw (kb/Work PB2922). A process-tree kill
+  skips that removal, so every supervisor start (it holds the lock, so no other supervisor of the directory is alive)
+  reaps every `dryrun-<pid>` directory but its own, with a log line.
 
 ### 4.9 The landing lane beside the unit (`land_lane.py`, kb/Work PB3103)
 
