@@ -997,6 +997,18 @@ reference formats, and the only place source comments are recognized. Its model:
   so a new statement, clause or entry needs no change; a new kind of HEADER is one line in the pass. Rejected: a parse
   predicate (PB2720 removed the last one; the rule is an edition's, not the grammar's) and a front-end check (a
   FrontendError would hide every bind-time edition gate of the same program).
+  **The one half the pass cannot ask is the CONTINUATION line** (kb/Work PB3168): X3.23-1985 also requires "Area A of a
+  continuation line must be blank" (IBM Enterprise COBOL states it outright; VCR row 7.35), the same
+  `fixed-form-text-in-area-a-2002` row. A continued literal's tail is no token's start, and a resultant position has no
+  inverse to the physical line, so only the §6.5 logical conversion — which alone sees the hyphen — can name the line:
+  `LogicalLineBuilder.Add` asks `FixedFormLine.IsAreaAOffset` of the first character of every fixed continuation line and
+  reports through `ReferenceFormatDiagnostics.OnContinuationTextInAreaA` (every such line, the first text's column), the
+  way the other §6.3.5 continuation rules are reported. It is therefore a front-end error: the one place this family does
+  hide the bind-time gates, accepted because the line is the only fact the rule has and a continuation line in area A is
+  rare. The same fact makes a continuation line holding a period or a word in area A one diagnostic, not two: the row is
+  not yet introduced at every edition the pass screens, so the report is an error on both axes, the compilation returns
+  `FrontendError` before the bind, and the area pass never sees that token (it needs no exemption). A comment-entry
+  paragraph's continuation lines are commentary (discarded before the builder) and are not asked.
 - **A column is a CHARACTER POSITION — one code point — and never a string index** (DOC-A.1-157, kb/Work PB1966): a
   supplementary-plane character is two UTF-16 units and one position. `CharacterPositions` (count, index of a position,
   position of an index) is the one definition, `FixedFormLine` the one reader of a fixed-form line's columns (sequence

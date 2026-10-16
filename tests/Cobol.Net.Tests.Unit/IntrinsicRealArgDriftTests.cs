@@ -103,8 +103,32 @@ public sealed class IntrinsicRealArgDriftTests
     /// <c>…Real</c> body. <c>IntegerOfBooleanReal</c> stays unwritten for that reason, and
     /// <c>IntrinsicFloatLaneArgumentRunDriftTests</c> holds the renderer to it from the other side.
     /// </para>
+    /// <para>
+    /// ⛔ <b>AND A FUNCTION WHOSE EVERY POSITION IS §15.3 TYPE 6 NEVER REACHES THE LANE (kb/Work PB651).</b> The
+    /// renderer takes a type-6 operand's INTEGER before any lane is chosen (<c>IntrinsicRenderer.RawArg</c>), so a
+    /// float there no longer makes the call binary64: MOD, FACTORIAL, the date family, the TEST- validators and the
+    /// windowing trio owe no <c>…Real</c> body, and <see cref="NoRealBody_ServesAFunctionWhoseEveryPositionIsType6"/>
+    /// keeps the deleted ones from returning as unreachable code. The positions are read from the SPEC-VERIFIED
+    /// schemas (<c>IntrinsicArgumentRules.IsIntegerPosition</c>), the same fact the renderer keys on.
+    /// </para>
     /// </remarks>
-    private static HashSet<string> NumericArgumentMethods()
+    private static HashSet<string> NumericArgumentMethods() =>
+        [.. NumericArgumentRows().Where(r => !EveryPositionIsType6(r.Name, r.Max)).Select(r => r.Rm)];
+
+    /// <summary>Does a float reach this function only through §15.3 type-6 positions — every operand position up to
+    /// its maximum argument count (or <see cref="IntrinsicFloatLaneArgumentRunDriftTests.PastEveryDeclaredPosition"/>
+    /// for an unbounded one) typed integer by its verified schema?</summary>
+    private static bool EveryPositionIsType6(string name, string max)
+    {
+        int positions = int.TryParse(max, out int m)
+            ? Math.Min(m, IntrinsicFloatLaneArgumentRunDriftTests.PastEveryDeclaredPosition)
+            : IntrinsicFloatLaneArgumentRunDriftTests.PastEveryDeclaredPosition;
+        return Enumerable.Range(0, positions).All(p => IntrinsicArgumentRules.IsIntegerPosition(name, p));
+    }
+
+    /// <summary>The catalog rows that can receive a float at a numeric position: (function, max argument count,
+    /// runtime method).</summary>
+    private static List<(string Name, string Max, string Rm)> NumericArgumentRows()
     {
         string catalog = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "IntrinsicCatalog.cs"));
         var rx = new Regex("Add\\(new\\(\"(?<n>[A-Z0-9-]+)\",\\s*IntrinsicType\\.\\w+,\\s*IntrinsicArity\\.\\w+,"
@@ -123,8 +147,30 @@ public sealed class IntrinsicRealArgDriftTests
             // ("String")` filter that stood here with no reason attached.
             .Where(m => IntrinsicArgumentRules.ArgumentRunIsAllNumeric(m.Groups["n"].Value,
                         IntrinsicFloatLaneArgumentRunDriftTests.PastEveryDeclaredPosition))
-            .Select(m => m.Groups["rm"].Value)
-            .Where(s => s.Length > 0)];
+            .Where(m => m.Groups["rm"].Value.Length > 0)
+            .Select(m => (m.Groups["n"].Value, m.Groups["max"].Value, m.Groups["rm"].Value))];
+    }
+
+    /// <summary>
+    /// ⛔ AN UNREACHABLE BODY IS NOT COVERAGE (kb/Work PB651). A function whose every operand position is §15.3 type 6
+    /// receives its arguments as INTEGERS — <c>IntrinsicRenderer.RawArg</c> takes them before the lane is chosen — so
+    /// no float argument can route it to a <c>…Real</c> body, and one that exists reads as a carrier the function has
+    /// when it has none. The integer-only bodies PB21 wrote were deleted on that ground; this keeps them deleted.
+    /// </summary>
+    [Fact]
+    public void NoRealBody_ServesAFunctionWhoseEveryPositionIsType6()
+    {
+        var real = RealBodies();
+        var dead = NumericArgumentRows()
+            .Where(r => EveryPositionIsType6(r.Name, r.Max))
+            .Select(r => RealName(r.Rm))
+            .Where(real.Contains)
+            .Distinct()
+            .Order()
+            .ToList();
+        Assert.True(dead.Count == 0,
+            $"…Real body/bodies [{string.Join(", ", dead)}] serve a function whose every position is §15.3 type 6; the "
+            + "renderer takes those operands' integers before any lane is chosen, so no call can reach them. Delete them.");
     }
 
     /// <summary>
@@ -139,18 +185,6 @@ public sealed class IntrinsicRealArgDriftTests
 
         var missing = ExactArms()
             .Where(numericArg.Contains)
-            // ⛔ THE ONE ARM ROUTED TO ITSELF RATHER THAN TO A ...Real BODY (PB21). RenderFloat wraps every
-            // result in FromDouble(double, ws), so a ...Real body must return something a double can carry —
-            // and §15.36's cannot: 33! is ~8.7e36, which is why the exact body returns Int128. Its arm consumes
-            // the argument through IntArg, whose (long)(double) handles a float, so RenderNum skips the float
-            // dispatch for it by name. Writing FactorialReal to satisfy the pattern would have meant returning a
-            // double and losing exactness past 2^53 — the same argument-shape dependence PB13 closed.
-            // ⚠ This exemption is NOT a free pass: the assertion below still fails if the RENDERER stops
-            // skipping it, because then the missing body becomes reachable again. ⛔ It reads the renderer's
-            // DECLARED set rather than an inline `!= "Factorial"` spelling (kb/Work PB635) — a second exempt
-            // function is then one line there and needs no edit here.
-            .Where(m => !IntrinsicRenderer.FloatLaneExempt.Contains(m)
-                        || !RendererSource().Contains("FloatLaneExempt.Contains(sig.RuntimeMethod)"))
             .Where(m => !real.Contains(RealName(m)))
             .Order()
             .ToList();
