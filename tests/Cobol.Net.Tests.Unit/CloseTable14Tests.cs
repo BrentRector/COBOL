@@ -123,7 +123,7 @@ public sealed class CloseTable14Tests
 
             // (d) Non-sequential: every phrase cell is N/A.
             reg.RegisterRelative("R", Path.Combine(dir, "r.dat"), 8, false, 0, 4, -1, -1);
-            reg.RegisterIndexed("I", Path.Combine(dir, "i.dat"), 8, false, 0, 0, 4, -1, -1);
+            reg.RegisterIndexed("I", Path.Combine(dir, "i.dat"), 8, false, 0, [new(0, 4)], -1, -1);
             Assert.Throws<InvalidOperationException>(() => reg.CloseReelUnit("R"));
             Assert.Throws<InvalidOperationException>(() => reg.CloseReelUnitForRemoval("R"));
             Assert.Throws<InvalidOperationException>(() => reg.CloseNoRewind("I"));

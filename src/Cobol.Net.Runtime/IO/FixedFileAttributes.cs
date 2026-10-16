@@ -43,10 +43,32 @@ public sealed record FixedFileAttributes(
     int MaxRecordSize,
     IReadOnlyList<FixedFileAttributes.KeyDescriptor> Keys)
 {
-    /// <summary>One record key's fixed attributes (§12.4.5.12 / §12.4.5.6 / §12.4.5.7): the byte window into the
-    /// record image, the WITH DUPLICATES phrase, the §12.4.5.6.4 GR6 SUPPRESS WHEN value (null = no phrase) and
-    /// the key's collating sequence, identified by <see cref="Fingerprint"/>.</summary>
-    public readonly record struct KeyDescriptor(int Offset, int Length, bool Duplicates, string? Suppress, string Collation);
+    /// <summary>One record key's fixed attributes (§12.4.5.12 / §12.4.5.6 / §12.4.5.7): the byte windows of the
+    /// record image whose concatenation IS the key (one for data-name-1; one per data-name-2 of the SOURCE phrase,
+    /// §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2 — kb/Work PB1099), the WITH DUPLICATES phrase, the §12.4.5.6.4 GR6
+    /// SUPPRESS WHEN value (null = no phrase) and the key's collating sequence, identified by
+    /// <see cref="Fingerprint"/>. A segment carries only its offset and length here: a layout locates the window
+    /// in a record, and is no attribute of the physical file.
+    /// <para>Equality is by VALUE over the segment list, because <see cref="Conflicts"/> asks it: the generated
+    /// record-struct equality would compare the list by reference, and every recorded file would conflict.</para></summary>
+    public readonly record struct KeyDescriptor(IReadOnlyList<KeySegment> Segments, bool Duplicates, string? Suppress, string Collation)
+    {
+        /// <summary>Value equality: the same windows in the same order, and the same three other attributes.</summary>
+        public bool Equals(KeyDescriptor other) =>
+            Duplicates == other.Duplicates && Suppress == other.Suppress && Collation == other.Collation
+            && Segments.SequenceEqual(other.Segments);
+
+        /// <inheritdoc/>
+        public override int GetHashCode()
+        {
+            var h = new HashCode();
+            foreach (var s in Segments) h.Add(s);
+            h.Add(Duplicates);
+            h.Add(Suppress);
+            h.Add(Collation);
+            return h.ToHashCode();
+        }
+    }
 
     /// <summary>§9.1.6's primary attribute, sequential — "There are three organizations: sequential, relative,
     /// and indexed". Both §9.1.7.2 types of sequential file (record sequential and line sequential) are THIS

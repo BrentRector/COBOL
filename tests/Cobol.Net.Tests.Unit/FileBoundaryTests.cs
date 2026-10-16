@@ -166,7 +166,7 @@ public sealed class FileBoundaryTests : IDisposable
     [Fact]
     public void IndexedStore_RecordBytes_IsTheComposedSize()
     {
-        var attributes = new IndexedConnector("i.dat", 8, KeyedAccess.Random, 0, 4, varyMin: 4, varyMax: 8).DeclaredAttributes;
+        var attributes = new IndexedConnector("i.dat", 8, KeyedAccess.Random, [new(0, 4)], varyMin: 4, varyMax: 8).DeclaredAttributes;
         var store = new IndexedStore();
         var a = new KeyedRec { Image = "K001AAAA", Ordinals = [1] };
         var b = new KeyedRec { Image = "K002", Extents = RecordFraming.VoidExtents(1), Ordinals = [2] };
@@ -191,8 +191,8 @@ public sealed class FileBoundaryTests : IDisposable
     [Fact]
     public void IndexedStore_Framing_CarriesTheReleaseOrdinals()
     {
-        var c = new IndexedConnector("i.dat", 8, KeyedAccess.Random, 0, 4, varyMin: -1, varyMax: -1);
-        c.AddAlternateKey(4, 1, duplicates: true);
+        var c = new IndexedConnector("i.dat", 8, KeyedAccess.Random, [new(0, 4)], varyMin: -1, varyMax: -1);
+        c.AddAlternateKey([new(4, 1)], duplicates: true);
         var attributes = c.DeclaredAttributes;
         Assert.Equal(2, RecordFraming.OrdinalSlots(attributes));
         using var ms = RecordFraming.ComposeStore(attributes,
@@ -277,7 +277,7 @@ public sealed class FileBoundaryTests : IDisposable
         Assert.Equal("ABCD", rel);
         Assert.Equal(FileStatusCode.Success, r.Close());
 
-        var ix = new IndexedConnector(Host("ix.dat"), 8, KeyedAccess.Random, 0, 4);
+        var ix = new IndexedConnector(Host("ix.dat"), 8, KeyedAccess.Random, [new(0, 4)]);
         Assert.Equal(FileStatusCode.Success, ix.Open(FileOpenMode.Output));
         Assert.Equal(FileStatusCode.Success, ix.Write("K001DATA"));
         Assert.Equal(FileStatusCode.Success, ix.Close());

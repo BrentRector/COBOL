@@ -523,7 +523,7 @@ public sealed class FileAuthorityPresenceTests : IDisposable
         {
             case "seq": reg.Register("F", host, 17, false, optional, -1, -1); break;
             case "rel": reg.RegisterRelative("F", host, 17, optional, SeqAccess, 4, -1, -1); break;
-            case "idx": reg.RegisterIndexed("F", host, 17, optional, SeqAccess, 0, 4, -1, -1); break;
+            case "idx": reg.RegisterIndexed("F", host, 17, optional, SeqAccess, [new(0, 4)], -1, -1); break;
             default: throw new ArgumentOutOfRangeException(nameof(organization), organization, "seq|rel|idx");
         }
         return reg;

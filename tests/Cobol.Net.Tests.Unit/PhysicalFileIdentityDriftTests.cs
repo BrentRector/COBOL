@@ -52,7 +52,7 @@ public sealed class PhysicalFileIdentityDriftTests
             var reg = new FileRegistry();
             foreach (var (name, file) in new[] { ("U", "Cust.dat"), ("L", "cust.dat") })
                 reg.RegisterIndexed(name, Path.Combine(dir, file), recordWidth: 8, optional: false,
-                    accessMode: (int)KeyedAccess.Dynamic, primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
+                    accessMode: (int)KeyedAccess.Dynamic, primeKey: [new(0, 4)], varyMin: -1, varyMax: -1);
             reg.OpenStatic("U", FileOpenMode.Output);
             reg.OpenStatic("L", FileOpenMode.Output);
             Assert.Equal("00", reg.Status("U"));

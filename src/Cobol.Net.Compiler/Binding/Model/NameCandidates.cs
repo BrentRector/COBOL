@@ -45,6 +45,16 @@ public readonly struct NameCandidates<T> where T : class
     internal NameCandidates<T> Including(IReadOnlyCollection<T> more) =>
         more.Count == 0 ? this : new([.. _items ?? [], .. more]);
 
+    /// <summary>The survivors followed by another set's — one count over declarations of different origin that the
+    /// same reference can name (the record-key-names of several files, kb/Work PB1099 review R1-2).</summary>
+    internal NameCandidates<T> Plus(NameCandidates<T> other) =>
+        other.Count == 0 ? this : Count == 0 ? other : new([.. _items!, .. other._items!]);
+
+    /// <summary>The survivors as another member type, in the same order — so a position whose format admits TWO
+    /// name classes (data-name-1 or record-key-name-1) counts both in one set and meets the one verdict.</summary>
+    internal NameCandidates<TOut> Select<TOut>(Func<T, TOut> map) where TOut : class =>
+        new(_items is null ? [] : _items.ConvertAll(i => map(i)));
+
     /// <summary>The first-declared survivor — read ONLY by <see cref="DataBinder.UniqueOrReportAmbiguous{T}"/>'s
     /// <c>--permissive</c> arm (<c>DataNameResolutionDriftTests</c> holds every other reader out).</summary>
     internal T FirstDeclaredForPermissive => _items![0];

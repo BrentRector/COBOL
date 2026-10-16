@@ -1353,6 +1353,18 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMSTRD.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 A PIC X(3) VALUE \"ABC\".\n01 B PIC X(6) VALUE SPACES.\nPROCEDURE DIVISION.\nMAIN.\n    STRING A A INTO B.\n    DISPLAY B.\n    STOP RUN.\n"
   },
   {
+   "id": "record-key-source-2002",
+   "description": "The SOURCE phrase of the RECORD KEY and ALTERNATE RECORD KEY clauses (ISO §12.4.5.12.2 / §12.4.5.6.2: record-key-name-1 SOURCE IS { data-name-2 } ...) - a key that is 'the concatenation of all occurrences of data-name-2 in the order specified' (§12.4.5.12.4 GR2 / §12.4.5.6.4 GR2), with the record-key-name word class (§8.3.2.2.24) and its scope (§8.4.6.2.4). ANSI X3.23-1985 prints RECORD KEY IS data-name-1 only, so the form is post-1985. THE EDGE IS DERIVED, NOT QUOTED (VCR row 7.36; the repo holds no 1985/2002/2014 text, ratified decision #1): Annex E (2014->2023) does not list it, so it predates 2023; the 2002-versus-2014 split is not derivable in-repo and takes the provisional 2002 edge rows 7.21/7.31 carry - the edge that never refuses a legal 2002 program. Annex A.3 item 40 makes the capability processor-dependent; this implementation provides it (kb/Work PB1099 Q1, owner rule R65). Gated in ONE place, VersionConformancePass.VisitRecordKeySourcePhrase - the one grammar rule both clauses share.",
+   "display": "the SOURCE phrase of the RECORD KEY or ALTERNATE RECORD KEY clause",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §12.4.5.12.2 / §12.4.5.6.2 (GR2: the key is the concatenation of data-name-2); a post-1985 form (derived: VCR row 7.36)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "RECORD KEY / ALTERNATE RECORD KEY SOURCE phrase (post-85; provisional 2002 edge); VCR row 7.36",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMRKSRC.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F ASSIGN TO \"vmrksrc.dat\" ORGANIZATION IS INDEXED\n        RECORD KEY IS R-SPLIT SOURCE IS R-B R-A.\nDATA DIVISION.\nFILE SECTION.\nFD F.\n01 R.\n   05 R-A PIC X(2).\n   05 R-B PIC X(2).\nPROCEDURE DIVISION.\nMAIN. STOP RUN.\n"
+  },
+  {
    "id": "label-records-removed-2002",
    "description": "LABEL RECORDS clause (FD) — obsolete '85 element DELETED by ISO/IEC 1989:2002; the 2023 FD clause set (§13.18) has no LABEL clause. The FIRST removal gate, shipped with the permissive flip (every NIST FD writes this clause).",
    "display": "the LABEL RECORDS clause",

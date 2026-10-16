@@ -324,16 +324,17 @@ public sealed class EditionContext(int dialectLevel, bool permissive = false) : 
     /// compile would change the ANSWER, so Annex A.4.1's "shall accept the syntax … only when support … is
     /// claimed" applies to an optional element, and §4.2.6 ¶3's "The implementor is not required to produce
     /// executable code when unsupported processor-dependent language elements are used" to a
-    /// processor-dependent one: COBOLNET1560/1705/1706/1707/1954).</para>
+    /// processor-dependent one: COBOLNET1560/1584/1705/1706/1707).</para>
     /// <para>⛔ THE BAND SPLITS ON WHETHER AN INERT READING EXISTS, NOT ON WHICH ANNEX LISTS THE ELEMENT, and
     /// that is why there is ONE method and not two: a facility whose absence leaves every program-visible value
     /// unchanged is accepted-and-named, and one whose absence would change the ANSWER is refused-and-named.
     /// ⚠ This paragraph read "an Annex A.3 processor-dependent facility is accepted-and-warned under §4.2.6,
     /// while an Annex A.4 optional module that is Not claimed is refused" until 2026-09-09, which described a
     /// COINCIDENCE in the rows that existed — every refusal happened to be A.4 — as if it were the rule.
-    /// COBOLNET1954 (kb/Work PB358) refutes it: the SOURCE phrase of RECORD KEY / ALTERNATE RECORD KEY is
-    /// Annex A.3 item 40 and is REFUSED, because a record-key-name (§8.3.2.2.24) names no data item and an
-    /// inert compile would leave the file with no prime key. What the annex still decides is the POSTURE
+    /// COBOLNET1584 refutes it: a national key collating sequence defined by literals or LOCALE is Annex A.3
+    /// item 41 and is REFUSED, because an inert compile would order the key by a different sequence than the one
+    /// written (the first refutation, COBOLNET1954's A.3 item 40, is retired — kb/Work PB1099 provides the
+    /// SOURCE phrase). What the annex still decides is the POSTURE
     /// CLAUSE the message cites — <see cref="DiagnosticDescriptor.Annex"/> → <c>PostureClause</c>.
     /// Both dispositions are "name the facility, then bind to a no-op or refuse"; only the severity differs, so
     /// the severity lives in the descriptor and every declined site — A.3 and A.4, data surface and statement

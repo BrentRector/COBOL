@@ -1335,18 +1335,27 @@ internal static class RuntimeApi
     /// all), and an emitted named argument is what makes a wrong one readable in a <c>--emit-cs</c> dump.</para></summary>
     private static string EditionArg(int edition) => $", edition: {edition}";
 
-    /// <summary>Register an INDEXED connector — <c>CobolFile.RegisterIndexed</c> (prime-key window per §12.4.5.12,
-    /// plus the optional §12.4.5.7 prime-key collating sequence — a CobolCollation expression; <paramref name="weights"/>
-    /// is "null" for native, emitted as a named argument so a no-clause file's registration is byte-identical to the
-    /// pre-clause engine).</summary>
-    public static string FileRegisterIndexed(string name, string assign, int width, string optional, int access, string pkOffset, int pkWidth, string varyArgs, int edition, string weights = "null", string? selectName = null, string layout = "null") =>
-        $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterIndexed)}({name}, {assign}, {width}, {optional}, {access}, {pkOffset}, {pkWidth}{varyArgs}{(weights == "null" ? "" : $", primeCollation: {weights}")}{SelectNameArg(selectName)}{EditionArg(edition)}{(layout == "null" ? "" : $", primeLayout: {layout}")})";
+    /// <summary>Register an INDEXED connector — <c>CobolFile.RegisterIndexed</c> (the prime key's byte windows per
+    /// §12.4.5.12, <see cref="KeySegments"/>, plus the optional §12.4.5.7 prime-key collating sequence — a
+    /// CobolCollation expression; <paramref name="weights"/> is "null" for native, emitted as a named argument so a
+    /// no-clause file's registration carries no collation argument).</summary>
+    public static string FileRegisterIndexed(string name, string assign, int width, string optional, int access, string primeKey, string varyArgs, int edition, string weights = "null", string? selectName = null) =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.RegisterIndexed)}({name}, {assign}, {width}, {optional}, {access}, {primeKey}{varyArgs}{(weights == "null" ? "" : $", primeCollation: {weights}")}{SelectNameArg(selectName)}{EditionArg(edition)})";
 
-    /// <summary>Register one ALTERNATE RECORD KEY window (§12.4.5.6) — <c>CobolFile.AddAlternateKey</c>, with its
-    /// optional §12.4.5.7 collating weights and §12.4.5.6.4 GR6 SUPPRESS WHEN value ("null" = absent, each emitted
-    /// as a named argument so a plain alternate key's registration is unchanged).</summary>
-    public static string FileAddAlternateKey(string name, string offset, int width, string dups, string weights = "null", string suppress = "null", string layout = "null") =>
-        $"{nameof(CobolFile)}.{nameof(CobolFile.AddAlternateKey)}({name}, {offset}, {width}, {dups}{(weights == "null" ? "" : $", collation: {weights}")}{(suppress == "null" ? "" : $", suppress: {suppress}")}{(layout == "null" ? "" : $", layout: {layout}")})";
+    /// <summary>Register one ALTERNATE RECORD KEY (§12.4.5.6) by its byte windows (<see cref="KeySegments"/>) —
+    /// <c>CobolFile.AddAlternateKey</c>, with its optional §12.4.5.7 collating weights and §12.4.5.6.4 GR6 SUPPRESS
+    /// WHEN value ("null" = absent, each emitted as a named argument so a plain alternate key's registration
+    /// carries neither).</summary>
+    public static string FileAddAlternateKey(string name, string key, string dups, string weights = "null", string suppress = "null") =>
+        $"{nameof(CobolFile)}.{nameof(CobolFile.AddAlternateKey)}({name}, {key}, {dups}{(weights == "null" ? "" : $", collation: {weights}")}{(suppress == "null" ? "" : $", suppress: {suppress}")})";
+
+    /// <summary>A record key as the connector takes it — the array of its <c>KeySegment</c> byte windows in order
+    /// (ISO §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2: the SOURCE phrase's key is the concatenation of its data-name-2
+    /// operands; data-name-1's is one window). Each window is (byte offset, byte width, layout expression), the
+    /// layout "null" for a window at a fixed position.</summary>
+    public static string KeySegments(IEnumerable<(int Offset, int Width, string Layout)> windows) =>
+        "new " + nameof(KeySegment) + "[] { " + string.Join(", ", windows.Select(w =>
+            $"new({w.Offset}, {w.Width}{(w.Layout == "null" ? "" : $", {w.Layout}")})")) + " }";
 
     /// <summary>Position a relative connector to the RELATIVE KEY item's RRN — <c>CobolFile.SetRelativeKey</c>.</summary>
     public static string FileSetRelativeKey(string name, string rrn) =>

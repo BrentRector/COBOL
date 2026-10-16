@@ -103,6 +103,18 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
                 if (kind != ReadKind.Random)
                     ctx.Edition.Error("COBOLNET0864", $"READ … KEY on '{file.CobolName}' is a Format-2 phrase and "
                         + "cannot combine with NEXT/PREVIOUS/AT END (ISO §14.9.30 general formats)");
+                // SR11's record-key-name-1 arm (kb/Work PB1099): a SOURCE-form key is named by its record-key-name
+                // and by nothing else, so the name is asked BEFORE the operand is read as a data-name.
+                else if (RecordKeyNameOf(file, keyRef, $"READ on '{file.CobolName}': KEY IS") is var (use, rki) && use is not RecordKeyNameUse.None)
+                {
+                    if (use is RecordKeyNameUse.Refused) return BoundRejected.Reported(ctx.Edition);
+                    if (use is RecordKeyNameUse.OtherFile)
+                        return BoundRejected.Report(ctx.Edition, "COBOLNET0864", $"READ … KEY IS {keyRef.GetText()} on "
+                            + $"'{file.CobolName}': '{keyRef.GetText()}' is a record-key-name of another file; "
+                            + "record-key-name-1 shall be specified in the RECORD KEY clause or an ALTERNATE RECORD KEY "
+                            + "clause associated with file-name-1 (ISO §14.9.30.3 SR11)");
+                    keyIndex = rki;
+                }
                 else if (host.Expr.ResolveSending(keyRef).PlaceOrReported(ctx.Edition) is not { } keyPlace)
                     return BoundRejected.Reported(ctx.Edition);   // the resolver's diagnostic, never SR11's (kb/Work PB1030)
                 // ⛔ SR11 IS AN IDENTITY OVER DATA ITEMS, SO IT ASKS DenotedItem — START's SR5/SR6 twin (kb/Work
@@ -323,7 +335,23 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
             ctx.Edition.Error(DiagnosticCatalog.IoStatementOperandRule, $"START … WITH LENGTH on '{name}': the LENGTH phrase requires "
                 + "indexed organization (ISO §14.9.41.3 SR8)");
         Place? operand = null;
-        if (kp?.dataReference() is { } dref && host.Expr.ResolveSending(dref) is var keyAnswer
+        // §14.9.41.3 SR7 — "Record-key-name-1 shall be specified with the SOURCE phrase in the RECORD KEY clause or in
+        // the ALTERNATE RECORD KEY clause in the file control entry for file-name-1" (kb/Work PB1099). The name is
+        // asked before the operand is read as data-name-1, because a SOURCE-form key is no data item. SR4 needs no
+        // test of its own here: record-key-name-1's data-name-2 operands are screened by their clause's SR1.
+        int? namedKeyIndex = null;
+        if (kp?.dataReference() is { } rkRef && RecordKeyNameOf(file, rkRef, $"START on '{name}': KEY IS") is var (use, rkIndex)
+            && use is not RecordKeyNameUse.None)
+        {
+            if (use is RecordKeyNameUse.Refused) return BoundRejected.Reported(ctx.Edition);
+            if (use is RecordKeyNameUse.OtherFile)
+                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.IoStatementOperandRule, $"START on '{name}': "
+                    + $"'{rkRef.GetText()}' is a record-key-name of another file; record-key-name-1 shall be specified "
+                    + "with the SOURCE phrase in the RECORD KEY clause or in the ALTERNATE RECORD KEY clause in the "
+                    + "file control entry for file-name-1 (ISO §14.9.41.3 SR7)");
+            namedKeyIndex = rkIndex;
+        }
+        else if (kp?.dataReference() is { } dref && host.Expr.ResolveSending(dref) is var keyAnswer
             && (operand = keyAnswer.Place) is null)
             return keyAnswer.Refusal(ctx.Edition);   // the resolver's answer (kb/Work PB1030)
 
@@ -386,7 +414,10 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
         }
 
         int keyIndex = -1;
-        if (operand is not null)
+        RecordKey? namedKey = null;
+        if (namedKeyIndex is { } nk)
+            (keyIndex, namedKey) = (nk, file.KeyAt(nk));   // SR7 — the record-key-name's key IS the key of reference
+        else if (operand is not null)
         {
             // §14.9.41.3 SR6 — the operand is EITHER a) a prime or alternate record key of the file, OR b) a
             // generic key: leftmost-coincident within a record OF THE FILE (b1), of the same class, category and
@@ -409,11 +440,69 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
             }
             keyIndex = ki;
         }
+        // GR15 — "the same as if KEY IS EQUAL TO data-name-1 or record-key-name-1 had been specified, with
+        // data-name-1 or record-key-name-1 being the prime record key for the file".
+        else if (file.PrimeKey is { IsSourceForm: true } sourcePrime)
+            namedKey = sourcePrime;
         else
-            operand = file.RecordKeyItem is { } pk ? ctx.Refs.ResolveItem(pk) : null;   // GR15 — prime key EQUAL
-        if (operand is null)
+            operand = file.PrimeKey?.Item is { } pk ? ctx.Refs.ResolveItem(pk) : null;
+        if (operand is null && namedKey is null)
             return new BoundUnsupported($"START on '{name}' with no resolvable RECORD KEY item");
-        return new BoundKeyedStart(file, KeyedStartMode.Key, op, keyIndex, operand, length, invalid);
+        return new BoundKeyedStart(file, KeyedStartMode.Key, op, keyIndex, operand, length, invalid) { NamedKey = namedKey };
+    }
+
+    /// <summary>Whether a KEY phrase operand names a record-key-name (ISO §8.3.2.2.24) — a key defined by the
+    /// SOURCE phrase of a RECORD KEY or ALTERNATE RECORD KEY clause — and which key of <paramref name="file"/> it
+    /// is (−1 = prime): one of this file's, one only ANOTHER visible file declares (the SR7 / SR11 violation), or
+    /// none, when it is to be read as data-name-1 (kb/Work PB1099). The operand may carry §8.4.2.2.2 Format 6's one
+    /// file-name qualifier, which <see cref="FileModel.RecordKeyNameCandidates"/> reads; the files asked are the
+    /// VISIBLE set (<c>FilesByName</c>, a container's GLOBAL file included — §8.4.6.2.4 gives a GLOBAL file's
+    /// record-key-names its scope).
+    /// <para>⛔ EVERY READING IS COUNTED, NONE IS "ASKED FIRST" (kb/Work PB1099 review R1-2). The KEY phrase admits
+    /// data-name-1 or record-key-name-1, §8.3.2.2 lets one word be a data-name and a record-key-name, and two files
+    /// (or two clauses of one file) may declare the same record-key-name. The record-key-names of every visible file
+    /// and the data item the reference identifies as a data-name (<see cref="ReferenceResolver.Probe"/>, silent)
+    /// are one candidate set for the one ambiguity verdict: more than one is §8.4.2.2.3 SR1's error, never the
+    /// statement's own file's record-key-name chosen in silence. A <c>--permissive</c> verdict naming the data
+    /// item answers <see cref="RecordKeyNameUse.None"/>, so the operand is read as data-name-1.</para></summary>
+    private (RecordKeyNameUse Use, int KeyIndex) RecordKeyNameOf(FileModel file, Core.DataReferenceContext dref,
+                                                                string face)
+    {
+        var (word, quals) = DataBinder.KeyReference(dref);
+        var names = file.RecordKeyNameCandidates(word, quals);
+        foreach (var other in ctx.Data.FilesByName.Values)
+            if (!ReferenceEquals(other, file)) names = names.Plus(other.RecordKeyNameCandidates(word, quals));
+        if (names.Count == 0)
+            return (RecordKeyNameUse.None, 0);
+        // KeyReference keeps the qualifiers and DROPS a subscript or reference-modifier (kb/Work PB481), and a
+        // record-key-name carries neither — §8.4.2.2.2 Format 6 prints only the file-name qualifier — so the
+        // operand's shape is screened before the name is taken as one.
+        if (!DataBinder.ScreenDataNameShape(dref, "the KEY phrase's record-key-name", ctx.Edition,
+                "a record-key-name is qualified only by its file-name (ISO §8.4.2.2.2 Format 6)"))
+            return (RecordKeyNameUse.Refused, 0);
+        if (ctx.Refs.Probe(dref) is { } dataName)
+            names = names.Including([new KeyNameReading.DataName(dataName.Item)]);
+        return ctx.Data.UniqueOrReportAmbiguous(names, face, DataBinder.WrittenQualified(word, quals), out _) switch
+        {
+            KeyNameReading.RecordKeyName rk when ReferenceEquals(rk.File, file) => (RecordKeyNameUse.ThisFile, rk.KeyIndex),
+            KeyNameReading.RecordKeyName => (RecordKeyNameUse.OtherFile, 0),
+            KeyNameReading.DataName => (RecordKeyNameUse.None, 0),
+            _ => (RecordKeyNameUse.Refused, 0),   // SR1's ambiguity, reported
+        };
+    }
+
+    /// <summary>What a KEY phrase operand is as a record-key-name (<see cref="RecordKeyNameOf"/>).</summary>
+    private enum RecordKeyNameUse
+    {
+        /// <summary>No visible file declares the name: the operand is data-name-1.</summary>
+        None,
+        /// <summary>A record-key-name of the statement's own file.</summary>
+        ThisFile,
+        /// <summary>A record-key-name only another visible file declares — the SR11 / SR7 violation.</summary>
+        OtherFile,
+        /// <summary>A record-key-name written with a subscript or reference-modifier, or a reference §8.4.2.2.3 SR1
+        /// finds ambiguous — already reported.</summary>
+        Refused,
     }
 
     // ── Shared keyed-I/O helpers ───────────────────────────────────────────────────────────────────────────────

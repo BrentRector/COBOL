@@ -38,7 +38,7 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
                 relativeKeyDigits: 4, varyMin: -1, varyMax: -1);
         else
             reg.RegisterIndexed(name, host, recordWidth: 8, optional: optional, accessMode: (int)KeyedAccess.Dynamic,
-                primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
+                primeKey: [new(0, 4)], varyMin: -1, varyMax: -1);
         if (sharing is { } s) reg.RegisterSharing(name, s, FileLockMode.Manual, multiple: false);
     }
 
@@ -291,8 +291,8 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
             void Indexed(FileRegistry reg, string name, FileSharing? sharing)
             {
                 reg.RegisterIndexed(name, host, recordWidth: 8, optional: false, accessMode: (int)KeyedAccess.Dynamic,
-                    primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
-                reg.AddAlternateKey(name, offset: 4, length: 1, duplicates: true);
+                    primeKey: [new(0, 4)], varyMin: -1, varyMax: -1);
+                reg.AddAlternateKey(name, key: [new(4, 1)], duplicates: true);
                 if (sharing is { } s) reg.RegisterSharing(name, s, FileLockMode.Manual, multiple: false);
             }
             string W(FileRegistry reg, string name, string image) =>
@@ -358,9 +358,9 @@ public sealed class CrossRunUnitKeyedStoreDriftTests
             void Indexed(FileRegistry reg)
             {
                 reg.RegisterIndexed("F", host, recordWidth: 6, optional: false, accessMode: (int)KeyedAccess.Dynamic,
-                    primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
-                reg.AddAlternateKey("F", offset: 4, length: 1, duplicates: true);
-                reg.AddAlternateKey("F", offset: 5, length: 1, duplicates: true);
+                    primeKey: [new(0, 4)], varyMin: -1, varyMax: -1);
+                reg.AddAlternateKey("F", key: [new(4, 1)], duplicates: true);
+                reg.AddAlternateKey("F", key: [new(5, 1)], duplicates: true);
             }
             var writer = new FileRegistry();
             Indexed(writer);

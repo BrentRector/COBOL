@@ -51,6 +51,8 @@
   "pb2093_member_names_like_generated_members",
   "pb1545_hex_alphanumeric_literal",
   "pb1567_string_delimited_omitted",
+  "pb1099_record_key_source",
+  "pb1099_record_key_source_national",
   "pb2076_universal_returning_move_match",
   "pb2463_universal_returning_set_match",
   "pb2463_call_object_reference_set_conformance",
