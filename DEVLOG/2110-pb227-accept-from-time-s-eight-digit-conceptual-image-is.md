@@ -1,4 +1,4 @@
-## PB227: ACCEPT FROM TIME's eight-digit conceptual image is pinned whole, with its date siblings
+## Entry 2110 — 2026-10-16 14:00 PDT — PB227: ACCEPT FROM TIME's eight-digit conceptual image is pinned whole, with its date siblings
 
 kb/Work PB227 (wave 1097, group I) said that no test observed the whole §14.9.1.4 GR11 image of TIME
 (HHMMSScc, "an unsigned elementary integer data item of usage display eight digits in length"): the one TIME witness
@@ -22,3 +22,4 @@ was already pinned. Every expected value comes from the GR7-GR11 position tables
 
 **Rows.** Batch `w1097i-PB227-accept-time-image`: GR-14.9.1.4-11 goes PARTIAL to CONFORMS (GAP 71 to 70), and
 GR-14.9.1.4-7 to -10 each gain the date witness. PB227 is landed with `closes_rows: ["GR-14.9.1.4-11"]`.
+
