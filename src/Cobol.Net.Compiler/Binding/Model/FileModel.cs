@@ -222,6 +222,15 @@ public sealed class FileModel
     /// range over".</summary>
     public IEnumerable<DataItem> WrittenRecords => Records.Where(r => !ReferenceEquals(r, ImpliedRecord));
 
+    /// <summary>True for a file description entry of a sequential, relative or indexed file (the "FORMATS 1 AND 2"
+    /// heading SR3 is written under) that specifies NO record description entries — the antecedent of ISO §13.4.5.3 SR3, "When no record description
+    /// entries are specified:". Asked of <see cref="WrittenRecords"/>, so it holds whether or not
+    /// <c>DataBinder.MaterializeImpliedRecord</c> could synthesize the implied record (an entry with no RECORD
+    /// maximum, COBOLNET1836, or an indexed one, COBOLNET1837, has none, and still has no record description
+    /// entries). A REPORT file (Format 3, SR8) and a sort-merge file description entry (§13.4.6) are not SR3's
+    /// subject, and a SELECT no entry describes has nothing to ask (COBOLNET2635).</summary>
+    public bool HasNoRecordDescriptionEntries => HasFd && !IsSortMerge && !IsReportFile && !WrittenRecords.Any();
+
     /// <summary>The source position of the file control entry itself — the cursor the entry's own syntax rules
     /// report at when the violation is the ABSENCE of a clause (ISO §12.4.5.1's required members and §12.4.5.2
     /// SR10), since there is no clause to point at. See <see cref="FileControlKeyRules"/>.</summary>
