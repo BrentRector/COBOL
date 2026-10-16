@@ -8016,13 +8016,13 @@
   "ordinal": 3,
   "subject": "Class and category of data items and literals",
   "rule-digest": "16ca5033d3bf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of",
-  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassNameOf; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NonNumericOperandKind",
+  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description; conformance:2002/pb1400_group_usage_operand_class; conformance:negative/pb1400-group-usage-arithmetic-operand; conformance-test:ArithmeticOperandClassTests.TheRefusal_NamesTheSection8521ClassOfTheOperand; unit:ClassSpellingDriftTests.TheArithmeticOperandScreen_AsksTheClassItNames",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1400 (registrar 15b). Rule: '3) A group item explicitly or implicitly described with a GROUP-USAGE clause with the BIT phrase.' (cite.py OK). Both halves verified: explicit (GB) and IMPLICIT (subordinate group GBS inside a GROUP-USAGE BIT group) -- probe p2.cob: LENGTH(GBS)=6 boolean positions (§15.50.4 r1), MOVE B\"110011\" TO GBS -> GB1=1100 GB2=11. pb522 golden derives the boolean-position LENGTH of explicit and nested bit groups from §8.5.2.5 item 3 + §15.50.4. || REFUTED: PARTIAL — The LENGTH, MOVE and COMPUTE-boolean paths treat a GROUP-USAGE BIT group as boolean. GBS B-OR B\"101010\" works, and MOVE GB TO a PIC 1(4) item gives 1011. But a second site restates group class without the GROUP-USAGE branch: ExpressionBinder.NonNumericOperandKind has the arm '_ when p.Item.IsGroup => class alphanumeric, ISO 8.5'. So COMPUTE N = GB + 1 on a bit group is rejected with a diagnostic that tells the user the bit group is 'class alphanumeric'. §8.5.2.1 and §8.5.2.5 item 3 make it class and category boolean. This is one rule in two places, and one of them is wrong for this rule's subject. The rejection itself is correct. Fix: derive that text from ItemCategory.GroupKindsOf / ClassOfItem.",
-  "state": "GAP"
+  "notes": "kb/Work PB1400 LANDED (w1095j). A group explicitly or implicitly described GROUP-USAGE BIT is category and class boolean everywhere it is asked: LENGTH/MOVE/boolean expressions (pb522, pb1400_group_usage_operand_class: GB B-XOR, subordinate GBS B-AND) and now the arithmetic-operand refusal too, whose text was the refuter's residual ('group item GB (class alphanumeric, ISO 8.5)'). ExpressionBinder.NonNumericOperandKind's group and ref-mod arms no longer spell a class; IntrinsicArgumentRules.ClassNameOf derives it from ClassOfPlace (the one 8.5.2.1 classifier): COMPUTE N = GB + 1 / GBS + 1 -> 'group item GB of class boolean (ISO 8.5.2.1)'. ClassSpellingDriftTests pins that no diagnostic spells a class from the enum name.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.5-4",
@@ -8106,13 +8106,13 @@
   "ordinal": 3,
   "subject": "Class and category of data items and literals",
   "rule-digest": "7d99adc20826",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of",
-  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassNameOf; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NonNumericOperandKind",
+  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description; conformance:2002/pb1400_group_usage_operand_class; conformance:negative/pb1400-group-usage-arithmetic-operand; conformance-test:ArithmeticOperandClassTests.TheRefusal_NamesTheSection8521ClassOfTheOperand; unit:ClassSpellingDriftTests.TheArithmeticOperandScreen_AsksTheClassItNames",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1400 (registrar 15b). Rule: '3) A group item explicitly or implicitly described with a GROUP-USAGE clause with the NATIONAL phrase.' (cite.py OK). Both halves probed (p2.cob): subordinate group GS inside '01 GN GROUP-USAGE NATIONAL' -> LENGTH 3 national positions, BYTE-LENGTH 6, and MOVE \"XYZ\" TO GS converts to national as an elementary PIC N(3) (§13.18.29.4 GR2 b) -> GN1=XY GN2=Z. pb522 derives explicit + nested national group LENGTH; negative/pb59-display-of-group pins the complement (a plain group is not national). || REFUTED: PARTIAL — MOVE, LENGTH and the SR10 screen treat a GROUP-USAGE NATIONAL group as national. MOVE 'PQ' TO GN converts, and MOVE GS TO X2 is rejected as a national sender. The same second site as the bit group, ExpressionBinder.NonNumericOperandKind's IsGroup arm, gets it wrong: COMPUTE N = GB + 1 on a national group is diagnosed as 'group item GB (class alphanumeric, ISO 8.5)', but §8.5.2.10 item 3 / §8.5.2.1 make it class national. Two sites derive group class, and one lacks the GROUP-USAGE branch. There is also a group-MOVE lead, recorded under GR-8.5.2.3-3: a national group moved into an alphanumeric group is converted instead of being copied without conversion (§14.9.25.4 GR5).",
-  "state": "GAP"
+  "notes": "kb/Work PB1400 LANDED (w1095j). A group explicitly or implicitly described GROUP-USAGE NATIONAL is category and class national everywhere it is asked: LENGTH/MOVE (pb522; pb1400_group_usage_operand_class: MOVE N\"PQR\" TO GN as an elementary PIC N(3), GN = N\"PQR\", subordinate GNS moved as a national sender) and now the arithmetic-operand refusal, which said 'class alphanumeric' (the refuter's residual): COMPUTE N = GN + 1 / GNS + 1 -> 'group item GN of class national (ISO 8.5.2.1)', through IntrinsicArgumentRules.ClassNameOf over ClassOfPlace. The separate group-MOVE lead (a national group moved into an alphanumeric group) belongs to GR-8.5.2.3-3, not this row.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.10-4",
