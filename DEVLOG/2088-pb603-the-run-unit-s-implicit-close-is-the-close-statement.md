@@ -1,4 +1,4 @@
-## PB603: the run unit's implicit CLOSE is the CLOSE statement, for every open file, even when one fails
+## Entry 2088 — 2026-10-16 09:52 PDT — PB603: the run unit's implicit CLOSE is the CLOSE statement, for every open file, even when one fails
 
 kb/Work PB603 (wave 1095, group F). ISO §14.6.11 2): *"An implicit CLOSE statement without any phrases is executed
 for each file that is in the open mode. These implicit close statements shall be executed for all open files in the
@@ -47,3 +47,4 @@ had been closed by PB321/PB740, PB316 and PB833. They were re-probed here: `2002
 start and run-unit end closes all enter one dispatch. Performance: one key snapshot per termination.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T162206Z-ecc4d8; Conformance 5,926/11,816 · Unit 33,105/33,721 · Characterization 6/36 in leg 1; all four new tests passed there). `RunUnitTerminationTests` (6/6) run separately on the same build. Linux gate: the lander's (batched gating).
+
