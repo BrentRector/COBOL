@@ -285,10 +285,10 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
     /// the ACCEPT and DISPLAY statements", and only mnemonic-name-3 is a device's), and the device shall have
     /// <paramref name="need"/> (SR7's "additional restrictions", read off the ONE table, <see cref="ImplementorNames"/>).
     /// Returns the device row, or null after reporting COBOLNET0817.</summary>
-    private ImplementorName? MnemonicDevice(IParseTree at, string name, string verb, string sr2, DeviceCapability need,
+    private ImplementorName? MnemonicDevice(Antlr4.Runtime.RuleContext at, string name, string verb, string sr2, DeviceCapability need,
         string capable)
     {
-        if (!ctx.Mnemonics.Of(at).TryGetValue(name, out var row))
+        if (!ctx.Mnemonics.TryUse(at, name, out var row))
         {
             ctx.Edition.Error("COBOLNET0817", $"{verb} '{name}': not a mnemonic-name declared in SPECIAL-NAMES "
                 + $"(ISO §{sr2} SR2 — mnemonic-name-1 shall be associated with an implementor device-name, "

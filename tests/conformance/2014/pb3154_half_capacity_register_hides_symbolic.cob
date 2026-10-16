@@ -25,6 +25,10 @@
       *> Before the fix the registers were not asked: MOVE S1 and
       *>   MOVE S2 moved the figuratives ALL "B" and ALL "C" (refused
       *>   COBOLNET0902 at 2023).
+      *> kb/Work PB3165 moved a method's registers into the method's
+      *>   own scope; the method tier asked the class's register index
+      *>   and A2 printed CCC (the PB3165 merge-queue bounce) until it
+      *>   asked OoMethodDataScope.Declares, every method name index.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB3154RP.
        ENVIRONMENT DIVISION.
