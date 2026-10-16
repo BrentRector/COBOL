@@ -1,4 +1,4 @@
-## PB867: an un-TURNed RAISE raises nothing, now witnessed and closed CONFORMS
+## Entry 2109 — 2026-10-16 13:52 PDT — PB867: an un-TURNed RAISE raises nothing, now witnessed and closed CONFORMS
 
 **Mechanism.** kb/Work PB867 asked whether `RAISE EXCEPTION EC-USER-x` raises its condition when checking for it is not enabled. The
 w1033 adjudication (refuter UPHELD) found that the standard settles it: `§14.6.13.1.1` says a condition that a statement's general rules
@@ -32,3 +32,4 @@ of `COBOLNET_CONDITIONS_EXCEPTIONS_DESIGN.md` now states the checking-off arm.
 
 **Self-review.** Architecture and duplication: no code moved, and the rule lives once, in `EmitRaise`, as the `BoundRaise.Enabled` split.
 Full code: the comments now quote the rule they implement. Performance: nothing changed.
+
