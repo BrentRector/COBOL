@@ -159,6 +159,20 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 SectionDataItem.NonSectionKind(p))
             : null;
 
+    /// <summary>⛔ THE ONE OWN-ITEM TEST (kb/Work PB3153): does the REFERRING element itself describe an item that
+    /// <paramref name="dref"/> names, either a data item (<see cref="Probe"/>) or a constant-name (a bare word only,
+    /// <see cref="DataBinder.ConstantOf"/>)? A contained program or a method sees the SPECIAL-NAMES and REPOSITORY
+    /// names its container declares, and "a source element's reference to such a name, even when it is a different
+    /// type of user-defined word, is to the item which that source element describes" (§8.4.6.1). So every position
+    /// whose format admits both an inherited configuration-section name and an operand asks THIS first, and takes
+    /// the configuration-section reading (which records the §8.3.2.2 use) only on a false answer. Both halves are
+    /// needed: a constant-name "may be used anywhere that a format specifies a literal of the class and category of
+    /// constant-name-1" (§13.10.3 SR2), and a constant is no data item, so a probe alone misses it (the round-2
+    /// review finding: an own <c>01 LVL CONSTANT AS 1</c> in STANDARD-COMPARE's argument-4 position was claimed as
+    /// the inherited ordering-name). Diagnostic-free, like <see cref="Probe"/>.</summary>
+    public bool DescribesOwnItem(Core.DataReferenceContext dref) =>
+        data.ConstantOf(dref) is not null || Probe(dref) is not null;
+
     /// <summary>What a <see cref="Probe"/> may tell its caller: the resolved <see cref="DataItem"/>, the
     /// operand CATEGORY of the reference (§8.4.3.3.4 GR6 for a reference-modified one — <see cref="RefModPlace"/>'s
     /// own reader — else <see cref="DataItem.OperandPic"/>, the D20 one reader, so a GROUP-USAGE group sniffs as
@@ -203,7 +217,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         // position needs. R38 adjudicated the vendor alphabet-operand forms (GnuCOBOL's INSPECT CONVERTING
         // alphabet) as extensions no edition admits, and the owner's 2026-08-08 decision keeps WiseOwl COBOL
         // strict-ISO permanently; this arm used to report nothing and let the statement abort at run time.
-        if (data.Alphabets.ContainsKey(name) || data.NationalAlphabets.ContainsKey(name))
+        if (data.IsAlphabetName(name))
         {
             data.Edition.Error(DiagnosticCatalog.UndefinedReference,
                 $"'{text}' is declared as an alphabet-name in the SPECIAL-NAMES paragraph, not as a data item, so "
@@ -1837,7 +1851,9 @@ public sealed partial class ReferenceResolver(DataBinder data)
         NameCandidates<DataItem> Reached);
 
     /// <summary>⛔ THE ONE MATCH OF A WRITTEN REFERENCE AGAINST THE NAMED OCCURS DYNAMIC CAPACITY REGISTERS
-    /// (kb/Work PB457) — a PURE check over <see cref="DataBinder.CapacityRegisters"/> with NO side effects (unlike
+    /// (kb/Work PB457) — a PURE check over the registers the ONE name lookup
+    /// <see cref="Model.SymbolTable.CapacityCandidates"/> reaches in the active scope (the unit's
+    /// <see cref="DataBinder.CapacityRegisters"/>, or a method's own, kb/Work PB3165) with NO side effects (unlike
     /// the full <see cref="Resolve"/> pipeline, which routes an unresolved qualified name through the
     /// property-reference hook and enqueues a pending op). The SET Format 14 reroute peek uses this so it never
     /// mints a spurious property temp/op for a non-capacity target (data-model D9; OCCURS DYNAMIC review #7).
@@ -1871,7 +1887,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
     internal CapacityRef? CapacityRegisterFor(Core.DataReferenceContext dref)
     {
         DataReferenceCst r = dref;
-        if (r.BaseName is not { } name || !data.CapacityRegisters.TryGetValue(name, out var tables)) return null;
+        if (r.BaseName is not { } name || data.Symbols.CapacityCandidates(name, data.ActiveScope) is not { } tables) return null;
         var written = ReadWritten(dref);
         var reached = tables.FindAll(t => t.OccursSpec?.CapacityRegister is { } cand
                                           && data.QualifierChainMatches(cand, written.Qualifiers));

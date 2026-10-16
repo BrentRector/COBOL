@@ -1,6 +1,7 @@
       *> ISO 12.3.7.3 SR17 c5 / SR16 f1 IN arm - the ordinals of an
       *> alphabet that names ALL 65,536 native national characters
-      *> (kb/Work PB1557; golden-lane-2 misc-p30 row SR-12.3.7.3-L7.5).
+      *> (kb/Work PB1557; golden-lane-2 misc-p30; SR17 c) 5., in row
+      *> SR-12.3.7.3-17 since kb/Work PB55).
       *>
       *> An ALPHABET whose literal phrase names every native character
       *> is legal: SR14 c4 says the count "shall not exceed" the native

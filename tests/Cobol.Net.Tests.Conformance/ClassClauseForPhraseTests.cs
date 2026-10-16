@@ -40,9 +40,9 @@ public sealed class ClassClauseForPhraseTests
     }
 
     /// <summary>§12.3.7.3 SR17 d) — "<i>Alphabet-name-4 shall not reference an alphabet specified with the LOCALE
-    /// phrase.</i>" Both classes (the national arm is the one row SR-12.3.7.3-L7.5 lumps with c5): a LOCALE alphabet
-    /// defines a collating sequence and no coded character set (§12.3.7.4 GR7 Table 6), so the ONE coded-set resolver
-    /// refuses it by SR17 d's name.</summary>
+    /// phrase.</i>" Both classes (the national arm is the one SR17 c) 5. — once row SR-12.3.7.3-L7.5, folded into
+    /// SR-12.3.7.3-17 by kb/Work PB55 — lumps with c5): a LOCALE alphabet defines a collating sequence and no coded
+    /// character set (§12.3.7.4 GR7 Table 6), so the ONE coded-set resolver refuses it by SR17 d's name.</summary>
     [Theory]
     [InlineData("PB1557D", "ALPHABET LA IS LOCALE\n    CLASS CL IS 1 THRU 3 IN LA.", "COBOLNET1669: CLASS CL … IN LA: the alphabet 'LA' is associated with a locale")]
     [InlineData("PB1557DN", "ALPHABET LN FOR NATIONAL IS LOCALE\n    CLASS CN FOR NATIONAL IS 1 THRU 3 IN LN.", "COBOLNET1669: CLASS CN … IN LN: the alphabet 'LN' is associated with a locale")]
@@ -93,9 +93,9 @@ public sealed class ClassClauseForPhraseTests
     [InlineData("PB976C4", "CLASS C9 FOR NATIONAL IS N\"A\" THRU N\"YZ\".", "(ISO §12.3.7.3 SR17 c4)")]
     public void MultiCharacterThroughOperand_IsSR17_4(string pid, string clause, string expected) => Rejects(pid, clause, expected);
 
-    /// <summary>kb/Work PB1091 (row SR-12.3.7.3-L7.4) — SR17 c4 is a rule about NATIONAL LITERALS ("Each national literal,
-    /// when a THROUGH phrase is specified, shall be one character in length"); a NUMERIC literal is an ordinal, names one
-    /// character of its set by construction, and is held to c2's range rule. The one-character test is asked of the operand
+    /// <summary>kb/Work PB1091 (SR17 c) 4., row SR-12.3.7.3-17 since kb/Work PB55 folded row SR-12.3.7.3-L7.4 into
+    /// it) — SR17 c4 is a rule about NATIONAL LITERALS ("Each national literal, when a THROUGH phrase is specified,
+    /// shall be one character in length"); a NUMERIC literal is an ordinal, names one character of its set by construction, and is held to c2's range rule. The one-character test is asked of the operand
     /// AS WRITTEN, so an ordinal under <c>IN</c> UCS-4 that names a SUPPLEMENTARY character (two UTF-16 code units) is no
     /// longer refused under c4. What a THROUGH phrase needs of it is a position in the NATIVE set (§12.3.7.4 GR12:
     /// "the contiguous characters in the native character set beginning with … literal-5 … ending with … literal-6"),

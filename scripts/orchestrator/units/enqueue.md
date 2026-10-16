@@ -34,7 +34,8 @@ unit keeps the judgment: the reviews, the finishers, the leads, the records and 
      merges it. The branch is ON MAIN only once the PR has merged (`gh pr view <n> --json state,mergedAt`); until then
      it reads ENQUEUED. Its leads go to step 5 and its record to step 6b.
    - `STOPPED`: `CONFLICT` (exit 4, before or after the gate), `GATE RED` (exit 5) or a DEVLOG refusal (exit 6): the
-     reason is in the log and in the branch's report (`BLOCKED: enqueue …`):
+     reason is in the log and in the branch's report (`BLOCKED: enqueue …`); the branch survey reads the branch
+     STOPPED too, never WAITING TO LAND, until a new tip or a re-arm (kb/Work PB3125):
      step 4. `UNREVIEWED` (exit 11): the branch's tip is not covered by its CLEAN review stamp (MANDATORY-PRACTICES
      I10): it goes back to step 2's reviewer, never to a finisher and never landed another way. A repeated exit 2 or
      9 (main kept moving, GitHub refused twice at one head): name it in the handoff with its log.

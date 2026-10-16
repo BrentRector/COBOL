@@ -89,7 +89,9 @@ space for a hand dispatch), the reviewer label and the round. Run every command 
 5. `RF stamp <report> --findings <file>` — writes `**Review:** CLEAN <label> <head>` (or `FINDINGS <n> <label> <head>
    <file>`) under the report's Status line. CLEAN at the branch's tip is what lists it WAITING TO LAND
    (`prune_worktrees.py`); FINDINGS sends it to a finisher: the wave's review finisher, or the next wave's planner
-   (`plan_wave.py`). Return the verdict, the count, the head and the stamp line.
+   (`plan_wave.py`). The stamp REFUSES a report that is not finished (`plan_wave.Report.finished`: a status line saying
+   DONE, or DISCHARGED with a HEAD past its base; kb/Work PB3181): return verdict STOPPED with its refusal in the
+   summary rather than edit the implementer's report. Return the verdict, the count, the head and the stamp line.
 
 A RE-REVIEW (round k > 1) reviews the review finisher's branch: `RF show <file> --round <k-1>` lists the earlier
 findings and the report's `## Review findings` section answers each by id (fixed in a commit, or `no_change_needed` with

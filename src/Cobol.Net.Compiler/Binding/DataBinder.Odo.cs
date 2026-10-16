@@ -624,7 +624,8 @@ public sealed partial class DataBinder
             // the numeric pipeline reads {tablePath}.Capacity (a long) as a scale-0 integer; no stored field. The
             // implementor digit count is 10 (unsigned BinaryLong): the CobolDynTable implementor maximum,
             // 0x3FFF_FFFF ≈ 1.07e9, fits in 10 digits (§8.5.1.9.1 — "a number of digits sufficient to hold the
-            // maximum"). Kept off ByName/Roots — reachable ONLY through CapacityRegisters (the resolver hook).
+            // maximum"). Kept off ByName/Roots — reachable ONLY through a register-name map, which only
+            // SymbolTable.CapacityCandidates reads.
             // ⛔ MINTED FOR EVERY DYNAMIC TABLE, NAMED ONLY WHEN `CAPACITY IN data-name-3` IS WRITTEN (kb/Work
             // PB61): the view over the table's current capacity is what FUNCTION LENGTH / BYTE-LENGTH read for a
             // variable-length group (§15.50.4 r7c / §15.14.4 r6c — "based on their current capacity"), whether or
@@ -662,8 +663,14 @@ public sealed partial class DataBinder
             // the OCCURS clause" — is how those copies are told apart (`DC OF A`, `DC OF B`). So a register whose
             // table is a copy of the same written entry as every table already listed under the name joins them; only
             // a register of a DIFFERENT written entry, or an explicit data-name, is the duplicate SR30 forbids.
-            if (ByName.ContainsKey(capName)
-                || (_capacityRegisters.TryGetValue(capName, out var sameName)
+            // ⛔ "THE SOURCE ELEMENT" OF A METHOD'S TABLE IS THE METHOD (kb/Work PB3165): a method definition is a source
+            // element of its own (§10.5, the census of kb/Work PB2921), so its register is judged against ITS data-names
+            // and registers only — never against the object's, which §11.7.4 GR5 makes inaccessible to the method when a
+            // word is declared in both, and never against a sibling method's. The name lands in the same scope.
+            var methodScope = ScopeOf(item.Root).Method;
+            var registers = methodScope?.CapacityRegisters ?? _capacityRegisters;
+            if ((methodScope is null ? ByName : methodScope.ByName).ContainsKey(capName)
+                || (registers.TryGetValue(capName, out var sameName)
                     && !sameName.TrueForAll(t => ReferenceEquals(t.WrittenDefinition, item.WrittenDefinition))))
             {
                 Edition.Error("COBOLNET1523", $"CAPACITY IN '{capName}' on '{subject}': data-name-3 is implicitly "
@@ -677,8 +684,10 @@ public sealed partial class DataBinder
             // one-type-per-word rule against a file-name, an index-name, a condition-name, a section- or paragraph-name
             // declared before OR after it — the procedure-division binder declares those later and its declaration is
             // the one refused. This used to be a hand-written file-name scan beside the data-name test.
-            DeclareUserWord(capName, UserWordKind.DataName);
-            AddCapacityRegister(capName, item);
+            // (A method's word lands in the method's own census — the funnel reads it off the declaration scope.)
+            if (methodScope is null) DeclareUserWord(capName, UserWordKind.DataName);
+            else using (EnterMethodDeclarations(methodScope)) DeclareUserWord(capName, UserWordKind.DataName);
+            AddCapacityRegister(registers, capName, item);
         }
     }
 
@@ -686,9 +695,9 @@ public sealed partial class DataBinder
     /// <see cref="DynamicResolve"/>, first) and each container's GLOBAL one (from <see cref="InheritGlobalSubtree"/>,
     /// nearest container first) — appended, so each name's list stays in nearest-declaring-element order (kb/Work
     /// PB1674).</summary>
-    private void AddCapacityRegister(string name, DataItem table)
+    private static void AddCapacityRegister(Dictionary<string, List<DataItem>> registers, string name, DataItem table)
     {
-        if (!_capacityRegisters.TryGetValue(name, out var tables)) _capacityRegisters[name] = tables = [];
+        if (!registers.TryGetValue(name, out var tables)) registers[name] = tables = [];
         tables.Add(table);
     }
 }

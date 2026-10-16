@@ -220,6 +220,7 @@
   "pb1929_set_function_pointer_function_sender",
   "pb1948_dynamic_length_limit_constant",
   "pb1674_global_capacity_register",
+  "pb3165_method_capacity_register_scope",
   "pb1265_occurs_printed_formats",
   "pb1374_flag02_defaults",
   "pb1073_dynamic_length_member_not_a_key_2014",
@@ -254,7 +255,8 @@
   "pb2937_unemitted_forest_edition_gates",
   "pb2988_capacity_register_type_copies",
   "pb546_group_into_national_dynamic",
-  "pb546_odo_national_tail"
+  "pb546_odo_national_tail",
+  "pb3153_inherited_names_yield_to_own_items"
  ],
  "pending": []
 }
