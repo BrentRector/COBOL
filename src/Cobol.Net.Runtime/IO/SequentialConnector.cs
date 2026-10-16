@@ -1280,7 +1280,7 @@ public sealed class SequentialConnector : FileConnector
                 // The table describes the image the group composed; a record sent at another length (GR13 a) is
                 // not that image, so it goes without one rather than with a table that would misdescribe it.
                 string record = FitRecord(image, len, national);
-                RecordFraming.WriteFrameHead(_writer, len, Framed(record, image, extents).Extents);
+                EmitFrameHead(len, Framed(record, image, extents).Extents);
                 EmitRecord(record, national);
             }
         }
@@ -1410,6 +1410,19 @@ public sealed class SequentialConnector : FileConnector
     /// §9.1.7.2 length prefix, the line delimiter, an ADVANCING newline or form feed — is FRAMING, not data of
     /// the record, and stays in the native encoding (see <see cref="CodeSetConversion"/>).</summary>
     private void EmitRecord(string data, bool national) => _writer!.Write(ToMedium(data, national));
+
+    /// <summary>A RECORD VARYING frame's HEAD — <see cref="RecordFraming.EncodeFrameHead"/>'s bytes, the one
+    /// encoder's — written through the Latin-1 channel as one character per byte, so the bytes on the medium are the
+    /// store-level head's exactly. It is framing (§9.1.7.2), never converted by a CODE-SET.</summary>
+    private void EmitFrameHead(int payloadLength, RecordExtents? extents)
+    {
+        int size = (int)RecordFraming.FrameHeadBytes(extents, ordinalSlots: 0);
+        Span<byte> head = size <= 64 ? stackalloc byte[64] : new byte[size];
+        Span<char> chars = size <= 64 ? stackalloc char[64] : new char[size];
+        RecordFraming.EncodeFrameHead(head, payloadLength, extents, []);
+        Encoding.Latin1.GetChars(head[..size], chars);
+        _writer!.Write(chars[..size]);
+    }
 
     /// <summary>— and the line sequential twin: the record's data converted, its delimiter native.</summary>
     private void EmitRecordLine(string data, bool national)
@@ -1661,50 +1674,82 @@ public sealed class SequentialConnector : FileConnector
         frameStart = _readOffset;
         if (IsVarying)
         {
-            // Length-framed record: 4-byte LE prefix + payload (see the framing note at the field declarations).
-            var pre = new char[4];
-            if (FillChars(pre, 4) < 4) return null;
-            int len = RecordFraming.PrefixLength(pre, out bool tableFollows);
-            int head = 4;
+            // A length-framed record, read by the ONE frame decoder (RecordFraming.ReadStreamFrame; kb/Work PB2754):
+            // a torn tail, a gap word or a head this writer cannot have produced ends the data here exactly where it
+            // ends the record count and the backward-READ index (FrameStarts), so a forward READ and a backward READ
+            // see the same records. The read offset stays at the frame's start, so a re-anchoring reader
+            // (EnsureReaderCoherent) reads the frame whole once another run unit's WRITE has completed it.
             _lastReadTableCount = -1;
-            if (tableFollows)
-            {
-                // The frame's EXTENT TABLE (RecordFraming's class summary): a count, then 8 characters per
-                // component. A table torn by the end of the file ends the data, as a torn payload does.
-                if (FillChars(pre, 4) < 4) return null;
-                int count = RecordFraming.ExtentCount(pre);
-                var table = new char[8 * count];
-                if (FillChars(table, table.Length) < table.Length) return null;
-                extents = RecordFraming.ExtentTableFromChars(table);
-                _lastReadTableCount = count;
-                head += 4 + table.Length;
-            }
-            var vbuf = new char[len];
-            int vn = FillChars(vbuf, len);
+            var channel = new ChannelMedium(this);
+            if (!RecordFraming.ReadStreamFrame(ref channel, out FrameHead frame)) return null;
+            extents = frame.Extents;
+            _lastReadTableCount = frame.Extents?.Count ?? -1;
+            long head = frame.HeadBytes;
             _lastReadBlockStart = _reader!.BaseStream.CanSeek ? _readOffset + head : -1;
-            _readOffset += head + vn;
-            return FromMedium(new string(vbuf, 0, vn));
+            _readOffset += head + frame.PayloadLength;
+            return FromMedium(channel.Payload!);
         }
         var buf = new char[RecordWidth];
-        int n = FillChars(buf, RecordWidth);
+        int n = FillChars(buf);
         if (n == 0) return null;
         _lastReadBlockStart = _reader!.BaseStream.CanSeek ? _readOffset : -1;
         _readOffset += n;
         return FromMedium(new string(buf, 0, n));
     }
 
-    /// <summary>Fill exactly <paramref name="count"/> characters (or to end-of-stream): StreamReader.Read may
-    /// return fewer than requested at an internal buffer boundary, which is not end-of-data.</summary>
-    private int FillChars(char[] buf, int count)
+    /// <summary>Fill <paramref name="buf"/> exactly (or to end-of-stream), returning the characters read:
+    /// StreamReader.Read may return fewer than requested at an internal buffer boundary, which is not
+    /// end-of-data.</summary>
+    private int FillChars(Span<char> buf)
     {
         int total = 0;
-        while (total < count)
+        while (total < buf.Length)
         {
-            int n = _reader!.Read(buf, total, count - total);
+            int n = _reader!.Read(buf[total..]);
             if (n == 0) break;
             total += n;
         }
         return total;
+    }
+
+    /// <summary>This connector's Latin-1 read channel as a frame medium for the ONE frame decoder
+    /// (<see cref="RecordFraming.ReadStreamFrame"/>): one character per medium byte, so a head's characters are
+    /// converted to its bytes once, here, and the decoder never sees a character (kb/Work PB2754).</summary>
+    private struct ChannelMedium(SequentialConnector connector) : IFrameMedium
+    {
+        /// <summary>Up to this many bytes a count read from the medium is admitted without asking the file's length:
+        /// a corrupt one then costs at most this allocation before the short read ends the data, and the common READ
+        /// pays no length query.</summary>
+        private const int UncheckedBytes = 64 * 1024;
+
+        /// <summary>The bytes this frame has consumed past the connector's read offset.</summary>
+        private long _taken;
+
+        /// <summary>The payload <see cref="TakePayload"/> took, in the medium's characters.</summary>
+        public string? Payload { get; private set; }
+
+        public bool Fill(Span<byte> into)
+        {
+            Span<char> chars = into.Length <= 16 ? stackalloc char[16] : new char[into.Length];
+            chars = chars[..into.Length];
+            if (connector.FillChars(chars) < chars.Length) return false;
+            Encoding.Latin1.GetBytes(chars, into);
+            _taken += into.Length;
+            return true;
+        }
+
+        public bool TakePayload(int length)
+        {
+            var buf = new char[length];
+            if (connector.FillChars(buf) < length) return false;
+            Payload = new string(buf);
+            _taken += length;
+            return true;
+        }
+
+        public readonly bool Holds(long bytes) =>
+            bytes <= UncheckedBytes || connector._reader!.BaseStream is not { CanSeek: true } stream
+            || bytes <= stream.Length - (connector._readOffset + _taken);
     }
 
     /// <summary>Read one physical line's DATA, up to and consuming its line delimiter, and report the delimiter's
@@ -1796,8 +1841,10 @@ public sealed class SequentialConnector : FileConnector
         if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record, national);
         RecordExtents? replacing = Framed(record, image, extents).Extents;
-        string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
-            ? replacing : RecordFraming.VoidExtents(_lastReadTableCount));
+        RecordExtents kept = replacing is not null && replacing.Count == _lastReadTableCount
+            ? replacing : RecordFraming.VoidExtents(_lastReadTableCount);
+        var table = new byte[RecordFraming.ExtentTableBytes(kept)];
+        RecordFraming.EncodeExtentTable(table, kept);
         return OverwriteInPlace(stream, _lastReadBlockStart - table.Length, table, record, national);
     }
 
@@ -1853,20 +1900,17 @@ public sealed class SequentialConnector : FileConnector
     /// <see cref="StreamReader"/> above it, not the file position indicator, so restoring it is what keeps
     /// THIS connector's own buffered characters valid across its own REWRITE.</para></summary>
     private string OverwriteInPlace(Stream stream, long anchor, string content, bool national) =>
-        OverwriteInPlace(stream, anchor, "", content, national);
+        OverwriteInPlace(stream, anchor, [], content, national);
 
-    /// <summary><see cref="OverwriteInPlace(Stream, long, string)"/> with a FRAME part ahead of the record: the
+    /// <summary><see cref="OverwriteInPlace(Stream, long, string, bool)"/> with a FRAME part ahead of the record: the
     /// replacing record's extent table (D-FRA (v); kb/Work PB1053), which is framing, not data of the record, so it
-    /// goes to the medium as it is and is never converted to the file's coded character set.</summary>
-    private string OverwriteInPlace(Stream stream, long anchor, string framing, string content, bool national)
+    /// goes to the medium as the one encoder's bytes (<see cref="RecordFraming.EncodeExtentTable"/>) and is never
+    /// converted to the file's coded character set.</summary>
+    private string OverwriteInPlace(Stream stream, long anchor, ReadOnlySpan<byte> framing, string content, bool national)
     {
         long resume = stream.Position;
         stream.Seek(anchor, SeekOrigin.Begin);
-        if (framing.Length > 0)
-        {
-            byte[] head = Encoding.Latin1.GetBytes(framing);
-            stream.Write(head, 0, head.Length);
-        }
+        stream.Write(framing);
         // ⛔ The REWRITE arm's §13.18.13.4 GR6 b boundary, for the same reason EmitRecord is the WRITE arm's:
         // `content` is the record's data in the NATIVE character set, and what goes on the medium is the file's
         // coded character set. Being the ONE in-place overwrite makes this the one place either arm converts.
