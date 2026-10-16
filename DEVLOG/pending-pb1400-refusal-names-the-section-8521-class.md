@@ -46,3 +46,15 @@ alphanumeric" where §8.5.2.1 makes its class its type-name. The SR4 verdict tho
 corrected, and `ClassSpellingDriftTests.NoSourceOrCorpusComment_SaysEveryGroupIsClassAlphanumeric` now scans every C#
 source and corpus program for the universal claim. The scan reads one line at a time, so it missed the pb59 claim,
 which a line break split; that one was corrected by hand.
+
+**Review round 2.** Two findings. First, round 1's `OperandText` rewrite replaced one wrong universal with another: it
+said an alphanumeric group is the only kind that holds BINARY or PACKED leaves. A strongly-typed group can hold them
+too. The comment now says so and explains why such a group never reaches the image as a compare operand: §8.8.4.2.3
+SR1 admits only a same-type pair, and §8.8.4.2.12 compares that pair element by element. A DISPLAY of one was probed
+and shows the BINARY leaf's true bytes, as the comment says. Second, two corpus fixtures still inferred the class from
+groupness ("is a group item and so of class alphanumeric"), a shape the line-at-a-time pattern did not have. The
+pattern now has it, and it reads whole files with comment continuations joined. The widened scan found four more
+sites (the `IntrinsicResultType.OperandCategory` doc, the `SortEmitter` group-key arm, `TierCRejectionTests` and
+`da5_table_sort_group_key`), and all six are corrected. Run over the pre-PB1400 tree it reports 19 sites, the pb59
+split line among them. A new theory, `TheUniversalClaimPattern_CatchesTheFormsItWasWrittenIn`, pins the forms it
+catches and the true statements that must pass, since a zero over the tree cannot show the pattern works.
