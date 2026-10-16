@@ -74,6 +74,23 @@ public sealed class AcceptDifferentialTests
             expected: "ABC       ]",
             stdin: "ABC\n");
 
+    // §14.9.1.4 GR1: "Any conversion of data required between the device and the data item referenced by identifier-1
+    // is defined by the implementor" — CONFORMANCE.md item 1: the device delivers characters of the UTF-16 repertoire
+    // and an alphanumeric receiver stores them as-is, one per character position. A redirected standard input is
+    // decoded as UTF-8 (kb/Work PB3193): the bytes C3 A9 are ONE character, é (U+00E9), whose ordinal position in the
+    // native sequence (code-unit order, item 188) is 0xE9 + 1 = 234; Z is 0x5A + 1 = 91 and € (U+20AC) is 8365. Under
+    // the Windows console's OEM code page the same bytes were the two characters ├⌐ (ORD 9501 and 8977).
+    [Fact]
+    public void Device_RedirectedInput_DecodesAsUtf8()
+        => AssertOutputs(
+            Program("ACCDEVU8", "01 WS-X PIC X(4).", """
+                ACCEPT WS-X.
+                DISPLAY FUNCTION ORD(WS-X(1:1)) " " FUNCTION ORD(WS-X(2:1)) " " FUNCTION ORD(WS-X(3:1)).
+            """),
+            expected: "234 91 8365",
+            stdin: "éZ€\n",
+            dialect: 2023);
+
     // §14.9.1.2 Format 1 `ACCEPT identifier-1 [ FROM mnemonic-name-1 ]`: the FROM operand is the WORD SPECIAL-NAMES
     // declares (§8.3.2.2.16), associated here with SYSIN — this implementation's input device (§14.9.1.3 SR2) — so
     // the transfer reads standard input exactly as the FROM-less form does (§14.9.1.4 GR4a: stored aligned to the
