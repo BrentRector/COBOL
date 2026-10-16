@@ -619,7 +619,8 @@ noSignPhrase
 // rejects an endianness-phrase on a non-standard-float usage (COBOLNET1716, §13.18.60.4 GR19c/d scope it) and an
 // encoding-phrase on anything but FLOAT-DECIMAL-16/-34 (COBOLNET1717, GR20). The 2014 introduction gate is
 // VersionConformancePass ParseArm.VisitUsageClause (Constructs.UsageFloatFormatPhrase2014) — NOT a parse-time
-// {is2014()}? predicate (COBOLNET_DESIGN §1.1: this tree has no parse-time edition predicates).
+// {is2014()}? predicate: a parse-time edition read is sanctioned only where it decides §8.9 word status, and no
+// word here has another reading (COBOLNET_DESIGN §1.1; kb/Work PB2291, pinned by EditionReadDriftTests).
 floatFormatPhrase
     : encodingPhrase
     | endiannessPhrase
@@ -848,7 +849,9 @@ valueClause
       // a tail of the condition-name arm because formats 3 and 5 share their literal/THRU list; the printed
       // format-5 figure differs only in dropping the IS/ARE connective before the list, which this arm's
       // `(IS|ARE)?` already tolerates as a superset. {is2002()}? at the left edge of the optional block: VALID
-      // is a user-defined word at COBOL-85 (§8.9).
+      // is a user-defined word at COBOL-85 (§8.9). ⚠ kb/Work PB2291 VERDICT: a CONSTRUCT GATE in part — INVALID is
+      // reserved at every edition and has no other reading here, so only the VALID arm needs word status; the
+      // INVALID arm is a COBOL0001 below 2002 where the conformance pass should name the edition (EditionReadDriftTests).
       ({is2002()}? validateValidPhrase)?
     ;
 
@@ -929,7 +932,7 @@ initializeStatement
 // three hand-written families). The keyword reading wins at every edition: the union grammar parses the
 // DEFAULT phrase at 85 too and refuses it BY NAME there.
 initializeOperandList
-    : dataReference (COMMA? dataReference)*
+    : receivingIdentifier (COMMA? receivingIdentifier)*
     ;
 
 // [ALL | category-name] TO VALUE (§14.9.20)

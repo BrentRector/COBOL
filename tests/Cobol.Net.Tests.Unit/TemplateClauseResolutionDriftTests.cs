@@ -27,7 +27,7 @@ public sealed class TemplateClauseResolutionDriftTests
         { "DataBinder.cs", "RenamesOwners" },
         { "DataBinder.cs", "ResolveRestrictedTypes" },
         { "DataBinder.cs", "ResolveRestrictedPrototypes" },
-        { "DataBinder.cs", "ClassifyRestrictedPrototypes" },
+        { "DataBinder.cs", "RestrictedPrototypePointers" },
     };
 
     private static string BodyOf(string file, string method)

@@ -420,7 +420,8 @@ public sealed class ExactCarrierBoundaryDriftTests
         int at = body.IndexOf("private bool ArgumentRoundsAtLift(", StringComparison.Ordinal);
         Assert.True(at > 0, "ArgumentRoundsAtLift is gone — the routing no longer asks the lift predicate");
         string method = body[at..body.IndexOf(';', at)];
-        Assert.Contains("num.LiftRounds(", method);
+        // Asked as a call or as a method group (Operands(ic).Any(num.LiftRounds)) — either way the predicate decides.
+        Assert.Matches(@"\bnum\.LiftRounds\b", method);
         Assert.DoesNotContain(".Digits", method);
         Assert.DoesNotMatch(@"\b34\b", method);
     }

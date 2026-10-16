@@ -261,7 +261,9 @@ public sealed class ProgramTable
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
     /// boundary; the STOP status itself is the run unit's <see cref="RunUnit.ExitStatus"/>, written by the STOP statement
     /// wherever in the run unit it executes). This is the HOST entry: it never writes the host process's exit code
-    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/>. The standalone executable's entry,
+    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/> — and never reconfigures the host's
+    /// console (kb/Work PB3193): a DISPLAY writes through the host's <see cref="Console.Out"/> / <see cref="Console.Error"/>
+    /// as the host configured them (DOC-A.1-59). The standalone executable's entry,
     /// which IS the process, is <see cref="RunModule"/>.
     /// <para>The whole of it runs on the run unit's own thread (<see cref="ActivationStack.RunOnRunUnitThread"/>,
     /// kb/Work PB2659), whose stack is sized for COBOL activation frames, so a RECURSIVE program reaches a realistic
@@ -280,23 +282,24 @@ public sealed class ProgramTable
     /// <para>This is the boundary that IS the process (DOC-A.1-167: "A standalone <c>cobol</c> executable IS its own
     /// host"), so it alone delivers the run unit's termination status to the process exit code, once, when the run unit
     /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the
-    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163).</para></summary>
+    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163). It is
+    /// also the one runtime entry that configures the process's standard streams (<see cref="IO.StandardStreams.EnsureUtf8"/>,
+    /// kb/Work PB3193), before the run unit begins.</para></summary>
     /// <param name="ensureRegistered">The module's registration member.</param>
     /// <param name="mainPath">The main program's path, or null for a module with no main program (a callable library of
     /// functions or prototypes, §8.3.1): it registers and ends.</param>
     public void RunModule(Action ensureRegistered, string? mainPath)
     {
+        // The process's console is this entry's too, for the same reason (kb/Work PB3193): the standard streams carry
+        // UTF-8 (DOC-A.1-59; kb/Work PB59, PB899), set here and in the CLI's Main, never by a host entry, so a run unit
+        // a host embeds writes through the console the host configured and leaves it as it found it.
+        IO.StandardStreams.EnsureUtf8();
         try { ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath)); }
         finally { Environment.ExitCode = CobolNum.Position32(_owner.ExitStatus); }   // StopRun unwinds through here too
     }
 
     private void RunOnThisThread(Action? ensureRegistered, string? path)
     {
-        // The standard display device writes UTF-8 (fix-queue PB59; CONFORMANCE.md item 59). ⛔ The rule lives in
-        // ONE place — CobolNet.Runtime.IO.StandardStreams — because this `if` used to BE that place and the
-        // `cobol` CLI's diagnostic path had no copy of it, so every ISO citation the compiler printed left the
-        // process mangled at the OS code page (kb/Work PB899, feedback_two_arm_dispatch).
-        IO.StandardStreams.EnsureUtf8();
         try
         {
             // The module's own registration is a statement of the run unit like any other (kb/Work PB2846): a refusal
@@ -501,11 +504,8 @@ public sealed class ProgramTable
         var exc = excState;
         int savedActivator = exc.ActivatorExternalMask;
         exc.ActivatorExternalMask = activatingExternalMask;   // captured before resolution (GR3e)
-        // Per-activation scope for the Format-3 exception-checking PERFORM interceptor (ISO §14.9.28.4): snapshot
-        // the frame-stack depth so a called program's raise is NOT intercepted by the caller's active WHEN frame
-        // (the cross-activation GR1 "in range" reading is a documented STAGED item). TrimPerformTo on return also
-        // balances the stack if the callee unwound abnormally past its own pops.
-        int savedPerformDepth = exc.PerformDepth;
+        // The exception-checking PERFORM's WHEN frames need nothing here: the Modules.Push above IS their boundary
+        // (ExceptionEngine.RunTopFrame stops at a frame another activation pushed; kb/Work PB442).
         // Per-activation scope for the §14.6.13.1.4 #3 selector of a NONFATAL condition raised at a RUNTIME site
         // (kb/Work PB367b): the declaratives that qualify are the ACTIVATED element's (§14.9.49.4 GR3 analyzes
         // "the USE statements in the source element", GR4 a) "the source element that contains the statement that
@@ -527,12 +527,17 @@ public sealed class ProgramTable
         // program", so a CobolCallException escaping it is marked: GR3i then makes every enclosing CALL site
         // ignore its own ON EXCEPTION phrase and leave the condition to §14.6.13.1 (kb/Work PB233 — before
         // this, a callee's unhandled failure ran the ACTIVATOR's imperative-statement-1 and was swallowed).
-        bool transferred = false;
+        bool transferred = false, returned = false, rangeTerminated = false;
         try
         {
             inst.DescribeExternals();   // GR3e — pre-transfer; inside the try so the finally still balances
             transferred = true;         // GR3g — control is transferred to the called program
             inst.Call(args, returning);
+            returned = true;
+            // §14.9.40.4 GR17 for a USE procedure of the activated element that ended in EXIT PROGRAM or GOBACK (a
+            // completion that is not normal, §14.6.13.1.2 1)) while a SORT whose range activated it is active: the
+            // activation has returned, and the SORT is terminated here, in the activator (kb/Work PB1177).
+            _owner.SortFiles.AfterActivationReturn();
         }
         // ⛔ A FILTER, NEVER A CATCH-AND-RETHROW (kb/Work PB2659). A catch block runs on top of the stack the condition
         // was thrown from, so a `throw;` inside it starts a NESTED dispatch there: a condition crossing N activation
@@ -543,11 +548,19 @@ public sealed class ProgramTable
         {
             throw new System.Diagnostics.UnreachableException("MarkBoundaryCrossing declines every condition");
         }
+        // §14.9.40.4 GR17 (kb/Work PB1177): a USE procedure invoked while a format 1 SORT is active did not complete
+        // normally, and this activation is in the terminated SORT's range (GR10/GR13 — "all statements that are executed
+        // as the result of a transfer of control in the range"), so it ends with it: the signal passes through to the
+        // SORT statement's landing. Noted by a declining filter, as above, so the INITIAL program's implicit CANCEL
+        // in the finally still runs for an activation that ended this way.
+        catch (SortTerminationSignal) when (SortTerminationSignal.EndsActivation(ref rangeTerminated))
+        {
+            throw new System.Diagnostics.UnreachableException("EndsActivation declines every signal");
+        }
         finally
         {
             n.Active--; _owner.Modules.Pop();
             exc.ActivatorExternalMask = savedActivator;
-            exc.TrimPerformTo(savedPerformDepth);
             exc.NonfatalDispatcher = savedNonfatalDispatcher;
             exc.RestoreChecking(savedChecking);
             if (freshInstance)
@@ -558,21 +571,7 @@ public sealed class ProgramTable
                 inst.EndStorage(StorageEnd.ActivationEnded);
                 n.Instance = displacedInstance;   // kb/Work PB133 — see above
             }
-        }
-
-        if (n.Initial)
-        {
-            // "If the program … is an initial program, an implicit CANCEL statement referencing that program is
-            // executed upon return" (ISO §14.9.18 GR2): close its files (§14.9.5 GR9), cascade (GR4), drop state.
-            // No `Active == 0` guard (kb/Work PB1507): an INITIAL program is never recursive — §11.10.3 SR5 forbids
-            // the INITIAL clause under a recursive container, so the attribute §11.10.4 GR4 hands down never reaches
-            // one, and SR6/0886 keep the two attributes apart in a single program — hence it can never return
-            // while an outer activation of itself is running (the guard served that nonconforming shape).
-            inst.CloseFiles();
-            CancelContained(n);
-            n.Instance = null;
-            n.CalledSinceCancel = false;   // §14.9.18 GR2 IS a CANCEL — the unit is "at present canceled",
-                                           // so a later explicit CANCEL is GR7's no-op
+            if (n.Initial && (returned || rangeTerminated)) EndInitialActivation(n, inst);
         }
 
         // ⛔ NO BOUNDARY DEFAULT HERE (kb/Work PB892 Arm B). A condition the callee staged with GOBACK / EXIT
@@ -580,6 +579,24 @@ public sealed class ProgramTable
         // ModuleStack identity), so only a pickup emitted in the activating element can take it, and an activator
         // that emitted none never has it raised — §14.9.18.4 GR1 b) for an unchecked activator. A discard here
         // was the CALL-only half of that rule; the INVOKE half had no chokepoint to put one in.
+    }
+
+    /// <summary>The end of an INITIAL program's activation — on return, or when the range of a terminated format 1 SORT
+    /// that activated it ends (§14.9.40.4 GR17; kb/Work PB1177) — whose activation always starts from a fresh instance,
+    /// so the one that ends must not keep its files open.</summary>
+    private void EndInitialActivation(Node n, ICobolProgram inst)
+    {
+        // "If the program … is an initial program, an implicit CANCEL statement referencing that program is
+        // executed upon return" (ISO §14.9.18 GR2): close its files (§14.9.5 GR9), cascade (GR4), drop state.
+        // No `Active == 0` guard (kb/Work PB1507): an INITIAL program is never recursive — §11.10.3 SR5 forbids
+        // the INITIAL clause under a recursive container, so the attribute §11.10.4 GR4 hands down never reaches
+        // one, and SR6/0886 keep the two attributes apart in a single program — hence it can never return
+        // while an outer activation of itself is running (the guard served that nonconforming shape).
+        inst.CloseFiles();
+        CancelContained(n);
+        n.Instance = null;
+        n.CalledSinceCancel = false;   // §14.9.18 GR2 IS a CANCEL — the unit is "at present canceled",
+                                       // so a later explicit CANCEL is GR7's no-op
     }
 
     /// <summary>Mark a <see cref="CobolCallException"/> leaving the called program across its activation boundary

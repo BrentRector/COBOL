@@ -7,8 +7,8 @@ edition gate are all in the tree; the §8 questions are resolved as decided. Rem
 PHASE 15), and the residual preprocessor namespace / `using Core =` alias cleanup.
 Scope: `src/Cobol.Net.Frontend/**` — the ANTLR lexer/parser grammars (`Grammar/**/*.g4`), the hand-written
 preprocessor (`Preprocessor/`), the parse-stage machinery (`Parsing/`), the diagnostics model
-(`Diagnostics/`), the generated-parser build (`GenerateIfNewer.ps1` + `Invoke-Antlr4CSharp.ps1` + csproj
-targets), and the frontend's contract to its ONE consumer, the `Cobol.Net.Compiler` binder.
+(`Diagnostics/`), the generated-parser build (`Invoke-Antlr4CSharp.ps1` + the csproj's
+`EnsureGeneratedFiles` target), and the frontend's contract to its ONE consumer, the `Cobol.Net.Compiler` binder.
 
 This document is the decision-complete target for the frontend. It is a companion to
 `docs/rearchitecture/DESIGN-edition-framework.md` (the edition/version framework — this doc owns the
@@ -177,7 +177,7 @@ policy. Three independent renders of "removed = error strict / warning permissiv
 ### 1.6 The binder consumes the tree by string interpretation, not the generated visitor
 The `Cobol.Net.Compiler` binder hand-walks the raw ANTLR context types with **~336 `GetText()` calls** and
 string comparisons (dossier; e.g. `DataBinder.cs:155`), rather than the generated typed visitor. ANTLR's
-`-visitor` output is generated (`Invoke-Antlr4CSharp.ps1:71`) but only `EditionValidator` uses it. The raw
+`-visitor` output is generated (`Invoke-Antlr4CSharp.ps1`, its ANTLR step) but only `EditionValidator` uses it. The raw
 parse-tree shape is thus a wide, un-narrowed, stringly-typed cross-assembly contract with no façade: any
 grammar rule rename ripples into dozens of `GetText()` sites invisibly.
 
@@ -788,11 +788,20 @@ format (`computer-name-optional-2002`, `VisitObjectComputerParagraph`); `sourceC
 ### 3.5 Generated-parser build (D7 + D8)
 
 Behavior is already correct (portable flat-output regen, fail-hard, `.gitignored` `Generated/`,
-java+pwsh prerequisites — `Invoke-Antlr4CSharp.ps1`, `GenerateIfNewer.ps1`). Target changes are hygiene:
+java+pwsh prerequisites — `Invoke-Antlr4CSharp.ps1`, run by the csproj's `EnsureGeneratedFiles` target). Target
+changes are hygiene:
 
 1. **Package name → MSBuild property (DONE).** The generated namespace `CobolNet.Frontend.Generated` is a csproj property
-   (`AntlrNamespace`) passed to `GenerateIfNewer.ps1` as `-PackageName`; this performed the D8 namespace rename with one
-   property (the `using Core = CobolParserCore` aliases in consumers are a separate cleanup).
+   (`AntlrNamespace`) passed to `Invoke-Antlr4CSharp.ps1` as `-PackageName`; this performed the D8 namespace rename with
+   one property (the `using Core = CobolParserCore` aliases in consumers are a separate cleanup).
+1a. **One up-to-date decision over every input (DONE, kb/Work PB2719, PB2730).** `EnsureGeneratedFiles` is the only
+   staleness check: its `Inputs` are the `AntlrGrammar` item (`Grammar/**/*.g4`, an item because MSBuild never expands a
+   wildcard in a target's `Inputs`), the generator script (which carries the tool flags), the `AntlrJar`, and a stamp
+   (`obj/antlr-generation.stamp`, rewritten only when its text changes) carrying the namespace and the jar path. It
+   runs the generator directly with `-PackageName`, `-JarPath` and `-OutputDir`, all mandatory and without defaults;
+   the generator always generates, empties `Generated/` first and again on any failure (so a run ANTLR wrote before a
+   warning cannot pass for up to date), and has no self-invocation guard. A warm tree therefore regenerates on a
+   namespace, jar or flag change exactly as a fresh CI checkout does. `AntlrGenerationDriftTests` pins it.
 2. **Delete the committed `.antlr/` caches** (`Grammar/.antlr/`, `Grammar/Core/.antlr/`) and add
    `**/.antlr/` to `.gitignore`. They are IDE build output; one caches a dead grammar.
 3. **Narrow the SLL-bail catch** (`Frontend.cs:135`): `catch (Antlr4.Runtime.Misc.ParseCanceledException)`
@@ -988,6 +997,18 @@ reference formats, and the only place source comments are recognized. Its model:
   so a new statement, clause or entry needs no change; a new kind of HEADER is one line in the pass. Rejected: a parse
   predicate (PB2720 removed the last one; the rule is an edition's, not the grammar's) and a front-end check (a
   FrontendError would hide every bind-time edition gate of the same program).
+  **The one half the pass cannot ask is the CONTINUATION line** (kb/Work PB3168): X3.23-1985 also requires "Area A of a
+  continuation line must be blank" (IBM Enterprise COBOL states it outright; VCR row 7.35), the same
+  `fixed-form-text-in-area-a-2002` row. A continued literal's tail is no token's start, and a resultant position has no
+  inverse to the physical line, so only the §6.5 logical conversion — which alone sees the hyphen — can name the line:
+  `LogicalLineBuilder.Add` asks `FixedFormLine.IsAreaAOffset` of the first character of every fixed continuation line and
+  reports through `ReferenceFormatDiagnostics.OnContinuationTextInAreaA` (every such line, the first text's column), the
+  way the other §6.3.5 continuation rules are reported. It is therefore a front-end error: the one place this family does
+  hide the bind-time gates, accepted because the line is the only fact the rule has and a continuation line in area A is
+  rare. The same fact makes a continuation line holding a period or a word in area A one diagnostic, not two: the row is
+  not yet introduced at every edition the pass screens, so the report is an error on both axes, the compilation returns
+  `FrontendError` before the bind, and the area pass never sees that token (it needs no exemption). A comment-entry
+  paragraph's continuation lines are commentary (discarded before the builder) and are not asked.
 - **A column is a CHARACTER POSITION — one code point — and never a string index** (DOC-A.1-157, kb/Work PB1966): a
   supplementary-plane character is two UTF-16 units and one position. `CharacterPositions` (count, index of a position,
   position of an index) is the one definition, `FixedFormLine` the one reader of a fixed-form line's columns (sequence
@@ -998,7 +1019,14 @@ reference formats, and the only place source comments are recognized. Its model:
   3) removes an inline comment on a continuation line too, a quotation symbol ends a literal only when it is the one
   that opened it, and it stops at the floating literal continuation indicator and at a directive after program text.
   It replaced two scanners that disagreed (a comment strip that assumed "not in a literal" and a
-  state scan that treated either quotation symbol as closing).
+  state scan that treated either quotation symbol as closing). What a literal's delimiters are and what a comment
+  indicator is, it asks `CobolSourceText` (Cobol.Net.Editions, beside `CobolSpace`; kb/Work PB2621): the §8.3.5 5)
+  opening delimiters with their B/N/X/BX/NX prefixes, the closing delimiter with the §8.3.3.2.3 3) doubled quotation
+  symbol as content, and the §6.2.3.1 comment indicator `*>`. The text-word scanner and the directive-line parse ask the
+  same reader, so the scan keeps only what is its own: the literal state carried ACROSS a line end (a quotation symbol
+  that ends a line may be the first half of a doubled one), the floating continuation indicator and the directive after
+  program text. `LiteralScanDriftTests` refuses a text stage that spells the comment indicator, the quotation-symbol
+  pair or a doubled-quotation test again.
 - **Comments never leave this pass.** A comment line becomes an empty line and an inline comment is cut, in fixed
   AND free form, so no later stage (the lexer's picture mode, the COPY/REPLACE text-word scanner, the NIST
   substitutions) has a comment rule to get wrong. The lexer keeps `COMMENT_START` (and `PIC_COMMENT` /
@@ -1182,8 +1210,21 @@ target:
   wording (`BailErrorStrategy` inherits `DefaultErrorStrategy.ReportError`), once in `CobolErrorStrategy`'s —
   and reported a FALSE error whenever SLL was merely the weaker predictor. `Frontend.Parse` now attaches
   `CobolErrorListener` inside the LL retry only, so the authoritative pass is the only one that diagnoses.
-- `CobolErrorStrategy` keeps its COBOL-intent heuristics (`GuessCobolIntent`, 19 rules) — these are genuinely
-  useful and not duplicative. It carries no edition logic: edition diagnosis lives in the
+- `CobolErrorStrategy` keeps its COBOL-intent heuristics (`GuessCobolIntent`) — these are genuinely
+  useful and not duplicative. ⛔ **A hint states only what is true, and is keyed on token TYPES and the parser
+  state, never on a word's spelling** (kb/Work PB2770): the "may not be supported" hints COBOL0101-0107 fired on a
+  word wherever the parse failed at it and claimed limitations the compiler does not have, so they are deleted
+  (0104-0106 by DEVLOG 232, 0101-0103 and 0107 by PB2770), and so is COBOL0304 "missing period after paragraph
+  name", keyed on a token's text containing ".MOVE" and its siblings — text no COBOL word can hold (ISO §8.3.2.1),
+  so it fired only on a literal or a PICTURE string. **The one exception is a SUPPRESSION, not a hint:** the
+  missing-period guess (COBOL0307) stays off a word spelled `END-…` (`CobolNames.StartsWith`) whether or not the
+  word is a scope terminator, because whoever wrote `END-INVOKE` (no ISO word, kb/Work PB758) or `END-OF-PAGE` at a
+  sentence end meant to close something; there the spelling is the evidence, and keying it on the token type
+  turns the `pb758-invoke-end-invoke-*` negatives into a false "A period may be missing". No hint is ever ADDED
+  because of a spelling. The misplaced-scope-terminator hint (COBOL0306, ISO
+  §14.5.3.2) reads from the ATN, once, which `…Statement` rules match each END-x token (`ScopeTerminator`):
+  END-SEARCH closes both SEARCH rules, and a word no statement rule matches (END-OF-PAGE, a user word spelled
+  END-…) is no terminator. It carries no edition logic: edition diagnosis lives in the
   `VersionConformancePass` (§3.2), and the recogniser call (`CobolErrorStrategy.cs:113`) is gone with the
   recogniser. It hosts the token-keyed vendor JSON/XML→COBOL0313 hint (§3.4), and the two §3.11 arms.
 - The `[code] message` construction (`CobolErrorStrategy.cs:93-95`) is retargeted to build a structured
@@ -1697,7 +1738,7 @@ assemblies produce, with the new wrapper rules flattened (DESIGN-architecture-re
 | create | — | `Cst/` façade namespace (`DataDescriptionCst`, `StatementCst`, …) | typed narrow contract; retire ~336 `GetText()` walks (§3.7) |
 | edit | `Frontend.cs:135` `catch (Exception)` | `catch (ParseCanceledException)` + `RecognitionException` | stop masking predicate/lexer-action bugs (§3.5) |
 | edit | `Frontend.cs:16` stale banner; `:103-105` throw | correct banner; record internal diagnostic | doc drift + exception-boundary consistency (§1.7, §3.6) |
-| edit | `Invoke-Antlr4CSharp.ps1:29`, csproj | `-PackageName $(AntlrPackage)` | package name in one MSBuild property (§3.5) |
+| edit | `Invoke-Antlr4CSharp.ps1`, csproj | `-PackageName $(AntlrNamespace)` | package name in one MSBuild property (§3.5) |
 | edit | `.gitignore` | add `**/.antlr/` | prevent re-committing IDE caches (§1.8) |
 
 ---

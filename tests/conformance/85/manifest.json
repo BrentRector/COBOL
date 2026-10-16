@@ -1,5 +1,10 @@
 {
  "enabled": [
+  "pb229_corresponding_filler_group_rule4",
+  "pb578_advancing_page_overflow_85",
+  "pb370_start_forward_operators",
+  "pb370_read_relative_invalid_key",
+  "pb370_use_file_beats_mode",
   "pb2532_identification_comment_paragraphs_85",
   "pb3133_object_computer_clauses_in_sequence_85",
   "pb1935_parenthesized_numeric_comparand",
@@ -422,8 +427,12 @@
   "pb2502_renames_sort_key",
   "pb2017_arithmetic_operator_spacing",
   "pb2722_evaluate_object_not_ownership",
+  "pb3153_inherited_special_names_words",
   "pb3154_contained_symbolic_character",
-  "pb3154_contained_symbolic_shadowed"
+  "pb3154_contained_symbolic_shadowed",
+  "pb359_unsuccessful_read_start_position",
+  "pb243_display_all_literal",
+  "pb3233_inspect_figurative_pattern_size"
  ],
  "pending": []
 }

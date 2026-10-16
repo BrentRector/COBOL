@@ -18,7 +18,7 @@
 > edition window, per-method DATA scopes (§11.7 GR5 shadowing), the LOCAL-FUNCTION dispatcher, INVOKE
 > USING/RETURNING marshaling under §14.8.2 (D6 — type-preserving crossings, §14.9.23.3 SR 10 object-data
 > auto-CONTENT), and implicit-RECURSIVE reentrancy (:12032); INHERITS (`: BASE`, override marking +
-> §9.3.8.2 signature checks via the shared DescriptionMismatch rule) and SELF/SUPER (D5: `this.M(…)`
+> §9.3.8.2 signature checks via the shared pair-mode relation, `OoConformance.SignatureDifference`) and SELF/SUPER (D5: `this.M(…)`
 > virtual GR2 / `base.M(…)` non-virtual GR3).
 > FACTORY (§11.4) is realized as per-class factory SINGLETON classes (`__FACTORY_FOO : __FACTORY_BASE |
 > CobolObject` with `__Instance` + a covariant `__Create` when the class inherits BASE — §8.6.4 per-class copies of inherited factory
@@ -82,7 +82,16 @@ declares, or the CLASS-ID is therefore legal (§8.4.6.1), until that half itself
 (kb/Work PB3154; PB3132's reference census). A half's data-name or named CAPACITY register (or a method's own data-, condition- or
 index-name or register) spelled like a SYMBOLIC CHARACTERS name of the class is the item a reference there names (§8.4.6.1): the half hides
 the inherited symbolic after it binds (`DataBinder.DropShadowedConstants`), and a method's names hide it, and an
-object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/Work PB3154 review R1-1).
+object constant-name, at reference time (`DataBinder.ActiveMethodDeclares`; kb/Work PB3154 review R1-1). That method tier is
+`OoMethodDataScope.Declares`, which asks EVERY name index the method's scope holds (`ByName`, `Conditions`, `IndexNames`,
+`CapacityRegisters`, and the method's constant entries, `Constants`, kb/Work PB3164); `GlobalNameClassDriftTests.MethodDeclares_AsksEveryMethodNameIndex` finds those indexes by reflection (a `DataBinder.ConstantScope` counts as one: a method's `01 X CONSTANT AS 7` that it missed let `IF X` test the object's level-88 `X`, kb/Work PB3153 review round 3), so an
+index added to the scope is asked too (kb/Work PB3165: when a method's registers moved into the method's own scope, a hand-written list
+kept asking the class's register index and the method's register stopped hiding the symbolic). Every `SymbolTable` lookup with a
+method tier asks the same predicate after its own name class's method index: `TryResolve`, `TryResolveCondition`, `IndexCandidates`
+and `CapacityCandidates` each answer from the method when it declares the spelling in their class, and report "not found here" when
+it declares it in another, so a method's word hides the object's declaration of it whatever either's class (§11.7.4 GR5, §8.4.6.1;
+kb/Work PB3165 review R2-1). `GlobalNameClassDriftTests.EverySymbolTableMethodTier_AsksTheMethodsWholeDeclaration` holds every
+method-tiered member of `SymbolTable` to it.
 
 ## Spec corrections
 
@@ -218,7 +227,7 @@ appends an explicit omitted `BoundInvokeArg` for each trailing OPTIONAL formal, 
 COBOLNET_INTERPROGRAM_DESIGN, `OmittedProbe`.
 
 **§9.3.8.2.3 per-method conformance is written ONCE — `OoConformance.MethodConformanceMismatches`** (rules 1–4,
-5 covariant RETURNING, 6, 7 via `DescriptionMismatch`'s strongly-typed sentence, 8, 9 RAISING via
+5 covariant RETURNING, 6, 7 via `SignatureDifference`'s strongly-typed arm, 8, 9 RAISING via
 `RaisingMismatches`, and the closing sentence's mutual-reference ban between the two RETURNING descriptions via
 `ReturningCircularity` — the transitive closure over returning-item object references and a class's INHERITS /
 IMPLEMENTS, distinct interfaces only; owner decision R63, kb/Work PB1498, CONFORMANCE.md D-OOCIRC), and it has
@@ -266,8 +275,8 @@ run-time relations admit only an argument of the same type (§8.5.2.1 category =
 **Tier-C posture at the method boundary.** A NON-strong group with a pointer leaf, or a variable-length group
 (§8.5.1.12.1) outside the current-extent carrier, has no character image (`DataItem.IsImageCapable`) and the crossing stages the documented Tier-C
 loud (COBOLNET_DESIGN §4.2) — it is never a backend compile error. That distinction is load-bearing: the bind
-side (`DataBinder.Oo`) applies no image screen, and `OoConformance.DescriptionMismatch`'s `!formal.IsImageCapable`
-arm runs only when an INVOKE or an override/implements **pair** exists, so a method that is merely DECLARED must
+side (`DataBinder.Oo`) applies no image screen, and the description of such a group (`ActivationDescriptions.Of`, none)
+is asked only when an INVOKE or an override/implements **pair** exists, so a method that is merely DECLARED must
 still emit compilable C#. Held by `tests/Cobol.Net.Tests.Unit/BoundaryImageChannelTests.cs` (a source-level drift
 test forbidding a self-spelled `.AsImage()`/`.FromImage(` outside the generator) and by the golden
 `pb177_method_group_boundary`, whose two never-invoked Tier-C methods are exactly this case. kb/Work PB177 arm A.
@@ -282,7 +291,7 @@ test forbidding a self-spelled `.AsImage()`/`.FromImage(` outside the generator)
 3. **Call-site lowering**: a plain field of matching storage passes `ref` DIRECTLY (subscripts evaluate once — GR7a for free); everything else is copy-in temp → `ref` temp → copy-out (BY REFERENCE identifiers only), groups crossing as character images, storage-form bridges via caller-side `FormatDisplay`/`ParseDisplay`/`NumericImagePlace`; float formals read the float value directly (never the scaled-integer path). **Emission order per GR8**: the call → the BY REFERENCE copy-outs → the RETURNING store into identifier-4 LAST.
 4. **Crossing-form harmonization** (`HarmonizeStorageCrossings`, in `StorageFormPass`): once the storage form is computed, override chains UNION the image-stored form across corresponding formal/RETURNING pairs to a fixed point, so base and override always emit the same C# signature (otherwise a base/override storage-form desync is CS0115 on the emitted C#). The union covers EVERY byte-form numeric (`PicInfo.HasImageByteForm`, minus the national-form numeric per D-N1 carriage), not the DISPLAY pair alone (kb/Work PB187): a formal REDEFINED in its linkage section (§14.2.2 NOTE 2) is image-stored whatever its usage, so its plain prototype/override twin is promoted to the image too. The universal box (D-U6a) stays canonical BY DESCRIPTOR, so its two bridges are: a zoned DISPLAY box over a NATIVE local (`OoUnivImageBridged`), and a NATIVE box (float/binary/packed/index) over an IMAGE local (`OoUnivNativeBoxOverImage` — `NumericRenderer.CarrierOfImage`/`ImageOfCarrier` (the ONE native↔storage-image pair, shared with the CALL/INVOKE copy-out arms of kb/Work PB970) through the item's own byte form, both the callee's unbox/rebox and the caller's box/copy-out). The typed call site's `NumericImagePlace` takes the IEEE lane for a native float.
 5. **Emitted-name safety**: a METHOD-ID named like its CLASS-ID is legal COBOL. A method is a source element of its own (§10.5), its METHOD-ID declares its method-name there (§8.4.6.5), and §8.3.2.2's one-type-per-word rule binds only "Within a source element", so the binder keeps ONE §8.3.2.2 census per method (`OoMethodDataScope.Words`, entered by `DataBinder.EnterMethodDeclarations` for the method's data entries, its METHOD-ID and its procedure-names; kb/Work PB2921). §8.3.2.2 says "used", and the object-class-names, interface-names and parameter-names a method references are declared by its CLASS, so the one class-name resolver (`OoNameResolution.Lookup`) records each one it resolves in the referring element's census (`OoClassTable.RecordReferenceUse` into `OoClassTable.CensusOf`, the one census per source element, which a contained program's references reach too; kb/Work PB3132): a METHOD-ID spelled like its CLASS-ID stays legal until the method also references that class-name (`INVOKE X "NEW"`, a `USAGE OBJECT REFERENCE X` item), and then COBOLNET2692 refuses whichever of the declaration and the reference comes second (negatives `pb3132-method-id-spells-its-class-id-and-invokes-it`, `pb3132-method-paragraph-spells-a-class-it-references`, `pb3132-contained-program-paragraph-spells-a-class-it-references`). C# forbids a member named like its enclosing type (CS0542), so the SYMBOL renames to the prefix family `NamingConvention.ClassNamedMethodName` (`__method_X`): no COBOL word begins with `__` (§8.3.2.1), whereas the `_M` suffix it replaced was also the identifier of a legal sibling method-name `X-M` (CS0111). The factory singleton class is the same kind of prefix, `__FACTORY_X`, never the suffix `X__FACTORY` that the class-name `X--FACTORY` spells. The object data and the instance methods share ONE emitted C# class (the factory data and the factory methods likewise), and a data-name spelled like a METHOD-ID of the same definition is legal for the same reason (the method-name is the method's source element's word), so the methods' C# names are reserved in the data's member scope before the data binds (`DataBinder.ReserveClassMemberNames`): the private data field takes the distinct name (`PQ_2`), never a second member `PQ` (CS0102; kb/Work PB2921 review R2-1, golden `2002/pb2921_data_named_like_method`). The enclosing C# type's own name is reserved there too, since an object data-name may spell the CLASS-ID (the class definition's word, kb/Work PB3154): the field never takes the type's name (CS0542; golden `2002/pb3154_half_data_named_like_class_words`). Overrides adopt the base slot's CsName verbatim; the one unrepresentable corner (a derived class named like an inherited slot) is a 0820 restriction diagnostic. Numeric profiles emit `internal` so CONTENT conversions qualify them cross-class.
-The procedure-division header's BY phrases parse and CARRY on a method (kb/Work PB1051): `OoBindMethodData` threads the using-phrase mode across the formals as the program arm does (§14.2.3 GR4, transitive until the other phrase) into `OoFormal.ByValue`, and asks the ONE header screen (`ProcedureHeaderScreen.ByValueClass`, §14.2.2 SR2, COBOLNET1553). A BY VALUE formal crosses the method ABI exactly as a BY REFERENCE one does (the typed `ref` plus the omitted flag): the activator hands a DETACHED temporary and the method skips the copy-out (§14.2.3 GR10), so there is no second C# signature. `OoBindInvocationArg` takes the argument's mode from the formal when the formal is BY VALUE (§14.9.23.4 GR6 b)), refuses SR5 a)/b) from both sides, asks SR16 (a literal) and SR15 (an identifier's class, COBOLNET2741), and binds a BY VALUE argument through the BY CONTENT arms (§14.8.2.3.3 covers both) — the INVOKE and inline forms alike. A universal invocation passes every argument BY REFERENCE (SR6), so a method with a BY VALUE formal never matches it (§9.3.6 match rule 3 a); the `__CobolInvoke` case breaks to EC-OO-METHOD). `MethodConformanceMismatches` compares the passing mode per formal pair (§9.3.8.2.3 rule 1). A PROGRAM or FUNCTION BY VALUE formal, floating-point included, is carried by the program ABI (kb/Work PB1114). The fixed-point⇄float BY CONTENT conversion IS carried on the INVOKE lane, as on CALL (`OoEmitter.IsFloatLanding` over `FloatResultant`; kb/Work PB1114), and every storage-less BY CONTENT sender — a numeric literal, an arithmetic expression, a boolean value — is described as the sender it is and asked ONE verdict, `OoConformance.ContentValueMismatch` (§14.8.2.3.3 rule 2 in its order: 2 b) SET for an index formal, 2 a) COMPUTE, 2 c) length only, 2 d) MOVE), by the INVOKE, CALL and function lanes alike; a numeric literal or an arithmetic expression into a non-numeric elementary formal crosses as the formal's MOVE record (`MoveEmitter.ConvertSource`) on both the INVOKE and CALL carriers (kb/Work PB1113, PB1946): rule 2 d) takes the argument's VALUE as the MOVE's sending operand (kb/Work PB1936), so an expression is a numeric sender on Table 16's NONINTEGER row (admitted into a numeric-edited formal and edited, refused into an alphanumeric or national one), refused into a group formal (no character image for §14.9.25.4 GR4's copy) and into a class-pointer or object-reference formal (no SET format sends a value); a reference-modified argument whose length is a run-time value crosses BY REFERENCE into a group formal (item 6, D-RM1 a)). OMITTED and OPTIONAL are carried (the pair above). The one-entry / one-relation redesign of argument conformance across CALL, function, typed and universal INVOKE is kb/Work PB1780.
+The procedure-division header's BY phrases parse and CARRY on a method (kb/Work PB1051): `OoBindMethodData` threads the using-phrase mode across the formals as the program arm does (§14.2.3 GR4, transitive until the other phrase) into `OoFormal.ByValue`, and asks the ONE header screen (`ProcedureHeaderScreen.ByValueClass`, §14.2.2 SR2, COBOLNET1553). A BY VALUE formal crosses the method ABI exactly as a BY REFERENCE one does (the typed `ref` plus the omitted flag): the activator hands a DETACHED temporary and the method skips the copy-out (§14.2.3 GR10), so there is no second C# signature. `OoBindInvocationArg` takes the argument's mode from the formal when the formal is BY VALUE (§14.9.23.4 GR6 b)), refuses SR5 a)/b) from both sides, asks SR16 (a literal) and SR15 (an identifier's class, COBOLNET2741), and binds a BY VALUE argument through the BY CONTENT arms (§14.8.2.3.3 covers both) — the INVOKE and inline forms alike. A universal invocation passes every argument BY REFERENCE (SR6), so a method with a BY VALUE formal never matches it (§9.3.6 match rule 3 a); the `__CobolInvoke` case breaks to EC-OO-METHOD). `MethodConformanceMismatches` compares the passing mode per formal pair (§9.3.8.2.3 rule 1). A PROGRAM or FUNCTION BY VALUE formal, floating-point included, is carried by the program ABI (kb/Work PB1114). The fixed-point⇄float BY CONTENT conversion IS carried on the INVOKE lane, as on CALL (`OoEmitter.IsFloatLanding` over `FloatResultant`; kb/Work PB1114), and every storage-less BY CONTENT sender — a numeric literal, an arithmetic expression, a boolean value — is described as the sender it is (`ActivationDescriptions.OfValue`) and asked ONE verdict, `ParameterConformance.ContentConformanceReason` over the run-time relation's `CallArgumentViolation` (§14.8.2.3.3 rule 2 in its order: 2 b) SET for an index formal, 2 a) COMPUTE, 2 c) length only, 2 d) MOVE), by the INVOKE, CALL and function lanes alike (D6 item 7); a numeric literal or an arithmetic expression into a non-numeric elementary formal crosses as the formal's MOVE record (`MoveEmitter.ConvertSource`) on both the INVOKE and CALL carriers (kb/Work PB1113, PB1946): rule 2 d) takes the argument's VALUE as the MOVE's sending operand (kb/Work PB1936), so an expression is a numeric sender on Table 16's NONINTEGER row (admitted into a numeric-edited formal and edited, refused into an alphanumeric or national one), refused into a group formal (no character image for §14.9.25.4 GR4's copy) and into a class-pointer or object-reference formal (no SET format sends a value); a reference-modified argument whose length is a run-time value crosses BY REFERENCE into a group formal (item 6, D-RM1 a)). OMITTED and OPTIONAL are carried (the pair above). The one-entry / one-relation redesign of argument conformance across CALL, function, typed and universal INVOKE is kb/Work PB1780.
 
 6. **One relation, read at two times (kb/Work PB2077; decision PB3098, 2026-10-12).** §14.9.23.4 GR7 b) locates the
    method for EVERY INVOKE by §9.3.6's match; conformance is asked of a typed receiver at compile time (§14.9.23.3 SR5 c),
@@ -293,9 +302,9 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    lane answers statically by §14.8.2.3.2 rule 4 with `invokedWith`) and
    `ActivationRelations.ParameterViolation` (§14.8.2.2's group rules; GR7 c)'s ANY LENGTH ban bans the bound METHOD's
    description, not a pair, so it is the universal switch's unconditional stop and never the typed lane's). A BY REFERENCE INVOKE argument has NO second comparator; a reference-modified argument BY CONTENT takes
-   §14.8.2.3.3's MOVE rules like any operand (§9.3.6 4 d)). This item is the INVOKE step of item 7: pair mode
-   (override, implements, property, RETURNING) asks `OoConformance.DescriptionMismatch` only until PB3101 deletes the
-   comparator and sends pair mode to `SameSignature`. What the one relation settles by
+   §14.8.2.3.3's MOVE rules like any operand (§9.3.6 4 d)). This item is the INVOKE step of item 7, whose pair mode
+   (override, implements, property, RETURNING) asks `ActivationRelations.SignatureDifference` over the same
+   descriptions. What the one relation settles by
    construction: a reference-modified argument is §8.4.3.3.4 GR6's PICTURE-less elementary item
    (`OfReferenceModification`), so BY REFERENCE it matches an alphanumeric group formal of no more bytes and never an
    elementary one (3 e)) — the typed lane used to accept `X(1:5)` into `PIC X(5)` and refuse the group; a whole
@@ -315,14 +324,15 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    "Additionally" d)/e) on BOTH lanes (`ActivationDescription.AnyLengthClauses`: the argument compared as if it were
    described with ANY LENGTH — only the length is relaxed), so a `PIC X(4)` argument matches a `PIC X ANY LENGTH` formal
    and, through a universal receiver, is then refused by GR7 c) (EC-OO-UNIVERSAL), while a slice matches no ANY LENGTH
-   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's run-time §14.8.2.3.2 rule 2 d) and §14.8.3.3 5) arms still compare
-   category and usage only (kb/Work PB2077's lead: reading the any-length form there moves the call ABI). Both lanes
+   formal (EC-OO-METHOD; a compile-time refusal on the typed lane). The CALL lane's §14.8.2.3.2 rule 2 d) and §14.8.3.3
+   5) arms read the same any-length form (`SameClausesAtFormalLength`; kb/Work PB3127), so an ANY LENGTH formal or
+   sending item relaxes the length and nothing else on every lane. Both lanes
    quote the relation's refusal, so a refusal spells each description as its entry does and never as its identity key:
    `ActivationDescription.Clauses` is the 3 e) identity (compared), `ClausePhrases` the same clauses as phrases
    (`PICTURE 9(6)`, `USAGE POINTER TO T-REC`, `DECIMAL-POINT IS COMMA`; never compared), built beside it by
    `ActivationDescriptions.ElementaryClauses`, and `ActivationRelations.ClauseDifference` names the phrases one side has
    and the other lacks. Drift: `TypedAndUniversalInvokeVerdictsAgreeDriftTests` —
-   structural (a Roslyn walk: `OoBinder` calls no `DescriptionMismatch`, its BY REFERENCE entry asks the two relations
+   structural (a Roslyn walk: `OoBinder` holds no comparator of its own, its BY REFERENCE entry asks the two relations
    and names no `RefModPlace`, and no `if` of `OoBindInvocationArg` branches on one) and behavioral (the binder's entry
    and the relation agree over every elementary, reference-modified and ANY LENGTH pair; PB3098's rows compile to their
    verdicts; a refusal carries no identity key, `ARefusal_SpellsItsClauses_NeverAnIdentityKey`). Goldens:
@@ -340,22 +350,103 @@ The procedure-division header's BY phrases parse and CARRY on a method (kb/Work 
    `Runtime/Control/ActivationRelations` holds every relation over it — `Matches` / `MatchViolation` /
    `ReturningMatches` (§9.3.6), `ParameterViolation` / `ReturningViolation` (§14.8.2 / §14.8.3 for a method),
    `CallArgumentViolation` / `CallReturningViolation` (a program or function: rule 1's length or rule 2's identity,
-   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MayMove` / `MaySet`, §14.8.2.2) and `SameSignature` (the
-   symmetric identity of §9.3.8.2.3 rules 1-6, §11.7.3 SR3/SR4 and §13.7.3 SR2). `ParameterConformance.CheckArgument`
+   §14.8.2.3.3's SET / COMPUTE / MOVE regime through `MoveViolation` / `MaySet`, §14.8.2.2) and `SignatureDifference`
+   (the symmetric identity of §9.3.8.2.3 rules 2, 3, 6 and 7, which §11.7.3 SR9, §9.3.11, §8.4.3.9.3 SR7 and §13.7.3
+   SR2 import; null when the two are the same description). `ParameterConformance.CheckArgument`
    is the ONE bind-time entry: CALL Format 2, a function reference and INVOKE build the argument's description
    (`OfCallArgument` / `OfPlace` / `OfValue`, the §14.9.4.4 GR8 reduction written once) and the formal's, and ask
    `CallArgumentViolation` (program, function) or `MatchViolation` then `ParameterViolation`
    (method — the match first, §14.9.23.4 GR7 b)); the returning arm asks the returning relations. Pair mode —
    `MethodConformanceMismatches` (override, implements, interface), the property accessor check,
-   `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SameSignature`. There is NO
+   `PrototypeSignatures` (§13.7.3 SR2) and the variable-length MOVE element test — asks `SignatureDifference` through
+   ONE entry, `OoConformance.SignatureDifference(DataItem, DataItem, …)`, which describes both items with
+   `ActivationDescriptions.Of` (an item with no description is the same as nothing). There is NO
    `DataItem` comparator: `OoConformance.DescriptionMismatch`, `ContentMismatch`, `ContentValueMismatch`, the literal
-   arms, `CallBinder.Gr8Classify`, `OoBinder`'s GR8 block and `StrongTypeModel.SameElementaryLayout` are deleted with
-   PB3101 (CLAUDE.md rule 4: no shim survives). Drift: `ActivationConformanceDriftTests` (every activation lane asks
+   arms and the rest of the family are deleted with PB3101 (CLAUDE.md rule 4: no shim survives; §8.5.3.1's structural
+   walk, `StrongTypeModel.SameElementaryLayout`, is a different rule and stays — see the design correction below). The
+   PARSE-TREE half of §14.9.4.4 GR8 / §14.9.23.4 GR4 (which node an argument's identifier or literal landed in) is one
+   reduction too, `ConditionBinder.ReduceArgument`, asked by every CALL spelling and every INVOKE argument (kb/Work
+   PB613). Drift: `ActivationConformanceDriftTests` (every activation lane asks
    `CheckArgument`), `ActivationDescriptionFieldDriftTests` (every description field is read by a relation) and
    `OneRelationDriftTests` (a Roslyn walk: no member outside the builder reads two `DataItem`s' picture, usage, ANY
    LENGTH or category against each other). Measured before PB3101 (2026-10-12): a reference-modified argument BY
    REFERENCE ran into a prototyped CALL's, a function's and a typed INVOKE's `PIC X(5)` formal, and a whole `PIC X(4)`
    ran into a typed INVOKE group formal, while the universal lane refused each — one rule in two currencies.
+   **Where it stands (waves 1077-1078, kb/Work PB3101).** Landed: the typed INVOKE BY REFERENCE step (item 6, PB2077);
+   `ParameterConformance.CheckArgument`'s BY REFERENCE arm asks `CallArgumentViolation` (rule 2: every activation that
+   entry serves has a program-specifier, the NESTED phrase or is a function) over `ActivationDescriptions.OfPlace` /
+   `Of`, so a slice BY REFERENCE into a prototyped program's, a NESTED program's or a function's elementary or ANY
+   LENGTH formal is refused as on the INVOKE lanes; `ReturningConformanceReason` asks `CallReturningViolation` for every
+   pair but two object references (§14.8.3.3 rule 1's SET table, unchanged); `ActivationDescriptions.Of` describes a
+   level-66 THROUGH alias as the alphanumeric group §13.18.45.4 GR2 makes it; `ReferenceGroupViolation` applies
+   §14.8.2.2 rule 1 to a fixed group opposite a variable-length one in the pair lengths §8.5.1.12.3 gives (the walk's
+   `GroupCharTally`); and the `DataItem` comparator was left pair mode only (its activation flags gone). Wave 1078 landed the
+   BY CONTENT / BY VALUE arm: `ParameterConformance.ContentConformanceReason` — asked by CALL, a function and every
+   INVOKE argument shape (identifier, literal-2, figurative, boolean value, arithmetic expression) — describes the
+   argument (`OfCallArgument` / `OfValue`) and asks `CallArgumentViolation`, and `OoConformance.ContentMismatch`,
+   `MoveContentMismatch`, `ContentValueMismatch`, the two literal arms and the `ContentValue` input type are deleted.
+   ⚠ DESIGN CORRECTION (wave 1078): two object references BY CONTENT stay with the class table
+   (`OoConformance.ObjectReferenceContentMismatch`), as the returning arm's pair does: the compile-time SET reads the
+   class facts AS A PAIR (`OoClassTable.SetOperands`, a parameterized class's formal standing for the most favourable
+   actual, kb/Work PB2937) and an ACTIVE-CLASS formal's alternatives are conditions on the invocation, which no
+   description carries. The relation gained what the bind-time copy had and it lacked — §14.8.2.2's strongly-typed
+   sentence in BY CONTENT mode (`StrongTypeViolation`, both modes), §14.9.25.3 SR6 / SR7 for a figurative argument
+   (`MoveValidity.FigurativeRefusal`, the one copy the compiler's MOVE chain asks too; an ALL literal of boolean
+   characters is `ActivationCategory.FigurativeBoolean`), and a MOVE refusal that names its rule (`MoveViolation`) —
+   and the bind-time copy's one refusal the standard does not make is gone (a group argument BY CONTENT into a numeric
+   formal: §14.8.2.2 rule 2's MOVE admits it). Wave 1079 wrote the GR8 reduction once (`ConditionBinder.ReduceArgument`,
+   PB613); reducing a keyword-less CALL argument before dispatching its shape fixed CALL's boolean arm, which passed an
+   identifier that reached a boolean node on a later argument's B-operator BY CONTENT where §14.9.4.4 GR9 a) 1. assumes
+   BY REFERENCE. Wave 1080 moved pair mode OUTSIDE the prototype signature classification to the relation:
+   `MethodConformanceMismatches` (every formal and a non-object RETURNING), the property accessors and
+   `MoveBinder.ElementMovesOf` ask `OoConformance.SignatureDifference`, and an object-reference description carries
+   `ObjectNameIsParameter` (a skeleton's parameter-name, kb/Work PB2937; §9.3.8.2.4 makes its identity each expansion's
+   question, so a pair that turns on it is admitted, `ActivationRelations.TurnsOnParameterName`). The relation
+   settled one difference the comparator carried from §14.8.2.2 rule 1's activation reading: a 4-byte alphanumeric group
+   and a `PIC X(4)` were "the same description" at equal width, so such an override, IMPLEMENTS pair or property
+   compiled, where §9.3.8.2.3 rule 3 refuses it (a group has no PICTURE clause; §8.4.3.9.3 SR7 likewise). A bit /
+   national group stays the same description as the elementary `PIC 1(m)` / `N(m)` item of its usage (§13.18.29.4 GR1
+   b) / GR2 b)); two fixed groups are the same description at the same length, two variable-length groups when
+   compatible at the same collapsed length (§9.3.5.3 item 7 keeps a variable-length group apart from a fixed one).
+   **The signature classes are a PARTITION REFINEMENT (design decision of wave 1080, landed in wave 1082).** A
+   restricted program- or function-pointer's description carries its signature CLASS (`Clauses` = `TO` the class, and
+   inside a strong group's `StrongType` key), and the classes are what `PrototypeSignatures.Same` decides, so a
+   description relation asked inside a classification that threads its own assumptions would be circular. Shape (a), a
+   restriction-equivalence parameter on `SignatureDifference` with the prototype NAME as a provisional identity, was
+   rejected: the identity is embedded in the `StrongType` key, so the hook would have to reach inside it, and a run-time
+   relation would carry a compile-time-only callback. Shape (b) is the code: `PrototypeSignatureClasses.Classify`
+   computes the coarsest stable partition — every resolved prototype starts in one block per namespace; each round stamps
+   every restricted pointer item with its prototype's CURRENT block (`DataItem.PointerRestrictionIdentity`) and splits each
+   block by `PrototypeSignatures.Same` against each part's founder; a round that splits nothing is the greatest fixed
+   point (kb/Work PB2495), independent of the order prototypes are presented in. `PrototypeSignatures.Same` asks
+   `OoConformance.SignatureDifference` per formal and returning item (with BY VALUE and OPTIONAL) under plain identity
+   equality, so `PrototypeBisimulation` and the `prototypes` parameters of `StrongTypeModel` are deleted, and so is the
+   whole `DataItem` comparator family (`DescriptionMismatch`, `StrongTypeMismatch`, `AsIfElementaryGroupMismatch`,
+   `CategoryArmMismatch`, `PictureClauseIdentity.Mismatch` / `MismatchAtAnyLength`, `ObjectRefDescriptor.SameDescriptionAs` /
+   `TurnsOnFormal`); `OneRelationDriftTests` keeps the conformance layer (`Oo/`, the verb binders, the prototype
+   signatures) from comparing two items' description facts again. Asking the relation changed one prototype verdict: a
+   bit / national group is the elementary `PIC 1(m)` / `N(m)` item §13.18.29.4 GR1 b) / GR2 b) treat it as, so a
+   prototype's bit group matches a definition's `PIC 1(m) USAGE BIT` (the comparator refused every group opposite an
+   elementary item) — and, for the same reason, two bit (or two national) groups of one length match whatever their
+   subordinate split, because the subordinate-layout half below is asked only of two groups that are NOT bit or
+   national groups. That keeps "the same signature" an EQUIVALENCE, which the founder-based refinement relies on: had
+   two bit groups still compared their split, `PIC 1(8)` would equal a 4+4 and a 2+6 bit group that differed from each
+   other (review finding R1-1; golden `2002/pb3101_bit_group_signature_equivalence`).
+   **⚠ DESIGN CORRECTION (wave 1082): `GroupAtom` does NOT gain each leaf's identity.** §13.7.3 SR2's subordinate-layout
+   half for two groups (kb/Work PB1115: a group's description is its subordinate entries) is §8.5.3.1's structural
+   relation — each elementary item at the same relative position, of the same length, with the same essential clauses —
+   which lives once, in `StrongTypeModel` (`SameElementaryLayout`, the walk type-declaration equivalence and its
+   `TypeIdentityKey` use), and `PrototypeSignatures.SameDescription` asks it beside the relation. Copying those
+   characteristics into the run-time `GroupAtom` would write §8.5.3.1 a second time, in the runtime, and carry it into
+   every generated group atom for a question only the compiler asks. §9.3.8.2.3 rule 3 names clauses a group does not
+   carry, so the pair-mode relation compares two fixed groups by length (as landed in wave 1080) and only §13.7.3 SR2,
+   whose "match the description" a group's subordinate entries answer, asks the layout.
+   Goldens: `conformance:2002/pb3101_activation_lanes_one_relation`, `conformance:2002/pb3101_content_one_relation`,
+   `conformance:2002/pb3101_pair_mode_one_relation`; negatives `pb3101-prototype-call-refmod-by-reference`,
+   `pb3101-function-refmod-by-reference`, `pb3101-nested-refmod-into-any-length`, `pb3127-nested-any-length-clause-differs`,
+   `pb3101-content-zero-into-alphabetic`, `pb3101-content-space-into-boolean`, `pb3101-override-group-for-elementary-formal`,
+   `pb3101-property-accessors-group-and-elementary`; for the reduction, `conformance:2002/pb613_gr8_one_reduction` and
+   negative `pb613-bare-literal-by-value-formal`.
 
 ### D7. Method attributes: instance methods are `virtual` by default; OVERRIDE→`override`; FINAL→`sealed override` (FINAL root → non-virtual); FACTORY methods → `virtual`/`override` members of the per-class FACTORY SINGLETON class, NEVER C# `static` (factory invocation dispatches on the runtime factory class, §9.3.6, and SELF-in-factory is polymorphic, §8.4.3.8.4 GR2 — statics cannot express either). Never emit C# `new`/method-hiding.
 
@@ -385,7 +476,7 @@ LINKAGE-only data division); prototype LINKAGE binds through the SAME OoBindMeth
 §9.3.11-via-§9.3.8.2.3 pass over the §11.8.4 GR2 closure (`ImplementsClosure`: direct + interface-INHERITed
 + class-INHERITed, cycle-safe; instance and factory sides separately) is BINDER-authoritative = **0841**,
 because the C# projection is insufficient in BOTH directions: PIC 9(4) and 9(8) formals both emit
-`ref long` (Roslyn under-rejects — the identical-description rules 2/3 live only in DescriptionMismatch),
+`ref long` (Roslyn under-rejects — the identical-description rules 2/3 live only in `SignatureDifference`),
 and C# forbids the covariant interface-implementation returns that rules 5a/5c2 PERMIT (Roslyn
 over-rejects — cured by `AdapterPairs` → explicit interface implementations
 `PROTO_RET IFACE.M(…) => (PROTO_RET)this.M(…);` as headerExtras on the instance half; the cast is what rule 5 a)
@@ -624,7 +715,7 @@ survives), §8.5.1.12's fixed / variable-length pair (through the pair's two sha
 carrier in the formal's shape segment by segment of the walk's correspondence, `CobolVarGroup.Overlay` stores the
 formal's back over the argument's storage, keeping what the formal does not reach — the typed INVOKE lane uses the same
 pair, `OoEmitter.VarGroupShapes`). A REFERENCE-MODIFIED argument is the §8.4.3.3.4 GR6 unique data item — no PICTURE, so it matches
-only a group formal of its class. Drift protection: `PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithTheComparator_OverEveryElementaryPair`
+only a group formal of its class. Drift protection: `PictureClauseIdentityDriftTests.ActivationMatch_AgreesWithThePairModeRelation_OverEveryElementaryPair`
 (the relation's match ⇔ the typed comparator's identity over analyzed elementary pictures, national / boolean /
 numeric-edited included) and `ActivationDescriptionFieldDriftTests` (every description field is read by a relation or
 the carrier and spelled by the renderer); the goldens `conformance:2002/pb480_universal_match_relations`,
@@ -649,25 +740,25 @@ what the delivery (`CobolObject.NarrowUniversal`) checks. A PROGRAM- or FUNCTION
 class, not its name (§13.18.60.4 GR25 / GR26; kb/Work PB2464): `PrototypeSignatureClasses` partitions a group's
 prototypes by `PrototypeSignatures.Same`, and `BinderDriver.ResolvePointerRestrictions` stamps each pointer item in two
 passes over every forest — `DataBinder.ResolveRestrictedPrototypes` attaches the prototype its `TO` phrase resolves to
-(`DataItem.RestrictedPrototype`), then `DataBinder.ClassifyRestrictedPrototypes` its class
+(`DataItem.RestrictedPrototype`), then `PrototypeSignatureClasses.Classify` its class
 (`DataItem.PointerRestrictionIdentity`) — BEFORE any signature check runs (the §10.6.2 SR2 / SR3 prototype pairs and the
 §9.3.8.2.3 override / implements / interface-inheritance / property-accessor checks run after it, kb/Work PB2495).
-`PrototypeSignatures.SameType` is the one "of the same type" relation over two such pointers: outside a signature
-comparison it compares the classes (`PrototypeSignatures.RestrictionIdentity`, also the `TO <class>` text of
-`ActivationDescription.Clauses`, so the §9.3.6 match, the §14.8.2 / §14.8.3 conformance and rule 6's SET validity all
-agree with the typed comparator's pointer arm); INSIDE `Same`, where a formal is itself a restricted pointer, it compares
-the signatures the two restrictions name as the greatest fixed point (`PrototypeBisimulation`: a pair already being
-compared is assumed equal), so prototypes that name each other or themselves are classified by what they describe and
-never by what they are called (kb/Work PB2495). Two differently named prototypes of one signature are therefore one
+`PrototypeSignatures.SameType` is the one "of the same type" relation over two such pointers: it compares the classes
+(`PrototypeSignatures.RestrictionIdentity`, also the `TO <class>` text of `ActivationDescription.Clauses`, so the §9.3.6
+match, the §14.8.2 / §14.8.3 conformance, rule 6's SET validity and the pair-mode signature relation all agree). The
+classes are the coarsest stable PARTITION (`PrototypeSignatureClasses.Classify`, kb/Work PB3101): every resolved
+prototype starts in one block per namespace, each round stamps every pointer with its prototype's current block and
+splits each block by `PrototypeSignatures.Same` (`ActivationRelations.SignatureDifference` per formal, through
+`OoConformance.SignatureDifference`), and a round that splits nothing is the greatest fixed point, so prototypes that
+name each other or themselves are classified by what they describe and never by what they are called (kb/Work PB2495). Two differently named prototypes of one signature are therefore one
 type on both lanes; the class identity is group-local until the external repository (`DESIGN-external-repository.md`)
 supplies a record's identity. The same relation decides a pointer that is a MEMBER of a group (kb/Work PB3120): a
 strongly-typed group formal is compared through §8.5.3.1's type-declaration equivalence
 (`StrongTypeModel.EquivalentTypeDeclarations` / `SameElementaryLayout`), whose per-item profile compare
 (`SameAnalyzedProfile`) elides `PicInfo.RestrictedPrototypeName` and `RestrictedTypeName` from the record equality and
 asks `PrototypeSignatures.SameType` / `StrongTypeModel.SameRestriction` instead, under one private `Comparison` that
-carries the enclosing signature comparison's `PrototypeBisimulation` (so a group holding a pointer restricted to the
-prototype being compared terminates) and the declaration pairs assumed equivalent while compared (so a type whose
-pointer member is restricted back to it terminates). `StrongTypeModel.TypeIdentityKey` keys such a member the same way
+carries the declaration pairs assumed equivalent while compared (so a type whose pointer member is restricted back to it
+terminates); a pointer member restricted to a prototype still being classified carries that prototype's current block. `StrongTypeModel.TypeIdentityKey` keys such a member the same way
 (the signature class, the folded type-name and the key of the declaration it resolves to, `@depth` for a cycle).
 `PrototypePointerTypeDriftTests` pins that no profile projection leaves either restricted name in the record compare.
 
@@ -735,8 +826,8 @@ are "as if a SET") is asked with the formal side standing for the actual MOST FA
 `SET ONE TO X` with ONE `T ONLY` and X `T` is refused in every expansion), a universal sender into a formal-typed
 receiver, a formal-typed sender into ACTIVE-CLASS (SR14), an interface formal into a class-typed receiver; two
 references to the SAME parameter-name are one class (opaque identity). (b) An identical-description question
-(§9.3.8.2.3 rule 2 through `DescriptionMismatch`) is admitted when the two sides differ only in a name a formal may
-take (`ObjectRefDescriptor.TurnsOnFormal`). (c) A statement that SELECTS A METHOD through a formal — an INVOKE whose
+(§9.3.8.2.3 rule 2 through `OoConformance.SignatureDifference`) is admitted when the two sides differ only in a name a formal may
+take (`ActivationRelations.TurnsOnParameterName`, over `ActivationDescription.ObjectNameIsParameter`). (c) A statement that SELECTS A METHOD through a formal — an INVOKE whose
 receiver is a formal-typed reference or a formal class-name, SELF of a method the definition does not define while
 its superclass is a formal (`OoClassSymbol.FormalBaseName`), SUPER or `B OF SUPER` over a formal superclass, an inline
 invocation or object property through a formal, `SET … TO` a formal class-name — binds the operands whose rules do
@@ -848,8 +939,9 @@ OBJECT-VIEW (§8.4.3.5, identifier Format 5; live — kb/Work PB1425; golden 200
   GRAMMAR: `objectReferenceAtom : objectView | objectReferenceTerm` — the view is an ATOM because §8.4.3.1.4 GR1
   applies it (c) before the inline invocation operator (e), so `U AS C :: "M"` invokes on the view; the phrase
   repeats (a view of a view, §8.4.3.1.3 SR1). Every object-reference position (INVOKE receiver, inline receiver,
-  SET Format 5 sender, RAISE) reaches it through the one `objectReference` rule. The two object-reference RECEIVING
-  positions (SET Format 5 receivers, INVOKE RETURNING) parse it as a superset so §8.4.3.5.3 SR2 is COBOLNET2871.
+  SET Format 5 sender, RAISE) reaches it through the one `objectReference` rule. Every RECEIVING position parses it
+  (with SELF, SUPER and NULL) as a `nonReceivableIdentifier`, so §8.4.3.5.3 SR2 is COBOLNET2871 wherever a view is
+  written as a receiver (kb/Work PB1551; the receiving chokepoint's `ReceivingOperandForms` table).
   UNIVERSAL is a token, §8.9-reserved 2002+ (a user word at 85). Edition gate `object-view-2002` on recognition.
   BINDER (`OoBinder.OoBindObjectView`): GR1 "treated at compile-time as though it had the description specified
   by the AS phrase" → a compiler temporary DESCRIBED by the phrase (`DataBinder.OoCreateObjectViewTemp`), filled
@@ -874,8 +966,9 @@ THE OO IDENTIFIERS IN THE EXPRESSION TIER (§8.4.3.1.3 SR1; live — kb/Work PB1
   of `invokeArgument` are gone: SELF is the sole primary of its expression arm), an inline-invocation argument, a
   SET sender (`SET O TO SELF` now parses as `setToValueStatement`, which precedes the object-reference alternative;
   that alternative is left with NULL). The GOBACK / EXIT RAISING phrase's identifier-1 (`raisingPhrase`) is
-  `objectReference`, RAISE's operand rule. A RECEIVING position never parses an expression, so §8.4.3.8.3 SR2 and
-  §8.4.3.5.3 SR2 are not widened (their general screen is kb/Work PB1551).
+  `objectReference`, RAISE's operand rule. A RECEIVING position never parses an expression; it parses SELF, SUPER,
+  NULL and the view only as a `nonReceivableIdentifier`, refused by §8.4.3.8.3 SR2 (COBOLNET3978), §8.4.3.7.3 SR1
+  (COBOLNET3977) and §8.4.3.5.3 SR2 (COBOLNET2871) at the receiving chokepoint (kb/Work PB1551).
   BINDER: ONE door, `OoBinder.OoBindOoIdentifier` (Formats 4, 5, 6) — every consumer of a SOLE identifier
   (`ConditionBinder.SoleOoIdentifier`: the relation and EVALUATE operand binders, the INVOKE / inline argument
   reduction, `SetSenders.Classify`, `ExpressionBinder.BindPrimary`) asks it. SELF binds to a compiler temporary
@@ -921,7 +1014,7 @@ The emitter's 'emit a data item reference' consults the bound item's owning scop
 
 The bound model carries an `ObjectRefDescriptor` (Binding/Model/ObjectRefDescriptor.cs) on `PicInfo.ObjectRef`: **Kind ∈ {Universal, Interface, ObjectClass, ActiveClass} × Name × Factory × Only** — the four axes §13.18.60.2 prints. `DataBinder.OoBindObjectRefDescriptor` is the ONE adjudication of a written phrase (kind resolution against the pass-1 class table → 0813; the interface alternative's FACTORY/ONLY ban → 1925; §13.18.60.3 SR16 placement → 1924), and every consumer ASKS the descriptor rather than re-deriving the kind. ⛔ It replaced a single `string? ObjectClassName`, whose one axis made ACTIVE-CLASS and ONLY unrepresentable (and therefore REJECTED as legal source), left FACTORY OF loud-staged, and spelled "universal" as "no class name recorded" — a test equally true of every other shape (kb/Work PB389). INVOKE binding reads the descriptor to pick the roster: universal → the dynamic path, interface-name → `AllPrototypes()`, object-class-name/ACTIVE-CLASS → the named/containing class, and its FACTORY roster when FACTORY OF was written (§9.3.6 — a class has two separate method interfaces). A class-name target (not a data item) means NEW/factory dispatch.
 
-**Conformance that depends on the INVOCATION (kb/Work PB1112).** An ACTIVE-CLASS formal or returning item means "the class of the object the method runs on", so ISO §14.8.2.3.2 rule 4, §14.8.2.3.3's ACTIVE-CLASS paragraph and §14.8.3.3 rule 2 state its conformance in terms of how the method is invoked. The INVOKE binder describes that invocation ONCE, as an `ObjectRefDescriptor` (`invokedWith` — §14.8.3.3 rule 2 b)'s four cases: a class-name is that object-class-name with ONLY, SELF and SUPER are ACTIVE-CLASS, an object reference is its own description), and hands it to the one comparator: `OoConformance.DescriptionMismatch` / `ContentMismatch` route an ACTIVE-CLASS formal of an activation to `ActiveClassFormalMismatch`, and an ACTIVE-CLASS returning item is delivered as `OoConformance.ReturningSender(returning, invokedWith)`. The standard class BASE's New / FactoryObject results (`OoBindStandardInvoke`) read the same view. The override / implements PAIR (§9.3.8.2.3 rule 2 d)) passes none and compares the two descriptions.
+**Conformance that depends on the INVOCATION (kb/Work PB1112).** An ACTIVE-CLASS formal or returning item means "the class of the object the method runs on", so ISO §14.8.2.3.2 rule 4, §14.8.2.3.3's ACTIVE-CLASS paragraph and §14.8.3.3 rule 2 state its conformance in terms of how the method is invoked. The INVOKE binder describes that invocation ONCE, as an `ObjectRefDescriptor` (`invokedWith` — §14.8.3.3 rule 2 b)'s four cases: a class-name is that object-class-name with ONLY, SELF and SUPER are ACTIVE-CLASS, an object reference is its own description), and hands it to the one entry: an ACTIVE-CLASS formal of an activation is asked `OoConformance.ActiveClassFormalMismatch` (by `OoBinder` and `OoConformance.ObjectReferenceContentMismatch`), and an ACTIVE-CLASS returning item is delivered as `OoConformance.ReturningSender(returning, invokedWith)`. The standard class BASE's New / FactoryObject results (`OoBindStandardInvoke`) read the same view. The override / implements PAIR (§9.3.8.2.3 rule 2 d)) passes none and compares the two descriptions.
 
 ### Cross-compilation-unit resolution: the driver PROGRAM and each CLASS are separate program units in one compilation group; INVOKE in the driver references a class defined later in the file, and a method body references sibling methods/inherited members.
 

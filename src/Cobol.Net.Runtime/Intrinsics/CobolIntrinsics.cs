@@ -234,6 +234,17 @@ public static partial class CobolIntrinsics
     /// <summary>The SDIDI-operand intake for a TOTAL integer argument (see <see cref="IntegerArgWideScaled"/>).</summary>
     public static Int128 IntegerArgWideDec(CobolDec v) => IntegerValue(v);
 
+    /// <summary>The SDIDI operand at a §15.3 type-6 position as its integer ON THE SDIDI — the same integrality test
+    /// (<see cref="CobolDec.HasFraction"/>; with checking off the fraction truncates toward zero, DOC-A.1-124) and no
+    /// landing on any narrower carrier. An SDIDI holds 34 significant digits at ANY exponent, so its integer can lie far
+    /// past <c>Int128</c> (MOD(10 ** 40, 3), MOD(A ** 3, B) of a 15-digit A — kb/Work PB2630, PB69); landing it there
+    /// is EC-SIZE-OVERFLOW for a value the function's own SDIDI body evaluates exactly (kb/Work PB651 finisher).</summary>
+    public static CobolDec IntegerArgUnboundedDec(CobolDec v)
+    {
+        RequireIntegral(v.HasFraction, () => v.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return v.TruncateToInteger();
+    }
+
     /// <summary>The <see cref="IntegerArg(Int128)"/> twin for a FLOATING-POINT argument — a distinct NAME rather
     /// than an overload, deliberately: an integer literal converts implicitly to BOTH <c>Int128</c> and
     /// <c>double</c>, so an overload pair would make <c>FUNCTION FACTORIAL(5)</c> a CS0121 ambiguity. That exact
@@ -262,6 +273,47 @@ public static partial class CobolIntrinsics
             ? (Int128)Math.Truncate(v)
             : Exceptions.ExceptionState.ArgumentError(
                 $"the intrinsic integer argument {v} is outside the range the function can represent (ISO §15.3)");
+    }
+
+    /// <summary>
+    /// ⛔ THE CLAMPING BINARY64 INTAKE OF A TOTAL INTEGER ARGUMENT WHOSE FUNCTION ANSWERS THE SAME PAST A BOUND — the
+    /// integer the operand holds, on the <c>Int128</c> carrier, CLAMPED past it instead of raised (kb/Work PB254,
+    /// PB651). Its members are TEST-DATE-YYYYMMDD / TEST-DAY-YYYYDDD argument-1 (§15.90.4 r1a / §15.91.4 r1a, a
+    /// CATCH-ALL verdict) and FIND-STRING argument-3 (§15.37.4 r2/r3, 0 once every match is ignored); the renderer
+    /// emits it from <c>IntrinsicRenderer.IntArgWideSaturating</c> alone.
+    /// </summary>
+    /// <remarks>
+    /// ⛔ A CLAMP ANSWERS FOR A DIFFERENT INTEGER, so it is wrong for every function whose value depends on its argument's
+    /// value — MOD(1.0E39, 7) answered 1 through it, where the operand's integer answers 5. Such an argument, and every
+    /// other §15.3 type-6 operand, takes <see cref="IntegerArgWideReal"/>, which keeps the value or raises.
+    /// The integrality test is the one every carrier shares (<see cref="RequireIntegralReal"/>, kb/Work PB1526): with
+    /// EC-ARGUMENT-FUNCTION checking off a fraction truncates toward zero (docs/CONFORMANCE.md DOC-A.1-124). A finite
+    /// magnitude inside the carrier converts exactly; a larger one, ±∞ included, SATURATES to the extreme of its sign —
+    /// verdict-preserving for these members only, whose answer past the bound they state depends on being outside it,
+    /// never on how far. The 1.7e38 bound is <see cref="FromDouble"/>'s saturation constant, below
+    /// <see cref="Int128.MaxValue"/>, so the boundary value cannot slip through the cast. A NaN is the value of no
+    /// integer: §15.3's EC-ARGUMENT-FUNCTION, and 0 with checking off.
+    /// </remarks>
+    public static Int128 IntegerArgSaturatingReal(double v)
+    {
+        RequireIntegralReal(v);
+        if (double.IsNaN(v))
+            return Exceptions.ExceptionState.ArgumentError(
+                $"the intrinsic integer argument {v} is not the value of any integer (ISO §15.3)");
+        return v >= 1.7e38 ? Int128.MaxValue : v <= -1.7e38 ? Int128.MinValue : (Int128)Math.Truncate(v);
+    }
+
+    /// <summary>The SDIDI twin of <see cref="IntegerArgSaturatingReal"/>, for the same members only. An SDIDI integer
+    /// reaches far past <c>Int128</c> (34 significant digits at any exponent), and landing it there through
+    /// <see cref="IntegerArgWideDec"/> made the TOTAL <c>FUNCTION TEST-DATE-YYYYMMDD(10 ** 40)</c> a fatal
+    /// EC-SIZE-OVERFLOW under ARITHMETIC IS STANDARD-DECIMAL, where §15.90.4 r1a answers 1 (kb/Work PB651 finisher).
+    /// The integrality test is the one every carrier shares. A magnitude inside ±1.7e38 is the exact integer, and a larger
+    /// one SATURATES to the extreme of its sign. That is verdict-preserving here, and only here.</summary>
+    public static Int128 IntegerArgSaturatingDec(CobolDec v)
+    {
+        RequireIntegral(v.HasFraction, () => v.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        double d = v.ToDouble();
+        return d >= 1.7e38 ? Int128.MaxValue : d <= -1.7e38 ? Int128.MinValue : v.TruncatedInteger();
     }
 
     public static double RealResult(double d) => double.IsNaN(d)

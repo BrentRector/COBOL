@@ -5,6 +5,7 @@ using CobolNet.Common;         // CobolLiteral — the ONE literal decoder / §8
 using CobolNet.Binding.Bound;
 using CobolNet.Binding.Model;  // BoundUnit / OoClassUnit — the bound model (P6)
 using CobolNet.Binding.Passes; // GroupBindContext — this pass is the manifest's NAMED terminal pass (P6 Step 4)
+using CobolNet.Binding.Procedure;   // ConditionBinder.MapOperator — the ONE relational-operator fold (the START KEY gate)
 using CobolNet.Editions;
 using CobolNet.Editions.Diagnostics;   // DiagnosticCatalog / EditionDiagnostic / EditionCodes / EditionSeverity(Policy) — the §8.9 funnel
 using CobolNet.Frontend.Common;        // CobolWordRule — the ONE §8.3.2.1 word-length ceiling (shared with the directive stages)
@@ -721,7 +722,9 @@ internal sealed class VersionConformancePass
         /// character, DELETED from the standard: the 2023 file control entry's clauses are §12.4.5.4–§12.4.5.15
         /// and none is PADDING, and the word appears nowhere in the 2023 text (§8.9's list runs PACKED-DECIMAL →
         /// PAGE). Parsed-and-ignored at 85/2002 (a compiler with no blocking model has nothing to pad — the
-        /// MULTIPLE FILE / RERUN posture, and NIST SQ216A/SQ217A both write the clause), gated here from 2014.
+        /// MULTIPLE FILE / RERUN posture, and NIST SQ216A/SQ217A both write the clause), gated here: the registry row
+        /// carries obsolete 2002 (COBOLNET0903) and removed 2014 (COBOLNET0902), GnuCOBOL's edges, the repository
+        /// holding no 2002/2014 text (kb/Work PB656; VCR row 7.20).
         /// <para>⛔ THE ABSENCE OF THIS ARM WAS THE DEFECT (kb/Work PB300): the clause parsed at EVERY edition
         /// with nothing reading the rule, so `--std 2023` accepted a clause the targeted standard does not
         /// contain and said nothing — the one leniency in the compiler that was on neither dialect axis.</para></summary>
@@ -2206,8 +2209,9 @@ internal sealed class VersionConformancePass
         /// <summary>The object-view (ISO §8.4.3.5, identifier Format 5 — <c>identifier-1 AS …</c>; kb/Work PB1425), gated
         /// on RECOGNITION like its Format-4 sibling above, and for the same three derived reasons: A.4.10's optional OO
         /// list does not name it, Annex E's 2014→2023 delta does not list it, and it re-describes an object reference,
-        /// a 2002 introduction. The receiving superset parse (§8.4.3.5.3 SR2, <c>objectViewReceiver</c>) is the same
-        /// construct written where it is refused, so it is gated alike and a COBOL-85 program is told the edition.</summary>
+        /// a 2002 introduction. The receiving superset parse (§8.4.3.5.3 SR2, a <c>nonReceivableIdentifier</c> carrying
+        /// the AS phrase) is the same construct written where it is refused, so it is gated alike and a COBOL-85 program
+        /// is told the edition.</summary>
         public override object? VisitObjectView(CobolParserCore.ObjectViewContext ctx)
         {
             _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
@@ -2215,9 +2219,10 @@ internal sealed class VersionConformancePass
         }
 
         /// <inheritdoc cref="VisitObjectView"/>
-        public override object? VisitObjectViewReceiver(CobolParserCore.ObjectViewReceiverContext ctx)
+        public override object? VisitNonReceivableIdentifier(CobolParserCore.NonReceivableIdentifierContext ctx)
         {
-            _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
+            if (ctx.objectViewPhrase().Length != 0)
+                _p.Check(Constructs.ObjectView2002, "an object-view (identifier AS class, interface or UNIVERSAL)");
             return base.VisitChildren(ctx);
         }
 
@@ -2249,6 +2254,31 @@ internal sealed class VersionConformancePass
         public override object? VisitStartWithLength(CobolParserCore.StartWithLengthContext ctx)
         {
             _p.Check(Constructs.StartWithLength2002, "the START … WITH LENGTH phrase");
+            return base.VisitChildren(ctx);
+        }
+
+        /// <summary>START … KEY with a REVERSE-SEARCH relational operator — LESS, NOT GREATER or LESS OR EQUAL,
+        /// symbols included — a COBOL-2002 introduction (start-reverse-operators-2002, kb/Work PB370). ISO
+        /// §14.9.41.4 splits the operator set by search direction: GR9 b) (<c>cite.py --check 14.9.41.4 "If the
+        /// relational operator is LESS, NOT GREATER, or LESS OR EQUAL, the file position indicator is set to the
+        /// relative record number of the first logical record in the file whose key satisfies the comparison
+        /// searching the file in reverse order"</c> OK) for a relative file and GR17 d) (<c>cite.py --check
+        /// 14.9.41.4 "If the relational operator is LESS, NOT GREATER, or LESS OR EQUAL, the file is searched in
+        /// reverse order"</c> OK) for an indexed one, and §A.3 item 39 (<c>cite.py --check A.3 "the relational
+        /// operators LESS, NOT GREATER, or LESS OR EQUAL in the START statement are dependent on the capabilities of
+        /// the processor"</c> OK) binds that set to READ … PREVIOUS as ONE reverse-access capability — the
+        /// capability <see cref="VisitReadDirection"/> gates at 2002. The operator is folded by
+        /// <see cref="ConditionBinder.MapOperator"/>, the fold the binder gives the same START
+        /// (<c>KeyedIoBinder</c>), so "reverse" is decided once: <c>&lt;</c> and <c>&lt;=</c> are exactly GR9 b)'s
+        /// LESS / NOT GREATER / LESS OR EQUAL, and NOT LESS (<c>&gt;=</c>) stays in the COBOL-85 forward set. On
+        /// the parse arm, like its two START siblings, because the operator is a PARSE fact: an ill-organized or
+        /// unbindable START still names the edition of what it wrote.</summary>
+        public override object? VisitStartKeyPhrase(CobolParserCore.StartKeyPhraseContext ctx)
+        {
+            var op = ctx.comparisonOperator();
+            if (ConditionBinder.MapOperator(op.GetText()) is "<" or "<=")
+                _p.Check(Constructs.StartReverseOperators2002,
+                    "START … KEY " + string.Join(" ", op.children.Select(t => t.GetText())));
             return base.VisitChildren(ctx);
         }
 

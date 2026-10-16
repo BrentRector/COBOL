@@ -17,6 +17,11 @@
   "deliberately one answer (a missing key says exactly as much as an empty one); a MALFORMED value is a third",
   "answer and carries an error CODE, because collapsing it into 'empty' is the fail-open PB875 is about.",
   "",
+  "`terminal` is what each engine's DONE vocabulary makes of the status (`work.TERMINAL_STATUSES`, and its C# twin",
+  "`WorkRegister.TerminalStatuses`). `work.py parity` refuses a fixture that leaves any status of `work.STATUSES`",
+  "without a case, or any case without every field, so a status added to the vocabulary reaches both engines' answers",
+  "here before either can read it differently (kb/Work PB3196).",
+  "",
   "Python: `python scripts/spec/work.py parity` (add --json for the C# gate to consume).",
   "C#    : CobolNet.Tests.Unit.ClosesRowsBackLinkDriftTests.TheFrontmatterReader_AgreesWithTheFixtureAndWithPython",
   "",
@@ -28,7 +33,7 @@
    "name": "a note as the register writes it (LF, one-line lists)",
    "text": "---\ntitle: \"PB245 — the back-link from a landed fix to the rows it closed\"\nid: PB245\nkind: defect\nstatus: landed\nseverity: MAJOR\narea: process/traceability\nprocess_only: true\nblocked: false\nblocked_by: []\nspec_refs: [\"15.4.1\"]\ninventory_rows: []\ncloses_rows: [\"RV-15.4.1-4\"]\ntags: [cobolsharp, work, defect]\n---\n\n# PB245\n\nbody text\n",
    "expect": {
-    "note": true, "id": "PB245", "kind": "defect", "status": "landed",
+    "note": true, "id": "PB245", "kind": "defect", "status": "landed", "terminal": true,
     "inventory_rows": [], "closes_rows": ["RV-15.4.1-4"], "closes_rows_reason": "", "errors": []
    }
   },
@@ -36,7 +41,7 @@
    "name": "the same note with CRLF line endings — still a note (the register is LF; the line-endings audit names a CR)",
    "text": "---\r\nid: PB245\r\nkind: defect\r\nstatus: landed\r\ninventory_rows: [AR-15.7.3-1]\r\ncloses_rows: [RV-15.4.1-4, AR-15.40.3-5]\r\n---\r\nbody\r\n",
    "expect": {
-    "note": true, "id": "PB245", "kind": "defect", "status": "landed",
+    "note": true, "id": "PB245", "kind": "defect", "status": "landed", "terminal": true,
     "inventory_rows": ["AR-15.7.3-1"], "closes_rows": ["RV-15.4.1-4", "AR-15.40.3-5"],
     "closes_rows_reason": "", "errors": []
    }
@@ -45,7 +50,7 @@
    "name": "⛔ inventory_rows WRAPPED across two lines — the exact shape that broke both readers (PB875)",
    "text": "---\nid: PB390\nkind: defect\nstatus: open\ninventory_rows: [\"SR-14.9.25.3-12\", \"SR-14.9.28.3-12\", \"SR-14.9.28.3-13\", \"SR-14.9.39.3-6\",\n  \"SR-14.9.16.3-1\", \"SR-14.9.21.3-1\", \"SR-14.9.46.3-1\"]\ntags: [cobolsharp, work, defect]\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB390", "kind": "defect", "status": "open",
+    "note": true, "id": "PB390", "kind": "defect", "status": "open", "terminal": false,
     "inventory_rows": ["SR-14.9.25.3-12", "SR-14.9.28.3-12", "SR-14.9.28.3-13", "SR-14.9.39.3-6",
                        "SR-14.9.16.3-1", "SR-14.9.21.3-1", "SR-14.9.46.3-1"],
     "closes_rows": [], "closes_rows_reason": "", "errors": []
@@ -55,7 +60,7 @@
    "name": "closes_rows wrapped across three lines, CRLF, mixed quoted and bare members",
    "text": "---\r\nid: PB64\r\nkind: defect\r\nstatus: landed\r\ncloses_rows: [\"GR-8.8.1-3\",\r\n  SR-13.18.40.3-22,\r\n  \"FMT-14.9.32.2\"]\r\ncloses_rows_reason: \"\"\r\n---\r\nbody\r\n",
    "expect": {
-    "note": true, "id": "PB64", "kind": "defect", "status": "landed",
+    "note": true, "id": "PB64", "kind": "defect", "status": "landed", "terminal": true,
     "inventory_rows": [], "closes_rows": ["GR-8.8.1-3", "SR-13.18.40.3-22", "FMT-14.9.32.2"],
     "closes_rows_reason": "", "errors": []
    }
@@ -64,7 +69,7 @@
    "name": "a landing that closed no inventory row: an empty list and a recorded reason",
    "text": "---\nid: PB875\nkind: defect\nstatus: landed\ninventory_rows: []\ncloses_rows: []\ncloses_rows_reason: \"no inventory row tracks the frontmatter reader; the defect is in the gate, not in a spec rule\"\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB875", "kind": "defect", "status": "landed",
+    "note": true, "id": "PB875", "kind": "defect", "status": "landed", "terminal": true,
     "inventory_rows": [], "closes_rows": [],
     "closes_rows_reason": "no inventory row tracks the frontmatter reader; the defect is in the gate, not in a spec rule",
     "errors": []
@@ -74,7 +79,7 @@
    "name": "a reason carrying a colon and brackets in its prose — the value is a scalar, never a list",
    "text": "---\nid: PB99\nkind: defect\nstatus: landed\ncloses_rows: []\ncloses_rows_reason: \"closed no row: the rule it fixes has no catalog entry [none was ever generated]\"\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB99", "kind": "defect", "status": "landed",
+    "note": true, "id": "PB99", "kind": "defect", "status": "landed", "terminal": true,
     "inventory_rows": [], "closes_rows": [],
     "closes_rows_reason": "closed no row: the rule it fixes has no catalog entry [none was ever generated]",
     "errors": []
@@ -84,7 +89,7 @@
    "name": "no closes_rows key at all — absent reads as empty, and that is the whole point of the gate",
    "text": "---\nid: PB1\nkind: defect\nstatus: landed\ninventory_rows: [\"AR-15.7.3-1\"]\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB1", "kind": "defect", "status": "landed",
+    "note": true, "id": "PB1", "kind": "defect", "status": "landed", "terminal": true,
     "inventory_rows": ["AR-15.7.3-1"], "closes_rows": [], "closes_rows_reason": "", "errors": []
    }
   },
@@ -92,7 +97,7 @@
    "name": "⛔ an UNTERMINATED list is an error, never an empty claim — the fail-open PB875 measured",
    "text": "---\nid: PB390\nkind: defect\nstatus: open\ninventory_rows: [\"SR-14.9.25.3-12\", \"SR-14.9.28.3-12\",\ntags: [cobolsharp, work, defect]\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB390", "kind": "defect", "status": "open",
+    "note": true, "id": "PB390", "kind": "defect", "status": "open", "terminal": false,
     "inventory_rows": [], "closes_rows": [], "closes_rows_reason": "",
     "errors": ["unterminated-list:inventory_rows"]
    }
@@ -101,7 +106,7 @@
    "name": "a file that is not a note at all — no frontmatter fence",
    "text": "# Index\n\nThis is kb/Work/Index.md, not a work item.\n",
    "expect": {
-    "note": false, "id": "", "kind": "", "status": "", "inventory_rows": [], "closes_rows": [],
+    "note": false, "id": "", "kind": "", "status": "", "terminal": false, "inventory_rows": [], "closes_rows": [],
     "closes_rows_reason": "", "errors": []
    }
   },
@@ -109,16 +114,16 @@
    "name": "a note whose frontmatter is the whole file — no body, no trailing newline",
    "text": "---\nid: PB2\nkind: analysis\nstatus: open\n---",
    "expect": {
-    "note": true, "id": "PB2", "kind": "analysis", "status": "open", "inventory_rows": [],
+    "note": true, "id": "PB2", "kind": "analysis", "status": "open", "terminal": false, "inventory_rows": [],
     "closes_rows": [], "closes_rows_reason": "", "errors": []
    }
   },
   {
    "name": "quoted and bare members, stray spaces and a trailing comma",
-   "text": "---\nid: PB3\nkind: defect\nstatus: landed\ncloses_rows: [ \"GR-4.2.10-1\" ,GR-7.2.3.4-L2.1,  , DOC-A.1-206, ]\n---\nbody\n",
+   "text": "---\nid: PB3\nkind: defect\nstatus: landed\ncloses_rows: [ \"GR-4.2.10-1\" ,GR-9.3.6-L4.1,  , DOC-A.1-206, ]\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB3", "kind": "defect", "status": "landed", "inventory_rows": [],
-    "closes_rows": ["GR-4.2.10-1", "GR-7.2.3.4-L2.1", "DOC-A.1-206"],
+    "note": true, "id": "PB3", "kind": "defect", "status": "landed", "terminal": true, "inventory_rows": [],
+    "closes_rows": ["GR-4.2.10-1", "GR-9.3.6-L4.1", "DOC-A.1-206"],
     "closes_rows_reason": "", "errors": []
    }
   },
@@ -126,8 +131,49 @@
    "name": "a title carrying a colon, quotes and brackets — it is a scalar and must not swallow the keys after it",
    "text": "---\ntitle: \"PB875 — the reader's test is `value.StartsWith('[') && value.EndsWith(']')`, else []: it fails OPEN\"\nid: PB875\nkind: defect\nstatus: open\ninventory_rows: []\n---\nbody\n",
    "expect": {
-    "note": true, "id": "PB875", "kind": "defect", "status": "open", "inventory_rows": [],
+    "note": true, "id": "PB875", "kind": "defect", "status": "open", "terminal": false, "inventory_rows": [],
     "closes_rows": [], "closes_rows_reason": "", "errors": []
+   }
+  },
+  {
+   "name": "⛔ a QUOTED terminal status is the status, unquoted — the shape the note generator's line scanners kept the quotes of (PB3196)",
+   "text": "---\nid: PB4\nkind: defect\nstatus: \"retired\"\ncloses_rows: []\ncloses_rows_reason: \"retired: the defect was a misreading of the rule, measured again\"\n---\nbody\n",
+   "expect": {
+    "note": true, "id": "PB4", "kind": "defect", "status": "retired", "terminal": true, "inventory_rows": [],
+    "closes_rows": [], "closes_rows_reason": "retired: the defect was a misreading of the rule, measured again",
+    "errors": []
+   }
+  },
+  {
+   "name": "a HALF-landed note is live: its other half is still owed",
+   "text": "---\nid: PB5\nkind: defect\nstatus: half\ninventory_rows: [SR-14.9.25.3-12]\n---\nbody\n",
+   "expect": {
+    "note": true, "id": "PB5", "kind": "defect", "status": "half", "terminal": false,
+    "inventory_rows": ["SR-14.9.25.3-12"], "closes_rows": [], "closes_rows_reason": "", "errors": []
+   }
+  },
+  {
+   "name": "a note waiting on the OWNER is live",
+   "text": "---\nid: PB6\nkind: decision\nstatus: owner\n---\nbody\n",
+   "expect": {
+    "note": true, "id": "PB6", "kind": "decision", "status": "owner", "terminal": false, "inventory_rows": [],
+    "closes_rows": [], "closes_rows_reason": "", "errors": []
+   }
+  },
+  {
+   "name": "a BLOCKED note is live",
+   "text": "---\nid: PB7\nkind: defect\nstatus: blocked\ninventory_rows: [GR-8.8.1-3]\n---\nbody\n",
+   "expect": {
+    "note": true, "id": "PB7", "kind": "defect", "status": "blocked", "terminal": false,
+    "inventory_rows": ["GR-8.8.1-3"], "closes_rows": [], "closes_rows_reason": "", "errors": []
+   }
+  },
+  {
+   "name": "⛔ a status OUTSIDE the vocabulary is LIVE in both engines (work.py check rejects it; the R0 census once counted it closed, PB3196)",
+   "text": "---\nid: PB8\nkind: defect\nstatus: superseded\ninventory_rows: [GR-4.2.10-1]\n---\nbody\n",
+   "expect": {
+    "note": true, "id": "PB8", "kind": "defect", "status": "superseded", "terminal": false,
+    "inventory_rows": ["GR-4.2.10-1"], "closes_rows": [], "closes_rows_reason": "", "errors": []
    }
   }
  ]

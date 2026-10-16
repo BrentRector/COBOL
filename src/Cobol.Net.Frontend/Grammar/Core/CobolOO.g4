@@ -3,9 +3,11 @@
 
 // Object-Orientation grammar (COBOL-2002, ISO §11.2 identification division structure, §11.3 CLASS-ID,
 // §11.7 METHOD-ID, §11.8 OBJECT + §14.9.23 INVOKE). This is a version-factored
-// fragment imported by CobolParserCore.g4 — OO rule BODIES live here; the minimal {is2002()}?-gated HOOK alternatives
+// fragment imported by CobolParserCore.g4 — OO rule BODIES live here; the minimal HOOK alternatives
 // (classDefinition in compilationGroup, invokeStatement in statement, objectReferenceUsage in usageKeyword) are added
-// to the core rules they extend. Keeps 2002 OO out of the COBOL-85 base (see memory feedback_grammar_version_factoring).
+// to the core rules they extend, each parsing at every edition and introduction-gated after the parse through
+// ConstructRegistry (VersionConformancePass for the class/interface definitions and INVOKE, PicInfo.ParseUsage
+// for USAGE OBJECT REFERENCE) — no parse-time edition read (kb/Work PB2291).
 // Imported (no options block); shares CobolLexer's tokens and references core rules (environmentDivision, dataDivision,
 // procedureDivision, cobolWord, objectReference, literal, dataReference, arithmeticExpression).
 
@@ -184,8 +186,8 @@ invokeUsing
 // identifier path: `BY CONTENT A` began matching the expression arm, losing the §14.9.23.3 SR9/SR10 object-data
 // rules, the §14.8.2.3.2 conformance check and the ref-mod handling — and `BY CONTENT "XY"` stopped binding at
 // all. `literal` is kept because the proven literal arm keys on it; the identifier case is recovered IN THE
-// BINDER from a sole-dataReference expression (OoBinder, the SoleDataReference shape ConditionBinder and
-// IntrinsicBinder already use), because the grammar cannot express "a reference, unless it is part of an
+// BINDER from a sole-dataReference expression (InvocationArg.OfInvokeArgument, through
+// ConditionBinder.SoleDataReference), because the grammar cannot express "a reference, unless it is part of an
 // expression" without the ambiguity that caused the original defect.
 // ⚠ BY VALUE keeps `arithmeticExpression` alone and does NOT gain the boolean arm: the format's BY VALUE branch
 // is `arithmetic-expression-1 | identifier-5 | literal-2` — the two phrases genuinely differ, and only
@@ -212,7 +214,7 @@ invokeUsing
 // (96.2%) all carry one. §8.3.2.4.3. The same shape is already spelled `BY?` in CALL's three phrases
 // (CobolParserCore.g4 callByReference / callByValue / callByContent) and in the procedure-division header
 // (CobolData.g4), so this brings the last copy into line rather than inventing a posture.
-// ⚠ NOTHING DOWNSTREAM KEYS ON `BY`: OoBinder.OoBindInvokeArg selects the passing mode from `arg.VALUE()`,
+// ⚠ NOTHING DOWNSTREAM KEYS ON `BY`: InvocationArg.OfInvokeArgument selects the passing mode from `arg.VALUE()`,
 // `arg.REFERENCE()` and `arg.CONTENT()` — the UNDERLINED words — and VersionConformancePass
 // .VisitInvokeArgument gates the boolean OPERATORS, not the phrase word. Verified by grep, not assumed.
 // ⛔ OMITTED IS A BRACE ALTERNATIVE OUTSIDE THE [BY REFERENCE] BRACKET (kb/Work PB757). §14.9.23.2 prints
@@ -234,7 +236,10 @@ invokeArgument
     // spells): without it `USING BY VALUE NULL` was a parse error (kb/Work PB1137). The binder decides it.
     : BY? VALUE (addressIdentifier | arithmeticExpression | literal)
     // predefinedNull: admitted only so OoBinder refuses it by §14.9.23.3 SR9's name — the CALL twin (kb/Work PB1427).
-    | BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
+    // Every other identifier-3 is a RECEIVING operand (§14.9.23.3 SR20: "If identifier-3 does not reference an
+    // address-identifier, identifier-3 is a receiving operand"), so the slot is `receivingIdentifier` and SELF, SUPER or
+    // an object-view written here is refused by its own §8.4.3 rule — callByReference's twin (kb/Work PB1551 review R1-1).
+    | BY? REFERENCE (addressIdentifier | predefinedNull | receivingIdentifier | OMITTED)
     // SELF is identifier-5 (§8.4.3.8 — an identifier format whose only role bar is "shall not be a receiving
     // operand"), so the BY CONTENT / BY VALUE braces and the keyword-less form admit it (kb/Work PB1137). It is an
     // `arithmeticExpression` primary — the identifier tier, as an object-view is (kb/Work PB1425) — and the binder
@@ -247,7 +252,7 @@ invokeArgument
     // an expression written with no BY is a legal argument (§14.9.23.4 GR6 a) 2 makes it BY CONTENT).
     // ⛔ A KEYWORD-LESS `N + 1` IS ONE ARGUMENT (decision R59, reversing PB130's list reading — see `callArgument`).
     // There is no bare `dataReference` arm: `arithmeticExpression` subsumes the identifier, which the binder recovers
-    // from a sole-dataReference expression (OoBindInvocationArg's `arg.Ref ?? SoleDataReference`, the path BY CONTENT
+    // from a sole-dataReference expression (InvocationArg.OfInvokeArgument's `Ref`, through ConditionBinder.SoleDataReference, the path BY CONTENT
     // already takes), so nothing wins the ambiguity over the greedy expression. The `literal` arm is guarded by
     // `numericLiteralIsLeftOperand()` for the numeric literal the spine also subsumes (`5 + 1`).
     | {boolExprAhead()}? booleanExpression
@@ -255,12 +260,10 @@ invokeArgument
     | arithmeticExpression
     ;
 
-// identifier-4 is a RECEIVING operand, so an `objectViewReceiver` here is the P3 superset parse of §8.4.3.5.3 SR2 ("An
-// object-view shall not be specified as a receiving operand"): admitted only so OoBinder refuses it by that rule
-// (COBOLNET2871) instead of COBOLNET0901 on AS (kb/Work PB1425; the SET Format-5 receiving twin is in CobolParserCore.g4).
+// identifier-4 is a RECEIVING operand, so it is the one `receivingIdentifier` (CobolParserCore.g4): an object-view,
+// SELF, SUPER or NULL written there is refused by its own rule at the receiving chokepoint (kb/Work PB1425, PB1551).
 invokeReturning
-    : RETURNING dataReference
-    | RETURNING objectViewReceiver
+    : RETURNING receivingIdentifier
     ;
 
 // ── USAGE OBJECT REFERENCE (ISO §13.18.60.2 general format; §13.18.60.4 GR22) ──

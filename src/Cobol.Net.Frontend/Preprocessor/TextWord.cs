@@ -32,7 +32,7 @@ internal enum TextWordKind
     PseudoTextDelimiter,
 
     /// <summary>A whole compiler directive line (§7.3.3: the <c>&gt;&gt;</c> indicator preceded only by spaces, as
-    /// <see cref="CobolNet.Editions.CompilerDirectiveLine.TryParse(string, out CobolNet.Editions.CompilerDirectiveLine, bool)"/>
+    /// <see cref="CobolNet.Editions.CompilerDirectiveLine.TryParse(string, out CobolNet.Editions.CompilerDirectiveLine)"/>
     /// recognizes it), from its indicator to the end of its line. Not a text-word: "Each occurrence of a compiler
     /// directive line is treated as a single space" for matching (§7.2.3.4 9) c) 5. / §7.2.4.4 8) c) 5.), and "A
     /// compiler directive line is not affected by the replacing action of a COPY statement or a REPLACE statement"
@@ -210,10 +210,10 @@ internal static class TextWordScanner
                 kind = TextWordKind.CharacterString;
                 pos++;
             }
-            else if (LiteralPrefixLength(text, pos) is var prefix and >= 0)
+            else if (CobolSourceText.TryOpeningDelimiterAt(text, pos, out var opening))
             {
                 kind = TextWordKind.Literal;
-                pos = LiteralEnd(text, pos + prefix);
+                pos = LiteralEnd(text, pos + opening.PrefixLength);
             }
             else
             {
@@ -228,11 +228,12 @@ internal static class TextWordScanner
     }
 
     /// <summary>Whether a comment begins at <paramref name="pos"/> (outside a literal): the floating comment indicator
-    /// <c>*&gt;</c> (§6.2.3.2), other than the fixed-form debugging-line carrier the §6.5 conversion writes in its
-    /// place. The ONE reading of a comment indicator in text manipulation — <see cref="TryNext"/> skips what it
-    /// starts, and <see cref="HoldsComment"/> finds what a replacing action produces.</summary>
+    /// <c>*&gt;</c> (§6.2.3.1, as <see cref="CobolSourceText.CommentIndicatorAt"/> reads it), other than the fixed-form
+    /// debugging-line carrier the §6.5 conversion writes in its place. Text manipulation's reading of a comment —
+    /// <see cref="TryNext"/> skips what it starts, and <see cref="HoldsComment"/> finds what a replacing action
+    /// produces.</summary>
     public static bool CommentStartsAt(string text, int pos)
-        => text[pos] == '*' && pos + 1 < text.Length && text[pos + 1] == '>' && !IsDebugLineCarrierAt(text, pos);
+        => CobolSourceText.CommentIndicatorAt(text, pos) && !IsDebugLineCarrierAt(text, pos);
 
     private static bool IsDebugLineCarrierAt(string text, int pos)
         => string.CompareOrdinal(text, pos, ReferenceFormatProcessor.DebugLineCarrier, 0,
@@ -257,24 +258,16 @@ internal static class TextWordScanner
         }
     }
 
-    /// <summary>Take a literal text-word apart (see <see cref="LiteralParts"/>).</summary>
+    /// <summary>Take a literal text-word apart (see <see cref="LiteralParts"/>): <paramref name="literal"/> begins with its
+    /// opening delimiter, which <see cref="CobolSourceText"/> reads, as it reads the content.</summary>
     public static LiteralParts DecomposeLiteral(string literal)
     {
-        int q = literal.IndexOfAny(Quotes);
-        char quote = literal[q];
-        var content = new System.Text.StringBuilder(literal.Length);
-        bool terminated = false;
-        for (int i = q + 1; i < literal.Length; i++)
-        {
-            if (literal[i] != quote) { content.Append(literal[i]); continue; }
-            if (i + 1 < literal.Length && literal[i + 1] == quote) { content.Append(quote); i++; continue; }
-            terminated = true;
-            break;
-        }
-        return new LiteralParts(literal[..q], quote, content.ToString(), terminated);
+        if (!CobolSourceText.TryOpeningDelimiterAt(literal, 0, out var opening))
+            throw new ArgumentException($"'{literal}' is not a literal text-word: it begins with no opening delimiter", nameof(literal));
+        int q = opening.PrefixLength;
+        string content = CobolSourceText.LiteralContent(literal, q, out int closing);
+        return new LiteralParts(literal[..q], literal[q], content, Terminated: closing < literal.Length);
     }
-
-    private static readonly char[] Quotes = ['"', '\''];
 
     /// <summary>A period, comma or semicolon is a separator only "when followed by a space" (§8.3.5 2) / 3)); the end
     /// of a line and of the text count as one (a space is assumed at the end of a source line — §7.2.4.4 NOTE 2), and
@@ -310,43 +303,21 @@ internal static class TextWordScanner
     {
         char d = text[pos];
         return CobolSpace.IsSeparator(d)
-            || d is '(' or ')' or ':' or '"' or '\'' or '&'
+            || d is '(' or ')' or ':' or '&'
+            || CobolSourceText.IsQuotationSymbol(d)
             || (d is '.' or ',' or ';' && SeparatorFollows(text, pos))
             || IsPseudoTextDelimiter(text, pos)
-            || (d == '*' && pos + 1 < text.Length && text[pos + 1] == '>');
-    }
-
-    /// <summary>The length of the literal opening-delimiter prefix at <paramref name="pos"/> — 0 for a bare
-    /// quotation symbol, 1 for <c>B X N</c>, 2 for <c>BX NX</c> (§8.3.5 5), any letter case) — or -1 when no literal
-    /// starts here.</summary>
-    private static int LiteralPrefixLength(string text, int pos)
-    {
-        static bool QuoteAt(string t, int i) => i < t.Length && t[i] is '"' or '\'';
-        if (QuoteAt(text, pos)) return 0;
-        char p = char.ToUpperInvariant(text[pos]);
-        if (p is 'B' or 'N' or 'X' && QuoteAt(text, pos + 1)) return 1;
-        if (p is 'B' or 'N' && pos + 1 < text.Length && char.ToUpperInvariant(text[pos + 1]) == 'X' && QuoteAt(text, pos + 2))
-            return 2;
-        return -1;
+            || CobolSourceText.CommentIndicatorAt(text, pos);
     }
 
     /// <summary>The end of the literal whose opening quotation symbol is at <paramref name="quotePos"/>: just past
-    /// the matching closing delimiter (a doubled quotation symbol is content), or the end of the line when the
-    /// literal is unterminated there.</summary>
+    /// the matching closing delimiter (<see cref="CobolSourceText.LiteralEnd"/>), or the end of the line when the
+    /// literal is unterminated there — the line bounds it, as the lexer bounds it (kb/Work PB1804 plans the §6.5
+    /// literal state this would ask instead).</summary>
     private static int LiteralEnd(string text, int quotePos)
     {
-        char quote = text[quotePos];
-        int i = quotePos + 1;
-        while (i < text.Length && text[i] != '\n')
-        {
-            if (text[i] == quote)
-            {
-                if (i + 1 < text.Length && text[i + 1] == quote) { i += 2; continue; }
-                return i + 1;
-            }
-            i++;
-        }
-        return i;
+        int lineEnd = text.IndexOf('\n', quotePos);
+        return CobolSourceText.LiteralEnd(text.AsSpan(0, lineEnd < 0 ? text.Length : lineEnd), quotePos);
     }
 }
 

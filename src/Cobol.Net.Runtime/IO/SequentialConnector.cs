@@ -229,7 +229,7 @@ public sealed class SequentialConnector : FileConnector
         if (SharedPhysical is not { } shared) return;
         // …and a writer the host denied READ (OpenWriter's write-only OUTPUT fallback, kb/Work PB2848) cannot count
         // the medium: a count it could not make would refuse, AFTER the flush above, a record that is in the file.
-        _writeOrdinal = anotherWriter && _writerReads
+        _writeOrdinal = anotherWriter && FileLock!.CanRead
             ? PhysicalOrdinalOfRelease((SharedAppendStream)_writer!.BaseStream)   // §9.1.16 identity, off the medium
             : ++shared.ReleasedOrdinal;                                           // …or the only writer's mint
     }
@@ -349,7 +349,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        TakeRegions(stream.SafeFileHandle);
+        TakeRegions(stream);
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -382,7 +382,6 @@ public sealed class SequentialConnector : FileConnector
             access = FileLockPosture.AccessOf(Mode);
             stream = HostFile.OpenConnectorWriteStream(HostPath, mode, access, HostShare);
         }
-        _writerReads = (access & FileAccess.Read) != 0;
         StreamWriter w;
         try
         {
@@ -394,7 +393,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        TakeRegions(HostFile.HandleOf(stream));
+        TakeRegions(HostFile.FileOf(stream));
         return w;
     }
 
@@ -404,12 +403,14 @@ public sealed class SequentialConnector : FileConnector
     /// given back) where the stream is.</summary>
     private RegionLocks? _regions;
 
-    /// <summary>Make the endpoint for the stream just opened on <paramref name="handle"/>; one a previous handle of this
-    /// connector had (a rebuilt reader) is given up with that handle.</summary>
-    private void TakeRegions(Microsoft.Win32.SafeHandles.SafeFileHandle handle)
+    /// <summary>Make the endpoint for the host stream just opened, <paramref name="host"/> (<see cref="FileLock"/>'s);
+    /// an endpoint still held is given up first, belt-and-braces like <c>KeyedConnector.TakeFileLock</c>'s handle (the
+    /// CLOSE and an abandoned OPEN already gave it up; no sibling's handle is ever rebuilt, kb/Work PB322). Its
+    /// writability is what the host GRANTED the handle, never re-derived from the open mode (kb/Work PB2758).</summary>
+    private void TakeRegions(FileStream host)
     {
         _regions?.Dispose();
-        _regions = HostRegionLocks.Open(handle, HostPath, writable: Mode is not FileOpenMode.Input);
+        _regions = HostRegionLocks.Open(host.SafeFileHandle, HostPath, writable: host.CanWrite);
     }
 
     /// <summary>Give the endpoint up with the handle it was made for.</summary>
@@ -419,10 +420,12 @@ public sealed class SequentialConnector : FileConnector
         _regions = null;
     }
 
-    /// <summary>Whether the writer's handle was granted READ access, so the connector can count records off the
-    /// medium (<see cref="PhysicalOrdinalOfRelease"/>). False only for the write-only OUTPUT handle
-    /// <see cref="OpenWriter"/> falls back to when the host refuses the read half; set by every OpenWriter.</summary>
-    private bool _writerReads;
+    /// <inheritdoc/>
+    /// <remarks>The host stream beneath the reader (INPUT, I-O) or the writer (OUTPUT, EXTEND) — the arms never hold
+    /// both — read through <see cref="HostFile.FileOf"/>, because the repositioning writer's own
+    /// <see cref="Stream.CanRead"/> is false over a read-write handle.</remarks>
+    internal override FileStream? FileLock =>
+        (_reader?.BaseStream ?? _writer?.BaseStream) is { } stream ? HostFile.FileOf(stream) : null;
 
     /// <inheritdoc/>
     /// <remarks>⛔ THE SEQUENTIAL ARM OF PB2660 (kb/Work PB2692). §9.1.16, <i>"While locked by a given file
@@ -701,10 +704,19 @@ public sealed class SequentialConnector : FileConnector
     /// does and where the device goes in the SAME sentence. <paramref name="lines"/> &lt; 0 = ADVANCING PAGE.
     /// Rules:
     /// <list type="bullet">
-    /// <item>ADVANCING PAGE resets the counter to 1 (§13.18.34 GR7c1) and repositions the device — §14.9.51.4
-    ///   GR25 g), <i>"The repositioning is to the first line that may be written on the next logical page as
-    ///   specified in the LINAGE clause"</i>. ⛔ NOT a form feed: GR25 h) is the form-feed arm and it is the
-    ///   NO-LINAGE case. No observable end-of-page (§14.9.51 SR18 bars PAGE+EOP in one statement).</item>
+    /// <item>⛔ ADVANCING PAGE IS A PAGE OVERFLOW (kb/Work PB578). §13.18.34.4 GR7 c) 1 resets the counter to one
+    ///   and says how: <i>"During the resetting of LINAGE-COUNTER to the value one, the value of LINAGE-COUNTER
+    ///   is implicitly incremented to exceed the value specified by integer-1 or the data item referenced by
+    ///   data-name-1"</i> — the counter passes the page size, which is §14.9.51.4 GR26 a)'s trigger (<i>"This
+    ///   occurs when the associated LINAGE-COUNTER is equal to or exceeds the page size"</i>), and GR27 a) names
+    ///   the condition EC-I-O-EOP-OVERFLOW. So ADVANCING PAGE takes the overflow arm below and has no arm of its
+    ///   own: one transition (GR25 g)'s destination IS GR26 a)'s, <i>"the first line that may be written on the
+    ///   next logical page"</i>), one reset (GR7 c) 1 / c) 4) and one end-of-page condition — which an
+    ///   EC-I-O-EOP-OVERFLOW declarative, an exception-checking PERFORM's WHEN phrase and FUNCTION
+    ///   EXCEPTION-STATUS see, and which keeps a NOT END-OF-PAGE imperative from running (GR28). §14.9.51.3 SR18
+    ///   bars only the AT END-OF-PAGE phrase beside ADVANCING PAGE (docs/CONFORMANCE.md §4, "DETERMINATION —
+    ///   WRITE ADVANCING PAGE on a logical page is a page overflow"). ⛔ NOT a form feed: GR25 h) is the
+    ///   form-feed arm and it is the NO-LINAGE case.</item>
     /// <item>ADVANCING n travels n lines and adds n (GR7c2/GR25a); a plain WRITE travels 1 and adds 1 (GR7c3 —
     ///   the caller passes 1). n = 0 is GR25 c)'s "no repositioning".</item>
     /// <item>Counter past the page body ⇒ page overflow (§14.9.51 GR26a): the device is <i>"repositioned to the
@@ -739,24 +751,21 @@ public sealed class SequentialConnector : FileConnector
         // The device is on the page body only once this page's top margin is behind it (GR4); every travel and
         // every presentation materializes it first, so the two call sites agree by construction.
         EmitTopMarginIfPending();
-        if (lines < 0)
-        {
-            // ADVANCING PAGE (§14.9.51.4 GR25 g) + §13.18.34 GR7c1): the device is repositioned to the first
-            // line that may be written on the next logical page — never GR25 h)'s form feed, which is the arm
-            // for a file with NO LINAGE clause.
-            return BeginNextLogicalPage(page);   // GR6 b) 2 — the re-evaluation may break the page
-        }
-        // ADVANCING n (n >= 0) or plain WRITE (n = 1): the counter is incremented (GR7c2/c3) and the device
-        // travels the same n lines (GR25 a); n = 0 is GR25 c)'s "no repositioning ... is performed").
-        if (LinageCounter + lines > _pageBody)
+        // ADVANCING PAGE (lines < 0) is the page-overflow arm, not one of its own: §13.18.34.4 GR7 c) 1 increments
+        // the counter "to exceed the value specified by integer-1" while resetting it (kb/Work PB578), which is
+        // GR26 a)'s trigger, and GR25 g)'s destination is GR26 a)'s. Otherwise ADVANCING n (n >= 0) or plain
+        // WRITE (n = 1): the counter is incremented (GR7c2/c3) and the device travels the same n lines (GR25 a);
+        // n = 0 is GR25 c)'s "no repositioning ... is performed").
+        if (lines < 0 || LinageCounter + lines > _pageBody)
         {
             // Page overflow (§14.9.51 GR26a): the line does not fit in the page body — the device repositions
-            // to the first writable line of the succeeding page and the counter resets to 1 (GR7c4).
+            // to the first writable line of the succeeding page and the counter resets to 1 (GR7c4, and GR7c1
+            // for ADVANCING PAGE) — never GR25 h)'s form feed, which is the arm for a file with NO LINAGE clause.
             // ⚖ STRICT `>`, NOT `>=` — the adjudicated boundary (docs/CONFORMANCE.md §4, kb/Work PB686). GR26a
             // as printed says "equal to or exceeds the page size"; `>=` here would push a record that lands on
             // the LAST body line onto the next page and make that line unwritable forever, against §13.18.34
             // GR2. The doc comment above carries the full derivation and the survey.
-            if (!BeginNextLogicalPage(page)) return false;   // GR6 b) 3's re-evaluation broke the page
+            if (!BeginNextLogicalPage(page)) return false;   // GR6 b) 2 / b) 3's re-evaluation broke the page
             _endOfPage = Exceptions.ExceptionCatalog.IoEopOverflow;   // §14.9.51.4 GR27 a) — caused by GR26 a)
             return true;
         }
@@ -1095,7 +1104,7 @@ public sealed class SequentialConnector : FileConnector
                     // create empty, then close — an auxiliary handle, not the connector's stream
                     if (!exists) using (HostFile.OpenAuxiliary(HostPath, FileMode.Create, FileAccess.Write)) { }
                     // ReadWrite access and NO FileOptions.SequentialScan for this mode — both decided once, in
-                    // OpenReader, which is also what the reposture rebuild uses.
+                    // OpenReader, the one spelling of the read handle.
                     _reader = OpenReader();
                     NoticeIfLayoutDisagrees();
                     if (!exists && IsOptional) return FileStatusCode.OptionalFileNotFound;
@@ -1280,7 +1289,7 @@ public sealed class SequentialConnector : FileConnector
                 // The table describes the image the group composed; a record sent at another length (GR13 a) is
                 // not that image, so it goes without one rather than with a table that would misdescribe it.
                 string record = FitRecord(image, len, national);
-                RecordFraming.WriteFrameHead(_writer, len, Framed(record, image, extents).Extents);
+                EmitFrameHead(len, Framed(record, image, extents).Extents);
                 EmitRecord(record, national);
             }
         }
@@ -1411,6 +1420,19 @@ public sealed class SequentialConnector : FileConnector
     /// the record, and stays in the native encoding (see <see cref="CodeSetConversion"/>).</summary>
     private void EmitRecord(string data, bool national) => _writer!.Write(ToMedium(data, national));
 
+    /// <summary>A RECORD VARYING frame's HEAD — <see cref="RecordFraming.EncodeFrameHead"/>'s bytes, the one
+    /// encoder's — written through the Latin-1 channel as one character per byte, so the bytes on the medium are the
+    /// store-level head's exactly. It is framing (§9.1.7.2), never converted by a CODE-SET.</summary>
+    private void EmitFrameHead(int payloadLength, RecordExtents? extents)
+    {
+        int size = (int)RecordFraming.FrameHeadBytes(extents, ordinalSlots: 0);
+        Span<byte> head = size <= 64 ? stackalloc byte[64] : new byte[size];
+        Span<char> chars = size <= 64 ? stackalloc char[64] : new char[size];
+        RecordFraming.EncodeFrameHead(head, payloadLength, extents, []);
+        Encoding.Latin1.GetChars(head[..size], chars);
+        _writer!.Write(chars[..size]);
+    }
+
     /// <summary>— and the line sequential twin: the record's data converted, its delimiter native.</summary>
     private void EmitRecordLine(string data, bool national)
     {
@@ -1480,11 +1502,15 @@ public sealed class SequentialConnector : FileConnector
     /// already answered with a status. The READ is unsuccessful, so §14.9.30.4 GR18 sets the file position
     /// indicator to "no valid record position" (the next sequential READ is then '46', §9.1.13.7 item 6); the
     /// status reaches the §9.1.13.1 exception path (USE procedures, the Annex A.1 item 103 action) like any
-    /// other '30'.</summary>
-    private bool ReadFailed()
+    /// other '30'. It is also the terminal of the one '30' a READ decides without an exception — a PREVIOUS
+    /// read on a stream that cannot be positioned (§14.9.30.4 GR20) — so that arm invalidates the same way.</summary>
+    private bool ReadFailed() => ReadUnsuccessful(FileStatusCode.PermanentError);
+
+    /// <summary>A READ's unsuccessful exit in this connector's <see langword="bool"/> shape: the one terminal
+    /// <see cref="FileConnector.Unsuccessful"/> (§14.9.30.4 GR18), then <see langword="false"/>.</summary>
+    private bool ReadUnsuccessful(string status)
     {
-        InvalidateFilePosition();
-        Status = FileStatusCode.PermanentError;
+        Unsuccessful(status);
         return false;
     }
 
@@ -1492,8 +1518,8 @@ public sealed class SequentialConnector : FileConnector
     private bool ReadRecord(bool previous, out string image)
     {
         image = BlankRecordArea();
-        if (SequentialReadGuard() is { } guard) { Status = guard; return false; }   // '47'/'46'/'10' — FileConnector
-        if (_reader is null) { Status = FileStatusCode.ReadNotOpenForInput; return false; }
+        if (SequentialReadGuard() is { } guard) return ReadUnsuccessful(guard);   // '47'/'46'/'10' — FileConnector
+        if (_reader is null) return ReadUnsuccessful(FileStatusCode.ReadNotOpenForInput);   // '47'
 
         // §14.9.30.4 GR21, "When the file is a sequential file": the direction selects the record NUMBER, so a
         // backward read is a REPOSITION to that ordinal followed by the ordinary physical read. Rule e) — "If no
@@ -1504,12 +1530,12 @@ public sealed class SequentialConnector : FileConnector
         if (MovesBackward(previous))
         {
             long target = TargetReadOrdinal(previous);   // the STATEMENT's phrase — MovesBackward owns the XOR
-            if (target < 1) { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }   // GR21 e
+            if (target < 1) return ReadUnsuccessful(FileStatusCode.AtEnd);   // GR21 e + GR24 b)
             // §14.9.30.4 GR20 — "If the PREVIOUS phrase is specified, the physical file associated with the file
             // connector referenced by file-name-1 shall be a single reel/unit mass storage file." A stream that
             // cannot be positioned is not one; report the permanent error rather than silently reading something
             // else (the same posture the non-seekable REWRITE arm below takes).
-            if (!SeekToOrdinal(target)) { Status = FileStatusCode.PermanentError; return false; }
+            if (!SeekToOrdinal(target)) return ReadFailed();   // '30'
         }
 
         // §14.9.30 GR14 (READ) / §9.1.13.2 item 3: a RECORD-sequential physical record whose length is outside the file's
@@ -1532,7 +1558,7 @@ public sealed class SequentialConnector : FileConnector
                 _lastReadLinePartial = true;   // a served remainder is only PART of its physical line (§14.9.35 GR17a)
             }
             else if (NextFrame(out _, out _) is { } physical) line = physical;
-            else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
+            else return ReadUnsuccessful(FileStatusCode.AtEnd);   // GR24 b)
             // The bound is the maximum size the RECORD DESCRIPTIONS specify (GR15's own words), which is the
             // record area's width except for a variable-length record (MaxRecordSize — kb/Work PB981).
             if (line.Length > MaxRecordSize)
@@ -1568,7 +1594,7 @@ public sealed class SequentialConnector : FileConnector
             // OPEN.
             shortLong = IsVarying ? data.Length < VaryMin || data.Length > VaryMax : data.Length < RecordWidth;
         }
-        else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
+        else return ReadUnsuccessful(FileStatusCode.AtEnd);   // GR24 b)
         _readOrdinal++;   // the record just made available is ordinal N+1 (§9.1.16 lock identity)
         ReadSucceeded(lineBadChar ? FileStatusCode.LineRecordInvalidCharRead   // '09' §14.9.30.4 GR16 — stated after GR15, so it wins over '06'
             : lineTooLong ? FileStatusCode.LineRecordTooLong
@@ -1657,50 +1683,82 @@ public sealed class SequentialConnector : FileConnector
         frameStart = _readOffset;
         if (IsVarying)
         {
-            // Length-framed record: 4-byte LE prefix + payload (see the framing note at the field declarations).
-            var pre = new char[4];
-            if (FillChars(pre, 4) < 4) return null;
-            int len = RecordFraming.PrefixLength(pre, out bool tableFollows);
-            int head = 4;
+            // A length-framed record, read by the ONE frame decoder (RecordFraming.ReadStreamFrame; kb/Work PB2754):
+            // a torn tail, a gap word or a head this writer cannot have produced ends the data here exactly where it
+            // ends the record count and the backward-READ index (FrameStarts), so a forward READ and a backward READ
+            // see the same records. The read offset stays at the frame's start, so a re-anchoring reader
+            // (EnsureReaderCoherent) reads the frame whole once another run unit's WRITE has completed it.
             _lastReadTableCount = -1;
-            if (tableFollows)
-            {
-                // The frame's EXTENT TABLE (RecordFraming's class summary): a count, then 8 characters per
-                // component. A table torn by the end of the file ends the data, as a torn payload does.
-                if (FillChars(pre, 4) < 4) return null;
-                int count = RecordFraming.ExtentCount(pre);
-                var table = new char[8 * count];
-                if (FillChars(table, table.Length) < table.Length) return null;
-                extents = RecordFraming.ExtentTableFromChars(table);
-                _lastReadTableCount = count;
-                head += 4 + table.Length;
-            }
-            var vbuf = new char[len];
-            int vn = FillChars(vbuf, len);
+            var channel = new ChannelMedium(this);
+            if (!RecordFraming.ReadStreamFrame(ref channel, out FrameHead frame)) return null;
+            extents = frame.Extents;
+            _lastReadTableCount = frame.Extents?.Count ?? -1;
+            long head = frame.HeadBytes;
             _lastReadBlockStart = _reader!.BaseStream.CanSeek ? _readOffset + head : -1;
-            _readOffset += head + vn;
-            return FromMedium(new string(vbuf, 0, vn));
+            _readOffset += head + frame.PayloadLength;
+            return FromMedium(channel.Payload!);
         }
         var buf = new char[RecordWidth];
-        int n = FillChars(buf, RecordWidth);
+        int n = FillChars(buf);
         if (n == 0) return null;
         _lastReadBlockStart = _reader!.BaseStream.CanSeek ? _readOffset : -1;
         _readOffset += n;
         return FromMedium(new string(buf, 0, n));
     }
 
-    /// <summary>Fill exactly <paramref name="count"/> characters (or to end-of-stream): StreamReader.Read may
-    /// return fewer than requested at an internal buffer boundary, which is not end-of-data.</summary>
-    private int FillChars(char[] buf, int count)
+    /// <summary>Fill <paramref name="buf"/> exactly (or to end-of-stream), returning the characters read:
+    /// StreamReader.Read may return fewer than requested at an internal buffer boundary, which is not
+    /// end-of-data.</summary>
+    private int FillChars(Span<char> buf)
     {
         int total = 0;
-        while (total < count)
+        while (total < buf.Length)
         {
-            int n = _reader!.Read(buf, total, count - total);
+            int n = _reader!.Read(buf[total..]);
             if (n == 0) break;
             total += n;
         }
         return total;
+    }
+
+    /// <summary>This connector's Latin-1 read channel as a frame medium for the ONE frame decoder
+    /// (<see cref="RecordFraming.ReadStreamFrame"/>): one character per medium byte, so a head's characters are
+    /// converted to its bytes once, here, and the decoder never sees a character (kb/Work PB2754).</summary>
+    private struct ChannelMedium(SequentialConnector connector) : IFrameMedium
+    {
+        /// <summary>Up to this many bytes a count read from the medium is admitted without asking the file's length:
+        /// a corrupt one then costs at most this allocation before the short read ends the data, and the common READ
+        /// pays no length query.</summary>
+        private const int UncheckedBytes = 64 * 1024;
+
+        /// <summary>The bytes this frame has consumed past the connector's read offset.</summary>
+        private long _taken;
+
+        /// <summary>The payload <see cref="TakePayload"/> took, in the medium's characters.</summary>
+        public string? Payload { get; private set; }
+
+        public bool Fill(Span<byte> into)
+        {
+            Span<char> chars = into.Length <= 16 ? stackalloc char[16] : new char[into.Length];
+            chars = chars[..into.Length];
+            if (connector.FillChars(chars) < chars.Length) return false;
+            Encoding.Latin1.GetBytes(chars, into);
+            _taken += into.Length;
+            return true;
+        }
+
+        public bool TakePayload(int length)
+        {
+            var buf = new char[length];
+            if (connector.FillChars(buf) < length) return false;
+            Payload = new string(buf);
+            _taken += length;
+            return true;
+        }
+
+        public readonly bool Holds(long bytes) =>
+            bytes <= UncheckedBytes || connector._reader!.BaseStream is not { CanSeek: true } stream
+            || bytes <= stream.Length - (connector._readOffset + _taken);
     }
 
     /// <summary>Read one physical line's DATA, up to and consuming its line delimiter, and report the delimiter's
@@ -1792,8 +1850,10 @@ public sealed class SequentialConnector : FileConnector
         if (RefusedAtCommit() is { } lockRefused) return Status = lockRefused;   // '54' / '53': the lock request is the last check (kb/Work PB2848)
         if (_lastReadTableCount < 0) return OverwriteInPlace(stream, _lastReadBlockStart, record, national);
         RecordExtents? replacing = Framed(record, image, extents).Extents;
-        string table = RecordFraming.ExtentTableChars(replacing is not null && replacing.Count == _lastReadTableCount
-            ? replacing : RecordFraming.VoidExtents(_lastReadTableCount));
+        RecordExtents kept = replacing is not null && replacing.Count == _lastReadTableCount
+            ? replacing : RecordFraming.VoidExtents(_lastReadTableCount);
+        var table = new byte[RecordFraming.ExtentTableBytes(kept)];
+        RecordFraming.EncodeExtentTable(table, kept);
         return OverwriteInPlace(stream, _lastReadBlockStart - table.Length, table, record, national);
     }
 
@@ -1849,20 +1909,17 @@ public sealed class SequentialConnector : FileConnector
     /// <see cref="StreamReader"/> above it, not the file position indicator, so restoring it is what keeps
     /// THIS connector's own buffered characters valid across its own REWRITE.</para></summary>
     private string OverwriteInPlace(Stream stream, long anchor, string content, bool national) =>
-        OverwriteInPlace(stream, anchor, "", content, national);
+        OverwriteInPlace(stream, anchor, [], content, national);
 
-    /// <summary><see cref="OverwriteInPlace(Stream, long, string)"/> with a FRAME part ahead of the record: the
+    /// <summary><see cref="OverwriteInPlace(Stream, long, string, bool)"/> with a FRAME part ahead of the record: the
     /// replacing record's extent table (D-FRA (v); kb/Work PB1053), which is framing, not data of the record, so it
-    /// goes to the medium as it is and is never converted to the file's coded character set.</summary>
-    private string OverwriteInPlace(Stream stream, long anchor, string framing, string content, bool national)
+    /// goes to the medium as the one encoder's bytes (<see cref="RecordFraming.EncodeExtentTable"/>) and is never
+    /// converted to the file's coded character set.</summary>
+    private string OverwriteInPlace(Stream stream, long anchor, ReadOnlySpan<byte> framing, string content, bool national)
     {
         long resume = stream.Position;
         stream.Seek(anchor, SeekOrigin.Begin);
-        if (framing.Length > 0)
-        {
-            byte[] head = Encoding.Latin1.GetBytes(framing);
-            stream.Write(head, 0, head.Length);
-        }
+        stream.Write(framing);
         // ⛔ The REWRITE arm's §13.18.13.4 GR6 b boundary, for the same reason EmitRecord is the WRITE arm's:
         // `content` is the record's data in the NATIVE character set, and what goes on the medium is the file's
         // coded character set. Being the ONE in-place overwrite makes this the one place either arm converts.
@@ -1899,13 +1956,13 @@ public sealed class SequentialConnector : FileConnector
         // The read-side medium boundary (ReadFailed): the scan below reads the medium. An unsuccessful START
         // invalidates the file position indicator (§14.9.41.4 GR7), exactly as ReadFailed does for a READ.
         try { return StartFirstLastRecord(last); }
-        catch (IOException) { ReadFailed(); return Status; }   // '30' §9.1.13.6 item 1
+        catch (IOException) { return Unsuccessful(FileStatusCode.PermanentError); }   // '30' §9.1.13.6 item 1
     }
 
     /// <summary>The body of <see cref="StartFirstLast"/>, inside its medium-boundary catch.</summary>
     private string StartFirstLastRecord(bool last)
     {
-        if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
+        if (StartOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent) return StartFail();                        // GR5 / §9.1.13.5 item 3 b)
         // "or the physical file does not support the ability to position at the first/last record" — a stream
         // that cannot be repositioned. A FileStream always can; a future non-seekable medium answers '23' here
@@ -1926,18 +1983,13 @@ public sealed class SequentialConnector : FileConnector
         }
         if (foundStart < 0) { SeekToRecord(0, 0); return StartFail(); }   // no records exist — GR20/GR21
         SeekToRecord(foundStart, foundOrdinal - 1);
-        LastReadUnsuccessful = false;   // a successful START is a reposition: §14.9.30.4 GR21's '46' poison clears
-        return Status = FileStatusCode.Success;
+        return StartPositioned();   // a successful START is a reposition: §14.9.30.4 GR21's '46' poison clears
     }
 
     /// <summary>An unsuccessful START: §14.9.41.4 GR7 — <i>"the file position indicator is set to indicate that
     /// no valid record position has been established"</i>, which on this connector is precisely the state
     /// §9.1.13.7 item 6 a) reads back as '46' on the next sequential READ — and the '23' GR20/GR21 name.</summary>
-    private string StartFail()
-    {
-        InvalidateFilePosition();
-        return Status = FileStatusCode.RecordNotFound;
-    }
+    private string StartFail() => Unsuccessful(FileStatusCode.RecordNotFound);
 
     /// <summary>Reposition the reader at <paramref name="byteOffset"/>, which shall be the START of a record,
     /// and reset every piece of derived read state so the next <see cref="Read"/> behaves as if the file had

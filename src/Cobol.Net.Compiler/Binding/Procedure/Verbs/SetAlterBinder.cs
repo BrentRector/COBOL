@@ -174,11 +174,18 @@ internal sealed class SetAlterBinder(BinderContext ctx)
     /// <summary>The switch-status condition a bare unsubscripted reference names (ISO §8.8.4.6; §8.4.4.2 Format 1
     /// SR1 — the condition-name shall be associated with a switch-name in SPECIAL-NAMES), else null. The CALLER
     /// must have tried level-88 resolution FIRST (<see cref="ConditionOf"/>): a name defined as both resolves as
-    /// the level-88 (legacy resolution order; NC211A regression guard).</summary>
+    /// the level-88 (legacy resolution order; NC211A regression guard).
+    /// <para>A switch-status condition-name a CONTAINING element declares yields to the referring element's own item
+    /// of that spelling (§8.4.6.1: "a source element's reference to such a name, even when it is a different type of
+    /// user-defined word, is to the item which that source element describes"; kb/Work PB3153 review w1085d R1-1): a
+    /// bare <c>IF SWON</c> over an own <c>01 SWON PIC 1</c> is the §8.8.4.3 simple boolean condition on that item, so
+    /// <see cref="ReferenceResolver.DescribesOwnItem"/> is asked before the switch reading records its §8.3.2.2 use.
+    /// SET's diagnostic (<see cref="SwitchNameOf"/>) goes through here, so it names no switch for an own item.</para></summary>
     public BoundCondition? SwitchCondOf(Core.DataReferenceContext dref)
     {
         if (dref.dataReferenceSuffix().Length != 0) return null;   // a status condition-name takes no subscript/qualifier
-        return dref.cobolWord()?.GetText() is { } name && ctx.Data.SwitchConditions.TryGetValue(name, out var sc)
+        return dref.cobolWord()?.GetText() is { } name && ctx.Data.SwitchConditions.Declares(name)
+            && !ctx.Refs.DescribesOwnItem(dref) && ctx.Data.SwitchConditions.TryUse(dref, name, out var sc)
             ? new BoundSwitchCondition(sc.ImplementorName, sc.IsOn)
             : null;
     }
@@ -218,7 +225,7 @@ internal sealed class SetAlterBinder(BinderContext ctx)
             foreach (var word in phrase.cobolWord())
             {
                 string name = word.GetText();
-                if (!ctx.Mnemonics.Of(word).TryGetValue(name, out var row) || row.Kind != SystemNameKind.Switch)
+                if (!ctx.Mnemonics.TryUse(word, name, out var row) || row.Kind != SystemNameKind.Switch)
                 {
                     // SR5 is decided here, so it is REPORTED here (kb/Work PB390 — the Format-3 sibling of the
                     // Format-4 condition-name rule; both used to ship as a run-time "not implemented" abort).

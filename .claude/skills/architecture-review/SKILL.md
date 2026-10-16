@@ -30,11 +30,13 @@ engine's deletion was the `PB2108` cluster (landed), implemented from the plan's
   tag); the census and every wave cover `src/Cobol.Net.*` (`.agent-fleet.json` indexes that tree only).
 - **The approved `DESIGN-external-repository.md` is given, not reopened.** Its slices PB2097–PB2104 are in flight;
   R1 designs around them and a wave never touches a file an in-flight slice names.
-- **The fix lane is partitioned**, never paused: a wave's brief declares its file set, and it is checked against the
-  in-flight trains' file sets before dispatch; a collision defers the wave, never the train. The check is
-  `plan_wave.py --cluster`'s `file_set_collisions` (the in-flight work from worktrees, unlanded branches and the
-  dispatch ledger, never a branch classification; and the open slices' §12 set, all three columns); `work.py check`
-  verifies that a note on a slice's file names the slice.
+- **The fix lane is partitioned**, never paused: every group's file set is checked against the in-flight work
+  before dispatch, by ONE rule for every plan (kb/Work PB2807): a group meeting RUNNING work waits, the collision
+  named; one meeting only FINISHED branches is planned as their continuation (it merges them first). The check is
+  `plan_wave.py`'s `file_set_collisions` through `classify_inflight` (the in-flight work from worktrees, unlanded
+  branches and the dispatch ledger, which only `make_dispatch_specs.py` writes, never a branch classification; for a
+  campaign also the open slices' §12 set, all three columns); `work.py check` verifies that a note on a slice's file
+  names the slice. The landing check is the guarantee for R3 work.
 
 ## Dispatch (R69 §4 and PB2120)
 
@@ -107,7 +109,9 @@ four (R69 §2), which is why R1 runs before zero GAP.
 - **The phase seams.** No C# text in a bound node; semantics live in binding, not in renderers. The
   `ICodeGenBackend` seam stays, so a CIL backend can still drop in.
 - **Grammar.** No left-edge semantic predicate in a lexer mode (`LexerDfaCacheDriftTests`); post-1985 features stay
-  in `Core/*.g4` behind `{isXXXX()}?`; the generated parser is a build output, never committed. The additive-only
+  in `Core/*.g4` and parse at every edition (D7), and a parse-time edition read is §8.9 word status — every one is
+  computed and held to kb/Work PB2291's verdict by `EditionReadDriftTests`; the generated parser is a build output,
+  never committed. The additive-only
   caution for the shared grammar lifts when PB2110 lands; PB2114 unifies what it forced.
 - **Registries.** Explicit registration over reflection discovery. Static state is a coupling hazard: PB1708
   measured how a static registry's initialization couples tests. `DiagnosticCatalog` restructuring must keep the

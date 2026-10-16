@@ -12,7 +12,8 @@ ACTUALLY changed with
 
   1. its DECLARED file set, for the R3 work it lands: the set the dispatch ledger recorded for those notes when they
      were planned, read from the FULL ledger (a landing flips its own notes to terminal, and that declaration is
-     still the authority for it), or, for a note no entry records, the set computed now. A file an R3 commit changed
+     still the authority for it), or, for a note no entry records, the set computed now (plan_wave.computed_file_set,
+     on the planner's own index policy, THE index of this tree: kb/Work PB3203). A file an R3 commit changed
      that existed on main and lies outside that set STOPS the landing: the wave touched a file nothing protected;
   2. every OTHER in-flight branch's actual changes (plan_wave.inflight_file_sets: worktrees, unlanded branches, the
      dispatch ledger's declared sets), when the shared file is R3 work on either side. A shared file stops the LATER
@@ -31,15 +32,20 @@ predecessor's commits, attributed one by one by the same walk, or main's own lan
 
 Draft 10 (the ninth refuter's K1-K3). Every diff is read with --no-renames (plan_wave.changed_files), so a moved file
 counts at its old path too. An in-flight branch is R3 work because its DISPATCH says so, never by its commit wording
-(implementers commit `WIP checkpoint: …`): a train manifest that lists it, the dispatch-ledger groups whose declared
-files its actual diff meets, then the ids that lead its subjects or whose status it flips. A dispatch entry stays in
-flight with its whole declared set until its notes are terminal, started or not. The landing's OWN members are
-excluded by its train manifest (<coord>/scratch/train*-manifest.json) and by content (a file whose version on the
-member IS the landing's: the lander re-commits or patches its clusters); anything else that shares a file and was
-dispatched earlier stops it, and the stop names how it was identified and how to bind a member it failed to recognise.
+alone (implementers commit `WIP checkpoint: …`), and it is bound to ONE dispatch (identity, kb/Work PB3186): its
+fix-lane REPORT (the newest whose branch field names it) and that report's ledger group, else the ids that lead its
+commit subjects or whose status it flips, else the ONE ledger group that best covers its actual diff (best_group). The
+union of every ledger group its diff met made a fix-lane worktree on a file one R3 group also declared R3 work, and with
+the scraped hand entries the dispatch guard once wrote (six of 303-910 files) it stopped 23 fix-lane landings on
+2026-10-14/15. The ledger is read through plan_wave.ledger_groups, which ignores those retired entries. A dispatch
+entry stays in flight with its whole declared set, started or not, until its notes are terminal or its report answers it
+(its agent returned: its work is then its branch's actual diff, kb/Work PB2795). A branch this landing
+contains (it merged it) is the landing's own: only its later, uncommitted edits count; and so is a file whose version
+on another branch IS the landing's (the same work re-committed); anything else that shares a file and was dispatched
+earlier stops it, and the stop names how it was identified and how to bind work it failed to recognise.
 
-Fix-lane trains with no R3 work in flight pass untouched: fix-lane implementers share files by design, and a train
-merges them. The partition's domain is the campaign's code roots (model_rules.json `campaign`: src, tests, scripts,
+Fix lane against fix lane is never stopped: fix-lane implementers share files by design, and the merge queue merges
+them (at worst through a conflict finisher, MANDATORY-PRACTICES L12). The partition's domain is the campaign's code roots (model_rules.json `campaign`: src, tests, scripts,
 .github, docs, minus exclude_dir) and only CODE files there (its extensions but .md): a document both sides edit is a
 text merge the rebase resolves, and kb/Work and DEVLOG/ are every landing's bookkeeping.
 
@@ -64,7 +70,7 @@ HERE = pathlib.Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 sys.path.insert(0, str(HERE.parent / "spec"))
 import coord  # noqa: E402
-import plan_wave  # noqa: E402  (inflight_file_sets: THE in-flight enumeration; note_file_set: THE declared set)
+import plan_wave  # noqa: E402  (inflight_file_sets: THE in-flight enumeration; computed_file_set: THE declared set)
 import work  # noqa: E402
 
 PB = re.compile(r"\bPB\d+\b")
@@ -74,7 +80,6 @@ MAX_RANGE = 64
 STATUS_LINE = re.compile(r"^([-+])status:[ ]*(\S*)")   # a frontmatter status line removed or added by a patch
 WORK_DIR = "kb/Work/"
 EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"   # git's empty tree: what a root commit's diff is taken against
-MANIFESTS = "scratch/train*-manifest.json"   # wf_rolling_wave.js writes one per train: each member's branch, worktree, notes
 
 
 def _git(repo: pathlib.Path) -> Callable[..., Any]:
@@ -82,15 +87,6 @@ def _git(repo: pathlib.Path) -> Callable[..., Any]:
         return subprocess.run(["git", "-C", str(cwd), *args], capture_output=True, text=True, encoding="utf-8",
                               errors="replace")
     return run
-
-
-def partitioned(rules: dict[str, Any]) -> Callable[[str], bool]:
-    """Whether a path is in the partition's domain: a code file under the campaign's roots (module doc)."""
-    cfg = rules["campaign"]
-    roots = tuple(r.rstrip("/") + "/" for r in cfg["src"])
-    exts = tuple(e.strip() for e in cfg["ext"].split(",") if e.strip() and e.strip() != ".md")
-    skip = set(cfg["exclude_dir"])
-    return lambda p: p.startswith(roots) and p.endswith(exts) and not skip & set(p.split("/")[:-1])
 
 
 def subject_ids(subjects: str) -> set[str]:
@@ -155,26 +151,24 @@ def _key(path: str | None) -> str:
     return (path or "").replace(chr(92), "/").rstrip("/").lower()
 
 
-def train_manifests(coord_dir: pathlib.Path) -> list[dict[str, Any]]:
-    """Every train manifest's members: {branch, worktree (normalised), notes (set)}. wf_rolling_wave.js writes the
-    manifest from the wave's results before its lander starts, so it names the branches a train carries."""
-    out = []
-    for f in sorted(coord_dir.glob(MANIFESTS)):
-        for m in coord.read_json(f, []) or []:
-            if isinstance(m, dict):
-                notes = m.get("notes") or []
-                out.append({"branch": m.get("branch"), "worktree": _key(m.get("worktree")),
-                            "notes": set(PB.findall(notes if isinstance(notes, str) else " ".join(notes)))})
-    return out
+def best_group(files: set[str], groups: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """The ONE ledger group that best covers an in-flight branch's actual diff `files` (kb/Work PB3186): the most of
+    its files among the group's declared files, then the smallest declared set (the most specific claim), then the
+    latest dispatch. None when no group declares any of them. Never the union of every overlapping group: a fix-lane
+    worktree on a file an R3 group also declares is the fix-lane group's, and the union made it R3 work."""
+    scored = [(len(files & {f.replace(chr(92), "/") for f in g.get("files", [])}), g) for g in groups]
+    return max(((n, g) for n, g in scored if n),
+               key=lambda ng: (ng[0], -len(ng[1].get("files", [])), ng[1].get("at", 0.0)), default=(0, None))[1]
 
 
 def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, items: list[dict], rules: dict[str, Any],
           declared_for: Callable[[list[str]], set[str]], git: Callable[..., Any] | None = None,
-          r3_lead: str = work.R3_PROGRAM) -> tuple[list[str], list[str]]:
+          r3_lead: str = work.R3_PROGRAM, reports: list[plan_wave.Report] = ()) -> tuple[list[str], list[str]]:
     """(stops, warnings) for landing `rev` onto `base`. `declared_for(note ids)` computes a declared set the dispatch
-    ledger does not hold."""
+    ledger does not hold; `reports` are the fix-lane reports (plan_wave.load_reports), which bind an in-flight branch
+    to its own dispatch first (identity)."""
     git = git or _git(repo)
-    inside = partitioned(rules)
+    inside = coord.campaign(rules).partitioned   # the partition's domain: a code file under a campaign root
     r3 = {i.get("id") for i in items if r3_lead in (i.get("cluster") or [])}
     status = {i.get("id"): i.get("status") for i in items}
     terminal = lambda n: status.get(n) in work.TERMINAL_STATUSES  # noqa: E731
@@ -190,13 +184,10 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
             r3_notes |= hit
             mine_r3_files |= {p for p in changed if inside(p)}
     mine_r3 = sorted(r3_notes, key=lambda s: int(s[2:]))
-    full_ledger = coord.read_json(coord_dir / plan_wave.DISPATCH_LEDGER, {"groups": []}).get("groups", [])
+    full_ledger = plan_wave.ledger_groups(coord_dir)   # THE reader: a retired hand entry is no dispatch (PB3186)
     ledger = [g for g in full_ledger if not all(terminal(i) for i in g.get("notes", []))]
-    manifests = train_manifests(coord_dir)
-    members = [m for m in manifests if m["notes"] & notes]   # THIS landing's train members (K3)
     my_at = min([g["at"] for g in ledger if "at" in g and set(g.get("notes", [])) & notes]
-                + [first_commit_time(git, base, rev) or float("inf")]
-                + [t for m in members if m["branch"] and (t := first_commit_time(git, base, m["branch"]))])
+                + [first_commit_time(git, base, rev) or float("inf")])
     stops, warnings = [], []
 
     if mine_r3:   # 1. the declared set
@@ -216,7 +207,9 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
                          f"hole: file a kb/Work note), and check them against the in-flight work before landing")
 
     meta: dict[str, dict] = {}
-    busy = plan_wave.inflight_file_sets(git=git, repo=repo, coord_dir=coord_dir, meta=meta, terminal=terminal)
+    # an answered dispatch (its report exists) is read through its branch, never its declared set (PB2795)
+    busy = plan_wave.inflight_file_sets(git=git, repo=repo, coord_dir=coord_dir, meta=meta, terminal=terminal,
+                                        reports=reports)
 
     def contained(their_rev: str, files: set[str]) -> set[str]:
         """The files whose version on `their_rev` IS this landing's: a lander that re-committed or patched a member's
@@ -224,22 +217,29 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
         return {f for f in files if git("rev-parse", "-q", "--verify", f"{rev}:{f}").stdout.strip()
                 == git("rev-parse", "-q", "--verify", f"{their_rev}:{f}").stdout.strip()}
 
-    def identity(owner: str, m: dict, files: set[str]) -> tuple[set[str], float, str]:
-        """(the notes an in-flight branch works on, its dispatch time, how that is known). By what DISPATCHED it,
-        never by its commit wording alone (K2: implementers commit `WIP checkpoint: …`): a train manifest that lists
-        its branch or worktree, the dispatch-ledger groups whose declared files its actual diff meets, and the ids
-        that lead its subjects or whose status it flips."""
-        their = set().union(*[x["notes"] for x in manifests
-                              if (m.get("branch") and x["branch"] == m["branch"]) or
-                              (m.get("path") and x["worktree"] == _key(m["path"]))]) if manifests else set()
-        how = "train manifest" if their else ""
-        bound = [g for g in ledger if files & {f.replace(chr(92), "/") for f in g.get("files", [])}]
-        if bound:
-            their |= {n for g in bound for n in g.get("notes", [])}
-            how = how or "dispatch ledger"
-        if subj := work_notes(git, base, m["rev"]):
-            their |= subj
-            how = how or "commit subjects"
+    report_of: dict[str, plan_wave.Report] = {}            # branch / worktree key -> its NEWEST report
+    for r in reports:                                      # oldest first: the last write is the newest
+        report_of.update({k: r for k in (r.branch, _key(r.worktree)) if k})
+    by_slug = {plan_wave.ledger_slug(g): g for g in full_ledger}
+
+    def identity(m: dict, files: set[str]) -> tuple[set[str], float, str]:
+        """(the notes an in-flight branch works on, its dispatch time, how that is known), bound to ONE dispatch by
+        the first of (kb/Work PB3186; never by its WIP commit wording alone, K2; never the union of every ledger group
+        its diff meets, which made a fix-lane worktree R3 work when one overlapping group was):
+          1. its REPORT (the newest whose branch field or worktree names it): that report's ledger group (its slug,
+             `w<wave><letter>`), else the report's lead;
+          2. its COMMIT SUBJECTS: the ids that lead them or whose status it flips;
+          3. the ONE ledger group that best covers its actual diff (best_group)."""
+        how = ""
+        if rep := report_of.get(m.get("branch") or "") or report_of.get(_key(m.get("path"))):
+            g = by_slug.get(rep.slug.lower())
+            their, how = (set(g.get("notes", [])) if g else {rep.lead}), f"report {rep.path.name}"
+        elif subj := work_notes(git, base, m["rev"]):
+            their, how = subj, "commit subjects"
+        elif g := best_group(files, ledger):
+            their, how = set(g.get("notes", [])), f"dispatch-ledger group {plan_wave.ledger_slug(g)}"
+        else:
+            their = set()
         at = min([g["at"] for g in ledger if "at" in g and set(g.get("notes", [])) & their]
                  + [first_commit_time(git, base, m["rev"]) or float("inf")])
         return their, at, how or "nothing"
@@ -247,20 +247,17 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
     for owner, files in sorted(busy.items()):
         m = meta.get(owner, {})
         if m.get("rev"):                                   # a worktree or an unlanded branch, by its ACTUAL diff
-            if any((m.get("branch") and x["branch"] == m["branch"]) or (m.get("path") and x["worktree"] == _key(m["path"]))
-                   for x in members):
-                continue                                   # this landing's own train member (its manifest)
             if git("merge-base", "--is-ancestor", m["rev"], rev).returncode == 0:
                 files = set(m.get("uncommitted", set()))   # its commits are in this landing; later edits are its own
             shared = {f for f in mine & files if inside(f)}
             if not shared:
                 continue
-            their_notes, their_at, how = identity(owner, m, files)
+            their_notes, their_at, how = identity(m, files)
             if not their_notes or their_notes & notes:     # not known to be OTHER work: its re-committed content
                 shared -= contained(m["rev"], shared - set(m.get("uncommitted", set())))   # is this landing's (K3)
                 if not shared:
                     continue
-        else:                                              # a dispatch-ledger entry: its DECLARED set, started or not
+        else:                                              # an unanswered dispatch: its DECLARED set, started or not
             their_notes, their_at, how = set(m.get("notes", [])), m.get("at", 0.0), "dispatch ledger"
             if their_notes & notes:
                 continue                                   # this landing's own dispatch entry
@@ -268,39 +265,23 @@ def check(repo: pathlib.Path, base: str, rev: str, coord_dir: pathlib.Path, item
             if not shared:
                 continue
         if not shared & mine_r3_files and not their_notes & r3:
-            continue                                       # fix lane against fix lane: a train merges them (PB2703:
-                                                           # per file — only a file an R3 commit changed is R3 here)
+            continue                                       # fix lane against fix lane is never stopped: the merge
+                                                           # queue merges them, at worst through a conflict finisher
+                                                           # (PB2703: per file — only a file an R3 commit changed is
+                                                           # R3 here; PB3186: their notes are ONE dispatch's)
         names = f"{', '.join(sorted(shared)[:5])}{' …' if len(shared) > 5 else ''}"
         if their_at < my_at:
             unbound = (" It is " + (f"{', '.join(sorted(their_notes)[:4])} work by its {how}" if how != "nothing"
-                                    else "bound to no dispatch: no train manifest, dispatch-ledger entry or commit "
-                                         "subject names its notes") +
-                       "; if it IS this landing's own implementer, list it in this train's manifest "
-                       f"(<coord>/{MANIFESTS}) and re-run.") if m.get("rev") else ""
+                                    else "bound to no dispatch: no report names its branch, no commit subject leads "
+                                         "with its notes and no dispatch-ledger group declares its files") +
+                       "; if it IS this landing's own work, merge it into this branch (a merged branch is this "
+                       "landing's) and re-run.") if m.get("rev") else ""
             stops.append(f"shares {names} with {owner}, dispatched earlier: this landing is the LATER branch — it "
                          f"waits, re-plans and rebases onto {owner} after that lands.{unbound}")
         else:
             warnings.append(f"shares {names} with {owner}, dispatched later: this landing proceeds; {owner} must "
                             f"re-plan and rebase onto it")
     return stops, warnings
-
-
-def computed_declared(repo: pathlib.Path) -> Callable[[list[str]], set[str]]:
-    """The declared set computed now (plan_wave.note_file_set over the newest member index): for R3 work the dispatch
-    ledger never recorded."""
-    def run(ids: list[str]) -> set[str]:
-        rules = coord.rules()
-        cfg = rules["campaign"]
-        fc = plan_wave.load_fix_clusters()
-        exts = [e.strip() for e in cfg["ext"].split(",") if e.strip()]
-        idx = fc.source_index([repo / s for s in cfg["src"] if (repo / s).is_dir()], exts, cfg["exclude_dir"], repo)
-        callers = plan_wave.member_callers(repo)
-        out: set[str] = set()
-        for i in ids:
-            if (f := repo / "kb" / "Work" / f"{i}.md").is_file():
-                out |= plan_wave.note_file_set(f.read_text(encoding="utf-8", errors="replace"), fc, idx, exts, callers)
-        return out
-    return run
 
 
 # ── self-test: plants an out-of-set edit and a two-branch overlap in a scratch repository ───────────────────────
@@ -463,26 +444,66 @@ def self_test() -> int:
     sh("branch", "-D", "r-train")
     branch("r-train2", "PB9001: extract", {"src/A.cs": "// moved, conflict resolved\n"}, 1_000_900)
     got = check(repo, "origin/main", "r-train2", cdir, items, rules, lambda ids: {"src/A.cs"}, git)
-    expect("K3b: an unrecorded member the lander changed (no manifest) STOPS, naming the train manifest", got, 1, 0)
-    expect("K3b': ... and the stop says how to bind it", ([s for s in got[0] if "train manifest" in s], []), 1, 0)
-    (cdir / "scratch").mkdir(exist_ok=True)
-    coord.write_json(cdir / "scratch" / "train9-manifest.json",
-                     [{"cluster": "A", "notes": "PB9001", "branch": "wt-impl", "worktree": str(root / "wt-impl")}])
-    expect("K3c: the same member listed in the train manifest is the landing's own: lands",
-           check(repo, "origin/main", "r-train2", cdir, items, rules, lambda ids: {"src/A.cs"}, git), 0, 0)
+    expect("K3b: an earlier worktree bound to no dispatch, whose content the landing changed, STOPS", got, 1, 0)
+    expect("K3b': ... and the stop says how to bind it", ([s for s in got[0] if "merge it into this branch" in s], []),
+           1, 0)
+    sh("checkout", "-q", "-b", "r-train3", "wt-impl")   # the landing MERGED its implementer's branch (a successor)
+    write("src/A.cs", "// moved, conflict resolved\n")
+    sh("add", "-A")
+    sh("commit", "-qm", "PB9001: extract, resolved", when=1_000_900)
+    sh("checkout", "-q", "main")
+    expect("K3c: an implementer branch the landing contains is the landing's own: lands",
+           check(repo, "origin/main", "r-train3", cdir, items, rules, lambda ids: {"src/A.cs"}, git), 0, 0)
     worktree("wt-other", "WIP checkpoint: another", {"src/A.cs": "// someone else\n"}, 1_000_150)
     expect("K3d: ... and another earlier worktree on the same file still STOPS it",
-           check(repo, "origin/main", "r-train2", cdir, items, rules, lambda ids: {"src/A.cs"}, git), 1, 0)
+           check(repo, "origin/main", "r-train3", cdir, items, rules, lambda ids: {"src/A.cs"}, git), 1, 0)
     drop("wt-other")
     drop("wt-impl")
-    sh("branch", "-D", "r-train2")
-    (cdir / "scratch" / "train9-manifest.json").unlink()
+    for b in ("r-train2", "r-train3"):
+        sh("branch", "-D", b)
+
+    # ── PB3186: a worktree is bound to ONE dispatch (its report, its commit subjects, else the one ledger group that
+    #    best covers its diff), never the union of every group its diff meets; a retired hand entry is no dispatch ──
+    r3_ab = {"wave": "3", "letter": "a", "notes": ["PB9001"], "files": ["src/A.cs", "src/B.cs"], "at": 1_000_100}
+    fix_bc = {"wave": "3", "letter": "b", "notes": ["PB9100"], "files": ["src/B.cs", "src/C.cs"], "at": 1_000_150}
+    ledger(r3_ab, fix_bc)
+    worktree("wt-fix", "WIP checkpoint: fix", {"src/B.cs": "// fix-lane wip\n", "src/C.cs": "// fix-lane wip\n"},
+             1_000_200)
+    branch("f-land", "PB9101: a later fix", {"src/C.cs": "// a later fix\n"}, 1_000_500)
+    expect("PB3186a: a fix-lane worktree on a file an R3 group ALSO declares binds to the group covering its diff "
+           "(PB9100): fix lane against fix lane passes",
+           check(repo, "origin/main", "f-land", cdir, items, rules, never, git), 0, 0)
+    drop("wt-fix")
+    worktree("wt-rep", "WIP checkpoint: fix", {"src/A.cs": "// wip\n", "src/B.cs": "// wip\n",
+                                                "src/D.cs": "// wip\n"}, 1_000_200)
+    branch("f-d", "PB9101: a later fix", {"src/D.cs": "// a later fix\n"}, 1_000_500)
+    expect("PB3186b: a WIP worktree whose diff the R3 group covers best is R3 work (K2): a later edit it shares STOPS",
+           check(repo, "origin/main", "f-d", cdir, items, rules, never, git), 1, 0)
+    rdir = root / "reports"
+    rdir.mkdir(exist_ok=True)
+    (rdir / "w3b-PB9100-report.md").write_text("Status: DONE" + chr(10) + "Branch: wt-rep" + chr(10), encoding="utf-8",
+                                               newline=chr(10))
+    expect("PB3186c: ... but its REPORT binds it first, to its own group (w3b, fix lane): passes",
+           check(repo, "origin/main", "f-d", cdir, items, rules, never, git,
+                 reports=plan_wave.load_reports(rdir)), 0, 0)
+    drop("wt-rep")
+    sh("branch", "-D", "f-d")
+    ledger({"wave": "hand", "letter": "", "hand": True, "notes": ["PB9001"], "files": ["src/C.cs"], "at": 1_000_000},
+           {"wave": "x", "letter": "a", "notes": ["PB9002"], "files": ["src/C.cs"], "at": 1_000_000})
+    expect("PB3186d: a retired hand entry and a non-numeric wave are no dispatch: a fix-lane landing on their files passes",
+           check(repo, "origin/main", "f-land", cdir, items, rules, never, git), 0, 0)
+    sh("branch", "-D", "f-land")
 
     ledger(dict(a_set, files=["src/A.cs", "src/C.cs"]))
     worktree("wt-start", "WIP checkpoint: part 1", {"src/A.cs": "// moved\n"}, 1_000_200)
     branch("f-c", "PB9100: fix", {"src/C.cs": "// fixed\n"}, 1_000_500)
     expect("N2: a STARTED R3 wave keeps its untouched declared files: a later fix-lane edit to one STOPS",
            check(repo, "origin/main", "f-c", cdir, items, rules, never, git), 1, 0)
+    (rdir / "w2a-PB9001-report.md").write_text("Status: SPLIT" + chr(10), encoding="utf-8", newline=chr(10))
+    expect("PB2795: ... until its agent RETURNS: a group its report answers (SPLIT residue included) is read through "
+           "its branch, so its untouched declared files are free",
+           check(repo, "origin/main", "f-c", cdir, items, rules, never, git,
+                 reports=plan_wave.load_reports(rdir)), 0, 0)
     sh("branch", "-D", "f-c")
     drop("wt-start")
 
@@ -615,8 +636,11 @@ def main(argv: list[str] | None = None) -> int:
         return self_test()
     repo = pathlib.Path(subprocess.run(["git", "rev-parse", "--show-toplevel"], capture_output=True, text=True,
                                        check=True).stdout.strip())
-    stops, warnings = check(repo, a.base, a.rev, coord.coord_dir(a.coord), work.load(repo / "kb" / "Work"),
-                            coord.rules(), computed_declared(repo))
+    cdir = coord.coord_dir(a.coord)
+    policy = plan_wave.IndexPolicy.of(cdir)   # the planner's policy: THE index of this tree (kb/Work PB3203)
+    stops, warnings = check(repo, a.base, a.rev, cdir, work.load(repo / "kb" / "Work"),
+                            coord.rules(), lambda ids: plan_wave.computed_file_set(repo, ids, policy),
+                            reports=plan_wave.load_reports(coord.reports_dir(a.coord)))
     for w in warnings:
         print(f"⚠ landing check: {w}")
     for s in stops:

@@ -32,7 +32,7 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
     {
         // Format 3 (screen) — Annex A.4.2 item 1, DECLINED. Refused BEFORE anything else so no format-1 rule is
         // applied to a statement that is not format 1.
-        if (ScreenFormatOf(ac.screenTail(), ac.dataReference() is { } recv ? [recv] : []) is { } why)
+        if (ScreenFormatOf(ac.screenTail(), ac.receivingIdentifier().dataReference() is { } recv ? [recv] : []) is { } why)
         {
             ScreenFacility.ReportAcceptScreen(ctx.Edition, why);
             return BoundRejected.Reported(ctx.Edition);
@@ -46,7 +46,7 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
         // An index-NAME receiver: not an identifier at all (ISO §8.4.3.1.2 — an index-name is none of the
         // identifier formats), and §13.18.38.3 r7 closes the contexts that may reference one. The context
         // diagnostic (COBOLNET1637), not the §8.4.2.1 UNDEFINED report the demanding resolve would produce.
-        if (ac.dataReference() is { } dref && host.Expr.IndexFieldOf(dref) is not null)
+        if (ac.receivingIdentifier().dataReference() is { } dref && host.Expr.IndexFieldOf(dref) is not null)
         {
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.IndexNameContext, $"ACCEPT receiver '{DataBinder.WrittenText(dref)}' is an index-name — an "
                 + "index-name is not an identifier (ISO §8.4.3.1.2) and ACCEPT is not among the contexts that "
@@ -58,7 +58,7 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
         // statement"), so it asks ExpressionBinder.ResolveReceiving, where the receiver-side rules are written
         // down once: §8.4.3.15.3 SR1 admits PAGE-COUNTER and SR3 refuses LINE-COUNTER, §13.10.4 GR1 refuses a
         // constant-name, §8.4.3.6.3 SR1 refuses EXCEPTION-OBJECT.
-        if (host.Expr.ResolveReceiving(ac.dataReference()) is not { } target)
+        if (host.Expr.ResolveReceiving(ac.receivingIdentifier()) is not { } target)
             return new BoundUnsupported("ACCEPT receiving operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
 
         // Format 2 is FROM a temporal source; FROM omitted / FROM mnemonic is the Format 1 device transfer.
@@ -285,10 +285,10 @@ internal sealed class AcceptDisplayBinder(BinderContext ctx, StatementBinder hos
     /// the ACCEPT and DISPLAY statements", and only mnemonic-name-3 is a device's), and the device shall have
     /// <paramref name="need"/> (SR7's "additional restrictions", read off the ONE table, <see cref="ImplementorNames"/>).
     /// Returns the device row, or null after reporting COBOLNET0817.</summary>
-    private ImplementorName? MnemonicDevice(IParseTree at, string name, string verb, string sr2, DeviceCapability need,
+    private ImplementorName? MnemonicDevice(Antlr4.Runtime.RuleContext at, string name, string verb, string sr2, DeviceCapability need,
         string capable)
     {
-        if (!ctx.Mnemonics.Of(at).TryGetValue(name, out var row))
+        if (!ctx.Mnemonics.TryUse(at, name, out var row))
         {
             ctx.Edition.Error("COBOLNET0817", $"{verb} '{name}': not a mnemonic-name declared in SPECIAL-NAMES "
                 + $"(ISO §{sr2} SR2 — mnemonic-name-1 shall be associated with an implementor device-name, "

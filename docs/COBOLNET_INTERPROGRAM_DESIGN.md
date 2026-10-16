@@ -135,7 +135,7 @@ trims a name expression: the runtime forms it (`ExternalizedNameFormationDriftTe
 
 **The carriers.** `CobolNet.Runtime.FunctionPointer(string? Name)` is shape-for-shape `ProgramPointer`: a readonly record struct over the EXTERNALIZED function-name, which ISO §8.4.3.12.4 GR2 makes the address of a COBOL function outright (*“For a COBOL function, the address is that of the function identified by the externalized function-name in its FUNCTION-ID paragraph”*), resolved through the ONE run-unit `ProgramTable` (`FunctionAddressOf`, the `EntryOf` twin, differing only in the `Node.IsFunction` discriminator §8.4.6.3's first paragraph requires in both directions). ⛔ **Two structs, not one.** §8.4.3.10.4 gives each category its own predefined NULL and §14.9.39.3 SR20/SR21 forbid mixing the two categories in one SET, so a shared struct would make a program-pointer and a function-pointer assignment-compatible in the GENERATED C# — the one place the binder's category screens cannot reach. Alignment / size / representation / allowable languages are published as `docs/CONFORMANCE.md` §7 row **DOC-A.1-210** (§13.18.60.4 GR26 requires it); GR15's “effect of SET on the function” is row **DOC-A.1-174** and the determination is NONE.
 
-**The restriction is one field.** `PicInfo.RestrictedPrototypeName` carries the `TO` operand for BOTH prototype carriers — §13.18.60.4 GR25 (program) and GR26 (function) — because the two general rules are one rule twice and so are their consumers, §14.9.39.3 SR20 and SR22: *“the {function|program}-prototypes associated with identifier-N and identifier-M shall have the same signature”*. The CATEGORY says which namespace resolves the name (§8.4.6.6 vs §8.4.6.8 — themselves the same sentence twice, and screened by one block in `DataBinder`); the RULE over it is `PrototypeSignatures.Same`, which compares the two `CalleeSignature`s position by position through `OoConformance.DescriptionMismatch`, the compiler's ONE description-equality check, and — because a group's description IS its subordinate entries (§13.7.3 SR2, §8.13; kb/Work PB1115) — requires a group to meet a group with the same §8.5.3.1 elementary layout (`StrongTypeModel.SameElementaryLayout`, the structural half of type-declaration equivalence: each elementary item at the same relative position, of the same length, with the same eight clauses; names and intermediate grouping excluded). It is DISTINCT from `RestrictedTypeName` (§13.18.60.4 GR23) because that one names a TYPE, not a prototype. §13.18.60.3 **SR18 and SR19** — the TYPEDEF requirement — are likewise one screen; there is NO function twin of them (measured: §13.18.60.3 stops at SR21 and carries no function-prototype-name sentence), so a level-1 `USAGE FUNCTION-POINTER TO fp` needs no TYPEDEF while `USAGE PROGRAM-POINTER TO pp` does.
+**The restriction is one field.** `PicInfo.RestrictedPrototypeName` carries the `TO` operand for BOTH prototype carriers — §13.18.60.4 GR25 (program) and GR26 (function) — because the two general rules are one rule twice and so are their consumers, §14.9.39.3 SR20 and SR22: *“the {function|program}-prototypes associated with identifier-N and identifier-M shall have the same signature”*. The CATEGORY says which namespace resolves the name (§8.4.6.6 vs §8.4.6.8 — themselves the same sentence twice, and screened by one block in `DataBinder`); the RULE over it is `PrototypeSignatures.Same`, which compares the two `CalleeSignature`s position by position through `OoConformance.SignatureDifference`, the compiler's ONE pair-mode relation (`ActivationRelations.SignatureDifference` over the two items' descriptions), and — because a group's description IS its subordinate entries (§13.7.3 SR2, §8.13; kb/Work PB1115) — requires two groups to share the same §8.5.3.1 elementary layout (`StrongTypeModel.SameElementaryLayout`, the structural half of type-declaration equivalence: each elementary item at the same relative position, of the same length, with the same eight clauses; names and intermediate grouping excluded). It is DISTINCT from `RestrictedTypeName` (§13.18.60.4 GR23) because that one names a TYPE, not a prototype. §13.18.60.3 **SR18 and SR19** — the TYPEDEF requirement — are likewise one screen; there is NO function twin of them (measured: §13.18.60.3 stops at SR21 and carries no function-prototype-name sentence), so a level-1 `USAGE FUNCTION-POINTER TO fp` needs no TYPEDEF while `USAGE PROGRAM-POINTER TO pp` does.
 
 **The CALL consumer of a restricted program-pointer (kb/Work PB609).** §14.9.4.3 SR14 is Format 2 only (`CALL identifier-1 AS program-prototype-name-1`): when identifier-1 is a restricted program-pointer, the signature of the prototype its TYPEDEF names shall equal the AS phrase's. `CallBinder` asks it where it classifies identifier-1 as a program-pointer, through `PrototypeSignatures.Same` over `StatementBinder.ProgramSignatureOf` — the ONE name-to-signature reader the SET program-pointer pairs (SR22) and the address-identifier argument share — and refuses a mismatch as COBOLNET2936. A Format 1 `CALL pp USING …` has no program-prototype-name-1 for SR14 to compare, and §14.9.4.4 GR7 takes the callee's characteristics only from a prototype the statement names, so no signature is imported from the pointer there (Annex D.9.3.2 is informative); the run unit's §14.9.4.4 GR3 d) check still applies at activation.
 
@@ -323,8 +323,8 @@ and the formal holds the pointer's 8 storage positions. `CobolArgAdapt.WithPoint
 string cell holding `PointerImage.OfCarrier(…)` (DOC-A.1-216), after which the ordinary storage-image arms adopt
 it. BY REFERENCE and BY VALUE (GR10 fills the formal's own description by COMPUTE/SET) stay EC-PROGRAM-ARG-MISMATCH,
 a group formal stays refused (§14.8.2.2 rule 2's MOVE), and a rule-2 activation is refused at BIND —
-`OoConformance.MoveContentMismatch` asks §14.9.25.3 SR1 of the sender before Table 16, because rule 2d is *“the
-same as for a MOVE statement”*.
+`ActivationRelations.MoveViolation` asks §14.9.25.3 SR1 of the sender before Table 16, because rule 2d is *“the
+same as for a MOVE statement”* (asked through `ParameterConformance.ContentConformanceReason`; kb/Work PB3101).
 
 ⛔ **The ACTIVATING and the ACTIVATED sides now read ONE classification**, `CallCrossing` +
 `CallEmitter.CrossingOf` / `ProgramEmitter.FormalCrossing`. They were two formulations of one rule — a caller
@@ -454,8 +454,9 @@ The BY VALUE float formal needed nothing more: it is non-resident (a float forma
 existing copy-in / no-copy-out round trip over the detached cell carries it; the header's COBOLNET0899 refusal of
 it (a "value-copy carrier not yet implemented" that was not true of the program and function arms) is gone. The
 literal and arithmetic-expression arguments into a float formal, refused COBOLNET1688 as "a documented
-refinement", are conformant (`OoConformance.ContentValueMismatch` — the ONE §14.8.2.3.3 verdict for a
-storage-less sending value: a numeric literal, an arithmetic expression or a boolean value, kb/Work PB1113).
+refinement", are conformant (`ActivationRelations.CallArgumentViolation` over `ActivationDescriptions.OfValue` —
+the ONE §14.8.2.3.3 verdict for a storage-less sending value: a numeric literal, an arithmetic expression or a
+boolean value, kb/Work PB1113, PB3101).
 
 **The INVOKE lane is the same rule and was the same defect's other arm.** `OoEmitter`'s BY CONTENT arms already
 landed caller-side (§14.8.2.3.3 rule 2 a): *"If the formal parameter is numeric, the conformance rules are the
@@ -587,7 +588,7 @@ receiving one ("superfluous elements are not moved"; missing ones are space fill
 
 **⛔ THE REVERSE PAIR, AND THE SIZE RULE A VARIABLE-LENGTH PAIR TAKES (kb/Work PB965, finisher).** A variable-length
 group has no length of its own: its collapsed `ImageWidth` counts a dynamic-capacity table as one element, which
-§8.5.1.12.3 grants only to two MATCHING dynamic-capacity tables. So `OoConformance.DescriptionMismatch` — the one
+§8.5.1.12.3 grants only to two MATCHING dynamic-capacity tables. So `ActivationRelations` — the one relation
 comparator behind COBOLNET1688 (CALL argument), 1736 (CALL RETURNING) and 0828 (INVOKE) — decides the size question
 per activation mode once either side is a variable-length group: a RETURNING pair takes compatibility alone (§14.8.3.2's
 length sentence applies only when "neither of them is strongly typed or a variable length group"); BY REFERENCE,
@@ -683,7 +684,7 @@ quantity; `Reshape` / `Overlay` convert it element by element over the element a
 — **the same** capability the §14.9.11.4 GR7 DISPLAY format uses, so a group that displays is a group that
 crosses. The one crossing-form predicate is `CallEmitter.CallPlaceIsVarGroup` (CALL/RETURNING) and
 `OoEmitter.OoCrossingType` (the INVOKE signature, box lanes and marshaling); the ADMISSION is decided once, at
-bind, by `VariableLengthCompatibility.Mismatch` through `OoConformance.DescriptionMismatch` — the same comparator
+bind, by the §8.5.1.12 walk `ActivationRelations.VariableLengthViolation` asks over the descriptions — the same relation
 the argument, RETURNING and override/implements checks all read.
 
 **Tier-C at the boundary, in BOTH halves.** A group with no boundary image at all (a pointer/object-class leaf,
@@ -711,7 +712,7 @@ pair, and separate compilation means the caller-side `ArgText` screen gives the 
 
 **Linkage referenceability — §13.7.3 SR4 and SR5 are decided once, from the header (kb/Work PB1249 / PB1250).** Once a unit's USING and RETURNING phrases are bound, `DataBinder.SealLinkageRules` (the program/function arm in `CallBindLinkage` and the method arm in `OoBindMethodData` call the same one) records which linkage RECORDS the procedure division may not reference: a record is referenceable when it is a header operand (a)), is BASED (the lead-in's "a based data item may be referenced as described in 13.18.5"), or REDEFINES one of those (c)); everything under it (b), d)), its RENAMES entries and its condition-names and index-names (e)) follow the record. A reference to anything else is COBOLNET2746, reported once per written reference by the ONE resolver (`ReferenceResolver.ScreenLinkageReference` for a data-name, the condition-name arm in `ConditionBinder.ConditionOf`, `ReferenceResolver.ScreenLinkageIndex` for an index-name; one wording, `ReportUnreferenceableLinkage`); the reference still resolves, so the statement binds without a cascade. The rule is per source element: a GLOBAL linkage item a contained program inherits is reached through §13.18.27.4 GR2 and is not asked. SR5 ("A formal parameter of a function shall not be used as a receiving operand") is an operand-ROLE rule, so it is one arm of `ExpressionBinder.ReceivingPlaceBar` (COBOLNET2747): every statement's receiver, and §8.4.3.2.4 GR5's BY-CONTENT choice for an argument, inherit it. The parameter is barred in any reference form (whole or reference-modified); an item SUBORDINATE to a group parameter is not "a formal parameter" (SR4 b) of the same clause says "subordinate to" when it means it), and the RETURNING item is no formal parameter.
 
-**Nested-name resolution — one set, depth tiers (kb/Work PB1047 / PB1243).** A contained program's name set is §8.4.6.2.1 1)'s: its own names plus EVERY global name of every container. `BinderDriver.BindUnitData` inherits each container's GLOBAL roots whole (`DataBinder.InheritGlobalSubtree` — data-names, their condition-names, RENAMES, index-names and the named OCCURS DYNAMIC CAPACITY registers (§13.18.38.3 SR30 places a register at the OCCURS entry's level, so under the global record; kb/Work PB1674), each tagged with the container's nesting depth; `GlobalNameClassDriftTests` finds every name index of `DataBinder` by reflection and holds that list total), never skipping a root whose spelling this unit also declares: §8.4.6.2.2 makes each subordinate of a global name global in its own right, so a local `01 G` hides the container's `G`, not its `G.Y`. WHICH item a reference names is decided at reference time, after qualification over the whole set, by §8.4.6.2.1 3)'s nearest-declaring-element rule — `SymbolTable.NearestDeclaring`, asked by `DataBinder.QualifiedCandidates` and `ConditionBinder.ConditionOf` after qualification, and — through `SymbolTable.TryResolveUnqualified`, the raw set narrowed at once because there is no qualifier — by every UNQUALIFIED lookup: `ReferenceResolver.ResolveUnqualified`, and the lookups that pick a candidate BY KIND, which filter the narrowed set and never the raw one (`IntrinsicBinder.FunctionPointerNamed` for §8.4.3.2.3 SR4, `InitializeBinder`'s whole-dynamic-table arm — filtering first counted a hidden global function-pointer as a rival, and initialized a container's global table in place of a nearer local item); `SymbolTable.IndexCandidates` and `ReferenceResolver.CapacityRegisterFor` weigh a nearer data-name against the index-names' or the register's depth through the one `SymbolTable.NearerDataNameHides`, and `DataBinder.DropShadowedConstants` a nearer data-, condition- or index-name, named CAPACITY register or report sum counter against an inherited global constant's or an inherited SYMBOLIC CHARACTERS name's, through the one predicate `DataBinder.DeclaredNearerThan`, which asks every inherited name index (`GlobalNameClassDriftTests` holds it to that list; the symbolic is hidden, never removed, because a contained unit inherits the whole table one level at a time; kb/Work PB3154 review R1-1, R2-1). A sum counter is placed by its report (`DataBinder.ReportDepth`: a container's GLOBAL report's counters share that index), and the same predicate makes `ReferenceResolver.SumCounterFamilyFor`, which resolves a counter BEFORE ordinary lookup, yield to a name declared nearer than the counter's report (kb/Work PB3154 review R3-1). A method's own names, its tables' CAPACITY registers included, are the one tier nearer still, asked at reference time by `DataBinder.ActiveMethodDeclares` in both literal-alias lookups (`FindConstant`, `SymbolicOf`). Two survivors in the one nearest element are still §8.4.2.2.3 SR1 ambiguity. Because every global root is now bridged, a local root spelled like one takes a distinct C# member name (`DataBinder.ReserveInheritedMemberNames`, run before the unit's data division binds, over `DataBinder.InheritedMemberNamesOf` — every bridge member AND the root's own C# name, the STEM its derived members `_redef_` / `_scell_` / `__addr_` are spelled from, so a local REDEFINES or BASED root's backing or address pointer never re-spells a container's bridged one; a derived member is therefore spelled from the root's C# name, never its COBOL word — `NamingConvention.AddressCarrierName` takes the C# name). An `ADDRESS OF` a global name taken in a CONTAINED program forces the cell in the CONTAINER, which owns the storage (`PtrBindBasedAndAddressables` scans the nested programs for this unit's GLOBAL names), and `ADDRESS OF` renders the cell the class names (`RedefinesClass.BackingCellCsName`), bridged or not.
+**Nested-name resolution — one set, depth tiers (kb/Work PB1047 / PB1243).** A contained program's name set is §8.4.6.2.1 1)'s: its own names plus EVERY global name of every container. `BinderDriver.BindUnitData` inherits each container's GLOBAL roots whole (`DataBinder.InheritGlobalSubtree` — data-names, their condition-names, RENAMES, index-names and the named OCCURS DYNAMIC CAPACITY registers (§13.18.38.3 SR30 places a register at the OCCURS entry's level, so under the global record; kb/Work PB1674), each tagged with the container's nesting depth; `GlobalNameClassDriftTests` finds every name index of `DataBinder` by reflection and holds that list total), never skipping a root whose spelling this unit also declares: §8.4.6.2.2 makes each subordinate of a global name global in its own right, so a local `01 G` hides the container's `G`, not its `G.Y`. WHICH item a reference names is decided at reference time, after qualification over the whole set, by §8.4.6.2.1 3)'s nearest-declaring-element rule — `SymbolTable.NearestDeclaring`, asked by `DataBinder.QualifiedCandidates` and `ConditionBinder.ConditionOf` after qualification, and — through `SymbolTable.TryResolveUnqualified`, the raw set narrowed at once because there is no qualifier — by every UNQUALIFIED lookup: `ReferenceResolver.ResolveUnqualified`, and the lookups that pick a candidate BY KIND, which filter the narrowed set and never the raw one (`IntrinsicBinder.FunctionPointerNamed` for §8.4.3.2.3 SR4, `InitializeBinder`'s whole-dynamic-table arm — filtering first counted a hidden global function-pointer as a rival, and initialized a container's global table in place of a nearer local item); `SymbolTable.IndexCandidates` and `ReferenceResolver.CapacityRegisterFor` weigh a nearer data-name against the index-names' or the register's depth through the one `SymbolTable.NearerDataNameHides`, and `DataBinder.DropShadowedConstants` a nearer data-, condition- or index-name, named CAPACITY register or report sum counter against an inherited global constant's or an inherited SYMBOLIC CHARACTERS name's, through the one predicate `DataBinder.DeclaredNearerThan`, which asks every inherited name index (`GlobalNameClassDriftTests` holds it to that list; the symbolic is hidden, never removed, because a contained unit inherits the whole table one level at a time; kb/Work PB3154 review R1-1, R2-1). A sum counter is placed by its report (`DataBinder.ReportDepth`: a container's GLOBAL report's counters share that index), and the same predicate makes `ReferenceResolver.SumCounterFamilyFor`, which resolves a counter BEFORE ordinary lookup, yield to a name declared nearer than the counter's report (kb/Work PB3154 review R3-1). A method's own names, its tables' CAPACITY registers included, are the one tier nearer still, asked at reference time by `DataBinder.ActiveMethodDeclares` in both literal-alias lookups (`FindConstant`, and `DataBinder.HidesSymbolic`, which every symbolic lookup asks, the resolving `SymbolicOf` and the `NamesSymbolic` predicates alike), and a method's register is reachable only from that method: it is held in the method's own scope (`OoMethodDataScope.CapacityRegisters`, read by `SymbolTable.CapacityCandidates`), never in the unit's `DataBinder.CapacityRegisters` (kb/Work PB3165). Two survivors in the one nearest element are still §8.4.2.2.3 SR1 ambiguity. Because every global root is now bridged, a local root spelled like one takes a distinct C# member name (`DataBinder.ReserveInheritedMemberNames`, run before the unit's data division binds, over `DataBinder.InheritedMemberNamesOf` — every bridge member AND the root's own C# name, the STEM its derived members `_redef_` / `_scell_` / `__addr_` are spelled from, so a local REDEFINES or BASED root's backing or address pointer never re-spells a container's bridged one; a derived member is therefore spelled from the root's C# name, never its COBOL word — `NamingConvention.AddressCarrierName` takes the C# name). An `ADDRESS OF` a global name taken in a CONTAINED program forces the cell in the CONTAINER, which owns the storage (`PtrBindBasedAndAddressables` scans the nested programs for this unit's GLOBAL names), and `ADDRESS OF` renders the cell the class names (`RedefinesClass.BackingCellCsName`), bridged or not.
 
 ### RECURSIVE programs and functions/methods need per-activation data; a `static class Program` cannot recurse or hold per-activation copies.
 
@@ -748,10 +749,13 @@ one spelling of one. Two grammar facts make it load-bearing and they are the sam
 `arithmeticExpression` subsumes `dataReference` and every numeric literal, and the `{boolExprAhead()}?`-gated
 `booleanExpression` alternative subsumes both of those in turn (its leaf is `valueOperand`, and the predicate's
 scan runs to the statement's period, so an earlier argument can land in a boolean node on a LATER argument's
-B-operator). `CallBinder.Gr8Classify` is therefore THE reduction, shared by the BY CONTENT arm, the BY VALUE
-arm and both keyword-less arms: it unwraps an operator-free boolean node to its bare `valueOperand` — **both**
-legs, `arithmeticExpression | nonNumericLiteral` — and recovers a sole `dataReference` from an expression node.
-Only the residue binds as an expression.
+B-operator). `ConditionBinder.ReduceArgument` is therefore THE reduction, shared by the BY CONTENT arm, the BY
+VALUE arm, the keyword-less argument (reduced ONCE, before its shape is dispatched) and every INVOKE argument
+(§14.9.23.4 GR4 is the same sentence; kb/Work PB613): it unwraps an operator-free boolean node to its bare
+`valueOperand` — **both** legs, `arithmeticExpression | nonNumericLiteral` — recovers a sole `dataReference` from an
+expression node and names a sole numeric literal. Only the residue binds as an expression. A keyword-less
+identifier or literal that reached the boolean node on a later argument's B-operator therefore takes GR9's mode
+like any other; the boolean arm used to pass such an identifier BY CONTENT.
 
 The MODE then comes from GR9, never from the copy-out: a keyword-less argument that meets §14.9.4.3 SR3 is
 identifier-2 and takes BY REFERENCE (9a1); one that does not — a literal, a constant-name (which §13.10.4 GR1
@@ -818,30 +822,34 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   (§14.9.4.3 SR25 / §8.4.3.2.3 SR13 → §14.8.2; kb/Work PB133 → PB204 → PB165 → PB1418).** Wherever the activated
   element's PD header is known at BIND — the AS NESTED containment table, a program prototype's §12.3.8.4 GR10 a)
   definition, or a function prototype (directly, or through a function-pointer's USAGE TO phrase) — the activating
-  binder asks `ParameterConformance.CheckArgument` for every argument, and every rule it applies lives in
-  `OoConformance`: `DescriptionMismatch` for
-  §14.8.2.3.2 / §14.8.2.2 (BY REFERENCE, identical description with the rule-1 group-prefix allowance and
-  §8.5.1.12 variable-length compatibility), and `ContentMismatch` + the four value-shape rules for §14.8.2.3.3
-  (BY CONTENT / BY VALUE: 2a COMPUTE for a numeric formal, 2b SET for an index item, 2c ANY LENGTH, 2d MOVE via
-  §14.9.25.3 Table 16, plus the class-pointer / object-reference SET paragraph).
-  `ParameterConformance.ContentConformanceReason` dispatches on the BOUND argument's shape — identifier, boolean
-  expression, arithmetic expression, alphanumeric literal, numeric literal, and an intrinsic function-identifier
-  by its RESULT category (§15.4) — and an arithmetic expression into a formal that is not numeric is asked rule 2 d)'s
-  MOVE question of its VALUE (a numeric sender on Table 16's noninteger row: edited into a numeric-edited formal,
-  refused into an alphanumeric, national, group, pointer or object-reference one; kb/Work PB1946, verdict PB1936;
-  `ArgText` crosses it through `ConvertSource`, the numeric literal's twin) — and a constant-name needs no arm
-  because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688 for a CALL and its twin
+  binder asks `ParameterConformance.CheckArgument` for every argument, and every rule it applies is the run-time
+  CALL lane's own relation, `ActivationRelations.CallArgumentViolation`, over the two descriptions
+  `ActivationDescriptions` builds (kb/Work PB3101): §14.8.2.3.2 / §14.8.2.2 BY REFERENCE (rule 2's clause identity,
+  rule 1's group sizes, §8.5.1.12 variable-length compatibility), and §14.8.2.3.3 / §14.8.2.2 rule 2 BY CONTENT /
+  BY VALUE (2a COMPUTE for a numeric formal, 2b SET for an index item, 2c ANY LENGTH, 2d the whole §14.9.25.3 MOVE
+  question — SR1, SR2, SR6 / SR7 for a figurative constant, SR8, SR9, Table 16 — plus the class-pointer SET
+  paragraph and §14.8.2.2's strongly-typed sentence, which governs both modes). Two object references BY CONTENT
+  are the one pair asked of the class table instead (`OoConformance.ObjectReferenceContentMismatch`: the SET table
+  over the pair's class facts, a parameterized class's formal standing for the most favourable actual, and an
+  ACTIVE-CLASS formal's conditions on the invocation). `ParameterConformance.ContentConformanceReason` describes
+  the BOUND argument as the sending operand it is (`ActivationDescriptions.OfCallArgument` / `OfValue`) —
+  identifier, boolean value, arithmetic expression, alphanumeric literal, numeric literal, figurative constant, and
+  an intrinsic function-identifier by its RESULT category (§15.4) — and an arithmetic expression into a formal that
+  is not numeric is asked rule 2 d)'s MOVE question of its VALUE (a numeric sender on Table 16's noninteger row:
+  edited into a numeric-edited formal, refused into an alphanumeric, national, group, pointer or object-reference
+  one; kb/Work PB1946, verdict PB1936; `ArgText` crosses it through `ConvertSource`, the numeric literal's twin) —
+  and a constant-name needs no arm because §13.10.4 GR1 has already substituted its literal. The verdict is COBOLNET1688 for a CALL and its twin
   COBOLNET2470 for a function-identifier, the same code the BY REFERENCE arm uses, because it is the same
   obligation. The same collaborator owns the bit-alignment proof (§14.9.4.3 SR6/SR8 and §8.4.3.2.3 SR14 —
   COBOLNET1683 / COBOLNET2471) and the BY VALUE class answer (§14.9.4.3 SR22 / §8.4.3.2.3 SR10 —
   `ValueArgumentClass`). ⚠ The function-identifier (`UdfBinder`) used to re-implement CALL's argument binding
   WITHOUT this regime, so a non-conforming function argument aliased its formal silently (kb/Work PB1418 /
-  PB1115); `ActivationConformanceDriftTests` pins both lanes to the shared routine. INVOKE (`OoBinder`) still
-  dispatches the same `OoConformance` comparators from its own lane for identifier arguments, but asks
-  `ParameterConformance.ContentConformanceReason` for its literal-2 verdict (kb/Work PB1137), so a literal gets one
-  answer from all three activations; a written nonnumeric literal is judged by its OWN category
-  (`OoConformance.ContentNonNumericLiteralMismatch` — a national literal does not move to an alphanumeric formal),
-  a figurative / ALL literal under any category.
+  PB1115); `ActivationConformanceDriftTests` pins both lanes to the shared routine. INVOKE (`OoBinder`) asks the
+  same relation: BY REFERENCE through `OoBinder.ByReferenceArgumentReason` (the §9.3.6 match, then §14.8.2;
+  kb/Work PB2077), BY CONTENT through `ParameterConformance.ContentConformanceReason` for every argument shape
+  (kb/Work PB1137, PB3101), so one argument gets one answer from all three activations and from the run-time CALL
+  lane; a written nonnumeric literal is judged by its OWN category (a national literal does not move to an
+  alphanumeric formal), a figurative / ALL literal under any category.
 - **The activation OPERAND screens are shared by CALL and INVOKE (kb/Work PB1137).** §14.9.4.3 and §14.9.23.3 state
   two operand rules in the same words, and `ParameterConformance` checks both for either statement: the
   STORAGE-SECTION rule — a BY REFERENCE argument is "an address-identifier or … a data item defined in the file,
@@ -897,9 +905,9 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   symbols match iff their currency STRINGS do; period/comma symbols match iff DECIMAL-POINT IS COMMA is in effect
   for both source elements or neither), and both are facts of the DECLARING source element, not of the
   character-string. `PictureAnalyzer.Analyze` attaches `PicInfo.Clause` (`PictureClauseIdentity`) to every analyzed
-  profile; `DescriptionMismatch` compares it for every category (so `PIC A(5)` is not `PIC X(5)`), the §8.5.3.1
+  profile; the activation description's clause key carries it for every category (so `PIC A(5)` is not `PIC X(5)`), the §8.5.3.1
   profile compare gets it through `PicInfo` record equality, and the non-PICTURE clauses ALIGNED / DYNAMIC LENGTH
-  are the one `DescriptionClauses` predicate both read. The LOCALE phrase compares the external identification AS
+  are clauses of that key and of the `DescriptionClauses` predicate the §8.5.3.1 compare reads. The LOCALE phrase compares the external identification AS
   WRITTEN (`LocaleSymbol.SameExternalIdentificationAs` — literal values ordinal, a word case-insensitively), never
   the L1-normalized tag that selects the locale at run time.
   ⛔ The same fact governs how a picture is EDITED across the boundary (kb/Work PB2554, §12.3.7.4 GR14 b)): a formal
@@ -1023,7 +1031,7 @@ a constant-name, on the literal §13.10.4 GR1/GR2 substitutes.
   declared PICTURE length for an activation with no receiver — docs/CONFORMANCE.md D-ALR1). The delivery needs no
   change: `FitToReceiver` already fits to the receiver's stated length (rule 5, "considered to match"), and an ANY LENGTH
   receiver stores at its own length. The binder side is the existing activation-mode relaxation of
-  `OoConformance.DescriptionMismatch` (rule 4 stays: an ANY LENGTH receiver needs an ANY LENGTH sender).
+  `ActivationRelations.CallReturningViolation` (rule 4 stays: an ANY LENGTH receiver needs an ANY LENGTH sender).
 - SET ADDRESS OF on a LINKAGE item re-points the callee's formal mid-execution — the carrier field is reassigned; subsequent refs read the new target.
 
 ## Edition gating (G1 — four per-`--std` compilers in one executable)

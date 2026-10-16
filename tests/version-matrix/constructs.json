@@ -1390,23 +1390,23 @@
   },
   {
    "id": "receive-as-user-word",
-   "description": "The word RECEIVE as a user-defined word — the RE-reservation interval in ONE f(case,V) row: 85-reserved (communication module) → user-definable 2002/2014 → re-reserved 2023 (Annex E.2 item 25).",
+   "description": "The word RECEIVE as a user-defined word — the RE-reservation interval in ONE f(case,V) row: 85/2002-reserved (the communication facility, obsolete at 2002 per GnuCOBOL's cobol2002.conf, its word reserved by the GnuCOBOL 2002 list) → user-definable at 2014 → re-reserved 2023 (Annex E.2 item 25, which compares 2023 with 2014 only: E.1). kb/Work PB656.",
    "display": "the word RECEIVE as a user-defined word",
    "diagnosticCode": "COBOLNET0901",
-   "citation": "§8.9 interval encoding of the RE-reservation: 85-reserved (communication) → user-definable 2002/2014 → re-reserved 2023 (Annex E.2 item 25)",
-   "introducedIn": 2002,
+   "citation": "§8.9 interval encoding of the RE-reservation: 85/2002-reserved (communication; GnuCOBOL 2002 list) → user-definable 2014 → re-reserved 2023 (Annex E.2 item 25)",
+   "introducedIn": 2014,
    "removedIn": 2023,
    "expectDiagnostic": "COBOLNET0901",
-   "vcr": "VCR row 32; reserved-words.json row RECEIVE (ISO Annex E overrides the GnuCOBOL 2002/2014 curation)",
+   "vcr": "VCR row 32; reserved-words.json row RECEIVE (ISO Annex E.2 item 25 decides the 2014 edge, the GnuCOBOL 2002 list the 2002 one)",
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. UWV.\nDATA DIVISION.\nWORKING-STORAGE SECTION.\n01 RECEIVE PIC 9 VALUE 3.\nPROCEDURE DIVISION.\nMAIN.\n    DISPLAY RECEIVE.\n    STOP RUN.\n"
   },
   {
    "id": "end-receive-as-user-word",
-   "description": "The word END-RECEIVE as a user-defined word — the THIRD re-reserved communication word (discovered mechanically, DEVLOG 585; the recall-based classification knew only two): same interval as RECEIVE.",
+   "description": "The word END-RECEIVE as a user-defined word — the THIRD re-reserved communication word (discovered mechanically, DEVLOG 585; the recall-based classification knew only two): same interval as RECEIVE, user-definable at 2014 only (kb/Work PB656).",
    "display": "the word END-RECEIVE as a user-defined word",
    "diagnosticCode": "COBOLNET0901",
    "citation": "§8.9 interval encoding: the THIRD re-reserved communication word — discovered mechanically (DEVLOG 585); same interval as RECEIVE",
-   "introducedIn": 2002,
+   "introducedIn": 2014,
    "removedIn": 2023,
    "expectDiagnostic": "COBOLNET0901",
    "vcr": "VCR row 32; reserved-words.json row END-RECEIVE",
@@ -1462,7 +1462,7 @@
   },
   {
    "id": "segment-limit-removed-2002",
-   "description": "SEGMENT-LIMIT clause (OBJECT-COMPUTER) — segmentation deleted by ISO 2002; gated at the modelled segmentLimitClause (P2.6; kb/Work PB830).",
+   "description": "SEGMENT-LIMIT clause (OBJECT-COMPUTER) — segmentation deleted by ISO 2002; gated at the modelled segmentLimitClause (P2.6; kb/Work PB830). The CLAUSE leaves at 2002 while the WORD stays reserved there (reserved-words.json r2002, the GnuCOBOL 2002 list): two facts, not a contradiction - GnuCOBOL 3.2 at -std=cobol2002 refuses both the clause ('does not conform to COBOL 2002') and the word as a data-name (kb/Work PB656; VCR row 7.8).",
    "display": "the SEGMENT-LIMIT clause (OBJECT-COMPUTER)",
    "diagnosticCode": "COBOLNET0902",
    "citation": "segmentation deleted by ISO 2002; VCR Table 7",
@@ -1826,6 +1826,18 @@
    "expectDiagnostic": "COBOLNET0900",
    "vcr": "provisional 2002 edge (decision-1 policy); W1.5 parse-layer mapping (DEVLOG 594)",
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. W15P.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F2 ASSIGN TO \"f2.dat\"\n        ORGANIZATION INDEXED ACCESS DYNAMIC RECORD KEY RK.\nDATA DIVISION.\nFILE SECTION.\nFD F2.\n01 R2.\n   05 RK PIC X(5).\n   05 RD2 PIC X(5).\nPROCEDURE DIVISION.\nMAIN.\n    START F2 KEY = RK WITH LENGTH 3.\n    STOP RUN.\n"
+  },
+  {
+   "id": "start-reverse-operators-2002",
+   "description": "The REVERSE-SEARCH relational operators of the START KEY phrase - LESS, NOT GREATER, LESS OR EQUAL and their symbols (<, NOT >, <=) - ISO 14.9.41.4 GR9 b) (relative: 'searching the file in reverse order') and GR17 d) (indexed: 'the file is searched in reverse order'). COBOL-85's START searches FORWARD only - the set GR9 a) / GR17 c) still name first, which NOT LESS and NOT < fold into, so they stay legal at 85 (conformance:85/pb370_start_forward_operators); A.3 item 39 binds the reverse set to READ ... PREVIOUS in ONE sentence as ONE reverse-access processor capability, and READ PREVIOUS is read-previous-2002. THE EDGE IS DERIVED, NOT QUOTED (the repo holds no 1985 or 2002 text, ratified decision #1): IBM Enterprise COBOL, a COBOL-85 implementation, admits only the forward set, and the 459 NIST CCVS-85 programs write only EQUAL, GREATER and NOT LESS. Gated on RECOGNITION in the VersionConformancePass parse arm (VisitStartKeyPhrase, the operator folded by ConditionBinder.MapOperator, the same fold KeyedIoBinder binds), so an ill-organized or unbindable START still names the edition (kb/Work PB370).",
+   "display": "a reverse-search START KEY operator (LESS, NOT GREATER, LESS OR EQUAL)",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §14.9.41.4 GR9 b) / GR17 d) (the reverse-search operator set); §A.3 item 39 (READ PREVIOUS and the reverse START operators, one processor-dependent capability); a COBOL-2002 introduction (derived)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "provisional 2002 edge (decision-1 policy), bound to read-previous-2002 by A.3 item 39",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMSTRV.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F ASSIGN TO \"vmstrv\" ORGANIZATION IS RELATIVE\n        ACCESS MODE IS DYNAMIC RELATIVE KEY IS W-K.\nDATA DIVISION.\nFILE SECTION.\nFD F.\n01 R PIC X(10).\nWORKING-STORAGE SECTION.\n01 W-K PIC 9(4).\nPROCEDURE DIVISION.\nMAIN.\n    OPEN INPUT F.\n    START F KEY IS LESS THAN W-K INVALID KEY DISPLAY \"E\".\n    CLOSE F.\n    STOP RUN.\n"
   },
   {
    "id": "code-set-national-2002",
@@ -2462,12 +2474,13 @@
   },
   {
    "id": "padding-character-removed-2014",
-   "description": "PADDING CHARACTER clause (file control entry) - the ANSI X3.23-1985 Sequential I-O block-fill character (PADDING [CHARACTER] IS {data-name-1 | literal-1}); no program-visible effect in a model with no blocking, so parsed-and-ignored at 85/2002 (the MULTIPLE FILE / RERUN posture). DELETED from the standard: the 2023 file control entry's clauses are 12.4.5.4 through 12.4.5.15 and none is PADDING, and the word appears NOWHERE in the 2023 text, 8.9 included. THE REMOVAL EDGE IS DERIVED, NOT QUOTED, and the derivation is stated so it can be overturned in one line: the repo holds no 2002 or 2014 text (ratified decision #1), and the only per-edition datum is reserved-words.json, which keeps PADDING reserved at 2002 and NOT at 2014. A clause whose leading word is not a reserved word cannot be written, so the clause is gone BY 2014; and gating it exactly where reservedHere() stops reserving the word is what keeps this row and the user-word-padding-2014 row from contradicting each other. kb/Work PB300.",
+   "description": "PADDING CHARACTER clause (file control entry) - the ANSI X3.23-1985 Sequential I-O block-fill character (PADDING [CHARACTER] IS {data-name-1 | literal-1}); no program-visible effect in a model with no blocking, so parsed-and-ignored at 85/2002 (the MULTIPLE FILE / RERUN posture), with the obsolete-element warning COBOLNET0903 at 2002. DELETED from the standard: the 2023 file control entry's clauses are 12.4.5.4 through 12.4.5.15 and none is PADDING, and the word appears NOWHERE in the 2023 text, 8.9 included. THE 2002 AND 2014 EDGES ARE DERIVED, NOT QUOTED (the repo holds no 2002 or 2014 text, ratified decision #1), so CLAUDE.md rule 1's precedence takes GnuCOBOL's: its 3.2 dialect files set padding-character-clause obsolete in cobol2002.conf and unconformable in cobol2014.conf, and cobc -std=cobol2002 warns 'PADDING CHARACTER is obsolete in COBOL 2002' (kb/Work PB656). The same source's word lists keep PADDING reserved at 2002 and not at 2014 (reserved-words.json), so the clause and the user-word-padding-2014 row agree. kb/Work PB300, PB656.",
    "display": "the PADDING CHARACTER clause (file control entry)",
    "diagnosticCode": "COBOLNET0902",
-   "citation": "absent from the whole ISO 2023 text; the file control entry's clauses are ISO §12.4.5.4-§12.4.5.15 (§12.4.5) and none is PADDING; §8.9 absence (the list runs PACKED-DECIMAL -> PAGE); VCR Table 7 row 7.20",
+   "citation": "absent from the whole ISO 2023 text; the file control entry's clauses are ISO §12.4.5.4-§12.4.5.15 (§12.4.5) and none is PADDING; §8.9 absence (the list runs PACKED-DECIMAL -> PAGE); GnuCOBOL 3.2 cobol2002.conf/cobol2014.conf: obsolete 2002, removed 2014 (kb/Work PB656); VCR Table 7 row 7.20",
    "introducedIn": 85,
    "removedIn": 2014,
+   "obsoleteIn": 2002,
    "expectDiagnostic": "COBOLNET0902",
    "vcr": "VCR Table 7 row 7.20; reserved-words.json row PADDING (r2014/r2023 false)",
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMPADC.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F ASSIGN TO \"vmpadc\" ORGANIZATION IS SEQUENTIAL\n        PADDING CHARACTER IS SPACE.\nDATA DIVISION.\nFILE SECTION.\nFD F.\n01 R PIC X(10).\nPROCEDURE DIVISION.\nMAIN.\n    OPEN OUTPUT F.\n    MOVE \"PAD\" TO R.\n    WRITE R.\n    CLOSE F.\n    STOP RUN.\n"
@@ -3450,7 +3463,7 @@
   },
   {
    "id": "fixed-form-text-in-area-a-2002",
-   "description": "Fixed-form program text that begins its line in AREA A (character positions 8-11) but is not an area-A item or a level-number: a statement, a sentence, an entry or clause continued on a subsequent line, a separator period. ANSI X3.23-1985's reference format wrote everything but the area-A items in area B (position 12 to margin R) - an entry, sentence, statement or clause continued 'by starting subsequent line(s) in area B'; ISO/IEC 1989:2002 removed the areas, and the 2023 rule continues an entry 'by starting subsequent COBOL words, literals, or picture character-strings in the program-text area of a subsequent line' (ISO §6.3.5). Level-numbers other than 01 and 77 may begin in either area (indentation by level). Refused at COBOL-85 by the ONE AreaPlacementPass (kb/Work PB3147); the edge is DERIVED, not quoted (VCR row 7.35), with the same evidence as fixed-form-area-a-item-outside-area-a-2002.",
+   "description": "Fixed-form program text that begins its line in AREA A (character positions 8-11) but is not an area-A item or a level-number: a statement, a sentence, an entry or clause continued on a subsequent line, a separator period, and ANY text of a CONTINUATION line (a hyphen in the indicator area: 'Area A of a continuation line must be blank'). ANSI X3.23-1985's reference format wrote everything but the area-A items in area B (position 12 to margin R) - an entry, sentence, statement or clause continued 'by starting subsequent line(s) in area B'; ISO/IEC 1989:2002 removed the areas, and the 2023 rule continues an entry 'by starting subsequent COBOL words, literals, or picture character-strings in the program-text area of a subsequent line' (ISO §6.3.5). Level-numbers other than 01 and 77 may begin in either area (indentation by level). Refused at COBOL-85 by the ONE AreaPlacementPass (kb/Work PB3147) for the text that begins a token, and by the §6.5 logical conversion (ReferenceFormatDiagnostics.OnContinuationTextInAreaA, kb/Work PB3168) for a continuation line, whose tail of a continued literal is no token's start; the edge is DERIVED, not quoted (VCR row 7.35), with the same evidence as fixed-form-area-a-item-outside-area-a-2002.",
    "display": "program text other than an area-A item or a level-number that begins its fixed-form line in area A",
    "diagnosticCode": "COBOLNET3735",
    "citation": "ANSI X3.23-1985 reference format, area B; ISO §6.3.1, §6.3.5: no areas from 2002",

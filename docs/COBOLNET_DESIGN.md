@@ -69,8 +69,9 @@ internal detail. Where a deep-dive conflicts with §1/§14/§18, the SSOT wins.
 source.cob
   → Frontend  (REUSED ANTLR, SUPERSET grammar: Preprocess[reference-format, >>directives, COPY, NIST placeholders]
                → Lex → Parse; construct introduction is gated post-bind, so the constructs parse at every --std
-               except where a parse-time edition read decides (word-status reads, and the one construct gate
-               validationClause; defined by rule in DESIGN-architecture-review §8.4, adjudicated in kb/Work PB2291); each
+               except where a parse-time edition read decides (§8.9 word-status reads, and three recorded construct
+               gates on the declined A.4 surface; defined by rule in DESIGN-architecture-review §8.4, adjudicated in
+               kb/Work PB2291, pinned by EditionReadDriftTests); each
                version-gated rule stamps its construct-id — DESIGN-version-conformance-pipeline.md)
        → parse tree
   → Bind      (edition-AGNOSTIC (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1): resolve symbols + build a typed/categorized BOUND TREE that PRESERVES COBOL structure;
@@ -90,19 +91,24 @@ Edition gating is ONE mechanism: the grammar declares construct *identity* (a co
 version-gated rule; version *numbers* live only in `constructs.json`), the binder is edition-agnostic (save the documented exception ledger, DESIGN-version-conformance-pipeline §1.1), and the
 `VersionConformancePass` over the bound tree is the sole gate — rejecting strict / accepting-inert permissive, and
 HALTING before emit so codegen never runs on an errored tree. Construct introduction is gated there, post-bind, but parser-grammar
-predicates still read the compile edition, under several names: most decide whether a word that is a user-defined word
-in an earlier edition is reserved here (`reservedHere`, `facilityWord`, `screenPositionAhead`, the `gatedDeclaration` action
-and the `NoteGatedOffender` listener, the 71 `keywordContinuesHere` alternatives of the
-generated `CobolWords.g4`, and four of the five `{isXXXX()}?` spellings: LOCATION, VALID, APPLY/COMMIT, RETRY); the
-fifth spelling gates a construct at parse time (`validationClause`), and SET LOCALE's `LC_` escape reads it too (word
-status as well: LOCALE and USER-DEFAULT are 1985 user words). The lexer and the retype stage read it too, as word status:
-the Annex C spelling a word has at the edition (`ApplyEditionSpelling`) and whether the edition reserves a subscript
-trigger (`PreviousTokenCouldBeDataName`, primed by `TokenRetypes.ReservedNonDataNames`).
-DESIGN-architecture-review §8.4 defines them by a rule (a parser-superclass, lexer or retype-stage member whose body
-reaches edition state — the parser's `Edition`, an `EditionInfo`, or a lexer field primed from one — and every
-predicate, action, lexer override, listener or retype-stage member that calls one), its drift test applies that rule,
-and kb/Work PB2291
-adjudicates each against this rule. There is no post-hoc reverse-signature recognizer, and no edition checks scattered through the binder.
+predicates still read the compile edition, under several names. **The sanctioned read is §8.9 WORD STATUS** — whether a
+word that is a user-defined word in an earlier edition is reserved here, which no post-bind gate can decide because the
+parse itself depends on it: `reservedHere`, `facilityWord`, `screenPositionAhead`, `entryNameHere`, `setLocaleAhead`
+(LOCALE and USER-DEFAULT are 1985 user words), the `gatedDeclaration` action, the `NoteGatedOffender` and
+`ReservedUserWordViolation` listener calls, the `keywordContinuesHere` alternatives of the generated `CobolWords.g4`, and
+two `{isXXXX()}?` spellings (bare LOCATION in PERFORM, OPEN's RETRY phrase). The lexer and the retype stage read it
+too, as word status: the Annex C spelling a word has at the edition (`ApplyEditionSpelling`) and whether the edition
+reserves a subscript trigger (`PreviousTokenCouldBeDataName`, primed by `TokenRetypes.ReservedNonDataNames`). **A
+CONSTRUCT GATE at parse time is a D7 defect**, and three remain, all on the declined Annex A.4 surface
+(`CobolDeclined.g4`): `{is2002()}? validationClause`, the INVALID arm of `{is2002()}? validateValidPhrase`, and
+`{is2023()}? applyCommitClause` refuse a construct that has no other reading below its introduction with a bare
+COBOL0001 where this pass should name the edition (COBOLNET0900); moving them waits on a constructs.json row form for
+a construct refused by name AT its introduction. DESIGN-architecture-review §8.4 defines the reads by a rule (a
+parser-superclass, lexer or retype-stage member whose body reaches edition state — the parser's `Edition`, an
+`EditionInfo`, or a lexer field primed from one — and every predicate, action, listener or other front-end member that
+calls one); `EditionReadDriftTests` applies that rule and holds the computed set equal to kb/Work PB2291's recorded
+verdict, so a new read under any name fails until it is adjudicated. There is no post-hoc reverse-signature recognizer,
+and no edition checks scattered through the binder.
 
 **Backend-neutral bound tree + a selectable codegen backend (owner-confirmed 2026-06-08).** The bound semantic tree
 is the single model that both backends consume; codegen is behind an **`ICodeGenBackend`** abstraction with two
@@ -176,7 +182,16 @@ a subscript position that is not a subscript — COBOLNET2363, a reference to a 
 the unbuilt ledger before any caller sees it, so a caller that drops the answer cannot make it silent, and a caller
 builds its node FROM the answer (`Refusal` / `OperandError` / `ExprError` / `BoolError`; `PlaceOrReported` where the
 caller cannot carry a deferral, which reports it as recognized-not-implemented, COBOLNET0899). The receiving
-chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported.
+chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported. Every
+receiving grammar slot is a `receivingIdentifier` (`setReceivingIdentifier` in SET, which lacks the data-address
+alternative so Format 7 keeps its own `ADDRESS OF data-name-1` receiver), and so is the BY REFERENCE argument of CALL and
+INVOKE (§14.9.4.3 SR5, §14.9.23.3 SR20; an address-identifier there is a sending operand and keeps its own arm; a
+keyword-less SELF, SUPER or view whose BY REFERENCE is implied reaches the same table): a data reference, or one of the identifier
+formats that are never a receiving operand (an object-view, SELF, SUPER, NULL, an address-identifier) parsed only so
+`ResolveReceiving` can refuse it by the row of `ReceivingOperandForms` that names its §8.4.3 rule — the same table the
+data-reference screens (LINAGE-COUNTER, LINE-COUNTER, EXCEPTION-OBJECT, the view of a qualified item) report from
+(kb/Work PB1551; `ReceivingOperandFormDriftTests`). The computed formats (function-identifier, inline invocation) stay
+out of the purely receiving rules by construction.
 `RefResolutionDriftTests` pins the census, the ledger and the callers. `BoundDeferralDriftTests` fails on a
 deferral whose message states a violated rule (kb/Work PB909); `RefusalNodeDriftTests` keeps the refusal
 constructors private and keeps report-then-`BoundNop` and failure-guarded `BoundNop` out of the binder (a genuine
@@ -1780,7 +1795,7 @@ src/Cobol.Net.Frontend/
   Common/          SourceLocation.cs, SourceLineMap.cs, TextSpan.cs, CobolLiteral.cs, NumericLiteral.cs, CobolWordRule.cs,
                    CompilerDirectiveWords.cs
   ANTLR4/          antlr-4.13.2-complete.jar
-  GenerateIfNewer.ps1, Invoke-Antlr4CSharp.ps1
+  Invoke-Antlr4CSharp.ps1   (the one ANTLR generator, run by the csproj's EnsureGeneratedFiles target)
   Pipeline/        Frontend.cs        (the orchestrator — MOVED from src/CobolNet/Frontend/, the one client of all of the above)
 
 src/Cobol.Net.Compiler/
@@ -1834,7 +1849,7 @@ The new `Cobol.Net.Frontend.csproj`:
 - Inherits TFM/lang from `Directory.Build.props` (net10.0 / C# 14) — **do not** re-declare.
 - `<PackageReference Include="Antlr4.Runtime.Standard" />` — **no `Version`** (central package management via `Directory.Packages.props`). It needs `Antlr4.Runtime`; it does **not** need `Mono.Cecil`.
 - No `ProjectReference` (the front-end is self-contained).
-- Carries the ANTLR generation: the `EnsureGeneratedFiles` + `CleanGenerated` targets and the `<None Include="Grammar\…">`/jar items live in its csproj; the `Inputs`/`Outputs` paths are relative.
+- Carries the ANTLR generation: the `WriteAntlrGenerationStamp` + `EnsureGeneratedFiles` + `CleanGenerated` targets, the `AntlrGrammar` item (`Grammar/**/*.g4`) and the `AntlrNamespace`/`AntlrJar`/`AntlrGenerator` properties live in its csproj; `EnsureGeneratedFiles` is the one up-to-date decision over every generation input (kb/Work PB2719), and its `Inputs`/`Outputs` paths are relative.
 - `<InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />` if any internals need testing.
 
 **Namespaces.** The five front-end sub-namespaces are `CobolNet.Frontend.{Common,Diagnostics,Generated,Parsing,Preprocessor}` (rearchitecture PHASE 01, `docs/rearchitecture/PHASE-01-mechanical-rename-deadcode.md`); the legacy tree that once shared them is deleted.
@@ -2146,7 +2161,8 @@ identical stdout; now the committed goldens, R69). The remaining items below sta
     lenient clamping dialect is a later option.
 16. **Exception model default.** EC checking OFF by default (NIST-faithful, fast — ISO §5000), enabled only by
     `>>TURN`/phrases; an unhandled **fatal** EC terminates the run unit with a diagnostic + nonzero exit.
-17. **VALIDATE.** Implemented minimally for the conformance corpus, marked obsolete (2023 Table 13).
+17. **VALIDATE.** Declined (Annex A.4.14; docs/CONFORMANCE.md §4 item 3): the statement compiles inert with the
+    COBOLNET1580 warning, no EC-VALIDATE condition is raised, and it is marked obsolete (2023 Table 13).
 18. **OO multiple inheritance.** Single inheritance in v1 (covers the whole current corpus); a multi-base program
     triggers an owner decision then (linearize one C# base + `IMPLEMENTS` interfaces with forwarding).
 19. **Intrinsic internals.** Never `decimal` — exact via unscaled `long`/`Int128`, float via `double` (extends the

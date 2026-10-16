@@ -61,6 +61,8 @@ this side truncated it, that side discarded it, and both called the note well-fo
 from __future__ import annotations
 
 import argparse
+import dataclasses
+import functools
 import json
 import pathlib
 import re
@@ -74,8 +76,13 @@ WORK = REPO / "kb" / "Work"
 
 KINDS = {"defect", "analysis", "adjudication", "decision"}
 STATUSES = {"open", "half", "landed", "owner", "blocked", "retired"}
-#: The statuses that mean an item is DONE. A view of open work shall exclude every one of them — see
-#: :func:`check_base_agrees`, which is what stops the next one added here from being half-applied.
+#: The statuses that mean an item is DONE — the ONE vocabulary every reader of the register asks (kb/Work PB3196:
+#: the R0 census and the note generator each read the status their own way, and the census's own copy held four
+#: statuses that `check` rejects). A view of open work shall exclude every one of them — see
+#: :func:`check_base_agrees`, which is what stops the next one added here from being half-applied. The C# reader's
+#: twin, `WorkRegister.TerminalStatuses`, is held to this tuple by the parity fixture: :func:`parity_view` reports
+#: `terminal`, and :func:`parity` refuses a fixture that leaves any status of STATUSES without a case, so a status
+#: added here reaches both engines' answers.
 TERMINAL_STATUSES = ("landed", "retired")
 HARM = {"wrong-answer", "crashes", "silent", "rejects-legal-source", "under-rejects", "process"}
 
@@ -360,7 +367,7 @@ def check_base_agrees() -> list[str]:
 
 
 #: A traceability-inventory rule-id, by SHAPE only — `AR-15.7.3-1`, `SR-13.18.40.3-22`, `FMT-14.9.32.2`,
-#: `GR-7.2.3.4-L2.1`. Whether the id names a row that EXISTS, and whether that row's verdict resolves, is the
+#: `GR-9.3.6-L4.1`. Whether the id names a row that EXISTS, and whether that row's verdict resolves, is the
 #: C# gate's question and is deliberately not asked here (see :func:`closes_rows_shape`).
 RULE_ID_SHAPE = re.compile(r"\A[A-Z]{2,4}-[0-9A-Za-z.]+(?:-[0-9A-Za-z.]+)?\Z")
 
@@ -607,10 +614,33 @@ def topology_problems(items: list[dict]) -> list[str]:
 R3_PROGRAM, R3_DRIFT_TEST = "PB2119", "PB2417"
 R3_MEASURED_WAVES = ("move", "move-rename", "extract", "re-model")
 _WAVE_KIND = re.compile(r"\*\*Wave kind:\*\*\s*([\w-]+)", re.I)
-_SITES = re.compile(r"\*\*Sites[^*]*\*\*(.*?)(?:\n\s*\n\*\*|\Z)", re.S)
-#: A path anywhere in the Sites block: a bare `src/...`, `tests/...` or `docs/...` site, or a census member's
-#: "`M:... @ src/...:n`" (Delete notes). tests/ and docs/ count: the slices' set names files there (§12 rows 21-23).
-_SITE_PATH = re.compile(r"(?<![\w/.])((?:src|tests|docs)/[^`:\s)]+)")
+#: The wave kind of an R2 defect routed to the fix lane (scripts/arch/r2_collect.py WAVES; file_census_notes writes it):
+#: a FIX-LANE note however it reaches the planner, so its declared set is its sites and never reads the member index.
+FIX_LANE_WAVE = "defect-for-fix-lane"
+#: The bold label file_census_notes writes before the files ONE STEP of a multi-step note edits: a structured site
+#: line, since a step's files can lie outside the census finding's Sites (kb/Work PB3242, branch review R1-1: PB2300's
+#: IntrinsicCatalog.cs).
+STEP_FILES_LABEL = "The files this step edits"
+#: A note's STRUCTURED SITE BLOCK opens with a bold label (a paragraph or a list item) or a heading whose first words
+#: are "Code site(s)" or "Site(s)": `**Sites:**`, `**Code site.**`, `**Code sites (located ...).**`, `### Code site`;
+#: or with the bold STEP_FILES_LABEL.
+_SITE_LABEL = re.compile(r"^[ \t]*(?:[-*][ \t]+)?\*\*(?:(?:Code[ \t]+)?Sites?\b|" + re.escape(STEP_FILES_LABEL)
+                         + r")[^*\n]*\*\*", re.I)
+_SITE_HEADING = re.compile(r"^(#{1,6})[ \t]+(?:Code[ \t]+)?Sites?\b", re.I)
+_HEADING = re.compile(r"^(#{1,6})[ \t]")
+_LABELED_LINE = re.compile(r"^[ \t]*(?:[-*][ \t]+)?\*\*[^*\n]+\*\*")
+_LIST_ITEM = re.compile(r"^[ \t]*(?:[-*+]|\d+[.)])[ \t]")
+#: The names a note moves or changes, read from three structured places only: the code spans of its
+#: `**Moves or changes:**` line, its `r2_members:` line (comma-separated), and the documentation ids (`M:Ns.T.M(...)`,
+#: a Delete note's census sites) in its site blocks or on that line.
+_MOVES_LINE = re.compile(r"^\*\*Moves or changes:\*\*(.*)$", re.M)
+_R2_MEMBERS = re.compile(r"^r2_members:[ \t]*(.*)$", re.M)
+_CODE_SPAN = re.compile(r"`([^`]+)`")
+_DOC_ID = re.compile(r"`[MPFETN]:([^`\s@]+)")
+#: A path token in a site block ends at whitespace, a quote, a bracket or a separator; a token holding a placeholder,
+#: a glob or an ellipsis is not a path.
+_PATH_CHAR = r"[^\s`'\"()\[\],;|]"
+_NOT_A_PATH = re.compile(r"[<>*{}…]|\.\.\.")
 #: The external-repository slices are the notes whose title says so (kb/Work PB2097-PB2104).
 EXTERNAL_SLICE_TITLE = re.compile(r"\A\S+ — external repository slice \d+\b")
 EXTERNAL_DESIGN = REPO / "docs" / "rearchitecture" / "DESIGN-external-repository.md"
@@ -634,10 +664,103 @@ sbyte sealed short sizeof stackalloc static string struct switch this throw true
 ushort using virtual void volatile while global record var dynamic""".split())
 
 
-def note_sites(it: dict) -> list[str]:
-    """The `src/` files an R3 note's **Sites** block names (paths, line suffixes dropped): the declared file set the
-    register can read. The planner adds the files its clustering resolves (plan_wave.py)."""
-    return sorted({p for s in _SITES.findall(it.get("_body", ""))[:1] for p in _SITE_PATH.findall(s)})
+@dataclasses.dataclass(frozen=True)
+class NoteSites:
+    """What a note DECLARES it works on (kb/Work PB3242): the repo-relative `paths` of its site blocks (files and
+    folders; `:line`, `#member` and `(member)` suffixes dropped), the `names` it moves or changes (member_index.py
+    resolves them to files and adds their callers), and its `**Wave kind:**` (`wave`, empty for a fix-lane note): only
+    a restructuring note with no names falls back to the types its sites declare (member_index.note_names)."""
+    paths: tuple[str, ...]
+    names: tuple[str, ...]
+    wave: str
+
+    @property
+    def fix_lane(self) -> bool:
+        """An R2 defect routed to the fix lane (FIX_LANE_WAVE): its `names` (r2_members) say where the defect lives,
+        never what a restructuring moves, so they resolve to no callers and its set is its sites (kb/Work PB3242,
+        branch review R1-2; DESIGN-architecture-review §8.7: a fix-lane plan never builds the index)."""
+        return self.wave == FIX_LANE_WAVE
+
+
+def _site_blocks(text: str) -> list[str]:
+    """The text of every site block: a site heading's section (to the next heading of its level or higher), or a site
+    label's paragraph plus the list that follows it (a loose list, or a label alone on its line), ending at a heading
+    or at the next labeled line."""
+    lines, out, i = text.split(chr(10)), [], 0
+    while i < len(lines):
+        if h := _SITE_HEADING.match(lines[i]):
+            level, block = len(h.group(1)), [lines[i]]
+            i += 1
+            while i < len(lines) and not ((n := _HEADING.match(lines[i])) and len(n.group(1)) <= level):
+                block.append(lines[i])
+                i += 1
+            out.append(chr(10).join(block))
+            continue
+        if not _SITE_LABEL.match(lines[i]):
+            i += 1
+            continue
+        block = [lines[i]]
+        i += 1
+        while i < len(lines):
+            if lines[i].strip():
+                if _HEADING.match(lines[i]) or _LABELED_LINE.match(lines[i]):
+                    break
+                block.append(lines[i])
+                i += 1
+                continue
+            j = i
+            while j < len(lines) and not lines[j].strip():
+                j += 1
+            if j < len(lines) and _LIST_ITEM.match(lines[j]) and not _LABELED_LINE.match(lines[j]):
+                i = j
+                continue
+            break
+        out.append(chr(10).join(block))
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def _path_token(roots: tuple[str, ...]) -> re.Pattern[str]:
+    return re.compile(r"(?<![\w/.-])((?:" + "|".join(map(re.escape, roots)) + r")/" + _PATH_CHAR + "+)")
+
+
+@functools.lru_cache(maxsize=1)
+def campaign_domain():
+    """model_rules.json `campaign` (coord.campaign, the one reader of model_rules.json; a coord.CampaignDomain): the
+    code roots a site path may start with, never a literal list here (scripts/ is a campaign root that this reader's
+    `(src|tests|docs)/` once ignored, so PB3203's own sites declared nothing: kb/Work PB3242)."""
+    sys.path.append(str(REPO / "scripts" / "orchestrator"))
+    import coord  # noqa: PLC0415
+    return coord.campaign()
+
+
+def note_sites(text: str, roots: tuple[str, ...] | None = None) -> NoteSites:
+    """THE ONE READER of a note's structured sites (kb/Work PB3242; DESIGN-architecture-review §8.7): the planner and the
+    landing check (plan_wave.declared_sets), the member index (member_index.note_file_set) and this register's checks
+    all read a note through it, and no other module scans a note's text for paths. A path counts only inside a site
+    block and only under a campaign root (`roots`, default campaign_domain()'s); a path in prose, a `Gate:` line or a
+    tool command, and a bare type name, declare nothing."""
+    text = text.replace(chr(13) + chr(10), chr(10))
+    blocks = _site_blocks(text)
+    token = _path_token(roots or campaign_domain().roots)
+    paths: set[str] = set()
+    for b in blocks:
+        for raw in token.findall(b):
+            if _NOT_A_PATH.search(raw):
+                continue
+            p = re.split(r"[:#]", raw, maxsplit=1)[0].rstrip(".,:").rstrip("/")
+            if "/" in p:   # a root alone ("src/") is no site
+                paths.add(p)
+    names: list[str] = []
+    moves = _MOVES_LINE.search(text)
+    if moves:
+        names += [s.strip() for s in _CODE_SPAN.findall(moves.group(1)) if not _DOC_ID.match(f"`{s}")]
+    if r2 := _R2_MEMBERS.search(text):
+        names += [s.strip() for s in r2.group(1).split(",") if s.strip()]
+    for part in blocks + ([moves.group(1)] if moves else []):
+        names += [d.split("~", 1)[0] for d in _DOC_ID.findall(part)]
+    wave = m.group(1).lower() if (m := _WAVE_KIND.search(text)) else ""
+    return NoteSites(tuple(sorted(paths)), tuple(dict.fromkeys(names)), wave)
 
 
 def _slice_rows(repo: pathlib.Path) -> list[list[str]]:
@@ -858,7 +981,7 @@ def r3_program_problems(items: list[dict], slice_files: set[str] | None = None,
         if it.get("id") == R3_DRIFT_TEST:
             continue
         wave = (m.group(1).lower() if (m := _WAVE_KIND.search(body)) else "")
-        hit = sorted(set(note_sites(it)) & slice_files)
+        hit = sorted(set(note_sites(body).paths) & slice_files)
         if hit and not any(reaches(it, s) for s in open_slices):
             bad.append(f"{it['_file']}: an R3 {wave or '?'} wave whose sites name {hit[0]}"
                        f"{f' (+{len(hit) - 1} more)' if len(hit) > 1 else ''}, a file of the external repository's "
@@ -906,14 +1029,18 @@ def parity_view(text: str) -> dict:
     what a note SAYS, and a key that is missing says exactly as much as a key that is empty. What is NOT
     normalized away is `errors` — a malformed value is a third outcome, and collapsing it into "empty" is the
     fail-open that `kb/Work/PB875` is about.
+
+    `terminal` is what each engine's vocabulary makes of the status (TERMINAL_STATUSES here, its C# twin there): the
+    register's gates read DONE through it, so it is compared like any field (kb/Work PB3196).
     """
     d = parse_frontmatter(text)
     if d is None:
-        return {"note": False, "id": "", "kind": "", "status": "", "inventory_rows": [], "closes_rows": [],
-                "closes_rows_reason": "", "errors": []}
+        return {"note": False, "id": "", "kind": "", "status": "", "terminal": False, "inventory_rows": [],
+                "closes_rows": [], "closes_rows_reason": "", "errors": []}
     scalar = lambda k: (v if isinstance(v := d.get(k, ""), str) else str(v))       # noqa: E731
     lst = lambda k: (v if isinstance(v := d.get(k, []), list) else [])             # noqa: E731
     return {"note": True, "id": scalar("id"), "kind": scalar("kind"), "status": scalar("status"),
+            "terminal": scalar("status") in TERMINAL_STATUSES,
             "inventory_rows": lst("inventory_rows"), "closes_rows": lst("closes_rows"),
             "closes_rows_reason": scalar("closes_rows_reason"), "errors": sorted(d.get("_errors", []))}
 
@@ -962,6 +1089,16 @@ def parity(as_json: bool) -> int:
     }
     findings += [f"the parity fixture carries no case for {what} — it cannot be measuring that shape"
                  for what, ok in covered.items() if not ok]
+    # EVERY STATUS OF THE VOCABULARY, so the two engines' terminal sets are compared on each one (kb/Work PB3196): a
+    # status added to STATUSES or TERMINAL_STATUSES stops this until a case states what it is, and that case is
+    # what holds the C# twin to it.
+    stated = {a["status"] for a in answers if a["note"]}
+    findings += [f"the parity fixture carries no note whose status is {s!r} — neither engine's `terminal` answer "
+                 f"for it is measured" for s in sorted((STATUSES | set(TERMINAL_STATUSES)) - stated)]
+    # EVERY FIELD, on every case: a field the fixture leaves unstated is a field the engines may disagree on unseen.
+    findings += [f'parity case "{c["name"]}": the fixture states no {k!r} — it must state every field the view '
+                 f'reports' for c, a in zip(fixture["cases"], answers)
+                 for k in a if k != "name" and k not in c["expect"]]
     if len(fixture["cases"]) < 8:
         findings.append(f'{len(fixture["cases"])} parity case(s) — too few to be measuring the reader')
 

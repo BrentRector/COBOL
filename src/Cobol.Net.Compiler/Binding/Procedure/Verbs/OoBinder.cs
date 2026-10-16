@@ -193,15 +193,30 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // file, working-storage, local-storage, or linkage section": BY REFERENCE NULL is neither, refused by THAT rule
         // (it drew the §8.9 reserved-word diagnostic through `dataReference`) — CallBinder's SR3 arm is the twin
         // (kb/Work PB1427). BY CONTENT / BY VALUE NULL are the §8.4.3.10.3 SR1 a) method-invocation argument.
+        // Every other identifier-3 BY REFERENCE is a RECEIVING operand (§14.9.23.3 SR20: "If identifier-3 does not
+        // reference an address-identifier, identifier-3 is a receiving operand"), so SELF, SUPER or an object-view written
+        // there is refused by its own §8.4.3 rule at the receiving chokepoint (kb/Work PB1551 review R1-1).
         foreach (var a in inv.invokeUsing()?.invokeArgument() ?? [])
+        {
             if (a.predefinedNull() is not null)
                 return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.InvokeOperandSection,
                     "INVOKE … USING BY REFERENCE NULL: ISO §14.9.23.3 SR9 — identifier-3 \"shall be an address-identifier "
                     + "or shall reference a data item defined in the file, working-storage, local-storage, or linkage "
                     + "section\", and the predefined NULL (§8.4.3.7 / §8.4.3.10) is neither; pass it BY CONTENT or BY VALUE");
-        // identifier-4 receives the result, and §8.4.3.5.3 SR2 forbids an object-view there (kb/Work PB1425).
-        if (inv.invokeReturning()?.objectViewReceiver() is { } returningView)
-            return RefuseObjectViewReceiver(returningView, "the RETURNING identifier of an INVOKE statement");
+            if (a.receivingIdentifier() is { } byRef && byRef.dataReference() is null)
+            {
+                _ = host.Expr.ResolveReceiving(byRef);
+                return BoundRejected.Reported(ctx.Edition);
+            }
+        }
+        // identifier-4 receives the result: an identifier format that is never a receiving operand (an object-view,
+        // SELF, SUPER, NULL — kb/Work PB1425, PB1551) is refused by its own rule at the receiving chokepoint, and the
+        // statement with it, before any receiver or method is resolved.
+        if (inv.invokeReturning()?.receivingIdentifier() is { } returning && returning.dataReference() is null)
+        {
+            _ = host.Expr.ResolveReceiving(returning);
+            return BoundRejected.Reported(ctx.Edition);
+        }
         // INVOKE (§14.9.23, OO) is a COBOL-2002 introduction; the edition gate fires on RECOGNITION in the
         // VersionConformancePass parse arm (VisitInvokeStatement), never on the BoundInvoke node this method
         // builds. It keyed on the node until kb/Work PB353, which was wrong BOTH ways: an INVOKE whose target
@@ -867,9 +882,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         return false;
     }
 
-    /// <summary>A literal-2 argument as the shared §14.8.2.3.3 verdict reads one — a BY CONTENT value with no
-    /// storage (<see cref="ParameterConformance.ContentConformanceReason"/>; kb/Work PB1137).</summary>
-    private static BoundCallArg LiteralArg(BoundOperand literal) => new(CobolNet.Runtime.CobolPassMode.Content, null, literal);
+    /// <summary>A literal-2, boolean or arithmetic-expression argument as the shared §14.8.2.3.3 verdict reads one — a BY
+    /// CONTENT value with no storage (<see cref="ParameterConformance.ContentConformanceReason"/>; kb/Work PB1137,
+    /// PB3101). A boolean value rides <see cref="BoundCallArg.ContentBool"/> beside a null <paramref name="value"/>.</summary>
+    private static BoundCallArg LiteralArg(BoundOperand? value) => new(CobolNet.Runtime.CobolPassMode.Content, null, value);
 
     /// <summary>An omitted argument's slot (kb/Work PB757) — spelled OMITTED or trailing-omitted; no source, no
     /// write-back (§14.9.23.4 GR9: the omitted-argument condition is true in the invoked method).</summary>
@@ -1020,24 +1036,18 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // `{boolExprAhead()}?`-gated `booleanExpression` alternative subsumes BOTH of those in turn — its leaf
         // is `valueOperand`, and the predicate's scan runs to the statement's period, so in
         // `USING BY CONTENT N + 1 BY CONTENT B1 B-AND B2` the FIRST argument reaches the boolean node on the
-        // strength of the SECOND argument's B-AND. Normalizing here is what makes that harmless: a boolean node
+        // strength of the SECOND argument's B-AND. The reduction is what makes that harmless: a boolean node
         // carrying NO boolean operator reduces to its bare `valueOperand` (ConditionBinder.UnwrapBareBool — the
         // same reduction BindPrimaryBoolean uses) and rides exactly the arm it would have without the predicate.
-        var boolCtx = arg.Bool;
-        var arithCtx = arg.Arith;
-        var nonNumCtx = arg.Literal?.nonNumericLiteral();
+        // §14.9.23.4 GR4 is §14.9.4.4 GR8's sentence, and both are asked of the ONE reduction (kb/Work PB613).
+        var (_, nonNumCtx, soleNum, soleRef, boolCtx, arithCtx) =
+            ConditionBinder.ReduceArgument(arg.Literal, arg.Ref, arg.Bool, arg.Arith);
         BoundNumericLiteral? writtenLit = arg.Literal?.numericLiteral() is { } numericLit ? host.Expr.NumericLiteralOperand(numericLit.GetText()) : null;
-        if (boolCtx is not null && ConditionBinder.UnwrapBareBool(boolCtx) is { } bare)
-        {
-            boolCtx = null;
-            arithCtx = bare.arithmeticExpression();
-            nonNumCtx = bare.nonNumericLiteral();
-        }
         // A SOLE numeric literal is a literal wherever it parsed. The grammar's own `literal` alternative wins
         // it when the boolean/arithmetic arms are not taken, and the two paths must agree: the literal arm
         // admits an unsigned integer into an ALPHANUMERIC formal by the MOVE rules, which the expression arm
         // (§14.8.2.3.3 rule 2a, category-numeric formals only) correctly does not.
-        if (writtenLit is null && arithCtx is not null && ConditionBinder.SoleNumLiteral(arithCtx) is { } soleNum)
+        if (writtenLit is null && soleNum is not null)
         {
             writtenLit = host.Expr.NumericLiteralOperand(soleNum);
             arithCtx = null;
@@ -1050,7 +1060,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // that only the identifier arm performs. The grammar cannot express "a reference, unless it is part of
         // an expression"; the binder can, through the SAME sole-reference reduction ConditionBinder and
         // IntrinsicBinder already use (feedback_one_rule_one_place — that helper is now shared, not re-copied).
-        var dref = arg.Ref ?? ConditionBinder.SoleDataReference(arithCtx);
+        var dref = soleRef;
         // ⛔ A CONSTANT-NAME IS LITERAL-2, NEVER AN IDENTIFIER (kb/Work PB1137). ISO §13.10.3 SR2: "constant-name-1
         // may be used anywhere that a format specifies a literal of the class and category of constant-name-1", and
         // §14.9.23.2's BY CONTENT branch specifies literal-2 — so a bare or BY CONTENT constant-name is literal-2,
@@ -1131,7 +1141,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // temporary moved as its 30-digit implementor description rather than as the function. The temporary now
             // IS the function for every MOVE (SendingValueTemp.OfComputed: an INTEGER function at scale 0, the text
             // image DOC-A.1-92's literal form), so rule 2 d)'s MOVE question is asked of it by the ONE chain
-            // (OoConformance.ContentMismatch → Table 16): an INTEGER function (§15.2 item 5) conforms to an
+            // (ParameterConformance.ContentConformanceReason → the relation's Table 16): an INTEGER function (§15.2 item 5) conforms to an
             // alphanumeric formal and a NUMERIC one (item 4, the Noninteger row) does not — the answer
             // `MOVE FUNCTION f TO x` gets for the same pair.
             // A USER function's result IS a temporary data item (§8.4.3.2.4 GR1) -- an object reference, a pointer, an
@@ -1205,7 +1215,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 && valueClass is not (CobolClass.Numeric or CobolClass.Object or CobolClass.Pointer))
             {
                 ctx.Edition.Error(DiagnosticCatalog.InvokeByValueOperandClass,
-                    $"{verb} \"{methodName}\": BY VALUE operand '{argText}' is of class {valueClass.ToString().ToLowerInvariant()}; "
+                    $"{verb} \"{methodName}\": BY VALUE operand '{argText}' is of class {IntrinsicArgumentRules.Name(valueClass)}; "
                     + "ISO §14.9.23.3 SR15 admits only class message-tag, numeric, object or pointer by value");
                 return null;
             }
@@ -1229,12 +1239,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 return new BoundInvokeArg(formal, place, null, null, WriteBack: true);
             }
 
-            // Effective BY CONTENT (§14.8.2.3.3): rule-per-formal-category — a reference-modified operand included, as
-            // the view it is (ContentMismatch reads RefModPlace's GR6 category).
-            if (OoConformance.ContentMismatch(host.OoClasses, host.Set.PointerAssignmentReason, formal, place, invokedWith) is { } cerr)
+            // Effective BY CONTENT (§14.8.2.3.3 / §14.8.2.2 rule 2): the ONE activation entry CALL and a function ask too,
+            // over the run-time relation (kb/Work PB3101) — a reference-modified operand included, described as the unique
+            // data item §8.4.3.3.4 GR5 creates.
+            if (host.Params.ContentConformanceReason(formal, new BoundCallArg(CobolNet.Runtime.CobolPassMode.Content, place, null),
+                    invokedWith) is { } cerr)
             {
                 Err($"BY CONTENT argument '{argText}' does not conform to formal "
-                    + $"'{formal.CobolName}': {cerr} (ISO §14.8.2.3.3)");
+                    + $"'{formal.CobolName}': {cerr} (ISO §14.8.2 via §14.9.23.3 SR5 c))");
                 return null;
             }
             // §14.8.2.3.3 rule 2a is "the same as for a COMPUTE statement", and a COMPUTE takes any numeric sender
@@ -1253,34 +1265,34 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         // two phrases genuinely differ in the printed general format. It is its own VALUE channel (D-B1: a
         // '0'/'1' bit string, §8.8.2), never the numeric one, which is why it needs a slot of its own rather
         // than a second spelling of ContentExpr.
-        // ⛔ BOTH ASK THE ONE VALUE VERDICT (kb/Work PB1113): each is described as the sending operand it is — a
-        // numeric COMPUTE sender, a boolean value — and asked §14.8.2.3.3 rule 2's question in rule 2's order
-        // (OoConformance.ContentValueMismatch, the verdict the CALL and function lanes ask through
-        // ParameterConformance.ContentConformanceReason). The boolean arm used to refuse a NATIONAL formal "on purpose",
-        // where Table 16's boolean row says Yes.
+        // ⛔ BOTH ASK THE ONE ACTIVATION ENTRY (kb/Work PB1113, PB3101): each is described as the sending operand it is — a
+        // boolean value, a numeric COMPUTE sender with no character image — and asked §14.8.2.3.3 rule 2's question
+        // through ParameterConformance.ContentConformanceReason, the verdict the CALL and function lanes get for the same
+        // argument. The boolean arm used to refuse a NATIONAL formal "on purpose", where Table 16's boolean row says Yes.
         if (boolCtx is { } bx && (explicitContent || impliedContent))
         {
-            if (OoConformance.ContentValueMismatch(formal, ContentValue.Boolean) is { } bErr)
+            var bound = host.Cond.BindBoolExpr(bx);
+            if (host.Params.ContentConformanceReason(formal, LiteralArg(null) with { ContentBool = bound }) is { } bErr)
             {
                 Err($"BY CONTENT boolean-expression argument '{bx.GetText()}' for formal "
                     + $"'{formal.CobolName}': {bErr}");
                 return null;
             }
-            var bound = host.Cond.BindBoolExpr(bx);
             return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
                 { ContentBool = bound };
         }
 
         if (arithCtx is { } ax && (explicitContent || impliedContent))   // a SOLE reference / numeric literal / inline invocation was taken above
         {
-            if (OoConformance.ContentValueMismatch(formal, ContentValue.Arithmetic) is { } aErr)
+            var expr = host.Expr.BindExpr(ax);
+            if (host.Params.ContentConformanceReason(formal, LiteralArg(new BoundComputedOperand(expr))) is { } aErr)
             {
                 Err($"BY CONTENT arithmetic-expression argument '{ax.GetText()}' for formal "
                     + $"'{formal.CobolName}': {aErr}");
                 return null;
             }
             return new BoundInvokeArg(formal, null, null, null, WriteBack: false, ByContent: true)
-                { ContentExpr = host.Expr.BindExpr(ax) };
+                { ContentExpr = expr };
         }
 
         // ── literal-2 (ISO §14.9.23.2) — BY CONTENT, because a literal never meets SR9 (§14.9.23.4 GR6 a) 2.) ──
@@ -1316,7 +1328,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 // storage, so it rides the boolean channel — Table 16's BOOLEAN row (§14.8.2.3.3 rule 2d), the same
                 // receivers the boolean-expression arm takes, from the SAME rule. A LITERAL contributes no item width
                 // to §8.8.2 rule 10, so the value crosses at the formal's width (BooleanRenderer.RenderAtItemWidth).
-                if (OoConformance.ContentValueMismatch(formal, ContentValue.Boolean) is { } blErr)
+                if (host.Params.ContentConformanceReason(formal, LiteralArg(null) with { ContentBool = new BoundBoolLiteral(boolLit.Value) })
+                    is { } blErr)
                 {
                     Err($"boolean literal argument {literalText} for formal '{formal.CobolName}': {blErr}");
                     return null;
@@ -1447,6 +1460,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 { Address = ao });
                 continue;
             }
+            // SR6 makes a keyword-less SELF, SUPER or object-view identifier-3 too, and SR20 a receiving operand: it is
+            // refused by its own §8.4.3 rule, exactly as when BY REFERENCE is written (kb/Work PB1551 review R1-1) —
+            // never as the literal or expression the arm below names.
+            if (ConditionBinder.SoleOoIdentifier(a.Arith) is { } oo && ReceivingOperandForms.FormOfOoIdentifier(oo) is { } ooForm)
+            {
+                _ = host.Expr.RefuseNonReceivable(ooForm, oo);
+                return BoundRejected.Reported(ctx.Edition);
+            }
             if (a.Ref is not { } dref)
             {
                 return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
@@ -1454,11 +1475,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     + "argument cannot cross BY REFERENCE (ISO §14.9.23.3 SR6 — every universal argument "
                     + "is implicitly BY REFERENCE)");
             }
+            // The receiving chokepoint reports every null it returns (a second diagnostic here only repeated it).
             if (host.Expr.ResolveReceiving(dref) is not { } p)
-            {
-                return BoundRejected.Report(ctx.Edition, "COBOLNET0866",
-                    $"INVOKE: the argument '{DataBinder.WrittenText(dref)}' is not resolvable to storage");
-            }
+                return BoundRejected.Reported(ctx.Edition);
             // SR9 and SR12 over identifier-3 — with no GR6 a) 2. fallback here (SR6), a special register or a
             // compiler temporary is refused rather than passed BY CONTENT.
             if (!host.Params.ScreenSection(p, dref, DiagnosticCatalog.InvokeOperandSection,
@@ -1605,16 +1624,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         var targets = new List<Place>(targetRefs.Count);
         foreach (var t in targetRefs)
         {
-            if (ctx.Refs.IsExceptionObjectRegister(t))
-            {
-                // ⛔ ONE RULE, ONE CODE (kb/Work PB922): the same §8.4.3.6.3 SR1 the general receiving chokepoint
-                // now screens (ExpressionBinder.ResolveReceiving). The clause number was §8.4.3.6 here and that
-                // is NOT where the rule is — `cite.py --check 8.4.3.6 "EXCEPTION-OBJECT shall not be specified as
-                // a receiving operand"` FAILS and `--check 8.4.3.6.3` passes as SR1.
-                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.ExceptionObjectReceiving,
-                    "SET EXCEPTION-OBJECT: the predefined object reference shall not be a receiving "
-                    + "operand (ISO §8.4.3.6.3 SR1)");
-            }
+            // ⛔ NO EXCEPTION-OBJECT ARM HERE (kb/Work PB1008, PB1551). §8.4.3.6.3 SR1 is one row of the receiving
+            // chokepoint's form table (ReceivingOperandForms); this loop used to write it a second time, with its own
+            // text. EXCEPTION-OBJECT is class object (§8.4.3.6.3 SR2), so it passes §14.9.39.3 SR8's screen below and is
+            // refused by the chokepoint's ResolveReceiving like every other receiving operand.
             // ⛔ THREE ARMS, AND THE ORDER IS THE POINT — SR8 and "the name identifies nothing" are DIFFERENT
             // rules and each is reported once, by itself. The former single `Resolve(t) is not { } tp || …`
             // arm reported BOTH for one operand: Resolve names the unidentified reference (COBOLNET1639) and
@@ -1890,11 +1903,9 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         ObjectRefDescriptor invokedWith)
     {
         if (ActivationDescriptions.OfPlace(argument, classes) is not { } a)
-            return argument.Item.IsGroup ? TierCIsland.Reason(argument.Item, "argument group")
-                : "the argument has no PICTURE description";
+            return ActivationDescriptions.NoDescriptionReason(argument.Item, "argument");
         if (ActivationDescriptions.OfFormal(formal, classes) is not { } f)
-            return formal.Item.IsGroup ? TierCIsland.Reason(formal.Item, "formal group")
-                : "the formal parameter has no PICTURE description";
+            return ActivationDescriptions.NoDescriptionReason(formal.Item, "formal parameter");
         if (CobolNet.Runtime.ActivationRelations.MatchViolation(a, f) is { } noMatch) return noMatch;
         if (formal.Item.Pic?.ObjectRef is { Kind: ObjectRefKind.ActiveClass } activeClass)
             return OoConformance.ActiveClassFormalMismatch(null, activeClass,

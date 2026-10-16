@@ -586,10 +586,15 @@ whole licence the lane rests on — is not granted for it.
 function, an undeclared position and the `'p'` negative-list kind all answer *yes*, so it can only ever take a
 call OUT of the lane on the authority of a cited §15.x.3 rule. ⛔ It is a question about the POSITION and
 deliberately not about the operand's class: under `--permissive` the DA6 leniency admits an alphanumeric operand
-at a numeric position and digit-decodes it, so `MOD(<PIC X item> <COMP-2>)` must keep the lane, and reading the
-operand would have reopened PB2's CS1503. The `Factorial` exclusion is a separate, CODOMAIN question — 33! is
-~8.7e36, which no `FromDouble` tail can carry — and is now the declared set `IntrinsicRenderer.FloatLaneExempt`
-rather than an inline `!= "Factorial"`.
+at a numeric position and digit-decodes it, so `REM(<PIC X item> <COMP-2>)` (type 10 at both positions; MOD is not the example, its positions are type 6) must keep the lane, and reading the
+operand would have reopened PB2's CS1503. The lane's TRIGGER is a binary64 operand at a type-10 position only: a
+§15.3 type-6 operand is taken as its INTEGER before any lane is chosen (`IntrinsicRenderer.RawArg`, kb/Work PB651 —
+docs/CONFORMANCE.md DOC-A.1-124's truncation, on every lane), so an integer-only function such as FACTORIAL, whose
+33! ≈ 8.7e36 no `FromDouble` tail can carry, needs no by-name exemption: it never reaches the lane. Before PB651 the
+arms decided this each for themselves, and three decided wrong under `--permissive`: MOD's scaled arm aligned a
+fraction (MOD(7.5, 3) = 1.5 where the integer 7 gives 1), a float argument-1 moved COMBINED-DATETIME to binary64,
+and ANNUITY's binary64 body took 3.5 periods — measured by `IntrinsicIntegerPositionPermissiveDriftTests`, which
+probes every verified type-6 position against the integer-literal control.
 
 The defect was reachable only under `--permissive` (PB248's §15.3 type-6 screen rejects a floating-point item at
 an integer position under strict, COBOLNET1627), and the sweep measured **ten** functions crashing that way, not
@@ -735,7 +740,36 @@ REFERENCES, since another element often declares them (a method's class, a conta
 the one class-name resolver, `OoNameResolution.Lookup`, calls `OoClassTable.RecordReferenceUse` for every name it
 resolves (kb/Work PB3132), so a METHOD-ID, a method paragraph or a contained program's paragraph spelled like a
 class-name the same element also references is refused. A parameter-name is recorded as the type its own REPOSITORY
-specifier declares it, as the skeleton's binder declares it.
+specifier declares it, as the skeleton's binder declares it. The names a CONFIGURATION SECTION declares reach a
+contained element the same way (§8.4.6.1's list: alphabet-name, class-name, a SPECIAL-NAMES condition-name,
+dynamic-length-structure-name, locale-name, mnemonic-name, ordering-name, symbolic-character; kb/Work PB3153): each
+type's registry is a `ConfigurationNames<T>` table, which exposes no `TryGetValue` — a reference the binder commits to
+resolves through `TryUse(site, name)`, which records the use through the ONE recorder
+`DataBinder.RecordConfigurationNameUse` (into `OoClassTable.RecordReferenceUse`), and a predicate, a declaration's
+duplicate check or a second read of an already-resolved name asks `Declares` / `TryPeek`, which record nothing; the
+mnemonic-names keep their parse-tree registry (`Procedure.MnemonicRegistry`), whose `TryUse` records the same way.
+`InheritConfiguration` hands every table down (`InheritFrom`; the symbolic characters were not handed down at all
+before PB3153, so a contained program's use of one was COBOLNET1639). Where a format admits both an inherited name and
+another reading of the same word, the referring element's own item of the same spelling is asked first — §8.4.6.1: "a
+source element's reference to such a name, even when it is a different type of user-defined word, is to the item which
+that source element describes" — and only the inherited reading records a use. The own item may be a data item or a
+constant-name (§13.10.3 SR2 admits a constant-name wherever a literal of its category is, and a constant is no data
+item), so a procedure-division position asks the ONE own-item test, `ReferenceResolver.DescribesOwnItem` (constant-name
+or data-item probe), never a bare `Refs.Probe`; `UserWordDeclarationDriftTests.AConfigurationNameLookup_AsksTheOneOwnItemTest_NeverARawProbe`
+refuses a configuration-name lookup paired with a raw probe. The positions: a bare literal-alias
+operand (`ExpressionBinder.LiteralAliasOf`, constant-name then data item before the symbolic-character), a VALUE
+operand (`DataBinder.RawValueOperandText`, constant-name before the symbolic-character), `SET LOCALE … TO`,
+`WRITE … ADVANCING`, a bare class-word operand (`ConditionBinder.BareClassWord`), FUNCTION STANDARD-COMPARE's
+argument-4 positions (`IntrinsicBinder.BindStandardCompare`), and the trailing `IN alphabet-name-1` of a THROUGH range
+(`EvaluateBinder.BindRangeHigh` probes the qualified reference; `DataBinder.RangeAlphabetPhraseOf`'s IN-omitted peel
+yields to a constant-name). A position that admits the configuration-section type ONLY (a class condition, `DISPLAY …
+UPON`, an ORDER TABLE position 3 of four) resolves the inherited name and lets the census refuse a same-spelled own
+item, which refuses exactly the programs §8.4.6.1's reading does. Two configuration-section names of different types
+cannot meet in one element this way: a contained program has no configuration section (§12.3.3 SR1), nor does a
+method (SR2). `UserWordDeclarationDriftTests.EveryConfigurationSectionNameType_ResolvesThroughARecordingTable`
+parses §8.4.6.1's list and keeps every type's registry a recording one; negative
+`pb3153-contained-program-paragraph-spells-an-inherited-class-it-uses`, golden `85/pb3153_inherited_special_names_words`
+and `InheritedConfigurationNameUseTests` (every type, and a method) are the witnesses.
 A later declaration or reference of another type is **COBOLNET2692** unless
 `UserWordKinds.MayBeOneWord` allows it — the standard's three exceptions as DATA (a compilation-variable-name; a
 level-number beside a paragraph- or section-name; the constant-name / data-name / property-name / record-key-name /

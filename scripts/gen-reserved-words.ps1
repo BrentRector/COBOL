@@ -164,15 +164,19 @@ if ($gc2002.Count -lt 380 -or $gc2002.Count -gt 470)   { throw "gc2002 $($gc2002
 if ($gc2014.Count -lt 370 -or $gc2014.Count -gt 470)   { throw "gc2014 $($gc2014.Count) outside 370..470" }
 if ($added2023.Count -ne 16) { throw "VCR row 32 parse yielded $($added2023.Count) != 16 words" }
 foreach ($w in $added2023) { if (-not $iso2023.Contains($w)) { throw "Annex-E addition '$w' missing from the 2023 extraction" } }
-# ISO Annex E.2 item 25 is authoritative: ALL 16 added-2023 words were user-defined before 2023 — so their
-# r2002/r2014 are FALSE even where the GnuCOBOL 2002/2014 lists disagree (they keep the communication trio
-# reserved — a dialect-pragmatic curation; overridden below with provenance). Three of the 16 are 1985
-# RE-reservations (the communication-module words incl. the END- scope terminator), discovered mechanically —
-# the earlier recall-based classification knew only two (DEVLOG 585).
+# ISO Annex E.2 item 25 is authoritative for ONE edition edge: E.1 lists "the substantive changes between the
+# previous COBOL standard and this" one, so its 16 added words were user-defined at 2014 - and it says NOTHING
+# about 2002 (kb/Work PB656). The 2014 source must therefore agree with it (asserted here, never overridden);
+# the 2002 flag stays the GnuCOBOL 2002 list's, which keeps three of the 16 reserved: the communication words
+# SEND, RECEIVE and END-RECEIVE, whose facility GnuCOBOL's cobol2002.conf records as OBSOLETE at 2002 (removed
+# 2014) - the same facility whose CD/DISABLE/ENABLE/PURGE/... rows read r2002 true from the same list. An
+# earlier revision cleared their r2002 too, on a reading of item 25 that the E.1 scope does not support, and so
+# left one facility's vocabulary half reserved at 2002. Those three are also the 1985 RE-reservations,
+# discovered mechanically - the earlier recall-based classification knew only two (DEVLOG 585).
 $reRes = @($added2023 | Where-Object { $gc85.Contains($_) })
 if ($reRes.Count -ne 3) { throw "re-reserved set check: added2023 ∩ gc85 = $($reRes.Count), expected 3" }
-$vcrVsGc = @($added2023 | Where-Object { $gc2014.Contains($_) -and -not $gc85.Contains($_) })
-if ($vcrVsGc.Count -ne 0) { throw "cross-check failed: $($vcrVsGc.Count) non-85 Annex-E 2023 additions already in the 2014 source" }
+$vcrVsGc = @($added2023 | Where-Object { $gc2014.Contains($_) })
+if ($vcrVsGc.Count -ne 0) { throw "cross-check failed: $($vcrVsGc.Count) Annex-E 2023 additions already reserved in the 2014 source (E.2 item 25 says they were user-defined at 2014)" }
 
 # ---- 5. Classify every word in the union ----
 $all = [System.Collections.Generic.SortedSet[string]]::new([System.StringComparer]::Ordinal)
@@ -182,10 +186,11 @@ $rows = foreach ($w in $all) {
     $f85 = $gc85.Contains($w); $f02 = $gc2002.Contains($w); $f14 = $gc2014.Contains($w); $f23 = $iso2023.Contains($w)
     $conf = 'high'; $prov = $null
     if ($added2023.Contains($w)) {
-        # ISO Annex E.2 item 25 overrides the 2002/2014 sources: user-defined before 2023, whatever GnuCOBOL says.
-        $f02 = $false; $f14 = $false
-        $prov = if ($f85) { '1985-reserved, unreserved 2002/2014, re-reserved 2023 (ISO Annex E.2 item 25 — overrides the GnuCOBOL 2002/2014 lists, which keep the communication trio)' }
-                else      { 'added 2023 (ISO Annex E.2 item 25 = VCR row 32)' }
+        # ISO Annex E.2 item 25 decides the 2014 edge only (E.1: the changes against the PREVIOUS standard), and
+        # step 4 asserted the 2014 source agrees; every other flag is its own source's (kb/Work PB656).
+        $prov = if ($f85 -and $f02) { '1985/2002-reserved (GnuCOBOL 85/2002 lists: the communication facility, obsolete at 2002), unreserved 2014, re-reserved 2023 (ISO Annex E.2 item 25 = VCR row 32, which speaks of 2014 only)' }
+                elseif ($f85)       { '1985-reserved, unreserved 2002/2014, re-reserved 2023 (ISO Annex E.2 item 25 = VCR row 32)' }
+                else                { 'added 2023 (ISO Annex E.2 item 25 = VCR row 32)' }
     }
     elseif ($f23 -and -not $f14 -and $f85) {
         # Reserved in 85 AND 2023, with Annex E recording NO 2023 (re-)addition. ISO E.3.1: "Such incompatible
@@ -211,7 +216,16 @@ $rows = foreach ($w in $all) {
         $prov = 'non-monotone reservation across sources — needs review (inert)'
     }
     elseif ($f85 -and $f23) { $prov = 'continuous since 1985 (GnuCOBOL 85/2002/2014 lists; ISO 2023 §8.9)' }
-    elseif ($f85 -and -not $f23) { $prov = '1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)' }
+    # A word 1985 reserved and 2023 does not: the label names the LAST edition the sources reserve it at, read from
+    # the same flags it describes (kb/Work PB656: one label said 'removed post-85' for every such word, so 35 rows
+    # still reserved at 2002 - SEGMENT-LIMIT, COBOL, the communication and debug vocabularies - contradicted their
+    # own flags). The word's reservation is its own fact: a construct removed at an edition may keep its leading
+    # word reserved there (GnuCOBOL 3.2 at -std=cobol2002 refuses the SEGMENT-LIMIT clause AND the word).
+    elseif ($f85 -and -not $f23) {
+        $prov = if ($f02 -and $f14) { '1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9' }
+                elseif ($f02)       { '1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)' }
+                else                { '1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)' }
+    }
     elseif ($f02) { $prov = 'added 2002 (GnuCOBOL 2002 list' + $(if ($f23) { '; ISO 2023 §8.9)' } else { '; dropped by 2023 §8.9)' }) }
     elseif ($f14) { $prov = 'added 2014 (GnuCOBOL 2014 list' + $(if ($f23) { '; ISO 2023 §8.9)' } else { '; dropped by 2023 §8.9)' }) }
     else { $prov = 'ISO 2023 §8.9' }
@@ -299,7 +313,7 @@ $stats = [ordered]@{
     total = @($rows).Count; iso2023 = $iso2023.Count; gc85 = $gc85.Count; gc2002 = $gc2002.Count; gc2014 = $gc2014.Count
     at85 = @($rows | Where-Object r85).Count; at2002 = @($rows | Where-Object r2002).Count
     at2014 = @($rows | Where-Object r2014).Count; at2023 = @($rows | Where-Object r2023).Count
-    removedPost85 = @($rows | Where-Object { $_.r85 -and -not $_.r2023 }).Count
+    reserved85Not2023 = @($rows | Where-Object { $_.r85 -and -not $_.r2023 }).Count
     high = @($rows | Where-Object { $_.confidence -eq 'high' }).Count
     mediumIsoOnly = $mediumBuckets.isoOnly; mediumNonMonotone = $mediumBuckets.nonMonotone
     contextSensitive = $ctxRows.Count

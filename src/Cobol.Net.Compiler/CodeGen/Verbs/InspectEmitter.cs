@@ -5,7 +5,6 @@ using CobolNet.Binding.Model;
 using CobolNet.Binding.Bound;
 using CobolNet.CodeGen.Emit;
 using CobolNet.Runtime;
-using ClassKind = CobolNet.Binding.CobolClass;
 
 namespace CobolNet.CodeGen;
 
@@ -104,7 +103,10 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     {
         var w = ctx.Writer;
         string back = ins.Backward ? "true" : "false";
-        var cat = CharacterCategoryOf(ins.Target);
+        // The character CONTEXT a figurative operand is read in: identifier-1's §8.5.2.1 Table 2 CLASS, never its raw
+        // PICTURE category (kb/Work PB1414 — a GROUP-USAGE NATIONAL identifier-1 took the alphanumeric collating
+        // sequence; kb/Work PB442 — the one projection, so a numeric-edited USAGE NATIONAL one is national too).
+        var cat = IntrinsicArgumentRules.CharacterContext(IntrinsicArgumentRules.ClassOf(ins.Target));
 
         if (ins.Tallying.Count > 0)
         {
@@ -277,17 +279,4 @@ internal sealed class InspectEmitter(EmitContext ctx, NumericRenderer num, Arith
     /// UNSTRING, kb/Work PB1185).</para></summary>
     private string OperandTextOf(BoundOperand? op, PicCategory? cat) =>
         op is null ? "null" : OperandText.AsString(op, num, deSign: true, characterCategory: cat);
-
-    /// <summary>The character CONTEXT a figurative operand is read in: identifier-1's §8.5.2.1 Table 2 CLASS, never
-    /// its raw PICTURE category (kb/Work PB1414). The category test this replaced read <c>Pic.Category</c>, which
-    /// is null for EVERY GROUP — so a GROUP-USAGE NATIONAL identifier-1 took the alphanumeric collating sequence —
-    /// and for a function-identifier. The class answers all of them: national ⇒ the national program collating
-    /// sequence, boolean ⇒ the pinned boolean fill, everything else ⇒ the alphanumeric one.</summary>
-    private static PicCategory CharacterCategoryOf(BoundOperand target) =>
-        IntrinsicArgumentRules.ClassOf(target) switch
-        {
-            ClassKind.National => PicCategory.National,
-            ClassKind.Boolean => PicCategory.Boolean,
-            _ => PicCategory.Alphanumeric,
-        };
 }

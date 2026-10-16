@@ -39,6 +39,10 @@ SETUP_LOG=/var/log/cobolsharp-setup-env.log
 exec > >(tee "$SETUP_LOG") 2>&1
 
 log() { echo "[setup-env] $*"; }
+# The installers' downloads and logs: a directory of this run's own, never fixed names in the machine-wide /tmp (kb/Work
+# PB2922). Each failure prints its log's tail above, so the directory goes when the script ends.
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/setup-env.XXXXXX")"
+trap 'rm -rf "$WORK"' EXIT
 
 DOTNET_DIR=/usr/share/dotnet
 
@@ -48,12 +52,12 @@ APT_PID=$!
 
 # ── .NET 10 SDK: dotnet-install.sh (latest 10.0 = what CI's setup-dotnet 10.0.x resolves), apt as the fallback ──
 install_dotnet() {
-  if curl -fsSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh \
-     && bash /tmp/dotnet-install.sh --channel 10.0 --install-dir "$DOTNET_DIR" >/tmp/dotnet-install.log 2>&1; then
+  if curl -fsSL https://dot.net/v1/dotnet-install.sh -o "$WORK/dotnet-install.sh" \
+     && bash "$WORK/dotnet-install.sh" --channel 10.0 --install-dir "$DOTNET_DIR" >"$WORK/dotnet-install.log" 2>&1; then
     log "dotnet-install.sh ok"
   else
     log "WARN: dotnet-install.sh failed (tail below); falling back to Ubuntu's dotnet-sdk-10.0"
-    tail -5 /tmp/dotnet-install.log 2>/dev/null
+    tail -5 "$WORK/dotnet-install.log" 2>/dev/null
     wait "$APT_PID" 2>/dev/null
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq dotnet-sdk-10.0 >/dev/null \
       && DOTNET_DIR=/usr/lib/dotnet && log "apt dotnet-sdk-10.0 ok" \
@@ -73,21 +77,21 @@ wait "$APT_PID" 2>/dev/null || true
 #    repo's only third-party imports (PyMuPDF for the spec renderers, fontTools, PyYAML for tooling_check.py) go into it. ─────────────────────────
 PYVER=3.14
 PY=""
-if python3 -m pip install -q --break-system-packages --root-user-action=ignore uv >/tmp/uv-install.log 2>&1 \
-   && UV_PYTHON_INSTALL_DIR=/opt/uv-python python3 -m uv python install "$PYVER" >>/tmp/uv-install.log 2>&1; then
+if python3 -m pip install -q --break-system-packages --root-user-action=ignore uv >"$WORK/uv-install.log" 2>&1 \
+   && UV_PYTHON_INSTALL_DIR=/opt/uv-python python3 -m uv python install "$PYVER" >>"$WORK/uv-install.log" 2>&1; then
   PY=$(UV_PYTHON_INSTALL_DIR=/opt/uv-python python3 -m uv python find --managed-python "$PYVER" 2>/dev/null)
 fi
 if [ -z "$PY" ]; then
   log "WARN: uv could not install CPython $PYVER (tail below); falling back to the newest system python3.12+"
-  tail -5 /tmp/uv-install.log 2>/dev/null
+  tail -5 "$WORK/uv-install.log" 2>/dev/null
   PY=$(ls /usr/bin/python3.[0-9]* 2>/dev/null | grep -E '/python3\.[0-9]+$' | sort -t. -k2 -n | tail -1)
   [ -n "$PY" ] && [ "${PY##*.}" -ge 12 ] || { log "WARN: no python3.12+ found (${PY:-none})"; PY=""; }
 fi
 if [ -n "$PY" ]; then
   ln -sf "$PY" /usr/local/bin/python && ln -sf "$PY" /usr/local/bin/python3 && log "python -> $PY"
   python -m pip install -q --break-system-packages --root-user-action=ignore --no-warn-script-location \
-      PyMuPDF fonttools pyyaml >/tmp/pip-deps.log 2>&1 \
-    && log "PyMuPDF + fontTools + PyYAML ok" || { log "WARN: pip deps failed"; tail -5 /tmp/pip-deps.log; }
+      PyMuPDF fonttools pyyaml >"$WORK/pip-deps.log" 2>&1 \
+    && log "PyMuPDF + fontTools + PyYAML ok" || { log "WARN: pip deps failed"; tail -5 "$WORK/pip-deps.log"; }
 fi
 
 cat > /etc/profile.d/dotnet.sh <<EOF
@@ -101,9 +105,9 @@ EOF
 #    dotnet packages conflict with Ubuntu's) ──────────────────────────────────────────────────────────────────────
 if command -v dotnet >/dev/null; then
   export DOTNET_ROOT=$DOTNET_DIR DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
-  dotnet tool install PowerShell --tool-path /usr/local/share/dotnet-tools >/tmp/pwsh-install.log 2>&1 \
+  dotnet tool install PowerShell --tool-path /usr/local/share/dotnet-tools >"$WORK/pwsh-install.log" 2>&1 \
     && ln -sf /usr/local/share/dotnet-tools/pwsh /usr/local/bin/pwsh && log "pwsh ok" \
-    || { log "WARN: pwsh install failed"; tail -5 /tmp/pwsh-install.log; }
+    || { log "WARN: pwsh install failed"; tail -5 "$WORK/pwsh-install.log"; }
 fi
 
 # ── the GnuCOBOL 3.2 corpus tarball, pre-cached (pinned: the same URL + SHA-256 as scripts/fetch-gnucobol-tests.ps1,

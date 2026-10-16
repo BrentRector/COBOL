@@ -27,7 +27,8 @@ public enum ActivationShape
     /// <summary>A BY CONTENT / BY VALUE argument that is a VALUE with a character image and no storage of the activating
     /// element's: a literal, a figurative constant, an ALL literal or a character-valued intrinsic function's value
     /// (kb/Work PB165). <see cref="ActivationDescription.Category"/> is its category (a figurative constant's is
-    /// <see cref="ActivationCategory.Figurative"/> or <see cref="ActivationCategory.FigurativeZero"/>, whose category
+    /// <see cref="ActivationCategory.Figurative"/>, <see cref="ActivationCategory.FigurativeZero"/> or
+    /// <see cref="ActivationCategory.FigurativeBoolean"/>, whose category
     /// the receiving context chooses, §8.3.3.6.4 GR1) and <see cref="ActivationDescription.Table16"/> its §14.9.25.3 Table 16
     /// row.</summary>
     Literal,
@@ -78,12 +79,18 @@ public static class ActivationCategory
     public const string Index = "index";
     /// <summary>Class and category numeric: the sending operand a COMPUTE takes (§8.8.1.1; §14.8.2.3.3 rule 2 a)).</summary>
     public const string Numeric = "numeric";
-    /// <summary>A figurative constant other than ZERO, or an ALL literal (a <see cref="ActivationShape.Literal"/>): an
-    /// alphanumeric value whose category the receiving context chooses (§8.3.3.6.4 GR1).</summary>
+    /// <summary>A figurative constant other than ZERO, or an ALL literal with a character that is not a boolean character
+    /// (a <see cref="ActivationShape.Literal"/>): an alphanumeric value whose category the receiving context chooses
+    /// (§8.3.3.6.4 GR1), which §14.9.25.3 SR7 keeps out of a boolean receiver.</summary>
     public const string Figurative = "figurative";
     /// <summary>The figurative constant ZERO (a <see cref="ActivationShape.Literal"/>): a <see cref="Figurative"/> that is
-    /// also the one figurative constant a COMPUTE takes as a sending operand (§8.8.1.1).</summary>
+    /// also the one figurative constant a COMPUTE takes as a sending operand (§8.8.1.1), that §14.9.25.3 SR6 keeps out of
+    /// an alphabetic receiver, and whose characters are boolean zeros in a boolean context (§8.3.3.6.4 GR4).</summary>
     public const string FigurativeZero = "figurative-zero";
+    /// <summary>An ALL literal every one of whose characters is a boolean character ('0' or '1'; a
+    /// <see cref="ActivationShape.Literal"/>): a <see cref="Figurative"/> that §14.9.25.3 SR7 lets move to a boolean
+    /// receiver (kb/Work PB3101).</summary>
+    public const string FigurativeBoolean = "figurative-boolean";
 }
 
 /// <summary>
@@ -221,6 +228,14 @@ public sealed record ActivationDescription
     /// <summary>The ONLY phrase of an object reference.</summary>
     public bool Only { get; init; }
 
+    /// <summary>True when <see cref="ObjectName"/> is a PARAMETER-NAME of the parameterized class or interface definition
+    /// being bound as itself (kb/Work PB2937), not a class-name or interface-name: ISO §9.3.8.2.4 makes each expansion
+    /// "treated as if the actual parameter classes or interfaces were substituted for the parameters throughout the class
+    /// definition", so whether such a description names the same class as another one is each expansion's question. Only
+    /// a skeleton's own binders describe one, and nothing emits a skeleton, so no run-time description carries it; the
+    /// pair-mode identity reads it (<see cref="ActivationRelations.SignatureDifference"/>).</summary>
+    public bool ObjectNameIsParameter { get; init; }
+
     /// <summary>The CLASSES an object-reference description's objects belong to, as ISO §14.9.39.3 SR12 a) 2. / b) 2. and
     /// SR10 relate them (<see cref="ObjectReferenceOperand.Classes"/>): the class the description names — for
     /// ACTIVE-CLASS, "the class containing the data item" — followed by every class it inherits from, folded. Null for a
@@ -257,8 +272,17 @@ public sealed record ActivationDescription
         ActivationShape.AlphanumericGroup => $"an alphanumeric group of {Positions} character positions",
         ActivationShape.AsIfElementaryGroup => $"a {Category} group of {Positions} positions",
         ActivationShape.VariableLengthGroup => $"a variable-length group ({GroupCompatibility.Describe(Atoms ?? [])})",
-        ActivationShape.StrongGroup => $"a strongly-typed group of type {Category}",
-        ActivationShape.Literal => $"a {Category} literal",
+        // The category is "type:" + the type-name (§8.5.2.1: a strongly-typed group's class and category ARE its
+        // type-name), so the reader is shown the type-name alone.
+        ActivationShape.StrongGroup => $"a strongly-typed group of type {Category[(Category.IndexOf(':') + 1)..]}",
+        ActivationShape.Literal => Category switch
+        {
+            ActivationCategory.Figurative => "a figurative constant or an ALL literal",
+            ActivationCategory.FigurativeZero => "the figurative constant ZERO",
+            ActivationCategory.FigurativeBoolean => "an ALL literal of boolean characters",
+            ActivationCategory.Alphanumeric => "an alphanumeric value",
+            _ => $"a {Category} value",
+        },
         ActivationShape.Expression => "an arithmetic expression",
         ActivationShape.PredefinedNull => "NULL",
         // A reference-modified operand (§8.4.3.3.4 GR6) is elementary and described by no clause at all. The clauses are

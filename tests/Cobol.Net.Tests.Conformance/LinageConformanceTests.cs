@@ -678,6 +678,40 @@ public sealed class LinageConformanceTests
         EditionHarness.AssertHasDiagnostic(diags, "SR18");
     }
 
+    [Fact]   // SR18 names the END-OF-PAGE phrase (GR27 b)'s imperative-statement-1); SR19 and GR28 name the NOT
+             // END-OF-PAGE phrase separately, so a NOT-only phrase beside ADVANCING PAGE is legal — and its
+             // imperative does not run, because ADVANCING PAGE is a page overflow (§13.18.34.4 GR7 c) 1's implicit
+             // increment → §14.9.51.4 GR26 a); kb/Work PB578). A plain write after it is the live control.
+    public void Sr18_AdvancingPageWithNotEopOnly_IsLegalAndTheEndOfPageConditionOccurs()
+        => AssertSpec(Program("LINAGE IS 5 LINES", "", """
+                WRITE P-REC AFTER ADVANCING PAGE
+                    NOT AT EOP DISPLAY "PAGE-NOT-EOP"
+                END-WRITE.
+                WRITE P-REC
+                    NOT AT EOP DISPLAY "PLAIN-NOT-EOP"
+                END-WRITE.
+                MOVE LINAGE-COUNTER TO LC-VAL.
+                DISPLAY "LC=" LC-VAL.
+                CLOSE LPF.
+                STOP RUN.
+            """), "PLAIN-NOT-EOP\nLC=002");
+
+    [Fact]   // SR18 with the NOT-first pair (§14.9.51.2's choice indicators, COBOL-2023): the pair still carries the
+             // END-OF-PAGE phrase, so it is rejected whichever phrase is written first (kb/Work PB578).
+    public void Sr18_AdvancingPageWithNotFirstEopPair_IsRejected()
+    {
+        var (ok, diags) = EditionHarness.Compile(Program("LINAGE IS 5 LINES", "", """
+                WRITE P-REC AFTER ADVANCING PAGE
+                    NOT AT EOP DISPLAY "N"
+                    AT EOP DISPLAY "A"
+                END-WRITE.
+                CLOSE LPF.
+                STOP RUN.
+            """), 2023);
+        Assert.False(ok);
+        EditionHarness.AssertHasDiagnostic(diags, "SR18");
+    }
+
     [Fact]   // SR13: a LINAGE file's ADVANCING phrase shall not name a SPECIAL-NAMES mnemonic.
     public void Sr13_MnemonicAdvancingOnLinageFile_IsRejected()
     {

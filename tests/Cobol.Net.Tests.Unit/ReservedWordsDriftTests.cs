@@ -69,15 +69,37 @@ public sealed class ReservedWordsDriftTests
         Assert.InRange(entries.Length, 420, 560);        // union of the four per-edition source lists
         Assert.Equal(entries.Length, entries.Select(e => e.Word).Distinct(StringComparer.Ordinal).Count());
         var high = entries.Where(e => e.Confidence == "high").ToList();
-        Assert.Equal(16, high.Count(e => !e.R85 && !e.R2002 && !e.R2014 && e.R2023)
-                        + high.Count(e => e.R85 && !e.R2002 && !e.R2014 && e.R2023));   // Annex E.2 item 25
+        // Annex E.2 item 25: the 16 words 2023 added, user-defined at 2014 (E.1 compares 2023 with the PREVIOUS
+        // standard only, so the item says nothing about 2002; kb/Work PB656).
+        Assert.Equal(16, high.Count(e => !e.R2014 && e.R2023));
         // The 1985 RE-reservations among the 16 — the communication trio incl. the END- scope terminator
-        // (mechanically derived, DEVLOG 585; the recall-based classification knew only two of them).
-        Assert.Equal(3, high.Count(e => e.R85 && !e.R2002 && !e.R2014 && e.R2023));
+        // (mechanically derived, DEVLOG 585; the recall-based classification knew only two of them), still reserved
+        // at 2002 by the GnuCOBOL 2002 list like the rest of that facility's vocabulary (obsolete there; kb/Work PB656).
+        Assert.Equal(3, high.Count(e => e.R85 && e.R2002 && !e.R2014 && e.R2023));
         Assert.True(high.Count(e => e.R85 && !e.R2023) >= 20, "the removed-post-85 group should be substantial");
         Assert.True(high.Count(e => !e.R85 && !e.R2002 && e.R2014 && e.R2023) >= 5,
             "the 2014 additions (IEEE family among them) should be present");
         Assert.All(entries, e => Assert.True(e.Word == e.Word.ToUpperInvariant(), $"not uppercase: {e.Word}"));
         Assert.All(entries, e => Assert.True(e.Confidence is "high" or "medium", $"bad confidence: {e.Word}"));
+    }
+
+    /// <summary>A row's provenance may not contradict its own flags (kb/Work PB656): the generator once labelled every
+    /// word reserved at 85 and not at 2023 "removed post-85", whatever its 2002/2014 flags said, so 35 rows — COBOL and
+    /// SEGMENT-LIMIT among them — read as unreserved at editions their flags reserve them at, and a reader of the
+    /// label (the registrar's refuter on SR-8.3.2.1-2) could not tell which was wrong. Each label's claim about an
+    /// edition is checked against that edition's flag.</summary>
+    [Fact]
+    public void Provenance_AgreesWithTheFlagsItDescribes()
+    {
+        var contradictions = ReservedWords.Entries.Where(e =>
+                (e.Provenance.Contains("removed post-85", StringComparison.Ordinal) && (e.R2002 || e.R2014 || e.R2023))
+                || (e.Provenance.Contains("unreserved 2002", StringComparison.Ordinal) && e.R2002)
+                || (e.Provenance.Contains("unreserved 2014", StringComparison.Ordinal) && e.R2014)
+                || (e.Provenance.Contains("removed by 2014", StringComparison.Ordinal) && (!e.R2002 || e.R2014))
+                || (e.Provenance.Contains("through 2014", StringComparison.Ordinal) && !(e.R2002 && e.R2014))
+                || (e.Provenance.StartsWith("1985", StringComparison.Ordinal) && !e.R85))
+            .Select(e => e.Word).ToList();
+        Assert.True(contradictions.Count == 0,
+            $"{contradictions.Count} provenance label(s) contradict their flags (first: {contradictions.FirstOrDefault()}) — fix scripts/gen-reserved-words.ps1 step 5 and regenerate");
     }
 }

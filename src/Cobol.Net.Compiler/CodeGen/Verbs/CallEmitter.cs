@@ -827,7 +827,7 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // PB164 waves 1–2 + the R40 INDEX pin) — the wording matches the predicate actually tested.
             // ⛔ THE PREDICATE IS BoundaryImageCapable, NOT IsImageCapable (kb/Work PB204). §14.8.2.2 admits a
             // VARIABLE-LENGTH group across a Format-2 boundary "subject to compatibility as described in
-            // 8.5.1.12" — an admission, checked at bind by OoConformance.DescriptionMismatch — so staging it
+            // 8.5.1.12" — an admission, checked at bind by ActivationRelations (kb/Work PB3101) — so staging it
             // loud here refused conforming source. Only a group with NO boundary image at all (a
             // pointer/object-class leaf, or a variable-length shape outside the current-extent gate) is loud.
             // Asked of the OPERAND (Place.BoundaryImageCapable — a subscripted dynamic-table element has an image
@@ -1067,7 +1067,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // §8.3.3.6.4 GR2's repetition is the ONE runtime rule EmitText.RepeatToWidth folds (kb/Work PB297).
             BoundAllLiteral all => CsLiteral(width is { } w ? RepeatToWidth(all.Literal, w) : all.Literal),
             BoundFigurative fig =>
-                $"new string({FigurativeConstants.Fill(fig.Kind, data.Collating, formal?.OperandPic?.Category, data.NationalCollating)}, {width ?? 1})",
+                $"new string({FigurativeConstants.Fill(fig.Kind, data.Collating,
+                    IntrinsicArgumentRules.CharacterContext(formal is null ? null : IntrinsicArgumentRules.ClassOfItem(formal)), data.NationalCollating)}, {width ?? 1})",
             _ => throw new ArgumentException(
                 $"{fill.GetType().Name} is not a figurative constant or ALL literal", nameof(fill)),
         };

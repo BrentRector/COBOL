@@ -269,6 +269,7 @@ public sealed class ClosesRowsBackLinkDriftTests
                 ["id"] = n?.Id ?? "",
                 ["kind"] = n?.Kind ?? "",
                 ["status"] = n?.Status ?? "",
+                ["terminal"] = n?.IsTerminal ?? false,   // the DONE vocabulary's answer (kb/Work PB3196)
                 ["inventory_rows"] = n?.InventoryRows ?? [],
                 ["closes_rows"] = n?.ClosesRows ?? [],
                 ["closes_rows_reason"] = n?.ClosesRowsReason ?? "",

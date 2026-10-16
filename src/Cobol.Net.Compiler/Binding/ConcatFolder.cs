@@ -159,8 +159,11 @@ internal static class ConcatFolder
     /// anything else as written. A message that printed <c>lit.GetText()</c> said <c>ALLZERO</c> and <c>"$"&amp;SYM-A</c>
     /// (kb/Work PB1631).</summary>
     public static string Spelling(Core.LiteralContext lit) =>
-        lit.nonNumericLiteral() is not { } nn ? lit.GetText()
-        : nn.figurativeConstant() is { } fig ? Spelling(fig)
+        lit.nonNumericLiteral() is { } nn ? Spelling(nn) : lit.GetText();
+
+    /// <summary><see cref="Spelling(Core.LiteralContext)"/> for a nonnumeric literal operand.</summary>
+    public static string Spelling(Core.NonNumericLiteralContext nn) =>
+        nn.figurativeConstant() is { } fig ? Spelling(fig)
         : nn.concatenationExpression() is { } ce ? string.Join(" & ", ce.concatOperand().Select(op => op.GetText()))
         : nn.GetText();
 
@@ -318,7 +321,7 @@ internal static class ConcatFolder
                     + "specify none, as a concatenation-expression operand included (ISO §12.3.7.3 SR11)");
                 return Term.Refusal(word);
             }
-            if (env.SymbolicValue(word) is { } ch) return Term.Symbolic(ch, word);
+            if (env.SymbolicValue(op, word) is { } ch) return Term.Symbolic(ch, word);
         }
         report?.Error(DiagnosticCatalog.ConcatOperandNotLiteral, $"'{word}' is not a literal — a concatenation-expression "
             + "operand is a literal or a figurative constant, and the only words that stand for one are a constant-name "

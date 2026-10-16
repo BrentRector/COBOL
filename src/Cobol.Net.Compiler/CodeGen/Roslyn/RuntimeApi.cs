@@ -509,6 +509,23 @@ internal static class RuntimeApi
     public static string IntegerArg(string value) =>
         $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArg)}({value})";
 
+    /// <summary>The CLAMPING binary64 intake of a total integer argument whose function answers the same past a bound —
+    /// <c>CobolIntrinsics.IntegerArgSaturatingReal</c>: its integer on the <c>Int128</c> carrier, clamped rather than
+    /// raised past the carrier. Only <c>IntrinsicRenderer.IntArgWideSaturating</c> may emit it (kb/Work PB254, PB651).</summary>
+    public static string IntegerArgSaturatingReal(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgSaturatingReal)}({value})";
+
+    /// <summary>The SDIDI twin of <see cref="IntegerArgSaturatingReal"/> — <c>CobolIntrinsics.IntegerArgSaturatingDec</c>,
+    /// for the same arms and emitted from the same one renderer member.</summary>
+    public static string IntegerArgSaturatingDec(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgSaturatingDec)}({value})";
+
+    /// <summary>The §15.3 type-6 intake of an SDIDI operand that STAYS on the SDIDI — <c>CobolIntrinsics.IntegerArgUnboundedDec</c>:
+    /// the integrality test, then the integer as a <c>CobolDec</c>, never landed on <c>Int128</c> (an SDIDI integer
+    /// reaches far past it). Only <c>IntrinsicRenderer.RawArg</c> emits it (kb/Work PB651).</summary>
+    public static string IntegerArgUnboundedDec(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgUnboundedDec)}({value})";
+
     /// <summary>The §15.3 type-6 intake for a value on ONE of the operand carriers, keyed by carrier KIND — the ONE
     /// family of landings the renderer's bounded (<c>long</c>) and total (<c>Int128</c>) integer arguments share,
     /// so the integrality rule (kb/Work PB1526) is asked on every carrier and a new carrier is a compile error in
@@ -1631,6 +1648,11 @@ internal static class RuntimeApi
     public static string SortInit(string sd, string weights, string natWeights) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.Init)}({sd}, {weights}, {natWeights})";
 
+    /// <summary>Register the statement as the run unit's active format 1 SORT, with its scope's declaratives (or
+    /// <c>null</c>), for §14.9.40.4 GR17 — <c>CobolSort.RegisterFormat1Sort</c> (kb/Work PB1177; <c>EcEmitter.SortUseScope</c>).</summary>
+    public static string SortRegisterFormat1Sort(string sd, string useScope) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.RegisterFormat1Sort)}({sd}, {useScope})";
+
     /// <summary>The implicit USING release of one record image — <c>CobolSort.Release</c>, with the size the
     /// record had when READ and the sort-merge file's record range (the EC-SORT-MERGE-RELEASE test, §14.9.40.4
     /// GR12 b) / §14.9.24.4 GR7 b)), and the record's EXTENT TABLE when a variable-length group record is released
@@ -1665,6 +1687,34 @@ internal static class RuntimeApi
     /// (<c>output: true</c>) — <c>CobolSort.EnterProcedure</c>, the phase the two verbs' GR1 test.</summary>
     public static string SortEnterProcedure(string sd, bool output) =>
         $"{nameof(CobolSort)}.{nameof(CobolSort.EnterProcedure)}({sd}, output: {(output ? "true" : "false")})";
+
+    /// <summary>§14.9.40.4 GR17's question after a declarative of the scope <paramref name="useScope"/> ends —
+    /// <c>CobolSort.AfterUseProcedure</c>: the action back, or the SORT termination signal when a not-normal completion
+    /// happened while a format 1 SORT is active (kb/Work PB1177).</summary>
+    public static string SortAfterUseProcedure(string useScope, string action) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.AfterUseProcedure)}({useScope}, {action})";
+
+    /// <summary>§14.9.40.4 GR17's question when a declarative of the scope <paramref name="useScope"/> ends in EXIT
+    /// PROGRAM or GOBACK — <c>CobolSort.UseProcedureExited</c>, a declining exception filter (kb/Work PB1177).</summary>
+    public static string SortUseProcedureExited(string useScope) =>
+        $"{nameof(CobolSort)}.{nameof(CobolSort.UseProcedureExited)}({useScope})";
+
+    /// <summary>§14.9.40.4 GR17's question at an INVOKE site once the method has returned and its RETURNING item is
+    /// delivered — <c>CobolSort.AfterActivationReturn</c> (kb/Work PB1177; a CALL's is <c>ProgramTable.CallProgram</c>'s).
+    /// Fully qualified, as <see cref="SortTerminationSignalType"/> is: every INVOKE asks it, and a group whose classes
+    /// declare no file has no <c>using</c> of the I-O namespace (the PB922 reason).</summary>
+    public static string SortAfterActivationReturn { get; } =
+        $"global::CobolNet.Runtime.IO.{nameof(CobolSort)}.{nameof(CobolSort.AfterActivationReturn)}()";
+
+    /// <summary>The declining filter an activation's end notes a SORT termination with —
+    /// <c>SortTerminationSignal.EndsActivation</c> over the local <paramref name="flag"/> (kb/Work PB1177).</summary>
+    public static string SortTerminationEndsActivation(string flag) =>
+        $"{SortTerminationSignalType}.{nameof(Runtime.Exceptions.SortTerminationSignal.EndsActivation)}(ref {flag})";
+
+    /// <summary>The C# type a format 1 SORT statement's landing catches — <c>SortTerminationSignal</c> (§14.9.40.4 GR17),
+    /// fully qualified so the emission does not depend on the conditional <c>using</c> (the PB922 reason).</summary>
+    public static string SortTerminationSignalType { get; } =
+        $"global::CobolNet.Runtime.Exceptions.{nameof(Runtime.Exceptions.SortTerminationSignal)}";
 
     /// <summary>The sequence phase — <c>CobolSort.Sort</c> (stable; GR8).</summary>
     public static string SortSort(string sd, string keys, string dupsInOrder) =>
@@ -2583,15 +2633,11 @@ internal static class RuntimeApi
         $"global::CobolNet.Runtime.Exceptions.{nameof(Runtime.Exceptions.ExceptionState)}"
         + $".{nameof(Runtime.Exceptions.ExceptionState.ExceptionObject)}";
 
-    /// <summary>Push a METHOD activation frame (ISO §15.65.4 r5 — "This may be by a CALL statement, an INVOKE
-    /// statement, a function reference, or an inline invocation"; fix-queue PB36). Emitted INSIDE the method body
-    /// rather than at the INVOKE site, because a method is reached by several paths — a typed direct call, the
-    /// universal <c>__CobolInvoke</c> switch, an inline invocation — and a per-site push would be the same
-    /// two-arm dispatch this compiler keeps re-learning.</summary>
-    public static string ModulePushMethod(string nameLit, string classLit) =>
-        $"{nameof(CobolModule)}.{nameof(CobolModule.Push)}({nameLit}, {classLit}, false)";
-
-    /// <summary>The run unit's module stack, resolved once per activation — <c>CobolModule.Stack</c>.</summary>
+    /// <summary>The run unit's module stack, resolved once per activation — <c>CobolModule.Stack</c>. A METHOD
+    /// activation pushes its frame through it INSIDE the method body (ISO §15.65.4 r5 — "This may be by a CALL
+    /// statement, an INVOKE statement, a function reference, or an inline invocation"; fix-queue PB36), never at
+    /// an INVOKE site, because a method is reached by several paths — a typed direct call, the universal
+    /// <c>__CobolInvoke</c> switch, an inline invocation.</summary>
     public static string ModuleStack() => $"{nameof(CobolModule)}.{nameof(CobolModule.Stack)}";
 
     /// <summary>A method activation's resource check (ISO §14.9.23.4 GR7 b); kb/Work PB2659) — the head of every method
@@ -2601,8 +2647,6 @@ internal static class RuntimeApi
     public static string MethodActivationResources(string methodLiteral, string classLiteral) =>
         $"{nameof(ActivationStack)}.{nameof(ActivationStack.RequireForMethod)}({methodLiteral}, {classLiteral})";
 
-    /// <summary>Pop the activation frame pushed by <see cref="ModulePushMethod"/> — always in a finally.</summary>
-    public static string ModulePop() => $"{nameof(CobolModule)}.{nameof(CobolModule.Pop)}()";
 
     /// <summary>FUNCTION MODULE-NAME's runtime read (§15.65) — <c>CobolModule.Name(kind)</c>.</summary>
     public static string ModuleNameFn(int kind) =>

@@ -465,6 +465,26 @@ internal static class IntrinsicArgumentRules
         return ClassOfItem(p.Item);
     }
 
+    /// <summary>The ISO §8.5.2.1 class of a place SPELLED for a diagnostic that names why an operand was refused —
+    /// <see cref="ClassOfPlace"/>'s answer through <see cref="Name"/>, so a message never states a class of its own.
+    /// <para>⛔ ONE RULE, ONE PLACE (kb/Work PB1400). <c>ExpressionBinder.NonNumericOperandKind</c> spelled the class
+    /// itself — <c>"group item … (class alphanumeric, ISO §8.5)"</c> for EVERY group and <c>"class alphanumeric"</c>
+    /// for every reference-modified operand — so a <c>GROUP-USAGE BIT</c> group (class boolean, §8.5.2.5 3)), a
+    /// <c>GROUP-USAGE NATIONAL</c> group (class national, §8.5.2.10 3)) and a reference-modified national item
+    /// (class national, §8.4.3.3.4 GR6 b)/c)) were each told they were alphanumeric while LENGTH, MOVE and the
+    /// class screen itself read them correctly.</para>
+    /// <para>⚠ The ONE place this differs from <see cref="ClassOfItem"/> is the strongly-typed group, and it is
+    /// a reading, not a fork: §8.5.2.1 — "Both the class and the category of a strongly-typed group item are the
+    /// type-name specified in the TYPE clause" — while <see cref="ClassOfItem"/> answers ALPHANUMERIC for it on
+    /// §15.3 item 2's ARGUMENT-position reading. A diagnostic outside a function argument names §8.5.2.1's class.
+    /// A strongly-typed SUBORDINATE group (§8.5.3.1: "subordinate to a group item described with the TYPE clause")
+    /// writes no TYPE clause of its own, so it names the type of the nearest TYPE clause it is typed by.</para></summary>
+    internal static string ClassNameOf(Place p) =>
+        p.DenotedItem is not null && StrongTypeModel.IsStrongGroup(p.Item)
+            && StrongTypeModel.TypeAnchor(p.Item)?.TypeName is { } typeName
+            ? $"{typeName}, the type-name of a strongly-typed group item"
+            : ClassOfPlace(p) is { } cls ? Name(cls) : "unknown";
+
     /// <summary>The ISO §8.5.2.1 Table-2 class of a DATA ITEM — the half of <see cref="ClassOfPlace"/> that does
     /// not need a <see cref="Place"/>, so a caller holding only the resolved item asks the SAME table.
     /// <para>⛔ IT IS A SPLIT, NOT A SECOND CLASSIFIER (kb/Work PB170). <c>ReferenceResolver</c> resolves a
@@ -494,24 +514,52 @@ internal static class IntrinsicArgumentRules
                 _ => CobolClass.Alphanumeric,
             };
         }
+        return item.Pic is { } pic ? ClassOfPic(pic) : null;
+    }
+
+    /// <summary>The ISO §8.5.2.1 Table-2 class of an ELEMENTARY item's description — the half of
+    /// <see cref="ClassOfItem"/> a caller holding only the <see cref="PicInfo"/> (a VALUE clause's initializer) asks,
+    /// so it reads the SAME table rather than the raw category.</summary>
+    internal static CobolClass? ClassOfPic(PicInfo pic)
+    {
         // The USAGE-keyed arm rides BEFORE the category table (kb/Work R27): an index DATA item's PicInfo
         // carries category NUMERIC for the storage model (PicInfo.IndexItem), but §8.5.2.1 Table 2 puts it in
         // class INDEX — a distinct class no §15 argument rule admits. Keying the usage first is what stops the
         // storage category from answering the CLASS question.
-        if (item.Pic is { Usage: Usage.Index }) return CobolClass.Index;
+        if (pic is { Usage: Usage.Index }) return CobolClass.Index;
         // Class ALPHABETIC before the category table (kb/Work PB124 wave 5): the storage model folds PIC A
         // into PicCategory.Alphanumeric, so the category cannot answer — IsAlphabetic can, exactly as the
         // Usage.Index arm above un-folds the index item's storage category.
-        if (item.Pic is { IsAlphabetic: true }) return CobolClass.Alphabetic;
+        if (pic.IsAlphabetic) return CobolClass.Alphabetic;
         // Table 2 splits the numeric-edited row on USAGE — class alphanumeric "if usage is display", national "if
         // usage is national" — so the category table below cannot answer it alone (kb/Work PB1128).
-        if (item.Pic is { AnalyzedCategory: PicCategory.NumericEdited, Usage: Usage.National })
+        if (pic is { AnalyzedCategory: PicCategory.NumericEdited, Usage: Usage.National })
             return CobolClass.NumericEditedNational;
         // ⛔ THE ANALYZED category, never the storage one (kb/Work PB960): a recovery profile — the placeholder
         // for an entry whose PICTURE was already rejected — has NO class, so it reads "not statically decidable"
         // and every screen over this table fails OPEN instead of re-diagnosing the item as alphanumeric.
-        return item.Pic?.AnalyzedCategory is { } category ? ClassOfCategory(category) : null;
+        return pic.AnalyzedCategory is { } category ? ClassOfCategory(category) : null;
     }
+
+    /// <summary>⛔ THE CHARACTER CONTEXT OF A CLASS, written once (kb/Work PB442): the category whose characters,
+    /// coded character set and program collating sequence a figurative constant reads against an operand of
+    /// class <paramref name="cls"/>. §8.3.3.6.4 GR1 makes a figurative "a national character value" in "a context
+    /// requiring national characters" and an alphanumeric one otherwise; §14.9.25.4 Table 17 spells that out for
+    /// the MOVE statement by the receiving operand — national for categories national, national-edited and
+    /// numeric-edited "if usage is national", which is exactly Table 2's class national (§8.5.2.1) — and gives
+    /// SPACE and ZERO a boolean category against a boolean receiver (GR4's boolean zero, determination D-B2's
+    /// boolean space). So the answer is the CLASS projected through <see cref="TableTwoClass"/>: National,
+    /// Boolean, or Alphanumeric for every other class and for an operand with no decidable class. It is never
+    /// the raw PICTURE category, which is how a <c>PIC ZZ9 USAGE NATIONAL</c> receiver took the ALPHANUMERIC
+    /// program collating sequence's HIGH-VALUE and LOW-VALUE.</summary>
+    public static PicCategory CharacterContext(CobolClass? cls) => cls is { } c
+        ? TableTwoClass(c) switch
+        {
+            CobolClass.National => PicCategory.National,
+            CobolClass.Boolean => PicCategory.Boolean,
+            _ => PicCategory.Alphanumeric,
+        }
+        : PicCategory.Alphanumeric;
 
     /// <summary>ISO §8.5.2.1 Table 2, read as written.</summary>
     private static CobolClass? ClassOfCategory(PicCategory category) => category switch
@@ -1073,6 +1121,16 @@ internal static class IntrinsicArgumentRules
                 + "operand list, so no class screen applies to it",
         };
 
+    /// <summary>Is operand position <paramref name="position"/> (0-based, the schema's operand convention) of
+    /// <paramref name="functionName"/> a §15.3 type-6 position — "An arithmetic expression that will always result in
+    /// an integer value or an integer data item shall be specified" — on a SPEC-VERIFIED schema? The renderer's
+    /// type-6 intake keys on it (<c>IntrinsicRenderer.RawArg</c>, kb/Work PB651), so it fails CLOSED — the opposite
+    /// direction from <see cref="ArgumentRunIsAllNumeric"/>, because a false here leaves the operand as it stands, which
+    /// is exactly what happened before the intake existed: a function absent from <see cref="Verified"/> or a position
+    /// its schema does not describe answers false.</summary>
+    public static bool IsIntegerPosition(string functionName, int position) =>
+        Verified.TryGetValue(functionName, out var schema) && schema.At(position) is { Kind: 'i' };
+
     /// <summary>
     /// Is EVERY operand position of <paramref name="functionName"/>'s argument run — <paramref name="argCount"/>
     /// operands — a §15.3 <b>numeric</b> position, i.e. one whose declared argument type is 6 (Integer) or 10
@@ -1098,9 +1156,11 @@ internal static class IntrinsicArgumentRules
     /// <para>
     /// ⛔ IT IS ALSO WHY THE ANSWER IS NOT "are the OPERANDS class numeric". Under <c>--permissive</c> the DA6
     /// leniency admits an ALPHANUMERIC operand at a NUMERIC position and digit-decodes it, so
-    /// <c>FUNCTION MOD(&lt;PIC X item&gt; &lt;COMP-2&gt;)</c> has a non-numeric OPERAND at a position that is
-    /// numeric and must keep riding the float lane. Reading the operand's class would have routed it to the
-    /// exact <c>Int128</c> arm and handed Roslyn a <c>double</c> — the CS1503 fix-queue PB2 closed, reopened.
+    /// <c>FUNCTION REM(&lt;PIC X item&gt; &lt;COMP-2&gt;)</c> has a non-numeric OPERAND at a position that is
+    /// numeric (§15.3 type 10, so the COMP-2 still moves the call to the float lane) and must keep riding it.
+    /// Reading the operand's class would have routed it to the exact <c>Int128</c> arm and handed Roslyn a
+    /// <c>double</c> — the CS1503 fix-queue PB2 closed, reopened. (MOD is not the example: both its positions
+    /// are §15.3 type 6, so its COMP-2 operand is taken as its integer before any lane is chosen.)
     /// </para>
     /// <para>
     /// <b>Fail OPEN, in the same direction and for the same reason as the screen above.</b> A function absent

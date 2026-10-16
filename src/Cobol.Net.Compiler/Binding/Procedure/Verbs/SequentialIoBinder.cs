@@ -217,17 +217,21 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
             winvalid = keyedIo.KeyedInvalidPhrase(wik.statementBlock(), PhraseBlocks.StartsWithNot(wik));
         }
 
-        // END-OF-PAGE phrases (ISO §14.9.51 GR27b/GR28): blocks[0] = AT EOP, blocks[1] = NOT AT EOP — the grammar
-        // rule `writeAtEndOfPage : AT? (END_OF_PAGE|EOP) statementBlock (NOT AT? (END_OF_PAGE|EOP) statementBlock)?`
-        // fixes that order (the readAtEnd block shape).
+        // END-OF-PAGE phrases (ISO §14.9.51 GR27b/GR28): the grammar rule `writeAtEndOfPage` admits either phrase
+        // first (the readAtEnd block shape), and PhraseBlocks reads the order off the leading NOT.
         List<BoundStatement>? atEop = null, notAtEop = null;
         if (w.writeAtEndOfPage() is { } eop)
         {
+            var (blocks, notFirst) = (eop.statementBlock(), PhraseBlocks.StartsWithNot(eop));
             // SR19 (the silent-drop bug class): the END-OF-PAGE / NOT END-OF-PAGE phrase requires a LINAGE clause
             // in the file's file description entry — a bind-time rejection, never a dropped branch.
             ctx.Validation.CheckWriteEopLinage(file);                                     // SR19 — pure check
-            ctx.Validation.CheckWriteEopAdvancingPage(AnyAdvancePage(adv));   // SR18 — pure check
-            (atEop, notAtEop) = PhraseBlocks.Split(eop.statementBlock(), PhraseBlocks.StartsWithNot(eop), b => host.BindBlocks([b]));
+            // SR18 names the END-OF-PAGE phrase — the AT phrase, imperative-statement-1's (GR27 b) — and SR19 names
+            // it and the NOT END-OF-PAGE phrase separately, so a NOT-only phrase beside ADVANCING PAGE is legal
+            // (and its imperative never runs: ADVANCING PAGE is a page overflow, GR7 c) 1 → GR26 a), kb/Work PB578).
+            ctx.Validation.CheckWriteEopAdvancingPage(
+                AnyAdvancePage(adv) && PhraseBlocks.HasOnBranch(blocks, notFirst));   // SR18 — pure check
+            (atEop, notAtEop) = PhraseBlocks.Split(blocks, notFirst, b => host.BindBlocks([b]));
         }
         // SR13: with a LINAGE clause, the ADVANCING phrase shall not name a SPECIAL-NAMES mnemonic (the
         // implementor positioning rules and the logical-page model are mutually exclusive).
@@ -250,13 +254,16 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
     {
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
         if (!ctx.Validation.ResolveFile(r.fileName(), "READ", out var file)) return BoundRejected.Reported(ctx.Edition);
+        // §13.4.5.3 SR3 c) is a rule of the FILE DESCRIPTION ENTRY, so it is asked BEFORE the organization reroute
+        // and the relative arm is under it too (kb/Work PB694, feedback_two_arm_dispatch).
+        ctx.Validation.CheckReadIntoOnRecordLessFile(file, r.readInto() is not null);   // SR3 c) — pure check
         if (!file.IsSequential) return keyedIo.BindRead(r, file);   // relative/indexed READ F1/F2 (ISO 14.9.30; KeyedIo partial)
         // READ … INTO is an IMPLICIT MOVE and is bound as one (ISO §14.9.30.4 GR4 b); kb/Work PB348): the
         // sender is the record area sliced to its §13.18.43.4 GR16 byte count, resolved through the LARGEST
         // record's view (ReferenceResolver.RecordArea, §13.18.33.4 GR3) exactly as the emitter's splice is.
         // A file with no usable record area leaves the move null and the phrase inert — the same reach the emitter's own
         // `area is not null` guard had, now decided once, at bind time.
-        BoundMove? intoMove = r.readInto()?.dataReference() is { } d && host.Expr.ResolveReceiving(d) is { } recv
+        BoundMove? intoMove = r.readInto()?.receivingIdentifier() is { } d && host.Expr.ResolveReceiving(d) is { } recv
             && ctx.Refs.RecordArea(file) is { } readArea
             ? host.Move.BindIntoPhrase(file, readArea, recv, IntoPhraseRules.Read)
             : null;
@@ -480,11 +487,17 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
     /// resolver and drew "'MYTOP (1)' is not defined — no declaration … gives the name 'MYTOP'" for a name
     /// SPECIAL-NAMES does declare. Keyed on the word, the suffixed mnemonic reaches its own arm, where
     /// <see cref="BindAdvancing"/> refuses the suffix by name. Pure (no report), because the SR13 screen asks it
-    /// too.</summary>
+    /// too. A mnemonic-name a CONTAINING element declares yields to the referring element's own item of the same
+    /// spelling (§8.4.6.1: "a source element's reference to such a name, even when it is a different type of
+    /// user-defined word, is to the item which that source element describes"; kb/Work PB3153), so
+    /// <see cref="ReferenceResolver.DescribesOwnItem"/> is asked first (an own data item OR an own integer
+    /// constant-name, which §13.10.3 SR2 admits as integer-1) and only the mnemonic reading records the §8.3.2.2
+    /// use.</summary>
     private (Core.DataReferenceContext Ref, string Name, ImplementorName System)? MnemonicOperand(
         Core.WriteBeforeAfterContext? wba)
         => wba?.dataReference() is { } m && m.cobolWord() is { } word
-           && ctx.Mnemonics.Of(wba).TryGetValue(word.GetText(), out var system)
+           && ctx.Mnemonics.TryPeek(wba, word.GetText(), out _) && !ctx.Refs.DescribesOwnItem(m)
+           && ctx.Mnemonics.TryUse(wba, word.GetText(), out var system)
             ? (m, word.GetText(), system)
             : null;
 

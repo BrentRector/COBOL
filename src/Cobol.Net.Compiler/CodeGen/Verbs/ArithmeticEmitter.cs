@@ -40,12 +40,25 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             // only observable under USE-F3 + RESUME NEXT STATEMENT, where a fatal-EC-interrupted statement leaves
             // undefined results anyway (§14.6.13.1.3). Pre-snapshotting all receiver reads before the first store would
             // close it; deferred to avoid restructuring the byte-critical arithmetic store loop for an undefined case.
-            foreach (var r in targets)
-                GuardedStore(ise, r.Place, () =>
-                    // The combine IS the final transfer to r (receiver ← receiver op value): outermost, so a MULTIPLY
-                    // BY product past the carrier rounds once at r's scale with r's mode (NumericRenderer.Multiply).
-                    StoreArith(r.Place, num.Combine(num.FieldNum(r.Place), op, value, RcvFor(r, ise), outermost: true), r.Rounding));
+            foreach (var r in targets) StoreInPlace(r, op, value, ise);
         });
+
+    /// <summary>ONE in-place resultant — <c>receiver ← receiver op value</c> — computed and stored inside its own
+    /// size-error guard (<see cref="GuardedStore"/>). The ONE shape of the in-place store, asked by
+    /// <see cref="EmitInPlace"/> per receiver and by <see cref="CorrespondingEmitter.Emit"/> per corresponding pair.
+    /// <para>The combine IS the final transfer to the receiver: outermost, so a MULTIPLY BY product past the carrier rounds
+    /// once at the receiver's scale with its mode (<see cref="NumericRenderer.Combine"/>).</para>
+    /// <para>⛔ A CORRESPONDING PAIR IS A SEPARATE STATEMENT, SO IT GETS THE SEPARATE STATEMENT'S STORE (kb/Work PB229).
+    /// ISO §14.9.2.4 GR5 (and §14.9.44.4 GR5 for SUBTRACT): "The results are the same as if the user had referred to each
+    /// pair of corresponding identifiers in separate ADD statements", and §14.7.6 runs the SIZE ERROR imperative "after
+    /// all of the implied statements are completed". The CORRESPONDING emitter used to write its own combine-and-store
+    /// with no per-pair guard, inside the statement's one outer try, so a raise while one pair's sum was EVALUATED (a
+    /// binary64 sum past the range, EC-SIZE-OVERFLOW) abandoned every later pair, measured: <c>ADD CORRESPONDING</c>
+    /// over a FLOAT-LONG pair at 1E308 and a <c>PIC 9(3)</c> pair 5 + 10 left the second at 10. It also passed no
+    /// <c>outermost</c>, so its final transfer was not the one an explicit ADD makes.</para></summary>
+    public void StoreInPlace(Receiver r, string op, NumX value, bool inSizeError)
+        => GuardedStore(inSizeError, r.Place, () =>
+            StoreArith(r.Place, num.Combine(num.FieldNum(r.Place), op, value, RcvFor(r, inSizeError), outermost: true), r.Rounding));
 
     /// <summary>GIVING arithmetic: the value is computed once and stored into each receiver, rounded by that
     /// receiver's own ROUNDED mode (ISO §14.7.5 rule 4 — one value, stored left-to-right into each resultant).</summary>

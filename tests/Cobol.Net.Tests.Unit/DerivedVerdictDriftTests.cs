@@ -181,7 +181,7 @@ public sealed class DerivedVerdictDriftTests
                 ? new Regex(li.GetString()!, RegexOptions.IgnoreCase) : null,
             // The per-arm twin of `excludes-patterns` (Python: `excludes-pattern`). kb/Work R43 / PB1519: A.4.10's
             // item-1 arm must not stamp the supported item 2 (`interface-name`), while its item-3 arm must reach
-            // GR-9.3.6-L5.2, whose exact-match criteria name "an interface-name".
+            // GR-9.3.6-L4.2, whose exact-match criteria name "an interface-name".
             notPattern: a.TryGetProperty("excludes-pattern", out var np)
                 ? new Regex(np.GetString()!, RegexOptions.IgnoreCase) : null)).ToList();
 
@@ -434,9 +434,9 @@ public sealed class DerivedVerdictDriftTests
 
         // THE ON EXCEPTION OPERAND ARM (kb/Work R43 / PB1151). The exception phrases exist only in the screen
         // formats, and the band's rules never say "screen" — a text-only predicate dropped all five ACCEPT rows.
-        foreach (string id in (string[])["GR-14.9.1.4-24", "GR-14.9.1.4-L2.1", "GR-14.9.1.4-L2.2",
-                                         "GR-14.9.1.4-L3.1", "GR-14.9.1.4-L3.2", "GR-14.9.11.4-17",
-                                         "GR-14.9.11.4-18", "GR-14.9.11.4-L2.1", "GR-14.9.11.4-L2.2"])
+        // (GR25 of ACCEPT and GR18 of DISPLAY carry their nested exception lists as their own body since kb/Work
+        // PB55; those items were rows GR-14.9.1.4-L2.1 … L3.2 and GR-14.9.11.4-L2.1/L2.2 until then.)
+        foreach (string id in (string[])["GR-14.9.1.4-24", "GR-14.9.1.4-25", "GR-14.9.11.4-17", "GR-14.9.11.4-18"])
             Assert.Contains(id, ids);
         // …and the device/temporal rules of the same two clauses stay out: GR1 of each is ordinary surface.
         Assert.DoesNotContain("GR-14.9.1.4-1", ids);
@@ -475,7 +475,9 @@ public sealed class DerivedVerdictDriftTests
 
         // Clause arm: seven §12.4.6.3 rules say only "this clause" and a text-only predicate drops all of them.
         Assert.Contains("SR-12.4.6.3.3-1", ids);
-        // The anchored EC exclusion must NOT reach EC-FLOW-APPLY-COMMIT.
+        // Clause arm, EC half: the APPLY COMMIT clause's own GR6 (EC-FLOW-APPLY-COMMIT) is module functionality and
+        // stays IN. The selector carries no EC-FLOW exclusion at all (kb/Work PB259 dropped the anchored one); if
+        // this drops out, an exclusion keyed on the EC-FLOW names came back and is reaching the clause arm.
         Assert.Contains("GR-12.4.6.3.4-6", ids);
         // Text arm: the module's own functionality stated inside the MANDATORY §14.6.11. Note the PLURAL.
         Assert.Contains("GR-14.6.11-1", ids);
@@ -490,8 +492,10 @@ public sealed class DerivedVerdictDriftTests
         // dropped and shipped code is being documented as unsupported.
         foreach (string id in (string[])["SR-14.9.7.3-1", "SR-14.9.7.3-2", "GR-14.9.7.4-1", "GR-14.9.36.4-7"])
             Assert.DoesNotContain(id, ids);
-        // PB259 holds this one open as a genuine adjudication.
-        Assert.DoesNotContain("GR-14.9.7.4-2", ids);
+        // Each statement's GR2 SETS EC-FLOW-COMMIT / EC-FLOW-ROLLBACK, the declined module's own condition, so
+        // nothing survives it (kb/Work PB259 settled both). If either drops out, an EC-FLOW exclusion came back.
+        foreach (string id in (string[])["GR-14.9.7.4-2", "GR-14.9.36.4-2"])
+            Assert.Contains(id, ids);
         // FMT-14.9.36.2 would be wrong as non-support — ROLLBACK IS a recognized, accepted-inert statement in the
         // shipped grammar. Excluded by KIND on the statement arm, not by matching "^<pre": that rendering proxy
         // leaks on 56 of 322 FMT rows. (The REFUSED clause's own format, FMT-12.4.6.3.2, is in — asserted above.)
@@ -561,12 +565,13 @@ public sealed class DerivedVerdictDriftTests
         Assert.DoesNotContain("FMT-11.3.2", ids);
         Assert.DoesNotContain("FMT-11.6.2", ids);
         // Mixed blocks keep their own verdicts: SR-11.3.3-6's second sentence has a satisfiable antecedent in a
-        // LINEAR chain, and GR-9.3.6-L5.3 absorbs the overload tie-break — the sharpest trap for a widening.
+        // LINEAR chain, and GR-9.3.6-L4.3 absorbs the overload tie-break — the sharpest trap for a widening.
         Assert.DoesNotContain("SR-11.3.3-6", ids);
         // ITEM 3 (kb/Work R43 / PB1519): §9.3.6's exact-match criteria, reached by the sentence that introduces
-        // them — they carry no vocabulary of their own. L5.2 names "an interface-name", so the item-2 exclusion
-        // must stay on the ITEM-1 arm (`excludes-pattern`); as a global exclusion it silently dropped L5.2.
-        foreach (string id in (string[])["GR-9.3.6-L5.1", "GR-9.3.6-L5.2", "GR-9.3.6-L5.3"])
+        // them — they carry no vocabulary of their own. L4.2 names "an interface-name", so the item-2 exclusion
+        // must stay on the ITEM-1 arm (`excludes-pattern`); as a global exclusion it silently dropped it. (L5 until
+        // kb/Work PB55 folded §9.3.6 3) e)'s nested list, the sub-list numbered before this one.)
+        foreach (string id in (string[])["GR-9.3.6-L4.1", "GR-9.3.6-L4.2", "GR-9.3.6-L4.3"])
             Assert.Contains(id, ids);
         // The introducing rule is half live (its MOVE-sender sentence), so R43 item 2 gives it the live verdict.
         Assert.DoesNotContain("GR-9.3.6-L3.7", ids);

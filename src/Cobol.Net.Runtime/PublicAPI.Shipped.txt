@@ -1041,7 +1041,6 @@ CobolNet.Runtime.Exceptions.ExceptionEngine.ProgramArgOmittedChecking.set -> voi
 CobolNet.Runtime.Exceptions.ExceptionEngine.ProgramArgOmittedError(string! detail) -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.PushAllCheckingOff() -> CobolNet.Runtime.Exceptions.CheckingFlags
 CobolNet.Runtime.Exceptions.ExceptionEngine.PushPerformFrame(CobolNet.Runtime.Exceptions.PerformFrame! f) -> void
-CobolNet.Runtime.Exceptions.ExceptionEngine.RaisePerformFloor() -> int
 CobolNet.Runtime.Exceptions.ExceptionEngine.RangeIndexChecking.get -> bool
 CobolNet.Runtime.Exceptions.ExceptionEngine.RangeIndexChecking.set -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.RangeIndexError(string! detail) -> void
@@ -1084,7 +1083,6 @@ CobolNet.Runtime.Exceptions.ExceptionEngine.ReportVaryingChecking.get -> bool
 CobolNet.Runtime.Exceptions.ExceptionEngine.ReportVaryingChecking.set -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.ReportVaryingError(string! detail) -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.RestoreChecking(CobolNet.Runtime.Exceptions.CheckingFlags saved) -> void
-CobolNet.Runtime.Exceptions.ExceptionEngine.RestorePerformFloor(int floor) -> void
 CobolNet.Runtime.Exceptions.ExceptionEngine.RunTopFrame(string! ec, string? file, out bool handled) -> int
 CobolNet.Runtime.Exceptions.ExceptionEngine.SaveChecking() -> CobolNet.Runtime.Exceptions.CheckingFlags
 CobolNet.Runtime.Exceptions.ExceptionEngine.Set(string! name, bool fatal, string? statement = null, string? location = null) -> void
@@ -1592,7 +1590,6 @@ CobolNet.Runtime.IO.KeyedConnector.Access.get -> CobolNet.Runtime.IO.KeyedAccess
 CobolNet.Runtime.IO.KeyedConnector.KeyedConnector(string! hostPath, int recordWidth, CobolNet.Runtime.IO.KeyedAccess access, int varyMin, int varyMax) -> void
 CobolNet.Runtime.IO.KeyedConnector.PersistIsReachable(bool owed) -> bool
 CobolNet.Runtime.IO.KeyedConnector.ReleaseFileLock() -> void
-CobolNet.Runtime.IO.KeyedConnector.Store.get -> System.IO.FileStream?
 CobolNet.Runtime.IO.KeyedConnector.StoreHolds(long framedBytes) -> bool
 CobolNet.Runtime.IO.KeyedConnector.TakeFileLock(bool create) -> System.IO.FileStream!
 CobolNet.Runtime.IO.LinagePage
@@ -2668,12 +2665,6 @@ static CobolNet.Runtime.CobolIntrinsics.Concat(params string![]! parts) -> strin
 static CobolNet.Runtime.CobolIntrinsics.Convert(string! arg, int src, int dst, bool dstHex) -> string!
 static CobolNet.Runtime.CobolIntrinsics.Cos(CobolNet.Runtime.CobolDec x) -> double
 static CobolNet.Runtime.CobolIntrinsics.Cos(double x) -> double
-static CobolNet.Runtime.CobolIntrinsics.DateOfIntegerReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.DateToYyyymmddReal(double date, double off = 50) -> long
-static CobolNet.Runtime.CobolIntrinsics.DateToYyyymmddReal(double date, double off, double baseYear) -> long
-static CobolNet.Runtime.CobolIntrinsics.DayOfIntegerReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.DayToYyyydddReal(double day, double off = 50) -> long
-static CobolNet.Runtime.CobolIntrinsics.DayToYyyydddReal(double day, double off, double baseYear) -> long
 static CobolNet.Runtime.CobolIntrinsics.DisplayOf(string! arg, string? sub = null) -> string!
 static CobolNet.Runtime.CobolIntrinsics.DomainDec(CobolNet.Runtime.CobolDec value, CobolNet.Runtime.CobolIntrinsics.ArgumentDomain domain, string! function, string! rule) -> double
 static CobolNet.Runtime.CobolIntrinsics.DomainDecAdmitted(CobolNet.Runtime.CobolDec value, CobolNet.Runtime.CobolIntrinsics.ArgumentDomain domain, string! function, string! rule) -> CobolNet.Runtime.CobolDec?
@@ -2703,8 +2694,6 @@ static CobolNet.Runtime.CobolIntrinsics.IntegerArgWideDec(CobolNet.Runtime.Cobol
 static CobolNet.Runtime.CobolIntrinsics.IntegerArgWideReal(double v) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerArgWideScaled(System.Int128 unscaled, int scale) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerOfBoolean(string! boolean) -> System.Int128
-static CobolNet.Runtime.CobolIntrinsics.IntegerOfDateReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.IntegerOfDayReal(double v) -> long
 static CobolNet.Runtime.CobolIntrinsics.Length(string! s) -> long
 static CobolNet.Runtime.CobolIntrinsics.Log(CobolNet.Runtime.CobolDec? x) -> double
 static CobolNet.Runtime.CobolIntrinsics.Log(double x) -> double
@@ -2732,7 +2721,6 @@ static CobolNet.Runtime.CobolIntrinsics.MinScaled(params System.Int128[]! xs) ->
 static CobolNet.Runtime.CobolIntrinsics.MinString(CobolNet.Runtime.CobolCollation! collation, params string![]! xs) -> string!
 static CobolNet.Runtime.CobolIntrinsics.MinString(params string![]! xs) -> string!
 static CobolNet.Runtime.CobolIntrinsics.ModDec(CobolNet.Runtime.CobolRounding mode, CobolNet.Runtime.CobolDec a, CobolNet.Runtime.CobolDec b) -> CobolNet.Runtime.CobolDec
-static CobolNet.Runtime.CobolIntrinsics.ModReal(double a, double b) -> double
 static CobolNet.Runtime.CobolIntrinsics.ModScaled(System.Int128 a, System.Int128 b) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.NationalOf(string! arg, string? sub = null) -> string!
 static CobolNet.Runtime.CobolIntrinsics.NumvalCDec(string! text, string! currency, bool commaMode = false, bool anycase = false, int digitCap = 31, CobolNet.Runtime.Globalization.LocaleFacts? classification = null) -> CobolNet.Runtime.CobolDec
@@ -2795,8 +2783,6 @@ static CobolNet.Runtime.CobolIntrinsics.SumReal(params double[]! xs) -> double
 static CobolNet.Runtime.CobolIntrinsics.SumScaled(string! fn, params System.Int128[]! xs) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.Tan(CobolNet.Runtime.CobolDec x) -> double
 static CobolNet.Runtime.CobolIntrinsics.Tan(double x) -> double
-static CobolNet.Runtime.CobolIntrinsics.TestDateYyyymmddReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.TestDayYyyydddReal(double v) -> long
 static CobolNet.Runtime.CobolIntrinsics.TestNumval(string! text, bool commaMode = false, int digitCap = 31) -> long
 static CobolNet.Runtime.CobolIntrinsics.TestNumvalC(string! text, string! currency, bool commaMode = false, bool anycase = false, int digitCap = 31, CobolNet.Runtime.Globalization.LocaleFacts? classification = null) -> long
 static CobolNet.Runtime.CobolIntrinsics.TestNumvalCLocale(string! text, string? localeTag, bool anycase = false, int digitCap = 31) -> long
@@ -2809,8 +2795,6 @@ static CobolNet.Runtime.CobolIntrinsics.UpperCase(string! s) -> string!
 static CobolNet.Runtime.CobolIntrinsics.Variance(CobolNet.Runtime.CobolRounding mode, params CobolNet.Runtime.CobolDec[]! xs) -> double
 static CobolNet.Runtime.CobolIntrinsics.Variance(params double[]! xs) -> double
 static CobolNet.Runtime.CobolIntrinsics.VarianceDec(CobolNet.Runtime.CobolRounding mode, params CobolNet.Runtime.CobolDec[]! xs) -> CobolNet.Runtime.CobolDec
-static CobolNet.Runtime.CobolIntrinsics.YearToYyyyReal(double yy, double off = 50) -> long
-static CobolNet.Runtime.CobolIntrinsics.YearToYyyyReal(double yy, double off, double baseYear) -> long
 static CobolNet.Runtime.CobolInvokeArg.OmittedArgument() -> CobolNet.Runtime.CobolInvokeArg!
 static CobolNet.Runtime.CobolInvokeArg.ReferenceModified(CobolNet.Runtime.ActivationDescription! description, System.Func<object?>! get, System.Action<object?>! set, CobolNet.Runtime.CellPointer? area) -> CobolNet.Runtime.CobolInvokeArg!
 static CobolNet.Runtime.CobolLocale.Compare(string? a, string? b, string? localeTag) -> string!
@@ -2825,8 +2809,6 @@ static CobolNet.Runtime.CobolLocaleEdit.DeEdit(string! content, string! picture,
 static CobolNet.Runtime.CobolLocaleEdit.Format(System.Int128 unscaled, int valueScale, string! picture, string? localeTag, int size, bool blankWhenZero = false) -> string!
 static CobolNet.Runtime.CobolLocaleEdit.TryFormat(System.Int128 unscaled, int valueScale, string! picture, string? localeTag, int size, out string! edited, bool blankWhenZero = false) -> bool
 static CobolNet.Runtime.CobolModule.Name(int kind) -> string!
-static CobolNet.Runtime.CobolModule.Pop() -> void
-static CobolNet.Runtime.CobolModule.Push(string! name, string! outermost, bool isNested) -> void
 static CobolNet.Runtime.CobolModule.Stack.get -> CobolNet.Runtime.ModuleStack!
 static CobolNet.Runtime.CobolNames.Comparer.get -> System.StringComparer!
 static CobolNet.Runtime.CobolNames.Contains(System.ReadOnlySpan<char> text, System.ReadOnlySpan<char> part) -> bool
@@ -3276,7 +3258,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.OoUniversalChecking.set -> voi
 static CobolNet.Runtime.Exceptions.ExceptionState.OrderNotSupportedChecking.get -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.OrderNotSupportedChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.OrderNotSupportedError(string! detail) -> void
-static CobolNet.Runtime.Exceptions.ExceptionState.PerformDepth.get -> int
 static CobolNet.Runtime.Exceptions.ExceptionState.PerformVaryingChecking.get -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.PerformVaryingChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.PerformVaryingIndexError(long value, string! detail) -> void
@@ -3286,7 +3267,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.ProgramArgOmittedChecking.set 
 static CobolNet.Runtime.Exceptions.ExceptionState.ProgramArgOmittedError(string! detail) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.PushAllCheckingOff() -> CobolNet.Runtime.Exceptions.CheckingFlags
 static CobolNet.Runtime.Exceptions.ExceptionState.PushPerformFrame(CobolNet.Runtime.Exceptions.PerformFrame! f) -> void
-static CobolNet.Runtime.Exceptions.ExceptionState.RaisePerformFloor() -> int
 static CobolNet.Runtime.Exceptions.ExceptionState.RangeIndexChecking.get -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.RangeIndexChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.RangeIndexError(string! detail) -> void
@@ -3328,7 +3308,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.ReportVaryingChecking.get -> b
 static CobolNet.Runtime.Exceptions.ExceptionState.ReportVaryingChecking.set -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.ReportVaryingError(string! detail) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.RestoreChecking(CobolNet.Runtime.Exceptions.CheckingFlags saved) -> void
-static CobolNet.Runtime.Exceptions.ExceptionState.RestorePerformFloor(int floor) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.RunTopFrame(string! ec, string? file, out bool handled) -> int
 static CobolNet.Runtime.Exceptions.ExceptionState.SaveChecking() -> CobolNet.Runtime.Exceptions.CheckingFlags
 static CobolNet.Runtime.Exceptions.ExceptionState.Set(string! name, bool fatal, string? statement = null, string? location = null) -> void
@@ -3362,7 +3341,6 @@ static CobolNet.Runtime.Exceptions.ExceptionState.StorageNotAvailError(string! d
 static CobolNet.Runtime.Exceptions.ExceptionState.SubscriptError(string! detail) -> void
 static CobolNet.Runtime.Exceptions.ExceptionState.TakePropagatedObject(out CobolNet.Runtime.CobolObject? obj) -> bool
 static CobolNet.Runtime.Exceptions.ExceptionState.TakeRaisedPropagation(string! activatorChecking, out string! name, out bool fatal) -> bool
-static CobolNet.Runtime.Exceptions.ExceptionState.TrimPerformTo(int depth) -> void
 static CobolNet.Runtime.ExternalDescriptor.operator !=(CobolNet.Runtime.ExternalDescriptor? left, CobolNet.Runtime.ExternalDescriptor? right) -> bool
 static CobolNet.Runtime.ExternalDescriptor.operator ==(CobolNet.Runtime.ExternalDescriptor? left, CobolNet.Runtime.ExternalDescriptor? right) -> bool
 static CobolNet.Runtime.ExternalStore.Cell(string! name, System.Func<CobolNet.Runtime.StorageCell!>! create) -> CobolNet.Runtime.StorageCell!

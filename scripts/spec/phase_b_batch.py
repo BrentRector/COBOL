@@ -55,9 +55,6 @@ import re
 import sys
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
-CATALOG = REPO / "docs" / "rearchitecture" / "spec-rule-catalog.json"
-INVENTORY = REPO / "tests" / "version-matrix" / "traceability-inventory.json"
-CONFORMANCE_DOC = REPO / "docs" / "CONFORMANCE.md"
 DIAGNOSTICS_DOC = REPO / "docs" / "DIAGNOSTICS.md"
 DEFAULT_OUT = REPO / "scratchpad" / "phase-b"
 
@@ -65,6 +62,8 @@ DEFAULT_OUT = REPO / "scratchpad" / "phase-b"
 # second one: the same format parsed in two places is CLAUDE.md rule 8's failure one level down — `spec_refs`
 # would grow a field here and not there, and the dossier would quietly stop seeing the notes that own its rows.
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import grammar_source  # noqa: E402  (THE reader of the grammar's rules, kb/Work PB3204)
+import inventory_schema  # noqa: E402  (THE reader of the catalog, the inventory and the §7 register, kb/Work PB3209)
 import work  # noqa: E402  (path must be set first)
 
 
@@ -185,7 +184,6 @@ def part_slug(base: str, index: int, total: int) -> str:
 #: the rest of the corpus put together — and an X-card cites a NIST test number, never an ISO clause. Including
 #: it would triple the scan to add nothing. The NIST `.cs` drivers under `tests/` are still scanned.
 CORPUS = {
-    "grammar": [("src/Cobol.Net.Frontend/Grammar", "**/*.g4")],
     "source": [("src", "Cobol.Net.*/**/*.cs")],
     "tests": [("tests", "**/*.cs"),
               ("tests/conformance", "**/*.cob"),
@@ -234,12 +232,8 @@ PROSE_NOISE = {"implementor", "defined", "specified", "standard", "meaning", "be
 CAMEL = re.compile(r"[A-Z]+(?![a-z])|[A-Z][a-z0-9]*|[a-z0-9]+")
 #: Separator-stripper for file-name comparison. Compiled once: `named` runs it over the whole corpus per subject.
 FLATTEN = re.compile(r"[^a-z0-9]")
-#: An ANTLR rule header: a bare identifier on its own line (the project's parser-rule style) or `NAME : …`.
-RULE_HEAD = re.compile(r"^([A-Za-z][A-Za-z0-9_]*)\s*(:.*)?$")
 #: `GR-14.9.10.4-6` → the clause `14.9.10.4`. Catalog kinds: GR · SR · FMT · RV · AR · DOC.
 RULE_ID = re.compile(r"^[A-Z]+-(\d+(?:\.\d+)*)-\d+$")
-#: An Annex A.1 implementor-determination row in `docs/CONFORMANCE.md`, whose first cell is the A.1 item number.
-A1_ROW = re.compile(r"^\|\s*(\d+)\s*\|")
 
 HOW_TO_READ = (
     "PRE-COMPUTED DISCOVERY — verify it, do not repeat it. Every entry below was found mechanically: a "
@@ -452,49 +446,32 @@ def named(files, kws: list[str]) -> dict:
 
 
 @functools.lru_cache(maxsize=None)
-def grammar_rules() -> tuple[dict, ...]:
+def quotable_rules() -> tuple[dict, ...]:
     """Every ANTLR rule in the grammar, as {file, line, name, text}, with the comment block above it.
+
+    The rules are `grammar_source.read`'s — THE reader (kb/Work PB3204). This dossier's own line-by-line reader
+    ended a rule only at a line ENDING in `;`, so a `;` followed by a trailing comment (`methodDefinition`,
+    `cceRelationOrBoolean`) ran the rule on into the next one and swallowed it: `methodName` and the DISPLAY
+    directive's rule were missing from every dossier, and another rule's text was quoted in their place.
 
     ⚠ THE LEADING COMMENT IS PART OF THE RULE for this purpose. The grammar's ISO citations and its
     superset-parses-here / gated-at-bind notes live in the comment above the rule, not inside it — quoting the
     rule body alone would hand the agent the shape and withhold the reasoning it most needs to verify.
+    ⚠ THE WHOLE COMMENT BLOCK IS SEARCHED, only the tail is QUOTED. This grammar's blocks run to a dozen lines
+    and the ISO citation is as often at the top as at the bottom: a 6-line window measured from the rule missed
+    `functionArgument`'s "TRIM LEADING/TRAILING §15.96" by two lines, which is how TRIM's dossier came back with
+    zero grammar rules the first time it was run.
     """
-    out: list[dict] = []
-    for rel, lines in corpus("grammar"):
-        i = 0
-        while i < len(lines):
-            m = RULE_HEAD.match(lines[i])
-            if not m:
-                i += 1
-                continue
-            start = i
-            end = i
-            while end < len(lines) and lines[end].strip() != ";" and not lines[end].rstrip().endswith(";"):
-                end += 1
-            if end >= len(lines):        # unterminated — not a rule after all (a stray identifier line)
-                i += 1
-                continue
-            # ⚠ THE WHOLE COMMENT BLOCK IS SEARCHED, only the tail is QUOTED. This grammar's blocks run to a
-            # dozen lines and the ISO citation is as often at the top as at the bottom: a 6-line window measured
-            # from the rule missed `functionArgument`'s "TRIM LEADING/TRAILING §15.96" by two lines, which is
-            # how TRIM's dossier came back with zero grammar rules the first time it was run.
-            lead = []
-            j = start - 1
-            while j >= 0 and lines[j].lstrip().startswith("//"):
-                lead.insert(0, lines[j])
-                j -= 1
-            body = list(lines[start:end + 1])
-            out.append({"rule": m.group(1), "file": rel, "line": start + 1,
-                        "text": "\n".join(lead[-MAX_LEAD_COMMENT:] + body[:MAX_RULE_LINES]),
-                        # ⛔ THE SEARCH TEXT INCLUDES THE LEAD COMMENT, and it must. The first cut searched the
-                        # rule BODY only, and TRIM came back with zero grammar rules — because a §15 function has
-                        # no rule of its own and its only grammar trace is the comment above
-                        # `CobolExpressions.g4`'s argument-list rule, naming "TRIM LEADING/TRAILING §15.96". The
-                        # citations live in the comments; a search that skips them cannot find a construct that
-                        # is implemented but not separately parsed.
-                        "_search": "\n".join(lead + body)})
-            i = end + 1
-    return tuple(out)
+    return tuple({"rule": r.name, "file": r.file.relative_to(REPO).as_posix(), "line": r.first_line,
+                  "text": "\n".join(r.lead[-MAX_LEAD_COMMENT:] + r.source[:MAX_RULE_LINES]),
+                  # ⛔ THE SEARCH TEXT INCLUDES THE LEAD COMMENT, and it must. The first cut searched the rule
+                  # BODY only, and TRIM came back with zero grammar rules — because a §15 function has no rule
+                  # of its own and its only grammar trace is the comment above `CobolExpressions.g4`'s
+                  # argument-list rule, naming "TRIM LEADING/TRAILING §15.96". The citations live in the
+                  # comments; a search that skips them cannot find a construct that is implemented but not
+                  # separately parsed.
+                  "_search": "\n".join(r.lead + r.source)}
+                 for r in grammar_source.read())
 
 
 def grammar_for(kws: list[str], provenance: str, pat: re.Pattern, role: str = "") -> dict:
@@ -517,7 +494,7 @@ def grammar_for(kws: list[str], provenance: str, pat: re.Pattern, role: str = ""
     # each and win on file order.
     exact_name = set().union(*parts) | ({role} if role else set()) if parts else set()
     scored: list[tuple[tuple, dict]] = []
-    for rule in grammar_rules():
+    for rule in quotable_rules():
         rule_toks = {t.rstrip("s") for t in tokens(rule["rule"])}
         by_name = sum(1 for ps in parts if ps <= rule_toks)
         by_cite = len(pat.findall(rule["_search"]))
@@ -540,20 +517,33 @@ def doc_lines(path: pathlib.Path) -> tuple[str, ...]:
     return tuple(path.read_text(encoding="utf-8", errors="replace").splitlines()) if path.exists() else ()
 
 
-def doc_citing(path: pathlib.Path, pat: re.Pattern) -> dict:
-    rel = path.relative_to(REPO).as_posix()
+@functools.lru_cache(maxsize=2)
+def register_rows_by_line(lines: tuple[str, ...]) -> dict[int, str]:
+    """`{line -> row key}` for the §7 Annex A.1 register (`DOC-A.1-<n>`) in these docs/CONFORMANCE.md lines.
+
+    ⛔ THE REGISTER HAS ONE READER, `inventory_schema.section7_rows_at` (kb/Work PB3209). This dossier once kept
+    its own pattern for "an A.1 row" — a first cell that is a bare number — written before §7 was re-keyed to
+    `DOC-A.1-<n>`: it matched no §7 row at all and every row of §2's Annex A.3 table, so each dossier handed an
+    adjudicator an A.3 item number labelled as an A.1 item and withheld the real one.
+    """
+    return {line: row.key for line, row in inventory_schema.section7_rows_at("\n".join(lines))}
+
+
+def doc_citing(lines: tuple[str, ...], pat: re.Pattern) -> dict:
+    """The docs/CONFORMANCE.md lines citing the subject; a line that is a §7 register row carries its key."""
+    rel = inventory_schema.REGISTER_PATH.relative_to(REPO).as_posix()
+    register = register_rows_by_line(lines)
     hits = []
     dropped = 0
-    for i, line in enumerate(doc_lines(path), 1):
+    for i, line in enumerate(lines, 1):
         if not pat.search(line):
             continue
         if len(hits) >= MAX_LINES:
             dropped += 1
             continue
         entry = {"file": rel, "line": i, "text": snip(line)}
-        row = A1_ROW.match(line)      # an Annex A.1 register row carries its item number
-        if row:
-            entry["a1-item"] = int(row.group(1))
+        if i in register:
+            entry["a1-item"] = register[i]
         hits.append(entry)
     return {"lines": hits, "truncated": dropped}
 
@@ -639,7 +629,7 @@ def build_dossier(sections: list[str], subject: str) -> dict:
         "grammar": grammar_for(kws, provenance, pat, role_of(subject)),
         "source": {"citing": citing(src, pat), "named": named(src, kws)},
         "tests": {"citing": citing(tst, pat), "named": named(tst, kws)},
-        "determinations": doc_citing(CONFORMANCE_DOC, pat),
+        "determinations": doc_citing(doc_lines(inventory_schema.REGISTER_PATH), pat),
         "register": register_for(secs),
         "diagnostics": diagnostics_citing(pat),
     }
@@ -659,6 +649,37 @@ def dossier_counts(d: dict) -> dict:
     }
 
 
+def self_test() -> int:
+    """The dossier's register tagging, on a planted CONFORMANCE.md (kb/Work PB3209): a §7 Annex A.1 row carries
+    its `DOC-A.1-<n>` key, and a §2 Annex A.3 row and a §8 derivation row citing the same clause carry none."""
+    planted = (
+        "# Conformance",
+        "## 2. Annex A.3 — processor-dependent language elements",
+        "| Item | Element | Disposition |",
+        "|---|---|---|",
+        "| 26 | an A.3 element of the file control entry, §12.4.5 | documented |",
+        "## 7. Annex A.1 — implementor-defined language elements",
+        f"| {inventory_schema.REGISTER_HEADER_CELL} | Element | What we do | Pinned by |",
+        "|---|---|---|---|",
+        "| DOC-A.1-151 | RECORD DELIMITER clause, §12.4.5.11.4 GR1 | determined | `Some.Test` |",
+        "## 8. Rules with no observable obligation",
+        "| DRV-GR-12.4.5-1 | closed set | §12.4.5 | the argument |",
+    )
+    hits = {h["line"]: h for h in doc_citing(planted, clause_pattern(["12.4.5"]))["lines"]}
+    checks = [
+        ("every citing line is returned (§2, §7 and §8)", sorted(hits) == [5, 9, 11]),
+        ("the §7 Annex A.1 row carries its register key", hits.get(9, {}).get("a1-item") == "DOC-A.1-151"),
+        ("the §2 Annex A.3 row carries no A.1 item", "a1-item" not in hits.get(5, {"a1-item": 0})),
+        ("the §8 derivation row carries no A.1 item", "a1-item" not in hits.get(11, {"a1-item": 0})),
+    ]
+    ok = True
+    for label, passed in checks:
+        print(f"  {'ok  ' if passed else 'FAIL'} {label}")
+        ok &= passed
+    print("SELF-TEST:", "PASS" if ok else "FAIL")
+    return 0 if ok else 1
+
+
 def main() -> int:
     # ⚠ BEFORE parse_args, not after. argparse prints this module's docstring for --help, and the docstring
     # carries ⚠/⛔; on a cp1252 Windows console that raises UnicodeEncodeError from inside argparse, so
@@ -670,7 +691,7 @@ def main() -> int:
             pass
 
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("clauses", nargs="+", help="clauses or ranges, e.g. 15.32-15.44 or 14.9.1")
+    ap.add_argument("clauses", nargs="*", help="clauses or ranges, e.g. 15.32-15.44 or 14.9.1")
     ap.add_argument("--max-rules", type=int, default=DEFAULT_MAX_RULES,
                     help=f"most rules in one agent's file before the subject is split (default {DEFAULT_MAX_RULES})")
     ap.add_argument("--no-dossier", action="store_true",
@@ -684,11 +705,16 @@ def main() -> int:
                          "PARTIAL row — and this script's own self-check — can still get the subject's dossier, "
                          "which is otherwise unreachable for any fully-adjudicated construct")
     ap.add_argument("--out", type=pathlib.Path, default=DEFAULT_OUT)
+    ap.add_argument("--self-test", action="store_true", help="prove the dossier's register tagging on a planted document")
     args = ap.parse_args()
+    if args.self_test:
+        return self_test()
+    if not args.clauses:
+        ap.error("name at least one clause or range")
 
-    rules = json.loads(CATALOG.read_text(encoding="utf-8"))["rules"]
+    rules = inventory_schema.load_catalog()
     done = set() if args.include_adjudicated else {
-        r["rule-id"] for r in json.loads(INVENTORY.read_text(encoding="utf-8")) if r.get("verdict")}
+        r["rule-id"] for r in inventory_schema.load_inventory() if r.get("verdict")}
 
     chosen = [r for r in rules if selected(r["section"], args.clauses) and r["id"] not in done]
     skipped = sum(1 for r in rules if selected(r["section"], args.clauses) and r["id"] in done)

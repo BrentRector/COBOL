@@ -26,7 +26,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// the operand-list alternative is absent — i.e. exactly the Format-3 parse.</summary>
     public BoundStatement BindAddCorresponding(Core.AddStatementContext add) =>
         add.CORRESPONDING() is not null || add.CORR() is not null
-            ? Bind(CorrVerb.Add, add.dataReference(), host.Expr.RoundingOf(add.roundedPhrase()),
+            ? Bind(CorrVerb.Add, add.dataReference(), add.receivingIdentifier(), host.Expr.RoundingOf(add.roundedPhrase()),
                 host.BindSizeError(add.arithmeticOnSizeError()))
             : BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "ADD: the statement matches no ADD format (ISO §14.9.2.2)");
 
@@ -34,7 +34,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// (ISO §14.9.44.2 Format 3; SR5 — CORR ≡ CORRESPONDING).</summary>
     public BoundStatement BindSubtractCorresponding(Core.SubtractStatementContext sub) =>
         sub.CORRESPONDING() is not null || sub.CORR() is not null
-            ? Bind(CorrVerb.Subtract, sub.dataReference(), host.Expr.RoundingOf(sub.roundedPhrase()),
+            ? Bind(CorrVerb.Subtract, sub.dataReference(), sub.receivingIdentifier(), host.Expr.RoundingOf(sub.roundedPhrase()),
                 host.BindSizeError(sub.arithmeticOnSizeError()))
             : BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "SUBTRACT: the statement matches no SUBTRACT format (ISO §14.9.44.2)");
 
@@ -54,7 +54,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// SR6/SR12 operand-kind screen is <c>StatementValidation.CheckCorrespondingGroupOperand</c>.</para>
     /// </summary>
     public BoundStatement Bind(
-        CorrVerb verb, Core.DataReferenceContext[] groups, CobolRounding rounding, SizeErrorPhrase? sizeErr)
+        CorrVerb verb, Core.DataReferenceContext? sending, Core.ReceivingIdentifierContext? receiving,
+        CobolRounding rounding, SizeErrorPhrase? sizeErr)
     {
         // ⛔ EACH VERB ASKS ITS OWN RULE, NOT A SHARED APPROXIMATION (kb/Work PB392). What stood here was a
         // verb-NAME switch here and a CLAUSE-STRING switch below, so the three rules differed only in the
@@ -69,12 +70,12 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             _ => CorrespondingOperandRule.Subtract,
         };
         string verbName = rule.Verb;
-        if (groups.Length < 2)
+        if (sending is null || receiving is null)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, $"{verbName} CORRESPONDING: its general format prints exactly two group "
                 + "operands, the sending group and the receiving group");
-        if (host.Expr.ResolveSending(groups[0]) is var srcR && srcR.Place is not { } src)
+        if (host.Expr.ResolveSending(sending) is var srcR && srcR.Place is not { } src)
             return srcR.Refusal(ctx.Edition);   // kb/Work PB1030
-        if (host.Expr.ResolveReceiving(groups[1]) is not { } dst)
+        if (host.Expr.ResolveReceiving(receiving) is not { } dst)
             return BoundRejected.Reported(ctx.Edition);   // the receiving chokepoint reported it — not a deferral (kb/Work PB236, PB881)
         // ⛔ BOTH OPERANDS SHALL BE GROUP ITEMS, AND THAT IS A SYNTAX RULE, SO IT IS DECIDED AT BIND TIME
         // (kb/Work PB236, row SR-14.9.2.3-6). MOVE §14.9.25.3 SR12 — "Identifier-3 and identifier-4 shall
@@ -102,8 +103,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         // PLACE, decorations intact, which is the only level at which a reference modifier is visible.
         // Both operands are screened before the verdict — a statement with two bad operands reports two
         // diagnostics, not the first one only (a short-circuit here would hide the second).
-        bool srcOk = ctx.Validation.CheckCorrespondingGroupOperand(src, groups[0].GetText(), rule);
-        bool dstOk = ctx.Validation.CheckCorrespondingGroupOperand(dst, groups[1].GetText(), rule);
+        bool srcOk = ctx.Validation.CheckCorrespondingGroupOperand(src, sending.GetText(), rule);
+        bool dstOk = ctx.Validation.CheckCorrespondingGroupOperand(dst, receiving.GetText(), rule);
         if (!srcOk || !dstOk) return BoundRejected.Reported(ctx.Edition);
 
         int id = _corrCounter++;
@@ -122,21 +123,23 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     }
 
     /// <summary>
-    /// The pair matcher (ISO §14.7.6, one source level per call): index D2's ELIGIBLE children by name, iterate
-    /// D1's children in DECLARATION order (the implied-statement execution order), and for each name present and
-    /// unique on BOTH sides descend matched group×group levels (rule 1 — identical relative qualification paths)
-    /// or yield the pair, filtered per verb (rule 2 move-validity / rule 3 both-numeric). Rule 5 holds for free:
-    /// the recursion never descends into an ineligible (OCCURS/REDEFINES) child. Returns a loud-failure reason for
-    /// an unreachable storage shape, else <see langword="null"/>.
+    /// The pair matcher (ISO §14.7.6, one source level per call): index D2's ELIGIBLE members by name
+    /// (<see cref="CorrMembers"/>: the children, and the items under a nameless group, which no qualifier separates
+    /// from this level), iterate D1's members in DECLARATION order (the implied-statement execution order), and for
+    /// each name present and unique on BOTH sides descend matched group×group levels (rule 1 — identical relative
+    /// qualification paths) or yield the pair, filtered per verb (rule 2 move-validity / rule 3 both-numeric). Rule 5
+    /// holds by construction: the recursion never descends into an ineligible (OCCURS/REDEFINES) child, and
+    /// <see cref="CorrMembers"/> never walks through a FILLER group carrying either clause. Returns a loud-failure
+    /// reason for an unreachable storage shape, else <see langword="null"/>.
     /// </summary>
     private string? CorrMatch(CorrVerb verb, string verbName, DataItem src, DataItem dst,
         CorrAccess srcAcc, CorrAccess dstAcc, List<DataItem> sChain, List<DataItem> dChain,
         List<CorrespondingPair> pairs, CobolRounding rounding)
     {
-        var dstByName = new Dictionary<string, List<DataItem>>(CobolNames.Comparer);
+        var dstByName = new Dictionary<string, List<CorrMember>>(CobolNames.Comparer);
         foreach (var d in CorrMembers(dst))
         {
-            if (!dstByName.TryGetValue(d.CobolName!, out var list)) dstByName[d.CobolName!] = list = [];
+            if (!dstByName.TryGetValue(d.Item.CobolName!, out var list)) dstByName[d.Item.CobolName!] = list = [];
             list.Add(d);
         }
         // Rule 6 is SYMMETRIC ("the name … is unique after application of the implied qualifiers"): a duplicated
@@ -144,16 +147,18 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         // over EVERY namesake the qualified reference could identify (kb/Work PB1111), not over the rule-1/4/5
         // eligible set: an OCCURS / REDEFINES / class-excluded twin still defeats uniqueness, because the rule's
         // subject is the eligible item and its predicate is the uniqueness of that item's NAME.
-        List<DataItem> srcMembers = CorrMembers(src);
+        List<CorrMember> srcMembers = CorrMembers(src);
         var srcCount = NamesakeCounts(src);
         var dstCount = NamesakeCounts(dst);
 
-        foreach (var s in srcMembers)
+        foreach (var sm in srcMembers)
         {
+            DataItem s = sm.Item;
             if (srcCount[s.CobolName!] > 1) continue;                          // rule 6, source side
             if (!dstByName.TryGetValue(s.CobolName!, out var cands)) continue; // rule 1: no same-named target
             if (dstCount[s.CobolName!] > 1) continue;                          // rule 6, target side
-            DataItem d = cands[0];
+            CorrMember dm = cands[0];
+            DataItem d = dm.Item;
 
             // A group × group namesake pair DESCENDS, and that is true of a bit group and a national group too:
             // NOTE 5 under §14.9.25.4 GR11 — "For purposes of MOVE CORRESPONDING, bit group items and national
@@ -161,9 +166,9 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             // place the MOVE statement does NOT treat them as the elementary items §14.9.25.4 GR4 makes them.
             if (s.IsGroup && d.IsGroup)
             {
-                sChain.Add(s); dChain.Add(d);
+                sm.EnterOn(sChain); dm.EnterOn(dChain);
                 string? fail = CorrMatch(verb, verbName, s, d, srcAcc, dstAcc, sChain, dChain, pairs, rounding);
-                sChain.RemoveAt(sChain.Count - 1); dChain.RemoveAt(dChain.Count - 1);
+                sm.LeaveOn(sChain); dm.LeaveOn(dChain);
                 if (fail is not null) return fail;
                 continue;
             }
@@ -174,16 +179,17 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
                 // error). The question goes to the ONE Table 16 — see CorrRule2MoveValid, which is a delegation.
                 if (!CorrRule2MoveValid(s, d)) continue;
             }
-            // Rule 3: BOTH shall be numeric data items — a group is class alphanumeric and numeric-edited is
+            // Rule 3: BOTH shall be numeric data items — a group never is (its §8.5.2.1 class is alphanumeric,
+            // boolean, national or its type-name) and numeric-edited is
             // category numeric-edited (§8.4.2), so only elementary-numeric × elementary-numeric qualifies; every
             // other namesake silently does not correspond. (The legacy matcher lacked this filter; spec governs.)
             else if (s.Pic?.Category is not PicCategory.Numeric || d.Pic?.Category is not PicCategory.Numeric)
                 continue;
 
-            sChain.Add(s); dChain.Add(d);
+            sm.EnterOn(sChain); dm.EnterOn(dChain);
             Place? sp = srcAcc.ChildPlace(sChain);
             Place? dp = dstAcc.ChildPlace(dChain);
-            sChain.RemoveAt(sChain.Count - 1); dChain.RemoveAt(dChain.Count - 1);
+            sm.LeaveOn(sChain); dm.LeaveOn(dChain);
             if (sp is null || dp is null)
                 return $"{verbName} CORRESPONDING pair '{s.CobolName}' (subscripted group operand over an "
                     + "interior REDEFINES class — member storage unreachable in this slice)";
@@ -203,35 +209,40 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         return null;
     }
 
-    /// <summary>A child participates in correspondence matching unless excluded (ISO §14.7.6): rule 1 — FILLER
-    /// (and a nameless group's whole subtree, which can never satisfy rule 1's name-qualified identity: a FILLER
-    /// level contributes no qualifier — the legacy/NIST-proven reading); rule 4 — <i>"Neither data item contains
-    /// an OCCURS, REDEFINES, or RENAMES clause or is of class index, message-tag, object, or pointer"</i>.
-    /// Level-66 entries never join <see cref="DataItem.Children"/>, so rule 4's RENAMES leg is structural; the
-    /// <see cref="DataItem.Renames"/> test is defensive.
-    /// <para>⛔ RULE 4'S CLASS LEG IS THE WHOLE FOUR-CLASS SET, THROUGH THE ONE PREDICATE (kb/Work PB391). What
-    /// stood here was <c>Pic?.Usage is not Usage.Index</c> under a comment claiming "the 2002+/2014 exclusion
-    /// classes (object, pointer, message-tag) have no representation in this data model yet" — a premise
-    /// <see cref="PicInfo"/> contradicts (it carries Pointer / ProgramPointer / FunctionPointer /
-    /// ObjectReference categories and a MessageTag usage). A POINTER namesake pair was excluded only by the
-    /// ACCIDENT of the private Table-16 copy's <c>_ =&gt; false</c> default, measured: with that copy deleted and
-    /// this leg absent, <c>MOVE CORRESPONDING</c> over two <c>TYPE PT</c> groups would have silently copied a
-    /// pointer. <see cref="ItemCategory.IsIndexMessageTagObjectOrPointer"/> is §13.16.3 SR24 e)'s and
-    /// §13.18.60.3 SR11's population too — one class test, three rules.</para>
-    /// <para>⛔ AND "IS IT A DATA ITEM AT ALL" IS SCREENED HERE, not inside the rule-2 filter where it used to
-    /// sit. A PICTURE-less entry with no subordinates is neither elementary (§8.5.1.3.1 — "The most basic
-    /// subdivisions of a record, that is, those not further subdivided, are called elementary items") nor a group item — an
-    /// error-recovery artifact (a refused MESSAGE-TAG or staged FUNCTION-POINTER entry, a picture-less
-    /// <c>USAGE NATIONAL</c> awaiting COBOLNET0881) — and §14.7.6 speaks only of "a data item in D1". Keeping it
-    /// in a MOVE-validity filter made the exclusion invisible to ADD and SUBTRACT CORRESPONDING, which reached
-    /// it only through rule 3's numeric test by luck of ordering.</para></summary>
+    /// <summary>One data item "in" one level of a CORRESPONDING operand (<see cref="CorrMembers"/>) and the entries
+    /// that lead to it from that level: the nameless (FILLER) groups it stands under, then the item itself. The
+    /// steps are what the pair's storage path walks (<see cref="CorrAccess.ChildPlace"/>, one struct member per
+    /// step); the qualification the match compares is the item's NAME alone, because a FILLER group is no
+    /// qualifier.</summary>
+    private readonly record struct CorrMember(DataItem Item, DataItem[] Steps)
+    {
+        /// <summary>Extend a relative chain by this member's steps (descending into it, or naming it as a pair).</summary>
+        public void EnterOn(List<DataItem> chain) => chain.AddRange(Steps);
+
+        /// <summary>Undo <see cref="EnterOn"/>.</summary>
+        public void LeaveOn(List<DataItem> chain) => chain.RemoveRange(chain.Count - Steps.Length, Steps.Length);
+    }
+
     /// <summary>⛔ THE DATA ITEMS "IN" ONE LEVEL OF A CORRESPONDING OPERAND, rule 1/4/5-eligible, in declaration
     /// order — the ONE place the matcher asks, so both operands (D1 AND D2) answer the same way (kb/Work PB966).
-    /// For an ordinary group they are its eligible subordinate entries. For a level-66 THROUGH alias —
+    /// For an ordinary group they are its eligible subordinate entries, and the eligible entries of every
+    /// nameless group subordinate to it, which stand at this level (below). For a level-66 THROUGH alias —
     /// §13.18.45.4 GR2, "data-name-1 defines an alphanumeric group item that includes all elementary items
     /// starting with data-name-2 … and concluding with data-name-3" — they are those ELEMENTARY items
     /// (<see cref="RenamesInfo.IncludedElementaryItems"/>).
-    /// <para>⚠ DETERMINATION (docs/CONFORMANCE.md §7, kb/Work PB966): §14.7.6 rule 1 compares "the same
+    /// <para>⚠ DETERMINATION (docs/CONFORMANCE.md §3 D-CORRFILLER, kb/Work PB229): A FILLER GROUP IS WALKED THROUGH,
+    /// NOT CUT OFF. §14.7.6 rule 1 asks of the two data items themselves that they "are not implicitly or explicitly
+    /// described with the keyword FILLER and have the same data-name and the same qualifiers, if any, up to, but not
+    /// including, D1 and D2", and §8.4.2.2.1 defines the qualifiers as "superordinate names from the hierarchy to
+    /// which a user-defined name belongs". A FILLER group has no name to be one (§13.18.20.4: "Under no circumstances
+    /// shall a FILLER item be referred to explicitly"), so an item under it has exactly the qualifiers it would have
+    /// beside it, and corresponds with a namesake standing there on the other side. Rule 5 is where the standard
+    /// names the intermediate groups whose subordinates are excluded — "when the group item contains an OCCURS or
+    /// REDEFINES clause" — and a FILLER group carrying one of those is cut off by it, like any other. What stood here
+    /// excluded every FILLER group's whole subtree on "the legacy/NIST-proven reading", an oracle and not the rule;
+    /// measured, <c>ADD CORRESPONDING</c> silently skipped such an item. The rule-6 universe
+    /// (<see cref="NamesakeCounts"/>) already stood FILLER subordinates at this level, so the two now agree.</para>
+    /// <para>⚠ DETERMINATION (docs/CONFORMANCE.md §3 D-CORR66, kb/Work PB966): §14.7.6 rule 1 compares "the same
     /// qualifiers, if any, up to, but not including, D1 and D2", and an alias is in no included item's
     /// qualifier chain — the items are subordinate to the renamed RECORD, not to the alias. Read with GR2's own
     /// wording, the alias includes elementary items and no groups, so each included item stands directly in D1
@@ -241,22 +252,45 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// to the included item and to every group between it and the window's enclosing group (the lowest group
     /// containing both endpoints): an item under an OCCURS or a REDEFINES entry inside the window is excluded
     /// exactly as it would be under a group subordinate to D1.</para></summary>
-    private static List<DataItem> CorrMembers(DataItem group)
+    private static List<CorrMember> CorrMembers(DataItem group)
     {
+        var members = new List<CorrMember>();
         if (group.Renames is not { IsAlias: false } ren)
-            return group.Children.Where(CorrEligible).ToList();
+        {
+            Walk(group.Children, []);
+            return members;
+        }
         DataItem? enclosing = EnclosingGroup(ren);
-        var members = new List<DataItem>();
         foreach (var e in ren.IncludedElementaryItems)
         {
             if (!CorrEligible(e)) continue;
             bool excluded = false;
             for (DataItem? a = e.Parent; a is not null && !ReferenceEquals(a, enclosing); a = a.Parent)
-                if (a.IsTable || a.RedefinesTargetName is not null) { excluded = true; break; }   // rule 5
-            if (!excluded) members.Add(e);
+                if (RuleFiveExcludesSubordinates(a)) { excluded = true; break; }
+            if (!excluded) members.Add(new CorrMember(e, [e]));
         }
         return members;
+
+        void Walk(IEnumerable<DataItem> items, DataItem[] via)
+        {
+            foreach (var item in items)
+            {
+                if (item.CobolName is null && item.IsGroup)
+                {
+                    if (!RuleFiveExcludesSubordinates(item)) Walk(item.Children, [.. via, item]);
+                }
+                else if (CorrEligible(item)) members.Add(new CorrMember(item, [.. via, item]));
+            }
+        }
     }
+
+    /// <summary>§14.7.6 rule 5 — "Neither data item is subordinate to a group item that is subordinate to D1 or D2
+    /// when the group item contains an OCCURS or REDEFINES clause" — asked of one intermediate group: ANY OCCURS
+    /// (fixed or a Format-4 dynamic table, D9) or a REDEFINES. The matcher never descends into such a group (it fails
+    /// <see cref="CorrEligible"/>); this is the same question for the groups it walks THROUGH rather than into: a
+    /// FILLER group, and the groups inside a THROUGH alias's window.</summary>
+    private static bool RuleFiveExcludesSubordinates(DataItem group) =>
+        group.IsTable || group.RedefinesTargetName is not null;
 
     /// <summary>⛔ THE RULE-6 UNIVERSE (§14.7.6 rule 6, kb/Work PB1111): how many data items answer to each name
     /// AT THIS QUALIFICATION LEVEL of one CORRESPONDING operand — every subordinate item named so, ELIGIBLE OR NOT
@@ -293,6 +327,28 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         return null;
     }
 
+    /// <summary>A data item participates in correspondence matching unless excluded (ISO §14.7.6): rule 1 — an item
+    /// described with FILLER (a FILLER GROUP is no pair member either, but <see cref="CorrMembers"/> walks through it
+    /// to the items it holds: no qualifier stands between them and this level); rule 4 — <i>"Neither data item
+    /// contains an OCCURS, REDEFINES, or RENAMES clause or is of class index, message-tag, object, or pointer"</i>.
+    /// Level-66 entries never join <see cref="DataItem.Children"/>, so rule 4's RENAMES leg is structural; the
+    /// <see cref="DataItem.Renames"/> test is defensive.
+    /// <para>⛔ RULE 4'S CLASS LEG IS THE WHOLE FOUR-CLASS SET, THROUGH THE ONE PREDICATE (kb/Work PB391). What
+    /// stood here was <c>Pic?.Usage is not Usage.Index</c> under a comment claiming "the 2002+/2014 exclusion
+    /// classes (object, pointer, message-tag) have no representation in this data model yet" — a premise
+    /// <see cref="PicInfo"/> contradicts (it carries Pointer / ProgramPointer / FunctionPointer /
+    /// ObjectReference categories and a MessageTag usage). A POINTER namesake pair was excluded only by the
+    /// ACCIDENT of the private Table-16 copy's <c>_ =&gt; false</c> default, measured: with that copy deleted and
+    /// this leg absent, <c>MOVE CORRESPONDING</c> over two <c>TYPE PT</c> groups would have silently copied a
+    /// pointer. <see cref="ItemCategory.IsIndexMessageTagObjectOrPointer"/> is §13.16.3 SR24 e)'s and
+    /// §13.18.60.3 SR11's population too — one class test, three rules.</para>
+    /// <para>⛔ AND "IS IT A DATA ITEM AT ALL" IS SCREENED HERE, not inside the rule-2 filter where it used to
+    /// sit. A PICTURE-less entry with no subordinates is neither elementary (§8.5.1.3.1 — "The most basic
+    /// subdivisions of a record, that is, those not further subdivided, are called elementary items") nor a group item — an
+    /// error-recovery artifact (a refused MESSAGE-TAG or staged FUNCTION-POINTER entry, a picture-less
+    /// <c>USAGE NATIONAL</c> awaiting COBOLNET0881) — and §14.7.6 speaks only of "a data item in D1". Keeping it
+    /// in a MOVE-validity filter made the exclusion invisible to ADD and SUBTRACT CORRESPONDING, which reached
+    /// it only through rule 3's numeric test by luck of ordering.</para></summary>
     private static bool CorrEligible(DataItem item) =>
         item.CobolName is not null
         && (item.IsGroup || item.IsElementary)

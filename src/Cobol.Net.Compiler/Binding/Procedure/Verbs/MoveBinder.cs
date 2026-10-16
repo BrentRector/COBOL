@@ -98,14 +98,14 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     public BoundStatement Bind(Core.MoveStatementContext move)
     {
         if (move.CORRESPONDING() is not null || move.CORR() is not null)   // Format 2 — BOTH tokens (§14.9.25.3 SR11)
-            return corr.Bind(CorrVerb.Move, move.dataReference(), CobolRounding.Truncation, null);
+            return corr.Bind(CorrVerb.Move, move.dataReference(), move.receivingIdentifier(), CobolRounding.Truncation, null);
         // ⛔ THE MESSAGE NO LONGER NAMES "MOVE CORRESPONDING" (kb/Work PB421). It used to read "MOVE
         // CORRESPONDING / unsupported MOVE form", and that was the arm `MOVE <sending> CORRESPONDING id-3 TO
         // id-4` reached — a shape §14.9.25.2 prints no format for, which `moveReceivingPhrase`'s deleted second
         // alternative admitted and this loud stage then answered AT RUN TIME. Format 2 is handled whole at the
         // CORRESPONDING test above, so what remains here is a defensive arm over the one printed receiving
         // shape, and it must not claim an unimplemented feature that this binder in fact implements.
-        if (move.sendingOperand() is not { } send || move.moveReceivingPhrase()?.dataReferenceList() is not { } targets)
+        if (move.sendingOperand() is not { } send || move.moveReceivingPhrase() is not { } targets)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, $"MOVE '{move.GetText()}': Format 1 prints one sending operand and "
                 + "TO identifier-2 … (ISO §14.9.25.2)");
         BoundOperand source = SendingOperand(send, "MOVE source");
@@ -115,7 +115,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         if (send.dataReference() is { } sdref
             && host.Expr.ScreenIndexNameOperand(source, sdref.GetText(), "a MOVE sending operand"))
             source = BoundOperandError.Refused(ctx.Edition, $"MOVE of the index-name '{DataBinder.WrittenText(sdref)}' (ISO §13.18.38.3 r7)");
-        var resolved = host.Expr.ResolveTargets(targets.dataReference());
+        var resolved = host.Expr.ResolveTargets(targets.receivingIdentifier());
         return BindMoveOf(source, resolved);
     }
 
@@ -213,8 +213,9 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// <list type="bullet">
     ///   <item>a GROUP element pair — §14.9.25.4 GR4 makes a fixed-length group move an alphanumeric move
     ///     "without conversion", and §8.5.1.12.3's matching made the two elements the same byte length;</item>
-    ///   <item>an elementary pair with IDENTICAL descriptions (<see cref="OoConformance.DescriptionMismatch"/>, the
-    ///     ONE identical-description check) — the conversion is then the identity.</item>
+    ///   <item>an elementary pair with IDENTICAL descriptions (<see cref="OoConformance.SignatureDifference"/>, the
+    ///     ONE pair-mode identity, over the descriptions every relation reads) — the conversion is then the
+    ///     identity.</item>
     /// </list>
     /// <para>Every other elementary pair — any category pair §14.9.25.3 admits, since §8.5.1.12.3 compares only
     /// the elements' byte lengths ("Two corresponding tables match when the byte length of their elements is equal
@@ -231,7 +232,8 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             foreach (var (sSite, rSite) in VariableLengthCompatibility.CorrespondingTables(send.Item, targets[t].Item))
             {
                 if (sSite.Table.IsGroup || rSite.Table.IsGroup) continue;                         // GR4: the image IS the move
-                if (OoConformance.DescriptionMismatch(sSite.Table, rSite.Table) is null) continue;  // identity conversion
+                if (OoConformance.SignatureDifference(sSite.Table, rSite.Table, "sending element", "receiving element")
+                    is null) continue;                                                              // identity conversion
                 (moves ??= []).Add(ElementMove(t, send, sSite, targets[t], rSite));
             }
         }
@@ -479,8 +481,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             // receiver has to be able to hold one whichever way the test goes).
             if (move.Stores[i].Kind is not MoveKind.FigurativeToNumericImage
                 && MoveClassifier.ZeroLengthItemRoute(move.Stores[i].Sender, t) is null) continue;
-            if (t is not (RedefViewPlace or NumericImagePlace) && t.OwnsStorageCell && t.Item.Class is null
-                && t.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display })   // CARRIAGE, not image form (kb/Work PB646)
+            if (t is not (RedefViewPlace or NumericImagePlace) && t.OwnsStorageCell && IsCharacterImageNumeric(t.Item))
                 ctx.Data.MarkImageForced(t.Item);   // the collected image fact
         }
     }
@@ -573,7 +574,16 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     {
         foreach (var t in targets)
             if (t is RefModPlace { OwnsStorageCell: true } rm
-                && rm.Item is { Class: null, Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display } } item)   // CARRIAGE, not image form (kb/Work PB646)
-                ctx.Data.MarkImageForced(item);   // the collected image fact
+                && IsCharacterImageNumeric(rm.Item))
+                ctx.Data.MarkImageForced(rm.Item);   // the collected image fact
     }
+
+    /// <summary>⛔ THE ONE ELIGIBILITY of both image marks above — a figurative fill and a reference-modified store:
+    /// a numeric item whose USAGE is a CHARACTER form, DISPLAY or NATIONAL (§13.18.60.4 GR7 / GR8 — an
+    /// alphanumeric or a national coded character set represents it), outside a REDEFINES class, never a float. Usage NATIONAL
+    /// was left out of both copies (kb/Work PB442): a pre-2023 <c>MOVE LOW-VALUE TO</c> a <c>PIC 9 USAGE NATIONAL</c>
+    /// item reached the emitter's "without image-backed storage" guard and stopped the run unit with
+    /// NotImplementedCobolFeatureException. The mark is the CARRIAGE, not the image form (kb/Work PB646).</summary>
+    private static bool IsCharacterImageNumeric(DataItem item) =>
+        item is { Class: null, Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display or Usage.National } };
 }

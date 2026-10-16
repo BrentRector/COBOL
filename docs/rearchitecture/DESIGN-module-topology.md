@@ -104,9 +104,10 @@ alias noise from every file. Namespace roots:
 | `Cobol.Net.Compiler` | `CobolNet.Compiler` with sub-namespaces per folder (below) |
 | `Cobol.Net.Cli` | `CobolNet.Cli` |
 
-The ANTLR package name is set in `Invoke-Antlr4CSharp.ps1` (currently hard-coded) → move to an MSBuild property
-`<AntlrNamespace>CobolNet.Frontend.Generated</AntlrNamespace>` in the Frontend csproj and reference it in the generator
-call, so it is single-sourced.
+The ANTLR package name is single-sourced in the MSBuild property
+`<AntlrNamespace>CobolNet.Frontend.Generated</AntlrNamespace>` of the Frontend csproj, which passes it to the generator
+(`Invoke-Antlr4CSharp.ps1 -PackageName`, a mandatory parameter with no default) and into the generation's up-to-date
+stamp (kb/Work PB2719, PB2730).
 
 ### 2.3 `Cobol.Net.Compiler` — target folder structure and sub-namespaces
 

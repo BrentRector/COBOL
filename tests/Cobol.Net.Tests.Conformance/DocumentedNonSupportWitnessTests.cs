@@ -175,7 +175,8 @@ public sealed class DocumentedNonSupportWitnessTests
     /// assertion: a decline wired into one statement's binder arm and not the other would still produce one
     /// COBOLNET1578 (feedback_two_arm_dispatch). The facility is a COBOL-2023 introduction; below it the two formats
     /// draw COBOLNET0900 and no COBOLNET1578 (negative/pb374-async-messaging-below-2023, kb/Work PB374), and at
-    /// 2002/2014 both words are ordinary user-defined words (negative/user-word-receive).
+    /// 2014 both words are ordinary user-defined words (at 2002 they are still reserved for the obsolete communication
+    /// facility, kb/Work PB656; negative/user-word-receive, version-matrix row receive-as-user-word).
     /// <para>The golden's <c>.out</c> pins the INERT half: with no message I-O neither ON EXCEPTION nor NOT ON
     /// EXCEPTION runs, where a conforming facility runs exactly one of them at each statement (§14.9.31.4 GR4/GR5,
     /// §14.9.38.4 GR2/GR3).</para></summary>

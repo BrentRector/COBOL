@@ -200,7 +200,7 @@ public sealed class PictureCompositionTests
     [InlineData("L9999.99F", 'L', false)]
     public void AnExtendedFloatingStringIsAdjacency_NotACount(string expanded, char letter, bool floating)
         => Assert.Equal(floating, PictureComposition.HasFloatingString(expanded, '$',
-            new HashSet<char> { 'L', 'F' }, new HashSet<char> { 'L', 'F' }, '.', ',', letter));
+            new HashSet<char> { 'L', 'F' }, new HashSet<char> { 'L', 'F' }, decimalPointIsComma: false, letter));
 
     private static string[] DiagnoseEditing(string picture, char[] phraseOrder)
     {
@@ -231,7 +231,8 @@ public sealed class PictureCompositionTests
     [InlineData("999", '\0', 0)]
     public void AFloatingStringIsAdjacency_NotACount(string expanded, char symbol, int occurrences)
         => Assert.Equal((symbol, occurrences),
-            PictureComposition.FloatingString(expanded, '$', new HashSet<char>(), new HashSet<char>(), '.', ','));
+            PictureComposition.FloatingString(expanded, '$', new HashSet<char>(), new HashSet<char>(),
+                decimalPointIsComma: false));
     /// <summary>
     /// ⛔ THE SCALE GATE. §13.18.40.3 SR4 caps character-string-1 at 63 characters AS WRITTEN, which
     /// <c>PIC X(30000)</c> obeys — so <c>ExpandRepeats</c> hands the composition validator a 30 000-SYMBOL

@@ -437,12 +437,14 @@ answers, each stated in the code where that organization's format lives:
   little-endian length prefix per record, whose method §12.4.5.11.4 GR5 grants ("If the RECORD DELIMITER clause
   is not specified, the method used for determining the length of a variable-length record is specified by the
   implementor") and whose GR1 it obeys ("Any method used shall not be reflected in the record area or the record
-  size used within the function, method, or program"). A first prefix naming more bytes than the file holds is
-  not a framed file at all, so the connector's declared VARIABLE **record type** — a §9.1.6 fixed file attribute —
-  contradicts the medium: **'39'**. A prefix that parses but falls outside the RECORD clause's bounds is NOT a
+  size used within the function, method, or program"). A first frame the ONE frame decoder cannot read
+  (`RecordFraming.ReadFrame`, kb/Work PB2754: a head naming more bytes than the file holds, the empty-slot tag, a
+  table this writer cannot produce) is not a framed file at all, so the connector's declared VARIABLE **record
+  type** — a §9.1.6 fixed file attribute — contradicts the medium: **'39'**. A prefix that parses but falls outside the RECORD clause's bounds is NOT a
   conflict; that is §9.1.13.2 item 3's '04' on the READ, which a '39' at the OPEN would make unreachable. A file
-  shorter than one prefix (fewer than four bytes) states nothing and is not a conflict — the same rule
-  `RecordFraming` already applies to a torn tail.
+  shorter than one prefix (fewer than four bytes) states nothing and is not a conflict. Past the first frame, the
+  same decoder ENDS the data at a torn or damaged frame for every reader — the forward READ, the record count and
+  the backward-READ index alike — so no reader sees a record another does not.
   ⚖ Behaviourally GnuCOBOL's `variable-length SEQUENTIAL data integrity` case: an FD of
   `RECORD VARYING FROM 5 TO 500` over a plain XML text file answers `OPEN ERROR: 39`.
 - **RELATIVE and INDEXED — whatever the framed store's HEADER carries**: the **organization**, the **record
@@ -590,7 +592,8 @@ which is also where REVERSED, the other alternative of the same printed bracket,
 
 **What it buys.** Categories (b) and (c) are unreachable today, so symbols a, b, d and f — previous units,
 no rewind of the current reel, unit removal, rewind — and symbol e's two unit-media branches are vacuous
-rather than missing, which is what `docs/CONFORMANCE.md` §8 `DRV-GR-14.9.6.4-L2.1` records. Adding a
+rather than missing, which is what the owner-signed determination in inventory row `GR-14.9.6.4-3`'s notes
+records (§14.9.6.4 GR3 e) 1.; a `docs/CONFORMANCE.md` §8 row until kb/Work PB55 folded the sub-item). Adding a
 unit-structured medium is then a bounded change: give its connector a category, fill the cells
 `CloseByFormat`'s loud arm names, and implement §14.9.27.4 GR12 b) where `NoRewindPhraseEffect` refuses.
 `CloseTable14Tests` is the drift test that keeps that true — it pins the
@@ -772,8 +775,16 @@ the sentence that used to stand here — *"those route through `CobolFile.OpenIn
 `OpenCore` with no arm of their own"* — recorded the half that was true as though it were the whole, which is
 how §14.9.40.4 GR12 a)'s READ ONLY and GR15 a)'s NO OTHER went unrendered for as long as they did
 (kb/Work PB714). Because every successful OPEN registers in `PhysicalFileTable`, every close
-path releases: `SharedClose` (from the Table-14 CLOSE dispatch), `CloseDisplaced`, `CloseAll` and
-`CloseAndDrop`. The registration is gated on the OPEN's STATUS, not on `IsOpen`, so a re-OPEN of an already-open
+path releases, and it does so by being the SAME close: `FileRegistry.CloseByFormat`, the Table-14 CLOSE dispatch,
+runs `SharedClose` (the deregistration and the §9.1.16 record-lock release) and is the only member that calls a
+connector's own `Close()`. The explicit CLOSE statement, CANCEL's `CloseIfOpen`, an object's `CloseAndDrop`, a
+displaced registration's `CloseDisplaced` and run-unit termination's `CloseAll` (§14.6.11 2), which `Reset` also
+runs for whatever an earlier run unit left open) are all entries over it, and
+`RunUnitImplicitCloseDriftTests` keeps it that way (kb/Work PB603: `CloseAll`, `Reset` and `CloseDisplaced` each
+used to call `Close()` directly, and `Reset` dropped keyed connectors still open). `CloseAll` closes only the files
+in the open mode, closes every one of them even when one close throws, and rethrows the failure afterwards;
+`FileConnector.Close` ends the file lock and the open mode in a `finally`, so a failure no I-O status describes
+never leaves a lock standing against the next run unit. The registration is gated on the OPEN's STATUS, not on `IsOpen`, so a re-OPEN of an already-open
 connector — `'41'`, which leaves the connector in its ORIGINAL mode — no longer re-registers it under the failed
 request's mode.
 
@@ -850,7 +861,9 @@ which is also what keeps kb/Work PB713 closed: a second handle for the load woul
 connector's own `FileShare.None` forbids. `FileLockPostureDriftTests.EveryOrganizationHoldsALiveFileLockWhileOpen`
 measures the lock from a handle OUTSIDE the connector for every (organization × open mode), and
 `EveryOrganisationsHandleAccessLiesInThatBand` turns a FOURTH organization red rather than letting it inherit
-the omission. The in-run-unit half is certified from COBOL by `pb771_keyed_file_lock` at both editions. The guarding test was six
+the omission, and `EveryOrganisationsLiveHandleTakesItsHostAccess` reads the access the host GRANTED each live handle
+(`FileConnector.FileLock`) against the `HostAccess` that band measures, so a handle that spells its own access is red
+even while the stated value stays inside the band (kb/Work PB2758). The in-run-unit half is certified from COBOL by `pb771_keyed_file_lock` at both editions. The guarding test was six
 `InlineData` rows against 35 cells with no row whose incoming mode was OUTPUT (kb/Work PB321). Two silent
 defaults went with it — the emitter registered a LOCK-MODE-only file as ALL OTHER, and a RETRY-phrase-only OPEN
 registered ALL OTHER here — three arms of one determination, two of which had already answered it.
@@ -1108,6 +1121,15 @@ that no SELECT names is rejected by §13.4.5.3 SR1 / §13.4.6.3 SR1 (COBOLNET263
   elementary alphanumeric sender would convert. GR6 says "group item".
 - **Unnamed and off `ByName`,** because the entry is implied: the program cannot reference it, which is precisely
   why SR3 b) and c) require the `FILE … FROM` and `INTO` phrases on the verbs.
+- **SR3 c) is a STATEMENT screen, asked above the organization split: COBOLNET3983** (kb/Work PB694).
+  `StatementValidation.CheckReadIntoOnRecordLessFile` refuses a READ without INTO on such a file; its antecedent is
+  `FileModel.HasNoRecordDescriptionEntries` (an FD — not a report file, not an SD — with no WRITTEN record
+  description entry, so it holds even where the implied record could not be built), and
+  `SequentialIoBinder.BindRead` asks it BEFORE rerouting a relative file to `KeyedIoBinder.BindRead`, so both arms
+  are under the one rule. **SR3 b) has no screen because none is reachable:** the record-name-1 alternative names
+  "a logical record in the file section" (§14.9.51.3 SR5, §14.9.35.3 SR1) and this entry has none, while the
+  `FILE file-name-1` alternative is Annex A.4.13, declined (COBOLNET1706, `docs/CONFORMANCE.md` §5 row A.4.13). The
+  consequence is documented there: a record-less file is INPUT-ONLY in this implementation.
 - **The size is "the maximum size established by the RECORD clause"** — format 1's integer-1, format 3's
   integer-5, format 2's integer-3. A format-2 clause with no `TO` phrase establishes none (§13.18.43.4 GR10
   defers to "the greatest number of bytes described for a record in that file", and none is described), and
@@ -2080,7 +2102,7 @@ BYTES. The two meet at exactly one law and one per-file encoding:
 |---|---|---|
 | in memory | alphanumeric / national items hold characters; a byte-form leaf (binary, packed, IEEE, pointer, bit, a national item's UTF-16BE pairs in a record image) holds BYTES, imaged one character per byte | the record structs and REDEFINES backings |
 | the storage-byte law | **byte 0xFF is the character U+FFFF (the native HIGH-VALUE, R52); every other byte b is U+00bb; a character's byte is its low-order byte**, so U+00FF and U+FFFF share 0xFF | `CobolNet.Runtime.StorageByte` — every byte-form encoder (`CobolNum.Image`, `PointerImage`, `CobolBits`) and decoder, the item-209 byte reduction (`CobolIntrinsics.RawBytes`) and the fixed-record medium |
-| the file encoding | fixed-record organizations (sequential, relative, indexed, report): one byte per position through the law, a character with no byte (above U+00FF, not U+FFFF) refused `'91'` (R47); LINE SEQUENTIAL: UTF-8 (PB1760); a CODE-SET clause converts the native one-byte channel (§13.18.13.4 GR6) | `FileCharacterSet.ToChannel` / `FromChannel` (the two medium sites: `FileConnector.ToMedium`/`FromMedium`, `RecordFraming.WriteStore`/`ReadStore`) |
+| the file encoding | fixed-record organizations (sequential, relative, indexed, report): one byte per position through the law, a character with no byte (above U+00FF, not U+FFFF) refused `'91'` (R47); LINE SEQUENTIAL: UTF-8 (PB1760); a CODE-SET clause converts the native one-byte channel (§13.18.13.4 GR6) | `FileCharacterSet.ToChannel` / `FromChannel` (the two medium sites: `FileConnector.ToMedium`/`FromMedium`, `RecordFraming.ComposeStore`/`DecodeStore`) |
 
 **Why one law and no per-leaf medium codec (the correction).** The first version of this decision gave every record
 struct a second generated image (`AsMedium`/`FromMedium`) whose alphanumeric leaves mapped U+FFFF <-> 0xFF, on the
@@ -2366,10 +2388,10 @@ A process-wide registry keyed by external name (with an Area discriminator for r
     **One page transition, shared** — `BeginNextLogicalPage`, reached from 14.9.51.4 GR25 g)'s ADVANCING PAGE and GR26 a)'s overflow because the standard writes the same destination for both. It is split along 13.18.34.4 GR6 b)'s own sentence ("this occurs before the device is positioned and after all positioning on the current page"): (1) all remaining positioning on the CURRENT page — its unwritten body lines plus its bottom margin, against the OLD page model; (2) the operand re-evaluation, whose values "apply to the next logical page"; (3) exactly ONE line onto the next page, which is what GR8's contiguity makes it. **The travel is derived from the LOGICAL PAGE, never from the WRITE's own line count.** `Advance`'s form feed survives only for 14.9.51.4 GR25 h), the arm for a file with NO LINAGE clause. The page model dies at CLOSE (`EndLinagePage`): GR6 b) 1 and GR7 d) establish it at OPEN OUTPUT and at no other mode.
     An ADVANCING or LINAGE file is forced to line-oriented output, and **a WRITE with no ADVANCING phrase on a file that supports vertical positioning IS an explicit `AFTER ADVANCING 1 LINE`** (kb/Work PB1027; §14.9.51.4 GR25: "automatic advancing shall be provided by the implementor to act as if the user has specified AFTER ADVANCING 1 LINE"): `SequentialConnector.WriteRecord` reroutes it to `WriteAdvancingRecord(lines: 1, before: false)` in EVERY state of the device, for record sequential AND line sequential files, so there is one placement (GR25 f): advance, then present) and one counter step (GR7 c) 3)), with no second arm to disagree with it. This replaced kb/Work PB964's `ImplicitAdvanceIsBefore`, which placed the advance by the device's line state and took BEFORE's record-then-terminator shape when no line was open: that left a plain WRITE after a BEFORE write with no blank line where the spelled-out AFTER has one, put the first record of a LINAGE page one line high, and made a line sequential file travel twice around an AFTER write. **Which files support vertical positioning is the implementor's determination** (`SequentialConnector.SupportsVerticalPositioning`, docs/CONFORMANCE.md §4): a file with a LINAGE clause, and a file to which an ADVANCING phrase has been written since its OPEN (`_printControl`); any other file is unpositioned and its plain WRITE is the record and its own line end (a line sequential delimiter, a record sequential block). `PlainWriteAdvancingConformanceTests` holds the equivalence over every three-write mix. A BEFORE write after an AFTER write still presents on the open line (GR25 e): no advance precedes it), exactly as AFTER ADVANCING 0 LINES does (GR25 c)).
   - **One statement-supplied operand set for both forms** (13.18.34 GR6): every OPEN and every sequential WRITE entry takes a `LinagePage?` — `SequentialIoEmitter.LinageArg(file)` renders `new LinagePage(body, footing, top, bottom)` from the file model (literals fold to constants, GR6a; data-names render the EXECUTING element's field reads, GR6b) or `null` for an FD with no LINAGE clause. The runtime adopts the values at OPEN OUTPUT (GR6b1, with counter := 1 per GR7d — `FileRegistry.SharedOpenAttempt` → `SequentialConnector.BeginLinagePage`, at the COMPLETION of a successful open as GR6b1 says) and at the two page transitions — the ADVANCING-PAGE reset (GR6b2) and the overflow wrap (GR6b3), AFTER the overflow decision against the OLD body, because "the value applies to the next logical page". Evaluating data-names at these page transitions (not only at OPEN) is required by GR6b2/GR6b3 — evaluating solely at OPEN is a conformance hole (SQ208M/SQ210M). **⛔ The page model is connector state; the operand SOURCE is not** (kb/Work PB673): a connector-held evaluator closure belonged to whichever activation installed it last, which for a RECURSIVE unit with a LOCAL-STORAGE operand is a RETURNED activation's dead storage — and it was installed on the program path only, so a class's LINAGE FD (`OoEmitter`) had no page model at all. `HasLinage` is gone with it: "this FD has a LINAGE clause" is now exactly "the statement supplied a page".
-  - **GR26 operational mapping** (`PositionOnLogicalPage` — the counter arithmetic ported from the legacy `AdvanceLinageCounter` and proven over the SQ goldens, now deciding the DEVICE with it because GR26 a) states both in one sentence): with post-advance counter c, body B, footing F — `c > B` ⇒ overflow end-of-page, counter := 1 (GR26a + GR7c4; the reposition lands on the next page's body line 1 through `BeginNextLogicalPage`, never a modulo carry); else `F > 0 ∧ c ≥ F` ⇒ footing end-of-page (GR26b). ADVANCING PAGE: the same transition, counter := 1, no observable EOP (SR18 bars PAGE+EOP). The counter advances in the CONNECTOR as part of EVERY write (EOP phrase or not), with the device and not separately from it, so an AT branch reads the post-advance counter whichever side of the presentation 14.9.51.4 GR25 e)/f) put the advance on.
+  - **GR26 operational mapping** (`PositionOnLogicalPage` — the counter arithmetic ported from the legacy `AdvanceLinageCounter` and proven over the SQ goldens, now deciding the DEVICE with it because GR26 a) states both in one sentence): with post-advance counter c, body B, footing F — `c > B` ⇒ overflow end-of-page, counter := 1 (GR26a + GR7c4; the reposition lands on the next page's body line 1 through `BeginNextLogicalPage`, never a modulo carry); else `F > 0 ∧ c ≥ F` ⇒ footing end-of-page (GR26b). ADVANCING PAGE IS THAT OVERFLOW ARM, not one of its own (kb/Work PB578): §13.18.34.4 GR7 c) 1 resets the counter to one and, "during the resetting", implicitly increments it "to exceed the value specified by integer-1" — GR26 a)'s trigger — so the write takes the same transition and counter := 1 AND causes the overflow end-of-page condition, EC-I-O-EOP-OVERFLOW (GR27 a)), which a USE declarative, an exception-checking PERFORM's WHEN and FUNCTION EXCEPTION-STATUS observe and which keeps a NOT END-OF-PAGE imperative from running (GR28); `docs/CONFORMANCE.md` §4 **DETERMINATION — WRITE ADVANCING PAGE on a logical page is a page overflow**. The counter advances in the CONNECTOR as part of EVERY write (EOP phrase or not), with the device and not separately from it, so an AT branch reads the post-advance counter whichever side of the presentation 14.9.51.4 GR25 e)/f) put the advance on.
     - ⚖ **`c == B` IS AN ADJUDICATED BOUNDARY, DECIDED AGAINST THE PRINTED ARM TEXT — do not "fix" either comparison to match GR26's words.** GR26 a) as printed fires at `c ≥ B` and GR26 b) is clamped to `c < B`; at `c == B` those two cannot both hold with §13.18.34.4 GR2 (all B lines may be written), GR3 (the footing area is [F, B] INCLUSIVE) and GR26's own lead sentence (the lines "do not fit within the current page body"). The strict `c > B` boundary above is the reading `docs/CONFORMANCE.md` §4 records as **DETERMINATION — the §14.9.51.4 GR26 a)/b) boundary at LINAGE-COUNTER = page size** (kb/Work PB686), with the survey (IBM, Micro Focus, GnuCOBOL-via-NIST) and the NIST SQ201M evidence. It is pinned at the boundary by `tests/conformance/2023/pb686_linage_gr26_boundary.cob` and its `85/` twin — **including the no-FOOTING arm**, because the literal reading would make the last body line unwritable for a file that never mentions FOOTING, and a FOOTING-only fixture cannot see that.
   - **LINAGE-COUNTER register** (8.4.3.14): runtime-sourced (`BoundLinageCounterRef` → `CobolFile.LinageCounter(name)`), never a synthesized storage item (only the IOCS modifies it, GR7b); qualified `OF/IN file-name` resolves via the grammar's dedicated alternative, unqualified requires exactly one LINAGE file (SR3/8.4.2.2, ambiguity is a bind-time diagnostic). `ReferenceResolver.Resolve` returns null for the register early (the qualified form's cobolWord is the FILE-name).
-  - **END-OF-PAGE phrases** branch on `CobolFile.EndOfPage(name)` read in the `if` HEADER (a branch body may WRITE the same file — SQ208M); EOP is a SUCCESSFUL write (GR27a — status 00, no USE hook competition). Bind-time diagnostics: SR19 (EOP without LINAGE — the old silent-drop), SR18 (PAGE+EOP), SR13 (mnemonic ADVANCING on a LINAGE file).
+  - **END-OF-PAGE phrases** branch on `CobolFile.EndOfPage(name)` read in the `if` HEADER (a branch body may WRITE the same file — SQ208M); EOP is a SUCCESSFUL write (GR27 — status 00), and GR27 a)'s EC-I-O-EOP / EC-I-O-EOP-OVERFLOW ride that status to the USE hook, which dispatches the exception-checking PERFORM's WHEN or the declarative only when the END-OF-PAGE phrase is absent (GR27 c)/d), kb/Work PB854). Bind-time diagnostics: SR19 (EOP without LINAGE — the old silent-drop), SR18 (ADVANCING PAGE + the AT END-OF-PAGE phrase; a NOT END-OF-PAGE phrase alone is legal beside it, because SR19 and GR28 name the two phrases separately — kb/Work PB578), SR13 (mnemonic ADVANCING on a LINAGE file).
   - **The GR6 b) VALUE RULES and EC-I-O-LINAGE** (kb/Work PB525 + PB526). `EvaluateLinage` is the ONE place the two value rules are applied — GR6 b) 1 `body > 0`, GR6 b) 2 `0 < footing ≤ body` **whenever the FOOTING PHRASE IS SPECIFIED** — and it is reached from all three GR6 b) evaluation points (the OPEN OUTPUT completion and both page transitions inside `BeginNextLogicalPage`).
     **The absent FOOTING phrase is ABSENT in the model, not zero.** `LinagePage.Footing` is `int?` and `SequentialIoEmitter.LinageOpExpr` renders `null` for an omitted phrase; TOP and BOTTOM stay `int` because GR1 says their values ARE zero when absent, so only FOOTING had two facts in one slot. With 0 encoding "absent", GR6 b) 2 could never be applied and a specified `WITH FOOTING AT` holding 0 silently took GR1's no-end-of-page reading — the program ran to completion printing NO-EOP where the footing area was written into. The `_footing > 0` guard on the GR26 b) arm is now `_footing is { } f`, a test of PRESENCE.
     **A violation is an exception condition, not a process kill.** GR6 b) 2 spells out three consequences and all three are realized: LINAGE-COUNTER is set to 0, the page model is discarded, and a `_linagePageBroken` latch holds until CLOSE so *"all subsequent WRITE statements referencing the file cause the EC-I-O-LINAGE exception condition to continue to exist"* — a latched WRITE returns before the record reaches the medium and before GR12's release. The latch is a SEPARATE bit from `HasLogicalPage`: read off the zeroed page model, every later write would take the no-LINAGE print-stream arm and SUCCEED. Both WRITE entries carry the check, because a plain WRITE on a LINE SEQUENTIAL LINAGE file does not route through `WriteAdvancing` (the two-arm dispatch this connector has been bitten by twice). The statement is ABANDONED where GR6 b) 2 abandons it — *"it continues with the statement following the WRITE statement"* — so an AFTER write never presents its record and a BEFORE write keeps the line it had already presented on the page whose values were still valid (GR25 e) puts the presentation first) but does not release it.
@@ -2440,12 +2462,28 @@ A process-wide registry keyed by external name (with an Area discriminator for r
 - **START's preconditions live in the same base, for the same reason** (kb/Work PB352). `FileConnector` owns
   `StartOpenModeGuard` — 14.9.41.4 GR1's "input or I-O" test, whose unsuccessful value is 9.1.13.7 item 7's
   '47' and whose blank cells are Table 20's — and the virtual `InvalidateFilePosition`, which is GR7 ("the file
-  position indicator is set to indicate that no valid record position has been established"). The guard applies
-  GR7 on the way out, because a refused START is an unsuccessful one: GR1's test had been written out FIVE
-  times (twice in each keyed connector, once in the sequential arm) and every copy returned '47' leaving the
-  indicator alone. A keyed connector overrides `InvalidateFilePosition` to clear its FPI VALIDITY BIT as well —
-  its indicator is a key value plus a bit, where the sequential connector's is the stream position — and each
-  connector's `StartFail` is that invalidation plus the invalid key condition's '23'.
+  position indicator is set to indicate that no valid record position has been established"). A refused START is
+  an unsuccessful one, so its '47' returns through the failure terminal `Unsuccessful` (below): GR1's test had
+  been written out FIVE times (twice in each keyed connector, once in the sequential arm) and every copy returned
+  '47' leaving the indicator alone. A keyed connector overrides `InvalidateFilePosition` to clear its FPI
+  VALIDITY BIT as well — its indicator is a key value plus a bit, where the sequential connector's is the stream
+  position — and each connector's `StartFail` is `Unsuccessful` with the invalid key condition's '23'.
+- **Every unsuccessful READ or START ends in ONE terminal, `FileConnector.Unsuccessful`** (kb/Work PB359).
+  §14.9.30.4 GR18 is GR7's READ twin ("Unless otherwise specified, at the completion of any unsuccessful execution
+  of a READ statement, … the file position indicator is set to indicate that no valid record position has been
+  established"), and both are unconditional on the kind of failure. `Unsuccessful(status)` is the twin of
+  `ReadSucceeded`: it calls `InvalidateFilePosition` and then assigns the status, as one step. The guards
+  (`ReadOpenModeGuard`, `SequentialReadGuard`, `RandomReadAbsentOptionalGuard`, `StartOpenModeGuard`) are PURE —
+  they answer a status and change nothing, which is also what lets the pre-read record identity
+  (`SequentialReadReachesRetrieval`, `PeekRandomReadRecordId`) ask the same guard a READ asks — and a READ or
+  START entry never assigns `Status` itself: every failing exit (the guards' '47'/'46'/'10'/'23', a random READ's
+  invalid key '23', an at-end '10', a relative '14', a sequential '30', START's '23') returns through
+  `Unsuccessful`, and every successful one through `ReadSucceeded` or the START epilogue `StartPositioned`. The
+  shapes this replaced — the base flag set by hand (which skipped a keyed connector's validity bit),
+  `return Status = notOpen;`, and `Status = X; return false;` with no invalidation — each kept GR18/GR7 only by an
+  argument about OPEN's current shape. The structural gate is `FilePositionInvalidationDriftTests` (no READ/START
+  entry of a connector assigns `Status`; the terminal invalidates first; the guards are pure); the witness is
+  `tests/conformance/85/pb359_unsuccessful_read_start_position`.
 - SAME AREA buffer-only and SAME SORT-MERGE AREA are no-ops in a managed runtime (pure memory-layout optimizations with no observable behavior).
 
 ## Per-edition gating (G1 — four compilers in one `cobol.exe`)

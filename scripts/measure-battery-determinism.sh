@@ -15,7 +15,9 @@ set -u
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
 . scripts/python-resolve.sh   # "$PY" — every test run below is SCRUBBED through test_population.py (kb/Work PB1718)
 LEG="${1:-guard}"; RUNS="${2:-5}"
-OUT="${3:-${TMPDIR:-/tmp}/determinism-$LEG}"
+# Default: a directory of this run's own (kb/Work PB2922), never one fixed name every run on the host shares; the
+# summary below names it.
+OUT="${3:-$(mktemp -d "${TMPDIR:-/tmp}/determinism-$LEG.XXXXXX")}"
 mkdir -p "$OUT"
 
 # The harness observation log is per-run so a retry or non-observation is attributed to the run that had it.

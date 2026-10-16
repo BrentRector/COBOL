@@ -1,9 +1,11 @@
 {
  "_comment": "The 2023 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2023 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
  "enabled": [
+  "pb370_open_unsuccessful_order",
   "pb374_ec_mcs_names_accept_inert",
   "pb2586_unstring_sr2_category_operands",
   "pb2841_continue_after_non_finite",
+  "pb241_continue_bare_equals_after_zero",
   "pb2757_medium_bytes_not_bom_sniffed",
   "pb1965_annex_c_word_keys",
   "pb2845_flag_option_word_annex_c_fold",
@@ -596,6 +598,8 @@
   "l1_test_formatted_datetime_national_format",
   "l1_trim_zero_length_result",
   "pb261_commit_facility_witness",
+  "pb259_commit_rollback_under_sort",
+  "pb259_commit_rollback_recursive",
   "pb292_record_delimiter_witness",
   "w59_mcs_facility_witness",
   "pb142_retry_conflict_class_ec",
@@ -753,10 +757,16 @@
   "pb640_invoke_argument_landing_checked",
   "pb640_call_argument_landing_legs",
   "pb530_picture_editing_order_2023",
+  "pb3220_editing_for_fixed_occurrences_size_2023",
+  "pb3220_editing_for_mixed_floating_fixed_2023",
+  "pb3219_decimal_point_comma_sr12_point_2023",
   "pb344_read_previous_indexed",
   "pb344_use_mode_invalid_key",
   "pb344_use_mode_read_exception",
   "pb344_use_f3_perform_preempt",
+  "pb442_f3_when_activation_scope",
+  "pb442_f3_when_method_scope",
+  "pb442_f3_when_io_enablement",
   "pb394_sending_value_evaluated_once",
   "pb394_evaluate_function_subscript_subject",
   "pb535_picture_category_size_2023",
@@ -854,7 +864,8 @@
   "pb2623_method_is_a_user_word_at_2023",
   "pb3102_report_not_terminated_with_location",
   "pb3102_intrinsic_names_ride_every_statement",
-  "pb2740_omitted_branch_turn_2023_name"
+  "pb2740_omitted_branch_turn_2023_name",
+  "pb656_directive_words_as_user_words"
   ],
  "pending": [
   "pb485_value_only_format1"

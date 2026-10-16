@@ -10,8 +10,8 @@ namespace CobolNet.Tests.Conformance;
 /// <see cref="PerformFormat3BehaviorTests"/> imp-2..5 matrix, but the F3 PERFORM lives in a method whose handler
 /// bodies reference the method's per-activation LOCAL-STORAGE — so every green case ALSO proves the method-local
 /// machinery (method-local <c>__RunUse</c>/<c>__RunF3</c>, the two-range <c>__MDispatch</c>, and the frame Matcher
-/// capturing the method's locals). Plus the §9.10.1-C2 cross-INVOKE frame-floor isolation. Every expected value is
-/// SPEC-PINNED (the former legacy engine has no EC model, let alone in a method).
+/// capturing the method's locals). Plus the §9.10.1-C2 cross-INVOKE isolation at the activation boundary. Every
+/// expected value is SPEC-PINNED (the former legacy engine has no EC model, let alone in a method).
 /// </summary>
 public sealed class PerformFormat3MethodBehaviorTests
 {
@@ -257,12 +257,12 @@ public sealed class PerformFormat3MethodBehaviorTests
                 DISPLAY "DONE"
             """, "HANDLER N=5\nIMP1 N=5\nDONE");
 
-    // ── §9.10.1-C2 cross-INVOKE frame-floor isolation ────────────────────────────────────────────────────────────
+    // ── §9.10.1-C2 cross-INVOKE isolation (the activation boundary, kb/Work PB442) ──────────────────────────────
 
     [Fact]   // An F3 method OUTER whose imp-1 INVOKEs an F3 method INNER: INNER raises EC-USER-DEMO, which INNER's own
-             // WHEN (EC-SIZE-OVERFLOW) does NOT match. The entry FLOOR hides OUTER's frame from INNER, so INNER's EC is
-             // NOT caught by OUTER's WHEN (it falls to INNER's default — a nonfatal RAISE simply continues). Without the
-             // floor, "OUTER-CAUGHT-LEAK" would print. A method is a separate source element (§14.9.18.3 SR2/SR4a).
+             // WHEN (EC-SIZE-OVERFLOW) does NOT match. OUTER's frame belongs to another activation, so INNER's EC is
+             // NOT caught by OUTER's WHEN (it falls to INNER's default — a nonfatal RAISE simply continues). Were the walk
+             // not bounded, "OUTER-CAUGHT-LEAK" would print. A method is a separate source element (§14.9.18.3 SR2/SR4a).
     public void CrossInvoke_InnerUnmatchedEc_DoesNotReachOuterWhen()
     {
         string src = """

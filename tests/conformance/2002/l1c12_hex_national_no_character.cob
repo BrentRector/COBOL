@@ -39,8 +39,12 @@
       *>     => ORD:55297 65536 00066
       *>   ORD of the pair's halves in WS-P: D800 -> 55297, DC00 ->
       *>     56321        => ORD:55297 56321
-      *>   NX"FFFF" vs NX"D800" compares code units, FFFF > D800
-      *>     => GT
+      *>   WS-N(2:1) (the stored FFFF) vs NX"D800" compares code
+      *>     units, FFFF > D800  => GT
+      *>   (the subject is a data item: §8.8.4.2.1 "A relation
+      *>     condition shall contain at least one reference to an
+      *>     operand that is not a literal" -> cite.py OK
+      *>     §8.8.4.2.1 13))
       *>   DISPLAY of WS-L, the unpaired low surrogate DC00, writes
       *>     U+FFFD       => [�] (the replacement
       *>   character, UTF-8 EF BF BD, between the brackets)
@@ -72,7 +76,7 @@
            MOVE FUNCTION ORD(WS-P(1:1)) TO O1.
            MOVE FUNCTION ORD(WS-P(2:1)) TO O2.
            DISPLAY "ORD:" O1 " " O2.
-           IF NX"FFFF" > NX"D800"
+           IF WS-N(2:1) > NX"D800"
                DISPLAY "GT"
            ELSE
                DISPLAY "NOT-GT"

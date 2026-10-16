@@ -476,7 +476,10 @@ chooses its preview (PB1754), two .NET 11 items are candidates for R1 to evaluat
 
 ### 5.6 Tests, scripts and CI
 Layout and duplication only. Test behavior is the oracle and is not rewritten, except to follow a renamed
-production type. Scripts follow the same no-wrapper rule.
+production type. Scripts follow the same no-wrapper rule, and the same one-rule-in-one-place rule: a rule every script
+needs is stated once per shell and the statements are held equal by a drift test (the interpreter every gate script
+runs: `scripts/python-resolve.sh` and its PowerShell twin, `PythonInterpreterDriftTests`,
+DESIGN-test-build-ci.md §3.14.11, kb/Work PB3197).
 
 ## 6. Risks
 - **Merge conflicts with the fix lane.** A whole-codebase rename touches everything. Mitigation: §2's quiet lane,
@@ -905,6 +908,17 @@ the first population to re-home because their `<summary>` names the files they g
 them). The gate is unaffected: `scripts/gate_plan.py` keys every case on its display name's class and method
 (`name_key`, gate_plan.py:16), not its namespace, and a stale impact-map key only changes the order, never what runs
 (PB1708). The oracle is unaffected: `ArchOracleDriftTests` enrolls row sources by attribute, not by name.
+
+**Scripts: an artifact the tooling reads has ONE Python reader** (kb/Work PB3204, PB3209; R2 findings at 8be230068).
+The rules above are written for C#; for `scripts/` the same "one rule in one place" reads: a script that needs a
+fact about a shared artifact imports that artifact's reader and keeps no parser of its own. The ANTLR grammar under
+`src/Cobol.Net.Frontend/Grammar` is read by `scripts/spec/grammar_source.py` (`read()` → `Rule(name, kind, file,
+first_line, last_line, body, source, lead)`, comments and actions blanked, the population asserted), which replaced
+three private readers that did not agree on which rules the grammar declares (the dossier's missed 78 of 1,205);
+its self-test plants each trap they fell into and refuses
+a script that declares one of their names again. The `docs/CONFORMANCE.md` register tables are read by
+`inventory_schema.register_section_at` (with each row's line, for a line-by-line reader such as the Phase-B
+dossier), and the rule catalog and the traceability inventory by `inventory_schema.load_catalog`/`load_inventory`.
 
 ### 8.3 Decomposition of each god class
 
@@ -1393,18 +1407,24 @@ exception phrases (1844–2001).
 
 **Edition reads in the grammar: a rule over bodies, not a list of spellings.** Most semantic predicates are lookahead
 disambiguation (`{boolExprAhead()}?`, `{!numericLiteralIsLeftOperand()}?` …). **The rule:** EDITION STATE is the
-parser's `Edition` (`Parsing/CobolParserCoreBase.cs:22`, which the front end sets, `Pipeline/Frontend.cs:498`, to the
+parser's `Edition` (`Parsing/CobolParserCoreBase.cs:26`, whose getter is `protected` so that nothing outside the
+parser can read it, and which the front end sets, `Pipeline/Frontend.cs:498`, to the
 compile edition for the program and to whatever edition a fragment parse is given), any `EditionInfo` value (a
 parameter, or a fixed one: `DirectiveExpressionFragment.cs:45` parses every directive expression at
 `EditionInfo.Latest` on purpose and gates the `>>` facility separately, so "the compile edition" is not what every
 parse reads), and every lexer field the front end primes from one
 (`_caseMappingEdition` and `_reservedNonNames`, set by `TokenRetypes.PrimeLexer` from `edition.Year` and from
-`ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of
-the lexer grammar's `@members`, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex)
+`ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of a
+committed `CobolParserCore` partial or a parser grammar's `@members`, of the lexer grammar's `@members` and its
+partials, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex) — a member of a
+type NESTED in one of these included, since a nested type reads its container's protected state through an instance,
+and a member of a type in `src/` DERIVED from one of these (transitively, from the base lists), since a subclass reads
+the protected `Edition` getter and calls the protected reads through `this` —
 whose body reads edition state or calls another edition read, to a fixpoint; an edition-read SITE is any parser or
 lexer predicate `{…}?` or action `{…}` body, any lexer override (`NextToken`, `Emit`), any parser listener, any
 retype-stage member, or any front-end DRIVER member that hands edition state to a lexer or parser or decides a
-re-lex from it, that calls one or passes edition state on: the pipeline's parse-again loop (`Pipeline/Frontend.cs:425-463`,
+re-lex from it, that calls one, names edition state itself (`{Edition.Has(2014)}?`, a primed lexer field) or passes
+edition state on: the pipeline's parse-again loop (`Pipeline/Frontend.cs:425-463`,
 calling `LexesDifferentlyFrom` at `:437` and `PrimeLexer` at `:463`) and the fragment parser (`FragmentParse.Parse`,
 `Parsing/FragmentParse.cs:62,72,93`, and its callers `SubscriptExpressionFragment.cs:31` and
 `DirectiveExpressionFragment.cs:45`), both added by Draft 6 after the fifth refuter (G4). Names play no part, so a read under a new name, in any of the three stages, is
@@ -1415,7 +1435,7 @@ transitive scan), the rule finds these members: `is85`, `is2002`, `is2014`, `is2
 `keywordContinuesHere` (`:437`) through `IsKeywordReadingHere` (`:467`); `userWordHere` (`:371-375`); the action
 `gatedDeclaration` (`:389-392`, through `userWordHere`) and `NoteGatedOffender` (`:401-404`, called by the
 authoritative pass's syntax-error listener); and `ReservedUserWordViolation` (`:545-554`, the COBOLNET0901 message, not
-a predicate); `DialectLevel` is the edition's setter, not a read. And these sites: five spelled `{isXXXX()}?` —
+a predicate); the `DialectLevel` setter shim is deleted (the front end sets `Edition`, both axes). And these sites: five spelled `{isXXXX()}?` —
 `| {is2023()}? LOCATION` (`CobolControlFlow.g4:66`), `| {is2002()}? validationClause` (`CobolData.g4:379`),
 `({is2002()}? validateValidPhrase)?` (`CobolData.g4:828`), `| {is2023()}? applyCommitClause` (`CobolIO.g4:334`) and
 OPEN's `{is2002() || retryPhraseAhead()}?` (`CobolIO.g4:393`); `{reservedHere("CRT")}?` and `{reservedHere("CURSOR")}?`
@@ -1433,12 +1453,14 @@ word status (is this word reserved at this edition, and how is it spelled there)
 comment calls LOCALE and USER-DEFAULT 1985 user words (`CobolParserCoreBase.cs:186-187`) — which the superset parse
 cannot avoid: a
 word that is a user-defined word in an earlier edition must still parse as one there. The grammar's comments give the
-same reason for four of the five spellings (LOCATION, VALID, APPLY and COMMIT, RETRY); the fifth, `validationClause`,
-gates a construct by edition. D7's statement in `COBOLNET_DESIGN.md` ("There is no parse-time `{isXXXX()}?` edition
-predicate") was not what the code does; that document now says what the code does, and kb/Work PB2291 adjudicates
-every member and site the rule finds against D7's purpose (a word-status read the superset parse cannot avoid, or a construct gate that
-belongs in `VersionConformancePass`). Draft 1's "zero" and its correction of §3 R1 and of the `architecture-review`
-skill stay withdrawn; that skill sentence describes the code.
+same reason for four of the five spellings (LOCATION, VALID, APPLY and COMMIT, RETRY), and kb/Work PB2291's verdict
+(landed) holds two of those four: LOCATION and RETRY are word status, while APPLY COMMIT has no other reading below
+2023 and the VALID phrase's INVALID arm none below 2002, so they and the fifth, `validationClause` (whose CLASS,
+DESTINATION, INVALID and VARYING arms are reserved at every edition), gate constructs by edition. D7's statement in
+`COBOLNET_DESIGN.md` ("There is no parse-time `{isXXXX()}?` edition predicate") was not what the code does; that
+document now states the verdict (word status sanctioned, the three construct gates recorded as D7 defects).
+Draft 1's "zero" and its correction of §3 R1 stay withdrawn; the `architecture-review` skill's grammar rule now
+states the verdict too.
 
 **Target: one fragment per division or facility; the core is the compilation group.** The rule: a grammar rule
 lives in the fragment of the clause or statement whose general format defines it, so the `spec-grammar-conformance`
@@ -1464,13 +1486,20 @@ token precedence with the import order; **the lexer stays one grammar**, its mod
 `LexerDfaCacheDriftTests`.
 
 **Kept, each with its pin:** no left-edge semantic predicate in a lexer mode (`LexerDfaCacheDriftTests`); the edition
-reads are what the rule above computes — the grammar drift test APPLIES the rule (it computes the members' fixpoint
-from the superclass's syntax and the call sites from every predicate and action body of the parser grammars and every
-parser listener) and compares the result with the set PB2291's verdict records, per file, so a new read under any
-name (a sixth spelling, a new `reservedHere` site, a new member, a new action or listener call) fails until PB2291's
-verdict records it (PB2291 lands the assertion with its verdict, and PB2333 moves those members as one set, so the pin
-names one type); `Generated/` is a build output,
-never committed (`GenerateIfNewer.ps1`); the generated `CobolWords.g4` is committed because it is an input,
+reads are what the rule above computes — `EditionReadDriftTests` APPLIES the rule (it computes the members' fixpoint
+from the syntax of the parser superclass, its committed partials and parser `@members`, the lexer's `@members` and
+partials and the retype stage, nested and derived types included, derives the primed lexer fields from the retype stage's setter
+calls, and finds the call sites in every predicate and action body of every grammar and in every C# member of `src/`
+outside the read's own stage (a second top-level type in a stage's file included), every front-end hand-off of the edition to a parser and every
+caller that passes one on) and compares the result with the set PB2291's verdict records,
+per file and per rule, each site with its verdict (§8.9 word status, or a construct gate), so a new read under any
+name (a new spelling, a new `reservedHere` site, a new member, a new action or listener call) fails until it is
+adjudicated and recorded (landed with PB2291's verdict; PB2333 moves those members as one set, so the pin names one
+type). The verdict: every read is word status except three construct gates on the declined A.4 surface
+(`validationClause`, `validateValidPhrase`'s INVALID arm, `applyCommitClause`), which stay recorded as D7 defects until
+a constructs.json row can carry a construct refused by name at its introduction; `Generated/` is a build output,
+never committed, regenerated by the csproj's `EnsureGeneratedFiles` target whenever any generation input is newer
+(`AntlrGenerationDriftTests`, kb/Work PB2719); the generated `CobolWords.g4` is committed because it is an input,
 single-sourced from its JSON; the token-stream and parse-tree differential (§4 item 3, not yet built) is the oracle of
 EVERY grammar wave, so no grammar wave runs before it exists. **The grammar leads, placed:** PB2143 (DISPLAY's inline
 sending set, blocked by 83 differing error trees) is the differential's first customer and lands only with it (its `blocked_by` names PB2350, as PB2144's, PB2145's
@@ -1609,12 +1638,30 @@ slice in `blocked_by`), PB2151 and PB2129 where a note's sites need them, and v1
 is COMPUTED, never listed (PB2118 Draft 8; the seventh refuter, J2, found PB2296's hand list missing 16 callers and
 naming a file that does not exist, and Draft 7's "the brief computes callers with the rewriter's dry run and
 `where.py`" was no mechanism: `where.py` maps spec clauses to files, and the brief is rendered after the check). It is
-every site its notes name, whatever the score (a bare type name included; Draft 7 kept only `fix_clusters`' scores of
-2 and up, J3), plus every file under a folder its sites name, on the current tree, plus every file the MEMBER INDEX
-finds using or emitting what a note moves or changes: the note's `**Moves or changes:**` names, the documentation ids
-in its code spans, and every word of its target paragraph that is a member of a type the note names or its sites
-declare (Draft 9: PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use;
-the eighth refuter, K1), else every type its Sites declare (a folder, a class's files). The index is the census's own
+the union of its notes' DECLARED sets plus the group's primary file (`plan_wave.collision_set`, the fix lane's groups
+and a campaign's alike), and a note's declared set is its STRUCTURED sites only, read by ONE reader, the register's
+`work.note_sites` (kb/Work PB3242), which the planner, the member index, the spec renderer and the landing check all
+call: the paths of its Code site / Site / Sites blocks (a bold label's paragraph and the list under it, or a heading's
+section; `:line`, `#member` and `(member)` suffixes dropped) and of the `**The files this step edits**` line
+`file_census_notes` writes into a multi-step note (`work.STEP_FILES_LABEL`: a step's files can lie outside the census
+finding's Sites, as PB2300's `IntrinsicCatalog.cs` does) under the campaign roots of `model_rules.json` (never a
+literal list: `scripts/` was a root the register's own reader ignored), plus every tracked code file under a folder
+its sites name, on the current tree, plus every file the MEMBER INDEX finds using or emitting what the note moves or
+changes: the names on its `**Moves or changes:**` and `r2_members:` lines, the documentation ids in its site blocks,
+and every word of its target paragraph that is a member of a type the note names or its sites declare (Draft 9:
+PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use; the eighth refuter,
+K1), else, for a restructuring note (one with a `**Wave kind:**`), every type its sites declare (a folder, a class's
+files); a fix-lane note declares its sites only: one that names no member, and an R2 defect routed to the fix lane
+(`**Wave kind:** defect-for-fix-lane`, `work.FIX_LANE_WAVE`) whatever its `r2_members:` line names, since those say
+where the defect lives, not what a restructuring moves. A path its prose mentions, a `Gate:` line, a
+tool command and a bare type name declare NOTHING: Drafts 7-10 read every site the note's text named through
+`fix_clusters`' scored heuristic (whatever the score, so a bare type name counted, J3): 57 of PB1754's 63 ready R2
+notes DISCUSS `plan_wave.py` and `landing_check.py` and every PB3160 slice names `cite.py`, so on 2026-10-16 the
+PB1754 dry run planned one campaign group and the PB3160 run one, and with the structured reading six and the whole
+seven-slice chain, every remaining wait a file real in-flight work changes (kb/Work PB3242); the same reading made a
+census member id's parameter type a site (PB2423) and indexed an ignored benchmark report (PB2678).
+`fix_clusters`' scored prose sites still rank and group the fix lane's notes, which carry no site block, and never
+enter a declared set; a campaign clusters on the declared sites. The index is the census's own
 Roslyn walk (`tools/ArchCensus --member-index`, recorded by `scripts/arch/member_index.py --record` as frozen evidence
 `<sha>.members.json.gz`: per symbol, the authored product and test files that use it; per type and member, the files
 that declare it; and, for every type and member of the EMITTED SURFACE, the authored files whose string or
@@ -1624,26 +1671,44 @@ of `src/` and `tests/`, and the host's sources), and the planner plans only on T
 (`member_index.current`: a committed or cached record with that key, else one regenerated into
 `<coord>/member-index/`, else a refusal with `--no-index-regenerate`): a stale index cannot see a type or file a
 landing added (PB833's `OfdRegionLocks.cs` inside PB2251's site folder; K1), and Draft 8's "an older index only widens
-a set" was false. The readers bounded by time (the dispatch guard's record, `work.py check`) use the newest committed
-record plus a text re-scan of every file changed since it and the folder expansion. For PB2296 step 1 the planner's
-set is 73 files (Draft 8: 66), and holds every one of `DataBinder.Options`'s six users the refuter found outside it
-(`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`, `IntrinsicRenderer.cs`,
-`NumericRenderer.cs`); PB2249's holds the nine code-generation files that write the runtime signals as text. The dispatcher, `scripts/orchestrator/plan_wave.py --cluster` (`file_set_collisions`, the ONE
-implementation), checks it against (a) the in-flight work, read from sources a branch classification cannot drop
-(`inflight_file_sets`): every worktree's changed files, committed or not, and every unlanded branch's, each counted
-only while it still differs from `origin/main`, plus every group of the dispatch ledger
-(`<coord>/inflight-groups.json`, written when a wave is planned for dispatch, and by the dispatch guard for every
-write-capable HAND dispatch it admits, an attended Fable or Mythos author or a direct Agent call, with the open notes
-its prompt names and their computed file sets, so the planner sees it before its first edit; J3) whose notes are
-still open — Draft 6
+a set" was false. ONE function computes a declared set, `plan_wave.declared_sets`, on ONE explicit index policy
+(`plan_wave.IndexPolicy`: THE index of the tree, cached in `<coord>/member-index/`; kb/Work PB3203), and the planner,
+the spec renderer (`computed_file_set`, for a groups file that carries no file set) and the landing check (the same, for
+unrecorded R3 work) all pass it: the admission and the guarantee are one quantity, where the landing check's copy once
+read the newest committed record, which cannot see what a landing added. Regenerating costs a solution build plus the
+census host (110 s measured on a cold worktree, 2026-10-16), paid once per tree and, at a landing, only for R3 work no
+ledger entry records; the index is read at all only for a note that names what it moves or changes, or a restructuring
+note, never a fix-lane note (`member_index.needs_index`), so a fix-lane plan never builds one. Only `work.py check`'s unknown-name rule, bounded by time, reads the newest
+committed record plus a text re-scan of every file changed since it. For PB2296 step 1 the declared set is 69 files
+(Draft 8: 66; Draft 9's 73 counted prose sites), and holds every one of `DataBinder.Options`'s six users the refuter
+found outside it (`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`,
+`IntrinsicRenderer.cs`, `NumericRenderer.cs`); PB2249's holds the code-generation files that write the runtime signals
+as text. The dispatcher, `scripts/orchestrator/plan_wave.py` (`file_set_collisions`, the ONE
+implementation; for EVERY plan, the fix lane's too since kb/Work PB2807), checks it against (a) the in-flight work,
+read from sources a branch classification cannot drop (`inflight_file_sets`): every worktree's changed files, committed
+or not, and every unlanded branch's, each counted only while it still differs from `origin/main`, plus every group of
+the dispatch ledger (`<coord>/inflight-groups.json`, read through `plan_wave.ledger_groups`) whose notes are still
+open. The ledger has STRUCTURED writers only (kb/Work PB3186): `plan_wave.record_dispatch`, an upsert keyed on (wave,
+letter), called by `make_dispatch_specs.py` for every group it renders, the planner's waves and a hand-planned wave
+alike, with the group's exact file set, so a dispatched group is in flight before its first edit (J3); and `--release`.
+Draft 8's second writer, the dispatch guard's record of every HAND dispatch it admitted from a scrape of every note id
+its prompt and named files mentioned, recorded reference notes as dispatched work with the union of their sets (six
+entries of 303 to 910 files on 2026-10-15) and is deleted; an entry it left (`hand: true`, a wave that is not a
+number) is ignored by every reader and dropped by the next record, and an attended dispatch made without a rendered
+group is in flight from its worktree's first edit, the landing check behind it. The planner reads each in-flight
+owner through the branch survey's lifecycle state (`plan_wave.classify_inflight`): work WAITING FOR REVIEW, WAITING TO
+LAND or ENQUEUED is finished, and a group meeting it is planned as its CONTINUATION (its pred merges that branch
+first, no `after:`); a dispatched group with no report, and a branch IN FLIGHT, STOPPED, BOUNCED or undecided
+(DECISION) is running, and a group meeting it waits, the collision named; a group's own work (the branch its pred
+continues, a dispatch or branch on its own notes) never collides. Draft 6
 read only the branches `prune_worktrees.classify` called UNLANDED or CHECK, which drops a dispatched branch with no
 commit (MERGED) and one that edits only existing files (LANDED; the sixth refuter's lead); and (b) the open
 external-repository slices' in-flight set (`work.slice_file_set`): every file `DESIGN-external-repository.md` §12
 names for a row not yet landed, in ALL three columns (Draft 6 read only "Today", which missed the twelve caller
 files of "Callers updated in the same change"; H4), from every name in a code span, not only the first (`: GroupRepository`), a type
 mapped to each file declaring it, a member to the file declaring it (a one-word or widely declared name is reported,
-not guessed), and the `tests/` and `docs/` paths the table names; a collision defers the wave, with the collision
-named, never the train.
+not guessed), and the `tests/` and `docs/` paths the table names (set (b) gates the campaign only: the fix lane
+was never held for a slice); a collision defers the group, with the collision named.
 
 **The planner's set is the ADMISSION estimate; the landing check is the GUARANTEE** (PB2118 Drafts 9–10). Three refuter
 rounds each found a new hole in the computed set (hand lists, then the index's blind spots, then its staleness), so a
@@ -1657,8 +1722,10 @@ through one reader, `plan_wave.changed_files`) with
 admitted, read from the FULL ledger (the landing flips its own notes to terminal, and that declaration stays its
 authority), or the set computed now for a note never recorded; a file an R3 commit changed that existed on `main` and
 lies outside it stops the landing; and (2) every other in-flight branch's actual diff and every dispatched group's
-whole declared set until its notes are terminal, started or not (`inflight_file_sets`), when the shared file is R3
-work on either side. R3 work is attributed PER COMMIT (PB2703): a train is mixed, one commit per cluster, so the
+whole declared set, started or not, until its notes are terminal or its report answers it (`inflight_file_sets`;
+a returned group is read through its branch, kb/Work PB2795), when the shared file is R3
+work on either side. R3 work is attributed PER COMMIT (PB2703): a landing can be mixed (a branch that merged a
+predecessor; before kb/Work PB3023, a train of one commit per cluster), so the
 landing's R3 work is the commits that work on an R3 note and the files those commits change; its fix-lane commits
 neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. Each commit
 is charged only with what it introduced (PB3180): a non-merge commit with its diff against its parent, a MERGE commit
@@ -1670,24 +1737,29 @@ predecessor changed and stopped PB3154's branch on a note whose only commit chan
 stops the LATER of the two by dispatch time (the ledger's `at`, one millisecond apart per group so a wave never ties,
 else the branch's first commit), which re-plans and rebases onto the earlier once it lands, and the earlier one lands
 with a warning naming the branch that must rebase. An in-flight branch is R3 work because its DISPATCH says so, never
-by its commit wording (implementers commit `WIP checkpoint: …`): a train manifest that lists it, the dispatch-ledger
-groups whose declared files its actual diff meets, then the ids leading its subjects or whose status it flips. The
-landing's OWN members are excluded by its train manifest (`<coord>/scratch/train<label>-manifest.json`, which the
-rolling wave has its lander write first) and by content (a file whose version on the member IS the landing's: the
-lander re-commits its clusters); a branch whose commits the landing contains is the landing itself; anything else
-that shares a file and was dispatched earlier stops it, naming how it was identified and how to bind a member it did
-not recognise. An aborted dispatch's entry never expires on a clock; it is released by hand (`plan_wave.py --release
-<wave|group|note>`). Fix-lane work against fix-lane work is a train's ordinary merge and is not checked. The check
+by its commit wording alone (implementers commit `WIP checkpoint: …`), and it is bound to ONE dispatch (`identity`,
+kb/Work PB3186): its fix-lane REPORT (the newest whose branch field names it) and that report's ledger group (its
+slug), else the ids leading its subjects or whose status it flips, else the ONE ledger group that best covers its
+actual diff (`best_group`: most of its files, then the smallest declared set, then the latest). Draft 10 bound it to
+the union of every ledger group its diff met, so a fix-lane worktree on a file one R3 group (or a scraped hand entry)
+also declared read as R3 work: 23 fix-lane landings stopped so on 2026-10-14/15. A branch whose commits the landing
+contains (a predecessor it merged) is the landing itself, and a file whose version on another branch IS the landing's
+is the landing's content; anything else that shares a file and was dispatched earlier stops it, naming how it was
+identified and how to bind work it did not recognise. (The train manifests that once named a train's own members are
+gone with the train, kb/Work PB3023.) An aborted dispatch's entry never expires on a clock; it is released by hand
+(`plan_wave.py --release <wave|group|note>`). Fix-lane work against fix-lane work is never stopped: the merge queue
+merges it, at worst through a conflict finisher. The check
 costs 7.6 s on a real range with 33 worktrees (the ninth refuter measured 64 s for Draft 9: the per-worktree reads now
 run on a thread pool, and a branch's register changes are one patch, not two reads per note). A STOP is
 `enqueue.py land`'s exit 3. It is enforced where every landing passes, not by the server: CI has no worktrees and no
 dispatch ledger to compare with, so the server-side check is `ci-gate` on the merge group, and the ruleset refuses a
 direct push to `main`. The domain is
 the campaign's code roots and extensions (`model_rules.json` `campaign`) without `.md`: a document both sides edit is
-a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 25 cases) plants an out-of-set edit, a
-two-branch overlap, a rename each way, a `WIP checkpoint:`-only R3 worktree, a train against its own implementer
-(recorded, unrecorded, re-resolved with and without its manifest, and beside a stranger), a started wave's
-untouched declared file, and a mixed train (a fix-lane commit outside the R3 set and sharing a file with earlier
+a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 35 cases) plants an out-of-set edit, a
+two-branch overlap, a rename each way, a `WIP checkpoint:`-only R3 worktree, a landing against its own implementer
+(recorded, unrecorded, re-resolved unbound and merged, and beside a stranger), a fix-lane worktree on a file an R3
+group also declares (bound to the group covering its diff, by coverage and by its report), retired hand entries, a
+started wave's untouched declared file, and a mixed landing (a fix-lane commit outside the R3 set and sharing a file with earlier
 fix-lane work, an R3 commit sharing one with earlier work, an R3 commit that lands its own note, and a squashed commit
 of both kinds), in a scratch repository, and fails with the check disabled.
 

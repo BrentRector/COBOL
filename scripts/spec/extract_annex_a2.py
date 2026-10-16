@@ -107,9 +107,12 @@ def resolve(items: list[dict], rules: list[dict]) -> list[dict]:
     """Attach to each item the catalog `rule-id`s its OWN citations resolve to.
 
     A citation resolves to every catalog rule of the cited KIND whose section falls under the cited clause and
-    whose ordinal is one of the cited rule numbers. Several ids per citation is normal and correct — A.2 item 41
-    cites §14.9.30 General rule 3 and the catalog carries that rule once per edition variant — and membership,
-    not uniqueness, is the question a checker asks of this data.
+    whose ordinal is one of the cited rule numbers, in the block's PRIMARY numbering (`sublist` 1): "General rule
+    3" names the third top-level rule, never item 3 of a list printed elsewhere in the block. Until kb/Work PB55
+    the ordinal alone was matched, and A.2 items 3, 37 and 41 resolved to six nested-list items numbered 2 or 3
+    (`GR-14.9.30.4-L2.3` …) beside the rule they cite — read at the time as "one id per edition variant", which
+    the catalog has never had. Several ids per citation stay possible when a citation names several rules or a
+    clause with several rule blocks, and membership, not uniqueness, is the question a checker asks of this data.
     """
     by_kind: dict[str, list[dict]] = {}
     for r in rules:
@@ -119,7 +122,8 @@ def resolve(items: list[dict], rules: list[dict]) -> list[dict]:
         ids: set[str] = set()
         for c in it["citations"]:
             for r in by_kind.get(c["kind"], []):
-                if r.get("ordinal") in c["rules"] and section_matches(c["clause"], r.get("section", "")):
+                if (r.get("ordinal") in c["rules"] and r.get("sublist", 1) == 1
+                        and section_matches(c["clause"], r.get("section", ""))):
                     ids.add(r["id"])
         out.append({**it, "rule-ids": sorted(ids)})
     return out
@@ -194,6 +198,8 @@ FAKE_CATALOG = [
     {"id": "GR-14.9.25.4-1", "section": "14.9.25.4", "kind": "GR", "ordinal": 1},
     {"id": "GR-13.4.4-1", "section": "13.4.4", "kind": "GR", "ordinal": 1},
     {"id": "GR-13.18.63.4-2", "section": "13.18.63.4", "kind": "GR", "ordinal": 2},
+    # Item 11 of a SECOND list printed in the same block (a peer sub-list, kb/Work PB55): not "General rule 11".
+    {"id": "GR-14.9.5.4-L2.11", "section": "14.9.5.4", "kind": "GR", "ordinal": 11, "sublist": 2},
 ]
 
 
@@ -212,6 +218,8 @@ def self_test() -> int:
           "GR-14.9.50.4-11" not in by[1]["rule-ids"])
     check("a General-rule citation does not select a SYNTAX rule of the same ordinal",
           "SR-14.9.5.3-11" not in by[1]["rule-ids"])
+    check("'General rule 11' does not select item 11 of a second list in the block (kb/Work PB55)",
+          "GR-14.9.5.4-L2.11" not in by[1]["rule-ids"])
     check("⛔ 'General rules 6d and 14.6.13.2' does not invent a phantom General rule 1",
           by[2]["rule-ids"] == ["GR-14.9.25.4-6"], f"got {by[2]['rule-ids']}")
     check("an item citing a clause with NO rule number resolves to nothing",

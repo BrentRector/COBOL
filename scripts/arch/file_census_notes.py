@@ -142,25 +142,35 @@ def parse_ranges(spec):
     return ids
 
 
+def note_status(text):
+    """A note's `status`, as the register reads it: `work.parse_frontmatter`, quotes stripped (kb/Work PB3196: a raw
+    `status:` line prefix kept `"open"` quoted, so --rerender skipped a note work.py calls open). None for a file that
+    is not a note or states no status."""
+    fm = work.parse_frontmatter(text)
+    return fm.get("status") if fm else None
+
+
 def scan_notes(notes_dir):
-    """-> ({census id: note id}, {design key: note id}, {note id: status})."""
+    """-> ({census id: note id}, {design key: note id}, {note id: status}). The status comes from the register's
+    reader (note_status); the census_ids/design_keys lines are this generator's own body lines."""
     census, design, status = {}, {}, {}
     for name in os.listdir(notes_dir):
         if not name.endswith(".md"):
             continue
         nid = name[:-3]
         with open(os.path.join(notes_dir, name), encoding="utf-8") as fh:
-            for line in fh:
-                if line.startswith("census_ids:"):
-                    for x in line[len("census_ids:"):].split(","):
-                        if x.strip():
-                            census.setdefault(x.strip(), nid)
-                elif line.startswith("design_keys:"):
-                    for x in line[len("design_keys:"):].split(","):
-                        if x.strip():
-                            design.setdefault(x.strip(), nid)
-                elif line.startswith("status:") and nid not in status:
-                    status[nid] = line[len("status:"):].strip()
+            text = fh.read()
+        if (st := note_status(text)) is not None:
+            status[nid] = st
+        for line in text.splitlines():
+            if line.startswith("census_ids:"):
+                for x in line[len("census_ids:"):].split(","):
+                    if x.strip():
+                        census.setdefault(x.strip(), nid)
+            elif line.startswith("design_keys:"):
+                for x in line[len("design_keys:"):].split(","):
+                    if x.strip():
+                        design.setdefault(x.strip(), nid)
     return census, design, status
 
 
@@ -379,8 +389,7 @@ def render(group, nid, record_path, short_sha, design=None):
                 len(steps), steps[0]["target"]))
             body.append("")
             if steps[0].get("files"):
-                body.append("**The files this step edits** (the Sites above are the census finding's, the whole "
-                            "class): " + ", ".join("`%s`" % x for x in steps[0]["files"]) + ".")
+                body.append(step_files_line(steps[0]["files"]))
                 body.append("")
             body.extend(file_set_lines(steps[0].get("moves")))
             body.append("**It claims only that step** (one note = one wave; `plan_wave.py` groups notes). Steps 2–%d are "
@@ -435,6 +444,13 @@ def render_step(rid, k, nid, finding, design, record_path, short_sha):
              "**Blocked by:** " + blocked_sentence(bb) + ". The wave proves the §4 contract and adds the drift test "
              "that keeps its new boundary true.", ""]
     return "\n".join(body), title
+
+
+def step_files_line(files):
+    """The structured line naming the files ONE STEP edits (work.STEP_FILES_LABEL, which work.note_sites reads as a site
+    block, so a step file outside the census finding's Sites is in the note's declared set: kb/Work PB3242 R1-1)."""
+    return ("**%s** (the Sites above are the census finding's, the whole class): " % work.STEP_FILES_LABEL
+            + ", ".join("`%s`" % x for x in files) + ".")
 
 
 def file_set_lines(moves):
@@ -576,12 +592,12 @@ def file_notes(findings_path, id_pool, notes_dir, dry_run, targets=None, rerende
 
 # ── R2: the review fleet's upheld findings (kb/Work PB2560; DESIGN-architecture-review §3 R2; the R2 review's B5) ──
 R2_PREFIX = {"extract": "Extract:", "unify": "Unify:", "move-and-rename": "Move/rename:", "data-ize": "Data-ize:",
-             "delete": "Delete:", "modernize": "Modernize:", "defect-for-fix-lane": "Defect:"}
+             "delete": "Delete:", "modernize": "Modernize:", work.FIX_LANE_WAVE: "Defect:"}
 R2_MODEL = {"extract": EXTRACT_MODEL, "unify": EXTRACT_MODEL, "data-ize": EXTRACT_MODEL,
             "move-and-rename": "Sonnet (a rewriter-driven wave, R69 §4); a judgment it meets returns NEEDS-OPUS",
             "delete": "Sonnet (a measured deletion, R69 §4); a judgment it meets returns NEEDS-OPUS",
             "modernize": "Sonnet (one analyzer rule with its code fix, §5.5; R69 §4)",
-            "defect-for-fix-lane": "the fix lane's routing (`model_rules.json`)"}
+            work.FIX_LANE_WAVE: "the fix lane's routing (`model_rules.json`)"}
 # Critical stays MAJOR: the register reserves BLOCKER for an adjudicated severe wrong answer (4 notes of 2,137),
 # and the fix lane ranks a defect by its harm flags first; the landing adjudication re-ranks it.
 R2_SEVERITY = {"Critical": "MAJOR", "Warning": "MINOR"}
@@ -624,14 +640,12 @@ def scan_r2(notes_dir):
             text = fh.read()
         if "\nr2_ids:" not in text.replace("\r\n", "\n"):
             continue
-        note = {"ids": [], "members": [], "sites": [], "wave_kind": None, "status": None}
+        note = {"ids": [], "members": [], "sites": [], "wave_kind": None, "status": note_status(text)}
         for line in text.splitlines():
             if line.startswith("r2_ids:"):
                 note["ids"] = [x.strip() for x in line[len("r2_ids:"):].split(",") if x.strip()]
             elif line.startswith("r2_members:"):
                 note["members"] = [x.strip() for x in line[len("r2_members:"):].split(",") if x.strip()]
-            elif line.startswith("status:") and note["status"] is None:
-                note["status"] = line[len("status:"):].strip()
             elif line.startswith("**Wave kind:** "):
                 note["wave_kind"] = line[len("**Wave kind:** "):].split(".")[0].strip()
             elif line.startswith("- `") and "`" in line[3:]:
@@ -662,7 +676,7 @@ def r2_merge(group):
 
 def render_r2(rec, nid, pin, areas):
     wave = rec["wave_kind"]
-    defect = wave == "defect-for-fix-lane" or rec["kind"] == "defect"
+    defect = wave == work.FIX_LANE_WAVE or rec["kind"] == "defect"
     harm = {v: "true" if k in (rec.get("harm") or []) else "false" for k, v in R2_HARM.items()}
     title = "%s — %s %s (R2 %s at %s)" % (nid, R2_PREFIX[wave], rec["title"].rstrip("."), rec["pair"], pin[:9])
     clauses = sorted({str(r["clause"]) for r in rec.get("spec_refs") or []})
@@ -841,7 +855,7 @@ def self_test_r2():
         cp = os.path.join(tmp, "collected.json")
         dup = rec(1, id="s1--architecture--f2#1", files=["src/T.cs", "src/U.cs"], sites=["src/T.cs:80-120 (N.T.F)", "src/U.cs:1-9"],
                   title="the same split, seen from the far end", severity="Critical")
-        d = rec(2, wave_kind="defect-for-fix-lane", kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
+        d = rec(2, wave_kind=work.FIX_LANE_WAVE, kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
                 sites=["src/D.cs:3"], severity="Critical", spec_refs=[clause], members=[])
         upheld = [rec(1), dup, d, rec(3, files=["src/Gone.cs"], sites=["src/Gone.cs:1"], members=["N.G.H"])]
         batch = {"pin": "abcdef0123456789", "complete": True, "relaunch": [], "upheld": upheld,
@@ -889,6 +903,16 @@ def self_test_r2():
         assert not w3 and tail3 == ["PB9106"] and s3["merged into an existing note"] == ["s9--duplication--f1#7 -> PB9101"], s3
         assert "r2_ids: s1--architecture--f1#1, s1--architecture--f2#1, s9--duplication--f1#7" in a2 and \
             "**Also found as** `s9--duplication--f1#7`" in a2, a2
+        # a QUOTED terminal status is terminal, as work.py reads it (kb/Work PB3196): the later finding is not merged
+        # into a note the register calls landed
+        with open(os.path.join(nd, "PB9101.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(a2.replace("\nstatus: open\n", '\nstatus: "landed"\n', 1))
+        assert scan_r2(nd)["PB9101"]["status"] == "landed", scan_r2(nd)["PB9101"]
+        last = rec(6, id="s8--duplication--f1#6", pair="s8--duplication", sites=["src/T.cs:70-75 (N.T.F)"])
+        with open(cp, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(dict(batch, upheld=[last], mechanisms=[mech(last["id"])], refuted=[], leads=[]), fh)
+        w4, s4, _ = file_r2(cp, ["PB9107"], nd, False, tmp, areas)
+        assert not w4 and s4.get("already-filed (its note is landed)") == [last["id"]], s4
     print("self-test R2 OK")
 
 
@@ -1002,6 +1026,11 @@ def self_test():
         assert not w4 and not r4 and len(s4["already-filed"]) == 5, (w4, s4, r4)
         gt["designed"][0]["seam"] = "W2"
         gt["targets"]["R0-9003"]["blocked_by"] = ["PB9100"]
+        # a QUOTED `status: "open"` is open, as work.py reads it (kb/Work PB3196): the note is re-rendered, not skipped
+        quoted = read("PB9008").replace("\nstatus: open\n", '\nstatus: "open"\n', 1)
+        assert '\nstatus: "open"\n' in quoted, quoted[:400]
+        with open(os.path.join(nd, "PB9008.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(quoted)
         _, _, _, r5 = file_notes(fp, ["PB9011"], nd, False, gt, rerender=True, path_root=tmp)
         assert r5 == ["PB9004", "PB9008"], r5
         assert "**Seam:** W2." in read("PB9008") and 'blocked_by: ["PB9100"]' in read("PB9004")

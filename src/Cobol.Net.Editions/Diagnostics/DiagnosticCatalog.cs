@@ -1705,7 +1705,8 @@ public static class DiagnosticCatalog
         "COBOLNET1796", "external-pointer-or-object-item", EditionSeverity.Error,
         "ISO §13.18.22.3 syntax rule 4: \"The EXTERNAL clause shall not be specified for a data item of class "
         + "object or pointer.\" (The rule names the ITEM's own class, so a strongly-typed EXTERNAL group with a "
-        + "pointer MEMBER is not barred by it — that group is class alphanumeric, and §13.18.22.3 SR5 requires "
+        + "pointer MEMBER is not barred by it — that group's class is its type-name (§8.5.2.1), not pointer, and "
+        + "§13.18.22.3 SR5 requires "
         + "only that its type declaration also be external. Class pointer covers the data-pointer and "
         + "program-pointer categories; class object is the object-reference category.)",
         "ISO §13.18.22.3 SR4");
@@ -3725,6 +3726,24 @@ public static class DiagnosticCatalog
         + "items identified by key data-names shall be described in records associated with file-name-1\". "
         + "Neither can be located in a record nothing describes.",
         "ISO §13.4.5.3 SR7 / §13.4.6.3 SR2");
+
+    /// <summary>COBOLNET3983 — the READ half of the record-less entry's verb rules (kb/Work PB694). The implied record
+    /// <c>DataBinder.MaterializeImpliedRecord</c> builds has no record-name, so a READ without INTO would fill an
+    /// area the program can never name; the standard gives that READ no meaning, because §14.9.30.4 GR6 defines the
+    /// implied record only for the INTO form. SR3 b), the WRITE/REWRITE half, needs no code of its own: the
+    /// record-name-1 alternative cannot name a record-less file (§14.9.51.3 SR5, §14.9.35.3 SR1), and the
+    /// <c>FILE file-name-1</c> alternative is Annex A.4.13, declined by COBOLNET1706.</summary>
+    public static readonly DiagnosticDescriptor RecordLessFdReadWithoutInto = new(
+        "COBOLNET3983", "record-less-fd-read-without-into", EditionSeverity.Error,
+        "ISO §13.4.5.3 syntax rule 3 c): \"When no record description entries are specified: … c) an INTO phrase "
+        + "shall be specified on all READ statements associated with the file.\" Such a file's record area is the "
+        + "implied entry of §14.9.30.4 GR6 — \"The execution of a READ statement with the INTO phrase when there "
+        + "are no record description entries subordinate to the file description entry proceeds as though there "
+        + "were one record description entry describing an alphanumeric group item of the maximum size established "
+        + "by the RECORD clause\" — which has no record-name, so the INTO phrase is the only way the program can "
+        + "receive the record. Applies to the sequential, relative and indexed formats (Formats 1 and 2); a report "
+        + "file (Format 3) is not read at all (§13.4.5.3 SR9).",
+        "ISO §13.4.5.3 SR3 c)");
 
     /// <summary>COBOLNET0862 — the I-O STATEMENT OPERAND/PHRASE band: a START or WRITE statement writes an
     /// operand or a phrase its own syntax rules do not admit. Covers ISO §14.9.41.3 (START — the access mode,
@@ -7009,6 +7028,38 @@ public static class DiagnosticCatalog
         + "and shall not be specified as a receiving operand. Write identifier-1 itself as the receiver.",
         "ISO §8.4.3.5.3 SR2");
 
+    /// <summary>COBOLNET3977 — the predefined NULL written as a receiving operand (kb/Work PB1551). It used to be a
+    /// parse error re-coded to §8.9 (COBOLNET0901 "'NULL' is a reserved word … cannot be used as a user-defined
+    /// word"), a rule the program had not broken; every receiving position now parses it (the grammar's
+    /// <c>receivingIdentifier</c>) so the receiving chokepoint names the rule that forbids it.</summary>
+    public static readonly DiagnosticDescriptor NullReceiving = new(
+        "COBOLNET3977", "null-receiving", EditionSeverity.Error,
+        "NULL is specified as a receiving operand. ISO §8.4.3.7.3 SR1: \"NULL shall not be specified as a receiving "
+        + "operand.\" The predefined object reference NULL references no object, and the predefined address NULL is "
+        + "only ever a sending operand (§8.4.3.10.3 SR1). Write the item that is to receive NULL as the receiver: "
+        + "SET item TO NULL.",
+        "ISO §8.4.3.7.3 SR1; §8.4.3.10.3 SR1");
+
+    /// <summary>COBOLNET3978 — SELF or SUPER (or <c>object-class-name-1 OF SUPER</c>'s bare form) written as a receiving
+    /// operand (kb/Work PB1551; ISO §8.4.3.8.3 SR2). The same parse-error-as-§8.9 history as <see cref="NullReceiving"/>.</summary>
+    public static readonly DiagnosticDescriptor SelfSuperReceiving = new(
+        "COBOLNET3978", "self-super-receiving", EditionSeverity.Error,
+        "SELF or SUPER is specified as a receiving operand. ISO §8.4.3.8.3 SR2: \"This identifier format shall not be "
+        + "specified as a receiving operand.\" SELF and SUPER \"both reference the object that was used to invoke the "
+        + "method\" (§8.4.3.8.4 GR1); they are not data items a statement can store into.",
+        "ISO §8.4.3.8.3 SR2");
+
+    /// <summary>COBOLNET3979 — a data-, function- or program-address-identifier written as a receiving operand (kb/Work
+    /// PB1551): each of the three formats carries the same sentence as its own syntax rule. SET Format 7's receiving
+    /// <c>ADDRESS OF data-name-1</c> is NOT one of them (Annex D) and is not refused.</summary>
+    public static readonly DiagnosticDescriptor AddressIdentifierReceiving = new(
+        "COBOLNET3979", "address-identifier-receiving", EditionSeverity.Error,
+        "An address-identifier (ADDRESS OF identifier, ADDRESS OF FUNCTION, ADDRESS OF PROGRAM) is specified as a "
+        + "receiving operand. ISO §8.4.3.11.3 SR5, §8.4.3.12.3 SR3 and §8.4.3.13.3 SR4: \"This identifier format shall "
+        + "not be specified as a receiving operand.\" Each creates a unique item that contains an address; store the "
+        + "address into a pointer item instead.",
+        "ISO §8.4.3.11.3 SR5; §8.4.3.12.3 SR3; §8.4.3.13.3 SR4");
+
     /// <summary>COBOLNET2872 — an object-view's AS phrase names an interface with FACTORY OF or ONLY (kb/Work PB1425).
     /// </summary>
     public static readonly DiagnosticDescriptor ObjectViewInterfacePhrase = new(
@@ -7167,14 +7218,40 @@ public static class DiagnosticCatalog
     /// area-A item or a level-number (kb/Work PB3147): a statement, a sentence, a clause or entry continued on a new
     /// line, a period. ANSI X3.23-1985 writes everything else in area B (positions 12 to margin R); ISO/IEC 1989:2002
     /// removed the areas (ISO §6.3.5 continues an entry "in the program-text area of a subsequent line"), so the rule is
-    /// the <c>fixed-form-text-in-area-a-2002</c> construct row's.</summary>
+    /// the <c>fixed-form-text-in-area-a-2002</c> construct row's. Also the text of a CONTINUATION line (a hyphen in the
+    /// indicator area) that begins in area A - X3.23-1985 "Area A of a continuation line must be blank" (kb/Work
+    /// PB3168), reported by the reference format's own gate, <c>ReferenceFormatDiagnostics.OnContinuationTextInAreaA</c>.</summary>
     public static readonly DiagnosticDescriptor ProgramTextInAreaA = new(
         "COBOLNET3735", "program-text-in-area-a", EditionSeverity.Error,
         "COBOL-85 fixed-form reference format reserves area A (character positions 8-11) for division, section and "
         + "paragraph headers, level indicators, level-numbers, DECLARATIVES, END DECLARATIVES and end markers: a "
         + "sentence, a statement, and an entry or clause continued on a subsequent line begin in area B (position 12 or "
-        + "later). Indent the text into area B, or target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
+        + "later), and area A of a continuation line (a hyphen in column 7) is blank. Indent the text into area B, or "
+        + "target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
         "ANSI X3.23-1985 reference format (area B); ISO §6.3.1, §6.3.5");
+
+    /// <summary>COBOLNET3803 — a <c>RAISE EXCEPTION</c> of a NONFATAL exception-name whose checking is not enabled at
+    /// that statement (kb/Work PB2505), so the statement raises nothing. A quality-of-implementation advisory, never a
+    /// refusal: the source is conforming and does exactly what the standard says (kb/Work PB867), but the outcome is
+    /// one a reader of the source does not expect — the standard's own Annex D.2.5 sample program writes eleven such
+    /// RAISEs and no TURN directive. "Provably" is exact here: checking is lexical (§7.3.25.4 GR6; an exception-checking
+    /// PERFORM's WHEN phrase is an implicit TURN over imperative-statement-1, §14.9.28.4 GR14), so the enablement the
+    /// binder folds at the statement is the one the generated code obeys — the advisory and
+    /// <c>EcEmitter.EmitRaise</c>'s nothing-emitted arm read the SAME <c>BoundRaise.Enabled</c>. A FATAL name with
+    /// checking off is not advised: it terminates the run unit (the §14.6.13.1.3 8) implementor arm, kb/Work PB2504),
+    /// which no reader misses.</summary>
+    public static readonly DiagnosticDescriptor RaiseCheckingNotEnabled = new(
+        "COBOLNET3803", "raise-checking-not-enabled", EditionSeverity.Warning,
+        "A RAISE EXCEPTION statement names a nonfatal exception condition whose checking is not enabled at that "
+        + "statement, so it raises nothing: ISO §14.6.13.1.1, \"when the general rules for a statement indicate that a "
+        + "specific exception condition exists, it is raised only if checking for that exception condition is "
+        + "enabled\", and §14.6.13.1.4, \"If checking is not enabled, execution continues as if the exception did not "
+        + "occur\". No USE declarative or WHEN phrase runs, and the last exception status and EXCEPTION-OBJECT keep "
+        + "their values. Checking is enabled by a >>TURN directive that precedes the statement in the source text "
+        + "(§7.3.25.4 GR6: a directive at a PERFORM does not reach the paragraphs it performs) or by the WHEN phrase "
+        + "of an exception-checking PERFORM whose imperative-statement-1 contains the RAISE (§14.9.28.4 GR14). Write "
+        + ">>TURN <exception-name> CHECKING ON before the statement if the RAISE is meant to raise.",
+        "ISO §14.6.13.1.1; §14.6.13.1.4; §14.9.29.4 GR1");
 
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>

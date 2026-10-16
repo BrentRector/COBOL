@@ -116,6 +116,14 @@ def witness_shape_error(field: str, ref: str, schema: "Schema") -> str | None:
         return f"test-ref '{ref}' — unknown form '{scheme}', expected one of {sorted(schema.test_ref_forms)}"
     if ":" not in ref or not ref.split(":", 1)[1].strip():
         return f"test-ref '{ref}' has an empty body after '{scheme}:'"
+    # An xUnit form ('test-dir') names ONE test method: its body is <Class>.<Method>, the shape the battery gate's
+    # resolver splits at the last dot (SpecTraceabilityInventoryDriftTests.UnresolvedTestRefs). A bare class is
+    # malformed, not merely unresolved, so it is refused at record time: GR-14.9.40.4-17 carried
+    # `unit:SortUseTerminationTests` through three batches and was caught only by CI's Linux unit leg (kb/Work PB1177).
+    body = ref.split(":", 1)[1].strip()
+    dot = body.rfind(".")
+    if "test-dir" in schema.test_ref_forms[scheme] and (dot <= 0 or dot == len(body) - 1):
+        return f"test-ref '{ref}' — expected {scheme}:<Class>.<Method>"
     return None
 
 
@@ -227,15 +235,25 @@ def register_cells(line: str) -> list[str]:
 
 
 def register_section(text: str, heading: str, header_cell: str) -> list[list[str]]:
-    """Every data row of ONE `docs/CONFORMANCE.md` register table, as raw cell lists, in document order.
+    """Every data row of ONE `docs/CONFORMANCE.md` register table, as raw cell lists, in document order."""
+    return [cells for _, cells in register_section_at(text, heading, header_cell)]
 
-    ⛔ THE ONE PARSER, and it lives HERE rather than in `audit_annex_a1.py` where it was written, because four
-    readers now need it and a markdown table read four ways is `feedback_one_rule_one_place` waiting to happen:
+
+def register_section_at(text: str, heading: str, header_cell: str) -> list[tuple[int, list[str]]]:
+    """Every data row of ONE `docs/CONFORMANCE.md` register table as `(1-based line in text, cells)`.
+
+    The line is for a reader that meets the document LINE BY LINE and must know which lines are register rows —
+    the Phase-B dossier tags a citing line with its row key (kb/Work PB3209) — so it asks here rather than
+    keeping a second idea of what a register row looks like. Lines are split on `\\n` alone, as the C# twin
+    splits them, so a line number here is a line number in the file.
+
+    ⛔ THE ONE PARSER, and it lives HERE rather than in `audit_annex_a1.py` where it was written, because five
+    readers now need it and a markdown table read five ways is `feedback_one_rule_one_place` waiting to happen:
     the register audit (which CHECKS the rows), `Schema.anchor_obliged` (which asks whether an item has a
-    determination at all), `DerivedSelector` (whose `determination-prefix` arm reads what the determination SAYS)
-    and `Derivation` (which reads §8). The C# twin is `tests/_shared/ConformanceRegister.cs`; that pair is the
-    same two-engines-one-artifact shape as the selector evaluator, and `EveryRowState_IsDerived_NotAsserted`
-    catches them drifting.
+    determination at all), `DerivedSelector` (whose `determination-prefix` arm reads what the determination SAYS),
+    `Derivation` (which reads §8) and the Phase-B dossier (which tags its citing lines). The C# twin is
+    `tests/_shared/ConformanceRegister.cs`; that pair is the same two-engines-one-artifact shape as the selector
+    evaluator, and `EveryRowState_IsDerived_NotAsserted` catches them drifting.
 
     ⛔ IT STOPS AT THE NEXT `## ` HEADING, and that is not tidiness. Until §8 existed §7 was the LAST section, so
     reading to end-of-file was indistinguishable from reading the section — and the moment a second register was
@@ -252,14 +270,15 @@ def register_section(text: str, heading: str, header_cell: str) -> list[list[str
     body = text[start + len(heading):]
     if (nxt := body.find("\n## ")) >= 0:
         body = body[:nxt]
-    rows: list[list[str]] = []
-    for line in body.splitlines():
+    first = text.count("\n", 0, start) + 1     # the heading's own line; `body` begins on it
+    rows: list[tuple[int, list[str]]] = []
+    for offset, line in enumerate(body.split("\n")):
         if not line.startswith("| "):
             continue
         cells = register_cells(line)
         if len(cells) < 2 or cells[0] == header_cell or set(cells[0]) <= set("-: "):
             continue
-        rows.append(cells)
+        rows.append((first + offset, cells))
     return rows
 
 
@@ -269,8 +288,13 @@ def _cell(cells: list[str], i: int) -> str:
 
 def section7_rows(text: str) -> list[Section7Row]:
     """Every data row of the §7 Annex A.1 register, in document order."""
-    return [Section7Row(c[0], c[1], _cell(c, 2), _cell(c, 3))
-            for c in register_section(text, REGISTER_HEADING, REGISTER_HEADER_CELL)]
+    return [row for _, row in section7_rows_at(text)]
+
+
+def section7_rows_at(text: str) -> list[tuple[int, Section7Row]]:
+    """Every data row of the §7 Annex A.1 register with its 1-based line in `text`, in document order."""
+    return [(line, Section7Row(c[0], c[1], _cell(c, 2), _cell(c, 3)))
+            for line, c in register_section_at(text, REGISTER_HEADING, REGISTER_HEADER_CELL)]
 
 
 def plain(cell: str) -> str:
@@ -327,7 +351,7 @@ class DerivedSelector:
       · `excludes-pattern` a TEXT exclusion scoped to ONE arm — the per-arm twin of the entry-level
         `excludes-patterns`, which drop a rule whatever arm took it. It exists because A.4.10's item-1 arm must
         not stamp the SUPPORTED item 2 (`interface-name`, kb/Work PB285) while its item-3 arm must reach
-        GR-9.3.6-L5.2, whose exact-match criteria name "an interface-name" (kb/Work R43 / PB1519): one exclusion
+        GR-9.3.6-L4.2, whose exact-match criteria name "an interface-name" (kb/Work R43 / PB1519): one exclusion
         was right for one arm and wrong for the other, and a global list cannot say that. Negative, so it is not
         in POSITIVE.
       · `kinds` / `excludes-kinds` the rule's KIND, per arm. A general-format diagram (kind FMT) is evidence
@@ -349,7 +373,7 @@ class DerivedSelector:
         (`feedback_verdict_evidence_invariant`).
       · `lead-in`       the sentence that INTRODUCES the printed list a rule is an item of — how the standard
         scopes a list's items when the items themselves carry no vocabulary. §9.3.6's exact-match criteria
-        (GR-9.3.6-L5.1 … L5.3) say only "the same class and category", "the same … PICTURE … clauses"; what makes
+        (GR-9.3.6-L4.1 … L4.3) say only "the same class and category", "the same … PICTURE … clauses"; what makes
         them exact-match criteria is the sentence ending GR-9.3.6-L3.7, "the following criteria are considered an
         exact match:". A list's lead-in is the catalog rule immediately BEFORE its first item (the catalog keeps
         the standard's order, and a list is its `kind`-`section`-`sublist` triple), so a nested list that

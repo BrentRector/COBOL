@@ -372,14 +372,59 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// (<c>IF A B-SHIFT-L 1 = B"1000"</c>) was taken for a bare operand and refused (kb/Work PB1412).</summary>
     private static bool HasBoolOp(Antlr4.Runtime.Tree.IParseTree t) => BooleanOperatorTokens.ContainsOperator(t);
 
+    /// <summary>One activation argument's operand after <see cref="ReduceArgument"/>: at most one of the shapes is the
+    /// operand's meaning, and the consumer reads them in its own order.</summary>
+    /// <param name="Literal">The <c>literal</c> alternative as written.</param>
+    /// <param name="NonNumericLiteral">The nonnumeric literal the operand consists of: the written one, or the one an
+    /// operator-free boolean node held.</param>
+    /// <param name="SoleNumericLiteral">The text of the numeric literal (sign included) the arithmetic operand consists
+    /// of, else null. <see cref="Arith"/> still carries the node, so a consumer that binds it as an expression keeps
+    /// it.</param>
+    /// <param name="Reference">The identifier the operand consists of: the written <c>dataReference</c>, or the sole one
+    /// of the arithmetic operand.</param>
+    /// <param name="Bool">A genuine boolean expression (one that carries a boolean operator), else null.</param>
+    /// <param name="Arith">The arithmetic operand, the one an operator-free boolean node held included.</param>
+    internal readonly record struct ArgumentOperand(
+        Core.LiteralContext? Literal, Core.NonNumericLiteralContext? NonNumericLiteral, string? SoleNumericLiteral,
+        Core.DataReferenceContext? Reference, Core.BooleanExpressionContext? Bool, Core.ArithmeticExpressionContext? Arith);
+
+    /// <summary>⛔ THE ONE PARSE-TREE REDUCTION OF AN ACTIVATION ARGUMENT, ISO §14.9.4.4 GR8 (CALL) and §14.9.23.4 GR4
+    /// (INVOKE), the same sentence: "An argument that consists merely of a single identifier or literal is regarded as
+    /// an identifier or literal rather than an arithmetic or boolean expression". Every CALL spelling (BY CONTENT, BY
+    /// VALUE, keyword-less) and every INVOKE argument asks it (kb/Work PB613, PB3101).
+    /// <para>The parse node an operand lands in is not its meaning. <c>arithmeticExpression</c> subsumes a
+    /// <c>dataReference</c> and every numeric literal, and the <c>{boolExprAhead()}?</c>-gated
+    /// <c>booleanExpression</c> subsumes both, its leaf being <c>valueOperand</c> (<c>arithmeticExpression |
+    /// nonNumericLiteral</c>). The predicate's scan runs to the statement's period, so in <c>USING BY CONTENT "AB"
+    /// BY CONTENT B1 B-AND B2</c> the first argument reaches the boolean node on the second one's operator. A boolean
+    /// node with no boolean operator therefore reduces to its bare <c>valueOperand</c> (<see cref="UnwrapBareBool"/>),
+    /// BOTH legs: the CALL copy once recovered only the arithmetic leg, and "AB" then bound as nothing (PB238).</para>
+    /// <para>It used to be written twice, <c>CallBinder.Gr8Classify</c> and an inline block in
+    /// <c>OoBinder.OoBindInvocationArg</c>, and only the INVOKE copy folded a sole numeric literal. Pure: it reads
+    /// parse contexts, resolves nothing and reports nothing. The BOUND-tree twin, a literal recovered from a bound
+    /// expression (<c>BY VALUE -1.5E-3</c> arrives as a negation), is <see cref="Gr8ArgumentLiteral"/>.</para></summary>
+    internal static ArgumentOperand ReduceArgument(Core.LiteralContext? literal, Core.DataReferenceContext? reference,
+        Core.BooleanExpressionContext? boolExpr, Core.ArithmeticExpressionContext? arith)
+    {
+        var nonNumeric = literal?.nonNumericLiteral();
+        if (boolExpr is not null && UnwrapBareBool(boolExpr) is { } bare)
+        {
+            boolExpr = null;
+            arith = bare.arithmeticExpression();
+            nonNumeric = bare.nonNumericLiteral();
+        }
+        string? soleNumeric = arith is not null ? SoleNumLiteral(arith) : null;
+        return new(literal, nonNumeric, soleNumeric, reference ?? SoleDataReference(arith), boolExpr, arith);
+    }
+
     /// <summary>The single leaf <c>valueOperand</c> of a B-op-FREE boolean expression (walking single-child
     /// tiers and paren groups), for re-binding as a normal operand; null if the shape is not a bare operand.</summary>
     /// <remarks>THE discriminator for every <c>{boolExprAhead()}?</c>-gated alternative, not just this one:
     /// the predicate's scan is condition-shaped and may fire on a B-operator that belongs elsewhere in the
     /// statement, so a parse tree reaching a boolean alternative is not proof of a boolean expression. A
     /// non-null result means "this operand carries NO boolean operator and is a bare operand" — reduce it and
-    /// bind it through the ordinary channel. Also read by <c>OoBinder</c>'s INVOKE BY CONTENT operand
-    /// normalization (fix-queue PB46).</remarks>
+    /// bind it through the ordinary channel. Every activation argument reaches it through
+    /// <see cref="ReduceArgument"/> (fix-queue PB46, kb/Work PB613).</remarks>
     internal static Core.ValueOperandContext? UnwrapBareBool(Core.BooleanExpressionContext ctx)
     {
         var xor = ctx.booleanXorTerm();
@@ -780,7 +825,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             return new BoundClassCondition(opnd, k, not);
         }
         // Every other alternative is a user-defined word — the class condition's alphabet-name-1 / class-name-1.
-        return BindUserWordClassCondition(userWord ?? cls.GetText(), not, operand);
+        return BindUserWordClassCondition(cls, userWord ?? cls.GetText(), not, operand);
     }
 
     /// <summary>§14.9.13.3 SR5's "class condition without the identifier" written as a BARE user-defined word
@@ -789,14 +834,16 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
     /// one word. <see cref="AnalyzeBareOperand"/> has already resolved the word to a class-name or alphabet-name
     /// (<see cref="BareOperandForm.ClassName"/>); SR8 then splices the selection subject in, exactly as for the
     /// <c>IS</c>-led spelling, and the ONE user-word class body binds it (kb/Work PB843).</summary>
-    public BoundCondition BindPartialClassName(string word, PartialSubjectOperand subject) =>
-        BindUserWordClassCondition(word, not: false, () => subject.Content);
+    public BoundCondition BindPartialClassName(Antlr4.Runtime.RuleContext at, string word, PartialSubjectOperand subject) =>
+        BindUserWordClassCondition(at, word, not: false, () => subject.Content);
 
     /// <summary>The §8.8.4.4.2 alternatives that are USER-DEFINED WORDS — alphabet-name-1 and class-name-1 — over
     /// an operand the caller names. One body for the written <c>classConditionName</c> spelling and the bare EVALUATE
     /// object (kb/Work PB843), so the LOCALE refusal, the operand screens and the undeclared-name diagnostic
-    /// cannot drift between them.</summary>
-    private BoundCondition BindUserWordClassCondition(string word, bool not, System.Func<BoundOperand> operand)
+    /// cannot drift between them. <paramref name="at"/> is where the word is written: the class-name or alphabet-name
+    /// it resolves to is a §8.3.2.2 use in that source element (kb/Work PB3153).</summary>
+    private BoundCondition BindUserWordClassCondition(Antlr4.Runtime.RuleContext at, string word, bool not,
+        System.Func<BoundOperand> operand)
     {
         // §8.8.4.4.3 SR2 — "Alphabet-name-1 shall not reference an alphabet associated with a locale": a LOCALE
         // alphabet is a collating sequence, not a coded character set (Table 6), so it names no character set a
@@ -810,7 +857,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
             return Refused($"class condition '{word}'");
         }
         // A SPECIAL-NAMES user-defined class (§12.3.7): membership over the expanded character set.
-        if (ctx.Data.UserClasses.TryGetValue(word, out var userClass))
+        if (ctx.Data.UserClasses.TryUse(at, word, out var userClass))
         {
             var opnd = operand();
             CheckClassConditionOperand(opnd, ClassConditionModel.ClassName);   // SR3 + SR4 name class-name-1
@@ -819,8 +866,8 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // An ALPHABET-NAME class (§8.8.4.4.4 GR3 a — kb/Work PB109): membership of the CODED CHARACTER SET the
         // alphabet identifies (the LOCALE refusal above already took Table 6's blank row). It used to fall to the
         // loud staged BoundConditionError.
-        if ((ctx.Data.Alphabets.TryGetValue(word, out var aDef) && aDef.CodedSet is { } aSet
-                ? aSet : ctx.Data.NationalAlphabets.TryGetValue(word, out var nDef) ? nDef.CodedSet : null) is { } set)
+        if ((ctx.Data.Alphabets.TryUse(at, word, out var aDef) && aDef.CodedSet is { } aSet
+                ? aSet : ctx.Data.NationalAlphabets.TryUse(at, word, out var nDef) ? nDef.CodedSet : null) is { } set)
         {
             var opnd = operand();
             // ⛔ ITS OWN KIND, NOT THE CLASS-NAME'S. SR3 names alphabet-name-1 beside class-name-1, but SR4 —
@@ -985,7 +1032,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         {
             carry.PartialSubject = null;
             carry.Reset();
-            return BindUserWordClassCondition(classWord, not: false, () => ps.Content);
+            return BindUserWordClassCondition(vo!, classWord, not: false, () => ps.Content);
         }
         if (BareOperandAsCondition(vo) is { } sole)
         {
@@ -1023,7 +1070,7 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
                 : $"class-name '{classWord}', which forms a class condition only after the identifier it tests — "
                   + "\"identifier-1 IS [NOT] class-name-1\" (ISO §8.8.4.4.2)";
         else if (dref is { } d && d.dataReferenceSuffix().Length == 0 && d.cobolWord()?.GetText() is { } word
-                 && ctx.Mnemonics.Of(d).TryGetValue(word, out var mnemonicRow) && mnemonicRow.Kind == SystemNameKind.Switch)
+                 && ctx.Mnemonics.TryPeek(d, word, out var mnemonicRow) && mnemonicRow.Kind == SystemNameKind.Switch)
             what = $"the mnemonic-name '{word}' of a switch; a switch-status condition is written with a condition-name "
                 + "the SPECIAL-NAMES paragraph associates with the switch's ON or OFF status (ISO §8.8.4.6.1; the §8.8.4.6.2 format is condition-name-1)";
         else if (dref is { } dd && ctx.Refs.Probe(dd) is { } probe)
@@ -1166,11 +1213,14 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
 
     /// <summary>The class-name-1 / alphabet-name-1 (ISO §8.8.4.4.2) a bare operand names, or null — the ONE symbol
     /// test behind <see cref="BareOperandForm.ClassName"/>. A word only: neither name is a data-name, so neither
-    /// takes a qualifier, a subscript or a reference modifier. PURE (dictionary lookups and a diagnostic-free
-    /// <see cref="ReferenceResolver.Probe"/>), so a classifier may ask it before anything is bound.</summary>
+    /// takes a qualifier, a subscript or a reference modifier. A class-name a CONTAINING element declares yields to
+    /// the referring element's own data item or constant-name of that spelling (§8.4.6.1; kb/Work PB3153): an
+    /// EVALUATE object <c>WHEN KW</c> with <c>01 KW CONSTANT AS "AB"</c> is a literal comparison object. PURE
+    /// (dictionary lookups and the diagnostic-free <see cref="ReferenceResolver.DescribesOwnItem"/>), so a
+    /// classifier may ask it before anything is bound.</summary>
     public string? BareClassWord(Core.ValueOperandContext? vo) =>
         vo?.arithmeticExpression() is { } expr && SoleDataRef(expr) is { } dref && dref.dataReferenceSuffix().Length == 0
-            && dref.cobolWord() is { } word && ctx.Data.IsClassConditionWord(word.GetText()) && ctx.Refs.Probe(dref) is null
+            && dref.cobolWord() is { } word && ctx.Data.IsClassConditionWord(word.GetText()) && !ctx.Refs.DescribesOwnItem(dref)
             ? word.GetText() : null;
 
     /// <summary>§14.9.13.3 SR5 over a selection object the grammar parsed as a whole <c>condition</c>: the

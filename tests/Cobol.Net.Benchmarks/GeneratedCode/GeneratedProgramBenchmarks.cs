@@ -51,8 +51,9 @@ public class GeneratedProgramBenchmarks
         // A file the program ASSIGNs by a relative name resolves against the current directory, so every run's
         // files land in this case's own scratch directory (BenchmarkDotNet runs each case in its own process).
         Directory.SetCurrentDirectory(_workDirectory);
-        // The runtime switches the console to UTF-8 on its first activation, and doing so replaces Console.Out; do
-        // it now, so the redirection in Run is never undone underneath it.
+        // The generated Main's process entry (ProgramTable.RunModule) switches the console to UTF-8 on its first run,
+        // and where the console refuses that it replaces Console.Out; do it now, so the redirection in Run is never
+        // undone underneath it.
         StandardStreams.EnsureUtf8();
 
         var witness = new StringWriter();

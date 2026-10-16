@@ -51,6 +51,15 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
     /// spelled ONCE here rather than at both (kb/Work PB367b).</summary>
     public bool UnitHasDispatchFunnel => ecState.UnitHasF3 || ecState.UnitHasF3Perform;
 
+    /// <summary>The declarative scope a format 1 SORT registers with itself (<c>CobolSort.RegisterFormat1Sort</c>) for
+    /// §14.9.40.4 GR17 (kb/Work PB1177): the emitted <c>__useActive</c> exactly when this scope's <c>__RunUse</c> asks
+    /// <c>CobolSort.AfterUseProcedure</c> — the EC-model form over at least one DECLARATIVE id
+    /// (<c>DispatchEmitter.EmitRunUseBody</c>) — else null. Without an EC-model declarative no USE procedure of THIS
+    /// scope can return having completed not normally (RESUME and the fatal-in-scope mark are EC-model facts, and EXIT
+    /// PROGRAM, GOBACK and STOP unwind through the SORT statement's <c>finally</c>, which ends it), so the SORT has no
+    /// own action to land — but it still registers, because another element's USE procedure can terminate it.</summary>
+    public string? SortUseScope => ecState.Active && dispatch.DeclCount > 0 ? "__useActive" : null;
+
     /// <summary>The <c>__EcObjDispatch</c> invocation (or the no-declarative constant when this unit has no
     /// Format-4 declaratives) — the §14.9.49.4 GR14 exception-OBJECT selector (the EC-OO wave).</summary>
     public string ObjDispatchExpr(string objExpr) =>
@@ -638,8 +647,10 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         {
             if (!r.Fatal)
             {
-                // §14.6.13.1.4 first sentence + §14.6.13.1.1 (24485): checking off ⇒ the condition is not raised
-                // and the last exception status is NOT set — the RAISE acts as CONTINUE (§14.9.29.4 GR1 NOTE).
+                // §14.6.13.1.1: a condition a statement's general rules say exists "is raised only if checking for
+                // that exception condition is enabled" — RAISE's §14.9.29.4 1) included (kb/Work PB867). A raise
+                // is ONE event (status set + EXCEPTION-OBJECT nulled), so neither happens here, and with checking
+                // off "execution continues as if the exception did not occur" (§14.6.13.1.4).
                 w.Line($"// RAISE {r.EcName}: checking not enabled — nonfatal, continues as if not raised (ISO §14.6.13.1.4)");
                 return false;
             }

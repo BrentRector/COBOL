@@ -52,7 +52,7 @@ src/Cobol.Net.Frontend/
   Common/          SourceLocation.cs, SourceLineMap.cs, TextSpan.cs, CobolLiteral.cs, NumericLiteral.cs, CobolWordRule.cs,
                    CompilerDirectiveWords.cs
   ANTLR4/          antlr-4.13.2-complete.jar
-  GenerateIfNewer.ps1, Invoke-Antlr4CSharp.ps1
+  Invoke-Antlr4CSharp.ps1   (the one ANTLR generator, run by the csproj's EnsureGeneratedFiles target)
   Pipeline/        Frontend.cs        (the orchestrator — MOVED from src/CobolNet/Frontend/, the one client of all of the above)
 
 src/Cobol.Net.Compiler/
@@ -112,7 +112,7 @@ The new `Cobol.Net.Frontend.csproj`:
 - Inherits TFM/lang from `Directory.Build.props` (net10.0 / C# 14) — **do not** re-declare.
 - `<PackageReference Include="Antlr4.Runtime.Standard" />` — **no `Version`** (central package management via `Directory.Packages.props`). It needs `Antlr4.Runtime`; it does **not** need `Mono.Cecil`.
 - `ProjectReference`s: `Cobol.Net.Editions` (edition metadata) and `Cobol.Net.Runtime` (since kb/Work PB1592). **Why the Runtime edge:** the compile-time expression evaluator (`>>DEFINE`/`>>IF`/`>>EVALUATE` and the CONSTANT binder) carries its values in the runtime's ONE SDIDI decimal engine (`CobolDec`) and selects its arithmetic mode through the ONE per-edition behaviour register (`DialectBehaviors`); ISO Annex E.2 6) and 21) prescribe standard arithmetic for compile-time arithmetic at 2002/2014. The alternative was a second copy of that engine in the front-end, which CLAUDE.md rule 5 rejects (one arithmetic engine). **Layering: `Cobol.Net.Editions` and `Cobol.Net.Runtime` are leaves (they reference nothing in the solution) → Frontend → Compiler → Cli. `Cobol.Net.Runtime` must NEVER reference `Cobol.Net.Frontend` (or the Compiler)**: the runtime is the assembly every generated program loads, and an edge back up would pull the parser into each compiled program's closure and close a cycle.
-- Carries the ANTLR generation: the `EnsureGeneratedFiles` + `CleanGenerated` targets and the `<None Include="Grammar\…">`/jar items live in its csproj; the `Inputs`/`Outputs` paths are relative.
+- Carries the ANTLR generation: the `WriteAntlrGenerationStamp` + `EnsureGeneratedFiles` + `CleanGenerated` targets, the `AntlrGrammar` item (`Grammar/**/*.g4`) and the `AntlrNamespace`/`AntlrJar`/`AntlrGenerator` properties live in its csproj; `EnsureGeneratedFiles` is the one up-to-date decision over every generation input (kb/Work PB2719), and its `Inputs`/`Outputs` paths are relative.
 - `<InternalsVisibleTo Include="Cobol.Net.Tests.Unit" />` if any internals need testing.
 
 **Namespaces.** The five front-end sub-namespaces are `CobolNet.Frontend.{Common,Diagnostics,Generated,Parsing,Preprocessor}` (rearchitecture PHASE 01, `docs/rearchitecture/PHASE-01-mechanical-rename-deadcode.md`); the legacy tree that once shared them is deleted.

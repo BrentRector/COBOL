@@ -134,12 +134,16 @@ public static partial class ReferenceFormatProcessor
                 if (!fixedContinuation) Discard(site);   // a blank line (§6.3.6): discarded; a blank continuation has no text to append
                 return;
             }
-            if (text.AsSpan(first).StartsWith("*>", StringComparison.Ordinal))
+            if (CobolSourceText.CommentIndicatorAt(text, first))
             {
                 ReportComment(text, first, site);
                 Discard(site);                           // a comment line (§6.2.3.1 1)): discarded, never a join
                 return;
             }
+            // X3.23-1985: "Area A of a continuation line must be blank" (kb/Work PB3168). A continuation line that continues
+            // a directive is dropped below and diagnosed there.
+            if (fixedContinuation && FixedFormLine.IsAreaAOffset(first) && !(_latest >= 0 && _latestIsDirective))
+                gates?.OnContinuationTextInAreaA(file, site.Line, site.Col(first));
             if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
                 DropDirectiveContinuation(site, site.Col(first));
             else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, site, fixedContinuation);
@@ -230,7 +234,7 @@ public static partial class ReferenceFormatProcessor
 
             // A continued literal. §6.3.5 2): "National literals may be continued only with a floating literal
             // continuation indicator"; §6.2.3.2 SR4: one form of continuation per literal.
-            if (state.Kind == LiteralKind.National) gates?.OnNationalFixedContinuation(file, site.Line);
+            if (state.Opening.IsNational) gates?.OnNationalFixedContinuation(file, site.Line);
             if (state.Form == ContinuationForm.Floating) gates?.OnTwoContinuationForms(file, site.Line, FixedFormLine.IndicatorColumn);
             state = state with { Form = ContinuationForm.Fixed };
 
@@ -259,7 +263,7 @@ public static partial class ReferenceFormatProcessor
             char c = text[first];
             if (c == quote) return first + 1;
             gates?.OnContinuationQuote(file, site.Line, site.Col(first), quote);
-            return c is '"' or '\'' ? first + 1 : first;
+            return CobolSourceText.IsQuotationSymbol(c) ? first + 1 : first;
         }
 
         /// <summary>Append <paramref name="content"/> to <paramref name="head"/> (the latest logical line) after §6.5 3)
@@ -396,28 +400,26 @@ public static partial class ReferenceFormatProcessor
 
     /// <summary>The multiple-character floating indicators whose characters are never literal content (§6.2.3.1): the
     /// comment indicator and the compiler directive indicator. §6.2.3.2 SR3 requires each on one line.</summary>
-    private static readonly string[] MultipleCharacterFloatingIndicators = ["*>", ">>"];
+    private static readonly string[] MultipleCharacterFloatingIndicators =
+        [CobolSourceText.CommentIndicator, CompilerDirectiveLine.Indicator];
 
     /// <summary>The multiple-character separator and the invocation operator (§8.3.5 6) the pseudo-text delimiter, §8.3.5
     /// 7) the invocation operator <c>::</c>) that §6.3.5 2) requires on one line.</summary>
     private static readonly string[] MultipleCharacterSeparators = ["==", "::"];
-
-    /// <summary>The kind of literal a quotation symbol opened (§8.3.5 5) opening delimiters: a quotation symbol, B", N",
-    /// X", BX", NX"): §6.2.3.2 SR4 limits the floating indicator to these three kinds, and §6.3.5 2) lets only the
-    /// floating form continue a national literal.</summary>
-    private enum LiteralKind { Alphanumeric, Boolean, National }
 
     /// <summary>The form of continuation a literal has been continued with so far (§6.2.3.2 SR4: "A given literal shall
     /// not be continued with more than one form of continuation").</summary>
     private enum ContinuationForm { None, Fixed, Floating }
 
     /// <summary>The literal state at a point of program text: outside any literal (<see cref="Quote"/> is NUL), or inside
-    /// one whose opening delimiter was <see cref="Quote"/>. <see cref="PendingClose"/> is set when the last character
+    /// one whose opening delimiter was <see cref="Opening"/>, with quotation symbol <see cref="Quote"/> (§8.3.5 5); the
+    /// opening delimiter says whether it is a national literal, which §6.3.5 2) lets only the floating form continue).
+    /// <see cref="PendingClose"/> is set when the last character
     /// scanned was that quotation symbol, which either closes the literal or is the first half of a doubled quotation
     /// symbol — the next character decides, and in fixed form it may be on the continuation line.
     /// <see cref="AwaitsFloating"/> is set when the line ended in a floating literal continuation indicator, so the
     /// next line that is not a comment or blank line is the literal's continuation line (§6.5 8)).</summary>
-    private readonly record struct LiteralState(char Quote, bool PendingClose, LiteralKind Kind, ContinuationForm Form,
+    private readonly record struct LiteralState(char Quote, bool PendingClose, OpeningDelimiter Opening, ContinuationForm Form,
         bool AwaitsFloating)
     {
         public static LiteralState Outside => default;
@@ -437,45 +439,59 @@ public static partial class ReferenceFormatProcessor
     private readonly record struct ScanStop(ScanStopKind Kind, int At, bool CommentFollows = false, int LiteralStart = 0);
 
     /// <summary>
-    /// THE ONE literal-aware scan of a piece of program text (kb/Work PB1491): starting in <paramref name="state"/>,
-    /// find the first floating comment indicator <c>*&gt;</c> that begins an inline comment or comment line
-    /// (§6.2.3.1) outside any literal, or the floating literal continuation indicator — the opening quotation symbol
-    /// followed by a hyphen — that ends the line inside a literal (§6.2.3.1, §6.5 4)); leaving <paramref name="state"/>
-    /// as it is at that point (or at the end of the text). A literal ends only at the quotation symbol that opened it,
-    /// a doubled one being content, so a quotation symbol or <c>*&gt;</c> inside a literal is literal content, and a
-    /// quotation symbol inside a comment never opens one.
+    /// The §6.5 conversion's literal-aware scan of a piece of program text (kb/Work PB1491): starting in
+    /// <paramref name="state"/>, find the first floating comment indicator <c>*&gt;</c> that begins an inline comment
+    /// or comment line (§6.2.3.1) outside any literal, the floating literal continuation indicator — the opening
+    /// quotation symbol followed by a hyphen — that ends the line inside a literal (§6.2.3.1, §6.5 4)), or a compiler
+    /// directive written after program text; leaving <paramref name="state"/> as it is at that point (or at the end of
+    /// the text). Where a literal opens and closes, and what a comment indicator is, are
+    /// <see cref="CobolSourceText"/>'s (kb/Work PB2621): a literal ends only at the quotation symbol that opened it, a
+    /// doubled one being content, so a quotation symbol or <c>*&gt;</c> inside a literal is literal content, and a
+    /// quotation symbol inside a comment never opens one. What this scan adds is the state a literal carries ACROSS a
+    /// line end: a quotation symbol that ends the text either closed its literal or is the first half of a doubled one,
+    /// and the next text's first character decides (<see cref="LiteralState.PendingClose"/>).
     /// </summary>
     private static ScanStop ScanProgramText(ReadOnlySpan<char> text, ref LiteralState state)
     {
         int literalStart = state.InLiteral ? -1 : 0;   // -1: the literal was opened before this text
-        for (int i = 0; i < text.Length; i++)
+        int i = 0;
+        if (state.PendingClose && text.Length > 0)
         {
-            char c = text[i];
-            if (state.PendingClose)
+            if (text[0] == state.Quote)
             {
-                if (c == state.Quote)
-                {
-                    state = state with { PendingClose = false };   // a doubled quotation symbol: content
-                    continue;
-                }
-                state = LiteralState.Outside;                       // the quotation symbol closed the literal
+                state = state with { PendingClose = false };   // a doubled quotation symbol: content
+                i = 1;
             }
+            else state = LiteralState.Outside;                  // the quotation symbol closed the literal
+        }
+        while (i < text.Length)
+        {
             if (state.InLiteral)
             {
-                if (c != state.Quote) continue;
-                if (ContinuationIndicatorEnds(text, i, out bool commentFollows))
-                    return new ScanStop(ScanStopKind.FloatingContinuation, i, commentFollows, literalStart);
-                state = state with { PendingClose = true };
+                int closing = CobolSourceText.ClosingDelimiterAt(text, i, state.Quote);
+                if (closing == text.Length) break;              // the literal runs on past this text
+                if (ContinuationIndicatorEnds(text, closing, out bool commentFollows))
+                    return new ScanStop(ScanStopKind.FloatingContinuation, closing, commentFollows, literalStart);
+                if (closing == text.Length - 1)
+                {
+                    state = state with { PendingClose = true }; // the next text's first character decides
+                    break;
+                }
+                state = LiteralState.Outside;
+                i = closing + 1;
             }
-            else if (c is '"' or '\'')
+            else if (CobolSourceText.TryOpeningDelimiterAt(text, i, out var opening))
             {
-                state = new LiteralState(c, false, LiteralKindAt(text, i), ContinuationForm.None, false);
-                literalStart = i + 1;
+                int quote = i + opening.PrefixLength;
+                state = new LiteralState(text[quote], false, opening, ContinuationForm.None, false);
+                literalStart = quote + 1;
+                i = quote + 1;
             }
-            else if (c == '*' && i + 1 < text.Length && text[i + 1] == '>')
+            else if (CobolSourceText.CommentIndicatorAt(text, i))
                 return new ScanStop(ScanStopKind.Comment, i);
-            else if (c == '>' && i + 1 < text.Length && text[i + 1] == '>' && DirectiveAfterText(text, i))
+            else if (text[i] == '>' && i + 1 < text.Length && text[i + 1] == '>' && DirectiveAfterText(text, i))
                 return new ScanStop(ScanStopKind.Directive, i);
+            else i++;
         }
         return new ScanStop(ScanStopKind.End, text.Length);
     }
@@ -506,22 +522,7 @@ public static partial class ReferenceFormatProcessor
         if (quote + 1 >= text.Length || text[quote + 1] != '-') return false;
         var rest = text[(quote + 2)..].TrimStart(' ');
         if (rest.IsEmpty) return true;
-        return commentFollows = rest.StartsWith("*>", StringComparison.Ordinal);
-    }
-
-    /// <summary>The kind of literal whose opening quotation symbol is at <paramref name="quote"/>: the one- or
-    /// two-character prefix (B, N, X, BX, NX) directly before it, when it is a whole word (§8.3.5 5)).</summary>
-    private static LiteralKind LiteralKindAt(ReadOnlySpan<char> text, int quote)
-    {
-        int start = quote;
-        while (start > 0 && quote - start < 2 && char.IsAsciiLetter(text[start - 1])) start--;
-        if (start > 0 && IsCobolWordChar(text[start - 1])) return LiteralKind.Alphanumeric;
-        return text[start..quote] switch
-        {
-            ['N' or 'n'] or ['N' or 'n', 'X' or 'x'] => LiteralKind.National,
-            ['B' or 'b'] or ['B' or 'b', 'X' or 'x'] => LiteralKind.Boolean,
-            _ => LiteralKind.Alphanumeric,
-        };
+        return commentFollows = rest.StartsWith(CobolSourceText.CommentIndicator, StringComparison.Ordinal);
     }
 
     /// <summary>Whether a continuation line's content (the text after its initial quotation symbol) holds no literal

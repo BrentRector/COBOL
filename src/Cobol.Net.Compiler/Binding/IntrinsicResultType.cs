@@ -287,15 +287,17 @@ internal static class IntrinsicResultType
     /// </para>
     /// <para>
     /// ⛔ A GROUP ANSWERS ITS §8.5.2.1 CLASS — "an alphanumeric group item has class and category alphanumeric"
-    /// — NOT null. The former null was defended as "the honest answer", and its OWN analysis refutes that: per
-    /// §8.5.2.10 item 3 a group is category national only under GROUP-USAGE NATIONAL (§13.18.29, staged), so
-    /// every group this compiler can express IS category alphanumeric — a fixed, statically-known category that
-    /// null mis-reported as unknowable. The cost was measured twice: <c>FUNCTION MAX(G1 G2)</c> resolved its
-    /// TYPE through the numeric row (FirstCategory saw nothing) while <c>IsStringOperand</c> chose the string
+    /// — NOT null. The former null was defended as "the honest answer", and its OWN analysis refuted that: a group
+    /// with no GROUP-USAGE clause that is not strongly typed is an alphanumeric group item (§13.18.29.4 GR3), a
+    /// fixed, statically-known category that null mis-reported as unknowable. The cost was measured twice:
+    /// <c>FUNCTION MAX(G1 G2)</c> resolved its TYPE through the numeric row (FirstCategory saw nothing) while <c>IsStringOperand</c> chose the string
     /// BODY, and the two halves of one decision disagreeing crashed at run time ("no numeric render recipe" —
     /// the exact PB48 shape both sites' comments warn about); and <c>DISPLAY-OF(group)</c> sailed past the
-    /// §15.26.3 r1 class-national screen. The National/Boolean arms below are the GROUP-USAGE/bit-group legs
-    /// (unreachable until those land — <c>ClassOfPlace</c>'s group arm is the same shape, deliberately).
+    /// §15.26.3 r1 class-national screen. A bit or national group never reaches the Alphanumeric fallback: it
+    /// answers its as-if picture's category through <c>OperandPic</c> (§13.18.29.4 GR1b/GR2b). A strongly-typed
+    /// group does reach it, though its class is its type-name (§8.5.2.1): Alphanumeric is §15.3 item 2's reading
+    /// of it as an argument ("treated as though they were of class and category alphanumeric"), and the relation
+    /// screen asks <c>StrongTypeModel</c> before this (§8.8.4.2.3 SR1).
     /// </para>
     /// </summary>
     public static PicCategory? OperandCategory(BoundOperand op) => op switch

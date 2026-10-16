@@ -980,7 +980,11 @@ public sealed record PicInfo(
     /// (<c>DataBinder.MarkImageForced</c> / <c>StorageFormPass</c>'s promotion): promotion pins the carrier at
     /// <c>ImageWidth</c> CHARACTER positions, which for usage DISPLAY is the leaf's whole storage and for usage
     /// NATIONAL is half of it (D-N1), and promoting a national-form numeric leaf was MEASURED to corrupt a plain
-    /// group-to-group MOVE between two of them. Each such site says so in its own comment.</para></summary>
+    /// group-to-group MOVE between two of them. Each such site says so in its own comment. The carriage sites
+    /// answer their own question: the whole-group promotion stays DISPLAY-only, while <c>MoveBinder</c>'s two
+    /// single-leaf marks (a figurative fill, a reference-modified store) admit usage NATIONAL because the leaf
+    /// has no other carrier for those characters (kb/Work PB442; <c>DisplayUsageUnionDriftTests</c> records the
+    /// probes).</para></summary>
     public bool IsCharacterFormNumeric =>
         Category is PicCategory.Numeric && !IsFloat && Usage is Usage.Display or Usage.National;
 

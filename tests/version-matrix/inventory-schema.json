@@ -444,9 +444,16 @@
         "    PB137 as a bind-time COBOLNET1690 rejection with three negative goldens. ⚠ Note what the word",
         "    'statement' is doing: §12.4.6.3.3 SR5/SR6 read 'This CLAUSE shall not be specified …' and stay IN,",
         "    because the APPLY COMMIT clause has no implementation at all.",
-        "  • 'EC-FLOW-(COMMIT|ROLLBACK)' — GR-14.9.7.4-2 / GR-14.9.36.4-2; kb/Work PB259 holds the first open as a",
-        "    genuine adjudication. Anchored so EC-FLOW-APPLY-COMMIT in GR-12.4.6.3.4-6 does NOT match.",
         "  • 'execution continues with the next logical statement' — GR-14.9.36.4-7, satisfied today.",
+        "",
+        "⚖ GR-14.9.7.4-2 / GR-14.9.36.4-2 (each statement's GR2, which SETS EC-FLOW-COMMIT / EC-FLOW-ROLLBACK under",
+        "the control of a recursive runtime element or a file SORT or MERGE) are IN; an 'EC-FLOW-(COMMIT|ROLLBACK)'",
+        "exclusion held them out until kb/Work PB259 settled them (w1033 adjudication, upheld by its refuter). The",
+        "condition they set IS the module's own (§9.1.18.7 states the pair inside 'Commit and Rollback', A.4.3",
+        "item 1), A.4.1 makes a module's exception conditions optional with it, and §14.6.13.1.1 does not require a",
+        "level-3 condition of an unimplemented element to be raised. Nothing survives: the STATIC reach is the",
+        "SR1/SR2 COBOLNET1690 rejection (excluded above by its own words), and the DYNAMIC reach is GR1's CONTINUE,",
+        "pinned by conformance:2023/pb259_commit_rollback_under_sort and pb259_commit_rollback_recursive.",
         "",
         "⚠ THE CLOSEST CALL IN THE SET, recorded because a re-deriver will challenge it. SR-12.4.6.3.3-10 ('No data",
         "items referenced by the FILE STATUS clause, the LINAGE clause, the RECORD clause, or separately specified",
@@ -457,9 +464,10 @@
         "FILE STATUS / LINAGE / RECORD returns nothing, so under the general reading this buried syntax rule would",
         "be the standard's ONLY prohibition on a BASED file-status item.",
         "",
-        "FMT rows are excluded by KIND, not by matching the transcription's '<pre'. How a GENERAL FORMAT records",
-        "under an unclaimed module is kb/Work PB259's explicitly OPEN question, and FMT-14.9.36.2 would be WRONG as",
-        "non-support anyway: ROLLBACK is a recognized statement in the shipped grammar, so the grammar matches the",
+        "FMT rows are excluded by KIND, not by matching the transcription's '<pre'. A statement's GENERAL FORMAT",
+        "records by its LIVE surface, never by the unclaimed module (kb/Work PB259 / PB2499: a declined-and-refused",
+        "alternative is unreachable rather than unverified, so FMT-14.9.1.2 and FMT-14.9.11.2 are CONFORMS), and",
+        "FMT-14.9.36.2 would be WRONG as non-support: ROLLBACK is a recognized statement in the shipped grammar, so the grammar matches the",
         "printed format. ⚠ The '<pre' proxy leaked — 56 of 322 FMT rows do not match it — and it looked safe here",
         "only because FMT-14.9.7.2 is MISSING FROM THE CATALOG (kb/Work PB284): §14.9.7.2 is headed 'General forms',",
         "the only such heading against 282 'General format' ones, and its format is an inline backtick rather than a",
@@ -478,7 +486,7 @@
       ],
       "arms": [
         {
-          "$arm": "clause — the module's own three clauses; a general format is a separate question (PB259)",
+          "$arm": "clause — the module's own three clauses; a statement's general format records by its live surface (PB259)",
           "sections": [
             "12.4.6.3",
             "14.9.7",
@@ -517,7 +525,6 @@
       "excludes-patterns": [
         "no active APPLY COMMIT clause",
         "This statement shall not be specified",
-        "\\bEC-FLOW-(COMMIT|ROLLBACK)\\b",
         "execution continues with the next logical statement"
       ]
     },
@@ -682,7 +689,7 @@
         "the SUM clause SR-13.18.54.3-1 and the procedure-division-header SR-14.2.2-1 — measured, not imagined.",
         "One mixed block stays OUT and must not be left blank: SR-11.3.3-6 (sentence 1 is solely conditioned;",
         "sentence 2 has a satisfiable antecedent in a LINEAR chain A→B→C→D). The overload tie-break absorbed into",
-        "GR-9.3.6-L5.3 was named here as a trap until R43; it is overload content through and through, and the",
+        "GR-9.3.6-L4.3 was named here as a trap until R43; it is overload content through and through, and the",
         "item-3 arm now takes it with the criteria it ranks.",
         "",
         "MEASURED 2026-09-02: the pattern catches 4 of 4,311; `interface-name` drops 1; 3 are selected, all blank.",

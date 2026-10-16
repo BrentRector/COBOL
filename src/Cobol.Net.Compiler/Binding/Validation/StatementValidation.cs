@@ -887,28 +887,44 @@ internal sealed class StatementValidation(DataBinder data)
         return false;
     }
 
-    /// <summary>SR6 — non-figurative literal-1 / literal-3 of unequal size is illegal (statically known, so
-    /// diagnosed at compile time; the identifier-size mismatch is the runtime GR14 EC case). Called on the
-    /// no-figurative-expansion path — the figurative rewrite (bind logic) stays in the binder.</summary>
-    public bool CheckInspectReplacingSize(BoundOperand pat, BoundOperand rep, bool figurative)
+    /// <summary>⛔ ONE SIZE RULE FOR BOTH INSPECT LITERAL PAIRS (kb/Work PB3233). ISO §14.9.22.3 SR6 ("When both
+    /// literal-1 and literal-3 are specified, they shall be the same size except when literal-3 is a figurative
+    /// constant") and SR9 ("When both literal-4 and literal-5 are specified they shall be the same size except when
+    /// literal-5 is a figurative constant") are one rule over two pairs, so both pairs are asked here. Each operand
+    /// arrives as the binder's <c>(Op, Figurative)</c> answer, and its size is <see cref="InspectLiteralSize"/>'s:
+    /// a figurative PATTERN (literal-1 / literal-4, a bare symbolic-character included) is the "implicit one character
+    /// data item" of SR3, never skipped as "not a literal". Only a figurative REPLACEMENT is exempt, because GR14 /
+    /// GR22 size it to the pattern at run time. An identifier on either side is no literal, so the size check is
+    /// GR14 / GR22's run-time EC-RANGE-INSPECT-SIZE instead.</summary>
+    /// <param name="converting">False for a REPLACING pair (SR6), true for the CONVERTING pair (SR9).</param>
+    public bool CheckInspectLiteralSizes((BoundOperand Op, bool Figurative) pattern,
+        (BoundOperand Op, bool Figurative) replacement, bool converting)
     {
-        if (pat is not BoundStringLiteral lp || rep is not BoundStringLiteral lr || figurative
-            || lp.Value.Length == lr.Value.Length) return true;
-        data.Edition.Error("COBOLNET0846", $"INSPECT REPLACING: literal '{lp.Value}' and replacement "
-            + $"'{lr.Value}' differ in size (ISO §14.9.22.3 SR6 — equal size unless the replacement is figurative)");
+        if (replacement.Figurative || InspectLiteralSize(pattern) is not { } patternSize
+            || InspectLiteralSize(replacement) is not { } replacementSize || patternSize == replacementSize) return true;
+        var (rule, phrase, names) = converting
+            ? ("SR9", "CONVERTING", ("literal-4", "literal-5"))
+            : ("SR6", "REPLACING", ("literal-1", "literal-3"));
+        data.Edition.Error("COBOLNET0846", $"INSPECT {phrase}: {names.Item1} {InspectLiteralImage(pattern, patternSize)} "
+            + $"and {names.Item2} {InspectLiteralImage(replacement, replacementSize)} differ in size "
+            + $"(ISO §14.9.22.3 {rule} — the same size unless {names.Item2} is a figurative constant)");
         return false;
     }
 
-    /// <summary>SR9 — CONVERTING literal-4 / literal-5 of unequal size (equal size unless literal-5 is
-    /// figurative; the figurative expansion stays in the binder).</summary>
-    public bool CheckInspectConvertingSize(BoundOperand from, BoundOperand to, bool figurative)
-    {
-        if (from is not BoundStringLiteral lf || to is not BoundStringLiteral lt || figurative
-            || lf.Value.Length == lt.Value.Length) return true;
-        data.Edition.Error("COBOLNET0846", $"INSPECT CONVERTING: '{lf.Value}' and '{lt.Value}' differ in "
-            + "size (ISO §14.9.22.3 SR9 — equal size unless literal-5 is figurative)");
-        return false;
-    }
+    /// <summary>The statically known size of an INSPECT literal operand, for SR6 / SR9: a figurative constant is ONE
+    /// character (ISO §14.9.22.3 SR3: "If literal-1, literal-2, or literal-4 is a figurative constant, it refers to an
+    /// implicit one character data item"), a nonnumeric literal its character count; null for an identifier, a
+    /// function-identifier or an operand already refused, none of which is a literal.</summary>
+    private static int? InspectLiteralSize((BoundOperand Op, bool Figurative) operand) =>
+        operand.Op is BoundOperandError ? null
+        : operand.Figurative ? 1
+        : operand.Op is BoundStringLiteral literal ? literal.Value.Length
+        : null;
+
+    private static string InspectLiteralImage((BoundOperand Op, bool Figurative) operand, int size) =>
+        operand.Op is BoundStringLiteral literal
+            ? $"'{literal.Value}' ({size} character{(size == 1 ? "" : "s")})"
+            : "(a figurative constant, an implicit one-character item by SR3)";
 
     /// <summary>⛔ THE ONE ELEMENTARY ARM OF INSPECT'S USAGE RULES (kb/Work PB856). ISO §14.9.22.3 SR1 and SR2 end in
     /// the same words — "an elementary item described implicitly or explicitly as usage display or national" — and
@@ -1339,6 +1355,30 @@ internal sealed class StatementValidation(DataBinder data)
         return false;
     }
 
+    /// <summary>⛔ THE ONE ENFORCEMENT OF ISO §13.4.5.3 SR3 c) — "When no record description entries are specified:
+    /// … c) an INTO phrase shall be specified on all READ statements associated with the file." (kb/Work PB694). The
+    /// rule is about the FILE DESCRIPTION ENTRY, which every organization has, so <c>SequentialIoBinder.BindRead</c>
+    /// asks it BEFORE its organization reroute and the relative arm (<c>KeyedIoBinder.BindRead</c>) is under it too
+    /// (feedback_two_arm_dispatch). The record area such a READ fills is §14.9.30.4 GR6's implied entry, which has no
+    /// record-name, so without INTO the program could never see what it read.
+    /// <para>SR3 b) — the WRITE/REWRITE half — has no screen of its own because none can be reached: the
+    /// record-name-1 alternative names "a logical record in the file section" (§14.9.51.3 SR5, §14.9.35.3 SR1), which
+    /// a record-less entry does not have, and the <c>FILE file-name-1</c> alternative is Annex A.4.13, refused by
+    /// COBOLNET1706 (docs/CONFORMANCE.md §5, row A.4.13).</para>
+    /// <para>A hard error at every edition: the source states a READ the standard gives no meaning, so there is no
+    /// lenient corpus to protect and nothing for <c>--permissive</c> to keep. Returns true when the statement
+    /// conforms; the caller still binds it, the compile having already failed.</para></summary>
+    public bool CheckReadIntoOnRecordLessFile(FileModel file, bool intoWritten)
+    {
+        if (intoWritten || !file.HasNoRecordDescriptionEntries) return true;
+        data.Edition.Error(DiagnosticCatalog.RecordLessFdReadWithoutInto, $"READ {file.CobolName}: the file "
+            + "description entry specifies no record description entries, so an INTO phrase shall be specified on "
+            + "all READ statements associated with the file (ISO §13.4.5.3 SR3 c)) — its record area is the implied "
+            + "record of §14.9.30.4 GR6, which has no name, and only READ … INTO can deliver the record. Write "
+            + $"READ {file.CobolName} INTO identifier, or describe the record under the FD.");
+        return false;
+    }
+
     /// <summary>⛔ THE ONE ENFORCEMENT OF ISO §14.9.30.3 SR10 — "The KEY phrase may be specified only if
     /// ORGANIZATION IS INDEXED is specified in the file control entry for file-name-1." The rule names an
     /// ORGANIZATION, so it cannot live on one organization's binder arm: it was enforced only in
@@ -1528,10 +1568,13 @@ internal sealed class StatementValidation(DataBinder data)
         return false;
     }
 
-    /// <summary>§14.9.51 SR18 — ADVANCING PAGE and END-OF-PAGE shall not both be specified in one WRITE.</summary>
-    public bool CheckWriteEopAdvancingPage(bool advancingPage)
+    /// <summary>§14.9.51 SR18 — <i>"The phrases ADVANCING PAGE and END-OF-PAGE shall not both be specified in a
+    /// single WRITE statement."</i> The END-OF-PAGE phrase is the AT phrase (GR27 b)'s imperative-statement-1);
+    /// SR19 and GR28 name the NOT END-OF-PAGE phrase separately, so the caller passes true only when the WRITE
+    /// carries ADVANCING PAGE AND the AT phrase (kb/Work PB578).</summary>
+    public bool CheckWriteEopAdvancingPage(bool advancingPageWithAtEop)
     {
-        if (!advancingPage) return true;
+        if (!advancingPageWithAtEop) return true;
         data.Edition.Error("COBOLNET0861", "WRITE … ADVANCING PAGE with an END-OF-PAGE phrase: the two "
             + "shall not both be specified in a single WRITE statement (ISO §14.9.51.3 SR18)");
         return false;
@@ -1668,7 +1711,7 @@ internal sealed class StatementValidation(DataBinder data)
         DataItem? sr = right is BoundFieldOperand fr ? fr.Place.Item : null;
         if ((sl is { } && StrongTypeModel.IsStrongGroup(sl)) || (sr is { } && StrongTypeModel.IsStrongGroup(sr)))
         {
-            if (sl is null || sr is null || !StrongTypeModel.SameType(sl, sr, prototypes: null))
+            if (sl is null || sr is null || !StrongTypeModel.SameType(sl, sr))
                 data.Edition.Error(DiagnosticCatalog.StrongCompareMismatch, "a strongly-typed group may be compared only with a group of the "
                     + "same type (ISO §8.8.4.2.3 SR1 / §8.5.3.3)");
             // §8.8.4.2.3 SR4: "Strongly-typed group items that contain elementary items of class boolean,

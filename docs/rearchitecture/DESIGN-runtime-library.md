@@ -193,7 +193,7 @@ facades cache `RunUnit.Current` in a local at entry to avoid repeated `AsyncLoca
 
 **Emitted-surface compatibility (battery-green):** the existing static facades stay as *thin delegating shims* over
 `RunUnit.Current` during the migration, so generated code (`ProgramRegistry.CallProgram(...)`,
-`ExceptionState.Set(...)`, `CobolFile.Open(...)`, `CobolModule.Push(...)`) keeps compiling unchanged:
+`ExceptionState.Set(...)`, `CobolFile.Open(...)`, `CobolModule.Name(...)`) keeps compiling unchanged:
 ```csharp
 public static class ProgramRegistry {                 // compat shim (deleted at G8 or kept — OPEN QUESTION)
     public static void CallProgram(string n, string c, CobolArg[] a, ManagedPointer? r,
@@ -222,9 +222,17 @@ public abstract class FileConnector
     // The READ preconditions, written ONCE for every organization (kb/Work PB336). Order IS the rule inside
     // SequentialReadGuard: §14.9.30.4 GR2 '47', then GR21's '46' poison, then §9.1.13.4 1c's '10' — which is
     // "first time" only BECAUSE its own arm arms the poison. Random side: §9.1.13.5 3b's '23', never '46'.
+    // The guards are PURE. A READ or START entry never assigns Status itself: a failure returns through
+    // Unsuccessful, which applies §14.9.30.4 GR18 / §14.9.41.4 GR7 through the virtual InvalidateFilePosition
+    // (kb/Work PB359); a success through ReadSucceeded or StartPositioned.
     protected string? ReadOpenModeGuard();
     protected string? SequentialReadGuard();
     protected string? RandomReadAbsentOptionalGuard();
+    protected string? StartOpenModeGuard();
+    protected string Unsuccessful(string status);             // InvalidateFilePosition, then the status
+    protected string ReadSucceeded(string status);            // re-arms the '43' gate, clears the '46' poison
+    protected string StartPositioned();                       // '00', clears the '46' poison
+    protected virtual void InvalidateFilePosition();          // keyed connectors also clear their FPI validity bit
     protected abstract string OpenCore(FileOpenMode mode, FilePresence presence);   // takes the ONE presence probe
     //   (Open also answers GR3/'37', GR10/'39' and GR16's write capability/'37' before OpenCore is reached)
     protected abstract bool ReadNext(out string image);        // sequential retrieval
@@ -382,7 +390,8 @@ cannot admit this run unit's second connector while refusing a foreign process. 
   has a physical file and `ReleaseFileLock` in the CLOSE and on an unsuccessful OPEN. ⛔ **It is the SAME handle
   the store travels through** — `KeyedConnector.Load`/`Persist` read and write positionally through it, and `RecordFraming` only composes and decodes the image — because a
   second handle for the load or the persist would ask for access the connector's own `FileShare.None` forbids,
-  which is kb/Work PB713's defect re-opened by its own cure. The handle's ACCESS is `FileConnector.HostAccess`,
+  which is kb/Work PB713's defect re-opened by its own cure. The handle's ACCESS is `FileConnector.HostAccess`
+  (every organization opens its handle, `FileConnector.FileLock`, with it and spells none of its own; kb/Work PB2758),
   not the open mode's floor, because a whole-store organization reads the physical file in every writable mode
   (§14.9.51.4 GR29 a)'s release number is a fact of the records already there).
 
@@ -665,13 +674,14 @@ first changes the file or its store: the sequential record, line and print arms,
 `CommitGateDriftTests` measures every one with a gate that always refuses.
 
 **The SEQUENTIAL organization publishes its record locks the same way (kb/Work PB2692).** Its `RecordLocks` endpoint is made for
-the handle beneath its reader or writer (`HostFile.HandleOf`), and three facts make the published lock guard the
+the handle beneath its reader or writer (`FileConnector.FileLock`, read through `HostFile.FileOf`), writable exactly
+when the host granted that handle write access, and three facts make the published lock guard the
 right record across run units. (1) A writer that registered a record-locking posture opens its handle READ-WRITE
 (`SequentialConnector.HostAccess`): the presence byte is a SHARED hold, which Linux refuses through a write-only
 descriptor, and a lock with no presence byte is invisible to every other run unit's hot-path test. The read half is
 a PREFERENCE for OUTPUT and a NEED for EXTEND (kb/Work PB2848): OUTPUT creates the file and has no record to read,
 so a host that refuses the read (a write-only file) still grants the write, `OpenWriter` falls back to the mode's
-write-only handle, and that connector numbers its records by the in-run-unit mint (`_writerReads` is false) and
+write-only handle, and that connector numbers its records by the in-run-unit mint (its `FileLock` cannot read) and
 publishes no presence; EXTEND numbers the records already in the file and answers `37` without the read. (2) A sharing
 writer's released record is NUMBERED OFF THE MEDIUM (`ReleaseRecord` → `PhysicalOrdinalOfRelease`): the record lands
 where `SharedAppendStream.ReleaseStart` says, and its ordinal is one more than the records starting before that
@@ -766,6 +776,13 @@ runs the registration and then the main program under the §14.6.12 abnormal-ter
 epilogue, so a registration the run unit refuses (another runtime major or call ABI, or an already-registered
 outermost name) ends the run unit through that surface and never escapes as an unhandled .NET exception. A host that
 registers its modules itself enters through `ProgramRegistry.RunMain(path)`, the same boundary without the registration.
+**The process's own state belongs to the entry that IS the process (kb/Work PB3163, PB3193).** `RunModule` and the
+`cobol` CLI's `Main` are the only writers of the process exit code and the only callers of
+`IO.StandardStreams.EnsureUtf8` (UTF-8 standard output and error, and a UTF-8 reader over a redirected standard input,
+DOC-A.1-59 and DOC-A.1-1); `RunMain`, `RunUnit.Run` and a CALL into a module write neither, so a run unit a host
+embeds DISPLAYs through the host's `Console.Out` / `Console.Error` as the host configured them and leaves the host's
+exit code and console as it found them. `ProcessStateOwnerDriftTests` (Unit) holds each process-owned write to its
+owner; `RunUnitHostExitCodeTests` and `RunUnitHostConsoleTests` (Conformance) are the host-side witnesses.
 `ProgramRegistry` → **`ProgramTable`** (an instance owned by `RunUnit`; the name "Registry" is reserved for the
 process-level nothing-here). The name-resolution / state-model / CANCEL / sibling-module-probe logic is ported
 verbatim onto the instance. `ExternalStore` and `CobolModule`→`ModuleStack` move off statics onto `RunUnit`. The CALL-
@@ -820,17 +837,29 @@ two intakes, and which one is not a property of the renderer arm — it is a pro
 `IntrinsicCarrierAgreementDriftTests.EveryTotalIntegerArgument_TakesTheWideIntake` re-derives the pairing by
 reflection over the shipped signatures and fails when an arm and its body disagree — in either direction. A new
 total function therefore needs one act, widening its body; forgetting its renderer arm is red, not silent.
-A body's `…Real` twin owes the same totality, and owes it WITHOUT a second copy of the rule: it routes through
-`TryTotalIntegerArg`, which saturates a magnitude past `Int128` (±∞ included) to the corresponding extreme —
-verdict-preserving, because a catch-all arm depends on being outside the window and not on how far — so the
-window itself stays written in exactly one body. It must NOT route to `TryIntegerArg`, whose false arm is a
-literal verdict; that literal was §15.90.4 r1d, "the date is valid".
-⚠ Since kb/Work PB248 a floating-point operand at a §15.3 type-6 position is REFUSED under strict
-(COBOLNET1627 — type 6 admits "an integer data item or an always-integral arithmetic expression", and a
-floating-point item is neither), so the `…Real` twins are reached only under `--permissive`. That is where
-their totality is witnessed: `tests/Cobol.Net.Tests.Conformance/FloatIntegerArgumentPermissiveTests.cs`,
-the one home for the coercion lane. The twins are still live code and still owe the rule — the lane
-changed, the obligation did not.
+⛔ **A type-6 position has NO `…Real` twin: the renderer takes the operand's INTEGER first (kb/Work PB651).**
+Since kb/Work PB248 a floating-point operand at a §15.3 type-6 position is REFUSED under strict (COBOLNET1627 —
+type 6 admits "an integer data item or an always-integral arithmetic expression", and a floating-point item is
+neither), so it arrives only under `--permissive`, and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means:
+the integer it holds, or the truncated integer with EC-ARGUMENT-FUNCTION checking off. That is a property of the
+POSITION, so `IntrinsicRenderer.RawArg` — the one indexed argument entry every intake and lane predicate reads —
+takes it there, before a lane is chosen, on every carrier, keeping the VALUE or saying it cannot. An SDIDI operand
+STAYS on the SDIDI (`CobolIntrinsics.IntegerArgUnboundedDec`: the integrality test, then `CobolDec.TruncateToInteger`),
+because an SDIDI holds 34 significant digits at any exponent and its integer reaches far past `Int128` —
+MOD(10 ** 40, 3) and MOD(A ** 3, B) of a 15-digit A are integers the SDIDI body evaluates (kb/Work PB2630, PB69),
+and landing them on `Int128` was EC-SIZE-OVERFLOW. A fixed-point operand's integer fits the `Int128` its unscaled
+value rides, and a float past it (±1.7e38, ±∞ included) raises EC-ARGUMENT-FUNCTION through
+`CobolIntrinsics.IntegerArgWideReal`. ⛔ The position intake never CLAMPS: a clamp
+answers for a different integer, so `MOD(1.0E39, 7)` answered 1 where the operand's integer answers 5 (PB651 review
+R1-2). Clamping is right only where the function answers the same for every integer past a bound — TEST-DATE-YYYYMMDD
+/ TEST-DAY-YYYYDDD argument-1 (the r1a catch-all) and FIND-STRING argument-3 (0 once every match is ignored) — and
+those arms alone take `IntrinsicRenderer.IntArgWideSaturating` (`CobolIntrinsics.IntegerArgSaturatingReal`);
+`IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates` keeps the set closed. An integer has no binary64-ness, so a float at a type-6 position never moves a call to the
+binary64 lane: the integer-only functions (MOD, FACTORIAL, the date family, the TEST- validators, the windowing
+trio) have no `…Real` body, and `IntrinsicRealArgDriftTests.NoRealBody_ServesAFunctionWhoseEveryPositionIsType6`
+keeps it so. A mixed row keeps its twin for its type-10 position (`CombinedDatetimeReal`, reached by a float
+argument-2). The lane is witnessed over every verified type-6 position by
+`IntrinsicIntegerPositionPermissiveDriftTests` and in `FloatIntegerArgumentPermissiveTests`, the coercion lane's home.
 
 ⛔ **WHICH bodies owe a `…Real` twin is likewise derived, and FIND-STRING owes none (kb/Work PB635).** The
 binary64 lane renders every argument through one `double` conversion, so it is enterable only for a call whose

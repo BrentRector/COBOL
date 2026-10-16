@@ -77,6 +77,17 @@ check_legs() {
   done
 }
 
+# PY: THE ONE INTERPRETER the gate scripts run (scripts/python-resolve.sh; kb/Work PB1637, PB3197), or the gate is NOT
+# RUN. This script took `command -v python3 || command -v python`, which accepts any name on PATH: a python3 below the
+# floor the scripts are written for (3.12) was taken, and the legs then failed on their syntax instead of refusing. The
+# resolver runs in a subshell, so a host with none ends on this gate's verdict line (exit 2, as every NOT RUN does).
+resolve_py() {
+  if ! PY="$(. "$(dirname "$0")/python-resolve.sh" && printf '%s' "$PY")"; then
+    echo "=== LINUX GATE: NOT RUN (python-resolve.sh found no runnable Python here — run scripts/wsl/setup-wsl.sh once) ==="
+    exit 2
+  fi
+}
+
 # The hand-off, measured with stand-ins for uname, wsl.exe and cygpath (shell functions, so no fake program and no
 # setting is needed, and it runs the same on every host): a Windows host hands every argument to WSL verbatim and
 # returns WSL's status; a host with no WSL is NOT RUN, never RED; a Linux host does not hand off.
@@ -104,6 +115,17 @@ if [ "${1:-}" = "--self-test" ]; then
   check "an unknown --legs name exits 2" "$rc" "2"
   got="$( legs=unit,characterization,conformance,guard; check_legs; echo "accepted ${wanted[*]}" )"
   check "the four selectable legs are accepted, in order" "$got" "accepted unit characterization conformance guard"
+  # The interpreter, through the one resolver, with stand-in interpreters (shell functions the resolver's probe runs):
+  # `return 1` answers the floor probe as an interpreter below 3.12 (or the Store alias) does, `return 0` as one at it.
+  got="$( python3() { return 1; }; python() { return 0; }; PYTHON=""; resolve_py; echo "$PY" )"
+  check "a python3 below the floor is passed over for a python at it" "$got" "python"
+  got="$( pinned-python() { return 0; }; python3() { return 0; }; PYTHON=pinned-python; resolve_py; echo "$PY" )"
+  check "an explicit \$PYTHON is probed first" "$got" "pinned-python"
+  got="$( python3() { return 1; }; python() { return 1; }; PYTHON=""; resolve_py 2>/dev/null; echo "resolved $PY" )"
+  rc=$?
+  check "no runnable Python at the floor is NOT RUN, never a leg run on a wrong interpreter" "$got" \
+        "=== LINUX GATE: NOT RUN (python-resolve.sh found no runnable Python here — run scripts/wsl/setup-wsl.sh once) ==="
+  check "no runnable Python exits 2, as every NOT RUN does" "$rc" "2"
   if [ "$fails" -eq 0 ]; then echo "=== LINUX-GATE SELF-TEST: GREEN ==="; exit 0; fi
   echo "=== LINUX-GATE SELF-TEST: RED ($fails) ==="; exit 1
 fi
@@ -126,14 +148,11 @@ export DOTNET_CLI_TELEMETRY_OPTOUT=1 DOTNET_NOLOGO=1
 if ! command -v dotnet >/dev/null 2>&1; then
   echo "=== LINUX GATE: NOT RUN (no .NET SDK in this Linux environment — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
 fi
-py="$(command -v python3 || command -v python)"
-if [ -z "$py" ]; then
-  echo "=== LINUX GATE: NOT RUN (no python in this Linux environment — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
-fi
+resolve_py
 # tooling_check.py's self-test parses every agent and skill frontmatter with PyYAML (kb/Work PB3097, branch review R3-1):
 # an interpreter without it is NOT RUN with the setup command, never a RED self-test leg.
-if ! "$py" -c 'import yaml' >/dev/null 2>&1; then
-  echo "=== LINUX GATE: NOT RUN ($py has no PyYAML — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
+if ! "$PY" -c 'import yaml' >/dev/null 2>&1; then
+  echo "=== LINUX GATE: NOT RUN ($PY, $(command -v "$PY"), has no PyYAML — run scripts/wsl/setup-wsl.sh once) ==="; exit 2
 fi
 if [ ! -f Cobol.Net.sln ]; then
   echo "=== LINUX GATE: NOT RUN (not at a repository root: $(pwd)) ==="; exit 2
@@ -191,7 +210,7 @@ corpus_red=""
 if [ -d tests/external/gnucobol ]; then
   mkdir -p "$snap/tests/external" && cp -r tests/external/gnucobol "$snap/tests/external/"
 fi
-if ! "$py" "$snap/scripts/external_corpus.py" ensure --repo "$snap" > "$out/corpus-fetch.log" 2>&1; then
+if ! "$PY" "$snap/scripts/external_corpus.py" ensure --repo "$snap" > "$out/corpus-fetch.log" 2>&1; then
   echo "linux-gate: EXTERNAL CORPUS FETCH FAILED, POPULATION UNMEASURED (TestResults/linux-gate/corpus-fetch.log); the two ExternalCorpusPopulationDriftTests reds in the unit leg are attributable to it"
   corpus_red=" corpus-fetch"
 fi
@@ -204,7 +223,7 @@ bad="$corpus_red"; ran=""
 # own log. A background leg cannot set this shell's variables, so each writes its report lines to <leg>.result and
 # GREEN|RED|NOT RUN to <leg>.status; after `wait` they are printed in a fixed order and folded into the verdict.
 # `selftests` needs no build, so it starts beside the build. Every script self-test runs on Linux through the ONE runner
-# CI runs (kb/Work PB2563): `selftests` is `python3 scripts/self_tests.py`, `selftests-built` its `--built` half, which
+# CI runs (kb/Work PB2563): `selftests` is `"$PY" scripts/self_tests.py`, `selftests-built` its `--built` half, which
 # reads the built test assemblies. They are path-sensitive: a drive-letter path that Linux reads as relative turned CI
 # red on 2026-10-07 after a green Windows run (kb/Work PB2142).
 leg_status() { printf '%s\n' "$2" > "$out/$1.status"; }   # <leg> <GREEN|RED|NOT RUN>
@@ -212,7 +231,7 @@ selftests_leg() {  # <leg name> [runner arguments…]
   local name="$1"; shift
   local start rc secs verdict
   start=$(date +%s)
-  ( cd "$snap" && "${nice_prefix[@]}" "$py" scripts/self_tests.py "$@" ) > "$out/$name.log" 2>&1
+  ( cd "$snap" && "${nice_prefix[@]}" "$PY" scripts/self_tests.py "$@" ) > "$out/$name.log" 2>&1
   rc=$?
   secs=$(( $(date +%s) - start ))
   verdict="$(grep -E '^=== SELF-TESTS: ' "$out/$name.log" | tail -1)"
@@ -229,8 +248,8 @@ guard_leg() {
   # CI's `guard` job (kb/Work PB1955, PB1957 row 40): the NIST suite through the `cobol` CLI from bash, the manifest
   # audit, the baseline check and the guard's own self-tests — the one CI Linux job that runs a SCRIPT rather than
   # `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on PB322's TERMINATES rows was invisible to
-  # every local leg. Its scratch is private to this clone (the guard writes fixed file names under TMPDIR, and
-  # implementers run this gate concurrently). Its own `dotnet build` of the CLI is up to date after the ONE build.
+  # every local leg. Its scratch is private to this clone (guard-fast.sh's own mktemp directory and every
+  # group's lie under TMPDIR, and implementers run this gate concurrently; kb/Work PB2922). Its own `dotnet build` of the CLI is up to date after the ONE build.
   # ⛔ The scratch lies BESIDE the clone, never inside it (kb/Work PB2989): `selftests-built` runs at the same time and
   # keys its inputs by every untracked file of the clone (scripts/self_test_inputs.py), so a guard temp file listed by
   # `git ls-files -o` and deleted before `git hash-object` read it made that leg NOT RUN (train 1056b, 2026-10-11).
@@ -256,7 +275,7 @@ test_leg() {  # <leg> <project> — `dotnet test --no-build` against the ONE bui
   start=$(date +%s)
   # Scrubbed (kb/Work PB1718): a gate-leg handshake or VSTest* variable inherited from the caller would narrow the run
   # to PART of its assembly while it exits 0. The one statement of that rule is test_population.py.
-  ( cd "$snap" && "${nice_prefix[@]}" "$py" "$snap/scripts/test_population.py" scrubbed dotnet test "$proj" \
+  ( cd "$snap" && "${nice_prefix[@]}" "$PY" "$snap/scripts/test_population.py" scrubbed dotnet test "$proj" \
       --no-build --no-restore --logger "trx;LogFileName=$leg.trx" --results-directory "$out" ) > "$out/$leg.log" 2>&1
   rc=$?
   secs=$(( $(date +%s) - start ))

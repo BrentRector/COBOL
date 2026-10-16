@@ -175,7 +175,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 // §13.10.4 GR1, EXCEPTION-OBJECT by §8.4.3.6.3 SR1. The sending resolver used here before knew
                 // none of them, so a legal PAGE-COUNTER counter fell out as an unresolved name and became a
                 // COBOLNET1756 run-time abort — the chokepoint's other arm, unfixed.
-                if (host.Expr.ResolveReceiving(item.dataReference()) is not { } counter)
+                if (host.Expr.ResolveReceiving(item.receivingIdentifier()) is not { } counter)
                     return new BoundUnsupported("INSPECT TALLYING count operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
                 ctx.Validation.CheckInspectTallyCounter(counter);   // SR5 — pure check; binding continues
                 // The grammar spells the printed phrase (PB1125): ONE FOR per counter, each CHARACTERS / ALL / LEADING
@@ -227,15 +227,17 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 foreach (var pair in item.inspectReplacingPair())
                 {
                     var (before, after) = InspectDelimiters(pair.inspectDelimiters());
-                    var (pat, _) = InspectCharOperand(pair.sendingOperand(0));
-                    var (rep2, figurative) = InspectCharOperand(pair.sendingOperand(1));
+                    var pattern = InspectCharOperand(pair.sendingOperand(0));
+                    var replacement = InspectCharOperand(pair.sendingOperand(1));
                     // SR6 / GR14: a figurative literal-3 "is expanded or contracted to be the size of literal-1", and
                     // GR14 says the same of identifier-3 — whose size is a RUN-TIME fact for a function-identifier or a
                     // dynamic-length item. So the runtime sizes it, for every pattern shape alike (kb/Work PB1126: a
                     // bind-time expansion that answered only a static width left `ALL FUNCTION TRIM(P) BY SPACES` a
-                    // one-character replacement the size check then skipped). Only two LITERALS are checked here.
-                    ctx.Validation.CheckInspectReplacingSize(pat, rep2, figurative);   // SR6 — pure check
-                    replacing.Add(new BoundInspectReplace(kind, pat, rep2, before, after, figurative));
+                    // one-character replacement the size check then skipped). Only two LITERALS are checked here, and
+                    // BOTH figurative flags go with them: a figurative literal-1 is SR3's one-character item, which
+                    // SR6 measures like any literal (kb/Work PB3233).
+                    ctx.Validation.CheckInspectLiteralSizes(pattern, replacement, converting: false);   // SR6 — pure check
+                    replacing.Add(new BoundInspectReplace(kind, pattern.Op, replacement.Op, before, after, replacement.Figurative));
                 }
             }
         }
@@ -253,21 +255,21 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             foreach (var ch in conv.sendingOperand())
                 if (ch.dataReference()?.cobolWord()?.GetText() is { } w
                     && !ctx.Symbols.TryResolve(w, ctx.ActiveScope, out _)
-                    && (ctx.Data.Alphabets.ContainsKey(w) || ctx.Data.NationalAlphabets.ContainsKey(w)))
+                    && ctx.Data.IsAlphabetName(w))
                     ctx.Edition.Error(DiagnosticCatalog.UndefinedReference,
                         $"INSPECT CONVERTING references the ALPHABET-name '{w}' — Format 4's operands are "
                         + "an identifier or a literal (ISO §14.9.22.2), and an alphabet-name is neither "
                         + "(the CONVERTING-alphabet form is a GnuCOBOL extension). Write the character "
                         + "strings, or a data item holding them");
-            var (from, _) = InspectCharOperand(conv.sendingOperand(0));
+            var from = InspectCharOperand(conv.sendingOperand(0));
             // Literal-5 is the ONE INSPECT literal SR3 does not bar from beginning with the word ALL (kb/Work PB1128).
-            var (to, figurative) = InspectCharOperand(conv.sendingOperand(1), literal5: true);
+            var to = InspectCharOperand(conv.sendingOperand(1), literal5: true);
             // SR9 / GR22: a figurative literal-5 takes literal-4's / identifier-6's size — at RUN time, the same
-            // reason as SR6 above (kb/Work PB1126).
-            ctx.Validation.CheckInspectConvertingSize(from, to, figurative);   // SR9 — pure check
+            // reason as SR6 above (kb/Work PB1126); a figurative literal-4 is SR3's one character (kb/Work PB3233).
+            ctx.Validation.CheckInspectLiteralSizes(from, to, converting: true);   // SR9 — pure check
             // The after-before-phrase is the ONE inspectDelimiters rule the other two formats use (PB1125).
             var (before, after) = InspectDelimiters(conv.inspectDelimiters());
-            converting = new BoundInspectConvert(from, to, before, after, figurative);
+            converting = new BoundInspectConvert(from.Op, to.Op, before, after, to.Figurative);
         }
 
         return new BoundInspect(targetOperand, tallying, replacing, converting, backward);
