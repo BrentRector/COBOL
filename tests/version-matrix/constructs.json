@@ -1828,6 +1828,18 @@
    "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. W15P.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F2 ASSIGN TO \"f2.dat\"\n        ORGANIZATION INDEXED ACCESS DYNAMIC RECORD KEY RK.\nDATA DIVISION.\nFILE SECTION.\nFD F2.\n01 R2.\n   05 RK PIC X(5).\n   05 RD2 PIC X(5).\nPROCEDURE DIVISION.\nMAIN.\n    START F2 KEY = RK WITH LENGTH 3.\n    STOP RUN.\n"
   },
   {
+   "id": "start-reverse-operators-2002",
+   "description": "The REVERSE-SEARCH relational operators of the START KEY phrase - LESS, NOT GREATER, LESS OR EQUAL and their symbols (<, NOT >, <=) - ISO 14.9.41.4 GR9 b) (relative: 'searching the file in reverse order') and GR17 d) (indexed: 'the file is searched in reverse order'). COBOL-85's START searches FORWARD only - the set GR9 a) / GR17 c) still name first, which NOT LESS and NOT < fold into, so they stay legal at 85 (conformance:85/pb370_start_forward_operators); A.3 item 39 binds the reverse set to READ ... PREVIOUS in ONE sentence as ONE reverse-access processor capability, and READ PREVIOUS is read-previous-2002. THE EDGE IS DERIVED, NOT QUOTED (the repo holds no 1985 or 2002 text, ratified decision #1): IBM Enterprise COBOL, a COBOL-85 implementation, admits only the forward set, and the 459 NIST CCVS-85 programs write only EQUAL, GREATER and NOT LESS. Gated on RECOGNITION in the VersionConformancePass parse arm (VisitStartKeyPhrase, the operator folded by ConditionBinder.MapOperator, the same fold KeyedIoBinder binds), so an ill-organized or unbindable START still names the edition (kb/Work PB370).",
+   "display": "a reverse-search START KEY operator (LESS, NOT GREATER, LESS OR EQUAL)",
+   "diagnosticCode": "COBOLNET0900",
+   "citation": "ISO §14.9.41.4 GR9 b) / GR17 d) (the reverse-search operator set); §A.3 item 39 (READ PREVIOUS and the reverse START operators, one processor-dependent capability); a COBOL-2002 introduction (derived)",
+   "introducedIn": 2002,
+   "removedIn": null,
+   "expectDiagnostic": "COBOLNET0900",
+   "vcr": "provisional 2002 edge (decision-1 policy), bound to read-previous-2002 by A.3 item 39",
+   "source": "IDENTIFICATION DIVISION.\nPROGRAM-ID. VMSTRV.\nENVIRONMENT DIVISION.\nINPUT-OUTPUT SECTION.\nFILE-CONTROL.\n    SELECT F ASSIGN TO \"vmstrv\" ORGANIZATION IS RELATIVE\n        ACCESS MODE IS DYNAMIC RELATIVE KEY IS W-K.\nDATA DIVISION.\nFILE SECTION.\nFD F.\n01 R PIC X(10).\nWORKING-STORAGE SECTION.\n01 W-K PIC 9(4).\nPROCEDURE DIVISION.\nMAIN.\n    OPEN INPUT F.\n    START F KEY IS LESS THAN W-K INVALID KEY DISPLAY \"E\".\n    CLOSE F.\n    STOP RUN.\n"
+  },
+  {
    "id": "code-set-national-2002",
    "description": "The NATIONAL half of the FD CODE-SET clause - alphabet-name-2 (the second name of the IS form) and the FOR ALPHANUMERIC / FOR NATIONAL phrases, ISO 13.18.13.2 - introduced 2002 with the national repertoire (the '85 format was CODE-SET IS alphabet-name-1 alone). Parse-arm gated (VisitCodeSetClause); kb/Work PB110.",
    "display": "the CODE-SET national phrases (alphabet-name-2 / FOR)",
