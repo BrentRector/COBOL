@@ -1,4 +1,4 @@
-## PB228 landed: ADD under ARITHMETIC IS STANDARD-DECIMAL is now pinned in all three formats, and the SUBTRACT twins' grouping too
+## Entry 2073 — 2026-10-16 07:51 PDT — PB228 landed: ADD under ARITHMETIC IS STANDARD-DECIMAL is now pinned in all three formats, and the SUBTRACT twins' grouping too
 
 kb/Work PB228 (wave 1091 I) was an evidence gap. No golden ran an ADD under `ARITHMETIC IS STANDARD-DECIMAL`, so the
 second paragraph of §14.9.2.4 GR1, GR2 and GR3 had no evidence. That paragraph is the standard-decimal equivalence and
@@ -33,3 +33,4 @@ was left alone.
 
 **Rows.** Batch `w1091i-PB228` moves GR-14.9.2.4-1, -2 and -3 from PARTIAL to CONFORMS and adds witnesses only to
 GR-14.9.44.4-1 and -2. GAP goes from 97 to 94. PB228 is landed with those three rows in `closes_rows`.
+
