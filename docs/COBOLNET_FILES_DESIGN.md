@@ -437,12 +437,14 @@ answers, each stated in the code where that organization's format lives:
   little-endian length prefix per record, whose method §12.4.5.11.4 GR5 grants ("If the RECORD DELIMITER clause
   is not specified, the method used for determining the length of a variable-length record is specified by the
   implementor") and whose GR1 it obeys ("Any method used shall not be reflected in the record area or the record
-  size used within the function, method, or program"). A first prefix naming more bytes than the file holds is
-  not a framed file at all, so the connector's declared VARIABLE **record type** — a §9.1.6 fixed file attribute —
-  contradicts the medium: **'39'**. A prefix that parses but falls outside the RECORD clause's bounds is NOT a
+  size used within the function, method, or program"). A first frame the ONE frame decoder cannot read
+  (`RecordFraming.ReadFrame`, kb/Work PB2754: a head naming more bytes than the file holds, the empty-slot tag, a
+  table this writer cannot produce) is not a framed file at all, so the connector's declared VARIABLE **record
+  type** — a §9.1.6 fixed file attribute — contradicts the medium: **'39'**. A prefix that parses but falls outside the RECORD clause's bounds is NOT a
   conflict; that is §9.1.13.2 item 3's '04' on the READ, which a '39' at the OPEN would make unreachable. A file
-  shorter than one prefix (fewer than four bytes) states nothing and is not a conflict — the same rule
-  `RecordFraming` already applies to a torn tail.
+  shorter than one prefix (fewer than four bytes) states nothing and is not a conflict. Past the first frame, the
+  same decoder ENDS the data at a torn or damaged frame for every reader — the forward READ, the record count and
+  the backward-READ index alike — so no reader sees a record another does not.
   ⚖ Behaviourally GnuCOBOL's `variable-length SEQUENTIAL data integrity` case: an FD of
   `RECORD VARYING FROM 5 TO 500` over a plain XML text file answers `OPEN ERROR: 39`.
 - **RELATIVE and INDEXED — whatever the framed store's HEADER carries**: the **organization**, the **record
@@ -2081,7 +2083,7 @@ BYTES. The two meet at exactly one law and one per-file encoding:
 |---|---|---|
 | in memory | alphanumeric / national items hold characters; a byte-form leaf (binary, packed, IEEE, pointer, bit, a national item's UTF-16BE pairs in a record image) holds BYTES, imaged one character per byte | the record structs and REDEFINES backings |
 | the storage-byte law | **byte 0xFF is the character U+FFFF (the native HIGH-VALUE, R52); every other byte b is U+00bb; a character's byte is its low-order byte**, so U+00FF and U+FFFF share 0xFF | `CobolNet.Runtime.StorageByte` — every byte-form encoder (`CobolNum.Image`, `PointerImage`, `CobolBits`) and decoder, the item-209 byte reduction (`CobolIntrinsics.RawBytes`) and the fixed-record medium |
-| the file encoding | fixed-record organizations (sequential, relative, indexed, report): one byte per position through the law, a character with no byte (above U+00FF, not U+FFFF) refused `'91'` (R47); LINE SEQUENTIAL: UTF-8 (PB1760); a CODE-SET clause converts the native one-byte channel (§13.18.13.4 GR6) | `FileCharacterSet.ToChannel` / `FromChannel` (the two medium sites: `FileConnector.ToMedium`/`FromMedium`, `RecordFraming.WriteStore`/`ReadStore`) |
+| the file encoding | fixed-record organizations (sequential, relative, indexed, report): one byte per position through the law, a character with no byte (above U+00FF, not U+FFFF) refused `'91'` (R47); LINE SEQUENTIAL: UTF-8 (PB1760); a CODE-SET clause converts the native one-byte channel (§13.18.13.4 GR6) | `FileCharacterSet.ToChannel` / `FromChannel` (the two medium sites: `FileConnector.ToMedium`/`FromMedium`, `RecordFraming.ComposeStore`/`DecodeStore`) |
 
 **Why one law and no per-leaf medium codec (the correction).** The first version of this decision gave every record
 struct a second generated image (`AsMedium`/`FromMedium`) whose alphanumeric leaves mapped U+FFFF <-> 0xFF, on the

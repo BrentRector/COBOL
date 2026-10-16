@@ -111,24 +111,34 @@ public sealed class RecordExtentsTests
     public void TheStreamFraming_CarriesTheTable_AndTheFrameWalkSkipsIt()
     {
         var extents = new RecordExtents([0, 3], [2, 4]);
-        var text = new StringWriter();
-        RecordFraming.WriteFrameHead(text, Written.Length, extents);
-        text.Write(Written);
-        RecordFraming.WriteFrameHead(text, 5, null);
-        text.Write("PLAIN");
-        string medium = text.ToString();
+        using var medium = new MemoryStream();
+        WriteStreamFrame(medium, Written, extents);
+        WriteStreamFrame(medium, "PLAIN", null);
+        long headBytes = 4 + 4 + (8 * 2);   // length word, table count, two (offset, length) components
 
-        int len = RecordFraming.PrefixLength(medium.AsSpan(0, 4), out bool follows);
-        Assert.True(follows);
-        Assert.Equal(Written.Length, len);
-        int count = RecordFraming.ExtentCount(medium.AsSpan(4, 4));
-        Assert.Equal(2, count);
-        var decoded = RecordFraming.ExtentTableFromChars(medium.AsSpan(8, 8 * count))!;
-        Assert.Equal([2, 4], decoded.Lengths);
-        Assert.Equal(Written, medium.Substring(8 + (8 * count), len));
+        medium.Position = 0;
+        var walk = new RecordFraming.StreamMedium(medium);
+        Assert.True(RecordFraming.ReadStreamFrame(ref walk, out FrameHead first));
+        Assert.Equal(Written.Length, first.PayloadLength);
+        Assert.Equal(headBytes, first.HeadBytes);
+        Assert.Equal([2, 4], first.Extents!.Lengths);
+        Assert.Equal([0, 3], first.Extents!.FixedAt);
+        Assert.Equal(Written, Encoding.Latin1.GetString(medium.GetBuffer(), (int)headBytes, Written.Length));
+        Assert.True(RecordFraming.ReadStreamFrame(ref walk, out FrameHead second));
+        Assert.Equal(5, second.PayloadLength);
+        Assert.Null(second.Extents);
+        Assert.False(RecordFraming.ReadStreamFrame(ref walk, out _));
 
-        using var bytes = new MemoryStream(Encoding.Latin1.GetBytes(medium));
-        var starts = RecordFraming.FrameStarts(bytes);
-        Assert.Equal([0L, 8 + (8 * count) + len], starts);
+        Assert.Equal([0L, headBytes + Written.Length], RecordFraming.FrameStarts(medium));
+    }
+
+    /// <summary>One stream-level frame as the sequential connector writes it: the one encoder's head, then the
+    /// payload's Latin-1 bytes.</summary>
+    private static void WriteStreamFrame(Stream medium, string payload, RecordExtents? extents)
+    {
+        var head = new byte[RecordFraming.FrameHeadBytes(extents, ordinalSlots: 0)];
+        RecordFraming.EncodeFrameHead(head, payload.Length, extents, []);
+        medium.Write(head);
+        medium.Write(Encoding.Latin1.GetBytes(payload));
     }
 }
