@@ -867,6 +867,8 @@
   "pb345-fd-varying-no-maximum",
   "pb345-indexed-no-record",
   "pb345-sd-no-record",
+  "pb694-read-no-into-sequential",
+  "pb694-read-no-into-relative",
   "pb332-start-key-needs-operator",
   "pb332-use-format1-needs-exception-or-error",
   "pb332-start-length-word-required",
