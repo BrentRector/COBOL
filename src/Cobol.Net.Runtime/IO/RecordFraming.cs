@@ -1,6 +1,5 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
-using System.Buffers;
 using System.Buffers.Binary;
 using System.Text;
 
@@ -34,6 +33,54 @@ internal enum StoreFormat
 /// carried in the store so a reload keeps it (kb/Work PB2693). Null for every other frame.</para></summary>
 internal readonly record struct StoredFrame(string Image, RecordExtents? Extents, long[]? Ordinals = null);
 
+/// <summary>What <see cref="RecordFraming.ReadFrame"/> found at a frame boundary.</summary>
+internal enum FrameKind
+{
+    /// <summary>A record's frame: its head is decoded (<see cref="FrameHead"/>) and its payload taken.</summary>
+    Record,
+
+    /// <summary>The empty-slot tag — a relative store's gap. A stream-level file holds none
+    /// (<see cref="RecordFraming.ReadStreamFrame"/>).</summary>
+    Gap,
+
+    /// <summary>No frame: the data ends inside it (a torn tail — a run unit killed mid-WRITE, a file copied short) or
+    /// its head is not one this writer produces. ⛔ THE FRAMED DATA ENDS HERE, for every reader of every shape: the
+    /// record count, the backward-READ index, the forward READ and the OPEN's framing check all stop at this frame.</summary>
+    End,
+}
+
+/// <summary>A decoded frame head: the payload's length in bytes, the EXTENT TABLE the frame carried (null when it
+/// carried none) and an indexed store frame's release ordinals (null for every other frame) — see
+/// <see cref="RecordFraming"/>'s class summary for the layout.</summary>
+internal readonly record struct FrameHead(int PayloadLength, RecordExtents? Extents, long[]? Ordinals)
+{
+    /// <summary>The bytes the head occupies ahead of the payload — the ONE size formula
+    /// (<see cref="RecordFraming.FrameBytes(int, RecordExtents?, int)"/>) over a payload of none.</summary>
+    public long HeadBytes => RecordFraming.FrameHeadBytes(Extents, Ordinals?.Length ?? 0);
+}
+
+/// <summary>Where <see cref="RecordFraming.ReadFrame"/> takes a frame's bytes from — the ONE frame decoder reads every
+/// shape through this, so the media differ only in how they hold bytes and never in what a frame is (kb/Work
+/// PB2754): a keyed store's image in memory, a stream-level file walked by its prefixes, and the sequential
+/// connector's Latin-1 read channel.</summary>
+internal interface IFrameMedium
+{
+    /// <summary>Fill <paramref name="into"/> from the current position and advance past it; false when the data ends
+    /// first.</summary>
+    bool Fill(Span<byte> into);
+
+    /// <summary>Take the <paramref name="length"/>-byte payload that follows the head and advance past it (a medium
+    /// that needs no payload seeks over it); false when the data ends first. ⛔ The decoder calls it only after
+    /// <see cref="Holds"/>(<paramref name="length"/>) answered true, so a medium that can answer Holds does not ask
+    /// it again here: on a stream every ask was a file-length query (kb/Work PB2754, review R1-1).</summary>
+    bool TakePayload(int length);
+
+    /// <summary>Can <paramref name="bytes"/> more bytes still follow the current position? Asked BEFORE storage sized
+    /// by a count read from the medium is allocated, so a corrupt length word or table count ends the data instead of
+    /// allocating what no file holds. A medium that cannot say answers true and relies on the short read.</summary>
+    bool Holds(long bytes);
+}
+
 /// <summary>
 /// The ONE on-disk record framing shared by every organization (DESIGN-runtime-library §2.2): each framed record
 /// is a 4-byte little-endian length prefix followed by that many Latin-1 payload bytes; an EMPTY slot (relative
@@ -59,12 +106,17 @@ internal readonly record struct StoredFrame(string Image, RecordExtents? Extents
 /// <item><b>Store-level</b> (<see cref="ComposeStore"/>/<see cref="DecodeStore"/>/<see cref="ReadHeader"/>) — the
 /// whole-file rewrite/load the keyed connectors use (relative slots; indexed records in release order, each with
 /// its release ordinals). It opens with the header described below.</item>
-/// <item><b>Stream-level</b> (<see cref="WritePrefix"/>/<see cref="PrefixLength"/>/<see cref="FrameStarts"/>) —
-/// the incremental prefix-per-record shape the sequential connector streams through its Latin-1 reader/writer
-/// (chars 0–255 map 1:1 to bytes under Latin-1, so the char-shaped prefix is byte-identical to the store-level
-/// one). It has NO header, deliberately: a header would stop a record sequential file being plain bytes and a
-/// line sequential file being plain text, which is the interchange property those shapes exist for.</item>
+/// <item><b>Stream-level</b> (<see cref="ReadStreamFrame"/>/<see cref="FrameStarts"/>/<see cref="StreamFramingParses"/>)
+/// — the incremental prefix-per-record shape the sequential connector streams through its Latin-1 reader/writer
+/// (chars 0–255 map 1:1 to bytes under Latin-1, so the head it writes and reads is the store-level head's bytes,
+/// converted once at the channel). It has NO header, deliberately: a header would stop a record sequential file
+/// being plain bytes and a line sequential file being plain text, which is the interchange property those shapes
+/// exist for.</item>
 /// </list>
+/// <para>⛔ ONE ENCODER AND ONE DECODER OF A FRAME HEAD, for both shapes (kb/Work PB2754): <see cref="EncodeFrameHead"/>
+/// writes it and <see cref="ReadFrame"/> reads it, through an <see cref="IFrameMedium"/>. The decoder alone says what
+/// a gap is and that a torn tail ends the data, so the record count, the backward-READ index, the forward READ and the
+/// OPEN's framing check cannot disagree about which records a file holds (<c>FrameDecoderDriftTests</c>).</para>
 /// <para>⛔ A FRAME MAY CARRY ITS RECORD'S EXTENT TABLE (determination D-FRA (v); kb/Work PB1053), in BOTH shapes and
 /// in the same way. A variable-length group record is sent as its contiguous image (§8.5.1.11.2), and with two or
 /// more variable-length components the characters alone cannot say where each ended, so the frame carries that
@@ -179,6 +231,10 @@ internal static class RecordFraming
     public static long FrameBytes(int chars, RecordExtents? extents, int ordinalSlots) =>
         4L + ExtentTableBytes(extents) + (long)OrdinalBytes * ordinalSlots + chars;
 
+    /// <summary>The bytes a frame's HEAD occupies ahead of its payload — its length word, its extent table and its
+    /// release ordinals: <see cref="FrameBytes(int, RecordExtents?, int)"/> of a payload of none.</summary>
+    public static long FrameHeadBytes(RecordExtents? extents, int ordinalSlots) => FrameBytes(0, extents, ordinalSlots);
+
     /// <summary>The bytes the store header for <paramref name="attributes"/> occupies — measured by encoding it
     /// with the ONE header writer, so the size cannot drift from the layout.</summary>
     public static long HeaderBytes(FixedFileAttributes attributes)
@@ -248,28 +304,24 @@ internal static class RecordFraming
                 + "relative or indexed file");
         var composed = new MemoryStream((int)size);
         WriteHeader(composed, attributes, generation, releaseMint);
-        Span<byte> len = stackalloc byte[4];
-        Span<byte> ordinal = stackalloc byte[OrdinalBytes];
+        // One head buffer for the whole compose, grown only for a frame whose extent table outgrows it.
+        byte[] head = new byte[FrameHeadBytes(null, slots) + 64];
         foreach (StoredFrame? stored in frames)
         {
             if (stored is not { } frame)
             {
-                BinaryPrimitives.WriteUInt32LittleEndian(len, GapTag);
-                composed.Write(len);
+                EncodeGap(head);
+                composed.Write(head, 0, GapBytes);
                 continue;
             }
             // The file coded character set's STRICT encoding (kb/Work PB690): the keyed WRITE/REWRITE refused any
             // record holding a character with no byte image ('91'), so an exception here is a missed refusal —
             // loud, raised before the file is truncated — never a silent '?'.
             byte[] payload = FileCharacterSet.Medium.GetBytes(FileCharacterSet.ToChannel(frame.Image, codeSet));
-            BinaryPrimitives.WriteUInt32LittleEndian(len, FrameWord(payload.Length, frame.Extents));
-            composed.Write(len);
-            if (frame.Extents is { } extents) composed.Write(EncodeExtentTable(extents));
-            foreach (long o in frame.Ordinals ?? [])
-            {
-                BinaryPrimitives.WriteInt64LittleEndian(ordinal, o);
-                composed.Write(ordinal);
-            }
+            int headBytes = (int)FrameHeadBytes(frame.Extents, slots);
+            if (headBytes > head.Length) head = new byte[headBytes];
+            EncodeFrameHead(head, payload.Length, frame.Extents, frame.Ordinals);
+            composed.Write(head, 0, headBytes);
             composed.Write(payload, 0, payload.Length);
         }
         return composed;
@@ -300,34 +352,39 @@ internal static class RecordFraming
         if (DecodeHeader(over) is not { } attributes) return frames;   // empty, or a layout this build cannot locate frames in
         releaseMint = BinaryPrimitives.ReadInt64LittleEndian(image.AsSpan(ReleaseMintOffset));
         int slots = OrdinalSlots(attributes);
-        int at = (int)over.Position;
-        while (at + 4 <= size)
-        {
-            uint word = BinaryPrimitives.ReadUInt32LittleEndian(image.AsSpan(at, size - at));
-            at += 4;
-            if (word == GapTag) { frames.Add(null); continue; }
-            RecordExtents? extents = null;
-            if ((word & ExtentFlag) != 0)
-            {
-                if (DecodeExtentTable(image.AsSpan(at, size - at), out int tableBytes) is not { } table) break;   // torn
-                extents = table;
-                at += tableBytes;
-            }
-            long[]? ordinals = null;
-            if (slots > 0)
-            {
-                if ((long)at + (long)OrdinalBytes * slots > size) break;   // torn
-                ordinals = new long[slots];
-                for (int k = 0; k < slots; k++, at += OrdinalBytes)
-                    ordinals[k] = BinaryPrimitives.ReadInt64LittleEndian(image.AsSpan(at, OrdinalBytes));
-            }
-            uint n = word & ~ExtentFlag;
-            if ((long)at + n > size) break;          // a torn tail ends the store (long: n is a uint)
-            string payload = Encoding.Latin1.GetString(image, at, (int)n);
-            at += (int)n;
-            frames.Add(new StoredFrame(FileCharacterSet.FromChannel(payload, codeSet), extents, ordinals));
-        }
+        var medium = new ImageMedium(image, size, (int)over.Position);
+        while (ReadFrame(ref medium, slots, out FrameHead head) is var kind && kind != FrameKind.End)
+            frames.Add(kind == FrameKind.Gap ? null
+                : new StoredFrame(FileCharacterSet.FromChannel(medium.Payload!, codeSet), head.Extents, head.Ordinals));
         return frames;
+    }
+
+    /// <summary>A store image in memory as a frame medium: its first <c>size</c> bytes, read from <see cref="At"/>.
+    /// The payload is taken as its Latin-1 characters (one per byte), the channel shape the frames are converted from.</summary>
+    private struct ImageMedium(byte[] image, int size, int at) : IFrameMedium
+    {
+        /// <summary>The next byte to read.</summary>
+        public int At = at;
+
+        /// <summary>The payload the last <see cref="TakePayload"/> took.</summary>
+        public string? Payload;
+
+        public bool Fill(Span<byte> into)
+        {
+            if (!Holds(into.Length)) return false;
+            image.AsSpan(At, into.Length).CopyTo(into);
+            At += into.Length;
+            return true;
+        }
+
+        public bool TakePayload(int length)
+        {
+            Payload = Encoding.Latin1.GetString(image, At, length);   // ReadFrame asked Holds(length) first
+            At += length;
+            return true;
+        }
+
+        public readonly bool Holds(long bytes) => bytes <= size - At;
     }
 
     // ── The store GENERATION — the cross-run-unit coherence stamp (kb/Work PB2660) ───────────────────────────
@@ -434,12 +491,12 @@ internal static class RecordFraming
     {
         s = null;
         var word = new byte[4];
-        if (!FillExactly(fs, word, 4)) return false;
+        if (!FillExactly(fs, word)) return false;
         int biased = BinaryPrimitives.ReadInt32LittleEndian(word);
         if (biased == 0) return true;
         if (biased < 0 || biased - 1 > Array.MaxLength / 2) return false;
         var buf = new byte[2 * (biased - 1)];
-        if (!FillExactly(fs, buf, buf.Length)) return false;
+        if (!FillExactly(fs, buf)) return false;
         var chars = new char[biased - 1];
         for (int i = 0; i < chars.Length; i++) chars[i] = (char)BinaryPrimitives.ReadUInt16LittleEndian(buf.AsSpan(2 * i));
         s = new string(chars);
@@ -453,7 +510,7 @@ internal static class RecordFraming
     private static FixedFileAttributes? DecodeHeader(Stream fs)
     {
         var head = new byte[FixedHeaderBytes];
-        if (!FillExactly(fs, head, FixedHeaderBytes)) return null;
+        if (!FillExactly(fs, head)) return null;
         if (!head.AsSpan(0, Magic.Length).SequenceEqual(Magic) || head[Magic.Length] != FormatVersion)
             return null;
         string org = head[8] switch
@@ -472,9 +529,9 @@ internal static class RecordFraming
         var word = new byte[4];
         for (int i = 0; i < count; i++)
         {
-            if (!FillExactly(fs, word, 4)) return null;
+            if (!FillExactly(fs, word)) return null;
             int off = BinaryPrimitives.ReadInt32LittleEndian(word);
-            if (!FillExactly(fs, word, 4)) return null;
+            if (!FillExactly(fs, word)) return null;
             int len = BinaryPrimitives.ReadInt32LittleEndian(word);
             int dup = fs.ReadByte();
             if (dup < 0) return null;
@@ -482,7 +539,7 @@ internal static class RecordFraming
             int collLen = fs.ReadByte();
             if (collLen < 0) return null;
             var coll = new byte[collLen];
-            if (!FillExactly(fs, coll, collLen)) return null;
+            if (!FillExactly(fs, coll)) return null;
             keys.Add(new FixedFileAttributes.KeyDescriptor(off, len, dup != 0, suppress, Encoding.ASCII.GetString(coll)));
         }
         return new FixedFileAttributes(org, head[9] == (byte)'V', min, max, keys);
@@ -491,9 +548,10 @@ internal static class RecordFraming
     /// <summary>The byte offset of every frame in a STREAM-LEVEL framed physical file, in order (index =
     /// ordinal − 1) — a RECORD VARYING record-sequential file, which carries no header.
     /// This is the positioning index a §14.9.30.4 GR21 BACKWARD sequential READ needs on a RECORD VARYING file,
-    /// whose frames are not uniformly wide the way a fixed record-sequential file's blocks are. Only the length
-    /// prefixes are read — each payload is SEEKED over, never materialized — so the index costs one pass and no
-    /// record storage. A torn tail ends the store, the same rule <see cref="DecodeStore"/> applies.
+    /// whose frames are not uniformly wide the way a fixed record-sequential file's blocks are. Only the frame
+    /// heads are read — each payload is SEEKED over, never materialized — so the index costs one pass and no
+    /// record storage. Where the frames end is the one decoder's answer (<see cref="ReadStreamFrame"/>), so the
+    /// index holds exactly the records a forward READ delivers.
     /// <para>⛔ IT INDEXES THE CONNECTOR'S OWN OPEN STREAM, NOT A PATH. Only a backward READ on an ALREADY-OPEN
     /// varying file asks for this index, so the presence question is already answered and asking the host again
     /// would be a second answer to it: <see cref="HostFile.Probe"/> is the ONE place the runtime asks the
@@ -511,26 +569,9 @@ internal static class RecordFraming
     {
         var starts = new List<long>();
         fs.Seek(from, SeekOrigin.Begin);
-        var len = new byte[4];
-        while (true)
-        {
-            long at = fs.Position;
-            if (at >= to) break;
-            if (!FillExactly(fs, len, 4)) break;
-            uint word = BinaryPrimitives.ReadUInt32LittleEndian(len);
-            if (word != GapTag)
-            {
-                long skip = word & ~ExtentFlag;
-                if ((word & ExtentFlag) != 0)
-                {
-                    if (!FillExactly(fs, len, 4)) break;   // a torn table ends the store
-                    skip += 8L * BinaryPrimitives.ReadUInt32LittleEndian(len);
-                }
-                if (fs.Position + skip > fs.Length) break;   // a torn tail ends the store
-                fs.Seek(skip, SeekOrigin.Current);
-            }
+        var medium = new StreamMedium(fs);
+        for (long at = from; at < to && ReadStreamFrame(ref medium, out _); at = fs.Position)
             starts.Add(at);
-        }
         return starts;
     }
 
@@ -539,35 +580,27 @@ internal static class RecordFraming
     /// format encodes.
     /// <para>§9.1.7.2 makes the prefix the file's own statement of its record type: "In record sequential files
     /// the length of each record is determined by any information the implementor may add to the record on the
-    /// physical storage medium (such as record length headers)". A first prefix naming more bytes than the file
-    /// holds is not a framed file at all, so a connector declaring the VARIABLE record type contradicts the
-    /// medium and the OPEN is unsuccessful with '39' (§9.1.13.6 item 7). ⛔ THE BOUND IS THE FILE, NOT THE
-    /// RECORD CLAUSE: a prefix that parses but falls outside the connector's VaryMin/VaryMax is exactly
+    /// physical storage medium (such as record length headers)". A first frame that the one decoder cannot read
+    /// (<see cref="ReadStreamFrame"/>: a head naming more bytes than the file holds, a gap tag, a table this writer
+    /// cannot have produced) is not a framed file at all, so a connector declaring the VARIABLE record type
+    /// contradicts the medium and the OPEN is unsuccessful with '39' (§9.1.13.6 item 7). ⛔ THE BOUND IS THE FILE,
+    /// NOT THE RECORD CLAUSE: a prefix that parses but falls outside the connector's VaryMin/VaryMax is exactly
     /// §9.1.13.2 item 3's '04' — "A READ statement is successfully executed but the physical record from the
     /// file is shorter than or longer than the minimum or maximum length of records allowed for the fixed file
     /// attributes for that file" — a SUCCESSFUL completion that a '39' at the OPEN would make unreachable.</para>
     /// <para>Only the FIRST frame is tested, and that is the rule rather than a shortcut: a torn or ragged TAIL
-    /// already ends the store for <see cref="FrameStarts"/> and <see cref="DecodeStore"/>, so a full walk would
-    /// answer a question the framing has already settled, at a cost proportional to the file. It is also what
-    /// the surveyed implementation does. A file shorter than one prefix states nothing and is not a conflict.
-    /// An I/O failure likewise answers "no conflict" — the authority statuses are the connector's own stream's
-    /// to raise.</para></summary>
+    /// already ends the data for every reader (<see cref="FrameKind.End"/>), so a full walk would answer a question
+    /// the framing has already settled, at a cost proportional to the file. It is also what the surveyed
+    /// implementation does. A file shorter than one length word states nothing and is not a conflict. An I/O
+    /// failure likewise answers "no conflict" — the authority statuses are the connector's own stream's to
+    /// raise.</para></summary>
     public static bool StreamFramingParses(string path)
     {
         try
         {
             using var fs = HostFile.OpenAuxiliary(path, FileMode.Open, FileAccess.Read);
-            var len = new byte[4];
-            if (!FillExactly(fs, len, 4)) return true;   // fewer than four bytes: nothing is claimed
-            uint word = BinaryPrimitives.ReadUInt32LittleEndian(len);
-            if (word == GapTag) return false;
-            long frame = 4L + (word & ~ExtentFlag);
-            if ((word & ExtentFlag) != 0)
-            {
-                if (!FillExactly(fs, len, 4)) return false;
-                frame += 4L + (8L * BinaryPrimitives.ReadUInt32LittleEndian(len));
-            }
-            return frame <= fs.Length;
+            var medium = new StreamMedium(fs);
+            return !medium.Holds(4) || ReadStreamFrame(ref medium, out _);   // fewer than a length word: nothing is claimed
         }
         catch (IOException) { return true; }
         catch (UnauthorizedAccessException) { return true; }
@@ -575,32 +608,123 @@ internal static class RecordFraming
         catch (NotSupportedException) { return true; }
     }
 
-    private static bool FillExactly(Stream s, byte[] buf, int count)
+    /// <summary>A stream-level framed file walked from its current position as a frame medium: the heads are read
+    /// and each payload is SEEKED over, never materialized.
+    /// <para>⛔ THE WALK READS THE FILE AS IT STOOD WHEN THE MEDIUM WAS MADE: the stream's length is asked ONCE, here,
+    /// and every <see cref="Holds"/> and <see cref="Fill"/> is bounded by that snapshot. A stream's length is an
+    /// uncached operating-environment query whenever the handle admits other writers, and every bookkeeping handle
+    /// does (<c>HostFile.OpenAuxiliary</c> shares <see cref="FileShare.ReadWrite"/>), so asking it per frame made it
+    /// the dominant cost of an O(file) walk (kb/Work PB2754, review R1-1). Bytes another run unit appends during the
+    /// walk lie past the snapshot and end the data there, as an append that has not completed does; the frame
+    /// index and the record count this walk produces are point-in-time answers already.</para></summary>
+    internal readonly struct StreamMedium(Stream fs) : IFrameMedium
     {
-        int got = 0;
-        while (got < count)
+        /// <summary>The stream's length when the walk began: the end of the data this medium reads.</summary>
+        private readonly long _end = fs.Length;
+
+        public bool Fill(Span<byte> into) => Holds(into.Length) && FillExactly(fs, into);
+
+        public bool TakePayload(int length)
         {
-            int n = s.Read(buf, got, count - got);
-            if (n == 0) return false;
-            got += n;
+            fs.Seek(length, SeekOrigin.Current);   // ReadFrame asked Holds(length) first
+            return true;
         }
-        return true;
+
+        public bool Holds(long bytes) => bytes <= _end - fs.Position;
     }
 
-    // ── Stream-level (char) shape — the sequential connector's varying-record framing ───────────────────────
+    private static bool FillExactly(Stream s, Span<byte> buf) =>
+        s.ReadAtLeast(buf, buf.Length, throwOnEndOfStream: false) == buf.Length;
 
-    /// <summary>Write a record's frame head through a Latin-1 text writer (chars 0–255 map 1:1 to bytes, so the
-    /// on-disk bytes equal the store-level frame head): its 4-byte little-endian length word and, when the record
-    /// was sent with one, its EXTENT TABLE (see the class summary). The payload follows.</summary>
-    public static void WriteFrameHead(TextWriter w, int len, RecordExtents? extents)
+    // ── THE frame head — one encoder, one decoder, for both shapes (kb/Work PB2754) ───────────────────────────
+
+    /// <summary>⛔ THE ONE FRAME DECODER. Reads the frame at <paramref name="medium"/>'s position — its length word,
+    /// its EXTENT TABLE when bit 31 says one follows, <paramref name="ordinalSlots"/> release ordinals, and its
+    /// payload — and says what it found (<see cref="FrameKind"/>). It alone decides the two questions the framing
+    /// has to answer about a damaged file, so no reader can answer them differently (kb/Work PB2754):
+    /// <list type="bullet">
+    /// <item>a GAP is the length word <see cref="GapTag"/>, with nothing after it;</item>
+    /// <item>a frame the data ends inside — or whose head this writer cannot have produced (a table component of
+    /// negative length) — is <see cref="FrameKind.End"/>: a torn tail ends the data. A count or a length is checked
+    /// against what the medium still holds (<see cref="IFrameMedium.Holds"/>) BEFORE anything is sized by it.</item>
+    /// </list>
+    /// The framing is the §9.1.7.2 information "the implementor may add to the record on the physical storage medium";
+    /// none of it reaches the record area (§12.4.5.11.4 GR1).</summary>
+    public static FrameKind ReadFrame<TMedium>(ref TMedium medium, int ordinalSlots, out FrameHead head)
+        where TMedium : struct, IFrameMedium
     {
-        WriteWord(w, FrameWord(len, extents));
-        if (extents is not null) w.Write(ExtentTableChars(extents));
+        head = default;
+        Span<byte> word = stackalloc byte[OrdinalBytes];
+        if (!medium.Fill(word[..4])) return FrameKind.End;
+        uint lengthWord = BinaryPrimitives.ReadUInt32LittleEndian(word);
+        if (lengthWord == GapTag) return FrameKind.Gap;
+        RecordExtents? extents = null;
+        if ((lengthWord & ExtentFlag) != 0 && (extents = ReadExtentTable(ref medium)) is null) return FrameKind.End;
+        long[]? ordinals = null;
+        if (ordinalSlots > 0)
+        {
+            ordinals = new long[ordinalSlots];
+            for (int k = 0; k < ordinalSlots; k++)
+            {
+                if (!medium.Fill(word)) return FrameKind.End;
+                ordinals[k] = BinaryPrimitives.ReadInt64LittleEndian(word);
+            }
+        }
+        int payloadLength = (int)(lengthWord & ~ExtentFlag);
+        if (!medium.Holds(payloadLength) || !medium.TakePayload(payloadLength)) return FrameKind.End;
+        head = new FrameHead(payloadLength, extents, ordinals);
+        return FrameKind.Record;
     }
 
-    /// <summary>An extent table as the Latin-1 characters of its on-medium bytes (its count and its components,
-    /// without the length word) — the shape the sequential connector's in-place REWRITE replaces.</summary>
-    public static string ExtentTableChars(RecordExtents extents) => Encoding.Latin1.GetString(EncodeExtentTable(extents));
+    /// <summary><see cref="ReadFrame"/> over a STREAM-LEVEL file, true for a record's frame. A stream-level file
+    /// holds no gaps — no writer of one writes the tag, and a payload long enough to spell it is not representable —
+    /// so a gap word there is not a frame of the file: it ends the data like a torn tail. The one answer for the
+    /// forward READ (<c>SequentialConnector.NextFrame</c>), the record count and the backward-READ index
+    /// (<see cref="FrameStarts"/>) and the OPEN's framing check (<see cref="StreamFramingParses"/>).</summary>
+    public static bool ReadStreamFrame<TMedium>(ref TMedium medium, out FrameHead head)
+        where TMedium : struct, IFrameMedium =>
+        ReadFrame(ref medium, ordinalSlots: 0, out head) == FrameKind.Record;
+
+    /// <summary>The extent table that follows a length word: its count, then (fixed-run offset, length) per
+    /// component. Null when the data ends inside it or a length is negative (a table this writer cannot have
+    /// produced) — <see cref="ReadFrame"/> then answers <see cref="FrameKind.End"/>.</summary>
+    private static RecordExtents? ReadExtentTable<TMedium>(ref TMedium medium) where TMedium : struct, IFrameMedium
+    {
+        Span<byte> component = stackalloc byte[8];
+        if (!medium.Fill(component[..4])) return null;
+        uint count = BinaryPrimitives.ReadUInt32LittleEndian(component);
+        if (!medium.Holds(8L * count)) return null;
+        var fixedAt = new int[count];
+        var lengths = new int[count];
+        for (int k = 0; k < count; k++)
+        {
+            if (!medium.Fill(component)) return null;
+            fixedAt[k] = BinaryPrimitives.ReadInt32LittleEndian(component);
+            lengths[k] = BinaryPrimitives.ReadInt32LittleEndian(component[4..]);
+            if (lengths[k] < 0) return null;
+        }
+        return new RecordExtents(fixedAt, lengths);
+    }
+
+    /// <summary>⛔ THE ONE FRAME-HEAD ENCODER, for both shapes: into the first <see cref="FrameHeadBytes"/> bytes of
+    /// <paramref name="into"/>, the length word (<paramref name="payloadLength"/>, with bit 31 when
+    /// <paramref name="extents"/> is given), the extent table and the release ordinals. The payload follows it.
+    /// The sequential connector writes these bytes through its Latin-1 channel, one character per byte.</summary>
+    public static void EncodeFrameHead(Span<byte> into, int payloadLength, RecordExtents? extents, ReadOnlySpan<long> ordinals)
+    {
+        BinaryPrimitives.WriteUInt32LittleEndian(into, (uint)payloadLength | (extents is null ? 0u : ExtentFlag));
+        int at = 4;
+        if (extents is not null) at += EncodeExtentTable(into[at..], extents);
+        foreach (long o in ordinals)
+        {
+            BinaryPrimitives.WriteInt64LittleEndian(into[at..], o);
+            at += OrdinalBytes;
+        }
+    }
+
+    /// <summary>An empty slot's frame — the <see cref="GapTag"/> alone — into the first <see cref="GapBytes"/> bytes
+    /// of <paramref name="into"/>.</summary>
+    private static void EncodeGap(Span<byte> into) => BinaryPrimitives.WriteUInt32LittleEndian(into, GapTag);
 
     /// <summary>A VOID table of <paramref name="count"/> components: every fixed-run offset is -1, which no record
     /// layout has, so it corresponds to no receiving record (<see cref="RecordExtents.Describes"/>) and the record it
@@ -614,84 +738,20 @@ internal static class RecordFraming
         return new RecordExtents(fixedAt, new int[count]);
     }
 
-    private static void WriteWord(TextWriter w, uint word)
-    {
-        w.Write((char)(word & 0xFF));
-        w.Write((char)((word >> 8) & 0xFF));
-        w.Write((char)((word >> 16) & 0xFF));
-        w.Write((char)((word >> 24) & 0xFF));
-    }
-
-    /// <summary>Decode a 4-byte little-endian length word read as Latin-1 chars: the payload length, and whether an
-    /// extent table follows the word.</summary>
-    public static int PrefixLength(ReadOnlySpan<char> pre, out bool extentTableFollows)
-    {
-        uint word = CharWord(pre);
-        extentTableFollows = word != GapTag && (word & ExtentFlag) != 0;
-        return (int)(word & ~ExtentFlag);
-    }
-
-    /// <summary>The number of components an extent table announces, from its 4-byte count read as Latin-1 chars;
-    /// <see cref="ExtentTableFromChars"/> then decodes the 8 characters per component that follow.</summary>
-    public static int ExtentCount(ReadOnlySpan<char> count) => (int)Math.Min(CharWord(count), int.MaxValue / 8);
-
-    /// <summary>Decode the per-component part of an extent table read as Latin-1 chars (8 per component); null when a
-    /// length is negative (a table this writer cannot have produced).</summary>
-    public static RecordExtents? ExtentTableFromChars(ReadOnlySpan<char> components)
-    {
-        int n = components.Length / 8;
-        var fixedAt = new int[n];
-        var lengths = new int[n];
-        for (int k = 0; k < n; k++)
-        {
-            fixedAt[k] = (int)CharWord(components.Slice(k * 8, 4));
-            lengths[k] = (int)CharWord(components.Slice((k * 8) + 4, 4));
-            if (lengths[k] < 0) return null;
-        }
-        return new RecordExtents(fixedAt, lengths);
-    }
-
-    private static uint CharWord(ReadOnlySpan<char> c) => (uint)(c[0] | (c[1] << 8) | (c[2] << 16) | (c[3] << 24));
-
-    // ── The extent table (both shapes) ─────────────────────────────────────────────────────────────────────
-
-    /// <summary>A frame's length word: the payload length, with <see cref="ExtentFlag"/> when a table follows.</summary>
-    private static uint FrameWord(int payloadLength, RecordExtents? extents) =>
-        (uint)payloadLength | (extents is null ? 0u : ExtentFlag);
-
     /// <summary>The bytes an extent table occupies on the medium (0 when there is none).</summary>
-    private static int ExtentTableBytes(RecordExtents? extents) => extents is null ? 0 : 4 + (8 * extents.Count);
+    public static int ExtentTableBytes(RecordExtents? extents) => extents is null ? 0 : 4 + (8 * extents.Count);
 
-    /// <summary>The ONE encoder of an extent table — its count, then (fixed-run offset, length) per component.</summary>
-    private static byte[] EncodeExtentTable(RecordExtents extents)
+    /// <summary>The ONE encoder of an extent table — its count, then (fixed-run offset, length) per component — into
+    /// the first <see cref="ExtentTableBytes"/> bytes of <paramref name="into"/>; returns that count of bytes. The
+    /// sequential connector's in-place REWRITE replaces a frame's table with these bytes.</summary>
+    public static int EncodeExtentTable(Span<byte> into, RecordExtents extents)
     {
-        var table = new byte[ExtentTableBytes(extents)];
-        BinaryPrimitives.WriteUInt32LittleEndian(table, (uint)extents.Count);
+        BinaryPrimitives.WriteUInt32LittleEndian(into, (uint)extents.Count);
         for (int k = 0; k < extents.Count; k++)
         {
-            BinaryPrimitives.WriteInt32LittleEndian(table.AsSpan(4 + (8 * k)), extents.FixedAt[k]);
-            BinaryPrimitives.WriteInt32LittleEndian(table.AsSpan(8 + (8 * k)), extents.Lengths[k]);
+            BinaryPrimitives.WriteInt32LittleEndian(into[(4 + (8 * k))..], extents.FixedAt[k]);
+            BinaryPrimitives.WriteInt32LittleEndian(into[(8 + (8 * k))..], extents.Lengths[k]);
         }
-        return table;
-    }
-
-    /// <summary>The ONE byte decoder of an extent table at the head of <paramref name="at"/>; null when the bytes
-    /// end inside it or describe no valid table (a torn tail, which ends the store like a torn payload).</summary>
-    private static RecordExtents? DecodeExtentTable(ReadOnlySpan<byte> at, out int tableBytes)
-    {
-        tableBytes = 0;
-        if (at.Length < 4) return null;
-        long n = BinaryPrimitives.ReadUInt32LittleEndian(at);
-        if (4 + (8 * n) > at.Length) return null;
-        var fixedAt = new int[n];
-        var lengths = new int[n];
-        for (int k = 0; k < n; k++)
-        {
-            fixedAt[k] = BinaryPrimitives.ReadInt32LittleEndian(at[(4 + (8 * k))..]);
-            lengths[k] = BinaryPrimitives.ReadInt32LittleEndian(at[(8 + (8 * k))..]);
-            if (lengths[k] < 0) return null;
-        }
-        tableBytes = (int)(4 + (8 * n));
-        return new RecordExtents(fixedAt, lengths);
+        return ExtentTableBytes(extents);
     }
 }
