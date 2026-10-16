@@ -44,6 +44,14 @@ internal readonly struct FixedFormLine
     /// reading: the comment-entry paragraph's end and the area-placement rules (kb/Work PB1494, PB3147).</summary>
     public const int AreaAWidth = 4;
 
+    /// <summary>The indicator-area character of a fixed continuation line (ISO §6.2.2: a hyphen). The ONE spelling of it:
+    /// the §6.5 line classifier and the reference-format detector both read it from here.</summary>
+    public const char ContinuationIndicator = '-';
+
+    /// <summary>Whether the character at 0-based <paramref name="programTextOffset"/> of the program-text area (position
+    /// 8 is offset 0) is in area A — the ONE definition of where area A ends (<see cref="AreaAWidth"/>).</summary>
+    public static bool IsAreaAOffset(int programTextOffset) => programTextOffset is >= 0 and < AreaAWidth;
+
     private readonly string _text;
     private readonly int _indicatorAt;      // the index of the indicator area, or _text.Length when the line ends before it
     private readonly int _programTextAt;    // the index of the first character of the program-text area
@@ -102,7 +110,7 @@ internal readonly struct FixedFormLine
 
     /// <summary>Whether the line's program text begins in area A (<see cref="AreaAWidth"/>): its first character that is
     /// not a space stands in positions 8–11. False for a line whose program-text area holds only spaces.</summary>
-    public bool BeginsInAreaA => ProgramTextStart is >= 0 and < AreaAWidth;
+    public bool BeginsInAreaA => IsAreaAOffset(ProgramTextStart);
 
     /// <summary>The text past margin R, which is ignored (Annex A item 158).</summary>
     public ReadOnlySpan<char> BeyondMarginR => _text.AsSpan(_marginRAt);

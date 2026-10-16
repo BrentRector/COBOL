@@ -1,6 +1,7 @@
 {
  "_comment": "The NEGATIVE corpus (must-REJECT programs; VERSION_TEST_MATRIX_DESIGN P2.8/Phase-2): each enabled entry is <name>.cob + <name>.err (the expected diagnostic substring, e.g. an edition-band code). The editions that must reject are named by the SOURCE, not by this manifest: CorpusRunnerTests.EnabledNegativeCase_RejectsWithItsDiagnostic reads them from the '*> reject-at: <year> ...' header on <name>.cob's FIRST line and throws when it is absent. (This comment used to promise an \"editions\" map; no entry ever carried one and the runner never looked for one.) Seeding: >=1 case per Wave-1 gate + the reserved-word interval witnesses (roadmap Phase 2 W2). The matrix reject cells already pin gate diagnostics; THIS corpus holds the free-form adversarial cases.",
  "enabled": [
+  "pb370-start-reverse-operator-85",
   "pb3164-method-duplicate-constant-unequal",
   "pb374-async-messaging-below-2023",
   "pb374-ec-mcs-name-below-2023",
@@ -2129,6 +2130,8 @@
   "l1c05-oo-strong-type-other-name",
   "l1c05-oo-strong-type-vs-plain-group",
   "l1c05-oo-strong-type-returning-other",
+  "pb1012-strong-type-override-layout-differs",
+  "pb1012-strong-type-factory-strong-one-side",
   "l1c05-cce-arith-exponentiation",
   "l1c05-cce-arith-division-by-zero",
   "l1c05-cce-arith-nonnumeric-operand",
@@ -2693,6 +2696,7 @@
   "pb3153-contained-program-paragraph-spells-an-inherited-class-it-uses",
   "pb3147-area-a-item-in-area-b-85",
   "pb3147-statement-in-area-a-85",
+  "pb3168-continuation-area-a-85",
   "pb3153-method-constant-hides-object-condition-name",
   "pb3153-method-constant-hides-object-index-name",
   "pb3153-contained-own-item-set-to-true-names-no-switch",

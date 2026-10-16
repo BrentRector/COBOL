@@ -1,5 +1,8 @@
 {
  "enabled": [
+  "pb370_start_forward_operators",
+  "pb370_read_relative_invalid_key",
+  "pb370_use_file_beats_mode",
   "pb2532_identification_comment_paragraphs_85",
   "pb3133_object_computer_clauses_in_sequence_85",
   "pb1935_parenthesized_numeric_comparand",

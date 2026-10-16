@@ -1,6 +1,10 @@
 {
   "_comment": "The 2002 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2002 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
   "enabled": [
+  "pb370_start_relative_reverse",
+  "pb370_start_indexed_reverse",
+  "pb370_exception_object_identity",
+  "pb370_use_file_beats_mode_method",
   "pb1177_sort_procedure_use_not_normal",
   "pb1177_method_sort_use_not_normal",
   "pb1177_sort_called_use_not_normal",
@@ -669,6 +673,7 @@
   "l1c05_coded_character_values_national",
   "l1c05_oo_returning_only_same_class",
   "l1c05_oo_strong_type_same_type",
+  "pb1012_strong_type_override_factory",
   "l1c05_cce_arith_expression",
   "l1c05_cce_boolean_expression",
   "l1c05_constant_expr_truncated_integer",
@@ -839,6 +844,7 @@
   "pb2739_copy_after_directive_line",
   "pb2739_indented_division_header_remarks",
   "pb3147_area_free_placement",
+  "pb3168_continuation_area_a",
   "pb2618_no_get_part_store_every_execution",
   "pb2618_string_into_property_keeps_unreferenced",
   "pb2695_wide_item_subscript_and_odo_count",

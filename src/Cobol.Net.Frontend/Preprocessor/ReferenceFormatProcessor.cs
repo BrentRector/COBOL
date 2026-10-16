@@ -388,7 +388,7 @@ public static partial class ReferenceFormatProcessor
             if (fixedLine.HasIndicator)
             {
                 int indicator = fixedLine.Indicator.Value;
-                if (indicator is ' ' or '*' or '/' or 'D' or 'd' or '-')
+                if (indicator is ' ' or '*' or '/' or 'D' or 'd' or FixedFormLine.ContinuationIndicator)
                 {
                     bool seqOk = true;
                     foreach (var c in fixedLine.SequenceArea.EnumerateRunes())
