@@ -49,3 +49,14 @@ campaign-root path regex or calls fix_clusters' `sites`. Each was seen failing o
 planted scanner module (11 checks red). `member_index.py --self-test` gains the fix-lane, unknown-name drift and folder
 checks. DESIGN-architecture-review §8.7 and DESIGN-orchestrator-loop §9.1 now define the declared set as the
 structured sites.
+
+Branch review round 1 found two holes, both fixed at the reader. R1-1: the `**The files this step edits**` line that
+`scripts/arch/file_census_notes.py` writes into a multi-step R3 note was not a site block, so PB2300's
+`IntrinsicCatalog.cs` (a step file outside its Sites that no caller recovers) left its declared set and the landing
+check would have stopped the wave. The label is now `work.STEP_FILES_LABEL`, a site label the reader reads and the
+writer renders through `step_files_line`; a sweep of every bold-labelled line in open notes found no other generated
+line that lists edited files. R1-2: `member_index.needs_index` read any wave kind and any `r2_members:` as a
+restructuring note, so the 47 open R2 defects routed to the fix lane made every fix-lane plan read and regenerate the
+member index (110 s per landing). `work.FIX_LANE_WAVE` is now the one spelling of that wave kind (the R2 collector and
+the note writer use it), and a note of that kind declares its sites only. New checks in `test_plan_wave.py` and the
+member-index self-test were each seen failing on a planted revert.

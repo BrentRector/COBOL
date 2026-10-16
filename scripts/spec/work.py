@@ -609,9 +609,18 @@ def topology_problems(items: list[dict]) -> list[str]:
 R3_PROGRAM, R3_DRIFT_TEST = "PB2119", "PB2417"
 R3_MEASURED_WAVES = ("move", "move-rename", "extract", "re-model")
 _WAVE_KIND = re.compile(r"\*\*Wave kind:\*\*\s*([\w-]+)", re.I)
+#: The wave kind of an R2 defect routed to the fix lane (scripts/arch/r2_collect.py WAVES; file_census_notes writes it):
+#: a FIX-LANE note however it reaches the planner, so its declared set is its sites and never reads the member index.
+FIX_LANE_WAVE = "defect-for-fix-lane"
+#: The bold label file_census_notes writes before the files ONE STEP of a multi-step note edits: a structured site
+#: line, since a step's files can lie outside the census finding's Sites (kb/Work PB3242, branch review R1-1: PB2300's
+#: IntrinsicCatalog.cs).
+STEP_FILES_LABEL = "The files this step edits"
 #: A note's STRUCTURED SITE BLOCK opens with a bold label (a paragraph or a list item) or a heading whose first words
-#: are "Code site(s)" or "Site(s)": `**Sites:**`, `**Code site.**`, `**Code sites (located ...).**`, `### Code site`.
-_SITE_LABEL = re.compile(r"^[ \t]*(?:[-*][ \t]+)?\*\*(?:Code[ \t]+)?Sites?\b[^*\n]*\*\*", re.I)
+#: are "Code site(s)" or "Site(s)": `**Sites:**`, `**Code site.**`, `**Code sites (located ...).**`, `### Code site`;
+#: or with the bold STEP_FILES_LABEL.
+_SITE_LABEL = re.compile(r"^[ \t]*(?:[-*][ \t]+)?\*\*(?:(?:Code[ \t]+)?Sites?\b|" + re.escape(STEP_FILES_LABEL)
+                         + r")[^*\n]*\*\*", re.I)
 _SITE_HEADING = re.compile(r"^(#{1,6})[ \t]+(?:Code[ \t]+)?Sites?\b", re.I)
 _HEADING = re.compile(r"^(#{1,6})[ \t]")
 _LABELED_LINE = re.compile(r"^[ \t]*(?:[-*][ \t]+)?\*\*[^*\n]+\*\*")
@@ -659,6 +668,13 @@ class NoteSites:
     paths: tuple[str, ...]
     names: tuple[str, ...]
     wave: str
+
+    @property
+    def fix_lane(self) -> bool:
+        """An R2 defect routed to the fix lane (FIX_LANE_WAVE): its `names` (r2_members) say where the defect lives,
+        never what a restructuring moves, so they resolve to no callers and its set is its sites (kb/Work PB3242,
+        branch review R1-2; DESIGN-architecture-review §8.7: a fix-lane plan never builds the index)."""
+        return self.wave == FIX_LANE_WAVE
 
 
 def _site_blocks(text: str) -> list[str]:

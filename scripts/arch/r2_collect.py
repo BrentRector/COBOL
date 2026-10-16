@@ -92,13 +92,14 @@ from functools import lru_cache
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts" / "spec"))
+# the register's ONE definition of a harm `work.py next` ranks, and of the fix lane's wave kind (kb/Work PB3242)
+from work import FIX_LANE_WAVE, HARM_FLAGS  # noqa: E402
 LENSES = ("site", "rule", "scenario")
 KINDS = ("finding", "lead", "defect")
-WAVES = ("extract", "unify", "move-and-rename", "data-ize", "delete", "modernize", "defect-for-fix-lane")
+WAVES = ("extract", "unify", "move-and-rename", "data-ize", "delete", "modernize", FIX_LANE_WAVE)
 SEVERITIES = ("Critical", "Warning", "Suggestion")
 HARMS = ("wrong-answer", "crashes", "silent", "rejects-legal-source", "under-rejects")
-sys.path.insert(0, str(REPO / "scripts" / "spec"))
-from work import HARM_FLAGS  # noqa: E402  (the register's ONE definition of a harm `work.py next` ranks)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import r2_cost  # noqa: E402  (the ONE estimator of what a launch plan spends)
 TEMPLATE = REPO / ".claude" / "skills" / "workstream" / "templates" / "wf_r2_review.js"
@@ -184,7 +185,7 @@ def problems(rec: dict, tracked: set[str]) -> list[str]:
     bad += ["file not in the pin's tree: %s" % f for f in rec["files"] if f not in tracked]
     if not DESIGN_REF.match(rec["design_ref"] or ""):
         bad.append("design_ref %r is neither §8.x nor PBnnnn" % rec["design_ref"])
-    if rec["kind"] == "defect" or rec["wave_kind"] == "defect-for-fix-lane":
+    if rec["kind"] == "defect" or rec["wave_kind"] == FIX_LANE_WAVE:
         if not set(rec.get("harm") or []) <= set(HARMS) or not set(rec.get("harm") or []) & set(RANKED_HARMS):
             bad.append("a defect names its harm from %s, at least one of %s" % (HARMS, RANKED_HARMS))
         bad += spec_ref_problems(rec.get("spec_refs"))
@@ -621,7 +622,7 @@ def self_test():
             {"type": "read", "file": "src/A.cs"}, rec(1), rec(2), rec(3), rec(4, files=["src/Nope.cs"]),
             rec(5, wave_kind="modernize"), rec(6, existing_note="PB1"), rec(7, design_ref="later"),
             rec(8, sites=["src/A.cs:5-50 (A.G)"], members=["N.A.G"]),
-            rec(9, wave_kind="defect-for-fix-lane", kind="defect", harm=["wrong-answer"],
+            rec(9, wave_kind=FIX_LANE_WAVE, kind="defect", harm=["wrong-answer"],
                 spec_refs=[{"clause": "14.9.27.4", "text": "Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value"}]),
             rec(10), rec(10, title="a different record under the same id")])
         # a second finder found the SAME mechanism as f1#1 (overlapping site, same member): one note, both provenances
@@ -655,7 +656,7 @@ def self_test():
             all(DESIGN_REF.match(s) for s in ("§8.3", "§8.3 (2)", "§8.3(2)", "§8.4 (PB2291, PB2333)", "§8.7 (b)",
                                               "§8.7 (R4 step 4); escalating CA1305", "PB948", "PB948 (code half)"))
             and not any(DESIGN_REF.match(s) for s in ("later", "§5.1 (consistent with §8)", "§80", "PB", "8.3")))
-        silent_only = rec(11, wave_kind="defect-for-fix-lane", kind="defect", harm=["silent"],
+        silent_only = rec(11, wave_kind=FIX_LANE_WAVE, kind="defect", harm=["silent"],
                           spec_refs=[{"clause": "14.9.27.4", "text": "Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value"}])
         arm("a defect whose only harm is `silent` is INVALID: work.py next ranks only HARM_FLAGS",
             any("at least one of" in p for p in problems(silent_only, tracked))

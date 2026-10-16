@@ -1613,14 +1613,18 @@ the union of its notes' DECLARED sets plus the group's primary file (`plan_wave.
 and a campaign's alike), and a note's declared set is its STRUCTURED sites only, read by ONE reader, the register's
 `work.note_sites` (kb/Work PB3242), which the planner, the member index, the spec renderer and the landing check all
 call: the paths of its Code site / Site / Sites blocks (a bold label's paragraph and the list under it, or a heading's
-section; `:line`, `#member` and `(member)` suffixes dropped) under the campaign roots of `model_rules.json` (never a
+section; `:line`, `#member` and `(member)` suffixes dropped) and of the `**The files this step edits**` line
+`file_census_notes` writes into a multi-step note (`work.STEP_FILES_LABEL`: a step's files can lie outside the census
+finding's Sites, as PB2300's `IntrinsicCatalog.cs` does) under the campaign roots of `model_rules.json` (never a
 literal list: `scripts/` was a root the register's own reader ignored), plus every tracked code file under a folder
 its sites name, on the current tree, plus every file the MEMBER INDEX finds using or emitting what the note moves or
 changes: the names on its `**Moves or changes:**` and `r2_members:` lines, the documentation ids in its site blocks,
 and every word of its target paragraph that is a member of a type the note names or its sites declare (Draft 9:
 PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use; the eighth refuter,
 K1), else, for a restructuring note (one with a `**Wave kind:**`), every type its sites declare (a folder, a class's
-files); a fix-lane note that names no member declares its sites only. A path its prose mentions, a `Gate:` line, a
+files); a fix-lane note declares its sites only: one that names no member, and an R2 defect routed to the fix lane
+(`**Wave kind:** defect-for-fix-lane`, `work.FIX_LANE_WAVE`) whatever its `r2_members:` line names, since those say
+where the defect lives, not what a restructuring moves. A path its prose mentions, a `Gate:` line, a
 tool command and a bare type name declare NOTHING: Drafts 7-10 read every site the note's text named through
 `fix_clusters`' scored heuristic (whatever the score, so a bare type name counted, J3): 57 of PB1754's 63 ready R2
 notes DISCUSS `plan_wave.py` and `landing_check.py` and every PB3160 slice names `cite.py`, so on 2026-10-16 the
@@ -1645,7 +1649,7 @@ unrecorded R3 work) all pass it: the admission and the guarantee are one quantit
 read the newest committed record, which cannot see what a landing added. Regenerating costs a solution build plus the
 census host (110 s measured on a cold worktree, 2026-10-16), paid once per tree and, at a landing, only for R3 work no
 ledger entry records; the index is read at all only for a note that names what it moves or changes, or a restructuring
-note, so a fix-lane plan never builds one. Only `work.py check`'s unknown-name rule, bounded by time, reads the newest
+note, never a fix-lane note (`member_index.needs_index`), so a fix-lane plan never builds one. Only `work.py check`'s unknown-name rule, bounded by time, reads the newest
 committed record plus a text re-scan of every file changed since it. For PB2296 step 1 the declared set is 69 files
 (Draft 8: 66; Draft 9's 73 counted prose sites), and holds every one of `DataBinder.Options`'s six users the refuter
 found outside it (`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`,

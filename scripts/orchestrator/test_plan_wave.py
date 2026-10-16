@@ -1038,6 +1038,31 @@ FLC = [{"file": "src/Lib/Alpha.cs", "files": ["src/Lib/Alpha.cs", "scripts/spec/
 pw.declare_fix_lane(FLC, DDECL, FL)
 check("a fix-lane cluster's collision set is its notes' declared sets plus its primary file, never fix_clusters' "
       "prose sites", FLC[0]["files"], ["scripts/gamma.py", "src/Lib/Alpha.cs"])
+# Branch review R1-2: an R2 defect routed to the fix lane (its wave kind work.FIX_LANE_WAVE, with r2_members) is a
+# fix-lane note: the fix lane's plan declares its sites without reading the member index, so it never regenerates
+# one (DDECL's policy has no cache and refuses to regenerate: a read would raise StaleIndex).
+(FL / "PB992.md").write_text(f"---{NL}id: PB992{NL}---{NL}{NL}r2_members: N.Beta.Run, N.Alpha.Go{NL}{NL}"
+                             f"**Wave kind:** {work.FIX_LANE_WAVE}. **Model:** the fix lane's routing.{NL}{NL}"
+                             f"**Sites:**{NL}- `src/Lib/Beta.cs:10-20` (Beta.Run){NL}", encoding="utf-8", newline="\n")
+FLD = [{"file": "src/Lib/Beta.cs", "files": ["src/Lib/Beta.cs"], "notes": [{"id": "PB992"}]}]
+try:
+    pw.declare_fix_lane(FLD, DDECL, FL)
+    check("R1-2: an R2 fix-lane defect with r2_members declares its sites and reads no index", FLD[0]["files"],
+          ["src/Lib/Beta.cs"])
+except Exception as e:   # noqa: BLE001 — any read of the index (StaleIndex, a git call on a fixture) is the red
+    check("R1-2: an R2 fix-lane defect with r2_members declares its sites and reads no index",
+          f"read the index: {type(e).__name__}: {e}",
+          ["src/Lib/Beta.cs"])
+sys.path.insert(0, str(coord.REPO / "scripts" / "arch"))
+import r2_collect  # noqa: E402
+import file_census_notes  # noqa: E402
+check("R1-2: the fix lane's wave kind is one of the R2 collector's wave kinds (one constant, work.FIX_LANE_WAVE)",
+      work.FIX_LANE_WAVE in r2_collect.WAVES, True)
+# Branch review R1-1: the line file_census_notes writes naming the files ONE STEP edits is a site block, so a step file
+# outside the census finding's Sites (PB2300's IntrinsicCatalog.cs) is declared; the reader reads the writer's line.
+STEP = f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}{NL}{file_census_notes.step_files_line(['src/Lib/Alpha.cs', 'src/Lib/Beta.cs'])}{NL}"
+check("R1-1: the step-files line file_census_notes writes declares its files (reader = planner)",
+      (work.note_sites(STEP).paths, tuple(sorted(DDECL(STEP)))), (("src/Lib/Alpha.cs", "src/Lib/Beta.cs"),) * 2)
 
 
 def note_path_scanners(sources: dict[str, str]) -> list[str]:

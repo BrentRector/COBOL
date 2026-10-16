@@ -269,27 +269,31 @@ def target_names(text: str, index: dict, named: list[str], sites: tuple[str, ...
     return out
 
 
+SITES_ONLY = "no names (a fix-lane note: its sites only)"
+
+
 def needs_index(sites: work.NoteSites) -> bool:
     """Whether a note's declared set reads the index at all: it names what it moves or changes, or it is a
-    restructuring note (a `**Wave kind:**`) whose sites declare the types it moves. A fix-lane note's sites are only
-    where its fix goes, so its set is its sites and never every caller of every type declared there."""
-    return bool(sites.names) or bool(sites.wave and sites.paths)
+    restructuring note (a `**Wave kind:**`) whose sites declare the types it moves. A fix-lane note (no wave kind, or
+    the fix lane's own, work.NoteSites.fix_lane, whatever `r2_members:` it carries) never does: its sites are only where
+    its fix goes, so its set is its sites and never every caller of every type or member named there."""
+    return not sites.fix_lane and (bool(sites.names) or bool(sites.wave and sites.paths))
 
 
 def note_names(text: str, index: dict, sites: work.NoteSites | None = None) -> tuple[list[str], str]:
     """(the names a note moves or changes, how they were found): the names its structured fields declare
     (work.note_sites: its `**Moves or changes:**` line, its `r2_members:` line and the documentation ids of its site
     blocks), plus the members its target paragraph names (target_names); else, for a restructuring note, every type
-    declared in the files and folders its sites name; else none."""
+    declared in the files and folders its sites name; else (a fix-lane note, needs_index) none."""
     sites = sites or work.note_sites(text)
+    if not needs_index(sites):
+        return [], SITES_ONLY
     names = list(sites.names)
     if names:
         have = {simple(n) for n in names}
         derived = [n for n in target_names(text, index, names, sites.paths) if n not in have]
         return sorted(dict.fromkeys(names + derived)), "declared" + (" and its target" if derived else "")
-    if sites.wave:
-        return types_declared_in(index, list(sites.paths)), "types declared in its sites"
-    return [], "no names (a fix-lane note: its sites only)"
+    return types_declared_in(index, list(sites.paths)), "types declared in its sites"   # needs_index: a wave, sites
 
 
 def folder_files(sites: tuple[str, ...], repo: Path = REPO) -> set[str]:
@@ -343,7 +347,7 @@ def note_file_set(text: str, repo: Path = REPO, index: dict | Callable[[], dict]
     changes, or a restructuring note; `drifted` likewise (default drifted_files)."""
     sites = work.note_sites(text)
     files = {p for p in sites.paths if not (repo / p).is_dir()} | folder_files(sites.paths, repo)
-    names, how, unknown, commit = [], "no names (a fix-lane note: its sites only)", [], None
+    names, how, unknown, commit = [], SITES_ONLY, [], None
     if needs_index(sites):
         idx = index() if callable(index) else (load(repo) if index is None else index)
         names, how = note_names(text, idx, sites)
@@ -403,6 +407,14 @@ def self_test() -> int:
         raise AssertionError("a fix-lane note read the member index")
     fs = note_file_set("**Code site.** `src/A/Binder.cs#Pending` (the arm)", root, index=no_index, drifted=no_index)
     check("fix-lane-sites-only", (fs["files"], fs["names"], fs["index"]), (["src/A/Binder.cs"], [], None))
+    # an R2 defect routed to the fix lane is a fix-lane note whatever `r2_members:` it carries: its members say where
+    # the defect lives, so neither they nor its site types are resolved (PB3242 branch review R1-2: the fix lane's plan
+    # once read, and regenerated, the index for these notes)
+    r2_defect = (f"r2_members: N.Binder.Pending, N.Sym.Flag\n\n**Wave kind:** {work.FIX_LANE_WAVE}.\n\n"
+                 "**Sites:**\n- `src/A/Binder.cs:10-20` (Binder.Pending)\n")
+    fs = note_file_set(r2_defect, root, index=no_index, drifted=no_index)
+    check("fix-lane-r2-defect", (fs["files"], fs["names"], fs["how"], note_names(r2_defect, idx)),
+          (["src/A/Binder.cs"], [], SITES_ONLY, ([], SITES_ONLY)))
     # drift: a file changed since the index that names a member is included; a deleted file drops out
     files, unknown = callers(idx, ["N.Sym.Flag"], root, drifted={"src/A/Use.cs": "x.Flag = 1;", "src/B/New.cs": "Flagged"})
     check("drift", (files, unknown), ({"src/A/Sym.cs", "src/B/Emit.cs", "src/A/Use.cs"}, []))
