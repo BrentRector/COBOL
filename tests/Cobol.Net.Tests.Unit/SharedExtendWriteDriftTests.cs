@@ -326,13 +326,13 @@ public sealed class SharedExtendWriteDriftTests
         try
         {
             var reg = new FileRegistry();
-            reg.RegisterIndexed("S", host, 7, optional: false, accessMode: 0, primeOffset: 0, primeLength: 4, -1, -1);
+            reg.RegisterIndexed("S", host, 7, optional: false, accessMode: 0, primeKey: [new(0, 4)], -1, -1);
             reg.OpenStatic("S", FileOpenMode.Output);
             Assert.Equal(FileStatusCode.Success, Write(reg, "S", "K002SSS"));
             reg.Close("S");
 
-            reg.RegisterIndexed("A", host, 7, false, 0, 0, 4, -1, -1);
-            reg.RegisterIndexed("B", host, 7, false, 0, 0, 4, -1, -1);
+            reg.RegisterIndexed("A", host, 7, false, 0, [new(0, 4)], -1, -1);
+            reg.RegisterIndexed("B", host, 7, false, 0, [new(0, 4)], -1, -1);
             Share(reg, "A", spelling);
             Share(reg, "B", spelling);
             reg.OpenStatic("A", FileOpenMode.Extend);
@@ -343,7 +343,7 @@ public sealed class SharedExtendWriteDriftTests
             reg.Close("B");
 
             var back = new FileRegistry();
-            back.RegisterIndexed("R", host, 7, false, 0, 0, 4, -1, -1);
+            back.RegisterIndexed("R", host, 7, false, 0, [new(0, 4)], -1, -1);
             back.OpenStatic("R", FileOpenMode.Input);
             var got = new List<string>();
             while (back.ReadKeyedNext("R", out string rec) == FileStatusCode.Success) got.Add(rec);

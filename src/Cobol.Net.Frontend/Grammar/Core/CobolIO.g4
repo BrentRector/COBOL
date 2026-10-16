@@ -228,32 +228,25 @@ accessMode
 // recordDelimiterClause holds: DELIMITER is a reserved token, so `RECORD DELIMITER …` cannot match dataReference
 // and falls through to recordDelimiterClause (likewise RECORD CONTAINS/VARYING in an FD).
 //
-// ⛔ BOTH CLAUSES CARRY A **REQUIRED CHOICE OF TWO KEY FORMS**, and the second one is DECLINED — so it is a
-// DISTINCT PARSE ALTERNATIVE the binder can SEE and refuse by name, exactly as `WRITE … FILE file-name-1` is
-// (Annex A.4.13 item 2 → COBOLNET1706, below). kb/Work PB358 / PB293. The general formats, RENDERED from the
-// printed pages rather than read off the OCR (§12.4.5.12.2 = PDF p359/folio 329, §12.4.5.6.2 = p350/folio 320):
+// ⛔ BOTH CLAUSES CARRY A **REQUIRED CHOICE OF TWO KEY FORMS**, each a DISTINCT PARSE ALTERNATIVE the binder
+// captures by its own arm (kb/Work PB358 gave the second its surface; kb/Work PB1099 provides it). The general
+// formats, RENDERED from the printed pages rather than read off the OCR (§12.4.5.12.2 = PDF p359/folio 329,
+// §12.4.5.6.2 = p350/folio 320):
 //     <u>RECORD</u> KEY IS { data-name-1 | record-key-name-1 <u>SOURCE</u> IS { data-name-2 } … }
 //     <u>ALTERNATE</u> <u>RECORD</u> KEY IS { … same brace … } [ WITH <u>DUPLICATES</u> ] [ <u>SUPPRESS</u> WHEN literal-1 ]
 // Underlining measured on both pages: RECORD / ALTERNATE / SOURCE carry rules, KEY and BOTH occurrences of IS
 // do not — so `SOURCE IS?` and the pre-existing `KEY? IS?` are the conforming spellings. The inner
 // `{ data-name-2 } …` brace pair takes the ellipsis, hence `dataReference+` (ONE or more), and §12.4.5.12.4
 // GR2 / §12.4.5.6.4 GR2 say what the repetition MEANS: "Record-key-name-1 defines a record key consisting of
-// the concatenation of all occurrences of data-name-2 in the order specified."
-// ⛔ WHY IT PARSES AND IS THEN REFUSED, rather than having no surface at all: Annex A.3 item 40 — "The
-// capability of specifying the SOURCE phrase of the RECORD KEY clause and ALTERNATE RECORD KEY clause is
-// dependent on the capabilities of the processor" — makes it PROCESSOR-DEPENDENT, docs/CONFORMANCE.md §2 row 40
-// declines it, and §4.2.6 ¶3 then obliges this compiler to SAY SO: "An implementation shall provide a warning
-// mechanism at compile time to indicate use of syntactically-detectable processor-dependent language elements
-// not supported by that implementation." Until 2026-09-09 the phrase matched no alternative anywhere and the
-// user got `COBOL0312: unexpected 'SOURCE' … A period may be missing at the end of the previous sentence` —
-// a generic parse error pointing at the wrong repair. DataBinder.BindFileControl now names it: COBOLNET1954.
-// The refusal is an ERROR rather than the accept-inert warning RECORD DELIMITER gets, because there is no inert
-// reading — a declared key that names no data item leaves the file with NO prime key — and §4.2.6 ¶3's own
-// closing sentence is the licence: "The implementor is not required to produce executable code when unsupported
-// processor-dependent language elements are used."
-// ⛔ ONE RULE, USED BY BOTH CLAUSES. A.3 item 40 names RECORD KEY and ALTERNATE RECORD KEY in ONE sentence, so
-// they get ONE shared sub-rule and ONE diagnostic; a fix touching only `recordKeyClause` would be this repo's
-// most reproducible defect shape (feedback_two_arm_dispatch) repeating on the clause that already has a twin.
+// the concatenation of all occurrences of data-name-2 in the order specified." Annex A.3 item 40 makes the
+// capability processor-dependent and this implementation provides it (docs/CONFORMANCE.md §2 row 40): the
+// binder's DataBinder.CaptureRecordKeySource reads the phrase and the key is a list of byte windows end to end
+// (docs/COBOLNET_FILES_DESIGN.md, "THE SECOND KEY FORM"). It is a post-1985 form, gated once on this shared
+// rule (VersionConformancePass.VisitRecordKeySourcePhrase, record-key-source-2002).
+// ⛔ ONE RULE, USED BY BOTH CLAUSES. A.3 item 40 names RECORD KEY and ALTERNATE RECORD KEY in ONE sentence and
+// the two general formats print the same brace group, so they get ONE shared sub-rule, ONE capture and ONE gate;
+// a change touching only `recordKeyClause` would be this repo's most reproducible defect shape
+// (feedback_two_arm_dispatch) repeating on the clause that already has a twin.
 // The SOURCE arm is listed FIRST so ANTLR tries the more specific alternative first (feedback_grammar_precedence);
 // `dataReference` cannot swallow `SOURCE` in any case, because SOURCE is a reserved token at every edition
 // (tests/version-matrix/reserved-words.json: r85/r2002/r2014/r2023 all true) and is not in `cobolWord`.
@@ -267,12 +260,12 @@ alternateKeyClause
       alternateKeySuppressWhen?
     ;
 
-// ISO §12.4.5.12.2 / §12.4.5.6.2 — the declined second arm of both clauses' required key-form choice.
+// ISO §12.4.5.12.2 / §12.4.5.6.2 — the second arm of both clauses' required key-form choice.
 // record-key-name-1 is its OWN name class (§8.3.2.2.24), not a data-name: §8.4.6.2.4 "Scope of
 // record-key-names" gives it file-level scope, and it is DEFINED here rather than referenced, which is why
 // this is a bare `cobolWord` with no qualification or subscript suffix — the printed format shows a plain
 // `record-key-name-1`. data-name-2 keeps the general `dataReference` surface the data-name-1 arm already uses,
-// so an OF/IN-qualified source item is recognized (and refused) rather than tripped over mid-clause.
+// so an OF/IN-qualified data-name-2 resolves by §8.4.2.2 as data-name-1 does.
 recordKeySourcePhrase
     : recordKeyName SOURCE IS? dataReference+
     ;

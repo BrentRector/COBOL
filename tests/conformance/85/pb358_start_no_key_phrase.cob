@@ -4,15 +4,12 @@
       *> data-name-1 or record-key-name-1 being the prime record key
       *> for the file." (cite.py --check 14.9.41.4 → OK, §14.9.41.4 15)
       *>
-      *> THE RULE NAMES TWO SPELLINGS OF THE PRIME KEY AND THIS
-      *> IMPLEMENTATION PROVIDES ONE. record-key-name-1 is declared by
-      *> the SOURCE phrase of the RECORD KEY clause (§12.4.5.12.2),
-      *> which Annex A.3 item 40 makes processor-dependent and which
-      *> docs/CONFORMANCE.md §2 row 40 declines — refused by name as
-      *> COBOLNET1954, witnessed by conformance:negative/pb358-*.
-      *> So this golden covers the data-name-1 spelling, which is the
-      *> whole of GR15 that a conforming program can reach here.
-      *> kb/Work PB358.
+      *> THE RULE NAMES TWO SPELLINGS OF THE PRIME KEY. record-key-name-1
+      *> is declared by the SOURCE phrase of the RECORD KEY clause
+      *> (§12.4.5.12.2), a post-1985 form, so at COBOL-85 this golden
+      *> covers the data-name-1 spelling; the record-key-name-1 spelling
+      *> is conformance 2002/pb1099_record_key_source's line F1.
+      *> kb/Work PB358, PB1099.
       *>
       *> ⛔ THE DISCRIMINATOR IS L2, NOT L1. "EQUAL TO" is a stronger
       *> claim than "positions somewhere sensible": an implementation

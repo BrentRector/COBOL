@@ -3218,11 +3218,11 @@ public static class DiagnosticCatalog
     //          misdescribe the posture: a decline under the processor-dependent clause reads "we could not",
     //          a decline under the optional clause reads "we chose not to, and documented it".
     //
-    //    • REFUSE (Error) — COBOLNET1560 / 1705 / 1706 / 1707 / 1954. These facilities are NOT additive:
+    //    • REFUSE (Error) — COBOLNET1560 / 1584 / 1705 / 1706 / 1707. These facilities are NOT additive:
     //      compiled inert they change the ANSWER (which bytes reach the medium; which record description entry
     //      is selected; a whole-record-area write standing in for a §14.9.51.4 GR8 implicit record; a screen
-    //      ACCEPT re-read as the device format, which transfers the wrong data; a prime record key that names
-    //      no data item at all). A.4.1's first sentence is the licence to refuse an OPTIONAL element: "An
+    //      ACCEPT re-read as the device format, which transfers the wrong data; a national key ordered by a
+    //      sequence other than the one written). A.4.1's first sentence is the licence to refuse an OPTIONAL element: "An
     //      implementation shall accept the syntax and provide the functionality for an optional element only
     //      when support for that language element is claimed by the implementor."
     //      Unclaimed ⇒ the syntax is not accepted. The strictness axis does NOT move these: --permissive is
@@ -3230,14 +3230,14 @@ public static class DiagnosticCatalog
     //      "pre-removal semantics" to preserve here — matching the accept-inert rows above, which --permissive
     //      likewise does not move.
     //      ⛔ THE DISPOSITION SPLITS ON WHETHER AN INERT READING EXISTS, **NOT** ON WHICH ANNEX LISTS THE
-    //      ELEMENT, and 1954 is what proves it (kb/Work PB358, 2026-09-09). Until it landed, every REFUSE row
-    //      happened to be Annex A.4 and every ACCEPT-INERT row Annex A.3, and this header and
-    //      EditionContext.Declined both wrote that coincidence down as if it were the rule ("an Annex A.3
-    //      processor-dependent facility is accepted-and-warned while an Annex A.4 optional module is
-    //      refused"). COBOLNET1954 is an **A.3** element (item 40, the SOURCE phrase of RECORD KEY /
-    //      ALTERNATE RECORD KEY) that must be REFUSED, because a record-key-name declared by a SOURCE phrase
-    //      names no data item — accept it inert and the file has no prime key, which is a wrong answer and not
-    //      an absent facility. §4.2.6 ¶3 licenses exactly that in its own closing sentence: "The implementor is
+    //      ELEMENT (kb/Work PB358, 2026-09-09). Until then every REFUSE row happened to be Annex A.4 and every
+    //      ACCEPT-INERT row Annex A.3, and this header and EditionContext.Declined both wrote that coincidence
+    //      down as if it were the rule ("an Annex A.3 processor-dependent facility is accepted-and-warned while
+    //      an Annex A.4 optional module is refused"). COBOLNET1584 is an **A.3** element (item 41, a national
+    //      key collating sequence defined by literals or LOCALE) that must be REFUSED, because accepted inert it
+    //      orders the key — and judges its uniqueness — by a sequence other than the one written, which is a
+    //      wrong answer and not an absent facility. (COBOLNET1954, the A.3 item 40 SOURCE phrase that first
+    //      proved the rule, is retired: kb/Work PB1099 provides it.) §4.2.6 ¶3 licenses exactly that in its own closing sentence: "The implementor is
     //      not required to produce executable code when unsupported processor-dependent language elements are
     //      used." The annex still decides the POSTURE CLAUSE the message cites (DiagnosticDescriptor.Annex →
     //      PostureClause: §4.2.6 for A.3, §4.2.7 for A.4); it does not decide the severity.
@@ -3310,48 +3310,12 @@ public static class DiagnosticCatalog
         + "record size, so no program-visible value changes. See docs/CONFORMANCE.md §2 row 26 and §7.",
         "ISO §4.2.6 ¶3 / Annex A.3 item 26 / Annex A.1 items 150-151 / §12.4.5.11", RecognizedNotImplemented,
         Annex: DeclinedAnnex.A3);
-    // ⛔ ONE CODE FOR **BOTH CLAUSES**, and that is the point (kb/Work PB358 / PB293). Annex A.3 item 40 names
-    //    the RECORD KEY clause and the ALTERNATE RECORD KEY clause in ONE sentence — "The capability of
-    //    specifying the SOURCE phrase of the RECORD KEY clause and ALTERNATE RECORD KEY clause is dependent on
-    //    the capabilities of the processor" — and §12.4.5.12.2 and §12.4.5.6.2 print the SAME brace group
-    //    (`{ data-name-1 | record-key-name-1 SOURCE IS { data-name-2 } … }`). One rule, one place
-    //    (feedback_one_rule_one_place); a second code would invite the two-arm defect this note was opened for,
-    //    which is exactly how the construct got here — the original finding named only the prime key.
-    // ⛔ REFUSE, not accept-inert, and the difference from COBOLNET1778 above is NOT the annex (both are A.3)
-    //    but whether an inert reading exists. §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2: "Record-key-name-1 defines a
-    //    record key consisting of the concatenation of all occurrences of data-name-2 in the order specified."
-    //    record-key-name-1 is its own name class (§8.3.2.2.24, scoped by §8.4.6.2.4) and names no data item, so
-    //    there is nothing for an inert compile to use as the key: the file would have NO prime key, every
-    //    keyed READ/START/WRITE would be resolved against nothing, and the program would produce a wrong
-    //    answer rather than merely lack a facility. §4.2.6 ¶3's closing sentence is the licence: "The
-    //    implementor is not required to produce executable code when unsupported processor-dependent language
-    //    elements are used."
-    // ⛔ WHAT PROVIDING IT WOULD COST is recorded in kb/Work PB293, NOT as a proposal: a record key would
-    //    become a LIST of byte windows end-to-end — FileModel's key model, KeyedIoEmitter.EmitRegistration,
-    //    RuntimeApi.FileRegisterIndexed/FileAddAlternateKey, IndexedConnector's single `(Off, Len)` slice,
-    //    RecordLayout.KeyIndexOfKeyItem (which matches by STORAGE POSITION and cannot express a
-    //    concatenation), FixedFileAttributes.KeyDescriptor and therefore the framed store's on-disk header
-    //    (docs/COBOLNET_FILES_DESIGN.md D10 — a second owner-visible file-format break), plus the §12.4.5.7
-    //    Format-2 per-key COLLATING SEQUENCE seam. The standard makes the element optional; this
-    //    implementation declines it and says so.
-    // EVERY EDITION. SOURCE is reserved at 85/2002/2014/2023 (tests/version-matrix/reserved-words.json), the
-    //    element is provided at none of them, and a construct that never compiles has no edition window — which
-    //    is why there is no tests/version-matrix/constructs.json row (that file models `introducedIn` /
-    //    `removedIn`), matching COBOLNET1778's precedent.
-    public static readonly DiagnosticDescriptor RecordKeySourcePhraseUnsupported = new(
-        "COBOLNET1954", "record-key-source-phrase-unsupported", EditionSeverity.Error,
-        "the SOURCE phrase of the RECORD KEY / ALTERNATE RECORD KEY clause (ISO §12.4.5.12.2 / §12.4.5.6.2) "
-        + "declares a record-key-name whose key is the concatenation of one or more data-name-2 operands "
-        + "(§12.4.5.12.4 GR2 / §12.4.5.6.4 GR2). It is a processor-dependent element (§4.2.6; Annex A.3 item "
-        + "40 — \"The capability of specifying the SOURCE phrase of the RECORD KEY clause and ALTERNATE RECORD "
-        + "KEY clause is dependent on the capabilities of the processor\") that this implementation does not "
-        + "provide: a record key here is one contiguous byte window of the record, never a concatenation of "
-        + "several. The clause is REFUSED rather than accepted inert, because record-key-name-1 is its own name "
-        + "class (§8.3.2.2.24) and names no data item — an inert compile would leave the file with no key at "
-        + "all. Write the single-item form instead: RECORD KEY IS data-name-1. See docs/CONFORMANCE.md §2 row "
-        + "40.",
-        "ISO §4.2.6 ¶3 / Annex A.3 item 40 / §12.4.5.12.2 / §12.4.5.6.2", RecognizedNotImplemented,
-        Annex: DeclinedAnnex.A3);
+    // ⛔ COBOLNET1954 ("record-key-source-phrase-unsupported") is RETIRED — NEVER REALLOCATE IT. It refused the
+    //    SOURCE phrase of the RECORD KEY / ALTERNATE RECORD KEY clause (Annex A.3 item 40) at every edition while a
+    //    record key was one contiguous byte window. kb/Work PB1099 Q1 (owner rule R65: a processor-dependent
+    //    element is declined only where the processor truly lacks the capability) PROVIDES it: a record key is a
+    //    list of byte windows end to end (FileModel's RecordKey, the runtime KeySegment), §12.4.5.12.4 GR2 /
+    //    §12.4.5.6.4 GR2's concatenation. The COBOLNET1518 precedent applies: a retired code stays retired.
     // ── 1560 / 1705 / 1706 / 1707 — the REFUSE half of the band (see the header above). One code per A.4
     //    MODULE (A.4.2 takes two, split at the division boundary — see the header below it), not per
     //    clause: the module is the unit §4.2.7 makes the implementor document and Annex A.4 makes optional, so

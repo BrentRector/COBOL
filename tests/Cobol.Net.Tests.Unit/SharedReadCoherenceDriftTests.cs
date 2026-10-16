@@ -385,8 +385,7 @@ public sealed class SharedReadCoherenceDriftTests
             void RegisterKeyed(string name)
             {
                 if (indexed)
-                    reg.RegisterIndexed(name, host, 8, optional: false, accessMode: 0, primeOffset: 0,
-                        primeLength: 4, -1, -1);
+                    reg.RegisterIndexed(name, host, 8, optional: false, accessMode: 0, primeKey: [new(0, 4)], -1, -1);
                 else
                     reg.RegisterRelative(name, host, 4, optional: false, accessMode: 0, relativeKeyDigits: 4,
                         -1, -1);

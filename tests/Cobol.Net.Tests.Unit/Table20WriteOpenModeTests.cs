@@ -49,7 +49,7 @@ public sealed class Table20WriteOpenModeTests
     {
         var reg = new FileRegistry();
         string host = Tmp("idx");
-        reg.RegisterIndexed("F", host, 8, false, access, 0, 4, -1, -1);
+        reg.RegisterIndexed("F", host, 8, false, access, [new(0, 4)], -1, -1);
         reg.OpenStatic("F", FileOpenMode.Output);
         Assert.Equal(FileStatusCode.Success, reg.WriteKeyed("F", "K001AAAA", -1));
         reg.Close("F");
@@ -71,7 +71,7 @@ public sealed class Table20WriteOpenModeTests
     private static int CountIndexed(string host)
     {
         var reg = new FileRegistry();
-        reg.RegisterIndexed("C", host, 8, false, SeqAccess, 0, 4, -1, -1);
+        reg.RegisterIndexed("C", host, 8, false, SeqAccess, [new(0, 4)], -1, -1);
         reg.OpenStatic("C", FileOpenMode.Input);
         int n = 0;
         while (reg.ReadKeyedNext("C", out _) == FileStatusCode.Success) n++;

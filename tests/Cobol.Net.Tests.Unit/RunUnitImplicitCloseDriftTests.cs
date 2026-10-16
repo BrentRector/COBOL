@@ -35,7 +35,7 @@ public sealed class RunUnitImplicitCloseDriftTests
     private static void RegisterIndexed(FileRegistry reg, string name, string host, FileSharing? sharing = null)
     {
         reg.RegisterIndexed(name, host, recordWidth: 8, optional: false, accessMode: (int)KeyedAccess.Dynamic,
-            primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
+            primeKey: [new(0, 4)], varyMin: -1, varyMax: -1);
         if (sharing is { } s) reg.RegisterSharing(name, s, FileLockMode.Manual, multiple: false);
     }
 

@@ -423,7 +423,7 @@ public sealed class CobolFileLockTests
         int width = indexed ? 9 : 5;
         void Register(string n, int access)
         {
-            if (indexed) CobolFile.RegisterIndexed(n, host, width, false, access, 0, 4);
+            if (indexed) CobolFile.RegisterIndexed(n, host, width, false, access, [new(0, 4)]);
             else CobolFile.RegisterRelative(n, host, width, false, access, 4);
         }
         Register("SEED", Random);

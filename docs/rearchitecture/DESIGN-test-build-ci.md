@@ -191,7 +191,11 @@ A rearchitecture phase is "behavior-neutral" iff, in order of authority:
 3. **Emitted-C# snapshots** (secondary, advisory): the generated `.g.cs` for a representative program set is
    snapshotted. A refactor that is a pure reorg SHOULD leave these byte-identical; a refactor that intentionally
    changes emission form (e.g. structured `Place` → different but equivalent C#) RE-BASELINES the snapshot **with
-   explicit review**, and gate (1) proves the re-baseline is behavior-preserving.
+   explicit review**, and gate (1) proves the re-baseline is behavior-preserving. The runtime version a module
+   records (`CobolRepository`, `EnsureRegistered`) is the package version, which every runtime major bump raises
+   (DESIGN-external-repository.md §15.4): the snapshot holds it as `{RUNTIME-VERSION}`, substituted only where it is
+   the runtime's own version, so a bump re-baselines nothing (a version reaches no test through code impact, so
+   leg 1 never planned these cases on one) and an emitter stamping any other version still diffs.
 
 Gates (1) and (2) are hard (red = stop). Gate (3) is a reviewed diff, never auto-accepted, never silently drifting.
 

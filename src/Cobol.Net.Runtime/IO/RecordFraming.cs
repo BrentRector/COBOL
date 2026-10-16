@@ -184,8 +184,17 @@ internal static class RecordFraming
     /// Foreign to this build, as version 1 is: no reader for it is kept (there is no backward-compatibility
     /// requirement, CLAUDE.md rule 4).</para>
     /// <para>Version 4 (kb/Work PB2693) adds the RELEASE MINT to the fixed header (<see cref="ReleaseMintOffset"/>) and
-    /// each indexed record's release-ordinal vector to its frame. A version-3 store is Foreign to this build.</para></summary>
-    private const byte FormatVersion = 4;
+    /// each indexed record's release-ordinal vector to its frame. A version-3 store is Foreign to this build.</para>
+    /// <para>Version 5 (kb/Work PB1099) records each key as a SEQUENCE of byte windows — a segment count, then an
+    /// (offset, length) pair per segment — because a SOURCE-phrase key is the concatenation of its data-name-2
+    /// operands (§12.4.5.12.4 GR2 / §12.4.5.6.4 GR2) and §12.4.5.12.4 GR3 makes every window's location a fixed
+    /// attribute of the file. A version-4 store is Foreign to this build.</para></summary>
+    private const byte FormatVersion = 5;
+
+    /// <summary>The most segments a header's key descriptor may declare: the decoder's bound on a count it reads
+    /// before trusting it. A key's segments are data-name-2 operands of ONE clause, each at least one byte of a
+    /// record, so no declarable key comes near it; a larger count is a header this build did not write.</summary>
+    private const int MaxKeySegments = 4096;
 
     /// <summary>The fixed part of the header — magic, organization, record type, the two record sizes, the key
     /// count, the generation and the release mint. Per-key descriptors follow it.</summary>
@@ -454,10 +463,15 @@ internal static class RecordFraming
         Span<byte> word = stackalloc byte[4];
         foreach (var k in a.Keys)
         {
-            BinaryPrimitives.WriteInt32LittleEndian(word, k.Offset);
+            BinaryPrimitives.WriteInt32LittleEndian(word, k.Segments.Count);
             fs.Write(word);
-            BinaryPrimitives.WriteInt32LittleEndian(word, k.Length);
-            fs.Write(word);
+            foreach (var s in k.Segments)
+            {
+                BinaryPrimitives.WriteInt32LittleEndian(word, s.Offset);
+                fs.Write(word);
+                BinaryPrimitives.WriteInt32LittleEndian(word, s.Length);
+                fs.Write(word);
+            }
             fs.WriteByte(k.Duplicates ? (byte)1 : (byte)0);
             // §12.4.5.6.4 GR6 admits ANY figurative-constant or literal SUPPRESS WHEN value, so it is written
             // with an explicit length rather than a delimiter: a value carrying a NUL or a line ending is legal.
@@ -530,9 +544,16 @@ internal static class RecordFraming
         for (int i = 0; i < count; i++)
         {
             if (!FillExactly(fs, word)) return null;
-            int off = BinaryPrimitives.ReadInt32LittleEndian(word);
-            if (!FillExactly(fs, word)) return null;
-            int len = BinaryPrimitives.ReadInt32LittleEndian(word);
+            int segmentCount = BinaryPrimitives.ReadInt32LittleEndian(word);
+            if (segmentCount < 1 || segmentCount > MaxKeySegments) return null;
+            var segments = new KeySegment[segmentCount];
+            for (int s = 0; s < segmentCount; s++)
+            {
+                if (!FillExactly(fs, word)) return null;
+                int off = BinaryPrimitives.ReadInt32LittleEndian(word);
+                if (!FillExactly(fs, word)) return null;
+                segments[s] = new KeySegment(off, BinaryPrimitives.ReadInt32LittleEndian(word));
+            }
             int dup = fs.ReadByte();
             if (dup < 0) return null;
             if (!ReadCodeUnits(fs, out string? suppress)) return null;
@@ -540,7 +561,7 @@ internal static class RecordFraming
             if (collLen < 0) return null;
             var coll = new byte[collLen];
             if (!FillExactly(fs, coll)) return null;
-            keys.Add(new FixedFileAttributes.KeyDescriptor(off, len, dup != 0, suppress, Encoding.ASCII.GetString(coll)));
+            keys.Add(new FixedFileAttributes.KeyDescriptor(segments, dup != 0, suppress, Encoding.ASCII.GetString(coll)));
         }
         return new FixedFileAttributes(org, head[9] == (byte)'V', min, max, keys);
     }

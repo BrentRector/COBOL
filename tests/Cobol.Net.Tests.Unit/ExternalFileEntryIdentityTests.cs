@@ -49,6 +49,11 @@ public sealed class ExternalFileEntryIdentityTests
         { "k) number of alternate record keys", f => f.AlternateKeyNames.Clear() },
         { "k) SUPPRESS WHEN phrase", f => f.AlternateKeyNames[0].SuppressWhen =
             new SuppressWhenOperand("\"XX\"", SuppressWhenForm.Literal, CobolNet.Common.LiteralClass.Alphanumeric, "XX", null) },
+        // j)/k) "each data-name-6" / "each data-name-3": the SOURCE phrase's operands, in order, are the key (kb/Work
+        // PB1099; review R1-3 found no witness that the identity carries them).
+        { "j) RECORD KEY SOURCE phrase", f => f.RecordKeySource = Source("XK", "XB", "XC") },
+        { "k) ALTERNATE RECORD KEY SOURCE phrase", f => f.AlternateKeyNames[0] =
+            new AlternateKeyClause { Name = "XA", Qualifiers = [], Duplicates = true, Source = Source("XA", "XB") } },
         { "l) sharing mode", f => f.Sharing = SharingMode.NoOther },
         { "m) lock mode", f => f.LockMode = new LockModeInfo(LockKind.Manual, false) },
     };
@@ -75,5 +80,23 @@ public sealed class ExternalFileEntryIdentityTests
         var a = Entry(); a.KeyLevelCollating.Add(KeyClause("XK", "ALPHA1")); a.KeyLevelCollating.Add(KeyClause("XA", "ALPHA2"));
         var b = Entry(); b.KeyLevelCollating.Add(KeyClause("XA", "alpha2")); b.KeyLevelCollating.Add(KeyClause("XK", "alpha1"));
         Assert.Equal(OoEmitter.SelectFingerprint(a), OoEmitter.SelectFingerprint(b));
+    }
+
+    /// <summary>A SOURCE phrase as written, its operands unresolved (no record items in this model), so the
+    /// fingerprint keys each operand by its spelling.</summary>
+    private static RecordKeySource Source(string recordKeyName, params string[] operands) => new()
+    {
+        Name = recordKeyName,
+        Operands = [.. operands.Select(o => new KeySourceOperand { Name = o, Qualifiers = [] })],
+    };
+
+    [Fact]
+    public void Source_operand_order_is_part_of_the_identity()
+    {
+        // GR1 j) "each data-name-6 as well as their relative location": the key IS the concatenation in the order
+        // specified (§12.4.5.12.4 GR2), so XB XC and XC XB are different keys.
+        var a = Entry(); a.RecordKeySource = Source("XK", "XB", "XC");
+        var b = Entry(); b.RecordKeySource = Source("XK", "XC", "XB");
+        Assert.NotEqual(OoEmitter.SelectFingerprint(a), OoEmitter.SelectFingerprint(b));
     }
 }

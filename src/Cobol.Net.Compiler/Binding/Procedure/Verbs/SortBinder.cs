@@ -779,20 +779,40 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         var first = keys[0];
         foreach (var g in givingFiles)
         {
-            if (g.Organization != FileOrganization.Indexed || g.RecordKeyItem is not { } prime) continue;
+            if (g.Organization != FileOrganization.Indexed || g.PrimeKey is not { } prime) continue;
             string? why = null;
             if (first.Descending)
                 why = "the first specification of data-name-1 is associated with a DESCENDING phrase";
-            else if (Model.RecordLayout.KeyWindowOf(SortRootOf(prime), prime, prime.ByteWidth) is { } pw
-                     && (pw.Offset != first.Offset || pw.Bytes != first.Length))
+            else if (PrimeKeyBytes(prime) is (false, _))
+                continue;   // a key with no window: its clause's own rules have reported it
+            else if (PrimeKeyBytes(prime).Run is not { } pw)
+                why = $"the prime record key '{prime.Face}' is the concatenation of data-name-2 operands that are not "
+                    + "one run of bytes in its record (ISO §12.4.5.12.4 GR2), so no data item occupies its byte positions";
+            else if (pw.Offset != first.Offset || pw.Bytes != first.Length)
                 why = $"the first key occupies bytes {first.Offset + 1}..{first.Offset + first.Length} of its record but the "
-                    + $"prime record key '{prime.CobolName}' occupies bytes {pw.Offset + 1}..{pw.Offset + pw.Bytes}";
+                    + $"prime record key '{prime.Face}' occupies bytes {pw.Offset + 1}..{pw.Offset + pw.Bytes}";
             if (why is null) continue;
             return ctx.Validation.RejectStatementOperand($"{(merge ? "MERGE" : "SORT")} GIVING file '{g.CobolName}' is an indexed file, "
                 + $"so the first key shall be ASCENDING and lie at the prime record key's byte location and size: {why} "
                 + $"({(merge ? "ISO §14.9.24.3 SR10" : "ISO §14.9.40.3 SR9")})");
         }
         return true;
+
+        // The prime record key's byte location and size in its record: data-name-1's window, or a SOURCE-form key's
+        // segments when each begins where the previous one ends (kb/Work PB1099). Locatable is false when a segment has
+        // no window at all; Run is null when the windows are not one run.
+        (bool Locatable, (int Offset, int Bytes)? Run) PrimeKeyBytes(RecordKey prime)
+        {
+            (int Offset, int End)? run = null;
+            bool contiguous = true;
+            foreach (var s in prime.Segments)
+            {
+                if (Model.RecordLayout.KeyWindowOf(SortRootOf(s), s, s.ByteWidth) is not { } w) return (false, null);
+                contiguous &= run is not { } r || w.Offset == r.End;
+                run = (run?.Offset ?? w.Offset, w.Offset + w.Bytes);
+            }
+            return (true, contiguous && run is { } whole ? (whole.Offset, whole.End - whole.Offset) : null);
+        }
     }
 
     /// <summary>⛔ THE RECORD-SIZE RULES BETWEEN A SORT-MERGE FILE AND THE FILES OF ITS USING AND GIVING PHRASES, ONE SCREEN

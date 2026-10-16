@@ -47,22 +47,22 @@ public static class CobolFile
 
     /// <summary>Register a SELECTed INDEXED file (emitted at program start).</summary>
     public static void RegisterIndexed(string cobolName, string assignTarget, int recordWidth, bool optional,
-        int accessMode, int primeOffset, int primeLength, int varyMin = -1, int varyMax = -1,
-        CobolCollation? primeCollation = null, string? selectName = null, int edition = 2023,
-        CobolContiguousLayout? primeLayout = null)
-        => _reg.RegisterIndexed(cobolName, assignTarget, recordWidth, optional, accessMode, primeOffset,
-            primeLength, varyMin, varyMax, primeCollation, selectName, edition, primeLayout);
+        int accessMode, KeySegment[] primeKey, int varyMin = -1, int varyMax = -1,
+        CobolCollation? primeCollation = null, string? selectName = null, int edition = 2023)
+        => _reg.RegisterIndexed(cobolName, assignTarget, recordWidth, optional, accessMode, primeKey,
+            varyMin, varyMax, primeCollation, selectName, edition);
 
     /// <summary>The SELECT-spelled name of a registered connector (ISO §15.28.4 r1c/r2b; kb/Work PB63) — the
     /// no-argument FUNCTION EXCEPTION-FILE's display of the last-exception connector.</summary>
     public static string SelectNameOf(string cobolName) => _reg.SelectNameOf(cobolName);
 
-    /// <summary>Register one ALTERNATE RECORD KEY (§12.4.5.6), in declaration order, with its optional
-    /// §12.4.5.7 collating-weight table (null = native ordinal) and §12.4.5.6.4 GR6 SUPPRESS WHEN value. A key that
+    /// <summary>Register one ALTERNATE RECORD KEY (§12.4.5.6) by its byte windows (<see cref="KeySegment"/> — one per
+    /// data-name-2 of the SOURCE phrase, §12.4.5.6.4 GR2), in declaration order, with its optional §12.4.5.7
+    /// collating-weight table (null = native ordinal) and §12.4.5.6.4 GR6 SUPPRESS WHEN value. A window that
     /// follows a variable-length member carries its record type's layout (kb/Work PB1025).</summary>
-    public static void AddAlternateKey(string name, int offset, int length, bool duplicates, CobolCollation? collation = null,
-        string? suppress = null, CobolContiguousLayout? layout = null)
-        => _reg.AddAlternateKey(name, offset, length, duplicates, collation, suppress, layout);
+    public static void AddAlternateKey(string name, KeySegment[] key, bool duplicates, CobolCollation? collation = null,
+        string? suppress = null)
+        => _reg.AddAlternateKey(name, key, duplicates, collation, suppress);
 
     // ⛔ EVERY OPEN ENTRY CARRIES THE EXECUTING ELEMENT'S OWN ASSIGN SPECIFICATION AND LINAGE PAGE, and none of
     // the three parameters has a default: ISO §12.4.5.3 GR3 a)/b) and §13.18.34 GR6 b) both name the runtime

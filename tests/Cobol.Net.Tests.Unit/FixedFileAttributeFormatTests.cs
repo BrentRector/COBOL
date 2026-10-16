@@ -85,12 +85,12 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // rejected with the sidecar, and one is what a `*.dat:*` enumeration would add here.
         Assert.Equal([Path.GetFileName(host)], Directory.GetFiles(_dir).Select(Path.GetFileName).Order());
 
-        // The whole of what a LATER RUN can know is these bytes: magic + version 4 (PB2693), 'R'elative, 'F'ixed,
+        // The whole of what a LATER RUN can know is these bytes: magic + version 5 (PB1099), 'R'elative, 'F'ixed,
         // min 10, max 10, no keys, the generation stamp of the store's one persist (its creation, PB2660) and a zero
         // release mint (a relative store has no release order). Nothing in this process holds them.
         byte[] head = File.ReadAllBytes(host);
         Assert.Equal(
-            [(byte)'C', (byte)'B', (byte)'N', (byte)'F', (byte)'S', (byte)'T', (byte)'R', 4,
+            [(byte)'C', (byte)'B', (byte)'N', (byte)'F', (byte)'S', (byte)'T', (byte)'R', 5,
              (byte)'R', (byte)'F', 10, 0, 0, 0, 10, 0, 0, 0, 0, 0,
              1, 0, 0, 0, 0, 0, 0, 0,
              0, 0, 0, 0, 0, 0, 0, 0],
@@ -347,8 +347,8 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
     private static void MakeIndexedFile(string host)
     {
         CobolFile.Init();
-        CobolFile.RegisterIndexed("IX", host, 20, false, 0, primeOffset: 0, primeLength: 4);
-        CobolFile.AddAlternateKey("IX", 4, 5, duplicates: true, suppress: "ZZZZZ");
+        CobolFile.RegisterIndexed("IX", host, 20, false, 0, primeKey: [new(0, 4)]);
+        CobolFile.AddAlternateKey("IX", [new(4, 5)], duplicates: true, suppress: "ZZZZZ");
         CobolFile.OpenOutput("IX", host, assignDynamic: false, page: null);
         CobolFile.Close("IX");
     }
@@ -362,8 +362,8 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // The header is what a later run reads back, so the round trip is asserted through the comparison the
         // OPEN performs: the same description matches, and each single-attribute change is a '39'.
         CobolFile.Init();
-        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeOffset: 0, primeLength: 4);
-        CobolFile.AddAlternateKey("RD", 4, 5, duplicates: true, suppress: "ZZZZZ");
+        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeKey: [new(0, 4)]);
+        CobolFile.AddAlternateKey("RD", [new(4, 5)], duplicates: true, suppress: "ZZZZZ");
         CobolFile.OpenInput("RD", host, assignDynamic: false, page: null);
         Assert.Equal(FileStatusCode.Success, CobolFile.Status("RD"));
         CobolFile.Close("RD");
@@ -382,8 +382,8 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         MakeIndexedFile(host);
 
         CobolFile.Init();
-        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeOff, primeLen);
-        CobolFile.AddAlternateKey("RD", 4, 5, dups, suppress: suppress);
+        CobolFile.RegisterIndexed("RD", host, 20, false, 0, [new(primeOff, primeLen)]);
+        CobolFile.AddAlternateKey("RD", [new(4, 5)], dups, suppress: suppress);
         CobolFile.OpenInput("RD", host, assignDynamic: false, page: null);
         Assert.Equal(FileStatusCode.FixedAttributeConflict, CobolFile.Status("RD"));
     }
@@ -399,7 +399,7 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         MakeIndexedFile(host);
 
         CobolFile.Init();
-        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeOffset: 0, primeLength: 4);
+        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeKey: [new(0, 4)]);
         CobolFile.OpenInput("RD", host, assignDynamic: false, page: null);
         Assert.Equal(FileStatusCode.FixedAttributeConflict, CobolFile.Status("RD"));
     }
@@ -416,7 +416,7 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
 
         Environment.SetEnvironmentVariable(FileRegistry.KeyCheckVariable, "OFF");
         CobolFile.Init();
-        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeOffset: 0, primeLength: 6);
+        CobolFile.RegisterIndexed("RD", host, 20, false, 0, primeKey: [new(0, 6)]);
         CobolFile.OpenInput("RD", host, assignDynamic: false, page: null);
         Assert.Equal(FileStatusCode.Success, CobolFile.Status("RD"));
         CobolFile.Close("RD");
@@ -425,8 +425,8 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // sizes stay validated — an opt-out that switched the whole comparison off would pass the assertion
         // above for the wrong reason.
         CobolFile.Init();
-        CobolFile.RegisterIndexed("SZ", host, 44, false, 0, primeOffset: 0, primeLength: 4);
-        CobolFile.AddAlternateKey("SZ", 4, 5, duplicates: true, suppress: "ZZZZZ");
+        CobolFile.RegisterIndexed("SZ", host, 44, false, 0, primeKey: [new(0, 4)]);
+        CobolFile.AddAlternateKey("SZ", [new(4, 5)], duplicates: true, suppress: "ZZZZZ");
         CobolFile.OpenInput("SZ", host, assignDynamic: false, page: null);
         Assert.Equal(FileStatusCode.FixedAttributeConflict, CobolFile.Status("SZ"));
     }
@@ -467,14 +467,14 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // so a legal COBOL program cannot write a store its own next OPEN refuses.
         string host = Host("ffa-suppress.dat");
         CobolFile.Init();
-        CobolFile.RegisterIndexed("IX", host, 12, false, 0, primeOffset: 0, primeLength: 4);
-        CobolFile.AddAlternateKey("IX", 4, 4, duplicates: false, suppress: "a,\r\n\0b");
+        CobolFile.RegisterIndexed("IX", host, 12, false, 0, primeKey: [new(0, 4)]);
+        CobolFile.AddAlternateKey("IX", [new(4, 4)], duplicates: false, suppress: "a,\r\n\0b");
         CobolFile.OpenOutput("IX", host, assignDynamic: false, page: null);
         CobolFile.Close("IX");
 
         CobolFile.Init();
-        CobolFile.RegisterIndexed("RD", host, 12, false, 0, primeOffset: 0, primeLength: 4);
-        CobolFile.AddAlternateKey("RD", 4, 4, duplicates: false, suppress: "a,\r\n\0b");
+        CobolFile.RegisterIndexed("RD", host, 12, false, 0, primeKey: [new(0, 4)]);
+        CobolFile.AddAlternateKey("RD", [new(4, 4)], duplicates: false, suppress: "a,\r\n\0b");
         CobolFile.OpenInput("RD", host, assignDynamic: false, page: null);
         Assert.Equal(FileStatusCode.Success, CobolFile.Status("RD"));
         CobolFile.Close("RD");
@@ -585,7 +585,7 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         Assert.Equal(FixedFileAttributes.Relative,
             new RelativeConnector("r.dat", 20, KeyedAccess.Sequential, 0).DeclaredAttributes.Organization);
         Assert.Equal(FixedFileAttributes.Indexed,
-            new IndexedConnector("i.dat", 20, KeyedAccess.Sequential, 0, 4).DeclaredAttributes.Organization);
+            new IndexedConnector("i.dat", 20, KeyedAccess.Sequential, [new(0, 4)]).DeclaredAttributes.Organization);
 
         // §9.1.6 names exactly three organizations — "There are three organizations: sequential, relative, and
         // indexed" — so those three constants are the whole vocabulary, and each is distinct.

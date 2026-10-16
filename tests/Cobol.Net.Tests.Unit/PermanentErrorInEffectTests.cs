@@ -78,7 +78,7 @@ public sealed class PermanentErrorInEffectTests
         string host = Tmp("idx");
         try
         {
-            var c = new IndexedConnector(host, 8, KeyedAccess.Dynamic, 0, 4, -1, -1);
+            var c = new IndexedConnector(host, 8, KeyedAccess.Dynamic, [new(0, 4)], -1, -1);
             Assert.Equal("00", c.Open(FileOpenMode.Output));
             Assert.Equal("00", c.Write("AAAA0001"));
             Assert.Equal("00", c.Write("BBBB0002"));
