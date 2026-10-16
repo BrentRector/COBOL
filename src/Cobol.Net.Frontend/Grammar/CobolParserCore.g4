@@ -1513,7 +1513,7 @@ setStatement
 // ordinary SET forms are chosen as before.
 setLocaleStatement
     : {setLocaleAhead()}? SET formatWord formatWord+ TO setLocaleSource  // F11: LOCALE {category+ | USER-DEFAULT} TO …
-    | {saveLocaleAhead()}? SET dataReference TO formatWord formatWord    // F12: identifier-11 TO LOCALE {LC_ALL | USER-DEFAULT}
+    | {saveLocaleAhead()}? SET setReceivingIdentifier TO formatWord formatWord    // F12: identifier-11 TO LOCALE {LC_ALL | USER-DEFAULT}
     ;
 
 // Format 11's TO operand: { identifier-10 | locale-name-1 | USER-DEFAULT | SYSTEM-DEFAULT } — two keywords and two

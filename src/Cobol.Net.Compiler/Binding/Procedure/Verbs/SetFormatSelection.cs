@@ -227,10 +227,10 @@ internal sealed class SetFormatSelection(BinderContext ctx, StatementBinder host
         // actually broke is the one it draws: §8.4.3.6.3 SR1, "EXCEPTION-OBJECT shall not be specified as a
         // receiving operand" (COBOLNET2196, reported by OoBindSetObjectRef — the SAME code the general receiving
         // chokepoint draws, because it is the same rule; kb/Work PB922).
-        // ⚠ Its three siblings cannot reach this classifier: NULL, SELF and SUPER are grammar TOKENS
-        // (`objectReference`), not cobolWords, so they cannot head a `dataReference` in a receiving position at
-        // all — `SET SELF TO G` is a parse error, and §8.4.3.7.3 SR1 / §8.4.3.8.3 SR2 are enforced by the
-        // grammar rather than here. EXCEPTION-OBJECT is the one spelled as an ordinary word.
+        // ⚠ Its three siblings never reach this classifier: NULL, SELF and SUPER are grammar TOKENS, which a SET
+        // receiving list parses as a `nonReceivableIdentifier` (kb/Work PB1551), and SetBinder.BindSet refuses every
+        // such receiver by its own rule (§8.4.3.7.3 SR1 / §8.4.3.8.3 SR2, the receiving chokepoint's form table)
+        // before a format is selected. EXCEPTION-OBJECT is the one spelled as an ordinary word.
         if (ctx.Refs.IsExceptionObjectRegister(dref)) return SetOperandKind.ObjectReference;          // §8.4.3.6.3 SR2
         if (ctx.Refs.CapacityRegisterFor(dref) is not null) return SetOperandKind.CapacityRegister;   // SR29
         if (host.Expr.IndexFieldOf(dref) is not null) return SetOperandKind.IndexName;                // §13.18.38.3 SR7

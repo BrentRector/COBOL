@@ -75,6 +75,11 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// 2002 FALSE phrase) fail loud by NAME until their subsystem lands.</summary>
     public BoundStatement BindSet(Core.SetStatementContext set)
     {
+        // ⛔ A RECEIVING OPERAND WRITTEN IN AN IDENTIFIER FORMAT THAT IS NEVER ONE (kb/Work PB1551): SELF, SUPER, NULL, an
+        // object-view, a function- or program-address-identifier. Every SET receiving list parses them (the grammar's
+        // `setReceivingIdentifier`, and Format 7's `setAddressReceiver`) so each is refused by its OWN rule at the
+        // receiving chokepoint — once, here, before a format is selected from a list that holds a non-reference.
+        if (RefuseNonReceivable(set) is { } nonReceivable) return nonReceivable;
         // F11 set-locale / F12 save-locale (§14.9.39; Annex A.4.9 item 9) — IMPLEMENTED since kb/Work PB64 T1 (it
         // used to be refused by name with COBOLNET1518 — kb/Work PB92 before that: "'LOCALE' is not defined").
         if (set.setLocaleStatement() is { } sl)
@@ -82,11 +87,6 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             bool save = sl.setLocaleSource() is null;   // F12 has no Format-11 TO operand (the grammar splits the two formats)
             return save ? BindSaveLocale(sl) : BindSetLocale(sl);
         }
-        // ⛔ A RECEIVING OPERAND WRITTEN IN AN IDENTIFIER FORMAT THAT IS NEVER ONE (kb/Work PB1551): SELF, SUPER, NULL, an
-        // object-view, a function- or program-address-identifier. Every SET receiving list parses them (the grammar's
-        // `setReceivingIdentifier`, and Format 7's `setAddressReceiver`) so each is refused by its OWN rule at the
-        // receiving chokepoint — once, here, before a format is selected from a list that holds a non-reference.
-        if (RefuseNonReceivable(set) is { } nonReceivable) return nonReceivable;
         // F6 attribute (§14.9.39; Annex A.4.2 item 24) — DECLINED: the screen module. It had NO grammar
         // alternative at all before kb/Work PB260, so `SET SG ATTRIBUTE HIGHLIGHT ON` was a generic COBOL0001
         // parse error pointing at ATTRIBUTE rather than a named refusal naming the facility.
@@ -428,7 +428,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     private BoundStatement BindSaveLocale(Core.SetLocaleStatementContext sl)
     {
         bool userDefault = ctx.CobolWords.Is(sl.formatWord(1).GetText(), "USER-DEFAULT");
-        var target = sl.dataReference();
+        var target = sl.setReceivingIdentifier().dataReference();   // a data reference: BindSet refused any other form (kb/Work PB1551)
         if (host.Expr.ResolveReceiving(target) is not { } place || place.Item.Pic?.Category is not PicCategory.Pointer)
         {
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.SetLocalePointerCategory, $"SET {target.GetText()} TO LOCALE {(userDefault ? "USER-DEFAULT" : "LC_ALL")}: identifier-11 shall "

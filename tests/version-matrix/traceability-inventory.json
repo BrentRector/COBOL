@@ -6321,13 +6321,13 @@
   "ordinal": 2,
   "subject": "Object-view",
   "rule-digest": "7c8a46d9d1de",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectView; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReferenceAtom; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.ObjectView.cs#OoBindObjectView; src/Cobol.Net.Compiler/Binding/DataBinder.Oo.cs#OoCreateObjectViewTemp; src/Cobol.Net.Compiler/CodeGen/Verbs/OoEmitter.cs#EmitObjectView; src/Cobol.Net.Runtime/Control/CobolObject.cs#ObjectView; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ReceivingFormBar",
-  "test-ref": "conformance:negative/pb1425-object-view-receiving",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving",
+  "test-ref": "conformance:negative/pb1425-object-view-receiving; conformance:negative/pb1551-object-view-initialize; unit:ReceivingOperandFormDriftTests.EveryNonReceivableAlternative_IsReadByFormOf",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1425 (w1019a; w1021a). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). SET Format 5's receiving list and INVOKE RETURNING refuse a view by this rule, COBOLNET2871, and so does every receiving position the ONE receiving chokepoint serves when the view is of a qualified data item written as one chain (`MOVE X TO A OF G AS C`, ExpressionBinder.ReceivingFormBar). A view of a plain name in a MOVE / INITIALIZE / CALL RETURNING receiver is still a parse error, not SR2's refusal - the general receiving-operand screen of kb/Work PB1551. [editions: the OO facility, 2002+]",
-  "state": "GAP"
+  "notes": "kb/Work PB1425 (w1019a; w1021a), PB1551 (w1097d). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). Every receiving position parses the view of a data reference, of SELF, SUPER or NULL as a nonReceivableIdentifier, and the receiving chokepoint refuses it by this rule (COBOLNET2871) from the ReceivingOperandForms table, as it does the view of a qualified item written as one chain (`MOVE X TO A OF G AS C`, ReceivingFormBar). The per-statement objectViewReceiver refusals of SET Format 5 and INVOKE RETURNING are deleted; both now reach the same row. [editions: the OO facility, 2002+]",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.4.3.5.4-1",
@@ -6502,11 +6502,11 @@
   "subject": "NULL object reference",
   "rule-digest": "97b322be96a8",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4#reservedGatedWord; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setObjectReferenceStatement; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetFormatSelection.cs#KindOf",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/Core/CobolWords.g4#reservedGatedWord; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setObjectReferenceStatement; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetFormatSelection.cs#KindOf; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules",
   "test-ref": "conformance:negative/l1m7-null-receiving-operand",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "§8.4.3.7.3 SR1: SET NULL TO OR1 (NULL as receiver) rejected with COBOLNET0901; SET OR1 TO NULL is the legal direction",
+  "notes": "§8.4.3.7.3 SR1: SET NULL TO OR1 (NULL as receiver) is refused by this rule, COBOLNET3977, at the receiving chokepoint's form table in every receiving position (kb/Work PB1551, w1097d); it was COBOLNET0901, a parse error re-coded to 8.9. SET OR1 TO NULL is the legal direction.",
   "state": "OK"
  },
  {
@@ -6561,13 +6561,13 @@
   "ordinal": 2,
   "subject": "SELF and SUPER",
   "rule-digest": "bb75159da8ab",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#objectReference; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/SetFormatSelection.cs",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#receivingIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving",
+  "test-ref": "conformance:negative/pb1551-self-receiving; conformance:negative/pb1551-super-receiving; conformance:2002/pb1551_receiving_identifier_routes; unit:ReceivingOperandFormDriftTests.EveryNonReceivableAlternative_IsReadByFormOf",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB1425 (registrar 15c). Rule (--check 8.4.3.8.3 'This identifier format shall not be specified as a receiving operand' -> OK §8.4.3.8.3 2)). Enforced structurally: no receiving slot (SET receivers are dataReference+, RETURNING, MOVE targets) admits the SELF/SUPER tokens. Probes probe/self-and-super/PSSETR.cob (`SET SELF TO O`) and PSRET.cob (`INVOKE PSRETA \"NEW\" RETURNING SELF`) both rejected. The diagnostic is the generic COBOLNET0901 \"reserved word ... cannot be used as a user-defined word\" rather than an SR2 citation (quality, not conformance). No spec-derived negative fixture found for this SR (SetFormatSelection.cs:232 comment only). || REFUTED: PARTIAL — No SR2 mechanism exists. Nine receiving-position probes each fail with COBOLNET0901 \"'SELF' is a reserved word ... cannot be used as a user-defined word (ISO §8.9)\": SET SELF TO NULL, RETURNING SELF, INITIALIZE SELF, SET SELF O / O SELF TO NULL, MOVE .. TO SELF, SET ADDRESS OF SELF, SET SUPER TO NULL and ACCEPT SELF. The source is rejected only because SELF/SUPER are not identifiers at all, which is the rejects-legal-source defect F2. The stated reason is also false: the source does not use SELF as a user-defined word, it uses a predefined-object identifier as a receiving operand. Nothing tests it. When F2 is fixed by admitting SELF/SUPER as identifier Format 6, every one of these positions would start compiling without a diagnostic. A verdict that depends on a separate defect staying unfixed, with no rule-owned diagnostic, is not CONFORMS. [editions as adjudicated: 2002, 2014, 2023 (OO predefined object references; absent from COBOL-85)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB1551 (w1097d). \"This identifier format shall not be specified as a receiving operand\" (cite.py --check 8.4.3.8.3 -> OK 2)). Every receiving grammar slot is a receivingIdentifier (setReceivingIdentifier in SET) that parses SELF and SUPER as a nonReceivableIdentifier, and ExpressionBinder.ResolveReceiving refuses them by this rule from the ReceivingOperandForms table (COBOLNET3978) in every receiving position: MOVE, INITIALIZE, ACCEPT, the arithmetic resultants, COMPUTE, CALL/INVOKE RETURNING, READ/RETURN INTO, STRING/UNSTRING, INSPECT TALLYING, SEARCH/PERFORM VARYING, ALLOCATE RETURNING and every SET receiving list. It was a parse error re-coded to 8.9 (COBOLNET0901). The qualified SUPER (`K OF SUPER`) is a data reference and is refused by SR3 (COBOLNET2900). [editions: SELF/SUPER are OO identifiers, 2002+; at COBOL-85 an undeclared SELF/SUPER is an undefined reference, COBOLNET1639]",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.4.3.8.3-3",
@@ -7207,11 +7207,11 @@
   "subject": "Program-address-identifier",
   "rule-digest": "bb75159da8ab",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#programAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier",
-  "test-ref": "conformance:negative/l1m7-program-address-receiving",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#programAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules",
+  "test-ref": "conformance:negative/l1m7-program-address-receiving; conformance:negative/pb1551-program-address-move",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "§8.4.3.13.3 SR4 + §14.9.39.4 GR16: SET ADDRESS OF PROGRAM \"X\" TO PP (receiving slot) rejected as a syntax error, COBOL0201; construct exists from 2002",
+  "notes": "§8.4.3.13.3 SR4 + §14.9.39.4 GR16: SET ADDRESS OF PROGRAM \"X\" TO PP and MOVE PP TO ADDRESS OF PROGRAM \"X\" are refused by this rule, COBOLNET3979, at the receiving chokepoint's form table (kb/Work PB1551, w1097d); the SET form was a syntax error (COBOL0201) and the MOVE form COBOLNET0901. Construct exists from 2002.",
   "state": "OK"
  },
  {
