@@ -1,0 +1,3 @@
+## New-defect leads filed as kb/Work notes (enqueue 20261016c)
+
+Filed PB3268 (FunctionValuePic scale-9 temporary, PB651 L1), PB3269 (about 40 displaced XML doc blocks, PB651 L2), PB3270 (COBOL words shadowing imported runtime or System types), PB3271 (four drift tests scanning generated tests/nist/output *.g.cs), PB3272 (dead public RunMain ABI) and PB3273 (strong group with a variable-length component and a reference has no host entry), from the PB651 and PB2099 reports. The gate-planner lead (non-cheap tests whose inputs a diff changes stay in leg 2 with no impact map) is appended to PB3131 as new evidence, and PB3274 went unused.
