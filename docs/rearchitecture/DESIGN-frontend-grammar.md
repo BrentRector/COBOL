@@ -996,8 +996,9 @@ reference formats, and the only place source comments are recognized. Its model:
   reports through `ReferenceFormatDiagnostics.OnContinuationTextInAreaA` (every such line, the first text's column), the
   way the other §6.3.5 continuation rules are reported. It is therefore a front-end error: the one place this family does
   hide the bind-time gates, accepted because the line is the only fact the rule has and a continuation line in area A is
-  rare. `ReferenceFormatMap` names a token that begins such a line `BeginsContinuationLineInAreaA`, which the pass leaves
-  to the walk, so a continuation line holding a period or a word in area A is reported once, not twice. A comment-entry
+  rare. The same fact makes a continuation line holding a period or a word in area A one diagnostic, not two: the row is
+  not yet introduced at every edition the pass screens, so the report is an error on both axes, the compilation returns
+  `FrontendError` before the bind, and the area pass never sees that token (it needs no exemption). A comment-entry
   paragraph's continuation lines are commentary (discarded before the builder) and are not asked.
 - **A column is a CHARACTER POSITION — one code point — and never a string index** (DOC-A.1-157, kb/Work PB1966): a
   supplementary-plane character is two UTF-16 units and one position. `CharacterPositions` (count, index of a position,

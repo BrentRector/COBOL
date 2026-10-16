@@ -45,15 +45,12 @@ internal readonly struct FixedFormLine
     public const int AreaAWidth = 4;
 
     /// <summary>The indicator-area character of a fixed continuation line (ISO §6.2.2: a hyphen). The ONE spelling of it:
-    /// the line classifier and the area record both read it from here.</summary>
+    /// the §6.5 line classifier and the reference-format detector both read it from here.</summary>
     public const char ContinuationIndicator = '-';
 
     /// <summary>Whether the character at 0-based <paramref name="programTextOffset"/> of the program-text area (position
     /// 8 is offset 0) is in area A — the ONE definition of where area A ends (<see cref="AreaAWidth"/>).</summary>
     public static bool IsAreaAOffset(int programTextOffset) => programTextOffset is >= 0 and < AreaAWidth;
-
-    /// <summary>Whether the indicator area holds the fixed continuation indicator (<see cref="ContinuationIndicator"/>).</summary>
-    public bool IsContinuation => Indicator.Value == ContinuationIndicator;
 
     private readonly string _text;
     private readonly int _indicatorAt;      // the index of the indicator area, or _text.Length when the line ends before it

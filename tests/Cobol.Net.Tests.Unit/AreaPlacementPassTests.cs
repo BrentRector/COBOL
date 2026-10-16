@@ -185,7 +185,10 @@ public sealed class AreaPlacementPassTests
         Assert.True(r.Success, string.Join("\n", r.Errors));
     }
 
-    [Fact] // a non-literal continuation line is a continuation line too, and its period is ONE diagnostic, not two
+    /// <summary>A non-literal continuation line is a continuation line too, and its period is ONE diagnostic, not two:
+    /// the logical conversion reports it as a FRONT-END error, so the compilation ends before the bind, and the area
+    /// pass, which would place the period's token in area A, never runs.</summary>
+    [Fact]
     public void ContinuationLineHoldingAPeriodInAreaA_IsReportedOnce()
     {
         string source = Source(
@@ -197,7 +200,9 @@ public sealed class AreaPlacementPassTests
             C("  ."),
             L("    STOP RUN."));
         AssertRejectedAt85Only(source, "(6,10): error COBOLNET3735");
-        Assert.Single(Check(85, source).Errors, e => e.Contains("COBOLNET373", StringComparison.Ordinal));
+        var r = Check(85, source);
+        Assert.Equal(CompilerDriver.Outcome.FrontendError, r.Status);
+        Assert.Single(r.Errors, e => e.Contains("COBOLNET373", StringComparison.Ordinal));
     }
 
     [Fact] // a blank continuation line has no text to place; a library text's continuation line is reported where it is written

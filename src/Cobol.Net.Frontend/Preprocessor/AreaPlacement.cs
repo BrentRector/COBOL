@@ -19,12 +19,6 @@ public enum AreaPlacement
     /// <summary>The text is the first text of its fixed-form line, and it begins in area B.</summary>
     BeginsLineInAreaB,
 
-    /// <summary>The text is the first text of a fixed-form CONTINUATION line (a hyphen in the indicator area), and it
-    /// begins in area A. X3.23-1985: "Area A of a continuation line must be blank" - a rule the §6.5 logical conversion
-    /// screens itself (kb/Work PB3168), because it alone sees the indicator and a continued literal's tail is no token's
-    /// start; the area pass leaves such a token to it.</summary>
-    BeginsContinuationLineInAreaA,
-
     /// <summary>The text follows other text of its fixed-form line.</summary>
     WithinLine,
 }

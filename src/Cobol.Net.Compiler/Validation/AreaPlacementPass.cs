@@ -30,8 +30,9 @@ using Core = CobolParserCore;
 /// <para>THE CONTINUATION LINE IS THE REFERENCE FORMAT'S (kb/Work PB3168). X3.23-1985 also requires "Area A of a
 /// continuation line [to] be blank" (the hyphen in the indicator area): the same text-in-area-A row, but the text of a
 /// continued literal's tail is no token's start, so this pass cannot place it. The §6.5 logical conversion, which alone
-/// sees the indicator, reports it (<c>ReferenceFormatDiagnostics.OnContinuationTextInAreaA</c>), and the map names such a
-/// token <see cref="AreaPlacement.BeginsContinuationLineInAreaA"/> so this pass does not report the line a second time.</para>
+/// sees the indicator, reports it (<c>ReferenceFormatDiagnostics.OnContinuationTextInAreaA</c>) as a FRONT-END error
+/// at every edition this pass screens (the row is not yet introduced there, an error on both axes), so a compilation
+/// that holds such a line ends before the bind and this pass never sees its token: the line is reported once.</para>
 /// <para>WHY ONE PASS OVER THE TOKENS. The rule has two arms, and each needs the other's knowledge: which tokens head
 /// an area-A item is the GRAMMAR's (the parse tree), where a token begins its line is the REFERENCE FORMAT's
 /// (<see cref="FixedFormAreas"/>, the record the §6.5 logical conversion keeps of where each fixed-form line's text
@@ -73,8 +74,7 @@ internal static class AreaPlacementPass
         using var _ = edition.At(token);
         if (items.Heads.TryGetValue(token.TokenIndex, out string? item))
         {
-            // A head that begins a CONTINUATION line in area A is the reference format's to report (kb/Work PB3168).
-            if (placement is not (AreaPlacement.BeginsLineInAreaA or AreaPlacement.BeginsContinuationLineInAreaA))
+            if (placement != AreaPlacement.BeginsLineInAreaA)
                 ConstructRegistry.Check(edition.Edition, edition, Constructs.FixedFormAreaAItemOutsideAreaA2002,
                     $"{item} {(placement == AreaPlacement.WithinLine ? "follows other text of its line" : "begins in area B")}");
         }
