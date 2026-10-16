@@ -136,10 +136,11 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         public static readonly ValueUse Text = new(null, AsText: true);
     }
 
-    /// <summary>The intermediate result item of a NUMERIC function whose value is a binary64: a COMP-2 (§13.18.60.4
-    /// GR15's binary64, USAGE FLOAT-LONG) item, the SAME carrier the float family's returned value has wherever no
-    /// fixed-point scale governs the render (<c>ReceiverContext.FloatLanding</c>), so a store into it and a store
-    /// from it lose nothing the function's own value did not.</summary>
+    /// <summary>The intermediate result item of a NUMERIC function whose value is a binary64: a COMP-2 item, the SAME
+    /// carrier the float family's returned value has wherever no fixed-point scale governs the render
+    /// (<c>ReceiverContext.FloatLanding</c>), so a store into it and a store from it lose nothing the function's own
+    /// value did not. USAGE FLOAT-LONG is "held in a floating-point format suitable for the machine" (§13.18.60.4 GR13);
+    /// this compiler's format is the IEEE binary64 that GR15's FLOAT-BINARY-64 names.</summary>
     internal static readonly PicInfo Binary64ReturnedValuePic = PicInfo.FloatItem(Usage.FloatLong);
 
     /// <summary>⛔ THE ONE DESCRIPTION OF THE INTERMEDIATE RESULT ITEM THAT HOLDS A NUMERIC FUNCTION'S VALUE FOR ITS
@@ -153,19 +154,22 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// <para>The carrier follows the value, in the order the renderer chooses it:</para>
     /// <list type="number">
     ///   <item>an INTEGER function (§15.2 item 5) — <see cref="IntegerFunctionValuePic"/>, unchanged;</item>
-    ///   <item>a function the renderer returns as a BINARY64 (<see cref="ReturnsBinary64"/>), or any function whose
+    ///   <item>a function the renderer returns as a BINARY64 (<see cref="FunctionValueLane.ReturnsBinary64"/>, asked of
+    ///     the call and its ARGUMENTS' carriers — a floating-point literal argument takes a function with an SDIDI body
+    ///     off the float lane, a binary64 argument puts any numeric-argument function onto it), or any function whose
     ///     every receiver is a floating-point item (a binary64 receiver takes the value as a binary64) —
     ///     <see cref="Binary64ReturnedValuePic"/>, so the store into the intermediate quantizes NOTHING and each
     ///     receiver's own transfer (the ONE float landing) quantizes once, at ITS scale;</item>
     ///   <item>otherwise a fixed-point item described by the receivers (<see cref="ShapedPic"/>), or, when no
     ///     receiver is known (an EVALUATE subject, an argument frozen for §8.4.3.2.4 GR2's order),
-    ///     <see cref="FunctionValuePic"/>.</item>
+    ///     <see cref="ValueOperandPic"/>.</item>
     /// </list></summary>
     private PicInfo IntermediatePic(BoundOperand c, ValueUse use)
     {
         if (IntrinsicResultType.IsIntegerOperand(c)) return IntegerFunctionValuePic;
         var receivers = use.Receivers;
-        if (ReturnsBinary64(c) || receivers is { Count: > 0 } && receivers.All(r => r.DenotedItem is not null && r.Item.OperandPic is { IsFloat: true }))
+        if (c is BoundComputedOperand { Expr: BoundIntrinsicCall call } && FunctionValueLane.ReturnsBinary64(call, ctx.Data.Options.Arithmetic)
+            || receivers is { Count: > 0 } && receivers.All(r => r.DenotedItem is not null && r.Item.OperandPic is { IsFloat: true }))
             return Binary64ReturnedValuePic;
         return receivers is { Count: > 0 } ? ShapedPic(receivers) : use.AsText ? FunctionValuePic : ValueOperandPic;
     }
@@ -180,32 +184,33 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         new(PicCategory.Numeric, Usage.Display, Length: PicInfo.ScaledCarrierDigits, Digits: PicInfo.ScaledCarrierDigits,
             Scale: PicInfo.ScaledCarrierDigits - ReturnedIntegerDigits, Signed: true);
 
-    /// <summary>True when the numeric function's value is a binary64 wherever no fixed-point scale governs the render:
-    /// the §15.4.1 floating-math family (<see cref="IntrinsicSig.Float"/>) under NATIVE arithmetic. Under a
-    /// decimal-engine mode the same family's returned value is "contained in a temporary standard data item in the
-    /// intermediate form defined for the arithmetic mode in effect" (§15.4.1) — an SDIDI, which is the fixed-point
-    /// description's case. This is the renderer's own dispatch (<c>IntrinsicRenderer.RenderFloat</c>: the
-    /// decimal-engine mode is tested before the float lane) read at bind time, and the golden
-    /// <c>pb3268_function_value_one_evaluation</c> holds the two agreeing over every such function.</summary>
-    private bool ReturnsBinary64(BoundOperand c) =>
-        c is BoundComputedOperand { Expr: BoundIntrinsicCall { Sig.Float: true } }
-        && !ArithmeticModes.IsDecimalEngine(ctx.Data.Options.Arithmetic);
+    /// <summary>The integer digits a floating-point receiver asks of a fixed-point intermediate (an implementor choice
+    /// under §15.4.1; <see cref="ShapedPic"/>): 12, leaving 26 fraction digits.</summary>
+    private const int FloatWindowIntegerDigits = 12;
 
     /// <summary>The fixed-point intermediate for a value that lands in <paramref name="receivers"/>: the WIDEST
     /// receiver's description (§14.9.25.4 GR1's `MOVE a TO temp` with temp described as the largest receiver, so
     /// every other receiver's store is a MOVE of a value the widest one already truncated the same way). A
     /// numeric or numeric-edited receiver contributes its fraction scale (<c>PicInfo.ReceiverScale</c>, the ONE
-    /// rule) and integer digit positions; a floating-point receiver, which holds ~17 significant digits at any
-    /// magnitude, contributes the carrier's 21-integer / 17-fraction split; a receiver with no numeric scale (a
-    /// character or boolean one, reachable only under --permissive for a NUMERIC function, Table 16) contributes the
-    /// <see cref="FunctionValuePic"/> description its text image has always been written from. The fraction is capped
-    /// so the item stays on the <c>Int128</c> carrier (<see cref="PicInfo.ScaledCarrierDigits"/>); integer digits keep
-    /// priority, because an under-counted integer part is a wrong value and an under-counted fraction a truncated one
-    /// (the order <c>ReceiverContext.WorkingScale</c> keeps).</summary>
+    /// rule) and integer digit positions; a receiver with no numeric scale (a character or boolean one, reachable only
+    /// under --permissive for a NUMERIC function, Table 16) contributes the <see cref="FunctionValuePic"/> description
+    /// its text image has always been written from. The fraction is capped so the item stays on the <c>Int128</c>
+    /// carrier (<see cref="PicInfo.ScaledCarrierDigits"/>); integer digits keep priority, because an under-counted
+    /// integer part is a wrong value and an under-counted fraction a truncated one (the order
+    /// <c>ReceiverContext.WorkingScale</c> keeps).
+    /// <para>⚠ A FLOATING-POINT RECEIVER BESIDE A FIXED-POINT ONE IS THE CARRIER'S LIMIT (kb/Work PB3268, review R1-2). A
+    /// binary64 receiver holds ~17 significant digits at ANY magnitude (1E-20 and 1E+30 alike), which no fixed-point
+    /// split of 38 digits holds. It is reached here only for a value that is NOT a binary64 (a binary64 value takes
+    /// <see cref="Binary64ReturnedValuePic"/>, and every receiver lands from it at its own scale), i.e. an exact or SDIDI
+    /// value; the float receiver takes what the fixed-point receivers leave of the 38 digits, with
+    /// <see cref="FloatWindowIntegerDigits"/> integer digits at least (so a value from 1E-9 to 1E+12 keeps the 17
+    /// significant digits a binary64 holds), and a fixed-point receiver never loses a fraction digit to a float one. An
+    /// exact value outside that window reaches the float receiver cut. An SDIDI-carried intermediate item is the
+    /// redesign that removes the limit (the same one the values past the <c>Int128</c> carrier need).</para></summary>
     private static PicInfo ShapedPic(IReadOnlyList<Place> receivers)
     {
         int scale = 0, integer = 0;
-        bool sized = false;
+        bool sized = false, anyFloat = false;
         foreach (var receiver in receivers)
         {
             // A reference-modified receiver is the elementary ALPHANUMERIC unique data item of §8.4.3.3.4 GR6, never
@@ -215,7 +220,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
             if (!slice && pic is null) continue;
             sized = true;
             if (pic is null) { scale = Math.Max(scale, ReturnedFractionDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
-            else if (pic.IsFloat) { scale = Math.Max(scale, PicInfo.ScaledCarrierDigits - ReturnedIntegerDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
+            else if (pic.IsFloat) anyFloat = true;
             else if (pic.Category is PicCategory.Numeric or PicCategory.NumericEdited)
             {
                 int s = pic.ReceiverScale();
@@ -229,6 +234,11 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         if (!sized) return ValueOperandPic;
         integer = Math.Clamp(integer, 1, PicInfo.ScaledCarrierDigits);
         scale = Math.Min(scale, PicInfo.ScaledCarrierDigits - integer);
+        if (anyFloat)
+        {
+            integer = Math.Max(integer, Math.Min(FloatWindowIntegerDigits, PicInfo.ScaledCarrierDigits - scale));
+            scale = Math.Max(scale, PicInfo.ScaledCarrierDigits - integer);
+        }
         int digits = integer + scale;
         return new PicInfo(PicCategory.Numeric, Usage.Display, Length: digits, Digits: digits, Scale: scale, Signed: true);
     }

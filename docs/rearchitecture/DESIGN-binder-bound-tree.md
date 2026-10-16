@@ -577,9 +577,12 @@ synthesized-temp constructor) with the **operand's own description**, so the sto
 and the equivalence is exact: a data item clones its description (§8.4.3.3.4 GR6's "unique data item" when
 reference-modified, carried by a run-time-length item per §8.5.1.10.4), and a function-identifier takes §15.4's
 "temporary elementary data item" — `IntegerFunctionValuePic` (scale 0) for an INTEGER function (§15.2 item 5), and for a NUMERIC one the item
-`SendingValueTemp.IntermediatePic` describes FOR THE VALUE AND ITS USE (kb/Work PB3268): a `double` for the §15.4.1
-float family under native arithmetic (the value IS a binary64, so each receiver's own float landing quantizes once, at
-its own scale), the WIDEST receiver's fixed-point description for a MOVE's other values (`ValueUse.MovedTo`: the
+`SendingValueTemp.IntermediatePic` describes FOR THE VALUE AND ITS USE (kb/Work PB3268): a `double` for a value the
+renderer returns as a binary64 (`FunctionValueLane.ReturnsBinary64`: the §15.4.1 float family and any numeric-argument
+function given a binary64 argument, under native arithmetic, unless a floating-point LITERAL argument takes a function
+with an SDIDI body onto the SDIDI; the argument carriers are read by a visitor over the same generated visitor
+interfaces `NumericRenderer` implements) — each receiver's own float landing then quantizes once, at its own scale —
+the WIDEST receiver's fixed-point description for a MOVE's other values (`ValueUse.MovedTo`: the
 GR1 `MOVE a TO temp` with temp described as the largest receiver), 21 integer + 17 fraction digits for a value read as
 an operand (an EVALUATE subject, a frozen argument), and the returned-value item's S9(21)V9(9) only for a value read as
 text in a character formal. It is not the fixed S9(21)V9(9) (`FunctionValuePic`) the returned-value item has for

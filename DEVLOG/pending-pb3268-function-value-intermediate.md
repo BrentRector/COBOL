@@ -56,3 +56,28 @@ question; `HostWitnessTraitDriftTests` wanted the sweep trait on the new class);
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to CI's whole-population run:
 Conformance 5,720 · Unit 446 · Characterization 31 ... Conformance 6,123/11,843 · Unit 33,333/33,779 · Characterization 5/36
 cases ran` (run `20261016T194103Z-db34e6`).
+
+**Review round 1.** The branch review found three defects in the first cut, all answered in the same branch.
+(1) The bind-time test "is this function's value a binary64" read the function alone (`IntrinsicSig.Float`), while the
+renderer chooses the lane from the function and its argument carriers. `MOVE FUNCTION VARIANCE(0.1E0 0.2E0 0.4E0) TO Q1 Q2`
+(`PIC 9V9(25)`) stored 00155555555555555551083823 against the single-receiver 00155555555555555555555555 (a floating-point
+literal is an SDIDI operand, so the call leaves the float lane; the COMP-2 intermediate rounded it), and `MOVE FUNCTION
+ABS(F9) TO FA N1` (F9 a COMP-2 holding 1E+30) stored 19884624838656 in the COMP-2 (a binary64 argument puts any
+numeric-argument function on the float lane; the fixed intermediate wrapped). A 14-function by 8-receiver-set differential
+found the same two directions across SUM, MEAN, RANGE, MIDRANGE, ANNUITY, PRESENT-VALUE, STANDARD-DEVIATION and a nested
+function's binary64 value. The fix is `FunctionValueLane`: the renderer's function-level order stated once
+(`ReturnsBinary64`), argument carriers read by a visitor over the generated bound-tree visitor interfaces (so a bound node
+added tomorrow is a compile error there as in `NumericRenderer`), following `CombineCore` and `Power` for the arithmetic
+around a float; `NumericLiteral.TryGetIntegerValue` is the one reader of "is this literal an integer value" now shared with
+`NumericRenderer`'s exact-power arm. The list it restates - the functions with an SDIDI body under native arithmetic - is
+pinned to `RenderDec`'s switch by `FunctionValueLaneDriftTests`; the golden `2023/pb3268_function_value_lane_matrix` is the
+whole prediction against the renderer's actual answer: 353 cells of function x argument shape x receiver set, each a
+multi-receiver MOVE compared with the single-receiver one (BAD=0000), plus the VARIANCE and ANNUITY readbacks (7/450 and
+0.1331/0.331 truncated at 25 places) and the 1E+30 and 1E-20 COMP-2 cases. (2) A floating-point receiver beside a
+fixed-point one was sized 21 integer + 17 fraction digits and so cost the fixed receiver fraction digits (`PIC 9V9(20)`
+beside a COMP-2 kept 17); the binary64 half is closed by (1), and for an exact or SDIDI value the float receiver now takes
+what the fixed-point receivers leave of the 38 digits, 12 integer digits at least. What stays open is the carrier's limit:
+an exact value outside 1E-9..1E+12 reaching a COMP-2 beside a fixed item (`MOVE FUNCTION NUMVAL("0.00000000000000000001")
+TO F1 N1` stores 0 in F1) needs an SDIDI-carried intermediate item, the same redesign as the values past the `Int128`
+carrier. (3) The COMP-2 description cited §13.18.60.4 GR15 (FLOAT-BINARY-64); the usage is FLOAT-LONG, GR13 (`cite.py
+--check` run on both).
