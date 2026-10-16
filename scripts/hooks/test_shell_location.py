@@ -148,6 +148,70 @@ with tempfile.TemporaryDirectory() as tmp:
     check("git_dir: -C", commit(f"git -C {W} commit -m x"), [wt])
     check("git_dir: cd then -C relative", commit(f"cd {W} && git -C sub commit -m x"), [wt / "sub"])
     check("git_dir: Set-Location then commit", commit(f"Set-Location {Wn}; git commit -m x", P), [wt])
+    check("git_dir: -c before -C (git_calls walks every global option)", commit(f"git -c a=b -C {W} commit -m x"), [wt])
+
+    # ── the ONE model of a command line every guard rule reads (kb/Work PB3198) ────────────────────────────────────
+    def exact(name, got, want) -> None:
+        global total
+        total += 1
+        if got != want:
+            fails.append(f"{name}: got {got!r}, want {want!r}")
+
+    shape = lambda cmd, shell=B: [(s.text, s.heredocs) for s in sl.steps(cmd, str(main), shell)]
+    exact("heredoc: the body is cut out of the text at its delimiter, the command after it is a step",
+          shape("cat > m.txt <<'EOF'\ngit stash\nEOF\ngit status"),
+          [("cat > m.txt <<'EOF'", ("git stash\n",)), ("git status", ())])
+    exact("heredoc: two on one line, bodies in order, `<<-` and a backslash-quoted delimiter",
+          shape("cat <<-A <<\\B\n\ta1\n\tA\nb1\nB\necho x"),
+          [("cat <<-A <<\\B", ("\ta1\n", "b1\n")), ("echo x", ())])
+    exact("heredoc: the body belongs to its command, not to the pipeline side after it",
+          shape("cat <<EOF | grep y\ny\nEOF"), [("cat <<EOF", ("y\n",)), ("grep y", ())])
+    exact("heredoc: no delimiter line means the body runs to the end, as Bash reads it",
+          shape("cat <<EOF\nline\ngit push"), [("cat <<EOF", ("line\ngit push",))])
+    exact("heredoc: CRLF line ends", shape("cat <<EOF\r\nx\r\nEOF\r\necho y"),
+          [("cat <<EOF", ("x\r\n",)), ("echo y", ())])
+    exact("no heredoc: `<<` inside quotes", shape('python -c "print(1<<2)"; echo x'),
+          [('python -c "print(1<<2)"', ()), ("echo x", ())])
+    exact("no heredoc: a here-string", shape('grep x <<< "a"; echo y'), [('grep x <<< "a"', ()), ("echo y", ())])
+    exact("no heredoc: an arithmetic shift", shape("echo $((1<<2)); echo y"), [("echo $((1<<2))", ()), ("echo y", ())])
+    exact("no heredoc: a shift by a NAME inside $(( )) hides no later line",
+          shape("echo $((x<<y))\ngit stash"), [("echo $((x<<y))", ()), ("git stash", ())])
+    exact("no heredoc: an arithmetic command", shape("(( n = m<<k ))\necho y")[-1], ("echo y", ()))
+    exact("heredoc in a group: an apostrophe in its body opens no quote, the next line is its own step",
+          [s.text for s in sl.steps("( cat <<EOF\ndon't\nEOF\n)\necho z", str(main), B)][-1], "echo z")
+    exact("heredoc feeding a -c payload rides on the payload's last step",
+          shape("bash -c 'cat' <<EOF\nbody\nEOF"), [("cat", ("body\n",))])
+    exact("a heredoc fed to a shell with no script operand IS its command line",
+          shape("bash <<'EOF'\ncd /x\ngit stash\nEOF\necho y"),
+          [("cd /x", ()), ("git stash", ("cd /x\ngit stash\n",)), ("echo y", ())])
+    exact("`bash -s args` and `sh -e -o pipefail` read their script from stdin too",
+          [shape(c)[-1][0] for c in ("bash -s a b <<EOF\ngit stash\nEOF", "sh -e -o pipefail <<EOF\ngit stash\nEOF")],
+          ["git stash", "git stash"])
+    exact("a heredoc fed to a shell's SCRIPT is that script's input, never a command line",
+          shape("bash run.sh 2>&1 <<EOF\ngit stash\nEOF"), [("bash run.sh 2>&1 <<EOF", ("git stash\n",))])
+    exact("`pwsh -Command -` reads stdin as PowerShell; `pwsh -File x.ps1` runs x.ps1",
+          [shape(c)[0][0] for c in ("pwsh -NoProfile -Command - <<'EOF'\nSet-Location E:/x; git stash\nEOF",
+                                    "pwsh -File x.ps1 <<'EOF'\ngit stash\nEOF")],
+          ["Set-Location E:/x", "pwsh -File x.ps1 <<'EOF'"])
+    check("a heredoc-fed shell's location changes run in the child, never in the caller",
+          dirs_of("bash <<'EOF'\ncd " + W + "\ndotnet build\nEOF\ndotnet build", main, B), [wt, main])
+    exact("words never hold a heredoc body",
+          [s.words for s in sl.steps("cat > m <<'EOF'\ndotnet build\nEOF", str(main), B)], [("cat", ">", "m", "<<EOF")])
+    exact("a heredoc body that names a build is no build step (fleet_active_build's sibling)",
+          dirs_of("cat > m.txt <<'EOF'\ndotnet build\nEOF\necho done", main, B), [])
+    calls = lambda cmd, shell=B: [(c.subcommand, c.options, c.args) for s in sl.steps(cmd, str(main), shell)
+                                  for c in sl.git_calls(s)]
+    exact("git_calls: global options in every spelling, then the subcommand and its words",
+          calls("FOO=1 git -c a=b --no-pager --git-dir=x -C /y push -q origin HEAD:main"),
+          [("push", ("-c", "a=b", "--no-pager", "--git-dir=x", "-C", "/y"), ("-q", "origin", "HEAD:main"))])
+    exact("git_calls: PowerShell's call operator and git.exe", calls("& git.exe stash list", P), [("stash", (), ("list",))])
+    exact("git_calls: a quoted `git push` is one word, no call", calls('git commit -m "then git push"'),
+          [("commit", (), ("-m", "then git push"))])
+    exact("git_calls: a -c payload's git is a call", calls("bash -c 'git push origin main'"),
+          [("push", (), ("origin", "main"))])
+    exact("git_calls: no subcommand", calls("git --version"), [(None, ("--version",), ())])
+    check("git_calls: -C applied to the step's cwd", [c.cwd for s in sl.steps(f"cd {W} && git -C sub push", str(main), B)
+                                                     for c in sl.git_calls(s)], [wt / "sub"])
 
 for f in fails:
     print("FAIL:", f)

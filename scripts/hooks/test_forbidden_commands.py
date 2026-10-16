@@ -12,6 +12,12 @@ import sys
 
 HOOK = pathlib.Path(__file__).with_name("forbidden_commands.py")
 BS = chr(92)  # a backslash, spelled without one
+NL = chr(10)
+# kb/Work PB3198: every rule reads the ONE model of the command line (shell_location.steps), so each rule is checked
+# AFTER a heredoc (the rules that scanned only the text before the first `<<` passed these) and after a QUOTED `<<`
+# (which made the rest of the line a "heredoc body" for the rules that did not).
+HD = "cat > m.txt <<'EOF'" + NL + "hello" + NL + "EOF" + NL
+QS = 'python -c "print(1<<2)"; '
 
 CASES = [
     # (command, expect_block)
@@ -64,6 +70,13 @@ CASES = [
     ("sed -n 17,20p scripts/orchestrator/enqueue.py && head -3 x.txt", False),
     ("git add -- .github/workflows/build-and-test.yml && git commit -q -m x", False),
     ("pwsh -NoProfile -File scripts/build-local.ps1 > b.log 2>&1; git status", True),
+    # the repros of kb/Work PB1725 and PB1736: a read-only command whose ARGUMENTS name a verdict command or script
+    ('grep -n "dotnet test" scripts/x.sh; echo ---', False),
+    ('sed -i "s/x/overlaps battery.sh/" STATUS.md; git add -A', False),
+    ("cat scripts/build-local.ps1; echo", False),
+    ("git ls-tree HEAD scripts/linux-gate.sh scripts/build-local.sh; git ls-tree HEAD x", False),
+    ("grep -rlE 'x|build-local.ps1' kb/Work | head; echo", False),
+    ("pwsh scripts/build-local.ps1 -Priority BelowNormal; git commit -m x", True),
     ("python scripts/orchestrator/enqueue.py land b > l.log 2>&1 && git log -1", True),
     # 5b'. the chain is read by the SHARED parser (review R1-1's sibling): a comment's apostrophe, an escaped quote or a
     # heredoc before the chain no longer hides it
@@ -111,6 +124,41 @@ CASES = [
     ("bash -c 'cd /e/x && a & b'", True),                                # a -c payload is a command line
     ("(cd /e/x && a) & b", False),                                       # the subshell already scopes the cd
     ("{ cd /e/x; a; } & b", True),                                       # a { } group is in the backgrounded list
+    # PB3198: every rule after a heredoc, after a quoted `<<`, and silent on its words inside a body or a quote
+    (HD + "git stash", True),
+    (QS + "git stash", True),
+    ("cat > m.txt <<'EOF'" + NL + "git stash" + NL + "EOF" + NL + "git status", False),   # the body is text
+    ('git commit -m "never git stash"', False),                          # so is a quoted message
+    (HD + "git pull --autostash", True),
+    ("git -c rebase.autoStash=true rebase origin/main", True),           # autostash switched on through -c
+    ("git -c rebase.autostash=false rebase origin/main", False),
+    (HD + "git push origin main", True),
+    (QS + "git push origin HEAD:main", True),
+    ("git push origin +HEAD:main", True),                                # a forced refspec is still main
+    ("git push origin +main", True),
+    ("cd /e/claude-skills && git push origin x; git -C /e/COBOL push origin main", True),   # each push in its own dir
+    ("cat > m.txt <<'EOF'" + NL + "git push origin main" + NL + "EOF" + NL + "git status", False),
+    (QS + 'printf "a' + BS + 'n"', False),                               # a quoted `<<` is no heredoc: no body
+    (HD + 'printf "a' + BS + 'n"', False),                               # the command after a body is no body
+    ("bash -c 'cat' <<'EOF'" + NL + "a" + BS + "nb" + NL + "EOF", True),  # a body feeding a -c payload is a body
+    (HD + 'dotnet test x.csproj --filter "~Foo" > log.txt', True),
+    (QS + 'dotnet test x.csproj --filter "~Foo" > log.txt', True),
+    (HD + 'dotnet test x.csproj --filter "FullyQualifiedName~Foo"', True),   # unredirected, after a heredoc
+    ('dotnet test x.csproj --filter=~Foo > log.txt', True),
+    ('dotnet test x.csproj --filter "FullyQualifiedName~Foo" & echo x > y.txt', True),  # another command's redirect
+    ('git commit -m "dotnet test --filter ~X"', False),                  # quoted text is no test run
+    (QS + "dotnet build x.sln > b.log && git commit -m x", True),
+    (HD + "wsl --shutdown", True),
+    (QS + "wsl --shutdown", True),
+    ("cat > m.txt <<'EOF'" + NL + "wsl --shutdown" + NL + "EOF", False),
+    (HD + "cd /e/x && a & b", True),
+    (QS + "cd /e/x && a & b", True),
+    # a heredoc a shell reads as its script is a command line, so every rule reads it (the w1098c lead)
+    ("bash <<'EOF'" + NL + "git stash" + NL + "EOF", True),
+    ("bash -s <<'EOF'" + NL + "git push origin main" + NL + "EOF", True),
+    ("sh <<'EOF'" + NL + 'dotnet test x.csproj --filter "~Foo" > log.txt' + NL + "EOF", True),
+    ("pwsh -NoProfile -Command - <<'EOF'" + NL + "git stash" + NL + "EOF", True),
+    ("bash run.sh <<'EOF'" + NL + "git stash" + NL + "EOF", False),   # stdin of a script is that script's data
 ]
 
 
@@ -124,6 +172,8 @@ PS_CASES = [
     ("git stash", True),
     ("Set-Location E:/x && a & b", True),                                # the same backgrounded list in PowerShell 7
     ("Set-Location E:/x; & pwsh -File y.ps1", False),                    # `&` that starts a command is the call operator
+    ("& git stash pop", True),                                           # the call operator before git (PB3198)
+    ("git commit -m 'never git stash'", False),
 ]
 
 
@@ -164,6 +214,8 @@ UNIT_CASES = [
      + "git commit -q -F ../m.txt; git push -q origin HEAD:main", True),
     ("cat > ../m.txt <<'EOF'" + chr(10) + "the unit ran git push -q origin HEAD:main" + chr(10) + "EOF" + chr(10)
      + "git commit -q -F ../m.txt", False),                                    # the word inside the heredoc BODY is text
+    (QS + "git push", True),                                                   # a quoted `<<` hides nothing (PB3198)
+    ("git commit -q -m 'x' && xargs -n1 git push origin < refs.txt", True),    # git wherever it stands in the step
 ]
 
 fails =[(c, e) for c, e in CASES if blocked(c) != e]
