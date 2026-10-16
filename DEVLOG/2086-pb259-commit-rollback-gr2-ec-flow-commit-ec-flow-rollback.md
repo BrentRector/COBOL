@@ -1,4 +1,4 @@
-## PB259: COMMIT/ROLLBACK GR2 (EC-FLOW-COMMIT, EC-FLOW-ROLLBACK) recorded as documented non-support, with goldens for the dynamic reach
+## Entry 2086 — 2026-10-16 09:29 PDT — PB259: COMMIT/ROLLBACK GR2 (EC-FLOW-COMMIT, EC-FLOW-ROLLBACK) recorded as documented non-support, with goldens for the dynamic reach
 
 kb/Work PB259 was an adjudication. Two inventory rows sat at PARTIAL only so that a reader would still see them:
 `GR-14.9.7.4-2` (COMMIT) and `GR-14.9.36.4-2` (ROLLBACK). Each statement's GR2 sets EC-FLOW-COMMIT or EC-FLOW-ROLLBACK
@@ -46,3 +46,4 @@ the two GR2 rows. The sweep found the same rot in two of the four other rows of 
 178 rows against 181, FORMAT/SELECT WHEN 37 against 36; REWRITE/WRITE FILE's 12 and VALIDATE's 81 still matched). The table now carries no row counts: §5's preamble says the
 selector is the set and `derive_verdict_batch.py --list` prints its count. The A.4.3 row now names both GR2 rows and
 why they are declined.
+
