@@ -939,8 +939,9 @@ OBJECT-VIEW (§8.4.3.5, identifier Format 5; live — kb/Work PB1425; golden 200
   GRAMMAR: `objectReferenceAtom : objectView | objectReferenceTerm` — the view is an ATOM because §8.4.3.1.4 GR1
   applies it (c) before the inline invocation operator (e), so `U AS C :: "M"` invokes on the view; the phrase
   repeats (a view of a view, §8.4.3.1.3 SR1). Every object-reference position (INVOKE receiver, inline receiver,
-  SET Format 5 sender, RAISE) reaches it through the one `objectReference` rule. The two object-reference RECEIVING
-  positions (SET Format 5 receivers, INVOKE RETURNING) parse it as a superset so §8.4.3.5.3 SR2 is COBOLNET2871.
+  SET Format 5 sender, RAISE) reaches it through the one `objectReference` rule. Every RECEIVING position parses it
+  (with SELF, SUPER and NULL) as a `nonReceivableIdentifier`, so §8.4.3.5.3 SR2 is COBOLNET2871 wherever a view is
+  written as a receiver (kb/Work PB1551; the receiving chokepoint's `ReceivingOperandForms` table).
   UNIVERSAL is a token, §8.9-reserved 2002+ (a user word at 85). Edition gate `object-view-2002` on recognition.
   BINDER (`OoBinder.OoBindObjectView`): GR1 "treated at compile-time as though it had the description specified
   by the AS phrase" → a compiler temporary DESCRIBED by the phrase (`DataBinder.OoCreateObjectViewTemp`), filled
@@ -965,8 +966,9 @@ THE OO IDENTIFIERS IN THE EXPRESSION TIER (§8.4.3.1.3 SR1; live — kb/Work PB1
   of `invokeArgument` are gone: SELF is the sole primary of its expression arm), an inline-invocation argument, a
   SET sender (`SET O TO SELF` now parses as `setToValueStatement`, which precedes the object-reference alternative;
   that alternative is left with NULL). The GOBACK / EXIT RAISING phrase's identifier-1 (`raisingPhrase`) is
-  `objectReference`, RAISE's operand rule. A RECEIVING position never parses an expression, so §8.4.3.8.3 SR2 and
-  §8.4.3.5.3 SR2 are not widened (their general screen is kb/Work PB1551).
+  `objectReference`, RAISE's operand rule. A RECEIVING position never parses an expression; it parses SELF, SUPER,
+  NULL and the view only as a `nonReceivableIdentifier`, refused by §8.4.3.8.3 SR2 (COBOLNET3978), §8.4.3.7.3 SR1
+  (COBOLNET3977) and §8.4.3.5.3 SR2 (COBOLNET2871) at the receiving chokepoint (kb/Work PB1551).
   BINDER: ONE door, `OoBinder.OoBindOoIdentifier` (Formats 4, 5, 6) — every consumer of a SOLE identifier
   (`ConditionBinder.SoleOoIdentifier`: the relation and EVALUATE operand binders, the INVOKE / inline argument
   reduction, `SetSenders.Classify`, `ExpressionBinder.BindPrimary`) asks it. SELF binds to a compiler temporary

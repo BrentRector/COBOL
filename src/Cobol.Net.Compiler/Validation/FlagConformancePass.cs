@@ -628,12 +628,14 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     {
         if (ctx.CORRESPONDING() is not null || ctx.CORR() is not null)   // MOVE CORRESPONDING dref TO dref
         {
-            var d = ctx.dataReference();
-            return d.Length >= 2 ? (d[0], [d[1]]) : (null, []);
+            return ctx.dataReference() is { } s && ctx.receivingIdentifier()?.dataReference() is { } r
+                ? (s, [r]) : (null, []);
         }
         var send = ctx.sendingOperand()?.dataReference();
-        IReadOnlyList<CobolParserCore.DataReferenceContext> recvs =
-            ctx.moveReceivingPhrase()?.dataReferenceList()?.dataReference() ?? [];
+        // A receiver that is no data reference (SELF, NULL, a view, an address-identifier) was refused at bind (kb/Work
+        // PB1551) and shares no data description entry with anything.
+        IReadOnlyList<CobolParserCore.DataReferenceContext> recvs = ctx.moveReceivingPhrase()?.receivingIdentifier()
+            .Select(r => r.dataReference()).OfType<CobolParserCore.DataReferenceContext>().ToList() ?? [];
         return (send, recvs);
     }
 
@@ -683,15 +685,21 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     //    the SHARED SET-TO / SET-UP/DOWN grammar (Formats 5/10/14/16) is intrinsically excluded (never an index-name). ──
     public override object? VisitSetToValueStatement(CobolParserCore.SetToValueStatementContext ctx)
     {
-        FlagIndexSet(ctx.dataReference(), ctx.Start.Line);
+        FlagIndexSet(SetReceiverReferences(ctx.setReceivingIdentifier()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
 
     public override object? VisitSetIndexStatement(CobolParserCore.SetIndexStatementContext ctx)
     {
-        FlagIndexSet(ctx.dataReference(), ctx.Start.Line);
+        FlagIndexSet(SetReceiverReferences(ctx.setReceivingIdentifier()), ctx.Start.Line);
         return base.VisitChildren(ctx);
     }
+
+    /// <summary>The data-reference receivers of a SET (a non-receivable identifier form was refused at bind, kb/Work
+    /// PB1551, and is no index-name).</summary>
+    private static CobolParserCore.DataReferenceContext[] SetReceiverReferences(
+        CobolParserCore.SetReceivingIdentifierContext[] receivers) =>
+        receivers.Select(r => r.dataReference()).OfType<CobolParserCore.DataReferenceContext>().ToArray();
 
     /// <summary>Flag the SET once (GR4 e) when a receiving operand is an index-name of the current unit AND
     /// EC-RANGE-INDEX checking is enabled at the statement line — the same <see cref="TurnState"/> read i uses for

@@ -379,11 +379,18 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
         // VersionConformancePass parse-arm (VisitAllocateStatement, Step 14h.2) — so a below-2002 ALLOCATE is an
         // edition violation even when its RETURNING fails to resolve (SR3/0869), which a bound-arm gate lost when
         // binding errored to a BoundNop before a BoundAllocate was produced (the DEVLOG-724 CI-red finding).
-        var drefs = al.dataReference();
         Place? returning = null;
-        if (al.RETURNING() is not null)
+        Core.DataReferenceContext? returningRef = null;
+        if (al.receivingIdentifier() is { } returningId)
         {
-            if (PtrResolvePointer(drefs[^1], "ALLOCATE RETURNING (ISO §14.9.3.3 SR3 — category data-pointer)", receiving: true) is not { } rp)
+            // data-name-2 is a RECEIVING operand: an identifier format that is never one is refused by its own rule at
+            // the chokepoint (kb/Work PB1551).
+            if ((returningRef = returningId.dataReference()) is null)
+            {
+                _ = host.Expr.ResolveReceiving(returningId);
+                return BoundRejected.Reported(ctx.Edition);
+            }
+            if (PtrResolvePointer(returningRef, "ALLOCATE RETURNING (ISO §14.9.3.3 SR3 — category data-pointer)", receiving: true) is not { } rp)
                 return BoundRejected.Reported(ctx.Edition);
             returning = rp;
         }
@@ -403,7 +410,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             // being half-enforced: Form 1 and Form 2 are separate code paths.
             if (StrongTypeModel.PointerRestriction(returning.Item) is { IsRestricted: true } charsRestriction)
             {
-                RejectRestriction(DataBinder.WrittenText(drefs[^1]),
+                RejectRestriction(DataBinder.WrittenText(returningRef!),
                     $"the RETURNING data item is a data-pointer restricted to type '{charsRestriction}', which "
                     + "ALLOCATE … CHARACTERS cannot satisfy — it specifies no data-name-1 to supply that type "
                     + "(ISO §14.9.3.3 SR4)");
@@ -413,7 +420,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
         }
 
         // Form 2: ALLOCATE based-item [INITIALIZED] [RETURNING pointer].
-        var basedRef = drefs[0];
+        var basedRef = al.dataReference();
         if (PtrResolveBased(basedRef) is not { } based) return BoundRejected.Reported(ctx.Edition);
         // ⛔ §14.9.3.3 SR4 AND SR5 — the restricted-data-pointer type-safety pair, BOTH directions, and neither
         // existed before kb/Work PB153. Measured on this tree beforehand: `01 T TYPEDEF STRONG. 02 F PIC 9(4).
@@ -438,7 +445,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             var basedType = StrongTypeModel.TypedItemType(based);
             if (strongType.IsRestricted && !StrongTypeModel.SameRestriction(strongType, returningRestriction))
             {
-                RejectRestriction(DataBinder.WrittenText(drefs[^1]),
+                RejectRestriction(DataBinder.WrittenText(returningRef!),
                     $"'{DataBinder.WrittenText(basedRef)}' is a strongly-typed group item of type '{strongType}', so the "
                     + "RETURNING data item shall be a data-pointer restricted to that type (ISO §14.9.3.3 SR5)");
                 return BoundRejected.Reported(ctx.Edition);
@@ -446,7 +453,7 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
             if (returningRestriction.IsRestricted
                 && !StrongTypeModel.SameRestriction(returningRestriction, basedType))
             {
-                RejectRestriction(DataBinder.WrittenText(drefs[^1]),
+                RejectRestriction(DataBinder.WrittenText(returningRef!),
                     $"the RETURNING data item is a data-pointer restricted to type '{returningRestriction}', so "
                     + $"'{DataBinder.WrittenText(basedRef)}' shall reference a typed data item of that type — it is "
                     + $"{(basedType.IsRestricted ? $"of type '{basedType}'" : "untyped")} (ISO §14.9.3.3 SR4)");
@@ -500,7 +507,8 @@ internal sealed class PtrBinder(BinderContext ctx, StatementBinder host)
     /// not for P — one statement, one rule, two verdicts.</para></summary>
     public BoundStatement BindSetUpDown(Core.SetIndexStatementContext ud)
     {
-        var drefs = ud.dataReference();
+        // Every receiver is a data reference: SetBinder.BindSet refused any other identifier format first (kb/Work PB1551).
+        var drefs = Array.ConvertAll(ud.setReceivingIdentifier(), r => r.dataReference());
         if (drefs.Length == 0)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "SET … UP BY / DOWN BY with no receiving operand (ISO §14.9.39.2)");
         // SET pointer UP/DOWN BY (§14.9.39 Format 10) is a COBOL-2002 introduction; edition gate moved to

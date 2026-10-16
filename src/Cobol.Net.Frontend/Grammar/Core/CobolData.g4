@@ -932,7 +932,7 @@ initializeStatement
 // three hand-written families). The keyword reading wins at every edition: the union grammar parses the
 // DEFAULT phrase at 85 too and refuses it BY NAME there.
 initializeOperandList
-    : dataReference (COMMA? dataReference)*
+    : receivingIdentifier (COMMA? receivingIdentifier)*
     ;
 
 // [ALL | category-name] TO VALUE (§14.9.20)
