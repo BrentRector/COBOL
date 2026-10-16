@@ -423,7 +423,8 @@
   "pb2017_arithmetic_operator_spacing",
   "pb2722_evaluate_object_not_ownership",
   "pb3154_contained_symbolic_character",
-  "pb3154_contained_symbolic_shadowed"
+  "pb3154_contained_symbolic_shadowed",
+  "pb359_unsuccessful_read_start_position"
  ],
  "pending": []
 }
