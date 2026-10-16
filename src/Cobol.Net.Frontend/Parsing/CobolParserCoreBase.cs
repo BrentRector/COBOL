@@ -14,27 +14,20 @@ namespace CobolNet.Frontend.Generated;
 public abstract class CobolParserCoreBase : Parser
 {
     /// <summary>
-    /// The targeted edition (rearch P2.7): the SINGLE source of the dialect year the grammar's introduction
-    /// gates read (ending the pre-P2 triple-sourcing across the parser base, the frontend, and the compiler).
-    /// Defaults to COBOL-85 (strict) — the level the NIST CCVS corpus targets; the CLI/front-end sets it
-    /// explicitly (via <see cref="DialectLevel"/>) for every real parse.
+    /// The targeted edition (rearch P2.7): the SINGLE source of the dialect year the parser's edition reads
+    /// consult (ending the pre-P2 triple-sourcing across the parser base, the frontend, and the compiler).
+    /// Defaults to COBOL-85 (strict) — the level the NIST CCVS corpus targets; the front end sets it explicitly,
+    /// both axes, for every real parse.
+    /// <para>⛔ WRITE-ONLY OUTSIDE THE PARSER (kb/Work PB2291; COBOLNET_DESIGN §1.1, D7). The getter is
+    /// <c>protected</c>: the parser reads the edition only through its own members and grammar predicates, each a
+    /// site the PB2291 verdict adjudicated (<c>EditionReadDriftTests</c>). A listener, pass or driver reading
+    /// <c>parser.Edition</c> would be an edition read no inventory sees, so the compiler refuses it.</para>
     /// </summary>
-    public EditionInfo Edition { get; set; } = EditionInfo.Of(85);
-
-    /// <summary>
-    /// Dialect level (ISO year) for gating non-COBOL-85 features — a shim over <see cref="Edition"/>, the single
-    /// source. Kept for the <c>parser.DialectLevel = …</c> call sites (Frontend); the setter rebuilds
-    /// <see cref="Edition"/> preserving its permissive axis.
-    /// </summary>
-    public int DialectLevel
-    {
-        get => Edition.Year;
-        set => Edition = EditionInfo.Of(value, Edition.Permissive);
-    }
+    public EditionInfo Edition { protected get; set; } = EditionInfo.Of(85);
 
     /// <summary>
     /// The compilation group's <c>&gt;&gt;COBOL-WORDS</c> overrides (ISO §7.3.10), set by the frontend beside
-    /// <see cref="DialectLevel"/>. <b>The parser needs it because several of its predicates classify a word by
+    /// <see cref="Edition"/>. <b>The parser needs it because several of its predicates classify a word by
     /// TEXT</b> — LOCALE, ORDER, CLASSIFICATION, ATTRIBUTE and the LC_ categories are §8.9/§8.10 words that are
     /// deliberately NOT lexer tokens, so the lexer's <c>CobolWordsRewriter.Plan</c> retype cannot reach them and a raw text
     /// comparison here is inert to the directive in both directions: an EQUATEd synonym would not steer the
