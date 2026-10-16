@@ -1200,7 +1200,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                 && valueClass is not (CobolClass.Numeric or CobolClass.Object or CobolClass.Pointer))
             {
                 ctx.Edition.Error(DiagnosticCatalog.InvokeByValueOperandClass,
-                    $"{verb} \"{methodName}\": BY VALUE operand '{argText}' is of class {valueClass.ToString().ToLowerInvariant()}; "
+                    $"{verb} \"{methodName}\": BY VALUE operand '{argText}' is of class {IntrinsicArgumentRules.Name(valueClass)}; "
                     + "ISO §14.9.23.3 SR15 admits only class message-tag, numeric, object or pointer by value");
                 return null;
             }
