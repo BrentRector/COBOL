@@ -97,6 +97,11 @@ internal readonly record struct FileKeyOperand(
     /// same category" — broken by this data-name-2 when its category differs from the FIRST data-name-2's (the one
     /// record-key-name-1 takes its class and category from, SR5 / SR6). Only an operand both of whose items are of a
     /// category SR2 admits is compared: SR2's own category row speaks about any other.</summary>
+    /// <summary>The first data-name-2 as a message names it — the operand the same-category rows compare against:
+    /// its name and what it is, or the bare phrase on an operand that carries no SOURCE phrase.</summary>
+    public string FirstSourceFace => Source?.Operands[0] is { Item: { } first } op
+        ? $"'{op.Name}' is {ItemCategory.Face(first)}" : "the first data-name-2 is of another category";
+
     public bool CategoryDiffersFromFirstSource =>
         Source is not null && SourceIndex > 0 && Item is { } mine && Source.Operands[0].Item is { } first
         && ItemCategory.IsAlphanumericOrNational(mine) && ItemCategory.IsAlphanumericOrNational(first)
@@ -297,8 +302,7 @@ internal static class FileControlKeyRules
             _ => true,
             (_, op) => op.CategoryDiffersFromFirstSource,
             (_, op) => $"{op.ClauseFace} {op.Written} is {ItemCategory.Face(op.Item!)}, but the first data-name-2 "
-                + $"'{op.Source!.Operands[0].Name}' is {ItemCategory.Face(op.Source.Operands[0].Item!)}; all occurrences "
-                + "of data-name-2 shall be of the same category (ISO §12.4.5.12.3 SR2)"),
+                + $"{op.FirstSourceFace}; all occurrences of data-name-2 shall be of the same category (ISO §12.4.5.12.3 SR2)"),
 
         new("SR-12.4.5.12.3-1", "12.4.5.12.3", "ISO §12.4.5.12.3 SR1",
             "Data-name-1 and data-name-2 shall not be subject to any OCCURS clauses",
@@ -373,8 +377,7 @@ internal static class FileControlKeyRules
             _ => true,
             (_, op) => op.CategoryDiffersFromFirstSource,
             (_, op) => $"{op.ClauseFace} {op.Written} is {ItemCategory.Face(op.Item!)}, but the first data-name-2 "
-                + $"'{op.Source!.Operands[0].Name}' is {ItemCategory.Face(op.Source.Operands[0].Item!)}; all occurrences "
-                + "of data-name-2 shall be of the same category (ISO §12.4.5.6.3 SR2)"),
+                + $"{op.FirstSourceFace}; all occurrences of data-name-2 shall be of the same category (ISO §12.4.5.6.3 SR2)"),
 
         new("SR-12.4.5.6.3-1", "12.4.5.6.3", "ISO §12.4.5.6.3 SR1",
             "Data-name-1 and data-name-2 shall not be subject to any OCCURS clauses",

@@ -287,6 +287,16 @@ public sealed class FileControlKeyRuleDriftTests
                     CobolNet.Common.LiteralClass.Alphanumeric, "AB", null));
             string message = rule.Message(file, op);
             Assert.Contains(rule.Citation, message);
+            // …and as the second data-name-2 of a SOURCE phrase (kb/Work PB1099), the operand shape every rule stated
+            // of "data-name-1 and data-name-2" now also renders.
+            var source = new RecordKeySource
+            {
+                Name = "RK",
+                Operands = [new KeySourceOperand { Name = "K0", Qualifiers = [], Item = item },
+                            new KeySourceOperand { Name = "K", Qualifiers = [], Item = item }],
+            };
+            string sourced = rule.Message(file, op with { Source = source, SourceIndex = 1 });
+            Assert.Contains(rule.Citation, sourced);
         }
     }
 

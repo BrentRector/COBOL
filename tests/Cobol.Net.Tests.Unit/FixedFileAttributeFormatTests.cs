@@ -85,12 +85,12 @@ public sealed class FixedFileAttributeFormatTests : IDisposable
         // rejected with the sidecar, and one is what a `*.dat:*` enumeration would add here.
         Assert.Equal([Path.GetFileName(host)], Directory.GetFiles(_dir).Select(Path.GetFileName).Order());
 
-        // The whole of what a LATER RUN can know is these bytes: magic + version 4 (PB2693), 'R'elative, 'F'ixed,
+        // The whole of what a LATER RUN can know is these bytes: magic + version 5 (PB1099), 'R'elative, 'F'ixed,
         // min 10, max 10, no keys, the generation stamp of the store's one persist (its creation, PB2660) and a zero
         // release mint (a relative store has no release order). Nothing in this process holds them.
         byte[] head = File.ReadAllBytes(host);
         Assert.Equal(
-            [(byte)'C', (byte)'B', (byte)'N', (byte)'F', (byte)'S', (byte)'T', (byte)'R', 4,
+            [(byte)'C', (byte)'B', (byte)'N', (byte)'F', (byte)'S', (byte)'T', (byte)'R', 5,
              (byte)'R', (byte)'F', 10, 0, 0, 0, 10, 0, 0, 0, 0, 0,
              1, 0, 0, 0, 0, 0, 0, 0,
              0, 0, 0, 0, 0, 0, 0, 0],

@@ -19,7 +19,10 @@ data-name-1 is the one-window case rather than a separate path (the shape kb/Wor
 - Runtime: `KeySegment` (offset, length, layout); `IndexedConnector.KeyOf` concatenates through the one slice;
   `RegisterIndexed` / `AddAlternateKey` take `KeySegment[]`; `FixedFileAttributes.KeyDescriptor` holds the segment
   list (value equality); the store header is FORMAT VERSION 5 (each key's segment count and windows — §12.4.5.12.4
-  GR3 makes every window a fixed attribute). A version-4 store is Foreign ('39').
+  GR3 makes every window a fixed attribute). A version-4 store is Foreign ('39'). The changed public members make
+  this an incompatible runtime surface, so the runtime MAJOR is raised 5 → 6 (Directory.Build.props) and
+  `RuntimeAbiPinDriftTests` re-pinned: a module compiled against runtime 5 is refused by `RuntimeAbi.Skew` rather
+  than failing inside a key registration.
 - `FileControlKeyRules` yields ONE OPERAND PER data-name-2, so every rule stated of "data-name-1 and data-name-2"
   (SR1, SR2, SR3, the minimum-size rule) reaches each through the data-name-1 row; new rows for SR2's last sentence
   ("All occurrences of data-name-2 shall be of the same category") on both clauses; §12.4.5.6.3 SR4's SOURCE
