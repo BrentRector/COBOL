@@ -2210,7 +2210,12 @@ character-1 repeated twice or more is a floating string, exactly as `$$$` is. Tw
   width §13.18.40.4 GR14 gives it; `DeEdit` walks the same widths in reverse with a physical cursor. That is ONE
   variable-width mechanism for the TWO symbols GR14 widens: the currency string ('cs') and the editing literal
   ('es'). The search-based `ExpandCurrency`/`CollapseCurrency` pair that served the currency string alone is
-  DELETED. The size half is `PictureAnalyzer.EditingPositions`, the exact shape `currencyExtra` already had.
+  DELETED. The size half is `PictureAnalyzer.EditingPositions`, the exact shape `currencyExtra` already had. It
+  reads the SAME fixed-or-floating decision the renderer reads (`EditRule.Floating`, rule 6's adjacency test): a
+  floating string is one literal-wide occurrence plus one character per repetition, and every other rule — the IS
+  form and a FOR form with FIXED occurrences, `PIC L999L EDITING L FOR NEGATIVE IS "DB "` = 9 — counts the
+  literal's width at EACH occurrence (kb/Work PB3220; `PictureCategoryDriftTests` walks the accepted set and
+  compares the bound size with the rendered image's width).
 
 Goldens `2023/pb491_editing_variable_width` (Annex D.24's own images and sizes) and
 `negative/pb568-editing-char1-quoted`, `negative/pb491-editing-unequal-literal-widths`.
@@ -2270,7 +2275,13 @@ the P run, the decimal point and the floating symbol are where the standard requ
 COBOLNET1934 (a named §13.18.40.3 composition rule) or COBOLNET1935 (the §13.18.40.6 Table 10 precedence) and the
 item recovers, the compile having already failed. Table 10's `E` and exponent-`+` rows and columns are carried
 for fidelity and for the drift test but are not walked from this path: §13.18.40.4 GR13 b pins the floating-point
-form's two parts more narrowly than Table 10 does, and `AnalyzeFloatEdited` is that rule's one place.
+form's two parts more narrowly than Table 10 does, and `AnalyzeFloatEdited` is that rule's one place. That one
+place takes the picture's DECIMAL-POINT IS COMMA mode like the composition validator does: SR12 b's "may appear
+only once" is asked of the DECIMAL separator (`PictureComposition.DecimalSeparator`, the one asker of SR13's role
+swap, also read by the FOR-form symbol screen of SR12 b) and the grouping separator is simple insertion, so
+`PIC +9.9.9E+99` is legal and `PIC +9,9,9E+99` is not under the clause (kb/Work PB3219;
+`PictureCategoryDriftTests` proves SR13 as a closure over the accepted set: a string under the clause is accepted,
+and means what it means, exactly when its comma/period-interchanged twin is accepted without it).
 
 **Closing it carries regression risk, and the risk is MEASURED, not argued.** A prohibition written one symbol
 too wide rejects legal source, which is worse than the under-rejection it replaces. Every PICTURE
