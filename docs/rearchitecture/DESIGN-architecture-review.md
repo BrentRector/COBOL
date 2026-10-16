@@ -1005,11 +1005,11 @@ Draft 6 re-modelled them from the code after the fifth refuter, G2):
   own ENVIRONMENT DIVISION once, in a binder of the class's own source element (§10.5), and seeds each half from it
   through the same `InheritConfiguration` before the half binds its own division (`OoDriver.OoReparent` hands a binder
   only its own element's divisions; kb/Work PB3154, which made the class's names inherited by the halves rather than
-  declared in their §8.3.2.2 censuses); it builds the half's OPTIONS by
-  overlaying the half's paragraph on the class's (`OoDriver.cs:99-101` for the OBJECT half, `:119-120` for the
-  FACTORY half; an INTERFACE binds its own paragraph over none, `:41`), and `CallInheritOptions`
-  (`DataBinder.cs:294`) writes the same `_inheritedOptions` field `InheritConfiguration` writes
-  (`DataBinder.Switches.cs:428,483`). A method declares no configuration section (§12.3.3 SR2: "The configuration
+  declared in their §8.3.2.2 censuses); it hands each binder its definition's skeleton OPTIONS paragraph
+  (`DataBinder.UseSkeletonOptions`: the class, the OBJECT and FACTORY halves, an INTERFACE), and every binder binds
+  that paragraph in `BindDeclarations`, over the `_inheritedOptions` baseline only `InheritConfiguration` writes,
+  after the element's constant entries are declared (kb/Work PB780: the INITIALIZE clause's literal-1 may be a
+  constant-name, §13.10.3 SR2). A method declares no configuration section (§12.3.3 SR2: "The configuration
   section shall not be specified in a method definition") and binds through its half's binder, so it reads the half's
   slice; its OPTIONS are the procedure-bind scoped override below. And `MnemonicRegistry.Of`
   (`Binding/Procedure/MnemonicRegistry.cs:35-60`) builds the device map by its OWN walk up the parse ancestors
@@ -1062,8 +1062,8 @@ binder `OoDriver.BindClassData` builds for the purpose today (kb/Work PB3154) (t
 once). A method is not a configuration unit (§12.3.3 SR2): it reads its half's slice. The OPTIONS slice is produced by
 the same step and the same three arms from the baseline the arm names (none for Own; the container's for Contained;
 the class definition's for ClassHalf) overlaid by the unit's own OPTIONS paragraph clause by clause (§11.9.4 GR1), so
-`InheritConfiguration`'s copy and `CallInheritOptions`' overlay, today two writers of `_inheritedOptions`, become the
-slice's single write; a method's own OPTIONS stay the procedure-bind scoped override below. `MnemonicRegistry.Of`'s
+`InheritConfiguration`'s baseline copy and `BindDeclarations`' overlay of the unit's own paragraph (one bind point for
+every unit since kb/Work PB780) become the slice's single write; a method's own OPTIONS stay the procedure-bind scoped override below. `MnemonicRegistry.Of`'s
 parent walk becomes a reader of the slice (the device map is a configuration entry like the switch map), and so does
 `OoRepositoryScope.Build` (`Oo/OoNameResolution.cs:167-190`), a fourth reader with its own ancestor walk over the
 REPOSITORY paragraphs (the seventh refuter, J2): the REPOSITORY specifiers are a slice entry the same three arms produce

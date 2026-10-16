@@ -293,10 +293,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// the remaining clauses are captured for the features that will consume them. Defaults when no OPTIONS.</summary>
     public OptionsModel Options { get; internal set; } = OptionsModel.Default;
 
-    /// <summary>Seed the §11.9.4 GR1 baseline for a CLASS-CHANNEL bind (kb/Work PB135): OoDriver computes the
-    /// class/object/factory-level model from the skeleton paragraphs and hands it here before BindDeclarations,
-    /// whose own Bind over the synthetic unit (no identification body) then folds it as the baseline.</summary>
-    internal void CallInheritOptions(OptionsModel m) => _inheritedOptions = m;
+    /// <summary>Hand an OO definition's OPTIONS paragraph to this binder (kb/Work PB135, PB780). An interface, class,
+    /// factory or instance definition carries its paragraph on the SKELETON (§10.6.1), outside the synthetic program
+    /// unit <see cref="BindDeclarations"/> walks, so OoDriver names it here and BindDeclarations binds it at the ONE
+    /// point every source element's OPTIONS paragraph binds: after the element's constant entries are declared,
+    /// because literal-1 of the INITIALIZE clause may be a constant-name (§13.10.3 SR2). The §11.9.4 GR1 baseline is
+    /// the containing definition's model (<see cref="InheritConfiguration"/>), or the all-defaults model.</summary>
+    internal void UseSkeletonOptions(Core.OptionsParagraphContext? paragraph) => _skeletonOptions = paragraph;
+
+    /// <summary>The OO skeleton's OPTIONS paragraph (<see cref="UseSkeletonOptions"/>); null for a program unit, whose
+    /// paragraph is in its identification division.</summary>
+    private Core.OptionsParagraphContext? _skeletonOptions;
 
     /// <summary>All SELECTed files (the SELECT clause joined with its FD records), in source order.
     /// (READ-ONLY view — P6 Step 5. The bind-phase file-connector qualification mutates the FileModel ELEMENTS,
@@ -488,7 +495,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
         // §11.9.4 GR1: a contained program's OPTIONS start from its container's model and override clause by
         // clause (InheritConfiguration set the baseline); an outermost unit starts from the all-defaults model.
-        Options = OptionsBinder.Bind(program, Edition, _inheritedOptions);   // captured even when there is no WORKING-STORAGE
+        // Bound AFTER DeclareDataEntries: the INITIALIZE clause's literal-1 may be a constant-name of this element
+        // (§13.10.3 SR2), and FindConstant binds one on demand (kb/Work PB780).
+        Options = OptionsBinder.BindParagraph(_skeletonOptions ?? OptionsBinder.ParagraphOf(program), Edition,
+            _inheritedOptions, FindConstant);   // captured even when there is no WORKING-STORAGE
 
         // §12.3.3 SR1: "The configuration section shall not be specified in a program that is contained within
         // another program" — the container's applies (§12.3.4 GR1, InheritConfiguration). Diagnosed, then the
