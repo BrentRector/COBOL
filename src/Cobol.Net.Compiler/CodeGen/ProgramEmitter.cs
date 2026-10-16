@@ -137,6 +137,13 @@ internal sealed class ProgramEmitter
         foreach (var unit in units)
             if (unit.Parent is null && !unit.IsPrototype)   // a prototype has no body (§10.6.2 SR4f) — no class
                 EmitProgramClass(unit, w);
+        // The .NET host surface (DESIGN-external-repository §4.3; kb/Work PB2099): one public class per outermost unit, named
+        // in the module namespace's type scope beside every type the module already declares there.
+        new HostEntryEmitter(Current.Ctx.SignEncoding, comp.OoClasses).Emit(units,
+            units.Where(u => u.Parent is null).Select(u => u.ClassName)
+                .Concat(comp.OoClasses.Classes.SelectMany(c => c.FactoryOrInstanceCsTypes))
+                .Concat(comp.OoClasses.Interfaces.Select(i => i.CsName))
+                .Append(ModuleNamespace.RegistrarClass).Append("Program").Append(GroupAtomTable.ClassName), w);
         EmitEntryWrapper(units, w, anyFiles, ns);
         _atoms.Emit(w);   // every §8.5.1.12 atom array a unit named, once (kb/Work PB2690)
         return w.ToString();
@@ -878,16 +885,22 @@ internal sealed class ProgramEmitter
         }
     }
 
+    /// <summary>⛔ THE RUN-UNIT MAIN of a compilation group: its first top-level PROGRAM definition (§8.3.1), or null for a
+    /// group with none — a LIBRARY (DESIGN-external-repository §7.2), which the backend builds as
+    /// <c>OutputKind.DynamicallyLinkedLibrary</c> with no <c>Main</c> and no <c>runtimeconfig.json</c>, reached through its
+    /// host entries (§4.3) and, by a COBOL CALL, through <c>EnsureRegistered()</c> from the sibling probe. A prototype
+    /// precedes every other unit (§10.6.2 SR1), so units[0] may be a prototype; a PROGRAM prototype (§11.10.2 Format 2,
+    /// kb/Work PB894) is not a program definition and has no body (§10.6.2 SR4 f), so it is never the main — the same
+    /// exclusion the Register loop applies. One function, read by <see cref="EmitMain"/> and by the backend's output
+    /// kind, so the two cannot disagree.</summary>
+    internal static BoundUnit? MainUnit(IReadOnlyList<BoundUnit> units) =>
+        units.FirstOrDefault(u => u is { Parent: null, IsFunction: false, IsPrototype: false });
+
     /// <summary>Emit the run-unit entry, <c>Program.Main</c>: begin the run unit, register this module through its one
-    /// registration member, and run the main program.</summary>
+    /// registration member, and run the main program — nothing for a library (<see cref="MainUnit"/> null).</summary>
     private static void EmitMain(IReadOnlyList<BoundUnit> units, CodeWriter w, bool anyFiles)
     {
-        // The run-unit main is the first top-level PROGRAM unit (§8.3.1). A prototype precedes every other unit
-        // (§10.6.2 SR1), so units[0] may be a prototype; a function/prototype-only module (a callable library —
-        // the cross-assembly UDF-3 target) has no main and is reached through EnsureRegistered() by the sibling probe.
-        // A PROGRAM prototype (§11.10.2 Format 2, kb/Work PB894) is not a program definition and has no body
-        // (§10.6.2 SR4 f), so it is never the main — the same exclusion the Register loop above applies.
-        var mainUnit = units.FirstOrDefault(u => u is { Parent: null, IsFunction: false, IsPrototype: false });
+        if (MainUnit(units) is not { } mainUnit) return;   // a library: no Main (§7.2)
         using (w.Block("internal static class Program"))
         using (w.Block("private static void Main()"))
         {
@@ -898,20 +911,15 @@ internal sealed class ProgramEmitter
             // PB2097 — kb/Work PB2846: it used to run before the boundary, so a version-skew refusal of the main module
             // escaped as an unhandled .NET exception), the delivery of the run unit's STOP status to the process exit code
             // (§14.9.42.4 GR5: RunModule alone writes Environment.ExitCode, once, when the run unit has ended; the
-            // RunUnit.ExitStatus setter is plain run-unit state and RunMain, the host entry, writes nothing, so a second
+            // RunUnit.ExitStatus setter is plain run-unit state and a host entry's activation writes nothing, so a second
             // process entry must call RunModule, kb/Work PB3163), the §14.6.12 abnormal-termination diagnostic + nonzero exit on a fatal EC, and
             // the §14.6.11 implicit CLOSE of ALL run-unit connectors. Runtime-side so each applies to the WHOLE run unit —
             // incl. a separately-compiled CALLed module whose EC/file descriptors this compilation group never
             // saw — not just this group (SSOT §18.16 keeps the wrapper scaffolding-free). The entry wrapper only
-            // catches StopRun, the normal STOP RUN / main-program-GOBACK unwind boundary. A module with no main
-            // program (a callable library) registers through the same boundary and has no unwind to catch.
+            // catches StopRun, the normal STOP RUN / main-program-GOBACK unwind boundary.
             string ensure = $"{ModuleNamespace.RegistrarClass}.EnsureRegistered";
-            if (mainUnit is not null)
-            {
-                w.Line($"try {{ {RuntimeApi.RunModule(ensure, CsLiteral(mainUnit.Path))}; }}");
-                w.Line("catch (StopRun) { }");
-            }
-            else w.Line($"{RuntimeApi.RunModule(ensure, "null")};");
+            w.Line($"try {{ {RuntimeApi.RunModule(ensure, CsLiteral(mainUnit.Path))}; }}");
+            w.Line("catch (StopRun) { }");
         }
     }
 }

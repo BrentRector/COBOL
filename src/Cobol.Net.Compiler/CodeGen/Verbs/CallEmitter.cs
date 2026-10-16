@@ -544,8 +544,14 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// <summary>The emitted <c>NumProfile</c> of an elementary NUMERIC place's storage, or null when it has none
     /// (see <see cref="PlaceDescription"/>) — the ONE place that decides which items state a numeric profile, for the
     /// activating element's <c>CobolArg</c> and the activated unit's registration alike (kb/Work PB1040).</summary>
-    private static string? BoundaryProfile(Place p, SignEncoding signEncoding) =>
-        p.DenotedItem is { Pic: { Category: PicCategory.Numeric } pp } && pp.Usage is not Usage.Index
+    private static string? BoundaryProfile(Place p, SignEncoding signEncoding) => BoundaryProfile(p.DenotedItem, signEncoding);
+
+    /// <summary>The emitted <c>NumProfile</c> storage of <paramref name="item"/>'s description states across the boundary,
+    /// or null — the rule of <see cref="BoundaryProfile(Place, SignEncoding)"/>, for storage that is no place's: the .NET
+    /// host entry's detached storage of a formal's description (<c>HostEntryEmitter</c>; DESIGN-external-repository
+    /// §4.3).</summary>
+    internal static string? BoundaryProfile(DataItem? item, SignEncoding signEncoding) =>
+        item is { Pic: { Category: PicCategory.Numeric } pp } && pp.Usage is not Usage.Index
             ? pp.ProfileInitializer(signEncoding)
             : null;
 
@@ -624,6 +630,17 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             : a.Place is RefModPlace slice
                 ? $"({RuntimeApi.ActivationDescriptionNew(d)} with {{ Positions = {OperandText.FieldImage(slice)}.Length }})"
                 : RuntimeApi.ActivationDescriptionNew(d);
+        return Described(built, length, description);
+    }
+
+    /// <summary>⛔ THE ONE RENDERER OF WHAT AN ARGUMENT STATES for §14.9.4.4 GR3 d)'s comparison: the <c>CobolArg</c>
+    /// <paramref name="built"/> with its storage <paramref name="length"/> (unless unstated) and its
+    /// <paramref name="description"/> (the rendered <c>ActivationDescription</c>, or null). A CALL statement's argument and
+    /// a generated host entry's argument (<c>HostEntryEmitter</c>, the .NET counterpart of a CALL, DESIGN-external-repository
+    /// §4.3, §17.3 "One renderer") are both stated here, so the two activating elements cannot describe one formal's
+    /// storage two ways.</summary>
+    internal static string Described(string built, int length, string? description)
+    {
         var facts = new List<string>(2);
         if (length != RuntimeApi.UnstatedBoundaryLength) facts.Add($"Length = {length}");
         if (description is not null) facts.Add($"Description = {description}");
@@ -636,10 +653,15 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     /// formal are both four long. A USAGE INDEX item, a pointer or object reference and a variable-length group state none
     /// (their conformance is another rule's); ONLY a RETURNING item's FIT uses <see cref="BoundaryLength"/> alone, because a
     /// native cell is not fitted.</summary>
-    internal static int ArgumentLength(Place p) =>
-        BoundaryLength(p) is var text && text != RuntimeApi.UnstatedBoundaryLength ? text
-        : CrossingOf(p) is CallCrossing.Native
-          && p.DenotedItem is { IsGroup: false, IsAnyLength: false, Pic: { } pic } item && pic.Usage is not Usage.Index
+    internal static int ArgumentLength(Place p) => ArgumentLength(p.DenotedItem, CrossingOf(p));
+
+    /// <summary>The rule of <see cref="ArgumentLength(Place)"/> for storage of <paramref name="item"/>'s description that
+    /// crosses as <paramref name="crossing"/> — also the .NET host entry's detached storage, which is no place
+    /// (<c>HostEntryEmitter</c>; DESIGN-external-repository §4.3).</summary>
+    internal static int ArgumentLength(DataItem? item, CallCrossing crossing) =>
+        BoundaryLength(item, crossing) is var text && text != RuntimeApi.UnstatedBoundaryLength ? text
+        : crossing is CallCrossing.Native
+          && item is { IsGroup: false, IsAnyLength: false, Pic: { } pic } && pic.Usage is not Usage.Index
           && item.ImageWidth is > 0 and var width
             ? width
             : RuntimeApi.UnstatedBoundaryLength;
@@ -761,8 +783,13 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
     internal static int BoundaryLength(Place p) =>
         // DenotedItem is null for a reference-modified view, which is an alphanumeric slice with no item length of
         // its own (§8.4.3.3.4 GR5/GR6); the identity question is the model's, never re-derived here (kb/Work PB602).
-        CrossingOf(p) is CallCrossing.Text
-        && p.DenotedItem is { IsDynamicLength: false, IsAnyLength: false } item
+        BoundaryLength(p.DenotedItem, CrossingOf(p));
+
+    /// <summary>The rule of <see cref="BoundaryLength(Place)"/> for storage of <paramref name="item"/>'s description that
+    /// crosses as <paramref name="crossing"/> (see <see cref="ArgumentLength(DataItem, CallCrossing)"/>).</summary>
+    internal static int BoundaryLength(DataItem? item, CallCrossing crossing) =>
+        crossing is CallCrossing.Text
+        && item is { IsDynamicLength: false, IsAnyLength: false }
         && BoundaryImageWidth(item) is > 0 and var width
             ? width
             : RuntimeApi.UnstatedBoundaryLength;

@@ -17,7 +17,8 @@ namespace CobolNet.Tests.Conformance;
 /// through it.
 /// <para>The host is a real C# program compiled with Roslyn and run as its own process. It first gives its console an
 /// encoding of its own (ISO 8859-1, code page 28591), then installs its OWN writers for standard output and standard
-/// error, then runs a program through the host entry (<c>ProgramRegistry.RunMain</c>) that DISPLAYs wide characters
+/// error, then activates a program through its generated host entry (<c>Cobol.HCDISP.HCDISP.Call</c>,
+/// DESIGN-external-repository §4.3, the one host surface of §4.4) that DISPLAYs wide characters
 /// on the standard display device and UPON SYSERR. Expected, derived: the host's two writers and its encoding are all
 /// still in force afterwards, and each DISPLAY reached the host's writer for its device, every character intact
 /// (a writer holds UTF-16, so nothing is encoded on the way). Before the fix the run unit's first activation set
@@ -44,7 +45,6 @@ public sealed class RunUnitHostConsoleTests
         using System;
         using System.IO;
         using System.Text;
-        using CobolNet.Runtime;
 
         public static class HcHost
         {
@@ -65,11 +65,7 @@ public sealed class RunUnitHostConsoleTests
                 Console.SetError(hostErr);
                 TextWriter installedOut = Console.Out, installedErr = Console.Error;
 
-                ProgramRegistry.Reset();
-                var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, "HCDISP.dll"));
-                var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
-                asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
-                ProgramRegistry.RunMain("HCDISP");
+                Cobol.HCDISP.HCDISP.Call();
 
                 report.WriteLine("encoding=" + Console.OutputEncoding.CodePage);
                 report.WriteLine("out=" + (ReferenceEquals(Console.Out, installedOut) ? "host" : "replaced"));
@@ -87,7 +83,7 @@ public sealed class RunUnitHostConsoleTests
         try
         {
             NonCobolElement.CompileCobol(dir, "HCDISP", DisplayProgram);
-            NonCobolElement.CompileCSharp(dir, "HCHOST", Host, runtimeConfigOf: "HCDISP");
+            NonCobolElement.CompileCSharp(dir, "HCHOST", Host, "HCDISP", "HCDISP");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "HCHOST.dll"), dir);
             Assert.True(exit == 0, $"host exit {exit}: {stderr}");
             Assert.Equal(

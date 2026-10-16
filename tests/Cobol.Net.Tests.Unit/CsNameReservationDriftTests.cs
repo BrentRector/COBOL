@@ -67,6 +67,7 @@ public sealed class CsNameReservationDriftTests
         Assert.Contains(all, e => e.Name == "CloseFiles");
         var unreserved = all
             .Where(e => !CsNames.RecordStructMembers.Contains(e.Name) && !CsNames.ProgramClassMembers.Contains(e.Name)
+                        && !CsNames.HostEntryMembers.Contains(e.Name)
                         && !MembersOfClassesWithoutDataMembers.Contains(e.Name))
             .Select(e => $"{e.Rel}: {e.Name}")
             .Distinct()
@@ -74,7 +75,8 @@ public sealed class CsNameReservationDriftTests
         Assert.True(unreserved.Count == 0,
             "the code generator writes these members under a name a COBOL word can spell, but no CsNames seed reserves "
             + "it, so a data item spelled the same draws CS0102 (kb/Work PB2093) — add each to CsNames.RecordStructMembers "
-            + "or CsNames.ProgramClassMembers:\n  " + string.Join("\n  ", unreserved));
+            + "or CsNames.ProgramClassMembers (or, for a host-entry class, CsNames.HostEntryMembers):\n  "
+            + string.Join("\n  ", unreserved));
     }
 
     [Fact]

@@ -260,11 +260,12 @@ public sealed class ProgramTable
     /// EC or the open file originates in a SEPARATELY-COMPILED CALLed module whose descriptors the main group's
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
     /// boundary; the STOP status itself is the run unit's <see cref="RunUnit.ExitStatus"/>, written by the STOP statement
-    /// wherever in the run unit it executes). This is the HOST entry: it never writes the host process's exit code
-    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/> — and never reconfigures the host's
-    /// console (kb/Work PB3193): a DISPLAY writes through the host's <see cref="Console.Out"/> / <see cref="Console.Error"/>
-    /// as the host configured them (DOC-A.1-59). The standalone executable's entry,
-    /// which IS the process, is <see cref="RunModule"/>.
+    /// wherever in the run unit it executes). It never writes the host process's exit code (DOC-A.1-167; kb/Work PB3163)
+    /// and never reconfigures the process's console (kb/Work PB3193): only <see cref="RunModule"/> does either.
+    /// It is NOT a host route: a .NET host activates a program through the program's generated host entry
+    /// (DESIGN-external-repository §4.4, the one host surface), and the standalone executable's entry, which IS the
+    /// process, is <see cref="RunModule"/>; nothing in the runtime or the generated code calls it, and it stays only
+    /// because it is shipped public surface, whose removal raises the runtime major (RuntimeAbiPinDriftTests).
     /// <para>The whole of it runs on the run unit's own thread (<see cref="ActivationStack.RunOnRunUnitThread"/>,
     /// kb/Work PB2659), whose stack is sized for COBOL activation frames, so a RECURSIVE program reaches a realistic
     /// depth and the activation past the last one the stack can hold is §14.9.4.4 GR3c's EC-PROGRAM-RESOURCES rather
@@ -278,7 +279,9 @@ public sealed class ProgramTable
     /// refuses (a module built against another runtime major or call ABI, or one carrying an already-registered
     /// outermost name; PB2097) is a <see cref="CobolCallException"/> that reaches the same §14.6.12 abnormal-termination
     /// surface as any other fatal condition, because no statement of the entry runs outside the boundary that owns it.
-    /// A host that registers its modules itself enters through <see cref="RunMain"/>.
+    /// A .NET host never enters here: it activates a program through the program's generated host entry,
+    /// <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call</c>, whose activation is <see cref="CallProgram"/>'s outermost arm
+    /// (DESIGN-external-repository §4.3, §4.4).
     /// <para>This is the boundary that IS the process (DOC-A.1-167: "A standalone <c>cobol</c> executable IS its own
     /// host"), so it alone delivers the run unit's termination status to the process exit code, once, when the run unit
     /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the
@@ -286,9 +289,9 @@ public sealed class ProgramTable
     /// also the one runtime entry that configures the process's standard streams (<see cref="IO.StandardStreams.EnsureUtf8"/>,
     /// kb/Work PB3193), before the run unit begins.</para></summary>
     /// <param name="ensureRegistered">The module's registration member.</param>
-    /// <param name="mainPath">The main program's path, or null for a module with no main program (a callable library of
-    /// functions or prototypes, §8.3.1): it registers and ends.</param>
-    public void RunModule(Action ensureRegistered, string? mainPath)
+    /// <param name="mainPath">The main program's path. A module with no main program (a library, DESIGN-external-repository
+    /// §7.2) has no <c>Main</c> and never enters here.</param>
+    public void RunModule(Action ensureRegistered, string mainPath)
     {
         // The process's console is this entry's too, for the same reason (kb/Work PB3193): the standard streams carry
         // UTF-8 (DOC-A.1-59; kb/Work PB59, PB899), set here and in the CLI's Main, never by a host entry, so a run unit
@@ -298,29 +301,23 @@ public sealed class ProgramTable
         finally { Environment.ExitCode = CobolNum.Position32(_owner.ExitStatus); }   // StopRun unwinds through here too
     }
 
-    private void RunOnThisThread(Action? ensureRegistered, string? path)
+    private void RunOnThisThread(Action? ensureRegistered, string path)
     {
         try
         {
             // The module's own registration is a statement of the run unit like any other (kb/Work PB2846): a refusal
             // is a CobolCallException (EC-PROGRAM-NOT-FOUND, §14.9.4.4 GR3 b), and the catches below end the run unit.
             ensureRegistered?.Invoke();
-            if (path is not null) ActivateMain(path);
+            ActivateMain(path);
         }
         // The §14.6.12 abnormal-termination surface for a FATAL condition that reached the run-unit boundary
-        // unhandled — BOTH families, so neither escapes as a raw CLR crash: exception-condition fatals
-        // (CobolFatalException — a checking-enabled unresumed EC, §14.6.13.1.3 #7, or a raw runtime raise-point like
-        // a NULL BASED deref / an OO __CobolInvoke EC-OO-UNIVERSAL) AND the CALL/CANCEL machinery fatals
-        // (CobolCallException — EC-PROGRAM-NOT-FOUND / -RECURSIVE-CALL / -CANCEL-ACTIVE / EC-FUNCTION-NOT-FOUND,
-        // §14.9.4.4 GR3h → §14.6.13.1.3 #8). Runtime-side so a fatal from ANY runtime element reaches the surface,
-        // incl. a separately-compiled CALLed module (the settled SSOT §18.16 implementor choice).
-        catch (CobolFatalException fx) { AbnormalTermination(fx.Message); }
-        catch (CobolCallException cx) { AbnormalTermination(cx.Message); }
-        // An implementor-defined stop that raised NO exception condition (§14.6.13.1.1 NOTE 3) still terminates
-        // the run unit through the COBOL boundary — a .NET stack trace on the console is not a diagnostic a COBOL
-        // programmer can act on, and letting one escape is the runtime twin of emitting a Roslyn CS error on
-        // generated user source. Reported WITHOUT an exception-name, because there is none to name.
-        catch (CobolImplementorFatalException ix) { AbnormalTermination(ix.Message); }
+        // unhandled — every family, so none escapes as a raw CLR crash: the run-unit fatals of EndsRunUnitAbnormally
+        // AND the CALL/CANCEL machinery fatals (CobolCallException — EC-PROGRAM-NOT-FOUND / -RECURSIVE-CALL /
+        // -CANCEL-ACTIVE / EC-FUNCTION-NOT-FOUND, §14.9.4.4 GR3h → §14.6.13.1.3 #8), which a COBOL main's boundary ends
+        // the run unit for and a host's boundary hands its activator (CallFromHost). Runtime-side so a fatal from ANY
+        // runtime element reaches the surface, incl. a separately-compiled CALLed module (the settled SSOT §18.16
+        // implementor choice).
+        catch (Exception e) when (EndsRunUnitAbnormally(e) || e is CobolCallException) { AbnormalTermination(e.Message); }
         finally
         {
             // §14.6.11's runtime epilogue — item 2's implicit CLOSE of EVERY open file in the RUN UNIT (executed even
@@ -362,9 +359,30 @@ public sealed class ProgramTable
     /// <see cref="RunUnit.ExitStatus"/>; it overrides a STATUS an earlier STOP RUN wrote, as the exit code always did.</summary>
     private void AbnormalTermination(string message)
     {
-        Console.Error.WriteLine("abnormal run-unit termination: " + message);
-        _owner.ExitStatus = 1;
+        Console.Error.WriteLine(AbnormalTerminationReport(message));
+        _owner.ExitStatus = AbnormalTerminationStatus;
     }
+
+    /// <summary>The termination status of an abnormal run-unit termination (§14.6.12): Annex A's ERROR ⇒ 1, the settled
+    /// §18.16 implementor choice — the run unit's <see cref="RunUnit.ExitStatus"/> (which <see cref="RunModule"/> delivers
+    /// as a standalone run unit's process exit code), and the
+    /// <see cref="RunUnitEndedException.ExitStatus"/> a host receives.</summary>
+    private const int AbnormalTerminationStatus = 1;
+
+    /// <summary>The one wording of an abnormal run-unit termination's report, on stderr for a standalone run unit and as
+    /// the <see cref="RunUnitEndedException"/> message for a host.</summary>
+    private static string AbnormalTerminationReport(string message) => "abnormal run-unit termination: " + message;
+
+    /// <summary>The run-unit FATALS: the conditions that terminate the run unit abnormally (§14.6.12) when they reach its
+    /// outermost activation boundary, at either kind of boundary (<see cref="RunOnThisThread"/> for a COBOL main,
+    /// <see cref="CallFromHost"/> for a .NET host). <see cref="CobolFatalException"/> (with its
+    /// <see cref="CobolSizeError"/>) is an exception condition that terminates the run unit — a checking-enabled
+    /// unresumed fatal EC, §14.6.13.1.3 7), or a runtime raise point such as a NULL BASED reference or an OO
+    /// EC-OO-UNIVERSAL; <see cref="CobolImplementorFatalException"/> is an implementor-defined stop that raised NO
+    /// exception condition (§14.6.13.1.1 NOTE 3), which ends the run unit through the same boundary because a .NET stack
+    /// trace is not a diagnostic a COBOL programmer can act on. A <see cref="CobolCallException"/> is not one of them:
+    /// each boundary decides it itself.</summary>
+    private static bool EndsRunUnitAbnormally(Exception e) => e is CobolFatalException or CobolImplementorFatalException;
 
     /// <summary>
     /// Execute one CALL (ISO §14.9.4.4): resolve <paramref name="name"/> from <paramref name="callerPath"/> per
@@ -388,9 +406,64 @@ public sealed class ProgramTable
     /// activated program's formals it did not know: §14.2.3 GR9/GR10's COMPUTE is the ACTIVATING element's (kb/Work PB640),
     /// so its checking decides whether an argument that overflows its formal raises (§14.7.5) when the landing happens
     /// here (<see cref="LandArguments"/>).</param>
-    public void CallProgram(string name, string callerPath, CobolArg[] args, CobolArg? returning,
+    /// <param name="callerPath">The activating program's path (<see cref="OutermostPath"/>, <see cref="ContainedPath"/>),
+    /// whose §8.4.6.3 scope locates <paramref name="name"/>; <c>""</c> for a CALL written in a METHOD, which is contained in
+    /// no program; <c>null</c> for an activator outside every program, a .NET host — the run unit's OUTERMOST activation
+    /// boundary (<see cref="CallFromHost"/>).</param>
+    public void CallProgram(string name, string? callerPath, CobolArg[] args, CobolArg? returning,
         string notFoundEc = "EC-PROGRAM-NOT-FOUND", bool siteArgMismatchChecking = false,
         string[]? programSpecifiers = null, bool siteSizeTruncationChecking = false)
+    {
+        if (callerPath is null)
+            CallFromHost(name, args, returning, notFoundEc, siteArgMismatchChecking, programSpecifiers, siteSizeTruncationChecking);
+        else
+            Activate(name, callerPath, args, returning, notFoundEc, siteArgMismatchChecking, programSpecifiers, siteSizeTruncationChecking);
+    }
+
+    /// <summary>⛔ THE RUN UNIT'S OUTERMOST ACTIVATION BOUNDARY UNDER A .NET HOST (owner decision R48; docs/CONFORMANCE.md
+    /// DOC-A.1-167; DESIGN-external-repository §4.1, §4.3 "The exception contract"): the host's counterpart of
+    /// <see cref="RunOnThisThread"/>. The activation is <see cref="Activate"/>'s, the one §14.9.4.4 GR3 boundary every COBOL
+    /// CALL crosses; only §8.4.6.3's outermost-program rule locates the program, because the activator is in no program.
+    /// What this arm adds is the run-unit ENDING: a STOP RUN performs "The operations described in 14.6.11, Normal run unit
+    /// termination" and then "Execution of the run unit terminates and control is transferred to the operating system"
+    /// (ISO §14.9.42.4 1) and 6)), and a run-unit fatal (<see cref="EndsRunUnitAbnormally"/>) terminates the run unit
+    /// abnormally, after which "the runtime system attempts to perform the operations of normal termination as specified in
+    /// 14.6.11" and "The operating system shall indicate an abnormal termination of the run unit if such a capability exists
+    /// within the operating system" (§14.6.12). Here the host is that system: the run unit performs the §14.6.11 actions
+    /// (<see cref="RunUnit.EndForHost"/>), the host's ambient run unit becomes a new one, and the host receives the ONE
+    /// documented <see cref="RunUnitEndedException"/> with the termination status and whether the ending was abnormal —
+    /// never the internal <see cref="StopRun"/> or fatal signals, never a process exit (§14.2.3 13): the implementor
+    /// specifies the mechanisms for a non-COBOL activator).
+    /// <para>A <see cref="CobolCallException"/> leaves as itself (the exception contract's item 2): an activation attempt
+    /// that failed, or such a condition propagating out of the activated program, which the host may handle and continue in
+    /// the same run unit.</para>
+    /// <para>The ending is recognized by an exception FILTER and the epilogue runs after the try statement, never in a catch
+    /// block: a catch block runs on top of the stack the condition was thrown from (kb/Work PB2659), and a host thread has
+    /// only the .NET runtime's stack margin, which the §14.6.11 file closes must not have to share with the deepest
+    /// activation of a recursion that exhausted it.</para></summary>
+    private void CallFromHost(string name, CobolArg[] args, CobolArg? returning, string notFoundEc,
+        bool siteArgMismatchChecking, string[]? programSpecifiers, bool siteSizeTruncationChecking)
+    {
+        Exception? ending = null;
+        try
+        {
+            Activate(name, callerPath: null, args, returning, notFoundEc, siteArgMismatchChecking, programSpecifiers,
+                siteSizeTruncationChecking);
+        }
+        catch (Exception e) when (e is StopRun || EndsRunUnitAbnormally(e)) { ending = e; }
+        if (ending is null) return;
+        bool abnormal = ending is not StopRun;
+        long status = abnormal ? AbnormalTerminationStatus : _owner.ExitStatus;
+        _owner.EndForHost();
+        throw new RunUnitEndedException(status, abnormal, abnormal
+            ? AbnormalTerminationReport(ending.Message)
+            : $"STOP RUN ended the run unit during the host's activation of '{ExternalizedNames.Form(name)}' (ISO §14.9.42.4 6))");
+    }
+
+    /// <summary>The §14.9.4.4 GR3 activation boundary every CALL, function activation and host activation crosses
+    /// (<see cref="CallProgram"/>, whose parameters it takes; <paramref name="callerPath"/> null for a host).</summary>
+    private void Activate(string name, string? callerPath, CobolArg[] args, CobolArg? returning,
+        string notFoundEc, bool siteArgMismatchChecking, string[]? programSpecifiers, bool siteSizeTruncationChecking)
     {
         // The ACTIVATING element's EC-EXTERNAL half (§14.8.4.1 / §14.9.4.4 GR3e): the CALL statement guard's
         // checking flags, read HERE, before this activation's own checking scope opens below. The flags are a
@@ -766,7 +839,9 @@ public sealed class ProgramTable
     /// next CALL finds the program in its initial state (GR3). EXTERNAL data is untouched (GR8). A never-called
     /// or already-canceled program is a no-op (GR7).
     /// </summary>
-    public void Cancel(string name, string callerPath)
+    /// <param name="callerPath">As <see cref="CallProgram"/>'s: <c>null</c> for a .NET host, whose CANCEL locates only an
+    /// outermost program (§8.4.6.3).</param>
+    public void Cancel(string name, string? callerPath)
     {
         string n = ExternalizedNames.Form(name);
         if (n.Length == 0) return;   // §14.9.5 GR12

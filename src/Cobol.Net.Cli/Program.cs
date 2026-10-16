@@ -245,6 +245,13 @@ internal static class Program
             };
         }
 
+        if (options.Run && result.Library)
+        {
+            // A group with no main program is a library (DESIGN-external-repository §7.2): there is nothing to launch.
+            Console.Error.WriteLine($"error: --run: {result.OutputDll} is a library (the source has no program to run as "
+                + "the main program); a .NET host calls its host entries.");
+            return 64;   // POSIX sysexits: usage error
+        }
         return options.Run ? Run(result.OutputDll) : 0;
     }
 

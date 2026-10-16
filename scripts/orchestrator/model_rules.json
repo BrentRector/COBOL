@@ -177,6 +177,38 @@
           "agents": 204,
           "measured": "2026-10-16",
           "source": "r2_cost.py --measure batch-4a over its one Workflow run wf_2d2b1baa-8ae (Mythos lane, 2026-10-16)"
+        },
+        {
+          "batch": "4b",
+          "pin": "8be23006851a",
+          "line_dimensions": 22905,
+          "findings": 33,
+          "verdicts": 99,
+          "nulls": 0,
+          "finder_tokens": 2239694,
+          "skeptic_tokens": 2753917,
+          "null_tokens": 0,
+          "duplication_pass_tokens": null,
+          "workflow_runs": 1,
+          "agents": 43,
+          "measured": "2026-10-16",
+          "source": "r2_cost.py --measure batch-4b over its one Workflow run wf_02afb032-8d3 (Mythos lane, 2026-10-16)"
+        },
+        {
+          "batch": "5b",
+          "pin": "8be23006851a",
+          "line_dimensions": 54015,
+          "findings": 54,
+          "verdicts": 162,
+          "nulls": 0,
+          "finder_tokens": 5523685,
+          "skeptic_tokens": 4601571,
+          "null_tokens": 0,
+          "duplication_pass_tokens": null,
+          "workflow_runs": 1,
+          "agents": 71,
+          "measured": "2026-10-16",
+          "source": "r2_cost.py --measure batch-5b over its one Workflow run wf_eb2731ff-e57 (Mythos lane, 2026-10-16)"
         }
       ]
     },
