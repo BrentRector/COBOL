@@ -1,6 +1,9 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Reflection;
 using System.Text;
+using System.Text.RegularExpressions;
+using CobolNet.Frontend.Generated;
 using CobolNet.Tests.Shared;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -26,14 +29,19 @@ namespace CobolNet.Tests.Unit;
 ///   <item>EDITION STATE is the parser's <c>Edition</c> property, an <c>EditionInfo</c>, or a lexer field PRIMED from
 ///     one — the fields the retype stage's edition reads set through a lexer setter (computed from
 ///     <c>TokenRetypes</c>, never named here).</item>
-///   <item>An EDITION READ is a method or property of the parser superclass (<c>CobolParserCoreBase</c>), of the lexer
-///     (<c>CobolLexer.g4</c>'s <c>@members</c> and its committed partials) or of the retype stage
-///     (<c>TokenRetypes</c>) whose syntax reaches edition state, or that calls another read — to a fixpoint.</item>
-///   <item>A SITE is a predicate or action body of any grammar, or any C# member elsewhere in <c>src/</c> (the
-///     parser's syntax-error listeners, the front end's driver), that calls a read; a front-end member that hands the
-///     edition to a parser (<c>Edition = …</c>); and any caller of such a member that is not private (it passes the
-///     edition on).</item>
+///   <item>An EDITION READ is a method or property of the parser (<c>CobolParserCoreBase</c>, every committed
+///     <c>CobolParserCore</c> partial and any parser grammar's <c>@members</c>), of the lexer (<c>CobolLexer.g4</c>'s
+///     <c>@members</c> and its committed partials) or of the retype stage (<c>TokenRetypes</c>) whose syntax reaches
+///     edition state, or that calls another read — to a fixpoint.</item>
+///   <item>A SITE is a predicate or action body of any grammar that names a read OR edition state itself
+///     (<c>{Edition.Has(2014)}?</c>, a primed lexer field); any C# member elsewhere in <c>src/</c> (the parser's
+///     syntax-error listeners, the front end's driver) that calls or reads a read callable from outside its stage; a
+///     front-end member that hands the edition to a parser (<c>Edition = …</c>); and any caller of such a member that
+///     is not private (it passes the edition on).</item>
 /// </list>
+/// Outside the parser, edition state cannot be read at all: the parser's <c>Edition</c> getter is <c>protected</c>
+/// (the compiler refuses <c>parser.Edition</c> in a listener or pass) and the lexer's primed fields are private, and
+/// <see cref="TheParsersEdition_IsWriteOnlyOutsideIt"/> pins that, so the C# arm needs no type inference.
 /// Both computed sets are compared, per file, with the inventory PB2291's verdict recorded below. A new read under
 /// ANY name — a sixth <c>{isXXXX()}?</c> spelling, a new <c>reservedHere</c> site, a new member, a lexer field primed
 /// from the edition, a new listener call — fails here until it is adjudicated and recorded, with its verdict.</para>
@@ -66,12 +74,13 @@ public sealed class EditionReadDriftTests
 
     // ── The verdict (kb/Work PB2291), recorded ────────────────────────────────────────────────────────────────────
 
-    /// <summary>The edition-read MEMBERS each source holds, as the rule computes them.</summary>
+    /// <summary>The edition-read MEMBERS each stage holds, as the rule computes them, keyed by the stage's principal
+    /// source (the parser's key also covers its <c>CobolParserCore</c> partials, the lexer's its partials).</summary>
     private static readonly SortedDictionary<string, string[]> RecordedMembers = new(StringComparer.Ordinal)
     {
         ["src/Cobol.Net.Frontend/Parsing/CobolParserCoreBase.cs"] =
         [
-            "DialectLevel", "IsKeywordReadingHere", "NoteGatedOffender", "ReservedGatedWord",
+            "IsKeywordReadingHere", "NoteGatedOffender", "ReservedGatedWord",
             "ReservedUserWordViolation", "entryNameHere", "facilityWord", "gatedDeclaration", "is2002", "is2014",
             "is2023", "is85", "keywordContinuesHere", "reservedHere", "screenPositionAhead", "setLocaleAhead",
             "userWordHere",
@@ -211,6 +220,53 @@ public sealed class EditionReadDriftTests
         ], gates);
     }
 
+    /// <summary>Edition STATE named directly is a site too, not only a call of a read (review finding w1092e R1-1): a
+    /// grammar predicate spelling <c>{Edition.Has(2014)}?</c>, a lexer action naming a primed field, and a parser
+    /// partial or <c>@members</c> member that reads <c>Edition</c> are each found; and a C# use of an outside-callable
+    /// read is found whether it is called or read as a property. Applied to synthetic text, so the rule's reach is
+    /// stated without a construct gate in the tree.</summary>
+    [Fact]
+    public void TheRule_SeesEditionStateNamedDirectly()
+    {
+        var model = EditionReadModel.Compute();
+
+        var parserReads = EditionReadModel.ParserReadsOf(
+            EditionReadModel.ParserMembersOf("protected bool newGate() => Edition.Has(2014);"));
+        Assert.Equal(["newGate"], parserReads.Keys);
+
+        const string parserGrammar = "parser grammar T;\nr\n    : {Edition.Has(2014)}? a\n    | {newGate()}? b\n    ;\n";
+        Assert.Equal([("r", "Edition"), ("r", "newGate")],
+            EditionReadModel.GrammarSites(parserGrammar, parserReads, EditionReadModel.ParserState));
+
+        string primedField = model.PrimedLexerFields.Order(StringComparer.Ordinal).First();
+        string lexerGrammar = $"lexer grammar L;\nX : 'x' {{{primedField} >= 2002}}? ;\n";
+        Assert.Equal([("X", primedField)],
+            EditionReadModel.GrammarSites(lexerGrammar, new Dictionary<string, bool>(), model.PrimedLexerFields));
+
+        var root = CSharpSyntaxTree.ParseText(
+            "class L { void M(P p) { var y = p.Level; p.Level = 2; p?.Note(); p.Note(); } }").GetRoot();
+        Assert.Equal(["Level", "Note", "Note"], EditionReadModel.OutsideUses(root, ["Level", "Note"]).Select(u => u.Name));
+    }
+
+    /// <summary>Outside the parser and lexer, edition state cannot be read at all, which is what lets the C# arm of
+    /// the rule look only for reads: the parser's <c>Edition</c> getter is protected (a listener writing
+    /// <c>parser.Edition.Has(2002)</c> does not compile) while the front end can still set it, and every primed lexer
+    /// field is private.</summary>
+    [Fact]
+    public void TheParsersEdition_IsWriteOnlyOutsideIt()
+    {
+        var edition = typeof(CobolParserCoreBase).GetProperty(nameof(CobolParserCoreBase.Edition));
+        Assert.NotNull(edition);
+        Assert.True(edition.GetMethod is { IsFamily: true },
+            "CobolParserCoreBase.Edition's getter must be protected: an outside read is an edition read no inventory sees");
+        Assert.True(edition.SetMethod is { IsPublic: true }, "the front end hands the parser its edition");
+
+        var model = EditionReadModel.Compute();
+        foreach (string field in model.PrimedLexerFields)
+            Assert.True(typeof(CobolLexer).GetField(field, BindingFlags.Instance | BindingFlags.NonPublic) is { IsPrivate: true },
+                $"CobolLexer.{field} is primed from the edition and must stay private");
+    }
+
     /// <summary>The computed model: the reads of each stage, the primed lexer fields and the sites.</summary>
     private sealed class EditionReadModel
     {
@@ -232,9 +288,15 @@ public sealed class EditionReadDriftTests
 
         public static EditionReadModel Compute()
         {
-            // The parser superclass: its members that reach the parser's Edition property.
-            var parserMembers = Members(ClassBodies(File.ReadAllText(Repo(ParserBase)), "CobolParserCoreBase"));
-            var parserReads = Fixpoint(parserMembers, ids => ids.Contains("Edition"), exclude: ["Edition"]);
+            // The parser: the superclass, every committed partial of the generated parser and any parser grammar's
+            // @members — their members that reach the parser's Edition property.
+            var parserBodies = new List<MemberDeclarationSyntax>(ClassBodies(File.ReadAllText(Repo(ParserBase)), "CobolParserCoreBase"));
+            foreach (var path in SourceFiles().Where(p => IsPartialOf(File.ReadAllText(p), ParserType)))
+                parserBodies.AddRange(ClassBodies(File.ReadAllText(path), ParserType));
+            foreach (var path in Grammars().Where(p => Rel(p) != LexerGrammar))
+                foreach (var (_, body) in NamedActions(File.ReadAllText(path), "members"))
+                    parserBodies.AddRange(ParserMembersOf(body));
+            var parserReads = ParserReadsOf(parserBodies);
 
             // The retype stage: its members whose syntax names an EditionInfo.
             var retypeMembers = Members(ClassBodies(File.ReadAllText(Repo(RetypeStage)), "TokenRetypes"));
@@ -245,8 +307,8 @@ public sealed class EditionReadDriftTests
             var lexerBodies = new List<MemberDeclarationSyntax>();
             foreach (var (_, body) in NamedActions(lexerText, "members"))
                 lexerBodies.AddRange(ClassBodies($"partial class CobolLexer {{ {body} }}", "CobolLexer"));
-            foreach (var path in SourceFiles().Where(p => File.ReadAllText(p).Contains("partial class CobolLexer", StringComparison.Ordinal)))
-                lexerBodies.AddRange(ClassBodies(File.ReadAllText(path), "CobolLexer"));
+            foreach (var path in SourceFiles().Where(p => IsPartialOf(File.ReadAllText(p), LexerType)))
+                lexerBodies.AddRange(ClassBodies(File.ReadAllText(path), LexerType));
             var lexerMembers = Members(lexerBodies);
             var lexerFields = lexerBodies.OfType<FieldDeclarationSyntax>()
                 .SelectMany(f => f.Declaration.Variables.Select(v => v.Identifier.Text)).ToHashSet(StringComparer.Ordinal);
@@ -276,22 +338,23 @@ public sealed class EditionReadDriftTests
                     primed.UnionWith(info.Identifiers.Where(lexerFields.Contains));
             var lexerReads = Fixpoint(lexerMembers, ids => ids.Overlaps(primed), exclude: setters);
 
-            // Sites, 1: the predicate and action bodies of every grammar.
+            // Sites, 1: the predicate and action bodies of every grammar — a read, or the stage's edition state named
+            // directly (the parser's Edition, a primed lexer field).
             var sites = new SortedDictionary<string, int>(StringComparer.Ordinal);
-            foreach (var path in Directory.GetFiles(Repo("src/Cobol.Net.Frontend/Grammar"), "*.g4", SearchOption.AllDirectories)
-                         .Where(IsSourcePath).Order(StringComparer.Ordinal))
+            foreach (var path in Grammars())
             {
                 string rel = Rel(path);
-                var reads = rel == LexerGrammar ? lexerReads : parserReads;
-                foreach (var (rule, body) in RuleActions(File.ReadAllText(path)))
-                    foreach (string id in Identifiers(body).Where(reads.ContainsKey))
-                        Bump(sites, $"{rel} | {rule} | {id}");
+                bool lexer = rel == LexerGrammar;
+                foreach (var (rule, id) in GrammarSites(File.ReadAllText(path), lexer ? lexerReads : parserReads,
+                             lexer ? primed : ParserState))
+                    Bump(sites, $"{rel} | {rule} | {id}");
             }
 
-            // Sites, 2: every other C# member in src/ that calls a read callable from outside its stage, and every
-            // front-end DRIVER member that hands edition state to a parser (`Edition = …`, `DialectLevel = …`) —
-            // plus, one level up, each call of a non-private driver member that does so, which passes edition state
-            // on (the fragment parser's callers).
+            // Sites, 2: every other C# member in src/ that calls or reads a read callable from outside its stage, and
+            // every front-end DRIVER member that hands edition state to a parser (`Edition = …`) — plus, one level up,
+            // each call of a non-private driver member that does so, which passes edition state on (the fragment
+            // parser's callers). Edition state itself is unreadable here: the parser's getter is protected and the
+            // primed lexer fields are private (TheParsersEdition_IsWriteOnlyOutsideIt).
             string[] outside = [.. parserReads.Concat(lexerReads).Concat(retypeReads).Where(kv => kv.Value).Select(kv => kv.Key).Distinct()];
             var memberSources = new HashSet<string>([ParserBase, RetypeStage], StringComparer.Ordinal);
             var trees = new List<(string Rel, SyntaxNode Root)>();
@@ -300,18 +363,17 @@ public sealed class EditionReadDriftTests
                 string rel = Rel(path);
                 if (memberSources.Contains(rel)) continue;
                 string text = File.ReadAllText(path);
-                if (text.Contains("partial class CobolLexer", StringComparison.Ordinal)) continue;
+                if (IsPartialOf(text, LexerType) || IsPartialOf(text, ParserType)) continue;
                 bool frontEnd = rel.StartsWith("src/Cobol.Net.Frontend/", StringComparison.Ordinal);
-                if (!outside.Any(n => text.Contains(n + "(", StringComparison.Ordinal)) && !frontEnd) continue;
+                if (!outside.Any(n => text.Contains(n, StringComparison.Ordinal)) && !frontEnd) continue;
                 trees.Add((rel, CSharpSyntaxTree.ParseText(text).GetRoot()));
             }
 
             var drivers = new HashSet<string>(StringComparer.Ordinal);   // "Type.Member" of a non-private hand-off
             foreach (var (rel, root) in trees)
             {
-                foreach (var inv in root.DescendantNodes().OfType<InvocationExpressionSyntax>())
-                    if (InvokedName(inv) is { } name && outside.Contains(name))
-                        Bump(sites, $"{rel} | {SiteOf(inv)} | {name}");
+                foreach (var (node, name) in OutsideUses(root, outside))
+                    Bump(sites, $"{rel} | {SiteOf(node)} | {name}");
 
                 if (!rel.StartsWith("src/Cobol.Net.Frontend/", StringComparison.Ordinal)) continue;
                 foreach (var a in root.DescendantNodes().OfType<AssignmentExpressionSyntax>())
@@ -322,7 +384,7 @@ public sealed class EditionReadDriftTests
                         MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
                         _ => null,
                     };
-                    if (target is not ("Edition" or "DialectLevel")) continue;
+                    if (target is null || !ParserState.Contains(target)) continue;
                     Bump(sites, $"{rel} | {SiteOf(a)} | {target}=");
                     if (a.Ancestors().OfType<MemberDeclarationSyntax>().FirstOrDefault(m => m is not BaseTypeDeclarationSyntax) is { } md
                         && !md.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)))
@@ -351,12 +413,53 @@ public sealed class EditionReadDriftTests
 
         private static void Bump(SortedDictionary<string, int> d, string key) => d[key] = d.GetValueOrDefault(key) + 1;
 
-        private static string? InvokedName(InvocationExpressionSyntax inv) => inv.Expression switch
+        /// <summary>The parser's edition state: the one property every parser read reaches, excluded from the reads
+        /// themselves and named directly by a site.</summary>
+        public static readonly IReadOnlySet<string> ParserState = new HashSet<string>(["Edition"], StringComparer.Ordinal);
+
+        private const string ParserType = "CobolParserCore";
+        private const string LexerType = "CobolLexer";
+
+        /// <summary>The parser's edition reads among <paramref name="bodies"/>: the members whose syntax reaches its
+        /// <see cref="ParserState"/>, to a fixpoint.</summary>
+        public static Dictionary<string, bool> ParserReadsOf(IEnumerable<MemberDeclarationSyntax> bodies) =>
+            Fixpoint(Members(bodies), ids => ids.Overlaps(ParserState), exclude: [.. ParserState]);
+
+        /// <summary>The members a parser grammar's <c>@members</c> (or a committed partial's body) adds.</summary>
+        public static IEnumerable<MemberDeclarationSyntax> ParserMembersOf(string body) =>
+            ClassBodies($"partial class {ParserType} {{ {body} }}", ParserType);
+
+        /// <summary>Every <c>(rule, name)</c> where a predicate or action body of <paramref name="g4"/> names a read
+        /// or the edition state itself.</summary>
+        public static IEnumerable<(string Rule, string Name)> GrammarSites(string g4, IReadOnlyDictionary<string, bool> reads,
+            IReadOnlySet<string> state) =>
+            RuleActions(g4).SelectMany(a => Identifiers(a.Body).Where(id => reads.ContainsKey(id) || state.Contains(id))
+                .Select(id => (a.Rule, id)));
+
+        /// <summary>Every use of an outside-callable read in <paramref name="root"/> — called (<c>x.M()</c>,
+        /// <c>x?.M()</c>) or read as a property (<c>x.P</c>) — but not an assignment to it.</summary>
+        public static IEnumerable<(SyntaxNode Node, string Name)> OutsideUses(SyntaxNode root, IReadOnlyCollection<string> outside)
         {
-            MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
-            MemberBindingExpressionSyntax mb => mb.Name.Identifier.Text,
-            _ => null,
-        };
+            foreach (var node in root.DescendantNodes())
+            {
+                string? name = node switch
+                {
+                    MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
+                    MemberBindingExpressionSyntax mb => mb.Name.Identifier.Text,
+                    _ => null,
+                };
+                if (name is null || !outside.Contains(name)) continue;
+                if (node.Parent is AssignmentExpressionSyntax a && a.Left == node) continue;
+                yield return (node, name);
+            }
+        }
+
+        private static bool IsPartialOf(string code, string type) =>
+            Regex.IsMatch(code, $@"\bpartial\s+class\s+{type}\b");
+
+        private static IEnumerable<string> Grammars() =>
+            Directory.GetFiles(Repo("src/Cobol.Net.Frontend/Grammar"), "*.g4", SearchOption.AllDirectories)
+                .Where(IsSourcePath).Order(StringComparer.Ordinal);
 
         /// <summary><c>Type.Member</c> enclosing <paramref name="node"/>.</summary>
         private static string SiteOf(SyntaxNode node)

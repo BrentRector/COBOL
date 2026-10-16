@@ -36,3 +36,17 @@ test; the `architecture-review` skill's grammar rule no longer says post-1985 fe
 comments that claimed `{is2002()}?` gates the grammar no longer has (`CobolLexer.g4` twice, `CobolOO.g4`, `CobolIO.g4`,
 `CobolData.g4#floatFormatPhrase`) were corrected, and the three gate sites, `CobolDeclined.g4`'s header and
 `DeclinedFacilityPass.Run` carry the verdict.
+
+**Branch review (round 1, finding R1-1): the pin saw only CALLS of a read, never edition state named directly.** A
+grammar predicate `{Edition.Has(2014)}?`, a lexer action naming `_caseMappingEdition`, a listener reading
+`parser.Edition` or `parser.DialectLevel`, or a committed `CobolParserCore` partial reading `Edition` would each have
+passed the pin green. Fixed at both ends. The product: the parser's `Edition` getter is now `protected`, so the
+compiler refuses an outside read (CS0271 when a listener names `parser.Edition`, measured by a temporary mutation of
+`CobolErrorListener`), and the unused `DialectLevel` setter shim is deleted (the front end already set `Edition`, both
+axes). The pin: a grammar site counts a read OR the stage's edition state (the parser's `Edition`, the computed primed
+lexer fields); the parser stage's members now include every committed `CobolParserCore` partial and any parser
+grammar's `@members`, as the lexer's already did; and the C# arm counts a read used as a property as well as one
+called. `TheRule_SeesEditionStateNamedDirectly` applies the rule to synthetic text for each shape, and
+`TheParsersEdition_IsWriteOnlyOutsideIt` pins the accessibility by reflection. A temporary mutation (`&& Edition.Has(2014)`
+on the CRT arm, a `mutantGate` reading `Edition` in the `CompilationUnitTokenRetypes` partial) turned
+`EditionReads_AreExactlyTheAdjudicatedSet` red with both rows named, and was reverted.

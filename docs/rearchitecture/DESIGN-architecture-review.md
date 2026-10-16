@@ -1393,18 +1393,21 @@ exception phrases (1844–2001).
 
 **Edition reads in the grammar: a rule over bodies, not a list of spellings.** Most semantic predicates are lookahead
 disambiguation (`{boolExprAhead()}?`, `{!numericLiteralIsLeftOperand()}?` …). **The rule:** EDITION STATE is the
-parser's `Edition` (`Parsing/CobolParserCoreBase.cs:22`, which the front end sets, `Pipeline/Frontend.cs:498`, to the
+parser's `Edition` (`Parsing/CobolParserCoreBase.cs:26`, whose getter is `protected` so that nothing outside the
+parser can read it, and which the front end sets, `Pipeline/Frontend.cs:498`, to the
 compile edition for the program and to whatever edition a fragment parse is given), any `EditionInfo` value (a
 parameter, or a fixed one: `DirectiveExpressionFragment.cs:45` parses every directive expression at
 `EditionInfo.Latest` on purpose and gates the `>>` facility separately, so "the compile edition" is not what every
 parse reads), and every lexer field the front end primes from one
 (`_caseMappingEdition` and `_reservedNonNames`, set by `TokenRetypes.PrimeLexer` from `edition.Year` and from
-`ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of
-the lexer grammar's `@members`, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex)
+`ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of a
+committed `CobolParserCore` partial or a parser grammar's `@members`, of the lexer grammar's `@members` and its
+partials, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex)
 whose body reads edition state or calls another edition read, to a fixpoint; an edition-read SITE is any parser or
 lexer predicate `{…}?` or action `{…}` body, any lexer override (`NextToken`, `Emit`), any parser listener, any
 retype-stage member, or any front-end DRIVER member that hands edition state to a lexer or parser or decides a
-re-lex from it, that calls one or passes edition state on: the pipeline's parse-again loop (`Pipeline/Frontend.cs:425-463`,
+re-lex from it, that calls one, names edition state itself (`{Edition.Has(2014)}?`, a primed lexer field) or passes
+edition state on: the pipeline's parse-again loop (`Pipeline/Frontend.cs:425-463`,
 calling `LexesDifferentlyFrom` at `:437` and `PrimeLexer` at `:463`) and the fragment parser (`FragmentParse.Parse`,
 `Parsing/FragmentParse.cs:62,72,93`, and its callers `SubscriptExpressionFragment.cs:31` and
 `DirectiveExpressionFragment.cs:45`), both added by Draft 6 after the fifth refuter (G4). Names play no part, so a read under a new name, in any of the three stages, is
@@ -1415,7 +1418,7 @@ transitive scan), the rule finds these members: `is85`, `is2002`, `is2014`, `is2
 `keywordContinuesHere` (`:437`) through `IsKeywordReadingHere` (`:467`); `userWordHere` (`:371-375`); the action
 `gatedDeclaration` (`:389-392`, through `userWordHere`) and `NoteGatedOffender` (`:401-404`, called by the
 authoritative pass's syntax-error listener); and `ReservedUserWordViolation` (`:545-554`, the COBOLNET0901 message, not
-a predicate); `DialectLevel` is the edition's setter, not a read. And these sites: five spelled `{isXXXX()}?` —
+a predicate); the `DialectLevel` setter shim is deleted (the front end sets `Edition`, both axes). And these sites: five spelled `{isXXXX()}?` —
 `| {is2023()}? LOCATION` (`CobolControlFlow.g4:66`), `| {is2002()}? validationClause` (`CobolData.g4:379`),
 `({is2002()}? validateValidPhrase)?` (`CobolData.g4:828`), `| {is2023()}? applyCommitClause` (`CobolIO.g4:334`) and
 OPEN's `{is2002() || retryPhraseAhead()}?` (`CobolIO.g4:393`); `{reservedHere("CRT")}?` and `{reservedHere("CURSOR")}?`
