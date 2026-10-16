@@ -240,7 +240,8 @@ public static class PictureAnalyzer
         //    IsFloatEdited flag drives every store / read dispatch. The COBOL-2002 introduction gate keys on that flag
         //    in VersionConformancePass.UsageConstructId (no SkeletonGate: the category is no longer recovered). ──
         if (hasE && invalid is null && !hasN && !has1)
-            return AnalyzeFloatEdited(picture, expanded, usage, explicitUsage, edition, where, editRules, char1Extended, editingExtra);
+            return AnalyzeFloatEdited(picture, expanded, usage, explicitUsage, edition, where, editRules, char1Extended, editingExtra,
+                decimalPointIsComma);
         if (invalid is { } bad)
         {
             // Wording is exact about what IS checked HERE: symbol MEMBERSHIP in the SR2 inventory. SR2's
@@ -279,6 +280,12 @@ public static class PictureAnalyzer
         if (!PictureComposition.Validate(picture, expanded, cs, char1Set, char1Extended, blankWhenZero, decimalPointIsComma,
                 edition, where))
             return PicInfo.Recovery(expanded.Length);
+
+        // The composition is legal, so the mask can take the shape the runtime reads: one kind of insertion per
+        // rule key (SeparateFixedFromFloating, kb/Work PB3220). GR14's size is re-asked of that mask.
+        (expanded, editRules) = SeparateFixedFromFloating(expanded, editRules, cs, char1Set, char1Extended,
+            decimalPointIsComma);
+        editingExtra = EditingPositions(expanded, editRules);
 
         // ── Category national (§8.5.2.10) / national-edited (§8.5.2.11) / boolean (§8.5.2.5) — LIVE. The
         // introduction gate stays at every entry point (COBOLNET0900 below 2002; the registry rows are silent at
@@ -365,7 +372,7 @@ public static class PictureAnalyzer
         // `PIC $999$` look like floating strings and silently answered a question the source never asked; both
         // are now SR24 errors, and the two readings can no longer disagree because there is only one.
         var (floatChar, floatOcc) = PictureComposition.FloatingString(expanded, cs, char1Set, char1Extended,
-            decimalPointIsComma ? ',' : '.', decimalPointIsComma ? '.' : ',');
+            decimalPointIsComma);
         int floatingExtra = floatOcc >= 2 ? floatOcc - 1 : 0;
         bool IsDigitAnchor(char c) => c is '9' or 'Z' or '*' || (floatChar != '\0' && c == floatChar);
         int firstNine = -1, lastNine = -1;
@@ -668,10 +675,12 @@ public static class PictureAnalyzer
     ///     counted in the size of the item" — the IS form, at EVERY occurrence;</item>
     ///   <item>"For extended editing sign control symbols with fixed insertion, each occurrence of the
     ///     character(s) specified in the associated literal are counted in the size of the item" — the FOR form
-    ///     with a single occurrence;</item>
+    ///     with FIXED occurrences, one or several (<c>PIC L999L</c>: two fixed occurrences, the literal at each;
+    ///     kb/Work PB3220);</item>
     ///   <item>"For floating inserting, one occurrence of literal-2 or literal-3 is counted in the size of the
-    ///     item plus one character for each repetition of character-1" — the FOR form with two or more, where
-    ///     exactly ONE occurrence is literal-wide and the rest are one character apiece.</item>
+    ///     item plus one character for each repetition of character-1" — the FOR form's FLOATING string (two or
+    ///     more ADJACENT, <see cref="CobolEdit.EditRule.Floating"/>), where exactly ONE occurrence is literal-wide
+    ///     and the rest are one character apiece.</item>
     /// </list>
     /// <para>Annex D.24 states the arithmetic for the floating case outright: <c>PIC LLLL9,88 EDITING "L" FOR
     /// NEGATIVE IS "DEBIT "</c> "would result in an item size of 13 characters: 6 for the first 'L', 3 for the
@@ -680,6 +689,8 @@ public static class PictureAnalyzer
     /// gives 6.</para></summary>
     private static int EditingPositions(string expanded, IReadOnlyList<CobolEdit.EditRule>? rules)
     {
+        // Every rule here is ONE kind: a letter holding both a floating string and a fixed occurrence has been
+        // split by SeparateFixedFromFloating before this is asked (kb/Work PB3220).
         if (rules is null) return 0;
         int extra = 0;
         foreach (var r in rules)
@@ -689,9 +700,57 @@ public static class PictureAnalyzer
             int occ = 0;
             foreach (char c in expanded) if (char.ToUpperInvariant(c) == c1) occ++;
             if (occ == 0) continue;
-            extra += (r.SimpleInsertion ? occ : 1) * (r.Width - 1);
+            // ONE fixed/floating decision (kb/Work PB3220): a FLOATING string (EditRule.Floating, rule 6's adjacency
+            // test, PictureComposition.HasFloatingString) is one literal-wide occurrence plus one character per
+            // repetition; every other rule — the IS form and a FOR form with FIXED occurrences, PIC L999L —
+            // counts the literal's width at EACH occurrence.
+            extra += (r.Floating ? 1 : occ) * (r.Width - 1);
         }
         return extra;
+    }
+
+    /// <summary>⛔ ONE EDITING RULE IS ONE KIND OF INSERTION (kb/Work PB3220). SR24 counts "extended editing sign
+    /// control symbols" as OCCURRENCES — a FLOATING string of one character-1 is a single symbol (rule 6) and each
+    /// FIXED occurrence another — so <c>PIC LL9L EDITING L FOR NEGATIVE IS "DB "</c> holds a floating string and a
+    /// fixed insertion of the SAME letter, which §13.18.40.6 allows (the extended symbol's order against another
+    /// currency-like symbol is SR25's, and the floating string stays outside Table 10), and GR14's 'es' sizes
+    /// them differently: "one occurrence of literal-2 or literal-3 is counted in the size of the item plus one
+    /// character for each repetition" for the floating string, "each occurrence of the character(s) specified in
+    /// the associated literal" for the fixed one. The rule table is keyed by the mask character, and
+    /// <see cref="CobolEdit.EditRule.Floating"/> is one flag per key, so the mask the runtime reads gives the
+    /// fixed occurrences of such a letter a KEY OF THEIR OWN: a private-use character (never a picture symbol,
+    /// never a declared character-1, which SR8 limits to basic letters) with a twin rule that differs only in
+    /// <c>Floating: false</c>. Everything downstream — GR14's size, the digit-position anchors, the renderer, the
+    /// de-editor — then reads one kind per key, with no second fixed-or-floating decision anywhere.</summary>
+    /// <returns>The mask to emit and the rules for it; both unchanged when no letter holds both kinds.</returns>
+    private static (string Mask, CobolEdit.EditRule[]? Rules) SeparateFixedFromFloating(string expanded,
+        CobolEdit.EditRule[]? rules, char cs, HashSet<char> char1Set, HashSet<char> char1Extended,
+        bool decimalPointIsComma)
+    {
+        if (rules is null) return (expanded, rules);
+        bool[]? marks = null;
+        char[]? mask = null;
+        List<CobolEdit.EditRule>? twins = null;
+        foreach (var r in rules)
+        {
+            if (r.SimpleInsertion || !r.Floating) continue;
+            char c1 = char.ToUpperInvariant(r.Char1);
+            marks ??= PictureComposition.FloatingMarks(expanded, cs, char1Set, char1Extended, decimalPointIsComma);
+            char twin = '\0';
+            for (int i = 0; i < expanded.Length; i++)
+            {
+                if (marks[i] || char.ToUpperInvariant(expanded[i]) != c1) continue;
+                if (twin == '\0')
+                {
+                    twin = (char)(0xE000 + (twins?.Count ?? 0));
+                    (twins ??= []).Add(r with { Char1 = twin, Floating = false });
+                }
+                (mask ??= expanded.ToCharArray())[i] = twin;
+            }
+        }
+        if (twins is null) return (expanded, rules);
+        foreach (var t in twins) { char1Set.Add(t.Char1); char1Extended.Add(t.Char1); }
+        return (new string(mask!), [.. rules, .. twins]);
     }
 
     /// <summary>ISO §13.18.40.3 SR4 — "The maximum number of characters allowed in character-string-1 is 63."
@@ -953,14 +1012,18 @@ public static class PictureAnalyzer
                 // — so this phrase, and only this form, is one of the two SR25's second sentence orders.
                 extended.Add(char1);
                 char1Extended.Add(char1);
-                // SR12b: a FOR (extended sign-control) picture may contain only character-1 and 9 . cs P V Z.
+                // SR12b: a FOR (extended sign-control) picture may contain only character-1 and 9 . cs P V Z — where
+                // "the symbol period" is the DECIMAL separator, which DECIMAL-POINT IS COMMA makes the comma
+                // (SR13: "The rules for the symbol period apply to the symbol comma, and the rules for the symbol
+                // comma apply to the symbol period"; kb/Work PB3219). The grouping separator is NOT in the list.
+                char pointSymbol = PictureComposition.DecimalSeparator(decimalPointIsComma);
                 foreach (char mc in expanded)
                 {
                     char mu = char.ToUpperInvariant(mc);
-                    if (allChar1.Contains(mu) || mu is '9' or '.' or 'P' or 'V' or 'Z' || mu == cs) continue;
+                    if (allChar1.Contains(mu) || mu is '9' or 'P' or 'V' or 'Z' || mu == pointSymbol || mu == cs) continue;
                     edition.Error("COBOLNET1596", $"{where}: with a FOR (extended editing sign control) EDITING "
-                        + $"phrase the PICTURE character-string may contain only character-1 and 9 . {cs} P V Z "
-                        + $"(ISO §13.18.40.3 SR12b; found '{mc}')");
+                        + $"phrase the PICTURE character-string may contain only character-1 and 9 {pointSymbol} {cs} P V Z "
+                        + $"(ISO §13.18.40.3 SR12b{(decimalPointIsComma ? "; SR13 — DECIMAL-POINT IS COMMA makes the comma the decimal point" : "")}; found '{mc}')");
                     error = true; break;
                 }
                 // SR12a: the NEGATIVE and POSITIVE literals (when both present) occupy the same number of positions.
@@ -1007,7 +1070,7 @@ public static class PictureAnalyzer
                 rules[k] = rules[k] with
                 {
                     Floating = PictureComposition.HasFloatingString(expanded, cs, char1Set, char1Extended,
-                        decimalPointIsComma ? ',' : '.', decimalPointIsComma ? '.' : ',', rules[k].Char1),
+                        decimalPointIsComma, rules[k].Char1),
                 };
 
         // ── SR25's SECOND sentence over the EXTENDED editing sign control symbols as a SET (ISO §13.18.40.3). It is
@@ -1182,7 +1245,8 @@ public static class PictureAnalyzer
     /// <c>significand E exponent</c>. Validated per string (§13.18.40.6 — Table 10 applies to the two strings
     /// separately): the exponent is exactly <c>+9</c>…<c>+9999</c>; the significand an optional leading fixed
     /// sign (SR23 + NOTE 3 sanction the significand's <c>−</c> beside the exponent's <c>+</c>) and then only the
-    /// symbols Table 10 row E admits before E — <c>9 B 0 / , .</c> (no floating insertion, no zero suppression with
+    /// symbols Table 10 row E admits before E — <c>9 B 0 /</c>, the grouping separator and the decimal point (<c>, .</c>, or
+/// <c>. ,</c> under DECIMAL-POINT IS COMMA, SR13; kb/Work PB3219) (no floating insertion, no zero suppression with
     /// replacement, no S/V/P/CR/DB/currency; an IS-form EDITING character-1 is simple insertion and admitted, a FOR-form
     /// one is barred by SR12's FOR-phrase rules, kb/Work PB866) — with one point at most (SR12 b)
     /// and 1..36 digit positions (SR15 — SR14's 31 does not apply). Every symbol of both parts is a character position
@@ -1191,8 +1255,13 @@ public static class PictureAnalyzer
     /// runtime property of its value); the recovery shape on a violation (the compile has failed).</summary>
     private static PicInfo AnalyzeFloatEdited(string picture, string expanded, Usage usage, bool explicitUsage,
         EditionContext edition, string where, IReadOnlyList<CobolEdit.EditRule>? editRules, HashSet<char> char1Extended,
-        int editingExtra)
+        int editingExtra, bool decimalPointIsComma)
     {
+        // SR13: under DECIMAL-POINT IS COMMA the COMMA is "the symbol period" of SR12 b (the point, once) and the
+        // period is the grouping insertion symbol (kb/Work PB3219); the runtime renderer already swaps them
+        // (CobolEdit.FloatMask.Parse commaMode), so this is the compile-time half of the same rule.
+        char point = PictureComposition.DecimalSeparator(decimalPointIsComma);
+        char grouping = PictureComposition.GroupingSeparator(decimalPointIsComma);
         void Bad(string why) => edition.Error(DiagnosticCatalog.PictureFloatEdited,
             $"invalid floating-point numeric-edited PICTURE {picture} — {where}: {why}");
         int eCount = expanded.Count(c => c == 'E');
@@ -1234,8 +1303,9 @@ public static class PictureAnalyzer
             switch (c)
             {
                 case '9': digits++; break;
-                case '.': points++; break;
-                case 'B': case '0': case '/': case ',': break;
+                case var p when p == point: points++; break;
+                case 'B': case '0': case '/': break;
+                case var g when g == grouping: break;   // simple insertion (rule 3): the comma, or the period under DECIMAL-POINT IS COMMA
                 case var c1 when IsChar1(c1): break;   // an IS-form character-1: simple insertion (§13.18.40.5 rule 3)
                 case '+': case '-':
                     Bad("a second sign symbol in the significand — the significand admits one leading + or − (ISO §13.18.40.6 Table 10 row E; SR25 applies per string)");
@@ -1244,7 +1314,7 @@ public static class PictureAnalyzer
                     Bad($"the symbol '{c}' — zero suppression with replacement shall not be specified for the significand (ISO §13.18.40.4 GR13 b)");
                     return PicInfo.Recovery(expanded.Length);
                 case 'V': case 'P': case 'S':
-                    Bad($"the symbol '{c}' may not appear in the significand — its point is the real '.' (ISO §13.18.40.6 Table 10 row E; SR17/SR18/SR20)");
+                    Bad($"the symbol '{c}' may not appear in the significand — its point is the real '{point}' (ISO §13.18.40.6 Table 10 row E; SR17/SR18/SR20)");
                     return PicInfo.Recovery(expanded.Length);
                 case 'C': case 'D':
                     Bad("CR / DB may not appear in the significand of a floating-point edited item (ISO §13.18.40.6 Table 10 row E; SR23)");
@@ -1254,7 +1324,12 @@ public static class PictureAnalyzer
                     return PicInfo.Recovery(expanded.Length);
             }
         }
-        if (points > 1) { Bad("the decimal point may appear only once (ISO §13.18.40.3 SR12 b)"); return PicInfo.Recovery(expanded.Length); }
+        if (points > 1)
+        {
+            Bad($"the decimal point '{point}' may appear only once (ISO §13.18.40.3 SR12 b"
+                + (decimalPointIsComma ? "; SR13 — the rules for the symbol period apply to the symbol comma)" : ")"));
+            return PicInfo.Recovery(expanded.Length);
+        }
         if (digits < 1 || digits > 36) { Bad($"the significand carries {digits} digit position(s) — it shall carry 1 to 36 (ISO §13.18.40.3 SR15)"); return PicInfo.Recovery(expanded.Length); }
         // ⛔ THE §13.18.60.3 USAGE × PICTURE SCREEN, asked through the ONE function (kb/Work PB646). This arm
         // used to carry its own SR12 half — a hand-written staging of the national form — and NOTHING else, so

@@ -1829,6 +1829,8 @@
   "pb528-picture-composition",
   "pb528-picture-precedence",
   "pb528-picture-composition-decimal-comma",
+  "pb3219-decimal-comma-for-form-period",
+  "pb3219-decimal-comma-float-two-points",
   "pb452-set-content-sign-required",
   "pb452-set-content-numeric-edited",
   "pb452-set-content-not-standard-float",
