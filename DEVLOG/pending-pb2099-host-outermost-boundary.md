@@ -404,3 +404,5 @@ when only the earlier formal is OPTIONAL the arm also asks that its cell is not 
 null by its own row. Design §4.3 states it. HostEntryTests gains H1OPT (`USING OPTIONAL LK-A LK-B OPTIONAL LK-P LK-Q
 LK-R OPTIONAL LK-S`) and its host lines `A [ABCD] B [ABCD]`, `P OMITTED`, `Q NULL`, `R NULL`, `S OMITTED` and
 `OPTNULL LK_B`; with the emitter at 0d47dd079 the host process dies at the first H1OPT call.
+Gate `TestResults/build-local/20261016T194523Z-cc2341` at eed17fdd7: `LEG 1 ONLY (batched gating, PB2515): GREEN`
+(Conformance 6,118/11,850, Unit 33,427/33,851, Characterization 5/36 in leg 1; HostEntryTests among them). Semgrep verify: PASS.
