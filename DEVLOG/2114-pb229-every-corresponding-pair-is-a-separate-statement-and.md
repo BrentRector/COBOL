@@ -1,4 +1,4 @@
-## PB229: every CORRESPONDING pair is a separate statement, and an item under a FILLER group corresponds
+## Entry 2114 — 2026-10-16 14:52 PDT — PB229: every CORRESPONDING pair is a separate statement, and an item under a FILLER group corresponds
 
 kb/Work PB229 was filed as an evidence gap on `GR-14.9.2.4-5` (ADD CORRESPONDING's "the results are the same as if
 the user had referred to each pair of corresponding identifiers in separate ADD statements"). Re-probed on the
@@ -36,3 +36,4 @@ pair's condition, EC-SIZE-TRUNCATION for pairs A B C and EC-SIZE-OVERFLOW for C 
 GR-14.7.6-1's statement restated. Self-review: the rule now lives in one place per question (the in-place store,
 the member walk, the rule-5 predicate shared by the FILLER walk and the THROUGH-alias window); no allocation on a
 hot path beyond the bind-time step arrays.
+
