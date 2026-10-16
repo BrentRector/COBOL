@@ -116,12 +116,4 @@ internal sealed partial class OoBinder
         BoundExprError.Report(ctx.Edition, DiagnosticCatalog.ObjectViewSubject,
             $"the object-view of '{written}': {why} — identifier-1 shall be of class object; the predefined object "
             + "references SUPER and NULL shall not be specified (ISO §8.4.3.5.3 SR1)", "object-view identifier-1");
-
-    /// <summary>§8.4.3.5.3 SR2 — "An object-view shall not be specified as a receiving operand" — for the receiving
-    /// positions whose grammar admits the view as a superset parse (SET Format 5's receivers, INVOKE RETURNING), so
-    /// the program is told the rule it broke rather than that AS is a reserved word.</summary>
-    internal BoundStatement RefuseObjectViewReceiver(Core.ObjectViewReceiverContext ov, string position) =>
-        BoundRejected.Report(ctx.Edition, DiagnosticCatalog.ObjectViewReceiving,
-            $"'{DataBinder.WrittenText(ov)}' is written as {position}: an object-view shall not be specified as a "
-            + "receiving operand (ISO §8.4.3.5.3 SR2)");
 }

@@ -175,7 +175,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
                 // §13.10.4 GR1, EXCEPTION-OBJECT by §8.4.3.6.3 SR1. The sending resolver used here before knew
                 // none of them, so a legal PAGE-COUNTER counter fell out as an unresolved name and became a
                 // COBOLNET1756 run-time abort — the chokepoint's other arm, unfixed.
-                if (host.Expr.ResolveReceiving(item.dataReference()) is not { } counter)
+                if (host.Expr.ResolveReceiving(item.receivingIdentifier()) is not { } counter)
                     return new BoundUnsupported("INSPECT TALLYING count operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
                 ctx.Validation.CheckInspectTallyCounter(counter);   // SR5 — pure check; binding continues
                 // The grammar spells the printed phrase (PB1125): ONE FOR per counter, each CHARACTERS / ALL / LEADING

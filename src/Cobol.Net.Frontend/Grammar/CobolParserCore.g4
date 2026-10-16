@@ -1070,12 +1070,12 @@ statementBlock
 // MULTIPLY's BY operand (§14.9.26.2): a receiver `identifier-2` in Format 1, or the literal-2 of the GIVING
 // format's one sending operand. Only its dataReference arm is a receiver (ArithmeticOperandRole.IsReceiver).
 receivingOperand
-    : dataReference
+    : receivingIdentifier
     | literal
     ;
 
 receivingArithmeticOperand
-    : dataReference roundedPhrase?
+    : receivingIdentifier roundedPhrase?
     ;
 
 // ⛔ THE SENDING OPERAND `{identifier-n | literal-n}` IS ONE RULE (kb/Work PB2114). Every general format that writes
@@ -1159,7 +1159,7 @@ arithmeticOnSizeError
 // Format 1 `ADD {identifier-1 | literal-1} … TO {identifier-2 [rounded]} …`, Format 2 `… [TO {identifier-2 |
 // literal-2}] GIVING …` and Format 3 CORRESPONDING. ArithmeticBinder narrows the union per format.
 addStatement
-    : ADD (CORRESPONDING | CORR) dataReference TO dataReference roundedPhrase? arithmeticOnSizeError? END_ADD?
+    : ADD (CORRESPONDING | CORR) dataReference TO receivingIdentifier roundedPhrase? arithmeticOnSizeError? END_ADD?
     | ADD sendingOperand+ addToPhrase? arithmeticGivingPhrase? arithmeticOnSizeError? END_ADD?
     ;
 
@@ -1172,7 +1172,7 @@ addToPhrase
 // ==========================================
 
 subtractStatement
-    : SUBTRACT (CORRESPONDING | CORR) dataReference FROM dataReference roundedPhrase? arithmeticOnSizeError? END_SUBTRACT?
+    : SUBTRACT (CORRESPONDING | CORR) dataReference FROM receivingIdentifier roundedPhrase? arithmeticOnSizeError? END_SUBTRACT?
     | SUBTRACT sendingOperand+ subtractFromPhrase? arithmeticGivingPhrase? arithmeticOnSizeError? END_SUBTRACT?
     ;
 
@@ -1212,7 +1212,7 @@ divideByPhrase
     ;
 
 divideRemainderPhrase
-    : REMAINDER dataReference
+    : REMAINDER receivingIdentifier
     ;
 
 // ==========================================
@@ -1225,7 +1225,7 @@ computeStatement
     ;
 
 computeStore
-    : dataReference roundedPhrase?
+    : receivingIdentifier roundedPhrase?
     ;
 
 // ISO 5.2.6.4 choice indicators — see the arithmeticOnSizeError note: both phrases, each once, any order.
@@ -1242,7 +1242,7 @@ computeOnSizeError
 // ==========================================
 
 moveStatement
-    : MOVE (CORRESPONDING | CORR) dataReference TO dataReference
+    : MOVE (CORRESPONDING | CORR) dataReference TO receivingIdentifier
     | MOVE sendingOperand moveReceivingPhrase
     ;
 
@@ -1256,7 +1256,7 @@ moveStatement
 // program COMPILED CLEAN and died at run time claiming a COBOL feature was not yet implemented. §4.2.2's first
 // paragraph fixes what an implementation may accept, and a construct no general format prints is not in it.
 moveReceivingPhrase
-    : TO dataReferenceList
+    : TO receivingIdentifier (COMMA? receivingIdentifier)*
     ;
 
 // ==========================================
@@ -1351,8 +1351,14 @@ callArgument
 // identifier-2 "shall reference an address-identifier or a data item defined in the file, working-storage,
 // local-storage, or linkage section", and the predefined NULL is neither — without the arm it matched `dataReference`
 // and drew the §8.9 reserved-word diagnostic, a rule it does not break (kb/Work PB1427).
+// ⛔ EVERY OTHER identifier-2 HERE IS A RECEIVING IDENTIFIER (kb/Work PB1551 review R1-1): §14.9.4.3 SR5 — "If the BY
+// REFERENCE phrase is specified or implied for an identifier-2 and identifier-2 is not an address-identifier, it is a
+// receiving operand" — so the slot is `receivingIdentifier`, and SELF / SUPER / an object-view / a function-address-
+// identifier written here is refused by its own §8.4.3 rule (ExpressionBinder.ResolveReceiving), not as a parse error
+// re-coded to §8.9. The two leading arms take the shapes receivingIdentifier also spells, first (ANTLR resolves the
+// overlap to the lower alternative): an address-identifier is SR4's SENDING operand, and NULL keeps SR3's refusal.
 callByReference
-    : BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
+    : BY? REFERENCE (addressIdentifier | predefinedNull | receivingIdentifier | OMITTED)
     ;
 
 // BY is an OPTIONAL word before VALUE exactly as before REFERENCE/CONTENT — only VALUE is underlined in the
@@ -1398,7 +1404,7 @@ callByContent
     ;
 
 callReturningPhrase
-    : RETURNING dataReference
+    : RETURNING receivingIdentifier
     ;
 
 // ISO 5.2.6.4 choice indicators — see the arithmeticOnSizeError note. CALL's ON EXCEPTION / NOT ON EXCEPTION
@@ -1513,7 +1519,7 @@ setStatement
 // ordinary SET forms are chosen as before.
 setLocaleStatement
     : {setLocaleAhead()}? SET formatWord formatWord+ TO setLocaleSource  // F11: LOCALE {category+ | USER-DEFAULT} TO …
-    | {saveLocaleAhead()}? SET dataReference TO formatWord formatWord    // F12: identifier-11 TO LOCALE {LC_ALL | USER-DEFAULT}
+    | {saveLocaleAhead()}? SET setReceivingIdentifier TO formatWord formatWord    // F12: identifier-11 TO LOCALE {LC_ALL | USER-DEFAULT}
     ;
 
 // Format 11's TO operand: { identifier-10 | locale-name-1 | USER-DEFAULT | SYSTEM-DEFAULT } — two keywords and two
@@ -1535,7 +1541,7 @@ setLocaleSource
 // claim the `TO ENTRY` prefix. A not-locatable program → EC-PROGRAM-NOT-FOUND + NULL (§8.4.3.13.4 GR4, which
 // governs the shared semantics whichever surface reaches them).
 setEntryStatement
-    : SET dataReference+ TO ENTRY (nonNumericLiteral | dataReference)
+    : SET setReceivingIdentifier+ TO ENTRY (nonNumericLiteral | dataReference)
     ;
 
 // SET LAST EXCEPTION TO OFF (ISO §14.9.39 Format 13, saved-exception; 2002+ — binder-gated): the last
@@ -1565,7 +1571,7 @@ setLastExceptionStatement
 // ConstructRegistry.Check(SetNumericContent2014)) — a parse-level gate would answer a 2002 program with a raw
 // ANTLR cascade instead of naming the edition.
 setContentStatement
-    : SET CONTENT OF? dataReference+ TO setContentValue
+    : SET CONTENT OF? setReceivingIdentifier+ TO setContentValue
     ;
 
 setContentValue
@@ -1613,11 +1619,11 @@ setSwitchPhrase
 // ⛔ OF IS AN OPTIONAL WORD (kb/Work PB695): printed folio 732 sets Format 16 as `SET [ SIZE OF ] data-name-3
 // TO …` with underline rules under SET, SIZE and TO and none under OF, so `SET SIZE DYN TO 5` is conforming.
 setSizeStatement
-    : SET SIZE OF? dataReference TO arithmeticExpression
+    : SET SIZE OF? setReceivingIdentifier TO arithmeticExpression
     ;
 
 setToValueStatement
-    : SET dataReference+ TO arithmeticExpression
+    : SET setReceivingIdentifier+ TO arithmeticExpression
     ;
 
 // SET {{condition-name-1}… TO {TRUE | FALSE}}… (COBOL-85; §14.9.39 Format 4, condition-setting — the FALSE
@@ -1662,6 +1668,7 @@ setAddressStatement
 // into. A hand-written re-derivation from token positions is what the Format-3/4 half of this note deleted.
 setAddressReceiver
     : (ADDRESS OF?)? dataReference
+    | nonReceivableIdentifier
     ;
 
 // identifier-6, the single sending operand. It may be an ordinary data-pointer item, a §8.4.3.11
@@ -1722,7 +1729,7 @@ dataAddressIdentifier
 // holds. The keyword-omitted function form (§8.4.3.2.3 SR2) is already a dataReference and is told apart at bind.
 // A sending-only position: the receiving list is the `dataReference+` before TO, never this rule.
 setFunctionAddressStatement
-    : SET dataReference+ TO functionAddressIdentifier
+    : SET setReceivingIdentifier+ TO functionAddressIdentifier
     ;
 
 // §8.4.3.12.2 FUNCTION-ADDRESS-IDENTIFIER — `ADDRESS OF FUNCTION { function-prototype-name-1 | identifier-1 }`
@@ -1767,15 +1774,15 @@ programAddressIdentifier
 // be tried first; PROGRAM is a reserved token and can never head a dataReference, so nothing else can claim
 // this shape. Gate: COBOL-2002 (the program-pointer family's edition — usage-program-pointer-2002).
 setProgramAddressStatement
-    : SET dataReference+ TO programAddressIdentifier
+    : SET setReceivingIdentifier+ TO programAddressIdentifier
     ;
 
 // ALLOCATE statement (COBOL-2002 §14.9.3): obtain dynamic storage, returned as a managed data-pointer.
 //   ALLOCATE n CHARACTERS [INITIALIZED] [RETURNING p]   — allocate n bytes, return the pointer
 //   ALLOCATE based-item   [INITIALIZED] [RETURNING p]   — allocate storage for a BASED item, set its address
 allocateStatement
-    : ALLOCATE arithmeticExpression CHARACTERS INITIALIZED? (RETURNING dataReference)?
-    | ALLOCATE dataReference INITIALIZED? (RETURNING dataReference)?
+    : ALLOCATE arithmeticExpression CHARACTERS INITIALIZED? (RETURNING receivingIdentifier)?
+    | ALLOCATE dataReference INITIALIZED? (RETURNING receivingIdentifier)?
     ;
 
 // FREE statement (COBOL-2002 §14.9.15): release storage previously ALLOCATEd; set each data-pointer to NULL.
@@ -1789,23 +1796,47 @@ freeStatement
 // target is an object-reference item; only NULL/SELF/SUPER senders (no arithmeticExpression prefix) reach
 // THIS rule. SUPER is admitted syntactically and rejected at bind (SR9 - 0867) for the better diagnostic.
 setObjectReferenceStatement
-    : SET setObjectReferenceReceiver+ TO objectReference   // introduction-gated at BIND time (StatementBinder.OoBindSetObjectRef → Check(SetObjectReference2002))
+    : SET setReceivingIdentifier+ TO objectReference   // introduction-gated at BIND time (StatementBinder.OoBindSetObjectRef → Check(SetObjectReference2002))
     ;
 
-// identifier-3, the repeated receiving unit (named, never an inline group — PrintedFormatAlternativeDriftTests). An
-// `objectViewReceiver` is the P3 superset parse of §8.4.3.5.3 SR2 ("An object-view shall not be specified as a receiving
-// operand"): admitted here only so SetBinder refuses it by THAT rule (COBOLNET2871) — it drew COBOLNET0901 on AS, a
-// reserved word misused as a user word, which is not what the program did (kb/Work PB1425).
-setObjectReferenceReceiver
+// ⛔ THE RECEIVING IDENTIFIER: EVERY RECEIVING POSITION PARSES EVERY IDENTIFIER FORMAT THAT IS NEVER A RECEIVING
+// OPERAND, SO THE BINDER REFUSES IT BY ITS OWN RULE (kb/Work PB1551, PB1782 step 1). ISO §8.4.3 writes the exclusion
+// into each identifier format, not into the statements: §8.4.3.5.3 SR2 "An object-view shall not be specified as a
+// receiving operand", §8.4.3.7.3 SR1 "NULL shall not be specified as a receiving operand", §8.4.3.8.3 SR2 (SELF and
+// SUPER), §8.4.3.11.3 SR5, §8.4.3.12.3 SR3 and §8.4.3.13.3 SR4 (the three address-identifiers) "This identifier
+// format shall not be specified as a receiving operand". A receiving slot that took only `dataReference` refused them
+// as a parse error re-coded to §8.9 (COBOLNET0901 "'SELF' is a reserved word … cannot be used as a user-defined
+// word") — the right verdict for a rule the program did not break, and one that would turn into SILENT ACCEPTANCE the
+// moment the identifier tier is widened (PB1782). The P3 superset parse lets ExpressionBinder.ResolveReceiving — the
+// ONE receiving chokepoint — name the rule from ONE table keyed by the identifier's form (ReceivingOperandForms).
+// The two computed formats (§8.4.3.2.3 SR1 function-identifier, §8.4.3.4.3 SR1 inline invocation) stay out: their
+// exclusion is structural (InlineMethodInvocationOperandDriftTests), and the mixed arithmetic rules name them.
+receivingIdentifier
     : dataReference
-    | objectViewReceiver
+    | nonReceivableIdentifier
+    | dataAddressIdentifier      // §8.4.3.11.3 SR5 — every receiving position but SET's (setReceivingIdentifier)
     ;
 
-// The RECEIVING superset of an object-view, for §8.4.3.5.3 SR2's diagnostic only (SET Format 5's receivers, INVOKE
-// RETURNING). Its identifier-1 is a data reference, never the sending `objectReferenceTerm`: NULL / SELF / SUPER as a
-// receiver are the receiving screen's (kb/Work PB1551), and a term there would let `SET NULL TO X` predict this rule.
-objectViewReceiver
+// SET's receiving identifier — receivingIdentifier less the data-address-identifier. SET Format 7 prints `ADDRESS OF
+// data-name-1` as a receiver of its OWN (setAddressReceiver; Annex D: "the ADDRESS OF phrase in the receiving operand of
+// a SET statement is not considered a data-address-identifier"), and setToValueStatement is listed before
+// setAddressStatement, so a data-address alternative here would take every Format-7 `SET ADDRESS OF B TO P` away.
+setReceivingIdentifier
+    : dataReference
+    | nonReceivableIdentifier
+    ;
+
+// The identifier formats that are never a receiving operand, as a receiving position writes them. An object-view of a
+// data reference, and SELF / SUPER / NULL with or without a view (a view of one is an object-view, §8.4.3.5.3 SR2),
+// then the function- and program-address-identifiers (FUNCTION / PROGRAM after ADDRESS OF tell them from Format 7's
+// receiver, so SET takes them too). Its identifier-1 is never the sending `objectReferenceTerm`, which would let a
+// function-identifier or an inline invocation in.
+nonReceivableIdentifier
     : dataReference objectViewPhrase+
+    | selfAndSuper objectViewPhrase*
+    | predefinedNull objectViewPhrase*
+    | functionAddressIdentifier
+    | programAddressIdentifier
     ;
 
 // ⛔ SELF AND SUPER ARE ONE RULE, `selfAndSuper`, AND THE QUALIFIED SUPER IS A WORD CHAIN (kb/Work PB1425). §8.4.3.8.2
@@ -1880,7 +1911,7 @@ selfAndSuper
 
 // SET dataReference+ UP/DOWN BY arithmeticExpression (COBOL-85 §14.9.39 Format 2)
 setIndexStatement
-    : SET dataReference+ ( UP | DOWN ) BY arithmeticExpression
+    : SET setReceivingIdentifier+ ( UP | DOWN ) BY arithmeticExpression
     ;
 
 // ==========================================
@@ -1893,7 +1924,7 @@ setIndexStatement
 // format-1 device ACCEPT, so without the binder's screen-name test it silently transfers device input into a
 // screen record (kb/Work PB260). The positioning and exception phrases live in CobolScreen.g4.
 acceptStatement
-    : ACCEPT dataReference (FROM acceptSource)? screenTail? END_ACCEPT?   // END-ACCEPT: 2002+ (gated in VersionConformancePass; kb/Work PB134)
+    : ACCEPT receivingIdentifier (FROM acceptSource)? screenTail? END_ACCEPT?   // END-ACCEPT: 2002+ (gated in VersionConformancePass; kb/Work PB134)
     ;
 
 // ⛔ THE FORMAT-1 SLOT IS A WORD, NOT A dataReference (kb/Work PB2499). §14.9.1.2 Format 1 prints

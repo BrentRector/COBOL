@@ -94,9 +94,9 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         // receiver-side rules live ONCE: §8.4.3.15.3 SR1 admits PAGE-COUNTER (an integer-data-item context) and SR3
         // refuses LINE-COUNTER, §13.10.4 GR1 refuses a constant-name, §8.4.3.6.3 SR1 refuses EXCEPTION-OBJECT. The
         // sending resolver these sites used knew none of them.
-        if (host.Expr.ResolveReceiving(st.stringIntoPhrase().dataReference()) is not { } into)
+        if (host.Expr.ResolveReceiving(st.stringIntoPhrase().receivingIdentifier()) is not { } into)
             return new BoundUnsupported("STRING INTO operand");   // the chokepoint reported it — not a deferral (kb/Work PB236)
-        string intoText = DataBinder.WrittenText(st.stringIntoPhrase().dataReference());
+        string intoText = DataBinder.WrittenText(st.stringIntoPhrase().receivingIdentifier());
         // §14.9.43.3 SR4–SR6, SR11 — bind-time rejections (kb/Work PB88: each was a run-time loud stage on ILLEGAL
         // source, the wrong-stage family; the statement compiled clean and died when control reached it).
         if (into is RefModPlace)
@@ -136,7 +136,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         }
 
         Place? pointer = null;
-        if (st.stringWithPointer()?.dataReference() is { } pd)
+        if (st.stringWithPointer()?.receivingIdentifier() is { } pd)
         {
             if (host.Expr.ResolveReceiving(pd) is not { } pp)
                 return new BoundUnsupported("STRING POINTER operand");   // identifier-4 is a receiver — the chokepoint reported it (kb/Work PB429)
@@ -228,7 +228,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         var areas = new List<(Place Target, Place? DelimiterIn, Place? CountIn)>();
         foreach (var t in un.unstringIntoPhrase().unstringIntoTarget())   // ONE INTO, then the receivers (§14.9.48.2; kb/Work PB1183)
         {
-            var drefs = t.dataReference();
+            var drefs = t.receivingIdentifier();
             if (host.Expr.ResolveReceiving(drefs[0]) is not { } target)
                 return new BoundUnsupported("UNSTRING INTO operand");   // identifier-4 is a receiver — the chokepoint reported it (kb/Work PB429)
             // SR4 — identifier-4 shall be (usage display + category alphabetic/alphanumeric/numeric) or (usage
@@ -312,7 +312,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
         }
 
         Place? pointer = null;
-        if (un.unstringWithPointer()?.dataReference() is { } pd)
+        if (un.unstringWithPointer()?.receivingIdentifier() is { } pd)
         {
             if (host.Expr.ResolveReceiving(pd) is not { } pp)
                 return new BoundUnsupported("UNSTRING POINTER operand");   // identifier-7 is a receiver — the chokepoint reported it (kb/Work PB429)
@@ -322,7 +322,7 @@ internal sealed class StringUnstringBinder(BinderContext ctx, StatementBinder ho
             pointer = pp;
         }
         Place? tallying = null;
-        if (un.unstringTallying()?.dataReference() is { } td)
+        if (un.unstringTallying()?.receivingIdentifier() is { } td)
         {
             if (host.Expr.ResolveReceiving(td) is not { } tp)
                 return new BoundUnsupported("UNSTRING TALLYING operand");   // identifier-8 is a receiver — the chokepoint reported it (kb/Work PB429)
