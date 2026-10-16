@@ -200,8 +200,7 @@ public sealed class DefectiveRowCoverageDriftTests
         // shapes this block used to assert (LF and CRLF, quoted and bare members, no claim at all, a file that is
         // not a note) are now cases in tests/version-matrix/work-frontmatter-parity-cases.json, where the PYTHON
         // reader is held to the same answers. A private copy of those assertions beside a private copy of the
-        // parser is exactly how the two readers drifted apart (kb/Work/PB875).
-        Assert.False(WorkRegister.Parse("e.md", "---\nid: PB9\nstatus: landed\n---\n")!.IsLive);
-        Assert.True(WorkRegister.Parse("f.md", "---\nid: PB9\nstatus: open\n---\n")!.IsLive);
+        // parser is exactly how the two readers drifted apart (kb/Work/PB875). The same holds for IsLive: the
+        // fixture's `terminal` field states it for every status of work.py's STATUSES, in both engines (PB3196).
     }
 }

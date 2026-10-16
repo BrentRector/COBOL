@@ -142,25 +142,35 @@ def parse_ranges(spec):
     return ids
 
 
+def note_status(text):
+    """A note's `status`, as the register reads it: `work.parse_frontmatter`, quotes stripped (kb/Work PB3196: a raw
+    `status:` line prefix kept `"open"` quoted, so --rerender skipped a note work.py calls open). None for a file that
+    is not a note or states no status."""
+    fm = work.parse_frontmatter(text)
+    return fm.get("status") if fm else None
+
+
 def scan_notes(notes_dir):
-    """-> ({census id: note id}, {design key: note id}, {note id: status})."""
+    """-> ({census id: note id}, {design key: note id}, {note id: status}). The status comes from the register's
+    reader (note_status); the census_ids/design_keys lines are this generator's own body lines."""
     census, design, status = {}, {}, {}
     for name in os.listdir(notes_dir):
         if not name.endswith(".md"):
             continue
         nid = name[:-3]
         with open(os.path.join(notes_dir, name), encoding="utf-8") as fh:
-            for line in fh:
-                if line.startswith("census_ids:"):
-                    for x in line[len("census_ids:"):].split(","):
-                        if x.strip():
-                            census.setdefault(x.strip(), nid)
-                elif line.startswith("design_keys:"):
-                    for x in line[len("design_keys:"):].split(","):
-                        if x.strip():
-                            design.setdefault(x.strip(), nid)
-                elif line.startswith("status:") and nid not in status:
-                    status[nid] = line[len("status:"):].strip()
+            text = fh.read()
+        if (st := note_status(text)) is not None:
+            status[nid] = st
+        for line in text.splitlines():
+            if line.startswith("census_ids:"):
+                for x in line[len("census_ids:"):].split(","):
+                    if x.strip():
+                        census.setdefault(x.strip(), nid)
+            elif line.startswith("design_keys:"):
+                for x in line[len("design_keys:"):].split(","):
+                    if x.strip():
+                        design.setdefault(x.strip(), nid)
     return census, design, status
 
 
@@ -630,14 +640,12 @@ def scan_r2(notes_dir):
             text = fh.read()
         if "\nr2_ids:" not in text.replace("\r\n", "\n"):
             continue
-        note = {"ids": [], "members": [], "sites": [], "wave_kind": None, "status": None}
+        note = {"ids": [], "members": [], "sites": [], "wave_kind": None, "status": note_status(text)}
         for line in text.splitlines():
             if line.startswith("r2_ids:"):
                 note["ids"] = [x.strip() for x in line[len("r2_ids:"):].split(",") if x.strip()]
             elif line.startswith("r2_members:"):
                 note["members"] = [x.strip() for x in line[len("r2_members:"):].split(",") if x.strip()]
-            elif line.startswith("status:") and note["status"] is None:
-                note["status"] = line[len("status:"):].strip()
             elif line.startswith("**Wave kind:** "):
                 note["wave_kind"] = line[len("**Wave kind:** "):].split(".")[0].strip()
             elif line.startswith("- `") and "`" in line[3:]:
@@ -895,6 +903,16 @@ def self_test_r2():
         assert not w3 and tail3 == ["PB9106"] and s3["merged into an existing note"] == ["s9--duplication--f1#7 -> PB9101"], s3
         assert "r2_ids: s1--architecture--f1#1, s1--architecture--f2#1, s9--duplication--f1#7" in a2 and \
             "**Also found as** `s9--duplication--f1#7`" in a2, a2
+        # a QUOTED terminal status is terminal, as work.py reads it (kb/Work PB3196): the later finding is not merged
+        # into a note the register calls landed
+        with open(os.path.join(nd, "PB9101.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(a2.replace("\nstatus: open\n", '\nstatus: "landed"\n', 1))
+        assert scan_r2(nd)["PB9101"]["status"] == "landed", scan_r2(nd)["PB9101"]
+        last = rec(6, id="s8--duplication--f1#6", pair="s8--duplication", sites=["src/T.cs:70-75 (N.T.F)"])
+        with open(cp, "w", encoding="utf-8", newline="\n") as fh:
+            json.dump(dict(batch, upheld=[last], mechanisms=[mech(last["id"])], refuted=[], leads=[]), fh)
+        w4, s4, _ = file_r2(cp, ["PB9107"], nd, False, tmp, areas)
+        assert not w4 and s4.get("already-filed (its note is landed)") == [last["id"]], s4
     print("self-test R2 OK")
 
 
@@ -1008,6 +1026,11 @@ def self_test():
         assert not w4 and not r4 and len(s4["already-filed"]) == 5, (w4, s4, r4)
         gt["designed"][0]["seam"] = "W2"
         gt["targets"]["R0-9003"]["blocked_by"] = ["PB9100"]
+        # a QUOTED `status: "open"` is open, as work.py reads it (kb/Work PB3196): the note is re-rendered, not skipped
+        quoted = read("PB9008").replace("\nstatus: open\n", '\nstatus: "open"\n', 1)
+        assert '\nstatus: "open"\n' in quoted, quoted[:400]
+        with open(os.path.join(nd, "PB9008.md"), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(quoted)
         _, _, _, r5 = file_notes(fp, ["PB9011"], nd, False, gt, rerender=True, path_root=tmp)
         assert r5 == ["PB9004", "PB9008"], r5
         assert "**Seam:** W2." in read("PB9008") and 'blocked_by: ["PB9100"]' in read("PB9004")

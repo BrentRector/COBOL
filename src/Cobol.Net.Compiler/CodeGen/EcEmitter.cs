@@ -647,8 +647,10 @@ internal sealed class EcEmitter(EmitContext ctx, EcState ecState, DispatchState 
         {
             if (!r.Fatal)
             {
-                // §14.6.13.1.4 first sentence + §14.6.13.1.1 (24485): checking off ⇒ the condition is not raised
-                // and the last exception status is NOT set — the RAISE acts as CONTINUE (§14.9.29.4 GR1 NOTE).
+                // §14.6.13.1.1: a condition a statement's general rules say exists "is raised only if checking for
+                // that exception condition is enabled" — RAISE's §14.9.29.4 1) included (kb/Work PB867). A raise
+                // is ONE event (status set + EXCEPTION-OBJECT nulled), so neither happens here, and with checking
+                // off "execution continues as if the exception did not occur" (§14.6.13.1.4).
                 w.Line($"// RAISE {r.EcName}: checking not enabled — nonfatal, continues as if not raised (ISO §14.6.13.1.4)");
                 return false;
             }
