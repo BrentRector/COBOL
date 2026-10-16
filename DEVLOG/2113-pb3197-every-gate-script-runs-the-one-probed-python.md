@@ -1,4 +1,4 @@
-## PB3197: every gate script runs the one probed Python interpreter, in bash and in PowerShell
+## Entry 2113 — 2026-10-16 14:46 PDT — PB3197: every gate script runs the one probed Python interpreter, in bash and in PowerShell
 
 PB1754 R3 wave 1098, group B (unify; kb/Work PB3197, an R2 duplication finding). `scripts/python-resolve.sh` (kb/Work
 PB1637) declared itself THE interpreter the gate scripts run, probing `$PYTHON`, `python3`, `python` by RUNNING each
@@ -67,3 +67,4 @@ for any candidate it cannot start, the same as the bash probe; re-probed.
 gate printed `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` at 6e45bc04a (run
 20261016T205034Z-70ab7d) and again at 2b47742fd (run 20261016T210148Z-9500b6). Its leg-1 Unit trx has all three
 `PythonInterpreterDriftTests` facts Passed.
+
