@@ -27,7 +27,14 @@
       *>        "ABC", and N is 3;
       *>   MSB - its own N AS 4: V PIC X(4) holds "ABCD", N is 4;
       *>   MSC - declares nothing: N is the object's data item, 7 + 1 = 8;
-      *>   MSD - its own data item C ("M") hides the object's constant C.
+      *>   MSD - its own data item C ("M") hides the object's constant C;
+      *>   ME - its own constants CX AS 7 and CQ AS 2 hide the object's
+      *>        condition-name CX and index-name CQ (11.7.4 GR5 is about
+      *>        the word, whatever its kind; kb/Work PB3153 review round
+      *>        3): "ME 7 2";
+      *>   MF - declares neither: SET CQ TO 3 moves the object's index,
+      *>        MOVE 5 TO OE(CQ), and the object's condition CX (OW = 1)
+      *>        is true: "MF 5" and "MF CX".
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB3164M.
        ENVIRONMENT DIVISION.
@@ -48,6 +55,8 @@
            INVOKE OBJ "MSB"
            INVOKE OBJ "MSC"
            INVOKE OBJ "MSD"
+           INVOKE OBJ "ME"
+           INVOKE OBJ "MF"
            STOP RUN.
        END PROGRAM PB3164M.
 
@@ -82,6 +91,10 @@
        01 K CONSTANT AS 2.
        01 C CONSTANT AS "O".
        01 N PIC 9 VALUE 7.
+       01 OW PIC 9 VALUE 1.
+          88 CX VALUE 1.
+       01 OT.
+          05 OE PIC 9 OCCURS 3 INDEXED BY CQ VALUE 0.
        PROCEDURE DIVISION.
        METHOD-ID. IA.
        DATA DIVISION.
@@ -133,5 +146,22 @@
        PROCEDURE DIVISION.
            DISPLAY "MSD " C.
        END METHOD MSD.
+       METHOD-ID. ME.
+       DATA DIVISION.
+       LOCAL-STORAGE SECTION.
+       01 CX CONSTANT AS 7.
+       01 CQ CONSTANT AS 2.
+       PROCEDURE DIVISION.
+           DISPLAY "ME " CX " " CQ.
+       END METHOD ME.
+       METHOD-ID. MF.
+       PROCEDURE DIVISION.
+           SET CQ TO 3
+           MOVE 5 TO OE(CQ)
+           DISPLAY "MF " OE(3)
+           IF CX
+               DISPLAY "MF CX"
+           END-IF.
+       END METHOD MF.
        END OBJECT.
        END CLASS PB3164S.

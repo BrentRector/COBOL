@@ -30,6 +30,9 @@
      "root": "src/X/Emitter.cs",
      "files": "`kb/Work/PB3.md`, `kb/Work/PB6.md`, `kb/Work/PB7.md`, `kb/Work/PB12.md`",
      "body": "NOTES: PB3 (2 inventory rows claimed): a defect in runtime · PB6 (10 inventory rows claimed): a defect in runtime · PB7 (3 inventory rows claimed): a defect in runtime · PB12 (4 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Emitter.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "file_set": [
+      "src/X/Emitter.cs"
+     ],
      "pred": "FINISH-FIRST: predecessor w1014b (PB3) returned SPLIT for PB3. Read <TMP>/reports/w1014b-PB3-report.md first, its NEXT and its \"For the next implementer\" section, and run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` when the worktree still exists. Its branch worktree-wf_bbb-2 (worktree E:/COBOL/.claude/worktrees/wf_bbb-2, head 2222222bb) is LANDED: its landed part is already on main, so orient from the report only."
     }
    },
@@ -59,6 +62,9 @@
      "root": "src/X/Half.cs",
      "files": "`kb/Work/PB4.md`",
      "body": "NOTES: PB4 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Half.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "file_set": [
+      "src/X/Half.cs"
+     ],
      "pred": "FINISH-FIRST: PB4 is `status: half`: read each note's record of the landed half and its kb/Work history before touching code; finish the open half at its root. Branch worktree-wf_fff-3 carries unlanded work for PB4 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots."
     }
    },
@@ -88,6 +94,9 @@
      "root": "src/X/Zero.cs",
      "files": "`kb/Work/PB13.md`",
      "body": "NOTES: PB13 (0 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Zero.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "file_set": [
+      "src/X/Zero.cs"
+     ],
      "pred": "FINISH-FIRST: Branch worktree-wf_ddd-9 carries unlanded work for PB13 with no report. Run `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <its worktree>` if the worktree still exists, read its STATUS.md, cherry-pick its commits onto current main (never merge the branch), resolve conflicts against the spec, re-gate, then finish the notes at their roots."
     }
    },
@@ -117,7 +126,10 @@
      "codes": "COBOLNET0001-COBOLNET0003",
      "root": "src/X/Binder.cs",
      "files": "`kb/Work/PB2.md`, `kb/Work/PB5.md`",
-     "body": "NOTES: PB2 (2 inventory rows claimed): a defect in runtime · PB5 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Binder.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes."
+     "body": "NOTES: PB2 (2 inventory rows claimed): a defect in runtime · PB5 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Binder.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "file_set": [
+      "src/X/Binder.cs"
+     ]
     }
    },
    {
@@ -145,7 +157,10 @@
      "codes": "COBOLNET0001-COBOLNET0003",
      "root": "src/X/Oo/Table.cs",
      "files": "`kb/Work/PB8.md`",
-     "body": "NOTES: PB8 (1 inventory rows claimed): a defect in oo/classes CODE SITES the notes name: src/X/Oo/Table.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: design-heavy file src/X/Oo/Table.cs (/Oo/); settle any open design question against its design doc first."
+     "body": "NOTES: PB8 (1 inventory rows claimed): a defect in oo/classes CODE SITES the notes name: src/X/Oo/Table.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: design-heavy file src/X/Oo/Table.cs (/Oo/); settle any open design question against its design doc first.",
+     "file_set": [
+      "src/X/Oo/Table.cs"
+     ]
     }
    },
    {
@@ -173,7 +188,10 @@
      "codes": "COBOLNET0001-COBOLNET0003",
      "root": "src/F/Grammar/Core.g4",
      "files": "`kb/Work/PB11.md`",
-     "body": "NOTES: PB11 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/F/Grammar/Core.g4. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: design-heavy file src/F/Grammar/Core.g4 (.g4); settle any open design question against its design doc first."
+     "body": "NOTES: PB11 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/F/Grammar/Core.g4. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: design-heavy file src/F/Grammar/Core.g4 (.g4); settle any open design question against its design doc first.",
+     "file_set": [
+      "src/F/Grammar/Core.g4"
+     ]
     }
    },
    {
@@ -201,7 +219,10 @@
      "codes": "COBOLNET0001-COBOLNET0003",
      "root": "src/X/Misc.cs",
      "files": "`kb/Work/PB9.md`",
-     "body": "NOTES: PB9 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Misc.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: PB9: an open design question ((?i)design question (is )?open); settle any open design question against its design doc first."
+     "body": "NOTES: PB9 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Misc.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: PB9: an open design question ((?i)design question (is )?open); settle any open design question against its design doc first.",
+     "file_set": [
+      "src/X/Misc.cs"
+     ]
     }
    },
    {
@@ -229,7 +250,10 @@
      "codes": "COBOLNET0001-COBOLNET0003",
      "root": "src/X/Other.cs",
      "files": "`kb/Work/PB10.md`",
-     "body": "NOTES: PB10 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Other.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: PB10 already attempted 2 times without landing; settle any open design question against its design doc first."
+     "body": "NOTES: PB10 (1 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Other.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes. Routed to Opus: PB10 already attempted 2 times without landing; settle any open design question against its design doc first.",
+     "file_set": [
+      "src/X/Other.cs"
+     ]
     }
    },
    {
@@ -258,6 +282,9 @@
      "root": "src/X/Binder.cs",
      "files": "`kb/Work/PB14.md`",
      "body": "NOTES: PB14 (0 inventory rows claimed): a defect in runtime CODE SITES the notes name: src/X/Binder.cs. Re-probe each note on your build, fix each at its root, sweep the sibling arms, and write closes_rows for every row the landing really closes.",
+     "file_set": [
+      "src/X/Binder.cs"
+     ],
      "after": "D"
     }
    }
