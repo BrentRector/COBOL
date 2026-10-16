@@ -27,6 +27,12 @@ using Core = CobolParserCore;
 /// character position immediately to the left of margin R" (ISO §6.3.1) and an entry is continued "in the
 /// program-text area of a subsequent line" (§6.3.5), so both rows are introductions of 2002 and the pass asks
 /// nothing from COBOL-2002 on. Free form (§6.4.1) has no areas at any edition.
+/// <para>THE CONTINUATION LINE IS THE REFERENCE FORMAT'S (kb/Work PB3168). X3.23-1985 also requires "Area A of a
+/// continuation line [to] be blank" (the hyphen in the indicator area): the same text-in-area-A row, but the text of a
+/// continued literal's tail is no token's start, so this pass cannot place it. The §6.5 logical conversion, which alone
+/// sees the indicator, reports it (<c>ReferenceFormatDiagnostics.OnContinuationTextInAreaA</c>) as a FRONT-END error
+/// at every edition this pass screens (the row is not yet introduced there, an error on both axes), so a compilation
+/// that holds such a line ends before the bind and this pass never sees its token: the line is reported once.</para>
 /// <para>WHY ONE PASS OVER THE TOKENS. The rule has two arms, and each needs the other's knowledge: which tokens head
 /// an area-A item is the GRAMMAR's (the parse tree), where a token begins its line is the REFERENCE FORMAT's
 /// (<see cref="FixedFormAreas"/>, the record the §6.5 logical conversion keeps of where each fixed-form line's text
