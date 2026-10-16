@@ -67,3 +67,18 @@ first cut flagged 24). New negatives `pb1551-call-by-reference-self`, `pb1551-ca
 (3979). A function-identifier or inline invocation written BY REFERENCE is still a parse error, by the computed formats'
 structural exclusion that this entry chose. Gate (run 20261016T201750Z-634ce0): `LEG 1 ONLY (batched gating, PB2515):
 GREEN`; the run before it was red only because the five negatives were not in the manifest.
+
+**Branch review round 2.** R2-1: the guard's alternation group was a greedy regex, so each receiving keyword yielded
+one operand, the group's LAST lower-case alternative. `GIVING (dataReference | literal)` and `INTO (dataReferenceList |
+identifierX)` therefore passed. It now reads the FIRST set of the element sequence after the keyword
+(`ReceivingOperandFormDriftTests.SlotOperands`): every top-level alternative of a group, nested groups, and past an
+optional element (`?`, `*`, a group with an empty alternative, a semantic predicate), so `TO (ADDRESS OF?)?
+dataReference` is seen too. The sibling one level down had the same hole, since a list rule was read only at its first
+alternative. It now reads the rule body as a group. Two names had been hard-coded as the converted shape; the test now
+treats any operand rule that can begin with `nonReceivableIdentifier` as converted, so SET's `setAddressReceiver`
+qualifies without being listed. The wider scan found no missed receiving slot in the grammar. It found four slots that
+are not receiving, each now exempt with its checked rule. Three are sending operands after TO, exempt per operand rule
+so their statements' receiving slots stay guarded: `sendingOperand` (INSPECT CONVERTING's identifier-7, §14.9.22.4 GR5),
+`setAddressSender` (SET Format 7's identifier-6, §14.9.39.3 SR19) and `setLocaleSource` (SET Format 11's identifier-10,
+§14.9.39.3 SR25). The fourth is `usingByReference`, the PROCEDURE DIVISION header's formal parameter (§14.2.2 SR1).
+Eleven theory cases pin the new shapes, and three converted shapes pin the complement.
