@@ -4776,13 +4776,13 @@
   "ordinal": 5,
   "subject": "National literals",
   "rule-digest": "0a2fabbba200",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#DecodeHexGroups",
-  "test-ref": "",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Frontend/Common/CobolLiteral.cs#DecodeHexGroups; docs/CONFORMANCE.md#DOC-A.1-97; docs/CONFORMANCE.md#DOC-A.1-98",
+  "test-ref": "conformance:2002/l1c12_hex_national_no_character; conformance:negative/r03-hex-national-literal-at-85",
   "derivation": "",
-  "editions": "85,2002,2014,2023",
-  "notes": "kb/Work PB160 (registrar 15c). cite.py --check 8.3.3.5.4 \"The implementor defines the result of specifying a hex-character-sequence-1 for which no corresponding character\" -> OK (rule 5). Behaviour exists: DecodeHexGroups stores any 4-digit group verbatim as a UTF-16 code unit, so a group with no corresponding character (an unpaired surrogate, probe p1 LENGTH(NX\"D800\")=1) yields that code unit unchanged, no diagnostic, no exception. Half 2 (characters not a multiple of four bits) is vacuous: a UTF-16 unit is 16 bits. BUT the determination is undocumented: Annex A.1 item 97 (cite.py --check A.1 \"Hexadecimal national literals (mapping for non-existing corresponding character)\" -> OK - required, documented) and item 122 (digits per national character, SR5) have no DOC-A.1-97 / DOC-A.1-122 row in docs/CONFORMANCE.md §7 (grep: absent). Those DOC-A.1 inventory rows own the documentation obligation; this row is PARTIAL because the implementor's definition is implicit in code only and no test pins the non-existing-character result. (A.1 item 97's own parenthetical still says \"General rule 4\" - a renumbering residue in the spec; the rule is GR5 today.) [editions as adjudicated: COBOL-2002, COBOL-2014, COBOL-2023 (national literals are a COBOL-2002 introduction; absent from COBOL-85, where the construct is rejected COBOLNET0900 via Constructs.NationalData2002)]",
-  "state": "GAP"
+  "editions": "2002,2014,2023",
+  "notes": "kb/Work PB160 (wave 1091 G). cite.py --check 8.3.3.5.4 \"The implementor defines the result of specifying a hex-character-sequence-1 for which no corresponding character in that coded character set exists.\" -> OK §8.3.3.5.4 5) (General rules). The implementor's definition is now written AND pinned. HALF 1 (no corresponding character): CobolLiteral.DecodeHexGroups stores each four-digit group verbatim as its UTF-16 code unit, a surrogate half or noncharacter included - one character position, no diagnostic, no exception condition; documented in docs/CONFORMANCE.md DOC-A.1-97 (A.1 item 97, cite.py --check A.1 \"Hexadecimal national literals (mapping for non-existing corresponding character)\" -> OK §A.1 97), and the code comment now carries the GR5 citation. Re-probed on the wave-1091 build (tests/conformance/2002/l1c12_hex_national_no_character.cob at --std 2002): LEN:1 2 / ORD:55297 65536 00066 / ORD:55297 56321 / GT / [U+FFFD] / NO-EC, exactly the golden, which pins LENGTH(NX\"D800\") = 1, ORD of D800/FFFF/0041 and of a valid pair's halves, the code-unit comparison and the U+FFFD DISPLAY of a lone DC00 under >>TURN EC-ALL CHECKING ON. HALF 2 (characters not a multiple of four bits): the condition cannot arise - a national character is one 16-bit code unit from exactly four digits (§8.3.3.5.3 SR5, DOC-A.1-122) - documented in DOC-A.1-98. The golden's code-unit comparison was rewritten from two literals (IF NX\"FFFF\" > NX\"D800\", COBOLNET3146 under §8.8.4.2.1, cite.py OK §8.8.4.2.1 13)) to a data-item subject (IF WS-N(2:1) > NX\"D800\"), so the witness is conforming source. Editions: NX literals are a COBOL-2002 introduction; at COBOL-85 the construct is rejected COBOLNET0900 (negative r03-hex-national-literal-at-85). (A.1 item 97's own parenthetical still says \"General rule 4\" - a renumbering residue in the spec; the rule is GR5 in the body text.)",
+  "state": "OK"
  },
  {
   "rule-id": "SR-8.3.3.6.3-1",
