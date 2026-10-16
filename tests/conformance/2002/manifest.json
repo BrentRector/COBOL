@@ -841,6 +841,7 @@
   "pb2739_copy_after_directive_line",
   "pb2739_indented_division_header_remarks",
   "pb3147_area_free_placement",
+  "pb3168_continuation_area_a",
   "pb2618_no_get_part_store_every_execution",
   "pb2618_string_into_property_keeps_unreferenced",
   "pb2695_wide_item_subscript_and_odo_count",
