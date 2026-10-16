@@ -476,7 +476,10 @@ chooses its preview (PB1754), two .NET 11 items are candidates for R1 to evaluat
 
 ### 5.6 Tests, scripts and CI
 Layout and duplication only. Test behavior is the oracle and is not rewritten, except to follow a renamed
-production type. Scripts follow the same no-wrapper rule.
+production type. Scripts follow the same no-wrapper rule, and the same one-rule-in-one-place rule: a rule every script
+needs is stated once per shell and the statements are held equal by a drift test (the interpreter every gate script
+runs: `scripts/python-resolve.sh` and its PowerShell twin, `PythonInterpreterDriftTests`,
+DESIGN-test-build-ci.md §3.14.11, kb/Work PB3197).
 
 ## 6. Risks
 - **Merge conflicts with the fix lane.** A whole-codebase rename touches everything. Mitigation: §2's quiet lane,
