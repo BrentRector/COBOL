@@ -27,6 +27,15 @@ public sealed class PerformFrame
     /// whose imp-1 is suspended while this handler runs) — see <see cref="ExceptionEngine.RunTopFrame"/>.</summary>
     public bool Handling { get; set; }
 
+    /// <summary>The activation that pushed this frame (<see cref="ModuleStack.CurrentActivation"/> at the push),
+    /// stamped by <see cref="ExceptionEngine.PushPerformFrame"/>, never by the emitted code. A WHEN phrase selects
+    /// only a condition raised in its OWN activation (kb/Work PB442): an exception status indicator "exists for each
+    /// function, method, or program" (ISO §14.6.13.1.1), and a condition reaches an activator only by propagation,
+    /// which raises it "in the activating runtime element" (§14.9.18.4 GR1 b), §14.6.13.1.3 6)) at the activating
+    /// statement (§14.9.33.4 GR2 a) 2.). <see cref="ExceptionEngine.RunTopFrame"/> stops at the first frame of
+    /// another activation.</summary>
+    internal long Activation { get; set; }
+
     /// <summary>The "no WHEN selected" sentinel — distinct from every real <see cref="DispatchResult"/> action (every named value
     /// and any non-negative pc), so a frame that legitimately returns <see cref="DispatchResult.Normal"/> (handled) is never
     /// confused with "no frame matched".</summary>

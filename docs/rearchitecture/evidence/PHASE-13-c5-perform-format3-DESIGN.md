@@ -890,10 +890,13 @@ public int RunTopFrame(string ec, string? file, out bool handled)
 public sealed class ExitPerformSignal(int id) : Exception { public int Id { get; } = id; }
 ```
 
-**CALL boundary** (`ProgramTable.CallProgram`, mirroring `ExternalCheckMask` at `ProgramTable.cs:152-161`):
-`int __d = exc.PerformDepth;` before `inst.Call(...)`, `exc.TrimPerformTo(__d);` in the `finally`. Per-activation
-scope (safe default; cross-CALL GR1 "in range" stays STAGED). A propagated EC at a CALL site in imp-1 still hits the
-intact caller frame (§14.9.33.4 GR2a2).
+**Activation boundary** (kb/Work PB442, superseding the depth snapshot and the method floor first built here):
+`ExceptionEngine.PushPerformFrame` stamps each frame with `ModuleStack.CurrentActivation`, and `RunTopFrame`
+stops at the first frame another activation pushed. Every activation mechanism (CALL, function activation, nested
+CALL, every method) pushes a ModuleStack frame, so none can forget the boundary; `ProgramTable.CallProgram` and the
+method body carry no frame-stack code. A propagated EC at a CALL site in imp-1 is raised in the activator after the
+callee's frame is popped, so it meets the caller's frame (§14.9.33.4 GR2a2). The reading is docs/CONFORMANCE.md §3
+D-F3S: dynamic within the activation, bounded by it.
 
 ### 9.3 Generated emit shapes (literal C#)
 
@@ -1123,9 +1126,9 @@ walled; every bounded `__RunUse`/PERFORM passes its own `__exitPc`, so PERFORM o
 ✅ **The open-mode WHEN operand form LANDED** (`WHEN EXCEPTION INPUT|OUTPUT|I-O|EXTEND` — GR3b, tier 1: matches an
 EC-I-O whose file is currently open in that mode via `CobolFile.OpenModeOf(__f)`; an OPEN-failure's mode is
 best-effort). ✅ **F3 PERFORM inside an OO method LANDED** (the pc-slice wiring, §9.10 IMPLEMENTED — the
-`F3StagedInMethodStub` 0899 is lifted). Remaining staged (kept explicit): cross-CALL / cross-INVOKE GR1 "in range"
-(the per-activation `TrimPerformTo`/frame-FLOOR default isolates the callee from the activator's frames — the
-cross-activation "in range" reading is the future opt-in, §5.4-2 / §9.10.1-C2);
+`F3StagedInMethodStub` 0899 is lifted). The cross-CALL / cross-INVOKE reach is DECIDED, not staged (kb/Work PB442; docs/CONFORMANCE.md §3 D-F3S): the
+WHEN stops at the activation boundary, which every frame records (the activation-boundary paragraph in §9.2).
+Remaining staged (kept explicit):
 `>>PROPAGATE` (§5.4-4 — ✅ **its EC-FLOW-USE half LANDED**, kb/Work PB368: §14.9.49.4 GR2 now raises from
 the ONE `__RunUse` guard through `EcDispatchExpr`, which is `__EcPerform` in an F3 unit, so the condition meets
 the active frames under GR17 before the USE declaratives — only the `>>PROPAGATE` DIRECTIVE is still
@@ -1346,7 +1349,10 @@ the referenced local function to a closure method; per-activation ref-captured l
   floor — the cross-CALL "in range" reading stays the documented STAGED item, §5.4-2, unchanged). NEW probe P6: an F3
   method whose imp-1 INVOKEs a second F3 method that raises an EC the inner's WHEN does not match — confirm the inner's
   EC does NOT reach the outer method's WHEN (falls to the inner's own default), and confirm a raise in the inner F3
-  method's ORDINARY code (outside any imp-1) sees no frame.
+  method's ORDINARY code (outside any imp-1) sees no frame. **SUPERSEDED (kb/Work PB442):** the floor under-realized the same default it was built for — only a method
+  holding an F3 PERFORM raised it, so a CALLed program and an ordinary method still ran the activator's WHEN whenever
+  their raise sites consulted the stack. Each frame now records its activation and `RunTopFrame` stops at the first
+  foreign one (§9.2's activation-boundary paragraph); the floor and `TrimPerformTo` are deleted.
 - **C3 (MINOR — see the M2/M3 emitter-changes note above):** the scope-parameterized `__RunUse` must render
   `dispatch.DispatchName`, not the hardcoded literal `__Dispatch`.
 
