@@ -1374,7 +1374,7 @@ def self_test() -> int:
 
 def main() -> int:
     # Both streams in UTF-8 BEFORE argparse can print (its --help and usage errors carry the docstring's non-ASCII):
-    # a redirected stream is the host's code page on Windows otherwise (kb/Work PB2615's class).
+    # a redirected stream is the host's code page on Windows otherwise (kb/Work PB1546's class).
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8")
