@@ -1,4 +1,4 @@
-## PB258: SR-14.9.4.3-5 closes on its discriminating golden — a BY REFERENCE address-identifier is sending beside a receiving identifier-2 in one CALL
+## Entry 2122 — 2026-10-16 16:27 PDT — PB258: SR-14.9.4.3-5 closes on its discriminating golden — a BY REFERENCE address-identifier is sending beside a receiving identifier-2 in one CALL
 
 kb/Work PB258 held one open inventory row, `SR-14.9.4.3-5` (§14.9.4.3 SR5: "If the BY REFERENCE phrase is
 specified or implied for an identifier-2 and identifier-2 is not an address-identifier, it is a receiving
@@ -34,3 +34,4 @@ I found an uncited paraphrase of §14.2.3 in its header and replaced it with GR8
 `closes_rows` back-link and `ClosesRowsBackLinkDriftTests` answer the design question the note carried.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` (run `20261016T225508Z-ea4b54`; the new golden and the edited 85 golden both Passed in leg 1).
+
