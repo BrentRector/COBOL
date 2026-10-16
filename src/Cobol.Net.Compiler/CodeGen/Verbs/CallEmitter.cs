@@ -1067,7 +1067,8 @@ internal sealed class CallEmitter(EmitContext ctx, NumericRenderer num, EcState 
             // §8.3.3.6.4 GR2's repetition is the ONE runtime rule EmitText.RepeatToWidth folds (kb/Work PB297).
             BoundAllLiteral all => CsLiteral(width is { } w ? RepeatToWidth(all.Literal, w) : all.Literal),
             BoundFigurative fig =>
-                $"new string({FigurativeConstants.Fill(fig.Kind, data.Collating, formal?.OperandPic?.Category, data.NationalCollating)}, {width ?? 1})",
+                $"new string({FigurativeConstants.Fill(fig.Kind, data.Collating,
+                    IntrinsicArgumentRules.CharacterContext(formal is null ? null : IntrinsicArgumentRules.ClassOfItem(formal)), data.NationalCollating)}, {width ?? 1})",
             _ => throw new ArgumentException(
                 $"{fill.GetType().Name} is not a figurative constant or ALL literal", nameof(fill)),
         };
