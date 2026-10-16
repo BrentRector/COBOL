@@ -172,11 +172,17 @@ public sealed class RunUnit
     /// statement and not yet released by a FREE statement is released", 4) "All instance objects are destroyed" and
     /// 6) "Any resources occupied by dynamic-capacity tables or dynamic-length elementary items are freed": a static
     /// POINTER, OBJECT REFERENCE or dynamic item is managed memory that stays reachable exactly as long as the
-    /// static field refers to it, and everything else the run unit owned is released with this object.</summary>
+    /// static field refers to it, and everything else the run unit owned is released with this object.
+    /// <para>The storage is released even when a close failed: item 2's closes run "even when an error occurs", and
+    /// <see cref="IO.FileRegistry.CloseAll"/> rethrows a failure no I-O status describes only after every file is
+    /// closed, so the rest of the epilogue must not hang on it either (kb/Work PB603).</para></summary>
     public void Terminate()
     {
-        Files.CloseAll();
-        foreach (var reset in _staticStorage) reset();
+        try { Files.CloseAll(); }
+        finally
+        {
+            foreach (var reset in _staticStorage) reset();
+        }
     }
 
     private long _exitStatus;

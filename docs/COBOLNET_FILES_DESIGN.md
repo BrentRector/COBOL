@@ -775,8 +775,16 @@ the sentence that used to stand here — *"those route through `CobolFile.OpenIn
 `OpenCore` with no arm of their own"* — recorded the half that was true as though it were the whole, which is
 how §14.9.40.4 GR12 a)'s READ ONLY and GR15 a)'s NO OTHER went unrendered for as long as they did
 (kb/Work PB714). Because every successful OPEN registers in `PhysicalFileTable`, every close
-path releases: `SharedClose` (from the Table-14 CLOSE dispatch), `CloseDisplaced`, `CloseAll` and
-`CloseAndDrop`. The registration is gated on the OPEN's STATUS, not on `IsOpen`, so a re-OPEN of an already-open
+path releases, and it does so by being the SAME close: `FileRegistry.CloseByFormat`, the Table-14 CLOSE dispatch,
+runs `SharedClose` (the deregistration and the §9.1.16 record-lock release) and is the only member that calls a
+connector's own `Close()`. The explicit CLOSE statement, CANCEL's `CloseIfOpen`, an object's `CloseAndDrop`, a
+displaced registration's `CloseDisplaced` and run-unit termination's `CloseAll` (§14.6.11 2), which `Reset` also
+runs for whatever an earlier run unit left open) are all entries over it, and
+`RunUnitImplicitCloseDriftTests` keeps it that way (kb/Work PB603: `CloseAll`, `Reset` and `CloseDisplaced` each
+used to call `Close()` directly, and `Reset` dropped keyed connectors still open). `CloseAll` closes only the files
+in the open mode, closes every one of them even when one close throws, and rethrows the failure afterwards;
+`FileConnector.Close` ends the file lock and the open mode in a `finally`, so a failure no I-O status describes
+never leaves a lock standing against the next run unit. The registration is gated on the OPEN's STATUS, not on `IsOpen`, so a re-OPEN of an already-open
 connector — `'41'`, which leaves the connector in its ORIGINAL mode — no longer re-registers it under the failed
 request's mode.
 
