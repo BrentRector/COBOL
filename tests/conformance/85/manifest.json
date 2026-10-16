@@ -429,7 +429,8 @@
   "pb3153_inherited_special_names_words",
   "pb3154_contained_symbolic_character",
   "pb3154_contained_symbolic_shadowed",
-  "pb359_unsuccessful_read_start_position"
+  "pb359_unsuccessful_read_start_position",
+  "pb243_display_all_literal"
  ],
  "pending": []
 }

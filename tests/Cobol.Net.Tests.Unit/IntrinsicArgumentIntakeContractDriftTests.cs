@@ -87,8 +87,10 @@ public sealed class IntrinsicArgumentIntakeContractDriftTests
 
         // ⛔ A RUN MUST ASSERT ITS POPULATION (feedback_verdict_evidence_invariant): if the member regex ever
         // stops matching, an empty set would pass this test silently and the contract would be unguarded.
-        Assert.True(intakes.Count >= 10,
-            $"expected at least 10 argument intakes in IntrinsicRenderer, found {intakes.Count} " +
+        // Eight since kb/Work PB651: Arg, LeadArg and the lane predicates read the indexed operands through RawArg (the
+        // one entry that takes a §15.3 type-6 operand's integer), so they no longer call num.AsNum themselves.
+        Assert.True(intakes.Count >= 8,
+            $"expected at least 8 argument intakes in IntrinsicRenderer, found {intakes.Count} " +
             $"([{string.Join(", ", intakes.Select(m => m.Name))}]) — the member scan is blind");
 
         var undeclared = intakes
