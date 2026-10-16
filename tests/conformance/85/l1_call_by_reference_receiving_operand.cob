@@ -6,7 +6,7 @@
       *>
       *> DERIVED BEFORE MEASURING. "Receiving operand" is an observable property, not a label: the callee
       *> stores into the formal parameter and the store reaches the CALLER's storage, because a BY
-      *> REFERENCE argument and its formal parameter share one data item (§14.2.3). SR5's condition has
+      *> REFERENCE argument's formal "occupies the same storage area as the argument" (§14.2.3 GR8). SR5's condition has
       *> two halves and both are pinned here:
       *>   · "specified"  — CALL … USING BY REFERENCE WS-REF ;
       *>   · "or IMPLIED" — CALL … USING WS-BARE, a bare argument, whose mode is BY REFERENCE by default.
