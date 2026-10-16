@@ -35,4 +35,10 @@ No inventory row is claimed or closed.
 arm runs before anything reads stdin, so no byte is buffered under another decoding. Performance: once per process.
 Duplication: the exit-code and console ownership rules now share one owner table.
 
-**Gate:** see the branch report.
+**Gate** (run 20261016T193237Z-2d03cd): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance
+6,130/11,841 · Unit 33,381/33,777 · Characterization 5/36 in leg 1; leg 2 left to CI). The three added tests passed in
+leg 1. Linux gate: the lander's (batched gating).
+
+**Leads, not probed here:** an interactive Windows console's ACCEPT input is still decoded in the console's input code
+page; and the `Console.OutputEncoding` setter at a process entry may leave the parent shell's shared console on code
+page 65001 after the process exits.
