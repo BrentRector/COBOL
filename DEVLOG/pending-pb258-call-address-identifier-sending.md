@@ -32,3 +32,5 @@ I found an uncited paraphrase of §14.2.3 in its header and replaced it with GR8
 
 **Rows.** `SR-14.9.4.3-5` PARTIAL → CONFORMS (GAP 65 → 64), and PB258's `closes_rows` names it. PB245's
 `closes_rows` back-link and `ClosesRowsBackLinkDriftTests` answer the design question the note carried.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` (run `20261016T225508Z-ea4b54`; the new golden and the edited 85 golden both Passed in leg 1).
