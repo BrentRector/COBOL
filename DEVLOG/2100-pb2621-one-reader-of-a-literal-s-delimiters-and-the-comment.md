@@ -1,4 +1,4 @@
-## PB2621: one reader of a literal's delimiters and the comment indicator
+## Entry 2100 — 2026-10-16 12:00 PDT — PB2621: one reader of a literal's delimiters and the comment indicator
 
 Wave 1096 E, an R3 unify wave of the PB1754 architecture review (kb/Work PB2621, R2 finding
 editions-diagnostics-1--duplication--f1#2).
@@ -48,3 +48,4 @@ Conformance 6,090/11,830 · Unit 33,338/33,809 · Characterization 6/36 in leg 1
 `ConditionalCompilationProcessor.FindRangeWord` and the `Frontend.cs` END-PERFORM locator onto the reader and empty
 `PendingStages`; the `>>` directive-indicator test is likewise spelled in three places (`CompilerDirectiveLine.TryParse`,
 `TextWordScanner.DirectiveLineEnd`, `ScanProgramText`).
+
