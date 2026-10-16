@@ -119,10 +119,11 @@ public abstract class KeyedConnector : FileConnector
     /// handle would make the truncation a property of when the handle happened to be taken.</para></summary>
     private FileStream? _store;
 
-    /// <summary>The connector's own handle on the physical file while it is open — null before the OPEN body
-    /// takes it, for an OPTIONAL file that is not present (there is no physical file to lock), and after the
-    /// CLOSE. The organizations' load and persist go through it and nowhere else.</summary>
-    protected FileStream? Store => _store;
+    /// <inheritdoc/>
+    /// <remarks>The store handle <see cref="TakeFileLock"/> took — null before the OPEN body takes it, for an
+    /// OPTIONAL file that is not present (there is no physical file to lock), and after the CLOSE. The
+    /// organizations' load and persist go through it and nowhere else.</remarks>
+    internal sealed override FileStream? FileLock => _store;
 
     /// <inheritdoc/>
     /// <remarks>⛔ THE KEYED STORE IS REWRITTEN WHOLE, so every writable mode READS the physical file before it
@@ -158,7 +159,8 @@ public abstract class KeyedConnector : FileConnector
         // Taken ONCE: the store is read and written positionally through it (never through the stream's buffer,
         // kb/Work PB2660), and it is the handle the store mutex and this connector's record locks are held by.
         _handle = taken.SafeFileHandle;
-        _regions = HostRegionLocks.Open(_handle, HostPath, writable: Mode is not FileOpenMode.Input);
+        // Writable is what the host granted this handle, never re-derived from the open mode (kb/Work PB2758).
+        _regions = HostRegionLocks.Open(_handle, HostPath, writable: taken.CanWrite);
         _coherent = FileLockPosture.AdmitsAnotherWriter(HostShare);
         return taken;
     }
@@ -239,9 +241,9 @@ public abstract class KeyedConnector : FileConnector
 
     // ── Coherence ACROSS RUN UNITS (ISO §9.1.15, §9.1.16; kb/Work PB2660) ────────────────────────────────────
 
-    /// <summary>The connector's own handle — <see cref="Store"/>'s, taken once — through which the store is read
+    /// <summary>The connector's own handle — <see cref="FileLock"/>'s, taken once — through which the store is read
     /// and written POSITIONALLY and through which the store mutex and the record locks are held
-    /// (<see cref="HostRegionLocks"/>). Null whenever <see cref="Store"/> is.</summary>
+    /// (<see cref="HostRegionLocks"/>). Null whenever <see cref="FileLock"/> is.</summary>
     private SafeFileHandle? _handle;
 
     /// <summary>This connector's endpoint on the host's region locks (<see cref="RegionLocks"/>, kb/Work PB2936): made

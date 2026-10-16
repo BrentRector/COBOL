@@ -229,7 +229,7 @@ public sealed class SequentialConnector : FileConnector
         if (SharedPhysical is not { } shared) return;
         // …and a writer the host denied READ (OpenWriter's write-only OUTPUT fallback, kb/Work PB2848) cannot count
         // the medium: a count it could not make would refuse, AFTER the flush above, a record that is in the file.
-        _writeOrdinal = anotherWriter && _writerReads
+        _writeOrdinal = anotherWriter && FileLock!.CanRead
             ? PhysicalOrdinalOfRelease((SharedAppendStream)_writer!.BaseStream)   // §9.1.16 identity, off the medium
             : ++shared.ReleasedOrdinal;                                           // …or the only writer's mint
     }
@@ -349,7 +349,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        TakeRegions(stream.SafeFileHandle);
+        TakeRegions(stream);
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -382,7 +382,6 @@ public sealed class SequentialConnector : FileConnector
             access = FileLockPosture.AccessOf(Mode);
             stream = HostFile.OpenConnectorWriteStream(HostPath, mode, access, HostShare);
         }
-        _writerReads = (access & FileAccess.Read) != 0;
         StreamWriter w;
         try
         {
@@ -394,7 +393,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        TakeRegions(HostFile.HandleOf(stream));
+        TakeRegions(HostFile.FileOf(stream));
         return w;
     }
 
@@ -404,12 +403,14 @@ public sealed class SequentialConnector : FileConnector
     /// given back) where the stream is.</summary>
     private RegionLocks? _regions;
 
-    /// <summary>Make the endpoint for the stream just opened on <paramref name="handle"/>; one a previous handle of this
-    /// connector had (a rebuilt reader) is given up with that handle.</summary>
-    private void TakeRegions(Microsoft.Win32.SafeHandles.SafeFileHandle handle)
+    /// <summary>Make the endpoint for the host stream just opened, <paramref name="host"/> (<see cref="FileLock"/>'s);
+    /// an endpoint still held is given up first, belt-and-braces like <c>KeyedConnector.TakeFileLock</c>'s handle (the
+    /// CLOSE and an abandoned OPEN already gave it up; no sibling's handle is ever rebuilt, kb/Work PB322). Its
+    /// writability is what the host GRANTED the handle, never re-derived from the open mode (kb/Work PB2758).</summary>
+    private void TakeRegions(FileStream host)
     {
         _regions?.Dispose();
-        _regions = HostRegionLocks.Open(handle, HostPath, writable: Mode is not FileOpenMode.Input);
+        _regions = HostRegionLocks.Open(host.SafeFileHandle, HostPath, writable: host.CanWrite);
     }
 
     /// <summary>Give the endpoint up with the handle it was made for.</summary>
@@ -419,10 +420,12 @@ public sealed class SequentialConnector : FileConnector
         _regions = null;
     }
 
-    /// <summary>Whether the writer's handle was granted READ access, so the connector can count records off the
-    /// medium (<see cref="PhysicalOrdinalOfRelease"/>). False only for the write-only OUTPUT handle
-    /// <see cref="OpenWriter"/> falls back to when the host refuses the read half; set by every OpenWriter.</summary>
-    private bool _writerReads;
+    /// <inheritdoc/>
+    /// <remarks>The host stream beneath the reader (INPUT, I-O) or the writer (OUTPUT, EXTEND) — the arms never hold
+    /// both — read through <see cref="HostFile.FileOf"/>, because the repositioning writer's own
+    /// <see cref="Stream.CanRead"/> is false over a read-write handle.</remarks>
+    internal override FileStream? FileLock =>
+        (_reader?.BaseStream ?? _writer?.BaseStream) is { } stream ? HostFile.FileOf(stream) : null;
 
     /// <inheritdoc/>
     /// <remarks>⛔ THE SEQUENTIAL ARM OF PB2660 (kb/Work PB2692). §9.1.16, <i>"While locked by a given file
@@ -701,10 +704,19 @@ public sealed class SequentialConnector : FileConnector
     /// does and where the device goes in the SAME sentence. <paramref name="lines"/> &lt; 0 = ADVANCING PAGE.
     /// Rules:
     /// <list type="bullet">
-    /// <item>ADVANCING PAGE resets the counter to 1 (§13.18.34 GR7c1) and repositions the device — §14.9.51.4
-    ///   GR25 g), <i>"The repositioning is to the first line that may be written on the next logical page as
-    ///   specified in the LINAGE clause"</i>. ⛔ NOT a form feed: GR25 h) is the form-feed arm and it is the
-    ///   NO-LINAGE case. No observable end-of-page (§14.9.51 SR18 bars PAGE+EOP in one statement).</item>
+    /// <item>⛔ ADVANCING PAGE IS A PAGE OVERFLOW (kb/Work PB578). §13.18.34.4 GR7 c) 1 resets the counter to one
+    ///   and says how: <i>"During the resetting of LINAGE-COUNTER to the value one, the value of LINAGE-COUNTER
+    ///   is implicitly incremented to exceed the value specified by integer-1 or the data item referenced by
+    ///   data-name-1"</i> — the counter passes the page size, which is §14.9.51.4 GR26 a)'s trigger (<i>"This
+    ///   occurs when the associated LINAGE-COUNTER is equal to or exceeds the page size"</i>), and GR27 a) names
+    ///   the condition EC-I-O-EOP-OVERFLOW. So ADVANCING PAGE takes the overflow arm below and has no arm of its
+    ///   own: one transition (GR25 g)'s destination IS GR26 a)'s, <i>"the first line that may be written on the
+    ///   next logical page"</i>), one reset (GR7 c) 1 / c) 4) and one end-of-page condition — which an
+    ///   EC-I-O-EOP-OVERFLOW declarative, an exception-checking PERFORM's WHEN phrase and FUNCTION
+    ///   EXCEPTION-STATUS see, and which keeps a NOT END-OF-PAGE imperative from running (GR28). §14.9.51.3 SR18
+    ///   bars only the AT END-OF-PAGE phrase beside ADVANCING PAGE (docs/CONFORMANCE.md §4, "DETERMINATION —
+    ///   WRITE ADVANCING PAGE on a logical page is a page overflow"). ⛔ NOT a form feed: GR25 h) is the
+    ///   form-feed arm and it is the NO-LINAGE case.</item>
     /// <item>ADVANCING n travels n lines and adds n (GR7c2/GR25a); a plain WRITE travels 1 and adds 1 (GR7c3 —
     ///   the caller passes 1). n = 0 is GR25 c)'s "no repositioning".</item>
     /// <item>Counter past the page body ⇒ page overflow (§14.9.51 GR26a): the device is <i>"repositioned to the
@@ -739,24 +751,21 @@ public sealed class SequentialConnector : FileConnector
         // The device is on the page body only once this page's top margin is behind it (GR4); every travel and
         // every presentation materializes it first, so the two call sites agree by construction.
         EmitTopMarginIfPending();
-        if (lines < 0)
-        {
-            // ADVANCING PAGE (§14.9.51.4 GR25 g) + §13.18.34 GR7c1): the device is repositioned to the first
-            // line that may be written on the next logical page — never GR25 h)'s form feed, which is the arm
-            // for a file with NO LINAGE clause.
-            return BeginNextLogicalPage(page);   // GR6 b) 2 — the re-evaluation may break the page
-        }
-        // ADVANCING n (n >= 0) or plain WRITE (n = 1): the counter is incremented (GR7c2/c3) and the device
-        // travels the same n lines (GR25 a); n = 0 is GR25 c)'s "no repositioning ... is performed").
-        if (LinageCounter + lines > _pageBody)
+        // ADVANCING PAGE (lines < 0) is the page-overflow arm, not one of its own: §13.18.34.4 GR7 c) 1 increments
+        // the counter "to exceed the value specified by integer-1" while resetting it (kb/Work PB578), which is
+        // GR26 a)'s trigger, and GR25 g)'s destination is GR26 a)'s. Otherwise ADVANCING n (n >= 0) or plain
+        // WRITE (n = 1): the counter is incremented (GR7c2/c3) and the device travels the same n lines (GR25 a);
+        // n = 0 is GR25 c)'s "no repositioning ... is performed").
+        if (lines < 0 || LinageCounter + lines > _pageBody)
         {
             // Page overflow (§14.9.51 GR26a): the line does not fit in the page body — the device repositions
-            // to the first writable line of the succeeding page and the counter resets to 1 (GR7c4).
+            // to the first writable line of the succeeding page and the counter resets to 1 (GR7c4, and GR7c1
+            // for ADVANCING PAGE) — never GR25 h)'s form feed, which is the arm for a file with NO LINAGE clause.
             // ⚖ STRICT `>`, NOT `>=` — the adjudicated boundary (docs/CONFORMANCE.md §4, kb/Work PB686). GR26a
             // as printed says "equal to or exceeds the page size"; `>=` here would push a record that lands on
             // the LAST body line onto the next page and make that line unwritable forever, against §13.18.34
             // GR2. The doc comment above carries the full derivation and the survey.
-            if (!BeginNextLogicalPage(page)) return false;   // GR6 b) 3's re-evaluation broke the page
+            if (!BeginNextLogicalPage(page)) return false;   // GR6 b) 2 / b) 3's re-evaluation broke the page
             _endOfPage = Exceptions.ExceptionCatalog.IoEopOverflow;   // §14.9.51.4 GR27 a) — caused by GR26 a)
             return true;
         }
@@ -1095,7 +1104,7 @@ public sealed class SequentialConnector : FileConnector
                     // create empty, then close — an auxiliary handle, not the connector's stream
                     if (!exists) using (HostFile.OpenAuxiliary(HostPath, FileMode.Create, FileAccess.Write)) { }
                     // ReadWrite access and NO FileOptions.SequentialScan for this mode — both decided once, in
-                    // OpenReader, which is also what the reposture rebuild uses.
+                    // OpenReader, the one spelling of the read handle.
                     _reader = OpenReader();
                     NoticeIfLayoutDisagrees();
                     if (!exists && IsOptional) return FileStatusCode.OptionalFileNotFound;

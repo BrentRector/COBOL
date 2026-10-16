@@ -634,13 +634,16 @@ public static class HostFile
         return stream;
     }
 
-    /// <summary>The host handle beneath a connector stream one of the roles above opened: the handle that IS the
-    /// connector's §9.1.15 file lock, and through which its §9.1.16 record locks are published to other run units
-    /// (<see cref="HostRegionLocks"/>, kb/Work PB2692).</summary>
-    internal static Microsoft.Win32.SafeHandles.SafeFileHandle HandleOf(Stream connectorStream) => connectorStream switch
+    /// <summary>The host stream beneath a connector stream one of the roles above opened: the handle that IS the
+    /// connector's §9.1.15 file lock (<c>FileConnector.FileLock</c>), through which its §9.1.16 record locks are
+    /// published to other run units (<see cref="HostRegionLocks"/>, kb/Work PB2692), and whose
+    /// <see cref="FileStream.CanRead"/>/<see cref="FileStream.CanWrite"/> are the access the host GRANTED — the one
+    /// answer to "what does this handle take?" (kb/Work PB2758), where a wrapper's own capabilities
+    /// (<see cref="SharedAppendStream.CanRead"/> is false over a read-write handle) answer a different question.</summary>
+    internal static FileStream FileOf(Stream connectorStream) => connectorStream switch
     {
-        SharedAppendStream shared => shared.SafeFileHandle,
-        FileStream plain => plain.SafeFileHandle,
+        SharedAppendStream shared => shared.Host,
+        FileStream plain => plain,
         _ => throw new ArgumentException($"{connectorStream.GetType().Name} is not a stream a HostFile role opened.",
             nameof(connectorStream)),
     };
@@ -670,8 +673,10 @@ internal sealed class SharedAppendStream(FileStream inner) : Stream
         _inner.Write(buffer);
     }
 
-    /// <summary>The host handle this stream writes through (<see cref="HostFile.HandleOf"/>).</summary>
-    internal Microsoft.Win32.SafeHandles.SafeFileHandle SafeFileHandle => _inner.SafeFileHandle;
+    /// <summary>The host stream this one writes through (<see cref="HostFile.FileOf"/>): its handle and the access the
+    /// host granted it. ⛔ Read those; never write through it, because a write that skips <see cref="Write(ReadOnlySpan{byte})"/>
+    /// skips the repositioning that is this type's reason to exist.</summary>
+    internal FileStream Host => _inner;
 
     /// <summary>The offset at which the first write since the last <see cref="NextRelease"/> landed, or -1 when
     /// nothing has been written since: the physical place of the record a connector has just released, which

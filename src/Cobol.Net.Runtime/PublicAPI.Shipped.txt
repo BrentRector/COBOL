@@ -1592,7 +1592,6 @@ CobolNet.Runtime.IO.KeyedConnector.Access.get -> CobolNet.Runtime.IO.KeyedAccess
 CobolNet.Runtime.IO.KeyedConnector.KeyedConnector(string! hostPath, int recordWidth, CobolNet.Runtime.IO.KeyedAccess access, int varyMin, int varyMax) -> void
 CobolNet.Runtime.IO.KeyedConnector.PersistIsReachable(bool owed) -> bool
 CobolNet.Runtime.IO.KeyedConnector.ReleaseFileLock() -> void
-CobolNet.Runtime.IO.KeyedConnector.Store.get -> System.IO.FileStream?
 CobolNet.Runtime.IO.KeyedConnector.StoreHolds(long framedBytes) -> bool
 CobolNet.Runtime.IO.KeyedConnector.TakeFileLock(bool create) -> System.IO.FileStream!
 CobolNet.Runtime.IO.LinagePage

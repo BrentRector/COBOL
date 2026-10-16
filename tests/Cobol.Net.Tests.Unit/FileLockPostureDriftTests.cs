@@ -531,10 +531,7 @@ public sealed class FileLockPostureDriftTests
             foreach (var org in Enum.GetValues<Org>())
             {
                 RegisterOrg(reg, $"C{org}", host, org);
-                var c = typeof(FileRegistry)
-                    .GetMethod("Require", BindingFlags.Instance | BindingFlags.NonPublic)!
-                    .Invoke(reg, [$"C{org}"]) as FileConnector;
-                Assert.NotNull(c);
+                var c = ConnectorOf(reg, $"C{org}");
                 foreach (var mode in Enum.GetValues<FileOpenMode>())
                 {
                     var taken = c.HostAccess(mode);
@@ -556,6 +553,76 @@ public sealed class FileLockPostureDriftTests
                 + $"{Enum.GetValues<Org>().Length}. A new organization owes §9.1.15's file lock exactly as the "
                 + "other three do (kb/Work PB771) — add it to Org, to RegisterOrg and to SeedOne, and every "
                 + "measurement in this class covers it.");
+        }
+        finally { TryDelete(host); }
+    }
+
+    /// <summary>The connector a registry holds under <paramref name="name"/> — the registry's own lookup, read
+    /// through reflection because the measurements below are of the connector, which no COBOL statement names.</summary>
+    private static FileConnector ConnectorOf(FileRegistry reg, string name) =>
+        typeof(FileRegistry).GetMethod("Require", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(reg, [name]) as FileConnector
+        ?? throw new InvalidOperationException($"The registry holds no connector named '{name}'.");
+
+    public static TheoryData<Org, FileOpenMode, Mode> EveryOrganizationOpenModeAndRecordLockPosture()
+    {
+        var data = new TheoryData<Org, FileOpenMode, Mode>();
+        foreach (var org in Enum.GetValues<Org>())
+            foreach (var mode in Enum.GetValues<FileOpenMode>())
+                foreach (var sharing in new[] { Mode.ClauseLess, Mode.AllOther })
+                    data.Add(org, mode, sharing);
+        return data;
+    }
+
+    /// <summary>⛔ THE BAND IS ONLY AS GOOD AS THE CLAIM THAT <c>HostAccess</c> IS WHAT THE HANDLE TAKES — MEASURED ON
+    /// THE HANDLE (kb/Work PB2758). <see cref="EveryOrganisationsHandleAccessLiesInThatBand"/> asks each connector what
+    /// it SAYS it takes; a handle opened with an access spelled at its own site (the sequential reader's ternary and
+    /// the write role's literal <c>FileAccess.Write</c> were two) can drift from that statement while the band stays
+    /// green — an INPUT reader widened to read-write is refused by a SHARING WITH READ ONLY INPUT sibling Table 19
+    /// admits (<c>FileShare.Read</c> does not admit a writer), and the OPEN answers '30': kb/Work PB713/PB740's shape,
+    /// and a read-only file refusing the OPEN INPUT that may read it, which the band's upper bound exists to forbid
+    /// (<see cref="AccessesAHandleMayTake"/>). So every (organization ×
+    /// open mode), under the clause-less posture and under a record-locking one (the sequential writer reads as well
+    /// as writes when it publishes record locks, <c>SequentialConnector.HostAccess</c>, kb/Work PB2692), opens a real
+    /// file, and the access the host GRANTED the connector's file-lock handle (<c>FileConnector.FileLock</c>) shall be
+    /// its <c>HostAccess</c>; the region-lock endpoint shall be writable exactly when that handle is; and the CLOSE
+    /// gives the handle back (§9.1.15, <i>"The file lock is removed by an explicit or implicit CLOSE statement executed
+    /// for that file connector"</i>). The temporary file is readable, so the sequential OUTPUT writer's narrowing to
+    /// the mode's floor (a host that refuses the read half, kb/Work PB2848) is not this measurement's case.</summary>
+    [Theory]
+    [MemberData(nameof(EveryOrganizationOpenModeAndRecordLockPosture))]
+    public void EveryOrganisationsLiveHandleTakesItsHostAccess(Org org, FileOpenMode mode, Mode sharing)
+    {
+        string host = Tmp($"access-{org}-{mode}-{sharing}");
+        try
+        {
+            var reg = new FileRegistry();
+            SeedOne(reg, host, org);
+            RegisterAndShare(reg, "F", host, sharing, org);
+            var c = ConnectorOf(reg, "F");
+            Assert.Null(c.FileLock);
+
+            reg.OpenStatic("F", mode);
+            Assert.True(reg.Status("F")[0] == '0',
+                $"({org} {mode} {sharing}) the OPEN answered '{reg.Status("F")}' — there is no handle to measure.");
+            FileStream? held = c.FileLock;
+            Assert.True(held is not null,
+                $"({org} {mode} {sharing}) the OPEN succeeded on a present file and the connector names no file-lock "
+                + "handle — §9.1.15's lock has no host expression, or FileLock does not name the handle it is.");
+
+            FileAccess granted = (held.CanRead ? FileAccess.Read : 0) | (held.CanWrite ? FileAccess.Write : 0);
+            FileAccess stated = c.HostAccess(mode);
+            Assert.True(granted == stated,
+                $"({org} {mode} {sharing}) the connector's handle was opened with {granted}, but HostAccess states "
+                + $"{stated}. HostAccess is what a sibling's file lock is derived to admit and what the band measures; "
+                + "a handle that spells its own access escapes both (kb/Work PB2758).");
+            Assert.True(c.RecordLocks is { } regions && regions.Writable == held.CanWrite,
+                $"({org} {mode} {sharing}) the region-lock endpoint's writability is not the handle's "
+                + $"(handle CanWrite={held.CanWrite}) — it was re-derived from something other than the handle.");
+
+            reg.Close("F");
+            Assert.True(reg.Status("F")[0] == '0', $"({org} {mode} {sharing}) CLOSE answered '{reg.Status("F")}'.");
+            Assert.True(c.FileLock is null, $"({org} {mode} {sharing}) the file-lock handle outlived the CLOSE.");
         }
         finally { TryDelete(host); }
     }
