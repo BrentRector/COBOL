@@ -92,3 +92,7 @@ exist; it now names COBOLNET1547.
 **Gate** (run `20261016T224025Z-bc695d`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left
 to CI's whole-population run: Conformance 5,795 · Unit 497 · Characterization 31 …`; every added golden, negative and
 `ConstantNameLiteralPositionDriftTests` case Passed in leg 1. semgrep verify: PASS, counts unchanged.
+
+**Gate after the review fixes** (run `20261016T231310Z-bc0b58`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
+PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,740 · Unit 442 · Characterization 31 …`; the
+extended golden and both new negatives Passed in leg 1. semgrep verify: PASS, counts unchanged.
