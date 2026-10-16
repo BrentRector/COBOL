@@ -290,8 +290,8 @@ GO TO), 0882 (CALL ON OVERFLOW).
   en-dash minus; METHOD is NOT added: the printed 2023 list does not contain it, kb/Work PB2623) ⊕ a small authored delta file
   (`tests/version-matrix/reserved-word-deltas.json`: the authoritative 16-word 2023 additions = VCR row 32; the
   hand-authored X3.23-1985 list; a medium-confidence 2014 IEEE-754 family). Derivation: ∈2023 ∧ ∈85 ∧ ∉added2023
-  ⇒ continuous; ∈added2023 ⇒ 2023-only EXCEPT RECEIVE/SEND (85-reserved → unreserved 2002/2014 → re-reserved
-  2023); ∈85 ∧ ∉2023 ⇒ 85-only (removed 2002, flagged); remainder ⇒ added 2002. ROUNDED-mode words etc. are
+  ⇒ continuous; ∈added2023 ⇒ 2023-only EXCEPT RECEIVE/SEND/END-RECEIVE (85/2002-reserved → unreserved 2014 →
+  re-reserved 2023; kb/Work PB656); ∈85 ∧ ∉2023 ⇒ 85-only (removed 2002, flagged); remainder ⇒ added 2002. ROUNDED-mode words etc. are
   §8.10 CONTEXT-SENSITIVE in 2023 — not reserved, not in the table. Script emits BOTH the C# table
   (`src/Cobol.Net.Editions/ReservedWords.Table.cs`) AND the canonical `tests/version-matrix/reserved-words.json`; a
   drift test compares them.
@@ -338,13 +338,14 @@ once gating lands the INV-1 continuity legs at ≥2002 (the file-suite `[InlineD
 migration posture; INV-1's formal statement becomes "compiles permissive at later editions; strict failures
 must trace to removal/reserved rows"). New matrix rows: one per P2.6 gate, plus reserved-word rows via the
 interval encoding — `user-word-commit-2023` (intro 85 / removedIn 2023 / 0901), `user-word-raising-2002`
-(intro 85 / removedIn 2002 / 0901), and `receive-as-user-word` (intro **2002** / removedIn 2023 / 0901 — encodes
-85-reserved → 2002/2014-free → 2023-re-reserved in one f(case,V) row).
+(intro 85 / removedIn 2002 / 0901), and `receive-as-user-word` (intro **2014** / removedIn 2023 / 0901 — encodes
+85/2002-reserved → 2014-free → 2023-re-reserved in one f(case,V) row; kb/Work PB656).
 
 > **As built (deltas from the plan above).** The reserved-word 85/2002/2014 lists come from GnuCOBOL's per-standard
 > `config/*.words` (curl disk-to-disk, gitignored `.cache/`, facts-only into the repo) ⊕ the in-repo spec §8.9 ⊕ VCR
 > row 32: the re-reservation set is THREE words incl. the END- scope terminator; the EC words are reserved since 2002
-> (not 2023-only); Annex E overrides the GnuCOBOL 2002/2014 curation, which keeps the communication trio. ORDER carries
+> (not 2023-only); Annex E.2 item 25 decides only the 2014 edge (E.1 compares with the previous standard), where the GnuCOBOL 2014
+> list already agrees; at 2002 the trio stays reserved like the rest of the communication vocabulary (kb/Work PB656). ORDER carries
 > a CCVS-proof not-85 override (conforming ST127A uses it as a data name). The interval rows include
 > `end-receive-as-user-word`. The INV-1-strong behavioral leg is `COBOLNET_NIST_STD=2023 COBOLNET_NIST_PERMISSIVE=1`
 > over the golden run — byte-exact at the default edition (the roadmap's fatal-challenge criterion). The four binder
