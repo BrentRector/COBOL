@@ -17,7 +17,6 @@ namespace CobolNet.Tests.Unit;
 /// is that regression; <see cref="PictureCategoryDriftTests"/> holds the property (SR13 as a closure over the
 /// accepted set) that proves the rules agree.
 /// </summary>
-[Trait("Sweep", "tree")]
 public sealed class PictureSeparatorDriftTests
 {
     private static readonly Regex LiteralSeparatorTernary =
