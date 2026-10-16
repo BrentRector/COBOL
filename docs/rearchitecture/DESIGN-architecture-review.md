@@ -1404,18 +1404,24 @@ exception phrases (1844–2001).
 
 **Edition reads in the grammar: a rule over bodies, not a list of spellings.** Most semantic predicates are lookahead
 disambiguation (`{boolExprAhead()}?`, `{!numericLiteralIsLeftOperand()}?` …). **The rule:** EDITION STATE is the
-parser's `Edition` (`Parsing/CobolParserCoreBase.cs:22`, which the front end sets, `Pipeline/Frontend.cs:498`, to the
+parser's `Edition` (`Parsing/CobolParserCoreBase.cs:26`, whose getter is `protected` so that nothing outside the
+parser can read it, and which the front end sets, `Pipeline/Frontend.cs:498`, to the
 compile edition for the program and to whatever edition a fragment parse is given), any `EditionInfo` value (a
 parameter, or a fixed one: `DirectiveExpressionFragment.cs:45` parses every directive expression at
 `EditionInfo.Latest` on purpose and gates the `>>` facility separately, so "the compile edition" is not what every
 parse reads), and every lexer field the front end primes from one
 (`_caseMappingEdition` and `_reservedNonNames`, set by `TokenRetypes.PrimeLexer` from `edition.Year` and from
-`ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of
-the lexer grammar's `@members`, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex)
+`ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of a
+committed `CobolParserCore` partial or a parser grammar's `@members`, of the lexer grammar's `@members` and its
+partials, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex) — a member of a
+type NESTED in one of these included, since a nested type reads its container's protected state through an instance,
+and a member of a type in `src/` DERIVED from one of these (transitively, from the base lists), since a subclass reads
+the protected `Edition` getter and calls the protected reads through `this` —
 whose body reads edition state or calls another edition read, to a fixpoint; an edition-read SITE is any parser or
 lexer predicate `{…}?` or action `{…}` body, any lexer override (`NextToken`, `Emit`), any parser listener, any
 retype-stage member, or any front-end DRIVER member that hands edition state to a lexer or parser or decides a
-re-lex from it, that calls one or passes edition state on: the pipeline's parse-again loop (`Pipeline/Frontend.cs:425-463`,
+re-lex from it, that calls one, names edition state itself (`{Edition.Has(2014)}?`, a primed lexer field) or passes
+edition state on: the pipeline's parse-again loop (`Pipeline/Frontend.cs:425-463`,
 calling `LexesDifferentlyFrom` at `:437` and `PrimeLexer` at `:463`) and the fragment parser (`FragmentParse.Parse`,
 `Parsing/FragmentParse.cs:62,72,93`, and its callers `SubscriptExpressionFragment.cs:31` and
 `DirectiveExpressionFragment.cs:45`), both added by Draft 6 after the fifth refuter (G4). Names play no part, so a read under a new name, in any of the three stages, is
@@ -1426,7 +1432,7 @@ transitive scan), the rule finds these members: `is85`, `is2002`, `is2014`, `is2
 `keywordContinuesHere` (`:437`) through `IsKeywordReadingHere` (`:467`); `userWordHere` (`:371-375`); the action
 `gatedDeclaration` (`:389-392`, through `userWordHere`) and `NoteGatedOffender` (`:401-404`, called by the
 authoritative pass's syntax-error listener); and `ReservedUserWordViolation` (`:545-554`, the COBOLNET0901 message, not
-a predicate); `DialectLevel` is the edition's setter, not a read. And these sites: five spelled `{isXXXX()}?` —
+a predicate); the `DialectLevel` setter shim is deleted (the front end sets `Edition`, both axes). And these sites: five spelled `{isXXXX()}?` —
 `| {is2023()}? LOCATION` (`CobolControlFlow.g4:66`), `| {is2002()}? validationClause` (`CobolData.g4:379`),
 `({is2002()}? validateValidPhrase)?` (`CobolData.g4:828`), `| {is2023()}? applyCommitClause` (`CobolIO.g4:334`) and
 OPEN's `{is2002() || retryPhraseAhead()}?` (`CobolIO.g4:393`); `{reservedHere("CRT")}?` and `{reservedHere("CURSOR")}?`
@@ -1444,12 +1450,14 @@ word status (is this word reserved at this edition, and how is it spelled there)
 comment calls LOCALE and USER-DEFAULT 1985 user words (`CobolParserCoreBase.cs:186-187`) — which the superset parse
 cannot avoid: a
 word that is a user-defined word in an earlier edition must still parse as one there. The grammar's comments give the
-same reason for four of the five spellings (LOCATION, VALID, APPLY and COMMIT, RETRY); the fifth, `validationClause`,
-gates a construct by edition. D7's statement in `COBOLNET_DESIGN.md` ("There is no parse-time `{isXXXX()}?` edition
-predicate") was not what the code does; that document now says what the code does, and kb/Work PB2291 adjudicates
-every member and site the rule finds against D7's purpose (a word-status read the superset parse cannot avoid, or a construct gate that
-belongs in `VersionConformancePass`). Draft 1's "zero" and its correction of §3 R1 and of the `architecture-review`
-skill stay withdrawn; that skill sentence describes the code.
+same reason for four of the five spellings (LOCATION, VALID, APPLY and COMMIT, RETRY), and kb/Work PB2291's verdict
+(landed) holds two of those four: LOCATION and RETRY are word status, while APPLY COMMIT has no other reading below
+2023 and the VALID phrase's INVALID arm none below 2002, so they and the fifth, `validationClause` (whose CLASS,
+DESTINATION, INVALID and VARYING arms are reserved at every edition), gate constructs by edition. D7's statement in
+`COBOLNET_DESIGN.md` ("There is no parse-time `{isXXXX()}?` edition predicate") was not what the code does; that
+document now states the verdict (word status sanctioned, the three construct gates recorded as D7 defects).
+Draft 1's "zero" and its correction of §3 R1 stay withdrawn; the `architecture-review` skill's grammar rule now
+states the verdict too.
 
 **Target: one fragment per division or facility; the core is the compilation group.** The rule: a grammar rule
 lives in the fragment of the clause or statement whose general format defines it, so the `spec-grammar-conformance`
@@ -1475,12 +1483,18 @@ token precedence with the import order; **the lexer stays one grammar**, its mod
 `LexerDfaCacheDriftTests`.
 
 **Kept, each with its pin:** no left-edge semantic predicate in a lexer mode (`LexerDfaCacheDriftTests`); the edition
-reads are what the rule above computes — the grammar drift test APPLIES the rule (it computes the members' fixpoint
-from the superclass's syntax and the call sites from every predicate and action body of the parser grammars and every
-parser listener) and compares the result with the set PB2291's verdict records, per file, so a new read under any
-name (a sixth spelling, a new `reservedHere` site, a new member, a new action or listener call) fails until PB2291's
-verdict records it (PB2291 lands the assertion with its verdict, and PB2333 moves those members as one set, so the pin
-names one type); `Generated/` is a build output,
+reads are what the rule above computes — `EditionReadDriftTests` APPLIES the rule (it computes the members' fixpoint
+from the syntax of the parser superclass, its committed partials and parser `@members`, the lexer's `@members` and
+partials and the retype stage, nested and derived types included, derives the primed lexer fields from the retype stage's setter
+calls, and finds the call sites in every predicate and action body of every grammar and in every C# member of `src/`
+outside the read's own stage (a second top-level type in a stage's file included), every front-end hand-off of the edition to a parser and every
+caller that passes one on) and compares the result with the set PB2291's verdict records,
+per file and per rule, each site with its verdict (§8.9 word status, or a construct gate), so a new read under any
+name (a new spelling, a new `reservedHere` site, a new member, a new action or listener call) fails until it is
+adjudicated and recorded (landed with PB2291's verdict; PB2333 moves those members as one set, so the pin names one
+type). The verdict: every read is word status except three construct gates on the declined A.4 surface
+(`validationClause`, `validateValidPhrase`'s INVALID arm, `applyCommitClause`), which stay recorded as D7 defects until
+a constructs.json row can carry a construct refused by name at its introduction; `Generated/` is a build output,
 never committed, regenerated by the csproj's `EnsureGeneratedFiles` target whenever any generation input is newer
 (`AntlrGenerationDriftTests`, kb/Work PB2719); the generated `CobolWords.g4` is committed because it is an input,
 single-sourced from its JSON; the token-stream and parse-tree differential (§4 item 3, not yet built) is the oracle of
