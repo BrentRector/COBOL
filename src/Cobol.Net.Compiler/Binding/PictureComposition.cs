@@ -183,6 +183,21 @@ internal static class PictureComposition
     /// every rule below counts in.</summary>
     private readonly record struct Sym(string Text, char Kind, int At);
 
+    /// <summary>⛔ THE ONE ASKER OF SR13's ROLE SWAP (kb/Work PB3219). §13.18.40.3 SR13 — "When the DECIMAL-POINT IS
+    /// COMMA clause is specified, the symbol comma is the decimal separator and the symbol period is the grouping
+    /// separator. The rules for the symbol period apply to the symbol comma, and the rules for the symbol comma
+    /// apply to the symbol period" — and §13.18.40.6 ("the precedence rules for the symbols comma and period are
+    /// interchanged") decide which character plays the DECIMAL separator in every rule that names "the symbol
+    /// period" (SR12 b in both of its forms, SR17, SR20, Table 10's period row). Every consumer asks THIS pair
+    /// instead of spelling <c>decimalPointIsComma ? ',' : '.'</c> itself: the composition validator, the
+    /// floating-string detector, the FOR-form symbol screen and the floating-point significand each had their
+    /// own copy, and the last two forgot the swap. <c>PictureSeparatorDriftTests</c> fails if a literal ternary
+    /// returns.</summary>
+    internal static char DecimalSeparator(bool decimalPointIsComma) => decimalPointIsComma ? ',' : '.';
+
+    /// <summary>The GROUPING separator — the symbol <see cref="DecimalSeparator"/> is not (SR13).</summary>
+    internal static char GroupingSeparator(bool decimalPointIsComma) => decimalPointIsComma ? '.' : ',';
+
     /// <summary>
     /// Validate the composition of one Format-1 character-string. Returns <see langword="true"/> when it is an
     /// allowable combination; otherwise emits ONE diagnostic naming the exact rule and returns
@@ -195,8 +210,8 @@ internal static class PictureComposition
         IReadOnlySet<char> char1Extended, bool blankWhenZero, bool decimalPointIsComma, EditionContext edition,
         string where)
     {
-        char decimalSep = decimalPointIsComma ? ',' : '.';
-        char grouping = decimalPointIsComma ? '.' : ',';
+        char decimalSep = DecimalSeparator(decimalPointIsComma);
+        char grouping = GroupingSeparator(decimalPointIsComma);
         var syms = Tokenize(expanded);
         int n = syms.Count;
         if (n == 0) return true;   // the empty string is already COBOLNET0808 at the caller
@@ -456,10 +471,11 @@ internal static class PictureComposition
     /// character-string has none. §13.18.40.3 SR27 admits at most one such string, and the Table-10 walk rejects
     /// a second, so the first one found is the only one.</returns>
     internal static (char Symbol, int Occurrences) FloatingString(string expanded, char cs,
-        IReadOnlySet<char> char1, IReadOnlySet<char> char1Extended, char decimalSep, char grouping)
+        IReadOnlySet<char> char1, IReadOnlySet<char> char1Extended, bool decimalPointIsComma)
     {
         var syms = Tokenize(expanded);
-        var floating = MarkFloating(syms, cs, char1, char1Extended, decimalSep, grouping);
+        var floating = MarkFloating(syms, cs, char1, char1Extended, DecimalSeparator(decimalPointIsComma),
+            GroupingSeparator(decimalPointIsComma));
         for (int i = 0; i < syms.Count; i++)
         {
             if (!floating[i]) continue;
@@ -477,10 +493,11 @@ internal static class PictureComposition
     /// holds two fixed occurrences, each rendering its own sign literal, and no floating string (kb/Work PB855 —
     /// the same count-for-adjacency error kb/Work PB528 removed for the currency symbol).</summary>
     internal static bool HasFloatingString(string expanded, char cs, IReadOnlySet<char> char1,
-        IReadOnlySet<char> char1Extended, char decimalSep, char grouping, char letter)
+        IReadOnlySet<char> char1Extended, bool decimalPointIsComma, char letter)
     {
         var syms = Tokenize(expanded);
-        var floating = MarkFloating(syms, cs, char1, char1Extended, decimalSep, grouping);
+        var floating = MarkFloating(syms, cs, char1, char1Extended, DecimalSeparator(decimalPointIsComma),
+            GroupingSeparator(decimalPointIsComma));
         for (int i = 0; i < syms.Count; i++)
             if (floating[i] && syms[i].Kind == letter) return true;
         return false;
