@@ -19,7 +19,7 @@
       *>                   ALPHANUMERIC; MOVE 42 aligns on the decimal point (042.00) and the two Z
       *>                   positions suppress the leading zero, giving " 42.00" with ONE leading space.
       *>   NAT=NAT       — PIC N(3), class national.
-      *>   GRP=GHIJ      — a group item is class alphanumeric (§8.5.2.1); its content is the concatenation
+      *>   GRP=GHIJ      — an alphanumeric group is class alphanumeric (§8.5.2.1); its content is the concatenation
       *>                   of its subordinates.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1DSPADM.

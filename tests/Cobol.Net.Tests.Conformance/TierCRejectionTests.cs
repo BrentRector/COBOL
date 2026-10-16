@@ -156,7 +156,8 @@ public sealed class TierCRejectionTests
 
     /// <summary>PB164's DISPLAY leg for a COMP-5 leaf CLOSED with the image widening: the group has a whole
     /// image now, and DISPLAY transfers a group's character content VERBATIM (the A.1 item-56 determination —
-    /// a group is class alphanumeric), so the COMP-5 leaf's two's-complement bytes appear raw in the output,
+    /// a group with no GROUP-USAGE clause is class alphanumeric, ISO §8.5.2.1), so the COMP-5 leaf's two's-complement
+    /// bytes appear raw in the output,
     /// exactly as GnuCOBOL renders such a group (the split-latitude tiebreaker). GR-14.9.11.4-4's COMP-5
     /// residue is discharged; the floats closed with wave 2 and the INDEX leg with R40 — every leaf-kind
     /// display leg is now a WORKING pin.</summary>

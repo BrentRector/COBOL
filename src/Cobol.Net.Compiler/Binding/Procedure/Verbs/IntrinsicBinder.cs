@@ -2067,7 +2067,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
         // ordinal per D-N3); a nested intrinsic with a string-class result (alphanumeric OR national —
         // NATIONAL-OF/CONVERT-to-NAT) is a string operand likewise. ⛔ The FIELD arm reads the ONE classifier
         // (PB59 family 7b) so the BODY choice and UniformArgumentType's TYPE resolution can never split on a
-        // shape again: a group is category alphanumeric (§8.5.2.1), and a ref-mod view takes GR6's rewrites —
+        // shape again: a group takes its §8.5.2.1 category (an alphanumeric group alphanumeric, a national group
+        // national, a bit group boolean), and a ref-mod view takes GR6's rewrites —
         // the pre-7b split crashed MAX(G1 G2) at run time ("no numeric render recipe").
         BoundFieldOperand => OperandCategory(op) is PicCategory.Alphanumeric or PicCategory.NumericEdited
             or PicCategory.National or PicCategory.Boolean,

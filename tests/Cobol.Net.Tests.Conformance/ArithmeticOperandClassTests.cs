@@ -7,8 +7,11 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// ⛔ ISO §8.8.1.1 — THE CLASS OF AN ARITHMETIC OPERAND (DA6). "An arithmetic expression may be an identifier
 /// referencing a <b>numeric data item</b>, a numeric literal, the figurative constant ZERO (ZEROS, ZEROES) …".
-/// A group item (class alphanumeric, §8.5), an elementary alphanumeric or national item, and a reference-modified
-/// slice (§8.4.3.3.4) are therefore NOT permissible arithmetic operands.
+/// No group item is a numeric data item — ISO §8.5.2.1 gives an alphanumeric group class alphanumeric, a bit group
+/// class boolean, a national group class national and a strongly-typed group its type-name — so a group item, an
+/// elementary alphanumeric or national item, and a reference-modified slice (§8.4.3.3.4) are NOT permissible
+/// arithmetic operands. The refusal names the operand's own class (kb/Work PB1400; pinned below by
+/// <see cref="TheRefusal_NamesTheSection8521ClassOfTheOperand"/>).
 /// <para>
 /// WiseOwl COBOL accepted all of them and decoded their digit characters — and did so INCONSISTENTLY: a group of
 /// <c>PIC X</c> leaves computed, while a group of <c>PIC 9</c> leaves compiled and then THREW at run time. The
@@ -305,5 +308,48 @@ public sealed class ArithmeticOperandClassTests
             + string.Join(" ;; ", contentErrors));
         EditionHarness.AssertHasDiagnostic(contentErrors, "COBOLNET0844");
         EditionHarness.AssertHasDiagnostic(moveErrors, "COBOLNET0844");
+    }
+
+    /// <summary>⛔ THE REFUSAL NAMES THE CLASS §8.5.2.1 GIVES THE OPERAND (kb/Work PB1400). The refusal of a group as an
+    /// arithmetic operand was always right; the reason it gave was not — "group item … (class alphanumeric, ISO §8.5)"
+    /// for EVERY group, and "class alphanumeric" for every reference-modified operand. ISO §8.5.2.1: "a bit group item
+    /// has class and category boolean — a national group item has class and category national"; §8.5.2.5 3) and
+    /// §8.5.2.10 3) reach a group "explicitly or implicitly described with a GROUP-USAGE clause", so the SUBORDINATE
+    /// group of each is the same class; "the class and the category of a strongly-typed group item are the type-name";
+    /// §8.4.3.3.4 GR6 keeps a reference-modified national item class national. GROUP-USAGE is COBOL-2002 (the 85
+    /// refusal of the clause is <c>negative/pb79-group-usage-85</c>), and the text is edition-invariant from there.</summary>
+    [Theory]
+    [InlineData(2002)]
+    [InlineData(2014)]
+    [InlineData(2023)]
+    public void TheRefusal_NamesTheSection8521ClassOfTheOperand(int edition)
+    {
+        const string ws = "       01 GB GROUP-USAGE BIT.\n          05 GB1 PIC 1(4).\n          05 GBS.\n"
+            + "             10 GB2 PIC 1(2).\n"
+            + "       01 GN GROUP-USAGE NATIONAL.\n          05 GN1 PIC N(2).\n          05 GNS.\n"
+            + "             10 GN2 PIC N(1).\n"
+            + "       01 GA.\n          05 GA1 PIC X(2).\n"
+            + "       01 TT TYPEDEF STRONG.\n          05 TT1 PIC 9(2).\n       01 SG TYPE TT.\n"
+            + "       01 NN PIC N(2).\n       01 NE PIC ZZ9.\n"
+            + "       01 T1.\n          05 TE PIC 9 OCCURS 5.\n       01 R PIC 9(4).";
+        (string Stmt, string Reason)[] cases =
+        [
+            ("COMPUTE R = GB + 1.", "group item 'GB' of class boolean (ISO §8.5.2.1)"),
+            ("COMPUTE R = GBS + 1.", "group item 'GBS' of class boolean (ISO §8.5.2.1)"),
+            ("COMPUTE R = GN + 1.", "group item 'GN' of class national (ISO §8.5.2.1)"),
+            ("COMPUTE R = GNS + 1.", "group item 'GNS' of class national (ISO §8.5.2.1)"),
+            ("COMPUTE R = GA + 1.", "group item 'GA' of class alphanumeric (ISO §8.5.2.1)"),
+            ("COMPUTE R = SG + 1.", "group item 'SG' of class TT, the type-name of a strongly-typed group item"),
+            ("COMPUTE R = NN(1:1) + 1.", "a reference-modified operand of class national (ISO §8.4.3.3.4 GR6)"),
+            // The subscript route (ReferenceResolver) spells the class through the same Table-2 spelling.
+            ("MOVE TE (NE) TO R.", "item 'NE' of class alphanumeric (numeric-edited) (ISO §8.5.2.1 Table 2)"),
+        ];
+        foreach (var (stmt, reason) in cases)
+        {
+            var (ok, errors, _) = EditionHarness.CompileFull(Program(ws, "           " + stmt), edition);
+            Assert.False(ok, $"[std {edition}] '{stmt}' must be rejected — ISO §8.8.1.1");
+            EditionHarness.AssertHasDiagnostic(errors, "COBOLNET0844");
+            EditionHarness.AssertHasDiagnostic(errors, reason);
+        }
     }
 }

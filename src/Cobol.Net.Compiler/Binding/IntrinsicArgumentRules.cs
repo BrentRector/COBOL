@@ -465,6 +465,26 @@ internal static class IntrinsicArgumentRules
         return ClassOfItem(p.Item);
     }
 
+    /// <summary>The ISO §8.5.2.1 class of a place SPELLED for a diagnostic that names why an operand was refused —
+    /// <see cref="ClassOfPlace"/>'s answer through <see cref="Name"/>, so a message never states a class of its own.
+    /// <para>⛔ ONE RULE, ONE PLACE (kb/Work PB1400). <c>ExpressionBinder.NonNumericOperandKind</c> spelled the class
+    /// itself — <c>"group item … (class alphanumeric, ISO §8.5)"</c> for EVERY group and <c>"class alphanumeric"</c>
+    /// for every reference-modified operand — so a <c>GROUP-USAGE BIT</c> group (class boolean, §8.5.2.5 3)), a
+    /// <c>GROUP-USAGE NATIONAL</c> group (class national, §8.5.2.10 3)) and a reference-modified national item
+    /// (class national, §8.4.3.3.4 GR6 b)/c)) were each told they were alphanumeric while LENGTH, MOVE and the
+    /// class screen itself read them correctly.</para>
+    /// <para>⚠ The ONE place this differs from <see cref="ClassOfItem"/> is the strongly-typed group, and it is
+    /// a reading, not a fork: §8.5.2.1 — "Both the class and the category of a strongly-typed group item are the
+    /// type-name specified in the TYPE clause" — while <see cref="ClassOfItem"/> answers ALPHANUMERIC for it on
+    /// §15.3 item 2's ARGUMENT-position reading. A diagnostic outside a function argument names §8.5.2.1's class.
+    /// A strongly-typed SUBORDINATE group (§8.5.3.1: "subordinate to a group item described with the TYPE clause")
+    /// writes no TYPE clause of its own, so it names the type of the nearest TYPE clause it is typed by.</para></summary>
+    internal static string ClassNameOf(Place p) =>
+        p is not RefModPlace && StrongTypeModel.IsStrongGroup(p.Item)
+            && StrongTypeModel.TypeAnchor(p.Item)?.TypeName is { } typeName
+            ? $"{typeName}, the type-name of a strongly-typed group item"
+            : ClassOfPlace(p) is { } cls ? Name(cls) : "unknown";
+
     /// <summary>The ISO §8.5.2.1 Table-2 class of a DATA ITEM — the half of <see cref="ClassOfPlace"/> that does
     /// not need a <see cref="Place"/>, so a caller holding only the resolved item asks the SAME table.
     /// <para>⛔ IT IS A SPLIT, NOT A SECOND CLASSIFIER (kb/Work PB170). <c>ReferenceResolver</c> resolves a

@@ -492,7 +492,8 @@ internal static class OperandText
         // A group operand's character image is the generated AsImage(): each string-stored leaf contributes its
         // characters; a DISPLAY leaf its zoned digits; and a BINARY/PACKED leaf ⛔ ITS TRUE BYTES — radix-2
         // two's complement of StorageWidth, or BCD with a trailing sign nibble (V59). Implementor-defined
-        // territory (§8.8.4.2.1 + §8.8.4.2.7: a group operand is class alphanumeric compared over its
+        // territory (§8.8.4.2.1 + §8.8.4.2.7: an ALPHANUMERIC group — the only kind that holds such leaves — is
+        // compared as an elementary alphanumeric item, over its
         // REPRESENTATION, and §13.18.60.4 GR4/GR11 leave a binary/packed item's representation, including its
         // sign, to the implementor — COBOLNET_DESIGN §14.4 and docs/CONFORMANCE.md items 205–215 are the ONE
         // total definition).

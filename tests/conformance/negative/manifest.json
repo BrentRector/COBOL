@@ -565,6 +565,7 @@
   "pb1007-invoke-content-numeric-function-alnum-formal",
   "pb856-inspect-operand-binary-usage",
   "pb856-inspect-identifier1-bit-group",
+  "pb1400-group-usage-arithmetic-operand",
   "pb881-inspect-replacing-constant-record",
   "pb881-read-into-constant-record",
   "pb881-move-corresponding-constant-record",
