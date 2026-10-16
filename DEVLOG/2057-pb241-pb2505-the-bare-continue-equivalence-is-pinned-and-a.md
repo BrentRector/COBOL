@@ -1,4 +1,4 @@
-## PB241 + PB2505: the bare-CONTINUE equivalence is pinned, and a RAISE that raises nothing is advised (COBOLNET3803)
+## Entry 2057 — 2026-10-16 04:24 PDT — PB241 + PB2505: the bare-CONTINUE equivalence is pinned, and a RAISE that raises nothing is advised (COBOLNET3803)
 
 Wave 1084 group C, the EC-binder pair: one statement whose meaning was right but unwitnessed, and one whose meaning was
 right but invisible.
@@ -36,3 +36,4 @@ rule. Sibling arms: RAISE identifier-1 is never TURN-gated (no advisory owed); E
 and citations re-checked with `cite.py --check`. Performance: one bool test per RAISE at bind time.
 
 Gate (run `20261015T202523Z-9f6d92`): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,025/11,714 · Unit 33,106/33,667 · Characterization 6/36 cases ran; leg 2 left to CI. The two corpus cases and the four new facts ran in leg 1 and passed.
+
