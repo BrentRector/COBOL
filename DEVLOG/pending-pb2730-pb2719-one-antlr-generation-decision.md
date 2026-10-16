@@ -38,3 +38,19 @@ parameter fails instead of waiting for input.
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — … Conformance 6,062/11,770 · Unit
 33,272/33,698 · Characterization 6/36 cases ran …` (run 20261016T133256Z-eb5152); the five `AntlrGenerationDriftTests`
 facts passed in leg 1. Linux gate: the lander's (batched gating).
+
+**Finisher (the landing's Linux gate RED on 0f8e83d26).** `HostWitnessTraitDriftTests.TheSweepTrait_…` failed in the
+whole-population Linux unit leg: "missing the trait: AntlrGenerationDriftTests". The new class reads
+`TestRepo.Src("Cobol.Net.Frontend")`, two segments, so `drift_rules.py --sweeps` classifies it a tree-wide sweep on
+both hosts alike (measured: the Windows `--sweeps` lists it). It now carries `[Trait("Sweep", "tree")]`. The Windows
+gate did not fail on the same source for a planner reason, not a host one: both of the trait guard's dear facts
+(`TheSweepTrait_…`, 5-11 s under load, and `EveryFileSystemRaceWitness_…`, 2-9 s, because they spawn the scans) cost
+over `SWEEP_CHEAP_SECONDS`, so tier 0c left them in leg 2 and they were NOT RUN in either Windows run
+(`not-run-Unit.txt` of 20261016T133256Z and 20261016T134854Z), while the Linux gate runs every unit case. The same
+cause explains the sibling branch `worktree-wf_e3f5e138-3a8-20`'s red in the other direction ("trait on a non-sweep:
+PictureSeparatorDriftTests", whose path `src/Cobol.Net.Compiler/Binding` is three segments): its two Windows runs left
+the guard NOT RUN too. Fix: `gate_plan.TRAIT_GUARD` puts the guard's class in tier 0h, leg 1 at every gate whatever
+its cost, because a tier the gate does not check at every gate is a tier on trust. A planner self-test case plants a
+dear guard and proves it lands in leg 1 (red with the fix removed), and `ThePlan_Orders…` pins the name to
+`nameof(HostWitnessTraitDriftTests)`. Sweep: 185 other sweep cases are over the threshold and stay leg 2 by the
+design's cost rule; the guard is the only one whose rule is the gate's own tier membership.

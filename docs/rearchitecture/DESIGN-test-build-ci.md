@@ -859,7 +859,12 @@ because the raw name is not stable (`b7`):
   of recorded time; leg 1 within the collection cap. Both traits are read from the test SOURCES (`class_traits`, so
   the plan needs no build), and `HostWitnessTraitDriftTests` holds the scan equal to the compiled attributes, the
   Sweep set equal to the sweeps, and every race witness (a Unit class driving the sharing layer's host types from
-  concurrent workers) traited `Host`. `TIER_ORDER = ("0a", "0h", "0c", "0u", "1", "2", "3")`.
+  concurrent workers) traited `Host`. That class, `gate_plan.TRAIT_GUARD`, is itself tier 0h: its cases spawn the
+  scans and cost 5-11 s under a gate's load, over `SWEEP_CHEAP_SECONDS`, so as a plain sweep it sat in leg 2 and the
+  Windows leg 1 never checked the two tiers; two branches on 2026-10-16 gated GREEN there over a trait drift (a new
+  sweep without the trait, a non-sweep with it) that the landing's whole-population Linux unit leg found (kb/Work
+  PB2730's finisher). A tier the gate does not check at every gate is a tier on trust.
+  `TIER_ORDER = ("0a", "0h", "0c", "0u", "1", "2", "3")`.
 - **Tier 0a** — a case of a test METHOD the diff adds (matched by method name in the assemblies the file is compiled
   into); a corpus row whose manifest entry or golden files the diff changes; a case red at this worktree's previous
   gate. Always leg 1, exempt from the budget and the cap. The implementer's own new tests and goldens are here by

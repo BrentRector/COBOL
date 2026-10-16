@@ -22,6 +22,7 @@ namespace CobolNet.Tests.Unit;
 /// stamp carries the namespace and the jar, and the Exec passes each value from the csproj; (3) the generator is the
 /// only script in the project, so no second up-to-date decision can return.
 /// </summary>
+[Trait("Sweep", "tree")]
 public sealed class AntlrGenerationDriftTests
 {
     private static readonly string ProjectDir = TestRepo.Src("Cobol.Net.Frontend");
