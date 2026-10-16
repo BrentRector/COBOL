@@ -542,7 +542,7 @@ def file_notes(findings_path, id_pool, notes_dir, dry_run, targets=None, rerende
         if os.path.exists(path):
             raise SystemExit("refusing to overwrite " + path)
         if not dry_run:
-            with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)
         written.append((nid, kind, title))
     rewritten = []
@@ -568,7 +568,7 @@ def file_notes(findings_path, id_pool, notes_dir, dry_run, targets=None, rerende
                 have = fh.read().replace("\r\n", "\n")
             if have.rstrip("\n") != text.rstrip("\n"):
                 if not dry_run:
-                    with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+                    with open(path, "w", encoding="utf-8", newline="\n") as fh:
                         fh.write(text)
                 rewritten.append(nid)
     return written, skipped, id_pool[len(groups) + len(new_keys):], sorted(rewritten)
@@ -737,7 +737,7 @@ def merge_into_note(path, rec, new_ids, pin, dry_run):
             r["id"], r["pair"], pin[:9], ", ".join("%s %s" % (k, v) for k, v in sorted(r.get("votes", {}).items())),
             r["title"].rstrip(".")) for r in adds) + "\n"
     if not dry_run:
-        with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+        with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(text)
 
 
@@ -811,7 +811,7 @@ def file_r2(collected_path, id_pool, notes_dir, dry_run, path_root=REPO, areas=N
         if os.path.exists(path):
             raise SystemExit("refusing to overwrite " + path)
         if not dry_run:
-            with open(path, "w", encoding="utf-8", newline="\r\n") as fh:
+            with open(path, "w", encoding="utf-8", newline="\n") as fh:
                 fh.write(text)
         written.append((nid, r["wave_kind"], title))
     return written, skipped, id_pool[len(written):]
