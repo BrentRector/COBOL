@@ -484,7 +484,11 @@ public static class ACCT_UPDATE
   activated (r7-brk): the entry's statements `HostLanding.RequireDistinct(Unsafe.AreSame(ref a, ref b), …)`, one per
   such pair, all precede the FIRST formal's landing, so a value that a formal would refuse (`123456` for the `PIC 9(4)`
   one) never reports the call's shape as a value error, while a pair of one description is the landing's own
-  `Unsafe.AreSame(…) ? <first cell> :` arm. Each formal has its own record-struct type, so two group
+  `Unsafe.AreSame(…) ? <first cell> :` arm. That arm shares only a storage that exists, so one null variable lands
+  exactly as two null variables would: an OPTIONAL second formal is omitted before the arm is asked, and when only the
+  first is OPTIONAL it is omitted and the second lands the null by its own row (a non-OPTIONAL text refuses it with
+  `ArgumentNullException`, a data pointer's null is `NULL`).
+  Each formal has its own record-struct type, so two group
   formals cannot be passed one host variable: a host cannot express that aliasing, and the restriction is
   DOC-A.1-141's. Distinct host variables are distinct storage in .NET; inside the activation every COBOL reference —
   the callee, its contained programs, a COBOL program it calls back — sees the boundary's storage exactly as for a

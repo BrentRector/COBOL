@@ -110,6 +110,38 @@ public sealed class HostEntryTests
             END-IF
             GOBACK.
         END PROGRAM H1PTR.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H1OPT.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-A PIC X(4).
+        01 LK-B PIC X(4).
+        01 LK-P USAGE POINTER.
+        01 LK-Q USAGE POINTER.
+        01 LK-R USAGE POINTER.
+        01 LK-S USAGE POINTER.
+        PROCEDURE DIVISION USING OPTIONAL LK-A LK-B OPTIONAL LK-P LK-Q
+            LK-R OPTIONAL LK-S.
+        P1.
+            IF LK-A IS OMITTED
+                DISPLAY "A OMITTED"
+            ELSE
+                DISPLAY "A [" LK-A "] B [" LK-B "]"
+            END-IF
+            IF LK-P IS OMITTED
+                DISPLAY "P OMITTED"
+            END-IF
+            IF LK-Q = NULL
+                DISPLAY "Q NULL"
+            END-IF
+            IF LK-R = NULL
+                DISPLAY "R NULL"
+            END-IF
+            IF LK-S IS OMITTED
+                DISPLAY "S OMITTED"
+            END-IF
+            GOBACK.
+        END PROGRAM H1OPT.
         """;
 
     /// <summary>A function unit: its entry returns the RETURNING item and has no Cancel (CANCEL names programs).</summary>
@@ -184,6 +216,14 @@ public sealed class HostEntryTests
                 CobolNet.Runtime.ManagedPointer p = null!;
                 H1PTR.Call(ref p);
                 Console.WriteLine($"PTR {ReferenceEquals(p, CobolNet.Runtime.ManagedPointer.Null)}");
+
+                // One variable for formals of one description, OPTIONAL and not, lands as distinct variables would
+                // (DESIGN-external-repository §4.3): a null one omits each OPTIONAL formal, a non-OPTIONAL data
+                // pointer lands it as NULL, and a non-OPTIONAL text refuses it.
+                string? s = "ABCD"; CobolNet.Runtime.ManagedPointer? q = null;
+                H1OPT.Call(ref s, ref s, ref q, ref q, ref q, ref q);
+                try { s = null; H1OPT.Call(ref s, ref s, ref q, ref q, ref q, ref q); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentNullException e) { Console.WriteLine($"OPTNULL {e.ParamName}"); }
 
                 long x = 21;
                 Console.WriteLine($"FN {H1FN.Call(ref x)}");
@@ -795,6 +835,12 @@ public sealed class HostEntryTests
                 "SIGN LK_U\n" +
                 "P NULL\n" +
                 "PTR True\n" +
+                "A [ABCD] B [ABCD]\n" +
+                "P OMITTED\n" +
+                "Q NULL\n" +
+                "R NULL\n" +
+                "S OMITTED\n" +
+                "OPTNULL LK_B\n" +
                 "FN 42", stdout);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);

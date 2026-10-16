@@ -174,9 +174,13 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
                 var e = formals[j];
                 if (e.ByValue || e.CsType != f.CsType || (e.Optional != f.Optional && IsValueType(e.Type))) continue;
                 string sameVariable = $"global::System.Runtime.CompilerServices.Unsafe.AreSame(ref {e.Name}, ref {f.Name})";
+                // The arm shares only a storage that exists, so one null variable is landed as two would be (§4.3):
+                // an OPTIONAL later formal is omitted before the arm is asked (below), and when only the earlier
+                // formal is OPTIONAL it was omitted, so the later one lands the null by its own row (a text refuses
+                // it, a data pointer's is NULL).
                 if (OoConformance.SignatureDifference(e.Description, f.Description, "formal", "other formal") is null
                     && OoConformance.SignatureDifference(f.Description, e.Description, "formal", "other formal") is null)
-                    aliases[i] += $"{sameVariable} ? {e.Cell} : ";
+                    aliases[i] += $"{sameVariable}{(e.Optional && !f.Optional ? $" && {e.Cell} is not null" : "")} ? {e.Cell} : ";
                 else
                     w.Line($"HostLanding.RequireDistinct({sameVariable}, {CsLiteral(e.Name)}, {CsLiteral(f.Name)});");
             }
@@ -185,9 +189,9 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         for (int i = 0; i < formals.Count; i++)
         {
             var f = formals[i];
-            string landed = Storage(f);
+            string landed = aliases[i] + Storage(f);
             if (f.Optional) landed = $"{f.Name} is null ? null : {landed}";
-            w.Line($"var {f.Cell} = {aliases[i]}{landed};");
+            w.Line($"var {f.Cell} = {landed};");
         }
         if (returning is not null)
             w.Line($"var {returning.Cell} = {ReceiverSeed(returning)};");

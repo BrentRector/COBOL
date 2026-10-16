@@ -389,3 +389,18 @@ Gate `TestResults/build-local/20261016T192507Z-8d5723` at bb4120465: `LEG 1 ONLY
 (Conformance 6,128/11,845, Unit 33,394/33,797, Characterization 5/36 in leg 1; HostEntryTests, HostEntryShapeDriftTests,
 RuntimeAbiPinDriftTests and OneRelationDriftTests among them). Run directly on the same build, being leg 2:
 `AnnexA1RegisterDriftTests` and IC207A's NIST differential and version-matrix cases, all passed. Semgrep verify: PASS.
+
+**Review of the w1098a head (0d47dd079), finding R1-1 of round 1 (wave 1098 finisher 2).** The review found that the
+landing's one-description alias arm let a non-OPTIONAL reference-type formal share the cell of an earlier OPTIONAL one:
+`USING OPTIONAL LK-A LK-B` (both `PIC X(4)`) emits `ref string? LK_A, ref string LK_B`, and a host's
+`string s = null; PALIAS.Call(ref s, ref s)` handed LK_B the omitted LK_A's null cell, so LK_B's null refusal never ran
+and the entry's write-back threw `NullReferenceException`, where two distinct null variables are refused with
+`ArgumentNullException` naming LK_B. The sibling sweep found two more arms of the same shape, both for data pointers
+(a reference type, so OPTIONAL and non-OPTIONAL share the CLR type): an OPTIONAL pointer followed by a non-OPTIONAL one
+crashed the activated program's `IF LK-Q = NULL` on the null cell, and a non-OPTIONAL pointer followed by an OPTIONAL
+one gave the OPTIONAL formal the first one's NULL storage, so it was present where a null variable must omit it. The
+arm now shares only a storage that exists: an OPTIONAL later formal's omission test is outermost, before the arm, and
+when only the earlier formal is OPTIONAL the arm also asks that its cell is not null, so the later formal lands the
+null by its own row. Design §4.3 states it. HostEntryTests gains H1OPT (`USING OPTIONAL LK-A LK-B OPTIONAL LK-P LK-Q
+LK-R OPTIONAL LK-S`) and its host lines `A [ABCD] B [ABCD]`, `P OMITTED`, `Q NULL`, `R NULL`, `S OMITTED` and
+`OPTNULL LK_B`; with the emitter at 0d47dd079 the host process dies at the first H1OPT call.
