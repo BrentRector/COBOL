@@ -41,6 +41,34 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// syntax rule of the same <see cref="SetSender"/>.</summary>
     private readonly SetSenders _senders = new(host);
 
+    /// <summary>Refuse every SET receiving operand written in an identifier format that is never a receiving operand,
+    /// each by its own rule (<see cref="ExpressionBinder.ResolveReceiving(Core.SetReceivingIdentifierContext)"/>), and
+    /// the statement with them; null when every receiver is a data reference. A <c>setStatement</c> alternative is one
+    /// format rule, so its receivers are that rule's own children.</summary>
+    private BoundStatement? RefuseNonReceivable(Core.SetStatementContext set)
+    {
+        if (set.ChildCount == 0 || set.GetChild(0) is not Antlr4.Runtime.ParserRuleContext format) return null;
+        bool refused = false;
+        foreach (var r in format.GetRuleContexts<Core.SetReceivingIdentifierContext>())
+            if (r.dataReference() is null)
+            {
+                _ = host.Expr.ResolveReceiving(r);
+                refused = true;
+            }
+        foreach (var r in format.GetRuleContexts<Core.SetAddressReceiverContext>())
+            if (r.nonReceivableIdentifier() is { } n)
+            {
+                _ = host.Expr.RefuseNonReceivable(n);
+                refused = true;
+            }
+        return refused ? BoundRejected.Reported(ctx.Edition) : null;
+    }
+
+    /// <summary>The receiving data references of a SET format, in source order — every one a data reference once
+    /// <see cref="RefuseNonReceivable"/> has passed the statement.</summary>
+    private static Core.DataReferenceContext[] Receivers(Core.SetReceivingIdentifierContext[] receivers) =>
+        Array.ConvertAll(receivers, r => r.dataReference());
+
     /// <summary>Bind a SET statement, dispatching by format (ISO §14.9.39; COBOLNET_DESIGN §12.3). The COBOL-85
     /// surface — Format 1 index/value assignment, Format 2 UP/DOWN BY, Format 4 condition-name TO TRUE — binds here;
     /// the later-edition formats (switches need SPECIAL-NAMES, pointers/objects their 2002 subsystems, TO FALSE the
@@ -54,6 +82,11 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             bool save = sl.setLocaleSource() is null;   // F12 has no Format-11 TO operand (the grammar splits the two formats)
             return save ? BindSaveLocale(sl) : BindSetLocale(sl);
         }
+        // ⛔ A RECEIVING OPERAND WRITTEN IN AN IDENTIFIER FORMAT THAT IS NEVER ONE (kb/Work PB1551): SELF, SUPER, NULL, an
+        // object-view, a function- or program-address-identifier. Every SET receiving list parses them (the grammar's
+        // `setReceivingIdentifier`, and Format 7's `setAddressReceiver`) so each is refused by its OWN rule at the
+        // receiving chokepoint — once, here, before a format is selected from a list that holds a non-reference.
+        if (RefuseNonReceivable(set) is { } nonReceivable) return nonReceivable;
         // F6 attribute (§14.9.39; Annex A.4.2 item 24) — DECLINED: the screen module. It had NO grammar
         // alternative at all before kb/Work PB260, so `SET SG ATTRIBUTE HIGHLIGHT ON` was a generic COBOL0001
         // parse error pointing at ATTRIBUTE rather than a named refusal naming the facility.
@@ -66,7 +99,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         if (set.setContentStatement() is { } sc) return BindSetContent(sc);   // F15 numeric-content (2014; kb/Work PB452)
         if (set.setEntryStatement() is { } se) return BindSetEntry(se);   // F9 + §8.4.3.13 ENTRY sender (P10 Step 7)
         if (set.setSizeStatement() is { } ss)
-            return BindSetSize(ss.dataReference(), ss.arithmeticExpression());   // F16 explicit SIZE OF (2023)
+            return BindSetSize(ss.setReceivingIdentifier().dataReference(), ss.arithmeticExpression());   // F16 explicit SIZE OF (2023)
         if (set.setToValueStatement() is { } tv) return BindSetTo(tv);
         if (set.setIndexStatement() is { } ud) return BindSetUpDown(ud);
         if (set.setBooleanStatement() is { } b) return BindSetCondition(b);
@@ -85,11 +118,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
             // ⛔ WITHOUT THE FUNCTION-POINTER ARM a declarable function-pointer falls through into the OO
             // Format-5 bind and, through BindSetTo, into the Format-1 arithmetic store — the silent wrong
             // answer PB817 filed as "the other end, which a fixer will otherwise miss".
-            // §8.4.3.5.3 SR2 — the receiving list admits an object-view only so it is refused by this rule (kb/Work PB1425).
-            var receivers = sor.setObjectReferenceReceiver();
-            if (receivers.FirstOrDefault(r => r.objectViewReceiver() is not null) is { } receivingView)
-                return host.Oo.RefuseObjectViewReceiver(receivingView.objectViewReceiver(), "a receiving operand of a SET statement");
-            var sorRefs = Array.ConvertAll(receivers, r => r.dataReference());
+            var sorRefs = Receivers(sor.setReceivingIdentifier());
             var objRef = sor.objectReference();
             // NULL is the sender that arrives here: every identifier the expression tier carries — a data reference,
             // a function-identifier, an inline invocation, an object-view, SELF / SUPER (kb/Work PB1425) — parses as
@@ -166,7 +195,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         bool signWritten = v.setContentSign() is not null;
 
         var stores = new List<SetContentStore>();
-        foreach (var dref in sc.dataReference())
+        foreach (var dref in Receivers(sc.setReceivingIdentifier()))
         {
             if (host.Expr.ResolveReceiving(dref) is not { } place)
                 return BoundRejected.Reported(ctx.Edition);   // the receiving chokepoint reported it — not a deferral (kb/Work PB236, PB881)
@@ -773,7 +802,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // ⚠ `drefs` IS the receiving-operand list and nothing else: the function-address-identifier is its own
         // grammar RULE (§8.4.3.12.2 is an identifier format), so its operand lives under `fai`, exactly as the
         // program-address-identifier's does under BindSetProgramAddress.
-        var drefs = sfa.dataReference();
+        var drefs = Receivers(sfa.setReceivingIdentifier());
         var fai = sfa.functionAddressIdentifier();
         if (drefs.Length < 1)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "SET … TO ADDRESS OF FUNCTION with no receiving operand (ISO §14.9.39.2)");
@@ -948,12 +977,12 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     {
         // The LAST dataReference is the ENTRY identifier operand when no literal is present — the grammar
         // shape is `SET dataReference+ TO ENTRY (nonNumericLiteral | dataReference)`.
-        var drefs = se.dataReference();
+        var drefs = Receivers(se.setReceivingIdentifier());
         // ⛔ The words `TO ENTRY` occur nowhere in ISO/IEC 1989 (the grammar's own note; kb/Work PB549) — a Micro Focus /
         // IBM spelling this compiler accepts for its program-pointer semantics, so the §4.2.10 warning names it.
         ctx.Edition.Extension(ExtensionIds.SetProgramPointerToEntry, "SET … TO ENTRY");
         bool identForm = se.nonNumericLiteral() is null;
-        int targetCount = identForm ? drefs.Length - 1 : drefs.Length;
+        int targetCount = drefs.Length;
         if (targetCount < 1)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "SET … TO ENTRY with no receiving operand (ISO §14.9.39.2)");
         if (BindProgramAddressTargets(drefs, targetCount, "SET … TO ENTRY") is not { } targets)
@@ -974,7 +1003,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         }
         // The resolver reported (or defers) the reference; "the ENTRY identifier is unresolvable" on top named
         // no rule the program broke (kb/Work PB1030).
-        if (host.Expr.ResolveSending(drefs[^1]) is var entryAnswer && entryAnswer.Place is not { } namePlace)
+        if (host.Expr.ResolveSending(se.dataReference()) is var entryAnswer && entryAnswer.Place is not { } namePlace)
             return entryAnswer.Refusal(ctx.Edition);
         return new BoundSetEntry(targets, null, namePlace);
     }
@@ -1022,7 +1051,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// receiver — the same compare the pointer-to-pointer arm runs, so it is the same helper.</para></summary>
     private BoundStatement BindSetProgramAddress(Core.SetProgramAddressStatementContext spa)
     {
-        var drefs = spa.dataReference();
+        var drefs = Receivers(spa.setReceivingIdentifier());
         var pai = spa.programAddressIdentifier();
         var operandRef = pai.dataReference();
         // ⚠ `drefs` IS the receiving-operand list and nothing else. The program-address-identifier is its own
@@ -1196,7 +1225,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// the receivers select Format 5 whatever the sender looks like, and SR9 refuses the literal by name.</para></summary>
     public BoundStatement BindSetTo(Core.SetToValueStatementContext tv)
     {
-        var recvs = tv.dataReference();
+        var recvs = Receivers(tv.setReceivingIdentifier());
         var kinds = _fmt.KindsOf(recvs);
         var amount = tv.arithmeticExpression();
         string senderText = amount.GetText();
@@ -1366,7 +1395,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// to compile and answer 5; it now draws COBOLNET2112, because no printed format admits it.</para></summary>
     public BoundStatement BindSetUpDown(Core.SetIndexStatementContext ud)
     {
-        var recvs = ud.dataReference();
+        var recvs = Receivers(ud.setReceivingIdentifier());
         var kinds = _fmt.KindsOf(recvs);
         var amount = ud.arithmeticExpression();
         bool down = ud.DOWN() is not null;

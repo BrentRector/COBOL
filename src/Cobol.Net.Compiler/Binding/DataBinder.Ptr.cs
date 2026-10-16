@@ -290,7 +290,8 @@ public sealed partial class DataBinder
             }
             if (node is Core.CallReturningPhraseContext ret)
             {
-                if (HeadOf(ret.dataReference()) is { } rh) yield return (rh.Name, rh.Qualifiers, false, true);
+                if (ret.receivingIdentifier().dataReference() is { } rd && HeadOf(rd) is { } rh)
+                    yield return (rh.Name, rh.Qualifiers, false, true);
                 continue;
             }
             if (node is not Core.CallUsingPhraseContext phrase) continue;

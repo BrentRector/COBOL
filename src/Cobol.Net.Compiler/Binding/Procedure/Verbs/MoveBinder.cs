@@ -98,14 +98,14 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     public BoundStatement Bind(Core.MoveStatementContext move)
     {
         if (move.CORRESPONDING() is not null || move.CORR() is not null)   // Format 2 — BOTH tokens (§14.9.25.3 SR11)
-            return corr.Bind(CorrVerb.Move, move.dataReference(), CobolRounding.Truncation, null);
+            return corr.Bind(CorrVerb.Move, move.dataReference(), move.receivingIdentifier(), CobolRounding.Truncation, null);
         // ⛔ THE MESSAGE NO LONGER NAMES "MOVE CORRESPONDING" (kb/Work PB421). It used to read "MOVE
         // CORRESPONDING / unsupported MOVE form", and that was the arm `MOVE <sending> CORRESPONDING id-3 TO
         // id-4` reached — a shape §14.9.25.2 prints no format for, which `moveReceivingPhrase`'s deleted second
         // alternative admitted and this loud stage then answered AT RUN TIME. Format 2 is handled whole at the
         // CORRESPONDING test above, so what remains here is a defensive arm over the one printed receiving
         // shape, and it must not claim an unimplemented feature that this binder in fact implements.
-        if (move.sendingOperand() is not { } send || move.moveReceivingPhrase()?.dataReferenceList() is not { } targets)
+        if (move.sendingOperand() is not { } send || move.moveReceivingPhrase() is not { } targets)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, $"MOVE '{move.GetText()}': Format 1 prints one sending operand and "
                 + "TO identifier-2 … (ISO §14.9.25.2)");
         BoundOperand source = SendingOperand(send, "MOVE source");
@@ -115,7 +115,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         if (send.dataReference() is { } sdref
             && host.Expr.ScreenIndexNameOperand(source, sdref.GetText(), "a MOVE sending operand"))
             source = BoundOperandError.Refused(ctx.Edition, $"MOVE of the index-name '{DataBinder.WrittenText(sdref)}' (ISO §13.18.38.3 r7)");
-        var resolved = host.Expr.ResolveTargets(targets.dataReference());
+        var resolved = host.Expr.ResolveTargets(targets.receivingIdentifier());
         return BindMoveOf(source, resolved);
     }
 

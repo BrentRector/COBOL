@@ -199,9 +199,14 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
                     "INVOKE … USING BY REFERENCE NULL: ISO §14.9.23.3 SR9 — identifier-3 \"shall be an address-identifier "
                     + "or shall reference a data item defined in the file, working-storage, local-storage, or linkage "
                     + "section\", and the predefined NULL (§8.4.3.7 / §8.4.3.10) is neither; pass it BY CONTENT or BY VALUE");
-        // identifier-4 receives the result, and §8.4.3.5.3 SR2 forbids an object-view there (kb/Work PB1425).
-        if (inv.invokeReturning()?.objectViewReceiver() is { } returningView)
-            return RefuseObjectViewReceiver(returningView, "the RETURNING identifier of an INVOKE statement");
+        // identifier-4 receives the result: an identifier format that is never a receiving operand (an object-view,
+        // SELF, SUPER, NULL — kb/Work PB1425, PB1551) is refused by its own rule at the receiving chokepoint, and the
+        // statement with it, before any receiver or method is resolved.
+        if (inv.invokeReturning()?.receivingIdentifier() is { } returning && returning.dataReference() is null)
+        {
+            _ = host.Expr.ResolveReceiving(returning);
+            return BoundRejected.Reported(ctx.Edition);
+        }
         // INVOKE (§14.9.23, OO) is a COBOL-2002 introduction; the edition gate fires on RECOGNITION in the
         // VersionConformancePass parse arm (VisitInvokeStatement), never on the BoundInvoke node this method
         // builds. It keyed on the node until kb/Work PB353, which was wrong BOTH ways: an INVOKE whose target
@@ -1603,16 +1608,10 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         var targets = new List<Place>(targetRefs.Count);
         foreach (var t in targetRefs)
         {
-            if (ctx.Refs.IsExceptionObjectRegister(t))
-            {
-                // ⛔ ONE RULE, ONE CODE (kb/Work PB922): the same §8.4.3.6.3 SR1 the general receiving chokepoint
-                // now screens (ExpressionBinder.ResolveReceiving). The clause number was §8.4.3.6 here and that
-                // is NOT where the rule is — `cite.py --check 8.4.3.6 "EXCEPTION-OBJECT shall not be specified as
-                // a receiving operand"` FAILS and `--check 8.4.3.6.3` passes as SR1.
-                return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.ExceptionObjectReceiving,
-                    "SET EXCEPTION-OBJECT: the predefined object reference shall not be a receiving "
-                    + "operand (ISO §8.4.3.6.3 SR1)");
-            }
+            // ⛔ NO EXCEPTION-OBJECT ARM HERE (kb/Work PB1008, PB1551). §8.4.3.6.3 SR1 is one row of the receiving
+            // chokepoint's form table (ReceivingOperandForms); this loop used to write it a second time, with its own
+            // text. EXCEPTION-OBJECT is class object (§8.4.3.6.3 SR2), so it passes SR8 below and is refused by the
+            // chokepoint's ResolveReceiving like every other receiving operand.
             // ⛔ THREE ARMS, AND THE ORDER IS THE POINT — SR8 and "the name identifies nothing" are DIFFERENT
             // rules and each is reported once, by itself. The former single `Resolve(t) is not { } tp || …`
             // arm reported BOTH for one operand: Resolve names the unidentified reference (COBOLNET1639) and
