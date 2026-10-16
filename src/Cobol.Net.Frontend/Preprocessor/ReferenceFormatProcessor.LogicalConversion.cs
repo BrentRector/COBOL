@@ -62,7 +62,7 @@ public static partial class ReferenceFormatProcessor
         {
             ' ' => LineKind.Source,
             '*' or '/' => LineKind.Comment,
-            '-' => LineKind.Continuation,
+            FixedFormLine.ContinuationIndicator => LineKind.Continuation,
             'D' or 'd' => LineKind.Debugging,                   // COBOL-85's debugging line
             _ when !ccvsIndicators => LineKind.NotAnIndicator,
             'S' or 's' or 'Y' or 'y' or 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u' => LineKind.CcvsExcluded,
