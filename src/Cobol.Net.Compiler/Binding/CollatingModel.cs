@@ -471,8 +471,19 @@ public static class CollatingSelection
     /// §8.8.1.1) answered ALPHANUMERIC, so <c>EVALUATE N WHEN A + 1 THRU B + 2 IN AL</c> sailed past SR3 and was
     /// evaluated as a STRING range (measured on d80cb676). It is now the OTHER reader's body — the one that was
     /// already total and already declared itself the single definition — so a shape added there is seen
-    /// here.</para></summary>
-    public static PicCategory? OperandCategory(Bound.BoundOperand o) => IntrinsicResultType.OperandCategory(o);
+    /// here.</para>
+    /// <para>⛔ ONE ARM IS THIS READER'S OWN, AND IT IS THE CLASS (kb/Work PB442): a comparison is collated by
+    /// CLASS — §8.8.4.2.9 compares "an operand of class national" under "the current national program collating
+    /// sequence" — and Table 2 (§8.5.2.1) puts a numeric-edited item "if usage is national" in class NATIONAL
+    /// while its category stays numeric-edited, which the shared category reader keeps answering for the
+    /// category-worded rules. So that one operand answers National here; before, two <c>PIC Z9 USAGE NATIONAL</c>
+    /// items were compared under the ALPHANUMERIC program collating sequence.</para></summary>
+    public static PicCategory? OperandCategory(Bound.BoundOperand o) =>
+        IntrinsicResultType.OperandCategory(o) is var category
+            && category is PicCategory.NumericEdited
+            && IntrinsicArgumentRules.ClassOf(o) is CobolClass.NumericEditedNational
+            ? PicCategory.National
+            : category;
 
     /// <summary>⛔ THE §14.7.8 CLASS OF A THROUGH RANGE, asked of BOTH ends at once and written down ONCE for the
     /// two clauses that print the phrase — "This specification applies to THROUGH phrases specified in the VALUE

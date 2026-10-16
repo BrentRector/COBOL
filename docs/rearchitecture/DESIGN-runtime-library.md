@@ -193,7 +193,7 @@ facades cache `RunUnit.Current` in a local at entry to avoid repeated `AsyncLoca
 
 **Emitted-surface compatibility (battery-green):** the existing static facades stay as *thin delegating shims* over
 `RunUnit.Current` during the migration, so generated code (`ProgramRegistry.CallProgram(...)`,
-`ExceptionState.Set(...)`, `CobolFile.Open(...)`, `CobolModule.Push(...)`) keeps compiling unchanged:
+`ExceptionState.Set(...)`, `CobolFile.Open(...)`, `CobolModule.Name(...)`) keeps compiling unchanged:
 ```csharp
 public static class ProgramRegistry {                 // compat shim (deleted at G8 or kept — OPEN QUESTION)
     public static void CallProgram(string n, string c, CobolArg[] a, ManagedPointer? r,
