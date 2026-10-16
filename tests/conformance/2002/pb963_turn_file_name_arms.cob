@@ -45,9 +45,9 @@
       *>   8 the statements after that READ are succeeding statements
       *>     too, and the TURN named only F1 -> F1 [AT-END] F2 [ ].
       *> An implementation that ignored file-name-1 would show F2
-      *> enabled in 1 and 8 and disabled in 3 and 6; one that let a
-      *> file-scoped OFF outlive a later file-less ON would show spaces
-      *> in 5.
+      *> enabled in 1 and 8, F2 disabled in 3 and F1 disabled in 6;
+      *> one that let a file-scoped OFF outlive a later file-less ON
+      *> would show spaces for both files in 5.
       *> EDITION: >>TURN, SET LAST EXCEPTION and FUNCTION
       *> EXCEPTION-STATUS are COBOL-2002.
        IDENTIFICATION DIVISION.
