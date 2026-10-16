@@ -22,8 +22,9 @@ using Core = CobolParserCore;
 ///   <item><see cref="Arithmetic"/> — ISO §8.8.1.1: "An arithmetic expression may be an identifier referencing a
 ///         NUMERIC data item, a numeric literal, the figurative constant ZERO …". A group (never numeric: its
 ///         §8.5.2.1 class is alphanumeric, boolean, national or its type-name), an elementary alphanumeric/national
-///         item, and a reference-modified slice (§8.4.3.3.4 GR6) are all inadmissible. This is the default and by far the common case: COMPUTE, the arithmetic verbs,
-///         subscripts, reference-modifier offsets, relation conditions, SET, PERFORM VARYING.</item>
+///         item, and a reference-modified slice (§8.4.3.3.4 GR6) are all inadmissible. This is the default and by
+///         far the common case: COMPUTE, the arithmetic verbs, subscripts, reference-modifier offsets, relation
+///         conditions, SET, PERFORM VARYING.</item>
 ///   <item><see cref="FunctionArgument"/> — governed instead by the individual function's §15.x ARGUMENT RULE,
 ///         which for the string functions explicitly admits alphanumeric data: <c>FUNCTION TRIM(S)</c>,
 ///         <c>SUBSTITUTE</c>, <c>FIND-STRING</c> and <c>CONVERT</c> over a <c>PIC X</c> item are all legal.</item>

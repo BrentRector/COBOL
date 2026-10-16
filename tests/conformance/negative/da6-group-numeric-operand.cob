@@ -1,7 +1,7 @@
 *> reject-at: 85 2002 2014 2023
 *> ISO 8.8.1.1 - "An arithmetic expression may be an identifier referencing a NUMERIC data item, a
-*> numeric literal, the figurative constant ZERO ...". No group item is numeric (8.5.2.1: G is class
-*> alphanumeric), so it is not a permissible arithmetic operand. DA6: previously ACCEPTED, decoding the digits (R=000013 for
+*> numeric literal, the figurative constant ZERO ...". No group item is numeric (8.5.2.1), so G
+*> is not a permissible arithmetic operand. DA6: previously ACCEPTED, decoding the digits (R=000013 for
 *> a PIC X group) while a PIC 9-leaf group compiled and THREW at run time - the operand whose digits
 *> were unambiguous failed and the merely-textual one succeeded. --permissive still accepts it.
 IDENTIFICATION DIVISION.
