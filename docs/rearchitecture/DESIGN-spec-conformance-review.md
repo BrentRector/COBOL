@@ -96,7 +96,15 @@ rule = `(rule-id, §-anchor, subject, kind, edition-applicability, text)`. The c
 Extract EVERY normative rule from `specs/ISO_COBOL.md` into a structured, machine-checkable catalog. The spec's SR/GR
 are numbered under "Syntax rules" / "General rules" headings per section, so extraction is tractable (parse by
 §-section). **Output:** `docs/rearchitecture/spec-rule-catalog.json` — one entry per rule:
-`{ id, section, subject, kind: SR|GR|format|concept|intrinsic|doc-behavior, editions, text }`. A **completeness
+`{ id, section, subject, kind: SR|GR|format|concept|intrinsic|doc-behavior, editions, text }`.
+**THE RULE IS THE UNIT** (owner decision 2026-08-08, landed by kb/Work PB55): one entry per TOP-LEVEL numbered rule
+of a rule block; every sub-item — lettered, or a numbered list nested under one, at any depth — is its parent rule's
+text, addressed by citation path (`9) c) 2.`), and verifying the rule means verifying every sub-item, in that one
+row. A block may also print SEVERAL lists at its own margin, each under its own prose lead-in (§14.7.5, §9.3.6):
+those are rules in their own right and take sub-list ids `<kind>-<section>-L<sublist>.<n>`. The transcription's
+indentation cannot tell a flattened nested list from such a peer list, so the difference is MEASURED on the PDF
+(`scripts/spec/measure_sublist_levels.py`, recorded in `scripts/spec/data/sublist-levels.json`) and the extractor's
+`--check` fails on a sub-list the record does not hold at level 0. A **completeness
 critic** cross-checks the catalog against the spec's TOC + section numbering, because an OMITTED rule is silent false
 confidence. Orchestrated: fan out over the §-clauses; loop-until-dry.
 

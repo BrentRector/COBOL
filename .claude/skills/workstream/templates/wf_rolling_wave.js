@@ -177,11 +177,42 @@ function fixFindings(g, r, v, round) {
   })
 }
 
-// A branch with finished work: DONE, or DISCHARGED with commits. A SPLIT branch is unfinished and is never reviewed or
-// landed here: the next wave's planner gives it a finisher (plan_wave.py FINISH_STATUSES, kb/Work PB2575), as the land
-// unit lands only DONE branches.
-function hasWork(r) {
-  return r.status === 'DONE' || (r.status === 'DISCHARGED' && r.head && r.head !== r.base)
+// THE FINISHED TEST (kb/Work PB3181). A branch with finished work is the one its REPORT calls finished: DONE, or
+// DISCHARGED with a HEAD past its base. That predicate lives ONCE, in Python (plan_wave.Report.finished), because the
+// branch survey (prune_worktrees.py) reads the same report to decide WAITING TO LAND; this wave kept its own copy
+// (`hasWork`) of the return's claim, so a DONE return whose report had no status line was reviewed, stamped CLEAN and
+// then never landed (w1080f, 2026-10-15). A workflow script has no process API, so ONE mechanical cobol-locator runs
+// `plan_wave.py --finished <report>` and returns its exit code; a DONE or DISCHARGED return whose report it does not
+// call finished is treated as SPLIT (logged, never reviewed): the next wave's planner gives it a finisher (plan_wave.py
+// FINISH_STATUSES, kb/Work PB2575). Any other status is unfinished without asking.
+const FINISHED_SCHEMA = {
+  type: 'object',
+  properties: { exit: { type: 'integer' }, line: { type: 'string', maxLength: 400 } },
+  required: ['exit', 'line'],
+}
+
+async function finishedReport(g, r, label) {
+  if (!r || !(r.status === 'DONE' || r.status === 'DISCHARGED')) return false
+  let v = null
+  if (r.report) {
+    try {
+      v = await agent(
+        AUTH + `Run exactly ONE command, from the repository root E:\\COBOL, and nothing else: ` +
+        `python scripts/orchestrator/plan_wave.py --finished "${r.report}" ` +
+        `— then call StructuredOutput with its exit code (0, 1 or 2) as \`exit\` and its \`=== REPORT: \` line verbatim as \`line\`. ` +
+        `Read no file, judge nothing, retry nothing: an exit code other than 0 is an answer, not an error.`,
+        { label: `finished-${label}`, phase: 'Review', agentType: 'cobol-locator', schema: FINISHED_SCHEMA })
+    } catch (e) { v = null }
+  }
+  if (v && v.exit === 0) return true
+  log(`${g.letter}: ${label} returned ${r.status}, but plan_wave.py --finished does not call its report ${r.report || '(none named)'} finished ` +
+      `(${v ? `exit ${v.exit}: ${v.line}` : 'no answer'}); treated as SPLIT, no reviewer dispatched (kb/Work PB3181)`)
+  return false
+}
+
+// A return the finished test refused, as the rest of the wave reads it: SPLIT, with the status it claimed.
+function asSplit(r) {
+  return { ...r, claimed: r.status, status: 'SPLIT', finished: false }
 }
 
 // The review loop: review the head; on FINDINGS a review finisher answers them and its branch is reviewed again, up to
@@ -203,8 +234,9 @@ async function reviewed(g, r) {
     }
     let f = null
     try { f = await fixFindings(g, cur, v, round) } catch (e) { f = null }
-    const next = f && f.head && f.head !== cur.head ? { ...f, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes, reviewed_from: cur.branch } : null
-    if (!next || f.status !== 'DONE') {
+    let next = f && f.head && f.head !== cur.head ? { ...f, letter: g.letter, lead: g.lead, notes: g.notes, codes: g.codes, reviewed_from: cur.branch } : null
+    if (next && f.status === 'DONE') next = (await finishedReport(g, next, `review finisher round ${round}`)) ? { ...next, finished: true } : asSplit(next)
+    if (!next || !next.finished) {
       log(`${g.letter}: review finisher round ${round} returned ${f ? f.status : 'NO-RESULT'}; not landed by this wave`)
       return { ...(next || cur), review: `FINDINGS ${v.findings}`, review_rounds: round, finisher: f ? f.status : 'NO-RESULT' }
     }
@@ -213,7 +245,7 @@ async function reviewed(g, r) {
 }
 
 function landable(r) {
-  return hasWork(r) && r.review === 'CLEAN'
+  return r.finished === true && r.review === 'CLEAN'
 }
 
 function wakeAll() { const w = wake; wake = () => {}; w() }
@@ -229,12 +261,12 @@ async function onResult(g, r) {
   results.push(r)
   byLetter[r.letter] = r
   wakeAll()                       // a successor parked on this predecessor may start now, while this one is reviewed
-  if (hasWork(r) && hasSuccessorQueued(r.letter)) {
+  if (r.finished && hasSuccessorQueued(r.letter)) {
     held[r.letter] = { g, r }
     log(`${r.letter}: ${r.status}; HELD — it lands through its same-file successor, whose review covers its commits`)
   } else if (landable(r)) {
     ready.push(r)
-  } else if (hasWork(r)) {
+  } else if (r.finished) {
     log(`${r.letter}: ${r.status} but review ${r.review}; not landed by this wave (prune_worktrees.py names who acts next)`)
   }
   if (g.after && held[g.after]) {
@@ -243,7 +275,7 @@ async function onResult(g, r) {
     delete held[g.after]
     if (!landable(r)) await landAlone(p)
   }
-  log(`${r.letter}: ${r.status}; ${ready.length} branch(es) reviewed CLEAN for the enqueue unit, ${queue.length} group(s) queued`)
+  log(`${r.letter}: ${r.status}; ${ready.length} branch(es) reviewed CLEAN for the landing lane, ${queue.length} group(s) queued`)
 }
 
 function nextEligible() {
@@ -266,8 +298,10 @@ async function worker() {
     let r
     try {
       r = await runGroup(g)
+      // a DONE or DISCHARGED return is finished only when its report is (the finished test above, kb/Work PB3181)
+      if (r.status === 'DONE' || r.status === 'DISCHARGED') r = (await finishedReport(g, r, 'implementer')) ? { ...r, finished: true } : asSplit(r)
       // the branch review holds this group's slot: reviewing and answering findings are part of finishing it
-      if (hasWork(r) && !hasSuccessorQueued(g.letter)) r = await reviewed(g, r)
+      if (r.finished && !hasSuccessorQueued(g.letter)) r = await reviewed(g, r)
     } catch (e) {
       r = { letter: g.letter, lead: g.lead, notes: g.notes, status: 'NO-RESULT', error: String(e && e.message || e) }
     } finally {

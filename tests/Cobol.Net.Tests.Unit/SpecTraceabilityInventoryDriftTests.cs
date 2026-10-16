@@ -916,17 +916,16 @@ public sealed class SpecTraceabilityInventoryDriftTests
             // only for a multi-reel/unit file no connector is — and its §8 derivation was retired with it.
             "DOC-A.1-19", "GR-14.9.11.4-11", "GR-14.9.30.4-20", "GR-14.9.30.4-3",
             "GR-14.9.34.4-2", "GR-14.9.5.4-11", "RV-15.50.4-9",
-            // ⚙ The NINTH, added deliberately (kb/Work PB235, 2026-09-05) — this edit is the point of the list.
-            // §14.9.6.4 GR3 symbol e's unit-media branch 1. Its antecedent needs a physical file in §14.9.6.4
-            // GR2 category (b) or (c); no connector answers either, the placement is FORCED by §9.1.13.2 item
-            // 6's non-reel/unit definition of the '07' this compiler reports, and it is documented in
-            // docs/CONFORMANCE.md §7 (Annex A.1 item 24). It joins the SAME medium determination the owner
-            // already signed for GR-14.9.30.4-20 and -23 — this is that argument reaching the CLOSE rule it
-            // was originally about, not a new ground. CloseTable14Tests reds if the placement ever changes.
-            "GR-14.9.6.4-L2.1",
+            // ⚙ The NINTH, GR-14.9.6.4-L2.1 (kb/Work PB235, 2026-09-05) — §14.9.6.4 GR3 symbol e's unit-media
+            // branch 1 — LEFT on 2026-10-15 (kb/Work PB55, THE RULE IS THE UNIT): it was a nested sub-item the
+            // transcription had flattened into a row of its own. Indented at its printed level it is the body of
+            // GR-14.9.6.4-3, which closes on its own spec-derived test, and a derivation stands in place of a
+            // WHOLE row's test, never beside one; the owner-signed determination (unit media unreachable, forced by
+            // §9.1.13.2 item 6) moved verbatim into that row's notes, and CloseTable14Tests still reds if the
+            // medium placement ever changes.
             // ⚙ The TENTH, ELEVENTH and TWELFTH, added deliberately (owner decisions Q25–Q27, 2026-09-09, after a
             // plain-language brief; DEVLOG 1577). GR-14.9.27.4-12: OPEN's rewindable-medium rule, arm
-            // unpopulatable-antecedent over the SAME closed medium set as GR-14.9.6.4-L2.1 (§14.9.27.4 GR11 and GR12
+            // unpopulatable-antecedent over the SAME closed medium set as §14.9.6.4 GR3 e) 1. (§14.9.27.4 GR11 and GR12
             // partition the media; every connector answers non-unit, forced by §9.1.13.2 item 6; kb/Work PB317).
             // GR-14.9.20.4-9 and GR-14.9.28.4-2: the MECHANICAL undefined-A.2 arm — Annex A.2 items 20
             // (INITIALIZE onto overlapping storage) and 37 (overlapping PERFORM ranges) resolve to exactly these

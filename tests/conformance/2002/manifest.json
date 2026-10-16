@@ -873,7 +873,8 @@
   "pb3154_half_data_hides_class_symbolic",
   "pb3154_sum_counter_hides_symbolic",
   "pb3154_global_sum_counter_tier",
-  "pb3164_method_constant_scope"
+  "pb3164_method_constant_scope",
+  "pb3153_own_item_hides_switch_condition"
   ],
   "pending": []
 }

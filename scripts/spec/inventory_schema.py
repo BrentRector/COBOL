@@ -335,7 +335,7 @@ class DerivedSelector:
       · `excludes-pattern` a TEXT exclusion scoped to ONE arm — the per-arm twin of the entry-level
         `excludes-patterns`, which drop a rule whatever arm took it. It exists because A.4.10's item-1 arm must
         not stamp the SUPPORTED item 2 (`interface-name`, kb/Work PB285) while its item-3 arm must reach
-        GR-9.3.6-L5.2, whose exact-match criteria name "an interface-name" (kb/Work R43 / PB1519): one exclusion
+        GR-9.3.6-L4.2, whose exact-match criteria name "an interface-name" (kb/Work R43 / PB1519): one exclusion
         was right for one arm and wrong for the other, and a global list cannot say that. Negative, so it is not
         in POSITIVE.
       · `kinds` / `excludes-kinds` the rule's KIND, per arm. A general-format diagram (kind FMT) is evidence
@@ -357,7 +357,7 @@ class DerivedSelector:
         (`feedback_verdict_evidence_invariant`).
       · `lead-in`       the sentence that INTRODUCES the printed list a rule is an item of — how the standard
         scopes a list's items when the items themselves carry no vocabulary. §9.3.6's exact-match criteria
-        (GR-9.3.6-L5.1 … L5.3) say only "the same class and category", "the same … PICTURE … clauses"; what makes
+        (GR-9.3.6-L4.1 … L4.3) say only "the same class and category", "the same … PICTURE … clauses"; what makes
         them exact-match criteria is the sentence ending GR-9.3.6-L3.7, "the following criteria are considered an
         exact match:". A list's lead-in is the catalog rule immediately BEFORE its first item (the catalog keeps
         the standard's order, and a list is its `kind`-`section`-`sublist` triple), so a nested list that

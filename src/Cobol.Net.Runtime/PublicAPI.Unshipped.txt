@@ -118,3 +118,5 @@ static CobolNet.Runtime.IO.CobolSort.RegisterFormat1Sort(string! name, object? u
 static CobolNet.Runtime.IO.CobolSort.UseProcedureExited(object! useScope) -> bool
 static CobolNet.Runtime.IO.CobolSort.AfterActivationReturn() -> void
 static CobolNet.Runtime.Exceptions.SortTerminationSignal.EndsActivation(ref bool ended) -> bool
+CobolNet.Runtime.IO.FileConnector.StartPositioned() -> string!
+CobolNet.Runtime.IO.FileConnector.Unsuccessful(string! status) -> string!

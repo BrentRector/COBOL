@@ -3044,36 +3044,36 @@ The COPY statement incorporates library text into a COBOL compilation group.
    a) The leftmost library text-word that is not a separator comma or a separator semicolon is the first text-word used for comparison. Any text-word or space preceding this text-word is copied into the resultant text. Starting with the first text-word for comparison and first pseudo-text-1 or partial-word-1 that was specified in the REPLACING phrase, the entire REPLACING phrase operand that precedes the reserved word BY is compared to an equivalent number of contiguous library text-words.
 
 
-b) Pseudo-text-1 matches the library text only if the ordered sequence of text-words that forms pseudo-text-1 is equal, character for character, to the ordered sequence of library text-words. When the LEADING phrase is specified, partial-word-1 matches the library text only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters starting with the leftmost character position of a library text-word. When the TRAILING phrase is specified, partial-word-1 matches the library text only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters ending with the rightmost character position of a library text-word.
+   b) Pseudo-text-1 matches the library text only if the ordered sequence of text-words that forms pseudo-text-1 is equal, character for character, to the ordered sequence of library text-words. When the LEADING phrase is specified, partial-word-1 matches the library text only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters starting with the leftmost character position of a library text-word. When the TRAILING phrase is specified, partial-word-1 matches the library text only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters ending with the rightmost character position of a library text-word.
 
-c) The following rules apply for the purpose of matching:
+   c) The following rules apply for the purpose of matching:
 
-1. Each occurrence of a separator comma, semicolon, or space in pseudo-text-1 or in the library text is considered to be a single space. Each sequence of one or more space separators is considered to be a single space.
+   1\. Each occurrence of a separator comma, semicolon, or space in pseudo-text-1 or in the library text is considered to be a single space. Each sequence of one or more space separators is considered to be a single space.
 
-2. Each operand and operator of a concatenation expression is a separate text-word.
+   2\. Each operand and operator of a concatenation expression is a separate text-word.
 
-3. Except when used in the non-hexadecimal formats of alphanumeric and national literals, each alphanumeric character is equivalent to its corresponding national character and each lowercase letter is equivalent to its corresponding uppercase letter, as specified for the COBOL character repertoire in 8.1.3, COBOL character repertoire.
+   3\. Except when used in the non-hexadecimal formats of alphanumeric and national literals, each alphanumeric character is equivalent to its corresponding national character and each lowercase letter is equivalent to its corresponding uppercase letter, as specified for the COBOL character repertoire in 8.1.3, COBOL character repertoire.
 
-4. For alphanumeric, boolean and national literals:
+   4\. For alphanumeric, boolean and national literals:
 
    a. The two representations of the quotation symbol match when specified in the opening and closing delimiters of the literal, and those delimiters shall be in the same representation.
 
    b. In the content of the literal, two contiguous occurrences of the character used as the quotation symbol in the opening delimiter are treated as a single occurrence of that character.
 
-5. Each occurrence of a compiler directive line is treated as a single space.
+   5\. Each occurrence of a compiler directive line is treated as a single space.
 
-6. Comments, if any, are treated as a single space.
+   6\. Comments, if any, are treated as a single space.
 
    NOTE Because comments are removed during logical conversion, none are expected.
 
-d) If no match occurs, the comparison is repeated with each next successive pseudo-text-1 or partial-word-1, if any, in the REPLACING phrase until either a match is found or there is no next successive REPLACING operand.
+   d) If no match occurs, the comparison is repeated with each next successive pseudo-text-1 or partial-word-1, if any, in the REPLACING phrase until either a match is found or there is no next successive REPLACING operand.
 
-e) When all the REPLACING phrase operands have been compared and no match has occurred, the leftmost library text-word is copied into the resultant text. The next successive library text-word is then considered as the leftmost library text-word, and the comparison cycle starts again with the first pseudo-text-1 or partial-word-1 specified in the REPLACING phrase.
+   e) When all the REPLACING phrase operands have been compared and no match has occurred, the leftmost library text-word is copied into the resultant text. The next successive library text-word is then considered as the leftmost library text-word, and the comparison cycle starts again with the first pseudo-text-1 or partial-word-1 specified in the REPLACING phrase.
 
 
-f) When a match occurs between pseudo-text-1 and the library text, the corresponding pseudo-text-2, text-2, word-2, or literal-4 is placed into the resultant text. When a match occurs between partial-word-1 and the library text-word, the library text-word is placed into the resultant text with the matched characters either replaced by partial-word-2 or deleted when partial-word-2 consists of zero text-words. The library text-word immediately following the rightmost text-word that participated in the match is then considered as the leftmost text-word. The comparison cycle starts again with the first pseudo-text-1 or partial-word-1 specified in the REPLACING phrase.
+   f) When a match occurs between pseudo-text-1 and the library text, the corresponding pseudo-text-2, text-2, word-2, or literal-4 is placed into the resultant text. When a match occurs between partial-word-1 and the library text-word, the library text-word is placed into the resultant text with the matched characters either replaced by partial-word-2 or deleted when partial-word-2 consists of zero text-words. The library text-word immediately following the rightmost text-word that participated in the match is then considered as the leftmost text-word. The comparison cycle starts again with the first pseudo-text-1 or partial-word-1 specified in the REPLACING phrase.
 
-g) The comparison operation continues until the rightmost text-word in the library text has either participated in a match or been considered as a leftmost library text-word and participated in a complete comparison cycle.
+   g) The comparison operation continues until the rightmost text-word in the library text has either participated in a match or been considered as a leftmost library text-word and participated in a complete comparison cycle.
 
 10\) If the REPLACING phrase is specified, the library text shall not contain a COPY statement.
 
@@ -3179,19 +3179,19 @@ d) A format 2 REPLACE statement without the LAST phrase cancels the active REPLA
 
 8\) The comparison operation to determine text replacement begins with the text immediately following the REPLACE statement and occurs in the following manner:
 
-a) Starting with the leftmost source text-word and the first pseudo-text-1 or partial-word-1, pseudo-text-1 or partial-word-1 is compared to an equivalent number of contiguous source text-words.
+   a) Starting with the leftmost source text-word and the first pseudo-text-1 or partial-word-1, pseudo-text-1 or partial-word-1 is compared to an equivalent number of contiguous source text-words.
 
-b) Pseudo-text-1 matches the source text if, and only if, the ordered sequence of text-words that forms pseudo-text-1 is equal, character for character, to the ordered sequence of source text-words. When the LEADING phrase is specified, partial-word-1 matches the source text-word only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters starting with the leftmost character position of that source text-word. When the TRAILING phrase is specified, partial-word-1 matches the source text-word only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters ending with the rightmost character position of that source text-word.
+   b) Pseudo-text-1 matches the source text if, and only if, the ordered sequence of text-words that forms pseudo-text-1 is equal, character for character, to the ordered sequence of source text-words. When the LEADING phrase is specified, partial-word-1 matches the source text-word only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters starting with the leftmost character position of that source text-word. When the TRAILING phrase is specified, partial-word-1 matches the source text-word only if the contiguous sequence of characters that forms partial-word-1 is equal, character for character, to an equal number of contiguous characters ending with the rightmost character position of that source text-word.
 
-c) The following rules apply for the purpose of matching:
+   c) The following rules apply for the purpose of matching:
 
-1. Each occurrence of a separator comma, semicolon, or space in pseudo-text-1 or in the source text is considered to be a single space. Each sequence of one or more space separators is considered to be a single space.
+   1\. Each occurrence of a separator comma, semicolon, or space in pseudo-text-1 or in the source text is considered to be a single space. Each sequence of one or more space separators is considered to be a single space.
 
-2. Each operand and operator of a concatenation expression is a separate text-word.
+   2\. Each operand and operator of a concatenation expression is a separate text-word.
 
-3. Except when used in the non-hexadecimal formats of alphanumeric and national literals, each alphanumeric character is equivalent to its corresponding national character and each lowercase letter is equivalent to its corresponding uppercase letter, as specified for the COBOL character repertoire in 8.1.3, COBOL character repertoire.
+   3\. Except when used in the non-hexadecimal formats of alphanumeric and national literals, each alphanumeric character is equivalent to its corresponding national character and each lowercase letter is equivalent to its corresponding uppercase letter, as specified for the COBOL character repertoire in 8.1.3, COBOL character repertoire.
 
-4. For alphanumeric, boolean, and national literals:
+   4\. For alphanumeric, boolean, and national literals:
 
     a. The two representations of the quotation symbol match when specified in the opening and closing delimiters of the literal and those delimiters shall be in the same representation.
 
@@ -3199,19 +3199,19 @@ c) The following rules apply for the purpose of matching:
 
 b. In the content of the literal, two contiguous occurrences of the character used as the quotation symbol in the opening delimiter are treated as a single occurrence of that character.
 
-5. Each occurrence of a compiler directive line is treated as a single space.
+   5\. Each occurrence of a compiler directive line is treated as a single space.
 
-6. Comments, if any, are treated as a single space.
+   6\. Comments, if any, are treated as a single space.
 
 NOTE 1 Because comments are removed during logical conversion, none are expected.
 
-d) If no match occurs, the comparison is repeated with each next successive occurrence of pseudo-text-1 or partial-word-1, until either a match is found or there is no next successive occurrence of pseudo-text-1 or partial-word-1.
+   d) If no match occurs, the comparison is repeated with each next successive occurrence of pseudo-text-1 or partial-word-1, until either a match is found or there is no next successive occurrence of pseudo-text-1 or partial-word-1.
 
-e) When all occurrences of pseudo-text-1 or partial-word-1 have been compared and no match has occurred, the next successive source text-word is then considered as the leftmost source text-word, and the comparison cycle starts again with the first occurrence of pseudo-text-1 or partial-word-1.
+   e) When all occurrences of pseudo-text-1 or partial-word-1 have been compared and no match has occurred, the next successive source text-word is then considered as the leftmost source text-word, and the comparison cycle starts again with the first occurrence of pseudo-text-1 or partial-word-1.
 
-f) When a match occurs between pseudo-text-1 and the source text, the corresponding pseudo-text-2 replaces the matched text in the source text. When a match occurs between partial-word-1 and the source text-word, the matched characters of that source text-word are either replaced by partial-word-2 or deleted when partial-word-2 consists of zero text-words. The source text-word immediately following the rightmost text-word that participated in the match is then considered as the leftmost source text-word. The comparison cycle starts again with the first occurrence of pseudo-text-1 or partial-word-1.
+   f) When a match occurs between pseudo-text-1 and the source text, the corresponding pseudo-text-2 replaces the matched text in the source text. When a match occurs between partial-word-1 and the source text-word, the matched characters of that source text-word are either replaced by partial-word-2 or deleted when partial-word-2 consists of zero text-words. The source text-word immediately following the rightmost text-word that participated in the match is then considered as the leftmost source text-word. The comparison cycle starts again with the first occurrence of pseudo-text-1 or partial-word-1.
 
-g) The comparison operation continues until the rightmost text-word in the source text that is within the scope of the REPLACE statement has either participated in a match or been considered as a leftmost source text-word and participated in a complete comparison cycle.
+   g) The comparison operation continues until the rightmost text-word in the source text that is within the scope of the REPLACE statement has either participated in a match or been considered as a leftmost source text-word and participated in a complete comparison cycle.
 
 9\) The text produced as a result of processing a REPLACE statement shall not contain a COPY statement, a REPLACE statement, a SOURCE FORMAT directive, a comment, or a blank line.
 
@@ -3812,21 +3812,21 @@ NOTE The FLAG-02 directive is an obsolete element in this Working Draft Internat
 
 
 
-1. the source element calls any function, or
+   1\. the source element calls any function, or
 
-2. the source element invokes any method.
+   2\. the source element invokes any method.
 
-c) IO-STATUS-07: A CLOSE statement shall be flagged if it specifies either the WITH NO REWIND phrase or the UNIT phrase.
+   c) IO-STATUS-07: A CLOSE statement shall be flagged if it specifies either the WITH NO REWIND phrase or the UNIT phrase.
 
-d) MOVE-TO-SAME-NAME: A MOVE statement shall be flagged when the sending and receiving operands are described by the same data description entry, and:
+   d) MOVE-TO-SAME-NAME: A MOVE statement shall be flagged when the sending and receiving operands are described by the same data description entry, and:
 
-1. the operands are of category alphanumeric-edited, or
+   1\. the operands are of category alphanumeric-edited, or
 
-2. the data description entry for the operands includes a subordinate OCCURS … DEPENDING clause, and the data item referenced by that OCCURS … DEPENDING clause is subordinate to the data description entry referenced by the operands.
+   2\. the data description entry for the operands includes a subordinate OCCURS … DEPENDING clause, and the data item referenced by that OCCURS … DEPENDING clause is subordinate to the data description entry referenced by the operands.
 
-e) RANGE-EXCEPTION-FOR-INDEX: An index-assignment or index-arithmetic format SET statement that specifies an index as the receiving field shall be flagged when checking for EC-RANGE-INDEX is enabled.
+   e) RANGE-EXCEPTION-FOR-INDEX: An index-assignment or index-arithmetic format SET statement that specifies an index as the receiving field shall be flagged when checking for EC-RANGE-INDEX is enabled.
 
-f) TERMINATE-WITH-VARYING: A TERMINATE statement shall be flagged if the report being terminated contains a VARYING clause.
+   f) TERMINATE-WITH-VARYING: A TERMINATE statement shall be flagged if the report being terminated contains a VARYING clause.
 
 5\) If the FLAG-02 directive is not specified, the default for all options is off.
 
@@ -8679,27 +8679,27 @@ identifier-1 IS [ <u>NOT</u> ] ┤                              ├
    2\. If a locale is not in effect for character classification, the condition is true if the content of the data item referenced by identifier-1 consists only of a combination of the uppercase letters A, B, C, …, Z, and space.
 
 
-e) If BOOLEAN is specified, the condition is true if the content of the data item referenced by identifier-1 consists entirely of the boolean values '0' and '1'.
+   e) If BOOLEAN is specified, the condition is true if the content of the data item referenced by identifier-1 consists entirely of the boolean values '0' and '1'.
 
-f) If class-name-1 is specified, the condition is true if the content of the data item referenced by identifier-1 consists entirely of the characters listed in the definition of class-name-1 in the SPECIAL-NAMES paragraph.
+   f) If class-name-1 is specified, the condition is true if the content of the data item referenced by identifier-1 consists entirely of the characters listed in the definition of class-name-1 in the SPECIAL-NAMES paragraph.
 
-g) If FARTHEST-FROM-ZERO is specified, the condition is true if the content of the data item referenced by identifier-1 is the numeric value farthest from zero that may be contained in that data item, whether that value is positive or negative.
+   g) If FARTHEST-FROM-ZERO is specified, the condition is true if the content of the data item referenced by identifier-1 is the numeric value farthest from zero that may be contained in that data item, whether that value is positive or negative.
 
-h) If FLOAT-INFINITY is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of positive infinity or negative infinity as described in ISO/IEC 60559:2020, Clause 3.
+   h) If FLOAT-INFINITY is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of positive infinity or negative infinity as described in ISO/IEC 60559:2020, Clause 3.
 
-i) If FLOAT-NOT-A-NUMBER is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of either a quiet NaN or a signaling NaN as described in ISO/IEC 60559:2020, Clause 3.
+   i) If FLOAT-NOT-A-NUMBER is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of either a quiet NaN or a signaling NaN as described in ISO/IEC 60559:2020, Clause 3.
 
-j) If FLOAT-NOT-A-NUMBER-QUIET is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of a quiet NaN as described in ISO/IEC 60559:2020, Clause 3.
+   j) If FLOAT-NOT-A-NUMBER-QUIET is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of a quiet NaN as described in ISO/IEC 60559:2020, Clause 3.
 
-k) If FLOAT-NOT-A-NUMBER-SIGNALING is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of a signaling NaN as described in ISO/IEC 60559:2020, Clause 3.
+   k) If FLOAT-NOT-A-NUMBER-SIGNALING is specified, the condition is true if the content of the data item referenced by identifier-1 is one of the valid representations of a signaling NaN as described in ISO/IEC 60559:2020, Clause 3.
 
-l) If IN-ARITHMETIC-RANGE Is specified, the condition is true if the numeric content of the data item referenced by identifier-1 is neither farther from zero nor closer to zero than is permitted for the form of an intermediate data item appropriate to the mode of arithmetic in effect.
+   l) If IN-ARITHMETIC-RANGE Is specified, the condition is true if the numeric content of the data item referenced by identifier-1 is neither farther from zero nor closer to zero than is permitted for the form of an intermediate data item appropriate to the mode of arithmetic in effect.
 
-m) If NEAREST-TO-ZERO is specified, the condition is true if the content of the data item referenced by identifier-1 is the nonzero numeric value nearest to zero that may be contained in that data item, whether that value is positive or negative.
+   m) If NEAREST-TO-ZERO is specified, the condition is true if the content of the data item referenced by identifier-1 is the nonzero numeric value nearest to zero that may be contained in that data item, whether that value is positive or negative.
 
-n) If NUMERIC is specified,
+   n) If NUMERIC is specified,
 
-1. If the category of the data item referenced by identifier-1 is numeric,
+   1\. If the category of the data item referenced by identifier-1 is numeric,
 
    a. If the usage of the data item referenced by identifier-1 is implicitly or explicitly display or national, the condition is true if the presence or absence of an operational sign in the content of the data item referenced by identifier-1 is in agreement with the data description of identifier-1 and if the content, except for the operational sign, consists entirely of the characters 0, 1, 2, 3, ..., 9. Valid operational signs are defined in 13.18.52, SIGN clause.
 
@@ -8709,7 +8709,7 @@ n) If NUMERIC is specified,
 
 c. Otherwise, the condition is true if the content of the data item referenced by identifier-1 consists entirely of a valid representation for the usage and, if a PICTURE clause is specified, the numeric value is within the range of values implied by the PICTURE clause.
 
-2. If the category of the data item referenced by identifier-1 is not numeric, the condition is true if the content of the data item referenced by identifier-1 consists entirely of the characters 0, 1, 2, 3, …, 9.
+   2\. If the category of the data item referenced by identifier-1 is not numeric, the condition is true if the content of the data item referenced by identifier-1 consists entirely of the characters 0, 1, 2, 3, …, 9.
 
 <a id="section-8-8-4-5"></a>
 ##### 8.8.4.5 Simple condition-name condition (conditional variable)
@@ -10643,13 +10643,13 @@ For a method invocation to match the method resolution signature of a method, th
 
    5\. If the parameter in the invoked method is described with the ACTIVE-CLASS and FACTORY phrases, the corresponding parameter shall evaluate to an object reference to the factory of the class specified in the invocation.
 
-e) If the parameter in the invoked method is not an object reference, the corresponding parameter has the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses, with the following additional constraints:
+   e) If the parameter in the invoked method is not an object reference, the corresponding parameter has the same ALIGNED, ANY LENGTH, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED, PICTURE, SIGN, and USAGE clauses, with the following additional constraints:
 
-1. Currency symbols match if and only if the corresponding currency strings are the same.
+   1\. Currency symbols match if and only if the corresponding currency strings are the same.
 
-2. Period picture symbols match if and only if the DECIMAL-POINT IS COMMA clause is in effect for both or for neither of these interfaces. Comma picture symbols match if and only if the DECIMAL-POINT IS COMMA clause is in effect for both or for neither of these interfaces.
+   2\. Period picture symbols match if and only if the DECIMAL-POINT IS COMMA clause is in effect for both or for neither of these interfaces. Comma picture symbols match if and only if the DECIMAL-POINT IS COMMA clause is in effect for both or for neither of these interfaces.
 
-3. Locale specifications in the PICTURE clauses match if and only if:
+   3\. Locale specifications in the PICTURE clauses match if and only if:
 
    a. both specify the same SIZE phrase in the LOCALE phrase of the PICTURE clause, and
 
@@ -10798,13 +10798,13 @@ d) If the parameter in interface-2 is described with the ACTIVE-CLASS phrase, th
 
 
 
-1. If the returning item in interface-2 is described with the ONLY phrase, the returning item in interface-1 shall be described with the ONLY phrase and the same object-class-name.
+   1\. If the returning item in interface-2 is described with the ONLY phrase, the returning item in interface-1 shall be described with the ONLY phrase and the same object-class-name.
 
-2. If the returning item in interface-2 is described without the ONLY phrase, the returning item in interface-1 shall be described with the same object-class-name or a subclass of that object-class-name.
+   2\. If the returning item in interface-2 is described without the ONLY phrase, the returning item in interface-1 shall be described with the same object-class-name or a subclass of that object-class-name.
 
-3. The presence or absence of the FACTORY phrase shall be the same.
+   3\. The presence or absence of the FACTORY phrase shall be the same.
 
-d) If the returning item in interface-2 is described with the ACTIVE-CLASS phrase, the corresponding returning item in interface-1 is described with the ACTIVE-CLASS phrase, and the presence or absence of the FACTORY phrase is the same.
+   d) If the returning item in interface-2 is described with the ACTIVE-CLASS phrase, the corresponding returning item in interface-1 is described with the ACTIVE-CLASS phrase, and the presence or absence of the FACTORY phrase is the same.
 
 If the description of the returning item of a method in interface-1 directly or indirectly references interface-2, the description of the returning item of the corresponding method in interface-2 shall not directly or indirectly reference interface-1.
 
@@ -12505,85 +12505,85 @@ where symbolic-characters-clause is:
 
 14\) When the ALPHABET clause is specified with a literal-phrase:
 
-a) A given character shall not be specified more than once in that ALPHABET clause.
+   a) A given character shall not be specified more than once in that ALPHABET clause.
 
-b) When the ALPHANUMERIC phrase is specified or implied:
+   b) When the ALPHANUMERIC phrase is specified or implied:
 
-1. Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set.
+   1\. Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set.
 
-2. Each noninteger literal shall be an alphanumeric literal.
+   2\. Each noninteger literal shall be an alphanumeric literal.
 
-3. Each alphanumeric literal, when a THROUGH or ALSO phrase is specified, shall be one character in length.
+   3\. Each alphanumeric literal, when a THROUGH or ALSO phrase is specified, shall be one character in length.
 
-4. The number of characters specified shall not exceed the number of characters in the native alphanumeric character set.
+   4\. The number of characters specified shall not exceed the number of characters in the native alphanumeric character set.
 
-c) When the NATIONAL phrase is specified:
+   c) When the NATIONAL phrase is specified:
 
-1. Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native national character set.
+   1\. Each numeric literal shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native national character set.
 
-2. Each noninteger literal shall be a national literal.
+   2\. Each noninteger literal shall be a national literal.
 
-3. Each national literal, when a THROUGH or ALSO phrase is specified, shall be one character in length.
+   3\. Each national literal, when a THROUGH or ALSO phrase is specified, shall be one character in length.
 
-4. The number of characters specified shall not exceed the number of characters in the native national character set.
+   4\. The number of characters specified shall not exceed the number of characters in the native national character set.
 
 15\) The implementor shall specify the names supported for code-name-1 and code-name-2 in the ALPHABET clause, if any.
 
 16\) When the SYMBOLIC CHARACTERS clause is specified:
 
-a) A given symbolic-character-1 may be specified only once within the SYMBOLIC CHARACTER clauses of this SPECIAL-NAMES paragraph.
+   a) A given symbolic-character-1 may be specified only once within the SYMBOLIC CHARACTER clauses of this SPECIAL-NAMES paragraph.
 
-b) The relationship between each symbolic-character-1 and the corresponding integer-1 is by position in the SYMBOLIC CHARACTERS clause. The first symbolic-character-1 is paired with the first integer-1; the second symbolic-character-1 is paired with the second integer-1; and so on.
+   b) The relationship between each symbolic-character-1 and the corresponding integer-1 is by position in the SYMBOLIC CHARACTERS clause. The first symbolic-character-1 is paired with the first integer-1; the second symbolic-character-1 is paired with the second integer-1; and so on.
 
-c) There shall be a one-to-one correspondence between occurrences of symbolic-character-1 and occurrences of integer-1.
+   c) There shall be a one-to-one correspondence between occurrences of symbolic-character-1 and occurrences of integer-1.
 
 
-d) When neither the ALPHANUMERIC phrase nor the NATIONAL phrase is specified, the ALPHANUMERIC phrase is implied.
+   d) When neither the ALPHANUMERIC phrase nor the NATIONAL phrase is specified, the ALPHANUMERIC phrase is implied.
 
-e) When the ALPHANUMERIC phrase is specified or implied:
+   e) When the ALPHANUMERIC phrase is specified or implied:
 
-1. When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines an alphanumeric character set, and the ordinal position specified by integer-1 shall exist in that character set.
+   1\. When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines an alphanumeric character set, and the ordinal position specified by integer-1 shall exist in that character set.
 
-2. When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native alphanumeric character set.
+   2\. When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native alphanumeric character set.
 
-f) When the NATIONAL phrase is specified:
+   f) When the NATIONAL phrase is specified:
 
-1. When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines a national character set, and the ordinal position specified by integer-1 shall exist in that character set.
+   1\. When the IN phrase is specified, alphabet-name-3 shall reference an alphabet that defines a national character set, and the ordinal position specified by integer-1 shall exist in that character set.
 
-2. When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native national character set.
+   2\. When the IN phrase is not specified, the ordinal position specified by integer-1 shall exist in the native national character set.
 
-g) Alphabet-name-3 shall not reference an alphabet specified with the LOCALE phrase.
+   g) Alphabet-name-3 shall not reference an alphabet specified with the LOCALE phrase.
 
 17\) When the CLASS clause is specified:
 
-a) When neither the ALPHANUMERIC phrase nor the NATIONAL phrase is specified, the ALPHANUMERIC phrase is implied.
+   a) When neither the ALPHANUMERIC phrase nor the NATIONAL phrase is specified, the ALPHANUMERIC phrase is implied.
 
-b) When the ALPHANUMERIC phrase is specified or implied:
+   b) When the ALPHANUMERIC phrase is specified or implied:
 
-1. When the IN phrase is specified, alphabet-name-4 shall reference an alphabet that defines an alphanumeric character set.
+   1\. When the IN phrase is specified, alphabet-name-4 shall reference an alphabet that defines an alphanumeric character set.
 
-2. Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set, or, when the IN phrase is specified, the maximum number of characters in the character set referenced by alphabet-name-4.
+   2\. Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the maximum number of characters in the native alphanumeric character set, or, when the IN phrase is specified, the maximum number of characters in the character set referenced by alphabet-name-4.
 
-3. Each noninteger literal shall be an alphanumeric literal.
+   3\. Each noninteger literal shall be an alphanumeric literal.
 
-4. Each alphanumeric literal, when a THROUGH phrase is specified, shall be one character in length.
+   4\. Each alphanumeric literal, when a THROUGH phrase is specified, shall be one character in length.
 
-5. The number of characters specified shall not exceed the number of characters in the native alphanumeric character set or, when the IN phrase is specified, the number of characters in the character set referenced by alphabet-name-4.
+   5\. The number of characters specified shall not exceed the number of characters in the native alphanumeric character set or, when the IN phrase is specified, the number of characters in the character set referenced by alphabet-name-4.
 
-c) When the NATIONAL phrase is specified:
+   c) When the NATIONAL phrase is specified:
 
 
-1. When the IN phrase is specified, alphabet-name-4 shall reference an alphabet that defines a national character set.
+   1\. When the IN phrase is specified, alphabet-name-4 shall reference an alphabet that defines a national character set.
 
-2. Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the number of characters in the native national character set, or, when the IN phrase is specified, the number of characters in the character set referenced by alphabet-name-4.
+   2\. Literal-5, if numeric, shall be an unsigned integer and shall have a value within the range of one through the number of characters in the native national character set, or, when the IN phrase is specified, the number of characters in the character set referenced by alphabet-name-4.
 
-3. Each noninteger literal shall be a national literal.
+   3\. Each noninteger literal shall be a national literal.
 
-4. Each national literal, when a THROUGH phrase is specified, shall be one character in length.
+   4\. Each national literal, when a THROUGH phrase is specified, shall be one character in length.
 
-5. The number of characters specified shall not exceed the number of characters in the native national character set or, when the IN phrase is specified, the number of characters in the character set referenced by alphabet-name-4.
+   5\. The number of characters specified shall not exceed the number of characters in the native national character set or, when the IN phrase is specified, the number of characters in the character set referenced by alphabet-name-4.
 
-d) Alphabet-name-4 shall not reference an alphabet specified with the LOCALE phrase.
+   d) Alphabet-name-4 shall not reference an alphabet specified with the LOCALE phrase.
 
 18\) Literal-7 shall be an alphanumeric or national literal that is not a figurative constant.
 
@@ -12684,36 +12684,36 @@ Y in the Collating sequence column indicates that the alphabet operand in the le
 
 When the ALPHABET clause is specified:
 
-a) When the ALPHANUMERIC phrase is specified or implied, a coded character set referenced by alphabet-name-1 is an alphanumeric coded character set and a collating sequence referenced by alphabet-name-1 is an alphanumeric collating sequence.
+   a) When the ALPHANUMERIC phrase is specified or implied, a coded character set referenced by alphabet-name-1 is an alphanumeric coded character set and a collating sequence referenced by alphabet-name-1 is an alphanumeric collating sequence.
 
-b) When the NATIONAL phrase is specified, a coded character set referenced by alphabet-name-2 is a national coded character set and a collating sequence referenced by alphabet-name-2 is a national collating sequence.
+   b) When the NATIONAL phrase is specified, a coded character set referenced by alphabet-name-2 is a national coded character set and a collating sequence referenced by alphabet-name-2 is a national collating sequence.
 
-c) When the STANDARD-1 phrase is specified, the referenced coded character set shall be as specified in ISO/IEC 646 International Reference Version. When the STANDARD-2 phrase is specified, the referenced coded character set shall be as specified in ISO/IEC 646; the implementor shall specify whether the International Reference Version or a national version is referenced, and shall specify the circumstances that define which national version is referenced. The collating sequence referenced by both the STANDARD-1 and STANDARD-2 phrases shall be as defined by the order in which characters appear in ISO/IEC 646. Each character of the standard character set is associated with its corresponding character of the native alphanumeric character set. The implementor defines the correspondence between the characters of the standard character set and the characters of the native character set.
+   c) When the STANDARD-1 phrase is specified, the referenced coded character set shall be as specified in ISO/IEC 646 International Reference Version. When the STANDARD-2 phrase is specified, the referenced coded character set shall be as specified in ISO/IEC 646; the implementor shall specify whether the International Reference Version or a national version is referenced, and shall specify the circumstances that define which national version is referenced. The collating sequence referenced by both the STANDARD-1 and STANDARD-2 phrases shall be as defined by the order in which characters appear in ISO/IEC 646. Each character of the standard character set is associated with its corresponding character of the native alphanumeric character set. The implementor defines the correspondence between the characters of the standard character set and the characters of the native character set.
 
-d) When the NATIVE phrase is specified:
+   d) When the NATIVE phrase is specified:
 
-1. If the ALPHANUMERIC phrase is specified or implied, the native alphanumeric coded character set and native alphanumeric collating sequence are referenced;
+   1\. If the ALPHANUMERIC phrase is specified or implied, the native alphanumeric coded character set and native alphanumeric collating sequence are referenced;
 
-2. If the NATIONAL phrase is specified, the native national coded character set and native national collating sequence are referenced.
+   2\. If the NATIONAL phrase is specified, the native national coded character set and native national collating sequence are referenced.
 
 
-e) When the LOCALE phrase is specified, the collating sequence identified is defined by the locale referenced by locale-name-2 when specified, otherwise by the locale that is current at the time the collating sequence is used at runtime. When LOCALE is specified in the ALPHANUMERIC phrase, an alphanumeric collating sequence is identified; when specified in the NATIONAL phrase, a national collating sequence is identified.
+   e) When the LOCALE phrase is specified, the collating sequence identified is defined by the locale referenced by locale-name-2 when specified, otherwise by the locale that is current at the time the collating sequence is used at runtime. When LOCALE is specified in the ALPHANUMERIC phrase, an alphanumeric collating sequence is identified; when specified in the NATIONAL phrase, a national collating sequence is identified.
 
-f) When the UCS-4 phrase is specified, the coded character set referenced shall be as specified in ISO/IEC 10646 as UTF-32. Each character of UTF-32 is associated with a corresponding character of the native national character set. The implementor shall specify the correspondence between the characters of UTF-32 and the characters of the native national character set. The collating sequence referenced by the UCS-4 phrase shall be defined by the order in which characters appear in ISO/IEC 10646.
+   f) When the UCS-4 phrase is specified, the coded character set referenced shall be as specified in ISO/IEC 10646 as UTF-32. Each character of UTF-32 is associated with a corresponding character of the native national character set. The implementor shall specify the correspondence between the characters of UTF-32 and the characters of the native national character set. The collating sequence referenced by the UCS-4 phrase shall be defined by the order in which characters appear in ISO/IEC 10646.
 
-g) When the UTF-8 phrase is specified, the coded character set referenced shall be as specified in ISO/IEC 10646 as UTF-8. Each character of ISO/IEC 10646 UTF-32 shall be associated with a corresponding character of the native national character set. The association is the same as the association for the UCS-32 character from which the UTF-8 character was transformed.
+   g) When the UTF-8 phrase is specified, the coded character set referenced shall be as specified in ISO/IEC 10646 as UTF-8. Each character of ISO/IEC 10646 UTF-32 shall be associated with a corresponding character of the native national character set. The association is the same as the association for the UCS-32 character from which the UTF-8 character was transformed.
 
-h) When the UTF-16 phrase is specified, the coded character set referenced shall be as specified in ISO/IEC 10646 as UTF-16. Each character of ISO/IEC 10646 UTF-16 shall be associated with a corresponding character of the native national character set. The association is the same as the association for the UTF-32 character from which the UTF-16 character was transformed.
+   h) When the UTF-16 phrase is specified, the coded character set referenced shall be as specified in ISO/IEC 10646 as UTF-16. Each character of ISO/IEC 10646 UTF-16 shall be associated with a corresponding character of the native national character set. The association is the same as the association for the UTF-32 character from which the UTF-16 character was transformed.
 
-i) When code-name-1 is specified, the alphanumeric coded character set and collating sequence referenced are defined by the implementor. The implementor shall specify the ordinal number of each character for use when code-name-1 references a coded character set and the collating position of each character for use when code-name-1 references a collating sequence. The implementor also shall specify the correspondence between characters of the alphanumeric coded character set specified by code-name-1 and the characters of the native alphanumeric coded character set.
+   i) When code-name-1 is specified, the alphanumeric coded character set and collating sequence referenced are defined by the implementor. The implementor shall specify the ordinal number of each character for use when code-name-1 references a coded character set and the collating position of each character for use when code-name-1 references a collating sequence. The implementor also shall specify the correspondence between characters of the alphanumeric coded character set specified by code-name-1 and the characters of the native alphanumeric coded character set.
 
    The coded character set referenced by code-name-1 is statically defined.
 
-j) When code-name-2 is specified, the national coded character set and collating sequence referenced are defined by the implementor. The implementor shall specify the ordinal number of each character for use when code-name-2 references a coded character set and the collating position of each character for use when code-name-2 references a collating sequence. The implementor also shall specify the correspondence between characters of the national coded character set specified by code-name-2 and the characters of the native national coded character set.
+   j) When code-name-2 is specified, the national coded character set and collating sequence referenced are defined by the implementor. The implementor shall specify the ordinal number of each character for use when code-name-2 references a coded character set and the collating position of each character for use when code-name-2 references a collating sequence. The implementor also shall specify the correspondence between characters of the national coded character set specified by code-name-2 and the characters of the native national coded character set.
 
    The coded character set referenced by code-name-2 is statically defined.
 
-k) When literal-phrase is specified, the coded character set and collating sequence are defined according to the following rules, where the native coded character set is the type of coded character set or collating sequence being defined, either alphanumeric or national:
+   k) When literal-phrase is specified, the coded character set and collating sequence are defined according to the following rules, where the native coded character set is the type of coded character set or collating sequence being defined, either alphanumeric or national:
 
    1\. The value of each literal specifies:
 
@@ -12726,13 +12726,13 @@ b. Otherwise, the actual character within the native character set. If the value
 
    2\. The order in which the literals appear in the ALPHABET clause specifies, in ascending sequence, the ordinal number of the character within the collating sequence being specified.
 
-3. Any characters of the native collating sequence that are not specified in the literal phrase shall assume a position in the collating sequence that is greater than that of the highest character specified in this literal phrase. The relative order within the set of these unspecified characters is unchanged from the native collating sequence.
+   3\. Any characters of the native collating sequence that are not specified in the literal phrase shall assume a position in the collating sequence that is greater than that of the highest character specified in this literal phrase. The relative order within the set of these unspecified characters is unchanged from the native collating sequence.
 
-4. If a character code set is being specified, the implementor defines the ordinal number within the character code set being specified for each character within the native character set that is not specified by the literal-1 phrase.
+   4\. If a character code set is being specified, the implementor defines the ordinal number within the character code set being specified for each character within the native character set that is not specified by the literal-1 phrase.
 
-5. If the THROUGH phrase is specified, the set of consecutive characters in the native character set beginning with the character specified by the value of literal-1, and ending with the character specified by the value of literal-2, is assigned a successive ascending position in the collating sequence being specified. In addition, the set of consecutive characters specified by a given THROUGH phrase may specify characters of the native character set in either ascending or descending sequence.
+   5\. If the THROUGH phrase is specified, the set of consecutive characters in the native character set beginning with the character specified by the value of literal-1, and ending with the character specified by the value of literal-2, is assigned a successive ascending position in the collating sequence being specified. In addition, the set of consecutive characters specified by a given THROUGH phrase may specify characters of the native character set in either ascending or descending sequence.
 
-6. If the ALSO phrase is specified, the characters of the native character set specified by the value of literal-1 and literal-3 are assigned to the same ordinal position in the collating sequence being specified or in the character code set that is used to represent the data. Literal-1 is the first character in the sequence of multiple characters defined at that ordinal position. If alphabet-name-1 is referenced in a SYMBOLIC CHARACTERS clause, only literal-1 is used to represent the character in the native character set.
+   6\. If the ALSO phrase is specified, the characters of the native character set specified by the value of literal-1 and literal-3 are assigned to the same ordinal position in the collating sequence being specified or in the character code set that is used to represent the data. Literal-1 is the first character in the sequence of multiple characters defined at that ordinal position. If alphabet-name-1 is referenced in a SYMBOLIC CHARACTERS clause, only literal-1 is used to represent the character in the native character set.
 
 8\) The character that has the highest ordinal position in the program collating sequence is associated with the figurative constant HIGH-VALUE, except when this figurative constant is specified as a literal in the SPECIAL-NAMES paragraph. If more than one character has the highest position in the program collating sequence, the last character specified is associated with the figurative constant HIGH-VALUE.
 
@@ -16519,13 +16519,13 @@ The FORMAT clause specifies that records written to the file are to be formatted
 
 
 
-c) If there are no record description entries associated with the file description entry, the record description entry or data description entry that is selected depends on the input-output operation as follows:
+   c) If there are no record description entries associated with the file description entry, the record description entry or data description entry that is selected depends on the input-output operation as follows:
 
-1. If the input-output statement is a READ statement, it is the data description entry of the identifier that is specified in the INTO phrase of that READ statement.
+   1\. If the input-output statement is a READ statement, it is the data description entry of the identifier that is specified in the INTO phrase of that READ statement.
 
-2. If the input-output statement is a WRITE or REWRITE statement and an identifier is specified in the FROM phrase, it is the data description entry of that identifier.
+   2\. If the input-output statement is a WRITE or REWRITE statement and an identifier is specified in the FROM phrase, it is the data description entry of that identifier.
 
-3. If the input-output statement is a WRITE or REWRITE statement and a literal is specified in the FROM phrase, an implicit data description entry that describes the literal is the data description entry as follows:
+   3\. If the input-output statement is a WRITE or REWRITE statement and a literal is specified in the FROM phrase, an implicit data description entry that describes the literal is the data description entry as follows:
 
    a. If the literal is an alphanumeric literal, the implicit data description entry is
 
@@ -17038,19 +17038,19 @@ The LINAGE clause provides a means for specifying the depth of a logical page in
    a) A separate LINAGE-COUNTER is supplied for each file described in the file section whose file description entry contains a LINAGE clause.
 
 
-b) LINAGE-COUNTER may be referenced only in procedure division statements; however only the input-output control system may change the value of LINAGE-COUNTER. Since more than one LINAGE-COUNTER may exist in a source element, the user shall qualify LINAGE-COUNTER by file-name when necessary.
+   b) LINAGE-COUNTER may be referenced only in procedure division statements; however only the input-output control system may change the value of LINAGE-COUNTER. Since more than one LINAGE-COUNTER may exist in a source element, the user shall qualify LINAGE-COUNTER by file-name when necessary.
 
-c) LINAGE-COUNTER is automatically modified, according to the following rules, during the execution of a WRITE statement to an associated file:
+   c) LINAGE-COUNTER is automatically modified, according to the following rules, during the execution of a WRITE statement to an associated file:
 
-1. When the ADVANCING PAGE phrase of the WRITE statement is specified, the LINAGE-COUNTER is automatically reset to one. During the resetting of LINAGE-COUNTER to the value one, the value of LINAGE-COUNTER is implicitly incremented to exceed the value specified by integer-1 or the data item referenced by data-name-1.
+   1\. When the ADVANCING PAGE phrase of the WRITE statement is specified, the LINAGE-COUNTER is automatically reset to one. During the resetting of LINAGE-COUNTER to the value one, the value of LINAGE-COUNTER is implicitly incremented to exceed the value specified by integer-1 or the data item referenced by data-name-1.
 
-2. When the ADVANCING phrase of the WRITE statement is specified, the LINAGE-COUNTER is incremented by the value of the integer specified in the ADVANCING phrase or the contents of the data item referenced by the identifier specified in the ADVANCING phrase.
+   2\. When the ADVANCING phrase of the WRITE statement is specified, the LINAGE-COUNTER is incremented by the value of the integer specified in the ADVANCING phrase or the contents of the data item referenced by the identifier specified in the ADVANCING phrase.
 
-3. When the ADVANCING phrase of the WRITE statement is not specified, the LINAGE-COUNTER is incremented by the value one.
+   3\. When the ADVANCING phrase of the WRITE statement is not specified, the LINAGE-COUNTER is incremented by the value one.
 
-4. The value of LINAGE-COUNTER is automatically reset to one when the device is repositioned to the first line that may be written on for each of the succeeding logical pages.
+   4\. The value of LINAGE-COUNTER is automatically reset to one when the device is repositioned to the first line that may be written on for each of the succeeding logical pages.
 
-d) The value of LINAGE-COUNTER is automatically set to one at the time an OPEN statement with the OUTPUT phrase is executed for the associated file.
+   d) The value of LINAGE-COUNTER is automatically set to one at the time an OPEN statement with the OUTPUT phrase is executed for the associated file.
 
 8\) Each logical page is contiguous to the next with no additional spacing provided.
 
@@ -19696,27 +19696,27 @@ g) The report footing, if defined, is printed, as the very last report group in 
 
 7\) The upper limit is defined to be the uppermost permitted line on the page that may be occupied by the report group's first line. It is calculated as follows:
 
-a) The upper limit for a report heading or a page heading where no report heading appears on the same page is the line given by the HEADING integer.
+   a) The upper limit for a report heading or a page heading where no report heading appears on the same page is the line given by the HEADING integer.
 
-b) The upper limit for a page heading where a report heading appears on the same page is the line following the last line of the report heading.
+   b) The upper limit for a page heading where a report heading appears on the same page is the line following the last line of the report heading.
 
-c) The upper limit for a body group, if there is no control heading defined in the report with the OR PAGE phrase, is the line given by the FIRST DETAIL integer.
+   c) The upper limit for a body group, if there is no control heading defined in the report with the OR PAGE phrase, is the line given by the FIRST DETAIL integer.
 
-d) If there is at least one control heading defined in the report with the OR PAGE phrase, the upper limit for a body group is determined as follows:
+   d) If there is at least one control heading defined in the report with the OR PAGE phrase, the upper limit for a body group is determined as follows:
 
-1. If the body group is a control heading at the same or a higher control level than the highest-level control heading that has an OR PAGE phrase, the upper limit is the line given by the FIRST DETAIL integer.
+   1\. If the body group is a control heading at the same or a higher control level than the highest-level control heading that has an OR PAGE phrase, the upper limit is the line given by the FIRST DETAIL integer.
 
-2. If the body group is a control heading at a lower control level than the highest-level control heading that has an OR PAGE phrase, the upper limit is the line following the last line of the next higher-level control heading.
+   2\. If the body group is a control heading at a lower control level than the highest-level control heading that has an OR PAGE phrase, the upper limit is the line following the last line of the next higher-level control heading.
 
-3. If the body group is a detail, the upper limit is the line following the last line of the lowest-level control heading that has an OR PAGE phrase.
+   3\. If the body group is a detail, the upper limit is the line following the last line of the lowest-level control heading that has an OR PAGE phrase.
 
-4. If the body group is a control footing, the upper limit is the line following the last line of the lowest-level control heading with an OR PAGE phrase at the same level as the control footing, or higher. If no such control heading is defined, the upper limit is the FIRST DETAIL integer.
+   4\. If the body group is a control footing, the upper limit is the line following the last line of the lowest-level control heading with an OR PAGE phrase at the same level as the control footing, or higher. If no such control heading is defined, the upper limit is the FIRST DETAIL integer.
 
-e) The upper limit for a page footing is the line number obtained by adding 1 to the FOOTING integer.
+   e) The upper limit for a page footing is the line number obtained by adding 1 to the FOOTING integer.
 
-f) The upper limit for a report footing that appears on a page by itself is the line given by the HEADING integer.
+   f) The upper limit for a report footing that appears on a page by itself is the line given by the HEADING integer.
 
-g) The upper limit for a report footing that does not appear on a page by itself is the line following the last line of the page footing, if specified, or the line number obtained by adding 1 to the FOOTING integer, if no page footing is defined for the report.
+   g) The upper limit for a report footing that does not appear on a page by itself is the line following the last line of the page footing, if specified, or the line number obtained by adding 1 to the FOOTING integer, if no page footing is defined for the report.
 
 
 
@@ -20069,32 +20069,32 @@ c) If an encoding-phrase is not specified, 11.9.9, FLOAT-DECIMAL clause, specifi
 
 22\) A data item described with a USAGE OBJECT REFERENCE clause is called an object reference. An object reference is a data item of class object and category object-reference. It shall contain either null or a reference to an object, subject to the following rules:
 
-a) The amount of storage allocated for an object reference data item is implementor-defined and is not necessarily the same for every object reference.
+   a) The amount of storage allocated for an object reference data item is implementor-defined and is not necessarily the same for every object reference.
 
-b) If none of the optional phrases is specified, this data item is called a universal object reference. Its content may be a reference to any object.
+   b) If none of the optional phrases is specified, this data item is called a universal object reference. Its content may be a reference to any object.
 
-c) If interface-name-1 is specified, the object referenced by this data item shall implement interface-1.
+   c) If interface-name-1 is specified, the object referenced by this data item shall implement interface-1.
 
 
-d) If object-class-name-1 is specified, the object referenced by this data item shall be an object of object-class-name-1 or of a subclass of object-class-name-1, subject to the following rules:
+   d) If object-class-name-1 is specified, the object referenced by this data item shall be an object of object-class-name-1 or of a subclass of object-class-name-1, subject to the following rules:
 
-1. If the ONLY phrase is not specified:
+   1\. If the ONLY phrase is not specified:
 
    a. If the FACTORY phrase is specified, the object referenced by this data item shall be the factory object of the specified class or of a subclass of the specified class.
 
    b. If the FACTORY phrase is not specified, the object referenced by this data item shall be an instance object of the specified class or of a subclass of the specified class.
 
-2. If the ONLY phrase is specified:
+   2\. If the ONLY phrase is specified:
 
    a. If the FACTORY phrase is specified, the object referenced by this data item shall be the factory object of the specified class.
 
    b. If the FACTORY phrase is not specified, the object referenced by this data item shall be an instance object of the specified class.
 
-e) If ACTIVE-CLASS is specified, the object referenced by this data item shall be of the same class as the object that was used to invoke the method in which this data description entry is specified, subject to the following rules:
+   e) If ACTIVE-CLASS is specified, the object referenced by this data item shall be of the same class as the object that was used to invoke the method in which this data description entry is specified, subject to the following rules:
 
-1. If the FACTORY phrase is specified, the object referenced by this data item shall be the factory object of that class.
+   1\. If the FACTORY phrase is specified, the object referenced by this data item shall be the factory object of that class.
 
-2. If the FACTORY phrase is not specified, the object referenced by this data item shall be an instance object of that class.
+   2\. If the FACTORY phrase is not specified, the object referenced by this data item shall be an instance object of that class.
 
 23\) A data description entry that specifies the USAGE POINTER clause specifies a data-pointer data item, also called a data-pointer, that may contain the address of a data item. Each implementor defines the precise effect of the USAGE POINTER clause upon alignment, size, representation, and range of values of the data item in the storage of the computer. If type-name-1 is specified, this data item is a restricted data-pointer. A restricted data-pointer shall contain only the predefined address NULL or the address of a data item of the specified type.
 
@@ -22447,19 +22447,19 @@ receiving-field is the data item referenced in the TO or USING clause, and scree
 
 25\) If the execution of the ACCEPT statement results in an unsuccessful completion, is terminated by a function key stroke, or causes an EC-SCREEN exception condition to exist, then:
 
-a) If the ON EXCEPTION phrase is specified in the ACCEPT statement, control is transferred to imperative-statement-1. If control is returned from imperative-statement-1, control is then transferred to the end of the ACCEPT statement.
+   a) If the ON EXCEPTION phrase is specified in the ACCEPT statement, control is transferred to imperative-statement-1. If control is returned from imperative-statement-1, control is then transferred to the end of the ACCEPT statement.
 
-b) If the ON EXCEPTION phrase is not specified in the ACCEPT statement, the following occurs.
+   b) If the ON EXCEPTION phrase is not specified in the ACCEPT statement, the following occurs.
 
-1. If the ACCEPT statement is specified in a statement that is in imperative-statement-1 in an exception-checking PERFORM statement and a WHEN phrase in that statement specifies the exception condition that occurred, control is transferred to the imperative-statement in that WHEN phrase and the flow of control is specified in the rules for the WHEN phrase. If control is returned from the WHEN phrase, control is then transferred to the end of the ACCEPT statement.
+   1\. If the ACCEPT statement is specified in a statement that is in imperative-statement-1 in an exception-checking PERFORM statement and a WHEN phrase in that statement specifies the exception condition that occurred, control is transferred to the imperative-statement in that WHEN phrase and the flow of control is specified in the rules for the WHEN phrase. If control is returned from the WHEN phrase, control is then transferred to the end of the ACCEPT statement.
 
-2. Otherwise, if there is no applicable WHEN phrase and there is an applicable declarative, control is transferred to that declarative. If control is returned from the declarative, control is transferred to the end of the ACCEPT statement.
+   2\. Otherwise, if there is no applicable WHEN phrase and there is an applicable declarative, control is transferred to that declarative. If control is returned from the declarative, control is transferred to the end of the ACCEPT statement.
 
-c) If the ON EXCEPTION phrase is not specified in the ACCEPT statement and there are no other applicable exception processing procedures,
+   c) If the ON EXCEPTION phrase is not specified in the ACCEPT statement and there are no other applicable exception processing procedures,
 
-1. If the EC-DATA-INCOMPATIBLE exception condition exists, execution continues as specified in 14.6.13.1.3, Fatal exception conditions.
+   1\. If the EC-DATA-INCOMPATIBLE exception condition exists, execution continues as specified in 14.6.13.1.3, Fatal exception conditions.
 
-2. If the EC-DATA-INCOMPATIBLE exception condition does not exist, control is transferred to the end of the ACCEPT statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
+   2\. If the EC-DATA-INCOMPATIBLE exception condition does not exist, control is transferred to the end of the ACCEPT statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
 
 
 <a id="section-14-9-2"></a>
@@ -22801,9 +22801,9 @@ The effect of the USING phrase on the activated runtime element is described in 
 
 3\) Execution of the CALL statement proceeds as follows:
 
-a) Arithmetic-expression-1, boolean-expression-1, identifier-1, identifier-2, and identifier-4 are evaluated and item identification is done for identifier-3 at the beginning of the execution of the CALL statement. If an exception condition exists, no program is called and execution proceeds as specified in General rule 3h. If an exception condition does not exist, the values of identifier-2, identifier-4, arithmetic-expression-1, boolean-expression-1, or literal-2 are made available to the called program at the time control is transferred to that program.
+   a) Arithmetic-expression-1, boolean-expression-1, identifier-1, identifier-2, and identifier-4 are evaluated and item identification is done for identifier-3 at the beginning of the execution of the CALL statement. If an exception condition exists, no program is called and execution proceeds as specified in General rule 3h. If an exception condition does not exist, the values of identifier-2, identifier-4, arithmetic-expression-1, boolean-expression-1, or literal-2 are made available to the called program at the time control is transferred to that program.
 
-b) The program being called is identified by its program-name or its location, which are determined as follows:
+   b) The program being called is identified by its program-name or its location, which are determined as follows:
 
 — If identifier-1 references an alphanumeric or national data item or literal-1 is specified, the value of literal-1 or the content of the data item referenced by identifier-1 is the program-name of the program being called, as described in 8.3.2.2, User-defined words.
 
@@ -22816,11 +22816,11 @@ If the program being called is a COBOL program, the runtime system attempts to l
 
 If the data item referenced by identifier-1 contains the predefined address NULL, the EC-PROGRAM-PTR-NULL exception condition is set to exist. If the program cannot be located or identifier-1 references a zero-length item, the EC-PROGRAM-NOT-FOUND exception condition is set to exist. If either the EC-PROGRAM-NOT-FOUND or the EC-PROGRAM-PTR-NULL exception condition exists, the program call is not successful, and execution continues as specified in General rule 3h.
 
-c) If the program is located but the resources necessary to execute the program are not available, the EC-PROGRAM-RESOURCES exception condition is set to exist, the program call is not successful, and execution continues as specified in General rule 3h. The runtime resources that are checked in order to determine the availability of the called program for execution are defined by the implementor.
+   c) If the program is located but the resources necessary to execute the program are not available, the EC-PROGRAM-RESOURCES exception condition is set to exist, the program call is not successful, and execution continues as specified in General rule 3h. The runtime resources that are checked in order to determine the availability of the called program for execution are defined by the implementor.
 
-d) If the resources are available and the program being called is a COBOL program, the rules for conformance specified in 14.8.2, Parameters and 14.8.3, Returning items apply. If a violation of these rules is detected, the EC-PROGRAM-ARG-MISMATCH exception condition is set to exist if checking for it is enabled in both the activated program and activating runtime element, the program call is not successful, and execution continues as specified in General rule 3h.
+   d) If the resources are available and the program being called is a COBOL program, the rules for conformance specified in 14.8.2, Parameters and 14.8.3, Returning items apply. If a violation of these rules is detected, the EC-PROGRAM-ARG-MISMATCH exception condition is set to exist if checking for it is enabled in both the activated program and activating runtime element, the program call is not successful, and execution continues as specified in General rule 3h.
 
-e) External items are checked to ensure that they comply with the following rules as specified in 14.8.4, External items:
+   e) External items are checked to ensure that they comply with the following rules as specified in 14.8.4, External items:
 
 | Rule | Exception condition |
 |------|---------------------|
@@ -22831,19 +22831,19 @@ e) External items are checked to ensure that they comply with the following rule
 If one of the rules listed above is violated and checking for it is enabled for the associated exception in both the activated program and activating runtime element, that exception is set to exist, the program call is not successful, and execution continues as specified in General rule 3h.
 
 
-f) If the program being called is in the active state and that program does not have the recursive attribute, the EC-PROGRAM-RECURSIVE-CALL exception condition is set to exist, the program call is not successful, and execution continues as specified in General rule 3h.
+   f) If the program being called is in the active state and that program does not have the recursive attribute, the EC-PROGRAM-RECURSIVE-CALL exception condition is set to exist, the program call is not successful, and execution continues as specified in General rule 3h.
 
-g) If a fatal exception condition has not been raised, the program specified by the CALL statement is made available for execution and control is transferred to the called program. If identifier-1 is defined as a program-pointer data item and contains an invalid program address, execution of the CALL statement is undefined. If the called program is a COBOL program, its execution is described in 14.2, Procedure division structure; otherwise the execution is defined by the implementor.
+   g) If a fatal exception condition has not been raised, the program specified by the CALL statement is made available for execution and control is transferred to the called program. If identifier-1 is defined as a program-pointer data item and contains an invalid program address, execution of the CALL statement is undefined. If the called program is a COBOL program, its execution is described in 14.2, Procedure division structure; otherwise the execution is defined by the implementor.
 
-h) If the program was not successfully called and an exception condition was set to exist, one of the following actions occurs:
+   h) If the program was not successfully called and an exception condition was set to exist, one of the following actions occurs:
 
-1. If the exception condition is any of the EC-PROGRAM or EC-EXTERNAL exception conditions and an ON EXCEPTION phrase is specified in the CALL statement, control is transferred to imperative-statement-1. If control is returned from imperative-statement-1, control is then transferred to the end of the CALL statement.
+   1\. If the exception condition is any of the EC-PROGRAM or EC-EXTERNAL exception conditions and an ON EXCEPTION phrase is specified in the CALL statement, control is transferred to imperative-statement-1. If control is returned from imperative-statement-1, control is then transferred to the end of the CALL statement.
 
-2. If checking for the exception condition is enabled, and if the exception condition is one of the EC-PROGRAM or EC-EXTERNAL exception conditions and an ON EXCEPTION phrase is not specified or if the exception condition is not one of the EC-PROGRAM exception conditions, any applicable exception processing statements are executed. If control is returned from these statements, control is then transferred to the end of the CALL statement. All other effects of the CALL statement are defined by the implementor.
+   2\. If checking for the exception condition is enabled, and if the exception condition is one of the EC-PROGRAM or EC-EXTERNAL exception conditions and an ON EXCEPTION phrase is not specified or if the exception condition is not one of the EC-PROGRAM exception conditions, any applicable exception processing statements are executed. If control is returned from these statements, control is then transferred to the end of the CALL statement. All other effects of the CALL statement are defined by the implementor.
 
-3. If checking for the exception condition is not enabled, subsequent behavior is as specified in 14.6.13.1, Exception conditions.
+   3\. If checking for the exception condition is not enabled, subsequent behavior is as specified in 14.6.13.1, Exception conditions.
 
-i) If the program was successfully called, after control is returned from the called program the ON EXCEPTION phrase, if specified, is ignored. If an exception condition is propagated from the called program, execution continues as specified in 14.6.13.1, Exception conditions; otherwise, control is transferred to the end of the CALL statement or, if the NOT ON EXCEPTION phrase is specified, to imperative-statement-2. If control is returned from imperative-statement-2, control is then transferred to the end of the CALL statement.
+   i) If the program was successfully called, after control is returned from the called program the ON EXCEPTION phrase, if specified, is ignored. If an exception condition is propagated from the called program, execution continues as specified in 14.6.13.1, Exception conditions; otherwise, control is transferred to the end of the CALL statement or, if the NOT ON EXCEPTION phrase is specified, to imperative-statement-2. If control is returned from imperative-statement-2, control is then transferred to the end of the CALL statement.
 
 4\) If a RETURNING phrase is specified, the result of the activated program is placed into identifier-3.
 
@@ -23006,7 +23006,7 @@ The CLOSE statement terminates the processing of reels/units and files with rewi
 
 The definitions of the symbols in Table 14, Relationship of categories of physical files and the format of the CLOSE statement, are given below. The notation 'N/A' means that the combination is not applicable. The other symbols apply to the rules below. Where the definition depends on whether the file is an input, output, or input-output file, alternate definitions are given; otherwise, a definition applies to input, output, and input-output files.
 
-a) Effect on previous units
+   a) Effect on previous units
 
 <u>Input files and input-output files</u>:
 
@@ -23018,28 +23018,28 @@ If the current unit is not the last in the physical file, the units in the physi
 
 All units in the physical file prior to the current unit are closed except those units controlled by a prior CLOSE UNIT statement.
 
-b) No rewind of current reel
+   b) No rewind of current reel
 
 The current unit is left in its current position.
 
-c) Close file
+   c) Close file
 
 Closing operations specified by the implementor are executed.
 
-d) Unit removal
+   d) Unit removal
 
 The current unit is rewound, when applicable, and the unit is logically removed from the run unit; however, the unit may be accessed again, in its proper order of units within the physical file, if a CLOSE statement without the UNIT phrase is subsequently executed for this file followed by the execution of an OPEN statement for the file.
 
 
 NOTE This Working Draft International Standard does not address when the unit is unloaded or left loaded.
 
-e) Close unit
+   e) Close unit
 
 <u>Input files and input-output files (unit media)</u>:
 
-1. If the current unit is the last or only unit for the physical file, there is no unit swap, the current volume pointer remains unchanged, and the file position indicator is set to indicate that no next or previous logical record exists.
+   1\. If the current unit is the last or only unit for the physical file, there is no unit swap, the current volume pointer remains unchanged, and the file position indicator is set to indicate that no next or previous logical record exists.
 
-2. If another unit exists for the physical file, a unit swap occurs, the current volume pointer is updated to point to the next unit existing in the physical file, and the file position indicator is set to one less than the number of the first record existing on the new current volume. If no records exist for the current volume, another unit swap occurs.
+   2\. If another unit exists for the physical file, a unit swap occurs, the current volume pointer is updated to point to the next unit existing in the physical file, and the file position indicator is set to one less than the number of the first record existing on the new current volume. If no records exist for the current volume, another unit swap occurs.
 
 <u>Output files (unit media)</u>:
 
@@ -23049,11 +23049,11 @@ A unit swap occurs and the current volume pointer is updated to point to the new
 
 Execution of this statement is considered successful. The file remains in the open mode, the file position indicator is unchanged, the I-O status indicator for the file connector is set to '07', and no other action takes place.
 
-f) Rewind
+   f) Rewind
 
 The current reel or analogous device is positioned at its physical beginning.
 
-g) Optional phrases ignored
+   g) Optional phrases ignored
 
 The CLOSE statement is executed as if none of the optional phrases were present. The I-O status indicator for the file connector is set to '07'.
 
@@ -23513,16 +23513,16 @@ The transfer takes place and each elementary screen item is displayed on the ter
 
 18\) If the execution of the DISPLAY statement is unsuccessful, then:
 
-a) If the ON EXCEPTION phrase is specified in the DISPLAY statement, control is transferred to imperative-statement-1. Execution then continues according to the rules for each statement specified in imperative-statement-1. If a procedure branching or conditional statement that causes explicit transfer of control is executed, control is transferred in accordance with the rules for that statement; otherwise, upon completion of the execution of imperative-statement-1, control is transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
+   a) If the ON EXCEPTION phrase is specified in the DISPLAY statement, control is transferred to imperative-statement-1. Execution then continues according to the rules for each statement specified in imperative-statement-1. If a procedure branching or conditional statement that causes explicit transfer of control is executed, control is transferred in accordance with the rules for that statement; otherwise, upon completion of the execution of imperative-statement-1, control is transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
 
 
-b) If the ON EXCEPTION phrase is not specified in the DISPLAY statement, the following occurs.
+   b) If the ON EXCEPTION phrase is not specified in the DISPLAY statement, the following occurs.
 
-1. If the DISPLAY statement is specified in a statement that is in imperative-statement-1 in an exception-checking PERFORM statement and a WHEN phrase. If control is returned from the PERFORM statement, control is then transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
+   1\. If the DISPLAY statement is specified in a statement that is in imperative-statement-1 in an exception-checking PERFORM statement and a WHEN phrase. If control is returned from the PERFORM statement, control is then transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
 
-2. If there is no applicable WHEN phrase and there is an applicable USE declarative, control is transferred to the declarative. If control is returned from the declarative, control is then transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
+   2\. If there is no applicable WHEN phrase and there is an applicable USE declarative, control is transferred to the declarative. If control is returned from the declarative, control is then transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
 
-c) If the ON EXCEPTION phrase is not specified in the DISPLAY statement and there is no applicable exception processing procedure, control is transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
+   c) If the ON EXCEPTION phrase is not specified in the DISPLAY statement and there is no applicable exception processing procedure, control is transferred to the end of the DISPLAY statement and the NOT ON EXCEPTION phrase, if specified, is ignored.
 
 19\) If one or more of the exception conditions EC-SCREEN-FIELD-OVERLAP, EC-SCREEN-ITEM-TRUNCATED, EC-SCREEN-LINE-NUMBER, or EC-SCREEN-STARTING-COLUMN exists during the execution of the DISPLAY statement, the execution of the DISPLAY statement continues as described for that exception condition and upon completion, the execution of the DISPLAY statement is considered unsuccessful.
 
@@ -24534,17 +24534,17 @@ Otherwise, the implicit statement is:
 
 6\) The sending-operand in each implicit MOVE and SET statement is determined as follows:
 
-a) If the data item qualifies as a receiving-operand because of the VALUE phrase:
+   a) If the data item qualifies as a receiving-operand because of the VALUE phrase:
 
-1. If the category of the receiving-operand is data-pointer, function-pointer, message-tag, or program-pointer, the sending-operand is the predefined address NULL;
+   1\. If the category of the receiving-operand is data-pointer, function-pointer, message-tag, or program-pointer, the sending-operand is the predefined address NULL;
 
-2. If the category of the receiving-operand is object-reference, the sending-operand is the predefined object reference NULL;
+   2\. If the category of the receiving-operand is object-reference, the sending-operand is the predefined object reference NULL;
 
-3. Otherwise, the sending-operand is determined by the literal in the VALUE clause specified in the data description entry of the data item. If the data item is a table element, the literal in the VALUE clause that corresponds to the occurrence being initialized determines the sending-operand. The actual sending-operand is a literal that, when moved to the receiving-operand with a MOVE statement, produces the same result as the initial value of the data item as produced by the application of the VALUE clause.
+   3\. Otherwise, the sending-operand is determined by the literal in the VALUE clause specified in the data description entry of the data item. If the data item is a table element, the literal in the VALUE clause that corresponds to the occurrence being initialized determines the sending-operand. The actual sending-operand is a literal that, when moved to the receiving-operand with a MOVE statement, produces the same result as the initial value of the data item as produced by the application of the VALUE clause.
 
-b) If the data item does not qualify as a receiving-operand because of the VALUE phrase, but does qualify because of the REPLACING phrase, the sending-operand is the literal-1 or identifier-2 associated with the category specified in the REPLACING phrase.
+   b) If the data item does not qualify as a receiving-operand because of the VALUE phrase, but does qualify because of the REPLACING phrase, the sending-operand is the literal-1 or identifier-2 associated with the category specified in the REPLACING phrase.
 
-c) If the data item does not qualify in accordance with General rules 6a and 6b, the sending-operand used depends on the category of the receiving-operand as follows:
+   c) If the data item does not qualify in accordance with General rules 6a and 6b, the sending-operand used depends on the category of the receiving-operand as follows:
 
 | Receiving operand | Figurative constant |
 |---|---|
@@ -24782,36 +24782,36 @@ FORMATS 1 AND 2
 
 8\) The comparison operation to determine the occurrence of literal-1 to be tallied or to be replaced, occurs as follows:
 
-a) The operands of the TALLYING or REPLACING phrase are considered in the order they are specified in the INSPECT statement from left to right. The first literal-1 is compared to an equal number of contiguous characters, starting with the leftmost character position, or, if BACKWARD is specified, the rightmost character position in the data item referenced by identifier-1. Literal-1 matches that portion of the content of the data item referenced by identifier-1 if they are equal, character for character and:
+   a) The operands of the TALLYING or REPLACING phrase are considered in the order they are specified in the INSPECT statement from left to right. The first literal-1 is compared to an equal number of contiguous characters, starting with the leftmost character position, or, if BACKWARD is specified, the rightmost character position in the data item referenced by identifier-1. Literal-1 matches that portion of the content of the data item referenced by identifier-1 if they are equal, character for character and:
 
-1. If neither LEADING nor FIRST is specified; or
+   1\. If neither LEADING nor FIRST is specified; or
 
-2. If the LEADING adjective applies to literal-1 and literal-1 is a leading occurrence as defined in General rules 12 and 17; or
+   2\. If the LEADING adjective applies to literal-1 and literal-1 is a leading occurrence as defined in General rules 12 and 17; or
 
-3. If the FIRST adjective applies to literal-1 and literal-1 is the first occurrence as defined in General rule 17.
+   3\. If the FIRST adjective applies to literal-1 and literal-1 is the first occurrence as defined in General rule 17.
 
-b) If no match occurs in the comparison of the first literal-1, the comparison is repeated with each successive literal-1, if any, until either a match is found or there is no next successive literal-1. When there is no next successive literal-1, the character position in the data item referenced by identifier-1 immediately to the right, or if BACKWARD is specified to the left, of the leftmost character position considered in the last comparison cycle is considered as the leftmost character position, and the comparison cycle begins again with the first literal-1.
+   b) If no match occurs in the comparison of the first literal-1, the comparison is repeated with each successive literal-1, if any, until either a match is found or there is no next successive literal-1. When there is no next successive literal-1, the character position in the data item referenced by identifier-1 immediately to the right, or if BACKWARD is specified to the left, of the leftmost character position considered in the last comparison cycle is considered as the leftmost character position, and the comparison cycle begins again with the first literal-1.
 
 NOTE 2 The keyword BACKWARD specifies only the direction of the scan, not the direction of the matching. Matching always takes place starting at the leftmost character at the current character position as specified in General rule 8 with the leftmost position of the characters being tallied or replaced.
 
-c) Whenever a match occurs, tallying or replacing takes place as described in General rules 12 and 15. The character position in the data item referenced by identifier-1 immediately to the right of the rightmost character position that participated in the match or, if BACKWARD is specified, the character position in the data item referenced by identifier-1 immediately to the left of the leftmost character position that participated in the match is now considered to be the leftmost character position of the data item referenced by identifier-1, and the comparison cycle starts again with the first literal-1.
+   c) Whenever a match occurs, tallying or replacing takes place as described in General rules 12 and 15. The character position in the data item referenced by identifier-1 immediately to the right of the rightmost character position that participated in the match or, if BACKWARD is specified, the character position in the data item referenced by identifier-1 immediately to the left of the leftmost character position that participated in the match is now considered to be the leftmost character position of the data item referenced by identifier-1, and the comparison cycle starts again with the first literal-1.
 
-d) If BACKWARD was not specified the comparison operation continues until the rightmost character position of the data item referenced by identifier-1 has participated in a match or has been considered as the leftmost character position otherwise if BACKWARD has been specified, the comparison operation continues until the leftmost character position of the data item referenced by identifier-1 has participated in a match or has been considered as the rightmost character position. When this occurs, inspection is terminated.
+   d) If BACKWARD was not specified the comparison operation continues until the rightmost character position of the data item referenced by identifier-1 has participated in a match or has been considered as the leftmost character position otherwise if BACKWARD has been specified, the comparison operation continues until the leftmost character position of the data item referenced by identifier-1 has participated in a match or has been considered as the rightmost character position. When this occurs, inspection is terminated.
 
-e) If the CHARACTERS phrase is specified, an implied one character operand participates in the cycle described in General rules 8a through 8d above as if it had been specified by literal-1, except that no comparison to the content of the data item referenced by identifier-1 takes place. This implied character is considered always to match the leftmost character of the content of the data item referenced by identifier-1 participating in the current comparison cycle.
+   e) If the CHARACTERS phrase is specified, an implied one character operand participates in the cycle described in General rules 8a through 8d above as if it had been specified by literal-1, except that no comparison to the content of the data item referenced by identifier-1 takes place. This implied character is considered always to match the leftmost character of the content of the data item referenced by identifier-1 participating in the current comparison cycle.
 
 
 9\) The comparison operation defined in General rule 8 is restricted by the BEFORE and AFTER phrase as follows:
 
-a) If neither the BEFORE nor AFTER phrase is specified or identifier-4 references a zero-length item, literal-1 or the implied operand of the CHARACTERS phrase participates in the comparison operation as described in General rule 8. Literal-1 or the implied operand of the CHARACTERS phrase is first eligible to participate in matching at the leftmost character position, or, if BACKWARD is specified, at the rightmost character position of identifier-1.
+   a) If neither the BEFORE nor AFTER phrase is specified or identifier-4 references a zero-length item, literal-1 or the implied operand of the CHARACTERS phrase participates in the comparison operation as described in General rule 8. Literal-1 or the implied operand of the CHARACTERS phrase is first eligible to participate in matching at the leftmost character position, or, if BACKWARD is specified, at the rightmost character position of identifier-1.
 
-b) If the BEFORE phrase is specified, the associated literal-1 or the implied operand of the CHARACTERS phrase participates only in those comparison cycles that involve that portion of the content of the data item referenced by identifier-1 the first character position that is eligible to participate up to, but not including, the first occurrence encountered of literal-2 within the content of the data item referenced by identifier-1. The position of this first occurrence is determined before the first cycle of the comparison operation described in General rule 8 is begun. If, on any comparison cycle, literal-1 or the implied operand of the CHARACTERS phrase is not eligible to participate, it is considered not to match the content of the data item referenced by identifier-1. If there is no occurrence of literal-2 within the content of the data item referenced by identifier-1, its associated literal-1 or the implied operand of the CHARACTERS phrase participates in the comparison operation as though the BEFORE phrase had not been specified.
+   b) If the BEFORE phrase is specified, the associated literal-1 or the implied operand of the CHARACTERS phrase participates only in those comparison cycles that involve that portion of the content of the data item referenced by identifier-1 the first character position that is eligible to participate up to, but not including, the first occurrence encountered of literal-2 within the content of the data item referenced by identifier-1. The position of this first occurrence is determined before the first cycle of the comparison operation described in General rule 8 is begun. If, on any comparison cycle, literal-1 or the implied operand of the CHARACTERS phrase is not eligible to participate, it is considered not to match the content of the data item referenced by identifier-1. If there is no occurrence of literal-2 within the content of the data item referenced by identifier-1, its associated literal-1 or the implied operand of the CHARACTERS phrase participates in the comparison operation as though the BEFORE phrase had not been specified.
 
-c) If the AFTER phrase is specified:
+   c) If the AFTER phrase is specified:
 
-1. If BACKWARD is specified, the associated literal-1 or the implied operand of the CHARACTERS phrase participates only in those comparison cycles that involve that portion of the content of the data item referenced by identifier-1 from the character position immediately to the left of the leftmost character position of the first occurrence of literal-2 within the content of the data item referenced by identifier-1 to the leftmost character position of the data item referenced by identifier-1, else
+   1\. If BACKWARD is specified, the associated literal-1 or the implied operand of the CHARACTERS phrase participates only in those comparison cycles that involve that portion of the content of the data item referenced by identifier-1 from the character position immediately to the left of the leftmost character position of the first occurrence of literal-2 within the content of the data item referenced by identifier-1 to the leftmost character position of the data item referenced by identifier-1, else
 
-2. the associated literal-1 or the implied operand of the CHARACTERS phrase participates only in those comparison cycles that involve that portion of the content of the data item referenced by identifier-1 from the character position immediately to the right of the rightmost character position of the first occurrence of literal-2 within the content of the data item referenced by identifier-1 to the rightmost character position of the data item referenced by identifier-1.
+   2\. the associated literal-1 or the implied operand of the CHARACTERS phrase participates only in those comparison cycles that involve that portion of the content of the data item referenced by identifier-1 from the character position immediately to the right of the rightmost character position of the first occurrence of literal-2 within the content of the data item referenced by identifier-1 to the rightmost character position of the data item referenced by identifier-1.
 
 This is the character position at which literal-1 or the implied operand of the CHARACTERS phrase is first eligible to participate in matching. The position of this first occurrence is determined before the first cycle of the comparison operation described in General rule 8 is begun. If, on any comparison cycle, literal-1 or the implied operand of the CHARACTERS phrase is not eligible to participate, it is considered not to match the content of the data item referenced by identifier-1. If there is no occurrence of literal-2 within the content of the data item referenced by identifier-1, its associated literal-1 or the implied operand of the CHARACTERS phrase is never eligible to participate in the comparison operation.
 
@@ -25007,13 +25007,13 @@ The effect of the USING phrase on the activated runtime element is described in 
 
 6\) If object-class-name-1 is specified or the data item referenced by identifier-1 is not a universal object reference, the following applies: If an argument is specified without any of the keywords BY REFERENCE, BY CONTENT, or BY VALUE, the manner used for passing that argument is determined as follows:
 
-a) When the BY REFERENCE phrase is specified or implied for the corresponding formal parameter:
+   a) When the BY REFERENCE phrase is specified or implied for the corresponding formal parameter:
 
-1. if the argument meets the requirements of Syntax rules 9 and 10, BY REFERENCE is assumed;
+   1\. if the argument meets the requirements of Syntax rules 9 and 10, BY REFERENCE is assumed;
 
-2. if the argument does not meet the requirements of Syntax rules 9 and 10, BY CONTENT is assumed.
+   2\. if the argument does not meet the requirements of Syntax rules 9 and 10, BY CONTENT is assumed.
 
-b) When the BY VALUE phrase is specified or implied for the corresponding formal parameter, BY VALUE is assumed.
+   b) When the BY VALUE phrase is specified or implied for the corresponding formal parameter, BY VALUE is assumed.
 
 7\) Execution of the INVOKE statement proceeds as follows:
 
@@ -25169,13 +25169,13 @@ g) If the file referenced by file-name-1 contains variable-length records, all t
    b) The logical records are obtained and released to the merge operation. Each record is obtained as if a READ statement with the NEXT phrase, the IGNORING LOCK phrase, and the AT END phrase had been executed. When the at end condition exists for file-name-2 or file-name-3, the processing for that file connector is terminated. If the file referenced by file-name-1 is described with variable-length records, the size of any record written to file-name-1 is the size of that record when it was read from file-name-2 or file-name-3, regardless of the content of the data item referenced by the DEPENDING ON phrase of either a RECORD IS VARYING clause or an OCCURS clause specified in the sort-merge file description entry for file-name-1. If the size of the record read from the file referenced by file-name-2 or file-name-3 is larger than the largest record allowed in the file description entry for file-name-1, the EC-SORT-MERGE-RELEASE exception condition is set to exist and the execution of the MERGE statement is terminated. If file-name-1 is specified with variable-length records and the size of the record read from the file referenced by file-name-2 or file-name-3 is smaller than the smallest record allowed in the file description entry for file-name-1, the EC-SORT-MERGE-RELEASE exception condition is set to exist and the execution of the MERGE statement is terminated.
 
 
-c) The processing of the file is terminated. The termination is performed as if a CLOSE statement without optional phrases had been executed. If an output procedure is specified, this termination is not performed until after control passes the last statement in the output procedure. For a relative file, the content of the relative key data item is undefined after the execution of the MERGE statement.
+   c) The processing of the file is terminated. The termination is performed as if a CLOSE statement without optional phrases had been executed. If an output procedure is specified, this termination is not performed until after control passes the last statement in the output procedure. For a relative file, the content of the relative key data item is undefined after the execution of the MERGE statement.
 
 These implicit functions are performed such that any applicable USE procedures are executed. If a nonfatal exception condition exists from an attempt to CLOSE file-name-2 or file-name-3:
 
-1. If there is an applicable USE procedure that completes normally, the MERGE statement continues.
+   1\. If there is an applicable USE procedure that completes normally, the MERGE statement continues.
 
-2. If there is no applicable USE procedure, the exception condition is ignored and the MERGE statement continues execution.
+   2\. If there is no applicable USE procedure, the exception condition is ignored and the MERGE statement continues execution.
 
 The value of the data item referenced by the DEPENDING ON phrase of a RECORD IS VARYING clause specified in the file description entry for file-name-2 or file-name-3 is undefined upon completion of the MERGE statement.
 
@@ -25427,11 +25427,11 @@ If the sending group is longer than the receiving group, the character positions
 
 If the sending group is shorter than the receiving group, each location that occupies the excess part is space filled, according to the following recursive procedure:
 
-1. If the data item to be space-filled is a dynamic-length elementary item, the length of the receiving operand is set to zero.
+   1\. If the data item to be space-filled is a dynamic-length elementary item, the length of the receiving operand is set to zero.
 
-2. If the data item to be space filled is a dynamic-capacity table, it is space filled according to 14.6.9.4, Space filling a dynamic table.
+   2\. If the data item to be space filled is a dynamic-capacity table, it is space filled according to 14.6.9.4, Space filling a dynamic table.
 
-3. All other character positions are filled with space characters.
+   3\. All other character positions are filled with space characters.
 
 The common part of the variable-length groups is now moved according to the rules for variable-length groups of equal length, as defined in General rule 9a above.
 
@@ -25958,32 +25958,32 @@ NOTE 5 If an augment value is less than 0, the induction variable is actually de
 
 13\) The sequence of operation of the PERFORM statement is as follows:
 
-a) All induction variables are set to their associated initialization values in the left-to-right order in which the induction variables are specified.
+   a) All induction variables are set to their associated initialization values in the left-to-right order in which the induction variables are specified.
 
-b) If the TEST AFTER phrase is specified, and there is no AFTER phrase, the specified set of statements is executed once and condition-1 is tested. If the condition is false, the induction variable is incremented by the augment value, and the specified set of statements is executed again. The cycle continues until condition-1 is tested and found to be true, at which point control is transferred to the end of the PERFORM statement. At that point, the induction variable contains the value it contained at the completion of the execution of the specified set of statements.
+   b) If the TEST AFTER phrase is specified, and there is no AFTER phrase, the specified set of statements is executed once and condition-1 is tested. If the condition is false, the induction variable is incremented by the augment value, and the specified set of statements is executed again. The cycle continues until condition-1 is tested and found to be true, at which point control is transferred to the end of the PERFORM statement. At that point, the induction variable contains the value it contained at the completion of the execution of the specified set of statements.
 
-c) If the TEST AFTER phrase is specified, and there is one or more AFTER phrase, the following occurs:
+   c) If the TEST AFTER phrase is specified, and there is one or more AFTER phrase, the following occurs:
 
-1. The specified set of statements is executed.
+   1\. The specified set of statements is executed.
 
-2. The rightmost condition-2 is then evaluated.
+   2\. The rightmost condition-2 is then evaluated.
 
-3. If the rightmost condition-2 is false, the associated induction variable is incremented by the associated augment value, and execution proceeds with step 13 a.
+   3\. If the rightmost condition-2 is false, the associated induction variable is incremented by the associated augment value, and execution proceeds with step 13 a.
 
-4. If the last condition evaluated is true, the condition to its left is evaluated. This is repeated until either a false condition is found or the last condition evaluated is condition-1 and condition-1 is true. If a false condition is found, the induction variable associated with that condition is incremented by the associated augment value, all induction variables to the right of the false condition are set to their initialization values, and execution proceeds with step 13 a. If no condition is found to be false, control is transferred to the end of the PERFORM statement.
+   4\. If the last condition evaluated is true, the condition to its left is evaluated. This is repeated until either a false condition is found or the last condition evaluated is condition-1 and condition-1 is true. If a false condition is found, the induction variable associated with that condition is incremented by the associated augment value, all induction variables to the right of the false condition are set to their initialization values, and execution proceeds with step 13 a. If no condition is found to be false, control is transferred to the end of the PERFORM statement.
 
    NOTE 6 After successful execution of the PERFORM statement, all induction variables contain the values they had at the completion of the last execution of the specified set of statements.
 
-d) If the TEST AFTER phrase is not specified and there is no AFTER phrase, condition-1 is evaluated, and if it is true, control is transferred to the end of the PERFORM statement. If it is false, the specified set of statements is executed. Then, the induction variable is incremented by the augment value, and condition-1 is evaluated again. When control is passed to the end of the PERFORM statement, the induction variable contains the value it contained when condition-1 was evaluated.
+   d) If the TEST AFTER phrase is not specified and there is no AFTER phrase, condition-1 is evaluated, and if it is true, control is transferred to the end of the PERFORM statement. If it is false, the specified set of statements is executed. Then, the induction variable is incremented by the augment value, and condition-1 is evaluated again. When control is passed to the end of the PERFORM statement, the induction variable contains the value it contained when condition-1 was evaluated.
 
 
-e) If the TEST AFTER phrase is not specified, and there is one or more AFTER phrase, the following occurs:
+   e) If the TEST AFTER phrase is not specified, and there is one or more AFTER phrase, the following occurs:
 
-1. Condition-1 is evaluated.
+   1\. Condition-1 is evaluated.
 
    If condition-1 is true, control is transferred to the end of the PERFORM statement; otherwise, the condition-2 immediately to the right becomes the current condition.
 
-2. The current condition is evaluated.
+   2\. The current condition is evaluated.
 
    If the current condition is true:
 
@@ -26292,73 +26292,73 @@ The setting of the file position indicator at the start of the execution of the 
 
 When the file is an indexed file:
 
-a) Comparisons for records relate to the value of the current key of reference. The comparisons are made according to the collating sequence of the file.
+   a) Comparisons for records relate to the value of the current key of reference. The comparisons are made according to the collating sequence of the file.
 
-b) If the KEY phrase is specified, the key of reference is set to the key specified in that phrase. Otherwise, the key of reference is set to the last key of reference in the file position indicator**.**
+   b) If the KEY phrase is specified, the key of reference is set to the key specified in that phrase. Otherwise, the key of reference is set to the last key of reference in the file position indicator**.**
 
-c) If the key of reference is an alternate key, any record identified as being suppressed by the SUPPRESS WHEN phrase of the ALTERNATE RECORD KEY clause is not considered to exist.
+   c) If the key of reference is an alternate key, any record identified as being suppressed by the SUPPRESS WHEN phrase of the ALTERNATE RECORD KEY clause is not considered to exist.
 
-d) If the previous operation on the file was a successful OPEN or START statement, the first existing record to be made available is either:
+   d) If the previous operation on the file was a successful OPEN or START statement, the first existing record to be made available is either:
 
-1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key of reference value is greater than or equal to the key value in the file position indicator**.**
+   1\. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key of reference value is greater than or equal to the key value in the file position indicator**.**
 
-2. If PREVIOUS is specified and the previous operation on the file was a START statement, the first existing record in the physical file whose key of reference value is less than or equal to the key value in the file position indicator.
+   2\. If PREVIOUS is specified and the previous operation on the file was a START statement, the first existing record in the physical file whose key of reference value is less than or equal to the key value in the file position indicator.
 
-3. If no such record is found or PREVIOUS is specified and the previous operation on the file was an OPEN statement, the at end condition exists and execution proceeds as indicated in General rule 24.
+   3\. If no such record is found or PREVIOUS is specified and the previous operation on the file was an OPEN statement, the at end condition exists and execution proceeds as indicated in General rule 24.
 
-e) If the previous operation on the file was a successful READ statement and the current key of reference is not an alternate key that allows duplicates, the first existing record to be made available is either:
+   e) If the previous operation on the file was a successful READ statement and the current key of reference is not an alternate key that allows duplicates, the first existing record to be made available is either:
 
 
-1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than the key value in the file position indicator.
+   1\. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than the key value in the file position indicator.
 
 > ⚠ **CORRECTED — see the Addendum (C12).** The standard prints `1. If NEXT is specified or implied, the record to be made available is the first existing record in the physical file whose key value is greater than or equal to the key value in the file position indicator.` (page 698): sub-item e)1 (NEXT, after a successful READ) says `greater than or equal to`, which would make a sequential READ return the record it has just returned. Corrected to `greater than`: see the Addendum entry for the evidence.
 
-2. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than the key value in the file position indicator.
+   2\. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than the key value in the file position indicator.
 
 > ⚠ **CORRECTED — see the Addendum (C12).** The standard prints `2. If PREVIOUS is specified, the first existing record in the physical file whose key value is less than or equal to the key value in the file position indicator.` (page 698): sub-item e)2 (PREVIOUS, after a successful READ) is the mirror of e)1 and has the same defect. Corrected to `less than`: see the Addendum entry for the evidence.
 
-3. If no such record is found, the at end condition exists and execution proceeds as indicated in General rule 24. Otherwise, the first record in the physical file whose key value is greater than the key of reference is made available.
+   3\. If no such record is found, the at end condition exists and execution proceeds as indicated in General rule 24. Otherwise, the first record in the physical file whose key value is greater than the key of reference is made available.
 
-f) If the previous operation on the file was a successful READ statement and the current key of reference is an alternate key that allows duplicates the record to be made available is one of the following:
+   f) If the previous operation on the file was a successful READ statement and the current key of reference is an alternate key that allows duplicates the record to be made available is one of the following:
 
-1. If NEXT is specified or implied, and there exists in the physical file a record whose key value is equal to the key of reference and whose logical position within the set of duplicates is after the record that was made available by that prior READ statement, the record within the set of duplicates that is immediately after the record that was made available by that prior READ statement. Otherwise, the first record in the physical file whose key value is greater than the key of reference value.
+   1\. If NEXT is specified or implied, and there exists in the physical file a record whose key value is equal to the key of reference and whose logical position within the set of duplicates is after the record that was made available by that prior READ statement, the record within the set of duplicates that is immediately after the record that was made available by that prior READ statement. Otherwise, the first record in the physical file whose key value is greater than the key of reference value.
 
-2. If PREVIOUS is specified and there exists in the physical file a record whose key value is equal to the file position indicator and whose logical position within the set of duplicates is before the record that was made available by that prior READ statement is made available. the record within the set of duplicates that is immediately before the record that was made available by that prior READ statement; Otherwise, the last record within the set of duplicates, if any, whose key value is the first key value is less than the key of reference value.
+   2\. If PREVIOUS is specified and there exists in the physical file a record whose key value is equal to the file position indicator and whose logical position within the set of duplicates is before the record that was made available by that prior READ statement is made available. the record within the set of duplicates that is immediately before the record that was made available by that prior READ statement; Otherwise, the last record within the set of duplicates, if any, whose key value is the first key value is less than the key of reference value.
 
-3. If no such record is found, the at end condition exists and execution proceeds as indicated in General rule 24.
+   3\. If no such record is found, the at end condition exists and execution proceeds as indicated in General rule 24.
 
-g) If a record is made available, the file position indicator is set to the value of the current key of reference of the record made available and the read operation is successful.
+   g) If a record is made available, the file position indicator is set to the value of the current key of reference of the record made available and the read operation is successful.
 
 When the file is a relative file:
 
-a) Comparisons for records in relative files relate to the relative key number.
+   a) Comparisons for records in relative files relate to the relative key number.
 
-b) If the file position indicator was established by a prior successful OPEN or START statement, the first existing record that is selected is made available, regardless of whether NEXT or PREVIOUS is specified.
+   b) If the file position indicator was established by a prior successful OPEN or START statement, the first existing record that is selected is made available, regardless of whether NEXT or PREVIOUS is specified.
 
-c) If the file position indicator was established by a prior successful READ statement, the first existing record in the physical file whose relative key number is greater than the file position indicator if NEXT is specified or implied or is less than the file position indicator if PREVIOUS is specified is selected.
+   c) If the file position indicator was established by a prior successful READ statement, the first existing record in the physical file whose relative key number is greater than the file position indicator if NEXT is specified or implied or is less than the file position indicator if PREVIOUS is specified is selected.
 
 
-d) If a record is found according to the above rules, the record is made available in the record area associated with file-name-1 unless the RELATIVE KEY clause is specified for file-name-1 and the number of significant digits in the relative key number of the selected record is larger than the size of the relative key data item. In that case, the I-O status value associated with file-name-1 is set to '14', the at end condition exists, the file position indicator is set to indicate that no next or previous logical record exists, and execution proceeds as specified in General rule 24.
+   d) If a record is found according to the above rules, the record is made available in the record area associated with file-name-1 unless the RELATIVE KEY clause is specified for file-name-1 and the number of significant digits in the relative key number of the selected record is larger than the size of the relative key data item. In that case, the I-O status value associated with file-name-1 is set to '14', the at end condition exists, the file position indicator is set to indicate that no next or previous logical record exists, and execution proceeds as specified in General rule 24.
 
 NOTE 4 The record made available can have a length of zero.
 
-e) If no record is found that satisfies the above rules, the at end condition exists, and execution proceeds as specified in General rule 24.
+   e) If no record is found that satisfies the above rules, the at end condition exists, and execution proceeds as specified in General rule 24.
 
-f) If a record is made available, the file position indicator is set to the relative record number of the record made available.
+   f) If a record is made available, the file position indicator is set to the relative record number of the record made available.
 
 When the file is a sequential file:
 
-a) Comparisons for records in sequential files relate to the record number.
+   a) Comparisons for records in sequential files relate to the record number.
 
-b) If the file position indicator was established by a prior successful OPEN or START statement, the first existing record that is selected is made available, regardless of whether NEXT or PREVIOUS is specified.
+   b) If the file position indicator was established by a prior successful OPEN or START statement, the first existing record that is selected is made available, regardless of whether NEXT or PREVIOUS is specified.
 
-c) If the file position indicator was established by a prior successful READ statement, the first existing record in the physical file whose relative key number is greater than the file position indicator if NEXT is specified or implied or is less than the file position indicator if PREVIOUS is specified is selected.
+   c) If the file position indicator was established by a prior successful READ statement, the first existing record in the physical file whose relative key number is greater than the file position indicator if NEXT is specified or implied or is less than the file position indicator if PREVIOUS is specified is selected.
 
-d) If a record is found according to the above rules, the record is made available in the record area associated with file-name-1.
+   d) If a record is found according to the above rules, the record is made available in the record area associated with file-name-1.
 
-e) If no record is found that satisfies the above rules, the at end condition exists, and execution proceeds as specified in General rule 24.
+   e) If no record is found that satisfies the above rules, the at end condition exists, and execution proceeds as specified in General rule 24.
 
-f) If a record is made available, the file position indicator is set to the record number of the record made available.
+   f) If a record is made available, the file position indicator is set to the record number of the record made available.
 
 NOTE 5 The record made available can have a length of zero.
 
@@ -26796,16 +26796,16 @@ c) The REWRITE statement is unsuccessful.
 
 12\) If record locks are in effect, the following actions take place at the beginning or at the successful completion of the execution of the REWRITE statement:
 
-a) If single record locking is specified for the rewrite file connector:
+   a) If single record locking is specified for the rewrite file connector:
 
-1. If that file connector holds a record lock on the record to be logically replaced, that lock is released at completion unless the WITH LOCK phrase is specified.
+   1\. If that file connector holds a record lock on the record to be logically replaced, that lock is released at completion unless the WITH LOCK phrase is specified.
 
-2. If that file connector holds a record lock on a record other than the one to be logically replaced, that lock is released at the beginning.
+   2\. If that file connector holds a record lock on a record other than the one to be logically replaced, that lock is released at the beginning.
 
-b) If multiple record locking is specified for the rewrite file connector, and a record lock is associated with the record to be logically replaced, that record lock is released at completion only when the WITH NO LOCK phrase is specified and the record to be logically replaced was already locked by that file connector.
+   b) If multiple record locking is specified for the rewrite file connector, and a record lock is associated with the record to be logically replaced, that record lock is released at completion only when the WITH NO LOCK phrase is specified and the record to be logically replaced was already locked by that file connector.
 
 
-c) If the WITH LOCK phrase is specified, the record lock associated with the record to be replaced is set at completion.
+   c) If the WITH LOCK phrase is specified, the record lock associated with the record to be replaced is set at completion.
 
 13\) The file position indicator in the rewrite file connector is not affected by the execution of a REWRITE statement.
 
@@ -26854,24 +26854,24 @@ INDEXED FILES
 
 24\) Execution of the REWRITE statement for a record that has an alternate record key occurs as follows:
 
-a) When the value of a specific alternate record key is not changed, the order of retrieval when that key is the key of reference remains unchanged.
+   a) When the value of a specific alternate record key is not changed, the order of retrieval when that key is the key of reference remains unchanged.
 
 
-b) When the value of a specific alternate record key is changed, the subsequent order of retrieval of that record may be changed when that specific alternate record key is the key of reference. When duplicate key values are permitted, the record is logically positioned last within the set of duplicate records where the alternate record key value is equal to the same alternate key value in one or more records in the file based on the collating sequence for the file.
+   b) When the value of a specific alternate record key is changed, the subsequent order of retrieval of that record may be changed when that specific alternate record key is the key of reference. When duplicate key values are permitted, the record is logically positioned last within the set of duplicate records where the alternate record key value is equal to the same alternate key value in one or more records in the file based on the collating sequence for the file.
 
 NOTE 5 If two or more file connectors share the physical file, a duplicate alternate key might not actually be positioned last at the completion of the REWRITE statement, because another duplicate key might have been created by another operation.
 
 If the SUPPRESS WHEN phrase is specified in the ALTERNATE RECORD KEY clause and the value of the alternate record key is no longer equal to the literal specified in that phrase:
 
-1. an access path to this record using this key of reference shall be provided, and
+   1\. an access path to this record using this key of reference shall be provided, and
 
-2. the record shall be logically positioned so that it will be found when accessed using the alternate record key.
+   2\. the record shall be logically positioned so that it will be found when accessed using the alternate record key.
 
 If alternate record key suppression is specified for this alternate record key and the value of this alternate record key is now equal to its key suppression value:
 
-1. the access path to the record using this alternate record key shall no longer be provided, and
+   1\. the access path to the record using this alternate record key shall no longer be provided, and
 
-2. the record shall be logically repositioned so that it will not be found when accessed using this alternate record key.
+   2\. the record shall be logically repositioned so that it will not be found when accessed using this alternate record key.
 
 The comparison used for determining changes to the key is based on the collating sequence for the file according to the rules for a relation condition. Any number of records may have the same alternate key value equal to its key suppression value without requiring the DUPLICATES phrase to be specified for that key. Key entries that are suppressed shall not cause a duplicate key condition to exist.
 
@@ -27065,19 +27065,19 @@ FORMAT 1
 
 3\) The index to be varied by the search operation is referred to as the search index and it is determined as follows:
 
-a) If the VARYING phrase is not specified, the search index is the index referenced by the first (or only) index-name specified in the INDEXED phrase in the OCCURS clause associated with identifier-1.
+   a) If the VARYING phrase is not specified, the search index is the index referenced by the first (or only) index-name specified in the INDEXED phrase in the OCCURS clause associated with identifier-1.
 
-b) If the VARYING identifier-2 phrase is specified, the search index is the same as in General rule 3a and the following also applies:
+   b) If the VARYING identifier-2 phrase is specified, the search index is the same as in General rule 3a and the following also applies:
 
-1. If identifier-2 references an index data item, that data item is incremented by the same amount as, and at the same time as, the search index.
+   1\. If identifier-2 references an index data item, that data item is incremented by the same amount as, and at the same time as, the search index.
 
-2. If identifier-2 references an integer data item, that data item is incremented by the value one at the same time as the search index is incremented.
+   2\. If identifier-2 references an integer data item, that data item is incremented by the value one at the same time as the search index is incremented.
 
-c) If the VARYING index-name-1 phrase is specified, the search index depends on the following:
+   c) If the VARYING index-name-1 phrase is specified, the search index depends on the following:
 
-1. If index-name-1 is specified in the INDEXED BY phrase in the OCCURS clause associated with identifier-1, the index referenced by index-name-1 is the search index.
+   1\. If index-name-1 is specified in the INDEXED BY phrase in the OCCURS clause associated with identifier-1, the index referenced by index-name-1 is the search index.
 
-2. If index-name-1 is not one of the indexes specified in the INDEXED phrase in the OCCURS clause associated with identifier-1, the search index is the same as in General rule 3a. The index referenced by index-name-1 is incremented by one occurrence number at the same time as the search index is incremented.
+   2\. If index-name-1 is not one of the indexes specified in the INDEXED phrase in the OCCURS clause associated with identifier-1, the search index is the same as in General rule 3a. The index referenced by index-name-1 is incremented by one occurrence number at the same time as the search index is incremented.
 
 Only the data item and indexes indicated are varied by the search operation. All other indexes associated with identifier-1 are unchanged by the search operation.
 
@@ -27485,61 +27485,61 @@ FORMAT 5
 
 10\) If identifier-4 is specified and the data item referenced by identifier-3 is described with an interface-name that identifies the interface int-1, the data item referenced by identifier-4 shall be one of the following:
 
-a) an object reference described with an interface-name that identifies int-1 or an interface inheriting from int-1;
+   a) an object reference described with an interface-name that identifies int-1 or an interface inheriting from int-1;
 
-b) an object reference described with an object-class-name, subject to the following rules:
+   b) an object reference described with an object-class-name, subject to the following rules:
 
-1. if described with a FACTORY phrase, the factory object of the specified class shall implement int-1,
+   1\. if described with a FACTORY phrase, the factory object of the specified class shall implement int-1,
 
-2. if described without a FACTORY phrase, the objects of the specified class shall implement int-1;
+   2\. if described without a FACTORY phrase, the objects of the specified class shall implement int-1;
 
-c) an object reference described with an ACTIVE-CLASS phrase, subject to the following rules:
+   c) an object reference described with an ACTIVE-CLASS phrase, subject to the following rules:
 
-1. if described with a FACTORY phrase, the factory object of the class containing the data item referenced by identifier-4 shall implement int-1,
+   1\. if described with a FACTORY phrase, the factory object of the class containing the data item referenced by identifier-4 shall implement int-1,
 
-2. if described without a FACTORY phrase, the objects of the class containing the data item referenced by identifier-4 shall implement int-1;
+   2\. if described without a FACTORY phrase, the objects of the class containing the data item referenced by identifier-4 shall implement int-1;
 
-d) the predefined object reference SELF, subject to the following rules:
+   d) the predefined object reference SELF, subject to the following rules:
 
-1. if the SET statement is contained in a method within the factory definition of the class, that factory definition shall be described with an IMPLEMENTS clause that references int-1,
+   1\. if the SET statement is contained in a method within the factory definition of the class, that factory definition shall be described with an IMPLEMENTS clause that references int-1,
 
-2. if the SET statement is contained in a method within the instance definition of the class, that instance definition shall be described with an IMPLEMENTS clause that references int-1;
+   2\. if the SET statement is contained in a method within the instance definition of the class, that instance definition shall be described with an IMPLEMENTS clause that references int-1;
 
 
-e) the predefined object reference NULL.
+   e) the predefined object reference NULL.
 
 11\) If object-class-name-1 is specified and the data item referenced by identifier-3 is described with an interface-name that identifies the interface int-1, the factory object of object-class-name-1 shall be described with an IMPLEMENTS clause that references int-1.
 
 12\) If identifier-4 is specified and the data item referenced by identifier-3 is described with an object-class-name, the data item referenced by identifier-4 shall be one of the following:
 
-a) an object reference described with an object-class-name, subject to the following rules:
+   a) an object reference described with an object-class-name, subject to the following rules:
 
-1. if the data item referenced by identifier-3 is described with an ONLY phrase, the data item referenced by identifier-4 shall be described with the ONLY phrase, and the object-class-name specified in the description of the data item referenced by identifier-4 shall be the same as the object-class-name specified in the description of the data item referenced by identifier-3,
+   1\. if the data item referenced by identifier-3 is described with an ONLY phrase, the data item referenced by identifier-4 shall be described with the ONLY phrase, and the object-class-name specified in the description of the data item referenced by identifier-4 shall be the same as the object-class-name specified in the description of the data item referenced by identifier-3,
 
-2. if the data item referenced by identifier-3 is described without an ONLY phrase, the object-class-name specified in the description of the data item referenced by identifier-4 shall reference the same class or a subclass of the class specified in the description of the data item referenced by identifier-3,
+   2\. if the data item referenced by identifier-3 is described without an ONLY phrase, the object-class-name specified in the description of the data item referenced by identifier-4 shall reference the same class or a subclass of the class specified in the description of the data item referenced by identifier-3,
 
-3. the presence or absence of the FACTORY phrase shall be the same as in the description of the data item referenced by identifier-3;
+   3\. the presence or absence of the FACTORY phrase shall be the same as in the description of the data item referenced by identifier-3;
 
-b) an object reference described with an ACTIVE-CLASS phrase, subject to the following rules:
+   b) an object reference described with an ACTIVE-CLASS phrase, subject to the following rules:
 
-1. the data item referenced by identifier-3 shall not be described with the ONLY phrase,
+   1\. the data item referenced by identifier-3 shall not be described with the ONLY phrase,
 
-2. the class containing the data item referenced by identifier-4 shall be the same class or a subclass of the class specified in the description of the data item referenced by identifier-3,
+   2\. the class containing the data item referenced by identifier-4 shall be the same class or a subclass of the class specified in the description of the data item referenced by identifier-3,
 
-3. the presence or absence of the FACTORY phrase shall be the same as in the description of the data item referenced by identifier-3;
+   3\. the presence or absence of the FACTORY phrase shall be the same as in the description of the data item referenced by identifier-3;
 
-c) the predefined object reference SELF, subject to the following rules:
+   c) the predefined object reference SELF, subject to the following rules:
 
-1. the data item referenced by identifier-3 shall not be described with the ONLY phrase,
+   1\. the data item referenced by identifier-3 shall not be described with the ONLY phrase,
 
-2. the class containing the SET statement shall be the same class or a subclass of the class specified in the description of the data item referenced by identifier-3,
+   2\. the class containing the SET statement shall be the same class or a subclass of the class specified in the description of the data item referenced by identifier-3,
 
-3. if the data item referenced by identifier-3 is described without a FACTORY phrase, the method containing the SET statement shall be defined in the instance definition of its containing class,
+   3\. if the data item referenced by identifier-3 is described without a FACTORY phrase, the method containing the SET statement shall be defined in the instance definition of its containing class,
 
-4. if the data item referenced by identifier-3 is described with a FACTORY phrase, the method containing the SET statement shall be defined in the factory definition of its containing class;
+   4\. if the data item referenced by identifier-3 is described with a FACTORY phrase, the method containing the SET statement shall be defined in the factory definition of its containing class;
 
 
-d) the predefined object reference NULL.
+   d) the predefined object reference NULL.
 
 13\) If object-class-name-1 is specified and the data item referenced by identifier-3 is described with an object-class-name, the data item shall be described with the FACTORY phrase, and the following rules apply:
 
@@ -27549,15 +27549,15 @@ b) otherwise, object-class-name-1 shall reference the same class or a subclass o
 
 14\) If the data item referenced by identifier-3 is described with an ACTIVE-CLASS phrase, the data item referenced by identifier-4 shall be one of the following:
 
-a) an object reference described with the ACTIVE-CLASS phrase, where the presence or absence of the FACTORY phrase is the same as in the data item referenced by identifier-3;
+   a) an object reference described with the ACTIVE-CLASS phrase, where the presence or absence of the FACTORY phrase is the same as in the data item referenced by identifier-3;
 
-b) the predefined object SELF, subject to the following rules:
+   b) the predefined object SELF, subject to the following rules:
 
-1. if the data item referenced by identifier-3 is described without a FACTORY phrase, the method containing the SET statement shall be defined in the instance definition of its containing class,
+   1\. if the data item referenced by identifier-3 is described without a FACTORY phrase, the method containing the SET statement shall be defined in the instance definition of its containing class,
 
-2. if the data item referenced by identifier-3 is described with a FACTORY phrase, the method containing the SET statement shall be defined in the factory definition of its containing class;
+   2\. if the data item referenced by identifier-3 is described with a FACTORY phrase, the method containing the SET statement shall be defined in the factory definition of its containing class;
 
-c) the predefined object reference NULL.
+   c) the predefined object reference NULL.
 
 FORMAT 6
 
@@ -27642,9 +27642,9 @@ FORMAT 1
 
 2\) The value of the sending operand is determined once at the beginning of the execution of the statement. However, item identification of the data item referenced by identifier-1 is done immediately before the value of that data item is changed. For each occurrence of index-name-1 or identifier-1:
 
-a) If index-name-1 is specified:
+   a) If index-name-1 is specified:
 
-1. If arithmetic-expression-1 is specified,
+   1\. If arithmetic-expression-1 is specified,
 
 a. If the value of arithmetic-expression-1 does not result in an integer, and
 
@@ -27665,7 +27665,7 @@ b. Otherwise, if the value of the arithmetic-expression-1 is outside the limit s
 
 c. Otherwise, the evaluation of the expression is successful and index-name-1 is set to a value causing it to refer to the table element that would correspond in occurrence number to that expression, even if that occurrence is not a valid occurrence within this table.
 
-2. If identifier-2 is specified:
+   2\. If identifier-2 is specified:
 
 a. If the value of the identifier-2 is outside the limit specified in General rule 2 of 13.18.38, OCCURS clause:
 
@@ -27677,7 +27677,7 @@ a. If the value of the identifier-2 is outside the limit specified in General ru
 
 b. Otherwise, index-name-1 is set to a value causing it to refer to the table element that would correspond in occurrence number to the value of identifier-2, even if that occurrence is not a valid occurrence within this table.
 
-3. If index-name-2 is specified:
+   3\. If index-name-2 is specified:
 
 a. If index-name-2 is associated with the same table as index-name-1, the content of the index referenced by index-name-2 is placed in the index referenced by index-name-1 unchanged.
 
@@ -27692,9 +27692,9 @@ b. Otherwise, if the value that corresponds to the occurrence number of the tabl
 
 c. Otherwise, index-name-1 is set to a value causing it to refer to the table element that would correspond in occurrence number to the occurrence number of the table associated with index-name-2, even if that occurrence is not a valid occurrence within this table.
 
-b) If identifier-1 references an index data item, the content of index-name-2 or of the data item referenced by identifier-2 is placed in the index referenced by index-name-1 unchanged.
+   b) If identifier-1 references an index data item, the content of index-name-2 or of the data item referenced by identifier-2 is placed in the index referenced by index-name-1 unchanged.
 
-c) If identifier-1 references a numeric data item, that item is set to the occurrence number of the table element referenced by index-name-2.
+   c) If identifier-1 references a numeric data item, that item is set to the occurrence number of the table element referenced by index-name-2.
 
 FORMAT 2
 
@@ -28232,23 +28232,23 @@ INDEXED FILES
 
 17\) Execution of the START statement behaves as if:
 
-a) The specified key is set up by moving the relevant parts of the record area into a temporary data area.
+   a) The specified key is set up by moving the relevant parts of the record area into a temporary data area.
 
-b) The length of this temporary area is considered to be the length specified in the LENGTH clause, if specified, or else the length of record-key-name-1, if specified, or else the length of data-name-1.
-
-
+   b) The length of this temporary area is considered to be the length specified in the LENGTH clause, if specified, or else the length of record-key-name-1, if specified, or else the length of data-name-1.
 
 
 
-c) If the relational operator is EQUAL, GREATER, NOT LESS, or GREATER OR EQUAL, the file is searched sequentially with the key of reference being extracted from each record in turn into another temporary area. This second temporary area is truncated to the same length as the first.
 
-d) If the relational operator is LESS, NOT GREATER, or LESS OR EQUAL, the file is searched in reverse order with the key of reference being extracted from each record in turn into another temporary area. This second temporary area is truncated to the same length as the first.
 
-e) The comparison specified by the relational operator in the KEY phrase is made between these two temporary areas, with the second temporary area on the left hand side, and according to the collating sequence of the file. Comparison proceeds as specified for items of the class of data-name-1 and operands of equal length in 8.8.4.2.7, Comparison of alphanumeric operands, or 8.8.4.2.9, Comparison of national operands. If the key of reference is an alternate key, any record identified as being suppressed by the SUPPRESS WHEN phrase of the ALTERNATE RECORD KEY clause is ignored. Then, either:
+   c) If the relational operator is EQUAL, GREATER, NOT LESS, or GREATER OR EQUAL, the file is searched sequentially with the key of reference being extracted from each record in turn into another temporary area. This second temporary area is truncated to the same length as the first.
 
-1. The file position indicator is set to the value of the key of reference in the first logical record whose key satisfies the comparison, or
+   d) If the relational operator is LESS, NOT GREATER, or LESS OR EQUAL, the file is searched in reverse order with the key of reference being extracted from each record in turn into another temporary area. This second temporary area is truncated to the same length as the first.
 
-2. If the comparison is not satisfied by any record in the file, the invalid key condition exists and the execution of the START statement is unsuccessful.
+   e) The comparison specified by the relational operator in the KEY phrase is made between these two temporary areas, with the second temporary area on the left hand side, and according to the collating sequence of the file. Comparison proceeds as specified for items of the class of data-name-1 and operands of equal length in 8.8.4.2.7, Comparison of alphanumeric operands, or 8.8.4.2.9, Comparison of national operands. If the key of reference is an alternate key, any record identified as being suppressed by the SUPPRESS WHEN phrase of the ALTERNATE RECORD KEY clause is ignored. Then, either:
+
+   1\. The file position indicator is set to the value of the key of reference in the first logical record whose key satisfies the comparison, or
+
+   2\. If the comparison is not satisfied by any record in the file, the invalid key condition exists and the execution of the START statement is unsuccessful.
 
 18\) If FIRST is specified, the file position indicator is set to the value of the primary key of the first existing logical record in the physical file and the key of reference is set to the primary key. If no records exist in the file, the I-O status value in the file connector referenced by file-name-1 is set to '23', the invalid key condition exists, and the execution of the START statement is unsuccessful.
 
@@ -32683,27 +32683,27 @@ f) If the ANYCASE keyword is specified, the matching rules for detecting a curre
 
 5\) If the LOCALE keyword is specified, the following rules apply:
 
-a) Locale-name-1, if specified, shall be associated with a locale in the SPECIAL-NAMES paragraph; locale category LC_MONETARY in the referenced locale is used in evaluating the monetary format in argument-1. If locale-name-1 is not specified, category LC_MONETARY in the current locale is used. If the required locale is not available, the EC-LOCALE-MISSING exception condition is set to exist.
+   a) Locale-name-1, if specified, shall be associated with a locale in the SPECIAL-NAMES paragraph; locale category LC_MONETARY in the referenced locale is used in evaluating the monetary format in argument-1. If locale-name-1 is not specified, category LC_MONETARY in the current locale is used. If the required locale is not available, the EC-LOCALE-MISSING exception condition is set to exist.
 
-b) The content of argument-1 shall be a string of digits and characters in a format consistent with the specifications of locale category LC_MONETARY in the locale in use. The following rules apply:
+   b) The content of argument-1 shall be a string of digits and characters in a format consistent with the specifications of locale category LC_MONETARY in the locale in use. The following rules apply:
 
 
 
-1. If the ANYCASE keyword is specified, the matching rules for detecting a currency string in argument-1 are case-insensitive. If the ANYCASE keyword is not specified, the matching rules for detecting a currency string are case-sensitive.
+   1\. If the ANYCASE keyword is specified, the matching rules for detecting a currency string in argument-1 are case-insensitive. If the ANYCASE keyword is not specified, the matching rules for detecting a currency string are case-sensitive.
 
-2. Usage national representation of locale fields is used for purposes of matching argument-1. If argument-1 is of category alphanumeric, usage national representation of argument-1 is used for purposes of matching locale fields.
+   2\. Usage national representation of locale fields is used for purposes of matching argument-1. If argument-1 is of category alphanumeric, usage national representation of argument-1 is used for purposes of matching locale fields.
 
-3. Argument-1 may contain a currency string that matches either locale field currency_symbol or the first three characters of locale field int_curr_symbol, in accordance with locale fields p_cs_precedes and n_cs_precedes.
+   3\. Argument-1 may contain a currency string that matches either locale field currency_symbol or the first three characters of locale field int_curr_symbol, in accordance with locale fields p_cs_precedes and n_cs_precedes.
 
    If the ANYCASE keyword is specified, the matching rules for detecting a currency string in argument-1 are as if all uppercase letters in argument-1 and the locale field currency_symbol and the first three characters of local field int_curr_symbol were replaced by their corresponding lowercase letters as specified in the rules for the LOWER-CASE function with LOCALE locale-name-1 specified.
 
-4. Argument-1 may contain a positive sign in accordance with locale fields positive_sign and p_sign_posn or a negative sign in accordance with locale fields negative_sign and n_sign_posn.
+   4\. Argument-1 may contain a positive sign in accordance with locale fields positive_sign and p_sign_posn or a negative sign in accordance with locale fields negative_sign and n_sign_posn.
 
-5. Argument-1 may contain a decimal separator in accordance with locale fields mon_decimal_point, int_frac_digits, and frac_digits.
+   5\. Argument-1 may contain a decimal separator in accordance with locale fields mon_decimal_point, int_frac_digits, and frac_digits.
 
-6. Argument-1 may contain one or more grouping separators in accordance with locale fields mon_thousands_sep and mon_grouping.
+   6\. Argument-1 may contain one or more grouping separators in accordance with locale fields mon_thousands_sep and mon_grouping.
 
-7. Argument-1 shall contain at least one digit and may contain leading or trailing spaces.
+   7\. Argument-1 shall contain at least one digit and may contain leading or trailing spaces.
 
 6\) If native arithmetic is in effect, the total number of digits in argument-1 shall not exceed 31.
 
@@ -33741,21 +33741,21 @@ The type of this function is integer.
 
 1\) The returned value is:
 
-a) If the content of argument-1 conforms to the argument rules for the NUMVAL function,
+   a) If the content of argument-1 conforms to the argument rules for the NUMVAL function,
 
 (0)
 
-b) Otherwise, if one or more characters are in error, the position of the first character in error,
+   b) Otherwise, if one or more characters are in error, the position of the first character in error,
 
-1. Because one or more spaces following one or more digits is valid, if one or more spaces are embedded within a string of numeric characters, the returned value is the position of the first non-space character following the spaces. If argument-1 is '0 1', the returned value will be 3.
+   1\. Because one or more spaces following one or more digits is valid, if one or more spaces are embedded within a string of numeric characters, the returned value is the position of the first non-space character following the spaces. If argument-1 is '0 1', the returned value will be 3.
 
-2. If native arithmetic is in effect, because the character in error for an argument that is greater than 31 digits is the 32nd digit, the returned value is the position of the 32nd digit if no prior error is found.
+   2\. If native arithmetic is in effect, because the character in error for an argument that is greater than 31 digits is the 32nd digit, the returned value is the position of the 32nd digit if no prior error is found.
 
-3. If standard-binary arithmetic is in effect, and the argument has more than 35 digits, the returned value is the position of the 36th digit if no prior error has been found.
+   3\. If standard-binary arithmetic is in effect, and the argument has more than 35 digits, the returned value is the position of the 36th digit if no prior error has been found.
 
-4. If standard-decimal arithmetic is in effect, and the argument has more than 34 digits, the returned value is the position of the 35th digit if no prior error has been found.
+   4\. If standard-decimal arithmetic is in effect, and the argument has more than 34 digits, the returned value is the position of the 35th digit if no prior error has been found.
 
-c) Otherwise,
+   c) Otherwise,
 
 (FUNCTION LENGTH (argument-1) + 1).
 
