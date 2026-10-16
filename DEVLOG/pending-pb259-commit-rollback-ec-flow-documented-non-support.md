@@ -37,3 +37,12 @@ raised. Nothing else in GR2 survives the decline. The static reach is already re
 **Rows.** Batch `w1095d-PB259` moved both rows from PARTIAL to DOCUMENTED-NON-SUPPORT, taking GAP from 91 to 89. PB259
 is now landed with `closes_rows: [GR-14.9.7.4-2, GR-14.9.36.4-2]`. The note's bookmark sweep found no other row held
 below its earned verdict for visibility: the three inventory notes that say "stays PARTIAL" each name a real residue.
+
+**Branch review, round 1.** The reviewer found two stale texts this change left behind. The drift test's comment above
+`GR-12.4.6.3.4-6` still described the anchored EC-FLOW exclusion the change deleted; it now says what the assertion
+guards (the clause's own EC-FLOW-APPLY-COMMIT rule stays in, and an exclusion keyed on the EC-FLOW names must not
+come back). `docs/CONFORMANCE.md`'s A.4.3 row quoted the selector as 26 rows (27 on main, 29 here) and did not name
+the two GR2 rows. The sweep found the same rot in three of the four other rows of that table (screen handling said
+178 rows against 181, FORMAT/SELECT WHEN 37 against 36). The table now carries no row counts: §5's preamble says the
+selector is the set and `derive_verdict_batch.py --list` prints its count. The A.4.3 row now names both GR2 rows and
+why they are declined.

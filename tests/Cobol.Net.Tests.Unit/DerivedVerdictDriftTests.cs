@@ -475,7 +475,9 @@ public sealed class DerivedVerdictDriftTests
 
         // Clause arm: seven §12.4.6.3 rules say only "this clause" and a text-only predicate drops all of them.
         Assert.Contains("SR-12.4.6.3.3-1", ids);
-        // The anchored EC exclusion must NOT reach EC-FLOW-APPLY-COMMIT.
+        // Clause arm, EC half: the APPLY COMMIT clause's own GR6 (EC-FLOW-APPLY-COMMIT) is module functionality and
+        // stays IN. The selector carries no EC-FLOW exclusion at all (kb/Work PB259 dropped the anchored one); if
+        // this drops out, an exclusion keyed on the EC-FLOW names came back and is reaching the clause arm.
         Assert.Contains("GR-12.4.6.3.4-6", ids);
         // Text arm: the module's own functionality stated inside the MANDATORY §14.6.11. Note the PLURAL.
         Assert.Contains("GR-14.6.11-1", ids);
