@@ -861,7 +861,9 @@ which is also what keeps kb/Work PB713 closed: a second handle for the load woul
 connector's own `FileShare.None` forbids. `FileLockPostureDriftTests.EveryOrganizationHoldsALiveFileLockWhileOpen`
 measures the lock from a handle OUTSIDE the connector for every (organization × open mode), and
 `EveryOrganisationsHandleAccessLiesInThatBand` turns a FOURTH organization red rather than letting it inherit
-the omission. The in-run-unit half is certified from COBOL by `pb771_keyed_file_lock` at both editions. The guarding test was six
+the omission, and `EveryOrganisationsLiveHandleTakesItsHostAccess` reads the access the host GRANTED each live handle
+(`FileConnector.FileLock`) against the `HostAccess` that band measures, so a handle that spells its own access is red
+even while the stated value stays inside the band (kb/Work PB2758). The in-run-unit half is certified from COBOL by `pb771_keyed_file_lock` at both editions. The guarding test was six
 `InlineData` rows against 35 cells with no row whose incoming mode was OUTPUT (kb/Work PB321). Two silent
 defaults went with it — the emitter registered a LOCK-MODE-only file as ALL OTHER, and a RETRY-phrase-only OPEN
 registered ALL OTHER here — three arms of one determination, two of which had already answered it.

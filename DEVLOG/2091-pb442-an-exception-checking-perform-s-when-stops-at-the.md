@@ -75,3 +75,9 @@ failed. Main had not touched the file or the row; the defect was the branch's ow
 never ran the test: its class is a tree-wide sweep, but its recorded 8.6 s is above the 2 s cheap-sweep bound, so
 with no impact map it was tier 1 and fell outside leg 1's budget.
 
+**Bringing main in conflicted on the runtime ABI pin.** Main's PB2758 removed the dead protected
+`KeyedConnector.Store` and re-pinned the surface hash alone at major 5 (no other assembly could reach it). This branch
+had raised the major to 6 for the deleted `CobolModule.Push`/`Pop` floor. The merged surface carries both removals,
+so the major stays 6, one above main's 5. The hash was not taken from either side: the pin test printed the merged
+surface's hash (`85770B63053634F3`) and that is what is pinned.
+
