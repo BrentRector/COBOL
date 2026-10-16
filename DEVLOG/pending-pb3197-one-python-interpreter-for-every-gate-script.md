@@ -57,3 +57,13 @@ said its selftests leg runs `python3`.
 §5.6 now says a rule every script needs is stated once per shell and held equal by a drift test. DOC_INDEX.md has a
 row for `scripts/python-resolve.{sh,ps1}`. PB3197 is landed with `closes_rows: []`, a behavior-neutral restructuring
 with no inventory row.
+
+**Self-review.** The twin first caught only `CommandNotFoundException`. A candidate that exists but cannot be started
+therefore ended the PowerShell gate NOT RUN, while the bash probe tries the next candidate. The twin now answers "no"
+for any candidate it cannot start, the same as the bash probe; re-probed.
+
+**Neutrality and gate.** `python scripts/arch/compare_oracle.py` printed `=== ARCH-ORACLE: IDENTICAL — 8025 cases
+(baseline 16b82f639c26, new 6e45bc04acb7) ===`. `python scripts/semgrep/verify.py` printed PASS with no count up. The
+gate printed `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` at 6e45bc04a (run
+20261016T205034Z-70ab7d) and again at 2b47742fd (run 20261016T210148Z-9500b6). Its leg-1 Unit trx has all three
+`PythonInterpreterDriftTests` facts Passed.
