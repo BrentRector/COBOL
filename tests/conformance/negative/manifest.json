@@ -2715,7 +2715,10 @@
   "pb3153-method-constant-hides-object-condition-name",
   "pb3153-method-constant-hides-object-index-name",
   "pb3153-contained-own-item-set-to-true-names-no-switch",
-  "pb656-cobol-reserved-through-2014"
+  "pb656-cobol-reserved-through-2014",
+  "pb3233-inspect-figurative-literal1-size",
+  "pb3233-inspect-figurative-literal4-size",
+  "pb3233-inspect-symbolic-literal1-size"
  ],
  "pending": []
 }
