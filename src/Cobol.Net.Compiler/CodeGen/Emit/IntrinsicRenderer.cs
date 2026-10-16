@@ -940,13 +940,18 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// RANDOM's seed, ANNUITY's periods, BOOLEAN-OF-INTEGER's bit configuration — never takes it:
     /// <c>IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates</c> holds the arm
     /// set closed.</para>
-    /// <para>INTAKE(INTEGRAL) — the operand as an integer on the <c>Int128</c> carrier: an exact carrier through
-    /// <see cref="AsIntWide"/>, a binary64 one integrality-tested (DOC-A.1-124) and clamped past the carrier.</para>
+    /// <para>INTAKE(INTEGRAL) — the operand as an integer on the <c>Int128</c> carrier: a fixed-point carrier through
+    /// <see cref="AsIntWide"/>, a binary64 or an SDIDI one integrality-tested (DOC-A.1-124) and clamped past the
+    /// carrier. The SDIDI needs the clamp as much as binary64 does: its integer reaches far past <c>Int128</c>, and
+    /// <c>TEST-DATE-YYYYMMDD(10 ** 40)</c> under STANDARD-DECIMAL was a fatal EC-SIZE-OVERFLOW through the wide landing,
+    /// where §15.90.4 r1a answers 1.</para>
     /// </remarks>
     private string IntArgWideSaturating(BoundIntrinsicCall ic, int i)
     {
         NumX x = num.AsNum(ic.Args[i], num.Receiver);
-        return x.Real ? RuntimeApi.IntegerArgSaturatingReal(x.Expr) : AsIntWide(x);
+        return x.Real ? RuntimeApi.IntegerArgSaturatingReal(x.Expr)
+            : x.Dec ? RuntimeApi.IntegerArgSaturatingDec(x.Expr)
+            : AsIntWide(x);
     }
 
     /// <summary>Every argument as its position takes it (<see cref="RawArg"/>), in order — what a lane predicate asks.</summary>

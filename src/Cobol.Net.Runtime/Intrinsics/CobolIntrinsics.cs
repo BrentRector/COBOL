@@ -303,6 +303,19 @@ public static partial class CobolIntrinsics
         return v >= 1.7e38 ? Int128.MaxValue : v <= -1.7e38 ? Int128.MinValue : (Int128)Math.Truncate(v);
     }
 
+    /// <summary>The SDIDI twin of <see cref="IntegerArgSaturatingReal"/>, for the same members only. An SDIDI integer
+    /// reaches far past <c>Int128</c> (34 significant digits at any exponent), and landing it there through
+    /// <see cref="IntegerArgWideDec"/> made the TOTAL <c>FUNCTION TEST-DATE-YYYYMMDD(10 ** 40)</c> a fatal
+    /// EC-SIZE-OVERFLOW under ARITHMETIC IS STANDARD-DECIMAL, where §15.90.4 r1a answers 1 (kb/Work PB651 finisher).
+    /// The integrality test is the one every carrier shares. A magnitude inside ±1.7e38 is the exact integer, and a larger
+    /// one SATURATES to the extreme of its sign. That is verdict-preserving here, and only here.</summary>
+    public static Int128 IntegerArgSaturatingDec(CobolDec v)
+    {
+        RequireIntegral(v.HasFraction, () => v.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        double d = v.ToDouble();
+        return d >= 1.7e38 ? Int128.MaxValue : d <= -1.7e38 ? Int128.MinValue : v.TruncatedInteger();
+    }
+
     public static double RealResult(double d) => double.IsNaN(d)
         ? Exceptions.ExceptionState.ArgumentError("floating-point intrinsic argument out of domain (NaN result)")
         : d;

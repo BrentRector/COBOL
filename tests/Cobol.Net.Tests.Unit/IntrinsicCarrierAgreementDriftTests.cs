@@ -422,6 +422,7 @@ public sealed class IntrinsicCarrierAgreementDriftTests
         // The clamping runtime intake is emitted from ONE renderer member, and the type-6 position intake is not it.
         string src = Regex.Replace(Regex.Replace(raw, @"/\*.*?\*/", "", RegexOptions.Singleline), @"//[^\n]*", "");
         Assert.Single(Regex.Matches(src, @"RuntimeApi\.IntegerArgSaturatingReal\("));
+        Assert.Single(Regex.Matches(src, @"RuntimeApi\.IntegerArgSaturatingDec\("));
         var rawArg = Regex.Match(src, @"private NumX RawArg\(BoundIntrinsicCall ic, int i\)\s*\{(?<body>.*?)\n    \}",
             RegexOptions.Singleline);
         Assert.True(rawArg.Success, "IntrinsicRenderer.RawArg was not found — the guard is reading the wrong file");
@@ -531,6 +532,12 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgSaturatingReal(1e40)));
             Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgSaturatingReal(double.PositiveInfinity)));
             Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgSaturatingReal(double.NegativeInfinity)));
+            // The SDIDI twin: 10^40 under STANDARD-DECIMAL was a fatal EC-SIZE-OVERFLOW through the wide landing.
+            Assert.Equal(1, CobolDate.TestDateYyyymmdd(CobolIntrinsics.IntegerArgSaturatingDec(new CobolDec(1, 40))));
+            Assert.Equal(1, CobolDate.TestDayYyyyddd(CobolIntrinsics.IntegerArgSaturatingDec(new CobolDec(-1, 40))));
+            Assert.Equal(20240229, CobolIntrinsics.IntegerArgSaturatingDec(new CobolDec(20240229, 0)));
+            Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", false, CobolIntrinsics.IntegerArgSaturatingDec(new CobolDec(1, 40)), false));
+            Assert.Equal(1, CobolIntrinsics.FindString("abcabc", "abc", false, CobolIntrinsics.IntegerArgSaturatingDec(new CobolDec(-1, 40)), false));
             // §15.37.4 r3 — argument-3 ignores every match, so none is left and the answer is 0, not a position.
             Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", false, past, false));
             Assert.Equal(0, CobolIntrinsics.FindString("abcabc", "abc", true, past, false));

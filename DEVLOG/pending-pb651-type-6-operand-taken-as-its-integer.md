@@ -80,3 +80,9 @@ That still witnesses PB56's no-quantization property, because a scale-6 landing 
 spelling `num.LiftRounds(`, and the branch passes the predicate as a method group. The test now accepts either
 form. (4) The 14 emitted-C# snapshots were re-recorded for runtime 5.0.0. The diff is exactly the two version lines
 per snapshot, the third recurrence of kb/Work PB3144.
+(5) The sibling sweep over the other SDIDI-to-`Int128` landing at an integer position found one more instance, older
+than this branch. The clamping intake of the TOTAL arms (`IntArgWideSaturating`) handled binary64 but sent an SDIDI
+operand through `IntegerArgWideDec`, so `FUNCTION TEST-DATE-YYYYMMDD(10 ** 40)` under STANDARD-DECIMAL was a fatal
+EC-SIZE-OVERFLOW on conforming source, where §15.90.4 r1a answers 1. It now takes `IntegerArgSaturatingDec`, the
+SDIDI twin of the binary64 clamp, for the same three arms. Lines 14 and 15 of `2014/pb2630_integer_family_beyond_int128`
+witness it.
