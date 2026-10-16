@@ -1,4 +1,4 @@
-## PB3291 filed: plan_wave takes a wave number the reports, the ledger or a scratch directory already hold
+## Entry 2121 — 2026-10-16 16:21 PDT — PB3291 filed: plan_wave takes a wave number the reports, the ledger or a scratch directory already hold
 
 On 2026-10-16 the orchestrator loop planned wave 1098 at 12:12 (three groups, its files at the scratch root), and the
 attended Mythos session's planner passed `--wave 1098` explicitly and rendered eight groups into `scratch\w1098` at
@@ -12,3 +12,4 @@ and it had written no report, `next_wave()` returned 1100 although `scratch\w110
 stepped past it by hand. PB3291 asks for one `wave_taken(n)` predicate (reports, ledger, DEVLOG head and the scratch
 directory) that `next_wave()` steps past and an explicit `--wave` is refused by, pinned by a drift test in
 `scripts/orchestrator/test_plan_wave.py`. Notes only; no source change.
+
