@@ -1,4 +1,4 @@
-## PB370: the reverse START operators are gated below 2002, six witness rows close, and GR11 finds a MOVE evaluation-order defect
+## Entry 2071 — 2026-10-16 07:32 PDT — PB370: the reverse START operators are gated below 2002, six witness rows close, and GR11 finds a MOVE evaluation-order defect
 
 kb/Work PB370 held seven `PARTIAL` rows from lane-3 batch b1. Each row's behaviour had been derived from the rule
 text and measured correct, but the rows had nothing on disk that could fail: three witnesses asserted less than
@@ -46,3 +46,4 @@ operator fold is reused rather than re-spelled. The one construct is checked fro
 `85/pb370_use_file_beats_mode`) cited §9.1.13.5, the invalid-key clause, for I-O status 35. `cite.py --check` puts
 status 35 in §9.1.13.6 5), the permanent-error clause, and both comments now cite that. A sweep of every §9.1.13.5
 citation in the tree found no other one attached to a 3x status.
+
