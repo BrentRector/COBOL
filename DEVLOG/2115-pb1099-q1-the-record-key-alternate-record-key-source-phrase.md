@@ -1,4 +1,4 @@
-## PB1099 Q1: the RECORD KEY / ALTERNATE RECORD KEY SOURCE phrase is provided (a record key is a list of byte windows)
+## Entry 2115 — 2026-10-16 15:17 PDT — PB1099 Q1: the RECORD KEY / ALTERNATE RECORD KEY SOURCE phrase is provided (a record key is a list of byte windows)
 
 kb/Work PB1099 (wave 1095, group I). The owner rule R65 (2026-09-30) classified Q1 — Annex A.3 item 40, the
 `record-key-name-1 SOURCE IS { data-name-2 } …` key form of §12.4.5.12.2 / §12.4.5.6.2 — as a processor-dependent
@@ -109,3 +109,4 @@ COBOLNET_FILES_DESIGN.md "THE SECOND KEY FORM" and D10 (format version 5), the g
 Code: each cited rule re-read for the operand it names (data-name-1 vs data-name-2, record-key-name-1). Performance:
 the one-window key keeps its single-slice path; only a multi-window key allocates its concatenation. Duplication:
 `KeyWindow` (the emitter's per-item window reader) is reused per segment rather than copied.
+
