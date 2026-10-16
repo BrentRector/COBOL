@@ -109,7 +109,9 @@ four (R69 §2), which is why R1 runs before zero GAP.
 - **The phase seams.** No C# text in a bound node; semantics live in binding, not in renderers. The
   `ICodeGenBackend` seam stays, so a CIL backend can still drop in.
 - **Grammar.** No left-edge semantic predicate in a lexer mode (`LexerDfaCacheDriftTests`); post-1985 features stay
-  in `Core/*.g4` behind `{isXXXX()}?`; the generated parser is a build output, never committed. The additive-only
+  in `Core/*.g4` and parse at every edition (D7), and a parse-time edition read is §8.9 word status — every one is
+  computed and held to kb/Work PB2291's verdict by `EditionReadDriftTests`; the generated parser is a build output,
+  never committed. The additive-only
   caution for the shared grammar lifts when PB2110 lands; PB2114 unifies what it forced.
 - **Registries.** Explicit registration over reflection discovery. Static state is a coupling hazard: PB1708
   measured how a static registry's initialization couples tests. `DiagnosticCatalog` restructuring must keep the
