@@ -1,4 +1,4 @@
-## PB442: an exception-checking PERFORM's WHEN stops at the activation, and Table 17 reads the receiver's class
+## Entry 2091 — 2026-10-16 10:23 PDT — PB442: an exception-checking PERFORM's WHEN stops at the activation, and Table 17 reads the receiver's class
 
 PB442 was filed as an analysis note: three inventory rows held PARTIAL on an evidence burden, not on a measured
 wrong answer. Re-probing every claim on this tree found three wrong answers and one crash behind it.
@@ -74,3 +74,4 @@ failed. Main had not touched the file or the row; the defect was the branch's ow
 `InspectEmitter.cs#Emit`; the verdict stays CONFORMS. Every other inventory code-location resolves. The Windows leg 1
 never ran the test: its class is a tree-wide sweep, but its recorded 8.6 s is above the 2 s cheap-sweep bound, so
 with no impact map it was tier 1 and fell outside leg 1's budget.
+
