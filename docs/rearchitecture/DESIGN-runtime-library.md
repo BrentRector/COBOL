@@ -828,17 +828,29 @@ two intakes, and which one is not a property of the renderer arm — it is a pro
 `IntrinsicCarrierAgreementDriftTests.EveryTotalIntegerArgument_TakesTheWideIntake` re-derives the pairing by
 reflection over the shipped signatures and fails when an arm and its body disagree — in either direction. A new
 total function therefore needs one act, widening its body; forgetting its renderer arm is red, not silent.
-A body's `…Real` twin owes the same totality, and owes it WITHOUT a second copy of the rule: it routes through
-`TryTotalIntegerArg`, which saturates a magnitude past `Int128` (±∞ included) to the corresponding extreme —
-verdict-preserving, because a catch-all arm depends on being outside the window and not on how far — so the
-window itself stays written in exactly one body. It must NOT route to `TryIntegerArg`, whose false arm is a
-literal verdict; that literal was §15.90.4 r1d, "the date is valid".
-⚠ Since kb/Work PB248 a floating-point operand at a §15.3 type-6 position is REFUSED under strict
-(COBOLNET1627 — type 6 admits "an integer data item or an always-integral arithmetic expression", and a
-floating-point item is neither), so the `…Real` twins are reached only under `--permissive`. That is where
-their totality is witnessed: `tests/Cobol.Net.Tests.Conformance/FloatIntegerArgumentPermissiveTests.cs`,
-the one home for the coercion lane. The twins are still live code and still owe the rule — the lane
-changed, the obligation did not.
+⛔ **A type-6 position has NO `…Real` twin: the renderer takes the operand's INTEGER first (kb/Work PB651).**
+Since kb/Work PB248 a floating-point operand at a §15.3 type-6 position is REFUSED under strict (COBOLNET1627 —
+type 6 admits "an integer data item or an always-integral arithmetic expression", and a floating-point item is
+neither), so it arrives only under `--permissive`, and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means:
+the integer it holds, or the truncated integer with EC-ARGUMENT-FUNCTION checking off. That is a property of the
+POSITION, so `IntrinsicRenderer.RawArg` — the one indexed argument entry every intake and lane predicate reads —
+takes it there, before a lane is chosen, on every carrier, keeping the VALUE or saying it cannot. An SDIDI operand
+STAYS on the SDIDI (`CobolIntrinsics.IntegerArgUnboundedDec`: the integrality test, then `CobolDec.TruncateToInteger`),
+because an SDIDI holds 34 significant digits at any exponent and its integer reaches far past `Int128` —
+MOD(10 ** 40, 3) and MOD(A ** 3, B) of a 15-digit A are integers the SDIDI body evaluates (kb/Work PB2630, PB69),
+and landing them on `Int128` was EC-SIZE-OVERFLOW. A fixed-point operand's integer fits the `Int128` its unscaled
+value rides, and a float past it (±1.7e38, ±∞ included) raises EC-ARGUMENT-FUNCTION through
+`CobolIntrinsics.IntegerArgWideReal`. ⛔ The position intake never CLAMPS: a clamp
+answers for a different integer, so `MOD(1.0E39, 7)` answered 1 where the operand's integer answers 5 (PB651 review
+R1-2). Clamping is right only where the function answers the same for every integer past a bound — TEST-DATE-YYYYMMDD
+/ TEST-DAY-YYYYDDD argument-1 (the r1a catch-all) and FIND-STRING argument-3 (0 once every match is ignored) — and
+those arms alone take `IntrinsicRenderer.IntArgWideSaturating` (`CobolIntrinsics.IntegerArgSaturatingReal`);
+`IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates` keeps the set closed. An integer has no binary64-ness, so a float at a type-6 position never moves a call to the
+binary64 lane: the integer-only functions (MOD, FACTORIAL, the date family, the TEST- validators, the windowing
+trio) have no `…Real` body, and `IntrinsicRealArgDriftTests.NoRealBody_ServesAFunctionWhoseEveryPositionIsType6`
+keeps it so. A mixed row keeps its twin for its type-10 position (`CombinedDatetimeReal`, reached by a float
+argument-2). The lane is witnessed over every verified type-6 position by
+`IntrinsicIntegerPositionPermissiveDriftTests` and in `FloatIntegerArgumentPermissiveTests`, the coercion lane's home.
 
 ⛔ **WHICH bodies owe a `…Real` twin is likewise derived, and FIND-STRING owes none (kb/Work PB635).** The
 binary64 lane renders every argument through one `double` conversion, so it is enterable only for a call whose
