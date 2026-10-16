@@ -144,3 +144,11 @@ directory was the corpus; three older ones were found in the sibling sweep (`200
 `2023/pb63loc.txt`). All eleven are removed. The new tree sweep `CorpusRunFileDriftTests` fails on any tracked file in a
 corpus directory that is neither a corpus kind nor library text a program there COPYs, and `.gitignore` now covers the
 corpus `.dat`/`.seq` files. Gate run `20261015T201139Z-533497`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
+
+Branch review round 3 (R3-1, comment accuracy): the note said the re-applied batch
+`w1082a-pb3101-comparator-resite-on-pb55-fold` covered 25 rows. It covers 24: the original batch has 26 records, and
+the fold drops the GR-9.3.6-L4.1 and L4.2 records because their re-site lands on L3.3, which the batch already carried
+(counted from the batch file: 24 records, 24 distinct rule-ids). The note's forensic line and its `closes_rows_reason`
+now give both batches and both counts. The finisher also merged main `bfb2eb47e`: `2002/manifest.json` conflicted
+(both sides prepended to `enabled`) and was resolved as the union; the inventory auto-merged with no overlapping row
+(main 3 rows, the branch 34).
