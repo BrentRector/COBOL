@@ -479,10 +479,11 @@ public static class CollatingSelection
     /// category-worded rules. So that one operand answers National here; before, two <c>PIC Z9 USAGE NATIONAL</c>
     /// items were compared under the ALPHANUMERIC program collating sequence.</para></summary>
     public static PicCategory? OperandCategory(Bound.BoundOperand o) =>
-        IntrinsicResultType.OperandCategory(o) is PicCategory.NumericEdited
+        IntrinsicResultType.OperandCategory(o) is var category
+            && category is PicCategory.NumericEdited
             && IntrinsicArgumentRules.ClassOf(o) is CobolClass.NumericEditedNational
             ? PicCategory.National
-            : IntrinsicResultType.OperandCategory(o);
+            : category;
 
     /// <summary>⛔ THE §14.7.8 CLASS OF A THROUGH RANGE, asked of BOTH ends at once and written down ONCE for the
     /// two clauses that print the phrase — "This specification applies to THROUGH phrases specified in the VALUE

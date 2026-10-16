@@ -506,7 +506,7 @@ internal static class IntrinsicArgumentRules
         // carries category NUMERIC for the storage model (PicInfo.IndexItem), but §8.5.2.1 Table 2 puts it in
         // class INDEX — a distinct class no §15 argument rule admits. Keying the usage first is what stops the
         // storage category from answering the CLASS question.
-        if (pic.Usage is Usage.Index) return CobolClass.Index;
+        if (pic is { Usage: Usage.Index }) return CobolClass.Index;
         // Class ALPHABETIC before the category table (kb/Work PB124 wave 5): the storage model folds PIC A
         // into PicCategory.Alphanumeric, so the category cannot answer — IsAlphabetic can, exactly as the
         // Usage.Index arm above un-folds the index item's storage category.
