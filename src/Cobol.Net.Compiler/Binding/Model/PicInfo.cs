@@ -561,6 +561,13 @@ public sealed record PicInfo(
     /// (numeric design D1 / SSOT §18 #4). ≤18 digits stay hardware-native <see cref="long"/>.</summary>
     public bool IsWide => Category is PicCategory.Numeric && !IsFloat && Digits > 18;
 
+    /// <summary>The most decimal digits a scaled fixed-point value holds on the <see cref="Int128"/> carrier
+    /// (<c>Int128.MaxValue</c> ≈ 1.7×10³⁸, so every 38-digit magnitude fits) — the numeric engine's intermediate
+    /// width (<c>ReceiverContext.IntermediateDigits</c>) and the widest item a compiler-synthesized intermediate may
+    /// be described as (<c>SendingValueTemp</c>). One number, so an intermediate item and the engine that stores
+    /// into it cannot disagree about where the carrier ends.</summary>
+    public const int ScaledCarrierDigits = 38;
+
     /// <summary>
     /// ⛔ THE ONE "is this the description of an INTEGER DATA ITEM?" primitive (ISO §5.5 2)b)2., kb/Work PB248).
     /// The standard's own definition of the term is a CONJUNCTION of three conditions, and every screen in this

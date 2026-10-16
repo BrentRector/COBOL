@@ -162,6 +162,29 @@ public static class NumericLiteral
         return true;
     }
 
+    /// <summary>The integer VALUE of a numeric literal of either form, whatever notation it was written in — <c>30</c>,
+    /// <c>30.0</c> and <c>3.0E+1</c> are one operand (trailing zeros past the point are notation, not scale; ISO
+    /// §8.3.3.3.3 rule 5 makes a floating-point literal's value "the algebraic product of the value of its significand
+    /// and the quantity derived by raising ten to the power of the exponent" and nothing more). False for a literal
+    /// whose value is not an integer, and for one past <see cref="Int128"/>. The ONE reader of "is this literal an
+    /// integer VALUE" (kb/Work PB272): the native exact-integer exponentiation arm keys on it
+    /// (<c>NumericRenderer.IntegerLiteralValue</c>) and so does the bind-time lane prediction that must agree with
+    /// that arm (<c>FunctionValueLane</c>, kb/Work PB3268).</summary>
+    public static bool TryGetIntegerValue(string text, out Int128 value)
+    {
+        value = 0;
+        if (!TryParseExact(text, out Int128 sig, out int exp10)) return false;
+        while (exp10 < 0 && sig % 10 == 0) { sig /= 10; exp10++; }   // trailing zeros are notation, not scale
+        if (exp10 < 0) return false;                                  // a genuinely non-integer value
+        for (int i = 0; i < exp10; i++)
+        {
+            if (Int128.Abs(sig) > Int128.MaxValue / 10) return false; // past Int128
+            sig *= 10;
+        }
+        value = sig;
+        return true;
+    }
+
     /// <summary>The EXACT value of a floating-point numeric literal (ISO §8.3.3.3.3 GR5: "the algebraic product of
     /// the value of its significand and the quantity derived by raising ten to the power of the exponent") as a
     /// canonical fixed-point literal text — <c>1.5E+3</c> → <c>1500</c>, <c>-1.234E-5</c> → <c>-0.00001234</c>,
