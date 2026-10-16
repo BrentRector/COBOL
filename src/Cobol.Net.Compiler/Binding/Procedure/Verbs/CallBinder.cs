@@ -256,9 +256,17 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                         + "address-identifier or a data item defined in the file, working-storage, local-storage, or "
                         + "linkage section\", and the predefined address NULL (§8.4.3.10) is neither; pass it BY CONTENT "
                         + "or BY VALUE");
-                if (byRef.dataReference() is not { } byRefDref)
+                if (byRef.receivingIdentifier() is not { } byRefId)
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "CALL … USING BY REFERENCE with neither an identifier nor OMITTED "
                         + "(ISO §14.9.4.2)");
+                // §14.9.4.3 SR5: identifier-2 BY REFERENCE that is not an address-identifier "is a receiving operand", so
+                // SELF, SUPER, an object-view or a function-address-identifier written here is refused by its own §8.4.3
+                // rule at the receiving chokepoint (kb/Work PB1551 review R1-1).
+                if (byRefId.dataReference() is not { } byRefDref)
+                {
+                    _ = host.Expr.ResolveReceiving(byRefId);
+                    return BoundRejected.Reported(ctx.Edition);
+                }
                 // kb/Work PB128: a BY REFERENCE argument is a RECEIVING operand and rides the ONE receiving
                 // chokepoint — the direct Refs.Resolve bypass skipped the CONSTANT RECORD (§13.18.15.3 SR2),
                 // CAPACITY-register (§13.18.38 SR30–32), constant-name and LINE-COUNTER screens, letting a
@@ -568,6 +576,15 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 // left is a real arithmetic-expression-1: `N + 1` is ONE argument (kb/Work PB1135, decision R59).
                 if (IsSoleIdentifierExpression(bArith))
                 {
+                    // §14.9.4.3 SR5: under Format 1's prevailing BY REFERENCE (GR5) a keyword-less identifier-2 "is a
+                    // receiving operand", so SELF, SUPER or an object-view is refused by its own §8.4.3 rule, exactly as
+                    // when BY REFERENCE is written (kb/Work PB1551 review R1-1) — not as a temporary it is not.
+                    if (!formatTwo && mode is CobolPassMode.Reference
+                        && ConditionBinder.SoleOoIdentifier(bArith) is { } oo && ReceivingOperandForms.FormOfOoIdentifier(oo) is { } ooForm)
+                    {
+                        _ = host.Expr.RefuseNonReceivable(ooForm, oo);
+                        return BoundRejected.Reported(ctx.Edition);
+                    }
                     // A function-identifier is identifier-2 (§14.9.4.4 GR8), not an expression: Format 1 admits it.
                     if (AddBareTemporaryArg(ExpressionOperand(bArith), DataBinder.WrittenText(bArith)) is { } refusal) return refusal;
                     continue;
@@ -736,9 +753,16 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         {
             // call-returning-2002: the VersionConformancePass owns the edition gate (Exec Step E).
             // kb/Work PB128: identifier-3 is a pure receiver — the chokepoint's screens apply.
-            if (host.Expr.ResolveReceiving(rp.dataReference()) is not { } rpl)
-                return OperandUnresolved(rp.dataReference(), "RETURNING item");
-            ScreenCallOperand(rpl, rp.dataReference(), CobolPassMode.Reference, formatTwo, isReturning: true);
+            // A RETURNING identifier that is no data reference (SELF, NULL, an address-identifier, a view) was refused
+            // by its own rule at the chokepoint (kb/Work PB1551).
+            if (rp.receivingIdentifier().dataReference() is not { } rpRef)
+            {
+                _ = host.Expr.ResolveReceiving(rp.receivingIdentifier());
+                return BoundRejected.Reported(ctx.Edition);
+            }
+            if (host.Expr.ResolveReceiving(rpRef) is not { } rpl)
+                return OperandUnresolved(rpRef, "RETURNING item");
+            ScreenCallOperand(rpl, rpRef, CobolPassMode.Reference, formatTwo, isReturning: true);
             returning = rpl;
         }
         // §14.9.4.3 SR25 → §14.8.3, RETURNING ITEMS — the half that had NO home at all (kb/Work PB204). SR25

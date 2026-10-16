@@ -26,7 +26,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// the operand-list alternative is absent — i.e. exactly the Format-3 parse.</summary>
     public BoundStatement BindAddCorresponding(Core.AddStatementContext add) =>
         add.CORRESPONDING() is not null || add.CORR() is not null
-            ? Bind(CorrVerb.Add, add.dataReference(), host.Expr.RoundingOf(add.roundedPhrase()),
+            ? Bind(CorrVerb.Add, add.dataReference(), add.receivingIdentifier(), host.Expr.RoundingOf(add.roundedPhrase()),
                 host.BindSizeError(add.arithmeticOnSizeError()))
             : BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "ADD: the statement matches no ADD format (ISO §14.9.2.2)");
 
@@ -34,7 +34,7 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// (ISO §14.9.44.2 Format 3; SR5 — CORR ≡ CORRESPONDING).</summary>
     public BoundStatement BindSubtractCorresponding(Core.SubtractStatementContext sub) =>
         sub.CORRESPONDING() is not null || sub.CORR() is not null
-            ? Bind(CorrVerb.Subtract, sub.dataReference(), host.Expr.RoundingOf(sub.roundedPhrase()),
+            ? Bind(CorrVerb.Subtract, sub.dataReference(), sub.receivingIdentifier(), host.Expr.RoundingOf(sub.roundedPhrase()),
                 host.BindSizeError(sub.arithmeticOnSizeError()))
             : BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "SUBTRACT: the statement matches no SUBTRACT format (ISO §14.9.44.2)");
 
@@ -54,7 +54,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
     /// SR6/SR12 operand-kind screen is <c>StatementValidation.CheckCorrespondingGroupOperand</c>.</para>
     /// </summary>
     public BoundStatement Bind(
-        CorrVerb verb, Core.DataReferenceContext[] groups, CobolRounding rounding, SizeErrorPhrase? sizeErr)
+        CorrVerb verb, Core.DataReferenceContext? sending, Core.ReceivingIdentifierContext? receiving,
+        CobolRounding rounding, SizeErrorPhrase? sizeErr)
     {
         // ⛔ EACH VERB ASKS ITS OWN RULE, NOT A SHARED APPROXIMATION (kb/Work PB392). What stood here was a
         // verb-NAME switch here and a CLAUSE-STRING switch below, so the three rules differed only in the
@@ -69,12 +70,12 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
             _ => CorrespondingOperandRule.Subtract,
         };
         string verbName = rule.Verb;
-        if (groups.Length < 2)
+        if (sending is null || receiving is null)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, $"{verbName} CORRESPONDING: its general format prints exactly two group "
                 + "operands, the sending group and the receiving group");
-        if (host.Expr.ResolveSending(groups[0]) is var srcR && srcR.Place is not { } src)
+        if (host.Expr.ResolveSending(sending) is var srcR && srcR.Place is not { } src)
             return srcR.Refusal(ctx.Edition);   // kb/Work PB1030
-        if (host.Expr.ResolveReceiving(groups[1]) is not { } dst)
+        if (host.Expr.ResolveReceiving(receiving) is not { } dst)
             return BoundRejected.Reported(ctx.Edition);   // the receiving chokepoint reported it — not a deferral (kb/Work PB236, PB881)
         // ⛔ BOTH OPERANDS SHALL BE GROUP ITEMS, AND THAT IS A SYNTAX RULE, SO IT IS DECIDED AT BIND TIME
         // (kb/Work PB236, row SR-14.9.2.3-6). MOVE §14.9.25.3 SR12 — "Identifier-3 and identifier-4 shall
@@ -102,8 +103,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
         // PLACE, decorations intact, which is the only level at which a reference modifier is visible.
         // Both operands are screened before the verdict — a statement with two bad operands reports two
         // diagnostics, not the first one only (a short-circuit here would hide the second).
-        bool srcOk = ctx.Validation.CheckCorrespondingGroupOperand(src, groups[0].GetText(), rule);
-        bool dstOk = ctx.Validation.CheckCorrespondingGroupOperand(dst, groups[1].GetText(), rule);
+        bool srcOk = ctx.Validation.CheckCorrespondingGroupOperand(src, sending.GetText(), rule);
+        bool dstOk = ctx.Validation.CheckCorrespondingGroupOperand(dst, receiving.GetText(), rule);
         if (!srcOk || !dstOk) return BoundRejected.Reported(ctx.Edition);
 
         int id = _corrCounter++;
