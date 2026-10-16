@@ -1,4 +1,4 @@
-## PB3193: a run unit under a host no longer reconfigures the host's console; a redirected stdin decodes as UTF-8
+## Entry 2104 — 2026-10-16 12:55 PDT — PB3193: a run unit under a host no longer reconfigures the host's console; a redirected stdin decodes as UTF-8
 
 **Mechanism.** `StandardStreams.EnsureUtf8` (the PB59/PB899 rule that the standard streams carry UTF-8) was called
 from `ProgramTable.RunOnThisThread`, which runs on every `RunMain`, the host entry. A host that embeds a run unit
@@ -42,3 +42,4 @@ leg 1. Linux gate: the lander's (batched gating).
 **Leads, not probed here:** an interactive Windows console's ACCEPT input is still decoded in the console's input code
 page; and the `Console.OutputEncoding` setter at a process entry may leave the parent shell's shared console on code
 page 65001 after the process exits.
+
