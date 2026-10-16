@@ -1,0 +1,4 @@
+## Entry 2082 — 2026-10-16 09:00 PDT — New-defect leads filed as kb/Work notes (enqueue 20261016c)
+
+Filed PB3268 (FunctionValuePic scale-9 temporary, PB651 L1), PB3269 (about 40 displaced XML doc blocks, PB651 L2), PB3270 (COBOL words shadowing imported runtime or System types), PB3271 (four drift tests scanning generated tests/nist/output *.g.cs), PB3272 (dead public RunMain ABI) and PB3273 (strong group with a variable-length component and a reference has no host entry), from the PB651 and PB2099 reports. PB3275 (a conflicting auto-merge PR reads ENQUEUED forever in prune_worktrees.py) and PB3276 (three parse-time edition construct gates beside VersionConformancePass, from PB2291's unlanded branch) came from coordinator steers. Evidence was appended to PB3131 (non-cheap tests whose inputs a diff changes stay in leg 2, with the PB2730 TRAIT_GUARD pin covering one class only) and to PB3116 (three more manifest.json landing stops). PB3274 went unused.
+

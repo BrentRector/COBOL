@@ -27,7 +27,9 @@ THE TIERS (per case; a key shared by several cases takes the lowest):
   0h  a HOST-ONLY WITNESS (kb/Work PB3022; DESIGN-test-build-ci.md §3.17.3): its class carries the xUnit trait
       `[Trait("Host", v)]` with v in HOST_ONLY — a property of this host CI's runners lack (`ReFS`: the Windows
       file-system race witnesses, which CI's NTFS runners may not reproduce) — always leg 1, whatever the diff, and
-      exempt from the collection cap: CI's whole-population run is no net for them;
+      exempt from the collection cap: CI's whole-population run is no net for them; and THE TRAIT GUARD
+      (TRAIT_GUARD), the class that holds both trait tiers to their rules, on the same terms: a tier the gate does
+      not check at every gate is a tier on trust;
   0c  a CHEAP TREE-WIDE CHECK (kb/Work PB3022, the operator's proposal 2): its class carries `[Trait("Sweep", ...)]`
       (a drift test that scans a whole tree: an index, a register, a citation sweep) and its recorded time is at most
       SWEEP_CHEAP_SECONDS — leg 1 at every gate within the collection cap, so a gate catches the bookkeeping red a
@@ -98,6 +100,15 @@ HOST_ONLY = {
 #: 0c when each costs at most SWEEP_CHEAP_SECONDS of recorded time.
 SWEEP_TRAIT = "Sweep"
 SWEEP_CHEAP_SECONDS = 2.0
+#: ⛔ THE TRAIT GUARD RUNS AT EVERY GATE, WHATEVER IT COSTS (tier 0h; kb/Work PB2730's finisher, 2026-10-16). The two
+#: tiers above are only as true as the class that holds them to their rules — every race witness traited `Host`, the
+#: `Sweep` set exactly drift_rules.py's sweeps, the source scan equal to the compiled attributes — and any diff that
+#: adds a test class can break them. Its cases spawn the scans as processes and measure 5-11 s under a gate's load,
+#: over SWEEP_CHEAP_SECONDS, so tier 0c left them in leg 2 and the Windows leg 1 never ran them: two branches (one a
+#: new sweep missing the trait, one a non-sweep carrying it) gated GREEN there and went RED in the landing's
+#: whole-population Linux unit leg. A tier the gate does not check at every gate is a tier on trust.
+#: `HostWitnessTraitDriftTests` pins this name to its own (nameof), so a rename cannot orphan it.
+TRAIT_GUARD = "HostWitnessTraitDriftTests"
 #: `[Trait("<name>", "<value>")]` on a class: the attribute line, then any further attribute or doc-comment lines, then
 #: the class declaration. `HostWitnessTraitDriftTests` holds this scan equal to the attributes the compiler sees.
 CLASS_TRAIT_RE = re.compile(
@@ -337,7 +348,7 @@ def tier_of(display: str, key: str, ctx: Context, per_case: float | None, has_ti
             or any(f'name: "{g}"' in display for g in ctx.goldens)):
         return "0a"
     cls = class_of(key)  # the class without its partition suffix: a trait is declared on the family
-    if cls in ctx.host_classes:
+    if cls in ctx.host_classes or cls == TRAIT_GUARD:
         return "0h"
     if cls in ctx.sweep_classes and per_case is not None and per_case <= SWEEP_CHEAP_SECONDS:
         return "0c"
@@ -610,6 +621,15 @@ def self_test() -> int:
     p = plan_assembly(cheap + [f"{ns}RaceWitness.M"], ctx(host_classes={"RaceWitness"}))
     check("tier 0h with no timings: the witness is still leg 1",
           p["leg1"] == [f"{ns}RaceWitness.M"] and p["stats"]["tiers"]["0h"] == 1, p["stats"])
+    # the trait guard: a DEAR sweep (over SWEEP_CHEAP_SECONDS, so tier 0c would leave it in leg 2) is leg 1 at every
+    # gate, because it is the one class that checks the 0h and 0c membership (kb/Work PB2730's finisher).
+    guard = [f"{ns}{TRAIT_GUARD}.TheSweepTrait", f"{ns}{TRAIT_GUARD}.EveryWitness"]
+    tg = timed([(d, 1.0) for d in cheap] + [(pole, 1000.0)] + [(d, SWEEP_CHEAP_SECONDS + 9.0) for d in guard])
+    kg = {name_key(d) for d in cheap + [pole] + guard}
+    p = plan_assembly(cheap + [pole] + guard, ctx(previous=tg, map_known=kg, tiers={k: 3 for k in kg},
+                                                  sweep_classes={TRAIT_GUARD}))
+    check("the trait guard is tier 0h: leg 1 at every gate, however dear its cases",
+          p["stats"]["tiers"]["0h"] == 2 and all(d in p["leg1"] for d in guard), p["stats"])
     # tier 0c: a cheap sweep is leg 1 within the cap; a dear one, and an untimed one, are not.
     sweeps = [f"{ns}IndexSweep.M{i}" for i in range(20)] + [f"{ns}DearSweep.M"]
     t6 = timed([(d, 1.0) for d in cheap] + [(pole, 1000.0)] + [(d, 1.0) for d in sweeps[:20]]
