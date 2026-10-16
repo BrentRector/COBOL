@@ -385,3 +385,7 @@ gains the line `FIRST ArgumentException LK_C`. The merge with main 32f372674 too
 asks `OoConformance.SignatureDifference` (the deleted `DescriptionMismatch` was its only caller here); DOC-A.1-141 and
 DOC-A.1-13 combine both sides; the runtime ABI pin keeps main's major 6 and re-pins the surface hash alone, the merged
 Shipped surface differing from main's only by the nullable `callerPath` annotation.
+Gate `TestResults/build-local/20261016T192507Z-8d5723` at bb4120465: `LEG 1 ONLY (batched gating, PB2515): GREEN`
+(Conformance 6,128/11,845, Unit 33,394/33,797, Characterization 5/36 in leg 1; HostEntryTests, HostEntryShapeDriftTests,
+RuntimeAbiPinDriftTests and OneRelationDriftTests among them). Run directly on the same build, being leg 2:
+`AnnexA1RegisterDriftTests` and IC207A's NIST differential and version-matrix cases, all passed. Semgrep verify: PASS.
