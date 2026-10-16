@@ -128,7 +128,7 @@ internal sealed class InvocationSite
         {
             Args = args,
             ArgsWritten = inv.invokeUsing() is not null,
-            ReturningRef = inv.invokeReturning()?.dataReference(),
+            ReturningRef = inv.invokeReturning()?.receivingIdentifier().dataReference(),
             Verb = "INVOKE",
         };
     }

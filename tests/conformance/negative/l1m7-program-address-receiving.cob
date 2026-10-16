@@ -13,12 +13,10 @@
       *> The first SET is the legal direction (the program-address-
       *> identifier is the SENDER; literal-1 "L1M7PAS" is alphanumeric
       *> and non-empty, §8.4.3.13.3 SR2).  The second SET writes the
-      *> same identifier as the receiver, which only SR4 forbids.  The
-      *> grammar admits the identifier only in sender slots, so the
-      *> refusal is a syntax error.  CobolErrorListener re-codes a
-      *> syntax error with its leading hint's code, and the hint that
-      *> fires on the reserved word PROGRAM where an identifier is
-      *> expected is COBOL0201 (observed by the row's adjudicator).
+      *> same identifier as the receiver, which only SR4 forbids.  Every
+      *> SET receiving list parses the program-address-identifier
+      *> (kb/Work PB1551), so the receiving chokepoint refuses it by SR4
+      *> (COBOLNET3979); it used to be a syntax error (COBOL0201).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1M7PAR.
        DATA DIVISION.

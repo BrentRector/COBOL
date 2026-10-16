@@ -736,9 +736,16 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         {
             // call-returning-2002: the VersionConformancePass owns the edition gate (Exec Step E).
             // kb/Work PB128: identifier-3 is a pure receiver — the chokepoint's screens apply.
-            if (host.Expr.ResolveReceiving(rp.dataReference()) is not { } rpl)
-                return OperandUnresolved(rp.dataReference(), "RETURNING item");
-            ScreenCallOperand(rpl, rp.dataReference(), CobolPassMode.Reference, formatTwo, isReturning: true);
+            // A RETURNING identifier that is no data reference (SELF, NULL, an address-identifier, a view) was refused
+            // by its own rule at the chokepoint (kb/Work PB1551).
+            if (rp.receivingIdentifier().dataReference() is not { } rpRef)
+            {
+                _ = host.Expr.ResolveReceiving(rp.receivingIdentifier());
+                return BoundRejected.Reported(ctx.Edition);
+            }
+            if (host.Expr.ResolveReceiving(rpRef) is not { } rpl)
+                return OperandUnresolved(rpRef, "RETURNING item");
+            ScreenCallOperand(rpl, rpRef, CobolPassMode.Reference, formatTwo, isReturning: true);
             returning = rpl;
         }
         // §14.9.4.3 SR25 → §14.8.3, RETURNING ITEMS — the half that had NO home at all (kb/Work PB204). SR25

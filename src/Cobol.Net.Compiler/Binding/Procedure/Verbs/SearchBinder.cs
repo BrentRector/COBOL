@@ -92,14 +92,19 @@ internal sealed class SearchBinder(BinderContext ctx, StatementBinder host)
     /// increments that item in step with the search index.</summary>
     public BoundStatement BindSearch(Core.SearchStatementContext s)
     {
-        var drefs = s.dataReference();
-        if (Identifier1(drefs[0], "SEARCH", out var bail) is not { } table) return bail;
+        if (Identifier1(s.dataReference(), "SEARCH", out var bail) is not { } table) return bail;
 
         string searchIx = table.Indexes[0].Cell;   // the table's OWN first declaration (kb/Work PB919)
         BoundSetTarget? also = null;
-        if (drefs.Length > 1)   // the VARYING phrase
+        if (s.receivingIdentifier() is { } varying)   // the VARYING phrase
         {
-            var v = drefs[1];
+            // identifier-2 is incremented — a RECEIVING operand, so a format that is never one (SELF, NULL, an
+            // address-identifier, a view) is refused by its own rule at the chokepoint (kb/Work PB1551).
+            if (varying.dataReference() is not { } v)
+            {
+                _ = host.Expr.ResolveReceiving(varying);
+                return BoundRejected.Reported(ctx.Edition);
+            }
             if (host.Expr.IndexFieldOf(v) is { } vix)
             {
                 if (table.Indexes.Any(d => d.Cell == vix)) searchIx = vix;   // same table (GR3 c) 1.)

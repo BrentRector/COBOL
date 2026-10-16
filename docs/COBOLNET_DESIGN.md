@@ -182,7 +182,14 @@ a subscript position that is not a subscript — COBOLNET2363, a reference to a 
 the unbuilt ledger before any caller sees it, so a caller that drops the answer cannot make it silent, and a caller
 builds its node FROM the answer (`Refusal` / `OperandError` / `ExprError` / `BoolError`; `PlaceOrReported` where the
 caller cannot carry a deferral, which reports it as recognized-not-implemented, COBOLNET0899). The receiving
-chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported.
+chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported. Every
+receiving grammar slot is a `receivingIdentifier` (`setReceivingIdentifier` in SET, which lacks the data-address
+alternative so Format 7 keeps its own `ADDRESS OF data-name-1` receiver): a data reference, or one of the identifier
+formats that are never a receiving operand (an object-view, SELF, SUPER, NULL, an address-identifier) parsed only so
+`ResolveReceiving` can refuse it by the row of `ReceivingOperandForms` that names its §8.4.3 rule — the same table the
+data-reference screens (LINAGE-COUNTER, LINE-COUNTER, EXCEPTION-OBJECT, the view of a qualified item) report from
+(kb/Work PB1551; `ReceivingOperandFormDriftTests`). The computed formats (function-identifier, inline invocation) stay
+out of the purely receiving rules by construction.
 `RefResolutionDriftTests` pins the census, the ledger and the callers. `BoundDeferralDriftTests` fails on a
 deferral whose message states a violated rule (kb/Work PB909); `RefusalNodeDriftTests` keeps the refusal
 constructors private and keeps report-then-`BoundNop` and failure-guarded `BoundNop` out of the binder (a genuine
