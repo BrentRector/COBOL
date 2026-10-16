@@ -99,7 +99,7 @@ public sealed class CodeSetConversionTests : IDisposable
     public void IndexedWrite_RefusesAnUnrepresentableRecord_AtTheStatement_AndTheCloseSucceeds()
     {
         string host = Path.Combine(_dir, "ix.dat");
-        var ix = new IndexedConnector(host, 8, KeyedAccess.Random, 0, 4) { CodeSet = Ebcdic() };
+        var ix = new IndexedConnector(host, 8, KeyedAccess.Random, [new(0, 4)]) { CodeSet = Ebcdic() };
         Assert.Equal(FileStatusCode.Success, ix.Open(FileOpenMode.Output));
         Assert.Equal(FileStatusCode.CharacterWithoutByteImage, ix.Write("K" + Euro + "01DATA"));
         Assert.Equal(FileStatusCode.Success, ix.Write("K001DATA"));

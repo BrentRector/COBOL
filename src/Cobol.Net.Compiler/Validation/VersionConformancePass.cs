@@ -1440,6 +1440,12 @@ internal sealed class VersionConformancePass
         public override object? VisitAlternateKeySuppressWhen(CobolParserCore.AlternateKeySuppressWhenContext ctx)
         { _p.Check(Constructs.AlternateKeySuppressWhen2023, "the SUPPRESS WHEN phrase of the ALTERNATE RECORD KEY clause"); return base.VisitChildren(ctx); }
 
+        /// <summary>The SOURCE phrase of the RECORD KEY and ALTERNATE RECORD KEY clauses (ISO §12.4.5.12.2 /
+        /// §12.4.5.6.2) — a post-1985 form on the provisional 2002 edge (VCR row 7.36, derived). ONE arm for both
+        /// clauses: they share the one grammar rule, so neither can be gated without the other (kb/Work PB1099).</summary>
+        public override object? VisitRecordKeySourcePhrase(CobolParserCore.RecordKeySourcePhraseContext ctx)
+        { _p.Check(Constructs.RecordKeySource2002, "the SOURCE phrase of the RECORD KEY or ALTERNATE RECORD KEY clause"); return base.VisitChildren(ctx); }
+
         /// <summary>ALPHABET … FOR ALPHANUMERIC/NATIONAL (ISO §12.3.7) — a COBOL-2002 introduction; the base ALPHABET
         /// clause is version-invariant. One of the three SPECIAL-NAMES FOR-phrase sites (all one constructId +
         /// where-string), gated once per clause on the FOR phrase's presence at its ISO position between the name

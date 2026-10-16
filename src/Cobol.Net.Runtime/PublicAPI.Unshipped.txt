@@ -128,3 +128,19 @@ CobolNet.Runtime.ActivationDescription.ObjectNameIsParameter.init -> void
 static CobolNet.Runtime.ActivationRelations.SignatureDifference(CobolNet.Runtime.ActivationDescription! first, CobolNet.Runtime.ActivationDescription! second, string! firstRole = "item", string! secondRole = "corresponding item") -> string?
 CobolNet.Runtime.IO.FileConnector.StartPositioned() -> string!
 CobolNet.Runtime.IO.FileConnector.Unsuccessful(string! status) -> string!
+CobolNet.Runtime.IO.KeySegment
+CobolNet.Runtime.IO.KeySegment.Deconstruct(out int Offset, out int Length, out CobolNet.Runtime.CobolContiguousLayout? Layout) -> void
+CobolNet.Runtime.IO.KeySegment.Equals(CobolNet.Runtime.IO.KeySegment other) -> bool
+CobolNet.Runtime.IO.KeySegment.KeySegment() -> void
+CobolNet.Runtime.IO.KeySegment.KeySegment(int Offset, int Length, CobolNet.Runtime.CobolContiguousLayout? Layout = null) -> void
+CobolNet.Runtime.IO.KeySegment.Layout.get -> CobolNet.Runtime.CobolContiguousLayout?
+CobolNet.Runtime.IO.KeySegment.Layout.init -> void
+CobolNet.Runtime.IO.KeySegment.Length.get -> int
+CobolNet.Runtime.IO.KeySegment.Length.init -> void
+CobolNet.Runtime.IO.KeySegment.Offset.get -> int
+CobolNet.Runtime.IO.KeySegment.Offset.init -> void
+override CobolNet.Runtime.IO.KeySegment.GetHashCode() -> int
+static CobolNet.Runtime.IO.KeySegment.operator !=(CobolNet.Runtime.IO.KeySegment left, CobolNet.Runtime.IO.KeySegment right) -> bool
+static CobolNet.Runtime.IO.KeySegment.operator ==(CobolNet.Runtime.IO.KeySegment left, CobolNet.Runtime.IO.KeySegment right) -> bool
+~override CobolNet.Runtime.IO.KeySegment.Equals(object obj) -> bool
+~override CobolNet.Runtime.IO.KeySegment.ToString() -> string

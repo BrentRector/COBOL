@@ -134,8 +134,16 @@ public sealed record BoundKeyedDeleteFile(
 /// <paramref name="Op"/> is the mapped C# relational operator (EQUAL when the KEY phrase or its operator is
 /// omitted, GR8/GR15; NOT EQUAL is rejected, SR3). <paramref name="KeyIndex"/> = −1 prime/relative, ≥0 alternate.
 /// <paramref name="Operand"/> is the comparison data item — the RELATIVE KEY item (SR5/GR10) or the (possibly
-/// generic, leftmost-coincident shorter) indexed key item (SR6); <paramref name="Length"/> is the 2002+ WITH
-/// LENGTH partial-key character count (SR8/GR13–GR14, indexed only).</summary>
+/// generic, leftmost-coincident shorter) indexed key item (SR6) — and null when the KEY phrase names a
+/// record-key-name (<see cref="NamedKey"/>); <paramref name="Length"/> is the 2002+ WITH LENGTH partial-key
+/// character count (SR8/GR13–GR14, indexed only).</summary>
 public sealed record BoundKeyedStart(
     FileModel File, KeyedStartMode Mode, string Op, int KeyIndex, Place? Operand, BoundExpr? Length,
-    KeyedInvalidKey? InvalidKey) : BoundStatement;
+    KeyedInvalidKey? InvalidKey) : BoundStatement
+{
+    /// <summary>The SOURCE-form key the KEY phrase names by its record-key-name (SR7), or the GR15 prime key when
+    /// that is SOURCE-form; null when <see cref="Operand"/> is data-name-1 (kb/Work PB1099). GR17 b) takes the
+    /// default temporary-area length from it — "or else the length of record-key-name-1, if specified" — and
+    /// GR13 the class that counts LENGTH's positions.</summary>
+    public RecordKey? NamedKey { get; init; }
+}

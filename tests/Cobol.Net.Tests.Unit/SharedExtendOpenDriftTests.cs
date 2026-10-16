@@ -270,7 +270,7 @@ public sealed class SharedExtendOpenDriftTests
         try
         {
             var reg = new FileRegistry();
-            reg.RegisterIndexed("F", host, 7, optional: false, accessMode: 0, primeOffset: 0, primeLength: 4, -1, -1);
+            reg.RegisterIndexed("F", host, 7, optional: false, accessMode: 0, primeKey: [new(0, 4)], -1, -1);
             Assert.Equal(FileStatusCode.Success, ShareAndOpen(reg, "F", spelling, FileOpenMode.Output));
             Assert.Equal(FileStatusCode.Success,
                 reg.WriteShared("F", "K002AAA", -1, FileRecordLock.None, FileRetryKind.None, 0, page: null));
@@ -284,7 +284,7 @@ public sealed class SharedExtendOpenDriftTests
             reg.Close("F");
 
             var back = new FileRegistry();
-            back.RegisterIndexed("R", host, 7, false, 0, 0, 4, -1, -1);
+            back.RegisterIndexed("R", host, 7, false, 0, [new(0, 4)], -1, -1);
             back.OpenStatic("R", FileOpenMode.Input);
             Assert.Equal(FileStatusCode.Success, back.ReadKeyedNext("R", out string a));
             Assert.Equal(FileStatusCode.Success, back.ReadKeyedNext("R", out string b));

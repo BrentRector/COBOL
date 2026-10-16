@@ -67,21 +67,41 @@ internal enum FileKinds
 /// <para><paramref name="ClauseFace"/> is the clause's name as the standard prints it, and it is the ONLY
 /// spelling of it: every message below renders it rather than repeating a literal, so a role and its
 /// diagnostics cannot drift apart.</para>
-/// <para><paramref name="Written"/> is the THIRD state a clause can be in, and it exists because "absent" and
-/// "named nothing" are not the same fact (kb/Work PB358). A clause written in the declined
-/// <c>record-key-name-1 SOURCE IS data-name-2 …</c> form (Annex A.3 item 40 — COBOLNET1954) is refused at bind
-/// and contributes NO data-name, so <paramref name="Name"/> is null while the clause is plainly there. Only the
-/// §12.4.5.1 Format-1 requiredness row reads it, because that is the only rule whose subject is the clause's
-/// PRESENCE; every operand rule below it tests <paramref name="Item"/> or <paramref name="Name"/> and is
-/// correctly silent on a refused clause.</para>
+/// <para>⛔ A SOURCE-PHRASE CLAUSE IS ONE OPERAND PER data-name-2 (kb/Work PB1099 Q1). §12.4.5.12.3 SR1–SR4 and
+/// §12.4.5.6.3 SR1–SR3/SR5 are each stated of "data-name-1 and data-name-2" (or "each data-name-2"), so the rows
+/// that screen data-name-1 screen every data-name-2 by the same predicate — <paramref name="Source"/> is the
+/// phrase and <paramref name="SourceIndex"/> the operand's position in it (−1 for data-name-1). A rule about the
+/// CLAUSE rather than an operand — the §12.4.5.2 SR8 placement rows, SR4's coincidence, SR7's SUPPRESS WHEN —
+/// asks only the clause's <see cref="IsClauseHead"/> operand, so a clause is reported once whatever its
+/// operand count.</para>
 /// <para><paramref name="SuppressWhen"/> is an ALTERNATE RECORD KEY clause's SUPPRESS WHEN literal-1 as read
-/// (§12.4.5.6.3 SR7's subject); null on every other role and on a clause without the phrase.</para>
+/// (§12.4.5.6.3 SR7's subject); null on every other role, on a clause without the phrase, and on every
+/// data-name-2 after the first.</para>
 /// <para><paramref name="Ordinal"/> is an ALTERNATE RECORD KEY clause's position among the entry's alternate
 /// clauses as written — what lets §12.4.5.6.3 SR4's "another alternate record key" exclude the clause itself
 /// without excluding a SECOND clause that names the same item; 0 on every other role.</para></summary>
 internal readonly record struct FileKeyOperand(
-    FileKeyRole Role, string ClauseFace, string? Name, DataItem? Item, DiagnosticCursor At, bool Written = true,
-    SuppressWhenOperand? SuppressWhen = null, int Ordinal = 0);
+    FileKeyRole Role, string ClauseFace, string? Name, DataItem? Item, DiagnosticCursor At,
+    SuppressWhenOperand? SuppressWhen = null, int Ordinal = 0, RecordKeySource? Source = null, int SourceIndex = -1)
+{
+    /// <summary>The operand the clause-level rules ask: data-name-1, or the first data-name-2 of a SOURCE phrase.</summary>
+    public bool IsClauseHead => SourceIndex <= 0;
+
+    /// <summary>Which operand of the general format this is, as a message names it.</summary>
+    public string OperandFace => Source is null ? "data-name-1" : "data-name-2";
+
+    /// <summary>The operand as a message names it: data-name-1, or <c>record-key-name-1 SOURCE … data-name-2</c>.</summary>
+    public string Written => Source is null ? $"'{Name}'" : $"'{Source.Name}' SOURCE operand '{Name}'";
+
+    /// <summary>§12.4.5.12.3 SR2 / §12.4.5.6.3 SR2's last sentence — "All occurrences of data-name-2 shall be of the
+    /// same category" — broken by this data-name-2 when its category differs from the FIRST data-name-2's (the one
+    /// record-key-name-1 takes its class and category from, SR5 / SR6). Only an operand both of whose items are of a
+    /// category SR2 admits is compared: SR2's own category row speaks about any other.</summary>
+    public bool CategoryDiffersFromFirstSource =>
+        Source is not null && SourceIndex > 0 && Item is { } mine && Source.Operands[0].Item is { } first
+        && ItemCategory.IsAlphanumericOrNational(mine) && ItemCategory.IsAlphanumericOrNational(first)
+        && ItemCategory.IsAlphanumeric(mine) != ItemCategory.IsAlphanumeric(first);
+}
 
 /// <summary>The four general formats of ISO/IEC 1989:2023 §12.4.5.1, as the set a clause is printed in.</summary>
 [Flags]
@@ -203,8 +223,11 @@ internal sealed record FileControlKeyRule(
 /// both), so an entry on an FD can never specify Format 4 alone and SR13's FD direction has nothing to screen:
 /// the obligation it states for an SD is the one the SD rows carry.</para>
 /// <para>NOT HERE, deliberately: the DESCRIPTIVE rules of the same clauses — §12.4.5.12.3 SR5 and §12.4.5.6.3 SR6,
-/// "Record-key-name-1 has the class and category of data-name-2", which state a property of the SOURCE phrase's
-/// operand and have no obligation to screen while that phrase is declined (Annex A.3 item 40, COBOLNET1954). Every
+/// "Record-key-name-1 has the class and category of data-name-2" — which state a property of the key, not an
+/// obligation on the source: the resolved key takes its class and category from data-name-2
+/// (<see cref="RecordKey.CategorySource"/>, which every consumer of a key's class reads), and SR2's "All
+/// occurrences of data-name-2 shall be of the same category" — rows below — is what makes that one answer
+/// (kb/Work PB1099 Q1). Every
 /// other syntax rule of the three key clauses is a row, which is the point of the table — §12.4.5.6.3 SR5 and SR7
 /// and §12.4.5.12.3 SR4 became rows exactly that way (kb/Work PB1025, PB1072), and SR3 and SR4 of the ALTERNATE
 /// RECORD KEY (PB1073) after them.</para>
@@ -236,13 +259,11 @@ internal static class FileControlKeyRules
             "No choice indicators appear anywhere in this figure",
             FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
             f => f.HasFd,
-            // ⛔ "NAMED NOTHING" IS NOT "ABSENT". The predicate was `op.Name is null` alone until 2026-09-09,
-            // which was safe only while every RECORD KEY clause that parsed also bound a data-name. The declined
-            // SOURCE key form (Annex A.3 item 40 → COBOLNET1954, kb/Work PB358) names a record-key-name and no
-            // data-name, so a program that WROTE the clause was then told its file has none — a false sentence
-            // pointing at a different repair. This rule's subject is the clause's PRESENCE (an unbracketed member
-            // of Format 1), so it reads the presence fact.
-            (_, op) => op.Name is null && !op.Written,
+            // ⛔ THIS RULE'S SUBJECT IS THE CLAUSE'S PRESENCE (an unbracketed member of Format 1), never what it
+            // named: an absent clause is the one operand with a null name, and either key form — data-name-1, or a
+            // SOURCE phrase's data-name-2 operands (kb/Work PB1099) — gives every operand a name, so a clause that
+            // was written is never told it is missing (the false sentence kb/Work PB358 measured).
+            (_, op) => op.Name is null,
             (f, op) => $"indexed file '{f.CobolName}' has no {op.ClauseFace} clause (ISO §12.4.5.1 Format 1 — the "
                 + "RECORD KEY clause is unbracketed in the indexed format, so it is required for ORGANIZATION "
                 + "INDEXED)"),
@@ -252,8 +273,8 @@ internal static class FileControlKeyRules
             FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
             f => f.HasFd && f.Records.Count > 0,
             (f, op) => op.Name is not null && !RecordLayout.IsInRecordOfFile(f, op.Item),
-            (f, op) => $"{op.ClauseFace} '{op.Name}' {(op.Item is null ? "references nothing described in this program" : "references an item outside this file's record descriptions")}; "
-                + $"data-name-1 shall reference a data item within a record description entry associated with "
+            (f, op) => $"{op.ClauseFace} {op.Written} {(op.Item is null ? "references nothing described in this program" : "references an item outside this file's record descriptions")}; "
+                + $"{op.OperandFace} shall reference a data item within a record description entry associated with "
                 + $"'{f.SelectName}' (ISO §12.4.5.12.3 SR2)"),
 
         // SR2's OTHER obligation. The sentence joins a CATEGORY and a LOCATION with "within", and a rule read as
@@ -265,15 +286,26 @@ internal static class FileControlKeyRules
             FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
             _ => true,
             (_, op) => op.Item is { } i && !ItemCategory.IsAlphanumericOrNational(i),
-            (_, op) => $"{op.ClauseFace} '{op.Name}' is {ItemCategory.Face(op.Item!)}; data-name-1 shall reference "
+            (_, op) => $"{op.ClauseFace} {op.Written} is {ItemCategory.Face(op.Item!)}; {op.OperandFace} shall reference "
                 + "a data item of category alphanumeric or category national (ISO §12.4.5.12.3 SR2)"),
+
+        // SR2's THIRD obligation, its last sentence — kb/Work PB1099 Q1. Stated only of the SOURCE phrase's operands,
+        // and the reason SR5's "Record-key-name-1 has the class and category of data-name-2" names ONE category.
+        new("SR-12.4.5.12.3-2", "12.4.5.12.3", "ISO §12.4.5.12.3 SR2",
+            "All occurrences of data-name-2 shall be of the same category",
+            FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
+            _ => true,
+            (_, op) => op.CategoryDiffersFromFirstSource,
+            (_, op) => $"{op.ClauseFace} {op.Written} is {ItemCategory.Face(op.Item!)}, but the first data-name-2 "
+                + $"'{op.Source!.Operands[0].Name}' is {ItemCategory.Face(op.Source.Operands[0].Item!)}; all occurrences "
+                + "of data-name-2 shall be of the same category (ISO §12.4.5.12.3 SR2)"),
 
         new("SR-12.4.5.12.3-1", "12.4.5.12.3", "ISO §12.4.5.12.3 SR1",
             "Data-name-1 and data-name-2 shall not be subject to any OCCURS clauses",
             FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
             _ => true,
             (_, op) => op.Item is { } i && RecordLayout.IsSubjectToOccurs(i),
-            (_, op) => $"{op.ClauseFace} '{op.Name}' is subject to an OCCURS clause; data-name-1 shall not be "
+            (_, op) => $"{op.ClauseFace} {op.Written} is subject to an OCCURS clause; {op.OperandFace} shall not be "
                 + "(ISO §12.4.5.12.3 SR1)"),
 
         // SR3 — kb/Work PB1073. §8.5.1.11.1 defines the term: "a dynamic-capacity table or a dynamic-length
@@ -287,8 +319,8 @@ internal static class FileControlKeyRules
             FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
             _ => true,
             (_, op) => op.Item is { IsDynamicLength: true },
-            (_, op) => $"{op.ClauseFace} '{op.Name}' is a dynamic-length elementary item, which is a variable-length "
-                + "data item (ISO §8.5.1.11.1); data-name-1 shall not reference one (ISO §12.4.5.12.3 SR3)"),
+            (_, op) => $"{op.ClauseFace} {op.Written} is a dynamic-length elementary item, which is a variable-length "
+                + $"data item (ISO §8.5.1.11.1); {op.OperandFace} shall not reference one (ISO §12.4.5.12.3 SR3)"),
 
         // ⛔ THE MINIMUM-RECORD-SIZE RULE (kb/Work PB1025). Unenforced until 2026-09-22: a RECORD KEY that a
         // dynamic-length item preceded compiled clean, was sliced at its FIXED-run offset, and a READ … KEY
@@ -311,7 +343,7 @@ internal static class FileControlKeyRules
             "Format 1 shall be specified only for an indexed file",
             FileKinds.AnyOrganization & ~FileKinds.Indexed, FileKeyRole.PrimeRecordKey,
             _ => true,
-            (_, op) => op.Name is not null,
+            (_, op) => op.Name is not null && op.IsClauseHead,
             (f, op) => $"file '{f.CobolName}' has a {op.ClauseFace} clause, which appears only in the indexed file "
                 + $"control entry (ISO §12.4.5.1 Format 1), but this file is {f.OrganizationFace}; Format 1 shall "
                 + "be specified only for an indexed file (ISO §12.4.5.2 SR8)"),
@@ -322,8 +354,8 @@ internal static class FileControlKeyRules
             FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
             f => f.HasFd && f.Records.Count > 0,
             (f, op) => !RecordLayout.IsInRecordOfFile(f, op.Item),
-            (f, op) => $"{op.ClauseFace} '{op.Name}' {(op.Item is null ? "references nothing described in this program" : "references an item outside this file's record descriptions")}; "
-                + $"data-name-1 shall be defined within a record description entry associated with "
+            (f, op) => $"{op.ClauseFace} {op.Written} {(op.Item is null ? "references nothing described in this program" : "references an item outside this file's record descriptions")}; "
+                + $"{op.OperandFace} shall be defined within a record description entry associated with "
                 + $"'{f.SelectName}' (ISO §12.4.5.6.3 SR2)"),
 
         new("SR-12.4.5.6.3-2", "12.4.5.6.3", "ISO §12.4.5.6.3 SR2",
@@ -331,15 +363,25 @@ internal static class FileControlKeyRules
             FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
             _ => true,
             (_, op) => op.Item is { } i && !ItemCategory.IsAlphanumericOrNational(i),
-            (_, op) => $"{op.ClauseFace} '{op.Name}' is {ItemCategory.Face(op.Item!)}; data-name-1 shall be defined "
+            (_, op) => $"{op.ClauseFace} {op.Written} is {ItemCategory.Face(op.Item!)}; {op.OperandFace} shall be defined "
                 + "as a data item of category alphanumeric or national (ISO §12.4.5.6.3 SR2)"),
+
+        // SR2's last sentence — the ALTERNATE RECORD KEY twin of the prime-key row above (kb/Work PB1099 Q1).
+        new("SR-12.4.5.6.3-2", "12.4.5.6.3", "ISO §12.4.5.6.3 SR2",
+            "All occurrences of data-name-2 shall be of the same category",
+            FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
+            _ => true,
+            (_, op) => op.CategoryDiffersFromFirstSource,
+            (_, op) => $"{op.ClauseFace} {op.Written} is {ItemCategory.Face(op.Item!)}, but the first data-name-2 "
+                + $"'{op.Source!.Operands[0].Name}' is {ItemCategory.Face(op.Source.Operands[0].Item!)}; all occurrences "
+                + "of data-name-2 shall be of the same category (ISO §12.4.5.6.3 SR2)"),
 
         new("SR-12.4.5.6.3-1", "12.4.5.6.3", "ISO §12.4.5.6.3 SR1",
             "Data-name-1 and data-name-2 shall not be subject to any OCCURS clauses",
             FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
             _ => true,
             (_, op) => op.Item is { } i && RecordLayout.IsSubjectToOccurs(i),
-            (_, op) => $"{op.ClauseFace} '{op.Name}' is subject to an OCCURS clause; data-name-1 shall not "
+            (_, op) => $"{op.ClauseFace} {op.Written} is subject to an OCCURS clause; {op.OperandFace} shall not "
                 + "be (ISO §12.4.5.6.3 SR1)"),
 
         // SR3 — the ALTERNATE RECORD KEY twin of §12.4.5.12.3 SR3 above, same one-arm reading (kb/Work PB1073).
@@ -348,14 +390,15 @@ internal static class FileControlKeyRules
             FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
             _ => true,
             (_, op) => op.Item is { IsDynamicLength: true },
-            (_, op) => $"{op.ClauseFace} '{op.Name}' is a dynamic-length elementary item, which is a variable-length "
-                + "data item (ISO §8.5.1.11.1); data-name-1 shall not reference one (ISO §12.4.5.6.3 SR3)"),
+            (_, op) => $"{op.ClauseFace} {op.Written} is a dynamic-length elementary item, which is a variable-length "
+                + $"data item (ISO §8.5.1.11.1); {op.OperandFace} shall not reference one (ISO §12.4.5.6.3 SR3)"),
 
         // SR4 — kb/Work PB1073. The rule is stated about the ALTERNATE key and counts the PRIME key and every OTHER
         // alternate clause as the keys it may not coincide with, so two clauses naming the same item each violate it
         // (each coincides with the other) and a prime key is never itself a subject. Its closing sentence — "This
-        // restriction does not apply in the case where either key is specified using the SOURCE phrase" — exempts a
-        // form this compiler declines (Annex A.3 item 40, COBOLNET1954): no operand reaches this row through it.
+        // restriction does not apply in the case where either key is specified using the SOURCE phrase" — is
+        // CoincidingKey's first test: a SOURCE-form subject is exempt, and a SOURCE-form key is no other key to
+        // coincide with (kb/Work PB1099).
         // "Leftmost byte position" is the position in the key's own record (RecordLayout.KeyWindowOf, the one
         // reader every key rule uses), so a key a variable-length member precedes is compared by its fixed-run
         // position AND that fact.
@@ -403,7 +446,7 @@ internal static class FileControlKeyRules
                 && (op.SuppressWhen!.Class is LiteralClass.National) != !ItemCategory.IsAlphanumeric(i),
             (_, op) => $"{op.ClauseFace} '{op.Name}': SUPPRESS WHEN {op.SuppressWhen?.Written} is "
                 + $"{SuppressWhenFace(op.SuppressWhen)}, but '{op.Name}' is {ItemCategory.Face(op.Item!)}; literal-1 "
-                + "shall be of the same category as data-name-1 (ISO §12.4.5.6.3 SR7)"),
+                + $"shall be of the same category as {op.OperandFace} (ISO §12.4.5.6.3 SR7)"),
 
         new("SR-12.4.5.6.3-7", "12.4.5.6.3", "ISO §12.4.5.6.3 SR7",
             "If ALL literal is specified, the literal shall be one character long",
@@ -420,7 +463,7 @@ internal static class FileControlKeyRules
             "Format 1 shall be specified only for an indexed file",
             FileKinds.AnyOrganization & ~FileKinds.Indexed, FileKeyRole.AlternateRecordKey,
             _ => true,
-            (_, _) => true,
+            (_, op) => op.IsClauseHead,
             (f, op) => $"file '{f.CobolName}' has an {op.ClauseFace} clause, which appears only in the indexed file "
                 + $"control entry (ISO §12.4.5.1 Format 1), but this file is {f.OrganizationFace}; Format 1 shall "
                 + "be specified only for an indexed file (ISO §12.4.5.2 SR8)"),
@@ -642,10 +685,13 @@ internal static class FileControlKeyRules
     /// The prime key is asked first so an alternate that coincides with both hears about the one SR4 names first.</summary>
     private static string? CoincidingKey(FileModel f, FileKeyOperand op)
     {
-        if (RecordLayout.KeyWindowInFile(f, op.Item) is not { } mine) return null;
+        // SR4's last sentence: "This restriction does not apply in the case where either key is specified using the
+        // SOURCE phrase" — so a SOURCE-form subject has no rule here, and a SOURCE-form key is no other key to
+        // coincide with (its clause's data-name-1 Item is null, and the prime's PrimeKey.Item is null).
+        if (op.Source is not null || RecordLayout.KeyWindowInFile(f, op.Item) is not { } mine) return null;
         bool Same(DataItem? other) =>
             RecordLayout.KeyWindowInFile(f, other) is { } w && w.Offset == mine.Offset && w.FollowsVariable == mine.FollowsVariable;
-        if (Same(f.RecordKeyItem)) return $"the prime record key '{f.RecordKeyName}'";
+        if (Same(f.PrimeKey?.Item)) return $"the prime record key '{f.RecordKeyName}'";
         for (int i = 0; i < f.AlternateKeyNames.Count; i++)
             if (i != op.Ordinal && Same(f.AlternateKeyNames[i].Item))
                 return $"another alternate record key '{f.AlternateKeyNames[i].Name}'";
@@ -660,7 +706,7 @@ internal static class FileControlKeyRules
             { } w => $"occupies bytes {w.Offset + 1}..{w.MaxEnd} of the record",
             null => "is not contained within the minimum record size",
         };
-        return $"{op.ClauseFace} '{op.Name}' {where}, but indexed file '{f.CobolName}' contains variable-length "
+        return $"{op.ClauseFace} {op.Written} {where}, but indexed file '{f.CobolName}' contains variable-length "
             + $"records with minimum size {f.VaryMin}; the key shall be contained within the first {n} bytes of the "
             + $"record, where {n} equals the minimum record size ({citation})";
     }
@@ -735,15 +781,31 @@ internal static class FileControlKeyRules
     /// <summary>The operands a role contributes to the entry. The prime and relative roles always contribute
     /// EXACTLY ONE — with a null name when the clause is absent, which is what lets an absence rule and an
     /// operand rule be the same kind of row.</summary>
+    /// <summary>One operand per data-name-2 of a SOURCE phrase (kb/Work PB1099 Q1), in the order specified; the
+    /// SUPPRESS WHEN operand rides the first only, so SR7 is asked once per clause.</summary>
+    private static IEnumerable<FileKeyOperand> SourceOperands(FileKeyRole role, string face, RecordKeySource source,
+                                                              SuppressWhenOperand? suppressWhen, int ordinal)
+    {
+        for (int k = 0; k < source.Operands.Count; k++)
+        {
+            var op = source.Operands[k];
+            yield return new FileKeyOperand(role, face, op.Name, op.Item, op.At,
+                SuppressWhen: k == 0 ? suppressWhen : null, Ordinal: ordinal, Source: source, SourceIndex: k);
+        }
+    }
+
     private static IEnumerable<FileKeyOperand> Operands(FileModel file, FileKeyRole role)
     {
         switch (role)
         {
             case FileKeyRole.PrimeRecordKey:
-                // `Written` is the entry's own record of whether the clause appeared, NOT `Name is not null`:
-                // the declined SOURCE key form writes the clause and binds no data-name (kb/Work PB358).
-                yield return new FileKeyOperand(role, "RECORD KEY", file.RecordKeyName, file.RecordKeyItem,
-                    file.RecordKeyAt, file.RecordKeyClauseWritten);
+                // A SOURCE-phrase clause contributes its data-name-2 operands; an absent clause, one operand with a
+                // null name (the Format 1 requiredness row's subject).
+                if (file.RecordKeySource is { } pks)
+                    foreach (var op in SourceOperands(role, "RECORD KEY", pks, null, 0)) yield return op;
+                else
+                    yield return new FileKeyOperand(role, "RECORD KEY", file.RecordKeyName, file.PrimeKey?.Item,
+                        file.RecordKeyAt);
                 break;
             case FileKeyRole.AlternateRecordKey:
                 // The clauses AS WRITTEN, not FileModel.AlternateKeys: a clause whose data-name-1 resolved to
@@ -751,8 +813,11 @@ internal static class FileControlKeyRules
                 for (int i = 0; i < file.AlternateKeyNames.Count; i++)
                 {
                     var alt = file.AlternateKeyNames[i];
-                    yield return new FileKeyOperand(role, "ALTERNATE RECORD KEY", alt.Name, alt.Item, alt.At,
-                        SuppressWhen: alt.SuppressWhen, Ordinal: i);
+                    if (alt.Source is { } aks)
+                        foreach (var op in SourceOperands(role, "ALTERNATE RECORD KEY", aks, alt.SuppressWhen, i)) yield return op;
+                    else
+                        yield return new FileKeyOperand(role, "ALTERNATE RECORD KEY", alt.Name, alt.Item, alt.At,
+                            SuppressWhen: alt.SuppressWhen, Ordinal: i);
                 }
                 break;
             case FileKeyRole.RelativeKey:

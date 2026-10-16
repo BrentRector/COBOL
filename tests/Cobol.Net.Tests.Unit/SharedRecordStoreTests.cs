@@ -110,8 +110,8 @@ public sealed class SharedRecordStoreTests
     {
         var reg = new FileRegistry();
         string host = Tmp("ix");
-        reg.RegisterIndexed("A", host, 8, false, Random, 0, 2, -1, -1);
-        reg.RegisterIndexed("B", host, 8, false, Random, 0, 2, -1, -1);
+        reg.RegisterIndexed("A", host, 8, false, Random, [new(0, 2)], -1, -1);
+        reg.RegisterIndexed("B", host, 8, false, Random, [new(0, 2)], -1, -1);
         reg.RegisterSharing("A", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
         reg.RegisterSharing("B", FileSharing.AllOther, FileLockMode.Manual, multiple: false);
         try

@@ -31,7 +31,7 @@ public sealed class IndexedNationalKeyPadTests
         var reg = new FileRegistry();
         string host = Tmp();
         // 10-byte record area, prime key at offset 0 for 6 bytes, RECORD VARYING 2..10.
-        reg.RegisterIndexed("X", host, 10, false, Dynamic, 0, 6, 2, 10);
+        reg.RegisterIndexed("X", host, 10, false, Dynamic, [new(0, 6)], 2, 10);
         if (national) reg.RegisterNationalArea("X");
         reg.OpenStatic("X", FileOpenMode.Output);
         Assert.Equal("00", reg.WriteKeyed("X", ShortNationalRecord, ShortNationalRecord.Length));
