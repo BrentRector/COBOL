@@ -26,10 +26,12 @@ namespace CobolNet.Tests.Conformance;
 /// ⚠ WHAT THEY REALLY PROVED IS PRESERVED HERE, WHICH IS THE POINT OF MOVING THEM RATHER THAN DELETING THEM.
 /// PB21's subject was a CRASH — a float operand at an integer position emitted a call to a runtime member that
 /// DOES NOT EXIST and failed Roslyn with a raw CS0117 — and PB2's was the sibling CS1503 from handing a
-/// <c>double</c> to an <c>Int128</c> parameter. Both paths are still REACHED under <c>--permissive</c>, so both
-/// crashes are still live risks and still need a guard; only the strict verdict changed. The invariant each
-/// asserted — a function's value must not depend on how its argument happened to be stored — is asserted here as
-/// the float lane agreeing with the fixed-point lane value for value.
+/// <c>double</c> to an <c>Int128</c> parameter. Both programs still REACH the renderer under <c>--permissive</c>,
+/// so both still need a guard; only the strict verdict changed. Since kb/Work PB651 the renderer takes a type-6
+/// operand's INTEGER before it chooses a lane (<c>IntrinsicRenderer.RawArg</c>), so a float there never enters the
+/// binary64 lane at all. The invariant each asserted — a function's value must not depend on how its argument
+/// happened to be stored — is asserted here as the float operand agreeing with the fixed-point one value for value,
+/// and over every verified type-6 position by <c>IntrinsicIntegerPositionPermissiveDriftTests</c>.
 /// </para>
 /// </remarks>
 public sealed class FloatIntegerArgumentPermissiveTests
@@ -267,6 +269,111 @@ public sealed class FloatIntegerArgumentPermissiveTests
                 "F4=0007", // LAST + ANYCASE over {1,4,7,10}, ignore 1 from the tail
                 "F5=0007", // the FIXED-POINT control: an integer literal argument-3, same answer
             },
+            stdout.Replace("\r\n", "\n").TrimEnd('\n').Split('\n'));
+    }
+
+    /// <summary>
+    /// kb/Work PB651 — a FRACTIONAL float at a §15.3 type-6 position, on each of the three lanes a call with one used to
+    /// take: MOD's exact arm (which aligned the fraction instead of dropping it), COMBINED-DATETIME (which the float moved
+    /// to the binary64 lane), and ANNUITY (a §15.4.1 float-family function, whose body took the double as it stood).
+    /// docs/CONFORMANCE.md DOC-A.1-124: with EC-ARGUMENT-FUNCTION checking off the truncated integer is the result, so
+    /// each answers exactly what its integer answers.
+    /// </summary>
+    private const string Pb651FractionProgram = """
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB651FRACTIONPERMISSIVE.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 F75   USAGE FLOAT-LONG VALUE 7.5.
+       01 FDT   USAGE FLOAT-LONG VALUE 143951.5.
+       01 F35   USAGE FLOAT-LONG VALUE 3.5.
+       01 RM    PIC 9.
+       01 RC    PIC 9(6)V9(5).
+       01 RA    PIC 9V9(9).
+       PROCEDURE DIVISION.
+           COMPUTE RM = FUNCTION MOD(F75 3)
+           DISPLAY "MOD=" RM
+           COMPUTE RC = FUNCTION COMBINED-DATETIME(FDT 3600)
+           DISPLAY "CDT=" RC
+           COMPUTE RA = FUNCTION ANNUITY(0.05 F35)
+           DISPLAY "ANN=" RA
+           STOP RUN.
+       """;
+
+    /// <summary>The three values from the equivalent arithmetic expressions over the TRUNCATED integers: §15.64.4
+    /// 7 − 3 × INTEGER(7 / 3) = 1; §15.17.4 143951 + 3600 / 100000 = 143951.03600; §15.9.4 1) b)
+    /// 0.05 / (1 − 1.05 ** −3) = 0.367208564…, truncated to the receiver's nine fraction digits.</summary>
+    [Fact]
+    public void Pb651FractionalFloat_AtATypeSixPosition_UnderPermissive_IsTruncatedOnEveryLane()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull(Pb651FractionProgram, 2023, permissive: true);
+        Assert.True(ok, $"--permissive must accept the coercion: {string.Join("\n", errors)}");
+        EditionHarness.AssertHasDiagnostic(warnings, "COBOLNET1627");
+
+        var (ranOk, stdout, detail) = EditionHarness.CompileAndRun(Pb651FractionProgram, 2023, permissive: true);
+        Assert.True(ranOk, detail);
+        Assert.Equal(new[] { "MOD=1", "CDT=14395103600", "ANN=0367208564" },
+            stdout.Replace("\r\n", "\n").TrimEnd('\n').Split('\n'));
+    }
+
+    /// <summary>
+    /// kb/Work PB651 review R1-2 — a float whose integer lies PAST the <c>Int128</c> carrier (±1.7e38) at a §15.3 type-6
+    /// position. The position intake used to CLAMP it to the carrier's extreme, which answers for a different integer:
+    /// <c>MOD(1.0E39, 7)</c> answered 1, the remainder of 2¹²⁷ − 1, with no exception condition. Now a function whose
+    /// value depends on the integer keeps it or says it cannot — EC-ARGUMENT-FUNCTION, here handled by a declarative
+    /// that resumes, so the receiver keeps its 9999 — while the two TOTAL functions whose answer is the same for every
+    /// integer past a bound (TEST-DATE-YYYYMMDD / TEST-DAY-YYYYDDD argument-1, FIND-STRING argument-3) still answer,
+    /// with checking ON, and raise nothing (kb/Work PB254). <c>M30</c> is the inside-the-carrier control: the
+    /// binary64 nearest 1.0E30 is the integer 1000000000000000019884624838656, whose remainder by 7 is 5.
+    /// </summary>
+    private const string Pb651PastTheCarrierProgram = """
+       >>TURN EC-ARGUMENT-FUNCTION CHECKING ON
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB651PASTCARRIER.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 F39   USAGE FLOAT-LONG VALUE 1.0E39.
+       01 FN39  USAGE FLOAT-LONG VALUE -1.0E39.
+       01 F30   USAGE FLOAT-LONG VALUE 1.0E30.
+       01 RM    PIC 9(4) VALUE 9999.
+       01 RN    PIC 9(4) VALUE 9999.
+       01 RV    PIC 9(2).
+       PROCEDURE DIVISION.
+       DECLARATIVES.
+       EC-H SECTION. USE AFTER EXCEPTION CONDITION EC-ARGUMENT-FUNCTION.
+       EC-H-P.
+           DISPLAY "EC=" FUNCTION EXCEPTION-STATUS
+           RESUME AT NEXT STATEMENT.
+       END DECLARATIVES.
+       MAIN-S SECTION.
+       MAIN-P.
+           COMPUTE RM = FUNCTION MOD(F30 7)
+           DISPLAY "M30=" RM
+           COMPUTE RN = FUNCTION MOD(F39 7)
+           DISPLAY "M39=" RN
+           COMPUTE RV = FUNCTION TEST-DATE-YYYYMMDD(F39)
+           DISPLAY "TD=" RV
+           COMPUTE RV = FUNCTION TEST-DAY-YYYYDDD(FN39)
+           DISPLAY "TY=" RV
+           COMPUTE RM = FUNCTION FIND-STRING("abcabc" "c" START AFTER F39)
+           DISPLAY "FS=" RM
+           STOP RUN.
+       """;
+
+    /// <summary>§15.64.4: MOD(1000000000000000019884624838656, 7) = 5. §15.3: a value the implementation cannot represent
+    /// at an integer argument of a function that depends on it is EC-ARGUMENT-FUNCTION (docs/CONFORMANCE.md
+    /// DOC-A.1-124). §15.90.4 r1a / §15.91.4 r1a: 01 for every integer outside the window. §15.37.4 r2/r3: 0 once every
+    /// match is ignored.</summary>
+    [Fact]
+    public void Pb651FloatPastTheCarrier_KeepsItsValueOrRaises_AndOnlyAConstantAnswerClamps()
+    {
+        var (ok, errors, warnings) = EditionHarness.CompileFull(Pb651PastTheCarrierProgram, 2023, permissive: true);
+        Assert.True(ok, $"--permissive must accept the coercion: {string.Join("\n", errors)}");
+        EditionHarness.AssertHasDiagnostic(warnings, "COBOLNET1627");
+
+        var (ranOk, stdout, detail) = EditionHarness.CompileAndRun(Pb651PastTheCarrierProgram, 2023, permissive: true);
+        Assert.True(ranOk, detail);
+        Assert.Equal(new[] { "M30=0005", "EC=EC-ARGUMENT-FUNCTION", "M39=9999", "TD=01", "TY=01", "FS=0000" },
             stdout.Replace("\r\n", "\n").TrimEnd('\n').Split('\n'));
     }
 

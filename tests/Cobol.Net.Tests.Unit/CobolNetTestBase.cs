@@ -39,7 +39,15 @@ public abstract class CobolNetTestBase : IDisposable
         var result = CompilerDriver.Compile(new CompilerDriver.Options(srcPath, dllPath, DialectLevel: dialectLevel, SourceFormat: InitialReferenceFormat.Auto));
         if (!result.Success)
             return (false, "", $"{result.Status}: {string.Join("\n", result.Errors)}");
+        return RunAssembly(dllPath);
+    }
 
+    /// <summary>Run an assembly <see cref="CompilerDriver"/> produced; returns whether it exited 0, its stdout with
+    /// newlines canonicalized and trailing whitespace trimmed, and its stderr. For a test that compiles with options
+    /// <see cref="CompileAndRun"/> does not take (<c>--permissive</c>, a source format) and reads the result's
+    /// warnings before running it.</summary>
+    protected (bool ok, string stdout, string detail) RunAssembly(string dllPath)
+    {
         // The ONE child-process observer (tests/_shared/ProcessObservation.cs) — a run that does not complete
         // raises rather than returning an empty stdout for the caller to compare. See plan §11 A12.
         var psi = new ProcessStartInfo("dotnet", $"\"{dllPath}\"") { WorkingDirectory = TempDir };

@@ -2668,12 +2668,6 @@ static CobolNet.Runtime.CobolIntrinsics.Concat(params string![]! parts) -> strin
 static CobolNet.Runtime.CobolIntrinsics.Convert(string! arg, int src, int dst, bool dstHex) -> string!
 static CobolNet.Runtime.CobolIntrinsics.Cos(CobolNet.Runtime.CobolDec x) -> double
 static CobolNet.Runtime.CobolIntrinsics.Cos(double x) -> double
-static CobolNet.Runtime.CobolIntrinsics.DateOfIntegerReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.DateToYyyymmddReal(double date, double off = 50) -> long
-static CobolNet.Runtime.CobolIntrinsics.DateToYyyymmddReal(double date, double off, double baseYear) -> long
-static CobolNet.Runtime.CobolIntrinsics.DayOfIntegerReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.DayToYyyydddReal(double day, double off = 50) -> long
-static CobolNet.Runtime.CobolIntrinsics.DayToYyyydddReal(double day, double off, double baseYear) -> long
 static CobolNet.Runtime.CobolIntrinsics.DisplayOf(string! arg, string? sub = null) -> string!
 static CobolNet.Runtime.CobolIntrinsics.DomainDec(CobolNet.Runtime.CobolDec value, CobolNet.Runtime.CobolIntrinsics.ArgumentDomain domain, string! function, string! rule) -> double
 static CobolNet.Runtime.CobolIntrinsics.DomainDecAdmitted(CobolNet.Runtime.CobolDec value, CobolNet.Runtime.CobolIntrinsics.ArgumentDomain domain, string! function, string! rule) -> CobolNet.Runtime.CobolDec?
@@ -2703,8 +2697,6 @@ static CobolNet.Runtime.CobolIntrinsics.IntegerArgWideDec(CobolNet.Runtime.Cobol
 static CobolNet.Runtime.CobolIntrinsics.IntegerArgWideReal(double v) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerArgWideScaled(System.Int128 unscaled, int scale) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerOfBoolean(string! boolean) -> System.Int128
-static CobolNet.Runtime.CobolIntrinsics.IntegerOfDateReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.IntegerOfDayReal(double v) -> long
 static CobolNet.Runtime.CobolIntrinsics.Length(string! s) -> long
 static CobolNet.Runtime.CobolIntrinsics.Log(CobolNet.Runtime.CobolDec? x) -> double
 static CobolNet.Runtime.CobolIntrinsics.Log(double x) -> double
@@ -2732,7 +2724,6 @@ static CobolNet.Runtime.CobolIntrinsics.MinScaled(params System.Int128[]! xs) ->
 static CobolNet.Runtime.CobolIntrinsics.MinString(CobolNet.Runtime.CobolCollation! collation, params string![]! xs) -> string!
 static CobolNet.Runtime.CobolIntrinsics.MinString(params string![]! xs) -> string!
 static CobolNet.Runtime.CobolIntrinsics.ModDec(CobolNet.Runtime.CobolRounding mode, CobolNet.Runtime.CobolDec a, CobolNet.Runtime.CobolDec b) -> CobolNet.Runtime.CobolDec
-static CobolNet.Runtime.CobolIntrinsics.ModReal(double a, double b) -> double
 static CobolNet.Runtime.CobolIntrinsics.ModScaled(System.Int128 a, System.Int128 b) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.NationalOf(string! arg, string? sub = null) -> string!
 static CobolNet.Runtime.CobolIntrinsics.NumvalCDec(string! text, string! currency, bool commaMode = false, bool anycase = false, int digitCap = 31, CobolNet.Runtime.Globalization.LocaleFacts? classification = null) -> CobolNet.Runtime.CobolDec
@@ -2795,8 +2786,6 @@ static CobolNet.Runtime.CobolIntrinsics.SumReal(params double[]! xs) -> double
 static CobolNet.Runtime.CobolIntrinsics.SumScaled(string! fn, params System.Int128[]! xs) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.Tan(CobolNet.Runtime.CobolDec x) -> double
 static CobolNet.Runtime.CobolIntrinsics.Tan(double x) -> double
-static CobolNet.Runtime.CobolIntrinsics.TestDateYyyymmddReal(double v) -> long
-static CobolNet.Runtime.CobolIntrinsics.TestDayYyyydddReal(double v) -> long
 static CobolNet.Runtime.CobolIntrinsics.TestNumval(string! text, bool commaMode = false, int digitCap = 31) -> long
 static CobolNet.Runtime.CobolIntrinsics.TestNumvalC(string! text, string! currency, bool commaMode = false, bool anycase = false, int digitCap = 31, CobolNet.Runtime.Globalization.LocaleFacts? classification = null) -> long
 static CobolNet.Runtime.CobolIntrinsics.TestNumvalCLocale(string! text, string? localeTag, bool anycase = false, int digitCap = 31) -> long
@@ -2809,8 +2798,6 @@ static CobolNet.Runtime.CobolIntrinsics.UpperCase(string! s) -> string!
 static CobolNet.Runtime.CobolIntrinsics.Variance(CobolNet.Runtime.CobolRounding mode, params CobolNet.Runtime.CobolDec[]! xs) -> double
 static CobolNet.Runtime.CobolIntrinsics.Variance(params double[]! xs) -> double
 static CobolNet.Runtime.CobolIntrinsics.VarianceDec(CobolNet.Runtime.CobolRounding mode, params CobolNet.Runtime.CobolDec[]! xs) -> CobolNet.Runtime.CobolDec
-static CobolNet.Runtime.CobolIntrinsics.YearToYyyyReal(double yy, double off = 50) -> long
-static CobolNet.Runtime.CobolIntrinsics.YearToYyyyReal(double yy, double off, double baseYear) -> long
 static CobolNet.Runtime.CobolInvokeArg.OmittedArgument() -> CobolNet.Runtime.CobolInvokeArg!
 static CobolNet.Runtime.CobolInvokeArg.ReferenceModified(CobolNet.Runtime.ActivationDescription! description, System.Func<object?>! get, System.Action<object?>! set, CobolNet.Runtime.CellPointer? area) -> CobolNet.Runtime.CobolInvokeArg!
 static CobolNet.Runtime.CobolLocale.Compare(string? a, string? b, string? localeTag) -> string!
