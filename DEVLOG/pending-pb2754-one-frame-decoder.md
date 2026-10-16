@@ -55,4 +55,4 @@ point-in-time answers already. Witnesses: `FrameDecoderDriftTests.TheFrameWalk_A
 `ChannelMedium` was the sibling arm checked: its `TakePayload` never re-asked and its `Holds` asks the length only
 above 64 KiB.
 
-**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T155805Z-f7e334; Conformance 6,014 · Unit 33,193 · Characterization 6 ran in leg 1, the new FrameDecoderDriftTests cases among them). The architecture oracle (`compare_oracle.py`) compares emitted C# and diagnostics, which no file of this change reaches (runtime only).
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T155805Z-f7e334; Conformance 6,014 · Unit 33,193 · Characterization 6 ran in leg 1, the new FrameDecoderDriftTests cases among them); after the review fix, `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` again (run 20261016T161829Z-130770; Conformance 5,978 · Unit 33,156 · Characterization 6 ran in leg 1, both new walk witnesses Passed). The architecture oracle (`compare_oracle.py`) compares emitted C# and diagnostics, which no file of this change reaches (runtime only).
