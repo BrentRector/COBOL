@@ -37,6 +37,12 @@ public static class CsNames
     public static readonly FrozenSet<string> ProgramClassMembers = FrozenSet.ToFrozenSet(
         ["Call", "CloseFiles", "EndStorage", "Activate", "DescribeExternals"], StringComparer.Ordinal);
 
+    /// <summary>The members a generated HOST-ENTRY class carries (<c>HostEntryEmitter</c>; DESIGN-external-repository
+    /// §4.3): <c>Call</c>, the .NET counterpart of a CALL statement, and <c>Cancel</c>, of a CANCEL statement. Its
+    /// published record structs are allocated in the same scope, so a description whose word spells either is given the
+    /// next free name.</summary>
+    public static readonly FrozenSet<string> HostEntryMembers = FrozenSet.ToFrozenSet(["Call", "Cancel"], StringComparer.Ordinal);
+
     /// <summary>The namespace every type a module emits lives in (docs/rearchitecture/DESIGN-external-repository.md
     /// §4.5; kb/Work PB2097): <c>Cobol.&lt;S&gt;</c>, where <c>&lt;S&gt;</c> is the assembly simple name made ONE C#
     /// identifier by <see cref="DataItem.Sanitize"/> (each character an identifier cannot hold, <c>.</c> included,
@@ -89,6 +95,19 @@ public sealed class CsNameScope
 
     /// <summary>A program class's member scope (<see cref="CsNames.ProgramClassMembers"/>).</summary>
     public static CsNameScope ProgramClass() => new(CsNames.ProgramClassMembers);
+
+    /// <summary>A host-entry class's member scope (<see cref="CsNames.HostEntryMembers"/>), seeded with the class's
+    /// own name, which no member may spell (CS0542; DESIGN-external-repository §4.3 "Names").</summary>
+    public static CsNameScope HostEntry(string className) => new(CsNames.HostEntryMembers.Append(className));
+
+    /// <summary>The parameter scope of a host entry's <c>Call</c>: the same seeds, so a parameter never shares a name
+    /// with the class, its members or its published record structs (§4.3 "Names").</summary>
+    public CsNameScope Nested() => new(_claimed);
+
+    /// <summary>A module namespace's type scope (DESIGN-external-repository §4.5): the host-entry classes are allocated in
+    /// it, seeded with every type name the module already declares there (<paramref name="reserved"/> — the
+    /// registrar, the entry class, the atom table, the program classes and the OO classes and interfaces).</summary>
+    public static CsNameScope ModuleTypes(IEnumerable<string> reserved) => new(reserved);
 
     /// <summary>Claim names this scope already holds from elsewhere — a container's GLOBAL roots, bridged into this
     /// unit's class under their own member names (kb/Work PB1047).</summary>

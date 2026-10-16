@@ -46,9 +46,9 @@ public sealed class RuntimeAbiPinDriftTests
 {
     // ── The pins. Change a hash only with the decision the class summary describes. ──
     private const int PinnedMajor = 4;
-    private const string PinnedRuntimeHash = "3C602050825E8722";
+    private const string PinnedRuntimeHash = "FC31CDD19AA81079";
     private const int PinnedCallAbi = 1;
-    private const string PinnedBoundaryHash = "B7BD29ADAB9ED8EE";
+    private const string PinnedBoundaryHash = "F1BA4F9B825BEC61";
 
     /// <summary>The boundary-layout fixture: every elementary category and byte form a Format 1 CALL passes BY
     /// REFERENCE and BY CONTENT, a group and a table, and a RETURNING item, with EC-PROGRAM-ARG-MISMATCH checking on

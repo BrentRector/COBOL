@@ -1970,6 +1970,31 @@ internal static class RuntimeApi
     /// <summary>The empty carrier value (an unbound formal's seed).</summary>
     public static string VarGroupEmpty => $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Empty)}";
 
+    /// <summary>A variable-length group's FIXED RUN from its window image — <c>CobolVarGroup.RunOf</c>, the one fixed-run
+    /// rule (ISO §8.5.1.12.3); <paramref name="dynTable"/> is each component's table element width, 0 for a dynamic-length
+    /// item.</summary>
+    public static string VarGroupRunOf(string window, IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.RunOf)}({window}, {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
+
+    /// <summary>The inverse of <see cref="VarGroupRunOf"/> — <c>CobolVarGroup.WindowOf</c>: a fixed run laid back around
+    /// the tables' reservations of <paramref name="window"/>.</summary>
+    public static string VarGroupWindowOf(string run, string window, IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.WindowOf)}({run}, {window}, {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
+
+    /// <summary>A carried dynamic-capacity table's occurrence images — <c>CobolVarGroup.Occurrences</c>.</summary>
+    public static string VarGroupOccurrences(string content, int elementWidth) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Occurrences)}({content}, {elementWidth})";
+
+    /// <summary>Component <paramref name="ordinal"/>'s content in a carrier — <c>CobolVarGroup.Dyn</c>.</summary>
+    public static string VarGroupDyn(string carrier, string ordinal) => $"{carrier}.{nameof(CobolVarGroup.Dyn)}({ordinal})";
+
+    /// <summary>Component <paramref name="ordinal"/>'s occurrence carriers — <c>CobolVarGroup.ElementCarriersAt</c>.</summary>
+    public static string VarGroupElementCarriersAt(string carrier, string ordinal) =>
+        $"{carrier}.{nameof(CobolVarGroup.ElementCarriersAt)}({ordinal})";
+
+    /// <summary>A carrier's fixed run — <c>CobolVarGroup.Fixed</c>.</summary>
+    public static string VarGroupFixed(string carrier) => $"{carrier}.{nameof(CobolVarGroup.Fixed)}";
+
     /// <summary>A FIXED-length group's record image as a §8.5.1.12 carrier in its OWN shape — no components, the whole
     /// image its fixed run (kb/Work PB2496); a statement pairs it with a variable-length group by the two shapes
     /// (<see cref="VarGroupReshape"/>, <see cref="VarGroupCompare"/>).</summary>
@@ -2232,11 +2257,11 @@ internal static class RuntimeApi
     public static string FileInit() => $"{nameof(CobolFile)}.{nameof(CobolFile.Init)}()";
 
     /// <summary>The entry wrapper's one run-unit statement: <c>ProgramRegistry.RunModule(registrar.EnsureRegistered,
-    /// mainPath)</c> (kb/Work PB2846) — the module's registration member and its main program's path (a literal, or
-    /// <c>null</c> for a module with no main), handed to the runtime boundary that owns the §14.6.11 / §14.6.12 run-unit
-    /// termination, so the module's own registration is inside it.</summary>
-    public static string RunModule(string registrarEnsureRegistered, string mainPathLiteralOrNull) =>
-        $"{nameof(ProgramRegistry)}.{nameof(ProgramRegistry.RunModule)}({registrarEnsureRegistered}, {mainPathLiteralOrNull})";
+    /// mainPath)</c> (kb/Work PB2846) — the module's registration member and its main program's path literal (a module
+    /// with no main is a library and has no entry wrapper, DESIGN-external-repository §7.2), handed to the runtime
+    /// boundary that owns the §14.6.11 / §14.6.12 run-unit termination, so the module's own registration is inside it.</summary>
+    public static string RunModule(string registrarEnsureRegistered, string mainPathLiteral) =>
+        $"{nameof(ProgramRegistry)}.{nameof(ProgramRegistry.RunModule)}({registrarEnsureRegistered}, {mainPathLiteral})";
 
     // ── The module's repository record and its one registration member (DESIGN-external-repository §4.5, §11.2;
     //    kb/Work PB2097). Both state the versions this compiler's runtime declares, as compiled against, so the run unit
@@ -2542,6 +2567,12 @@ internal static class RuntimeApi
     /// same-level bit members that SHARE a byte (§8.5.1.6.3) independent receivers.</summary>
     public static string BitsWriteWindow(string imageExpr, string startBitExpr, string bitsExpr) =>
         $"{nameof(CobolBits)}.{nameof(CobolBits.WriteWindow)}({imageExpr}, {startBitExpr}, {bitsExpr})";
+
+    /// <summary>The in-place form of <see cref="BitsWriteWindow"/> over a record image held in a mutable buffer —
+    /// <c>CobolBits.WriteWindowInto</c>, which a .NET host entry's published record composes its image with
+    /// (DESIGN-external-repository §4.3).</summary>
+    public static string BitsWriteWindowInto(string bufferExpr, string startBitExpr, string bitsExpr) =>
+        $"{nameof(CobolBits)}.{nameof(CobolBits.WriteWindowInto)}({bufferExpr}, {startBitExpr}, {bitsExpr})";
 
     /// <summary>The national read of a Tier-B window over the class's one byte backing —
     /// <c>CobolBits.NatReadWindow</c> (kb/Work PB231). A national character position occupies TWO bytes of the
