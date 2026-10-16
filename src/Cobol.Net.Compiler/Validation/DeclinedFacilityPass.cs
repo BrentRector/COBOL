@@ -57,10 +57,11 @@ internal sealed class DeclinedFacilityPass(EditionContext edition) : CursorFollo
 
     public static void Run(GroupBindContext group, EditionContext edition)
     {
-        // Below COBOL-2002 no declined-facility node can exist: every rule in CobolDeclined.g4 is behind an
-        // {is2002()}? / {is2023()}? left-edge predicate, because its keywords are user-defined words at COBOL-85
-        // (§8.9). Skipping the walk there is not an optimization that could hide a diagnostic — it is the same
-        // fact the predicates state, and it keeps a pure COBOL-85 compile byte-for-byte free of this pass.
+        // Below COBOL-2002 no declined-facility node can exist: every entry into CobolDeclined.g4 is behind an
+        // {is2002()}? / {is2023()}? left-edge predicate (kb/Work PB2291 records them, and finds them construct gates
+        // rather than §8.9 word status for CLASS, DESTINATION, INVALID, VARYING and APPLY COMMIT). Skipping the walk
+        // there is not an optimization that could hide a diagnostic — it is the same fact the predicates state, and
+        // it keeps a pure COBOL-85 compile byte-for-byte free of this pass.
         if (edition.DialectLevel < 2002) return;
         new DeclinedFacilityPass(edition).VisitPositioned(group.Tree);
     }

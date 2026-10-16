@@ -3,9 +3,11 @@
 
 // Object-Orientation grammar (COBOL-2002, ISO §11.2 identification division structure, §11.3 CLASS-ID,
 // §11.7 METHOD-ID, §11.8 OBJECT + §14.9.23 INVOKE). This is a version-factored
-// fragment imported by CobolParserCore.g4 — OO rule BODIES live here; the minimal {is2002()}?-gated HOOK alternatives
+// fragment imported by CobolParserCore.g4 — OO rule BODIES live here; the minimal HOOK alternatives
 // (classDefinition in compilationGroup, invokeStatement in statement, objectReferenceUsage in usageKeyword) are added
-// to the core rules they extend. Keeps 2002 OO out of the COBOL-85 base (see memory feedback_grammar_version_factoring).
+// to the core rules they extend, each parsing at every edition and introduction-gated after the parse through
+// ConstructRegistry (VersionConformancePass for the class/interface definitions and INVOKE, PicInfo.ParseUsage
+// for USAGE OBJECT REFERENCE) — no parse-time edition read (kb/Work PB2291).
 // Imported (no options block); shares CobolLexer's tokens and references core rules (environmentDivision, dataDivision,
 // procedureDivision, cobolWord, objectReference, literal, dataReference, arithmeticExpression).
 
