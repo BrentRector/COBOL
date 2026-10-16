@@ -4,14 +4,14 @@
       *>     so MAX(N9(1:1) "A") is a UNIFORM alphanumeric list (15.59.3 r2) compared by the 8.8.4.2.7
       *>     relation - "A" (ordinal 66) exceeds "0" (49). Before the fix the skipped GR6c rewrite sent the
       *>     call down the numeric row and it ANSWERED 0 - a silent wrong answer on legal source.
-      *> MG: a group is class and category alphanumeric (8.5.2.1; per 8.5.2.10 item 3 only GROUP-USAGE
+      *> MG: an alphanumeric group is class and category alphanumeric (8.5.2.1; per 8.5.2.10 item 3 GROUP-USAGE
       *>     NATIONAL makes a national group, which is staged) - MAX over two groups compares their character
       *>     images and returns the greater image. Before the fix the type resolution saw NO category (the
       *>     null group arm) while the body chose the string comparison, and the halves disagreeing CRASHED
       *>     at run time ("FUNCTION MAX (no numeric render recipe)").
-      *> NG: NATIONAL-OF(group) is CONFORMING - 15.66.3 r1 admits class alphabetic or alphanumeric, and a
-      *>     group IS class alphanumeric - so the now-live class screen must keep admitting it (the PB1
-      *>     failure mode guarded against: a new screen must not reject legal source).
+      *> NG: NATIONAL-OF(group) is CONFORMING - 15.66.3 r1 admits class alphabetic or alphanumeric, and an
+      *>     alphanumeric group IS class alphanumeric - so the now-live class screen must keep admitting it
+      *>     (the PB1 failure mode guarded against: a new screen must not reject legal source).
       *> SP: DISPLAY-OF(SPACE) is conforming (8.3.3.6.3 SR1 admits a figurative where a rule allows a
       *>     literal; SPACE reads national in the national-argument context, GR5) and converts to the one
       *>     alphanumeric space - ORD = 33. Figuratives stay category-NEUTRAL at bind (8.3.3.6.4 GR1/GR4),

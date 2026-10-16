@@ -19,7 +19,8 @@
       *> ⛔ EVERYTHING ELSE HERE IS LEGAL, so SR6 is the ONLY ground on which this program can be
       *> rejected — a fixture that also broke a second rule would keep passing for the wrong reason
       *> if the SR6 screen ever stopped firing:
-      *>   SR1  identifier-1 (G) is a group item and so of class alphanumeric — admitted outright
+      *>   SR1  identifier-1 (G) is an alphanumeric group item (no GROUP-USAGE clause, not strongly
+      *>        typed: §13.18.29.4 GR3), so of class alphanumeric (§8.5.2.1) — admitted outright
       *>        ("Identifier-1 shall be strongly typed or of class alphabetic, alphanumeric,
       *>        boolean, message-tag, national, numeric, object, or pointer.").
       *>   SR3  no DATA-POINTER / FUNCTION-POINTER / MESSAGE-TAG / OBJECT-REFERENCE /

@@ -12,11 +12,11 @@
       *> THE RULE NAMES THE ITEM'S OWN CLASS. 13.18.60.4 GR23 makes a
       *> USAGE POINTER entry "a data-pointer data item", and 8.5.2 puts
       *> it in class pointer - so EP is barred. A strongly-typed
-      *> EXTERNAL group holding a pointer MEMBER is class alphanumeric
-      *> and is NOT barred by SR4 (13.18.22.3 SR5 asks only that its
-      *> type declaration also be external); that legal shape runs in
-      *> the positive corpus, so this fixture cannot be satisfied by
-      *> refusing pointers under EXTERNAL wholesale.
+      *> EXTERNAL group holding a pointer MEMBER is class <type-name>,
+      *> not pointer (8.5.2.1), so SR4 does not bar it (13.18.22.3 SR5
+      *> asks only that its type declaration also be external); that
+      *> legal shape runs in the positive corpus, so this fixture cannot
+      *> be satisfied by refusing pointers under EXTERNAL wholesale.
       *> The EXTERNAL clause is a COBOL-85 element, but USAGE POINTER
       *> is a COBOL-2002 introduction, so at --std 85 the program draws
       *> the edition gate (COBOLNET0900) instead and the reject-at list
