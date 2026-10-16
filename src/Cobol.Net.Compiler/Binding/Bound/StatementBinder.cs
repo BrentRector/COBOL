@@ -724,7 +724,12 @@ public sealed partial class StatementBinder(DataBinder data, ReferenceResolver r
     /// <summary>COMMIT / ROLLBACK (kb/Work PB137): the §4.2.6 named warning keeps the documented A.3
     /// non-support posture, §14.9.7.3/§14.9.36.3 SR1 rejects the statement in a RECURSIVE source element
     /// at bind (a function and a method are ALWAYS recursive, §8.6.6), and the IDENTITY node lets the
-    /// VersionConformancePass enforce SR2's SORT/MERGE procedure ban.</summary>
+    /// VersionConformancePass enforce SR2's SORT/MERGE procedure ban. §14.9.7.4 GR2 / §14.9.36.4 GR2's
+    /// DYNAMIC reach — the statement executed under the control of a recursive runtime element or an active
+    /// file SORT or MERGE, outside SR1/SR2's static reach — sets no EC-FLOW-COMMIT / EC-FLOW-ROLLBACK and stays
+    /// GR1's CONTINUE (kb/Work PB259): the condition is the declined Annex A.4.3 module's own (§9.1.18.7),
+    /// A.4.1 makes a module's exception conditions optional with it, and §14.6.13.1.1 does not require a
+    /// level-3 condition of an unimplemented element to be raised.</summary>
     private BoundStatement BindCommitRollback(bool isCommit)
     {
         string verb = isCommit ? "COMMIT" : "ROLLBACK";
