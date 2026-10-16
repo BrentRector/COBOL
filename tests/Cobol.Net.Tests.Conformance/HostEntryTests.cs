@@ -504,6 +504,129 @@ public sealed class HostEntryTests
         finally { CutRunner.TryDelete(dir); }
     }
 
+    /// <summary>Programs whose group formal and RETURNING item are VARIABLE-LENGTH groups (ISO §8.5.1.12): a dynamic-length
+    /// item with a LIMIT, a dynamic-capacity table of numeric leaves with a minimum capacity, a dynamic-capacity table whose
+    /// elements hold a dynamic-length item (a table of variable-length elements), and a fixed table whose occurrences hold
+    /// one each. The activated program grows both tables by storing past their capacity and stores past the LIMITs.</summary>
+    private const string VarPrograms = """
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H5VAR.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-V.
+           05 LK-ID PIC 9(3).
+           05 LK-NAME PIC X DYNAMIC LENGTH LIMIT IS 10.
+           05 LK-NUMS PIC 9(2) OCCURS DYNAMIC CAPACITY IN LK-NC FROM 1.
+           05 LK-ROWS OCCURS DYNAMIC CAPACITY IN LK-RC.
+              10 LK-RK PIC X(2).
+              10 LK-RN PIC X DYNAMIC LENGTH.
+           05 LK-PAIR OCCURS 2.
+              10 LK-PN PIC 9.
+              10 LK-PT PIC X DYNAMIC LENGTH LIMIT IS 4.
+           05 LK-TAG PIC X(2).
+        PROCEDURE DIVISION USING LK-V.
+        P1.
+            DISPLAY "IN " LK-ID " [" LK-NAME "] " LK-NUMS(1) LK-NUMS(2) " " LK-RK(1) "[" LK-RN(1) "] "
+                LK-PN(1) "[" LK-PT(1) "]" LK-PN(2) "[" LK-PT(2) "] " LK-TAG
+            ADD 1 TO LK-ID
+            MOVE "LONGER NAMES" TO LK-NAME
+            MOVE 33 TO LK-NUMS(3)
+            MOVE "R2" TO LK-RK(2)
+            MOVE "second" TO LK-RN(2)
+            MOVE "abcdef" TO LK-PT(1)
+            MOVE "Z" TO LK-TAG
+            GOBACK.
+        END PROGRAM H5VAR.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H5RET.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 SR.
+           05 SP PIC X(3).
+           05 SDYN PIC X DYNAMIC LENGTH.
+           05 ST PIC X(2) OCCURS DYNAMIC CAPACITY IN SC.
+        PROCEDURE DIVISION RETURNING SR.
+        P1.
+            MOVE "RET" TO SP
+            MOVE "dynamic" TO SDYN
+            MOVE "t1" TO ST(1)
+            MOVE "t2" TO ST(2)
+            GOBACK.
+        END PROGRAM H5RET.
+        """;
+
+    private const string VarHost = """
+        using System;
+        using Cobol.H5PROGS;
+
+        public static class H5HostProgram
+        {
+            private static void Refused(string what, H5VAR.LK_V_Record v)
+            {
+                try { H5VAR.Call(ref v); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentException x) { Console.WriteLine($"{what} {x.ParamName} {x.GetType().Name}"); }
+            }
+
+            public static int Main()
+            {
+                var v = new H5VAR.LK_V_Record();
+                Console.WriteLine($"NEW {v.LK_NUMS.Length} {v.LK_ROWS.Length} [{v.LK_NAME}] {v.LK_PAIR.Length}");
+                v.LK_ID = 7;
+                v.LK_NAME = "Ann";
+                v.LK_NUMS = [11, 22];
+                v.LK_ROWS = [new() { LK_RK = "AA", LK_RN = "note" }];
+                v.LK_PAIR[0] = new() { LK_PN = 1, LK_PT = "p" };
+                v.LK_PAIR[1] = new() { LK_PN = 2, LK_PT = "qq" };
+                v.LK_TAG = "XY";
+                Refused("NAME", v with { LK_NAME = "ELEVEN CHARS" });
+                Refused("MIN", v with { LK_NUMS = [] });
+                Refused("NULL", v with { LK_ROWS = null! });
+                var pairs = (H5VAR.LK_V_Record.LK_PAIR_Record[])v.LK_PAIR.Clone();
+                pairs[1] = pairs[1] with { LK_PT = "five5" };
+                Refused("PAIR", v with { LK_PAIR = pairs });
+                H5VAR.Call(ref v);
+                Console.WriteLine($"OUT {v.LK_ID} [{v.LK_NAME}] {string.Join(",", v.LK_NUMS)} "
+                    + $"{string.Join(",", Array.ConvertAll(v.LK_ROWS, r => r.LK_RK + "/" + r.LK_RN))} "
+                    + $"{string.Join(",", Array.ConvertAll(v.LK_PAIR, p => p.LK_PN + "/" + p.LK_PT))} [{v.LK_TAG}]");
+                var r = H5RET.Call();
+                Console.WriteLine($"RET [{r.SP}] [{r.SDYN}] {string.Join(",", r.ST)}");
+                return 0;
+            }
+        }
+        """;
+
+    /// <summary>A host passes and receives VARIABLE-LENGTH groups (ISO §8.5.1.12; DESIGN-external-repository §4.3): the
+    /// published record presents a dynamic-length item as a string and a dynamic-capacity table as an array of its current
+    /// capacity, and crosses as the CALL lane's variable-length carrier of its description. Expected values, derived: a
+    /// dynamic-length item stored past its LIMIT is "truncated on the right as necessary" (§8.5.1.10.4), so "LONGER NAMES"
+    /// returns as its first 10 characters and "abcdef" as its first 4; a store past a dynamic-capacity table's capacity
+    /// creates the occurrence (§8.5.1.9.3), so the tables return with 3 and 2 entries; a landing that would lose content —
+    /// a string past the LIMIT, an array below the minimum capacity ("Integer-4 is the minimum capacity of the table",
+    /// §13.18.38.4 16)), a null array — is refused before anything is activated.</summary>
+    [Fact]
+    public void AHost_PassesVariableLengthGroups_AsTheCallLanesVariableLengthCarrier()
+    {
+        string dir = CutRunner.NewTempDir("h5host");
+        try
+        {
+            NonCobolElement.CompileCobol(dir, "H5PROGS", VarPrograms);
+            NonCobolElement.CompileCSharp(dir, "H5HOST", VarHost, "H5PROGS", "H5PROGS");
+            var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "H5HOST.dll"), dir);
+            Assert.Equal(
+                "NEW 1 0 [] 2\n" +
+                "NAME LK_V ArgumentOutOfRangeException\n" +
+                "MIN LK_V ArgumentException\n" +
+                "NULL LK_V ArgumentNullException\n" +
+                "PAIR LK_V ArgumentOutOfRangeException\n" +
+                "IN 007 [Ann] 1122 AA[note] 1[p]2[qq] XY\n" +
+                "OUT 8 [LONGER NAM] 11,22,33 AA/note,R2/second 1/abcd,2/qq [Z ]\n" +
+                "RET [RET] [dynamic] t1,t2", stdout);
+            Assert.Equal(0, exit);
+            Assert.Equal("", stderr);
+        }
+        finally { CutRunner.TryDelete(dir); }
+    }
+
     /// <summary>A program whose group formal is a strongly-typed group holding a data pointer, a program pointer and a
     /// table: the first call sets both pointers, the second reads storage through the data pointer the host passed back.</summary>
     private const string SlotPrograms = """

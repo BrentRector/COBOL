@@ -166,6 +166,23 @@ public static class HostLanding
                 $"The parameters '{first}' and '{second}' refer to one variable, and their formals have different "
                 + "descriptions, which one storage cannot be (ISO §14.2.3 8); DESIGN-external-repository §4.3).", second));
 
+    /// <summary>Require a DYNAMIC-CAPACITY table member's array to be a capacity the table can have: its length is the
+    /// table's current capacity, which is never below the minimum capacity ("Integer-4 is the minimum capacity of the
+    /// table", ISO §13.18.38.4 16)) and never above the maximum capacity, the implementor's limit (§8.5.1.9.1,
+    /// <see cref="CobolDynTable{T}.MaxOccurrences"/>); returns the array.</summary>
+    /// <exception cref="ArgumentNullException">The array is null.</exception>
+    /// <exception cref="ArgumentException">The array's length lies outside the table's capacities.</exception>
+    public static T[] RequireCapacity<T>(T[]? array, int minimum, string parameter, string member)
+    {
+        if (array is null)
+            throw new ArgumentNullException(parameter, $"{Subject(parameter, member)} is a table, and its array is null.");
+        if (array.Length < minimum || array.Length > CobolDynTable<T>.MaxOccurrences)
+            throw new ArgumentException($"{Subject(parameter, member)} is a dynamic-capacity table of at least {minimum} "
+                + $"and at most {CobolDynTable<T>.MaxOccurrences} entries, and its array has {array.Length} (ISO §13.18.38.4 "
+                + "16), §8.5.1.9.1).", parameter);
+        return array;
+    }
+
     /// <summary>Require an OCCURS member's array to have the table's <paramref name="occurrences"/> entries — the
     /// declared count of a fixed table, the DEPENDING ON value of an OCCURS DEPENDING ON table — and that count to lie
     /// within the table's bounds <paramref name="minimum"/>..<paramref name="maximum"/>; returns the array.</summary>

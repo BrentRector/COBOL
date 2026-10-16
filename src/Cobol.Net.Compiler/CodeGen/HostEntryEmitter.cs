@@ -214,7 +214,10 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         // A group: its published record's image, every member landed exactly (PublishedRecordEmitter), crossing as the
         // CALL lane's TEXT crossing of a group of its description.
         if (f.Type.Kind is HostTypeKind.Group)
-            return PublishedRecordEmitter.HoldsSlots(d)
+            return PublishedRecordEmitter.HoldsComponents(d)
+                // A variable-length record: the CALL lane's variable-length carrier of its description (ISO §8.5.1.12).
+                ? RuntimeApi.VarGroupCell($"{value}.__Var({CsLiteral(f.Name)})")
+                : PublishedRecordEmitter.HoldsSlots(d)
                 // A record holding references: the CALL lane's cell area (kb/Work PB2087), its image and its slots.
                 ? $"{value}.__Area({CsLiteral(f.Name)})"
                 : $"ManagedPointer<string>.Cell({GroupCrossing(d, $"{value}.__Land({CsLiteral(f.Name)})")})";
@@ -270,7 +273,9 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
     {
         DataItem d = r.Description;
         if (r.Type.Kind is HostTypeKind.Group)
-            return PublishedRecordEmitter.HoldsSlots(d)
+            return PublishedRecordEmitter.HoldsComponents(d)
+                ? RuntimeApi.VarGroupCell($"new {r.CsType}().__Var({CsLiteral(r.CsType)})")
+                : PublishedRecordEmitter.HoldsSlots(d)
                 ? $"new {r.CsType}().__Area({CsLiteral(r.CsType)})"
                 : $"ManagedPointer<string>.Cell({GroupCrossing(d, $"new {r.CsType}().__Land({CsLiteral(r.CsType)})")})";
         PicInfo pic = d.Pic ?? throw Unsupported(r);
@@ -320,13 +325,14 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
 
     /// <summary>The fixed storage length the argument states: the CALL lane's own rule
     /// (<see cref="CallEmitter.ArgumentLength(DataItem, CallCrossing)"/>) for the detached storage's crossing.</summary>
-    private static int StorageLength(Item f) => CallEmitter.ArgumentLength(f.Description, Crossing(f.Type));
+    private static int StorageLength(Item f) => CallEmitter.ArgumentLength(f.Description, Crossing(f));
 
     /// <summary>The crossing of the detached storage (see the class remarks): a fixed-point or character formal its
-    /// (record) image, a floating-point or index formal its native cell, a pointer or object reference its managed
-    /// slot.</summary>
-    private static CallCrossing Crossing(HostType t) => t.Kind switch
+    /// (record) image, a variable-length group its variable-length carrier, a floating-point or index formal its native
+    /// cell, a pointer or object reference its managed slot.</summary>
+    private static CallCrossing Crossing(Item f) => f.Type.Kind switch
     {
+        HostTypeKind.Group when PublishedRecordEmitter.HoldsComponents(f.Description) => CallCrossing.VarGroup,
         HostTypeKind.Float or HostTypeKind.Index => CallCrossing.Native,
         HostTypeKind.Pointer or HostTypeKind.ObjectReference => CallCrossing.Managed,
         _ => CallCrossing.Text,
@@ -341,10 +347,12 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
         string word = f.Name == "__hr" ? f.Description.CobolName ?? "RETURNING" : f.Name;
         if (f.Type.Kind is HostTypeKind.Group)
             return $"{{ if ({f.CsType}.__TryGet("
-                + (PublishedRecordEmitter.HoldsSlots(f.Description)
+                + (PublishedRecordEmitter.HoldsComponents(f.Description) ? $"{f.Cell}.Value"
+                    : PublishedRecordEmitter.HoldsSlots(f.Description)
                     ? $"{f.Cell}.Ref, {f.Cell}"
                     : $"{GroupImage(f.Description, $"{f.Cell}.Value")}, null")
-                + $", 0, {CsLiteral(word + ".")}, ref __hbad, out var __hg)) {target} = __hg; }}";
+                + (PublishedRecordEmitter.HoldsComponents(f.Description) ? "" : ", 0")
+                + $", {CsLiteral(word + ".")}, ref __hbad, out var __hg)) {target} = __hg; }}";
         PicInfo pic = f.Description.Pic ?? throw Unsupported(f);
         return f.Type.Kind is HostTypeKind.Integer or HostTypeKind.Decimal or HostTypeKind.Dec
             ? NumericDecode(f.Type, pic, $"{f.Cell}.Value", f.Profile!, CsLiteral(word), target, "__hbad", "")
