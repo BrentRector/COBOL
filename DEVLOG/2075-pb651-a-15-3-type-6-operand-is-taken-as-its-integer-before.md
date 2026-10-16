@@ -1,4 +1,4 @@
-## PB651: a §15.3 type-6 operand is taken as its integer before any lane is chosen
+## Entry 2075 — 2026-10-16 08:13 PDT — PB651: a §15.3 type-6 operand is taken as its integer before any lane is chosen
 
 kb/Work PB651 asked for a probe of the `--permissive` lane, because PB248's strict screen (COBOLNET1627) had moved a
 whole class of source, a floating-point operand at a §15.3 type-6 position, into a lane nothing probed. The probe is
@@ -94,3 +94,4 @@ design: the `ArgumentRunIsAllNumeric` remark and its design-doc twin used `MOD(<
 example of a call that must keep the float lane, but both MOD positions are type 6 and that call now compiles to the
 exact arm (`IntegerArgWideReal` + `ModScaled`); REM, whose positions are type 10, is the example the rule needs. And
 the `DomainGuardOffenders` remark named the deleted `TryIntegerArg`. Both now state the current design; no behaviour changed.
+
