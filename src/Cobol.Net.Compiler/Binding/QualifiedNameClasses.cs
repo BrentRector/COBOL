@@ -44,9 +44,9 @@ internal static class QualifiedNameClasses
             "§8.4.2.2.3 SR1 + SR7"),
         new("qualified-screen-name", Disposition.Declined, typeof(ScreenFacility), "ReportSection",
             "the SCREEN SECTION is the declined Annex A.4.2 module (COBOLNET1560) — no screen-name is declared"),
-        new("qualified-record-key-name", Disposition.Resolved, typeof(Model.FileModel), "KeyIndexOfRecordKeyName",
-            "§8.4.2.2.3 SR1 — a record-key-name is asked of the file its statement or clause names, and Format 6's "
-            + "one file-name qualifier must name that file (kb/Work PB1099)"),
+        new("qualified-record-key-name", Disposition.Resolved, typeof(Model.FileModel), "RecordKeyNameCandidates",
+            "§8.4.2.2.3 SR1 — every file's record-key-names (Format 6: one file-name qualifier) and the data-name reading "
+            + "are one KeyNameReading set, counted by DataBinder.UniqueOrReportAmbiguous (kb/Work PB1099)"),
         new("qualified-linage-counter", Disposition.Resolved, typeof(ExpressionBinder), "LinageFileOf",
             "§8.4.2.2.3 SR8"),
         new("qualified-report-counter", Disposition.Resolved, typeof(ReportWriterBinder), "CounterReportOf",

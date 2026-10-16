@@ -1342,12 +1342,19 @@ the same list.
   rule) reaches each one by the row that screens data-name-1; SR2's last sentence — *"All occurrences of
   data-name-2 shall be of the same category"* — is a row of its own; the clause-level rows (§12.4.5.2 SR8,
   §12.4.5.6.3 SR4, SR7's SUPPRESS WHEN) ask only the clause's first operand, so a clause is reported once.
-- **Naming the key.** A record-key-name is asked of the file its statement or clause names
-  (`FileModel.KeyIndexOfRecordKeyName`, which also reads §8.4.2.2.2 Format 6's one file-name qualifier):
+- **Naming the key.** A file answers which of its keys a record-key-name reference names as a COUNTED set
+  (`FileModel.RecordKeyNameCandidates`, which also reads §8.4.2.2.2 Format 6's one file-name qualifier):
   READ … KEY (§14.9.30.3 SR11), START … KEY (§14.9.41.3 SR7; GR15's default is the prime key in either form, GR17
-  b)'s default length the concatenation's), COLLATING SEQUENCE OF (§12.4.5.7.3 SR5). A record-key-name that only
-  another visible file declares is refused naming the rule; a GLOBAL file's record-key-names have its scope
-  (§8.4.6.2.4) because the visible file set carries them. A SOURCE-form key is no data item, so the data-item
+  b)'s default length the concatenation's), COLLATING SEQUENCE OF (§12.4.5.7.3 SR5). Those positions admit
+  data-name-1 OR record-key-name-1, and §8.3.2.2 lets one word be both, so each counts every reading in one
+  `KeyNameReading` set — the record-key-names of every visible file (the clause: of its own entry) and the data-name
+  reading — judged by the one §8.4.2.2.3 SR1 verdict (`DataBinder.UniqueOrReportAmbiguous`, COBOLNET1639): a name two
+  clauses of one entry declare (no Format 6 qualifier can separate them), two files declare unqualified, or a data
+  item also bears is refused, never resolved to "the record-key-name first" (kb/Work PB1099 review R1-2). A
+  record-key-name that only another visible file declares is refused naming the rule; a GLOBAL file's
+  record-key-names have its scope (§8.4.6.2.4) because the visible file set carries them. A key clause that did not
+  resolve is already reported, so a COLLATING SEQUENCE operand naming it is not reported again
+  (`FileModel.DeclaresUnresolvedKeyNamed`; a SOURCE-form clause is unresolved only when one of its operands is). A SOURCE-form key is no data item, so the data-item
   arms — READ SR11's identity, START SR6 a)/b) (b) 1. *"defined without the SOURCE phrase"*), §12.4.5.12.4 GR4's
   positional promotion — pass over it (`RecordLayout.KeyIndexAtOffset`).
 - **SORT/MERGE GIVING an indexed file** (§14.9.40.3 SR9, §14.9.24.3 SR10) compares the first key with the prime

@@ -586,11 +586,18 @@ public sealed class FileControlKeyRuleSpecTests
     /// ALTERNATE RECORD KEY clause or in a RECORD KEY clause in the file control entry."</i> A key-level COLLATING
     /// SEQUENCE naming the record-key-name ANOTHER entry declares is refused under SR4/SR5's one message; the same
     /// clause naming its own entry's record-key-name — bare, or qualified by its own file-name (§8.4.2.2.2
-    /// Format 6) — is the complement and compiles.</summary>
+    /// Format 6) — is the complement and compiles. The ALTERNATE rows are kb/Work PB1099 review R1-1: a SOURCE-form
+    /// alternate's record-key-name qualified by ANOTHER file-name names no key of this entry and is refused too —
+    /// it was dropped unreported, because a resolved SOURCE alternate read as an unresolved clause (its data-name-1
+    /// item is always null) and the one-fault-one-verdict guard swallowed the report.</summary>
     [Theory]
     [InlineData("G-PK", true)]
     [InlineData("F-PK", false)]
     [InlineData("F-PK OF F", false)]
+    [InlineData("F-AK IN G", true)]
+    [InlineData("F-AK OF G", true)]
+    [InlineData("F-AK", false)]
+    [InlineData("F-AK IN F", false)]
     public void CollatingSequenceOf_ARecordKeyName_MustBeThisEntrys(string operand, bool refused)
     {
         string source = $"""
@@ -604,6 +611,7 @@ public sealed class FileControlKeyRuleSpecTests
             FILE-CONTROL.
                 SELECT F ASSIGN TO "fckr-cf.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
                     RECORD KEY IS F-PK SOURCE IS F-K2 F-K1
+                    ALTERNATE RECORD KEY IS F-AK SOURCE IS F-K1 WITH DUPLICATES
                     COLLATING SEQUENCE OF {operand} IS ALPHA-X.
                 SELECT G ASSIGN TO "fckr-cg.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
                     RECORD KEY IS G-PK SOURCE IS G-K2 G-K1.
@@ -631,6 +639,97 @@ public sealed class FileControlKeyRuleSpecTests
                     StringComparison.Ordinal));
             else
                 Assert.True(d.Count == 0, $"[{operand}] @ {edition}: {string.Join(" | ", d)}");
+        }
+    }
+
+    /// <summary>§8.4.2.2.3 SR1 — <i>"For each non unique user-defined name that is explicitly referenced, uniqueness
+    /// shall be established through a sequence of qualifiers that precludes any ambiguity of reference."</i> A
+    /// position that admits data-name-1 OR record-key-name-1 (the READ and START KEY phrases, the key-level COLLATING
+    /// SEQUENCE clause) counts every reading in one set (kb/Work PB1099 review R1-2): the same record-key-name
+    /// declared by two clauses of ONE entry (no Format 6 qualifier can separate them — the reference bound silently
+    /// to the prime key), by two FILES (unqualified), or also declared as a data-name (§8.3.2.2 rule 3 allows it).
+    /// Each is refused naming SR1; the complement — qualification that leaves one reading — compiles.</summary>
+    [Theory]
+    [InlineData("TWICE", "READ F KEY IS RK INVALID KEY CONTINUE END-READ", true)]
+    [InlineData("TWICE", "START F KEY IS = RK INVALID KEY CONTINUE END-START", true)]
+    [InlineData("TWICE", "READ F KEY IS RK OF F INVALID KEY CONTINUE END-READ", true)]
+    [InlineData("TWICE-COLL", "CONTINUE", true)]
+    [InlineData("FILES", "READ F KEY IS RK INVALID KEY CONTINUE END-READ", true)]
+    [InlineData("FILES", "START G KEY IS = RK INVALID KEY CONTINUE END-START", true)]
+    [InlineData("FILES", "READ F KEY IS RK OF F INVALID KEY CONTINUE END-READ", false)]
+    [InlineData("FILES", "START G KEY IS = RK IN G INVALID KEY CONTINUE END-START", false)]
+    [InlineData("DATA", "READ F KEY IS RK INVALID KEY CONTINUE END-READ", true)]
+    [InlineData("DATA", "READ F KEY IS RK IN F INVALID KEY CONTINUE END-READ", false)]
+    public void ARecordKeyNameReference_ThatQualificationLeavesNonUnique_IsSR1(string shape, string statement, bool refused)
+    {
+        string fKeys = shape switch
+        {
+            "TWICE" => "RECORD KEY IS RK SOURCE IS F-K2 F-K1\n                    ALTERNATE RECORD KEY IS RK SOURCE IS F-K1 WITH DUPLICATES.",
+            "TWICE-COLL" => "RECORD KEY IS RK SOURCE IS F-K2 F-K1\n                    ALTERNATE RECORD KEY IS RK SOURCE IS F-K1 WITH DUPLICATES\n                    COLLATING SEQUENCE OF RK IS ALPHA-X.",
+            _ => "RECORD KEY IS RK SOURCE IS F-K2 F-K1.",
+        };
+        string gKeys = shape == "FILES" ? "RK SOURCE IS G-K2 G-K1" : "G-K1";
+        string working = shape == "DATA" ? "WORKING-STORAGE SECTION.\n            01 RK PIC X(4)." : "";
+        string source = $"""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. FCKRSR1.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            SPECIAL-NAMES.
+                ALPHABET ALPHA-X IS NATIVE.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "fckr-sf.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+                    {fKeys}
+                SELECT G ASSIGN TO "fckr-sg.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+                    RECORD KEY IS {gKeys}.
+            DATA DIVISION.
+            FILE SECTION.
+            FD F.
+            01 F-REC.
+               05 F-K1 PIC X(2).
+               05 F-K2 PIC X(2).
+            FD G.
+            01 G-REC.
+               05 G-K1 PIC X(2).
+               05 G-K2 PIC X(2).
+            {working}
+            PROCEDURE DIVISION.
+            MAIN.
+                OPEN INPUT F G
+                {statement}
+                CLOSE F G
+                STOP RUN.
+            """;
+        foreach (int edition in SourceEditions)
+        {
+            var d = Diagnostics(source, edition);
+            if (refused)
+                Assert.True(d.Count(e => e.Contains("does not uniquely identify a record key or data item", StringComparison.Ordinal)
+                    && e.Contains("ISO §8.4.2.2.3 SR1", StringComparison.Ordinal)) == 1,
+                    $"[{shape}: {statement}] @ {edition}: {string.Join(" | ", d)}");
+            else
+                Assert.True(d.Count == 0, $"[{shape}: {statement}] @ {edition}: {string.Join(" | ", d)}");
+        }
+    }
+
+    /// <summary>§12.4.5.12.3 SR4 — <i>"If the indexed file contains variable-length records, data-name-1 and each
+    /// data-name-2 shall be contained within the first n bytes of the record, where n equals the minimum record
+    /// size specified for the file."</i> The SOURCE phrase's operands are measured ONE BY ONE (kb/Work PB1099 review
+    /// R1-3: the inventory row still said data-name-2 had no operand to measure): with a 2-byte minimum, F-K1
+    /// (bytes 1-2) is within it and F-K2 (bytes 3-4) is not, so the rule is reported once, naming F-K2 alone.</summary>
+    [Fact]
+    public void SourcePhraseOperand_BeyondTheMinimumRecordSize_IsSR4_ForThatOperandOnly()
+    {
+        string source = Indexed("        RECORD KEY IS F-PK SOURCE IS F-K1 F-K2.",
+                "01 F-REC.\n   05 F-K1 PIC X(2).\n   05 F-K2 PIC X(2).\n   05 F-D PIC X(4).", "", EntryOnlyBody)
+            .Replace("FD F.", "FD F RECORD IS VARYING IN SIZE FROM 2 TO 8 CHARACTERS.", StringComparison.Ordinal);
+        foreach (int edition in SourceEditions)
+        {
+            var hits = Diagnostics(source, edition).Where(e => e.Contains("§12.4.5.12.3 SR4", StringComparison.Ordinal)).ToList();
+            Assert.True(hits.Count == 1, $"@ {edition}: SR4 reported {hits.Count}×: {string.Join(" | ", hits)}");
+            Assert.Contains("'F-K2'", hits[0], StringComparison.Ordinal);
+            Assert.DoesNotContain("'F-K1'", hits[0], StringComparison.Ordinal);
         }
     }
 

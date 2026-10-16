@@ -27,10 +27,10 @@ data-name-1 is the one-window case rather than a separate path (the shape kb/Wor
   (SR1, SR2, SR3, the minimum-size rule) reaches each through the data-name-1 row; new rows for SR2's last sentence
   ("All occurrences of data-name-2 shall be of the same category") on both clauses; §12.4.5.6.3 SR4's SOURCE
   exemption is now `CoincidingKey`'s first test; the clause-level rows ask only the clause's first operand.
-- Naming the key: `FileModel.KeyIndexOfRecordKeyName` (with §8.4.2.2.2 Format 6's one file-name qualifier) is the
+- Naming the key: `FileModel.RecordKeyNameCandidates` (with §8.4.2.2.2 Format 6's one file-name qualifier) is the
   ONE lookup READ … KEY (§14.9.30.3 SR11), START … KEY (§14.9.41.3 SR7; GR15/GR17 b) through
-  `BoundKeyedStart.NamedKey`) and COLLATING SEQUENCE OF (§12.4.5.7.3 SR5) ask; another file's record-key-name is
-  refused naming the rule. The data-item arms (`RecordLayout.KeyIndexAtOffset`, START SR6 b) 1. "defined without
+  `BoundKeyedStart.NamedKey`) and COLLATING SEQUENCE OF (§12.4.5.7.3 SR5) ask, as a COUNTED set; another file's
+  record-key-name is refused naming the rule. The data-item arms (`RecordLayout.KeyIndexAtOffset`, START SR6 b) 1. "defined without
   the SOURCE phrase") pass over a SOURCE-form key. SORT/MERGE GIVING an indexed file (§14.9.40.3 SR9) compares a
   SOURCE-form prime key only when its windows are one run. The EXTERNAL file fingerprint (§12.4.5.3 GR1 j)/k))
   carries each data-name-2's entry.
@@ -56,6 +56,30 @@ declare a record-key-name", is withdrawn); the rest gained witnesses and lost th
 `record-key-source-only` derived-verdict selector is withdrawn. Q3 (§8.13 external repository) is carried by
 kb/Work PB1086 and its slices, which already claim DOC-A.1-161/162. Docs: CONFORMANCE.md §2 row 40 Claimed,
 COBOLNET_FILES_DESIGN.md "THE SECOND KEY FORM" and D10 (format version 5), the grammar's comments, README.
+
+**Branch review, round 1 (three findings, all fixed by the review finisher).**
+- R1-1: `DataBinder.CollatingKeyNamed`'s one-fault-one-verdict guard took `AlternateKeyClause.Item is null` to mean
+  "unresolved", and `Item` is always null for the SOURCE form, so `COLLATING SEQUENCE OF AK IN IXG` (IXG another
+  file) compiled clean and the clause was dropped. `FileModel.DeclaresUnresolvedKeyNamed` now holds the guard: a
+  SOURCE clause is unresolved only when one of its operands is, and matches only under Format 6's qualifier. The
+  probe draws COBOLNET1582 (§12.4.5.7.3 SR4/SR5).
+- R1-2: the record-key-name lookup returned the FIRST match, the kb/Work PB978 shape. A record-key-name declared by
+  two clauses of one entry (Format 6's only qualifier is the file-name both share) bound silently to the prime key
+  (READ returned '23' on a stored alternate key). `cite.py --check 8.4.2.2.3 "For each non unique user-defined name
+  that is explicitly referenced, uniqueness shall be established through a sequence of qualifiers that precludes any
+  ambiguity of reference"` → OK 1). `RecordKeyNameCandidates` returns `NameCandidates<KeyNameReading>`, and the
+  positions that admit data-name-1 OR record-key-name-1 (`KeyedIoBinder.RecordKeyNameOf`, `CollatingKeyNamed`)
+  count every reading in one set — every visible file's record-key-names, and the data-name reading, since
+  §8.3.2.2 rule 3 lets one word be both — for the one verdict, `UniqueOrReportAmbiguous` (COBOLNET1639). The
+  sibling sweep found the same "asked first" order in both positions and the cross-file and data-name collisions,
+  and all are now in the count. `NameCandidates` gained `Plus` and `Select`, still with no indexer.
+- R1-3: five inventory rows still argued from the retired COBOLNET1954 decline. They were restated with evidence:
+  GR-14.9.41.4-13 has a new golden `2002/pb1099_record_key_source_national`, where START LENGTH counts national
+  positions across the SOURCE segments (LENGTH 3 crosses the IX-B/IX-A boundary, and each row is chosen so that a
+  byte count would pick a different record). SR-12.4.5.12.3-4 has a new SR4 witness per data-name-2.
+  GR-12.4.5.3-1 has the `ExternalFileEntryIdentityTests` j)/k) SOURCE rows and an operand-order row.
+  SR-8.4.2.2.3-1 and FMT-14.9.41.2 were also restated. The deleted lookup was retired as a witness from
+  SR-12.4.5.7.3-5 and SR-14.9.41.3-7.
 
 **Self-review.** Architecture: one key shape, one capture, one lookup, one gate; no C# text in a bound node.
 Code: each cited rule re-read for the operand it names (data-name-1 vs data-name-2, record-key-name-1). Performance:

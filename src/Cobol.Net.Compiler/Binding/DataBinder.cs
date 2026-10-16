@@ -1630,26 +1630,30 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// RECORD KEY clause in the file control entry", SR5: "Record-key-name-1 shall be a name specified as a
     /// record-key-name in an ALTERNATE RECORD KEY clause or in a RECORD KEY clause in the file control entry" — or
     /// null, REPORTED, when it names none (kb/Work PB1075, PB1099).
-    /// <para>A record-key-name this entry declares is asked first, through the ONE record-key-name lookup
-    /// (<see cref="FileModel.KeyIndexOfRecordKeyName"/>, which also reads its §8.4.2.2.2 Format 6 file-name
-    /// qualifier). Otherwise the operand is a qualified data-name, resolved by §8.4.2.2 like every other clause
-    /// operand and narrowed to this file's data-name-1 key items: qualification is what separates two files'
-    /// same-named keys (the case that used to be a parse error), and a reference that still leaves two key items is
-    /// ambiguous (§8.4.2.2.3 SR1). A key clause whose own operand failed to resolve has already been reported, so an
-    /// operand spelled like it is not reported a second time as "not a key" (one fault, one verdict).</para></summary>
+    /// <para>⛔ BOTH READINGS IN ONE COUNTED SET (kb/Work PB1099 review R1-2). The operand position admits
+    /// data-name-1 or record-key-name-1, and §8.3.2.2 lets one word be both, so the record-key-names this entry
+    /// declares (<see cref="FileModel.RecordKeyNameCandidates"/>, which reads §8.4.2.2.2 Format 6's file-name
+    /// qualifier) and the qualified data-names resolved by §8.4.2.2 and narrowed to this file's data-name-1 key
+    /// items are ONE candidate set: qualification is what separates two files' same-named keys (the case that used
+    /// to be a parse error), and a reference that still leaves two readings is ambiguous (§8.4.2.2.3 SR1) — never
+    /// "the record-key-name first". A key clause whose own operand failed to resolve has already been reported, so
+    /// an operand naming it is not reported a second time as "not a key"
+    /// (<see cref="FileModel.DeclaresUnresolvedKeyNamed"/>: one fault, one verdict).</para></summary>
     private RecordKey? CollatingKeyNamed(FileModel file, CollatingKeyOperand k, IReadOnlyList<RecordKey> keys,
                                          string written)
     {
-        if (file.KeyIndexOfRecordKeyName(k.Name, k.Qualifiers) is { } byName) return file.KeyAt(byName);
-        var named = QualifiedCandidates(k.Name, k.Qualifiers, Model.Scope.Program)
-            .Where(i => keys.Any(key => ReferenceEquals(key.Item, i)));
-        if (named.Count > 0)
-            return UniqueOrReportAmbiguous(named, $"file '{file.CobolName}': COLLATING SEQUENCE OF", written, out _)
-                is { } item ? keys.Single(key => ReferenceEquals(key.Item, item)) : null;
-        bool unresolvedKeyOfThatName =
-            file.PrimeKey is null && CobolNames.Same(file.RecordKeyName, k.Name)
-            || file.AlternateKeyNames.Any(a => a.Item is null && CobolNames.Same(a.Name, k.Name));
-        if (!unresolvedKeyOfThatName)
+        var readings = file.RecordKeyNameCandidates(k.Name, k.Qualifiers)
+            .Plus(QualifiedCandidates(k.Name, k.Qualifiers, Model.Scope.Program)
+                .Where(i => keys.Any(key => ReferenceEquals(key.Item, i)))
+                .Select(KeyNameReading (i) => new KeyNameReading.DataName(i)));
+        if (readings.Count > 0)
+            return UniqueOrReportAmbiguous(readings, $"file '{file.CobolName}': COLLATING SEQUENCE OF", written, out _) switch
+            {
+                KeyNameReading.RecordKeyName rk => file.KeyAt(rk.KeyIndex),
+                KeyNameReading.DataName dn => keys.Single(key => ReferenceEquals(key.Item, dn.Item)),
+                _ => null,
+            };
+        if (!file.DeclaresUnresolvedKeyNamed(k.Name, k.Qualifiers))
             Edition.Error(DiagnosticCatalog.FileCollatingKey, $"file '{file.CobolName}': COLLATING SEQUENCE OF "
                 + $"'{written}' — '{written}' is not a RECORD KEY or ALTERNATE RECORD KEY of this file "
                 + "(ISO §12.4.5.7.3 SR4/SR5)");
@@ -8588,7 +8592,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         T? verdict = Edition.Permissive ? candidates.FirstDeclaredForPermissive : null;
         if (!report) return verdict;
         // One verdict for every name class §8.4.2.2.3 SR1 covers (kb/Work PB919): only the noun differs.
-        string what = typeof(T) == typeof(IndexDeclaration) ? "an index-name" : "a data item";
+        string what = typeof(T) == typeof(IndexDeclaration) ? "an index-name"
+            : typeof(T) == typeof(KeyNameReading) ? "a record key or data item" : "a data item";
         string msg = $"{clauseFace} '{written}' does not uniquely identify {what} — {candidates.Count} "
             + "declarations match the written reference (ISO §8.4.2.2.3 SR1: \"For each non unique user-defined "
             + "name that is explicitly referenced, uniqueness shall be established through a sequence of qualifiers "

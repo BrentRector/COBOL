@@ -334,25 +334,54 @@ public sealed class FileModel
     /// phrase, or an operand §12.4.5.6.3 SR7 refused).</summary>
     public List<(RecordKey Key, bool Duplicates, KeySuppression? Suppress)> AlternateKeys { get; } = [];
 
-    /// <summary>The index of the SOURCE-form key this file declares as <paramref name="recordKeyName"/> (−1 = the
-    /// prime key, i = the i-th alternate), or null when no RECORD KEY or ALTERNATE RECORD KEY clause of this file
-    /// declares it — the ONE answer to ISO §14.9.30.3 SR11 / §14.9.41.3 SR7 / §12.4.5.7.3 SR5's "specified as a
-    /// record-key-name … in the file control entry". <paramref name="qualifiers"/> is the reference's IN/OF
-    /// list: §8.4.2.2.2 Format 6 (qualified-record-key-name) qualifies a record-key-name by ONE file-name, so a
-    /// reference qualified by anything but this file's own name names no key of it.</summary>
-    public int? KeyIndexOfRecordKeyName(string recordKeyName, IReadOnlyList<string> qualifiers)
+    /// <summary>The SOURCE-form keys of this file that a reference <paramref name="recordKeyName"/>
+    /// <paramref name="qualifiers"/> names — the ONE answer to ISO §14.9.30.3 SR11 / §14.9.41.3 SR7 / §12.4.5.7.3
+    /// SR5's "specified as a record-key-name … in the file control entry", as a COUNTED set (prime key first, then
+    /// the alternates in declaration order). <paramref name="qualifiers"/> is the reference's IN/OF list:
+    /// §8.4.2.2.2 Format 6 (qualified-record-key-name) qualifies a record-key-name by ONE file-name, so a reference
+    /// qualified by anything but this file's own name names no key of it.
+    /// <para>⛔ A SET, NEVER "THE FIRST MATCH" (kb/Work PB1099 review R1-2). Nothing forbids two of this entry's
+    /// clauses declaring the same record-key-name (§8.3.2.2), and Format 6's only qualifier is the file-name both
+    /// share, so no reference can single either out: §8.4.2.2.3 SR1's error, reported by the caller's one
+    /// ambiguity verdict. Returning the first match bound such a reference silently to the prime key.</para></summary>
+    public NameCandidates<KeyNameReading> RecordKeyNameCandidates(string recordKeyName, IReadOnlyList<string> qualifiers)
     {
-        if (qualifiers.Count > 1
-            || qualifiers.Count == 1 && !CobolNet.Runtime.CobolNames.Same(qualifiers[0], SelectName)
-                && !CobolNet.Runtime.CobolNames.Same(qualifiers[0], CobolName))
-            return null;
+        List<KeyNameReading> named = [];
+        if (!RecordKeyNameQualifiersAdmit(qualifiers)) return new(named);
         if (PrimeKey is { IsSourceForm: true } pk && CobolNet.Runtime.CobolNames.Same(pk.RecordKeyName, recordKeyName))
-            return -1;
+            named.Add(new KeyNameReading.RecordKeyName(this, -1));
         for (int i = 0; i < AlternateKeys.Count; i++)
             if (AlternateKeys[i].Key.IsSourceForm
                 && CobolNet.Runtime.CobolNames.Same(AlternateKeys[i].Key.RecordKeyName, recordKeyName))
-                return i;
-        return null;
+                named.Add(new KeyNameReading.RecordKeyName(this, i));
+        return new(named);
+    }
+
+    /// <summary>Whether a record-key-name reference's IN/OF list can name a key of this file: none, or §8.4.2.2.2
+    /// Format 6's one file-name qualifier naming this file.</summary>
+    private bool RecordKeyNameQualifiersAdmit(IReadOnlyList<string> qualifiers) =>
+        qualifiers.Count == 0
+        || qualifiers.Count == 1 && (CobolNet.Runtime.CobolNames.Same(qualifiers[0], SelectName)
+                                     || CobolNet.Runtime.CobolNames.Same(qualifiers[0], CobolName));
+
+    /// <summary>Whether a key clause of this entry that did NOT resolve (an operand referencing nothing describable,
+    /// already reported by that clause's own SR2 row) is the one a key-level COLLATING SEQUENCE operand
+    /// <paramref name="name"/> <paramref name="qualifiers"/> was written to name — so the operand is not reported a
+    /// second time as "not a key of this file" (one fault, one verdict). A data-name-1 clause matches by spelling (its
+    /// operand names nothing, so no qualification can be judged); a SOURCE-form clause matches its record-key-name
+    /// under Format 6's qualifier rule. ⛔ A SOURCE-form clause is unresolved when one of ITS OPERANDS is — never
+    /// because <see cref="AlternateKeyClause.Item"/> is null, which it always is for that form (kb/Work PB1099 review
+    /// R1-1: every SOURCE alternate read as unresolved, so <c>COLLATING SEQUENCE OF AK IN another-file</c> was
+    /// dropped unreported).</summary>
+    public bool DeclaresUnresolvedKeyNamed(string name, IReadOnlyList<string> qualifiers)
+    {
+        bool Matches(string clauseName, RecordKeySource? source) =>
+            CobolNet.Runtime.CobolNames.Same(clauseName, name)
+            && (source is null || RecordKeyNameQualifiersAdmit(qualifiers));
+        bool Unresolved(DataItem? item, RecordKeySource? source) =>
+            source is null ? item is null : source.Operands.Any(o => o.Item is null);
+        return RecordKeyName is { } rk && PrimeKey is null && Matches(rk, RecordKeySource)
+            || AlternateKeyNames.Any(a => Unresolved(a.Item, a.Source) && Matches(a.Name, a.Source));
     }
 
     /// <summary>The resolved key at <paramref name="keyIndex"/> (−1 = prime), or null.</summary>
