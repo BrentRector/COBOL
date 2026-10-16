@@ -5,7 +5,8 @@
       *> the argument as the sending operand". A literal or an expression
       *> is DESCRIBED as the sender it is and asked that question, on the
       *> CALL ... AS NESTED lane and the typed INVOKE lane alike (one
-      *> verdict, OoConformance.ContentValueMismatch). Before the fix the
+      *> verdict, ParameterConformance.ContentConformanceReason, which
+      *> asks ActivationRelations.CallArgumentViolation). Before the fix the
       *> literal/boolean lanes carried hand lists and refused every pair
       *> below except B"1" -> N(4) on CALL.
       *> EXPECTED VALUES, DERIVED (14.9.25.3 Table 16; 14.9.25.4 GR4/GR6):

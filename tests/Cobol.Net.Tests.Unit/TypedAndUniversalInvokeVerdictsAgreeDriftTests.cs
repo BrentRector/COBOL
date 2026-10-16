@@ -32,8 +32,10 @@ namespace CobolNet.Tests.Unit;
 /// — and the two lanes gave opposite verdicts: a slice into an equal-length <c>PIC X(5)</c> ran on one and raised
 /// EC-OO-METHOD on the other, a slice into a smaller group formal the reverse.
 /// <list type="bullet">
-/// <item>STRUCTURAL: <c>OoBinder</c> calls no <c>DescriptionMismatch</c> (deleted everywhere by kb/Work
-/// PB3101; <c>OneRelationDriftTests</c>), its BY REFERENCE verdict asks the two relations and names no <c>RefModPlace</c>, and no
+/// <item>STRUCTURAL: <c>OoBinder</c> calls no <c>SignatureDifference</c>, the pair-mode relation that replaced
+/// <c>DescriptionMismatch</c> (deleted everywhere by kb/Work PB3101;
+/// <c>ActivationConformanceDriftTests.PairMode_AsksTheDescriptionRelation_ThroughOneEntry</c>), its BY REFERENCE
+/// verdict asks the two relations and names no <c>RefModPlace</c>, and no
 /// <c>if</c> of <c>OoBindInvocationArg</c> tests for one.</item>
 /// <item>BEHAVIORAL: over every elementary pair the comparator's own drift test enumerates, plus reference-modified and
 /// ANY LENGTH sides, the binder's verdict is the relation's; and PB3098's rows compile to the verdicts the table
@@ -55,12 +57,12 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
     {
         var root = CSharpSyntaxTree.ParseText(File.ReadAllText(OoBinderFile)).GetRoot();
         var comparatorCalls = root.DescendantNodes().OfType<InvocationExpressionSyntax>()
-            .Where(i => i.Expression is MemberAccessExpressionSyntax { Name.Identifier.Text: "DescriptionMismatch" })
+            .Where(i => i.Expression is MemberAccessExpressionSyntax { Name.Identifier.Text: "SignatureDifference" })
             .Select(i => i.GetLocation().GetLineSpan().StartLinePosition.Line + 1)
             .ToList();
         Assert.True(comparatorCalls.Count == 0,
-            "OoBinder calls OoConformance.DescriptionMismatch (line " + string.Join(", ", comparatorCalls) + "): an INVOKE "
-            + "argument would be judged by a second comparator the universal lane does not ask (kb/Work PB2077).");
+            "OoBinder calls the pair-mode relation SignatureDifference (line " + string.Join(", ", comparatorCalls)
+            + "): an INVOKE argument would be judged by an identity the universal lane does not ask (kb/Work PB2077).");
 
         var verdict = Assert.Single(Methods("ByReferenceArgumentReason"));
         string body = verdict.Body!.ToString();

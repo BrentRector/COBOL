@@ -134,8 +134,9 @@ public sealed class ActivationConformanceDriftTests
     /// <c>ActivationDescription</c>s, and the two disagreed where the standard does not: a reference-modified argument BY
     /// REFERENCE into a prototyped CALL's or a function's elementary formal ran (it has no PICTURE clause, docs/CONFORMANCE.md
     /// D-RM1), and the run-time lane's ANY LENGTH arm compared category and usage only. So the activation entry asks
-    /// <c>CallArgumentViolation</c> / <c>CallReturningViolation</c>, and no verb binder asks the pair comparator at all
-    /// (<c>MoveBinder</c>'s identity-conversion test, a pair question, asks the pair-mode relation:
+    /// <c>CallArgumentViolation</c> / <c>CallReturningViolation</c>, the comparator is deleted, and no verb binder asks
+    /// its successor, the pair-mode relation <c>SignatureDifference</c>, for an activation (<c>MoveBinder</c>'s
+    /// identity-conversion test, a pair question, is the one verb binder that asks it:
     /// <see cref="PairMode_AsksTheDescriptionRelation_ThroughOneEntry"/>).</summary>
     [Fact]
     public void ActivationConformance_AsksTheRunTimeRelations_NotThePairComparator()
@@ -145,13 +146,16 @@ public sealed class ActivationConformanceDriftTests
             Assert.True(code.Contains(call, System.StringComparison.Ordinal),
                 $"ParameterConformance no longer asks {call.TrimEnd('(')} — the bind-time activation lane would answer a "
                 + "pair the run-time CALL lane answers differently (kb/Work PB3101).");
+        // The pair-mode question is SignatureDifference now (the comparator is deleted, kb/Work PB3101): only MoveBinder's
+        // identity-conversion test, itself a pair question, may ask it among the verb binders.
         var offenders = Directory.EnumerateFiles(VerbsDir, "*.cs", SearchOption.AllDirectories)
-            .Where(f => Regex.IsMatch(CodeOf(f), @"OoConformance\s*\.\s*DescriptionMismatch\s*\("))
+            .Where(f => Path.GetFileName(f) != "MoveBinder.cs")
+            .Where(f => Regex.IsMatch(CodeOf(f), @"(OoConformance|ActivationRelations)\s*\.\s*SignatureDifference\s*\("))
             .Select(Path.GetFileName)
             .ToList();
         Assert.True(offenders.Count == 0,
-            "A verb binder asks the pair-mode comparator OoConformance.DescriptionMismatch for an activation instead of "
-            + "ActivationRelations (kb/Work PB3101): " + string.Join(", ", offenders));
+            "A verb binder asks the pair-mode relation SignatureDifference for an activation instead of the run-time "
+            + "relations CallArgumentViolation / CallReturningViolation (kb/Work PB3101): " + string.Join(", ", offenders));
     }
 
     /// <summary>⛔ THE RETURNING-ITEM HALF OF §14.8.3 IS ONE ENTRY TOO (kb/Work PB1164). §14.8.3.3 rule 1 makes two

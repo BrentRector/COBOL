@@ -152,3 +152,19 @@ the fold drops the GR-9.3.6-L4.1 and L4.2 records because their re-site lands on
 now give both batches and both counts. The finisher also merged main `bfb2eb47e`: `2002/manifest.json` conflicted
 (both sides prepended to `enabled`) and was resolved as the union; the inventory auto-merged with no overlapping row
 (main 3 rows, the branch 34).
+
+Branch review round 1 of wave 1093 (R1-1, R1-2). R1-1, a dead guard: `MethodConformanceRuleSetDriftTests` still banned
+the deleted `DescriptionMismatch(` in the three §9.3.8.2.3 askers, so a second hand-written copy of rules 2/3, 6 and 7
+calling `SignatureDifference(` beside `MethodConformanceMismatches` stayed green. The ban now names every member the
+rule set calls for one of its rules (`SignatureDifference(`, `ActivationRelations.`, `OptionalMismatch(`,
+`ObjectRefAssignmentMismatch(`, `ReturningCircularity(`), and the rule-set fact asserts that `SignatureDifference(` is
+in the rule set. The sibling sweep found the same dead identifier in two more guards:
+`ActivationConformanceDriftTests.ActivationConformance_AsksTheRunTimeRelations_NotThePairComparator` (verb binders; it
+now bans any `SignatureDifference(` call outside `MoveBinder`'s pair question) and
+`TypedAndUniversalInvokeVerdictsAgreeDriftTests.OoBinder_HoldsNoArgumentComparatorOfItsOwn` (OoBinder). A mutation run
+injected one second copy per guard and turned all three red, then was reverted. R1-2: five corpus headers named
+deleted members as the current mechanism (`2002/pb1113_content_compute_move_regime`,
+`2002/pb1946_content_expression_move_regime`, `2002/oo_interface_conformance`, `2023/pb177_method_group_boundary`,
+`negative/pb133-arg-conformance`); each now names `ParameterConformance.ContentConformanceReason` or
+`ActivationRelations`, or marks the old comparator as deleted. These are comment-only edits; no `.out` or `.err`
+changed.
