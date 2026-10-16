@@ -42,3 +42,5 @@ boundary changed. `Store` was `protected` on a class with `private protected abs
 than the runtime could ever subclass `KeyedConnector` and reach it. No compiled module could reference it, and
 raising the major would refuse every module compiled at 5 for no reason. The compare oracle reads IDENTICAL over
 7999 cases, and the semgrep counts are unchanged.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T164838Z-f92b87; Unit 33,237/33,746 in leg 1, all 24 new cases passed). LINUX GATE: the lander's (batched gating).
