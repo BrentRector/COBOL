@@ -492,10 +492,14 @@ internal static class OperandText
         // A group operand's character image is the generated AsImage(): each string-stored leaf contributes its
         // characters; a DISPLAY leaf its zoned digits; and a BINARY/PACKED leaf ⛔ ITS TRUE BYTES — radix-2
         // two's complement of StorageWidth, or BCD with a trailing sign nibble (V59). Implementor-defined
-        // territory (§8.8.4.2.1 + §8.8.4.2.7: a group operand is class alphanumeric compared over its
-        // REPRESENTATION, and §13.18.60.4 GR4/GR11 leave a binary/packed item's representation, including its
-        // sign, to the implementor — COBOLNET_DESIGN §14.4 and docs/CONFORMANCE.md items 205–215 are the ONE
-        // total definition).
+        // territory (§8.8.4.2.1 + §8.8.4.2.7: an ALPHANUMERIC group is compared as an elementary alphanumeric
+        // item, over its REPRESENTATION, and §13.18.60.4 GR4/GR11 leave a binary/packed item's representation,
+        // including its sign, to the implementor — COBOLNET_DESIGN §14.4 and docs/CONFORMANCE.md items 205–215 are
+        // the ONE total definition). A STRONGLY-TYPED group (class = its type-name, §8.5.2.1) may hold the same
+        // BINARY/PACKED leaves and reaches this path as a sender (DISPLAY of one shows its BINARY leaf's true
+        // bytes), but never as a compare operand: §8.8.4.2.3 SR1 admits only a same-type strong pair, which
+        // §8.8.4.2.12 compares element by element (lowered at bind by StrongGroupComparison, kb/Work PB1469), not
+        // over this image.
         // ⚠ THIS COMMENT USED TO SAY "its zoned decimal digit image … with a trailing-overpunch sign", which was
         // true of the PRE-V59 image and is now false — the bytes are not digits. Corrected rather than left, since
         // a stale comment describing the old representation is exactly how the two-predicate residue below spread.

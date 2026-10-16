@@ -1705,7 +1705,8 @@ public static class DiagnosticCatalog
         "COBOLNET1796", "external-pointer-or-object-item", EditionSeverity.Error,
         "ISO §13.18.22.3 syntax rule 4: \"The EXTERNAL clause shall not be specified for a data item of class "
         + "object or pointer.\" (The rule names the ITEM's own class, so a strongly-typed EXTERNAL group with a "
-        + "pointer MEMBER is not barred by it — that group is class alphanumeric, and §13.18.22.3 SR5 requires "
+        + "pointer MEMBER is not barred by it — that group's class is its type-name (§8.5.2.1), not pointer, and "
+        + "§13.18.22.3 SR5 requires "
         + "only that its type declaration also be external. Class pointer covers the data-pointer and "
         + "program-pointer categories; class object is the object-reference category.)",
         "ISO §13.18.22.3 SR4");

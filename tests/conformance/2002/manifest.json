@@ -612,6 +612,7 @@
     "pb565_report_repeating_entry",
     "pb565_report_vertical_repetition",
     "pb522_group_usage_travels_with_the_description",
+    "pb1400_group_usage_operand_class",
     "pb888_compiler_temp_takes_the_whole_description",
     "pb889_type_to_optional_word",
     "pb836_implicit_record_redefinition",

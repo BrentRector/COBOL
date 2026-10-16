@@ -20,10 +20,11 @@ using Core = CobolParserCore;
 /// </para>
 /// <list type="bullet">
 ///   <item><see cref="Arithmetic"/> — ISO §8.8.1.1: "An arithmetic expression may be an identifier referencing a
-///         NUMERIC data item, a numeric literal, the figurative constant ZERO …". A group (class alphanumeric,
-///         §8.5), an elementary alphanumeric/national item, and a reference-modified slice (§8.4.3.3.4 GR6) are all
-///         inadmissible. This is the default and by far the common case: COMPUTE, the arithmetic verbs,
-///         subscripts, reference-modifier offsets, relation conditions, SET, PERFORM VARYING.</item>
+///         NUMERIC data item, a numeric literal, the figurative constant ZERO …". A group (never numeric: its
+///         §8.5.2.1 class is alphanumeric, boolean, national or its type-name), an elementary alphanumeric/national
+///         item, and a reference-modified slice (§8.4.3.3.4 GR6) are all inadmissible. This is the default and by
+///         far the common case: COMPUTE, the arithmetic verbs, subscripts, reference-modifier offsets, relation
+///         conditions, SET, PERFORM VARYING.</item>
 ///   <item><see cref="FunctionArgument"/> — governed instead by the individual function's §15.x ARGUMENT RULE,
 ///         which for the string functions explicitly admits alphanumeric data: <c>FUNCTION TRIM(S)</c>,
 ///         <c>SUBSTITUTE</c>, <c>FIND-STRING</c> and <c>CONVERT</c> over a <c>PIC X</c> item are all legal.</item>
@@ -433,7 +434,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     {
         if (IntrinsicArgumentRules.ClassOf(op) is not { } cls || !excluded.Contains(cls)) return false;
         ctx.Edition.Error(DiagnosticCatalog.OperandClassExcluded,
-            $"{where} operand '{sourceText}' is of class {cls.ToString().ToLowerInvariant()}, which the "
+            $"{where} operand '{sourceText}' is of class {IntrinsicArgumentRules.Name(cls)}, which the "
             + $"statement's rules exclude — {cite}");
         return true;
     }
@@ -657,8 +658,14 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// </para></summary>
     private static string NonNumericOperandKind(Place p) => p switch
     {
-        RefModPlace => "a reference-modified operand (class alphanumeric, ISO §8.4.3.3.4 GR6)",
-        _ when p.Item.IsGroup => $"group item '{p.Item.CobolName}' (class alphanumeric, ISO §8.5)",
+        // ⛔ NEITHER ARM SPELLS A CLASS OF ITS OWN (kb/Work PB1400). Both said "class alphanumeric" outright, which
+        // told the user a GROUP-USAGE BIT group (class boolean, §8.5.2.5 3)), a GROUP-USAGE NATIONAL group (class
+        // national, §8.5.2.10 3)) and a reference-modified national item (§8.4.3.3.4 GR6) were alphanumeric: one
+        // rule written in two places. The class is ClassNameOf's, over the ONE §8.5.2.1 classifier.
+        RefModPlace =>
+            $"a reference-modified operand of class {IntrinsicArgumentRules.ClassNameOf(p)} (ISO §8.4.3.3.4 GR6)",
+        _ when p.Item.IsGroup =>
+            $"group item '{p.Item.CobolName}' of class {IntrinsicArgumentRules.ClassNameOf(p)} (ISO §8.5.2.1)",
         // The INDEX arm the old switch lacked (kb/Work PB170): §8.5.2.1 Table 2 puts an index data item in class
         // INDEX, and §13.18.60.3 SR10's closed reference list — "a SEARCH or SET statement, a relation condition,
         // an intrinsic function argument" — has no arithmetic-operand entry. Named by the same words
@@ -679,12 +686,10 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
             + (pic.EditMask is not null ? " (an edited item is not a NUMERIC data item — ISO §8.5.2.1 "
                 + "Table 2; the de-editing grant is MOVE's alone, §14.9.25.4 GR6d1)" : ""),
         // ⛔ TOTAL BY CONSTRUCTION. The classifier has already said "not class numeric", so there is no
-        // admissible shape left to fall through to — a pointer, a program-pointer, an object reference, a PIC A
-        // alphabetic item and a bit/national group all land here and are NAMED rather than silently admitted
-        // (which is what the former `_ => null` did for the first three).
-        _ => $"item '{p.Item.CobolName}' of class "
-            + $"{IntrinsicArgumentRules.ClassOfPlace(p)?.ToString().ToLowerInvariant() ?? "unknown"} "
-            + "(ISO §8.5.2.1 Table 2)",
+        // admissible shape left to fall through to — a pointer, a program-pointer, an object reference and an
+        // elementary boolean item all land here and are NAMED rather than silently admitted (which is what the
+        // former `_ => null` did for the first three).
+        _ => $"item '{p.Item.CobolName}' of class {IntrinsicArgumentRules.ClassNameOf(p)} (ISO §8.5.2.1 Table 2)",
     };
 
     /// <summary>Reject a non-numeric literal alias in a numeric-expression position (ISO §8.8.1.1 — arithmetic
@@ -1319,7 +1324,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         if (!context.Rules().NumericClassScreen) return bound;
         var operand = IntrinsicBinder.OperandOf(bound);
         if (IntrinsicArgumentRules.IsArithmeticOperandClass(operand)) return bound;
-        string cls = IntrinsicArgumentRules.ClassOf(operand)?.ToString().ToLowerInvariant() ?? "non-numeric";
+        string cls = IntrinsicArgumentRules.ClassOf(operand) is { } c ? IntrinsicArgumentRules.Name(c) : "non-numeric";
         string article = cls[0] is 'a' or 'e' or 'i' or 'o' or 'u' ? "an" : "a";
         string what = bound is BoundIntrinsicCall sc
             ? $"FUNCTION {sc.Sig.Name} ({article} {cls} function, ISO §15.2)"
