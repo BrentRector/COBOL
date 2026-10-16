@@ -76,21 +76,19 @@ def decide(command: str, cwd: str, shell: str = shell_location.BASH) -> str | No
         return None
     # git's argv is the shared parser's words of the step (kb/Work PB3198: one model of the command line, never a second
     # splitter): quotes removed as the shell removes them, so the paths judged are the paths git receives.
-    argv = [_norm(w) for w in step.words]
-    if not argv or argv[0] not in ("git", "git.exe"):
+    # Its git invocation is `git_calls`' reading (the same one every guard rule reads): the step must BE that call, and
+    # its only global options `-C <dir>` (any other, `-c`, `--git-dir`, `--work-tree`, changes what `rm` acts on).
+    calls = shell_location.git_calls(step)
+    if (not step.words or step.words[0] not in ("git", "git.exe") or len(calls) != 1 or calls[0].subcommand != "rm"
+            or calls[0].cwd is None):
         return None
-    base = pathlib.Path(_norm(step.cwd))
-    i = 1
-    if i < len(argv) and argv[i] == "-C":
-        if i + 1 >= len(argv) or _drive_relative(argv[i + 1]):
-            return None
-        target = argv[i + 1]
-        base = pathlib.Path(target) if shell_location.is_absolute(target) else base / target
-        i += 2
-    if i >= len(argv) or argv[i] != "rm":
+    call = calls[0]
+    flags, dirs = call.options[0::2], call.options[1::2]
+    if len(flags) != len(dirs) or any(f != "-C" for f in flags) or any(_drive_relative(_norm(d)) for d in dirs):
         return None
+    base = pathlib.Path(_norm(call.cwd))
     opts, paths = [], []
-    for a in argv[i + 1:]:
+    for a in (_norm(w) for w in call.args):
         (opts if a.startswith("-") and a != "--" or a == "--" else paths).append(a)
     if not paths or any(o not in ALLOWED_OPTIONS for o in opts) or "-r" not in opts:
         return None

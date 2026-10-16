@@ -12,7 +12,8 @@ the build guard denied it while a main-tree fleet was live (2026-10-07/08, six d
 following every location change the two shells accept:
 
   Bash         `cd [-L|-P] [dir]` (no dir: home; `-`: the previous dir), `pushd dir`, `popd`; a `( … )` subshell's
-               changes end at its `)`; `bash|sh -c '…'` runs its payload in a child (its changes never persist).
+               changes end at its `)`; `bash|sh -c '…'` runs its payload in a child (its changes never persist), and
+               so does a heredoc fed to a shell with no script operand (`bash <<'EOF' … EOF`, `pwsh -Command - <<EOF`).
   PowerShell   `Set-Location`, `sl`, `cd`, `chdir`, `Push-Location`, `pushd`, `Pop-Location`, `popd`, with the path
                positional or as `-Path`/`-LiteralPath`/`-LP`/`-PSPath` (also `-Path:dir`); `cd -` the previous dir;
                `pwsh|powershell [-WorkingDirectory|-wd dir] -Command "…"` runs its payload in a child in that dir;
@@ -27,8 +28,9 @@ following every location change the two shells accept:
 It is also the ONE model of a command line that every guard rule reads (kb/Work PB3198): a step's `text` and `words` are
 its command without the BODIES of the heredocs it introduces (a body is cut at its own delimiter line, never at the first
 `<<`, and a `<<` inside quotes or `$(( … ))` is no heredoc), the bodies ride beside it in `heredocs`, quoted text is one
-word, a `-c`/`-Command` payload is walked as the command line it is, and `git_calls` reads every `git` invocation of a
-step (its global options, the directory its `-C` options name, its subcommand). A rule that scans the raw text instead
+word, a `-c`/`-Command` payload (and a heredoc a shell reads as its script) is walked as the command line it is, and
+`git_calls` reads every `git` invocation of a step (its global options, the directory its `-C` options name, its
+subcommand). A rule that scans the raw text instead
 sees a heredoc body as commands, or a command after a heredoc as body: the hole PB3198 closed in four rules at once.
 
 A directory the line does not determine (a target spelled with an unknown variable or a command substitution, `popd`
@@ -452,20 +454,59 @@ def _workdir(words: tuple[str, ...], cwd: str | None) -> str | None:
     return cwd if arg is None else resolve(arg, cwd)
 
 
+def _reads_stdin_script(words: tuple[str, ...], shell: str) -> bool:
+    """A shell called with no script operand (`bash`, `bash -s args`, `sh -e`, `pwsh -NoProfile`) reads its commands
+    from stdin, so a heredoc fed to it is a command line, never data. A first operand that is not an option (or an
+    option's value, or a redirection) is a script file, and then stdin is that script's input."""
+    i = 1
+    while i < len(words):
+        w, low = words[i], words[i].lower()
+        if re.match(r"^[0-9&]*(<<?-?|>>?|<>)", w):        # a redirection; a bare operator's target is the next word
+            i += 2 if re.fullmatch(r"[0-9&]*(<|>>?|<>)&?", w) else 1
+            continue
+        if shell == BASH and w == "-s":
+            return True                                  # `-s`: commands from stdin, the rest are its arguments
+        if shell == BASH and w in ("-o", "+o", "-O", "+O", "--rcfile", "--init-file"):
+            i += 2
+            continue
+        if shell == POWERSHELL and low in ("-file", "-f"):
+            return i + 1 < len(words) and words[i + 1] == "-"   # `-File -` reads stdin; `-File x.ps1` runs x.ps1
+        if shell == POWERSHELL and low in _PS_SHELL_VALUE_OPTIONS:
+            i += 2
+            continue
+        if w.startswith(("-", "+")) and w not in ("-", "--"):
+            i += 1
+            continue
+        return False
+    return True
+
+
+# pwsh's command-line options that take their value as the next word (`pwsh -?` lists them)
+_PS_SHELL_VALUE_OPTIONS = {"-executionpolicy", "-ep", "-ex", "-workingdirectory", "-wd", "-configurationname", "-config",
+                           "-settingsfile", "-settings", "-outputformat", "-of", "-o", "-inputformat", "-if", "-inp",
+                           "-windowstyle", "-w", "-custompipename"}
+
+
 def _shell_child(words: tuple[str, ...], state: _State, depth: int, sep: str, heredocs: tuple[str, ...],
                  out: list[Step]) -> bool:
-    """`bash -c '…'` / `pwsh [-WorkingDirectory dir] -Command "…"`: walk the payload in a child shell (its location
-    changes never come back). True when `words` was such a call."""
+    """`bash -c '…'` / `pwsh [-WorkingDirectory dir] -Command "…"`, or a shell with no script operand fed a heredoc
+    (`bash <<'EOF' … EOF`, `pwsh -Command - <<EOF`): walk the payload in a child shell (its location changes never come
+    back). True when `words` was such a call."""
     child_shell = _shell_named(words[0]) if words else None
     if child_shell is None:
         return False
     at = next((i for i, w in enumerate(words[1:-1], 1) if w.lower() in _SHELL_PAYLOAD_FLAGS), None)
-    if at is None:
+    if at is not None and not (heredocs and words[at + 1] == "-"):
+        payloads = [" ".join(words[at + 1:]) if child_shell == POWERSHELL else words[at + 1]]
+        workdir = _workdir(words[:at], state.cwd)
+    elif heredocs and (at is not None or _reads_stdin_script(words, child_shell)):
+        payloads = list(heredocs)    # stdin IS the script (`-Command -` names stdin): each body is a command line
+        workdir = _workdir(words, state.cwd)
+    else:
         return False
-    payload = " ".join(words[at + 1:]) if child_shell == POWERSHELL else words[at + 1]
-    child = _State(_workdir(words[:at], state.cwd), None, [], {})
     before = len(out)
-    _walk(payload, child, child_shell, depth + 1, out)
+    for payload in payloads:
+        _walk(payload, _State(workdir, None, [], {}), child_shell, depth + 1, out)
     if len(out) > before:
         last = out[-1]
         out[-1] = dataclasses.replace(last, sep=sep, heredocs=last.heredocs + heredocs)

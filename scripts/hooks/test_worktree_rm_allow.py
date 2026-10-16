@@ -66,6 +66,12 @@ CASES = [
     ("cat > m.txt <<'EOF'\ngit rm -r src/X\nEOF", str(WT), False),                   # a body is text, not the command
     ("git rm -r E:src/X", str(WT), False),                                           # drive-relative: its dir is unknown
     ("git -C E:sub rm -r src/X", str(WT), False),
+    # the git call is `git_calls`' reading: only `-C` options, applied in order, and the step is that one call
+    (f"git -C {REPO.as_posix()} -C {WT.as_posix()} rm -r src/X", MAIN, True),       # the last -C wins, as in git
+    (f"git -C {WT.as_posix()} -C ../.. rm -r src/X", MAIN, False),                  # ... and can leave the worktree
+    ("git --work-tree=/e/COBOL rm -r src/X", str(WT), False),                        # another global option: no allow
+    ("git -c core.x=y rm -r src/X", str(WT), False),
+    ("git rm -r src/X; bash <<'EOF'\ngit rm -r src/Y\nEOF", str(WT), False),         # a shell's heredoc is a payload
 ]
 
 

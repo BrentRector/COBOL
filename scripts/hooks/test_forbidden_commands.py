@@ -153,6 +153,12 @@ CASES = [
     ("cat > m.txt <<'EOF'" + NL + "wsl --shutdown" + NL + "EOF", False),
     (HD + "cd /e/x && a & b", True),
     (QS + "cd /e/x && a & b", True),
+    # a heredoc a shell reads as its script is a command line, so every rule reads it (the w1098c lead)
+    ("bash <<'EOF'" + NL + "git stash" + NL + "EOF", True),
+    ("bash -s <<'EOF'" + NL + "git push origin main" + NL + "EOF", True),
+    ("sh <<'EOF'" + NL + 'dotnet test x.csproj --filter "~Foo" > log.txt' + NL + "EOF", True),
+    ("pwsh -NoProfile -Command - <<'EOF'" + NL + "git stash" + NL + "EOF", True),
+    ("bash run.sh <<'EOF'" + NL + "git stash" + NL + "EOF", False),   # stdin of a script is that script's data
 ]
 
 

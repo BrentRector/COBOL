@@ -23,17 +23,27 @@ redirection or pipe reader. `worktree_rm_allow.py` takes git's argv from `Step.w
 heredoc-fed call or a drive-relative path. `fleet_active_build.py` and `status_guard.py` stop reading a heredoc body as
 a build or a commit through the model, with no edit of their own.
 
-**Tests.** `test_forbidden_commands.py` 117 → 155: every rule after a heredoc and after a quoted `<<`, its words inside
-a body or a quote, and the PB1725/PB1736 repros. Seventeen of the new cases fail on the old hook.
-`test_shell_location.py` 73 → 92 and `test_worktree_rm_allow.py` 45 → 51.
+**Finished on resume (wave 1101 group A).** The CLI update of 2026-10-16 14:45 PDT killed wave 1098's agent before its
+gate. Its three commits were cherry-picked onto fda09da03 without conflict, and two holes its self-review had left were
+closed in the same model. First, a heredoc that a shell reads as its SCRIPT is walked as a command line
+(`_reads_stdin_script`): `bash <<'EOF'`, `bash -s args`, `sh -e -o pipefail`, `pwsh -Command -` and `-File -`. Before
+it, `bash <<'EOF'` / `git stash` / `EOF` passed every rule. A heredoc fed to a script operand (`bash run.sh <<EOF`)
+stays that script's data. Second, `worktree_rm_allow.decide` reads its git invocation through `git_calls`, and its
+private `-C` parse is deleted. It now accepts only `-C` global options, applied in order as git applies them, and gives
+no decision for `-c`, `--work-tree` or any other option.
 
-**Register.** PB3198 landed (`closes_rows: []`, behavior-neutral restructuring, no inventory row). PB1725 and PB1736 were
+**Tests.** `test_forbidden_commands.py` 117 → 160: every rule after a heredoc, after a quoted `<<` and inside a
+shell-read heredoc; its words inside a body or a quote; and the PB1725/PB1736 repros. Seventeen of the w1098c cases fail
+on the old hook. `test_shell_location.py` 73 → 99 and `test_worktree_rm_allow.py` 45 → 56.
+
+**Register.** PB3198 landed (`closes_rows: []`: guard-hook tooling, no inventory row). PB1725 and PB1736 were
 discharged: commit 10499a6b5 had already anchored `VERDICT` at command position, and their repros are now pinned.
 
-**File set.** `shell_location.py` and `test_shell_location.py` lie outside the wave's declared set, which named only the
-four `forbidden_commands`/`worktree_rm_allow` files. The member index does not index the hooks' Python, so the model the
-note's target needs was invisible to the planner. The landing check stops on it until the set is re-planned.
+**File set.** `shell_location.py` and `test_shell_location.py` were outside wave 1098's declared set, which named only
+the four `forbidden_commands`/`worktree_rm_allow` files. The member index does not index the hooks' Python, so the
+planner could not see the model the note's target needs. Wave 1101's ledger entry declares the branch's full file set.
 
-**Self-review.** Architecture: one parser, every rule a reader of it. Code: each rule re-derived from its docstring
-rule, and the old regexes' corner cases kept (relative `cd`, submodules, `git log --grep=push`, quoted messages).
-Duplication: `_shell_named` and `git_calls` share `program()`. Gate: see the w1098c report.
+**Self-review.** Architecture: one parser, and every rule reads it, `worktree_rm_allow`'s git reading included. Code:
+each rule re-derived from its docstring, keeping the old regexes' corner cases (relative `cd`, submodules,
+`git log --grep=push`, quoted messages). A doubtful parse grants nothing in `worktree_rm_allow` and blocks in
+`forbidden_commands`. Duplication: `_shell_named` and `git_calls` share `program()`, and `-C` is parsed in one place.

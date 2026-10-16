@@ -181,6 +181,20 @@ with tempfile.TemporaryDirectory() as tmp:
           [s.text for s in sl.steps("( cat <<EOF\ndon't\nEOF\n)\necho z", str(main), B)][-1], "echo z")
     exact("heredoc feeding a -c payload rides on the payload's last step",
           shape("bash -c 'cat' <<EOF\nbody\nEOF"), [("cat", ("body\n",))])
+    exact("a heredoc fed to a shell with no script operand IS its command line",
+          shape("bash <<'EOF'\ncd /x\ngit stash\nEOF\necho y"),
+          [("cd /x", ()), ("git stash", ("cd /x\ngit stash\n",)), ("echo y", ())])
+    exact("`bash -s args` and `sh -e -o pipefail` read their script from stdin too",
+          [shape(c)[-1][0] for c in ("bash -s a b <<EOF\ngit stash\nEOF", "sh -e -o pipefail <<EOF\ngit stash\nEOF")],
+          ["git stash", "git stash"])
+    exact("a heredoc fed to a shell's SCRIPT is that script's input, never a command line",
+          shape("bash run.sh 2>&1 <<EOF\ngit stash\nEOF"), [("bash run.sh 2>&1 <<EOF", ("git stash\n",))])
+    exact("`pwsh -Command -` reads stdin as PowerShell; `pwsh -File x.ps1` runs x.ps1",
+          [shape(c)[0][0] for c in ("pwsh -NoProfile -Command - <<'EOF'\nSet-Location E:/x; git stash\nEOF",
+                                    "pwsh -File x.ps1 <<'EOF'\ngit stash\nEOF")],
+          ["Set-Location E:/x", "pwsh -File x.ps1 <<'EOF'"])
+    check("a heredoc-fed shell's location changes run in the child, never in the caller",
+          dirs_of("bash <<'EOF'\ncd " + W + "\ndotnet build\nEOF\ndotnet build", main, B), [wt, main])
     exact("words never hold a heredoc body",
           [s.words for s in sl.steps("cat > m <<'EOF'\ndotnet build\nEOF", str(main), B)], [("cat", ">", "m", "<<EOF")])
     exact("a heredoc body that names a build is no build step (fleet_active_build's sibling)",
