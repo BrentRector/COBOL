@@ -11,10 +11,16 @@ using Core = CobolParserCore;
 
 /// <summary>
 /// The fully-parsed content of a source unit's OPTIONS paragraph (ISO/IEC 1989:2023 §11.9), captured once at bind
-/// time and exposed program-wide so every later pass can read it. CONSUMED today: ARITHMETIC +
+/// time and exposed program-wide so every later pass can read it. Every field has a consumer: ARITHMETIC +
 /// INTERMEDIATE ROUNDING drive the numeric engine's standard-decimal SDIDI path (NumericRenderer.StandardDecimal
-/// → CobolDec, §8.8.1.5), DEFAULT ROUNDED sets the bare-ROUNDED mode (§11.9.6). Still capture-only:
-/// FLOAT-BINARY/DECIMAL (standard-float USAGE encodings) and INITIALIZE (the initial-state fill).
+/// → CobolDec, §8.8.1.5), DEFAULT ROUNDED sets the bare-ROUNDED mode (§11.9.6), FLOAT-BINARY supplies the implied
+/// endianness of a standard binary floating-point item (DataBinder → PicInfo.FloatItem, §11.9.8) and INITIALIZE
+/// sets the section-background fill (StorageFormPass / InitialStateBackground, §11.9.10).
+/// <para>⛔ A clause that cannot change a program has NO field (kb/Work PB298): ENTRY-CONVENTION is screened by
+/// <c>OptionsBinder.ScreenEntryConvention</c> down to its one admissible value, COBOL, which is also the implied
+/// convention (§11.9.7.4 GR4 c), and FLOAT-DECIMAL is declined (COBOLNET2424). A producer-only field is a clause
+/// the program wrote, accepted in silence, that changes nothing; <c>OptionsModelConsumerDriftTests</c> fails on
+/// one.</para>
 /// </summary>
 /// <remarks>An absent OPTIONS paragraph (or an absent clause) yields the ISO-implied default — see
 /// <see cref="Default"/>. The model carries the program's <i>intent</i>; whether a clause is yet <i>applied</i> is the
@@ -27,11 +33,6 @@ public sealed record OptionsModel
     /// <summary>DEFAULT ROUNDED clause (§11.9.6) — the rounding mode applied to a bare <c>ROUNDED</c> phrase that omits
     /// its own MODE. Default <see cref="CobolRounding.NearestAwayFromZero"/> when absent (§11.9.6.3 r2).</summary>
     public CobolRounding DefaultRounding { get; init; } = CobolRounding.NearestAwayFromZero;
-
-    /// <summary>ENTRY-CONVENTION clause (§11.9.7): <c>COBOL</c> or an entry-convention-name, as written; null when
-    /// absent (the entry convention is then COBOL, §11.9.7.4 GR4 c). Only COBOL is provided — any other name is
-    /// refused by <c>OptionsBinder.EntryConventionOf</c> (COBOLNET2385, kb/Work PB232).</summary>
-    public string? EntryConvention { get; init; }
 
     /// <summary>FLOAT-BINARY clause endianness (§11.9.8). <see cref="FloatEndianness.Unspecified"/> when absent (the
     /// implementor default applies).</summary>
@@ -202,19 +203,20 @@ public static class ArithmeticModes
     };
 }
 
-/// <summary>Endianness of a standard floating-point usage (FLOAT-BINARY / FLOAT-DECIMAL clauses, §11.9.8/§11.9.9,
-/// and the USAGE clause's own endianness-phrase, §13.18.60.2).</summary>
+/// <summary>Endianness of a standard binary floating-point usage (the OPTIONS FLOAT-BINARY clause, §11.9.8, and the
+/// USAGE clause's own endianness-phrase, §13.18.60.2).</summary>
 public enum FloatEndianness { Unspecified, HighOrderLeft, HighOrderRight }
 
-/// <summary>Encoding of a standard decimal floating-point usage (FLOAT-DECIMAL clause, §11.9.9, and the USAGE
-/// clause's own encoding-phrase, §13.18.60.2).</summary>
+/// <summary>Encoding of a standard decimal floating-point usage, as the USAGE clause's own encoding-phrase states it
+/// (§13.18.60.2). The OPTIONS FLOAT-DECIMAL clause's phrase is not read: the clause is declined (COBOLNET2424).</summary>
 public enum FloatEncoding { Unspecified, BinaryEncoding, DecimalEncoding }
 
 /// <summary>The token → enum mapping for the two float FORMAT phrases of ISO §13.18.60.2 ("where encoding-phrase
-/// is" / "where endianness-phrase is"). ONE definition for THREE citing clauses — the OPTIONS FLOAT-BINARY clause
-/// (§11.9.8), the OPTIONS FLOAT-DECIMAL clause (§11.9.9) and the USAGE clause's per-item phrases (§13.18.60.2).
-/// The grammar already shares one <c>encodingPhrase</c>/<c>endiannessPhrase</c> rule pair across all three; this
-/// is its binder-side twin, so a fourth citing site inherits the mapping instead of copying it (kb/Work PB174 —
+/// is" / "where endianness-phrase is"). ONE definition for every clause that reads them — the OPTIONS FLOAT-BINARY
+/// clause (§11.9.8, endianness) and the USAGE clause's per-item phrases (§13.18.60.2, both). The grammar shares one
+/// <c>encodingPhrase</c>/<c>endiannessPhrase</c> rule pair across those and the OPTIONS FLOAT-DECIMAL clause
+/// (§11.9.9), whose phrases nothing reads because the clause is declined (COBOLNET2424); this is the rule pair's
+/// binder-side twin, so a further citing site inherits the mapping instead of copying it (kb/Work PB174 —
 /// before this the mapping lived privately in <c>OptionsBinder</c> and the USAGE arm would have been copy #2).</summary>
 internal static class FloatFormatPhrase
 {
