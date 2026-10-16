@@ -101,8 +101,8 @@ COBOLNET_FILES_DESIGN.md "THE SECOND KEY FORM" and D10 (format version 5), the g
   of main raises this branch's change to 7 and re-pins the merged surface (1EDF6BEDACF395D8), each landing's
   incompatible change getting its own major as PB442 did over PB651. The root fix: `EmittedCSharpSnapshotTests`
   snapshots the version stamp as `{RUNTIME-VERSION}`, substituted only where it equals `RuntimeAbi.Version`, so a
-  major bump no longer touches the snapshots (the fourth finisher to re-record them for one; an emitter stamping any
-  other version still diffs, and `TheEmittedRecord_StatesTheVersionsThisRuntimeDeclares` pins the exact text).
+  major bump no longer touches the snapshots (four earlier finishers each re-recorded all 14 for one bump, to 3, 4, 5
+  and 6; an emitter stamping any other version still diffs, and `TheEmittedRecord_StatesTheVersionsThisRuntimeDeclares` pins the exact text).
   DESIGN-test-build-ci.md gate 3 says so.
 
 **Self-review.** Architecture: one key shape, one capture, one lookup, one gate; no C# text in a bound node.
