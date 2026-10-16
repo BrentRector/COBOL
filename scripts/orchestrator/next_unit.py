@@ -296,7 +296,7 @@ def main(argv: list[str] | None = None) -> int:
     started = dt.datetime.fromisoformat(a.last_started) if a.last_started else None
     acct = account.current()
     print(json.dumps(choose(handoff, coord.coord_dir(a.coord), pathlib.Path(a.repo), now, a.last_failed, started,
-                            acct.quota["meter_max_age_hours"], acct.name, a.cluster, pathlib.Path(a.work), operator)))
+                            acct.quota_at(now)["meter_max_age_hours"], acct.name, a.cluster, pathlib.Path(a.work), operator)))
     return 0
 
 

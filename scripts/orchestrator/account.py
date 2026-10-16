@@ -67,6 +67,19 @@ class Account:
     explicit: bool               # the row names a config dir: CLAUDE_CONFIG_DIR is set to it (else the default, unset)
     weekly_reset: dict[str, Any]
     quota: dict[str, Any]        # the shared quota with this account's overrides applied
+    # The owner's dated special cases (`quota_overrides`, kb/Work PB3305), validated by `_make`: (start or None, until,
+    # the quota keys they set). Read them only through `quota_at`.
+    quota_overrides: tuple[tuple[datetime.datetime | None, datetime.datetime, dict[str, Any]], ...] = ()
+
+    def quota_at(self, now: datetime.datetime) -> dict[str, Any]:
+        """The quota in force at `now`: `quota` with every dated override whose window holds `now` (`from` <= now <
+        `until`) applied, in table order. An override past its `until` is inert, so it lapses by itself at the reset
+        it names and no second change is needed to take it back."""
+        q = dict(self.quota)
+        for start, until, keys in self.quota_overrides:
+            if (start is None or start <= now) and now < until:
+                q.update(keys)
+        return q
 
     @property
     def global_config(self) -> pathlib.Path:
@@ -130,8 +143,38 @@ def _table(rules: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _make(row: dict[str, Any], cdir: pathlib.Path, explicit: bool, rules: dict[str, Any]) -> Account:
+    quota = {**rules["quota"], **row.get("quota", {})}
     return Account(name=row["name"], config_dir=cdir, explicit=explicit, weekly_reset=row["weekly_reset"],
-                   quota={**rules["quota"], **row.get("quota", {})})
+                   quota=quota, quota_overrides=_overrides(row, quota))
+
+
+#: The keys of a `quota_overrides` entry that are not quota keys.
+OVERRIDE_META = ("from", "until", "_source")
+
+
+def _overrides(row: dict[str, Any], quota: dict[str, Any]) -> tuple:
+    """A row's `quota_overrides`, validated: each entry names its window (`until`, optionally `from`, ISO times with a
+    zone), the owner's words (`_source`) and at least one key of the quota it changes. A malformed entry is an error,
+    never a silently ignored row: an override the budget skips would leave the loop on the cap the owner lifted, and
+    one without its source would be an overage nobody approved (owner 2026-10-14: overages are named special cases)."""
+    out = []
+    for i, o in enumerate(row.get("quota_overrides") or []):
+        where = f"model_rules.json accounts.list {row['name']!r} quota_overrides[{i}]"
+        keys = {k: v for k, v in o.items() if k not in OVERRIDE_META}
+        unknown = sorted(k for k in keys if k not in quota)
+        if not str(o.get("_source", "")).strip():
+            raise ValueError(f"{where}: no `_source` (the owner's words that approved it)")
+        if not keys or unknown:
+            raise ValueError(f"{where}: " + (f"keys the quota does not have: {unknown}" if unknown else "sets no quota key"))
+        try:
+            until = datetime.datetime.fromisoformat(o["until"])
+            start = datetime.datetime.fromisoformat(o["from"]) if o.get("from") else None
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError(f"{where}: `until` (and `from`) must be ISO times with a zone: {e}") from None
+        if until.tzinfo is None or (start is not None and start.tzinfo is None):
+            raise ValueError(f"{where}: `until` and `from` need a zone (a bare time is ambiguous across hosts)")
+        out.append((start, until, keys))
+    return tuple(out)
 
 
 def _row_dir(row: dict[str, Any]) -> pathlib.Path:
@@ -304,6 +347,7 @@ def _self_test() -> int:
         check("uuid and email read from the global config", (p.uuid, p.email), ("u-1", "a@b"))
         check("per-account quota override", (p.quota["weekly_cap_pct"], p.quota["daily_pct"]),
               (50, rules["quota"]["daily_pct"]))
+        _quota_override_cases(check, rules, row, d)
         (d / ".claude.json").write_text("{not json", encoding="utf-8", newline="\n")
         check("unreadable global config -> no uuid", p.uuid, None)
     _skill_review_cases(check)
@@ -311,6 +355,28 @@ def _self_test() -> int:
         print("FAIL:", f)
     print(f"account self-test: {len(checked) - len(fails)}/{len(checked)} checks OK")
     return 1 if fails else 0
+
+
+def _quota_override_cases(check, rules: dict[str, Any], row: dict[str, Any], d: pathlib.Path) -> None:
+    """kb/Work PB3305: a dated override applies inside its window only, and a malformed one is refused."""
+    tz = datetime.timezone(datetime.timedelta(hours=-7))
+    at = lambda h: datetime.datetime(2026, 10, 16, h, 0, tzinfo=tz)  # noqa: E731
+    o = {"from": at(9).isoformat(), "until": at(12).isoformat(), "weekly_cap_pct": 99, "_source": "owner: test"}
+    p = current(dict(rules, accounts={"list": [dict(row, quota_overrides=[o])]}), {ENV: str(d)})
+    check("override: before `from` the row's own cap", p.quota_at(at(8))["weekly_cap_pct"], 50)
+    check("override: inside its window", p.quota_at(at(10))["weekly_cap_pct"], 99)
+    check("override: inert at `until` (it lapses by itself)", p.quota_at(at(12))["weekly_cap_pct"], 50)
+    check("override: the static quota is untouched", p.quota["weekly_cap_pct"], 50)
+    bad = {"no _source": {k: v for k, v in o.items() if k != "_source"},
+           "an unknown key": dict(o, weekly_cap=99),
+           "no quota key": {"until": o["until"], "_source": "owner: test"},
+           "a bare time": dict(o, until="2026-10-16T12:00:00")}
+    for what, entry in bad.items():
+        try:
+            current(dict(rules, accounts={"list": [dict(row, quota_overrides=[entry])]}), {ENV: str(d)})
+            check(f"override with {what} refused", False, True)
+        except ValueError:
+            check(f"override with {what} refused", True, True)
 
 
 def _skill_review_cases(check) -> None:
