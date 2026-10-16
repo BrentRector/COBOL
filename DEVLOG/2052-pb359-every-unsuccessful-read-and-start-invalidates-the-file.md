@@ -1,4 +1,4 @@
-## PB359: every unsuccessful READ and START invalidates the file position through one terminal
+## Entry 2052 — 2026-10-16 03:55 PDT — PB359: every unsuccessful READ and START invalidates the file position through one terminal
 
 **Wave 1084 E, kb/Work PB359.** The note described the `'47'` START in both keyed connectors returning
 `Status = ReadNotOpenForInput` without applying §14.9.41.4 GR7 ("Following the unsuccessful execution of a START
@@ -58,3 +58,4 @@ the invalidation. The gate is now a Roslyn rule over every READ/START entry: no 
 `SequentialConnector.ReadRecord`'s `_reader is null` arm to its old bare form turns the gate red and names the arm.
 
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T211153Z-8627d3: Conformance 6,085/11,709, Unit 33,216/33,672, Characterization 6/36 in leg 1; no failures). The golden, the five drift tests and the PB352 START goldens ran in leg 1 and passed. Semgrep verify: PASS. The Linux gate runs at the landing.
+
