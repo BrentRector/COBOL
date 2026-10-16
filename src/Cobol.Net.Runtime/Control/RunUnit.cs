@@ -181,35 +181,38 @@ public sealed class RunUnit
 
     private long _exitStatus;
 
-    /// <summary>The run-unit termination status "passed to the operating system" by STOP RUN / a main-program
-    /// GOBACK with a status phrase (ISO §14.9.42.4 GR5 / §14.9.18.4 GR10). On .NET the single observable is the
-    /// process exit code (<c>Environment.ExitCode</c>), so the STATUS value and the ERROR/NORMAL indication
-    /// collapse into this ONE canonical integer (the documented implementor mapping — <c>docs/CONFORMANCE.md</c>
-    /// §4.2.16; Annex A "required documented behavior" items 192/193): the STATUS value when specified, else
-    /// ERROR ⇒ 1 / NORMAL ⇒ 0. <b>Writing this field flushes to <c>Environment.ExitCode</c> AT THE WRITE SITE</b>
-    /// (the setter below), which is what makes the status cross assembly boundaries: STOP RUN terminates the WHOLE
-    /// run unit from anywhere (§14.9.42.4 GR6), so a status set by a separately-compiled CALLed module reaches the
-    /// process exit code even though the run unit's MAIN program carries no status phrase of its own — the flush
-    /// cannot live in the main group's generated <c>Main</c>, which never sees the sibling module's parse tree.
-    /// Default 0 (a status-free run unit never writes this field, so <c>Environment.ExitCode</c> keeps its 0
-    /// default and the generated <c>Main</c> stays scaffolding-free — the zero-scaffolding invariant, DESIGN §18.16).
-    /// The future RETURN-CODE special register writes this SAME field (singular-pattern — one exit-code source AND
-    /// one flush, never two).
-    /// <para>The host exit code is a 32-bit integer, so the status is CLAMPED to that range through the one
-    /// saturating narrowing (<see cref="CobolNum.Position32"/>), never wrapped: a bare <c>(int)</c> turned
+    /// <summary>The run unit's own termination status "passed to the operating system" by STOP RUN / a main-program
+    /// GOBACK with a status phrase (ISO §14.9.42.4 GR5 / §14.9.18.4 GR10), or 1 once the run unit ended abnormally
+    /// (§14.6.12). On .NET the single observable of that hand-over is the process exit code, so the STATUS value and the
+    /// ERROR/NORMAL indication collapse into this ONE canonical integer (the documented implementor mapping —
+    /// <c>docs/CONFORMANCE.md</c> §4.2.16; Annex A "required documented behavior" items 192/193): the STATUS value when
+    /// specified, else ERROR ⇒ 1 / NORMAL ⇒ 0. <b>It is the RUN UNIT's state and nothing else's</b>: writing it touches no
+    /// process-wide cell, because a run unit embedded in a .NET host (<see cref="Run"/>, <see cref="ProgramTable.RunMain"/>)
+    /// must not end or restate the HOST's exit code (DOC-A.1-167 — STOP RUN and a fatal condition "end the RUN UNIT ONLY";
+    /// kb/Work PB3163). The boundary that IS the process entry — the generated <c>Main</c>'s
+    /// <see cref="ProgramTable.RunModule"/> — delivers it to <c>Environment.ExitCode</c> once, when the run unit has ended,
+    /// and a host reads it here. The status still crosses assembly boundaries, because STOP RUN terminates the WHOLE run
+    /// unit from anywhere (§14.9.42.4 GR6) and every module of the run unit writes this ONE shared field through
+    /// <see cref="SetExitStatus"/>: a status set by a separately-compiled CALLed module reaches the entry boundary even
+    /// though the run unit's MAIN program carries no status phrase of its own. Default 0 (a status-free run unit never
+    /// writes this field, and the generated <c>Main</c> stays scaffolding-free — the zero-scaffolding invariant, DESIGN
+    /// §18.16). The future RETURN-CODE special register writes this SAME field (singular-pattern — one exit-code source,
+    /// never two).
+    /// <para>The host exit code is a 32-bit integer, so the entry boundary CLAMPS the status to that range through the one
+    /// saturating narrowing (<see cref="CobolNum.Position32"/>), never wraps it: a bare <c>(int)</c> turned
     /// <c>STOP RUN WITH ERROR STATUS 4294967296</c> into exit 0 — a NORMAL termination for an ERROR phrase
     /// (kb/Work PB1178). docs/CONFORMANCE.md item 192 documents the range (and a POSIX host's own low-8-bit
     /// report).</para></summary>
     public long ExitStatus
     {
         get => _exitStatus;
-        set { _exitStatus = value; Environment.ExitCode = CobolNum.Position32(value); }
+        set => _exitStatus = value;
     }
 
     /// <summary>The emitted-surface shim STOP RUN / GOBACK write (kept name-stable over <see cref="Current"/>,
-    /// mirroring the <see cref="ExceptionState"/>/<see cref="ProgramRegistry"/> facades): set the run unit's
-    /// termination status (ISO §14.9.42.4 GR5 / §14.9.18.4 GR10). The <see cref="ExitStatus"/> setter flushes the
-    /// value to <c>Environment.ExitCode</c> at the write site (so the status crosses assembly boundaries).</summary>
+    /// mirroring the <see cref="ExceptionState"/>/<see cref="ProgramRegistry"/> facades): set the ambient run unit's
+    /// termination status (ISO §14.9.42.4 GR5 / §14.9.18.4 GR10). Every module of the run unit shares that one run
+    /// unit, so the status crosses assembly boundaries.</summary>
     public static void SetExitStatus(long status) => Current.ExitStatus = status;
 
     /// <summary>Establish a FRESH ambient run unit for the duration of <paramref name="body"/> — the host's
@@ -241,9 +244,8 @@ public sealed class RunUnit
     }
 
     /// <summary>A new run unit that follows <paramref name="prior"/> (null = none): fresh state, the prior's
-    /// <see cref="HostConfiguration"/>, and the process exit code restated from the new run unit's own
-    /// termination status (0) — <c>Environment.ExitCode</c> is the flushed copy of <see cref="ExitStatus"/>, so a
-    /// status the PREVIOUS run unit's STOP RUN set must not become this run unit's.</summary>
+    /// <see cref="HostConfiguration"/>. Its termination status is its own (0): the previous run unit's STOP RUN status is
+    /// not inherited, and no process-wide cell is touched (kb/Work PB3163).</summary>
     private static RunUnit StartAfter(RunUnit? prior)
     {
         var ru = new RunUnit();
@@ -252,7 +254,6 @@ public sealed class RunUnit
             ru.Clock = prior.Clock;
             ru.DebugMode = prior.DebugMode;
         }
-        ru.ExitStatus = 0;
         return ru;
     }
 }

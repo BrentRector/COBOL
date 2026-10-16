@@ -1211,10 +1211,13 @@ LENGTH OF/BYTE-LENGTH → a folded `long` byte-size from PIC+USAGE; ADDRESS OF �
 LINE-COUNTER/PAGE-COUNTER + XML-*/JSON-* register NAMES are reserved by the registry but attach to their (scope-flagged)
 subsystems. **The run-unit exit code is ONE canonical field** (`RunUnit.ExitStatus`) — written by the STOP RUN /
 main-program GOBACK **WITH {NORMAL|ERROR} STATUS** phrase (§14.9.42.4 GR5 / §14.9.18.4 GR10) and by RETURN-CODE
-when implemented; the setter flushes it to `Environment.ExitCode` AT THE WRITE SITE, so a status set by a
-separately-compiled CALLed module crosses the assembly boundary to the process exit code (STOP RUN terminates the
-whole run unit from anywhere — the flush cannot live in the main group's generated `Main`, which never sees the
-sibling module's parse tree). A cross-subsystem contract (§14/§15); the DISTINCT RETURNING/GIVING activation
+when implemented. It is the RUN UNIT's state and writes no process-wide cell: a status set by a separately-compiled
+CALLed module crosses the assembly boundary because every module of the run unit writes this one shared field (STOP
+RUN terminates the whole run unit from anywhere — the delivery cannot live in the main group's generated `Main`,
+which never sees the sibling module's parse tree), and the one boundary that IS the process,
+`ProgramTable.RunModule` (the generated `Main`'s single statement), writes it to `Environment.ExitCode` once, when the
+run unit has ended; a host that embeds a run unit (`RunUnit.Run`, `ProgramRegistry.RunMain`) never has its own exit code
+rewritten and reads `RunUnit.ExitStatus` (DOC-A.1-167, kb/Work PB3163). A cross-subsystem contract (§14/§15); the DISTINCT RETURNING/GIVING activation
 result does not feed it — decision 20.
 
 ### 12.3 Smaller surfaces
@@ -1973,10 +1976,11 @@ identical stdout; now the committed goldens, R69). The remaining items below sta
     standard has no ALTER; §14.9.17 GO TO has only Formats 1–2). Realization: the D4 per-paragraph mutable field.
     `PERFORM UNTIL EXIT` in scope (`while(true)` + EXIT PERFORM=`break`); a STOP RUN / main-program `GOBACK` WITH
     {NORMAL|ERROR} STATUS (§14.9.42.4 GR5 / §14.9.18.4 GR10) writes the termination status into the run-unit
-    `RunUnit.ExitStatus` field, whose setter flushes it to `Environment.ExitCode` at the write site (the status
-    rides the run-unit field, NOT a `ProgramReturn`/`StopRun` payload — `ProgramReturn` is caught at the dispatcher,
-    never reaching `Main`; the write-site flush is why a separately-compiled module's STOP RUN … WITH STATUS reaches
-    the exit code even when the main group has no status phrase; a called-program GOBACK status is inert, GR2).
+    `RunUnit.ExitStatus` field, which the process-entry boundary (`ProgramTable.RunModule`) delivers to
+    `Environment.ExitCode` when the run unit has ended (the status rides the run-unit field, NOT a
+    `ProgramReturn`/`StopRun` payload — `ProgramReturn` is caught at the dispatcher, never reaching `Main`; the one shared
+    run-unit field is why a separately-compiled module's STOP RUN … WITH STATUS reaches the exit code even when the main
+    group has no status phrase; a called-program GOBACK status is inert, GR2).
 11. **CALL BY REFERENCE of an irregular receiver.** Array element → C# `ref`; a reference-modified splice →
     promote to BY CONTENT (lenient default), diagnosable under a strict dialect.
 12. **Pointer carrier.** A typed `ManagedRef<T>` (managed reference; NOT the abandoned `byte[]`+offset+length form);
@@ -2148,11 +2152,12 @@ identical stdout; now the committed goldens, R69). The remaining items below sta
 19. **Intrinsic internals.** Never `decimal` — exact via unscaled `long`/`Int128`, float via `double` (extends the
     owner's decimal/BigInteger ban into intrinsic internals).
 20. **RETURN-CODE / termination status.** The run-unit exit code is ONE canonical field — `RunUnit.ExitStatus`
-    (long), whose setter flushes to `Environment.ExitCode` AT THE WRITE SITE (so a separately-compiled CALLed
-    module's STOP RUN … WITH STATUS crosses the assembly boundary to the process exit code — the flush is
-    runtime-side, never per-`Main` scaffolding, upholding §18.16). It is written by the STOP RUN / GOBACK
+    (long), the run unit's own state (so a separately-compiled CALLed module's STOP RUN … WITH STATUS crosses the assembly
+    boundary: every module writes the one shared field) that the process-entry boundary `ProgramTable.RunModule`
+    delivers to `Environment.ExitCode` once, when the run unit has ended — runtime-side, never per-`Main` scaffolding,
+    upholding §18.16; an embedding host's own exit code is never written, kb/Work PB3163). It is written by the STOP RUN / GOBACK
     **WITH {NORMAL|ERROR} STATUS** phrase (§14.9.42.4 GR5 / §14.9.18.4 GR10 — the OS termination status) and, when
-    implemented, by the RETURN-CODE special register; a single cross-subsystem owner AND a single flush, never duplicated. NOTE:
+    implemented, by the RETURN-CODE special register; a single cross-subsystem owner AND a single delivery, never duplicated. NOTE:
     RETURNING / GIVING is the **activation result** (§14.9.18.4 GR2 — moved into the caller's RETURNING item), a
     DISTINCT mechanism from the OS status — it does NOT feed the exit code.
 21. **Whole-group-as-alphanumeric.** A generated `string AsImage()` / `FromImage()` per record struct is the
