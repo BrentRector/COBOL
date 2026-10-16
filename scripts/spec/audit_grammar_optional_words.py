@@ -52,14 +52,15 @@ import re
 import sys
 from typing import NamedTuple
 
+# The grammar is SPLIT ACROSS TWELVE FILES — CobolParserCore.g4 plus Grammar/Core/*.g4. An earlier version of this
+# script read only the root file and therefore scanned a fraction of the rules, reporting a reassuring "3
+# candidates" that was an artifact of not looking. `grammar_source` is THE reader of all of them (kb/Work PB3204):
+# it excludes the build-time COPIES under obj/, blanks comments and actions, and refuses an empty population.
+import grammar_source
+
 HERE = pathlib.Path(__file__).resolve().parent
 REPO = HERE.parents[1]
 SPEC_MD = REPO / "specs" / "ISO_COBOL.md"
-# The grammar is SPLIT ACROSS TWELVE FILES — CobolParserCore.g4 plus Grammar/Core/*.g4. An earlier version of this
-# script read only the root file and therefore scanned a fraction of the rules, reporting a reassuring "3
-# candidates" that was an artifact of not looking. obj/antlr-lib holds build-time COPIES of the same grammars and
-# must be excluded, or every rule is counted twice.
-GRAMMAR_DIR = REPO / "src" / "Cobol.Net.Frontend" / "Grammar"
 PDF = next(iter(sorted((REPO / "specs-private").glob("*COBOL*.pdf"))), None)
 
 #: The printed body band, borrowed from `render_figure` so the running header and the folio/licence footer can
@@ -117,79 +118,26 @@ def declared_formats(md_text: str) -> list[Format]:
     return out
 
 
-def strip_comments(text: str) -> str:
-    """ANTLR source with comments AND `{…}` actions/predicates blanked out, `'…'` literals left intact.
+def parser_rules() -> dict[str, grammar_source.Rule]:
+    """Rule name -> the parser rule, read by `grammar_source` (comments and `{…}` actions blanked, literals intact).
 
-    A comment is prose ABOUT the rule, so a keyword written in one is not a token the parser requires; the
-    previous version dropped comment-only LINES and kept trailing comments, which turned every explanatory
-    `// … ON …` into a false candidate. An ACTION or SEMANTIC PREDICATE is target-language code and can never
-    hold a token reference — `{facilityWord("RECEIVE")}?` in the `statement` dispatch made that 200-alternative
-    rule look like the RECEIVE statement's own spelling and dragged 233 rules into its closure.
+    A comment is prose ABOUT the rule, so a keyword written in one is not a token the parser requires; an ACTION
+    or SEMANTIC PREDICATE is target-language code and can never hold a token reference —
+    `{facilityWord("RECEIVE")}?` in the `statement` dispatch once made that 200-alternative rule look like the
+    RECEIVE statement's own spelling and dragged 233 rules into its closure. A name declared in two files keeps
+    the later file's rule, in `grammar_source.grammar_files` order.
     """
-    out, i, n = [], 0, len(text)
-    while i < n:
-        c = text[i]
-        if c == "'":                                   # an ANTLR literal — copy through, honouring \' escapes
-            j = i + 1
-            while j < n and text[j] != "'":
-                j += 2 if text[j] == "\\" else 1
-            out.append(text[i:min(j + 1, n)])
-            i = j + 1
-        elif text.startswith("//", i):
-            j = text.find("\n", i)
-            i = n if j < 0 else j
-        elif text.startswith("/*", i):
-            j = text.find("*/", i + 2)
-            out.append(re.sub(r"[^\n]", " ", text[i:n if j < 0 else j + 2]))
-            i = n if j < 0 else j + 2
-        elif c == "{":                                 # an action or predicate — blank it, keep the newlines
-            depth, j = 1, i + 1
-            while j < n and depth:
-                depth += {"{": 1, "}": -1}.get(text[j], 0)
-                j += 1
-            out.append(re.sub(r"[^\n]", " ", text[i:j]))
-            i = j
-        else:
-            out.append(c)
-            i += 1
-    return "".join(out)
-
-
-#: A parser-rule head, in EITHER of the two styles this grammar uses: the name alone on its line with the `:`
-#: below it, or the name and the `:` together. The name-alone-only test missed 25 rules in CobolExpressions.g4
-#: and CobolScreen.g4. What makes it a RULE and not an ANTLR declaration (`tokens`, `options`, `channels`) is
-#: the `:` that must follow — a structural test, so no list of ANTLR keywords has to be maintained here.
-RULE_HEAD = re.compile(r"^([a-z][A-Za-z0-9_]*)[ \t]*(:?)[ \t]*$|^([a-z][A-Za-z0-9_]*)[ \t]*:", re.M)
-
-
-def grammar_rules(text: str) -> dict[str, str]:
-    """Rule name -> rule body, for every parser rule, comments removed."""
-    text = strip_comments(text)
-    heads = []
-    for m in RULE_HEAD.finditer(text):
-        if m.group(3) is None and not m.group(2):       # name alone: the `:` must be the next thing printed
-            if not re.match(r"\s*:", text[m.end():]):
-                continue
-        heads.append((m.start(), m.group(1) or m.group(3)))
-    rules: dict[str, str] = {}
-    for k, (pos, name) in enumerate(heads):
-        end = heads[k + 1][0] if k + 1 < len(heads) else len(text)
-        body = text[pos:end]
-        stop = body.find("\n;")
-        rules[name] = body if stop < 0 else body[:stop + 2]
-    return rules
+    return {r.name: r for r in grammar_source.read() if r.kind == "parser"}
 
 
 _TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
-#: A LEXER rule head — an uppercase name and its `:`. The body decides what kind of token it is.
-LEXER_RULE = re.compile(r"^([A-Z][A-Z0-9_]*)[ \t]*:(.*?)(?<!\\);", re.M | re.S)
 #: What is left of a lexer body once its quoted literals, its `->` action, and its punctuation are removed. A
 #: KEYWORD token's body is nothing but literals; a LEXICAL CLASS names fragments, character sets or predicates.
 _LEX_LITERAL = re.compile(r"'((?:[^'\\]|\\.)*)'")
 
 
-def keyword_spellings(files: list[pathlib.Path]) -> dict[str, set[str]]:
+def keyword_spellings() -> dict[str, set[str]]:
     """Lexer token -> the COBOL words it spells, for tokens that spell WORDS and nothing else.
 
     ⛔ THIS IS THE LINE BETWEEN A COBOL WORD AND A LEXICAL CLASS, and it is drawn STRUCTURALLY — a token whose
@@ -211,17 +159,16 @@ def keyword_spellings(files: list[pathlib.Path]) -> dict[str, set[str]]:
     evidence about what it RETURNED (feedback_measure_the_selectors_complement).
     """
     out: dict[str, set[str]] = {}
-    for f in files:
-        text = strip_comments(f.read_text(encoding="utf-8"))
-        for m in LEXER_RULE.finditer(text):
-            name, body = m.group(1), m.group(2)
-            body = re.sub(r"->.*$", "", body, flags=re.S)               # a lexer command, not part of the match
-            lits = [w for w in _LEX_LITERAL.findall(body) if RESERVED.match(w.upper())]
-            if not lits:
-                continue
-            if re.sub(r"'(?:[^'\\]|\\.)*'|[\s|()?*+]", "", body):       # anything but literals and alternation
-                continue
-            out.setdefault(name, set()).update(w.upper().replace("-", "_") for w in lits)
+    for rule in grammar_source.read():
+        if rule.kind != "lexer":                                         # a fragment is never a token of its own
+            continue
+        body = re.sub(r"->.*$", "", rule.rhs, flags=re.S)               # a lexer command, not part of the match
+        lits = [w for w in _LEX_LITERAL.findall(body) if RESERVED.match(w.upper())]
+        if not lits:
+            continue
+        if re.sub(r"'(?:[^'\\]|\\.)*'|[\s|()?*+]", "", body):           # anything but literals and alternation
+            continue
+        out.setdefault(rule.name, set()).update(w.upper().replace("-", "_") for w in lits)
     return out
 
 
@@ -439,16 +386,12 @@ def main() -> int:
     doc = fitz.open(PDF)
 
     # ---- the grammar side --------------------------------------------------------------------------------
-    files = sorted(f for f in GRAMMAR_DIR.rglob("*.g4") if "obj" not in f.parts)
-    rules: dict[str, str] = {}
-    origin: dict[str, str] = {}
-    for f in files:
-        for n, b in grammar_rules(f.read_text(encoding="utf-8")).items():
-            rules[n] = b
-            origin[n] = f.name
+    grammar = parser_rules()                      # ⛔ grammar_source.read refuses an empty population
+    rules = {n: r.body for n, r in grammar.items()}
+    origin = {n: r.file.name for n, r in grammar.items()}
     needed = required_tokens(rules)
-    keywords = keyword_spellings(files)
-    print(f"grammar files scanned: {len(files)}   parser rules: {len(rules)}   "
+    keywords = keyword_spellings()
+    print(f"grammar files scanned: {len(grammar_source.grammar_files())}   parser rules: {len(rules)}   "
           f"rules demanding at least one token: {sum(1 for v in needed.values() if v)}   "
           f"lexer tokens spelling COBOL words: {len(keywords)}")
 
@@ -542,9 +485,9 @@ def main() -> int:
     # NOTHING must never be able to print a clean zero: that is precisely how this one stayed green while three
     # statements rejected legal COBOL (kb/Work PB332).
     print(f"\n{candidates} candidate(s) — CONFIRM each against the raw rectangles before editing the grammar")
+    # (The grammar half of the population — at least one .g4 file and one parser rule — is asserted by
+    # `grammar_source.read`, which refuses before a single format is measured.)
     failures: list[str] = []
-    if not rules:
-        failures.append(f"NO parser rules were read from {len(files)} grammar file(s) under {GRAMMAR_DIR}")
     if not formats:
         failures.append(f"NO `General format` heading was found in {SPEC_MD} — the transcription declares none")
     if unresolved:

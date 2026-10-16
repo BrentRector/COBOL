@@ -47,136 +47,17 @@ namespace CobolNet.Runtime;
 /// <c>IntrinsicRenderer.RealMethod</c>, and <c>IntrinsicRealArgDriftTests</c> asserts every exact method
 /// reachable with a real argument has its counterpart — so the convention is enforced rather than remembered.
 /// </para>
+/// <para>
+/// ⛔ <b>NO BODY HERE TAKES A §15.3 TYPE-6 (INTEGER) ARGUMENT AS A DOUBLE</b> (kb/Work PB651). An integer has no
+/// binary64-ness: the renderer's one argument entry (<c>IntrinsicRenderer.RawArg</c>) takes a type-6 operand's
+/// INTEGER through the one type-6 intake before any lane is chosen, so a float there no longer moves a call to this
+/// lane, and the integer-only functions' bodies (the date family, the TEST- validators, the windowing trio, MOD) were
+/// deleted rather than kept as unreachable code. A mixed row keeps its body for its type-10 position:
+/// <see cref="CombinedDatetimeReal"/> is reached by a float argument-2, and its argument-1 arrives an integer.
+/// </para>
 /// </remarks>
 public static partial class CobolIntrinsics
 {
-    /// <summary>
-    /// ⛔ THE ONE FLOAT→INTEGER-ARGUMENT LANDING for the §15.3 type-6 family (fix-queue PB21). Every integer-
-    /// argument body below funnels through here so a float operand gets the IDENTICAL disposition a fixed-point
-    /// one gets from <c>IntrinsicRenderer.AsInt</c> — truncation toward zero, the §15.3 implementor latitude for
-    /// a value that is not the integer the rule demands. Two separate conversions would let the same function
-    /// answer differently depending on how its argument happened to be stored, which is the receiver-shape class
-    /// of defect PB13 closed; one helper makes that impossible rather than merely unlikely.
-    /// <para>⚠ THE RANGE GUARD IS NOT DECORATION (PB22's lesson, applied before PB22 lands): a
-    /// <c>(long)</c> cast on an out-of-range double is UNDEFINED in C#, so a huge operand would wrap into a
-    /// plausible date rather than raising. Out of range ⇒ EC-ARGUMENT-FUNCTION (§15.3), never a wrapped value.
-    /// The bound is stated as ±9.2e18 rather than long.MaxValue because the nearest double to long.MaxValue is
-    /// ABOVE it — comparing against the exact integer would let the boundary value through the cast.</para>
-    /// </summary>
-    private static bool TryIntegerArg(double v, string fn, out long n)
-    {
-        RequireIntegralReal(v);   // §15.3 type 6 — the ONE integrality test every carrier's intake shares (kb/Work PB1526)
-        if (double.IsFinite(v) && v > -9.2e18 && v < 9.2e18) { n = (long)Math.Truncate(v); return true; }
-        Exceptions.ExceptionState.ArgumentError(
-            $"{fn}: the floating-point argument {v} is outside the integer-argument range (ISO §15.3)");
-        n = 0;
-        return false;
-    }
-
-    // ── §15.3 type-6 INTEGER arguments reached with a FLOATING-POINT operand (PB21) ────────────────────────────
-    // A COMP-2 item is category numeric (§8.5.2.12 item 2) hence class numeric (§8.5.2.1 Table 2), so
-    // `Admissible('i')` ADMITS it — the integer-ness is a VALUE property, not a class the screen can reject on.
-    // Without these bodies `IntrinsicRenderer.RenderNum`'s AnyRealArgument dispatch emitted a call to a member
-    // that does not exist and the user saw a raw Roslyn CS0117 on conforming source.
-    // ⚠ INTEGER-OF-BOOLEAN is DELIBERATELY ABSENT: §15.45.3 r1 requires class BOOLEAN, so PB19's screen rejects a
-    // float operand at bind time and a body here would be unreachable code that reads as coverage.
-    /// <summary>§15.22 DATE-OF-INTEGER with a floating-point argument.</summary>
-    public static long DateOfIntegerReal(double v) => TryIntegerArg(v, "DATE-OF-INTEGER", out long n) ? CobolDate.DateOfInteger(n) : 0;
-    /// <summary>§15.24 DAY-OF-INTEGER with a floating-point argument.</summary>
-    public static long DayOfIntegerReal(double v) => TryIntegerArg(v, "DAY-OF-INTEGER", out long n) ? CobolDate.DayOfInteger(n) : 0;
-    /// <summary>§15.46 INTEGER-OF-DATE with a floating-point argument.</summary>
-    public static long IntegerOfDateReal(double v) => TryIntegerArg(v, "INTEGER-OF-DATE", out long n) ? CobolDate.IntegerOfDate(n) : 0;
-    /// <summary>§15.47 INTEGER-OF-DAY with a floating-point argument.</summary>
-    public static long IntegerOfDayReal(double v) => TryIntegerArg(v, "INTEGER-OF-DAY", out long n) ? CobolDate.IntegerOfDay(n) : 0;
-    // ── The two TOTAL date validators (§15.90 / §15.91) — NOT members of the family above ──────────────────────
-    // ⛔ THESE TWO MUST NOT USE TryIntegerArg (kb/Work PB254). Every OTHER function in this file is PARTIAL: its
-    // argument rules bound the value (§15.5.2's date forms, §15.23.3 r1's "< 1 000 000", §15.100.3 r1/r4's
-    // windows), so an argument the body cannot represent genuinely "results in an incorrect value … according to
-    // the rules specified in the function definition" (§15.3) and the shared raise site is right. The TEST-
-    // validators are TOTAL — §15.90.3 r1 / §15.91.3 r1 constrain nothing but integer-ness and r1a is a
-    // CATCH-ALL — so `TryIntegerArg(…) ? body : 0` answered **0, "the date is valid"**, for every argument past
-    // ±9.2e18: a COMP-2 holding 1.0E19 probed as VALID where §15.90.4 r1a requires 1. The literal `: 0` tail is
-    // the PB32 defect shape wearing the shared raise site as camouflage — routing to the site is not enough when
-    // the function has no incorrect argument to raise on in the first place.
-
-    /// <summary>§15.90 TEST-DATE-YYYYMMDD with a floating-point argument — TOTAL, like its exact twin.</summary>
-    public static long TestDateYyyymmddReal(double v) =>
-        TryTotalIntegerArg(v, out Int128 n) ? CobolDate.TestDateYyyymmdd(n)
-                                            : NotAnIntegerDateArgument(v, "TEST-DATE-YYYYMMDD");
-
-    /// <summary>§15.91 TEST-DAY-YYYYDDD with a floating-point argument — TOTAL.</summary>
-    public static long TestDayYyyydddReal(double v) =>
-        TryTotalIntegerArg(v, out Int128 n) ? CobolDate.TestDayYyyyddd(n)
-                                            : NotAnIntegerDateArgument(v, "TEST-DAY-YYYYDDD");
-
-    /// <summary>The binary64 argument of a TOTAL integer function, as the <c>Int128</c> its ONE body takes.
-    /// False only for a NaN.</summary>
-    /// <remarks>
-    /// ⛔ IT DOES NOT RE-DECIDE THE VERDICT. The §15.90.4 / §15.91.4 r1a windows live in <c>CobolDate</c> and
-    /// NOWHERE ELSE — a rule written once per carrier is exactly the drift PB32 was opened for, and this file
-    /// is where that drift happened. A finite magnitude inside <c>Int128</c> converts exactly (truncated —
-    /// §15.3's integer-argument latitude, the same latitude <see cref="TryIntegerArg"/> takes); a larger one,
-    /// ±∞ included, SATURATES to the corresponding extreme, which is verdict-preserving because both extremes
-    /// lie outside both r1a windows and r1a is a CATCH-ALL: the returned value depends on being outside, never
-    /// on how far outside. The 1.7e38 bound is <c>FromDouble</c>'s saturation constant, below
-    /// <c>Int128.MaxValue</c>, so the boundary value cannot slip through the cast.
-    /// </remarks>
-    private static bool TryTotalIntegerArg(double v, out Int128 n)
-    {
-        RequireIntegralReal(v);   // §15.90.3 r1 / §15.91.3 r1 "shall be an integer" — a total argument is still an INTEGER (kb/Work PB1526)
-        if (double.IsNaN(v)) { n = Int128.Zero; return false; }
-        n = v >= 1.7e38 ? Int128.MaxValue
-          : v <= -1.7e38 ? Int128.MinValue
-          : (Int128)Math.Truncate(v);
-        return true;
-    }
-
-    /// <summary>The ONE input to a §15.90/§15.91 argument that is the value of NO integer: a NaN. §15.3 sets
-    /// EC-ARGUMENT-FUNCTION (the shared raise site, fatal under checking); with checking disabled §15.3's
-    /// closing sentence makes the result implementor-defined, and WiseOwl COBOL defines it as the r1a verdict
-    /// <b>1</b> — "the date is not valid" — never the 0 that would report a non-date as a VALID date.
-    /// <para>±∞ is deliberately NOT routed here: infinity saturates into the body and r1a answers it, so there
-    /// is nothing to raise on.</para></summary>
-    private static long NotAnIntegerDateArgument(double v, string fn)
-    {
-        Exceptions.ExceptionState.ArgumentError(
-            $"{fn}: the floating-point argument {v} is not the value of any integer (ISO §15.3)");
-        return 1;                                                               // the implementor-defined result (§15.3)
-    }
-
-    // The Y2K windowing trio (§15.23 / §15.25 / §15.100) — the optional argument-2/argument-3 keep the SAME
-    // C#-optional defaults the exact bodies use (50 / the argument-3 = 0 execution-year sentinel), because the
-    // renderer emits only the arguments actually written.
-    /// <summary>§15.23 DATE-TO-YYYYMMDD with a floating-point argument.</summary>
-    public static long DateToYyyymmddReal(double date, double off = 50) =>
-        TryIntegerArg(date, "DATE-TO-YYYYMMDD", out long d) && TryIntegerArg(off, "DATE-TO-YYYYMMDD", out long o)
-        ? CobolDate.DateToYyyymmdd(d, o) : 0;
-    /// <summary>§15.24 DATE-TO-YYYYMMDD, argument-3 written.</summary>
-    public static long DateToYyyymmddReal(double date, double off, double baseYear) =>
-        TryIntegerArg(date, "DATE-TO-YYYYMMDD", out long d) && TryIntegerArg(off, "DATE-TO-YYYYMMDD", out long o)
-        && TryIntegerArg(baseYear, "DATE-TO-YYYYMMDD", out long b) ? CobolDate.DateToYyyymmdd(d, o, b) : 0;
-    /// <summary>§15.25 DAY-TO-YYYYDDD with a floating-point argument.</summary>
-    public static long DayToYyyydddReal(double day, double off = 50) =>
-        TryIntegerArg(day, "DAY-TO-YYYYDDD", out long d) && TryIntegerArg(off, "DAY-TO-YYYYDDD", out long o)
-        ? CobolDate.DayToYyyyddd(d, o) : 0;
-    /// <summary>§15.25 DAY-TO-YYYYDDD, argument-3 written.</summary>
-    public static long DayToYyyydddReal(double day, double off, double baseYear) =>
-        TryIntegerArg(day, "DAY-TO-YYYYDDD", out long d) && TryIntegerArg(off, "DAY-TO-YYYYDDD", out long o)
-        && TryIntegerArg(baseYear, "DAY-TO-YYYYDDD", out long b) ? CobolDate.DayToYyyyddd(d, o, b) : 0;
-    /// <summary>§15.100 YEAR-TO-YYYY with a floating-point argument. ⛔ The OVERLOAD SPLIT mirrors the exact
-    /// core (kb/Work PB119 — the two-arm dispatch shape's sixth occurrence, and the sweep found all THREE
-    /// windowing twins carrying it): the former single signature defaulted an OMITTED argument-3 to an explicit
-    /// 0, which the core's §15.100.3 r4 "greater than 1600" screen rejected — the §15.3 default 0 (or an abort
-    /// under checking) where r3 requires windowing against the execution year; and a WRITTEN 0 must still reach
-    /// that screen, so a sentinel cannot express the difference — only the arity can.</summary>
-    public static long YearToYyyyReal(double yy, double off = 50) =>
-        TryIntegerArg(yy, "YEAR-TO-YYYY", out long y) && TryIntegerArg(off, "YEAR-TO-YYYY", out long o)
-        ? CobolDate.YearToYyyy(y, o) : 0;
-    /// <summary>§15.100 YEAR-TO-YYYY, argument-3 written.</summary>
-    public static long YearToYyyyReal(double yy, double off, double baseYear) =>
-        TryIntegerArg(yy, "YEAR-TO-YYYY", out long y) && TryIntegerArg(off, "YEAR-TO-YYYY", out long o)
-        && TryIntegerArg(baseYear, "YEAR-TO-YYYY", out long b) ? CobolDate.YearToYyyy(y, o, b) : 0;
-
     // ── NATIVE EXPONENTIATION (ISO §8.8.1.2 rule 6; fix-queue PB18 + PB28) ──────────────────────────────────────
 
     /// <summary>
@@ -326,30 +207,14 @@ public static partial class CobolIntrinsics
     /// <summary>§15.42 FRACTION-PART — argument minus its integer part, keeping the argument's sign.</summary>
     public static double FractionPartReal(double v) => v - Math.Truncate(v);
 
-    /// <summary>§15.64 MOD — the FLOORED modulus, whose result takes the sign of argument-2
-    /// (§15.64.4: <c>argument-1 − (argument-2 × FUNCTION INTEGER (argument-1 / argument-2))</c>).
-    /// ⛔ The zero-divisor leg calls the SHARED <see cref="ModZeroDivisor"/> rather than carrying its own guard
-    /// (fix-queue PB32): this body used to answer <c>b == 0 ? 0 : …</c>, which returned the §15.3 default WITHOUT
-    /// ever setting the fatal EC-ARGUMENT-FUNCTION its exact twin sets.
-    /// <para>⛔ COMPUTED AS THE EXACT CARRIER REMAINDER, NOT THE LITERAL EAE (fix-queue PB65 / RV-15.64.4-1
-    /// sweep): the C# <c>%</c> on doubles is IEC 60559's exact truncated remainder of the two carrier values,
-    /// adjusted by one addition to the floored form §15.64.4 defines. The literal
-    /// <c>a − (b × Math.Floor(a / b))</c> form cancels catastrophically once <c>b·⌊a/b⌋</c> exceeds 2⁵³ —
-    /// measured returning 320612800-class garbage for arguments whose true remainder the carrier represents
-    /// exactly — and §15.4.1's "implementor-defined approximation" has to approximate the EXPRESSION, which
-    /// the exact remainder does and the cancellation does not.</para></summary>
-    public static double ModReal(double a, double b)
-    {
-        if (b == 0) return ModZeroDivisor();
-        double r = a % b;
-        return r != 0 && (r < 0) != (b < 0) ? r + b : r;
-    }
-
     /// <summary>§15.77 REM — the TRUNCATED remainder, whose result takes the sign of argument-1
     /// (§15.77.4: <c>argument-1 − (argument-2 × FUNCTION INTEGER-PART (argument-1 / argument-2))</c>).
-    /// ⚠ Distinct from <see cref="ModReal(double, double)"/> exactly as the two exact bodies are: REM(−7, 3) is
-    /// −1 where MOD(−7, 3) is 2. Shares <see cref="RemZeroDivisor"/> with the exact carrier for the same reason,
-    /// and rides the same exact <c>%</c> (which IS the truncated remainder) for the same PB65 sweep reason.</summary>
+    /// ⚠ Distinct from MOD exactly as the two exact bodies are: REM(−7, 3) is −1 where MOD(−7, 3) is 2. MOD has no
+    /// binary64 body: both its positions are §15.3 type 6, so the renderer takes their integers first and the call
+    /// never reaches this lane (kb/Work PB651). Shares <see cref="RemZeroDivisor"/> with the exact carrier (one raise
+    /// site per rule, fix-queue PB32), and computes C#'s <c>%</c> on the two doubles — IEC 60559's exact truncated
+    /// remainder, which IS §15.77.4's value; the literal <c>a − (b × truncate(a / b))</c> cancels catastrophically
+    /// once <c>b·⌊a/b⌋</c> passes 2⁵³ (fix-queue PB65's sweep).</summary>
     public static double RemReal(double a, double b) => b == 0 ? RemZeroDivisor() : a % b;
 
     /// <summary>§15.59 MAX — the greatest argument value.</summary>

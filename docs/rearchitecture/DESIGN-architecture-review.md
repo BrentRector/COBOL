@@ -906,6 +906,17 @@ them). The gate is unaffected: `scripts/gate_plan.py` keys every case on its dis
 (`name_key`, gate_plan.py:16), not its namespace, and a stale impact-map key only changes the order, never what runs
 (PB1708). The oracle is unaffected: `ArchOracleDriftTests` enrolls row sources by attribute, not by name.
 
+**Scripts: an artifact the tooling reads has ONE Python reader** (kb/Work PB3204, PB3209; R2 findings at 8be230068).
+The rules above are written for C#; for `scripts/` the same "one rule in one place" reads: a script that needs a
+fact about a shared artifact imports that artifact's reader and keeps no parser of its own. The ANTLR grammar under
+`src/Cobol.Net.Frontend/Grammar` is read by `scripts/spec/grammar_source.py` (`read()` → `Rule(name, kind, file,
+first_line, last_line, body, source, lead)`, comments and actions blanked, the population asserted), which replaced
+three private readers that did not agree on which rules the grammar declares (the dossier's missed 78 of 1,205);
+its self-test plants each trap they fell into and refuses
+a script that declares one of their names again. The `docs/CONFORMANCE.md` register tables are read by
+`inventory_schema.register_section_at` (with each row's line, for a line-by-line reader such as the Phase-B
+dossier), and the rule catalog and the traceability inventory by `inventory_schema.load_catalog`/`load_inventory`.
+
 ### 8.3 Decomposition of each god class
 
 **Method.** For each of the 52 candidates (census `godClasses`; the finding's `responsibilities` gives the partial
