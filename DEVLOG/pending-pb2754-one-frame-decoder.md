@@ -40,3 +40,5 @@ a damaged first frame is not a framed file ('39'), and the store shape keeps a g
 `<see cref="WritePrefix"/>` in the class summary, a wrong `OverwriteInPlace` cref, a stale `WriteStore`/`ReadStore`
 name in `COBOLNET_FILES_DESIGN.md`, and an unused `using System.Buffers`. Lead left open: OPEN EXTEND on a file whose
 data ends at a damaged frame appends PAST it, where no reader reaches.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T155805Z-f7e334; Conformance 6,014 · Unit 33,193 · Characterization 6 ran in leg 1, the new FrameDecoderDriftTests cases among them). The architecture oracle (`compare_oracle.py`) compares emitted C# and diagnostics, which no file of this change reaches (runtime only).
