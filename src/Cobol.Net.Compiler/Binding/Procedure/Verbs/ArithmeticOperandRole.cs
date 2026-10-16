@@ -58,7 +58,7 @@ internal static class ArithmeticOperandRole
     internal static bool IsReceiver(ParserRuleContext operand) => operand switch
     {
         Core.ReceivingArithmeticOperandContext => true,
-        Core.ReceivingOperandContext r => r.dataReference() is not null,
+        Core.ReceivingOperandContext r => r.receivingIdentifier() is not null,
         _ => false,
     };
 

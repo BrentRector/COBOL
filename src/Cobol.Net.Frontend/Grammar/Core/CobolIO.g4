@@ -545,7 +545,7 @@ readDirection
     ;
 
 readInto
-    : INTO dataReference
+    : INTO receivingIdentifier
     ;
 
 readKey
@@ -962,7 +962,7 @@ mergeOutputProcedurePhrase
 
 returnStatement
     : RETURN fileName RECORD?
-      (INTO dataReference)?
+      (INTO receivingIdentifier)?
       returnAtEndPhrase?
       END_RETURN?
 
@@ -1042,11 +1042,11 @@ delimitedByPhrase
     ;
 
 stringIntoPhrase
-    : INTO dataReference
+    : INTO receivingIdentifier
     ;
 
 stringWithPointer
-    : WITH? POINTER dataReference
+    : WITH? POINTER receivingIdentifier
     ;
 
 // ISO 5.2.6.4: the positive and negative phrases are enclosed in CHOICE INDICATORS (| bars inside the
@@ -1089,17 +1089,17 @@ unstringIntoPhrase
     ;
 
 unstringIntoTarget
-    : dataReference
-      (DELIMITER IN? dataReference)?
-      (COUNT IN? dataReference)?
+    : receivingIdentifier
+      (DELIMITER IN? receivingIdentifier)?
+      (COUNT IN? receivingIdentifier)?
     ;
 
 unstringWithPointer
-    : WITH? POINTER dataReference
+    : WITH? POINTER receivingIdentifier
     ;
 
 unstringTallying
-    : TALLYING IN? dataReference
+    : TALLYING IN? receivingIdentifier
     ;
 
 // ISO 5.2.6.4: the positive and negative phrases are enclosed in CHOICE INDICATORS (| bars inside the
@@ -1146,7 +1146,7 @@ inspectTallyingPhrase
 // phrase — only the operands AFTER it are bare. The grammar used to spell `identifier-2 (FOR phrase+)+` with an
 // adjective-less alternative at every position, so `N FOR ALL "A" FOR ALL "B"` and `N FOR "A"` were accepted.
 inspectTallyingItem
-    : dataReference FOR inspectCountPhrase+
+    : receivingIdentifier FOR inspectCountPhrase+
     ;
 
 // ALL/LEADING are transitive across the bare operands that follow them (GR 10), so a

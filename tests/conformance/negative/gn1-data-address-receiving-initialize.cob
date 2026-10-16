@@ -14,7 +14,9 @@
       *> Measured control: the same program with INITIALIZE P (P a
       *> data-pointer item) compiles and runs at 2002 and 2023.
       *> Expected: REJECTED, at every edition with
-      *> data-address-identifiers.
+      *> data-address-identifiers, by SR5 itself (COBOLNET3979, the
+      *> receiving chokepoint's form table, kb/Work PB1551) - it was a
+      *> parse error re-coded to 8.9 (COBOLNET0901).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. GN1AB2.
        DATA DIVISION.

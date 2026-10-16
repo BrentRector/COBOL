@@ -36,7 +36,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             {
                 Format2SendingOperand("ADD", "§14.9.2.2", toAddend.receivingArithmeticOperand());
                 if (toAddend.receivingArithmeticOperand() is { Length: > 0 } tors)
-                    addends.AddRange(tors.Select(r => host.Expr.BindExpr(r.dataReference())));
+                    addends.AddRange(tors.Select(r => host.Expr.BindExpr(r.receivingIdentifier())));
                 else
                     // The literal / functionCall arm binds through the WRAPPER so the operand walk's
                     // function-call arm fires — passing the raw FunctionCallContext re-springs PB45's
@@ -150,9 +150,9 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             // kb/Work PB128: identifier-4 rides the ONE receiving chokepoint like every other resultant —
             // the direct Refs.Resolve bypass skipped the CONSTANT RECORD / CAPACITY-register / constant-name
             // screens, and §14.9.12.3 SR2 fixes its category (numeric or numeric-edited).
-            if (host.Expr.ResolveReceiving(rem.dataReference()) is not { } r0
-                || host.Expr.ScreenResultant(r0, rem.dataReference().GetText(), editedOk: true, "§14.9.12.3 SR2") is not { } r)
-                return new BoundUnsupported($"DIVIDE REMAINDER receiver '{rem.dataReference().GetText()}'");
+            if (host.Expr.ResolveReceiving(rem.receivingIdentifier()) is not { } r0
+                || host.Expr.ScreenResultant(r0, rem.receivingIdentifier().GetText(), editedOk: true, "§14.9.12.3 SR2") is not { } r)
+                return new BoundUnsupported($"DIVIDE REMAINDER receiver '{rem.receivingIdentifier().GetText()}'");
             BoundExpr dividend = div.divideIntoPhrase() is { } i ? host.Expr.BindExpr(i.receiversOrSendingOperand())
                 : div.divideByPhrase() is not null ? a
                 : a;
@@ -254,7 +254,8 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
         // PICTURE 1(m)), and probing only computeStore(0) let `COMPUTE N B = 1` miss the boolean receiver
         // (the reroute then judged it a pure Format 1).
         bool receiverBoolean = compute.computeStore()
-            .Any(s => ctx.Refs.Probe(s.dataReference()) is { Item.OperandPic.Category: PicCategory.Boolean });
+            .Any(s => s.receivingIdentifier().dataReference() is { } r
+                && ctx.Refs.Probe(r) is { Item.OperandPic.Category: PicCategory.Boolean });
         bool rhsBoolean = ConditionBinder.SoleDataRef(expr) is { } d && ctx.Refs.Probe(d) is { Item.OperandPic.Category: PicCategory.Boolean };
         if (receiverBoolean || rhsBoolean)
         {
@@ -321,7 +322,8 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             && compute.computeStore().Length > 0
             // OperandPic (kb/Work PB157): a GROUP-USAGE BIT receiver is boolean (§13.18.29.4 GR1b) — raw Pic
             // read it as non-boolean and misrouted `COMPUTE <bit-group> = ZERO` to the arithmetic channel.
-            && ctx.Refs.Probe(compute.computeStore(0).dataReference()) is not { Item.OperandPic.Category: PicCategory.Boolean })
+            && (compute.computeStore(0).receivingIdentifier().dataReference() is not { } r0
+                || ctx.Refs.Probe(r0) is not { Item.OperandPic.Category: PicCategory.Boolean }))
         {
             // §8.3.3.6.4 GR4 — "the numeric value '0' … depending on context"; a numeric receiver IS that context.
             return new BoundCompute(new BoundNumLiteral("0"), host.Expr.Receivers(compute.computeStore()),
@@ -362,11 +364,9 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             // Refs.Resolve bypass skipped the CONSTANT RECORD / CAPACITY / constant-name screens); the
             // ARITHMETIC category screen deliberately does not apply — §14.9.8.3 SR2's boolean-receiver rule
             // is BuildComputeBoolean's own (kb/Work PB157).
-            if (host.Expr.ResolveReceiving(store.dataReference()) is not { } p)
-            {
-                ctx.Edition.Error("COBOLNET1511", $"COMPUTE receiver '{store.dataReference().GetText()}' is unresolvable");
-                continue;
-            }
+            // Null is REPORTED by the chokepoint (an undefined name, a non-receivable identifier form, a constant): a
+            // second "is unresolvable" here contradicted the rule it had just named.
+            if (host.Expr.ResolveReceiving(store.receivingIdentifier()) is not { } p) continue;
             // OperandPic — THE ONE category reader (D20/PB79; kb/Work PB157): a GROUP-USAGE BIT receiver IS
             // an elementary boolean for SR2 (§13.18.29.4 GR1b's as-if PICTURE 1(m)); raw Pic rejected it
             // while the SENDING side of the same statement accepted it.
@@ -378,7 +378,7 @@ internal sealed class ArithmeticBinder(BinderContext ctx, StatementBinder host)
             // ordinary boolean one and needs no exclusion.)
             var cat = p is RefModPlace rm ? rm.Category : p.Item.OperandPic?.Category;
             if (cat is not PicCategory.Boolean)
-                ctx.Edition.Error("COBOLNET1511", $"the receiver '{store.dataReference().GetText()}' of a boolean "
+                ctx.Edition.Error("COBOLNET1511", $"the receiver '{store.receivingIdentifier().GetText()}' of a boolean "
                     + "COMPUTE shall be an elementary boolean item (ISO §14.9.8.3 Format 2 SR2)");
             targets.Add(p);
         }

@@ -308,7 +308,7 @@ internal sealed partial class EcBinder
         // and one item spelled two ways (`N OF G` / `N IN G`) slipped past even the duplicate reading. A
         // duplicate is still rejected: it is one case of "more than once".
         foreach (var ini in regionA.SelectMany(Descendants<Core.InitializeStatementContext>)
-                     .Where(s => s.initializeOperandList().dataReference().Length > 1))
+                     .Where(s => s.initializeOperandList().receivingIdentifier().Length > 1))
             ctx.Edition.Error("COBOLNET1614", "an INITIALIZE naming more than one identifier-1 shall not appear in "
                 + "imperative-statement-1 of an exception-checking PERFORM (ISO §14.9.20.3 SR2)");
         foreach (var _ in regionA.SelectMany(Descendants<Core.MergeStatementContext>))

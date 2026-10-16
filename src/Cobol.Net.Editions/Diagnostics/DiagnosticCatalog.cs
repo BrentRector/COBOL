@@ -6992,6 +6992,38 @@ public static class DiagnosticCatalog
         + "and shall not be specified as a receiving operand. Write identifier-1 itself as the receiver.",
         "ISO §8.4.3.5.3 SR2");
 
+    /// <summary>COBOLNET3977 — the predefined NULL written as a receiving operand (kb/Work PB1551). It used to be a
+    /// parse error re-coded to §8.9 (COBOLNET0901 "'NULL' is a reserved word … cannot be used as a user-defined
+    /// word"), a rule the program had not broken; every receiving position now parses it (the grammar's
+    /// <c>receivingIdentifier</c>) so the receiving chokepoint names the rule that forbids it.</summary>
+    public static readonly DiagnosticDescriptor NullReceiving = new(
+        "COBOLNET3977", "null-receiving", EditionSeverity.Error,
+        "NULL is specified as a receiving operand. ISO §8.4.3.7.3 SR1: \"NULL shall not be specified as a receiving "
+        + "operand.\" The predefined object reference NULL references no object, and the predefined address NULL is "
+        + "only ever a sending operand (§8.4.3.10.3 SR1). Write the item that is to receive NULL as the receiver: "
+        + "SET item TO NULL.",
+        "ISO §8.4.3.7.3 SR1; §8.4.3.10.3 SR1");
+
+    /// <summary>COBOLNET3978 — SELF or SUPER (or <c>object-class-name-1 OF SUPER</c>'s bare form) written as a receiving
+    /// operand (kb/Work PB1551; ISO §8.4.3.8.3 SR2). The same parse-error-as-§8.9 history as <see cref="NullReceiving"/>.</summary>
+    public static readonly DiagnosticDescriptor SelfSuperReceiving = new(
+        "COBOLNET3978", "self-super-receiving", EditionSeverity.Error,
+        "SELF or SUPER is specified as a receiving operand. ISO §8.4.3.8.3 SR2: \"This identifier format shall not be "
+        + "specified as a receiving operand.\" SELF and SUPER \"both reference the object that was used to invoke the "
+        + "method\" (§8.4.3.8.4 GR1); they are not data items a statement can store into.",
+        "ISO §8.4.3.8.3 SR2");
+
+    /// <summary>COBOLNET3979 — a data-, function- or program-address-identifier written as a receiving operand (kb/Work
+    /// PB1551): each of the three formats carries the same sentence as its own syntax rule. SET Format 7's receiving
+    /// <c>ADDRESS OF data-name-1</c> is NOT one of them (Annex D) and is not refused.</summary>
+    public static readonly DiagnosticDescriptor AddressIdentifierReceiving = new(
+        "COBOLNET3979", "address-identifier-receiving", EditionSeverity.Error,
+        "An address-identifier (ADDRESS OF identifier, ADDRESS OF FUNCTION, ADDRESS OF PROGRAM) is specified as a "
+        + "receiving operand. ISO §8.4.3.11.3 SR5, §8.4.3.12.3 SR3 and §8.4.3.13.3 SR4: \"This identifier format shall "
+        + "not be specified as a receiving operand.\" Each creates a unique item that contains an address; store the "
+        + "address into a pointer item instead.",
+        "ISO §8.4.3.11.3 SR5; §8.4.3.12.3 SR3; §8.4.3.13.3 SR4");
+
     /// <summary>COBOLNET2872 — an object-view's AS phrase names an interface with FACTORY OF or ONLY (kb/Work PB1425).
     /// </summary>
     public static readonly DiagnosticDescriptor ObjectViewInterfacePhrase = new(
