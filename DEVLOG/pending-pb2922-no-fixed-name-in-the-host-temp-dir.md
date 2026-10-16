@@ -29,12 +29,24 @@ its proof is red. `guard-verdict.sh`'s standalone forensics default now carries 
 downloads and logs go to a `mktemp` directory removed on exit.
 
 The drift test makes the next case automatic: `scripts/temp_names.py --self-test`, which `self_tests.py` discovers, so it
-runs in every gate's SELF-TESTS audit and in CI. It catches 13 planted shapes (the ones that reached the tree), passes
-9 run-unique ones, and then scans every tracked `.py`, `.ps1`, `.psm1` and `.sh` under `scripts/` and `.claude/`. A
-finding is the temp root (`GetTempPath()`, `$env:TEMP`/`$env:TMP`, `tempfile.gettempdir()`, `/tmp`, `$TMPDIR`)
+runs in every gate's SELF-TESTS audit and in CI. It catches 26 planted shapes (the ones that reached the tree), passes
+12 run-unique ones, and then scans every tracked `.py`, `.ps1`, `.psm1` and `.sh` under `scripts/` and `.claude/`. A
+finding is the temp root (`GetTempPath()`, `tempfile.gettempdir()`, the TEMP/TMP/TMPDIR environment variable in each
+language, `/tmp`)
 joined to a literal with no unique part, or assigned bare to a variable, which would hide every later join. Python is
 read from its syntax tree, PowerShell and bash by line. Before the sweep it found 22 sites on this tree; afterwards it
 finds none. `semgrep/verify.py` passes with every rule's count unchanged. The design doc (DESIGN-orchestrator-loop.md
 section 4.8 and its coordination-directory table) and DOC_INDEX describe the new shape. PB2922 is landed with
 `closes_rows: []` (process tooling, no ISO rule). PB2590's text now credits the steer arm to PB2922 and records that
 nothing of its load arm is still open.
+
+The branch review found the scanner's Python arm modelled only `tempfile.gettempdir()` (finding R1-1), so
+`scripts/render-spec-page.py`, which wrote the fixed `spec_p<N>.png` into `os.environ['TEMP']`, read GREEN: two agents
+rendering one page at once (the fix-lane brief and the spec-lookup skill both send agents there) overwrite each other's
+PNG. The root is a model of the temp directory that named one API per language rather than every way a language names
+it. The scanner now models the environment variable in all three languages (`os.environ[...]`, `os.environ.get`,
+`os.getenv`, an `or` fallback; `$env:TMPDIR` and `[Environment]::GetEnvironmentVariable`; bash `$TEMP`, and `$TMP`
+unless the script assigns TMP itself), a tuple assignment, and a literal `/tmp/<name>` path in Python. Thirteen new
+planted cases, every one missed by the reviewed scanner, and three new run-unique ones. On the tree it then found
+exactly render-spec-page.py:16, now a fresh `tempfile.mkdtemp(prefix='spec-pages-')` per run when `--out` is not given
+(`page_workunit.py` passes `--out` and is unchanged); two concurrent renders of page 30 landed in two directories.
