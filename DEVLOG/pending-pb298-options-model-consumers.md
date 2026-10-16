@@ -29,3 +29,10 @@ and both were re-probed. The seven ENTRY-CONVENTION rows' code-location moved to
 `OptionsBinder.cs#ScreenEntryConvention`, retiring the old method and the deleted field as witnesses
 (`batch-PB298.json`). `docs/CONFORMANCE.md` DRV-GR-11.9.7.4-4 and `DESIGN-external-repository.md` §3.4 name the
 screen and say that the model has no field for the clause.
+
+**Review round 1 (kb/Work PB3027).** The branch review found that three inventory rows still described the deleted
+field as current: GR-11.9.7.4-1 and GR-11.9.7.4-4 named `OptionsModel.EntryConvention` and an "open PB298", and
+GR-4.2.10-3 said GR-4.2.10-2 "stays PARTIAL under kb/Work PB298". `batch-PB298-r1.json` restates the three notes for
+the current tree; verdicts, editions and witnesses are unchanged, and `audit_witness_loss.py --check` is GREEN. The
+sweep of every other `PB298` and `EntryConvention` mention in the inventory, docs and source found the rest current
+or historical.
