@@ -73,3 +73,11 @@ from CALL AS NESTED BY VALUE KN, `IN ENTRY` from SET PP TO ENTRY KE, then STOP R
 PROGRAM-ID AS KP2, which is AS KP1). Negative `pb780-constant-as-constant-cycle` (§13.10.3 SR5).
 
 **Row.** `SR-13.10.3-2` PARTIAL → CONFORMS, editions 2002, 2014, 2023 (GAP 66 → 65). kb/Work PB780 landed.
+
+**Self-review** found two leads outside the mechanism, filed through the report: the SELECT PADDING CHARACTER operand is
+never bound, so `PADDING CHARACTER IS NOSUCH` compiles clean at 2002; and two private sole-data-reference descents
+(`OoBinder.OoExtractBareReference`, `SearchAllFormat2Rules.SoleDataReference`) duplicate `SoleOperand.DataRef`.
+
+**Gate** (run `20261016T224025Z-bc695d`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left
+to CI's whole-population run: Conformance 5,795 · Unit 497 · Characterization 31 …`; every added golden, negative and
+`ConstantNameLiteralPositionDriftTests` case Passed in leg 1. semgrep verify: PASS, counts unchanged.
