@@ -202,14 +202,16 @@ internal static class OptionsBinder
         // literal"; kb/Work PB780): the effect "is as if literal-1 … were written where constant-name-1 is written"
         // (§13.10.4 GR1), so SR1 below is asked of the entry's literal-1 exactly as of a written one. SR1 asks the
         // literal's FORM (hexadecimal-alphanumeric), which the entry's value no longer carries (RawText re-quotes it:
-        // X'2A' is "*"), so it is asked of the AS operand as written, the Specification: literal-1 itself when the
-        // operand is one literal. An operand of any other shape (a concatenation, an arithmetic expression, a length
-        // phrase, a FROM compilation-variable) is not one written hexadecimal-alphanumeric literal and is refused.
+        // X'2A' is "*"), so it is asked of ConstantDef.WrittenLiteral: literal-1 as written, reached through a
+        // constant-name the entry is written AS (KY AS KX) or the literal a FROM compilation variable was defined as
+        // — never the entry's Specification, which for AS KX is the word KX (kb/Work PB780 review R1-1). An operand
+        // of any other shape (a concatenation, an arithmetic expression, a length phrase) has no written literal
+        // and is not one hexadecimal-alphanumeric literal: it is refused.
         if (fill.cobolWord() is { } word)
         {
             string name = word.GetText();
             if (constants(name) is { } k)
-                return LiteralFill(sections, k.Specification, $"constant-name {name}, specified as {k.Specification} "
+                return LiteralFill(sections, k.WrittenLiteral, $"constant-name {name}, standing for {k.StandsFor} "
                     + "(ISO §13.10.4 GR1),", figurative: false, edition);
             edition?.Error(DiagnosticCatalog.OptionsInitializeFillLiteral, $"the INITIALIZE clause's fill {name} is "
                 + "neither a literal nor a constant-name in scope — literal-1 shall be a one-byte "
@@ -239,8 +241,9 @@ internal static class OptionsBinder
     }
 
     /// <summary>The literal-1 arm, written or substituted for a constant-name: ISO §11.9.10.3 SR1 asked of
-    /// <paramref name="raw"/>, the literal's text. <paramref name="described"/> names what the program wrote.</summary>
-    private static OptionsInitialize LiteralFill(OptionsSections sections, string raw, string described, bool figurative,
+    /// <paramref name="raw"/>, the literal's text (null: a constant whose literal-1 is no one written literal).
+    /// <paramref name="described"/> names what the program wrote.</summary>
+    private static OptionsInitialize LiteralFill(OptionsSections sections, string? raw, string described, bool figurative,
         EditionContext? edition)
     {
         char? c = OneByteHexAlphanumeric(raw);

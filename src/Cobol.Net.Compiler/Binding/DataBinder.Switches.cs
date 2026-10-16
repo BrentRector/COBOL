@@ -639,8 +639,10 @@ public sealed partial class DataBinder
             if (SpecialNamesConstant(word, Report, $"CURRENCY SIGN {word.GetText()}", op.Name) is not { } k)
                 return null;
             // A constant's literal-1 is never a figurative constant (§13.10.3 SR6), so its class and its form remain;
-            // the form is literal-1 as written, the entry's specification (§13.10.3 SR9's subject).
-            bool hex = CobolLiteral.IsHexadecimalFormat(k.Specification);
+            // the form is literal-1 as written (ConstantDef.WrittenLiteral: through a constant-name written AS another,
+            // or a FROM compilation variable, §13.10.4 GR1), never the entry's specification, which for AS KX is
+            // the word KX (kb/Work PB780 review R1-1).
+            bool hex = k.WrittenLiteral is { } written && CobolLiteral.IsHexadecimalFormat(written);
             what = k.Category switch
             {
                 PicCategory.Numeric => "a numeric literal",
@@ -648,7 +650,7 @@ public sealed partial class DataBinder
                 _ when op.RefusesHexadecimal && hex => "a hexadecimal literal",
                 _ => null,
             };
-            spelling = $"{word.GetText()} (the constant-name for {k.Specification})";
+            spelling = $"{word.GetText()} (the constant-name for {k.StandsFor})";
             if (what is null)
                 value = new(k.Text, hex, k.Category is PicCategory.National ? LiteralClass.National : LiteralClass.Alphanumeric);
         }
@@ -1179,7 +1181,7 @@ public sealed partial class DataBinder
             if (constant.Category is not (PicCategory.Alphanumeric or PicCategory.National))
             {
                 Report($"{what}: {operand} shall be an alphanumeric or national literal (ISO "
-                    + $"§12.3.7.3 SR10); the constant-name '{word.GetText()}' stands for {constant.Specification}, of "
+                    + $"§12.3.7.3 SR10); the constant-name '{word.GetText()}' stands for {constant.StandsFor}, of "
                     + $"class {constant.Category} (§13.10.4 GR1/GR2)");
                 return false;
             }
@@ -1794,7 +1796,7 @@ public sealed partial class DataBinder
                 // (GR3's integer forms included), the class rule otherwise, SR11's zero-length half. Its literal-1 is
                 // never a figurative constant (§13.10.3 SR6).
                 if (SpecialNamesConstant(w, m => Edition.Error(r.Code, m), r.What, "a literal-phrase operand") is not { } k) return null;
-                string spec = $"{w.GetText()} (the constant-name for {k.Specification})";
+                string spec = $"{w.GetText()} (the constant-name for {k.StandsFor})";
                 if (k.Category is PicCategory.Numeric && k.IntegerText is { } integer)
                     return Ordinal(integer.TrimStart('-'), k.Text.StartsWith('+') || k.Text.StartsWith('-'), spec);
                 if (k.Category is not PicCategory.Numeric && k.Text.Length == 0)

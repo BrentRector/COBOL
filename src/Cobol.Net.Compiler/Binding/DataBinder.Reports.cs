@@ -1320,7 +1320,7 @@ public sealed partial class DataBinder
             if (k.Category != PicCategory.Alphanumeric)
             {
                 Edition.Error(DiagnosticCatalog.ReportCodeClauseRule, $"{where} names the constant-name '{DataBinder.WrittenText(dref)}' "
-                    + $"for {k.Specification}, which is not an alphanumeric literal: literal-1 shall be an alphanumeric literal "
+                    + $"for {k.StandsFor}, which is not an alphanumeric literal: literal-1 shall be an alphanumeric literal "
                     + "(ISO §13.18.12.3 SR1; §13.10.4 GR1)");
                 return null;
             }

@@ -351,10 +351,13 @@ public sealed class CompileTimeExpressionEvaluator
         { ReportDirective(where, "a concatenation expression shall not appear in a compiler directive (ISO §7.3.3 SR10)"); return null; }
         if (nn.figurativeConstant() is not null)
         { ReportDirective(where, "a figurative constant shall not appear in a compiler directive (ISO §7.3.3 SR10)"); return null; }
-        if (nn.STRINGLIT() is { } s) return CtValue.Alphanumeric(CobolLiteral.Decode(s.GetText()));
-        if (nn.HEXLIT() is { } h) return CtValue.Alphanumeric(CobolLiteral.Decode(h.GetText()));   // X"…" — category alphanumeric
-        if (nn.NATLIT() is { } nat) return CtValue.National(CobolLiteral.Decode(nat.GetText()));
-        if (nn.BOOLLIT() is { } bl) return CtValue.Boolean(BitString.Of(CobolLiteral.Decode(bl.GetText())));
+        // Each keeps the literal as written (CtValue.WrittenLiteral): a constant entry FROM the variable asks its form.
+        if (nn.STRINGLIT() is { } s) return CtValue.Alphanumeric(CobolLiteral.Decode(s.GetText())) with { WrittenLiteral = s.GetText() };
+        if (nn.HEXLIT() is { } h)   // X"…" — category alphanumeric
+            return CtValue.Alphanumeric(CobolLiteral.Decode(h.GetText())) with { WrittenLiteral = h.GetText() };
+        if (nn.NATLIT() is { } nat) return CtValue.National(CobolLiteral.Decode(nat.GetText())) with { WrittenLiteral = nat.GetText() };
+        if (nn.BOOLLIT() is { } bl)
+            return CtValue.Boolean(BitString.Of(CobolLiteral.Decode(bl.GetText()))) with { WrittenLiteral = bl.GetText() };
         ReportDirective(where, $"'{nn.GetText()}' is not a supported compile-time literal operand");
         return null;
     }

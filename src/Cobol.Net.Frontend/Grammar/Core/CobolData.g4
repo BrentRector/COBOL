@@ -888,7 +888,8 @@ valueClauseTablePhrase
 // anywhere that a format specifies a literal of the class and category of constant-name-1" — so `VALUE "A" "B" FROM
 // (K)` is conforming source and drew COBOL0309 "A literal value is expected here, not a data-name". The grammar
 // cannot tell a constant-name from any other word, so the alternative is `cobolWord` and the BINDER substitutes
-// (DataBinder.TableValueSubscript), refusing a word that is not an integer constant-name by SR19 (COBOLNET3980).
+// (DataBinder.TableValueSubscript), refusing a word that is not an integer constant-name by SR19
+// (DiagnosticCatalog.ConstantEntryRule, COBOLNET1547).
 valueTableSubscript
     : signedIntegerLiteral
     | cobolWord

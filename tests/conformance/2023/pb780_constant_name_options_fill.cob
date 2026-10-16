@@ -19,6 +19,16 @@
       *>   OW=[OOO] the OBJECT paragraph's own constant KO = X"4F".
       *>   M1=[MMM] method M1's LOCAL-STORAGE, its own constant KM.
       *>   M2=[OOO] method M2 names its object's constant KO.
+      *>   U=[JJ]   contained PB780OJ fills with KK, written AS KJ, that
+      *>            is AS X"4A": KK is as if X"4A" were written
+      *>            (13.10.4 GR1), so SR1 holds of the literal KJ
+      *>            stands for, never of the word KJ (review R1-1).
+      *>   V=[HHHH] contained PB780OK fills with KH, FROM compilation
+      *>            variable PB780VH defined AS X"48": GR1, "as if
+      *>            ... the text represented by compilation-variable-
+      *>            name-1 were written", and 7.3.11.1 names it "a
+      *>            particular literal value".
+       >>DEFINE PB780VH AS X"48"
        IDENTIFICATION DIVISION.
        CLASS-ID. PB780OC INHERITS FROM BASE.
        ENVIRONMENT DIVISION.
@@ -86,6 +96,8 @@
        PROCEDURE DIVISION.
            DISPLAY "S=[" S "]"
            CALL "PB780OI"
+           CALL "PB780OJ"
+           CALL "PB780OK"
            INVOKE PB780OC "FM"
            INVOKE PB780OC "NEW" RETURNING O1
            INVOKE O1 "M1"
@@ -102,4 +114,29 @@
            DISPLAY "T=[" T "]"
            GOBACK.
        END PROGRAM PB780OI.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB780OJ.
+       OPTIONS.
+           INITIALIZE WORKING-STORAGE TO KK.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 U PIC X(2).
+       01 KJ CONSTANT AS X"4A".
+       01 KK CONSTANT AS KJ.
+       PROCEDURE DIVISION.
+           DISPLAY "U=[" U "]"
+           GOBACK.
+       END PROGRAM PB780OJ.
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PB780OK.
+       OPTIONS.
+           INITIALIZE WORKING-STORAGE TO KH.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 V PIC X(4).
+       01 KH CONSTANT FROM PB780VH.
+       PROCEDURE DIVISION.
+           DISPLAY "V=[" V "]"
+           GOBACK.
+       END PROGRAM PB780OK.
        END PROGRAM PB780OF.

@@ -78,6 +78,17 @@ PROGRAM-ID AS KP2, which is AS KP1). Negative `pb780-constant-as-constant-cycle`
 never bound, so `PADDING CHARACTER IS NOSUCH` compiles clean at 2002; and two private sole-data-reference descents
 (`OoBinder.OoExtractBareReference`, `SearchAllFormat2Rules.SoleDataReference`) duplicate `SoleOperand.DataRef`.
 
+**Branch review, round 1.** R1-1: V15's copy restated `Specification` (§13.10.3 SR9's subject, the AS operand as
+written) as the WORD KX, and the two rules that ask literal-1's FORM read `Specification`. So `KY AS KX AS X'2A'` drew
+COBOLNET1727 at `INITIALIZE … TO KY`, and `PICTURE SYMBOL KY` over `KX AS X'23'` compiled (§12.3.7.3 SR26). A FROM
+constant already failed both ways, because its specification is `FROM name`. The fix splits the field:
+`ConstantDef.WrittenLiteral` is literal-1 as written when it is one nonnumeric literal token. `AS KX` inherits it, and a
+FROM entry takes it from the DEFINE operand (`CtValue.WrittenLiteral`; §13.10.4 GR1, "the text represented by
+compilation-variable-name-1"). The OPTIONS fill and the CURRENCY screen read it; SR9 keeps `Specification`. The spec
+has no third form rule. Golden `2023/pb780_constant_name_options_fill` gains `U=[JJ]` and `V=[HHHH]`. New negatives:
+`pb780-currency-symbol-constant-chain-hex` and `-from-hex`. R1-2: a grammar comment named COBOLNET3980, which does not
+exist; it now names COBOLNET1547.
+
 **Gate** (run `20261016T224025Z-bc695d`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left
 to CI's whole-population run: Conformance 5,795 · Unit 497 · Characterization 31 …`; every added golden, negative and
 `ConstantNameLiteralPositionDriftTests` case Passed in leg 1. semgrep verify: PASS, counts unchanged.
