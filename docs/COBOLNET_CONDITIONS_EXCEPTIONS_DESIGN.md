@@ -421,7 +421,7 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
   IF / DISPLAY / MOVE gets the generic guard: status set, the F3 selection (USE F3 / the enclosing PERFORM's WHEN,
   #4/#5), RESUME or the abnormal termination (#7). ARITHMETIC statements are excluded from that guard by the
   structural marker `IArithmeticStatement` (every bound statement carrying a `SizeErrorPhrase`; `EmitArith` owns
-  their §14.7.5 shape). With checking OFF the raise reaches `ProgramTable.RunMain`'s `CobolFatalException` catch
+  their §14.7.5 shape). With checking OFF the raise reaches the run-unit boundary's (`ProgramTable.RunModule`) `CobolFatalException` catch
   and terminates loudly (#8 — the implementor's documented choice; `IF 10 ** 100000 > 5` under STANDARD-DECIMAL
   was an unhandled stack trace, exit 127).
 - **ONE dispatch per raise (kb/Work PB75).** A guard that processed a fatal condition (the F3 selection ran and did
@@ -706,7 +706,7 @@ range inside a condition (EC-RANGE-INVALID, §14.7.8 rule 2) and a dynamic-lengt
 §14.6.13.1.1 rule already lives there per (ambient flag, exception-name) pair — and why the §14.6.13.1.4 #3
 selection now lives there too: `NonfatalIfEnabled` sets the last exception status AND asks
 `ExceptionEngine.NonfatalDispatcher` — the `ICobolProgram` of the ACTIVATION now executing, installed and
-restored by `ProgramTable.RunMain`/`CallProgram` beside the ModuleStack frame — for its declarative. The
+restored by `ProgramTable.ActivateMain`/`CallProgram` beside the ModuleStack frame — for its declarative. The
 interface member (`int NonfatalDispatch(string ec)`) defaults to the dispatch protocol's "no qualifying
 declarative", so a program with no Format-3 machinery overrides nothing and the zero-scaffolding invariant is
 untouched; a program with it emits one expression-bodied override onto its existing `EcDispatchExpr` funnel, so
@@ -978,7 +978,7 @@ if (_se) { <ON SIZE ERROR> } else { <NOT ON SIZE ERROR> }
 
 AT END / INVALID KEY / ON OVERFLOW / ON EXCEPTION: status flag from the op drives a branch; NOT form = the else (success). `var _st = CobolFile.ReadShared(f,…); if (CobolStatus.IsAtEnd(_st)) {AT END} else {NOT AT END}` (the ONE governed READ entry — there is no ungoverned one, kb/Work PB683). AT END↔EC-I-O-AT-END↔status 1x; INVALID KEY↔2x; ON OVERFLOW↔EC-OVERFLOW-STRING/UNSTRING; ON EXCEPTION (CALL)↔EC-PROGRAM-NOT-FOUND.
 
-EC RUNTIME (CobolNet.Runtime.Exceptions), as built: `ExceptionCatalog` holds ISO Table 13 as string-keyed rows (name, level, level-2 parent, fatality `EcFatality` {Fatal, Nonfatal, Imp}, introducing edition) with the level3→level2→EC-ALL hierarchy predicates (`UnderLevel2`, `DirectiveCovers`) — there is no `ExceptionCondition` enum. `ExceptionState` is the run-unit register (last name + fatality + file / I-O status / statement / location, `ExceptionObject`, the propagation slots, the per-EC checking flags of `CheckingFlags`) written through `Set` / `SetIo` / `SetObject` / `Clear`. RAISE EXCEPTION ec → emitted `ExceptionState.Set(name, fatal, …)` followed by `EcEmitter.EmitSelection` (the §14.9.49 selection, RESUME landing and fatal default); RAISE identifier → `ExceptionState.SetObject` + the generated `__EcObjDispatch`; an unhandled fatal condition → `CobolFatalException`, caught at the run-unit boundary (`ProgramTable.RunMain`) as abnormal termination. The EXCEPTION-* functions read the register through `EcFunctions` (§15.28/§15.30/§15.32/§15.33).
+EC RUNTIME (CobolNet.Runtime.Exceptions), as built: `ExceptionCatalog` holds ISO Table 13 as string-keyed rows (name, level, level-2 parent, fatality `EcFatality` {Fatal, Nonfatal, Imp}, introducing edition) with the level3→level2→EC-ALL hierarchy predicates (`UnderLevel2`, `DirectiveCovers`) — there is no `ExceptionCondition` enum. `ExceptionState` is the run-unit register (last name + fatality + file / I-O status / statement / location, `ExceptionObject`, the propagation slots, the per-EC checking flags of `CheckingFlags`) written through `Set` / `SetIo` / `SetObject` / `Clear`. RAISE EXCEPTION ec → emitted `ExceptionState.Set(name, fatal, …)` followed by `EcEmitter.EmitSelection` (the §14.9.49 selection, RESUME landing and fatal default); RAISE identifier → `ExceptionState.SetObject` + the generated `__EcObjDispatch`; an unhandled fatal condition → `CobolFatalException`, caught at the run-unit boundary (`ProgramTable.RunModule`; a host's `ProgramTable.CallFromHost`) as abnormal termination. The EXCEPTION-* functions read the register through `EcFunctions` (§15.28/§15.30/§15.32/§15.33).
 
 USE declaratives (as built — the D11 sketch's paragraph-methods and `ResumeAction` enum were not how it landed): a declarative SECTION is a pc RANGE of the one `__Dispatch`, run by the generated `__RunUse(id, startPc, endPc)`; the generated selectors (`__IoCheck` / `__IoCheckEc` for the file and open-mode tiers, `__EcDispatch` for the Format-3 GR3c–g tiers, `__EcObjDispatch` for Format 4, `__EcPerform` in front of them when an exception-checking PERFORM is active) pick the first match at COMPILE-TIME-known order — there is no runtime `ExceptionDispatch` registry — and the raise site reads the int dispatch result (see "The declarative dispatch-result protocol" under EC engine specifics).
 

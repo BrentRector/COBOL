@@ -260,9 +260,11 @@ public sealed class ProgramTable
     /// EC or the open file originates in a SEPARATELY-COMPILED CALLed module whose descriptors the main group's
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
     /// boundary; the STOP status itself is the run unit's <see cref="RunUnit.ExitStatus"/>, written by the STOP statement
-    /// wherever in the run unit it executes). This is the HOST entry: it never writes the host process's exit code
-    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/>. The standalone executable's entry,
-    /// which IS the process, is <see cref="RunModule"/>.
+    /// wherever in the run unit it executes). It never writes the host process's exit code (DOC-A.1-167; kb/Work PB3163).
+    /// It is NOT a host route: a .NET host activates a program through the program's generated host entry
+    /// (DESIGN-external-repository §4.4, the one host surface), and the standalone executable's entry, which IS the
+    /// process, is <see cref="RunModule"/>; nothing in the runtime or the generated code calls it, and it stays only
+    /// because it is shipped public surface, whose removal raises the runtime major (RuntimeAbiPinDriftTests).
     /// <para>The whole of it runs on the run unit's own thread (<see cref="ActivationStack.RunOnRunUnitThread"/>,
     /// kb/Work PB2659), whose stack is sized for COBOL activation frames, so a RECURSIVE program reaches a realistic
     /// depth and the activation past the last one the stack can hold is §14.9.4.4 GR3c's EC-PROGRAM-RESOURCES rather
