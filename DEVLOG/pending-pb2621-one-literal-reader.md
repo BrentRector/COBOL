@@ -40,4 +40,11 @@ reported as a lead.
 `LiteralPrefixLength` → `TryOpeningDelimiterAt`, `LiteralEnd`; SR-7.3.3-3 and SR-7.3.3-4: `StripInlineComment` →
 `InlineCommentAt`), GAP 78 → 78.
 
-**Gate.** See the report for the verdict line of `pwsh scripts/build-local.ps1 -Priority BelowNormal`.
+**Gate.** Run 20261016T183649Z-a114de: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` —
+Conformance 6,090/11,830 · Unit 33,338/33,809 · Characterization 6/36 in leg 1, leg 2 left to CI. The first gate
+(20261016T183209Z-b60de4) was RED on the Sweep trait above.
+
+**Leads (outside the declared file set).** Move `CobolWordsDirectiveProcessor.Tokenize` / `ReadQuoted`,
+`ConditionalCompilationProcessor.FindRangeWord` and the `Frontend.cs` END-PERFORM locator onto the reader and empty
+`PendingStages`; the `>>` directive-indicator test is likewise spelled in three places (`CompilerDirectiveLine.TryParse`,
+`TextWordScanner.DirectiveLineEnd`, `ScanProgramText`).
