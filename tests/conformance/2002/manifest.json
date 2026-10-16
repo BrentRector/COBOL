@@ -744,6 +744,8 @@
   "l1c24_repository_self_interface_specifier",
   "l1c24_repository_self_program_specifier",
   "l1c25_rewrite_record_lock_release",
+  "pb242_delete_record_lock_release",
+  "pb242_delete_lock_release_indexed",
   "l1c26_relational_operator_not_equal_symbol",
   "l1c27_same_as_group_hierarchy_past_49",
   "l1c29_sort_assign_using_at_sort",
