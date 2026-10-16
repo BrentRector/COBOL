@@ -555,19 +555,42 @@ public static class CellComponents
     /// subscript tuple gains below the group, so a seeder keys a table VALUE to the right element). A
     /// dynamic-capacity table enumerates its ELEMENT's components (it is referenced one element at a time, and its
     /// members' offsets are relative to the element cell).</summary>
-    public static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> Of(DataItem group) =>
-        Walk(group, group.IsDynamicTable ? 0 : group.ClassOffset, 0, default);
+    public static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> Of(DataItem group)
+    {
+        int origin = group.IsDynamicTable ? 0 : group.ClassOffset;
+        return Walk(group, c => c.ClassOffset - origin, 0, default);
+    }
 
-    private static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> Walk(DataItem node, int origin, int shift,
-                                                                               Subscripts fixedSubs)
+    /// <summary>The same components in the same order, each placed by the description's STORAGE LAYOUT — the
+    /// §8.5.1.6.3 placement walk (<see cref="BitLayout.StartBitWithin"/>) that the class offsets <see cref="Of"/> reads
+    /// are laid out by — for a description no storage class holds: a .NET host's published record of a group formal or
+    /// RETURNING item composes the CALL lane's carrier of it (kb/Work PB2099, <c>PublishedRecordEmitter</c>). For an item
+    /// a class holds the two agree position for position.</summary>
+    public static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> InLayout(DataItem group) =>
+        Walk(group, c => LayoutOffset(group, c), 0, default);
+
+    /// <summary>The character offset of <paramref name="item"/>'s first occurrence within <paramref name="group"/> (one
+    /// element of it, for a dynamic-capacity table), summed along the parent chain over the one placement walk.</summary>
+    private static int LayoutOffset(DataItem group, DataItem item)
+    {
+        int bits = 0;
+        for (DataItem d = item; !ReferenceEquals(d, group); d = d.Parent!) bits += BitLayout.StartBitWithin(d.Parent!, d);
+        return bits / BitLayout.BitsPerCharacter;
+    }
+
+    /// <summary>The one walk: storage children in order, every fixed table's occurrences expanded (each displacing the
+    /// components under it by its width), a component yielded at its first occurrence's <paramref name="placed"/>
+    /// position plus that displacement.</summary>
+    private static IEnumerable<(DataItem Item, int At, Subscripts Fixed)> Walk(DataItem node, Func<DataItem, int> placed,
+                                                                               int shift, Subscripts fixedSubs)
     {
         foreach (var c in node.Children.Where(c => c.RedefinesTargetName is null))
             for (int o = 0; o < (c.Occurs ?? 1); o++)
             {
                 int s = shift + o * c.ByteWidth;
                 var f = c.Occurs is null ? fixedSubs : fixedSubs.With(o + 1);
-                if (IsComponent(c)) yield return (c, c.ClassOffset - origin + s, f);
-                else foreach (var x in Walk(c, origin, s, f)) yield return x;
+                if (IsComponent(c)) yield return (c, placed(c) + s, f);
+                else foreach (var x in Walk(c, placed, s, f)) yield return x;
             }
     }
 }

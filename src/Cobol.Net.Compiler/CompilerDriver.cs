@@ -76,8 +76,12 @@ public static class CompilerDriver
         IReadOnlyList<string> Errors,
         IReadOnlyList<string> Warnings)
     {
-        /// <summary>True iff a runnable assembly was produced.</summary>
+        /// <summary>True iff the assembly was produced.</summary>
         public bool Success => Status == Outcome.Success;
+
+        /// <summary>The assembly is a LIBRARY: the group has no main program (DESIGN-external-repository §7.2), so a .NET
+        /// host loads it and calls its host entries, and nothing launches it.</summary>
+        public bool Library { get; init; }
 
         /// <summary>The compilation's AMBIENT inputs (kb/Work PB985): every file it read, every path it probed
         /// (found or not), every environment variable a directive consulted, and whether it read the clock. With
@@ -195,6 +199,7 @@ public static class CompilerDriver
                 { Inputs = inputs, CompileOutput = diagnostics.CompileOutput, OutputFiles = artifact.OutputFiles };
 
         return new Result(Outcome.Success, outputDll, artifact.GeneratedSourcePath, [],
-            [.. feWarnings, .. edition.Warnings]) { Inputs = inputs, CompileOutput = diagnostics.CompileOutput, OutputFiles = artifact.OutputFiles };
+            [.. feWarnings, .. edition.Warnings])
+            { Inputs = inputs, CompileOutput = diagnostics.CompileOutput, OutputFiles = artifact.OutputFiles, Library = artifact.Library };
     }
 }
