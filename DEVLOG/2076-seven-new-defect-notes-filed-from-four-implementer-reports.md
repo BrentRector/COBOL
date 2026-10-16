@@ -1,4 +1,4 @@
-## Seven new defect notes filed from four implementer reports and the operator's survey lead, and one note appended
+## Entry 2076 — 2026-10-16 08:13 PDT — Seven new defect notes filed from four implementer reports and the operator's survey lead, and one note appended
 
 The clerk grepped each lead against `kb/Work/` first (MANDATORY-PRACTICES R1) and filed one note per mechanism (R3).
 
@@ -13,3 +13,4 @@ Appended:
 - PB1546: `audit_code_citations.py --help` crashes on a cp1252 console because `parse_args()` runs before the stdout reconfigure (`scripts/spec/audit_code_citations.py:1105`); the note already owned the mechanism.
 
 Unused ids: PB3268. No compiler, spec or code change; clause numbers inherited from the reports are marked as not re-derived where the clerk's `cite.py --check` did not pass.
+
