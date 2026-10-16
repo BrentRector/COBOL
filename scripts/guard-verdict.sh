@@ -52,8 +52,9 @@ if [ "${BASH_VERSINFO[0]:-0}" -lt 4 ] || { [ "${BASH_VERSINFO[0]:-0}" -eq 4 ] &&
 fi
 
 # Where a non-MATCH's evidence is kept. Both guards set a RUN-SCOPED directory; this default is for a standalone
-# guard-run-group.sh invocation. Nothing is written here on a green run.
-GUARD_FORENSICS="${GUARD_FORENSICS:-${TMPDIR:-/tmp}/nist-forensics}"
+# guard-run-group.sh invocation, named for that process as guard.sh's is (kb/Work PB2922: one fixed name was every run's
+# on the host). Nothing is written here on a green run; guard_preserve names the directory when it writes.
+GUARD_FORENSICS="${GUARD_FORENSICS:-${TMPDIR:-/tmp}/nist-forensics.$$}"
 
 # One line of a log/diagnostic file, flattened for a verdict line. A verdict line is PARSED (by the audit and by
 # guard-verify), so it must stay one line and stay short.

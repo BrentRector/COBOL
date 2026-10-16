@@ -229,8 +229,8 @@ guard_leg() {
   # CI's `guard` job (kb/Work PB1955, PB1957 row 40): the NIST suite through the `cobol` CLI from bash, the manifest
   # audit, the baseline check and the guard's own self-tests — the one CI Linux job that runs a SCRIPT rather than
   # `dotnet test`, so it was the one no local gate ran. Train 1013's CI red on PB322's TERMINATES rows was invisible to
-  # every local leg. Its scratch is private to this clone (the guard writes fixed file names under TMPDIR, and
-  # implementers run this gate concurrently). Its own `dotnet build` of the CLI is up to date after the ONE build.
+  # every local leg. Its scratch is private to this clone (guard-fast.sh's own mktemp directory and every
+  # group's lie under TMPDIR, and implementers run this gate concurrently; kb/Work PB2922). Its own `dotnet build` of the CLI is up to date after the ONE build.
   # ⛔ The scratch lies BESIDE the clone, never inside it (kb/Work PB2989): `selftests-built` runs at the same time and
   # keys its inputs by every untracked file of the clone (scripts/self_test_inputs.py), so a guard temp file listed by
   # `git ls-files -o` and deleted before `git hash-object` read it made that leg NOT RUN (train 1056b, 2026-10-11).
