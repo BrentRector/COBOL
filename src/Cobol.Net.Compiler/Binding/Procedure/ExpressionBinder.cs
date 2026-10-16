@@ -859,16 +859,20 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// reference resolves through <see cref="ResolveReceiving(Core.DataReferenceContext)"/>, and every identifier
     /// format the position parses only so that it can be refused (an object-view, SELF, SUPER, NULL, an
     /// address-identifier) is refused HERE by the row of <see cref="ReceivingOperandForms"/> that names its rule. Null
-    /// means reported, exactly as for a data reference.</summary>
+    /// means reported, exactly as for a data reference — and for a receiving identifier with no alternative at all,
+    /// which only the parser's error recovery builds and the parser has already reported.</summary>
     public Place? ResolveReceiving(Core.ReceivingIdentifierContext r) =>
         r.dataReference() is { } d ? ResolveReceiving(d)
         : r.nonReceivableIdentifier() is { } n ? RefuseNonReceivable(n)
-        : RefuseNonReceivable(NonReceivableForm.DataAddress, r.dataAddressIdentifier());
+        : r.dataAddressIdentifier() is { } a ? RefuseNonReceivable(NonReceivableForm.DataAddress, a)
+        : null;
 
     /// <summary>SET's twin of <see cref="ResolveReceiving(Core.ReceivingIdentifierContext)"/> (its receiving identifier
     /// has no data-address alternative: Format 7 spells <c>ADDRESS OF data-name-1</c> as a receiver of its own).</summary>
     public Place? ResolveReceiving(Core.SetReceivingIdentifierContext r) =>
-        r.dataReference() is { } d ? ResolveReceiving(d) : RefuseNonReceivable(r.nonReceivableIdentifier());
+        r.dataReference() is { } d ? ResolveReceiving(d)
+        : r.nonReceivableIdentifier() is { } n ? RefuseNonReceivable(n)
+        : null;   // error recovery's empty alternative — the parser reported it
 
     /// <summary>The receiving data references of a list of <c>receivingIdentifier</c>s, each non-receivable one refused
     /// by its own rule on the way — the list form of <see cref="ResolveReceiving(Core.ReceivingIdentifierContext)"/>

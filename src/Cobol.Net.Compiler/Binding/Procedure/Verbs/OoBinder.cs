@@ -1610,8 +1610,8 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
         {
             // ⛔ NO EXCEPTION-OBJECT ARM HERE (kb/Work PB1008, PB1551). §8.4.3.6.3 SR1 is one row of the receiving
             // chokepoint's form table (ReceivingOperandForms); this loop used to write it a second time, with its own
-            // text. EXCEPTION-OBJECT is class object (§8.4.3.6.3 SR2), so it passes SR8 below and is refused by the
-            // chokepoint's ResolveReceiving like every other receiving operand.
+            // text. EXCEPTION-OBJECT is class object (§8.4.3.6.3 SR2), so it passes §14.9.39.3 SR8's screen below and is
+            // refused by the chokepoint's ResolveReceiving like every other receiving operand.
             // ⛔ THREE ARMS, AND THE ORDER IS THE POINT — SR8 and "the name identifies nothing" are DIFFERENT
             // rules and each is reported once, by itself. The former single `Resolve(t) is not { } tp || …`
             // arm reported BOTH for one operand: Resolve names the unidentified reference (COBOLNET1639) and
