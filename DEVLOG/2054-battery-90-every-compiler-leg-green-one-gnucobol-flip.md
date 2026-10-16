@@ -1,4 +1,4 @@
-## Battery #90: every compiler leg green; one GnuCOBOL flip, PROGRAM-ID. short., ruled expected
+## Entry 2054 — 2026-10-16 03:58 PDT — Battery #90: every compiler leg green; one GnuCOBOL flip, PROGRAM-ID. short., ruled expected
 
 The operator ran battery #90 on main `f5fec711b`: every landing since battery #89 (DEVLOG 1933-2050), in a fresh
 detached worktree, cold compile cache, 763 s wall. Every compiler leg is green. Conformance ran 11,708 of 11,708,
@@ -19,3 +19,4 @@ The branch review found the ruling cited §11.10.3 as SR1-SR5. The clause has si
 SR2-SR6 for Format 1; SR6 is the RECURSIVE-in-an-initial-container rule). The note now names all six, checked with
 `cite.py --check 11.10.3` on SR6, and lists §11.10.3 in its `spec_refs`. None of the six constrains a program-name's
 spelling, so the verdict stands.
+
