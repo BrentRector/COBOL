@@ -499,7 +499,7 @@ $dryRunDir = $null
 try {
     # The lock is held, so no other supervisor of this coordination directory is alive: every dryrun-<pid> directory but
     # this process's own was left by a dry run killed before its `finally` ran. Every start reaps them.
-    foreach ($stale in @(Get-ChildItem (Join-Path $CoordDir 'scratch') -Directory -Filter 'dryrun-*' | Where-Object { $_.Name -ne "dryrun-$PID" })) {
+    foreach ($stale in @(Get-ChildItem (Join-Path $CoordDir 'scratch') -Directory -Filter 'dryrun-*' | Where-Object { $_.Name -match '^dryrun-\d+$' -and $_.Name -ne "dryrun-$PID" })) {
         try { Remove-Item $stale.FullName -Recurse -Force; Say "reaped a killed dry run's directory $($stale.FullName)" }
         catch { Say "could not reap a killed dry run's directory $($stale.FullName): $($_.Exception.Message)" }
     }
