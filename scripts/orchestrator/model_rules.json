@@ -161,6 +161,22 @@
           "agents": 128,
           "measured": "2026-10-15",
           "source": "r2_cost.py --measure batch-3 over its one Workflow run wf_a7c279ce-665 (account 1, 2026-10-15)"
+        },
+        {
+          "batch": "4a",
+          "pin": "8be23006851a",
+          "line_dimensions": 133275,
+          "findings": 158,
+          "verdicts": 474,
+          "nulls": 0,
+          "finder_tokens": 10732696,
+          "skeptic_tokens": 13033024,
+          "null_tokens": 0,
+          "duplication_pass_tokens": null,
+          "workflow_runs": 1,
+          "agents": 204,
+          "measured": "2026-10-16",
+          "source": "r2_cost.py --measure batch-4a over its one Workflow run wf_2d2b1baa-8ae (Mythos lane, 2026-10-16)"
         }
       ]
     },
