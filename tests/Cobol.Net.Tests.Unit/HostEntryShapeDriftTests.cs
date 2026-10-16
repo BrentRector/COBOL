@@ -68,6 +68,23 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                PROCEDURE DIVISION USING L-G L-P RETURNING L-R.
                    GOBACK.
                END PROGRAM H2GRP.
+               IDENTIFICATION DIVISION.
+               PROGRAM-ID. H2VAR.
+               DATA DIVISION.
+               LINKAGE SECTION.
+               01 L-V.
+                  05 L-VN PIC 9(2).
+                  05 L-VD PIC X DYNAMIC LENGTH LIMIT IS 8.
+                  05 L-VT OCCURS DYNAMIC CAPACITY IN L-VC FROM 1.
+                     10 L-VK PIC 9.
+                     10 L-VE PIC X DYNAMIC LENGTH.
+                  05 L-VF PIC X(2) OCCURS DYNAMIC CAPACITY IN L-VFC.
+               01 L-W.
+                  05 L-WD PIC X DYNAMIC LENGTH.
+                  05 L-WT PIC X(2) OCCURS DYNAMIC CAPACITY IN L-WC FROM 1.
+               PROCEDURE DIVISION USING L-V RETURNING L-W.
+                   GOBACK.
+               END PROGRAM H2VAR.
                """;
 
     [Fact]
@@ -81,7 +98,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             .Where(c => c.Members.OfType<MethodDeclarationSyntax>().Any(m => m.Identifier.Text == "Call")
                         && c.Modifiers.Any(SyntaxKind.StaticKeyword))
             .ToList();
-        Assert.Equal(["H2GRP", "H2MAIN", "H2ROWS"], entries.Select(e => e.Identifier.Text).Order().ToArray());
+        Assert.Equal(["H2GRP", "H2MAIN", "H2ROWS", "H2VAR"], entries.Select(e => e.Identifier.Text).Order().ToArray());
 
         foreach (var entry in entries)
         {
@@ -174,6 +191,35 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
             Assert.All(get.Body!.DescendantNodes().OfType<IfStatementSyntax>(),
                 i => Assert.Matches(@"^(HostLanding\.TryDecode\(|HostLanding\.TryOccurrences\(|\w+_Record\.__TryGet\()", i.Condition.ToString()));
         }
+
+        // A VARIABLE-LENGTH group (ISO §8.5.1.12) crosses as the CALL lane's variable-length carrier of its description: its
+        // storage is the record's __Var, a ManagedPointer<CobolVarGroup> cell; each SCOPE (the record, and the element of a
+        // dynamic-capacity table whose element holds components) composes and decodes a carrier, every component lands
+        // through HostLanding (LandVariable for a dynamic-length item, RequireCapacity for a table's array), and a
+        // variable-length record publishes no image API.
+        var vary = entries.Single(e => e.Identifier.Text == "H2VAR");
+        var varCall = vary.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "Call");
+        Assert.Equal(["ref L_V_Record"], varCall.ParameterList.Parameters.Select(p => $"{p.Modifiers} {p.Type}".Trim()).ToArray());
+        Assert.Contains("var __hc0 = ManagedPointer<CobolVarGroup>.Cell(L_V.__Var(", varCall.Body!.ToString());
+        Assert.Contains("var __hc1 = ManagedPointer<CobolVarGroup>.Cell(new L_W_Record().__Var(", varCall.Body.ToString());
+        var varRecords = vary.DescendantNodes().OfType<RecordDeclarationSyntax>().ToList();
+        Assert.Equal(["L_V_Record", "L_VT_Record", "L_W_Record"], varRecords.Select(r => r.Identifier.Text).Order().ToArray());
+        foreach (var record in varRecords)
+        {
+            string[] methods = [.. record.Members.OfType<MethodDeclarationSyntax>().Select(m => m.Identifier.Text)];
+            Assert.Contains("__Var", methods);
+            Assert.Contains("__PutDyn", methods);
+            Assert.Contains("__TryGetDyn", methods);
+            Assert.DoesNotContain("AsImage", methods);
+            Assert.DoesNotContain("FromImage", methods);
+            string putDyn = record.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__PutDyn").Body!.ToString();
+            Assert.Contains("HostLanding.LandVariable(", putDyn);
+            Assert.DoesNotContain(record.DescendantNodes().OfType<BinaryExpressionSyntax>(),
+                b => b.Kind() is SyntaxKind.LessThanExpression or SyntaxKind.GreaterThanExpression
+                     && b.Parent is not ForStatementSyntax);
+        }
+        Assert.All(varRecords.Where(r => r.Identifier.Text is "L_V_Record" or "L_W_Record"), r => Assert.Contains(
+            "HostLanding.RequireCapacity(", r.Members.OfType<MethodDeclarationSyntax>().Single(m => m.Identifier.Text == "__PutDyn").Body!.ToString()));
     }
 
     /// <summary>⛔ ONE RENDERER (DESIGN-external-repository §17.3): what a host entry's argument states for §14.9.4.4 3) d) —

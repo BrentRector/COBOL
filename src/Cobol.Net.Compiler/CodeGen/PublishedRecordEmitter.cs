@@ -48,7 +48,8 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
 
     /// <summary>The components of one occurrence of the record of <paramref name="group"/>, in ordinal order: the
     /// carrier's <c>Dynamic</c> list of a SCOPE (the published record, or one element of a dynamic-capacity table,
-    /// whose element is a scope of its own), and the sub-range a nested group's record holds.</summary>
+    /// whose element is a scope of its own), placed by the description's layout (<see cref="CellComponents.InLayout"/>:
+    /// a RETURNING item has no storage class whose offsets <see cref="CellComponents.Of"/> could read).</summary>
     private static List<(DataItem Item, int At)> ComponentsOf(DataItem group) =>
         CellComponents.InLayout(group).Select(p => (p.Item, p.At)).ToList();
 

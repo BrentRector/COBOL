@@ -554,6 +554,7 @@ emitter (this slice) and the decoder (slice 4) hold the same input and nothing i
 | message-tag (§14.2.2 SR2 admits it BY VALUE) | none: the A.4 message-control facility is not provided and the DATA DIVISION refuses a message-tag item (`docs/CONFORMANCE.md` §4), so no formal has that class |
 | fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`); for OCCURS DEPENDING ON whose data-name-1 is in the record (where §13.18.38.3 20) places it before the table), the array's length is the DEPENDING ON value, which §13.18.38.4 7) makes "the current number of occurrences", and for one whose data-name-1 is outside the record the array is the table's whole area, every occurrence the storage holds (§8.5.1.8); a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
 | strongly-typed group with an object-reference or pointer leaf | the published record struct with those members; packed as the CALL lane's carrier for that shape (PB2087's cell area with managed slots) |
+| variable-length group — a dynamic-length elementary item or a dynamic-capacity table beneath it (§8.5.1.12), whose current extent composes (`DataItem.CurrentExtentImageCapable`, the CALL lane's own gate) | the published record struct: a dynamic-length member is `string`, a dynamic-capacity table an array of its current capacity (never below its minimum capacity, "Integer-4 is the minimum capacity of the table", §13.18.38.4 16)); crosses as the CALL lane's variable-length carrier (`CobolVarGroup`); no `AsImage`/`FromImage`, because its storage has no single image (a dynamic-length item "may be located elsewhere", §8.5.1.10.3). ⚠ GR13 RESTRICTION: a group holding both such a component and a pointer or object-reference member publishes no entry — the variable-length carrier has no managed slot, and the cell area that has them carries no components |
 
 The published record struct is rendered from the DESCRIPTION by `PublishedRecordEmitter` (corrected 2026-10-15, kb/Work
 PB2099: this paragraph used to name a "published mode" of `RecordStructEmitter` and `GroupImageCodec`, but a group
@@ -587,6 +588,20 @@ to share; what IS shared is the storage geometry and the door rules):
   `CobolPtr.SlotWrite`), the argument states `Area: new CellPointer(cell, 0)` so the activated program's formal occupies
   that storage (§14.2.3 8)), and the write-back reads each slot back (`CobolPtr.SlotRead`). An image alone
   (`AsImage`/`FromImage`) holds no reference: `FromImage` leaves those members in their null state.
+- **The variable-length carrier.** A record holding dynamic-length items or dynamic-capacity tables (§8.5.1.12) crosses
+  as the CALL lane's carrier of its description, `CobolVarGroup` (`__Var`; `ManagedPointer<CobolVarGroup>`, the
+  `CallCrossing.VarGroup` arm), composed in the description's own shape so the activated program's formal takes it
+  as a COBOL argument of the same description (`CobolArgAdapt.VarGroup`): its fixed run is the landed image with each
+  table's one-element reservation cut out (`CobolVarGroup.RunOf`, the rule a cell-backed group's carrier is built by,
+  `StorageCell.VarGroupAt`), and its components, in the order `CellComponents` numbers them (placed by
+  `CellComponents.InLayout`, the same walk over `BitLayout` — a RETURNING item has no storage class to read offsets
+  from), are each dynamic-length member's content landed by `HostLanding.LandVariable` (refused past the item's
+  maximum size, §8.5.1.10.1) and each dynamic-capacity table's occurrences — their images concatenated, or the
+  occurrences' own carriers for a table whose elements hold components (`CobolVarGroup.Elements`, kb/Work PB2496) —
+  with the table's array required to be a capacity it can have (`HostLanding.RequireCapacity`). The write-back decodes
+  the carrier the activated program left (`__TryGet(CobolVarGroup …)`: the fixed run back into the image by
+  `CobolVarGroup.WindowOf`, then each component, a table one entry per occurrence it carries) by the same validity
+  rule; components no member presents (FILLER) keep what the write-back read, as the image's positions do.
 
 ### 4.4 Why the host entry lives in the program's assembly, and why it is not a shim
 **Placement.** The entry is generated into the assembly that compiled the unit because (1) the repository IS that
@@ -1099,7 +1114,9 @@ both beside your host. Every program and user-defined function has a class `Cobo
 receives what the program stored), a plain parameter for BY VALUE, nullable when OPTIONAL (`null` passes OMITTED) —
 and whose return value is its RETURNING item; a program's class also has `Cancel()`. Numbers are `long` or `Int128`
 when the PICTURE has no decimal places and `decimal` when it has; text is `string`; a group is a nested record struct
-named `<group>_Record`, with `AsImage()` and `FromImage()` for its character image. Run your calls inside
+named `<group>_Record`, with `AsImage()` and `FromImage()` for its character image; in a group holding a DYNAMIC LENGTH item or an
+OCCURS DYNAMIC table that item is a `string` and that table an array as long as its current capacity, and the record has
+no image methods. Run your calls inside
 `RunUnit.Run(ru => { … })`, which begins a run unit and ends it (closing its files) when the body returns; a call
 outside it joins the ambient run unit of your execution context. Every call crosses the same boundary a COBOL CALL
 crosses: the program keeps one WORKING-STORAGE per run unit until you `Cancel()` it, recursion is refused unless the
@@ -1121,8 +1138,10 @@ signature than the one it is called with is detected at run time only when it en
 products: any .NET language, and only as the ACTIVATING element.** No non-COBOL element can be activated: a CALL, a
 program-pointer or `ADDRESS OF PROGRAM` resolves only WiseOwl COBOL programs. **Mechanism:** every outermost program
 and every user-defined function — definition or prototype — has a generated public class `Cobol.<assembly>.<name>`
-in the assembly that compiled it, whose static `Call` method activates it through the same boundary a COBOL CALL
-crosses (§14.9.4.4 GR3), and, for a program, a static `Cancel` method (§14.9.5). This is the only host interface.
+in the assembly that compiled it (except a unit one of whose group formals or RETURNING item holds both a dynamic-length
+item or dynamic-capacity table and a pointer or object reference, which has none), whose static `Call` method activates
+it through the same boundary a COBOL CALL crosses (§14.9.4.4 GR3), and, for a program, a static `Cancel` method
+(§14.9.5). This is the only host interface.
 **Parameter matching:** positional (§14.2.3 GR2), one `Call` parameter per USING formal in order; the C# compiler
 checks the count and the types; a prototype library's `Call` against a changed definition is EC-PROGRAM-ARG-MISMATCH
 when the definition enables that checking. **Data type representation:** a numeric item without decimal places is
@@ -1130,9 +1149,13 @@ when the definition enables that checking. **Data type representation:** a numer
 runtime's `CobolDec` beyond 28 digits or 28 places); a floating-point item is its own CLR type; an alphanumeric,
 national, boolean or edited item is `string`; an index is `long`; pointers are `ManagedPointer`, `ProgramPointer`,
 `FunctionPointer`; an object reference is its class's CLR type; a group is a generated record struct with
-`AsImage`/`FromImage`. Values are landed by §14.2.3 GR9/GR10's COMPUTE, SET or MOVE, and a value that the landing
-would change in any way — a digit lost at either end, a sign dropped, a character beyond the item's length — is
-refused with `ArgumentOutOfRangeException` before the program is activated. BY REFERENCE is a C# `ref` parameter:
+`AsImage`/`FromImage`; in a group that holds a dynamic-length item or a dynamic-capacity table (a variable-length
+group, §8.5.1.12) a dynamic-length item is `string` and a dynamic-capacity table an array of its current capacity, and
+the record has no image methods, its storage having no single image (§8.5.1.9.1, §8.5.1.10.3). Values are landed by
+§14.2.3 GR9/GR10's COMPUTE, SET or MOVE, and a value that the landing would change in any way — a digit lost at either
+end, a sign dropped, a character beyond the item's length or a dynamic-length item's LIMIT, a dynamic-capacity table's
+array below its minimum capacity — is refused with `ArgumentOutOfRangeException` (`ArgumentException` for the array)
+before the program is activated. BY REFERENCE is a C# `ref` parameter:
 the program operates on a storage of the formal's description, and the variable receives its content when the call
 ends; two `ref` parameters given one variable share one storage when their formals have one description and are
 refused with `ArgumentException` otherwise. **Return of a value:** the RETURNING item is the return value; numeric
@@ -1839,9 +1862,10 @@ and 6 stand alone; 3 needs 1, 2 and kb/Work PB2087; 4 needs 3; 5 needs 4; 7 need
    (`PublishedRecordEmitter`, §4.3) for every group whose members the record image holds, an OCCURS DEPENDING ON table
    included (an array of the DEPENDING ON value's entries, `HostLanding.LandedOccurrences`/`TryOccurrences`, witnessed by
    `HostEntryTests`' OCCURS DEPENDING Fact) and a strongly-typed group holding pointer or object-reference members (the
-   CALL lane's cell area, `PublishedRecordEmitter.HoldsSlots`, witnessed by the pointer Fact), and a unit with a group
-   holding a dynamic-length item or a dynamic-capacity table — the CALL lane's variable-length carrier — publishes no
-   entry until the next step renders those shapes (`PublishedRecordEmitter.Renders`); and a group with no main program
+   CALL lane's cell area, `PublishedRecordEmitter.HoldsSlots`, witnessed by the pointer Fact) and a variable-length group
+   (the CALL lane's variable-length carrier, `PublishedRecordEmitter.EmitVar`, witnessed by `HostEntryTests`'
+   variable-length Fact and `HostEntryShapeDriftTests`' H2VAR arm; a group holding both a component and a reference is
+   §4.3's stated GR13 restriction); and a group with no main program
    is a library (`ProgramEmitter.MainUnit` null: `OutputKind.DynamicallyLinkedLibrary`, no `Main`, no
    `runtimeconfig.json`, §7.2; witnessed in `HostEntryTests`); and the untyped host route is retired — every host test
    calls the generated entries, DOC-A.1-65/-116/-141/-167 describe the entry, and `OneHostSurfaceDriftTests`,

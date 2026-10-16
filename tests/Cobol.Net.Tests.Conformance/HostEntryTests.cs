@@ -507,7 +507,9 @@ public sealed class HostEntryTests
     /// <summary>Programs whose group formal and RETURNING item are VARIABLE-LENGTH groups (ISO §8.5.1.12): a dynamic-length
     /// item with a LIMIT, a dynamic-capacity table of numeric leaves with a minimum capacity, a dynamic-capacity table whose
     /// elements hold a dynamic-length item (a table of variable-length elements), and a fixed table whose occurrences hold
-    /// one each. The activated program grows both tables by storing past their capacity and stores past the LIMITs.</summary>
+    /// one each; and a group whose OCCURS DEPENDING ON table follows a dynamic-length item, as its trailing storage. The
+    /// activated program grows both dynamic-capacity tables by storing past their capacity, stores past the LIMITs and
+    /// raises the DEPENDING ON count.</summary>
     private const string VarPrograms = """
         IDENTIFICATION DIVISION.
         PROGRAM-ID. H5VAR.
@@ -553,6 +555,22 @@ public sealed class HostEntryTests
             MOVE "t2" TO ST(2)
             GOBACK.
         END PROGRAM H5RET.
+        IDENTIFICATION DIVISION.
+        PROGRAM-ID. H5ODO.
+        DATA DIVISION.
+        LINKAGE SECTION.
+        01 LK-O.
+           05 LK-OC PIC 9.
+           05 LK-OD PIC X DYNAMIC LENGTH.
+           05 LK-OT PIC X(2) OCCURS 1 TO 3 DEPENDING ON LK-OC.
+        PROCEDURE DIVISION USING LK-O.
+        P1.
+            DISPLAY "ODO " LK-OC " [" LK-OD "] " LK-OT(1) LK-OT(2)
+            MOVE 3 TO LK-OC
+            MOVE "C3" TO LK-OT(3)
+            MOVE "more" TO LK-OD
+            GOBACK.
+        END PROGRAM H5ODO.
         """;
 
     private const string VarHost = """
@@ -590,6 +608,12 @@ public sealed class HostEntryTests
                     + $"{string.Join(",", Array.ConvertAll(v.LK_PAIR, p => p.LK_PN + "/" + p.LK_PT))} [{v.LK_TAG}]");
                 var r = H5RET.Call();
                 Console.WriteLine($"RET [{r.SP}] [{r.SDYN}] {string.Join(",", r.ST)}");
+                var o = new H5ODO.LK_O_Record();
+                o.LK_OC = 2;
+                o.LK_OD = "d";
+                o.LK_OT = ["A1", "B2"];
+                H5ODO.Call(ref o);
+                Console.WriteLine($"ODOOUT {o.LK_OC} [{o.LK_OD}] {string.Join(",", o.LK_OT)}");
                 return 0;
             }
         }
@@ -620,7 +644,9 @@ public sealed class HostEntryTests
                 "PAIR LK_V ArgumentOutOfRangeException\n" +
                 "IN 007 [Ann] 1122 AA[note] 1[p]2[qq] XY\n" +
                 "OUT 8 [LONGER NAM] 11,22,33 AA/note,R2/second 1/abcd,2/qq [Z ]\n" +
-                "RET [RET] [dynamic] t1,t2", stdout);
+                "RET [RET] [dynamic] t1,t2\n" +
+                "ODO 2 [d] A1B2\n" +
+                "ODOOUT 3 [more] A1,B2,C3", stdout);
             Assert.Equal(0, exit);
             Assert.Equal("", stderr);
         }

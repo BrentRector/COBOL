@@ -1,4 +1,4 @@
-## PB2099 parts 1-6: the host's outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry, the published record struct, OCCURS DEPENDING and reference members, the library output kind and the one host surface
+## PB2099: the .NET host surface lands (parts 1-7): the outermost activation boundary, R48's run-unit-ended result, the host type table, the door rules, the host entry, the published record struct with OCCURS DEPENDING, reference and variable-length members, the library output kind and the one host surface
 
 Wave 1077 group E took kb/Work PB2099, slice 3 of DESIGN-external-repository: the typed host entry and the one host
 surface. Two earlier waves had left it unstarted. The re-probe at a6744fa4d found none of the slice in the tree:
@@ -301,3 +301,47 @@ dynamic-capacity table: the §8.5.1.12 carrier), and the manual's host chapter, 
 creates `docs/manual/`.
 
 **Gate.** `TestResults/build-local/20261015T210923Z-d4c692` at fe2ec5ef1: `LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,103/11,713, Unit 33,229/33,688, Characterization 6/36 in leg 1). Leg 1 did not hold the changed `NonCobolActivatorReturnTests`, `DefaultLocaleDeterminationTests` or the re-pinned `RuntimeAbiPinDriftTests.TheCallAbi_IsPinnedBesideTheBoundaryLayout`, because the gate puts only added tests in tier 0a; each passed in a direct run on the same build, and the whole Characterization assembly (36) passed. Semgrep verify: PASS, no count moved.
+
+### Part 7 (wave 1093 group B): variable-length groups, and the slice lands
+
+**Cherry-pick.** Wave 1085 A's 28 commits went onto main bfb2eb47e. Main had landed kb/Work PB3163 (a run unit under a
+host no longer writes the process exit code) in the meantime, so `ProgramTable` conflicted three times. The merged
+`AbnormalTermination` writes the run unit's `ExitStatus` (PB3163) through the predecessor's `AbnormalTerminationStatus`
+and report, and `RunModule` keeps PB3163's one exit-code write with the predecessor's non-null `mainPath`. PB3163's new
+witness, `RunUnitHostExitCodeTests`, hosted the run units through `ProgramRegistry.RunMain`, which
+`OneHostSurfaceDriftTests` refused. It now calls the generated entries. Its fatal arm is a NULL BASED reference, because
+an absent program's CALL is a `CobolCallException` the host receives and ends no run unit; that CALL is its own arm.
+CONFORMANCE.md's exit-code paragraph, DOC-A.1-136, COBOLNET_DESIGN and the conditions design no longer name `RunMain` as a
+route. The boundary hash is re-pinned alone (F1BA4F9B825BEC61): each side had re-pinned alone, and the merge combines
+them.
+
+**Re-probe.** `PublishedRecordEmitter.Renders` refused every group with a dynamic-length item or a dynamic-capacity
+table, so a unit with such a formal published no `Call`.
+
+**Fix.** A variable-length group (ISO §8.5.1.12) publishes its record. A dynamic-length member is `string`. A
+dynamic-capacity table is an array whose length is the current capacity; `HostLanding.RequireCapacity` refuses an array
+below the minimum capacity (§13.18.38.4 16): "Integer-4 is the minimum capacity of the table"). The record crosses as
+the CALL lane's carrier of its own description (`PublishedRecordEmitter.EmitVar`), so the activated program's formal
+adopts it as a COBOL argument of the same description. `__Var` builds the fixed run from the landed image with each
+table's reservation cut out. The components follow `CellComponents` order: each dynamic-length member's content goes
+through `HostLanding.LandVariable` (refused past its LIMIT). Each table's occurrence images are concatenated, or, for a
+table of variable-length elements, each occurrence's own carrier is kept. `__TryGet(CobolVarGroup …)` and `__TryGetDyn`
+decode the carrier back by the same validity rule. The fixed-run rule is now ONE function, `CobolVarGroup.RunOf` and its
+inverse `WindowOf`, and `StorageCell.RunOf`/`StoreRun` call it. The first run returned `RET` as `"  R"`: a RETURNING
+item has no storage class, so `CellComponents.Of` placed every component at offset 0 (probe
+`scratch/w1093b/pret/H5.g.cs`). `CellComponents.InLayout` runs the same walk with positions from `BitLayout`. A variable-length
+record has no `AsImage`/`FromImage`, because its storage has no single image (§8.5.1.10.3, §8.5.1.9.1). Design §4.3
+states one GR13 restriction: a group holding both a variable-length component and a pointer or object reference
+publishes no entry.
+
+**Witnesses.** `HostEntryTests.AHost_PassesVariableLengthGroups_AsTheCallLanesVariableLengthCarrier` uses a real C#
+host, out of process. It covers LIMIT truncation (§8.5.1.10.4), implicit table growth (§8.5.1.9.3), a table of
+variable-length elements, a fixed table of them, an OCCURS DEPENDING ON table after a dynamic-length item, a RETURNING
+item, and four refusals before activation. `HostEntryShapeDriftTests` adds an H2VAR arm.
+
+**Rows.** Batch `w1093b-PB2099-host-surface-gr13`: GR-14.2.3-13 and DOC-A.1-141 PARTIAL → CONFORMS (PB1149's GR13
+half), DOC-A.1-167 DIVERGES → CONFORMS (R48), GAP 98 → 95. PB2099 is landed and closes those rows. PB1149 keeps its
+INVOKE half. The five R3 notes that waited on PB2099 now wait on PB2100.
+
+**Still open, not this slice's.** The manual's host chapter belongs to kb/Work PB1610, which creates `docs/manual/`; its
+text is design §9.4's. `ProgramRegistry.RunMain` has no caller, and removing it is a runtime-major bump.
