@@ -894,7 +894,6 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// predefined identifier the edition does not have (COBOL-85 has no SELF, NULL or address-identifier).</summary>
     private Place? RefuseNonReceivable(NonReceivableForm form, Antlr4.Runtime.ParserRuleContext written)
     {
-        string text = DataBinder.WrittenText(written);
         if (written.Start.Type is CobolLexer.SELF or CobolLexer.SUPER or CobolLexer.NULL_ or CobolLexer.ADDRESS
             && CobolNames.UpperFold(written.Start.Text) is var head
             && !Editions.ReservedWordSet.Default.RejectsAt(head, ctx.Edition.Edition.Year))
@@ -905,14 +904,18 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
                 + "identifies that resource\"). Check the spelling, or declare the item.");
             return null;
         }
-        var bar = Bar(form, text);
+        var bar = Bar(form, written);
         ctx.Edition.Error(bar.Code, bar.Message);
         return null;
     }
 
-    /// <summary>The <see cref="ReceivingBar"/> of a <see cref="NonReceivableForm"/> — its table row, as written.</summary>
-    private static ReceivingBar Bar(NonReceivableForm form, string written) =>
-        ReceivingOperandForms.Rules[form] is var rule ? new(rule.Descriptor.Code, rule.Message(written)) : default;
+    /// <summary>The <see cref="ReceivingBar"/> of a <see cref="NonReceivableForm"/> — its table row, naming the operand as
+    /// written (rendered only here, once a prohibition applies: the screens run on every receiver).</summary>
+    private static ReceivingBar Bar(NonReceivableForm form, Antlr4.Runtime.ParserRuleContext written)
+    {
+        var rule = ReceivingOperandForms.Rules[form];
+        return new(rule.Descriptor.Code, rule.Message(DataBinder.WrittenText(written)));
+    }
 
     /// <summary>Whether <paramref name="dref"/>, already resolved (as a SENDING operand) to <paramref name="place"/>,
     /// is "an identifier that is permitted as a receiving operand" — the test ISO §8.4.3.2.4 GR5 a)/b) choose a
@@ -928,14 +931,13 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// input-output control system owns, the predefined EXCEPTION-OBJECT, and a constant-name (a literal).</summary>
     private ReceivingBar? ReceivingFormBar(Core.DataReferenceContext dref)
     {
-        string written = DataBinder.WrittenText(dref);
-        if (dref.LINE_COUNTER() is not null) return Bar(NonReceivableForm.LineCounter, written);
+        if (dref.LINE_COUNTER() is not null) return Bar(NonReceivableForm.LineCounter, dref);
         // ⛔ THE THIRD ARM OF THE SAME DISPATCH (kb/Work PB489). LINE-COUNTER above is rejected by rule and
         // PAGE-COUNTER is a receiving-capable place (ResolveReceiving resolves it); LINAGE-COUNTER — the only one of the three
         // that is flatly ILLEGAL as a receiver — had no arm at all and fell through to the generic
         // recognized-not-implemented catch-all, so permanently illegal source was reported as a promise. The
         // rule that forbids it appeared nowhere in the compiler (feedback_two_arm_dispatch).
-        if (dref.LINAGE_COUNTER() is not null) return Bar(NonReceivableForm.LinageCounter, written);
+        if (dref.LINAGE_COUNTER() is not null) return Bar(NonReceivableForm.LinageCounter, dref);
         // ⛔ THE FOURTH ARM OF THE SAME DISPATCH (kb/Work PB922). ISO §8.4.3.6.3 SR1 — "EXCEPTION-OBJECT shall
         // not be specified as a receiving operand" — is a rule about EVERY receiving operand in the language,
         // not about SET, which is the one statement that had an arm for it. The name RESOLVES now (the resolver
@@ -946,11 +948,11 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
         // other, and neither of them the rule the program broke.
         // ⛔ THE RESOLVER'S OWN PREDICATE, NOT A SECOND SPELLING TEST: it carries the §8.9/2002 edition gate, so
         // a '85 program that legally declares `01 EXCEPTION-OBJECT PIC X(4).` keeps its ordinary receiving path.
-        if (ctx.Refs.IsExceptionObjectRegister(dref)) return Bar(NonReceivableForm.ExceptionObject, written);
+        if (ctx.Refs.IsExceptionObjectRegister(dref)) return Bar(NonReceivableForm.ExceptionObject, dref);
         // §8.4.3.5.3 SR2 — "An object-view shall not be specified as a receiving operand" — for the view of a qualified data
         // item the grammar spells as one chain (`A OF G AS C`, kb/Work PB1425); the property of a view (`P OF U AS C`) is
         // a property and receivable (§8.4.3.9.3 SR6), and a view of a plain name parses as a `nonReceivableIdentifier`.
-        if (ctx.Refs.IsObjectViewOfQualifiedItem(dref)) return Bar(NonReceivableForm.ObjectView, written);
+        if (ctx.Refs.IsObjectViewOfQualifiedItem(dref)) return Bar(NonReceivableForm.ObjectView, dref);
         // A constant-name substitutes a LITERAL (ISO §13.10.3 SR2 / §13.10.4 GR1) and a symbolic-character IS one, a
         // figurative constant (§12.3.7.4 GR11 a)) — a literal can never be a receiving operand; without this the name
         // would fall to Refs.Resolve and fail as merely "unresolved" (a symbolic-character did, kb/Work PB1544).
