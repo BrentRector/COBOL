@@ -65,3 +65,12 @@ so it was probed for the single-leaf mark. Group MOVEs ran between two alphanume
 between two GROUP-USAGE NATIONAL groups, with both leaves forced, one forced, and an ALL "7" deposit. Every value
 and class test matched the unforced twin. Golden `2002/pb442_forced_national_leaf_group_move` (§14.9.25.4 GR4)
 pins it.
+
+**The landing's Linux gate was RED on an inventory witness the branch had orphaned.** Deleting INSPECT's private
+class projection (`InspectEmitter.CharacterCategoryOf`, folded into `IntrinsicArgumentRules.CharacterContext`) left
+row GR-8.3.3.6.4-7 naming the deleted member, so `SpecTraceabilityInventoryDriftTests.EveryCodeLocation_ResolvesInTheTree`
+failed. Main had not touched the file or the row; the defect was the branch's own. A `record_verdicts.py` batch
+(`w1091h-PB442-finisher2-resite`) retired the dead witness and named `IntrinsicArgumentRules.cs#CharacterContext` and
+`InspectEmitter.cs#Emit`; the verdict stays CONFORMS. Every other inventory code-location resolves. The Windows leg 1
+never ran the test: its class is a tree-wide sweep, but its recorded 8.6 s is above the 2 s cheap-sweep bound, so
+with no impact map it was tier 1 and fell outside leg 1's budget.

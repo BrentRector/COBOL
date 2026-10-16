@@ -4942,11 +4942,11 @@
   "subject": "Figurative constant values",
   "rule-digest": "c688de14fa82",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs#FillChar; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#LowValue; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetFigurative; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#CharacterCategoryOf",
+  "code-location": "src/Cobol.Net.Compiler/CodeGen/Roslyn/FigurativeConstants.cs#FillChar; src/Cobol.Net.Compiler/Binding/CollatingModel.cs#LowValue; src/Cobol.Net.Compiler/Binding/DataBinder.Switches.cs#AlphabetFigurative; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#CharacterContext; src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#Emit",
   "test-ref": "conformance:2002/da1_alphabet_hex_thru; conformance:2023/pb1414_inspect_low_value_follows_program_collating_sequence; conformance:2023/pb1414_figurative_follows_program_collating_sequence_every_verb",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "LANDED kb/Work PB1414 (INSPECT arm + sibling sweep). INSPECT reads a figurative through OperandText.AsString with identifier-1's Table 2 CLASS (a GROUP-USAGE NATIONAL group has no PICTURE, so the old category test answered alphanumeric for it). The sweep over MOVE (elementary, national, national group, alphanumeric group, edited, reference-modified), INITIALIZE REPLACING, STRING, UNSTRING, relation, SEARCH, EVALUATE, level-88 VALUE, DISPLAY and ORD found no other emitter spelling a figurative as a char constant: all honour the program collating sequence, alphanumeric and national, pinned by the every-verb golden. GR6 (HIGH-VALUE) is a separate row.",
+  "notes": "LANDED kb/Work PB1414 (INSPECT arm + sibling sweep). INSPECT reads a figurative through OperandText.AsString with identifier-1's Table 2 CLASS (a GROUP-USAGE NATIONAL group has no PICTURE, so the old category test answered alphanumeric for it). The sweep over MOVE (elementary, national, national group, alphanumeric group, edited, reference-modified), INITIALIZE REPLACING, STRING, UNSTRING, relation, SEARCH, EVALUATE, level-88 VALUE, DISPLAY and ORD found no other emitter spelling a figurative as a char constant: all honour the program collating sequence, alphanumeric and national, pinned by the every-verb golden. GR6 (HIGH-VALUE) is a separate row. retired-witness: src/Cobol.Net.Compiler/CodeGen/Verbs/InspectEmitter.cs#CharacterCategoryOf (kb/Work PB442 deleted INSPECT's private class projection; IntrinsicArgumentRules.CharacterContext is now the one projection, asked by InspectEmitter.Emit)",
   "state": "OK"
  },
  {
