@@ -42,6 +42,13 @@ internal static class WorkRegister
     /// Every other status, including one added tomorrow, counts as LIVE: that default fails SAFE, because an
     /// unrecognized status then keeps a note holding its rows rather than silently dropping them out of coverage.
     /// </summary>
+    /// <remarks>
+    /// ⛔ HELD TO THE PYTHON TUPLE BY THE PARITY FIXTURE, NOT BY A COMMENT (kb/Work PB3196). This copy stood outside
+    /// the mechanism built to keep the two readers in step: the parity view now reports <c>terminal</c> (this array's
+    /// answer here, <c>TERMINAL_STATUSES</c>' there), and <c>work.py parity</c> refuses a fixture that leaves any
+    /// status of <c>STATUSES</c> without a case, so a status added on the Python side fails
+    /// <c>ClosesRowsBackLinkDriftTests.TheFrontmatterReader_AgreesWithTheFixtureAndWithPython</c> until both agree.
+    /// </remarks>
     public static readonly string[] TerminalStatuses = ["landed", "retired"];
 
     /// <summary>One <c>kb/Work/</c> note, reduced to the facts the register's gates read.</summary>
@@ -60,9 +67,9 @@ internal static class WorkRegister
         string ClosesRowsReason,
         string[] Errors)
     {
-        public bool IsLive => !TerminalStatuses.Contains(Status, StringComparer.Ordinal);
+        public bool IsTerminal => TerminalStatuses.Contains(Status, StringComparer.Ordinal);
 
-        public bool IsTerminal => !IsLive;
+        public bool IsLive => !IsTerminal;
     }
 
     /// <summary>

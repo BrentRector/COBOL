@@ -49,10 +49,11 @@ public sealed class ExceptionEngine
     public string? LastStatement { get; private set; }
 
     /// <summary>EXCEPTION-OBJECT (§8.4.3.6) — the run unit's ONE predefined object reference (GR2):
-    /// references the current exception object, null when none (GR1). Implicitly UNIVERSAL (SR2 :7249) —
+    /// references the current exception object, null when none (GR1). Implicitly UNIVERSAL (§8.4.3.6.3 SR2) —
     /// typed <see cref="CobolObject"/> per the D-U1 universal model. Set by RAISE identifier-1, by
     /// the GR1b2 activator-side pickup, and (GR15) it already holds the object when an F4 declarative
-    /// enters; nulled by every NAMED raise (§14.9.29.4 GR1 / :24485).</summary>
+    /// enters; nulled by every NAMED raise (§14.9.29.4 GR1) — one that is RAISED, i.e. whose checking is
+    /// enabled (§14.6.13.1.1; an un-raised RAISE nulls nothing, kb/Work PB867).</summary>
     public CobolObject? ExceptionObject { get; private set; }
 
     /// <summary>Record a raised exception OBJECT (§14.6.13.1.5 (1)/(2): EXCEPTION-OBJECT references the
