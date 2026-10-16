@@ -461,10 +461,16 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
     /// <para>⛔ EVERY READING IS COUNTED, NONE IS "ASKED FIRST" (kb/Work PB1099 review R1-2). The KEY phrase admits
     /// data-name-1 or record-key-name-1, §8.3.2.2 lets one word be a data-name and a record-key-name, and two files
     /// (or two clauses of one file) may declare the same record-key-name. The record-key-names of every visible file
-    /// and the data item the reference identifies as a data-name (<see cref="ReferenceResolver.Probe"/>, silent)
-    /// are one candidate set for the one ambiguity verdict: more than one is §8.4.2.2.3 SR1's error, never the
-    /// statement's own file's record-key-name chosen in silence. A <c>--permissive</c> verdict naming the data
-    /// item answers <see cref="RecordKeyNameUse.None"/>, so the operand is read as data-name-1.</para></summary>
+    /// and EVERY data item the written qualifiers reach (<see cref="DataBinder.QualifiedCandidates"/> over the
+    /// statement's scope, the set the data-name resolution itself counts) are one candidate set for the one
+    /// ambiguity verdict: more than one is §8.4.2.2.3 SR1's error, never the statement's own file's record-key-name
+    /// chosen in silence. A <c>--permissive</c> verdict naming a data item answers
+    /// <see cref="RecordKeyNameUse.None"/>, so the operand is read as data-name-1.</para>
+    /// <para>⛔ THE DATA-NAME READINGS ARE COUNTED, NOT PROBED (kb/Work PB1099 review R2-1). A probe answers only a
+    /// UNIQUE data item, so it dropped the data-name readings out of the count exactly when there were more of
+    /// them: one same-spelled data item made the record-key-name ambiguous, and a second one made it compile clean
+    /// and bind silently to the record key (§8.4.2.2.1 rule 1, "No other name has the identical
+    /// spelling").</para></summary>
     private (RecordKeyNameUse Use, int KeyIndex) RecordKeyNameOf(FileModel file, Core.DataReferenceContext dref,
                                                                 string face)
     {
@@ -480,8 +486,8 @@ internal sealed class KeyedIoBinder(BinderContext ctx, StatementBinder host, Fil
         if (!DataBinder.ScreenDataNameShape(dref, "the KEY phrase's record-key-name", ctx.Edition,
                 "a record-key-name is qualified only by its file-name (ISO §8.4.2.2.2 Format 6)"))
             return (RecordKeyNameUse.Refused, 0);
-        if (ctx.Refs.Probe(dref) is { } dataName)
-            names = names.Including([new KeyNameReading.DataName(dataName.Item)]);
+        names = names.Plus(ctx.Data.QualifiedCandidates(word, quals, ctx.Data.ActiveScope)
+            .Select(KeyNameReading (i) => new KeyNameReading.DataName(i)));
         return ctx.Data.UniqueOrReportAmbiguous(names, face, DataBinder.WrittenQualified(word, quals), out _) switch
         {
             KeyNameReading.RecordKeyName rk when ReferenceEquals(rk.File, file) => (RecordKeyNameUse.ThisFile, rk.KeyIndex),

@@ -648,7 +648,11 @@ public sealed class FileControlKeyRuleSpecTests
     /// SEQUENCE clause) counts every reading in one set (kb/Work PB1099 review R1-2): the same record-key-name
     /// declared by two clauses of ONE entry (no Format 6 qualifier can separate them — the reference bound silently
     /// to the prime key), by two FILES (unqualified), or also declared as a data-name (§8.3.2.2 rule 3 allows it).
-    /// Each is refused naming SR1; the complement — qualification that leaves one reading — compiles.</summary>
+    /// Each is refused naming SR1 and counting every declaration that matches; the complement — qualification that
+    /// leaves one reading — compiles. DATA2 is the review R2-1 shape: TWO same-spelled data items (§8.4.2.2.1 rule 1,
+    /// "No other name has the identical spelling") must make the reference MORE ambiguous, never resolve it — the
+    /// data-name readings used to be probed (unique only), so a second data item dropped both out of the count and
+    /// the READ bound silently to the record key.</summary>
     [Theory]
     [InlineData("TWICE", "READ F KEY IS RK INVALID KEY CONTINUE END-READ", true)]
     [InlineData("TWICE", "START F KEY IS = RK INVALID KEY CONTINUE END-START", true)]
@@ -660,6 +664,9 @@ public sealed class FileControlKeyRuleSpecTests
     [InlineData("FILES", "START G KEY IS = RK IN G INVALID KEY CONTINUE END-START", false)]
     [InlineData("DATA", "READ F KEY IS RK INVALID KEY CONTINUE END-READ", true)]
     [InlineData("DATA", "READ F KEY IS RK IN F INVALID KEY CONTINUE END-READ", false)]
+    [InlineData("DATA2", "READ F KEY IS RK INVALID KEY CONTINUE END-READ", true)]
+    [InlineData("DATA2", "START F KEY IS = RK INVALID KEY CONTINUE END-START", true)]
+    [InlineData("DATA2", "READ F KEY IS RK IN F INVALID KEY CONTINUE END-READ", false)]
     public void ARecordKeyNameReference_ThatQualificationLeavesNonUnique_IsSR1(string shape, string statement, bool refused)
     {
         string fKeys = shape switch
@@ -669,7 +676,15 @@ public sealed class FileControlKeyRuleSpecTests
             _ => "RECORD KEY IS RK SOURCE IS F-K2 F-K1.",
         };
         string gKeys = shape == "FILES" ? "RK SOURCE IS G-K2 G-K1" : "G-K1";
-        string working = shape == "DATA" ? "WORKING-STORAGE SECTION.\n            01 RK PIC X(4)." : "";
+        string working = shape switch
+        {
+            "DATA" => "WORKING-STORAGE SECTION.\n            01 RK PIC X(4).",
+            "DATA2" => "WORKING-STORAGE SECTION.\n            01 G1.\n               05 RK PIC X(4).\n            01 G2.\n               05 RK PIC X(4).",
+            _ => "",
+        };
+        // Every declaration the unqualified (or Format-6-qualified) reference reaches: two record-key-names, or one
+        // record-key-name and each same-spelled data item.
+        int matches = shape == "DATA2" ? 3 : 2;
         string source = $"""
             IDENTIFICATION DIVISION.
             PROGRAM-ID. FCKRSR1.
@@ -706,6 +721,7 @@ public sealed class FileControlKeyRuleSpecTests
             var d = Diagnostics(source, edition);
             if (refused)
                 Assert.True(d.Count(e => e.Contains("does not uniquely identify a record key or data item", StringComparison.Ordinal)
+                    && e.Contains($"{matches} declarations match", StringComparison.Ordinal)
                     && e.Contains("ISO §8.4.2.2.3 SR1", StringComparison.Ordinal)) == 1,
                     $"[{shape}: {statement}] @ {edition}: {string.Join(" | ", d)}");
             else

@@ -81,6 +81,19 @@ COBOLNET_FILES_DESIGN.md "THE SECOND KEY FORM" and D10 (format version 5), the g
   SR-8.4.2.2.3-1 and FMT-14.9.41.2 were also restated. The deleted lookup was retired as a witness from
   SR-12.4.5.7.3-5 and SR-14.9.41.3-7.
 
+**Branch review, round 2 (one finding, fixed by the round-2 review finisher).**
+- R2-1: R1-2 counted the data-name reading through `ReferenceResolver.Probe`, which answers only a unique item. So
+  the count went DOWN as same-spelled data items were added: one WORKING-STORAGE `RK` beside the record-key-name
+  `RK` drew COBOLNET1639, and two (`RK` in `G1` and in `G2`) compiled clean with the READ bound to the SOURCE prime
+  key. Measured on the merged build before the fix: `q1.cob` exit 0, `q0.cob` two SR1 errors. `cite.py --check
+  8.4.2.2.1 "No other name has the identical spelling"` → OK 1). `KeyedIoBinder.RecordKeyNameOf` now adds every
+  `DataBinder.QualifiedCandidates` survivor (the set the data-name resolution counts) to the `KeyNameReading` set;
+  `q1.cob` draws COBOLNET1639 with 3 declarations on the READ and the START, `--permissive` warns. The SR1 theory
+  gained the DATA2 rows and now asserts each refusal's declaration count. `CollatingKeyNamed` already counted
+  `QualifiedCandidates`, so it had no such hole. SR-8.4.2.2.3-1's notes were restated (batch
+  `w1095i-review-r2-pb1099`; CONFORMS, GAP 78 → 78). The merge of main brought PB2758's runtime surface change under
+  this branch's major 6, so the runtime surface hash was re-pinned (21C3F112DD1E124B).
+
 **Self-review.** Architecture: one key shape, one capture, one lookup, one gate; no C# text in a bound node.
 Code: each cited rule re-read for the operand it names (data-name-1 vs data-name-2, record-key-name-1). Performance:
 the one-window key keeps its single-slice path; only a multi-window key allocates its concatenation. Duplication:

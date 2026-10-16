@@ -1349,10 +1349,14 @@ the same list.
   READ … KEY (§14.9.30.3 SR11), START … KEY (§14.9.41.3 SR7; GR15's default is the prime key in either form, GR17
   b)'s default length the concatenation's), COLLATING SEQUENCE OF (§12.4.5.7.3 SR5). Those positions admit
   data-name-1 OR record-key-name-1, and §8.3.2.2 lets one word be both, so each counts every reading in one
-  `KeyNameReading` set — the record-key-names of every visible file (the clause: of its own entry) and the data-name
-  reading — judged by the one §8.4.2.2.3 SR1 verdict (`DataBinder.UniqueOrReportAmbiguous`, COBOLNET1639): a name two
-  clauses of one entry declare (no Format 6 qualifier can separate them), two files declare unqualified, or a data
-  item also bears is refused, never resolved to "the record-key-name first" (kb/Work PB1099 review R1-2). A
+  `KeyNameReading` set — the record-key-names of every visible file (the clause: of its own entry) and EVERY
+  data-name reading (each same-spelled data item `DataBinder.QualifiedCandidates` reaches; the clause narrows them to
+  its entry's key items, as its key clauses' SR2 selection does) — judged by the one §8.4.2.2.3 SR1 verdict
+  (`DataBinder.UniqueOrReportAmbiguous`, COBOLNET1639): a name two clauses of one entry declare (no Format 6 qualifier
+  can separate them), two files declare unqualified, or one or more data items also bear is refused, never resolved
+  to "the record-key-name first" (kb/Work PB1099 review R1-2). The data-name readings are counted, never probed: a
+  probe answers only a unique item, so a second same-spelled data item used to drop both out of the count and the
+  reference bound silently to the record key (review R2-1). A
   record-key-name that only another visible file declares is refused naming the rule; a GLOBAL file's
   record-key-names have its scope (§8.4.6.2.4) because the visible file set carries them. A key clause that did not
   resolve is already reported, so a COLLATING SEQUENCE operand naming it is not reported again
