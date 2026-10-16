@@ -883,7 +883,8 @@
   "pb3154_global_sum_counter_tier",
   "pb3164_method_constant_scope",
   "pb3153_own_item_hides_switch_condition",
-  "pb656_padding_character_obsolete_2002"
+  "pb656_padding_character_obsolete_2002",
+  "pb243_display_all_literal_kinds"
   ],
   "pending": []
 }

@@ -178,6 +178,172 @@ public sealed class PictureCategoryDriftTests
             + string.Join(Environment.NewLine, wrong.Take(40)));
     }
 
+    // ── The PICTURE EDITING walk (kb/Work PB3220, PB3219) ────────────────────────────────────────────────────────
+    // The two properties above ran with NO EDITING phrase, which is why neither saw that the 'es' widening of GR14
+    // read every FOR rule as floating (PIC L999L bound LENGTH 7 for an item that renders 9 characters), nor that
+    // SR12 b read a literal period under DECIMAL-POINT IS COMMA. Both are stated here over the ACCEPTED set of a
+    // symbol walk, with the literal width, the phrase form and the decimal-point mode as the walked dimensions.
+
+    /// <summary>The symbols of an editing walk: the extended character-1 'L', the digit, the two separators, and
+    /// a zero-suppression symbol (FOR admits it, SR12 b; IS admits every Format-1 symbol).</summary>
+    private const string EditingAlphabet = "L9.,Z";
+
+    private const int EditingWalkLength = 5;
+
+    /// <summary>Every string of one to <see cref="EditingWalkLength"/> symbols of <see cref="EditingAlphabet"/>.</summary>
+    public static IEnumerable<string> EveryEditingShape()
+    {
+        var level = new List<string> { "" };
+        for (int len = 1; len <= EditingWalkLength; len++)
+        {
+            var next = new List<string>(level.Count * EditingAlphabet.Length);
+            foreach (string prefix in level)
+                foreach (char c in EditingAlphabet)
+                    next.Add(prefix + c);
+            foreach (string s in next) yield return s;
+            level = next;
+        }
+    }
+
+    private static (PicInfo Pic, string[] Diagnostics) AnalyzeEditing(string picture, bool forForm, int literalWidth,
+        bool decimalPointIsComma)
+    {
+        var ed = new EditionContext(2023);
+        string text = new string(':', literalWidth);
+        var literal = new EditLiteral(text, EditLiteralClass.Alphanumeric);
+        var phrase = forForm
+            ? new EditingPhraseSpec("L", null, literal, null, IsForForm: true)
+            : new EditingPhraseSpec("L", literal, null, null, IsForForm: false);
+        PicInfo pic = PictureAnalyzer.Analyze(picture, Usage.Display, ed, "data item 'T'", editing: [phrase],
+            decimalPointIsComma: decimalPointIsComma);
+        return (pic, ed.Diagnostics.ToArray());
+    }
+
+    /// <summary>⛔ ISO §13.18.40.4 GR4 + GR14 'es', over the EDITING walk: the size the analyzer binds is the
+    /// width of the image the editing rules render, for the IS form (the literal at every occurrence), for a FOR
+    /// form with FIXED occurrences (the literal at every occurrence) and for a FOR form's FLOATING string (one
+    /// literal plus one character per repetition). The renderer is the oracle here because GR14 states the size
+    /// as a property of the image: "the size of literal-1 is counted in the size of the item".</summary>
+    [Fact]
+    public void EveryAcceptedEditingPicture_HasTheSizeOfItsRenderedImage()
+    {
+        var wrong = new List<string>();
+        int accepted = 0, fixedRepeated = 0, floating = 0, comma = 0, mixed = 0;
+        foreach (string picture in EveryEditingShape())
+            foreach (bool forForm in new[] { true, false })
+                foreach (int width in new[] { 1, 3 })
+                    foreach (bool dpc in new[] { false, true })
+                    {
+                        var (pic, diags) = AnalyzeEditing(picture, forForm, width, dpc);
+                        if (diags.Length > 0 || pic.EditMask is null || pic.EditingRules is not { Count: > 0 } rules) continue;
+                        accepted++;
+                        if (dpc && picture.Contains(',')) comma++;
+                        if (rules.Count > 1) mixed++;   // a floating string AND a fixed occurrence of one character-1
+                        if (rules[0].Floating) floating++;
+                        else if (forForm && picture.Count(c => c == 'L') >= 2) fixedRepeated++;
+                        foreach (int value in new[] { -5, 5 })
+                        {
+                            string image = CobolNet.Runtime.CobolEdit.Format(value, 0, pic.EditMask, commaMode: dpc,
+                                edits: [.. rules]);
+                            if (image.Length != pic.Length)
+                                wrong.Add($"PIC {picture} {(forForm ? "FOR" : "IS")} width {width}{(dpc ? " DPC" : "")} "
+                                    + $"value {value}: size {pic.Length}, image \"{image}\" is {image.Length}");
+                        }
+                    }
+        Assert.True(wrong.Count == 0,
+            $"{wrong.Count} accepted EDITING picture(s) bind a size other than the width of the image they render "
+            + $"(ISO §13.18.40.4 GR4, GR14 'es'):{Environment.NewLine}" + string.Join(Environment.NewLine, wrong.Take(40)));
+        // The population guard: the walk must have SEEN the shapes the property exists for.
+        Assert.True(fixedRepeated > 0 && floating > 0 && comma > 0 && mixed > 0,
+            $"the editing walk accepted {accepted} but saw {fixedRepeated} repeated-fixed, {floating} floating, "
+            + $"{comma} DECIMAL-POINT IS COMMA comma pictures, {mixed} mixed floating-and-fixed");
+    }
+
+    /// <summary>⛔ ISO §13.18.40.4 GR14 'es' with a floating string AND a fixed occurrence of ONE character-1
+    /// (<c>PIC LL9L</c>; kb/Work PB3220, review round 1). The oracle is GR14's own arithmetic, written out per
+    /// occurrence and independent of the renderer the walk above compares against: the floating string is one
+    /// literal plus one character per repetition, each fixed occurrence is the literal, every other symbol is one
+    /// position. The digit positions are rule 6's: the floating string's occurrences after the first, plus the 9s.</summary>
+    [Theory]
+    [InlineData("LL9L", 3, 8, 2)]      // (3 + 1) + 1 + 3
+    [InlineData("LLL9L", 3, 9, 3)]     // (3 + 2) + 1 + 3
+    [InlineData("LLL9L", 2, 7, 3)]     // (2 + 2) + 1 + 2
+    [InlineData("LL9.99L", 3, 11, 4)]  // (3 + 1) + 1 + 1 + 2 + 3
+    public void AFloatingStringAndAFixedOccurrenceOfOneCharacter1_AreSizedEachByItsOwnKind(
+        string picture, int literalWidth, int size, int digits)
+    {
+        var (pic, diags) = AnalyzeEditing(picture, forForm: true, literalWidth, decimalPointIsComma: false);
+        Assert.Empty(diags);
+        Assert.Equal(size, pic.Length);
+        Assert.Equal(digits, pic.DigitPositions);
+        Assert.Equal(size, CobolNet.Runtime.CobolEdit.Format(-5, 0, pic.EditMask!, commaMode: false,
+            edits: [.. pic.EditingRules!]).Length);
+    }
+
+    /// <summary>The same picture with the roles of comma and period interchanged.</summary>
+    private static string SwapSeparators(string picture) =>
+        string.Concat(picture.Select(c => c switch { '.' => ',', ',' => '.', _ => c }));
+
+    private static string Fingerprint(PicInfo pic, string[] diagnostics) =>
+        string.Join(" ", diagnostics.Select(d => System.Text.RegularExpressions.Regex.Match(d, @"COBOLNET\d+").Value).Order())
+        + $"|{pic.Category}|{pic.Length}|{pic.Digits}|{pic.Signed}|{pic.IsFloatEdited}";
+
+    /// <summary>The floating-point and sign-bearing shapes a short walk over the plain alphabet cannot spell.</summary>
+    private static readonly string[] SeparatorShapes =
+    [
+        "+9.9.9E+99", "+9,9,9E+99", "+9,9.9E+99", "+9.9,9E+99", "9.999E+99", "9,999E+99", "-9,9(5)E+99", "-9.9(5)E+99",
+        "9.9.9.9E+99", "9,9,9,9E+99", "9.99,99E+99", "9,99.99E+99", "9.99E+99", "9,99E+99", "$$$.$$9,99", "$$$,$$9.99",
+    ];
+
+    /// <summary>⛔ ISO §13.18.40.3 SR13 as a CLOSURE property, over the plain walk, the float-edited shapes and the
+    /// EDITING walk: "The rules for the symbol period apply to the symbol comma, and the rules for the symbol comma
+    /// apply to the symbol period" - so a character-string under DECIMAL-POINT IS COMMA is accepted, and means what
+    /// it means, exactly when the string with the two symbols interchanged is accepted and means the same without
+    /// the clause. A rule that reads a literal period (SR12 b's FOR-form screen and its only-once rule) breaks it.</summary>
+    [Fact]
+    public void DecimalPointIsComma_InterchangesTheRolesOfPeriodAndComma_InEveryRule()
+    {
+        var wrong = new List<string>();
+        int compared = 0;
+        void Compare(string label, string picture, Func<string, bool, (PicInfo, string[])> analyze)
+        {
+            var (comma, commaDiags) = analyze(picture, true);
+            var (period, periodDiags) = analyze(SwapSeparators(picture), false);
+            compared++;
+            string a = Fingerprint(comma, commaDiags), b = Fingerprint(period, periodDiags);
+            if (a != b) wrong.Add($"{label} PIC {picture} under DECIMAL-POINT IS COMMA: {a}; swapped {SwapSeparators(picture)} without: {b}");
+        }
+        const string plain = "9Z.,+-VP";
+        var shapes = new List<string>(SeparatorShapes);
+        foreach (char a in plain)
+        {
+            shapes.Add(a.ToString());
+            foreach (char b in plain)
+            {
+                shapes.Add(string.Concat(a, b));
+                foreach (char c in plain)
+                {
+                    shapes.Add(string.Concat(a, b, c));
+                    foreach (char d in plain) shapes.Add(string.Concat(a, b, c, d));
+                }
+            }
+        }
+        foreach (string picture in shapes)
+            Compare("plain", picture, (p, dpc) =>
+            {
+                var ed = new EditionContext(2023);
+                return (PictureAnalyzer.Analyze(p, Usage.Display, ed, "data item 'T'", decimalPointIsComma: dpc),
+                    ed.Diagnostics.ToArray());
+            });
+        foreach (string picture in EveryEditingShape())
+            foreach (bool forForm in new[] { true, false })
+                Compare(forForm ? "FOR" : "IS", picture, (p, dpc) => AnalyzeEditing(p, forForm, 1, dpc));
+        Assert.True(wrong.Count == 0,
+            $"{wrong.Count} of {compared} picture(s) are not interchanged by SR13:{Environment.NewLine}"
+            + string.Join(Environment.NewLine, wrong.Take(40)));
+        Assert.True(compared > 10_000, $"the SR13 walk compared only {compared} pictures");
+    }
+
     private static string Describe(PicInfo pic) =>
         $"{CategoryName(pic)} len {pic.Length} digits {pic.Digits}";
 
