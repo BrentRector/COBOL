@@ -159,7 +159,7 @@ internal sealed class InitializeBinder(BinderContext ctx, StatementBinder host)
         // The written REPLACING phrase rides every implicit statement GR3 creates — §14.9.20.3 SR4's edition half
         // (§14.9.25.3 SR5) is asked of it by VersionConformancePass (kb/Work PB879).
         var replacingItems = replacements.Select(r => new InitializeReplacingItem(r.Cats, r.Value)).ToList();
-        foreach (var dref in ini.initializeOperandList().dataReference())
+        foreach (var dref in host.Expr.ReceivingReferences(ini.initializeOperandList().receivingIdentifier()))
         {
             var actions = new List<InitializeAction>();
             BindInitializeTarget(dref, spec, actions);   // GR3 — per identifier-1, in source order
