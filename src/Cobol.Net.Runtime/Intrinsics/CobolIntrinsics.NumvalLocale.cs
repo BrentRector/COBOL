@@ -24,8 +24,11 @@ namespace CobolNet.Runtime;
 /// every one (⚖ DETERMINATION, <see cref="MonetaryFacts.GroupingAdmits"/>). ⚖ Documented determinations: the
 /// fraction-digit count is not constrained by <c>frac_digits</c> — §15.68.1 names "the grouping separator and
 /// the decimal separator permitted" and r5b.5 is a permission;
-/// separator and currency matching uses the L12 spacing equivalence (a typed U+00A0 matches the normalized
-/// space); the negative convention is tried before the positive one (an empty positive sign matches only by
+/// argument-1 is compared with the snapshot under the ONE L12 equivalence (<see cref="LocaleFacts.TryFoldLocaleChar"/>:
+/// a Cf character is ignorable, U+00A0/U+202F/U+2009 is a space wherever a space is admitted or matched — a typed
+/// U+00A0 matches fr-FR's normalized separator, the U+200F an ar-* culture's own formatted string carries after its
+/// currency symbol matches the symbol the snapshot stripped it from), positions reported in the original argument;
+/// the negative convention is tried before the positive one (an empty positive sign matches only by
 /// absence); when both currency candidates match, the longer wins.</para>
 /// </summary>
 public static partial class CobolIntrinsics
@@ -64,8 +67,10 @@ public static partial class CobolIntrinsics
     private readonly record struct LocTemplate(LocTok[] Tokens, bool Negative, string Sign, string? Cs);
 
     /// <summary>The ONE §15.68.3 r5 scan — validates positionally AND accumulates the value in the same pass over
-    /// the ORIGINAL argument (positions stay ordinal; the ANYCASE fold happens only at the currency-comparison
-    /// site, never by rewriting the string — §15.57.4 r5's non-1:1 warning). Template set: the negative
+    /// the argument folded by DETERMINATION L12 (<see cref="LocaleFacts.NormalizeLocaleText(string, out int[])"/>,
+    /// the snapshot's own equivalence; every position is mapped back to its ordinal in the ORIGINAL argument). The
+    /// ANYCASE fold happens only at the currency-comparison site, never by rewriting the string — §15.57.4 r5's
+    /// non-1:1 warning. Template set: the negative
     /// convention first when it is distinguishable (parentheses or a nonempty negative_sign), then the positive,
     /// then the unsigned reduction; each × currency-present (both r5b.3 candidates, longer preferred) /
     /// currency-absent.</summary>
@@ -131,22 +136,32 @@ public static partial class CobolIntrinsics
             templates.Add(new(unsignedOrder, false, "", i3[..3]));
         templates.Add(new([LocTok.Num], false, "", null));
 
-        int n = text.Length;
+        // DETERMINATION L12: the snapshot's strings are folded (MonetaryFacts), so argument-1 is folded by the SAME
+        // per-character equivalence before it is scanned — "a format consistent with the specifications of locale
+        // category LC_MONETARY" (r5 b) is judged on one side of one equivalence. A removed Cf character shifts what
+        // follows it, so every position the scan finds is mapped back to its ordinal in the ORIGINAL argument.
+        string scan = LocaleFacts.NormalizeLocaleText(text, out int[]? origins);
+        int n = scan.Length;
         int bestConsumed = -1;
         bool bestCapHit = false;
         long bestCapPos = 0;
         foreach (var t in templates)
         {
-            var a = TryLocTemplate(text, t, f, ti, anycase, digitCap);
+            var a = TryLocTemplate(scan, t, f, ti, anycase, digitCap);
             if (a.Accepted) return new(0, false, t.Negative, a.Unscaled, a.Frac);
-            if (a.CapHit && (!bestCapHit || a.CapPos < bestCapPos)) { bestCapHit = true; bestCapPos = a.CapPos; }
+            long capPos = a.CapHit ? Ordinal((int)a.CapPos - 1) : 0;
+            if (a.CapHit && (!bestCapHit || capPos < bestCapPos)) { bestCapHit = true; bestCapPos = capPos; }
             if (a.Consumed > bestConsumed) bestConsumed = a.Consumed;
         }
-        long structuralPos = bestConsumed >= n ? n + 1 : bestConsumed + 1;             // r1 b / r1 c
+        long structuralPos = Ordinal(bestConsumed);                                     // r1 b / r1 c
         if (bestCapHit && bestCapPos <= structuralPos)
             return new(bestCapPos, true, false, 0, 0);                // r1 b.2/3/4 — the (cap+1)-th digit,
                                                                       //  "if no prior error is found"
         return new(structuralPos, false, false, 0, 0);
+
+        // The 1-based position in the ORIGINAL argument of the folded text's character k, or LENGTH + 1 when the
+        // scan ran off the end (r1 c — a trailing removed Cf character is admissible, so it does not move that).
+        long Ordinal(int k) => k >= n ? text.Length + 1 : (origins is null ? k : origins[k]) + 1;
     }
 
     private readonly record struct LocAttempt(bool Accepted, int Consumed, bool CapHit, long CapPos,
@@ -249,11 +264,11 @@ public static partial class CobolIntrinsics
         LocAttempt Fail() => new(false, i, false, 0, 0, 0);
     }
 
-    /// <summary>Compare <paramref name="candidate"/> against <paramref name="text"/> at <paramref name="at"/>,
-    /// per character through the L12 spacing equivalence (U+00A0/U+202F/U+2009 ≡ the plain space — the snapshot's
-    /// strings are already normalized, the argument's are not) and, when <paramref name="fold"/> is given (the
-    /// ANYCASE currency comparison — §15.68.3 r5b.1/3), the locale's simple LC_CTYPE lowercase correspondence
-    /// (L9; length-preserving, so positions stay ordinal).</summary>
+    /// <summary>Compare <paramref name="candidate"/> against <paramref name="text"/> at <paramref name="at"/>, per
+    /// character: both sides are already L12-folded (the snapshot by <see cref="MonetaryFacts"/>, the argument by
+    /// <see cref="NvScanLocale"/>), so the comparison is ordinal unless <paramref name="anycase"/> asks for the
+    /// ANYCASE currency comparison (§15.68.3 r5b.1/3) — the locale's simple LC_CTYPE lowercase correspondence
+    /// through <paramref name="fold"/> (L9; length-preserving, so positions stay ordinal).</summary>
     private static bool MatchAt(string text, int at, string candidate, System.Globalization.TextInfo? fold,
         bool anycase = false)
     {
@@ -261,7 +276,6 @@ public static partial class CobolIntrinsics
         for (int j = 0; j < candidate.Length; j++)
         {
             char a = text[at + j], b = candidate[j];
-            if (a is '\u00A0' or '\u202F' or '\u2009') a = ' ';
             if (anycase)
             {
                 a = fold?.ToLower(a) ?? char.ToLowerInvariant(a);

@@ -172,8 +172,8 @@ public sealed class CobolLocaleTests
     [Fact]
     public void TimePatternSpacing_IsHostStable()
     {
-        Assert.Equal("h:mm:ss tt", LocaleFacts.NormalizeSpacing("h:mm:ss\u202Ftt"));
-        Assert.Equal("h:mm:ss tt", LocaleFacts.NormalizeSpacing("h:mm:ss\u2009tt"));
+        Assert.Equal("h:mm:ss tt", LocaleFacts.NormalizeLocaleText("h:mm:ss\u202Ftt"));
+        Assert.Equal("h:mm:ss tt", LocaleFacts.NormalizeLocaleText("h:mm:ss\u2009tt"));
         Assert.DoesNotContain('\u202F', LocaleFacts.For("en-US").TimeFormat);
         Assert.DoesNotContain('\u2009', LocaleFacts.For("en-US").TimeFormat);
         if (!LocaleFacts.InvariantMode && LocaleFacts.For("en-US").HasCultureData)

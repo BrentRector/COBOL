@@ -386,6 +386,7 @@
     "pb64t6_locale_size_ec",
     "pb64t6_numvalc_locale",
     "pb835_numvalc_locale_grouping",
+    "pb2766_numvalc_locale_l12_argument",
     "pb64t6_picture_locale_smoke",
     "ca6_binary_operand_composite",
     "ca36_search_range_dispatch",

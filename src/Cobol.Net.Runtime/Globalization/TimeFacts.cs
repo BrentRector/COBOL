@@ -19,9 +19,9 @@ namespace CobolNet.Runtime.Globalization;
 /// <para>⚖ Why normalizing the PATTERN was not enough (kb/Work PB2764): .NET formats the pattern's <c>/</c> and
 /// <c>:</c> with the culture's own <see cref="DateTimeFormatInfo.DateSeparator"/> / <see cref="DateTimeFormatInfo.TimeSeparator"/>
 /// and its <c>tt</c> with the raw AM/PM designators. ICU puts U+200F RIGHT-TO-LEFT MARK in every ar-* date separator
-/// (28 cultures) and U+00A0 inside <c>a. m.</c> / <c>p. m.</c> of nine es-* / yrl-* cultures, so a pattern that
-/// <see cref="LocaleFacts.NormalizeSpacing"/> had already cleaned still produced those bytes through the separator and
-/// the designator — the host-varying, character-position-consuming text DETERMINATION L10/L12 exist to remove.</para>
+/// (28 cultures) and U+00A0 inside <c>a. m.</c> / <c>p. m.</c> of nine es-* / yrl-* cultures, so a pattern L10 had
+/// already cleaned (<see cref="LocaleFacts.DateFormat"/>, <see cref="LocaleFacts.TimeFormat"/>) still produced those
+/// bytes through the separator and the designator — the host-varying, character-position-consuming text DETERMINATION L10/L12 exist to remove.</para>
 /// <para>⚖ DETERMINATION L13 (CONFORMANCE.md §4 item 5): the DATE rendered is the Gregorian date argument-1 names
 /// (§15.52.3 r2: "a date in the same format as the year, month, and day returned in character positions 1 through 8
 /// by the CURRENT-DATE function"; §15.52.4 r2: <c>d_fmt</c> is a FORMAT of that date, ISO/IEC 9945 strftime, which

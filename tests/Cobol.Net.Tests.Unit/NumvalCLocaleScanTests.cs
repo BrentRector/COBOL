@@ -1,6 +1,8 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Globalization;
 using CobolNet.Runtime;
+using CobolNet.Runtime.Globalization;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -123,6 +125,65 @@ public sealed class NumvalCLocaleScanTests
         Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale("1 234,56", "fr-FR"));
         Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale("1 234,56", "fr-FR"));
         Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale("1 234,56", "fr-FR"));
+    }
+
+    /// <summary>DETERMINATION L12 is ONE equivalence for both sides (kb/Work PB2766): the snapshot drops every Cf
+    /// character, so a Cf character in argument-1 is ignorable too, and every position TEST-NUMVAL-C reports is still
+    /// the ORIGINAL argument's ordinal (§15.94.4 r1).</summary>
+    [Fact]
+    public void L12Equivalence_ACfCharacterInTheArgumentIsIgnorable_AndPositionsStayTheArgumentsOwn()
+    {
+        const string rlm = "\u200F";
+        Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale(rlm + "¤1,234.56", ""));
+        Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale("¤" + rlm + "1,2" + rlm + "34.56" + rlm, ""));
+        Assert.Equal((Int128)(-123456), Scaled2("(" + rlm + "¤1,234.56)"));
+        Assert.Equal(4, CobolIntrinsics.TestNumvalCLocale("0" + rlm + " 1", ""));          // "0 1" reports 3; the mark shifts the '1'
+        Assert.Equal(3, CobolIntrinsics.TestNumvalCLocale(rlm + rlm + "-¤1,234.56", ""));  // the '-' is in error
+        Assert.Equal(6, CobolIntrinsics.TestNumvalCLocale("1,23" + rlm, ""));              // r1 c: LENGTH + 1 of the argument
+        Assert.Equal(34, CobolIntrinsics.TestNumvalCLocale(rlm + "¤" + new string('1', 40), ""));   // the cap digit's ordinal
+    }
+
+    /// <summary>DETERMINATION L12: U+00A0 / U+202F / U+2009 is the plain space wherever r5b.7 or a token adjacency admits
+    /// a space, not only where it matches a normalized separator (kb/Work PB2766).</summary>
+    [Fact]
+    public void L12Equivalence_ANoBreakSpaceIsASpaceWhereverASpaceIsAdmitted()
+    {
+        Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale("\u00A0¤\u202F1,234.56\u2009", ""));
+        Assert.Equal(0, CobolIntrinsics.TestNumvalCLocale("(\u00A0¤1,234.56\u00A0)", ""));
+        Assert.Equal(4, CobolIntrinsics.TestNumvalCLocale("0\u00A0\u00A01", ""));           // still one ordinal per character
+    }
+
+    /// <summary>The scenario PB2766 names, over the whole host population: every culture's OWN formatted currency
+    /// string — the raw .NET text, U+200F after an ar-* currency symbol and U+00A0 / U+202F grouping included — is
+    /// conforming NUMVAL-C LOCALE input for that culture and evaluates to the formatted value (§15.68.3 r5 b,
+    /// §15.68.4 r1).</summary>
+    [Fact]
+    public void EveryHostCulture_RecognizesItsOwnFormattedCurrencyString()
+    {
+        int examined = 0;
+        var failures = new List<string>();
+        foreach (var culture in CultureInfo.GetCultures(CultureTypes.SpecificCultures))
+        {
+            if (culture.Name.Length == 0 || !LocaleFacts.For(culture.Name).HasCultureData) continue;
+            int d = culture.NumberFormat.CurrencyDecimalDigits;
+            if (d is < 0 or > 6) continue;
+            // A locale whose mon_thousands_sep IS its mon_decimal_point (mn-Mong-MN: ',' for both) is §8.2.1 "invalid"
+            // content to NvScanLocale — its own "1,234,567,89" is ambiguous, and EC-LOCALE-INVALID is the answer.
+            var f = MonetaryFacts.Of(LocaleFacts.For(culture.Name));
+            if (f.ThousandsSep.Length > 0 && f.ThousandsSep == f.DecimalPoint) continue;
+            decimal value = decimal.Round(1234567.891234m, d, MidpointRounding.AwayFromZero);
+            string text = value.ToString("C", culture);
+            examined++;
+            long verdict = CobolIntrinsics.TestNumvalCLocale(text, culture.Name);
+            if (verdict != 0) { failures.Add($"{culture.Name} '{text}': position {verdict}"); continue; }
+            Int128 expected = (Int128)(value * 100m);
+            Int128 actual = CobolIntrinsics.NumvalCLocaleDec(text, culture.Name).ToUnscaled(2, CobolRounding.Truncation);
+            if (actual != expected) failures.Add($"{culture.Name} '{text}': {actual} != {expected}");
+        }
+        if (LocaleFacts.InvariantMode) return;
+        Assert.True(examined >= 400, $"only {examined} cultures examined — the population is the evidence");
+        Assert.True(failures.Count == 0, $"{failures.Count} culture(s) reject their own currency string:{Environment.NewLine}"
+            + string.Join(Environment.NewLine, failures.Take(20)));
     }
 
     [Fact]
