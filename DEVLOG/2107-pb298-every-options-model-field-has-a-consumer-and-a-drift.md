@@ -1,4 +1,4 @@
-## PB298: every OPTIONS model field has a consumer, and a drift test keeps it so
+## Entry 2107 — 2026-10-16 13:25 PDT — PB298: every OPTIONS model field has a consumer, and a drift test keeps it so
 
 kb/Work PB298 (wave 1097 G) listed five `OptionsModel` fields as possibly set by `OptionsBinder` and read by nobody,
 the shape PB152 had proved to be a silent wrong answer (an OPTIONS clause the program wrote, accepted in silence,
@@ -36,3 +36,4 @@ GR-4.2.10-3 said GR-4.2.10-2 "stays PARTIAL under kb/Work PB298". `batch-PB298-r
 the current tree; verdicts, editions and witnesses are unchanged, and `audit_witness_loss.py --check` is GREEN. The
 sweep of every other `PB298` and `EntryConvention` mention in the inventory, docs and source found the rest current
 or historical.
+
