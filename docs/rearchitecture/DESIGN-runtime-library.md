@@ -774,12 +774,14 @@ The standalone executable's generated `Main` registers its own module INSIDE the
 `ProgramRegistry.RunModule(__CobolModule.EnsureRegistered, mainPath)` (`ProgramTable.RunModule`, kb/Work PB2846), which
 runs the registration and then the main program under the §14.6.12 abnormal-termination surface and the §14.6.11
 epilogue, so a registration the run unit refuses (another runtime major or call ABI, or an already-registered
-outermost name) ends the run unit through that surface and never escapes as an unhandled .NET exception. A host that
-registers its modules itself enters through `ProgramRegistry.RunMain(path)`, the same boundary without the registration.
+outermost name) ends the run unit through that surface and never escapes as an unhandled .NET exception. A .NET host
+enters through a program's generated host entry (`Cobol.<assembly>.<NAME>.Call`, DESIGN-external-repository §4.3, the
+one host surface of §4.4), which registers the program's module and activates it at the outermost boundary;
+`ProgramTable.RunMain(path)`, the same boundary as `RunModule` without the registration, is shipped surface no route calls.
 **The process's own state belongs to the entry that IS the process (kb/Work PB3163, PB3193).** `RunModule` and the
 `cobol` CLI's `Main` are the only writers of the process exit code and the only callers of
 `IO.StandardStreams.EnsureUtf8` (UTF-8 standard output and error, and a UTF-8 reader over a redirected standard input,
-DOC-A.1-59 and DOC-A.1-1); `RunMain`, `RunUnit.Run` and a CALL into a module write neither, so a run unit a host
+DOC-A.1-59 and DOC-A.1-1); `RunMain`, `RunUnit.Run`, a host entry's activation and a CALL into a module write neither, so a run unit a host
 embeds DISPLAYs through the host's `Console.Out` / `Console.Error` as the host configured them and leaves the host's
 exit code and console as it found them. `ProcessStateOwnerDriftTests` (Unit) holds each process-owned write to its
 owner; `RunUnitHostExitCodeTests` and `RunUnitHostConsoleTests` (Conformance) are the host-side witnesses.

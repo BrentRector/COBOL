@@ -1231,8 +1231,8 @@ CALLed module crosses the assembly boundary because every module of the run unit
 RUN terminates the whole run unit from anywhere — the delivery cannot live in the main group's generated `Main`,
 which never sees the sibling module's parse tree), and the one boundary that IS the process,
 `ProgramTable.RunModule` (the generated `Main`'s single statement), writes it to `Environment.ExitCode` once, when the
-run unit has ended; a host that embeds a run unit (`RunUnit.Run`, `ProgramRegistry.RunMain`) never has its own exit code
-rewritten and reads `RunUnit.ExitStatus` (DOC-A.1-167, kb/Work PB3163). A cross-subsystem contract (§14/§15); the DISTINCT RETURNING/GIVING activation
+run unit has ended; a host that embeds a run unit (its generated host entries, inside or outside `RunUnit.Run`) never has its own exit
+code rewritten and receives an ended run unit's status in `RunUnitEndedException` (DOC-A.1-167, kb/Work PB3163). A cross-subsystem contract (§14/§15); the DISTINCT RETURNING/GIVING activation
 result does not feed it — decision 20.
 
 ### 12.3 Smaller surfaces

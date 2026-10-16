@@ -10,10 +10,9 @@ namespace CobolNet.Tests.Conformance;
 /// §14.9.18.4 1) a) (cite.py OK): "If the activating runtime element is a non-COBOL element, execution continues in
 /// the activating element in an implementor-defined fashion"; EXIT PROGRAM reaches the same rule through
 /// §14.9.14.4 3) (cite.py OK: "execution proceeds as specified in 14.9.18, GOBACK statement, General rules 3 and 4").
-/// <para>DETERMINATION PINNED: the only non-COBOL activator is a .NET host, which loads the compiled assembly, runs
-/// its module's one registration member, <c>__CobolModule.EnsureRegistered()</c> (the registrar its
-/// <c>[assembly: CobolRepository]</c> record names), and activates a program through
-/// <c>ProgramRegistry.CallProgram(name, callerPath, args, returning)</c>. When the program executes GOBACK or EXIT
+/// <para>DETERMINATION PINNED: the only non-COBOL activator is a .NET host, which references the compiled assembly
+/// and activates a program through the program's generated host entry, <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call()</c>
+/// (DESIGN-external-repository §4.3; A.1 item 141), the one host interface. When the program executes GOBACK or EXIT
 /// PROGRAM the host's call RETURNS NORMALLY and the host continues at its own call site: no .NET exception reaches
 /// it and the statements after the GOBACK / EXIT PROGRAM are not executed.</para>
 /// <para>The corpus cannot carry this (every golden's activator is a COBOL main), so the non-COBOL element is a real
@@ -46,28 +45,20 @@ public sealed class NonCobolActivatorReturnTests
         """;
 
     /// <summary>The non-COBOL activating element. Every line it prints is a checkpoint of "execution continues in
-    /// the activating element"; a .NET exception escaping CallProgram would end it before HOST DONE.</summary>
+    /// the activating element"; a .NET exception escaping a host entry would end it before HOST DONE.</summary>
     private const string Host = """
         using System;
-        using System.IO;
-        using CobolNet.Runtime;
 
         public static class L1HostProgram
         {
             public static int Main()
             {
-                foreach (var module in new[] { "L1HSTGB", "L1HSTEP" })
-                {
-                    var asm = System.Reflection.Assembly.LoadFrom(Path.Combine(AppContext.BaseDirectory, module + ".dll"));
-                    var registrar = System.Reflection.CustomAttributeExtensions.GetCustomAttribute<CobolNet.Runtime.Repository.CobolRepositoryAttribute>(asm)!.Registrar!;
-                    asm.GetType(registrar)!.GetMethod("EnsureRegistered", Type.EmptyTypes)!.Invoke(null, null);
-                }
                 Console.WriteLine("HOST BEFORE");
-                ProgramRegistry.CallProgram("L1HSTGB", "", Array.Empty<CobolArg>(), null);
+                Cobol.L1HSTGB.L1HSTGB.Call();
                 Console.WriteLine("HOST RESUMED AFTER GOBACK");
-                ProgramRegistry.CallProgram("L1HSTEP", "", Array.Empty<CobolArg>(), null);
+                Cobol.L1HSTEP.L1HSTEP.Call();
                 Console.WriteLine("HOST RESUMED AFTER EXIT PROGRAM");
-                ProgramRegistry.CallProgram("L1HSTGB", "", Array.Empty<CobolArg>(), null);
+                Cobol.L1HSTGB.L1HSTGB.Call();
                 Console.WriteLine("HOST DONE");
                 return 0;
             }
@@ -82,7 +73,7 @@ public sealed class NonCobolActivatorReturnTests
         {
             NonCobolElement.CompileCobol(dir, "L1HSTGB", GobackSub);
             NonCobolElement.CompileCobol(dir, "L1HSTEP", ExitProgramSub);
-            NonCobolElement.CompileCSharp(dir, "L1HSTHOST", Host, runtimeConfigOf: "L1HSTGB");
+            NonCobolElement.CompileCSharp(dir, "L1HSTHOST", Host, "L1HSTGB", "L1HSTGB", "L1HSTEP");
             var (exit, stdout, stderr) = CutRunner.RunExit(Path.Combine(dir, "L1HSTHOST.dll"), dir);
             Assert.Equal(
                 "HOST BEFORE\n" +

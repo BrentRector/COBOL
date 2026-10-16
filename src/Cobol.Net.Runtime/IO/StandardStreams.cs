@@ -27,7 +27,7 @@ namespace CobolNet.Runtime.IO;
 /// (<see cref="Console.Out"/>, <see cref="Console.Error"/>, <see cref="Console.In"/>, <see cref="Console.OutputEncoding"/>)
 /// belongs to the PROCESS, and the entries that are the process own it: the CLI, and
 /// <see cref="ProgramTable.RunModule"/> ("A standalone <c>cobol</c> executable IS its own host", DOC-A.1-167). A host
-/// that embeds a run unit (<see cref="ProgramTable.RunMain"/>, <c>RunUnit.Run</c>, a CALL into a module) owns its
+/// that embeds a run unit (through a program's generated host entry, <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call</c>, DESIGN-external-repository §4.4, or <c>RunUnit.Run</c>; a CALL into a module) owns its
 /// console, and the run unit writes to it as the host configured it: under a host, the standard display device IS the
 /// host's <see cref="Console.Out"/> (DOC-A.1-59). Before PB3193 every <c>RunMain</c> called this, so a host that had
 /// given its console another encoding found it switched to UTF-8 by the first run unit it ran, and a host with no

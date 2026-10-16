@@ -10,7 +10,7 @@ namespace CobolNet.Tests.Unit;
 /// ⛔ THE PROCESS'S OWN STATE (ITS EXIT CODE AND ITS CONSOLE) IS WRITTEN ONLY BY AN ENTRY THAT IS THE PROCESS (kb/Work
 /// PB3163, PB3193; docs/CONFORMANCE.md DOC-A.1-167, DOC-A.1-59): the <c>cobol</c> CLI's <c>Main</c> and
 /// <c>ProgramTable.RunModule</c>, the generated <c>Main</c>'s one statement. A host that embeds a run unit
-/// (<c>ProgramTable.RunMain</c>, <c>RunUnit.Run</c>, a CALL into a module) owns its process, and no statement the run
+/// (through a program's generated host entry, <c>Cobol.&lt;assembly&gt;.&lt;NAME&gt;.Call</c>, or <c>RunUnit.Run</c>; a CALL into a module) owns its process, and no statement the run
 /// unit executes may change what the host set.
 /// <para>Both defects had the same shape and neither was visible to a corpus golden, because every golden's activator
 /// is the operating system, where the run unit and the process are one: the <c>RunUnit.ExitStatus</c> setter wrote
