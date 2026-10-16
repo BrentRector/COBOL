@@ -590,7 +590,8 @@ which is also where REVERSED, the other alternative of the same printed bracket,
 
 **What it buys.** Categories (b) and (c) are unreachable today, so symbols a, b, d and f — previous units,
 no rewind of the current reel, unit removal, rewind — and symbol e's two unit-media branches are vacuous
-rather than missing, which is what `docs/CONFORMANCE.md` §8 `DRV-GR-14.9.6.4-L2.1` records. Adding a
+rather than missing, which is what the owner-signed determination in inventory row `GR-14.9.6.4-3`'s notes
+records (§14.9.6.4 GR3 e) 1.; a `docs/CONFORMANCE.md` §8 row until kb/Work PB55 folded the sub-item). Adding a
 unit-structured medium is then a bounded change: give its connector a category, fill the cells
 `CloseByFormat`'s loud arm names, and implement §14.9.27.4 GR12 b) where `NoRewindPhraseEffect` refuses.
 `CloseTable14Tests` is the drift test that keeps that true — it pins the

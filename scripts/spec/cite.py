@@ -91,7 +91,14 @@ def rule_path(lines, at, start):
       · an UNLETTERED paragraph at the sub-items' own indentation (or shallower) is a trailing paragraph of the
         PARENT rule — §14.7.7 rule 2's "The composite of operands is a hypothetical data item…" follows its
         sub-items a) and b) at their indent and is neither — so it reports the bare rule, not the last letter.
-    A paragraph INSIDE a sub-item sits deeper than its label, which is how the two are told apart."""
+    A paragraph INSIDE a sub-item sits deeper than its label, which is how the two are told apart.
+
+    ⛔ A LABEL ABOVE IS AN ANCESTOR ONLY IF IT IS SHALLOWER THAN EVERYTHING ACCEPTED SO FAR (kb/Work PB55 review
+    R1-1). A nested `N.` list is transcribed at the SAME indentation as the lettered items around it (§7.2.3.4 9)
+    c) 1.–6. sits at the indent of a)–f)), so the nearest `N.` above `d)` belongs to the EARLIER letter `c)`, and
+    taking it reported the impossible `9) 6. d)`. Each label's depth is (indentation, style level): a deeper
+    indent nests, and at one indent `N)` < `x)` < `N.`. Walking back, a label whose depth is not strictly below
+    the last one accepted is a sibling or a sibling's descendant, never an ancestor, and is skipped."""
     while at > start and CORRECTION_NOTE.match(lines[at]):
         at -= 1
         while at > start and not lines[at].strip():
@@ -99,21 +106,35 @@ def rule_path(lines, at, start):
     own = lines[at]
     is_label = bool(TOP.match(own) or SUB.match(own) or SUBSUB.match(own))
     own_indent = _indent(own)
-    path, seen_sub, seen_subsub = [], False, False
+    path = []
+    # an unlabelled line is deeper than any label at its own indentation: (indent, a level below every style)
+    bound = (own_indent, len(_LEVELS) + 1)
     for k in range(at, start - 1, -1):
-        line = lines[k]
-        if not seen_subsub and (m := SUBSUB.match(line)):
-            if is_label or own_indent > len(m.group(1)):
-                path.append(f"{m.group(2)}.")
-            seen_subsub = True
-        elif not seen_sub and (m := SUB.match(line)):
-            if is_label or own_indent > len(m.group(1)):
-                path.append(f"{m.group(2)})")
-            seen_sub = True
-        elif (m := TOP.match(line)):
-            path.append(f"{m.group(1)})")
+        hit = _label(lines[k])
+        if hit is None:
+            continue
+        depth, text = hit
+        if depth >= bound:
+            continue  # a sibling, or inside one: not on this line's path
+        if depth[1] == 1:  # the rule itself (`N)` at column 0) ends the walk
+            path.append(text)
             break
+        if is_label or own_indent > depth[0]:
+            path.append(text)
+        bound = depth
     return " ".join(reversed(path))
+
+
+#: The label styles by nesting level at one indentation: the rule `N)`, its lettered items `x)`, their `N.` items.
+_LEVELS = ((TOP, ")"), (SUB, ")"), (SUBSUB, "."))
+
+
+def _label(line: str):
+    """((indent, style level), printed label) for a rule-label line, else None."""
+    for level, (pattern, delim) in enumerate(_LEVELS, start=1):
+        if m := pattern.match(line):
+            return (_indent(line), level), f"{m.groups()[-1]}{delim}"
+    return None
 
 
 def find(lines, cls, text):
@@ -162,7 +183,11 @@ def self_test() -> int:
         ("silent on a needle carrying digits", check(lines, cls, "15.43.4", "| S999 | +999 |")[0] == 0),
         ("pins 14.9.8.4 1) b)", "1) b)" in check(lines, cls, "14.9.8.4", "Otherwise, arithmetic-expression-1 is evaluated to produce an algebraic value")[1][0]),
         ("pins 14.7.7 2) bare (trailing paragraph)", check(lines, cls, "14.7.7", "The composite of operands is a hypothetical data item")[1][0].startswith("OK  §14.7.7 2)  (")),
-        ("pins 8.8.3.3 3)", check(lines, cls, "8.8.3.3", "equivalent to a literal")[1][0].startswith("OK  §8.8.3.3 3)")),
+        # PB55 review R1-1: a letter AFTER a nested `N.` list at its own indent is the list's sibling, not inside it
+        ("pins 7.2.3.4 9) d) (letter after a nested list)", check(lines, cls, "7.2.3.4", "If no match occurs, the comparison is repeated with each")[1][0].startswith("OK  §7.2.3.4 9) d)  (")),
+        ("pins 12.3.7.3 17) d) (letter after a nested list)", check(lines, cls, "12.3.7.3", "Alphabet-name-4 shall not reference an alphabet specified with the LOCALE phrase")[1][0].startswith("OK  §12.3.7.3 17) d)  (")),
+        ("pins 7.2.3.4 9) c) 2. (the nested item keeps its letter)", check(lines, cls, "7.2.3.4", "Each operand and operator of a concatenation expression is a separate text-word")[1][0].startswith("OK  §7.2.3.4 9) c) 2.  (")),
+        ("pins 8.8.3.3 3)",check(lines, cls, "8.8.3.3", "equivalent to a literal")[1][0].startswith("OK  §8.8.3.3 3)")),
         ("accepts the CORRECTED form (C6)", check(lines, cls, "14.9.10.4", "The value '62' is placed into the I-O status")[0] == 0),
         ("accepts the PRINTED form (C6)", check(lines, cls, "14.9.10.4", "The valu62' is placed into the I-O status")[0] == 0),
         ("accepts the PRINTED form (C12)", check(lines, cls, "14.9.30.4", "whose key value is greater than or equal to the key value in the file position indicator")[0] == 0),

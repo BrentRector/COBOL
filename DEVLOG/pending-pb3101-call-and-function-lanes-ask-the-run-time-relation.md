@@ -123,6 +123,9 @@ and negative `pb3101-prototype-bit-group-positions` pins the length difference (
 in D6 item 7. `GroupAtom` does not gain leaf identity: §13.7.3 SR2's group layout is §8.5.3.1's structural walk, which
 already lives once in `StrongTypeModel`, and copying it into the runtime atoms would write it twice. Batch
 `w1082a-pb3101-comparator-resite` moved the code-location of 26 CONFORMS rows off the deleted members (GAP 101 → 101). Gate run `20261015T194430Z-f29348`: `LEG 1 ONLY (batched gating, PB2515): GREEN`.
+PB55 landed first and folded §9.3.6 3) e) 1. and 2. (GR-9.3.6-L4.1/L4.2) into GR-9.3.6-L3.3, so the landing took main's
+inventory and re-applied the branch's five batches with `record_verdicts.py`; the two folded records' re-site lands on
+L3.3 (`w1082a-pb3101-comparator-resite-on-pb55-fold`, GAP 100 → 100).
 
 
 Branch review round 1 (wave 1082 group A's review finisher) answered three findings. R1-1: "the same signature" was not

@@ -211,7 +211,13 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
             $"{what} (ISO §14.9.42.3 {stopRule} for STOP RUN; §14.9.18.3 {gobackRule} for GOBACK)");
 
     /// <summary>CONTINUE [AFTER arithmetic-expression-1 SECONDS] (ISO §14.9.9). Plain CONTINUE is a 1985-continuous
-    /// no-op (<see cref="BoundNop"/>). The AFTER … SECONDS timed-pause phrase (COBOL-2023, introduction-gated on the
+    /// no-op (<see cref="BoundNop"/>). That is §14.9.9.3 SR2 ("processed as if an AFTER phrase were specified with
+    /// arithmetic-expression-1 specified as zero") resolved at bind: by §14.9.9.4 GR1 a zero interval suspends
+    /// nothing and is not less than zero, so it can never set EC-CONTINUE-LESS-THAN-ZERO, and the AFTER-0 reading
+    /// leaves no observable trace for the node to carry. The equivalence is MEASURED, not assumed:
+    /// <c>conformance:2023/pb241_continue_bare_equals_after_zero</c> runs both spellings under checking ON WITH
+    /// LOCATION and compares their EXCEPTION-STATUS / -STATEMENT / -LOCATION triples (kb/Work PB241), so giving
+    /// <see cref="BoundNop"/> anything observable fails it. The AFTER … SECONDS timed-pause phrase (COBOL-2023, introduction-gated on the
     /// phrase by the VersionConformancePass) binds to a <see cref="BoundContinueAfter"/>. Whether
     /// EC-CONTINUE-LESS-THAN-ZERO checking is enabled at this statement is captured from the TurnState NOW (a bound
     /// node carries no parse line), so the runtime raises the nonfatal exception (GR1b) only under CHECKING ON.</summary>
