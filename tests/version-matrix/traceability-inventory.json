@@ -6997,11 +6997,11 @@
   "subject": "Data-address-identifier",
   "rule-digest": "bb75159da8ab",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressReceiver; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#dataAddressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setAddressReceiver; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#addressIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#receivingIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules",
   "test-ref": "conformance:negative/gn1-data-address-receiving-set-up-by; conformance:negative/gn1-data-address-receiving-initialize",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "ADDRESS OF W, with W BASED, used as the receiving operand of SET ... UP BY (SR23 data-pointer category fits) and of INITIALIZE (SR1 and SR7). Only SR5 forbids these. Both are rejected (COBOL0001 and COBOLNET0901). Controls on a pointer item P compile.",
+  "notes": "ADDRESS OF W, with W BASED, used as the receiving operand of SET ... UP BY (SR23 data-pointer category fits) and of INITIALIZE (SR1 and SR7). Only SR5 forbids these. INITIALIZE (and every non-SET receiving position) is refused by SR5 itself, COBOLNET3979, from the receiving chokepoint's form table (kb/Work PB1551, w1097d; it was COBOLNET0901); SET ... UP BY is still a parse error (COBOL0001) because SET's receiving identifier carries no data-address alternative. Controls on a pointer item P compile.",
   "state": "OK"
  },
  {

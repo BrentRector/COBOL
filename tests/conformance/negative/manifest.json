@@ -2256,7 +2256,6 @@
   "pb1551-self-receiving",
   "pb1551-super-receiving",
   "pb1551-object-view-initialize",
-  "pb1551-data-address-receiving",
   "pb1551-program-address-move",
   "pb1551-self-arithmetic-sending",
   "pb1551-self-undeclared-85",

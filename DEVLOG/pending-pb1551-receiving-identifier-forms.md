@@ -36,9 +36,9 @@ object-reference loop's EXCEPTION-OBJECT arm (PB1008), and a second "COMPUTE rec
 that a boolean COMPUTE stacked on every receiver the chokepoint had already refused.
 
 **Goldens and rows.** Negatives `pb1551-self-receiving`, `pb1551-super-receiving` (3978), `pb1551-object-view-initialize`
-(2871), `pb1551-data-address-receiving`, `pb1551-program-address-move` (3979), `pb1551-self-arithmetic-sending` (0844)
+(2871), `pb1551-program-address-move` (3979), `pb1551-self-arithmetic-sending` (0844)
 and `pb1551-self-undeclared-85` (1639 at 85); `l1m7-null-receiving-operand` re-pinned 0901 → 3977 and
-`l1m7-program-address-receiving` COBOL0201 → 3979; positive `2002/pb1551_receiving_identifier_routes` runs the legal
+`l1m7-program-address-receiving` COBOL0201 → 3979 and `gn1-data-address-receiving-initialize` 0901 → 3979; positive `2002/pb1551_receiving_identifier_routes` runs the legal
 neighbour of every superset shape (SELF and NULL senders, INVOKE RETURNING, ALLOCATE RETURNING, Format 7's `SET ADDRESS
 OF B TO P`, the data- and program-address senders, ADD GIVING and MULTIPLY BY) and prints SAME / ABCD / EQ / 0002 / SUB
 / NUL. Drift test `ReceivingOperandFormDriftTests`: every form has its rule; the grammar rule spells exactly the

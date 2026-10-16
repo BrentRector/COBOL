@@ -22,7 +22,6 @@ namespace CobolNet.Tests.Unit;
 /// grammar rule spells a receiving phrase over a bare <c>dataReference</c> any more, other than the slots named in
 /// <see cref="NotReceivingIdentifiers"/> with the reason each is not one.</para>
 /// </summary>
-[Trait("Sweep", "tree")]
 public sealed class ReceivingOperandFormDriftTests
 {
     private static readonly string[] GrammarFiles =
