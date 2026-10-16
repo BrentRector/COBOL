@@ -1,4 +1,4 @@
-## PB3220 + PB3219: the EDITING FOR-form size reads the renderer's fixed-or-floating decision, and SR13's comma/period swap has one asker
+## Entry 2078 — 2026-10-16 08:28 PDT — PB3220 + PB3219: the EDITING FOR-form size reads the renderer's fixed-or-floating decision, and SR13's comma/period swap has one asker
 
 Two R2 findings on `PictureAnalyzer` (PB1754), one file pair, both re-probed first on the wave's own build and both
 reproduced exactly as filed.
@@ -62,3 +62,4 @@ de-editor each read one kind per key and no second fixed-or-floating decision ex
 `AFloatingStringAndAFixedOccurrenceOfOneCharacter1_AreSizedEachByItsOwnKind` carries GR14's arithmetic per occurrence
 (independent of the renderer) and the size walk gains a `mixed > 0` population guard. Float-edited pictures refuse FOR
 (COBOLNET1658) and cs/+/- cannot mix (Table 10), so this is the only arm.
+
