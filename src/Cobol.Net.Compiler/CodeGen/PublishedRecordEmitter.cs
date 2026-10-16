@@ -314,8 +314,8 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         }
         if (!scopeRoot) return;
         int n = components.Count;
-        string at = $"[{string.Join(", ", components.Select(c => c.At))}]";
-        string tables = $"[{string.Join(", ", components.Select(c => c.Item.IsDynamicTable ? c.Item.ByteWidth : 0))}]";
+        var at = components.Select(c => c.At).ToList();
+        var tables = components.Select(c => c.Item.IsDynamicTable ? c.Item.ByteWidth : 0).ToList();
         bool nested = components.Any(c => c.Item.IsDynamicTable && ComponentsOf(c.Item).Count > 0);
         w.Line("/// <summary>The record as the CALL lane's variable-length carrier: every member landed exactly, or refused "
             + "with <see cref=\"global::System.ArgumentException\"/> naming it.</summary>");
@@ -326,7 +326,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             w.Line($"if (__var?.Dynamic is {{ Length: {n} }} __wd) __d = (string[])__wd.Clone();");
             w.Line($"else {{ __d = new string[{n}]; global::System.Array.Fill(__d, \"\"); }}");
             w.Line($"var __e = __var?.Elements is {{ Length: {n} }} __we ? (CobolVarGroup[]?[])__we.Clone() : {(nested ? $"new CobolVarGroup[]?[{n}]" : "null")};");
-            w.Line($"string __run = CobolVarGroup.RunOf(__Land(__parameter, __path), {at}, {tables});");
+            w.Line($"string __run = {RuntimeApi.VarGroupRunOf("__Land(__parameter, __path)", at, tables)};");
             w.Line("__PutDyn(__d, __e, 0, __parameter, __path);");
             w.Line("return new CobolVarGroup(__run, __d, __e);");
         }
@@ -334,7 +334,8 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             + "first refusal in __bad, when one fails it.</summary>");
         using (w.Block($"internal static bool __TryGet(CobolVarGroup __v, string __name, ref global::System.FormatException? __bad, out {name} __r)"))
         {
-            w.Line($"bool __ok = __TryGet(CobolVarGroup.WindowOf(__v.Fixed, {BlankImage(group, width)}, {at}, {tables}), null, 0, __name, ref __bad, out __r);");
+            w.Line($"bool __ok = __TryGet({RuntimeApi.VarGroupWindowOf(RuntimeApi.VarGroupFixed("__v"), BlankImage(group, width), at, tables)}, "
+                + "null, 0, __name, ref __bad, out __r);");
             w.Line("__r.__var = __v;");
             w.Line("return __TryGetDyn(__v, 0, __name, ref __bad, ref __r) && __ok;");
         }
@@ -394,7 +395,7 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
         string each = $"{name} + \"[\" + __i + \"]\"";
         if (m.Item is { IsElementary: true, IsDynamicLength: true })
         {
-            w.Line($"__r.{m.Name} = __v.Dyn({at});");
+            w.Line($"__r.{m.Name} = {RuntimeApi.VarGroupDyn("__v", at)};");
             return;
         }
         if (m.Item.IsDynamicTable)
@@ -403,8 +404,8 @@ internal sealed class PublishedRecordEmitter(Func<DataItem, string> profileOf)
             {
                 bool nested = m.Record is not null && ComponentsOf(m.Item).Count > 0;
                 w.Line(nested
-                    ? $"var __o = __v.ElementCarriersAt({at});"
-                    : $"var __o = CobolVarGroup.Occurrences(__v.Dyn({at}), {m.Item.ByteWidth});");
+                    ? $"var __o = {RuntimeApi.VarGroupElementCarriersAt("__v", at)};"
+                    : $"var __o = {RuntimeApi.VarGroupOccurrences(RuntimeApi.VarGroupDyn("__v", at), m.Item.ByteWidth)};");
                 w.Line($"__r.{m.Name} = new {m.Element}[__o.Length];");
                 string body = m.Record is not null
                     ? $"{{ if ({m.Record}.__TryGet(__o[__i]{(nested ? "" : ", null, 0")}, {each} + \".\", ref __bad, out var __g)) "

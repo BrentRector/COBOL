@@ -1970,6 +1970,31 @@ internal static class RuntimeApi
     /// <summary>The empty carrier value (an unbound formal's seed).</summary>
     public static string VarGroupEmpty => $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Empty)}";
 
+    /// <summary>A variable-length group's FIXED RUN from its window image — <c>CobolVarGroup.RunOf</c>, the one fixed-run
+    /// rule (ISO §8.5.1.12.3); <paramref name="dynTable"/> is each component's table element width, 0 for a dynamic-length
+    /// item.</summary>
+    public static string VarGroupRunOf(string window, IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.RunOf)}({window}, {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
+
+    /// <summary>The inverse of <see cref="VarGroupRunOf"/> — <c>CobolVarGroup.WindowOf</c>: a fixed run laid back around
+    /// the tables' reservations of <paramref name="window"/>.</summary>
+    public static string VarGroupWindowOf(string run, string window, IEnumerable<int> dynFixedAt, IEnumerable<int> dynTable) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.WindowOf)}({run}, {window}, {IntSpan(dynFixedAt)}, {IntSpan(dynTable)})";
+
+    /// <summary>A carried dynamic-capacity table's occurrence images — <c>CobolVarGroup.Occurrences</c>.</summary>
+    public static string VarGroupOccurrences(string content, int elementWidth) =>
+        $"{nameof(CobolVarGroup)}.{nameof(CobolVarGroup.Occurrences)}({content}, {elementWidth})";
+
+    /// <summary>Component <paramref name="ordinal"/>'s content in a carrier — <c>CobolVarGroup.Dyn</c>.</summary>
+    public static string VarGroupDyn(string carrier, string ordinal) => $"{carrier}.{nameof(CobolVarGroup.Dyn)}({ordinal})";
+
+    /// <summary>Component <paramref name="ordinal"/>'s occurrence carriers — <c>CobolVarGroup.ElementCarriersAt</c>.</summary>
+    public static string VarGroupElementCarriersAt(string carrier, string ordinal) =>
+        $"{carrier}.{nameof(CobolVarGroup.ElementCarriersAt)}({ordinal})";
+
+    /// <summary>A carrier's fixed run — <c>CobolVarGroup.Fixed</c>.</summary>
+    public static string VarGroupFixed(string carrier) => $"{carrier}.{nameof(CobolVarGroup.Fixed)}";
+
     /// <summary>A FIXED-length group's record image as a §8.5.1.12 carrier in its OWN shape — no components, the whole
     /// image its fixed run (kb/Work PB2496); a statement pairs it with a variable-length group by the two shapes
     /// (<see cref="VarGroupReshape"/>, <see cref="VarGroupCompare"/>).</summary>
