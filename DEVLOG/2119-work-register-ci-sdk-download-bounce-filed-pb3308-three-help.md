@@ -1,4 +1,4 @@
-## Work register: CI SDK-download bounce filed (PB3308); three --help encoding notes merged into PB1546
+## Entry 2119 — 2026-10-16 16:12 PDT — Work register: CI SDK-download bounce filed (PB3308); three --help encoding notes merged into PB1546
 
 Two register chores, no compiler change.
 
@@ -11,3 +11,4 @@ because the reconfigure runs after `parse_args()` or never. Verified on main 0c5
 `filter_population.py` still crash, `gen_ledger.py` does not; 107 scripts call `reconfigure`, 11 argparse scripts never
 do. PB1546 is the one open note (shared helper plus drift test); PB2615 and PB2915 are retired. Two script comments that
 named PB2615 now name PB1546.
+
