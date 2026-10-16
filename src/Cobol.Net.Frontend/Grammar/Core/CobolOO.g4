@@ -356,7 +356,8 @@ inlineMethodInvocation
 // that a format specifies a literal", and §8.4.3.4.2 writes literal-1 here, so `O :: K (X)` is conforming source and drew
 // COBOL0001. The alternative is `cobolWord`, never `dataReference`: no identifier stands after `::`, and a data
 // reference would swallow the argument list as a subscript. The binder reads the word through the ONE literal-alias
-// resolution (ExpressionBinder.LiteralAliasOf) and refuses a word that names no constant by §14.9.23.3 SR2.
+// resolution (ExpressionBinder.LiteralAliasOf) and refuses a word that names no constant by the INVOKE statement's
+// literal-1 rule (§8.4.3.4.3 SR3 makes the inline form that INVOKE; §14.9.23.3 SR2).
 inlineInvocationSegment
     : COLONCOLON (literal | cobolWord) (LPAREN argumentList RPAREN)?
     ;
