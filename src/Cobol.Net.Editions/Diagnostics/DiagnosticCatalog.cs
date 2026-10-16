@@ -1705,7 +1705,8 @@ public static class DiagnosticCatalog
         "COBOLNET1796", "external-pointer-or-object-item", EditionSeverity.Error,
         "ISO §13.18.22.3 syntax rule 4: \"The EXTERNAL clause shall not be specified for a data item of class "
         + "object or pointer.\" (The rule names the ITEM's own class, so a strongly-typed EXTERNAL group with a "
-        + "pointer MEMBER is not barred by it — that group is class alphanumeric, and §13.18.22.3 SR5 requires "
+        + "pointer MEMBER is not barred by it — that group's class is its type-name (§8.5.2.1), not pointer, and "
+        + "§13.18.22.3 SR5 requires "
         + "only that its type declaration also be external. Class pointer covers the data-pointer and "
         + "program-pointer categories; class object is the object-reference category.)",
         "ISO §13.18.22.3 SR4");
@@ -3689,6 +3690,24 @@ public static class DiagnosticCatalog
         + "items identified by key data-names shall be described in records associated with file-name-1\". "
         + "Neither can be located in a record nothing describes.",
         "ISO §13.4.5.3 SR7 / §13.4.6.3 SR2");
+
+    /// <summary>COBOLNET3983 — the READ half of the record-less entry's verb rules (kb/Work PB694). The implied record
+    /// <c>DataBinder.MaterializeImpliedRecord</c> builds has no record-name, so a READ without INTO would fill an
+    /// area the program can never name; the standard gives that READ no meaning, because §14.9.30.4 GR6 defines the
+    /// implied record only for the INTO form. SR3 b), the WRITE/REWRITE half, needs no code of its own: the
+    /// record-name-1 alternative cannot name a record-less file (§14.9.51.3 SR5, §14.9.35.3 SR1), and the
+    /// <c>FILE file-name-1</c> alternative is Annex A.4.13, declined by COBOLNET1706.</summary>
+    public static readonly DiagnosticDescriptor RecordLessFdReadWithoutInto = new(
+        "COBOLNET3983", "record-less-fd-read-without-into", EditionSeverity.Error,
+        "ISO §13.4.5.3 syntax rule 3 c): \"When no record description entries are specified: … c) an INTO phrase "
+        + "shall be specified on all READ statements associated with the file.\" Such a file's record area is the "
+        + "implied entry of §14.9.30.4 GR6 — \"The execution of a READ statement with the INTO phrase when there "
+        + "are no record description entries subordinate to the file description entry proceeds as though there "
+        + "were one record description entry describing an alphanumeric group item of the maximum size established "
+        + "by the RECORD clause\" — which has no record-name, so the INTO phrase is the only way the program can "
+        + "receive the record. Applies to the sequential, relative and indexed formats (Formats 1 and 2); a report "
+        + "file (Format 3) is not read at all (§13.4.5.3 SR9).",
+        "ISO §13.4.5.3 SR3 c)");
 
     /// <summary>COBOLNET0862 — the I-O STATEMENT OPERAND/PHRASE band: a START or WRITE statement writes an
     /// operand or a phrase its own syntax rules do not admit. Covers ISO §14.9.41.3 (START — the access mode,

@@ -261,7 +261,9 @@ public sealed class ProgramTable
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
     /// boundary; the STOP status itself is the run unit's <see cref="RunUnit.ExitStatus"/>, written by the STOP statement
     /// wherever in the run unit it executes). This is the HOST entry: it never writes the host process's exit code
-    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/>. The standalone executable's entry,
+    /// (DOC-A.1-167; kb/Work PB3163) — the host reads <see cref="RunUnit.ExitStatus"/> — and never reconfigures the host's
+    /// console (kb/Work PB3193): a DISPLAY writes through the host's <see cref="Console.Out"/> / <see cref="Console.Error"/>
+    /// as the host configured them (DOC-A.1-59). The standalone executable's entry,
     /// which IS the process, is <see cref="RunModule"/>.
     /// <para>The whole of it runs on the run unit's own thread (<see cref="ActivationStack.RunOnRunUnitThread"/>,
     /// kb/Work PB2659), whose stack is sized for COBOL activation frames, so a RECURSIVE program reaches a realistic
@@ -280,23 +282,24 @@ public sealed class ProgramTable
     /// <para>This is the boundary that IS the process (DOC-A.1-167: "A standalone <c>cobol</c> executable IS its own
     /// host"), so it alone delivers the run unit's termination status to the process exit code, once, when the run unit
     /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the
-    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163).</para></summary>
+    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163). It is
+    /// also the one runtime entry that configures the process's standard streams (<see cref="IO.StandardStreams.EnsureUtf8"/>,
+    /// kb/Work PB3193), before the run unit begins.</para></summary>
     /// <param name="ensureRegistered">The module's registration member.</param>
     /// <param name="mainPath">The main program's path, or null for a module with no main program (a callable library of
     /// functions or prototypes, §8.3.1): it registers and ends.</param>
     public void RunModule(Action ensureRegistered, string? mainPath)
     {
+        // The process's console is this entry's too, for the same reason (kb/Work PB3193): the standard streams carry
+        // UTF-8 (DOC-A.1-59; kb/Work PB59, PB899), set here and in the CLI's Main, never by a host entry, so a run unit
+        // a host embeds writes through the console the host configured and leaves it as it found it.
+        IO.StandardStreams.EnsureUtf8();
         try { ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath)); }
         finally { Environment.ExitCode = CobolNum.Position32(_owner.ExitStatus); }   // StopRun unwinds through here too
     }
 
     private void RunOnThisThread(Action? ensureRegistered, string? path)
     {
-        // The standard display device writes UTF-8 (fix-queue PB59; CONFORMANCE.md item 59). ⛔ The rule lives in
-        // ONE place — CobolNet.Runtime.IO.StandardStreams — because this `if` used to BE that place and the
-        // `cobol` CLI's diagnostic path had no copy of it, so every ISO citation the compiler printed left the
-        // process mangled at the OS code page (kb/Work PB899, feedback_two_arm_dispatch).
-        IO.StandardStreams.EnsureUtf8();
         try
         {
             // The module's own registration is a statement of the run unit like any other (kb/Work PB2846): a refusal
@@ -501,11 +504,8 @@ public sealed class ProgramTable
         var exc = excState;
         int savedActivator = exc.ActivatorExternalMask;
         exc.ActivatorExternalMask = activatingExternalMask;   // captured before resolution (GR3e)
-        // Per-activation scope for the Format-3 exception-checking PERFORM interceptor (ISO §14.9.28.4): snapshot
-        // the frame-stack depth so a called program's raise is NOT intercepted by the caller's active WHEN frame
-        // (the cross-activation GR1 "in range" reading is a documented STAGED item). TrimPerformTo on return also
-        // balances the stack if the callee unwound abnormally past its own pops.
-        int savedPerformDepth = exc.PerformDepth;
+        // The exception-checking PERFORM's WHEN frames need nothing here: the Modules.Push above IS their boundary
+        // (ExceptionEngine.RunTopFrame stops at a frame another activation pushed; kb/Work PB442).
         // Per-activation scope for the §14.6.13.1.4 #3 selector of a NONFATAL condition raised at a RUNTIME site
         // (kb/Work PB367b): the declaratives that qualify are the ACTIVATED element's (§14.9.49.4 GR3 analyzes
         // "the USE statements in the source element", GR4 a) "the source element that contains the statement that
@@ -561,7 +561,6 @@ public sealed class ProgramTable
         {
             n.Active--; _owner.Modules.Pop();
             exc.ActivatorExternalMask = savedActivator;
-            exc.TrimPerformTo(savedPerformDepth);
             exc.NonfatalDispatcher = savedNonfatalDispatcher;
             exc.RestoreChecking(savedChecking);
             if (freshInstance)

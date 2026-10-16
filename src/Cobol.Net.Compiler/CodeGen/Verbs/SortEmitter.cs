@@ -1002,9 +1002,10 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs, Dispa
             return RuntimeApi.StrCompare(shared ? pa : $"{pa}.AsNat()", shared ? pb : $"{pb}.AsNat()", weightsArg);
         // ⛔ V59 RESIDUE FIX (DA5): IsImageCapable, not the pre-V59 IsCharacterImage. §14.9.40.4 GR8
         // (`cite.py`-verified) makes a key comparison IDENTICAL to a relation condition — key data items are
-        // "compared according to the rules for comparison of operands in a relation condition" — and a GROUP
-        // operand in a relation condition is class alphanumeric (§8.8.4.2.1) compared over its
-        // representation, which `OperandText` already renders through `AsImage()` gated on IsImageCapable. Testing
+        // "compared according to the rules for comparison of operands in a relation condition" — and an
+        // ALPHANUMERIC group operand (the GROUP-USAGE groups took the arm above) is treated as an elementary
+        // alphanumeric item (§8.8.4.2.1 13)), compared over its representation, which `OperandText` already
+        // renders through `AsImage()` gated on IsImageCapable. Testing
         // the stricter predicate here therefore made SORT and `IF a > b` DISAGREE about the very same two group
         // operands: the IF compared their byte images while the SORT threw "no whole-group character image" —
         // a claim V59 falsified, since the codec is emitted for exactly IsImageCapable items. A group with a
@@ -1012,8 +1013,9 @@ internal sealed class SortEmitter(EmitContext ctx, ReferenceResolver refs, Dispa
         // PB164 + R40 — every NUMERIC leaf kind joined the image), so the wording matches the predicate tested.
         // ⚠ NOT A BUG, AND DELIBERATE: a big-endian two's-complement image is NOT order-preserving across zero,
         // so a group key holding a NEGATIVE binary leaf orders by its bytes rather than its value. That is what
-        // the standard prescribes — GR8 defers to the relation-condition rules, and those make a GROUP
-        // alphanumeric — and it is exactly what the same group compared with IF already does. A program wanting
+        // the standard prescribes — GR8 defers to the relation-condition rules, and those treat an alphanumeric
+        // group as an elementary alphanumeric item — and it is exactly what the same group compared with IF
+        // already does. A program wanting
         // value order names the ELEMENTARY numeric item as the key, which takes the by-value arm below.
         // (Reaching here the group is an ORDINARY one — the GROUP-USAGE arms above own the national and bit
         // groups, which are elementary operands of their own class rather than alphanumeric byte images.)

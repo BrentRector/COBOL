@@ -76,8 +76,13 @@ WORK = REPO / "kb" / "Work"
 
 KINDS = {"defect", "analysis", "adjudication", "decision"}
 STATUSES = {"open", "half", "landed", "owner", "blocked", "retired"}
-#: The statuses that mean an item is DONE. A view of open work shall exclude every one of them — see
-#: :func:`check_base_agrees`, which is what stops the next one added here from being half-applied.
+#: The statuses that mean an item is DONE — the ONE vocabulary every reader of the register asks (kb/Work PB3196:
+#: the R0 census and the note generator each read the status their own way, and the census's own copy held four
+#: statuses that `check` rejects). A view of open work shall exclude every one of them — see
+#: :func:`check_base_agrees`, which is what stops the next one added here from being half-applied. The C# reader's
+#: twin, `WorkRegister.TerminalStatuses`, is held to this tuple by the parity fixture: :func:`parity_view` reports
+#: `terminal`, and :func:`parity` refuses a fixture that leaves any status of STATUSES without a case, so a status
+#: added here reaches both engines' answers.
 TERMINAL_STATUSES = ("landed", "retired")
 HARM = {"wrong-answer", "crashes", "silent", "rejects-legal-source", "under-rejects", "process"}
 
@@ -1024,14 +1029,18 @@ def parity_view(text: str) -> dict:
     what a note SAYS, and a key that is missing says exactly as much as a key that is empty. What is NOT
     normalized away is `errors` — a malformed value is a third outcome, and collapsing it into "empty" is the
     fail-open that `kb/Work/PB875` is about.
+
+    `terminal` is what each engine's vocabulary makes of the status (TERMINAL_STATUSES here, its C# twin there): the
+    register's gates read DONE through it, so it is compared like any field (kb/Work PB3196).
     """
     d = parse_frontmatter(text)
     if d is None:
-        return {"note": False, "id": "", "kind": "", "status": "", "inventory_rows": [], "closes_rows": [],
-                "closes_rows_reason": "", "errors": []}
+        return {"note": False, "id": "", "kind": "", "status": "", "terminal": False, "inventory_rows": [],
+                "closes_rows": [], "closes_rows_reason": "", "errors": []}
     scalar = lambda k: (v if isinstance(v := d.get(k, ""), str) else str(v))       # noqa: E731
     lst = lambda k: (v if isinstance(v := d.get(k, []), list) else [])             # noqa: E731
     return {"note": True, "id": scalar("id"), "kind": scalar("kind"), "status": scalar("status"),
+            "terminal": scalar("status") in TERMINAL_STATUSES,
             "inventory_rows": lst("inventory_rows"), "closes_rows": lst("closes_rows"),
             "closes_rows_reason": scalar("closes_rows_reason"), "errors": sorted(d.get("_errors", []))}
 
@@ -1080,6 +1089,16 @@ def parity(as_json: bool) -> int:
     }
     findings += [f"the parity fixture carries no case for {what} — it cannot be measuring that shape"
                  for what, ok in covered.items() if not ok]
+    # EVERY STATUS OF THE VOCABULARY, so the two engines' terminal sets are compared on each one (kb/Work PB3196): a
+    # status added to STATUSES or TERMINAL_STATUSES stops this until a case states what it is, and that case is
+    # what holds the C# twin to it.
+    stated = {a["status"] for a in answers if a["note"]}
+    findings += [f"the parity fixture carries no note whose status is {s!r} — neither engine's `terminal` answer "
+                 f"for it is measured" for s in sorted((STATUSES | set(TERMINAL_STATUSES)) - stated)]
+    # EVERY FIELD, on every case: a field the fixture leaves unstated is a field the engines may disagree on unseen.
+    findings += [f'parity case "{c["name"]}": the fixture states no {k!r} — it must state every field the view '
+                 f'reports' for c, a in zip(fixture["cases"], answers)
+                 for k in a if k != "name" and k not in c["expect"]]
     if len(fixture["cases"]) < 8:
         findings.append(f'{len(fixture["cases"])} parity case(s) — too few to be measuring the reader')
 

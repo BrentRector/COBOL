@@ -174,7 +174,8 @@ internal sealed class CorrespondingBinder(BinderContext ctx, StatementBinder hos
                 // error). The question goes to the ONE Table 16 — see CorrRule2MoveValid, which is a delegation.
                 if (!CorrRule2MoveValid(s, d)) continue;
             }
-            // Rule 3: BOTH shall be numeric data items — a group is class alphanumeric and numeric-edited is
+            // Rule 3: BOTH shall be numeric data items — a group never is (its §8.5.2.1 class is alphanumeric,
+            // boolean, national or its type-name) and numeric-edited is
             // category numeric-edited (§8.4.2), so only elementary-numeric × elementary-numeric qualifies; every
             // other namesake silently does not correspond. (The legacy matcher lacked this filter; spec governs.)
             else if (s.Pic?.Category is not PicCategory.Numeric || d.Pic?.Category is not PicCategory.Numeric)

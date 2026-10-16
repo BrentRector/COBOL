@@ -137,8 +137,8 @@ public sealed partial class DataBinder
             // different verdict about a different thing. Opening the byte-window gate to pointer-class leaves
             // would have made this NONCONFORMING shape compile clean: an under-rejection created by a fix. The
             // rule that actually bars it is enforced in the same change set, and it is the ITEM's own class the
-            // rule names — a strongly-typed EXTERNAL group holding a pointer MEMBER is class alphanumeric and
-            // stays legal (SR5 only requires its type declaration to be external too).
+            // rule names — a strongly-typed EXTERNAL group holding a pointer MEMBER is of class its type-name
+            // (§8.5.2.1), not pointer, and stays legal (SR5 only requires its type declaration to be external too).
             if (ScreenExternalClassItem(item, name)) continue;
 
             // ── §13.18.5.3 SR1 ───────────────────────────────────────────────────────────────────────────
@@ -367,7 +367,7 @@ public sealed partial class DataBinder
     /// "POINTER" would make the one symptom of that invariant breaking look like an ordinary correct verdict.
     /// A message that cannot be false is worth one arm.</summary>
     private static string Sr14PhraseNameOf(DataItem d) => Sr14PhraseOf(d)
-        ?? $"an unnamed usage of class {d.Pic?.Category.ToString() ?? "(none)"} — this is a compiler defect: a "
+        ?? $"an unnamed usage of category {d.Pic?.Category.ToString() ?? "(none)"} — this is a compiler defect: a "
             + "slot-carried item whose profile names no §13.18.60.3 SR14 usage";
 
     /// <summary>SR14's "at level 1" arm. ⛔ 77 SATISFIES IT — see this file's header for the derivation

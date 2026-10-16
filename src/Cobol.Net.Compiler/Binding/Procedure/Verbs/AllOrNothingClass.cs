@@ -51,6 +51,6 @@ internal static class AllOrNothingClass
 
     /// <summary>The ONE message suffix for a violation, naming the rule the caller cites.</summary>
     public static string Offence(CobolClass governing, string rule) =>
-        $"mixes class {governing.ToString().ToUpperInvariant()} with an operand of another class; {rule} requires "
-        + $"that if any of the operands it names is of class {governing.ToString().ToLowerInvariant()}, all of them shall be";
+        $"mixes class {IntrinsicArgumentRules.Name(governing).ToUpperInvariant()} with an operand of another class; {rule} requires "
+        + $"that if any of the operands it names is of class {IntrinsicArgumentRules.Name(governing)}, all of them shall be";
 }

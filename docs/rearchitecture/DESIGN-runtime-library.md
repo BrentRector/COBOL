@@ -193,7 +193,7 @@ facades cache `RunUnit.Current` in a local at entry to avoid repeated `AsyncLoca
 
 **Emitted-surface compatibility (battery-green):** the existing static facades stay as *thin delegating shims* over
 `RunUnit.Current` during the migration, so generated code (`ProgramRegistry.CallProgram(...)`,
-`ExceptionState.Set(...)`, `CobolFile.Open(...)`, `CobolModule.Push(...)`) keeps compiling unchanged:
+`ExceptionState.Set(...)`, `CobolFile.Open(...)`, `CobolModule.Name(...)`) keeps compiling unchanged:
 ```csharp
 public static class ProgramRegistry {                 // compat shim (deleted at G8 or kept — OPEN QUESTION)
     public static void CallProgram(string n, string c, CobolArg[] a, ManagedPointer? r,
@@ -776,6 +776,13 @@ runs the registration and then the main program under the §14.6.12 abnormal-ter
 epilogue, so a registration the run unit refuses (another runtime major or call ABI, or an already-registered
 outermost name) ends the run unit through that surface and never escapes as an unhandled .NET exception. A host that
 registers its modules itself enters through `ProgramRegistry.RunMain(path)`, the same boundary without the registration.
+**The process's own state belongs to the entry that IS the process (kb/Work PB3163, PB3193).** `RunModule` and the
+`cobol` CLI's `Main` are the only writers of the process exit code and the only callers of
+`IO.StandardStreams.EnsureUtf8` (UTF-8 standard output and error, and a UTF-8 reader over a redirected standard input,
+DOC-A.1-59 and DOC-A.1-1); `RunMain`, `RunUnit.Run` and a CALL into a module write neither, so a run unit a host
+embeds DISPLAYs through the host's `Console.Out` / `Console.Error` as the host configured them and leaves the host's
+exit code and console as it found them. `ProcessStateOwnerDriftTests` (Unit) holds each process-owned write to its
+owner; `RunUnitHostExitCodeTests` and `RunUnitHostConsoleTests` (Conformance) are the host-side witnesses.
 `ProgramRegistry` → **`ProgramTable`** (an instance owned by `RunUnit`; the name "Registry" is reserved for the
 process-level nothing-here). The name-resolution / state-model / CANCEL / sibling-module-probe logic is ported
 verbatim onto the instance. `ExternalStore` and `CobolModule`→`ModuleStack` move off statics onto `RunUnit`. The CALL-

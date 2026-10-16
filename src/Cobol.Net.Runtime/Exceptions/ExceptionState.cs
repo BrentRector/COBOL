@@ -49,10 +49,11 @@ public sealed class ExceptionEngine
     public string? LastStatement { get; private set; }
 
     /// <summary>EXCEPTION-OBJECT (§8.4.3.6) — the run unit's ONE predefined object reference (GR2):
-    /// references the current exception object, null when none (GR1). Implicitly UNIVERSAL (SR2 :7249) —
+    /// references the current exception object, null when none (GR1). Implicitly UNIVERSAL (§8.4.3.6.3 SR2) —
     /// typed <see cref="CobolObject"/> per the D-U1 universal model. Set by RAISE identifier-1, by
     /// the GR1b2 activator-side pickup, and (GR15) it already holds the object when an F4 declarative
-    /// enters; nulled by every NAMED raise (§14.9.29.4 GR1 / :24485).</summary>
+    /// enters; nulled by every NAMED raise (§14.9.29.4 GR1) — one that is RAISED, i.e. whose checking is
+    /// enabled (§14.6.13.1.1; an un-raised RAISE nulls nothing, kb/Work PB867).</summary>
     public CobolObject? ExceptionObject { get; private set; }
 
     /// <summary>Record a raised exception OBJECT (§14.6.13.1.5 (1)/(2): EXCEPTION-OBJECT references the
@@ -1570,44 +1571,43 @@ public sealed class ExceptionEngine
     /// <summary>The active Format-3 PERFORM interceptor frames (innermost on top). A List, not a
     /// <c>Stack&lt;T&gt;</c>, so <see cref="RunTopFrame"/> can walk it top-down by index (§14.9.28.4 GR17 — the
     /// innermost PERFORM whose imperative-statement-1 is executing). Run-unit-scoped for free (this engine is per
-    /// run unit); nesting is the stack; CALL-safety is <see cref="PerformDepth"/>/<see cref="TrimPerformTo"/>.</summary>
+    /// run unit); nesting is the stack; each frame carries the activation that pushed it.</summary>
     private readonly List<PerformFrame> _perform = new();
 
+    // ── ⛔ A WHEN PHRASE SEES THE CONDITIONS OF ITS OWN ACTIVATION, AND ONLY THOSE (kb/Work PB442) ─────────────────
+    // §14.9.28.4 GR17's scope word is "during the execution of imperative-statement-1": DYNAMIC within the
+    // activation, so a raise in a paragraph PERFORMed from imp-1 is selected exactly like one written in it (GR1's
+    // range; §9.1.12 1) "an ACTIVE PERFORM statement"; §14.6.13.1.4 2) "the EXECUTED statement"). It stops at the
+    // activation boundary, because the condition does: an exception status indicator "exists for each function,
+    // method, or program" (§14.6.13.1.1), and a condition reaches the activator only by propagation (GOBACK / EXIT
+    // … RAISING, §14.9.18.4 GR1 b); PROPAGATE ON, §14.6.13.1.3 6)), raised again "in the activating runtime
+    // element" with the CALL or INVOKE as its statement (§14.9.33.4 GR2 a) 2.) — where this walk, now in the
+    // activator, finds the WHEN. The boundary is the run unit's ONE activation record (ModuleStack), which every
+    // activation mechanism pushes (CALL, function activation, nested CALL, every method), so no mechanism can
+    // forget it. It replaced a frame-depth floor raised only by a method that itself held an exception-checking
+    // PERFORM: a CALLed program or an ordinary method whose raise sites consulted the frame stack (any unit holding
+    // one such PERFORM emits them) ran the ACTIVATOR's WHEN inside the callee. Enablement stays lexical and is a
+    // separate question: GR14's implicit TURN is a directive written before imp-1's first statement (§7.3.25.4 GR6).
+
     /// <summary>Push the interceptor frame the emitted Format-3 PERFORM installs around imperative-statement-1
-    /// (paired with <see cref="PopPerformFrame"/> in a generated <c>finally</c>, so any unwind still balances).</summary>
-    public void PushPerformFrame(PerformFrame f) => _perform.Add(f);
+    /// (paired with <see cref="PopPerformFrame"/> in a generated <c>finally</c>, so any unwind still balances),
+    /// stamping it with the running activation (<see cref="PerformFrame.Activation"/>).</summary>
+    public void PushPerformFrame(PerformFrame f)
+    {
+        f.Activation = _activations?.CurrentActivation ?? 0;
+        _perform.Add(f);
+    }
 
     /// <summary>Pop the top interceptor frame at the end of a Format-3 PERFORM (before its FINALLY runs, so imp-5
     /// behaves as if in a Format-2 PERFORM — GR21).</summary>
     public void PopPerformFrame() => _perform.RemoveAt(_perform.Count - 1);
 
-    /// <summary>The current frame-stack depth (the CALL-boundary snapshot point).</summary>
-    internal int PerformDepth => _perform.Count;
-
-    /// <summary>Restore the frame stack to <paramref name="depth"/> — the activation boundary's per-activation
-    /// scope (§14.9.28.4 GR1's cross-activation "in range" reading is a documented STAGED item; the safe default
-    /// is that a called program's raise is not intercepted by the caller's frame).</summary>
-    internal void TrimPerformTo(int depth) { while (_perform.Count > depth) _perform.RemoveAt(_perform.Count - 1); }
-
-    /// <summary>The activation FLOOR — <see cref="RunTopFrame"/> never walks BELOW it. Zero by default (a program's
-    /// whole stack is visible — byte-identical behaviour). An OO method is a separate source element (ISO §14.9.18.3
-    /// SR2/SR4a): on entry an F3 method RAISES the floor to the current depth so its own unmatched raises are NOT
-    /// intercepted by the ACTIVATOR's WHEN (design SSOT §9.10.1-C2 — ECs cross a method boundary only via GOBACK/EXIT
-    /// … RAISING). Nests via the saved/restored old floor. The cross-CALL/INVOKE "in range" reading stays staged.</summary>
-    private int _floor;
-
-    /// <summary>Raise the frame-stack floor to the current depth (an F3-method entry), returning the previous floor
-    /// for a later <see cref="RestorePerformFloor"/>. Below this, <see cref="RunTopFrame"/> does not walk.</summary>
-    public int RaisePerformFloor() { int old = _floor; _floor = _perform.Count; return old; }
-
-    /// <summary>Restore the frame-stack floor to a value captured by <see cref="RaisePerformFloor"/> (the F3-method
-    /// exit — paired in a generated <c>finally</c> so any unwind still balances).</summary>
-    public void RestorePerformFloor(int floor) => _floor = floor;
-
     /// <summary>Select and run the innermost matching WHEN handler of an active exception-checking PERFORM
     /// (ISO §14.9.28.4 GR17 — the closest PERFORM whose imperative-statement-1 is executing; GR18 WHEN OTHER;
     /// GR21 — a frame is transparent to exception conditions raised while it is handling). Walks the stack
-    /// innermost→outermost, skipping frames already <see cref="PerformFrame.Handling"/>; the first frame whose
+    /// innermost→outermost and STOPS at the first frame another activation pushed (the rule above: an activation's
+    /// frames are always the top of the stack, since a deeper activation's frames are popped before it returns),
+    /// skipping frames already <see cref="PerformFrame.Handling"/>; the first frame whose
     /// matcher does not return <see cref="PerformFrame.NoMatch"/> handled it (<paramref name="handled"/> = true),
     /// and its returned dispatch action (a <see cref="DispatchResult"/> or a pc) is passed back to the raise site. Every frame
     /// visited in THIS resolution stays marked <c>Handling</c> until it completes (deferred clear), so an
@@ -1618,11 +1618,13 @@ public sealed class ExceptionEngine
     {
         handled = false;
         var marked = new List<PerformFrame>(4);   // per-raise (the EC path is rare); re-entrancy-safe
+        long running = _activations?.CurrentActivation ?? 0;
         try
         {
-            for (int i = _perform.Count - 1; i >= _floor; i--)   // innermost → the activation floor (§9.10.1-C2)
+            for (int i = _perform.Count - 1; i >= 0; i--)   // innermost → the running activation's outermost frame
             {
                 var f = _perform[i];
+                if (f.Activation != running) break;         // the activator's frames: reached only by propagation
                 if (f.Handling) continue;                   // GR21 — its own imp-1/handler is transparent
                 f.Handling = true;
                 marked.Add(f);                              // deferred clear ⇒ stays Handling for the whole walk
@@ -2345,16 +2347,4 @@ public static class ExceptionState
 
     /// <inheritdoc cref="ExceptionEngine.RunTopFrame"/>
     public static int RunTopFrame(string ec, string? file, out bool handled) => E.RunTopFrame(ec, file, out handled);
-
-    /// <inheritdoc cref="ExceptionEngine.PerformDepth"/>
-    public static int PerformDepth => E.PerformDepth;
-
-    /// <inheritdoc cref="ExceptionEngine.TrimPerformTo"/>
-    public static void TrimPerformTo(int depth) => E.TrimPerformTo(depth);
-
-    /// <inheritdoc cref="ExceptionEngine.RaisePerformFloor"/>
-    public static int RaisePerformFloor() => E.RaisePerformFloor();
-
-    /// <inheritdoc cref="ExceptionEngine.RestorePerformFloor"/>
-    public static void RestorePerformFloor(int floor) => E.RestorePerformFloor(floor);
 }

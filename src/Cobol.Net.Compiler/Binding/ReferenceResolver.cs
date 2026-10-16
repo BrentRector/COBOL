@@ -2909,8 +2909,10 @@ public sealed partial class ReferenceResolver(DataBinder data)
         string what = item.Pic is { Usage: Usage.Index }
                 ? $"item '{name}', an index data item (class index, ISO §8.5.2.1 Table 2; §13.18.60.3 SR10 admits "
                   + "an index data item only in SEARCH/SET, a relation condition, or an intrinsic argument)"
+            // The class SPELLED by the one Table-2 spelling (kb/Work PB1400): `ToString().ToLowerInvariant()` of the
+            // enum printed a numeric-edited subscript as "class numericediteddeediting".
             : $"item '{name}' of class "
-              + $"{IntrinsicArgumentRules.ClassOfItem(item)?.ToString().ToLowerInvariant() ?? "unknown"} "
+              + $"{(IntrinsicArgumentRules.ClassOfItem(item) is { } cls ? IntrinsicArgumentRules.Name(cls) : "unknown")} "
               + "(ISO §8.5.2.1 Table 2)";
         string where = position == SegmentPosition.Subscript
             ? "a subscript is arithmetic-expression-1 (ISO §8.4.2.3.2)"

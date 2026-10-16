@@ -254,6 +254,9 @@ internal sealed class SequentialIoBinder(BinderContext ctx, StatementBinder host
     {
         // The ONE file-name resolution step (kb/Work PB236 — §8.4.2.1 through COBOLNET1639).
         if (!ctx.Validation.ResolveFile(r.fileName(), "READ", out var file)) return BoundRejected.Reported(ctx.Edition);
+        // §13.4.5.3 SR3 c) is a rule of the FILE DESCRIPTION ENTRY, so it is asked BEFORE the organization reroute
+        // and the relative arm is under it too (kb/Work PB694, feedback_two_arm_dispatch).
+        ctx.Validation.CheckReadIntoOnRecordLessFile(file, r.readInto() is not null);   // SR3 c) — pure check
         if (!file.IsSequential) return keyedIo.BindRead(r, file);   // relative/indexed READ F1/F2 (ISO 14.9.30; KeyedIo partial)
         // READ … INTO is an IMPLICIT MOVE and is bound as one (ISO §14.9.30.4 GR4 b); kb/Work PB348): the
         // sender is the record area sliced to its §13.18.43.4 GR16 byte count, resolved through the LARGEST

@@ -191,7 +191,11 @@ A rearchitecture phase is "behavior-neutral" iff, in order of authority:
 3. **Emitted-C# snapshots** (secondary, advisory): the generated `.g.cs` for a representative program set is
    snapshotted. A refactor that is a pure reorg SHOULD leave these byte-identical; a refactor that intentionally
    changes emission form (e.g. structured `Place` → different but equivalent C#) RE-BASELINES the snapshot **with
-   explicit review**, and gate (1) proves the re-baseline is behavior-preserving.
+   explicit review**, and gate (1) proves the re-baseline is behavior-preserving. The runtime version a module
+   records (`CobolRepository`, `EnsureRegistered`) is the package version, which every runtime major bump raises
+   (DESIGN-external-repository.md §15.4): the snapshot holds it as `{RUNTIME-VERSION}`, substituted only where it is
+   the runtime's own version, so a bump re-baselines nothing (a version reaches no test through code impact, so
+   leg 1 never planned these cases on one) and an emitter stamping any other version still diffs.
 
 Gates (1) and (2) are hard (red = stop). Gate (3) is a reviewed diff, never auto-accepted, never silently drifting.
 
@@ -345,11 +349,13 @@ rule.
 
 **The wire encoding of a diagnostic is part of the diagnostic** (`kb/Work/PB899`). A message carries its ISO
 citation, so it carries non-ASCII — `(ISO §11.10.3 SR5–6)` holds U+00A7 and U+2013. `CobolNet.Runtime.IO.StandardStreams.EnsureUtf8()`
-is the ONE place that rule is written down, and BOTH entry points call it: `Program.Main` in the CLI before it
-parses an argument, and `ProgramTable.RunMain` for a run unit — which is where it used to live ALONE, so every
+is the ONE place that rule is written down, and BOTH process entries call it: `Program.Main` in the CLI before it
+parses an argument, and `ProgramTable.RunModule` for a compiled program's `Main` (never a host entry such as
+`RunMain`, whose host owns its console: kb/Work PB3193). The run-unit entry is where it used to live ALONE, so every
 citation the compiler printed left the process at the OS code page (on cp437 the section sign is the single byte
 `0x15`) in every redirected capture and every CI log. No golden could see it: the corpus runner matches `.err`
-files on a pure-ASCII diagnostic CODE substring, and the harness decodes every capture as UTF-8. The witness is
+files on a pure-ASCII diagnostic CODE substring, and the harness decodes every capture as UTF-8 (and encodes what it
+pipes to standard input as UTF-8, the ACCEPT device's decoding, kb/Work PB3193). The witness is
 therefore a BYTE assertion through a redirected stream, `CliDiagnosticEncodingTests`, which drives the CLI from a
 console forced to cp437 on Windows and FAILS if that code page was not actually in force — a child with no console
 inherits .NET's UTF-8 default and would pass on the broken build.

@@ -138,14 +138,24 @@ public sealed class DisplayUsageUnionDriftTests
             //      content its native carrier cannot, and the numeric class condition (§8.8.4.4.4 GR3 n) 1. c.)
             //      must read that content. UnifyCrossing had left with kb/Work PB187 on the same predicate.
 
-            // DISPLAY-ONLY (2), both CARRIAGE (MarkImageForced):
+            // PAIR (1) — CARRIAGE (MarkImageForced), the ONE eligibility (IsCharacterImageNumeric) of both of
+            //      this file's image marks:
             //  the figurative pass — a NON-DIGIT figurative fill deposits fill CHARACTERS into the receiver's
             //      cells ("MOVE QUOTE TO PIC 9(3) leaves three quotation marks"); a 2-byte binary carrier has
             //      no character cells to hold them.
             //  MarkRefModStoreImage — ⛔ NOT the §8.4.3.3.3 SR1 screen (that is ReferenceResolver's, above):
             //      this one FORCES the underlying item's carriage to its image so a ref-mod store can write
-            //      character cells, which is the promotion question and stays DISPLAY-only for the same reason.
-            ["Binding/Procedure/Verbs/MoveBinder.cs"] = (2, 0),
+            //      character cells.
+            //  ⛔ WAS 2 DISPLAY-ONLY, one per mark (kb/Work PB442). A usage NATIONAL numeric item is represented
+            //      in a national coded character set (§13.18.60.4 GR8), so it HAS the character cells both marks
+            //      write, and leaving it out was MEASURED: below 2023 `MOVE LOW-VALUE TO` a `PIC 9 USAGE NATIONAL`
+            //      item stopped the run unit with NotImplementedCobolFeatureException and `MOVE SPACE TO NN9(1:1)`
+            //      was silently lost (conformance:2002/pb442_numeric_edited_national_class). This is a SINGLE-LEAF
+            //      mark, not the whole-group promotion DataBinder's MarkImageLeaves keeps DISPLAY-only: a forced
+            //      national leaf was probed through group-to-group MOVEs between two such groups (both leaves
+            //      forced, one forced, GROUP-USAGE NATIONAL and alphanumeric groups, an ALL "7" group deposit) and
+            //      every value and class test matched its unforced twin.
+            ["Binding/Procedure/Verbs/MoveBinder.cs"] = (0, 1),
 
             // DISPLAY-ONLY (3) — KEEPER, SPEC-ALIGNED TO AN IMPLEMENTOR CHOICE (kb/Work PB1907, CONFORMANCE.md §3
             //      D-OVL2). The overlapping-MOVE corners are about ZONED DISPLAY storage by nature: a numeric DISPLAY

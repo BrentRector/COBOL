@@ -20,9 +20,9 @@ data-name-1 is the one-window case rather than a separate path (the shape kb/Wor
   `RegisterIndexed` / `AddAlternateKey` take `KeySegment[]`; `FixedFileAttributes.KeyDescriptor` holds the segment
   list (value equality); the store header is FORMAT VERSION 5 (each key's segment count and windows — §12.4.5.12.4
   GR3 makes every window a fixed attribute). A version-4 store is Foreign ('39'). The changed public members make
-  this an incompatible runtime surface, so the runtime MAJOR is raised 5 → 6 (Directory.Build.props) and
-  `RuntimeAbiPinDriftTests` re-pinned: a module compiled against runtime 5 is refused by `RuntimeAbi.Skew` rather
-  than failing inside a key registration.
+  this an incompatible runtime surface, so the runtime MAJOR is raised 6 → 7 (Directory.Build.props; main's PB442
+  had already raised it 5 → 6 for its own surface change) and `RuntimeAbiPinDriftTests` re-pinned: a module compiled
+  against runtime 6 is refused by `RuntimeAbi.Skew` rather than failing inside a key registration.
 - `FileControlKeyRules` yields ONE OPERAND PER data-name-2, so every rule stated of "data-name-1 and data-name-2"
   (SR1, SR2, SR3, the minimum-size rule) reaches each through the data-name-1 row; new rows for SR2's last sentence
   ("All occurrences of data-name-2 shall be of the same category") on both clauses; §12.4.5.6.3 SR4's SOURCE
@@ -93,6 +93,17 @@ COBOLNET_FILES_DESIGN.md "THE SECOND KEY FORM" and D10 (format version 5), the g
   `QualifiedCandidates`, so it had no such hole. SR-8.4.2.2.3-1's notes were restated (batch
   `w1095i-review-r2-pb1099`; CONFORMS, GAP 78 → 78). The merge of main brought PB2758's runtime surface change under
   this branch's major 6, so the runtime surface hash was re-pinned (21C3F112DD1E124B).
+- Landing finisher (Linux gate RED, characterization): the branch raised the runtime major to 6 but never
+  re-recorded the 14 emitted-C# characterization snapshots, which stamp the runtime version in
+  `[assembly: CobolRepository(…)]` and `EnsureRegistered`; they were red on both hosts, but the Windows gate's leg 1
+  never planned them (a version is reached by no test through code impact, and the impact map was absent), so only
+  the landing's whole Linux run saw them. Meanwhile main's PB442 raised the major 5 → 6 independently, so the merge
+  of main raises this branch's change to 7 and re-pins the merged surface (1EDF6BEDACF395D8), each landing's
+  incompatible change getting its own major as PB442 did over PB651. The root fix: `EmittedCSharpSnapshotTests`
+  snapshots the version stamp as `{RUNTIME-VERSION}`, substituted only where it equals `RuntimeAbi.Version`, so a
+  major bump no longer touches the snapshots (the fourth finisher to re-record them for one; an emitter stamping any
+  other version still diffs, and `TheEmittedRecord_StatesTheVersionsThisRuntimeDeclares` pins the exact text).
+  DESIGN-test-build-ci.md gate 3 says so.
 
 **Self-review.** Architecture: one key shape, one capture, one lookup, one gate; no C# text in a bound node.
 Code: each cited rule re-read for the operand it names (data-name-1 vs data-name-2, record-key-name-1). Performance:
