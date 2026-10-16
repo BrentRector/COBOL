@@ -205,12 +205,14 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     private static PicInfo ShapedPic(IReadOnlyList<Place> receivers)
     {
         int scale = 0, integer = 0;
+        bool sized = false;
         foreach (var receiver in receivers)
         {
             // A reference-modified receiver is the elementary ALPHANUMERIC unique data item of §8.4.3.3.4 GR6, never
             // the numeric item under it; an index or object receiver has no description to size by.
             var pic = receiver is RefModPlace ? null : receiver.Item.OperandPic;
             if (receiver is not RefModPlace && pic is null) continue;
+            sized = true;
             if (pic is null) { scale = Math.Max(scale, ReturnedFractionDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
             else if (pic.IsFloat) { scale = Math.Max(scale, PicInfo.ScaledCarrierDigits - ReturnedIntegerDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
             else if (pic.Category is PicCategory.Numeric or PicCategory.NumericEdited)
@@ -221,6 +223,9 @@ internal sealed class SendingValueTemp(BinderContext ctx)
             }
             else { scale = Math.Max(scale, ReturnedFractionDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
         }
+        // No receiver had a description to size by (an index or object receiver is not a numeric MOVE receiver, so this
+        // is unreachable from a legal MOVE): the value operand's item, never a one-digit guess.
+        if (!sized) return ValueOperandPic;
         integer = Math.Clamp(integer, 1, PicInfo.ScaledCarrierDigits);
         scale = Math.Min(scale, PicInfo.ScaledCarrierDigits - integer);
         int digits = integer + scale;

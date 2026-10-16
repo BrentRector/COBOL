@@ -235,10 +235,12 @@ public static class MoveClassifier
     /// (<see cref="CanBeZeroLengthItem"/>). GR1's own sentence is conditional — "If identifier-1 <i>is</i> a
     /// zero-length item" — and §8.5.4's enumeration makes both of these shapes conditional in turn. Freezing on
     /// the shape ALONE was a wrong answer, not a wasted temp: a numeric function-identifier sender was hoisted
-    /// into the §15.4 numeric temporary, whose implementor description (<c>SendingValueTemp.FunctionValuePic</c>,
-    /// 21 integer + 9 fraction digits) is narrower than a STANDARD-DECIMAL or float result, so
+    /// into a §15.4 numeric temporary — then a fixed 21 integer + 9 fraction digit item, narrower than a
+    /// STANDARD-DECIMAL or float result, so
     /// <c>MOVE FUNCTION E TO a 31-digit item</c> stored 2718281828000000000000000000000 for
-    /// 2718281828459045235360287471352 — the freeze re-rounded a value that can never be zero-length.</para></summary>
+    /// 2718281828459045235360287471352 — the freeze re-rounded a value that can never be zero-length. (The numeric
+    /// intermediate is now described for its value, <c>SendingValueTemp.IntermediatePic</c>, kb/Work PB3268; the
+    /// freeze is still skipped, because a numeric value has nothing for the zero-length test to read.)</para></summary>
     public static bool NeedsLengthFreeze(BoundOperand source, IReadOnlyList<Place> targets)
     {
         // The receiver half is the ROUTE's own predicate, never a second copy of it: a freeze exists only so the
