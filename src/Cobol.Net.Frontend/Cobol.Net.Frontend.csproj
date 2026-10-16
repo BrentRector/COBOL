@@ -78,8 +78,9 @@
 
     <Message Text="Generating the ANTLR parser into Generated/ (absent, or a generation input is newer)." Importance="high" />
 
-    <!-- A nonzero exit FAILS the build: the generator exits 1 on any failure and leaves Generated/ empty. -->
-    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/$(AntlrGenerator)&quot; -PackageName $(AntlrNamespace) -JarPath &quot;$(MSBuildProjectDirectory)/$(AntlrJar)&quot; -OutputDir &quot;$(MSBuildProjectDirectory)/Generated&quot;"
+    <!-- A nonzero exit FAILS the build: the generator exits 1 on any failure and leaves Generated/ empty
+         (-NonInteractive: a missing mandatory parameter fails instead of waiting for input). -->
+    <Exec Command="pwsh -NoProfile -NonInteractive -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/$(AntlrGenerator)&quot; -PackageName $(AntlrNamespace) -JarPath &quot;$(MSBuildProjectDirectory)/$(AntlrJar)&quot; -OutputDir &quot;$(MSBuildProjectDirectory)/Generated&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
 
     <!-- Add generated files to compilation in case they were missing during initial globbing -->

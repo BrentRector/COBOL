@@ -28,7 +28,8 @@ copy or delete fails the build.
 **After.** Fresh → one generation; warm → `Skipping target "EnsureGeneratedFiles"`; a namespace change, the jar or the
 script touched, or a `.g4` in a new `Grammar/` subfolder → regenerates; an injected grammar warning or a missing jar →
 MSB3073 with `Generated/` empty, and the next build recovers. The generated files are byte-identical to the baseline
-(`diff -r`). Pin: `AntlrGenerationDriftTests` (five facts). Docs: DESIGN-architecture-review §8.4's pin line names the
+(`diff -r`), and the §4 oracle reads `=== ARCH-ORACLE: IDENTICAL — 7957 cases (baseline bfb2eb47e9b0, new
+855996444353) ===`. Pin: `AntlrGenerationDriftTests` (five facts). Docs: DESIGN-architecture-review §8.4's pin line names the
 target, DESIGN-frontend-grammar §3.5 item 1a, COBOLNET_DESIGN / PROJECT_ORG, DESIGN-module-topology,
 DESIGN-edition-framework, EVAL-antlr-leverage, kb/Compiler/Build System, PB1957 row 11, PB2413. No inventory row (both
 notes `closes_rows: []`, process-only).
