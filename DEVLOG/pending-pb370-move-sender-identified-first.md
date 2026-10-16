@@ -30,6 +30,15 @@ EC-BOUND-SUBSCRIPT, EC-BOUND-ODO and EC-ARGUMENT-FUNCTION, a control leg, and th
 before the first run. Batch `w1102f-pb370-gr11`: GAP 65 → 64; PB370 is landed with all seven of its rows closed. The
 design doc (`DESIGN-binder-bound-tree.md`, the SendingValueTemp section) records the N = 1 order rule.
 
+The self-review found a second mechanism the first one exposed: freezing a NUMERIC function-identifier at one
+receiver made `MOVE FUNCTION PI TO S (I)` into `PIC 9V9(12)` store 3.141592653000 under >>TURN, because the §15.4
+temporary had the fixed 30-digit, scale-9 description while the un-frozen MOVE renders the function at the
+receiver's scale. That temporary was already wrong at N > 1 on main: `MOVE FUNCTION PI TO S1 S2` stored
+3.141592653000 in both, and a 25-digit NUMVAL value lost its four high-order digits. `SendingValueTemp.ReturnedValuePicFor`
+now sizes it to the receivers' widest scale and integer digits (`PicInfo.WidestReceiving`, the one fold
+`ReceiverContext.OfSet` now uses too), within the 38-digit carrier; golden `2002/pb370_move_function_value_digits`
+compares every multi-receiver result with its single-receiver twin, and DOC-A.1-92 records the widening.
+
 The sibling sweep found the same receiver-first order in the arithmetic statements (`ADD FUNCTION SQRT (NEG) TO N (I)`
 selects EC-BOUND-SUBSCRIPT; `ADD N (I) 1 GIVING O (1)` selects EC-BOUND-ODO), which is ArithmeticEmitter's store and a
 different mechanism; it is reported as a lead.

@@ -202,7 +202,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         // evaluation, EC-BOUND-REF-MOD (SenderIdentificationIsOverrun).
         if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets)
                 || SenderIdentificationIsOverrun(source, targets, senderPreOpsEnd))
-            && host.SendingValue.Materialize(source, "move", senderPreOpsEnd) is { } frozen)
+            && host.SendingValue.Materialize(source, "move", senderPreOpsEnd, ReceivingReach(targets)) is { } frozen)
             source = new BoundFieldOperand(frozen);
         // ⛔ §14.6.9.2's element moves are bound HERE, beside the group move they follow (kb/Work PB1144), so every
         // GR9 move — the written MOVE and each implicit phrase move alike — carries them, and each is a MOVE this
@@ -240,6 +240,15 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         bool receiverRanPreOps = senderPreOpsEnd is { } end && ctx.Data.PendingPreOps.Count > end;
         return receiverRanPreOps || (ctx.EcState.Turn.AnyEnabled && receiver.IdentifiesAtRunTime);
     }
+
+    /// <summary>What the numeric and numeric-edited receivers can hold (<see cref="PicInfo.WidestReceiving"/>) — the
+    /// digits the frozen value of a numeric function must keep for <c>MOVE temp TO b</c> to store what
+    /// <c>MOVE a TO b</c> does (<c>SendingValueTemp.ReturnedValuePicFor</c>). A reference-modified receiver denotes a
+    /// unique item that is never numeric (§8.4.3.3.4 GR6 c), so it contributes nothing.</summary>
+    private static (int Scale, int IntegerDigits) ReceivingReach(IReadOnlyList<Place> targets) =>
+        PicInfo.WidestReceiving(targets
+            .Select(t => t.DenotedItem?.Pic)
+            .Where(p => p is { Category: PicCategory.Numeric or PicCategory.NumericEdited }));
 
     // ── ISO §14.6.9.2's element moves of a §14.9.25.4 GR9 group move (kb/Work PB1144) ─────────────────────────
 
