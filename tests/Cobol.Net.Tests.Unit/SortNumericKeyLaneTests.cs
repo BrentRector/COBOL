@@ -56,7 +56,9 @@ public sealed class SortNumericKeyLaneTests
     /// runtime lane of its own. <c>NumericRenderer.WindowedNum</c> is THE reader of a windowed leaf's value;
     /// the table-SORT comparer used to carry a private SIGNED-only copy of it (kb/Work PB186), so a future
     /// lane added to the one reader never reached it. Each other file listed decodes for a different job and
-    /// says why at its call site: the codecs that BUILD the image, the alphanumeric-rendering channel (whose
+    /// says why at its call site: the codecs that BUILD the image (a record struct's, and a .NET host's published
+    /// record's, which decodes the image the activated program left for its host, DESIGN-external-repository §4.3), the
+    /// alphanumeric-rendering channel (whose
     /// own three-lane dispatch is <c>OperandText.NonTextBytes</c>), and two STORE-side re-derivations
     /// (INSPECT's sign, SET's INDEX augment) that are not sending reads of a numeric value, and the OPTIONS INITIALIZE
     /// background (InitialStateBackground), which seeds a native float carrier from its fill image (kb/Work PB1134).</summary>
@@ -68,7 +70,7 @@ public sealed class SortNumericKeyLaneTests
         var allowed = new HashSet<string>(StringComparer.Ordinal)
         {
             "RuntimeApi.cs", "NumericRenderer.cs", "OperandText.cs", "GroupImageCodec.cs", "InspectEmitter.cs",
-            "SetEmitter.cs", "InitialStateBackground.cs",
+            "SetEmitter.cs", "InitialStateBackground.cs", "PublishedRecordEmitter.cs",
         };
         var decode = new Regex(@"\bNumParseImage(U128|Float|U)?\(", RegexOptions.Compiled);
         var offenders = new List<string>();

@@ -34,7 +34,7 @@ public sealed record BackendOptions(string OutputPath, string AssemblyName, Edit
     bool EmitPdb = true, bool WriteSource = true, CobolNet.Frontend.CompilationInputs? Inputs = null);
 
 /// <summary>The outcome of one backend emission (DESIGN-codegen-backend §2.2).</summary>
-/// <param name="Success">True iff a runnable assembly was produced.</param>
+/// <param name="Success">True iff the assembly was produced.</param>
 /// <param name="Diagnostics">The backend's compile diagnostics (errors + warnings; empty for a clean emit).</param>
 /// <param name="GeneratedSourcePath">The intermediate-source path (<c>.g.cs</c>), when the backend produced one —
 /// set even on failure (the source is written before compilation, the primary debugging artifact).</param>
@@ -42,8 +42,10 @@ public sealed record BackendOptions(string OutputPath, string AssemblyName, Edit
 /// <param name="OutputFiles">EVERY file the emission wrote, as full paths — the intermediate source, the assembly
 /// and whatever packaging deployed beside it (kb/Work PB985): the complete output set a build cache must store
 /// and restore, stated by the component that wrote it rather than re-derived by the caller.</param>
+/// <param name="Library">The assembly is a library — the group has no main program (DESIGN-external-repository §7.2) —
+/// so a host loads it and nothing launches it.</param>
 public sealed record BackendArtifact(bool Success, IReadOnlyList<Diagnostic> Diagnostics,
-    string? GeneratedSourcePath, string? AssemblyPath, IReadOnlyList<string> OutputFiles);
+    string? GeneratedSourcePath, string? AssemblyPath, IReadOnlyList<string> OutputFiles, bool Library);
 
 /// <summary>
 /// THE backend seam (P7 Step 1; DESIGN-codegen-backend §2.2): everything after the Binder phase — rendering the

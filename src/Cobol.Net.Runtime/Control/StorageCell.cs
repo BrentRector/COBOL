@@ -500,46 +500,16 @@ public sealed class StorageCell
     }
 
     /// <summary>The group's FIXED RUN: its <paramref name="width"/>-position window with each table's reservation
-    /// cut out.</summary>
-    private string RunOf(int fixedAt, int width, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynTable)
-    {
-        string window = FixedRun(fixedAt, width);
-        if (!dynTable.ContainsAnyExcept(0)) return window;
-        var sb = new System.Text.StringBuilder(window.Length);
-        int at = 0;
-        for (int k = 0; k < dynFixedAt.Length; k++)
-        {
-            if (dynTable[k] == 0) continue;
-            sb.Append(window, at, dynFixedAt[k] - at);
-            at = dynFixedAt[k] + dynTable[k];
-        }
-        sb.Append(window, at, window.Length - at);
-        return sb.ToString();
-    }
+    /// cut out (<see cref="CobolVarGroup.RunOf"/>, the one fixed-run rule).</summary>
+    private string RunOf(int fixedAt, int width, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynTable) =>
+        CobolVarGroup.RunOf(FixedRun(fixedAt, width), dynFixedAt, dynTable);
 
-    /// <summary>Store <paramref name="run"/> as the group's FIXED RUN — the receiving twin of <see cref="RunOf"/>:
-    /// padded or truncated to the run's width and laid around the tables' reservations, which keep their
-    /// placeholder positions.</summary>
-    private void StoreRun(int fixedAt, int width, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynTable, string run)
-    {
-        run = CobolString.Store(run, width - Reserved(dynTable));
-        if (dynTable.ContainsAnyExcept(0))
-        {
-            string window = FixedRun(fixedAt, width);
-            var sb = new System.Text.StringBuilder(width);
-            int at = 0, r = 0;
-            for (int k = 0; k < dynFixedAt.Length; k++)
-            {
-                if (dynTable[k] == 0) continue;
-                int len = dynFixedAt[k] - at;
-                sb.Append(run, r, len).Append(window, dynFixedAt[k], dynTable[k]);
-                r += len;
-                at = dynFixedAt[k] + dynTable[k];
-            }
-            run = sb.Append(run, r, run.Length - r).ToString();
-        }
-        Ref = CobolString.WindowInto(Ref, fixedAt + 1, width, run);
-    }
+    /// <summary>Store <paramref name="run"/> as the group's FIXED RUN — the receiving twin of <see cref="RunOf"/>
+    /// (<see cref="CobolVarGroup.WindowOf"/>): padded or truncated to the run's width and laid around the tables'
+    /// reservations, which keep their placeholder positions.</summary>
+    private void StoreRun(int fixedAt, int width, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynTable, string run) =>
+        Ref = CobolString.WindowInto(Ref, fixedAt + 1, width,
+            CobolVarGroup.WindowOf(run, FixedRun(fixedAt, width), dynFixedAt, dynTable));
 
     private string FixedRun(int fixedAt, int fixedWidth) =>
         CobolString.Store(fixedAt >= Ref.Length ? "" : Ref.Substring(fixedAt, Math.Min(fixedWidth, Ref.Length - fixedAt)),
