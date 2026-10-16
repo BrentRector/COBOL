@@ -21,9 +21,10 @@ public sealed class ReferenceFormatMap
     private readonly int[] _directiveLines;
 
     // Per 0-based physical line read in FIXED form: where its program text begins — the physical column of the first
-    // character of the program-text area that is not a space, and whether that is in area A (FixedFormLine.BeginsInAreaA);
-    // null for a line read in free form or one whose program-text area holds only spaces (kb/Work PB3147).
-    private readonly (int Column, bool InAreaA)?[] _textStarts;
+    // character of the program-text area that is not a space, whether that is in area A (FixedFormLine.BeginsInAreaA) and
+    // whether the line is a continuation line (FixedFormLine.IsContinuation); null for a line read in free form or one
+    // whose program-text area holds only spaces (kb/Work PB3147, PB3168).
+    private readonly (int Column, bool InAreaA, bool Continuation)?[] _textStarts;
 
     private ReferenceFormatMap((int FromLine, bool Fixed, bool Detected)[] changes, int[] directiveLines,
         ReadOnlySpan<PhysicalLine> lines)
@@ -31,7 +32,7 @@ public sealed class ReferenceFormatMap
         _changes = changes;
         _directiveLines = directiveLines;
         var physicalText = new string[lines.Length];
-        _textStarts = new (int, bool)?[lines.Length];
+        _textStarts = new (int, bool, bool)?[lines.Length];
         for (int i = 0; i < lines.Length; i++)
         {
             physicalText[i] = lines[i].Text;
@@ -39,7 +40,7 @@ public sealed class ReferenceFormatMap
             var fixedLine = new FixedFormLine(lines[i].Text);
             if (fixedLine.ProgramTextStart is var start and >= 0)
                 _textStarts[i] = (PhysicalLine.ColumnOf(lines[i].Columns, fixedLine.ProgramTextIndex + start),
-                    fixedLine.BeginsInAreaA);
+                    fixedLine.BeginsInAreaA, fixedLine.IsContinuation);
         }
         PhysicalText = physicalText;
     }
@@ -77,16 +78,17 @@ public sealed class ReferenceFormatMap
             lines);
 
     /// <summary>Where the text at 0-based physical <paramref name="column"/> of 1-based physical <paramref name="line"/>
-    /// stands with respect to COBOL-85's areas (kb/Work PB3147): it BEGINS its fixed-form line, in area A or in area B,
-    /// or it follows other text of the line; <see cref="AreaPlacement.None"/> when the line was read in free form (which
+    /// stands with respect to COBOL-85's areas (kb/Work PB3147): it BEGINS its fixed-form line, in area A or in area B
+    /// (a CONTINUATION line's area A is <see cref="AreaPlacement.BeginsContinuationLineInAreaA"/>, kb/Work PB3168), or it
+    /// follows other text of the line; <see cref="AreaPlacement.None"/> when the line was read in free form (which
     /// has no areas, §6.4.1) or is not a line of this text. The column is the one a source map names
     /// (<see cref="Common.LineOrigin.Locate"/>), so a token's location answers the question directly.</summary>
     public AreaPlacement PlacementAt(int line, int column)
     {
         if (line < 1 || line > _textStarts.Length || !At(line).Fixed) return AreaPlacement.None;
-        return _textStarts[line - 1] is { } start && start.Column == column
-            ? start.InAreaA ? AreaPlacement.BeginsLineInAreaA : AreaPlacement.BeginsLineInAreaB
-            : AreaPlacement.WithinLine;
+        if (_textStarts[line - 1] is not { } start || start.Column != column) return AreaPlacement.WithinLine;
+        return !start.InAreaA ? AreaPlacement.BeginsLineInAreaB
+            : start.Continuation ? AreaPlacement.BeginsContinuationLineInAreaA : AreaPlacement.BeginsLineInAreaA;
     }
 
     /// <summary>The initial reference format of library text copied by a COPY statement at 1-based physical line

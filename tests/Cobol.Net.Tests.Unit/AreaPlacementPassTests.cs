@@ -150,4 +150,63 @@ public sealed class AreaPlacementPassTests
             L("END PROGRAM ARALL.")));
         Assert.True(r.Success, string.Join("\n", r.Errors));
     }
+
+    // ── kb/Work PB3168: X3.23-1985 "Area A of a continuation line must be blank" ─────────────────────────────
+
+    /// <summary>A fixed-form CONTINUATION line: a hyphen in position 7, then <paramref name="programText"/> from position 8.</summary>
+    private static string C(string programText) => "      -" + programText;
+
+    /// <summary>The first 52 characters of a literal: positions 21-72 of a line whose DISPLAY stands in position 12, so the
+    /// literal runs to margin R and its continuation line is the one that §6.3.5 2) names.</summary>
+    private const string FirstPartOfContinuedLiteral = "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+    private static string ContinuedLiteral(string continuation) => Source(
+        L("IDENTIFICATION DIVISION."),
+        L("PROGRAM-ID. ARCONT."),
+        L("PROCEDURE DIVISION."),
+        L("MAIN-PARA."),
+        L("    DISPLAY \"" + FirstPartOfContinuedLiteral),
+        continuation,
+        L("    STOP RUN."));
+
+    [Theory] // the literal's tail is no token's start, so only the reference format can see it: every position of area A
+    [InlineData("\"JK\".", 8)]
+    [InlineData(" \"JK\".", 9)]
+    [InlineData("   \"JK\".", 11)]
+    public void ContinuedLiteralTextInAreaA_IsRefusedAt85Only(string text, int column)
+        => AssertRejectedAt85Only(ContinuedLiteral(C(text)), $"(6,{column}): error COBOLNET3735");
+
+    [Fact] // position 12 is area B: the same continuation compiles at 85
+    public void ContinuedLiteralTextInAreaB_IsAccepted()
+    {
+        var r = Check(85, ContinuedLiteral(C("    \"JK\".")));
+        Assert.True(r.Success, string.Join("\n", r.Errors));
+    }
+
+    [Fact] // a non-literal continuation line is a continuation line too, and its period is ONE diagnostic, not two
+    public void ContinuationLineHoldingAPeriodInAreaA_IsReportedOnce()
+    {
+        string source = Source(
+            L("IDENTIFICATION DIVISION."),
+            L("PROGRAM-ID. ARPERIOD."),
+            L("PROCEDURE DIVISION."),
+            L("MAIN-PARA."),
+            L("    DISPLAY \"A\""),
+            C("  ."),
+            L("    STOP RUN."));
+        AssertRejectedAt85Only(source, "(6,10): error COBOLNET3735");
+        Assert.Single(Check(85, source).Errors, e => e.Contains("COBOLNET373", StringComparison.Ordinal));
+    }
+
+    [Fact] // a blank continuation line has no text to place; a library text's continuation line is reported where it is written
+    public void ContinuationLineOfLibraryTextInAreaA_IsReportedAtTheLibraryText()
+        => AssertRejectedAt85Only(Source(
+            L("IDENTIFICATION DIVISION."),
+            L("PROGRAM-ID. ARCOPYC."),
+            L("PROCEDURE DIVISION."),
+            L("MAIN-PARA."),
+            L("    COPY ARCONT."),
+            L("    STOP RUN.")),
+            "ARCONT.cpy(2,8): error COBOLNET3735",
+            ("ARCONT.cpy", Source(L("    DISPLAY \"" + FirstPartOfContinuedLiteral), C("\"JK\"."), C("        "))));
 }
