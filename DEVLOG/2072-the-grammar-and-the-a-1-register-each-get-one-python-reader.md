@@ -1,4 +1,4 @@
-## The grammar and the A.1 register each get ONE Python reader (PB3204, PB3209)
+## Entry 2072 — 2026-10-16 07:33 PDT — The grammar and the A.1 register each get ONE Python reader (PB3204, PB3209)
 
 Wave 1092 group D, two R2 unify findings of the PB1754 architecture review, both in the Phase-B dossier generator
 `scripts/spec/phase_b_batch.py`.
@@ -33,3 +33,4 @@ No inventory row is closed (behavior-neutral restructuring of tooling). Self-rev
 one each; the consumers keep only projections), full code (the end-of-rule rule is ANTLR's, outside literals and
 sets), performance (one cached read per process; the register map is cached per document), duplication (the guard
 in `grammar_source --self-test` keeps the retired names out).
+
