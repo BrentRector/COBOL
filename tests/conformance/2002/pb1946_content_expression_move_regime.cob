@@ -7,7 +7,9 @@
       *> receiver (14.9.25.3 Table 16, Numeric -> "Numeric, Numeric-edited":
       *> Yes, integer and noninteger alike) and is edited into the mask
       *> (14.9.25.4 GR6). Both lanes ask it, the CALL ... AS NESTED lane and
-      *> the typed INVOKE lane, through OoConformance.ContentValueMismatch.
+      *> the typed INVOKE lane, through ParameterConformance's
+      *> ContentConformanceReason, which asks the run-time relation
+      *> ActivationRelations.CallArgumentViolation (kb/Work PB3101).
       *> Before the fix every one of these was refused as COBOLNET1688 or
       *> COBOLNET0828 on the reading that MOVE takes only an identifier or a
       *> literal.

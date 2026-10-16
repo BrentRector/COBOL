@@ -41,7 +41,8 @@ public sealed class ActivationDescriptionFieldDriftTests
             LocaleFromLiteral = true, AnyLength = true, AnyLengthClauses = "a", Positions = 7, Usage = "u", StrongType = "s",
             Table16 = Table16Category.NumericNoninteger, BinaryWidth = true,
             Atoms = [new GroupAtom(GroupAtomKind.Fixed, 7, 7)], ObjectKind = ObjectReferenceKind.ObjectClass, ObjectName = "C", Factory = true,
-            Only = true, Optional = true, ByValue = true, ObjectClasses = ["c", "base"], ObjectInterfaces = ["i"],
+            Only = true, ObjectNameIsParameter = true, Optional = true, ByValue = true, ObjectClasses = ["c", "base"],
+            ObjectInterfaces = ["i"],
         };
         string text = CobolNet.CodeGen.RuntimeApi.ActivationDescriptionNew(d);
         foreach (var p in typeof(ActivationDescription).GetProperties(BindingFlags.Public | BindingFlags.Instance))

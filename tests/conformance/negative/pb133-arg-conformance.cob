@@ -1,8 +1,9 @@
       *> reject-at: 2023
       *> ISO 14.8.2.3.2 (elementary items passed BY REFERENCE, the NESTED-call regime): the definitions
       *> shall have the same PICTURE - a 9(6) argument against a 9(4) formal is EC-PROGRAM-ARG-MISMATCH
-      *> at run time and a diagnostic at bind under AS NESTED, through THE one comparator
-      *> (OoConformance.DescriptionMismatch, previously INVOKE-only - kb/Work PB133 wave C2).
+      *> at run time and a diagnostic at bind under AS NESTED, through THE one relation: the bind-time
+      *> entry ParameterConformance asks the run-time ActivationRelations.CallArgumentViolation
+      *> (kb/Work PB133 wave C2, PB3101).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. OM1.
        DATA DIVISION.

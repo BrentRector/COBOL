@@ -1,7 +1,9 @@
       *> ISO 1989:2023 §4.2.2 (conformance checking, the interface leg) via §14.9.23.3 SR4e + §14.8.2 STRICT:
       *> an INVOKE through an INTERFACE-typed receiver resolves the method over the interface's prototype
       *> closure and its USING/RETURNING descriptions are conformance-checked against THE PROTOTYPE at bind
-      *> time (the same ONE DescriptionMismatch the class-typed path uses — P9 Step 12's positive proof).
+      *> time (the same ONE relation the class-typed path asks — ActivationRelations.MatchViolation and
+      *> ParameterViolation for the argument, ParameterConformance.ReturningConformanceReason for the
+      *> RETURNING item, kb/Work PB2077, PB3101 — P9 Step 12's positive proof).
       *> The argument is BY REFERENCE PIC 9(4) matching the prototype exactly; RETURNING matches PIC 9(4).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. OOIFC1.

@@ -8,8 +8,9 @@
       *> THE DEFECT: OoEmitter.EmitMethod spelled `{root}.FromImage({param})` and `{formal}.AsImage()` itself,
       *> with NO capability consult - while RecordStructEmitter emits that codec for exactly ElementImageCapable
       *> items. A method DECLARING an imageless group formal therefore failed BACKEND compilation (CS1061), and
-      *> nothing invoked it: DataBinder.Oo applies no image screen, and OoConformance.DescriptionMismatch's
-      *> !formal.IsImageCapable arm runs only when an INVOKE or an override/implements PAIR exists. The three
+      *> nothing invoked it: DataBinder.Oo applies no image screen, and the pair comparator of the time
+      *> (OoConformance.DescriptionMismatch, deleted by kb/Work PB3101) had a !formal.IsImageCapable arm
+      *> that ran only when an INVOKE or an override/implements PAIR existed. The three
       *> sites now route through PlaceRenderer, THE ONE channel; held by BoundaryImageChannelTests.
       *>
       *> LEG 1 is also the REGRESSION NET for a repro that DISSOLVED: PB177's note named `05 N USAGE INDEX` as
