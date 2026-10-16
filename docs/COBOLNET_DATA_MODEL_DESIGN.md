@@ -2215,7 +2215,11 @@ character-1 repeated twice or more is a floating string, exactly as `$$$` is. Tw
   floating string is one literal-wide occurrence plus one character per repetition, and every other rule — the IS
   form and a FOR form with FIXED occurrences, `PIC L999L EDITING L FOR NEGATIVE IS "DB "` = 9 — counts the
   literal's width at EACH occurrence (kb/Work PB3220; `PictureCategoryDriftTests` walks the accepted set and
-  compares the bound size with the rendered image's width).
+  compares the bound size with the rendered image's width). One character-1 may hold BOTH kinds (`PIC LL9L`: a
+  floating string and a fixed trailing occurrence, the two symbols SR24 counts): `EditRule` is keyed by the mask
+  character, so `PictureAnalyzer.SeparateFixedFromFloating` gives that letter's fixed occurrences a key of their own
+  (a private-use mask character plus a twin rule with `Floating: false`) once the string as written has passed
+  `PictureComposition.Validate`, and every consumer then reads exactly one kind per key.
 
 Goldens `2023/pb491_editing_variable_width` (Annex D.24's own images and sizes) and
 `negative/pb568-editing-char1-quoted`, `negative/pb491-editing-unequal-literal-widths`.

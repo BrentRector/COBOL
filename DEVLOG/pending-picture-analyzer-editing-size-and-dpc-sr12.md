@@ -47,3 +47,18 @@ separator ternaries in the repo are date-time format and intrinsic NUMVAL parsin
 Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,057/11,774 · Unit 33,248/33,696 ·
 Characterization 6/36 cases ran, run 20261016T132841Z-567fe7; the four added goldens and the three added Unit tests Passed
 in leg 1.
+
+**Review round 1 (R1-1, PB3220's mixed arm).** The first review found the sibling arm the fix above did not touch: one
+FOR-form character-1 holding BOTH a floating string and a fixed occurrence (`PIC LL9L EDITING L FOR NEGATIVE IS "DB "`,
+legal: SR24 counts the string as one extended symbol and the trailing L as the second, Table 10 leaves a floating
+extended string outside the matrix, SR25/SR26 own the order). `EditRule.Floating` is one flag per mask character, so the
+rule was read as floating everywhere: LENGTH 6 instead of 8, the trailing L a third digit position (-125 displayed
+`DB 125`), its literal never rendered. My own walk had passed LL9L because its oracle, the renderer, shared the reading;
+the sweep above listed IS / FOR fixed / FOR floating and not this arm. Fix at the root: `SeparateFixedFromFloating`
+runs after `PictureComposition.Validate` and gives such a letter's fixed occurrences a key of their own (a private-use
+mask character plus a twin rule with `Floating: false`), so GR14's size, the digit anchors, the renderer and the
+de-editor each read one kind per key and no second fixed-or-floating decision exists. Golden
+`2023/pb3220_editing_for_mixed_floating_fixed_2023` (LL9L = 8: `DB 25DB `, ` DB 5DB `; LLL9L = 7); Unit
+`AFloatingStringAndAFixedOccurrenceOfOneCharacter1_AreSizedEachByItsOwnKind` carries GR14's arithmetic per occurrence
+(independent of the renderer) and the size walk gains a `mixed > 0` population guard. Float-edited pictures refuse FOR
+(COBOLNET1658) and cs/+/- cannot mix (Table 10), so this is the only arm.

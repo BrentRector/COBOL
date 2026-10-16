@@ -503,6 +503,24 @@ internal static class PictureComposition
         return false;
     }
 
+    /// <summary>Which CHARACTER of the repeat-expanded string belongs to a floating insertion string — rule 6's own
+    /// test (<see cref="FloatingString"/>) answered per occurrence, which is what tells the FIXED occurrences of an
+    /// extended character-1 from its floating string when it has both (<c>PIC LL9L</c>: SR24 counts the floating
+    /// string as one symbol and the trailing occurrence as another; kb/Work PB3220). One entry per character of
+    /// <paramref name="expanded"/> (the two characters of <c>CR</c> / <c>DB</c> carry their symbol's answer).</summary>
+    internal static bool[] FloatingMarks(string expanded, char cs, IReadOnlySet<char> char1,
+        IReadOnlySet<char> char1Extended, bool decimalPointIsComma)
+    {
+        var syms = Tokenize(expanded);
+        var floating = MarkFloating(syms, cs, char1, char1Extended, DecimalSeparator(decimalPointIsComma),
+            GroupingSeparator(decimalPointIsComma));
+        var marks = new bool[expanded.Length];
+        int at = 0;
+        for (int i = 0; i < syms.Count; i++)
+            for (int k = 0; k < syms[i].Text.Length; k++) marks[at++] = floating[i];
+        return marks;
+    }
+
     /// <summary>Mark every symbol occurrence that belongs to a floating insertion string — see
     /// <see cref="FloatingString"/> for the rule this implements.</summary>
     private static bool[] MarkFloating(List<Sym> syms, char cs, IReadOnlySet<char> char1,

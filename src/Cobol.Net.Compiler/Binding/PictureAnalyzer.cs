@@ -281,6 +281,12 @@ public static class PictureAnalyzer
                 edition, where))
             return PicInfo.Recovery(expanded.Length);
 
+        // The composition is legal, so the mask can take the shape the runtime reads: one kind of insertion per
+        // rule key (SeparateFixedFromFloating, kb/Work PB3220). GR14's size is re-asked of that mask.
+        (expanded, editRules) = SeparateFixedFromFloating(expanded, editRules, cs, char1Set, char1Extended,
+            decimalPointIsComma);
+        editingExtra = EditingPositions(expanded, editRules);
+
         // ── Category national (§8.5.2.10) / national-edited (§8.5.2.11) / boolean (§8.5.2.5) — LIVE. The
         // introduction gate stays at every entry point (COBOLNET0900 below 2002; the registry rows are silent at
         // 2002+), exactly the BINARY-CHAR/POINTER pattern. Usage resolution per §13.18.60.4: SR13a — PIC N with
@@ -683,6 +689,8 @@ public static class PictureAnalyzer
     /// gives 6.</para></summary>
     private static int EditingPositions(string expanded, IReadOnlyList<CobolEdit.EditRule>? rules)
     {
+        // Every rule here is ONE kind: a letter holding both a floating string and a fixed occurrence has been
+        // split by SeparateFixedFromFloating before this is asked (kb/Work PB3220).
         if (rules is null) return 0;
         int extra = 0;
         foreach (var r in rules)
@@ -699,6 +707,50 @@ public static class PictureAnalyzer
             extra += (r.Floating ? 1 : occ) * (r.Width - 1);
         }
         return extra;
+    }
+
+    /// <summary>⛔ ONE EDITING RULE IS ONE KIND OF INSERTION (kb/Work PB3220). SR24 counts "extended editing sign
+    /// control symbols" as OCCURRENCES — a FLOATING string of one character-1 is a single symbol (rule 6) and each
+    /// FIXED occurrence another — so <c>PIC LL9L EDITING L FOR NEGATIVE IS "DB "</c> holds a floating string and a
+    /// fixed insertion of the SAME letter, which §13.18.40.6 allows (the extended symbol's order against another
+    /// currency-like symbol is SR25's, and the floating string stays outside Table 10), and GR14's 'es' sizes
+    /// them differently: "one occurrence of literal-2 or literal-3 is counted in the size of the item plus one
+    /// character for each repetition" for the floating string, "each occurrence of the character(s) specified in
+    /// the associated literal" for the fixed one. The rule table is keyed by the mask character, and
+    /// <see cref="CobolEdit.EditRule.Floating"/> is one flag per key, so the mask the runtime reads gives the
+    /// fixed occurrences of such a letter a KEY OF THEIR OWN: a private-use character (never a picture symbol,
+    /// never a declared character-1, which SR8 limits to basic letters) with a twin rule that differs only in
+    /// <c>Floating: false</c>. Everything downstream — GR14's size, the digit-position anchors, the renderer, the
+    /// de-editor — then reads one kind per key, with no second fixed-or-floating decision anywhere.</summary>
+    /// <returns>The mask to emit and the rules for it; both unchanged when no letter holds both kinds.</returns>
+    private static (string Mask, CobolEdit.EditRule[]? Rules) SeparateFixedFromFloating(string expanded,
+        CobolEdit.EditRule[]? rules, char cs, HashSet<char> char1Set, HashSet<char> char1Extended,
+        bool decimalPointIsComma)
+    {
+        if (rules is null) return (expanded, rules);
+        bool[]? marks = null;
+        char[]? mask = null;
+        List<CobolEdit.EditRule>? twins = null;
+        foreach (var r in rules)
+        {
+            if (r.SimpleInsertion || !r.Floating) continue;
+            char c1 = char.ToUpperInvariant(r.Char1);
+            marks ??= PictureComposition.FloatingMarks(expanded, cs, char1Set, char1Extended, decimalPointIsComma);
+            char twin = '\0';
+            for (int i = 0; i < expanded.Length; i++)
+            {
+                if (marks[i] || char.ToUpperInvariant(expanded[i]) != c1) continue;
+                if (twin == '\0')
+                {
+                    twin = (char)(0xE000 + (twins?.Count ?? 0));
+                    (twins ??= []).Add(r with { Char1 = twin, Floating = false });
+                }
+                (mask ??= expanded.ToCharArray())[i] = twin;
+            }
+        }
+        if (twins is null) return (expanded, rules);
+        foreach (var t in twins) { char1Set.Add(t.Char1); char1Extended.Add(t.Char1); }
+        return (new string(mask!), [.. rules, .. twins]);
     }
 
     /// <summary>ISO §13.18.40.3 SR4 — "The maximum number of characters allowed in character-string-1 is 63."

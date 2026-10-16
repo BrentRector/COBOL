@@ -228,7 +228,7 @@ public sealed class PictureCategoryDriftTests
     public void EveryAcceptedEditingPicture_HasTheSizeOfItsRenderedImage()
     {
         var wrong = new List<string>();
-        int accepted = 0, fixedRepeated = 0, floating = 0, comma = 0;
+        int accepted = 0, fixedRepeated = 0, floating = 0, comma = 0, mixed = 0;
         foreach (string picture in EveryEditingShape())
             foreach (bool forForm in new[] { true, false })
                 foreach (int width in new[] { 1, 3 })
@@ -238,6 +238,7 @@ public sealed class PictureCategoryDriftTests
                         if (diags.Length > 0 || pic.EditMask is null || pic.EditingRules is not { Count: > 0 } rules) continue;
                         accepted++;
                         if (dpc && picture.Contains(',')) comma++;
+                        if (rules.Count > 1) mixed++;   // a floating string AND a fixed occurrence of one character-1
                         if (rules[0].Floating) floating++;
                         else if (forForm && picture.Count(c => c == 'L') >= 2) fixedRepeated++;
                         foreach (int value in new[] { -5, 5 })
@@ -253,9 +254,30 @@ public sealed class PictureCategoryDriftTests
             $"{wrong.Count} accepted EDITING picture(s) bind a size other than the width of the image they render "
             + $"(ISO §13.18.40.4 GR4, GR14 'es'):{Environment.NewLine}" + string.Join(Environment.NewLine, wrong.Take(40)));
         // The population guard: the walk must have SEEN the shapes the property exists for.
-        Assert.True(fixedRepeated > 0 && floating > 0 && comma > 0,
+        Assert.True(fixedRepeated > 0 && floating > 0 && comma > 0 && mixed > 0,
             $"the editing walk accepted {accepted} but saw {fixedRepeated} repeated-fixed, {floating} floating, "
-            + $"{comma} DECIMAL-POINT IS COMMA comma pictures");
+            + $"{comma} DECIMAL-POINT IS COMMA comma pictures, {mixed} mixed floating-and-fixed");
+    }
+
+    /// <summary>⛔ ISO §13.18.40.4 GR14 'es' with a floating string AND a fixed occurrence of ONE character-1
+    /// (<c>PIC LL9L</c>; kb/Work PB3220, review round 1). The oracle is GR14's own arithmetic, written out per
+    /// occurrence and independent of the renderer the walk above compares against: the floating string is one
+    /// literal plus one character per repetition, each fixed occurrence is the literal, every other symbol is one
+    /// position. The digit positions are rule 6's: the floating string's occurrences after the first, plus the 9s.</summary>
+    [Theory]
+    [InlineData("LL9L", 3, 8, 2)]      // (3 + 1) + 1 + 3
+    [InlineData("LLL9L", 3, 9, 3)]     // (3 + 2) + 1 + 3
+    [InlineData("LLL9L", 2, 7, 3)]     // (2 + 2) + 1 + 2
+    [InlineData("LL9.99L", 3, 11, 4)]  // (3 + 1) + 1 + 1 + 2 + 3
+    public void AFloatingStringAndAFixedOccurrenceOfOneCharacter1_AreSizedEachByItsOwnKind(
+        string picture, int literalWidth, int size, int digits)
+    {
+        var (pic, diags) = AnalyzeEditing(picture, forForm: true, literalWidth, decimalPointIsComma: false);
+        Assert.Empty(diags);
+        Assert.Equal(size, pic.Length);
+        Assert.Equal(digits, pic.DigitPositions);
+        Assert.Equal(size, CobolNet.Runtime.CobolEdit.Format(-5, 0, pic.EditMask!, commaMode: false,
+            edits: [.. pic.EditingRules!]).Length);
     }
 
     /// <summary>The same picture with the roles of comma and period interchanged.</summary>
