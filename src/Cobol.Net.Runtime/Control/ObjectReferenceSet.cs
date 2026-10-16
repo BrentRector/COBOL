@@ -214,7 +214,7 @@ public static class ObjectReferenceSet
     private const string OwnerlessActiveClassSender =
         "an ACTIVE-CLASS sender written in an interface method prototype has no containing class to relate to the receiver's";
 
-    /// <summary>How a FACTORY-axis refusal names one side's phrase (kb/Work PB1498's row GR-9.3.8.2.3-L2.3, probe O5B: the
-    /// three FACTORY arms once spliced "not " before "specified" for the receiver only).</summary>
+    /// <summary>How a FACTORY-axis refusal names one side's phrase (kb/Work PB1498, §9.3.8.2.3 rule 5 c) 3., probe
+    /// O5B: the three FACTORY arms once spliced "not " before "specified" for the receiver only).</summary>
     private static string FactoryPresence(bool factory) => factory ? "specified" : "not specified";
 }

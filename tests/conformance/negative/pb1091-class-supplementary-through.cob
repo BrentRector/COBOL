@@ -5,7 +5,8 @@
       *> of literal-6, are included in the set of characters identified by
       *> class-name-1" -> OK 12.3.7.4 12)).
       *>
-      *> kb/Work PB1091 (row SR-12.3.7.3-L7.4). The ordinals 65536 and 65537 of
+      *> kb/Work PB1091 (SR17 c) 4., in row SR-12.3.7.3-17 since kb/Work
+      *> PB55). The ordinals 65536 and 65537 of
       *> UCS-4 name SUPPLEMENTARY characters (two UTF-16 code units each). They
       *> are LEGAL ordinals (12.3.7.3 SR17 c2: each exists in the IN set), and
       *> SR17 c4 - "Each national literal, when a THROUGH phrase is specified,

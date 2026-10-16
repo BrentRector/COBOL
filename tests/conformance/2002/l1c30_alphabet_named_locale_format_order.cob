@@ -7,7 +7,8 @@
       *> clauses in source order and refused it (COBOLNET1664 'no
       *> LOCALE clause is in scope'); it now resolves locale-names
       *> after the whole paragraph is bound.
-      *> THE RULES (the lumped catalog row GR-12.3.7.4-L2.2; its i)
+      *> THE RULES (GR7 d) 2. and its sibling items, in row
+      *> GR-12.3.7.4-7 since kb/Work PB55; its i)
       *> code-name, f)/g)/h) UCS-4/UTF-8/UTF-16 and e) unnamed-locale
       *> legs are pinned by existing goldens - see the lane report):
       *>   cite.py --check 12.3.7.4 "If the NATIONAL phrase is
