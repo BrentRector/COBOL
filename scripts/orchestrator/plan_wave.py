@@ -48,16 +48,21 @@ cost the orchestrator a hand-written groups.json; this computes it.
    started (each waits, with the reason). Every finisher's pred says so.
 
 --cluster LEAD plans a CAMPAIGN wave instead (design section 9.1, kb/Work PB2120): the notes are work.py's
-cluster_order() of LEAD (every open note whose `cluster` names it, whatever its harm flags), clustered by the sites
-they name anywhere in the tree (model_rules.json `campaign`), one blocked_by depth at a time; a note waiting on
+cluster_order() of LEAD (every open note whose `cluster` names it, whatever its harm flags), clustered on the sites
+they DECLARE (their site blocks, under model_rules.json `campaign` roots), one blocked_by depth at a time; a note waiting on
 another planned note runs after it as a successor (`after:`); everything else above is the same mechanism.
 THE FILE-SET PARTITION (owner, kb/Work PB2118 question 5, 2026-10-07; R69 §2; DESIGN-architecture-review §8.7) gates
 EVERY plan, the fix lane's and a campaign's alike (kb/Work PB2807: it once gated a campaign only, so with two planners,
 the loop and an attended or Mythos session, a fix-lane group was planned on a file another session's running group
-held). A group's file set (a campaign's: the files its notes' sites resolve to, bare type names included, plus every
-file scripts/arch/member_index.py computes as a caller of what each note moves or changes, on THE index of this tree,
-regenerated into <coord>/member-index when stale: PB2118 Draft 8, J2; Draft 9, K1) is checked against the in-flight
-work (inflight_file_sets: every worktree's and every unlanded branch's changed files, committed or not, and every
+held). A group's file set (collision_set: its notes' DECLARED sets plus its primary file, the fix lane's and a
+campaign's alike, kb/Work PB3242) is checked against the in-flight work below. A note's declared set (declared_sets, the one
+computation, on one explicit IndexPolicy, kb/Work PB3203) is its STRUCTURED sites only, read by ONE reader
+(work.note_sites): the paths of its Code site / Site / Sites blocks, plus every file scripts/arch/member_index.py
+computes as a caller of what it moves or changes (its `**Moves or changes:**` and `r2_members:` names and site-block
+documentation ids), and the code files under a site folder, on THE index of this tree, regenerated into
+<coord>/member-index when stale (PB2118 Draft 8, J2; Draft 9, K1); never a path its prose, a `Gate:` line or a tool
+command mentions, nor a bare type name. fix_clusters' scored prose sites rank and group the fix lane's notes and never
+enter a declared set. The in-flight work (inflight_file_sets: every worktree's and every unlanded branch's changed files, committed or not, and every
 dispatched group whose notes are still open, from the coordination directory's dispatch ledger, which only the
 planner's and the spec renderer's record_dispatch write: kb/Work PB3186) and the open external-repository slices'
 in-flight set (work.slice_file_set, DESIGN-external-repository §12), classified by ONE rule (classify_inflight): a
@@ -83,7 +88,6 @@ import dataclasses
 import functools
 import importlib.util
 import json
-import math
 import pathlib
 import re
 import subprocess

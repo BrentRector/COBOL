@@ -777,12 +777,13 @@ itself), ordered by `blocked_by:`.
   while a named blocker is open (a stale `true` hid PB1940 and PB1956 from every work list), and open notes form no
   cycle.
 - **Planning** (`plan_wave.py --cluster <lead>`): a note is PLANNABLE when it is ready or when everything it waits on
-  is plannable; the rest are printed as waiting with the reason. Plannable notes are clustered by the code sites their
-  text names, with `fix_clusters.py`'s own `source_index`, `sites` and `cluster` (imported, never forked) over
-  `model_rules.json` `campaign.src`, `ext` and `exclude_dir` (the whole tree less corpora and generated output; project
-  files are not sites, because their dotted names read as `Type.Member` references), one topological depth at a time
-  so a cluster never mixes a blocker with what it blocks. A note naming no site is a group of its own, ordered by its
-  chain. The clusters holding one dependent's blockers MERGE when they share a depth and fit the cap, so the dependent
+  is plannable; the rest are printed as waiting with the reason. Plannable notes are clustered on the sites they
+  DECLARE (`work.note_sites`, the one reader of a note's structured sites: the paths of its Code site / Site / Sites
+  blocks under `model_rules.json` `campaign.src`; never what its prose, a `Gate:` line or a tool command mentions,
+  kb/Work PB3242) with `fix_clusters.py`'s own `cluster` (imported, never forked), one topological depth at a time
+  so a cluster never mixes a blocker with what it blocks. A note declaring no site file is a group of its own, ordered
+  by its chain. A group's file set, the one the partition checks, is its notes' declared sets plus its primary file
+  (`plan_wave.collision_set`; DESIGN-architecture-review §8.7), for a fix-lane group too. The clusters holding one dependent's blockers MERGE when they share a depth and fit the cap, so the dependent
   can follow one chain (wave 1025 was planned so by hand: PB2108 + PB2109, then PB2110). Ranking puts depth first. Everything else is the fix lane's mechanism: awaiting landing, finishers, model
   routing, budget, trains, allocation and outputs.
 - **Dependencies become successors.** A group whose notes wait on notes planned in this wave joins the TAIL of the

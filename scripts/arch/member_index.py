@@ -164,8 +164,9 @@ def _records(repo: Path) -> list[dict]:
 
 
 def load(repo: Path = REPO) -> dict:
-    """The newest committed index (by commit date), for the readers that widen by drift (work.py check, the dispatch
-    record). A missing index is a refusal: a file set is never guessed."""
+    """The newest committed index (by commit date), for the readers bounded by time that widen by drift (work.py
+    check's unknown-name rule, `--note`); the planner, the spec renderer and the landing check read THE index of the
+    tree instead (plan_wave.IndexPolicy, kb/Work PB3203). A missing index is a refusal: a file set is never guessed."""
     found = _records(repo)
     if not found:
         raise SystemExit(f"⛔ no schema-{SCHEMA} member index under {RECORD_DIR}: run "
