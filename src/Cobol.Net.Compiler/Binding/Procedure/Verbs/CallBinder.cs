@@ -175,7 +175,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                          is { } tCls and not (CobolClass.Alphanumeric or CobolClass.National))
                 {
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CallTargetCategory,
-                        $"CALL target '{DataBinder.WrittenText(dref)}' is of class {tCls.ToString().ToLowerInvariant()}; ISO "
+                        $"CALL target '{DataBinder.WrittenText(dref)}' is of class {IntrinsicArgumentRules.Name(tCls)}; ISO "
                         + "§14.9.4.3 SR1 admits an alphanumeric, national, or program-pointer data item");
                 }
             }
@@ -945,7 +945,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                         is { } cCls and not (CobolClass.Alphanumeric or CobolClass.National))
                     {
                         ctx.Edition.Error(DiagnosticCatalog.CancelTargetCategory,
-                            $"CANCEL target '{DataBinder.WrittenText(dref)}' is of class {cCls.ToString().ToLowerInvariant()}; "
+                            $"CANCEL target '{DataBinder.WrittenText(dref)}' is of class {IntrinsicArgumentRules.Name(cCls)}; "
                             + "ISO §14.9.5.3 SR1 admits an alphanumeric or national data item");
                         continue;
                     }
@@ -1136,7 +1136,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     private void ValueClassScreen(CobolClass? actual, string what)
     {
         if (actual is null or CobolClass.Numeric or CobolClass.Object or CobolClass.Pointer) return;
-        string rule = $"CALL … USING BY VALUE operand '{what}' is of class {actual.Value.ToString().ToLowerInvariant()}; "
+        string rule = $"CALL … USING BY VALUE operand '{what}' is of class {IntrinsicArgumentRules.Name(actual.Value)}; "
             + "ISO §14.9.4.3 SR22 admits only class numeric, object or pointer by value";
         if (ctx.Edition.Permissive)
             ctx.Edition.Warning(DiagnosticCatalog.CallByValueOperandClass, $"{rule}; accepted under --permissive");

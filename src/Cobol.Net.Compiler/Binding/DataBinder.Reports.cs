@@ -1360,7 +1360,7 @@ public sealed partial class DataBinder
         bool codeRefMod = codeSfx.RefMods > 0;
         var itemClass = IntrinsicArgumentRules.ClassOfItem(item);
         string? why = !codeRefMod && (itemClass is not { } cls || IntrinsicArgumentRules.TableTwoClass(cls) != CobolClass.Alphanumeric)
-                ? $"is not an alphanumeric data item (it is of {itemClass?.ToString().ToLowerInvariant() ?? "unknown"} class)"
+                ? $"is not an alphanumeric data item (it is of {(itemClass is { } ic ? IntrinsicArgumentRules.Name(ic) : "unknown")} class)"
             : codeRefMod && (codeSfx.RefMods > 1 || codeSfx.NonLiteral || codeSfx.BeyondHostLimit || codeSfx.Start is null)
                 ? "is reference-modified with a leftmost-position or length that is not a single integer literal, so the "
                   + "characters it occupies in every logical record (§13.18.12.4 GR2) are not a fixed number"
