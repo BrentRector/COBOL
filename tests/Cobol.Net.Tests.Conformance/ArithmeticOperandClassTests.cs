@@ -7,8 +7,11 @@ namespace CobolNet.Tests.Conformance;
 /// <summary>
 /// ⛔ ISO §8.8.1.1 — THE CLASS OF AN ARITHMETIC OPERAND (DA6). "An arithmetic expression may be an identifier
 /// referencing a <b>numeric data item</b>, a numeric literal, the figurative constant ZERO (ZEROS, ZEROES) …".
-/// A group item (class alphanumeric, §8.5), an elementary alphanumeric or national item, and a reference-modified
-/// slice (§8.4.3.3.4) are therefore NOT permissible arithmetic operands.
+/// No group item is a numeric data item — ISO §8.5.2.1 gives an alphanumeric group class alphanumeric, a bit group
+/// class boolean, a national group class national and a strongly-typed group its type-name — so a group item, an
+/// elementary alphanumeric or national item, and a reference-modified slice (§8.4.3.3.4) are NOT permissible
+/// arithmetic operands. The refusal names the operand's own class (kb/Work PB1400; pinned below by
+/// <see cref="TheRefusal_NamesTheSection8521ClassOfTheOperand"/>).
 /// <para>
 /// WiseOwl COBOL accepted all of them and decoded their digit characters — and did so INCONSISTENTLY: a group of
 /// <c>PIC X</c> leaves computed, while a group of <c>PIC 9</c> leaves compiled and then THREW at run time. The

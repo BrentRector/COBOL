@@ -34,3 +34,15 @@ Every expected value is derived from §8.7.2, §13.18.29.4 GR2 b), §14.6.8.5 an
 
 **Rows.** GR-8.5.2.5-3 and GR-8.5.2.10-3 went from PARTIAL to CONFORMS, taking GAP from 83 to 81
 (batch `w1095j-pb1400-group-usage-class`).
+
+**Review round 1.** The branch reviewer found the refuted rule still stated as fact in the class doc of
+`ArithmeticOperandClassTests`: "A group item (class alphanumeric, §8.5)". The drift test had scanned only
+`ExpressionBinder.cs`, so the claim survived there and in eleven other places: the `ExpressionBinder` class doc
+itself, CORRESPONDING rule 3, the MAX/MIN string arm in `IntrinsicBinder` (which admits national and bit groups),
+the group-comparison note in `OperandText` (§8.8.4.2.1 treats only an alphanumeric group as elementary
+alphanumeric), `TierCRejectionTests`, and four corpus fixtures. The COBOLNET1796 message text, its binder comment and
+the `pb231-external-pointer-item` fixture were wrong differently: they called a strongly-typed EXTERNAL group "class
+alphanumeric" where §8.5.2.1 makes its class its type-name. The SR4 verdict those explain is unchanged. All were
+corrected, and `ClassSpellingDriftTests.NoSourceOrCorpusComment_SaysEveryGroupIsClassAlphanumeric` now scans every C#
+source and corpus program for the universal claim. The scan reads one line at a time, so it missed the pb59 claim,
+which a line break split; that one was corrected by hand.

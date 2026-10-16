@@ -137,8 +137,8 @@ public sealed partial class DataBinder
             // different verdict about a different thing. Opening the byte-window gate to pointer-class leaves
             // would have made this NONCONFORMING shape compile clean: an under-rejection created by a fix. The
             // rule that actually bars it is enforced in the same change set, and it is the ITEM's own class the
-            // rule names — a strongly-typed EXTERNAL group holding a pointer MEMBER is class alphanumeric and
-            // stays legal (SR5 only requires its type declaration to be external too).
+            // rule names — a strongly-typed EXTERNAL group holding a pointer MEMBER is of class its type-name
+            // (§8.5.2.1), not pointer, and stays legal (SR5 only requires its type declaration to be external too).
             if (ScreenExternalClassItem(item, name)) continue;
 
             // ── §13.18.5.3 SR1 ───────────────────────────────────────────────────────────────────────────

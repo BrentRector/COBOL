@@ -56,4 +56,40 @@ public sealed class ClassSpellingDriftTests
         Assert.DoesNotContain("a reference-modified operand (class alphanumeric", text);
         Assert.Contains("IntrinsicArgumentRules.ClassNameOf(p)", text);
     }
+
+    // The universal claim ISO §8.5.2.1 refutes, in the forms it was written: "a group is class alphanumeric", "A group
+    // item (class alphanumeric, …)", "a group IS class alphanumeric", "a group is class and category alphanumeric", "a
+    // group is category alphanumeric". Only an ALPHANUMERIC group is; a bit group is boolean, a national group national
+    // and a strongly-typed group its type-name. A claim that goes on to list the other classes ("alphanumeric, boolean
+    // or national") is the rule stated whole and passes. One source line at a time, so a claim split over a line break
+    // escapes it (the one in pb59_operand_category_total.cob was, and was corrected by hand with the rest).
+    private static readonly Regex UniversalGroupClass = new(
+        @"\b(?:a|any|every)\s+group(?:\s+item)?\s*(?:is\s+|\()?(?:of\s+)?(?:class|category)"
+        + @"(?:\s+and\s+(?:class|category))?\s+alphanumeric(?!,\s*(?:boolean|national)|\s+or\b|/)",
+        RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
+
+    /// <summary>The review of kb/Work PB1400 found the refuted rule still stated as fact in the class doc of the test
+    /// that pins its correction; the sweep that followed found it in source comments and corpus fixtures across the tree — a
+    /// sweep of <c>ExpressionBinder.cs</c> alone could not see them. Every C# source and every corpus program is
+    /// scanned.</summary>
+    [Fact]
+    public void NoSourceOrCorpusComment_SaysEveryGroupIsClassAlphanumeric()
+    {
+        string self = Path.GetFullPath(TestRepo.Tests(["Cobol.Net.Tests.Unit", "ClassSpellingDriftTests.cs"]));
+        static bool Built(string f) =>
+            f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")
+            || f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}");
+        var files = Directory.EnumerateFiles(TestRepo.Src(), "*.cs", SearchOption.AllDirectories)
+            .Concat(Directory.EnumerateFiles(TestRepo.Tests(), "*.cs", SearchOption.AllDirectories))
+            .Concat(Directory.EnumerateFiles(TestRepo.Tests(["conformance"]), "*.cob", SearchOption.AllDirectories))
+            .Where(f => !Built(f) && Path.GetFullPath(f) != self);
+        var offenders = files
+            .SelectMany(f => File.ReadLines(f).Select((line, i) => (f, line, i)))
+            .Where(t => UniversalGroupClass.IsMatch(t.line))
+            .Select(t => $"{Path.GetRelativePath(TestRepo.Root, t.f)}:{t.i + 1}: {t.line.Trim()}")
+            .ToList();
+        Assert.True(offenders.Count == 0,
+            "ISO §8.5.2.1: only an ALPHANUMERIC group is class alphanumeric — a bit group is boolean, a national group "
+            + "national, a strongly-typed group its type-name (kb/Work PB1400):\n" + string.Join("\n", offenders));
+    }
 }
