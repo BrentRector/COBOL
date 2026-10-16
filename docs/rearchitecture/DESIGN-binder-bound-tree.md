@@ -561,7 +561,10 @@ SR2, §8.4.3.13.3 SR2: an alphanumeric or national literal, not zero-length, for
 INVOKE's literal-1 asks it before the identifier-2 arm. The DATA DIVISION positions read the constant table through
 `DataBinder`'s own readers: the CODE clause's literal-1 (`BindCodeClause`), the Format-2 VALUE subscripts
 (`TableValueSubscript`, grammar `valueTableSubscript : signedIntegerLiteral | cobolWord`) and the `integerOperand`
-positions (`IntegerOperandValue`).
+positions (`IntegerOperandValue`). A constant entry's own AS operand is §13.10.2's literal-1 as well: an operand
+written as one constant-name copies that constant's class, category and text (`DataBinder.ConstantLiteralOperand`,
+§13.10.4 GR1/GR2; a numeric one is a single numeric literal by §13.10.3 SR1, never the integer an expression makes),
+and the pre-bind reader (`PreBindConstants`) follows the same chain for an AS phrase read before the data bind.
 
 ### 3.7 Statement PRE-ops and the ONE sending-value materialization
 

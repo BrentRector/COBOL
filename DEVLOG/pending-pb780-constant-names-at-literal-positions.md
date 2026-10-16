@@ -1,4 +1,4 @@
-## PB780 (part 1): a constant-name stands at nine more literal positions; the OPTIONS fill and the generated check remain
+## PB780: a constant-name stands at every literal slot of the grammar, and a generated check holds it
 
 kb/Work PB780 is the whole-language admission rule §13.10.3 SR2 ("constant-name-1 may be used anywhere that a format
 specifies a literal of the class and category of constant-name-1"; `cite.py --check` OK), with §13.10.4 GR1's
@@ -40,7 +40,36 @@ is after a written literal.
 `pb780-call-numeric-constant` (§14.9.4.3 SR2), `pb780-code-national-constant` (§13.18.12.3 SR1) and
 `pb780-value-subscript-not-integer-constant` (§13.18.63.3 SR19).
 
-**Not done in this part.** V11 is a phase-order problem, not a missing arm. `OptionsBinder` binds four OO units' OPTIONS
-paragraphs (`OoDriver`) and every method's (`DataBinder.OoBindMethodData`) before the unit's constant entries are
-declared. The note records what the fix needs. `SR-13.10.3-2` stays PARTIAL until V11 lands and the generated check the
-note describes exists.
+**V11, the OPTIONS fill (wave 1100 B).** V11 was a phase-order problem, not a missing arm: `OptionsBinder` bound four OO
+units' OPTIONS paragraphs (`OoDriver`) and every method's before the unit's constant entries were declared. The OPTIONS
+paragraph now binds at one point, `DataBinder.BindDeclarations`, after the constants, for every unit kind, so
+`INITIALIZE … TO KF` reads `KF CONSTANT AS X'2A'` as literal-1 (§11.9.10.3 SR1). Golden
+`conformance:2023/pb780_constant_name_options_fill`, negative `pb780-options-fill-constant-not-hex`.
+
+**The generated check (wave 1101 B).** `ConstantNameLiteralPositionDriftTests` derives every literal reference of the
+parser grammar from the `.g4` text (rules as nested alternative blocks; one-line rules included). A literal with no word
+alternative beside it must be argued as a position no constant-name stands in: a level-number (a user-defined word,
+§8.3.2.2.13), the 1985 STOP literal and the non-ISO ENTRY. A slot that admits a word must be WITNESSED: an enabled 2002+
+positive golden whose parse writes a declared constant-name in that rule's word arm, so the strict compile shows the
+binder admitted it. The alternative is an argued row: a compiler directive's operand (SR2's own "Except in a compiler
+directive"), the declined SCREEN, VALIDATE and message-server facilities, the deleted VALUE OF and PADDING CHARACTER
+clauses, and ASSIGN TO / LOCALE, whose reading is kb/Work PB2500's open latitude. The integer-n positions stay with
+`IntegerOperandSlotDriftTests`. Over main's grammar from before PB780 the check is red at `inlineInvocationSegment`,
+`optionsInitializeFill` and `valueClauseTablePhrase` (V13, V11, V10). A witness alone cannot see a binder arm that
+admits the word and then reads it wrong, so each witness is an output golden, not a compile-only one.
+
+**V15, found by the check.** Its first run left eleven word-admitting slots unwitnessed, and writing their witnesses
+found one more refusal: the constant entry's own literal-1. `01 K2 CONSTANT AS K1.`, K1 alphanumeric, was COBOLNET1547,
+because `constantValue` parses a lone word as `arithmeticExpression` and the arithmetic path admits only numeric operands.
+§13.10.2 specifies literal-1 there, so `DataBinder.ConstantLiteralOperand` makes the entry a copy of the named constant's
+class, category and text (§13.10.4 GR1/GR2). A numeric constant is then a single numeric literal (§13.10.3 SR1): `AS KF`
+keeps KF's 0.25, where the expression form would truncate it (GR4). A word that closes a cycle stays on the arithmetic
+path, which reports §13.10.3 SR5 once. The pre-bind reader `PreBindConstants.ValueOf` follows the same chain, so a
+PROGRAM-ID AS phrase naming such a constant reads it as the data bind does.
+
+**Goldens (wave 1101 B).** `conformance:2002/pb780_constant_names_slot_witnesses` (`K2=AAA`, `NX=NAT`, `Q=1` from KG*4
+with KG AS KF = 0.25, `M=14` from MULTIPLY 2 BY KN, `R=AAAAAA` from an inline invocation's constant arguments, `LV=0007`
+from CALL AS NESTED BY VALUE KN, `IN ENTRY` from SET PP TO ENTRY KE, then STOP RUN WITH NORMAL STATUS KZ, under
+PROGRAM-ID AS KP2, which is AS KP1). Negative `pb780-constant-as-constant-cycle` (§13.10.3 SR5).
+
+**Row.** `SR-13.10.3-2` PARTIAL → CONFORMS, editions 2002, 2014, 2023 (GAP 66 → 65). kb/Work PB780 landed.

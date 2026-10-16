@@ -1715,6 +1715,17 @@ alternatives, and `ArithmeticOperandRoleDriftTests` pins the two mixed-role rule
 behavior-neutral by a token-stream and parse-tree-shape differential over every lexer input the three test
 assemblies produce, with the new wrapper rules flattened (DESIGN-architecture-review §4 item 3).
 
+A literal position admits a constant-name too: "constant-name-1 may be used anywhere that a format specifies a literal
+of the class and category of constant-name-1" (§13.10.3 SR2; kb/Work PB780). So a slot that prints `literal-n` writes
+the literal rule beside a word alternative (`literal | dataReference`, or `literal | cobolWord` where no identifier
+stands), and the binder asks `ExpressionBinder.LiteralAliasOf` for the word. `ConstantNameLiteralPositionDriftTests`
+derives every literal reference from the `.g4` text in both directions: a reference with no word beside it is argued
+as a position no constant-name stands in (a level-number, the 1985 STOP literal, the non-ISO ENTRY), and every slot
+that admits a word is witnessed by an enabled 2002+ golden writing a declared constant-name in that rule's word arm
+(it compiles strict, so the binder admitted the word as the literal) or argued (a compiler directive's operand,
+SR2's own exception; the declined SCREEN, VALIDATE and message-server facilities; the open latitude of kb/Work
+PB2500). The `integer-n` positions are `IntegerOperandSlotDriftTests`'s (`integerOperand`).
+
 ## 4. Current → target module changes
 
 | Action | From | To | Why |
