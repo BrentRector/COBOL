@@ -1,4 +1,4 @@
-## A note's declared file set is its structured sites, read by one reader on one index policy (PB3242, PB3203; PB2423 and PB2678 with them)
+## Entry 2067 — 2026-10-16 06:04 PDT — A note's declared file set is its structured sites, read by one reader on one index policy (PB3242, PB3203; PB2423 and PB2678 with them)
 
 ### The finding
 
@@ -60,3 +60,4 @@ restructuring note, so the 47 open R2 defects routed to the fix lane made every 
 member index (110 s per landing). `work.FIX_LANE_WAVE` is now the one spelling of that wave kind (the R2 collector and
 the note writer use it), and a note of that kind declares its sites only. New checks in `test_plan_wave.py` and the
 member-index self-test were each seen failing on a planted revert.
+
