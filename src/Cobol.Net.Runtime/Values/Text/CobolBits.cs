@@ -96,6 +96,15 @@ public static class CobolBits
         return new string(buf);
     }
 
+    /// <summary>
+    /// <see cref="WriteWindow"/> into a record image held in a mutable <paramref name="buffer"/>: splice
+    /// <paramref name="bits"/> at ABSOLUTE bit position <paramref name="startBit"/>, leaving every other bit untouched
+    /// (§8.5.1.6.3's shared byte). A .NET host entry's published record composes its image member by member in one
+    /// buffer (DESIGN-external-repository §4.3), so a bit member is written in place rather than through a new string
+    /// per member; the bit-order law is the same <see cref="Blit"/>.
+    /// </summary>
+    public static void WriteWindowInto(char[] buffer, int startBit, string bits) => Blit(buffer, startBit, bits, bits.Length);
+
     /// <summary>⛔ THE ONE WRITE-SIDE bit-order law: set/clear <paramref name="count"/> boolean positions of
     /// <paramref name="buf"/> starting at bit <paramref name="startBit"/>, high-order bit of each byte first.
     /// Shared by <see cref="Pack"/> (into a fresh all-zero image) and <see cref="WriteWindow"/> (into a copy of

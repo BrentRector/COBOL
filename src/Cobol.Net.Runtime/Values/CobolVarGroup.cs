@@ -920,6 +920,48 @@ public sealed record CobolVarGroup(string Fixed, string[] Dynamic, CobolVarGroup
     private static int CompareRun(string a, string b, CobolCollation? collation) =>
         collation is null ? CobolString.Compare(a, b) : CobolString.Compare(a, b, collation);
 
+    /// <summary>⛔ THE ONE FIXED-RUN RULE (ISO §8.5.1.12.3): a variable-length group's FIXED RUN (<see cref="Fixed"/>) is
+    /// its <paramref name="window"/> — its storage positions, in which a dynamic-length item occupies none and a
+    /// dynamic-capacity table reserves one element (<c>CellComponents</c>) — with each table's reservation cut out:
+    /// <paramref name="dynFixedAt"/>[k] is component k's position in the window and <paramref name="dynTable"/>[k] its
+    /// table element width, 0 for a dynamic-length item. A cell-backed group's carrier (<c>StorageCell.VarGroupAt</c>) and
+    /// a .NET host's published record (kb/Work PB2099) compose their runs through it.</summary>
+    public static string RunOf(string window, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynTable)
+    {
+        if (!dynTable.ContainsAnyExcept(0)) return window;
+        var sb = new System.Text.StringBuilder(window.Length);
+        int at = 0;
+        for (int k = 0; k < dynFixedAt.Length; k++)
+        {
+            if (dynTable[k] == 0) continue;
+            sb.Append(window, at, dynFixedAt[k] - at);
+            at = dynFixedAt[k] + dynTable[k];
+        }
+        return sb.Append(window, at, window.Length - at).ToString();
+    }
+
+    /// <summary>The inverse of <see cref="RunOf"/>: <paramref name="run"/>, padded or truncated to the run's width
+    /// (§14.9.25.4 GR9's fixed part), laid around the tables' reservations, which keep <paramref name="window"/>'s
+    /// characters at those positions.</summary>
+    public static string WindowOf(string run, string window, ReadOnlySpan<int> dynFixedAt, ReadOnlySpan<int> dynTable)
+    {
+        int reserved = 0;
+        foreach (int w in dynTable) reserved += w;
+        run = CobolString.Store(run, window.Length - reserved);
+        if (reserved == 0) return run;
+        var sb = new System.Text.StringBuilder(window.Length);
+        int at = 0, r = 0;
+        for (int k = 0; k < dynFixedAt.Length; k++)
+        {
+            if (dynTable[k] == 0) continue;
+            int len = dynFixedAt[k] - at;
+            sb.Append(run, r, len).Append(window, dynFixedAt[k], dynTable[k]);
+            r += len;
+            at = dynFixedAt[k] + dynTable[k];
+        }
+        return sb.Append(run, r, run.Length - r).ToString();
+    }
+
     /// <summary>Split a dynamic-capacity table's carried content into its occurrences at
     /// <paramref name="elementWidth"/> character positions each — the read half of the concatenation the
     /// composer emits. A trailing partial occurrence is padded, so a sender whose capacity ended mid-element
