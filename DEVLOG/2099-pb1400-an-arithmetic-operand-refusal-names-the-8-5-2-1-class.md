@@ -1,4 +1,4 @@
-## PB1400: an arithmetic-operand refusal names the §8.5.2.1 class of the operand
+## Entry 2099 — 2026-10-16 11:52 PDT — PB1400: an arithmetic-operand refusal names the §8.5.2.1 class of the operand
 
 Wave 1095, group J (kb/Work PB1400, GAP campaign PB2911).
 
@@ -58,3 +58,4 @@ sites (the `IntrinsicResultType.OperandCategory` doc, the `SortEmitter` group-ke
 `da5_table_sort_group_key`), and all six are corrected. Run over the pre-PB1400 tree it reports 19 sites, the pb59
 split line among them. A new theory, `TheUniversalClaimPattern_CatchesTheFormsItWasWrittenIn`, pins the forms it
 catches and the true statements that must pass, since a zero over the tree cannot show the pattern works.
+
