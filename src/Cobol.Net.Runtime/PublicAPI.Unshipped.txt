@@ -113,3 +113,5 @@ static CobolNet.Runtime.MoveValidity.FigurativeRefusal(bool zero, bool booleanCh
 CobolNet.Runtime.ActivationDescription.ObjectNameIsParameter.get -> bool
 CobolNet.Runtime.ActivationDescription.ObjectNameIsParameter.init -> void
 static CobolNet.Runtime.ActivationRelations.SignatureDifference(CobolNet.Runtime.ActivationDescription! first, CobolNet.Runtime.ActivationDescription! second, string! firstRole = "item", string! secondRole = "corresponding item") -> string?
+CobolNet.Runtime.IO.FileConnector.StartPositioned() -> string!
+CobolNet.Runtime.IO.FileConnector.Unsuccessful(string! status) -> string!

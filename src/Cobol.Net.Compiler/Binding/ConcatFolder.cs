@@ -321,7 +321,7 @@ internal static class ConcatFolder
                     + "specify none, as a concatenation-expression operand included (ISO §12.3.7.3 SR11)");
                 return Term.Refusal(word);
             }
-            if (env.SymbolicValue(word) is { } ch) return Term.Symbolic(ch, word);
+            if (env.SymbolicValue(op, word) is { } ch) return Term.Symbolic(ch, word);
         }
         report?.Error(DiagnosticCatalog.ConcatOperandNotLiteral, $"'{word}' is not a literal — a concatenation-expression "
             + "operand is a literal or a figurative constant, and the only words that stand for one are a constant-name "

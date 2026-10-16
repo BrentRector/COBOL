@@ -1480,11 +1480,15 @@ public sealed class SequentialConnector : FileConnector
     /// already answered with a status. The READ is unsuccessful, so §14.9.30.4 GR18 sets the file position
     /// indicator to "no valid record position" (the next sequential READ is then '46', §9.1.13.7 item 6); the
     /// status reaches the §9.1.13.1 exception path (USE procedures, the Annex A.1 item 103 action) like any
-    /// other '30'.</summary>
-    private bool ReadFailed()
+    /// other '30'. It is also the terminal of the one '30' a READ decides without an exception — a PREVIOUS
+    /// read on a stream that cannot be positioned (§14.9.30.4 GR20) — so that arm invalidates the same way.</summary>
+    private bool ReadFailed() => ReadUnsuccessful(FileStatusCode.PermanentError);
+
+    /// <summary>A READ's unsuccessful exit in this connector's <see langword="bool"/> shape: the one terminal
+    /// <see cref="FileConnector.Unsuccessful"/> (§14.9.30.4 GR18), then <see langword="false"/>.</summary>
+    private bool ReadUnsuccessful(string status)
     {
-        InvalidateFilePosition();
-        Status = FileStatusCode.PermanentError;
+        Unsuccessful(status);
         return false;
     }
 
@@ -1492,8 +1496,8 @@ public sealed class SequentialConnector : FileConnector
     private bool ReadRecord(bool previous, out string image)
     {
         image = BlankRecordArea();
-        if (SequentialReadGuard() is { } guard) { Status = guard; return false; }   // '47'/'46'/'10' — FileConnector
-        if (_reader is null) { Status = FileStatusCode.ReadNotOpenForInput; return false; }
+        if (SequentialReadGuard() is { } guard) return ReadUnsuccessful(guard);   // '47'/'46'/'10' — FileConnector
+        if (_reader is null) return ReadUnsuccessful(FileStatusCode.ReadNotOpenForInput);   // '47'
 
         // §14.9.30.4 GR21, "When the file is a sequential file": the direction selects the record NUMBER, so a
         // backward read is a REPOSITION to that ordinal followed by the ordinary physical read. Rule e) — "If no
@@ -1504,12 +1508,12 @@ public sealed class SequentialConnector : FileConnector
         if (MovesBackward(previous))
         {
             long target = TargetReadOrdinal(previous);   // the STATEMENT's phrase — MovesBackward owns the XOR
-            if (target < 1) { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }   // GR21 e
+            if (target < 1) return ReadUnsuccessful(FileStatusCode.AtEnd);   // GR21 e + GR24 b)
             // §14.9.30.4 GR20 — "If the PREVIOUS phrase is specified, the physical file associated with the file
             // connector referenced by file-name-1 shall be a single reel/unit mass storage file." A stream that
             // cannot be positioned is not one; report the permanent error rather than silently reading something
             // else (the same posture the non-seekable REWRITE arm below takes).
-            if (!SeekToOrdinal(target)) { Status = FileStatusCode.PermanentError; return false; }
+            if (!SeekToOrdinal(target)) return ReadFailed();   // '30'
         }
 
         // §14.9.30 GR14 (READ) / §9.1.13.2 item 3: a RECORD-sequential physical record whose length is outside the file's
@@ -1532,7 +1536,7 @@ public sealed class SequentialConnector : FileConnector
                 _lastReadLinePartial = true;   // a served remainder is only PART of its physical line (§14.9.35 GR17a)
             }
             else if (NextFrame(out _, out _) is { } physical) line = physical;
-            else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
+            else return ReadUnsuccessful(FileStatusCode.AtEnd);   // GR24 b)
             // The bound is the maximum size the RECORD DESCRIPTIONS specify (GR15's own words), which is the
             // record area's width except for a variable-length record (MaxRecordSize — kb/Work PB981).
             if (line.Length > MaxRecordSize)
@@ -1568,7 +1572,7 @@ public sealed class SequentialConnector : FileConnector
             // OPEN.
             shortLong = IsVarying ? data.Length < VaryMin || data.Length > VaryMax : data.Length < RecordWidth;
         }
-        else { LastReadUnsuccessful = true; Status = FileStatusCode.AtEnd; return false; }
+        else return ReadUnsuccessful(FileStatusCode.AtEnd);   // GR24 b)
         _readOrdinal++;   // the record just made available is ordinal N+1 (§9.1.16 lock identity)
         ReadSucceeded(lineBadChar ? FileStatusCode.LineRecordInvalidCharRead   // '09' §14.9.30.4 GR16 — stated after GR15, so it wins over '06'
             : lineTooLong ? FileStatusCode.LineRecordTooLong
@@ -1899,13 +1903,13 @@ public sealed class SequentialConnector : FileConnector
         // The read-side medium boundary (ReadFailed): the scan below reads the medium. An unsuccessful START
         // invalidates the file position indicator (§14.9.41.4 GR7), exactly as ReadFailed does for a READ.
         try { return StartFirstLastRecord(last); }
-        catch (IOException) { ReadFailed(); return Status; }   // '30' §9.1.13.6 item 1
+        catch (IOException) { return Unsuccessful(FileStatusCode.PermanentError); }   // '30' §9.1.13.6 item 1
     }
 
     /// <summary>The body of <see cref="StartFirstLast"/>, inside its medium-boundary catch.</summary>
     private string StartFirstLastRecord(bool last)
     {
-        if (StartOpenModeGuard() is { } notOpen) return Status = notOpen;   // '47' §14.9.41.4 GR1 + GR7
+        if (StartOpenModeGuard() is { } notOpen) return Unsuccessful(notOpen);   // '47' §14.9.41.4 GR1 + GR7
         if (OptionalAbsent) return StartFail();                        // GR5 / §9.1.13.5 item 3 b)
         // "or the physical file does not support the ability to position at the first/last record" — a stream
         // that cannot be repositioned. A FileStream always can; a future non-seekable medium answers '23' here
@@ -1926,18 +1930,13 @@ public sealed class SequentialConnector : FileConnector
         }
         if (foundStart < 0) { SeekToRecord(0, 0); return StartFail(); }   // no records exist — GR20/GR21
         SeekToRecord(foundStart, foundOrdinal - 1);
-        LastReadUnsuccessful = false;   // a successful START is a reposition: §14.9.30.4 GR21's '46' poison clears
-        return Status = FileStatusCode.Success;
+        return StartPositioned();   // a successful START is a reposition: §14.9.30.4 GR21's '46' poison clears
     }
 
     /// <summary>An unsuccessful START: §14.9.41.4 GR7 — <i>"the file position indicator is set to indicate that
     /// no valid record position has been established"</i>, which on this connector is precisely the state
     /// §9.1.13.7 item 6 a) reads back as '46' on the next sequential READ — and the '23' GR20/GR21 name.</summary>
-    private string StartFail()
-    {
-        InvalidateFilePosition();
-        return Status = FileStatusCode.RecordNotFound;
-    }
+    private string StartFail() => Unsuccessful(FileStatusCode.RecordNotFound);
 
     /// <summary>Reposition the reader at <paramref name="byteOffset"/>, which shall be the START of a record,
     /// and reset every piece of derived read state so the next <see cref="Read"/> behaves as if the file had

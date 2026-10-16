@@ -129,19 +129,136 @@ public sealed class UserWordDeclarationDriftTests
     /// <summary>§8.3.2.2 says "used": a census is RECORDED from exactly two funnels, the declaration funnel
     /// (<c>DataBinder.CheckOneTypePerWord</c>) and the reference funnel (<c>OoClassTable.RecordReferenceUse</c>, a
     /// method's reference to an object-class-name, interface-name or parameter-name its class declares, kb/Work PB3132),
-    /// and the reference funnel is reached only from the one class-name resolver, <c>OoNameResolution.Lookup</c>. A third
-    /// recorder, or a class-name resolution that bypassed Lookup, would let a method use a word as two types unseen.</summary>
+    /// and the reference funnel is reached from two resolvers only: the one class-name resolver,
+    /// <c>OoNameResolution.Lookup</c>, and the one recorder of a reference to a name a CONFIGURATION SECTION declares,
+    /// <c>DataBinder.RecordConfigurationNameUse</c> (kb/Work PB3153), which every <c>ConfigurationNames.TryUse</c> and
+    /// <c>MnemonicRegistry.TryUse</c> calls. A third recorder, or a resolution that bypassed them, would let a contained
+    /// program or a method use a word as two types unseen.</summary>
     [Fact]
     public void TheCensus_IsRecordedOnlyByTheDeclarationAndReferenceFunnels()
     {
-        var sources = Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Compiler"), "*.cs", SearchOption.AllDirectories)
-            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
-            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f))).ToList();
+        var sources = CompilerSources();
         Assert.Equal(["DataBinder.cs", "OoClassTable.cs"],
             sources.Where(s => Regex.IsMatch(s.Text, @"(?:WordCensus|Words)\.Record\(")).Select(s => s.Name).Order());
-        Assert.Equal(["OoNameResolution.cs"],
-            sources.Where(s => Regex.IsMatch(s.Text, @"\.RecordReferenceUse\(")).Select(s => s.Name));
+        Assert.Equal(["DataBinder.cs", "OoNameResolution.cs"],
+            sources.Where(s => Regex.IsMatch(s.Text, @"\.RecordReferenceUse\(")).Select(s => s.Name).Order());
+        Assert.Equal(["ConfigurationNames.cs", "MnemonicRegistry.cs"],
+            sources.Where(s => Regex.IsMatch(s.Text, @"\b(?:recordUse|data\.RecordConfigurationNameUse)\(")).Select(s => s.Name).Order());
     }
+
+    /// <summary>⛔ EVERY TYPE §8.4.6.1 SAYS A CONFIGURATION SECTION DECLARES HAS A TABLE WHOSE RESOLUTIONS ARE USES
+    /// (kb/Work PB3153). §8.4.6.1 lists the types that, "<i>when they are declared within a configuration section, may be
+    /// referenced only by statements and entries either in that source element that contains a configuration section or
+    /// in any source element contained within that source element</i>": a contained program and a method resolve names
+    /// no declaration of their own announced, so each type's registry is a <c>ConfigurationNames</c> table built with
+    /// the recorder (or, for the mnemonic-name, the <c>MnemonicRegistry</c>, whose <c>TryUse</c> records), and the
+    /// referring element's §8.3.2.2 census sees the use. The list is parsed from <c>specs/ISO_COBOL.md</c>; a type it
+    /// gains, or a table that stops recording, is red here.</summary>
+    [Fact]
+    public void EveryConfigurationSectionNameType_ResolvesThroughARecordingTable()
+    {
+        string spec = File.ReadAllText(Path.Combine(TestRepo.Root, "specs", "ISO_COBOL.md"));
+        int start = spec.IndexOf("when they are declared within a configuration section, may be referenced only by",
+            StringComparison.Ordinal);
+        Assert.True(start >= 0, "§8.4.6.1's configuration-section list moved in specs/ISO_COBOL.md — re-derive this guard");
+        int end = spec.IndexOf("Specific conventions for declarations and references", start, StringComparison.Ordinal);
+        Assert.True(end > start, "§8.4.6.1's list end moved in specs/ISO_COBOL.md — re-derive this guard");
+        var listed = Regex.Matches(spec[start..end], @"^— ([a-z-]+)", RegexOptions.Multiline)
+            .Select(m => KindOfSpelling(m.Groups[1].Value)).Distinct().Order().ToArray();
+        Assert.Equal(8, listed.Length);
+
+        var sources = CompilerSources();
+        var tabled = sources.SelectMany(s => Regex.Matches(s.Text,
+                @"ConfigurationNames<[^>]+>\s+\w+\s*=>\s*field\s*\?\?=\s*new\(UserWordKind\.(\w+),\s*RecordConfigurationNameUse\)")
+            .Select(m => Enum.Parse<UserWordKind>(m.Groups[1].Value)));
+        string registry = sources.Single(s => s.Name == "MnemonicRegistry.cs").Text;
+        Assert.Contains("data.RecordConfigurationNameUse(at, name, UserWordKind.MnemonicName)", registry);
+        Assert.Equal(listed, tabled.Append(UserWordKind.MnemonicName).Distinct().Order().ToArray());
+    }
+
+    /// <summary>⛔ AN INHERITED CONFIGURATION-SECTION NAME YIELDS TO THE ELEMENT'S OWN ITEM THROUGH ONE TEST (kb/Work
+    /// PB3153 review round 2). Where a format admits both an inherited SPECIAL-NAMES name and an operand, §8.4.6.1 makes
+    /// the referring element's own item of that spelling the referent, and that item may be a data item OR a
+    /// constant-name (§13.10.3 SR2 admits one wherever a literal of its category is). A bare <c>Refs.Probe(…)</c> sees
+    /// only the data item, so STANDARD-COMPARE's argument-4, WRITE ADVANCING's integer-1 and an EVALUATE object
+    /// claimed an own constant-name as the inherited ordering-name, mnemonic-name or class-name and refused legal source
+    /// COBOLNET2692. So no expression pairs a configuration-section-name lookup with a raw probe: it asks
+    /// <c>ReferenceResolver.DescribesOwnItem</c>, and the next two-reading position gets both halves.
+    /// <para>The table names are read off the <c>ConfigurationNames</c> declarations, never listed by hand: a
+    /// hand-written list once named a <c>Symbolics</c> table that does not exist and missed <c>SwitchConditions</c>
+    /// (kb/Work PB3153 review w1085d R1-1).</para></summary>
+    [Fact]
+    public void AConfigurationNameLookup_AsksTheOneOwnItemTest_NeverARawProbe()
+    {
+        var sources = CompilerSources();
+        string tables = string.Join("|", ConfigurationTableNames(sources));
+        var raw = sources.SelectMany(s => Regex.Matches(s.Text,
+                @"(?:IsClassConditionWord|IsAlphabetName|NamesSymbolic|Mnemonics\.TryPeek|Mnemonics\.TryUse"
+                + $@"|\b(?:{tables})\.(?:Declares|TryUse|TryPeek))\([^;{{}}]*?Refs\.Probe\(")
+            .Select(m => $"{s.Name}:{LineOf(s.Text, m.Index)}")).ToList();
+        Assert.True(raw.Count == 0, "a configuration-section-name lookup is paired with a raw Refs.Probe, which misses an "
+            + "own constant-name (" + string.Join(", ", raw) + "): ask ReferenceResolver.DescribesOwnItem (§8.4.6.1, kb/Work PB3153)");
+        string resolver = sources.Single(s => s.Name == "ReferenceResolver.cs").Text;
+        Assert.Matches(@"public bool DescribesOwnItem\(Core\.DataReferenceContext dref\) =>\s+"
+            + @"data\.ConstantOf\(dref\) is not null \|\| Probe\(dref\) is not null;", resolver);
+    }
+
+    /// <summary>⛔ A PROCEDURE-DIVISION MEMBER THAT TAKES A DATA REFERENCE AS AN INHERITABLE CONFIGURATION-SECTION NAME
+    /// ASKS THE OWN-ITEM TEST (kb/Work PB3153 review w1085d R1-1). A word the grammar parsed as a data reference is a
+    /// position whose format also admits an operand, so §8.4.6.1 makes the referring element's own item of that spelling
+    /// the referent. The raw-probe guard above cannot see a member that asks NO own-item test at all: the bare-operand
+    /// switch-status arm (<c>SetAlterBinder.SwitchCondOf</c>) resolved <c>IF SWON</c> through
+    /// <c>SwitchConditions.TryUse</c> over a contained program's own <c>01 SWON PIC 1</c> and refused legal source
+    /// COBOLNET2692. So every member under <c>Binding/Procedure</c> that resolves a configuration-section name
+    /// (<c>TryUse</c> on a <c>ConfigurationNames</c> table or the mnemonic registry) and handles a data reference
+    /// (a <c>DataReferenceContext</c>, <c>dataReference()</c> or <c>SoleDataRef…</c>) asks
+    /// <c>DescribesOwnItem</c>. A member whose word arrives as a dedicated name token (ACCEPT FROM, the class
+    /// condition's class-name, SET Format 3) handles no data reference, so the rule does not reach it.</summary>
+    [Fact]
+    public void AProcedureDataReferenceTakenAsAConfigurationName_AsksTheOwnItemTest()
+    {
+        var sources = CompilerSources(TestRepo.Src("Cobol.Net.Compiler", "Binding", "Procedure"));
+        string tables = string.Join("|", ConfigurationTableNames(CompilerSources()));
+        var lookup = new Regex($@"\b(?:(?:{tables})|Mnemonics)\.TryUse\(");
+        var member = new Regex(@"^    (?:public|private|internal|protected)\b", RegexOptions.Multiline);
+        var dataReference = new Regex(@"DataReferenceContext\b|\.dataReference\(\)|\bSoleDataRef\w*\(");
+        int lookups = 0;
+        var missing = new List<string>();
+        foreach (var (name, text) in sources)
+        {
+            var starts = member.Matches(text).Select(m => m.Index).Append(text.Length).ToArray();
+            for (int i = 0; i + 1 < starts.Length; i++)
+            {
+                string body = text[starts[i]..starts[i + 1]];
+                if (!lookup.IsMatch(body)) continue;
+                lookups++;
+                if (dataReference.IsMatch(body) && !body.Contains("Refs.DescribesOwnItem(", StringComparison.Ordinal))
+                    missing.Add($"{name}:{LineOf(text, starts[i])}");
+            }
+        }
+        Assert.True(lookups >= 5, $"found only {lookups} configuration-name resolutions under Binding/Procedure — re-derive this guard");
+        Assert.True(missing.Count == 0, "a member resolves a data reference as an inherited configuration-section name "
+            + "without asking ReferenceResolver.DescribesOwnItem (" + string.Join(", ", missing) + "): the element's own "
+            + "item of that spelling is the referent (§8.4.6.1, kb/Work PB3153)");
+    }
+
+    /// <summary>The <c>ConfigurationNames</c> tables the compiler declares, read off their declarations.</summary>
+    private static string[] ConfigurationTableNames(List<(string Name, string Text)> sources)
+    {
+        var names = sources.SelectMany(s => Regex.Matches(s.Text, @"ConfigurationNames<[^>]+>\s+(\w+)\s*=>")
+            .Select(m => m.Groups[1].Value)).Distinct().Order(StringComparer.Ordinal).ToArray();
+        Assert.Contains("SwitchConditions", names);   // the scan found the declarations at all
+        return names;
+    }
+
+    private static int LineOf(string text, int index) => text[..index].Count(c => c == '\n') + 1;
+
+    private static List<(string Name, string Text)> CompilerSources() => CompilerSources(TestRepo.Src("Cobol.Net.Compiler"));
+
+    private static List<(string Name, string Text)> CompilerSources(string root) =>
+        [.. Directory.EnumerateFiles(root, "*.cs", SearchOption.AllDirectories)
+            .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}"))
+            .Select(f => (Name: Path.GetFileName(f), Text: File.ReadAllText(f)))];
 
     /// <summary>⛔ A PARAGRAPH-NAME-OMITTED PARAGRAPH IS NAMED NOWHERE (ISO §14.4.3; kb/Work PB990): the procedure table
     /// registered a declarative section's leading sentences, and its empty-section no-op pc, as a paragraph named like
