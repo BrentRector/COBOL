@@ -144,6 +144,7 @@ public static class Constructs
     public const string UsageFloatExtended2002 = "usage-float-extended-2002";
     public const string RepositoryClass2002 = "repository-class-2002";
     public const string StartWithLength2002 = "start-with-length-2002";
+    public const string StartReverseOperators2002 = "start-reverse-operators-2002";
     public const string CodeSetNational2002 = "code-set-national-2002";
     public const string SpecialNamesForNational2002 = "special-names-for-national-2002";
     public const string AlphabetNational2002 = "alphabet-national-2002";
