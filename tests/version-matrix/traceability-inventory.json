@@ -37433,7 +37433,7 @@
   "rule-digest": "8d1d5896163e",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectCharOperandOf; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#ScreenZeroLength; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#InspectCharOperand; src/Cobol.Net.Frontend/Grammar/Core/CobolExpressions.g4#figurativeConstant",
-  "test-ref": "conformance:negative/pb1127-inspect-zero-length-literal; conformance:negative/pb1127-inspect-zero-length-delimiter; conformance:negative/pb1127-inspect-boolean-figurative-not-zero; conformance:2023/pb1127_inspect_constant_name_operands; conformance:negative/pb1128-inspect-all-figurative-literal3; conformance:2023/pb1663_inspect_hexadecimal_alphanumeric_literal; conformance:2023/pb1414_figurative_follows_program_collating_sequence_every_verb; conformance:negative/pb1029-inspect-numeric-literal",
+  "test-ref": "conformance:negative/pb1127-inspect-zero-length-literal; conformance:negative/pb1127-inspect-zero-length-delimiter; conformance:negative/pb1127-inspect-boolean-figurative-not-zero; conformance:2023/pb1127_inspect_constant_name_operands; conformance:negative/pb1128-inspect-all-figurative-literal3; conformance:2023/pb1663_inspect_hexadecimal_alphanumeric_literal; conformance:2023/pb1414_figurative_follows_program_collating_sequence_every_verb; conformance:negative/pb1029-inspect-numeric-literal; conformance:85/pb3233_inspect_figurative_pattern_size; conformance:negative/pb3233-inspect-figurative-literal1-size",
   "derivation": "",
   "editions": "85,2002,2014,2023",
   "notes": "LANDED kb/Work PB1127 (+ PB1128/PB1663/PB1414 halves). Every clause of SR3 is screened at every literal position: numeric literal refused (pb1029), a figurative beginning with ALL refused for literal-1..4 and legal for literal-5 (pb1128), hexadecimal alphanumeric literal admitted (pb1663), a constant-name substitutes its literal before the identifier arm (pb1127 positive), a zero-length literal refused at every position including a BEFORE/AFTER delimiter (pb1127 negatives), a boolean identifier-1 admits only ZERO (pb1127 negative), and a figurative reads identifier-1's class context (pb1414 sweep). The zero-length and ALL screens are edition-invariant; boolean clause 2002+.",
@@ -37477,11 +37477,11 @@
   "subject": "INSPECT statement",
   "rule-digest": "97162f64a6a7",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectReplacingSize; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands",
-  "test-ref": "conformance:negative/pb1127-inspect-constant-name-replacing-size; conformance:2023/pb1127_inspect_constant_name_operands",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectLiteralSizes; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#InspectLiteralSize",
+  "test-ref": "conformance:negative/pb1127-inspect-constant-name-replacing-size; conformance:2023/pb1127_inspect_constant_name_operands; conformance:negative/pb3233-inspect-figurative-literal1-size; conformance:negative/pb3233-inspect-symbolic-literal1-size; conformance:85/pb3233_inspect_figurative_pattern_size",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "LANDED kb/Work PB1127. A constant-name literal-1/literal-3 (13.10.3 SR2) is substituted before the size check sees it: equal-size constants run (R2 in the positive golden), unequal sizes draw the SR6 COBOLNET0846 instead of the wrong-rule COBOLNET1639.",
+  "notes": "LANDED kb/Work PB1127, PB3233. A constant-name literal-1/literal-3 (13.10.3 SR2) is substituted before the size check sees it: equal-size constants run (R2 in the positive golden), unequal sizes draw the SR6 COBOLNET0846 instead of the wrong-rule COBOLNET1639. PB3233: a figurative literal-1, a bare symbolic character included, is SR3's 'implicit one character data item' and is measured as one character by the ONE size rule StatementValidation.CheckInspectLiteralSizes (shared with SR9), so ALL SPACE BY \"QR\" draws COBOLNET0846 at every edition (it compiled clean and left identifier-1 unchanged); only a figurative literal-3 is exempt. retired-witness: src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectReplacingSize (kb/Work PB3233 merged the SR6 and SR9 size checks into the one rule StatementValidation.CheckInspectLiteralSizes)",
   "state": "OK"
  },
  {
@@ -37522,11 +37522,11 @@
   "subject": "INSPECT statement",
   "rule-digest": "96f369e3f4d2",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectConvertingSize; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands",
-  "test-ref": "conformance:negative/pb1127-inspect-constant-name-converting-size; conformance:2023/pb1127_inspect_constant_name_operands",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/InspectBinder.cs#BindPhraseOperands; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectLiteralSizes; src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#InspectLiteralSize",
+  "test-ref": "conformance:negative/pb1127-inspect-constant-name-converting-size; conformance:2023/pb1127_inspect_constant_name_operands; conformance:negative/pb3233-inspect-figurative-literal4-size; conformance:85/pb3233_inspect_figurative_pattern_size",
   "derivation": "",
   "editions": "85,2002,2014,2023",
-  "notes": "LANDED kb/Work PB1127. A constant-name literal-4/literal-5 reaches the SR9 size check (equal sizes run, unequal draws COBOLNET0846); a figurative literal-5 stays exempt.",
+  "notes": "LANDED kb/Work PB1127, PB3233. A constant-name literal-4/literal-5 reaches the SR9 size check (equal sizes run, unequal draws COBOLNET0846); a figurative literal-5 stays exempt. PB3233: a figurative literal-4 is SR3's one character, measured by the ONE size rule StatementValidation.CheckInspectLiteralSizes (shared with SR6), so CONVERTING SPACE TO \"QR\" draws COBOLNET0846 at every edition (it compiled clean and converted each space to the first character). retired-witness: src/Cobol.Net.Compiler/Binding/Validation/StatementValidation.cs#CheckInspectConvertingSize (kb/Work PB3233 merged the SR6 and SR9 size checks into the one rule StatementValidation.CheckInspectLiteralSizes)",
   "state": "OK"
  },
  {
