@@ -46,3 +46,23 @@ alternatives `FormOf` reads; no receiving phrase (SET, INTO, GIVING, RETURNING, 
 TALLYING IN) takes a bare data reference outside five named, reasoned exemptions. Rows SR-8.4.3.8.3-2 and
 SR-8.4.3.5.3-2 PARTIAL → CONFORMS (GAP 78 → 76); SR-8.4.3.7.3-1 and SR-8.4.3.13.3-4 re-witnessed by their rules.
 kb/Work PB1551 and PB1008 landed; PB1136 unblocked; PB1782 step 1 recorded.
+
+**Branch review round 1 (kb/Work PB3027).** The reviewer found two holes, both real. R1-1: the BY REFERENCE argument of
+CALL and INVOKE was still a bare `dataReference`, though §14.9.4.3 SR5 and §14.9.23.3 SR20 make it a receiving operand,
+so `CALL "X" USING BY REFERENCE SELF` (and SUPER, and `O AS UNIVERSAL`, and the INVOKE twins) still drew COBOLNET0901 —
+the very refusal this entry set out to remove, while the rows claimed "every receiving position". Both slots now take
+`addressIdentifier | predefinedNull | receivingIdentifier | OMITTED`: the address-identifier stays SR4/SR19's sending
+operand and NULL keeps SR3/SR9's refusal, because ANTLR resolves the overlap to the lower alternative. The sibling sweep
+found the IMPLIED BY REFERENCE refused under the wrong description: CALL Format 1's keyword-less SELF under GR5's
+prevailing BY REFERENCE was "a function-identifier or inline method invocation", and a keyword-less SELF through a
+universal object reference (SR6) was "a literal or arithmetic-expression argument". Both now reach the form table's row
+(`ReceivingOperandForms.FormOfOoIdentifier`), and the universal path no longer repeats a reported `ResolveReceiving`
+null as a second COBOLNET0866. `BY REFERENCE ADDRESS OF FUNCTION F` became §8.4.3.12.3 SR3 (COBOLNET3979; it was
+COBOL0001), so SR-8.4.3.12.3-3's "exactly ONE grammar home" notes were restated. R1-2: the drift guard's keyword list
+had no TO, so it could not have caught the slots this entry converted; it now reads TO, REFERENCE, ACCEPT, INITIALIZE,
+SET CONTENT/SIZE OF, UNSTRING DELIMITER/COUNT IN, the ROUNDED resultant, INSPECT's counter, an alternation group and a
+list rule one level down, and a theory pins each shape (run over base 59208d8fb's grammar it flags 42 rules where the
+first cut flagged 24). New negatives `pb1551-call-by-reference-self`, `pb1551-call-implied-reference-self`,
+`pb1551-invoke-universal-self` (3978), `pb1551-invoke-by-reference-view` (2871), `pb1551-function-address-receiving`
+(3979). A function-identifier or inline invocation written BY REFERENCE is still a parse error, by the computed formats'
+structural exclusion that this entry chose.

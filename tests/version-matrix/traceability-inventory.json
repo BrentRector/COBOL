@@ -6322,11 +6322,11 @@
   "subject": "Object-view",
   "rule-digest": "7c8a46d9d1de",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving",
-  "test-ref": "conformance:negative/pb1425-object-view-receiving; conformance:negative/pb1551-object-view-initialize; unit:ReceivingOperandFormDriftTests.EveryNonReceivableAlternative_IsReadByFormOf",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#callByReference; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument",
+  "test-ref": "conformance:negative/pb1425-object-view-receiving; conformance:negative/pb1551-object-view-initialize; unit:ReceivingOperandFormDriftTests.EveryNonReceivableAlternative_IsReadByFormOf; conformance:negative/pb1551-invoke-by-reference-view",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1425 (w1019a; w1021a), PB1551 (w1097d). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). Every receiving position parses the view of a data reference, of SELF, SUPER or NULL as a nonReceivableIdentifier, and the receiving chokepoint refuses it by this rule (COBOLNET2871) from the ReceivingOperandForms table, as it does the view of a qualified item written as one chain (`MOVE X TO A OF G AS C`, ReceivingFormBar). The per-statement objectViewReceiver refusals of SET Format 5 and INVOKE RETURNING are deleted; both now reach the same row. [editions: the OO facility, 2002+]",
+  "notes": "kb/Work PB1425 (w1019a; w1021a), PB1551 (w1097d; review round 1 finding R1-1). \"An object-view shall not be specified as a receiving operand\" (cite.py --check 8.4.3.5.3 -> OK 2)). Every receiving position parses the view of a data reference, of SELF, SUPER or NULL as a nonReceivableIdentifier, and the receiving chokepoint refuses it by this rule (COBOLNET2871) from the ReceivingOperandForms table, as it does the view of a qualified item written as one chain (`MOVE X TO A OF G AS C`, ReceivingFormBar). That includes the BY REFERENCE argument of CALL and INVOKE (14.9.4.3 SR5, 14.9.23.3 SR20) and the implied BY REFERENCE of a keyword-less view (CALL Format 1, a universal INVOKE) — before review R1-1 those drew COBOLNET0901 on the word AS. The per-statement objectViewReceiver refusals of SET Format 5 and INVOKE RETURNING are deleted; both now reach the same row. [editions: the OO facility, 2002+]",
   "state": "OK"
  },
  {
@@ -6562,11 +6562,11 @@
   "subject": "SELF and SUPER",
   "rule-digest": "bb75159da8ab",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#receivingIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving",
-  "test-ref": "conformance:negative/pb1551-self-receiving; conformance:negative/pb1551-super-receiving; conformance:2002/pb1551_receiving_identifier_routes; unit:ReceivingOperandFormDriftTests.EveryNonReceivableAlternative_IsReadByFormOf",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#receivingIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#callByReference; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#FormOfOoIdentifier",
+  "test-ref": "conformance:negative/pb1551-self-receiving; conformance:negative/pb1551-super-receiving; conformance:2002/pb1551_receiving_identifier_routes; unit:ReceivingOperandFormDriftTests.EveryNonReceivableAlternative_IsReadByFormOf; conformance:negative/pb1551-call-by-reference-self; conformance:negative/pb1551-call-implied-reference-self; conformance:negative/pb1551-invoke-universal-self; unit:ReceivingOperandFormDriftTests.NoReceivingPhrase_TakesABareDataReference",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1551 (w1097d). \"This identifier format shall not be specified as a receiving operand\" (cite.py --check 8.4.3.8.3 -> OK 2)). Every receiving grammar slot is a receivingIdentifier (setReceivingIdentifier in SET) that parses SELF and SUPER as a nonReceivableIdentifier, and ExpressionBinder.ResolveReceiving refuses them by this rule from the ReceivingOperandForms table (COBOLNET3978) in every receiving position: MOVE, INITIALIZE, ACCEPT, the arithmetic resultants, COMPUTE, CALL/INVOKE RETURNING, READ/RETURN INTO, STRING/UNSTRING, INSPECT TALLYING, SEARCH/PERFORM VARYING, ALLOCATE RETURNING and every SET receiving list. It was a parse error re-coded to 8.9 (COBOLNET0901). The qualified SUPER (`K OF SUPER`) is a data reference and is refused by SR3 (COBOLNET2900). [editions: SELF/SUPER are OO identifiers, 2002+; at COBOL-85 an undeclared SELF/SUPER is an undefined reference, COBOLNET1639]",
+  "notes": "kb/Work PB1551 (w1097d; review round 1 finding R1-1). \"This identifier format shall not be specified as a receiving operand\" (cite.py --check 8.4.3.8.3 -> OK 2)). Every receiving grammar slot is a receivingIdentifier (setReceivingIdentifier in SET) that parses SELF and SUPER as a nonReceivableIdentifier, and ExpressionBinder.ResolveReceiving refuses them by this rule from the ReceivingOperandForms table (COBOLNET3978) in every receiving position: MOVE, INITIALIZE, ACCEPT, the arithmetic resultants, COMPUTE, CALL/INVOKE RETURNING, READ/RETURN INTO, STRING/UNSTRING, INSPECT TALLYING, SEARCH/PERFORM VARYING, ALLOCATE RETURNING, every SET receiving list, and the BY REFERENCE argument of CALL (14.9.4.3 SR5, cite.py OK 5)) and INVOKE (14.9.23.3 SR20, cite.py OK 20)). The IMPLIED BY REFERENCE reaches the same row: CALL Format 1's keyword-less SELF/SUPER under the prevailing BY REFERENCE (14.9.4.4 GR5) and every keyword-less argument through a universal object reference (14.9.23.3 SR6) are refused by this rule, not as a temporary or a literal. It was a parse error re-coded to 8.9 (COBOLNET0901). The qualified SUPER (`K OF SUPER`) is a data reference and is refused by SR3 (COBOLNET2900). [editions: SELF/SUPER are OO identifiers, 2002+; at COBOL-85 an undeclared SELF/SUPER is an undefined reference, COBOLNET1639]",
   "state": "OK"
  },
  {
@@ -7087,11 +7087,11 @@
   "subject": "Function-address-identifier",
   "rule-digest": "bb75159da8ab",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setFunctionAddressStatement",
-  "test-ref": "conformance:2014/pb452_set_function_pointer; conformance:2023/pb452_function_address_runtime",
+  "code-location": "src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#setFunctionAddressStatement; src/Cobol.Net.Frontend/Grammar/CobolParserCore.g4#nonReceivableIdentifier; src/Cobol.Net.Compiler/Binding/Procedure/ReceivingOperandForms.cs#Rules; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#ResolveReceiving",
+  "test-ref": "conformance:2014/pb452_set_function_pointer; conformance:2023/pb452_function_address_runtime; conformance:negative/pb1551-function-address-receiving",
   "derivation": "",
   "editions": "2014,2023",
-  "notes": "'This identifier format shall not be specified as a receiving operand.' STRUCTURALLY SATISFIED, and the structure is the point: the function-address-identifier has exactly ONE grammar home, setFunctionAddressStatement's `TO ADDRESS OF? FUNCTION dataReference` tail, which is a SENDING position by construction. It appears in no receiving-operand rule anywhere in the grammar, so the rule cannot be violated by a parsable program and no screen is needed - the SR18/SR19 lesson in reverse (a rule with a structural answer needs no second copy of that answer in the binder). Compare 8.4.3.13's PROGRAM twin, whose SR4 is the same sentence and whose grammar home setEntryStatement is likewise sender-only.",
+  "notes": "'This identifier format shall not be specified as a receiving operand.' (cite.py --check 8.4.3.12.3 -> OK 3)). Since kb/Work PB1551 (w1097d) the function-address-identifier has TWO grammar homes: the sending tail of setFunctionAddressStatement (`TO ADDRESS OF? FUNCTION ...`), and nonReceivableIdentifier, the superset every receiving slot parses (receivingIdentifier / setReceivingIdentifier, and CALL / INVOKE BY REFERENCE, which 14.9.4.3 SR5 makes receiving because 8.4.3.1.2 Format 9 lists no function arm). In a receiving position the receiving chokepoint refuses it by this rule from the ReceivingOperandForms table (COBOLNET3979): conformance:negative/pb1551-function-address-receiving pins `CALL ... USING BY REFERENCE ADDRESS OF FUNCTION F`, which was a parse error (COBOL0001). The sending uses stay witnessed by pb452_set_function_pointer and pb452_function_address_runtime.",
   "state": "OK"
  },
  {
@@ -38167,11 +38167,11 @@
   "subject": "INVOKE statement",
   "rule-digest": "f4d6eb03a5db",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg",
-  "test-ref": "conformance:negative/l1-invoke-byref-constant-record; conformance:negative/l1-invoke-byref-constant-record-universal",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvocationArg; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#invokeArgument; src/Cobol.Net.Compiler/Binding/Procedure/Verbs/OoBinder.cs#OoBindInvoke",
+  "test-ref": "conformance:negative/l1-invoke-byref-constant-record; conformance:negative/l1-invoke-byref-constant-record-universal; conformance:negative/pb1551-invoke-by-reference-view; conformance:negative/pb1551-invoke-universal-self",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "SR20 makes identifier-3 a receiving operand, and §13.18.15.3 SR2 then bars a CONSTANT RECORD item: BY REFERENCE KA is rejected with COBOLNET1548 on the resolved and universal arms",
+  "notes": "SR20 makes identifier-3 a receiving operand (cite.py --check 14.9.23.3 -> OK 20)), and every rule that forbids a receiving operand then applies: §13.18.15.3 SR2 bars a CONSTANT RECORD item (BY REFERENCE KA is rejected with COBOLNET1548 on the resolved and universal arms), and since kb/Work PB1551 review R1-1 the BY REFERENCE slot is a receivingIdentifier, so an object-view (COBOLNET2871), SELF or SUPER (COBOLNET3978) written there is refused by its own §8.4.3 rule instead of a parse error re-coded to §8.9; a keyword-less SELF or view through a universal object reference (SR6: BY REFERENCE assumed) is refused the same way.",
   "state": "OK"
  },
  {

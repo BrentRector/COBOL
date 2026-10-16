@@ -184,7 +184,9 @@ builds its node FROM the answer (`Refusal` / `OperandError` / `ExprError` / `Boo
 caller cannot carry a deferral, which reports it as recognized-not-implemented, COBOLNET0899). The receiving
 chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported. Every
 receiving grammar slot is a `receivingIdentifier` (`setReceivingIdentifier` in SET, which lacks the data-address
-alternative so Format 7 keeps its own `ADDRESS OF data-name-1` receiver): a data reference, or one of the identifier
+alternative so Format 7 keeps its own `ADDRESS OF data-name-1` receiver), and so is the BY REFERENCE argument of CALL and
+INVOKE (§14.9.4.3 SR5, §14.9.23.3 SR20; an address-identifier there is a sending operand and keeps its own arm; a
+keyword-less SELF, SUPER or view whose BY REFERENCE is implied reaches the same table): a data reference, or one of the identifier
 formats that are never a receiving operand (an object-view, SELF, SUPER, NULL, an address-identifier) parsed only so
 `ResolveReceiving` can refuse it by the row of `ReceivingOperandForms` that names its §8.4.3 rule — the same table the
 data-reference screens (LINAGE-COUNTER, LINE-COUNTER, EXCEPTION-OBJECT, the view of a qualified item) report from

@@ -236,7 +236,10 @@ invokeArgument
     // spells): without it `USING BY VALUE NULL` was a parse error (kb/Work PB1137). The binder decides it.
     : BY? VALUE (addressIdentifier | arithmeticExpression | literal)
     // predefinedNull: admitted only so OoBinder refuses it by §14.9.23.3 SR9's name — the CALL twin (kb/Work PB1427).
-    | BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
+    // Every other identifier-3 is a RECEIVING operand (§14.9.23.3 SR20: "If identifier-3 does not reference an
+    // address-identifier, identifier-3 is a receiving operand"), so the slot is `receivingIdentifier` and SELF, SUPER or
+    // an object-view written here is refused by its own §8.4.3 rule — callByReference's twin (kb/Work PB1551 review R1-1).
+    | BY? REFERENCE (addressIdentifier | predefinedNull | receivingIdentifier | OMITTED)
     // SELF is identifier-5 (§8.4.3.8 — an identifier format whose only role bar is "shall not be a receiving
     // operand"), so the BY CONTENT / BY VALUE braces and the keyword-less form admit it (kb/Work PB1137). It is an
     // `arithmeticExpression` primary — the identifier tier, as an object-view is (kb/Work PB1425) — and the binder

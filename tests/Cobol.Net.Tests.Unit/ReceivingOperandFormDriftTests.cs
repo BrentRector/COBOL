@@ -91,21 +91,43 @@ public sealed class ReceivingOperandFormDriftTests
         ["mcsSendStatement"] = "the declined '85 communication SEND (Annex A.4) — refused whole by name",
         ["sortGivingPhrase"] = "SORT … GIVING names FILES (file-name-2), not identifiers",
         ["mergeGivingPhrase"] = "MERGE … GIVING names FILES (file-name-2), not identifiers",
+        ["setBooleanStatement"] = "SET Format 4's receiver is condition-name-1 (§14.9.39.2), a user-defined word, not an identifier",
     };
 
+    /// <summary>The words that introduce a receiving identifier in a statement's general format: TO (MOVE, ADD, SET),
+    /// INTO, GIVING, RETURNING, REMAINDER, POINTER, VARYING, AFTER, REFERENCE (CALL / INVOKE BY REFERENCE, §14.9.4.3 SR5,
+    /// §14.9.23.3 SR20), ACCEPT, INITIALIZE, SET's own receiving list and its CONTENT OF / SIZE OF, and UNSTRING's
+    /// TALLYING IN / DELIMITER IN / COUNT IN. Each may be followed directly by the operand rule or by a parenthesized
+    /// alternation one of whose alternatives is it.</summary>
+    private static readonly Regex ReceivingSlot = new(
+        @"\b(?:SET|TO|INTO|GIVING|RETURNING|REMAINDER|POINTER|VARYING|AFTER|REFERENCE|ACCEPT|INITIALIZE"
+        + @"|TALLYING\s+IN\?|DELIMITER\s+IN\?|COUNT\s+IN\?|(?:CONTENT|SIZE)\s+OF\?)"
+        + @"\s+(?:\((?:[^()|;]*\|)*\s*)?(?<op>[a-z][A-Za-z0-9_]*)\b");
+
+    /// <summary>The receiving shapes no keyword introduces: an arithmetic resultant (<c>… ROUNDED</c>) and INSPECT
+    /// TALLYING's counter (<c>identifier-2 FOR …</c>).</summary>
+    private static readonly Regex TrailedReceiver = new(
+        @"\b(?:dataReference|dataReferenceList)\s+(?:roundedPhrase|ROUNDED|FOR\s+inspectCountPhrase)\b");
+
+    private static readonly Regex LeadsWithBareDataReference = new(@"^\s*(?:dataReference|dataReferenceList)\b");
+
+    /// <summary>The rules that spell a receiving slot over a bare <c>dataReference</c>: directly after a receiving keyword
+    /// (or as one alternative of the group it heads), through ONE named rule that begins with a bare data reference (a
+    /// receiving list such as INITIALIZE's), or in a keyword-less receiving shape.</summary>
+    internal static List<string> BareReceivingSlots(IReadOnlyDictionary<string, string> rules) =>
+        rules.Where(kv => TrailedReceiver.IsMatch(kv.Value) || ReceivingSlot.Matches(kv.Value).Any(m =>
+                m.Groups["op"].Value is "dataReference" or "dataReferenceList"
+                || (m.Groups["op"].Value is not ("receivingIdentifier" or "setReceivingIdentifier")
+                    && rules.TryGetValue(m.Groups["op"].Value, out string? body) && LeadsWithBareDataReference.IsMatch(body))))
+            .Select(kv => kv.Key).Order(StringComparer.Ordinal).ToList();
+
     /// <summary>⛔ NO RECEIVING PHRASE OVER A BARE DATA REFERENCE. A receiving slot written `dataReference` re-opens the
-    /// parse-error-as-§8.9 refusal for SELF / SUPER / NULL / a view / an address-identifier written there. Measured over
-    /// the keywords that introduce a receiving identifier in a statement's general format (TO, INTO, GIVING, RETURNING,
-    /// REMAINDER, POINTER, TALLYING, VARYING, AFTER, and SET's receiving list).</summary>
+    /// parse-error-as-§8.9 refusal for SELF / SUPER / NULL / a view / an address-identifier written there.</summary>
     [Fact]
     public void NoReceivingPhrase_TakesABareDataReference()
     {
         var rules = LoadRules();
-        var receivingPhrase = new Regex(
-            @"\b(SET|INTO|GIVING|RETURNING|REMAINDER|POINTER|VARYING|AFTER|TALLYING\s+IN\?)\s+(dataReference|dataReferenceList)\b");
-        var offenders = rules
-            .Where(kv => !NotReceivingIdentifiers.ContainsKey(kv.Key) && receivingPhrase.IsMatch(kv.Value))
-            .Select(kv => kv.Key).Order().ToList();
+        var offenders = BareReceivingSlots(rules).Where(k => !NotReceivingIdentifiers.ContainsKey(k)).ToList();
         Assert.True(offenders.Count == 0, "these grammar rules spell a receiving phrase over a bare dataReference, so a "
             + "non-receivable identifier format written there is a parse error instead of its own rule (kb/Work PB1551): "
             + string.Join(", ", offenders) + ". Use receivingIdentifier (setReceivingIdentifier in a SET statement).");
@@ -114,5 +136,33 @@ public sealed class ReceivingOperandFormDriftTests
         int served = rules.Count(kv => Regex.IsMatch(kv.Value, @"\b(set)?[rR]eceivingIdentifier\b"));
         Assert.True(served >= 20, $"only {served} rules take a receiving identifier — the scan lost them, so the zero above "
             + "proves nothing (feedback_verdict_evidence_invariant)");
+    }
+
+    /// <summary>The selector's own witness (feedback_measure_the_selectors_complement): every receiving shape the grammar
+    /// spelled over a bare data reference before kb/Work PB1551 — the review found the first cut of the scan blind to TO,
+    /// ACCEPT, SET CONTENT/SIZE OF, INITIALIZE's list, the arithmetic resultant, INSPECT's counter and BY REFERENCE — is
+    /// flagged, and the converted shape is not.</summary>
+    [Theory]
+    [InlineData("moveReceivingPhrase", "TO dataReferenceList")]
+    [InlineData("moveStatement", "MOVE (CORRESPONDING | CORR) dataReference TO dataReference")]
+    [InlineData("acceptStatement", "ACCEPT dataReference (FROM acceptSource)?")]
+    [InlineData("setContentStatement", "SET CONTENT OF? dataReference+ TO arithmeticExpression")]
+    [InlineData("setSizeStatement", "SET SIZE OF? dataReference+ TO arithmeticExpression")]
+    [InlineData("computeStore", "dataReference roundedPhrase?")]
+    [InlineData("inspectTallyingItem", "dataReference FOR inspectCountPhrase+")]
+    [InlineData("callByReference", "BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)")]
+    [InlineData("unstringIntoTarget", "dataReference (DELIMITER IN? dataReference)? (COUNT IN? dataReference)?")]
+    [InlineData("initializeStatement", "INITIALIZE initializeOperandList")]
+    public void BareReceivingSlots_FlagsEveryReceivingShape(string rule, string body)
+    {
+        var rules = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [rule] = body,
+            ["initializeOperandList"] = "dataReference (COMMA? dataReference)*",
+            ["converted"] = "TO receivingIdentifier (COMMA? receivingIdentifier)*",
+        };
+        var flagged = BareReceivingSlots(rules);
+        Assert.Contains(rule, flagged);
+        Assert.DoesNotContain("converted", flagged);
     }
 }

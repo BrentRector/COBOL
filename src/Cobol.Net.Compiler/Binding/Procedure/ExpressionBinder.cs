@@ -901,7 +901,7 @@ internal sealed class ExpressionBinder(BinderContext ctx, StatementBinder host)
     /// retyped to a user-defined word before this parse, so a keyword token that still reaches a receiving position
     /// there names nothing the program declared — the §8.4.2.1 undefined reference (COBOLNET1639), never a rule about a
     /// predefined identifier the edition does not have (COBOL-85 has no SELF, NULL or address-identifier).</summary>
-    private Place? RefuseNonReceivable(NonReceivableForm form, Antlr4.Runtime.ParserRuleContext written)
+    internal Place? RefuseNonReceivable(NonReceivableForm form, Antlr4.Runtime.ParserRuleContext written)
     {
         if (written.Start.Type is CobolLexer.SELF or CobolLexer.SUPER or CobolLexer.NULL_ or CobolLexer.ADDRESS
             && CobolNames.UpperFold(written.Start.Text) is var head

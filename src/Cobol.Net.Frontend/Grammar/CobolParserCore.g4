@@ -1351,8 +1351,14 @@ callArgument
 // identifier-2 "shall reference an address-identifier or a data item defined in the file, working-storage,
 // local-storage, or linkage section", and the predefined NULL is neither — without the arm it matched `dataReference`
 // and drew the §8.9 reserved-word diagnostic, a rule it does not break (kb/Work PB1427).
+// ⛔ EVERY OTHER identifier-2 HERE IS A RECEIVING IDENTIFIER (kb/Work PB1551 review R1-1): §14.9.4.3 SR5 — "If the BY
+// REFERENCE phrase is specified or implied for an identifier-2 and identifier-2 is not an address-identifier, it is a
+// receiving operand" — so the slot is `receivingIdentifier`, and SELF / SUPER / an object-view / a function-address-
+// identifier written here is refused by its own §8.4.3 rule (ExpressionBinder.ResolveReceiving), not as a parse error
+// re-coded to §8.9. The two leading arms take the shapes receivingIdentifier also spells, first (ANTLR resolves the
+// overlap to the lower alternative): an address-identifier is SR4's SENDING operand, and NULL keeps SR3's refusal.
 callByReference
-    : BY? REFERENCE (addressIdentifier | predefinedNull | dataReference | OMITTED)
+    : BY? REFERENCE (addressIdentifier | predefinedNull | receivingIdentifier | OMITTED)
     ;
 
 // BY is an OPTIONAL word before VALUE exactly as before REFERENCE/CONTENT — only VALUE is underlined in the

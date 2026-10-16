@@ -104,4 +104,15 @@ internal static class ReceivingOperandForms
         : n.predefinedNull() is not null ? NonReceivableForm.Null
         : n.functionAddressIdentifier() is not null ? NonReceivableForm.FunctionAddress
         : NonReceivableForm.ProgramAddress;
+
+    /// <summary>The form of an OO identifier written as the sole primary of an expression (<c>ConditionBinder.SoleOoIdentifier</c>)
+    /// where the position makes it a receiving operand without a receiving grammar slot — CALL Format 1's keyword-less
+    /// identifier-2 under the prevailing BY REFERENCE (§14.9.4.3 SR5 "specified or implied"). Null for an inline method
+    /// invocation, a computed format whose exclusion is not a row here (see <see cref="NonReceivableForm"/>).</summary>
+    internal static NonReceivableForm? FormOfOoIdentifier(Antlr4.Runtime.ParserRuleContext? ooIdentifier) => ooIdentifier switch
+    {
+        Core.ObjectViewContext => NonReceivableForm.ObjectView,
+        Core.SelfAndSuperContext ss => ss.SELF() is not null ? NonReceivableForm.Self : NonReceivableForm.Super,
+        _ => null,
+    };
 }
