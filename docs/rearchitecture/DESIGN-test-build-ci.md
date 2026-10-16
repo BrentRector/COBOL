@@ -1517,6 +1517,34 @@ Linux gate each went past it with every arm passing: `GateSlotDriftTests` (train
 two driver tests (train 1058;
 `self_tests.py --self-test` 19 s alone, over 120 s twice in that train's first gate).
 
+#### 3.14.11 The one Python interpreter the gate scripts run (kb/Work PB1637, PB3197)
+
+**The rule.** A name on PATH is not an interpreter: on the Windows dev box `python3` is the Microsoft Store alias,
+which runs, prints "Python was not found" and exits non-zero; a stock Ubuntu host has no `python`; and in the cloud
+image a `python3` below the floor the scripts are written for (3.12) can stay first on PATH, where they fail to parse.
+So every gate script runs ONE interpreter, resolved by PROBING each candidate, in order an explicit `$PYTHON`, then
+`python3`, then `python`, by running it against the floor; nothing runnable is a loud refusal, never a skipped check.
+
+**Where it lives.** The probe has to run before any Python can, so it is written once per shell that starts a gate:
+`scripts/python-resolve.sh`, sourced by every bash script that runs Python (`build-local.sh`, `linux-gate.sh`,
+`battery.sh`, `measure-battery-determinism.sh`, and CI's conformance-shard population steps),
+and its PowerShell twin `scripts/python-resolve.ps1`, dot-sourced by `build-local.ps1`. Each sets `PY`; the script then
+runs `"$PY"` (bash) or `& $PY` (PowerShell). A script with a verdict line of its own keeps it: `build-local.sh` and
+`linux-gate.sh` source the resolver in a subshell and `build-local.ps1` catches the twin's terminating error, so a host
+with no runnable Python ends `=== BUILD-LOCAL GATE: NOT RUN — … ===` or `=== LINUX GATE: NOT RUN (…) ===`, exit 2, as
+every other NOT RUN does. `linux-gate.sh --self-test` drives the resolver through that path with stand-in interpreters
+(a `python3` below the floor is passed over, `$PYTHON` is probed first, none is NOT RUN with exit 2). Only a provisioner
+that installs the interpreter itself (`scripts/cloud/setup-env.sh`, `scripts/wsl/setup-wsl.sh`: `uv python install`)
+names one directly. The rule covers the scripts; CI's other workflow steps name the runner image's interpreter
+(`python3` on ubuntu, `python` on windows) and are not scanned.
+
+**The drift test.** `PythonInterpreterDriftTests` (Unit, a tree-wide sweep): no bash script under `scripts/` and no
+PowerShell twin of one names an interpreter as a command (`python3 x.py`, `command -v python`, `& python`); every script
+that runs `$PY` sources its shell's resolver; and the two resolvers probe the same candidates in the same order with the
+same floor probe. Before PB3197 the gate's own entry points bypassed the resolver (bare `python` in both
+`build-local` twins; `command -v python3 || command -v python`, no probe and no floor, in `linux-gate.sh`), so
+`bash scripts/build-local.sh` died `python: command not found` (exit 127, no verdict line) on a python3-only host.
+
 ### 3.15 THE LOCAL LINUX GATE — CI's Linux legs under WSL before a push (kb/Work PB1732)
 
 > ⛔ **Reshaped by §3.17.3 (owner 2026-10-11, kb/Work PB3015, Q1a and the 12:45 correction "Yes, both hosts, leg 1"):
