@@ -34,9 +34,6 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
     /// <summary>The compiler-directive indicator (§6.2.3.1).</summary>
     public const string Indicator = ">>";
 
-    /// <summary>The floating inline-comment indicator (§6.2.3.1 / §7.3.3 SR3, SR4).</summary>
-    public const string InlineComment = "*>";
-
     /// <summary>
     /// Parse <paramref name="line"/> as a compiler-directive line. Returns false when the line is not one —
     /// which is the common case, so the cheap tests come first and nothing is allocated on the way out.
@@ -62,7 +59,10 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
         if (i == wordStart) return false;                            // ">>" with no word heads no directive
 
         string word = CobolNames.UpperFold(s[wordStart..i].ToString());
-        string operand = SeparatorsAsSpaces(StripInlineComment(s[i..].ToString()).TrimSpaces()).TrimSpaces();
+        // §7.3.3 SR3/SR4: the directive may be followed by an inline comment. The scan that finds it honours
+        // character-strings, so the *> inside >>DISPLAY "a *> b" is data (CobolSourceText, kb/Work PB2621).
+        var rest = s[i..];
+        string operand = SeparatorsAsSpaces(rest[..CobolSourceText.InlineCommentAt(rest)].ToString().TrimSpaces()).TrimSpaces();
         directive = new CompilerDirectiveLine(word, operand);
         return true;
     }
@@ -95,17 +95,10 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
     {
         if (operand.AsSpan().IndexOfAny(',', ';') < 0) return operand;
         var chars = operand.ToCharArray();
-        char quote = '\0';
         for (int i = 0; i < chars.Length; i++)
         {
             char c = chars[i];
-            if (quote != '\0')
-            {
-                if (c != quote) continue;
-                if (i + 1 < chars.Length && chars[i + 1] == quote) i++;   // a doubled quotation symbol stays inside
-                else quote = '\0';
-            }
-            else if (c is '"' or '\'') quote = c;
+            if (CobolSourceText.IsQuotationSymbol(c)) i = CobolSourceText.LiteralEnd(chars, i) - 1;   // a literal: untouched
             else if (c is ',' or ';' && i + 1 < chars.Length && CobolSpace.IsSeparator(chars[i + 1])) chars[i] = ' ';
         }
         return new string(chars);
@@ -123,28 +116,5 @@ public readonly record struct CompilerDirectiveLine(string Word, string Operand)
             || !CobolNames.Same(d.Word, word)) return false;
         operand = d.Operand;
         return true;
-    }
-
-    /// <summary>
-    /// Remove a §7.3.3 SR3/SR4 trailing inline comment. The scan honours character-strings, so the
-    /// <c>*&gt;</c> inside <c>&gt;&gt;DISPLAY "a *&gt; b"</c> is data, not a comment (§8.3.3.1: a literal is
-    /// delimited by a matched pair of quotation marks, and a doubled quotation mark within it is one character).
-    /// </summary>
-    public static string StripInlineComment(string text)
-    {
-        char quote = '\0';
-        for (int i = 0; i < text.Length; i++)
-        {
-            char c = text[i];
-            if (quote != '\0')
-            {
-                if (c != quote) continue;
-                if (i + 1 < text.Length && text[i + 1] == quote) i++;   // a doubled quotation mark stays inside
-                else quote = '\0';
-            }
-            else if (c is '"' or '\'') quote = c;
-            else if (c == '*' && i + 1 < text.Length && text[i + 1] == '>') return text[..i];
-        }
-        return text;
     }
 }
