@@ -31,17 +31,20 @@ namespace CobolNet.Tests.Unit;
 ///     <c>TokenRetypes</c>, never named here).</item>
 ///   <item>An EDITION READ is a method or property of the parser (<c>CobolParserCoreBase</c>, every committed
 ///     <c>CobolParserCore</c> partial and any parser grammar's <c>@members</c>), of the lexer (<c>CobolLexer.g4</c>'s
-///     <c>@members</c> and its committed partials) or of the retype stage (<c>TokenRetypes</c>) whose syntax reaches
-///     edition state, or that calls another read — to a fixpoint.</item>
+///     <c>@members</c> and its committed partials) or of the retype stage (<c>TokenRetypes</c>) — a NESTED type's
+///     members included, since C# lets a nested type read its container's protected and private state through an
+///     instance — whose syntax reaches edition state, or that calls another read — to a fixpoint.</item>
 ///   <item>A SITE is a predicate or action body of any grammar that names a read OR edition state itself
-///     (<c>{Edition.Has(2014)}?</c>, a primed lexer field); any C# member elsewhere in <c>src/</c> (the parser's
-///     syntax-error listeners, the front end's driver) that calls or reads a read callable from outside its stage; a
+///     (<c>{Edition.Has(2014)}?</c>, a primed lexer field); any C# member in <c>src/</c> outside a read's own stage
+///     (the parser's syntax-error listeners, the front end's driver) that calls or reads that read; a
 ///     front-end member that hands the edition to a parser (<c>Edition = …</c>); and any caller of such a member that
 ///     is not private (it passes the edition on).</item>
 /// </list>
 /// Outside the parser, edition state cannot be read at all: the parser's <c>Edition</c> getter is <c>protected</c>
 /// (the compiler refuses <c>parser.Edition</c> in a listener or pass) and the lexer's primed fields are private, and
-/// <see cref="TheParsersEdition_IsWriteOnlyOutsideIt"/> pins that, so the C# arm needs no type inference.
+/// <see cref="TheParsersEdition_IsWriteOnlyOutsideIt"/> pins that, so the C# arm needs no type inference. The only
+/// code that CAN still read that state is lexically inside the stage — its nested types too — which is exactly the
+/// code the read arm takes as the stage's members.
 /// Both computed sets are compared, per file, with the inventory PB2291's verdict recorded below. A new read under
 /// ANY name — a sixth <c>{isXXXX()}?</c> spelling, a new <c>reservedHere</c> site, a new member, a lexer field primed
 /// from the edition, a new listener call — fails here until it is adjudicated and recorded, with its verdict.</para>
@@ -245,7 +248,35 @@ public sealed class EditionReadDriftTests
 
         var root = CSharpSyntaxTree.ParseText(
             "class L { void M(P p) { var y = p.Level; p.Level = 2; p?.Note(); p.Note(); } }").GetRoot();
-        Assert.Equal(["Level", "Note", "Note"], EditionReadModel.OutsideUses(root, ["Level", "Note"]).Select(u => u.Name));
+        Assert.Equal(["Level", "Note", "Note"],
+            EditionReadModel.OutsideUses(root, new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "Level", "Note" } })
+                .Select(u => u.Name));
+    }
+
+    /// <summary>A NESTED type of a stage is the stage (review finding w1092e R2-1): C# lets a nested type of
+    /// <c>CobolParserCore</c> read the protected <c>Edition</c> getter and call the protected reads through a parser
+    /// instance, so its members are reads when they reach edition state — directly or through another read — and a
+    /// use of a stage's read is skipped as a site only when it sits inside THAT stage, never because of the file it
+    /// is in: a second top-level type in a stage's file is a site source like any other.</summary>
+    [Fact]
+    public void TheRule_SeesTheStagesNestedTypes()
+    {
+        // The reviewer's two spellings, in a nested context class of a committed parser partial.
+        var direct = EditionReadModel.ParserReadsOf(EditionReadModel.ParserMembersOf(
+            "public partial class CompilationUnitContext { internal bool Strict(CobolParserCore p) => p.Edition.Has(2014); }"));
+        Assert.Equal(["Strict"], direct.Keys);
+        var throughRead = EditionReadModel.ParserReadsOf(EditionReadModel.ParserMembersOf(
+            "protected bool userWordHere(string w) => Edition.Has(2014);"
+            + " public partial class CompilationUnitContext { internal bool Strict(CobolParserCore p) => p.userWordHere(\"LOCALE\"); }"));
+        Assert.Equal(["Strict", "userWordHere"], throughRead.Keys.Order(StringComparer.Ordinal));
+
+        // The site arm: the parser's own nested type is the read arm's; a listener in the same file is a site.
+        var root = CSharpSyntaxTree.ParseText(
+            "public partial class CobolParserCore { public partial class C { bool S(CobolParserCore p) => p.userWordHere(\"X\"); } }"
+            + " class Listener { bool T(CobolParserCore p) => p.userWordHere(\"Y\"); }").GetRoot();
+        var uses = EditionReadModel.OutsideUses(root,
+            new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "userWordHere" } }).ToList();
+        Assert.Equal(["Listener"], uses.Select(u => u.Node.Ancestors().OfType<ClassDeclarationSyntax>().First().Identifier.Text));
     }
 
     /// <summary>Outside the parser and lexer, edition state cannot be read at all, which is what lets the C# arm of
@@ -310,7 +341,7 @@ public sealed class EditionReadDriftTests
             foreach (var path in SourceFiles().Where(p => IsPartialOf(File.ReadAllText(p), LexerType)))
                 lexerBodies.AddRange(ClassBodies(File.ReadAllText(path), LexerType));
             var lexerMembers = Members(lexerBodies);
-            var lexerFields = lexerBodies.OfType<FieldDeclarationSyntax>()
+            var lexerFields = lexerBodies.OfType<FieldDeclarationSyntax>().Where(f => f.Parent is TypeDeclarationSyntax { Identifier.Text: LexerType })
                 .SelectMany(f => f.Declaration.Variables.Select(v => v.Identifier.Text)).ToHashSet(StringComparer.Ordinal);
 
             // The primed fields: a retype read calls a lexer SETTER (an invocation on a CobolLexer parameter) with an
@@ -355,17 +386,21 @@ public sealed class EditionReadDriftTests
             // each call of a non-private driver member that does so, which passes edition state on (the fragment
             // parser's callers). Edition state itself is unreadable here: the parser's getter is protected and the
             // primed lexer fields are private (TheParsersEdition_IsWriteOnlyOutsideIt).
-            string[] outside = [.. parserReads.Concat(lexerReads).Concat(retypeReads).Where(kv => kv.Value).Select(kv => kv.Key).Distinct()];
-            var memberSources = new HashSet<string>([ParserBase, RetypeStage], StringComparer.Ordinal);
+            // A use inside a read's OWN stage (nested types included) is the read arm's, not a site; every file is
+            // parsed, so a second top-level type in a stage's file is a site source like any other.
+            var outside = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
+            {
+                [ParserStage] = OutsideCallable(parserReads),
+                [LexerStage] = OutsideCallable(lexerReads),
+                [RetypeStageName] = OutsideCallable(retypeReads),
+            };
             var trees = new List<(string Rel, SyntaxNode Root)>();
             foreach (var path in SourceFiles())
             {
                 string rel = Rel(path);
-                if (memberSources.Contains(rel)) continue;
                 string text = File.ReadAllText(path);
-                if (IsPartialOf(text, LexerType) || IsPartialOf(text, ParserType)) continue;
                 bool frontEnd = rel.StartsWith("src/Cobol.Net.Frontend/", StringComparison.Ordinal);
-                if (!outside.Any(n => text.Contains(n, StringComparison.Ordinal)) && !frontEnd) continue;
+                if (!outside.Values.SelectMany(n => n).Any(n => text.Contains(n, StringComparison.Ordinal)) && !frontEnd) continue;
                 trees.Add((rel, CSharpSyntaxTree.ParseText(text).GetRoot()));
             }
 
@@ -384,7 +419,7 @@ public sealed class EditionReadDriftTests
                         MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
                         _ => null,
                     };
-                    if (target is null || !ParserState.Contains(target)) continue;
+                    if (target is null || !ParserState.Contains(target) || StageOf(a) == ParserStage) continue;
                     Bump(sites, $"{rel} | {SiteOf(a)} | {target}=");
                     if (a.Ancestors().OfType<MemberDeclarationSyntax>().FirstOrDefault(m => m is not BaseTypeDeclarationSyntax) is { } md
                         && !md.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)))
@@ -419,6 +454,28 @@ public sealed class EditionReadDriftTests
 
         private const string ParserType = "CobolParserCore";
         private const string LexerType = "CobolLexer";
+        private const string ParserStage = "parser";
+        private const string LexerStage = "lexer";
+        private const string RetypeStageName = "retype";
+
+        /// <summary>The types whose members — nested types' included — ARE a stage: code lexically inside one reads
+        /// that stage's state directly, so its uses of the stage's own reads are reads, never sites.</summary>
+        private static readonly IReadOnlyDictionary<string, string> StageTypes = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["CobolParserCoreBase"] = ParserStage,
+            [ParserType] = ParserStage,
+            [LexerType] = LexerStage,
+            ["TokenRetypes"] = RetypeStageName,
+        };
+
+        /// <summary>The stage <paramref name="node"/> sits lexically inside (its outermost stage type), or
+        /// <see langword="null"/>.</summary>
+        private static string? StageOf(SyntaxNode node) =>
+            node.Ancestors().OfType<BaseTypeDeclarationSyntax>()
+                .Select(t => StageTypes.GetValueOrDefault(t.Identifier.Text)).LastOrDefault(s => s is not null);
+
+        private static IReadOnlySet<string> OutsideCallable(IReadOnlyDictionary<string, bool> reads) =>
+            reads.Where(kv => kv.Value).Select(kv => kv.Key).ToHashSet(StringComparer.Ordinal);
 
         /// <summary>The parser's edition reads among <paramref name="bodies"/>: the members whose syntax reaches its
         /// <see cref="ParserState"/>, to a fixpoint.</summary>
@@ -437,8 +494,10 @@ public sealed class EditionReadDriftTests
                 .Select(id => (a.Rule, id)));
 
         /// <summary>Every use of an outside-callable read in <paramref name="root"/> — called (<c>x.M()</c>,
-        /// <c>x?.M()</c>) or read as a property (<c>x.P</c>) — but not an assignment to it.</summary>
-        public static IEnumerable<(SyntaxNode Node, string Name)> OutsideUses(SyntaxNode root, IReadOnlyCollection<string> outside)
+        /// <c>x?.M()</c>) or read as a property (<c>x.P</c>) — from code outside that read's own stage, but not an
+        /// assignment to it. <paramref name="outside"/> maps each stage to its outside-callable reads.</summary>
+        public static IEnumerable<(SyntaxNode Node, string Name)> OutsideUses(SyntaxNode root,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> outside)
         {
             foreach (var node in root.DescendantNodes())
             {
@@ -448,7 +507,9 @@ public sealed class EditionReadDriftTests
                     MemberBindingExpressionSyntax mb => mb.Name.Identifier.Text,
                     _ => null,
                 };
-                if (name is null || !outside.Contains(name)) continue;
+                if (name is null) continue;
+                string? home = StageOf(node);
+                if (!outside.Any(kv => kv.Key != home && kv.Value.Contains(name))) continue;
                 if (node.Parent is AssignmentExpressionSyntax a && a.Left == node) continue;
                 yield return (node, name);
             }
@@ -484,10 +545,13 @@ public sealed class EditionReadDriftTests
         private static IEnumerable<string> SourceFiles() =>
             Directory.GetFiles(TestRepo.Src(), "*.cs", SearchOption.AllDirectories).Where(IsSourcePath).Order(StringComparer.Ordinal);
 
-        /// <summary>The direct members of every declaration of <paramref name="type"/> in <paramref name="code"/>.</summary>
+        /// <summary>The members of every declaration of <paramref name="type"/> in <paramref name="code"/>, the
+        /// members of its NESTED types included (review finding w1092e R2-1): a nested type reads its container's
+        /// protected and private state through an instance, so it is the stage as much as a direct member is.</summary>
         private static IEnumerable<MemberDeclarationSyntax> ClassBodies(string code, string type) =>
             CSharpSyntaxTree.ParseText(code).GetRoot().DescendantNodes().OfType<TypeDeclarationSyntax>()
-                .Where(t => t.Identifier.Text == type).SelectMany(t => t.Members);
+                .Where(t => t.Identifier.Text == type)
+                .SelectMany(t => t.DescendantNodes().OfType<MemberDeclarationSyntax>().Where(m => m is not BaseTypeDeclarationSyntax));
 
         private sealed record MemberInfo(List<MemberDeclarationSyntax> Nodes, HashSet<string> Identifiers, bool Outside);
 

@@ -50,3 +50,16 @@ called. `TheRule_SeesEditionStateNamedDirectly` applies the rule to synthetic te
 `TheParsersEdition_IsWriteOnlyOutsideIt` pins the accessibility by reflection. A temporary mutation (`&& Edition.Has(2014)`
 on the CRT arm, a `mutantGate` reading `Edition` in the `CompilationUnitTokenRetypes` partial) turned
 `EditionReads_AreExactlyTheAdjudicatedSet` red with both rows named, and was reverted.
+
+**Branch review (round 2, finding R2-1): a nested type of a stage was seen by neither arm.** R1-1 skipped every file
+holding a `CobolParserCore` partial as a C# site source, but the parser's read set took only the partial's DIRECT
+members, so a member of a nested type (`CompilationUnitTokenRetypes.cs` already nests `CompilationUnitContext`)
+reading `p.Edition.Has(2014)` or calling `p.userWordHere(...)` through a parser instance (legal C#: a nested type sees
+its container's protected members) was neither a read nor a site. The same hole held for the other skipped files
+(the parser superclass, the retype stage, the lexer partials) and for a second top-level type in any of them. Fixed in
+the rule, not the file list: a stage's members are every member lexically inside its types, nested types included, and
+the C# site arm parses every file and skips a use only when it sits inside the read's OWN stage (by its enclosing
+types), so a listener in a stage's file is a site. `TheRule_SeesTheStagesNestedTypes` states both spellings and the
+site arm on synthetic text. Mutation runs on `CompilationUnitTokenRetypes.cs`: the reviewer's two nested `Strict`
+members gave `NEW edition read …#Strict` and `…#Strict2`; a top-level `Leak` class calling `p.userWordHere` gave
+`NEW site …CompilationUnitTokenRetypes.cs | Leak.L | userWordHere ×1`; both reverted. The live inventory did not move.
