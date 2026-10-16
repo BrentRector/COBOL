@@ -1355,6 +1355,30 @@ internal sealed class StatementValidation(DataBinder data)
         return false;
     }
 
+    /// <summary>⛔ THE ONE ENFORCEMENT OF ISO §13.4.5.3 SR3 c) — "When no record description entries are specified:
+    /// … c) an INTO phrase shall be specified on all READ statements associated with the file." (kb/Work PB694). The
+    /// rule is about the FILE DESCRIPTION ENTRY, which every organization has, so <c>SequentialIoBinder.BindRead</c>
+    /// asks it BEFORE its organization reroute and the relative arm (<c>KeyedIoBinder.BindRead</c>) is under it too
+    /// (feedback_two_arm_dispatch). The record area such a READ fills is §14.9.30.4 GR6's implied entry, which has no
+    /// record-name, so without INTO the program could never see what it read.
+    /// <para>SR3 b) — the WRITE/REWRITE half — has no screen of its own because none can be reached: the
+    /// record-name-1 alternative names "a logical record in the file section" (§14.9.51.3 SR5, §14.9.35.3 SR1), which
+    /// a record-less entry does not have, and the <c>FILE file-name-1</c> alternative is Annex A.4.13, refused by
+    /// COBOLNET1706 (docs/CONFORMANCE.md §5, row A.4.13).</para>
+    /// <para>A hard error at every edition: the source states a READ the standard gives no meaning, so there is no
+    /// lenient corpus to protect and nothing for <c>--permissive</c> to keep. Returns true when the statement
+    /// conforms; the caller still binds it, the compile having already failed.</para></summary>
+    public bool CheckReadIntoOnRecordLessFile(FileModel file, bool intoWritten)
+    {
+        if (intoWritten || !file.HasNoRecordDescriptionEntries) return true;
+        data.Edition.Error(DiagnosticCatalog.RecordLessFdReadWithoutInto, $"READ {file.CobolName}: the file "
+            + "description entry specifies no record description entries, so an INTO phrase shall be specified on "
+            + "all READ statements associated with the file (ISO §13.4.5.3 SR3 c)) — its record area is the implied "
+            + "record of §14.9.30.4 GR6, which has no name, and only READ … INTO can deliver the record. Write "
+            + $"READ {file.CobolName} INTO identifier, or describe the record under the FD.");
+        return false;
+    }
+
     /// <summary>⛔ THE ONE ENFORCEMENT OF ISO §14.9.30.3 SR10 — "The KEY phrase may be specified only if
     /// ORGANIZATION IS INDEXED is specified in the file control entry for file-name-1." The rule names an
     /// ORGANIZATION, so it cannot live on one organization's binder arm: it was enforced only in

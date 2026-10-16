@@ -1121,6 +1121,15 @@ that no SELECT names is rejected by §13.4.5.3 SR1 / §13.4.6.3 SR1 (COBOLNET263
   elementary alphanumeric sender would convert. GR6 says "group item".
 - **Unnamed and off `ByName`,** because the entry is implied: the program cannot reference it, which is precisely
   why SR3 b) and c) require the `FILE … FROM` and `INTO` phrases on the verbs.
+- **SR3 c) is a STATEMENT screen, asked above the organization split: COBOLNET3983** (kb/Work PB694).
+  `StatementValidation.CheckReadIntoOnRecordLessFile` refuses a READ without INTO on such a file; its antecedent is
+  `FileModel.HasNoRecordDescriptionEntries` (an FD — not a report file, not an SD — with no WRITTEN record
+  description entry, so it holds even where the implied record could not be built), and
+  `SequentialIoBinder.BindRead` asks it BEFORE rerouting a relative file to `KeyedIoBinder.BindRead`, so both arms
+  are under the one rule. **SR3 b) has no screen because none is reachable:** the record-name-1 alternative names
+  "a logical record in the file section" (§14.9.51.3 SR5, §14.9.35.3 SR1) and this entry has none, while the
+  `FILE file-name-1` alternative is Annex A.4.13, declined (COBOLNET1706, `docs/CONFORMANCE.md` §5 row A.4.13). The
+  consequence is documented there: a record-less file is INPUT-ONLY in this implementation.
 - **The size is "the maximum size established by the RECORD clause"** — format 1's integer-1, format 3's
   integer-5, format 2's integer-3. A format-2 clause with no `TO` phrase establishes none (§13.18.43.4 GR10
   defers to "the greatest number of bytes described for a record in that file", and none is described), and
