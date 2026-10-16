@@ -1,4 +1,4 @@
-## PB578: WRITE ADVANCING PAGE on a logical page is a page overflow, and SR18 bars only the AT END-OF-PAGE phrase
+## Entry 2084 — 2026-10-16 09:20 PDT — PB578: WRITE ADVANCING PAGE on a logical page is a page overflow, and SR18 bars only the AT END-OF-PAGE phrase
 
 **What the note said.** kb/Work PB578 (an analysis note in the GAP campaign PB2911) held GR-13.18.34.4-7 and
 GR-8.4.3.14.4-2 PARTIAL. Its claim: the implicit-increment sentence of §13.18.34.4 GR7 c) 1 ("During the resetting
@@ -52,3 +52,4 @@ feed) has no logical page and so no end-of-page condition, and is unchanged. Per
 **Gate** (run `20261016T154846Z-568530`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` —
 Conformance 5,958/11,795 · Unit 33,181/33,699 · Characterization 6/36 cases ran in leg 1; the three new corpus rows
 and the two new LinageConformanceTests passed in it.
+
