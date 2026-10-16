@@ -407,3 +407,14 @@ LK-R OPTIONAL LK-S`) and its host lines `A [ABCD] B [ABCD]`, `P OMITTED`, `Q NUL
 Gate `TestResults/build-local/20261016T194523Z-cc2341` at eed17fdd7: `LEG 1 ONLY (batched gating, PB2515): GREEN`
 (Conformance 6,118/11,850, Unit 33,427/33,851, Characterization 5/36 in leg 1; HostEntryTests among them). Semgrep verify: PASS.
 
+
+**Merge-queue bounce (finisher 3).** Pull request #139 left the merge queue on a merge conflict when #138 (PB3193: a
+run unit under a host no longer reconfigures the host's console) landed first. The resolution keeps both rules:
+`ProgramTable.RunMain` is no host route, and it never writes the exit code or reconfigures the console (only
+`RunModule` does); DOC-A.1-167 carries the `RunUnitEndedException` text and PB3193's sentence; the EC RUNTIME paragraph
+names the branch's boundaries and PB867's checking-enabled RAISE. PB3193's new witness `RunUnitHostConsoleTests` ran
+its host through `ProgramRegistry.RunMain` and a reflected `EnsureRegistered`, which `OneHostSurfaceDriftTests`
+forbids, so it now activates HCDISP through its generated host entry, `Cobol.HCDISP.HCDISP.Call`; the comments that
+called `RunMain` the host entry now name the generated one. Gate `TestResults/build-local/20261016T211917Z-ed5c55`:
+`LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,139/11,868, Unit 33,375/33,856, Characterization 5/36;
+`RunUnitHostConsoleTests`, `RunUnitHostExitCodeTests` and `OneHostSurfaceDriftTests` among them).
