@@ -363,8 +363,26 @@ public abstract class FileConnector
     /// writable mode before it can write them back, so its EXTEND handle asks for
     /// <see cref="FileAccess.ReadWrite"/>. A handle opened with the mode-derived guess would admit only the
     /// write and the host would refuse the read, which is kb/Work PB713's '30' arriving by another route.</para>
+    /// <para>⛔ IT IS STATED, NOT ASSUMED, OF THE HANDLE ITSELF (kb/Work PB2758): every organization opens its
+    /// long-lived handle with this value and spells no access of its own (the one narrowing is the sequential
+    /// OUTPUT writer's, to the mode's floor, when the host refuses the read half; kb/Work PB2848), and
+    /// <c>FileLockPostureDriftTests.EveryOrganisationsLiveHandleTakesItsHostAccess</c> reads the access the host
+    /// granted off <see cref="FileLock"/> for every (organization × open mode × posture), so a handle spelled with
+    /// its own access fails there even while the value here stays inside the band.</para>
     /// </summary>
     internal virtual FileAccess HostAccess(FileOpenMode mode) => FileLockPosture.AccessOf(mode);
+
+    /// <summary>The host stream that IS this connector's §9.1.15 file lock while it is open — the long-lived handle
+    /// carrying <see cref="HostShare"/> and opened with <see cref="HostAccess"/>, through which the connector's
+    /// records travel and its §9.1.16 record locks are published (<see cref="RecordLocks"/>). Null while no handle is
+    /// held: before the OPEN body takes one, after the CLOSE (§9.1.15, <i>"The file lock is removed by an explicit or
+    /// implicit CLOSE statement executed for that file connector"</i>), and for an arm with no physical file to hold
+    /// (an absent OPTIONAL file opened INPUT).
+    /// <para>Its <see cref="FileStream.CanRead"/>/<see cref="FileStream.CanWrite"/> are what the host GRANTED, the one
+    /// answer to what the handle takes: the region-lock endpoint's writability is read off it, never re-derived from
+    /// the open mode (kb/Work PB2758). Abstract, so a new organization states its handle rather than inheriting a
+    /// null that would leave the drift measurement nothing to measure.</para></summary>
+    internal abstract FileStream? FileLock { get; }
 
 
     /// <summary>Release whatever host handle this connector's <see cref="OpenCore"/> took before the OPEN turned
