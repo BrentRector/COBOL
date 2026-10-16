@@ -16,7 +16,7 @@
       *>      procedure is executed as specified for the rules for the
       *>      USE statement."
       *> FN and FM are absent and not OPTIONAL, so OPEN INPUT is '35'
-      *> (§9.1.13.5), a fatal EC-I-O-PERMANENT-ERROR (§9.1.13.1).
+      *> (§9.1.13.6 5)), a fatal EC-I-O-PERMANENT-ERROR (§9.1.13.1).
       *>   L1  checking OFF: a) '35', then d) the format 1 USE for FN
       *>       (F1-USE 35). b) does not apply ("If it is enabled").
       *>   L2  checking ON, FM: a), b) EC-I-O-PERMANENT-ERROR, d) the

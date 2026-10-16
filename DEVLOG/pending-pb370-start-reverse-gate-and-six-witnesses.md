@@ -41,3 +41,8 @@ first. That is a MoveEmitter evaluation-order defect outside this mechanism, and
 
 **Self-review.** The new code has no hot path because it runs at compile time. No rule is duplicated, since the
 operator fold is reused rather than re-spelled. The one construct is checked from one arm.
+
+**Branch review, round 1.** The reviewer found that two golden comments (`2023/pb370_open_unsuccessful_order` and
+`85/pb370_use_file_beats_mode`) cited §9.1.13.5, the invalid-key clause, for I-O status 35. `cite.py --check` puts
+status 35 in §9.1.13.6 5), the permanent-error clause, and both comments now cite that. A sweep of every §9.1.13.5
+citation in the tree found no other one attached to a 3x status.
