@@ -18,7 +18,8 @@ namespace CobolNet.CodeGen;
 /// <para>⛔ <b>IT IS A CALLER, NOT A SECOND BOUNDARY.</b> The body is exactly the parts §4.3 lists, which the §17.3 drift
 /// test asserts on the emitted corpus: <c>__CobolModule.EnsureRegistered()</c> (a definition's entry only); one
 /// <see cref="HostLanding"/> landing per formal into a detached storage of the formal's own description, with the alias
-/// grouping (<see cref="HostLanding.SharesStorage"/>); one <c>CobolArg</c> per formal over that storage, stating the
+/// grouping (one storage for one variable given to two formals of one description, <see cref="HostLanding.RequireDistinct"/>
+/// for two descriptions); one <c>CobolArg</c> per formal over that storage, stating the
 /// description a CALL site that checks EC-PROGRAM-ARG-MISMATCH states; exactly one <c>ProgramRegistry.CallProgram</c> with
 /// <c>callerPath: null</c> (the outermost boundary, kb/Work R48) and <c>siteArgMismatchChecking: true</c>; a
 /// <c>finally</c> of <see cref="HostLanding"/> decodes; the RETURNING decode. No catch clause, no instance, no mapping of
@@ -169,10 +170,16 @@ internal sealed class HostEntryEmitter(SignEncoding signEncoding, OoClassTable? 
                     // Only two ref parameters of one CLR type can refer to one variable (§4.3 "One storage for one
                     // variable passed twice").
                     if (e.ByValue || e.CsType != f.CsType || (e.Optional != f.Optional && IsValueType(e.Type))) continue;
-                    bool same = OoConformance.DescriptionMismatch(e.Description, f.Description) is null
-                        && OoConformance.DescriptionMismatch(f.Description, e.Description) is null;
-                    aliases += $"HostLanding.SharesStorage(global::System.Runtime.CompilerServices.Unsafe.AreSame(ref {e.Name}, "
-                        + $"ref {f.Name}), {(same ? "true" : "false")}, {CsLiteral(e.Name)}, {CsLiteral(f.Name)}) ? {e.Cell} : ";
+                    string sameVariable = $"global::System.Runtime.CompilerServices.Unsafe.AreSame(ref {e.Name}, ref {f.Name})";
+                    // One description: one storage, so the earlier formal's cell is this one's when the variable is one.
+                    // Two descriptions: one storage cannot be both, so the variable is refused before anything is landed
+                    // or activated, as its own statement — the two storages' cells are of different types whenever the
+                    // descriptions land differently (an index and a PIC 99 item are both `ref long`; NIST IC207A).
+                    if (OoConformance.DescriptionMismatch(e.Description, f.Description) is null
+                        && OoConformance.DescriptionMismatch(f.Description, e.Description) is null)
+                        aliases += $"{sameVariable} ? {e.Cell} : ";
+                    else
+                        w.Line($"HostLanding.RequireDistinct({sameVariable}, {CsLiteral(e.Name)}, {CsLiteral(f.Name)});");
                 }
             w.Line($"var {f.Cell} = {aliases}{landed};");
         }

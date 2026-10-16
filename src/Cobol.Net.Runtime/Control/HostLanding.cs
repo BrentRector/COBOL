@@ -153,18 +153,19 @@ public static class HostLanding
 
     // ── Shape rules: one storage for one variable; an OCCURS array's length ──────────────────────────────────────────
 
-    /// <summary>Whether two <c>ref</c> parameters of one CLR type that refer to <paramref name="sameVariable"/> are
-    /// given ONE storage: true when they do and their formals have one description, so <c>Call(ref a, ref a)</c> is the
-    /// host's <c>CALL … USING A A</c> (ISO §14.2.3 8): the activated element "operates as if the formal parameter occupies
-    /// the same storage area as the argument"). One storage cannot be two different descriptions, so a variable passed
-    /// to two formals of different descriptions is refused before anything is activated.</summary>
-    /// <exception cref="ArgumentException">One variable was given to two formals of different descriptions.</exception>
-    public static bool SharesStorage(bool sameVariable, bool sameDescription, string first, string second) =>
-        sameVariable && (sameDescription
-            ? true
-            : throw new ArgumentException(
+    /// <summary>Refuse one variable given to two <c>ref</c> parameters whose formals have DIFFERENT descriptions. Two
+    /// formals of one description that are given one variable share one storage — the generated entry gives the second
+    /// the first's cell, so <c>Call(ref a, ref a)</c> is the host's <c>CALL … USING A A</c> (ISO §14.2.3 8): the
+    /// activated element "operates as if the formal parameter occupies the same storage area as the argument"). One
+    /// storage cannot be two different descriptions, so such a variable is refused before anything is activated.</summary>
+    /// <exception cref="ArgumentException"><paramref name="sameVariable"/>: the two parameters refer to one variable.</exception>
+    public static void RequireDistinct(bool sameVariable, string first, string second)
+    {
+        if (sameVariable)
+            throw new ArgumentException(
                 $"The parameters '{first}' and '{second}' refer to one variable, and their formals have different "
-                + "descriptions, which one storage cannot be (ISO §14.2.3 8); DESIGN-external-repository §4.3).", second));
+                + "descriptions, which one storage cannot be (ISO §14.2.3 8); DESIGN-external-repository §4.3).", second);
+    }
 
     /// <summary>Require a DYNAMIC-CAPACITY table member's array to be a capacity the table can have: its length is the
     /// table's current capacity, which is never below the minimum capacity ("Integer-4 is the minimum capacity of the

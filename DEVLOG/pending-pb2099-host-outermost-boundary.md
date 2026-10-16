@@ -80,7 +80,7 @@ number lands through the runtime's own COMPUTE store (`CobolNum.TryStore`/`TrySt
 transfer is refused; a negative value into an unsigned item is refused because GR6's "absolute value of the sending
 value is used" (§14.9.25.4 6)) drops the sign. A string lands through the MOVE's own alignment (`CobolString.Store`;
 zero fill for boolean, §13.18.32.4 2)), refused when it would be truncated or when a boolean position would hold a
-character other than 0 or 1 (§8.8.4.4.4 3) e)). `SharesStorage` is the alias rule (§14.2.3 8)), `RequireOccurrences`
+character other than 0 or 1 (§8.8.4.4.4 3) e)). `RequireDistinct` is the alias rule (§14.2.3 8)), `RequireOccurrences`
 the OCCURS array rule, `TryDecode` the validity rule (the class test NUMERIC, §8.8.4.4.4 3) n), as
 `CobolNum.IsNumericImage` answers), keeping the first refusal for the entry to throw after every other write-back.
 
@@ -359,3 +359,17 @@ Gate: `TestResults/build-local/20261016T142356Z-cf0513` at db31969fc: `LEG 1 ONL
 in leg 1). Semgrep verify: PASS.
 
 **Gate (part 7).** `TestResults/build-local/20261016T140250Z-5116d8` at 8c067d41d: `LEG 1 ONLY (batched gating, PB2515): GREEN` (Conformance 6,015/11,776, Unit 33,206/33,714, Characterization 6/36 in leg 1; every test this part added or changed ran in leg 1 and passed). The first gate (`20261016T135015Z-7dcf04`) was RED on `RuntimeApiGuardTests` only: three bare `CobolVarGroup.` accesses in `PublishedRecordEmitter`, now routed through `RuntimeApi` (8c067d41d). Semgrep verify: PASS. LINUX GATE: the lander's (batched gating).
+
+**Finisher (the landing's Linux gate, RED on dfb23ce1c).** The Windows gate was GREEN in leg 1; the Linux gate, which
+runs every case, was RED on three defects, each the branch's. (1) NIST IC207A no longer compiled (CS0173, exit 70;
+also the guard leg's one regression): IC207A's `PROCEDURE DIVISION USING … INDEX-1 DN3` gives an index and a `PIC 99`
+formal, both `ref long`, of different descriptions, and the entry's alias conditional joined the index's
+`ManagedPointer<long>` cell and the image-stored `ManagedPointer<string>` cell in one `?:`. A pair of different
+descriptions is now refused by its own statement, `HostLanding.RequireDistinct(Unsafe.AreSame(ref a, ref b), …)`,
+before the second formal is landed; a pair of one description keeps the landing's `Unsafe.AreSame(…) ? <cell> :` arm
+(`SharesStorage` is deleted). The H1ALIAS fixture gains an index formal and its refusal (`ALIAS LK_I`). (2) docs/
+CONFORMANCE.md §7 rows DOC-A.1-141 and DOC-A.1-167 did not name in `Pinned by` the witnesses their inventory rows cite
+(`AnnexA1RegisterDriftTests`). (3) `OneHostSurfaceDriftTests` scanned the compiler's generated C# (`tests/nist/output/
+*.g.cs`, written by the guard leg in the same Linux clone); it now skips `*.g.cs`, the ABI's own home. Leg 1 on
+Windows held none of the three: IC207A and the register audit are leg 2 with no impact map, and the NIST output
+exists only where the guard leg ran.

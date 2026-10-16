@@ -61,7 +61,8 @@ public sealed class HostEntryTests
         01 LK-A PIC 9(4).
         01 LK-B PIC 9(4).
         01 LK-C PIC 9(8).
-        PROCEDURE DIVISION USING LK-A LK-B LK-C.
+        01 LK-I USAGE INDEX.
+        PROCEDURE DIVISION USING LK-A LK-B LK-C LK-I.
         P1.
             ADD 1 TO LK-A
             DISPLAY "B=" LK-B
@@ -153,10 +154,14 @@ public sealed class HostEntryTests
                 r = H1PRG.Call(ref amount, ref name, 0, ref note);
                 Console.WriteLine($"4 {r}");
 
-                long a = 4, c = 0;
-                H1ALIAS.Call(ref a, ref a, ref c);
+                long a = 4, c = 0, i = 1;
+                H1ALIAS.Call(ref a, ref a, ref c, ref i);
                 Console.WriteLine($"A {a}");
-                try { long b = 0; H1ALIAS.Call(ref a, ref b, ref a); Console.WriteLine("ACTIVATED"); }
+                try { long b = 0; H1ALIAS.Call(ref a, ref b, ref a, ref i); Console.WriteLine("ACTIVATED"); }
+                catch (ArgumentException e) { Console.WriteLine($"ALIAS {e.ParamName}"); }
+                // An index and a PIC 9(4) item are both `ref long` but different descriptions held in different
+                // storages: one variable for both is refused like any two descriptions (NIST IC207A's shape).
+                try { long b = 0; H1ALIAS.Call(ref a, ref b, ref c, ref a); Console.WriteLine("ACTIVATED"); }
                 catch (ArgumentException e) { Console.WriteLine($"ALIAS {e.ParamName}"); }
 
                 long n = 7; string t = "AAA";
@@ -777,6 +782,7 @@ public sealed class HostEntryTests
                 "B=0005\n" +
                 "A 5\n" +
                 "ALIAS LK_C\n" +
+                "ALIAS LK_I\n" +
                 "BAD 7 [XYZ] True\n" +
                 "U=0012\n" +
                 "W 999999999999999998 99999999999999999999\n" +

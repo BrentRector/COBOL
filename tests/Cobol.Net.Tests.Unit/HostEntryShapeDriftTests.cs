@@ -120,6 +120,7 @@ public sealed class HostEntryShapeDriftTests : CobolNetTestBase
                 string text = s.ToString();
                 bool part = text.StartsWith("__CobolModule.EnsureRegistered();", StringComparison.Ordinal)
                     || text.StartsWith("var __hc", StringComparison.Ordinal)
+                    || text.StartsWith("HostLanding.RequireDistinct(", StringComparison.Ordinal)
                     || text.StartsWith("global::System.FormatException? __hbad = null;", StringComparison.Ordinal)
                     || text.StartsWith("ProgramRegistry.CallProgram(", StringComparison.Ordinal)
                     || (s is TryStatementSyntax t && t.Catches.Count == 0 && t.Finally is not null

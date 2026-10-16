@@ -153,10 +153,9 @@ public sealed class HostLandingTests
     [Fact]
     public void OneVariable_IsOneStorage_OnlyForOneDescription()
     {
-        Assert.True(HostLanding.SharesStorage(sameVariable: true, sameDescription: true, "A", "B"));
-        Assert.False(HostLanding.SharesStorage(sameVariable: false, sameDescription: false, "A", "B"));
+        HostLanding.RequireDistinct(sameVariable: false, "A", "B");   // two variables: two storages, nothing refused
         var e = Assert.Throws<ArgumentException>(
-            () => HostLanding.SharesStorage(sameVariable: true, sameDescription: false, "LK_A", "LK_B"));
+            () => HostLanding.RequireDistinct(sameVariable: true, "LK_A", "LK_B"));
         Assert.Contains("LK_A", e.Message);
         Assert.Contains("LK_B", e.Message);
     }

@@ -45,10 +45,14 @@ public sealed class OneHostSurfaceDriftTests
         ["OperandActivationDriftTests.cs"] = "asserts which generated statements activate a program through the boundary",
     };
 
+    /// <summary>The test projects' C# sources: not their build output (<c>bin/</c>, <c>obj/</c>), and not the compiler's
+    /// generated C# (<c>*.g.cs</c>), which the corpus runs write beside the tests — <c>tests/nist/output/</c> by the NIST
+    /// guard, which the Linux gate runs in the same clone as this leg — and which is the ABI's own home.</summary>
     private static IEnumerable<string> TestSources() =>
         Directory.EnumerateFiles(TestRepo.Tests(), "*.cs", SearchOption.AllDirectories)
             .Where(f => !f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
-                        && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal));
+                        && !f.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}", StringComparison.Ordinal)
+                        && !f.EndsWith(".g.cs", StringComparison.Ordinal));
 
     /// <summary>A C# file's code without its comments: the text of every token, string literals included.</summary>
     private static string Code(string file) =>

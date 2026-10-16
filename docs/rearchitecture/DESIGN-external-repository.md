@@ -479,8 +479,11 @@ public static class ACCT_UPDATE
   (`Unsafe.AreSame`; only parameters of one CLR type can) are given ONE storage when their formals' descriptions are
   the same (`OoConformance.DescriptionMismatch` is null both ways), so `Call(ref a, ref a)` is the host's `CALL …
   USING A A` and §14.2.3 GR8 holds for it (r6-host: `LK-B=0005`). When the descriptions differ — `PIC 9(4)` and
-  `PIC 9(8)`, both `ref long` — one storage cannot be both, and the call is refused with `ArgumentException` naming
-  both parameters before anything is activated (r7-brk). Each formal has its own record-struct type, so two group
+  `PIC 9(8)`, both `ref long`, or an index and a `PIC 99` item, whose storages are not even of one type — one storage
+  cannot be both, and the call is refused with `ArgumentException` naming both parameters before anything is landed or
+  activated (r7-brk): the entry's statement `HostLanding.RequireDistinct(Unsafe.AreSame(ref a, ref b), …)` precedes the
+  second formal's landing, while a pair of one description is the landing's own `Unsafe.AreSame(…) ? <first cell> :`
+  arm. Each formal has its own record-struct type, so two group
   formals cannot be passed one host variable: a host cannot express that aliasing, and the restriction is
   DOC-A.1-141's. Distinct host variables are distinct storage in .NET; inside the activation every COBOL reference —
   the callee, its contained programs, a COBOL program it calls back — sees the boundary's storage exactly as for a
