@@ -32,4 +32,9 @@ MSB3073 with `Generated/` empty, and the next build recovers. The generated file
 855996444353) ===`. Pin: `AntlrGenerationDriftTests` (five facts). Docs: DESIGN-architecture-review §8.4's pin line names the
 target, DESIGN-frontend-grammar §3.5 item 1a, COBOLNET_DESIGN / PROJECT_ORG, DESIGN-module-topology,
 DESIGN-edition-framework, EVAL-antlr-leverage, kb/Compiler/Build System, PB1957 row 11, PB2413. No inventory row (both
-notes `closes_rows: []`, process-only).
+notes `closes_rows: []`, process-only). The csproj's Exec also runs `pwsh -NonInteractive`, so a missing mandatory
+parameter fails instead of waiting for input.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — … Conformance 6,062/11,770 · Unit
+33,272/33,698 · Characterization 6/36 cases ran …` (run 20261016T133256Z-eb5152); the five `AntlrGenerationDriftTests`
+facts passed in leg 1. Linux gate: the lander's (batched gating).
