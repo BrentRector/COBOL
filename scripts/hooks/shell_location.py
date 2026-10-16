@@ -24,14 +24,25 @@ following every location change the two shells accept:
                directory (kb/Work PB3095; the step after it carries the list's targets in `stranded`); quotes, escapes,
                comments, `$( … )`, `{ … }`, heredoc bodies and PowerShell here-strings never split a command; `~` is the home dir; a variable set earlier in the SAME call to a literal
                (`WT=/e/x`, `$wt = 'E:\\x'`) is substituted.
+  cmd.exe      (a `cmd /c "…"` payload) `cd [/d] dir`, `chdir`, `pushd`, `popd`; `&` runs the next command after it.
 
 It is also the ONE model of a command line that every guard rule reads (kb/Work PB3198): a step's `text` and `words` are
 its command without the BODIES of the heredocs it introduces (a body is cut at its own delimiter line, never at the first
 `<<`, and a `<<` inside quotes or `$(( … ))` is no heredoc), the bodies ride beside it in `heredocs`, quoted text is one
-word, a `-c`/`-Command` payload (and a heredoc a shell reads as its script) is walked as the command line it is, and
-`git_calls` reads every `git` invocation of a step (its global options, the directory its `-C` options name, its
-subcommand). A rule that scans the raw text instead
-sees a heredoc body as commands, or a command after a heredoc as body: the hole PB3198 closed in four rules at once.
+word, and `git_calls` reads every `git` invocation of a step (its global options, the directory its `-C` options name,
+its subcommand). EVERY place either shell takes a command line from is walked as the command line it is:
+  - a command substitution, in a word or inside double quotes: Bash `$( … )`, a backquote, `<( … )`, `>( … )`;
+    PowerShell `$( … )`, `@( … )`, a `( … )` expression and a `{ … }` script block. Its steps come BEFORE the step
+    whose text holds it (they run first) and carry `substitution=True`; the step's own `words` keep it as one word;
+  - an interpreter handed a string: `bash|sh -c '…'` (and `-lc`, `-ec` …), `pwsh -Command|-c|-EncodedCommand …`,
+    `cmd /c|/k …`, Bash `eval …`, PowerShell `Invoke-Expression|iex …`, also behind a command that runs another
+    (`timeout 5 bash -c …`, `env X=1 sh -c …`, `xargs sh -c …`, `wsl -e bash -c …`, PowerShell's `&`);
+  - a shell reading its script from stdin (no script operand, `-s`, `-Command -`, `-File -`) and `iex`: stdin is the
+    heredocs fed to it, its here-string (`bash <<< "…"`), or what the pipeline stage before it writes when the line
+    spells that (`echo|printf|Write-Output` of words, `cat` of a heredoc or here-string, a PowerShell literal string).
+A rule that scans the raw text instead sees a heredoc body as commands, or a command after a heredoc as body: the hole
+PB3198 closed in four rules at once; a model that skips any of those places hides the commands inside it from every rule
+(the branch review of PB3198, R1-1 and R1-2: a stash or a push inside `$( … )`, `eval "…"`, `cmd /c "…"` or `| bash`).
 
 A directory the line does not determine (a target spelled with an unknown variable or a command substitution, `popd`
 with nothing pushed in this call) is `None`, and so is every later step of that shell until an absolute location
@@ -42,22 +53,30 @@ Self-test: `python scripts/hooks/test_shell_location.py` (the gate's audits, CI'
 """
 from __future__ import annotations
 
+import base64
 import dataclasses
 import os
 import pathlib
 import re
 
-BASH, POWERSHELL = "bash", "powershell"
+BASH, POWERSHELL, CMD = "bash", "powershell", "cmd"
 
 _BASH_LOCATION = {"cd", "pushd", "popd"}
+_CMD_LOCATION = {"cd", "chdir", "pushd", "popd"}
 _PS_LOCATION = {"set-location", "sl", "cd", "chdir", "push-location", "pushd", "pop-location", "popd"}
 _PUSH = {"pushd", "push-location"}
 _POP = {"popd", "pop-location"}
 _PS_PATH_PARAMS = {"-path", "-literalpath", "-lp", "-pspath"}
 _PS_SWITCHES = {"-passthru"}
 _PS_VALUE_PARAMS = {"-stackname"}
-_SHELLS = {"bash": BASH, "sh": BASH, "zsh": BASH, "pwsh": POWERSHELL, "powershell": POWERSHELL}
-_SHELL_PAYLOAD_FLAGS = {"-c", "-lc", "-ic", "-command"}
+_SHELLS = {"bash": BASH, "sh": BASH, "zsh": BASH, "dash": BASH, "pwsh": POWERSHELL, "powershell": POWERSHELL,
+           "cmd": CMD}
+# the commands that run their command line in THIS shell: Bash's `eval`, PowerShell's `Invoke-Expression`
+_EVAL = {"eval": BASH, "invoke-expression": POWERSHELL, "iex": POWERSHELL}
+# commands that run ANOTHER command named among their words (`timeout 5 bash -c …`, `xargs sh -c …`, `wsl -e bash -c …`,
+# PowerShell's call operator `& pwsh -c …`): the interpreter is the first later word that names one (`_runs`)
+_PREFIX_COMMANDS = {"timeout", "env", "sudo", "doas", "nohup", "nice", "ionice", "time", "xargs", "exec", "command",
+                    "builtin", "stdbuf", "watch", "find", "wsl", "&"}
 _BASH_DECLARE = {"export", "declare", "local", "readonly", "typeset"}
 _ASSIGN_BASH = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.S)
 _ASSIGN_PS = re.compile(r"^\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.+)$", re.S)
@@ -84,6 +103,9 @@ class Step:
     heredocs: tuple[str, ...] = ()  # the bodies of the Bash heredocs (`<<DELIM`, `<<-DELIM`) the command introduces, in
                                  # order, each without its delimiter line; a `-c` payload's last step carries the
                                  # bodies that feed the payload (`bash -c '…' <<EOF`)
+    substitution: bool = False   # a step of a command substitution, `<( … )` or PowerShell expression / script block:
+                                 # it runs BEFORE the step whose text holds it (the next step not so marked at a lower
+                                 # depth), and its output is that step's text, not a command of the line
 
 
 @dataclasses.dataclass(frozen=True)
@@ -115,8 +137,9 @@ def is_absolute(p: str) -> bool:
 
 
 def resolve(target: str, cwd: str | None) -> str | None:
-    """`target` (a location-change or `-C` argument, already substituted) as a directory, or None when undetermined."""
-    if not target or "$" in target or "`" in target:
+    """`target` (a location-change or `-C` argument, already substituted) as a directory, or None when undetermined: a
+    variable (`$X`, cmd's `%X%`), a substitution, or a PowerShell expression or script block (`(Join-Path …)`)."""
+    if not target or any(ch in target for ch in "$`%") or target.startswith(("(", "@(", "{")):
         return None
     if target == "~" or target.startswith(("~/", "~\\")):
         target = str(pathlib.Path.home()) + target[1:]
@@ -134,64 +157,127 @@ def resolve(target: str, cwd: str | None) -> str | None:
 # A Bash heredoc operator: `<<` or `<<-`, then its delimiter word, quoted (`'EOF'`, `"EOF"`), backslash-quoted (`\EOF`) or
 # bare; a bare one starts with a letter or `_`, so `1<<2` outside `$(( … ))` is not read as a heredoc.
 _HEREDOC = re.compile(r"<<-?[ \t]*(?:(['\"])([^'\"\n]+)\1|\\?([A-Za-z_][A-Za-z0-9_.-]*))")
+_ESCAPE = {BASH: "\\", POWERSHELL: "`", CMD: "^"}
 
 
-def _split(command: str, shell: str) -> list[tuple[str, str, tuple[str, ...]]]:
-    """The tool call's top-level commands, each with the separator after it and the bodies of the heredocs it
-    introduces. Quotes, escapes, brackets and here-strings are kept inside the command they belong to; a heredoc body is
-    cut out of the text at its own delimiter line and carried beside its command (a body is data, never a command)."""
+def _opener(text: str, i: int, shell: str, quoted: bool) -> tuple[int, str] | None:
+    """At `text[i]`, a construct whose inside is a command line: (where the inside starts, the text that closes it), else
+    None. Bash `$( … )`, a backquote, `<( … )`, `>( … )` (inside double quotes only `$(` and the backquote); PowerShell
+    `$( … )`, `@( … )` and, outside double quotes, a `( … )` expression or a `{ … }` script block (`${name}` is a
+    variable). `$(( … ))` is arithmetic, never a command line; cmd.exe has none."""
+    if shell == BASH:
+        if text.startswith("$(", i) and not text.startswith("$((", i):
+            return i + 2, ")"
+        if text[i] == "`":
+            return i + 1, "`"
+        if not quoted and text.startswith(("<(", ">("), i):
+            return i + 2, ")"
+    elif shell == POWERSHELL:
+        if text.startswith(("$(", "@("), i):
+            return i + 2, ")"
+        if not quoted and text[i] == "(":
+            return i + 1, ")"
+        if not quoted and text[i] == "{" and not (i and text[i - 1] == "$"):
+            return i + 1, "}"
+    return None
+
+
+def _substitution(text: str, i: int, shell: str, quoted: bool) -> tuple[str, int] | None:
+    """The substitution (`_opener`) that starts at `text[i]`: (its inside, the index after its closer), else None. Its
+    end is found by the scanner itself, so a quote, a bracket or a heredoc body inside it never ends it early."""
+    opened = _opener(text, i, shell, quoted)
+    if opened is None:
+        return None
+    start, closer = opened
+    _, stop = _split(text, shell, start, closer)
+    return text[start:stop], (stop + len(closer) if stop < len(text) else stop)
+
+
+def _arithmetic_end(text: str, i: int) -> int:
+    """The index after the `(( … ))` that starts at `text[i]`: kept whole, so its `<<` is a shift, never a heredoc."""
+    j, d = i, 0
+    while j < len(text):
+        d += {"(": 1, ")": -1}.get(text[j], 0)
+        if d == 0:
+            break
+        j += 1
+    return min(j + 1, len(text))
+
+
+def _split(command: str, shell: str, start: int = 0, closer: str | None = None
+           ) -> tuple[list[tuple[str, str, tuple[str, ...], tuple[str, ...]]], int]:
+    """The commands of `command` from `start`, each with the separator after it, the bodies of the heredocs it introduces
+    and the insides of the substitutions it holds (`_opener`), in order; and the index where the scan stopped: at
+    `closer` (the text that ends a substitution, found at bracket depth 0) or at the end. Quotes, escapes, brackets,
+    substitutions and here-strings are kept inside the command they belong to; a heredoc body is cut out of the text at
+    its own delimiter line and carried beside its command (a body is data, never a command)."""
     out: list[tuple[str, str]] = []
     buf: list[str] = []
-    i, n, depth = 0, len(command), 0
-    esc = "\\" if shell == BASH else "`"
+    subs: list[str] = []                    # the substitutions of the command being read
+    i, n, depth = start, len(command), 0
+    esc = _ESCAPE[shell]
     heredocs: list[tuple[str, int]] = []   # (delimiter, index in `out` of its command): bodies due at the next newline
     bodies: dict[int, list[str]] = {}       # index in `out` -> the bodies of that command's heredocs, in order
+    inners: dict[int, list[str]] = {}       # index in `out` -> that command's substitutions, in order
 
     def flush(sep: str) -> None:
         text = "".join(buf).strip()
         if text:
             out.append((text, sep))
+            inners[len(out) - 1] = list(subs)
         elif out and sep and not out[-1][1]:
             out[-1] = (out[-1][0], sep)
         buf.clear()
+        subs.clear()
+
+    def substitution(at: int, quoted: bool) -> int | None:
+        found = _substitution(command, at, shell, quoted)
+        if found is None:
+            return None
+        subs.append(found[0])
+        return found[1]
 
     while i < n:
         c = command[i]
         if c == esc and i + 1 < n:
             buf.append(command[i:i + 2]); i += 2; continue
+        if closer is not None and depth == 0 and command.startswith(closer, i):
+            break
         if shell == POWERSHELL and c == "@" and command[i + 1:i + 2] in ("'", '"') and command[i + 2:i + 3] in ("\n", "\r"):
             end = command.find("\n" + command[i + 1] + "@", i + 2)
             end = n if end < 0 else end + 3
             buf.append(command[i:end]); i = end; continue
-        if c == "'":
+        if c == "'" and shell != CMD:
             j = command.find("'", i + 1)
             j = n if j < 0 else j + 1
             buf.append(command[i:j]); i = j; continue
         if c == '"':
             j = i + 1
             while j < n and command[j] != '"':
-                j += 2 if command[j] == esc else 1
+                if command[j] == esc and shell != CMD:
+                    j += 2
+                    continue
+                end = substitution(j, True)
+                j = j + 1 if end is None else end
             j = min(j + 1, n)
             buf.append(command[i:j]); i = j; continue
-        if c == "#" and (not buf or buf[-1][-1:].isspace() or buf[-1][-1:] in ";|&(") and depth == 0:
+        if (c == "#" and shell != CMD and depth == 0
+                and (not buf or buf[-1][-1:].isspace() or buf[-1][-1:] in ";|&(")):
             j = command.find("\n", i)
             i = n if j < 0 else j
             continue
         if shell == BASH and command.startswith("((", i):
             # arithmetic, `$(( … ))` or `(( … ))`: kept whole, so its `<<` is a shift and never opens a heredoc
-            j, d = i, 0
-            while j < n:
-                d += {"(": 1, ")": -1}.get(command[j], 0)
-                if d == 0:
-                    break
-                j += 1
-            j = min(j + 1, n)
+            j = _arithmetic_end(command, i)
             buf.append(command[i:j]); i = j; continue
         if shell == BASH and command.startswith("<<", i) and not command.startswith("<<<", i):
             m = _HEREDOC.match(command, i)
             if m:
                 heredocs.append((m.group(2) or m.group(3), len(out)))
                 buf.append(m.group(0)); i = m.end(); continue
+        end = substitution(i, False)
+        if end is not None:
+            buf.append(command[i:end]); i = end; continue
         if c in "({":
             depth += 1
         elif c in ")}" and depth:
@@ -225,22 +311,46 @@ def _split(command: str, shell: str) -> list[tuple[str, str, tuple[str, ...]]]:
             if c == "|":
                 flush("|"); i += 1; continue
             # A single `&` is the background operator, never in a redirection (`2>&1`, `*>&1`, `&>`); in PowerShell a
-            # `&` that STARTS a command is the call operator (`; & pwsh -File x.ps1`).
+            # `&` that STARTS a command is the call operator (`; & pwsh -File x.ps1`); in cmd.exe it runs the next
+            # command after this one, as `;` does.
             if (c == "&" and not (buf and buf[-1][-1:] in "<>") and command[i + 1:i + 2] != ">"
-                    and (shell == BASH or "".join(buf).strip())):
-                flush("&"); i += 1; continue
+                    and (shell != POWERSHELL or "".join(buf).strip())):
+                flush(";" if shell == CMD else "&"); i += 1; continue
         buf.append(c)
         i += 1
+    stop = min(i, n)
     flush("")
-    return [(text, sep, tuple(bodies.get(k, ()))) for k, (text, sep) in enumerate(out)]
+    return ([(text, sep, tuple(bodies.get(k, ())), tuple(inners.get(k, ()))) for k, (text, sep) in enumerate(out)],
+            stop)
+
+
+def _here_string(text: str, i: int) -> tuple[str, int] | None:
+    """The PowerShell here-string (`@'` or `@"` ending its line, closed by `'@`/`"@` at a line start) at `text[i]`: (its
+    content, the index after it), else None."""
+    if not (text[i] == "@" and text[i + 1:i + 2] in ("'", '"') and text[i + 2:i + 3] in ("\n", "\r")):
+        return None
+    start = i + 4 if text.startswith("\r\n", i + 2) else i + 3
+    end = text.find("\n" + text[i + 1] + "@", start - 1)
+    if end < 0:
+        return text[start:], len(text)
+    return text[start:end].removesuffix("\r"), end + 3
 
 
 def _words(text: str, shell: str) -> list[str]:
-    """The words of one command, quotes removed (Bash `\\x` is `x` outside single quotes; PowerShell keeps backslashes)."""
+    """The words of one command, quotes removed (Bash `\\x` is `x` outside single quotes; PowerShell keeps backslashes;
+    cmd.exe's `^x` is `x` outside double quotes). A substitution and an arithmetic expansion stay whole, inside the word
+    they stand in (`x=$(git rev-parse HEAD)` is one word); a PowerShell here-string is one word, its content."""
     words: list[str] = []
     cur: list[str] = []
     have = False
     i, n = 0, len(text)
+
+    def construct_end(at: int, quoted: bool) -> int | None:
+        if shell == BASH and text.startswith("((", at):
+            return _arithmetic_end(text, at)
+        found = _substitution(text, at, shell, quoted)
+        return None if found is None else found[1]
+
     while i < n:
         c = text[i]
         if c.isspace():
@@ -248,7 +358,9 @@ def _words(text: str, shell: str) -> list[str]:
                 words.append("".join(cur)); cur.clear(); have = False
             i += 1; continue
         have = True
-        if c == "'":
+        if shell == POWERSHELL and (here := _here_string(text, i)) is not None:
+            cur.append(here[0]); i = here[1]; continue
+        if c == "'" and shell != CMD:
             j = text.find("'", i + 1)
             j = n if j < 0 else j
             cur.append(text[i + 1:j]); i = j + 1; continue
@@ -259,10 +371,16 @@ def _words(text: str, shell: str) -> list[str]:
                     cur.append(text[j + 1]); j += 2; continue
                 if shell == POWERSHELL and text[j] == "`" and j + 1 < n:
                     cur.append(text[j + 1]); j += 2; continue
+                if shell != CMD and (end := construct_end(j, True)) is not None:
+                    cur.append(text[j:end]); j = end; continue
                 cur.append(text[j]); j += 1
             i = j + 1; continue
         if shell == BASH and c == "\\" and i + 1 < n:
             cur.append(text[i + 1]); i += 2; continue
+        if shell == CMD and c == "^" and i + 1 < n:
+            cur.append(text[i + 1]); i += 2; continue
+        if (end := construct_end(i, False)) is not None:
+            cur.append(text[i:end]); i = end; continue
         cur.append(c); i += 1
     if have:
         words.append("".join(cur))
@@ -278,14 +396,15 @@ def _group(text: str, shell: str) -> tuple[str, str] | None:
     `(a) + (b)` are not groups: the bracket that closes the first one must be the command's last character."""
     if not text or text[0] not in "({":
         return None
-    esc = "\\" if shell == BASH else "`"
+    esc = _ESCAPE[shell]
+    quotes = '"' if shell == CMD else "'\""
     depth, i, n = 0, 0, len(text)
     while i < n:
         c = text[i]
         if c == esc:
             i += 2
             continue
-        if c in "'\"":
+        if c in quotes:
             j = text.find(c, i + 1)
             i = n if j < 0 else j + 1
             continue
@@ -319,11 +438,11 @@ class _State:
 def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) -> None:
     began: _State | None = None        # the shell's state when the current and-or list began
     stranded: tuple[str, ...] = ()     # a backgrounded list's location changes, for the next step
-    for text, sep, heredocs in _split(command, shell):
+    for text, sep, heredocs, subs in _split(command, shell)[0]:
         if began is None:
             began = state.copy()
         first = len(out)
-        _command(text, sep, heredocs, state, shell, depth, out)
+        _command(text, sep, heredocs, subs, state, shell, depth, out)
         if stranded and len(out) > first:
             out[first] = dataclasses.replace(out[first], stranded=stranded)
             stranded = ()
@@ -339,14 +458,15 @@ def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) 
         began = None
 
 
-def _command(text: str, sep: str, heredocs: tuple[str, ...], state: _State, shell: str, depth: int,
-             out: list[Step]) -> None:
+def _command(text: str, sep: str, heredocs: tuple[str, ...], subs: tuple[str, ...], state: _State, shell: str,
+             depth: int, out: list[Step]) -> None:
     """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`."""
     grouped = _group(text, shell)
     if grouped is not None:
         bracket, inner = grouped
-        # A Bash `( … )` is a subshell: its location changes end at the `)`. A `{ … }` group, and every PowerShell
-        # bracket (location is per runspace), runs in the current shell, so its changes persist.
+        # A Bash `( … )` is a subshell: its location changes end at the `)`. A `{ … }` group, and every PowerShell or
+        # cmd.exe bracket (location is per runspace / process), runs in the current shell, so its changes persist.
+        # Its substitutions are its own commands', found again by this walk.
         child = state.copy()
         before = len(out)
         _walk(inner, child, shell, depth + 1, out)
@@ -355,6 +475,19 @@ def _command(text: str, sep: str, heredocs: tuple[str, ...], state: _State, shel
         if not (shell == BASH and bracket == "("):
             state.adopt(child)
         return
+    # the stage this command reads from when it follows a `|` (each side of a Bash pipeline runs in a subshell, so its
+    # changes do not persist; a background `&` is the whole list's, undone by `_walk`)
+    prev = out[-1] if out and out[-1].depth == depth and out[-1].sep == "|" else None
+    transient = shell == BASH and (sep == "|" or prev is not None)
+    # its substitutions run first: Bash's in a subshell; a PowerShell expression or script block in this runspace, so
+    # one that moves the location leaves the directory undetermined (a script block may or may not have run)
+    for inner in subs:
+        child = state.copy()
+        before = len(out)
+        _walk(inner, child, shell, depth + 1, out)
+        out[before:] = [dataclasses.replace(s, substitution=True) for s in out[before:]]
+        if shell == POWERSHELL and len(child.moved) > len(state.moved):
+            state.cwd = None
     if shell == POWERSHELL and (m := _ASSIGN_PS.match(text)):
         value = _words(m.group(2), shell)
         if len(value) == 1:
@@ -366,12 +499,10 @@ def _command(text: str, sep: str, heredocs: tuple[str, ...], state: _State, shel
         for w in assigned:
             name, value = _ASSIGN_BASH.match(w).groups()
             state.variables[name] = value
-    # each side of a Bash pipeline runs in a subshell, so its changes do not persist (a background `&` is the whole
-    # list's, undone by `_walk`)
-    transient = shell == BASH and (sep == "|" or bool(out and out[-1].depth == depth and out[-1].sep == "|"))
-    if _shell_child(words, state, depth, sep, heredocs, out):
+    stdin = heredocs + _here_strings(words, shell) + (_output(prev, shell) if prev is not None else ())
+    if _interpreter(words, state, shell, depth, sep, heredocs, stdin, out):
         return
-    location = _location(words, shell)
+    location = _location(words, shell, state.cwd)
     if location is not None:
         verb, target = location
         out.append(Step(text, words, state.cwd, sep, depth, target if target is not None else "",
@@ -382,16 +513,16 @@ def _command(text: str, sep: str, heredocs: tuple[str, ...], state: _State, shel
     out.append(Step(text, words, _workdir(words, state.cwd), sep, depth, heredocs=heredocs))
 
 
-def _location(words: tuple[str, ...], shell: str) -> tuple[str, str | None] | None:
+def _location(words: tuple[str, ...], shell: str, cwd: str | None) -> tuple[str, str | None] | None:
     """(verb, target) when the command changes the location; target None = no argument (home, or a pop)."""
     if not words:
         return None
-    verb = words[0].lower() if shell == POWERSHELL else words[0]
-    if verb not in (_PS_LOCATION if shell == POWERSHELL else _BASH_LOCATION):
+    verb = words[0] if shell == BASH else words[0].lower()
+    if verb not in {BASH: _BASH_LOCATION, POWERSHELL: _PS_LOCATION, CMD: _CMD_LOCATION}[shell]:
         return None
-    verb = verb.lower()
     args = list(words[1:])
     target = None
+    drive_switch = False
     i = 0
     while i < len(args):
         a = args[i]
@@ -411,9 +542,21 @@ def _location(words: tuple[str, ...], shell: str) -> tuple[str, str | None] | No
         if shell == BASH and a in ("-L", "-P", "-e", "-@", "--"):
             i += 1
             continue
+        if shell == CMD and low == "/d":
+            drive_switch = True
+            i += 1
+            continue
         if target is None:
             target = a
         i += 1
+    if shell == CMD and verb in ("cd", "chdir"):
+        # cmd.exe's bare `cd` prints the directory; without `/d`, a `cd` to another drive sets THAT drive's directory
+        # and leaves the current one where it is
+        if target is None:
+            return None
+        there, here = pathlib.PureWindowsPath(target).drive, pathlib.PureWindowsPath(native_path(cwd or "")).drive
+        if not drive_switch and there and here and there.lower() != here.lower():
+            return None
     return verb, target
 
 
@@ -434,7 +577,7 @@ def _move(state: _State, verb: str, target: str | None) -> None:
 
 
 def _shell_named(word: str) -> str | None:
-    """The shell a command word starts (`bash`, `/usr/bin/sh`, `pwsh.exe` …), or None when it is not a shell."""
+    """The shell a command word starts (`bash`, `/usr/bin/sh`, `pwsh.exe`, `cmd` …), or None when it is not a shell."""
     return _SHELLS.get(program(word))
 
 
@@ -455,14 +598,20 @@ def _workdir(words: tuple[str, ...], cwd: str | None) -> str | None:
 
 
 def _reads_stdin_script(words: tuple[str, ...], shell: str) -> bool:
-    """A shell called with no script operand (`bash`, `bash -s args`, `sh -e`, `pwsh -NoProfile`) reads its commands
-    from stdin, so a heredoc fed to it is a command line, never data. A first operand that is not an option (or an
-    option's value, or a redirection) is a script file, and then stdin is that script's input."""
+    """A shell called with no script operand (`bash`, `bash -s args`, `sh -e`, `pwsh -NoProfile`, `cmd /q`) reads its
+    commands from stdin, so a heredoc, a here-string or a pipe fed to it is a command line, never data. A first operand
+    that is not an option (or an option's value, or a redirection) is a script file, and then stdin is that script's
+    input."""
     i = 1
     while i < len(words):
         w, low = words[i], words[i].lower()
         if re.match(r"^[0-9&]*(<<?-?|>>?|<>)", w):        # a redirection; a bare operator's target is the next word
-            i += 2 if re.fullmatch(r"[0-9&]*(<|>>?|<>)&?", w) else 1
+            i += 2 if re.fullmatch(r"[0-9&]*(<<<|<<-?|<|>>?|<>)&?", w) else 1
+            continue
+        if shell == CMD:
+            if not w.startswith("/"):
+                return False
+            i += 1
             continue
         if shell == BASH and w == "-s":
             return True                                  # `-s`: commands from stdin, the rest are its arguments
@@ -487,26 +636,118 @@ _PS_SHELL_VALUE_OPTIONS = {"-executionpolicy", "-ep", "-ex", "-workingdirectory"
                            "-windowstyle", "-w", "-custompipename"}
 
 
-def _shell_child(words: tuple[str, ...], state: _State, depth: int, sep: str, heredocs: tuple[str, ...],
-                 out: list[Step]) -> bool:
-    """`bash -c '…'` / `pwsh [-WorkingDirectory dir] -Command "…"`, or a shell with no script operand fed a heredoc
-    (`bash <<'EOF' … EOF`, `pwsh -Command - <<EOF`): walk the payload in a child shell (its location changes never come
-    back). True when `words` was such a call."""
-    child_shell = _shell_named(words[0]) if words else None
-    if child_shell is None:
+def _payload_flag(word: str, shell: str) -> str | None:
+    """How a shell's option hands it a command line: "text" (Bash `-c` alone or among single-letter options, `-lc`,
+    `-ec`; pwsh `-Command` and its prefixes from `-comm`, `-c`, `-CommandWithArgs`/`-cwa`; cmd.exe `/c`, `/k`, and Git
+    Bash's `//c`), "encoded" (pwsh `-EncodedCommand`, `-e`, `-ec`, prefixes from `-enc`), else None. Bash's options are
+    case-sensitive (`-C` is noclobber), pwsh's and cmd.exe's are not."""
+    if shell == BASH:
+        return "text" if re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", word) else None
+    if shell == CMD:
+        return "text" if re.fullmatch(r"//?[ck]", word, re.I) else None
+    low = word.lower()
+    if low in ("-c", "-cwa") or (len(low) >= 5 and ("-command".startswith(low) or "-commandwithargs".startswith(low))):
+        return "text"
+    if low in ("-e", "-ec") or (len(low) >= 4 and "-encodedcommand".startswith(low)):
+        return "encoded"
+    return None
+
+
+def _decoded(word: str) -> str | None:
+    """pwsh's `-EncodedCommand` value: Base64 of the UTF-16LE command line; None when it is not one."""
+    try:
+        return base64.b64decode(word, validate=True).decode("utf-16-le")
+    except (ValueError, UnicodeDecodeError):
+        return None
+
+
+def _runs(words: tuple[str, ...], shell: str) -> int:
+    """The index of the word naming the program a step runs: past Bash's `NAME=value` prefixes, and through a command
+    that runs another (`_PREFIX_COMMANDS`: `timeout 5 bash -c …`, `xargs sh -c …`, PowerShell's `& pwsh …`) to the
+    first later word that names a shell or an eval."""
+    k = 0
+    if shell == BASH:
+        while k < len(words) and _ASSIGN_BASH.match(words[k]):
+            k += 1
+    if k < len(words) and program(words[k]) in _PREFIX_COMMANDS:
+        later = next((j for j in range(k + 1, len(words)) if program(words[j]) in _SHELLS or program(words[j]) in _EVAL),
+                     None)
+        if later is not None:
+            return later
+    return k
+
+
+def _here_strings(words: tuple[str, ...], shell: str) -> tuple[str, ...]:
+    """The text each Bash here-string of the command (`<<< word`, `<<<word`) feeds its stdin."""
+    if shell != BASH:
+        return ()
+    found = []
+    for k, w in enumerate(words):
+        m = re.fullmatch(r"[0-9]*<<<(.*)", w, re.S)
+        if m and (m.group(1) or k + 1 < len(words)):
+            found.append(m.group(1) or words[k + 1])
+    return tuple(found)
+
+
+def _output(step: Step, shell: str) -> tuple[str, ...]:
+    """What a pipeline stage writes when the line spells it: `cat` of its heredocs or here-string, `echo`/`printf`/
+    `Write-Output` of its words (a `\\n` in Bash's or cmd.exe's read as a line end), a PowerShell literal string;
+    () when the line does not determine it (`cat file`, a program's output)."""
+    w = step.words
+    if not w:
+        return ()
+    name = program(w[0])
+    if name == "cat":
+        return step.heredocs + _here_strings(w, shell)
+    if shell == POWERSHELL:
+        if name in ("echo", "write-output", "write"):
+            return ("\n".join(w[1:]),) if len(w) > 1 else ()
+        return (w[0],) if len(w) == 1 and step.text[:1] in ("'", '"', "@") else ()
+    if name in ("echo", "printf"):
+        args = list(w[1:])
+        while name == "echo" and shell == BASH and args and re.fullmatch(r"-[neE]+", args[0]):
+            args.pop(0)
+        return (" ".join(args).replace("\\n", "\n"),) if args else ()
+    return ()
+
+
+def _interpreter(words: tuple[str, ...], state: _State, shell: str, depth: int, sep: str, heredocs: tuple[str, ...],
+                 stdin: tuple[str, ...], out: list[Step]) -> bool:
+    """A command that hands a command line to an interpreter: walk that command line, in place of the command. `bash -c
+    '…'`, `pwsh [-WorkingDirectory dir] -Command "…"` / `-EncodedCommand …`, `cmd /c …`, and a shell reading its script
+    from `stdin` (`bash <<'EOF'`, `echo '…' | bash`, `pwsh -Command -`) run it in a CHILD shell, whose location changes
+    never come back; Bash's `eval …` and PowerShell's `Invoke-Expression …` (or `… | iex`) run it in THIS one. True
+    when `words` was such a call."""
+    call = words[_runs(words, shell):]
+    if not call:
         return False
-    at = next((i for i, w in enumerate(words[1:-1], 1) if w.lower() in _SHELL_PAYLOAD_FLAGS), None)
-    if at is not None and not (heredocs and words[at + 1] == "-"):
-        payloads = [" ".join(words[at + 1:]) if child_shell == POWERSHELL else words[at + 1]]
-        workdir = _workdir(words[:at], state.cwd)
-    elif heredocs and (at is not None or _reads_stdin_script(words, child_shell)):
-        payloads = list(heredocs)    # stdin IS the script (`-Command -` names stdin): each body is a command line
-        workdir = _workdir(words, state.cwd)
+    name = program(call[0])
+    if _EVAL.get(name) == shell:
+        args = [w for w in call[1:] if not (shell == POWERSHELL and w.lower() == "-command")]
+        payloads = [" ".join(args)] if args else list(stdin) if shell == POWERSHELL else []
+        child_shell, run_in = shell, (lambda: state)
     else:
+        child_shell = _SHELLS.get(name)
+        if child_shell is None:
+            return False
+        at = next((i for i, w in enumerate(call[1:-1], 1) if _payload_flag(w, child_shell)), None)
+        if at is not None and call[at + 1] != "-":
+            if _payload_flag(call[at], child_shell) == "encoded":
+                payloads = [p for p in (_decoded(call[at + 1]),) if p]
+            else:
+                payloads = [call[at + 1] if child_shell == BASH else " ".join(call[at + 1:])]
+            workdir = _workdir(call[:at], state.cwd)
+        elif stdin and (at is not None or _reads_stdin_script(call, child_shell)):
+            payloads = list(stdin)     # stdin IS the script (`-Command -` names stdin): each text is a command line
+            workdir = _workdir(call, state.cwd)
+        else:
+            return False
+        run_in = lambda: _State(workdir, None, [], {})  # noqa: E731 — a fresh child shell per payload
+    if not payloads:
         return False
     before = len(out)
     for payload in payloads:
-        _walk(payload, _State(workdir, None, [], {}), child_shell, depth + 1, out)
+        _walk(payload, run_in(), child_shell, depth + 1, out)
     if len(out) > before:
         last = out[-1]
         out[-1] = dataclasses.replace(last, sep=sep, heredocs=last.heredocs + heredocs)

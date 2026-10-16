@@ -68,8 +68,10 @@ cmd = (data.get("tool_input") or {}).get("command", "") or ""
 
 # EVERY rule reads the command line through the ONE model of it, the shared parser `shell_location.steps` (kb/Work
 # PB2599, PB3198): its simple commands in order, each with its words (quoted text is one word), the heredoc bodies it
-# introduces cut out beside it at their own delimiter lines, a `bash -c` / `pwsh -Command` payload walked as the command
-# line it is, and every `git` invocation read by `shell_location.git_calls`. No rule scans the raw text: a private view of
+# introduces cut out beside it at their own delimiter lines, every place a shell takes a command line from walked as the
+# command line it is (a `$( … )` / backquote / PowerShell expression or script block, a `bash -c` / `pwsh -Command` /
+# `cmd /c` payload, `eval` / `iex`, a heredoc, here-string or pipe a shell reads as its script; the branch review's R1-1
+# and R1-2), and every `git` invocation read by `shell_location.git_calls`. No rule scans the raw text: a private view of
 # it reads a heredoc body as commands, a command written after a heredoc as body, or a `<<` inside quotes as the start of
 # one (kb/Work PB3198: five such views let a stash, a push to main and a bare test filter through after a heredoc).
 # The cwd is "." so a relative location stays relative: a relative `cd` never leaves this
@@ -177,7 +179,9 @@ for n, st in enumerate(STEPS):
         block(f"filter term(s) {bare} have no property, so they match NOTHING and the run exits 0 — a silent "
               "green. Write `FullyQualifiedName~X` for every term. (A GATE never filters: it is "
               "`scripts/build-local.ps1`, the ordered gate.)")
-    reader = STEPS[n + 1].words[:1] if st.sep == "|" and n + 1 < len(STEPS) else ()
+    # the reader is the next stage's command; the steps of ITS substitutions run before it and are not the reader
+    nxt = next((s for s in STEPS[n + 1:] if not s.substitution), None) if st.sep == "|" else None
+    reader = nxt.words[:1] if nxt is not None else ()
     piped = bool(reader) and shell_location.program(reader[0]) in _PIPE_READERS
     if not (piped or any(">" in a for a in args)):
         block("a filtered `dotnet test` must redirect its output to a log (or pipe it through tail/grep) and read the "
@@ -205,10 +209,13 @@ READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-Stri
 def _segments(steps) -> list[str]:
     """The command line's segments: each a command or pipeline ended by `&&`, `||`, `;` or a newline (a pipe or a
     background `&` keeps what follows in the same segment). A group or a `-c` payload is one opaque part, `( … )`: a
-    verdict command inside one is not this command line's chain."""
+    verdict command inside one is not this command line's chain. A substitution's steps are part of the command whose
+    text holds them (`echo "EXIT=$? $(date)"` is one echo), so they are no segment of their own."""
     out: list[str] = []
     cur: list[str] = []
     for st in steps:
+        if st.substitution:
+            continue
         part = st.text if st.depth == 0 else "( … )"
         if not (part == "( … )" and cur and cur[-1] == part):
             cur.append(part)

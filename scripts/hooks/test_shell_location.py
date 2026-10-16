@@ -213,6 +213,50 @@ with tempfile.TemporaryDirectory() as tmp:
     check("git_calls: -C applied to the step's cwd", [c.cwd for s in sl.steps(f"cd {W} && git -C sub push", str(main), B)
                                                      for c in sl.git_calls(s)], [wt / "sub"])
 
+    # ── every place a shell takes a command line from is walked (the branch review of PB3198, R1-1 and R1-2) ───────
+    marked = lambda cmd, shell=B: [(s.text, s.depth, s.substitution) for s in sl.steps(cmd, str(main), shell)]
+    exact("a substitution's steps run first, one level down, marked; its own step keeps it as one word",
+          marked("x=$(cd /y && git stash) && echo z"),
+          [("cd /y", 1, True), ("git stash", 1, True), ("x=$(cd /y && git stash)", 0, False), ("echo z", 0, False)])
+    exact("a backquote and a process substitution", [t for t, _, sub in marked("echo `git a` <(git b)") if sub],
+          ["git a", "git b"])
+    exact("a substitution inside double quotes, never inside single quotes",
+          [t for t, _, sub in marked("echo \"$(git a)\" '$(git b)'") if sub], ["git a"])
+    exact("an arithmetic expansion is no substitution", marked("echo $((1+2))"), [("echo $((1+2))", 0, False)])
+    exact("words keep a substitution whole", [s.words for s in sl.steps("git commit -m \"$(echo a b)\"", str(main), B)][-1],
+          ("git", "commit", "-m", "$(echo a b)"))
+    msg = "git commit -m \"$(cat <<'EOF'\nsay \"hi\" (and ') too\nEOF\n)\" && echo z"
+    exact("a heredoc in a substitution: its body is the cat's, its quotes and brackets end nothing",
+          [(s.text, s.heredocs) for s in sl.steps(msg, str(main), B)][::2],
+          [("cat <<'EOF'", ("say \"hi\" (and ') too\n",)), ("echo z", ())])
+    check("a substitution's cd stays in its subshell", dirs_of(f"echo $(cd {W} && dotnet build); dotnet test", main, B),
+          [wt, main])
+    check("eval runs in THIS shell: its cd persists", dirs_of(f'eval "cd {W}"; dotnet build', main, B), [wt])
+    check("a timeout-run bash -c payload runs in a child",
+          dirs_of(f"timeout 60 bash -c 'cd {W} && dotnet build'; dotnet test", main, B), [wt, main])
+    check("a pipe into bash: echo's words are its script",
+          dirs_of(f"echo 'cd {W} && dotnet build' | bash; dotnet test", main, B), [wt, main])
+    check("a here-string fed to bash is its script", dirs_of(f'bash <<< "cd {W} && dotnet build"', main, B), [wt])
+    check("a pipe from a file is unknown, so bash is just a command", dirs_of("cat x.sh | bash", main, B, "bash"), [main])
+    check("cmd /c: `cd /d` moves, `&` runs the next command",
+          dirs_of(f'cmd /c "cd /d {W} & dotnet build"; dotnet test', main, B), [wt, main])
+    check("cmd /c: a bare cd prints, it does not go home", dirs_of('cmd /c "cd & dotnet build"', main, B), [main])
+    if os.name == "nt":
+        other = "Z:" if not str(main).upper().startswith("Z:") else "Y:"
+        check("cmd /c: a cd to another drive without /d leaves the current directory",
+              dirs_of(f'cmd /c "cd {other}/x & dotnet build"', main, B), [main])
+    check("powershell: a script block's command runs where the shell is",
+          dirs_of(f"Set-Location {Wn}; Get-ChildItem | ForEach-Object {{ dotnet build }}", main, P), [wt])
+    check("powershell: a subexpression that moves leaves the location undetermined",
+          dirs_of(f"$(Set-Location {Wn}); dotnet build", main, P), [None])
+    check("powershell: Invoke-Expression runs in this runspace",
+          dirs_of(f"Invoke-Expression 'Set-Location {Wn}'; dotnet build", main, P), [wt])
+    check("powershell: a literal string piped into iex", dirs_of(f"'Set-Location {Wn}; dotnet build' | iex", main, P), [wt])
+    check("powershell: an expression assigned is no path", dirs_of("$d = (Get-Location); Set-Location $d; dotnet build",
+                                                                   main, P), [None])
+    exact("powershell: a here-string is one word, its content", sl.steps("Write-Output @'\nline\n'@", str(main), P)[0].words,
+          ("Write-Output", "line"))
+
 for f in fails:
     print("FAIL:", f)
 print(f"shell_location self-test: {total - len(fails)}/{total} " + ("GREEN" if not fails else "RED"))

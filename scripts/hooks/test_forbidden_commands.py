@@ -4,6 +4,7 @@
 A guard hook is a gate, and a gate is only trusted once its failure branch has fired (feedback: prove the watchdog
 fails). Run: python scripts/hooks/test_forbidden_commands.py   (every gate and CI run it through scripts/self_tests.py.)
 """
+import base64
 import json
 import os
 import pathlib
@@ -159,6 +160,41 @@ CASES = [
     ("sh <<'EOF'" + NL + 'dotnet test x.csproj --filter "~Foo" > log.txt' + NL + "EOF", True),
     ("pwsh -NoProfile -Command - <<'EOF'" + NL + "git stash" + NL + "EOF", True),
     ("bash run.sh <<'EOF'" + NL + "git stash" + NL + "EOF", False),   # stdin of a script is that script's data
+    # the branch review of PB3198, R1-1: a command substitution is a command line, in a word or inside double quotes
+    ("x=$(git stash)", True),
+    ("echo `git stash`", True),
+    ('echo "$(git stash)"', True),
+    ("cat <(git stash)", True),
+    ("x=$(git stash list)", False),
+    ("r=$(git push origin HEAD:main 2>&1)", True),
+    ('r=$(dotnet test x.csproj --filter "~Foo")', True),
+    ("git commit -m \"$(cat <<'EOF'" + NL + "fix a" + BS + "nb" + NL + "EOF" + NL + ')"', True),   # the commit shape
+    ("git commit -m \"$(cat <<'EOF'" + NL + "fix a" + NL + "EOF" + NL + ')"', False),
+    # a quote or a bracket in the body never ends the substitution, so the command after it is still read
+    ("git commit -m \"$(cat <<'EOF'" + NL + 'say "hi" (and \') too' + NL + "EOF" + NL + ')" && git stash', True),
+    ("git commit -m \"$(cat <<'EOF'" + NL + 'say "hi" (and \') too' + NL + "EOF" + NL + ')" && git status', False),
+    ("dotnet test x.csproj > t.log 2>&1; echo \"EXIT=$? $(date)\"", False),   # a substitution is its echo's own
+    ('dotnet test x.csproj --filter "FullyQualifiedName~X" | tail $(echo -5)', False),   # the reader is still tail
+    # R1-2: every other way a shell is handed a command line as a string or through stdin
+    ('eval "git stash"', True),
+    ('eval "git stash list"', False),
+    ('cmd /c "git stash"', True),
+    ('cmd //c "git push origin main"', True),
+    ('cmd /c "cd /d E:/COBOL & git push origin main"', True),
+    ('cmd /c "cd /d E:/claude-skills & git push origin main"', False),      # another repository, read as cmd.exe does
+    ("echo 'git stash' | bash", True),
+    ("printf 'git stash" + BS + "n' | sh", True),
+    ("cat <<EOF | bash" + NL + "git stash" + NL + "EOF", True),
+    ("echo 'git stash' | grep stash", False),                              # piped into a reader, not a shell
+    ("cat run.sh | bash", False),                                          # what a file holds is not this line's
+    ('bash <<< "git stash"', True),
+    ('grep x <<< "git stash"', False),
+    ("timeout 5 bash -c 'git stash'", True),                               # behind a command that runs another
+    ("env A=1 sh -c 'git stash'", True),
+    ("xargs -n1 sh -c 'git stash' < x.txt", True),
+    ("wsl -d Ubuntu -e bash -lc 'git stash'", True),
+    ("bash -euc 'git stash'", True),                                       # `-c` among single-letter options
+    ("bash -C run.sh", False),                                             # `-C` is noclobber, not a payload
 ]
 
 
@@ -174,6 +210,23 @@ PS_CASES = [
     ("Set-Location E:/x; & pwsh -File y.ps1", False),                    # `&` that starts a command is the call operator
     ("& git stash pop", True),                                           # the call operator before git (PB3198)
     ("git commit -m 'never git stash'", False),
+    # the branch review of PB3198: PowerShell's subexpressions, expressions and script blocks are command lines
+    ("echo $(git stash)", True),
+    ('Write-Output "x $(git stash)"', True),
+    ("Write-Output (git stash)", True),
+    ("Get-ChildItem | ForEach-Object { git stash }", True),
+    ("if ($x) { git stash }", True),
+    ("$m = (git log -1 --format=%s)", False),
+    ("Write-Output 'git stash'", False),
+    # and every interpreter handed a string
+    ('Invoke-Expression "git stash"', True),
+    ("iex 'git stash'", True),
+    ("'git stash' | Invoke-Expression", True),
+    ("'git stash' | Write-Output", False),
+    ("& pwsh -NoProfile -c 'git stash'", True),
+    ('cmd /c "git stash"', True),
+    ("pwsh -EncodedCommand " + base64.b64encode("git stash".encode("utf-16-le")).decode(), True),
+    ("pwsh -EncodedCommand " + base64.b64encode("git status".encode("utf-16-le")).decode(), False),
 ]
 
 
@@ -216,6 +269,10 @@ UNIT_CASES = [
      + "git commit -q -F ../m.txt", False),                                    # the word inside the heredoc BODY is text
     (QS + "git push", True),                                                   # a quoted `<<` hides nothing (PB3198)
     ("git commit -q -m 'x' && xargs -n1 git push origin < refs.txt", True),    # git wherever it stands in the step
+    # the branch review of PB3198, R1-1: a push inside a command substitution is a push
+    ("out=$(git -C /e/claude-skills push origin main 2>&1)", True),
+    ("out=$(git push -q origin HEAD:main 2>&1)", True),
+    ("echo `git push`", True),
 ]
 
 fails =[(c, e) for c, e in CASES if blocked(c) != e]

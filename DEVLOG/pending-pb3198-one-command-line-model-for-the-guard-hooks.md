@@ -47,3 +47,23 @@ planner could not see the model the note's target needs. Wave 1101's ledger entr
 each rule re-derived from its docstring, keeping the old regexes' corner cases (relative `cd`, submodules,
 `git log --grep=push`, quoted messages). A doubtful parse grants nothing in `worktree_rm_allow` and blocks in
 `forbidden_commands`. Duplication: `_shell_named` and `git_calls` share `program()`, and `-C` is parsed in one place.
+
+**Branch review round 1 (wave 1101 review finisher).** The reviewer found that the move onto one model made the rules
+fail OPEN wherever the model did not walk a command line the base's raw-text scan had seen. R1-1: a command
+substitution. `x=$(git stash)`, `` echo `git stash` ``, `out=$(git push -q origin HEAD:main 2>&1)` in a unit,
+`r=$(dotnet test --filter "~Foo")`, PowerShell's `echo $(git stash)`, and the repository's own commit shape `git commit
+-m "$(cat <<'EOF' … EOF)"` (rule 3 never saw that body) all exited 0. R1-2: an interpreter handed a string or a pipe,
+as in `eval "…"`, `cmd /c "…"`, `echo '…' | bash` and `cat <<EOF | bash`. Re-probed on this branch: all of them passed.
+The fix is in the model, not in the rules. The scanner now reads a substitution (Bash `$( … )`, a backquote, `<( … )`,
+`>( … )`; PowerShell `$( … )`, `@( … )`, a `( … )` expression, a `{ … }` script block) by scanning its inside with
+itself, so a quote, a bracket or a heredoc body inside it never ends it early. Its steps come before their command,
+one level down, marked `Step.substitution`. One `_interpreter` replaces `_shell_child` and walks every interpreter: `-c`
+in any single-letter cluster (`-euc`; Bash's `-C` is noclobber), pwsh `-Command`/`-cwa`/`-EncodedCommand` (decoded),
+`cmd /c|/k|//c` (a third shell, cmd.exe: `&`, `^`, `cd /d`, and a cross-drive `cd` that does not move), Bash `eval`
+and PowerShell `Invoke-Expression` (run in THIS shell, so a `cd` persists). These are also found behind
+`timeout`/`env`/`xargs`/`wsl -e`/`&`. A shell reading its script from stdin now reads it from a heredoc, from a
+here-string (the lead the round-0 report filed) or from the pipeline stage before it when the line spells that stage's
+output (`echo`, `printf`, `Write-Output`, `cat` of a heredoc, a PowerShell literal). Rule 5 counts a substitution as
+part of its command (`echo "EXIT=$? $(date)"` stays a capture), and rule 4 reads the pipe's reader past one.
+`resolve` treats `%X%` and a PowerShell expression as undetermined. Tests: `test_forbidden_commands.py` 160 → 210 (32
+of the new cases fail on the reviewed head abc57f110), `test_shell_location.py` 99 → 120.
