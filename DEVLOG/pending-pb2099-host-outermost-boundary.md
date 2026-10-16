@@ -373,3 +373,15 @@ CONFORMANCE.md §7 rows DOC-A.1-141 and DOC-A.1-167 did not name in `Pinned by` 
 *.g.cs`, written by the guard leg in the same Linux clone); it now skips `*.g.cs`, the ABI's own home. Leg 1 on
 Windows held none of the three: IC207A and the register audit are leg 2 with no impact map, and the NIST output
 exists only where the guard leg ran.
+
+**Review of the finisher's head (82b288267), finding R1-1, and the merge with main (w1098a).** The review found that
+design §4.3 promised the two-description alias refusal "before anything is landed", while the entry ran each
+`HostLanding.RequireDistinct` inside the landing loop, after every earlier formal had been landed: H1ALIAS called
+with `ref big, ref b, ref big, ref i` and `big = 123456` refused LK-A's value (`ArgumentOutOfRangeException`) and never
+reported the alias. The code now matches the design: `EmitCallBody` decides every formal pair first (a pair of one
+description becomes the landing's `Unsafe.AreSame(…) ? <cell> :` arm, a pair of two descriptions its own
+`RequireDistinct` statement, all emitted before the first landing), then lands the formals. HostEntryTests' H1ALIAS run
+gains the line `FIRST ArgumentException LK_C`. The merge with main 32f372674 took main's PB3101 change: the alias test
+asks `OoConformance.SignatureDifference` (the deleted `DescriptionMismatch` was its only caller here); DOC-A.1-141 and
+DOC-A.1-13 combine both sides; the runtime ABI pin keeps main's major 6 and re-pins the surface hash alone, the merged
+Shipped surface differing from main's only by the nullable `callerPath` annotation.
