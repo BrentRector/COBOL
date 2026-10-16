@@ -1,0 +1,4 @@
+## Entry 2065 — 2026-10-16 05:27 PDT — Enqueue leads filed: the reserved-word reference cascade (PB3248) and a second citation defect on PB774
+
+Filed from the PB656 implementer's report (`w1084b-PB656-report.md`, "New defects"). PB3248 is a new defect note (`process_only`, cluster PB655): `DISPLAY RECEIVE.` raises COBOLNET0901 and then a spurious `COBOL0001: unexpected '.'`, one reserved-word reference producing two diagnostics. The second lead, the COBOLNET0901 message citing "ISO §8.9" at 85/2002/2014 where the flag's source is GnuCOBOL's list, concerns the same member (`UserWordViolationMessage`) that the open PB774 already covers for its other citation fault, so PB774 was extended with a section instead of a duplicate note; PB3249 was left unused. Notes only, no code change.
+
