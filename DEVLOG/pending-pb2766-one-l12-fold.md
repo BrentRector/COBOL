@@ -36,3 +36,7 @@ runtime library).
 **Sweep.** The L12 character set now appears only in `LocaleFacts`. The format-2 de-edit stays ordinal, because
 §14.6.13.2 r4 admits only "a possible result" of the edit, and the edit's output is already folded. The
 `MatchAt` in `CobolIntrinsics.Text.cs` is the unrelated SUBSTITUTE matcher. No inventory row was claimed or closed.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN ===` (run 20261016T191720Z-f3af96;
+Conformance 6,136/11,840 · Unit 33,371/33,779 · Characterization 5/36 in leg 1). The new golden and the three new
+unit tests passed in leg 1.
