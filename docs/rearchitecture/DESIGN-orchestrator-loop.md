@@ -643,6 +643,15 @@ D5), because it changes the landing contract.
 - **Weekly estimate** = anchor weekly % + points since the anchor.
 - **Allowance** = day N × 14.3 % (day 1 starts at the account's weekly reset), plus `--borrow-days` days the owner
   allowed, capped at the weekly cap (`weekly_cap_pct`, 97 by the owner's 2026-10-07 instruction, kb/Work R69 §6).
+- **The quota in force** is `Account.quota_at(now)`: the shared quota, the account row's `quota` keys, then each of
+  the row's `quota_overrides` whose window holds `now` (`from` <= now < `until`). An override is the owner's dated
+  special case: it carries the keys it sets and `_source`, the owner's words. `account.py` refuses an entry with no
+  source, no quota key, an unknown key or a time without a zone. It lapses by itself at its `until`, so taking it
+  back needs no second change. Every reader of the quota asks `quota_at`: the supervisor's budget check, the wave
+  planner's headroom (`plan_wave.py --from-budget`) and a unit's own `budget.py` call. So an override lands once
+  and governs them all at their next call, with no loop restart and no argument threaded through the prompts
+  (kb/Work PB3305). `-BorrowDays` and `-OverrideHold` stay per-run arguments, but neither lifts the cap: a
+  `stop-week` ends the loop under both.
 - **Session estimate** = the anchor's session % (when its `session_reset` is still in the future) plus points since
   the anchor × `session_pct_per_weekly_pct`; after the reset it starts from 0 at the reset.
 - **Decision**: `stop-week` when weekly ≥ the cap; `hold-day` when weekly ≥ the allowance; `hold-session` when the
