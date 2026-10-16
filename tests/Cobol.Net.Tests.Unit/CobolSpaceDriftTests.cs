@@ -24,9 +24,8 @@ public sealed class CobolSpaceDriftTests
     /// <summary>Every stage that reads source text as separated words or as lines: all of the preprocessor but the CCVS
     /// placeholder rewriter (<c>NistPreprocessor</c>, a dialect text substitution over the fixed CCVS archive), the
     /// directive-line parse and operand catalog every directive stage shares, and the pipeline driver that classifies
-    /// lines when it locates an END-PERFORM. <c>LiteralScanDriftTests</c> guards the same stages for the literal and
-    /// comment-indicator reading (kb/Work PB2621).</summary>
-    internal static IEnumerable<string> StageFiles()
+    /// lines when it locates an END-PERFORM.</summary>
+    private static IEnumerable<string> StageFiles()
     {
         foreach (string f in Directory.EnumerateFiles(TestRepo.Src("Cobol.Net.Frontend", "Preprocessor"), "*.cs"))
             if (Path.GetFileName(f) != "NistPreprocessor.cs") yield return f;
@@ -35,8 +34,7 @@ public sealed class CobolSpaceDriftTests
         yield return TestRepo.Src("Cobol.Net.Editions", "CompilerDirectiveCatalog.cs");
     }
 
-    /// <summary>The lines of <paramref name="file"/> that are code — every line but a <c>//</c> or <c>///</c> comment.</summary>
-    internal static IEnumerable<(string File, int Line, string Text)> CodeLines(string file)
+    private static IEnumerable<(string File, int Line, string Text)> CodeLines(string file)
     {
         string[] lines = File.ReadAllLines(file);
         for (int i = 0; i < lines.Length; i++)

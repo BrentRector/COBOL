@@ -27,9 +27,11 @@ text-word never starts right after a word character (a character-string runs unt
 `&`).
 
 **Tests.** `CobolSourceTextTests` pins each member against the rules (expected values read from §8.3.5 5),
-§8.3.3.2.3 3), §6.2.3.1); `LiteralScanDriftTests` (tree sweep) refuses a text stage — the stages
-`CobolSpaceDriftTests` guards, whose `StageFiles` / `CodeLines` it shares — that spells the comment indicator, the
-quotation-symbol pair or a doubled-quotation test. Three stages outside this wave's declared file set still carry their
+§8.3.3.2.3 3), §6.2.3.1); `LiteralScanDriftTests` refuses a stage that reads program text before the lexer (all of
+`Preprocessor/`, the directive-line parse, the END-PERFORM locator in `Frontend.cs`) and spells the comment indicator,
+the quotation-symbol pair or a doubled-quotation test. Its first gate was RED on `HostWitnessTraitDriftTests`: it
+carried `[Trait("Sweep", "tree")]` while scanning no tree, so the trait came off and the test names its own scope,
+which `drift_rules.py` now lists as a specific rule of each stage file. Three stages outside this wave's declared file set still carry their
 own spelling (`CobolWordsDirectiveProcessor.Tokenize` / `ReadQuoted`, `ConditionalCompilationProcessor.FindRangeWord`,
 the END-PERFORM locator in `Frontend.cs`); a `PendingStages` list that may only shrink holds them, and the follow-up is
 reported as a lead.
