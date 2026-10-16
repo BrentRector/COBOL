@@ -301,11 +301,6 @@ public sealed class DerivedVerdictDriftTests
             "FLOAT-BINARY-128 and the standard decimal floating-point usages are not provided (CONFORMANCE.md §2 "
             + "rows 13, 17, 19; kb/Work R43)");
 
-    [Fact]
-    public void NoRecordKeySourceFormRow_Diverges() =>
-        AssertHeldAtTheDerivedVerdict("record-key-source-only",
-            "the record-key SOURCE form, Annex A.3 item 40, is Not claimed (CONFORMANCE.md §2 row 40; kb/Work R43)");
-
     /// <summary>The one selector that is NOT a module decline: an owner ADJUDICATION common to a whole class of
     /// rows. It also drifts by a route none of the others can — a new §7 determination — and that is deliberate:
     /// writing "Not provided." into §7 for an optional item turns this red until the batch is re-run, which is
@@ -615,23 +610,6 @@ public sealed class DerivedVerdictDriftTests
         // One row, one determination: these two are standard-binary-only's.
         Assert.DoesNotContain("AR-15.43.3-3", ids);
         Assert.DoesNotContain("AR-15.58.3-3", ids);
-    }
-
-    [Fact]
-    public void TheRecordKeySourceSelector_IsStillSharp()
-    {
-        var (ids, _) = Select("record-key-source-only");
-        Assert.InRange(ids.Count, 3, 10);   // 5 when it landed (kb/Work R43)
-        foreach (string id in (string[])["SR-12.4.5.6.3-6", "GR-12.4.5.6.4-2", "SR-12.4.5.12.3-5",
-                                         "GR-12.4.5.12.4-2", "SR-14.9.41.3-7"])
-            Assert.Contains(id, ids);
-        // "data-name-1 or record-key-name-1" constrains the plain key too — each arm's own exclusion.
-        Assert.DoesNotContain("GR-12.4.5.6.4-6", ids);
-        Assert.DoesNotContain("SR-14.9.41.3-6", ids);
-        Assert.DoesNotContain("GR-12.4.5.12.4-4", ids);
-        // Each general format prints both key forms.
-        Assert.DoesNotContain("FMT-12.4.5.12.2", ids);
-        Assert.DoesNotContain("FMT-12.4.5.6.2", ids);
     }
 
     [Fact]

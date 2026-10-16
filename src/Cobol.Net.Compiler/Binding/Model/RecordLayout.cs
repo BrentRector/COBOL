@@ -374,8 +374,8 @@ internal static class RecordLayout
     /// PB698 transcription repair returned them to their printed level).
     /// <para>b) 1. also requires the key to be <i>"defined without the SOURCE phrase"</i>: a SOURCE-form key
     /// (kb/Work PB1099) has no data item of its own to coincide with, and <see cref="KeyIndexAtOffset"/> passes
-    /// over it — the same exclusion READ's §14.9.30.3 SR11 and START's SR6 a) get, since a SOURCE-form key is named
-    /// only by its record-key-name (SR7).</para></summary>
+    /// over it — the same exclusion START's §14.9.41.3 SR6 a) and READ's §14.9.30.3 SR11 get, since a SOURCE-form
+    /// key is named only by its record-key-name (§14.9.41.3 SR7).</para></summary>
     public static int? GenericKeyIndex(FileModel file, DataItem operand)
     {
         if (!IsInRecordOfFile(file, operand) || OffsetOf(operand) is not { } off) return null;   // b) 1.

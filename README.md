@@ -201,8 +201,8 @@ item, and a unit test (`ReadmeDeclinedSummaryDriftTests`) fails when this list a
   floating-point usages (A.3 items 19 and 20–21) have no conforming .NET type and are refused (COBOLNET1564); the
   FLOAT-DECIMAL clause (A.3 item 13) compiles with a warning (COBOLNET2424).
 - CONTINUE AFTER (A.3 item 8) suspends execution for whole seconds: a fractional interval truncates.
-- The RECORD DELIMITER clause (A.3 item 26) compiles with a warning (COBOLNET1778), and the SOURCE phrase of a record
-  key (A.3 item 40) is refused (COBOLNET1954).
+- The RECORD DELIMITER clause (A.3 item 26) compiles with a warning (COBOLNET1778). The SOURCE phrase of a record
+  key (A.3 item 40) is provided from COBOL-2002: the key is the concatenation of its operands.
 - No reel or unit device backs the CLOSE and OPEN phrases that name one (A.3 items 28–30 and 33–34): they are accepted,
   act as on a file that is not on a unit, and report I-O status '07'.
 - CODE-SET (A.3 item 27) converts the identity code sets and EBCDIC; an alphabet no device encodes (a literal-phrase
