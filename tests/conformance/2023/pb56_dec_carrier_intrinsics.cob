@@ -3,8 +3,8 @@
       *> expression": every line below derives from the function's own EAE evaluated on the SDIDI
       *> (§8.8.1.5.2), with NO argument quantization — the interim landing truncated Dec operands at
       *> working scale 6, so SIGN(A9 − 0) of a 1e-9 operand returned 0 where §15.81.4 r1a says +1.
-      *> Derivations: SIGN(1e-9)=+1 · MAX(1e-9, 0)=1e-9 · MOD(7e9·1e-9, 3e9·1e-9)=1 (§15.64.3 r1
-      *> integers; §15.64.4 r1: 7 − 3·INTEGER(7/3) = 1; landed at scale 6 both were 0) · MEDIAN(2e-9 4e-9 9e-9)=4e-9 · VARIANCE(1 2 3)=2/3
+      *> Derivations: SIGN(1e-9)=+1 · MAX(1e-9, 0)=1e-9 · MOD(1e-9·10^40, 7)=3 (§15.64.3 r1
+      *> integers; §15.64.4 r1: 10^31 − 7·INTEGER(10^31/7) = 3; quantized at scale 9 it needs 40 digits, past Int128) · MEDIAN(2e-9 4e-9 9e-9)=4e-9 · VARIANCE(1 2 3)=2/3
       *> (VARIANCE, §15.98.4: ((1−2)²+0+1)/3), stored truncating into 9V9(5) → 0.66666 · ANNUITY(0, 4)=1/4
       *> (§15.9.4 r1 rate-zero arm) · PRESENT-VALUE(1, 8 8)=8/2+8/4=6 (§15.74.4 r1) ·
       *> STANDARD-DEVIATION(2 2 2)=√0=0. The four financial/statistical functions were COBOLNET0899-
@@ -32,7 +32,7 @@
            DISPLAY "SG=" SG
            COMPUTE E9 = FUNCTION MAX(A9 - 0, 0)
            DISPLAY "MX=" E9
-           COMPUTE EM = FUNCTION MOD(A9 * 7000000000, A9 * 3000000000)
+           COMPUTE EM = FUNCTION MOD(A9 * 10 ** 40, 7)
            DISPLAY "MO=" EM
            COMPUTE ED = FUNCTION MEDIAN(A9 * 2, A9 * 4, A9 * 9)
            DISPLAY "ME=" ED
