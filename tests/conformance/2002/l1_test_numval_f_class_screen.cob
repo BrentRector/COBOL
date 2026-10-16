@@ -7,7 +7,9 @@
       *> THE RULE NAMES A CLASS, AND §8.5.2.1 TABLE 2 IS WHAT SAYS WHICH CATEGORIES REACH IT. Class
       *> ALPHANUMERIC covers categories alphanumeric, alphanumeric-edited and — the row easiest to read the
       *> wrong way — NUMERIC-EDITED with usage display. Class NATIONAL covers national and national-edited.
-      *> A GROUP item takes its class from its own kind and is class alphanumeric. Class ALPHABETIC is a
+      *> A GROUP item takes its class from its own kind (§8.5.2.1): an alphanumeric group (GRP below: no
+      *> GROUP-USAGE clause, not strongly typed, §13.18.29.4 GR3) has class alphanumeric, a bit group
+      *> boolean, a national group national. Class ALPHABETIC is a
       *> DISTINCT class with its own Table 2 row ("Alphabetic | Alphabetic") and r1 does not name it, which
       *> is the reject side: conformance:negative/l1-test-numval-f-alphabetic-item. Class NUMERIC is the
       *> other exclusion: conformance:negative/l1-test-numval-f-numeric-item.
