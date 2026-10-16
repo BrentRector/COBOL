@@ -1,17 +1,18 @@
       *> ISO §14.9.49.4 GR5: "Within a given procedure division, a USE
       *> statement specifying file-name-1 takes precedence over any USE
       *> statements specifying an INPUT, OUTPUT, I-O, or EXTEND phrase."
-      *> GR3: "The first declarative that satisfies the selection criteria
-      *> is executed and no other declaratives are executed", with a)
-      *> (file-name-1 specified) examined before b) (not specified); and
-      *> GR6 b) runs an INPUT procedure for a file opened in the input
-      *> mode "except those files referenced by file-name-1 in another USE
-      *> statement specifying the same condition".
-      *> The two declaratives are written MODE FIRST, FILE SECOND, so a
-      *> selection by source order would run the mode one; the rule's
-      *> precedence is by tier, not by order.
+      *> GR3: "The first declarative that satisfies the selection
+      *> criteria is executed and no other declaratives are executed",
+      *> with a) (file-name-1 specified) examined before b) (not
+      *> specified); and GR6 b) runs an INPUT procedure for a file
+      *> opened in the input mode "except those files referenced by
+      *> file-name-1 in another USE statement specifying the same
+      *> condition". The two declaratives are written MODE FIRST, FILE
+      *> SECOND, so a selection by source order would run the mode one;
+      *> the rule's precedence is by tier, not by order.
       *>   F2  absent, opened INPUT, no file-scoped USE names it: the
-      *>       INPUT procedure runs (the control - the mode arm is live).
+      *>       INPUT procedure runs (the control - the mode arm is
+      *>       live).
       *>   F1  absent, opened INPUT, named by the file-scoped USE: ONLY
       *>       the file procedure runs, although the INPUT one, written
       *>       first, also matches the mode.

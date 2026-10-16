@@ -11,7 +11,8 @@
       *>      1. "The file position indicator is set to the value of the
       *>         key of reference in the first logical record whose key
       *>         satisfies the comparison", or
-      *>      2. no record satisfies it: the invalid key condition exists.
+      *>      2. no record satisfies it: the invalid key condition
+      *>         exists.
       *> GR15: with the KEY phrase omitted the START behaves as KEY IS
       *> EQUAL TO the prime record key.
       *> FX holds prime keys AAA100, BBB200 and CCC300. Each START is
@@ -19,17 +20,18 @@
       *> position indicator names, so its key prints outright.
       *>   EQ   no KEY phrase, X-KEY = BBB200: GR15's EQUAL -> BBB200.
       *>   GT   KEY > BBB200: forward -> CCC300.
-      *>   LT   KEY < BBB999: REVERSE (d) -> BBB200, the LARGEST key below
-      *>        BBB999. A forward search would find AAA100 first, so this
-      *>        is the leg that tells d) from c).
-      *>   EQ3  KEY = BBB999 WITH LENGTH 3: both areas are truncated to 3
-      *>        characters (b, c), BBB = BBB -> BBB200; untruncated, no
-      *>        key equals BBB999 and the START would be '23'.
-      *>   NG3  KEY NOT GREATER CCA WITH LENGTH 3 (the area holds CCAZZZ):
-      *>        reverse over the truncated keys AAA, BBB, CCC; CCC > CCA,
-      *>        so the first satisfying key in reverse is BBB -> BBB200
-      *>        (forward would give AAA100).
-      *>   LT0  KEY < AAA000: nothing is below, e) 2. -> INVALID KEY, '23'.
+      *>   LT   KEY < BBB999: REVERSE (d) -> BBB200, the LARGEST key
+      *>        below BBB999. A forward search would find AAA100 first,
+      *>        so this is the leg that tells d) from c).
+      *>   EQ3  KEY = BBB999 WITH LENGTH 3: both areas are truncated to
+      *>        3 characters (b, c), BBB = BBB -> BBB200; untruncated,
+      *>        no key equals BBB999 and the START would be '23'.
+      *>   NG3  KEY NOT GREATER CCA WITH LENGTH 3 (the area holds
+      *>        CCAZZZ): reverse over the truncated keys AAA, BBB, CCC;
+      *>        CCC > CCA, so the first satisfying key in reverse is
+      *>        BBB -> BBB200 (forward would give AAA100).
+      *>   LT0  KEY < AAA000: nothing is below, e) 2. -> INVALID KEY,
+      *>        '23'.
       *> The WITH LENGTH phrase and the reverse operators are COBOL-2002
       *> introductions, so this golden runs at 2002.
        IDENTIFICATION DIVISION.

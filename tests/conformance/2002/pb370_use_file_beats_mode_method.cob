@@ -1,17 +1,19 @@
       *> ISO §14.9.49.4 GR5 inside a METHOD: "Within a given procedure
-      *> division, a USE statement specifying file-name-1 takes precedence
-      *> over any USE statements specifying an INPUT, OUTPUT, I-O, or
-      *> EXTEND phrase." A method definition's procedure division is one
-      *> such procedure division: §14.2.2 SR10 admits the DECLARATIVES
-      *> format in "a method definition", and GR4 a) selects the
-      *> declaratives of the element containing the failing statement.
-      *> The twin of conformance:85/pb370_use_file_beats_mode, run where
-      *> the declaratives sit in a method over the object's files (OO is a
-      *> COBOL-2002 introduction). The mode declarative is written FIRST.
+      *> division, a USE statement specifying file-name-1 takes
+      *> precedence over any USE statements specifying an INPUT, OUTPUT,
+      *> I-O, or EXTEND phrase." A method definition's procedure
+      *> division is one such procedure division: §14.2.2 SR10 admits
+      *> the DECLARATIVES format in "a method definition", and GR4 a)
+      *> selects the declaratives of the element containing the failing
+      *> statement. The twin of
+      *> conformance:85/pb370_use_file_beats_mode, run where the
+      *> declaratives sit in a method over the object's files (OO is a
+      *> COBOL-2002 introduction). The mode declarative is written
+      *> FIRST.
       *>   F2  absent, opened INPUT by the method, named by no file USE:
       *>       the INPUT procedure runs (the control).
-      *>   F1  absent, opened INPUT, named by the file USE: ONLY the file
-      *>       procedure runs.
+      *>   F1  absent, opened INPUT, named by the file USE: ONLY the
+      *>       file procedure runs.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB370UM.
        ENVIRONMENT DIVISION.

@@ -6,8 +6,8 @@
       *> The COMPLEMENT of start-reverse-operators-2002 (kb/Work PB370):
       *> that gate folds the written operator with the binder's own
       *> relational fold and refuses only the REVERSE results (< and <=)
-      *> below 2002. NOT LESS and NOT < fold to >=, a FORWARD search, and
-      *> are COBOL-85 (the NIST CCVS-85 programs write them), so at
+      *> below 2002. NOT LESS and NOT < fold to >=, a FORWARD search,
+      *> and are COBOL-85 (the NIST CCVS-85 programs write them), so at
       *> --std 85 they must still compile and search forward. A gate
       *> keyed on the word LESS, or on the presence of NOT, would refuse
       *> this program.

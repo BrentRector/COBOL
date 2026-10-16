@@ -1,7 +1,7 @@
       *> reject-at: 85
       *> ISO §14.9.41.4 GR9 b) / GR17 d): LESS, NOT GREATER and LESS OR
-      *> EQUAL in the START KEY phrase select a REVERSE search; §A.3 item
-      *> 39 binds them to READ ... PREVIOUS as one reverse-access
+      *> EQUAL in the START KEY phrase select a REVERSE search; §A.3
+      *> item 39 binds them to READ ... PREVIOUS as one reverse-access
       *> capability, a COBOL-2002 introduction
       *> (start-reverse-operators-2002, kb/Work PB370). COBOL-85's START
       *> searches forward only, so at --std 85 each reverse spelling

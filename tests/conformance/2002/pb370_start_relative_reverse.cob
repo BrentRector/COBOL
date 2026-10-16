@@ -23,9 +23,9 @@
       *> and GR25) makes the selected record available and moves its
       *> number into RK, so the file position indicator prints outright.
       *>   LT5  KEY < 5: searching in REVERSE, the first record whose
-      *>        number is < 5 is 4 - NOT 2, the lowest such number, which
-      *>        is what a forward search would find. This is the leg that
-      *>        tells b) from a).
+      *>        number is < 5 is 4 - NOT 2, the lowest such number,
+      *>        which is what a forward search would find. This is the
+      *>        leg that tells b) from a).
       *>   NG5  KEY NOT GREATER 5: the same reverse search, 4.
       *>   LE4  KEY LESS OR EQUAL 4: reverse, and 4 itself satisfies <=.
       *>   GT4  KEY > 4: forward (a), the first number above 4 is 6.

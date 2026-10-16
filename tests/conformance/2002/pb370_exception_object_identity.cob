@@ -1,22 +1,24 @@
       *> ISO §14.9.49.4 GR15: "Upon entry to the associated declarative,
       *> the predefined object reference EXCEPTION-OBJECT references the
       *> exception object." That is an IDENTITY claim, and §8.8.4.2.15
-      *> makes object-reference equality one: the relation is true "if the
-      *> object referenced by identifier-3 is the same object that is
-      *> referenced by identifier-4". So each leg compares the register
-      *> with the very object RAISEd AND with a second live instance of
-      *> the same class: a register set to SELF, to a fresh instance, to
-      *> the first object ever raised or to any other non-null object
-      *> fails one of the two comparisons (a NOT = NULL test, which
-      *> conformance:2002/oo_ec_raise_object makes, passes all of them).
+      *> makes object-reference equality one: the relation is true "if
+      *> the object referenced by identifier-3 is the same object that
+      *> is referenced by identifier-4". So each leg compares the
+      *> register with the very object RAISEd AND with a second live
+      *> instance of the same class: a register set to SELF, to a fresh
+      *> instance, to the first object ever raised or to any other
+      *> non-null object fails one of the two comparisons (a NOT = NULL
+      *> test, which conformance:2002/oo_ec_raise_object makes, passes
+      *> all of them).
       *>   P1  RAISE E1 in the program: EQ-E1 and NE-E2.
       *>   P2  RAISE E2 next: NE-E1 and EQ-E2 - the register follows the
       *>       raise, it is not latched by the first one.
       *>   M1  a METHOD's own declarative (§14.2.2 SR10 admits the
-      *>       DECLARATIVES format in a method definition): RAISE M1 in the
-      *>       method enters the method's USE, where EXCEPTION-OBJECT is M1
-      *>       and not M2. GR14 a) selects the object-class-name-1 arm (the
-      *>       raised object is an instance of PB370ER).
+      *>       DECLARATIVES format in a method definition): RAISE M1 in
+      *>       the method enters the method's USE, where
+      *>       EXCEPTION-OBJECT is M1 and not M2. GR14 a) selects the
+      *>       object-class-name-1 arm (the raised object is an instance
+      *>       of PB370ER).
       *> §14.6.13.1.5: "If execution of the declarative completes
       *> normally, execution continues with the statement following the
       *> RAISE statement."
