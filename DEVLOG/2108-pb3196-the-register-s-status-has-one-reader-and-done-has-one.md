@@ -1,4 +1,4 @@
-## PB3196: the register's status has one reader and DONE has one vocabulary
+## Entry 2108 — 2026-10-16 13:51 PDT — PB3196: the register's status has one reader and DONE has one vocabulary
 
 **What was wrong.** The R0 tools read a `kb/Work` note's `status` a second and third time, beside
 `work.parse_frontmatter` and `work.TERMINAL_STATUSES`. `scripts/arch/census.py` had its own regex and its own
@@ -44,3 +44,4 @@ tests to leg 2, so they were run by name on the gate's binaries: 13 of 13 passed
 `TheFrontmatterReader_AgreesWithTheFixtureAndWithPython`, `CensusSelfTest_DrivesEveryPolicyArm` and
 `EachFleetInstrument_PassesItsSelfTest(file_census_notes.py)`. With a wrong `terminal` planted in the fixture, the
 parity test fails.
+
