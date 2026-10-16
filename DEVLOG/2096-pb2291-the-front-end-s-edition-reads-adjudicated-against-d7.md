@@ -1,4 +1,4 @@
-## PB2291: the front end's edition reads adjudicated against D7, and the pin that computes them
+## Entry 2096 — 2026-10-16 11:09 PDT — PB2291: the front end's edition reads adjudicated against D7, and the pin that computes them
 
 kb/Work PB2291 (wave 1092 E, the PB1754 cluster) asked, of every place the front end reads the compile edition,
 whether it decides ISO §8.9 word status (sanctioned: the superset parse depends on it) or refuses a construct by
@@ -95,3 +95,4 @@ verdict: (a) word status for the arms led by a §8.9 user word below 2002 (DEFAU
 VAL-STATUS, VALID); (b) a recorded D7 construct gate for CLASS, DESTINATION, INVALID and VARYING (reserved at all four
 editions, re-measured in `reserved-words.json`) and for APPLY COMMIT (APPLY is §8.10 context-sensitive, a keyword only
 in the I-O-CONTROL paragraph). The hook-in comment further down now names all four (b) words.
+
