@@ -879,16 +879,22 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// </summary>
     /// <remarks>
     /// <para>§15.3 type 6: "An arithmetic expression that will always result in an integer value or an integer data item
-    /// shall be specified." Strict conformance refuses any other operand there (COBOLNET1627, kb/Work PB248), so only
-    /// <c>--permissive</c> brings a floating-point item, an SDIDI-carried literal or a fixed-point item with fraction
-    /// digits to such a position — and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means: an integer when its
-    /// value has no nonzero fraction digit, otherwise EC-ARGUMENT-FUNCTION with checking on and the TRUNCATED integer
-    /// with it off. That is a property of the POSITION, so it is taken here, ONCE, before any arm or lane predicate
-    /// sees the operand, on every carrier through the ONE type-6 intake at the total width (<see cref="IntegerIntake"/>),
-    /// which keeps the operand's VALUE or says it cannot: every exact carrier's integer fits the <c>Int128</c> carrier
-    /// (an SDIDI holds 34 digits), and a binary64 one past it (±1.7e38) raises EC-ARGUMENT-FUNCTION as outside what
-    /// the implementation can represent (<c>CobolIntrinsics.IntegerArgWideReal</c>). A bounded body narrows the integer
-    /// again through <see cref="IntArg"/> and keeps its own range raise.</para>
+    /// shall be specified." Strict conformance refuses a data item or literal that is not one (COBOLNET1627, kb/Work
+    /// PB248) and fails open on an arithmetic expression it cannot prove non-integral, so an expression (<c>A9 * 7</c>,
+    /// <c>A ** 3</c>) brings a fractional or SDIDI-carried value to such a position in every mode, and
+    /// <c>--permissive</c> also a floating-point item or a fixed-point item with fraction digits — and
+    /// docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means: an integer when its value has no nonzero fraction
+    /// digit, otherwise EC-ARGUMENT-FUNCTION with checking on and the TRUNCATED integer with it off. That is a
+    /// property of the POSITION, so it is taken here, ONCE, before any arm or lane predicate sees the operand, on every
+    /// carrier, keeping the operand's VALUE or saying it cannot. An SDIDI operand STAYS on the SDIDI
+    /// (<c>CobolIntrinsics.IntegerArgUnboundedDec</c>): it holds 34 significant digits at ANY exponent, so its integer
+    /// reaches far past <c>Int128</c> — MOD(10 ** 40, 3) (kb/Work PB2630) and MOD(A ** 3, B) of a 15-digit A
+    /// (kb/Work PB69) are integers the SDIDI body evaluates, and landing them on <c>Int128</c> was EC-SIZE-OVERFLOW
+    /// (the PB651 finisher's Linux-gate red). A fixed-point operand's integer fits the <c>Int128</c> carrier its
+    /// unscaled value already rides, and a binary64 one takes the ONE type-6 intake at the total width
+    /// (<see cref="IntegerIntake"/>), past ±1.7e38 raising EC-ARGUMENT-FUNCTION as outside what the implementation
+    /// can represent (<c>CobolIntrinsics.IntegerArgWideReal</c>). A bounded body narrows the integer again through
+    /// <see cref="IntArg"/> and keeps its own range raise.</para>
     /// <para>⛔ IT NEVER SATURATES (kb/Work PB651 review R1-2). Clamping a binary64 past the carrier to
     /// <see cref="Int128.MaxValue"/> answers for a DIFFERENT integer, so every function whose value depends on its
     /// argument's value answered silently wrong — MOD(1.0E39, 7) = 1 where the integer 10³⁹'s binary64 value answers
@@ -905,15 +911,17 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// type-10 (numeric) position, where §15.4.1's licence is an approximation of the equivalent arithmetic expression's
     /// own binary64 operand.</para>
     /// <para>INTAKE(EXACT) — the operand on its OWN carrier at its OWN scale, nothing rescaled, converted or truncated —
-    /// EXCEPT at a §15.3 type-6 position, where it is INTEGRAL: a float, an SDIDI or a fractional fixed-point operand
-    /// lands at scale 0 through the type-6 intake (an exact integer on any carrier passes as it stands), a float past
-    /// the Int128 carrier raising rather than changing its value.</para>
+    /// EXCEPT at a §15.3 type-6 position, where it is INTEGRAL: an SDIDI operand becomes its integer on the SDIDI, a
+    /// float or a fractional fixed-point operand lands at scale 0 through the type-6 intake (a scale-0 fixed-point
+    /// integer passes as it stands), a float past the Int128 carrier raising rather than changing its value.</para>
     /// </remarks>
     private NumX RawArg(BoundIntrinsicCall ic, int i)
     {
         NumX x = num.AsNum(ic.Args[i], num.Receiver);
         if (!(x.Real || x.Dec || x.Scale != 0) || !IntrinsicArgumentRules.IsIntegerPosition(ic.Sig.Name, i)) return x;
-        return new NumX(IntegerIntake(x, wide: true), 0);
+        return x.Dec
+            ? x with { Expr = RuntimeApi.IntegerArgUnboundedDec(x.Expr) }
+            : new NumX(IntegerIntake(x, wide: true), 0);
     }
 
     /// <summary>

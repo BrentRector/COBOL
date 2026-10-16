@@ -234,6 +234,17 @@ public static partial class CobolIntrinsics
     /// <summary>The SDIDI-operand intake for a TOTAL integer argument (see <see cref="IntegerArgWideScaled"/>).</summary>
     public static Int128 IntegerArgWideDec(CobolDec v) => IntegerValue(v);
 
+    /// <summary>The SDIDI operand at a §15.3 type-6 position as its integer ON THE SDIDI — the same integrality test
+    /// (<see cref="CobolDec.HasFraction"/>; with checking off the fraction truncates toward zero, DOC-A.1-124) and no
+    /// landing on any narrower carrier. An SDIDI holds 34 significant digits at ANY exponent, so its integer can lie far
+    /// past <c>Int128</c> (MOD(10 ** 40, 3), MOD(A ** 3, B) of a 15-digit A — kb/Work PB2630, PB69); landing it there
+    /// is EC-SIZE-OVERFLOW for a value the function's own SDIDI body evaluates exactly (kb/Work PB651 finisher).</summary>
+    public static CobolDec IntegerArgUnboundedDec(CobolDec v)
+    {
+        RequireIntegral(v.HasFraction, () => v.ToDouble().ToString("R", System.Globalization.CultureInfo.InvariantCulture));
+        return v.TruncateToInteger();
+    }
+
     /// <summary>The <see cref="IntegerArg(Int128)"/> twin for a FLOATING-POINT argument — a distinct NAME rather
     /// than an overload, deliberately: an integer literal converts implicitly to BOTH <c>Int128</c> and
     /// <c>double</c>, so an overload pair would make <c>FUNCTION FACTORIAL(5)</c> a CS0121 ambiguity. That exact

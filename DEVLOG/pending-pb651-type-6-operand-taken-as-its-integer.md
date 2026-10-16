@@ -64,3 +64,19 @@ appears at about forty other sites across the tree. Those sites predate this bra
 tree-wide sweep with a drift test. R1-2 is the clamp described above. The finisher's gate:
 `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261015T222413Z-d30b2a). semgrep verify
 PASS, no count rose.
+
+**Finisher (the landing's Linux gate, RED on 348b0926c).** All three reds were this branch's own; main had touched
+none of the files involved since the branch's base, and the leg-1 gate had run none of the cases. (1) The type-6
+intake landed an SDIDI operand on `Int128`, on the premise that "an SDIDI holds 34 digits". It holds 34
+SIGNIFICANT digits at any exponent, so MOD(10 ** 40, 3) (`2014/pb2630_integer_family_beyond_int128`) and
+MOD(A ** 3, B) of a 15-digit A (`2023/pb69_native_power_past_the_carrier`) became fatal EC-SIZE-OVERFLOW where the
+SDIDI body answers exactly. `RawArg` now keeps an SDIDI operand on the SDIDI as its integer
+(`CobolIntrinsics.IntegerArgUnboundedDec`: the same integrality test, then `CobolDec.TruncateToInteger`). (2)
+`2023/pb56_dec_carrier_intrinsics` computed MOD(7e-9, 3e-9) = 1e-9. That breaks §15.64.3 r1 ("Argument-1 and
+argument-2 shall be integers"), and under DOC-A.1-124 the answer is the truncated integers, which is what the branch
+now gives. The line now takes the integral SDIDI values 7 and 3, built from the same 1e-9 operand (MO=1.000000000).
+That still witnesses PB56's no-quantization property, because a scale-6 landing makes both 0. (3)
+`ExactCarrierBoundaryDriftTests.TheLiftPredicate_IsAskedNeverRestatedByTheIntrinsicRenderer` matched the call
+spelling `num.LiftRounds(`, and the branch passes the predicate as a method group. The test now accepts either
+form. (4) The 14 emitted-C# snapshots were re-recorded for runtime 5.0.0. The diff is exactly the two version lines
+per snapshot, the third recurrence of kb/Work PB3144.

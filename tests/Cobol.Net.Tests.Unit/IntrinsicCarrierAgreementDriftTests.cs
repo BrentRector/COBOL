@@ -498,11 +498,16 @@ public sealed class IntrinsicCarrierAgreementDriftTests
             // ... a digit PAST the ninth fraction digit is still a fraction (the exact value, never a truncated copy).
             Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgScaled(Int128.Parse("20000000000000001"), 16));
             Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgDec(new CobolDec(1, -50)));
+            Assert.Throws<CobolFatalException>(() => CobolIntrinsics.IntegerArgUnboundedDec(new CobolDec(35, -1)));
+            // The SDIDI integer the position keeps ON the SDIDI (IntrinsicRenderer.RawArg) is past Int128 and raises
+            // nothing even under checking: 10^40 is an integer (kb/Work PB2630's MOD(10 ** 40, 3)).
+            Assert.Equal(new CobolDec(1, 40), CobolIntrinsics.IntegerArgUnboundedDec(new CobolDec(1, 40)));
         });
         // ... and with checking off the truncated integer is the result the implementor defines.
         Assert.Equal(3, CobolIntrinsics.IntegerArgScaled(35, 1));
         Assert.Equal(2, CobolIntrinsics.IntegerArgReal(2.5));
         Assert.Equal(-3, CobolIntrinsics.IntegerArgScaled(-35, 1));
+        Assert.Equal(new CobolDec(-3, 0), CobolIntrinsics.IntegerArgUnboundedDec(new CobolDec(-35, -1)));
     }
 
     /// <summary>The behaviour the carrier exists for, asserted end to end on the runtime bodies: the three total

@@ -515,6 +515,12 @@ internal static class RuntimeApi
     public static string IntegerArgSaturatingReal(string value) =>
         $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgSaturatingReal)}({value})";
 
+    /// <summary>The §15.3 type-6 intake of an SDIDI operand that STAYS on the SDIDI — <c>CobolIntrinsics.IntegerArgUnboundedDec</c>:
+    /// the integrality test, then the integer as a <c>CobolDec</c>, never landed on <c>Int128</c> (an SDIDI integer
+    /// reaches far past it). Only <c>IntrinsicRenderer.RawArg</c> emits it (kb/Work PB651).</summary>
+    public static string IntegerArgUnboundedDec(string value) =>
+        $"{nameof(CobolIntrinsics)}.{nameof(CobolIntrinsics.IntegerArgUnboundedDec)}({value})";
+
     /// <summary>The §15.3 type-6 intake for a value on ONE of the operand carriers, keyed by carrier KIND — the ONE
     /// family of landings the renderer's bounded (<c>long</c>) and total (<c>Int128</c>) integer arguments share,
     /// so the integrality rule (kb/Work PB1526) is asked on every carrier and a new carrier is a compile error in

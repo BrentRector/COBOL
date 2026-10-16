@@ -834,9 +834,13 @@ type 6 admits "an integer data item or an always-integral arithmetic expression"
 neither), so it arrives only under `--permissive`, and docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means:
 the integer it holds, or the truncated integer with EC-ARGUMENT-FUNCTION checking off. That is a property of the
 POSITION, so `IntrinsicRenderer.RawArg` — the one indexed argument entry every intake and lane predicate reads —
-takes it there, before a lane is chosen, on every carrier through the shared wide intake, which keeps the VALUE or
-says it cannot: every exact carrier's integer fits `Int128`, and a float past it (±1.7e38, ±∞ included) raises
-EC-ARGUMENT-FUNCTION through `CobolIntrinsics.IntegerArgWideReal`. ⛔ The position intake never CLAMPS: a clamp
+takes it there, before a lane is chosen, on every carrier, keeping the VALUE or saying it cannot. An SDIDI operand
+STAYS on the SDIDI (`CobolIntrinsics.IntegerArgUnboundedDec`: the integrality test, then `CobolDec.TruncateToInteger`),
+because an SDIDI holds 34 significant digits at any exponent and its integer reaches far past `Int128` —
+MOD(10 ** 40, 3) and MOD(A ** 3, B) of a 15-digit A are integers the SDIDI body evaluates (kb/Work PB2630, PB69),
+and landing them on `Int128` was EC-SIZE-OVERFLOW. A fixed-point operand's integer fits the `Int128` its unscaled
+value rides, and a float past it (±1.7e38, ±∞ included) raises EC-ARGUMENT-FUNCTION through
+`CobolIntrinsics.IntegerArgWideReal`. ⛔ The position intake never CLAMPS: a clamp
 answers for a different integer, so `MOD(1.0E39, 7)` answered 1 where the operand's integer answers 5 (PB651 review
 R1-2). Clamping is right only where the function answers the same for every integer past a bound — TEST-DATE-YYYYMMDD
 / TEST-DAY-YYYYDDD argument-1 (the r1a catch-all) and FIND-STRING argument-3 (0 once every match is ignored) — and
