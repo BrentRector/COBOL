@@ -1414,7 +1414,9 @@ parse reads), and every lexer field the front end primes from one
 `ReservedNonDataNames(edition, …)`, `TokenRetypes.cs:47-51`). An EDITION READ is a member of `CobolParserCoreBase`, of a
 committed `CobolParserCore` partial or a parser grammar's `@members`, of the lexer grammar's `@members` and its
 partials, or of the retype stage (`TokenRetypes`, which primes the lexer and decides the re-lex) — a member of a
-type NESTED in one of these included, since a nested type reads its container's protected state through an instance —
+type NESTED in one of these included, since a nested type reads its container's protected state through an instance,
+and a member of a type in `src/` DERIVED from one of these (transitively, from the base lists), since a subclass reads
+the protected `Edition` getter and calls the protected reads through `this` —
 whose body reads edition state or calls another edition read, to a fixpoint; an edition-read SITE is any parser or
 lexer predicate `{…}?` or action `{…}` body, any lexer override (`NextToken`, `Emit`), any parser listener, any
 retype-stage member, or any front-end DRIVER member that hands edition state to a lexer or parser or decides a
@@ -1483,7 +1485,7 @@ token precedence with the import order; **the lexer stays one grammar**, its mod
 **Kept, each with its pin:** no left-edge semantic predicate in a lexer mode (`LexerDfaCacheDriftTests`); the edition
 reads are what the rule above computes — `EditionReadDriftTests` APPLIES the rule (it computes the members' fixpoint
 from the syntax of the parser superclass, its committed partials and parser `@members`, the lexer's `@members` and
-partials and the retype stage, nested types included, derives the primed lexer fields from the retype stage's setter
+partials and the retype stage, nested and derived types included, derives the primed lexer fields from the retype stage's setter
 calls, and finds the call sites in every predicate and action body of every grammar and in every C# member of `src/`
 outside the read's own stage (a second top-level type in a stage's file included), every front-end hand-off of the edition to a parser and every
 caller that passes one on) and compares the result with the set PB2291's verdict records,

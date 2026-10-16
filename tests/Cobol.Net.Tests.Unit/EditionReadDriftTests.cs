@@ -33,7 +33,10 @@ namespace CobolNet.Tests.Unit;
 ///     <c>CobolParserCore</c> partial and any parser grammar's <c>@members</c>), of the lexer (<c>CobolLexer.g4</c>'s
 ///     <c>@members</c> and its committed partials) or of the retype stage (<c>TokenRetypes</c>) — a NESTED type's
 ///     members included, since C# lets a nested type read its container's protected and private state through an
-///     instance — whose syntax reaches edition state, or that calls another read — to a fixpoint.</item>
+///     instance — whose syntax reaches edition state, or that calls another read — to a fixpoint. A type in
+///     <c>src/</c> DERIVED from a stage (transitively, computed from every base list) reads the stage's protected
+///     state and calls its protected reads through <c>this</c>, so its members that reach edition state or a stage
+///     read are reads too, recorded under the derived type's own file as <c>Type.Member</c>.</item>
 ///   <item>A SITE is a predicate or action body of any grammar that names a read OR edition state itself
 ///     (<c>{Edition.Has(2014)}?</c>, a primed lexer field); any C# member in <c>src/</c> outside a read's own stage
 ///     (the parser's syntax-error listeners, the front end's driver) that calls or reads that read; a
@@ -43,8 +46,11 @@ namespace CobolNet.Tests.Unit;
 /// Outside the parser, edition state cannot be read at all: the parser's <c>Edition</c> getter is <c>protected</c>
 /// (the compiler refuses <c>parser.Edition</c> in a listener or pass) and the lexer's primed fields are private, and
 /// <see cref="TheParsersEdition_IsWriteOnlyOutsideIt"/> pins that, so the C# arm needs no type inference. The only
-/// code that CAN still read that state is lexically inside the stage — its nested types too — which is exactly the
-/// code the read arm takes as the stage's members.
+/// code that CAN still read that state is lexically inside the stage — its nested types too — or in a type derived
+/// from it (the generated <c>CobolParserCore</c> is a non-sealed public partial and <c>CobolParserCoreBase</c> is
+/// public abstract), which is exactly the code the read arm takes as the stage's members
+/// (<see cref="TheRule_SeesTheStagesDerivedTypes"/>). The rule's population is <c>src/</c>: a test double deriving
+/// from the lexer is not product code.
 /// Both computed sets are compared, per file, with the inventory PB2291's verdict recorded below. A new read under
 /// ANY name — a sixth <c>{isXXXX()}?</c> spelling, a new <c>reservedHere</c> site, a new member, a lexer field primed
 /// from the edition, a new listener call — fails here until it is adjudicated and recorded, with its verdict.</para>
@@ -168,9 +174,13 @@ public sealed class EditionReadDriftTests
             [LexerGrammar] = [.. model.LexerReads.Keys.Order(StringComparer.Ordinal)],
             [RetypeStage] = [.. model.RetypeReads.Keys.Order(StringComparer.Ordinal)],
         };
+        foreach (var g in model.DerivedReads.GroupBy(d => d.Rel))
+            computedMembers[g.Key] = [.. (computedMembers.GetValueOrDefault(g.Key) ?? [])
+                .Concat(g.Select(d => $"{d.Type}.{d.Member}")).Distinct().Order(StringComparer.Ordinal)];
         var problems = new List<string>();
-        foreach (var (file, members) in computedMembers)
+        foreach (var file in computedMembers.Keys.Union(RecordedMembers.Keys).Order(StringComparer.Ordinal))
         {
+            var members = computedMembers.GetValueOrDefault(file) ?? [];
             var recorded = RecordedMembers.GetValueOrDefault(file) ?? [];
             foreach (var m in members.Except(recorded)) problems.Add($"NEW edition read {file}#{m}");
             foreach (var m in recorded.Except(members)) problems.Add($"STALE recorded read {file}#{m}");
@@ -250,7 +260,8 @@ public sealed class EditionReadDriftTests
         var root = CSharpSyntaxTree.ParseText(
             "class L { void M(P p) { var y = p.Level; p.Level = 2; p?.Note(); p.Note(); } }").GetRoot();
         Assert.Equal(["Level", "Note", "Note"],
-            EditionReadModel.OutsideUses(root, new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "Level", "Note" } })
+            EditionReadModel.OutsideUses(root, new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "Level", "Note" } },
+                    EditionReadModel.StagesOf([root]))
                 .Select(u => u.Name));
     }
 
@@ -276,7 +287,41 @@ public sealed class EditionReadDriftTests
             "public partial class CobolParserCore { public partial class C { bool S(CobolParserCore p) => p.userWordHere(\"X\"); } }"
             + " class Listener { bool T(CobolParserCore p) => p.userWordHere(\"Y\"); }").GetRoot();
         var uses = EditionReadModel.OutsideUses(root,
-            new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "userWordHere" } }).ToList();
+            new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "userWordHere" } },
+            EditionReadModel.StagesOf([root])).ToList();
+        Assert.Equal(["Listener"], uses.Select(u => u.Node.Ancestors().OfType<ClassDeclarationSyntax>().First().Identifier.Text));
+    }
+
+    /// <summary>A type DERIVED from a stage is the stage (review finding w1096b R1-1, first raised as w1092e R3-1): C#
+    /// lets a subclass of <c>CobolParserCore</c> read the protected <c>Edition</c> getter and call the protected reads
+    /// through <c>this</c>, and a subclass of <c>CobolLexer</c> call the lexer's, so the derivation is computed from
+    /// the base lists (transitively), the derived members that reach edition state or a stage read are reads, a
+    /// derived type's own use of a read is the read arm's, and an outside use of a derived read is a site.</summary>
+    [Fact]
+    public void TheRule_SeesTheStagesDerivedTypes()
+    {
+        // The reviewer's spelling, a type deriving from THAT one, a lexer subclass named by a qualified base, and a listener.
+        var root = CSharpSyntaxTree.ParseText(
+            "class StrictParser(ITokenStream s) : CobolParserCore(s) { public bool Strict() => Edition.Has(2014); bool Word() => reservedHere(\"LOCALE\"); }"
+            + " sealed class Stricter(ITokenStream s) : StrictParser(s) { internal bool Both() => this.Strict(); int Plain() => 1; }"
+            + " sealed class MyLexer(ICharStream c) : CobolNet.Frontend.Generated.CobolLexer(c) { public bool Spelled() => ApplyEditionSpelling(); }"
+            + " class Listener { bool T(StrictParser p) => p.Strict(); }").GetRoot();
+        var stages = EditionReadModel.StagesOf([root]);
+        Assert.Equal(("parser", "parser", "lexer"), (stages["StrictParser"], stages["Stricter"], stages["MyLexer"]));
+        Assert.False(stages.ContainsKey("Listener"));
+
+        (string, SyntaxNode)[] trees = [("Synthetic.cs", root)];
+        var parser = EditionReadModel.DerivedReadsOf(trees, stages, "parser", EditionReadModel.ParserState,
+            new Dictionary<string, bool> { ["reservedHere"] = false });
+        Assert.Equal(["StrictParser.Strict", "StrictParser.Word", "Stricter.Both"],
+            parser.Select(d => $"{d.Type}.{d.Member}").Order(StringComparer.Ordinal));
+        Assert.Equal(["Both", "Strict"], parser.Where(d => d.Outside).Select(d => d.Member).Order(StringComparer.Ordinal));
+        var lexer = EditionReadModel.DerivedReadsOf(trees, stages, "lexer", new HashSet<string>(),
+            new Dictionary<string, bool> { ["ApplyEditionSpelling"] = false });
+        Assert.Equal(["MyLexer.Spelled"], lexer.Select(d => $"{d.Type}.{d.Member}"));
+
+        var uses = EditionReadModel.OutsideUses(root,
+            new Dictionary<string, IReadOnlySet<string>> { ["parser"] = new HashSet<string> { "Strict" } }, stages).ToList();
         Assert.Equal(["Listener"], uses.Select(u => u.Node.Ancestors().OfType<ClassDeclarationSyntax>().First().Identifier.Text));
     }
 
@@ -306,7 +351,12 @@ public sealed class EditionReadDriftTests
         public required IReadOnlyDictionary<string, bool> LexerReads { get; init; }
         public required IReadOnlyDictionary<string, bool> RetypeReads { get; init; }
         public required IReadOnlySet<string> PrimedLexerFields { get; init; }
+        public required IReadOnlyList<DerivedRead> DerivedReads { get; init; }
         public required SortedDictionary<string, int> Sites { get; init; }
+
+        /// <summary>A read declared by a type derived from a stage: its file, the derived type (the outermost one in
+        /// that file), the member, and whether code outside the stage can call it.</summary>
+        public sealed record DerivedRead(string Rel, string Type, string Member, bool Outside);
 
         public string Render()
         {
@@ -314,6 +364,7 @@ public sealed class EditionReadDriftTests
             sb.AppendLine($"  {ParserBase}: {string.Join(", ", ParserReads.Keys.Order(StringComparer.Ordinal))}");
             sb.AppendLine($"  {LexerGrammar}: {string.Join(", ", LexerReads.Keys.Order(StringComparer.Ordinal))}");
             sb.AppendLine($"  {RetypeStage}: {string.Join(", ", RetypeReads.Keys.Order(StringComparer.Ordinal))}");
+            foreach (var d in DerivedReads) sb.AppendLine($"  {d.Rel}: {d.Type}.{d.Member} (derived)");
             foreach (var (site, n) in Sites) sb.AppendLine($"  {site} ×{n}");
             return sb.ToString();
         }
@@ -332,7 +383,7 @@ public sealed class EditionReadDriftTests
 
             // The retype stage: its members whose syntax names an EditionInfo.
             var retypeMembers = Members(ClassBodies(File.ReadAllText(Repo(RetypeStage)), "TokenRetypes"));
-            var retypeReads = Fixpoint(retypeMembers, ids => ids.Contains("EditionInfo"), exclude: []);
+            var retypeReads = Fixpoint(retypeMembers, ids => ids.Overlaps(RetypeState), exclude: []);
 
             // The lexer: @members plus every committed partial of CobolLexer.
             string lexerText = File.ReadAllText(Repo(LexerGrammar));
@@ -370,6 +421,30 @@ public sealed class EditionReadDriftTests
                     primed.UnionWith(info.Identifiers.Where(lexerFields.Contains));
             var lexerReads = Fixpoint(lexerMembers, ids => ids.Overlaps(primed), exclude: setters);
 
+            // The stages' DERIVED types (review finding w1096b R1-1): a type deriving from a stage reads its protected
+            // state and calls its protected reads through `this`, so its members are reads just as a nested type's
+            // are. The derivation is computed from the base lists of src/, to a fixpoint (a file can only derive from
+            // a stage it names, so only those files are parsed).
+            var sources = SourceFiles().Select(p => (Rel: Rel(p), Text: File.ReadAllText(p))).ToList();
+            var roots = new Dictionary<string, SyntaxNode>(StringComparer.Ordinal);
+            SyntaxNode RootOf((string Rel, string Text) s) =>
+                roots.TryGetValue(s.Rel, out var r) ? r : roots[s.Rel] = CSharpSyntaxTree.ParseText(s.Text).GetRoot();
+            var stages = StagesOf([]);
+            for (int known = 0; known != stages.Count;)
+            {
+                known = stages.Count;
+                var names = stages.Keys.ToList();
+                stages = StagesOf(sources.Where(s => names.Any(n => s.Text.Contains(n, StringComparison.Ordinal))).Select(RootOf));
+            }
+
+            var parsed = roots.Select(kv => (kv.Key, kv.Value)).ToList();
+            List<DerivedRead> derived =
+            [
+                .. DerivedReadsOf(parsed, stages, ParserStage, ParserState, parserReads),
+                .. DerivedReadsOf(parsed, stages, LexerStage, primed, lexerReads),
+                .. DerivedReadsOf(parsed, stages, RetypeStageName, RetypeState, retypeReads),
+            ];
+
             // Sites, 1: the predicate and action bodies of every grammar — a read, or the stage's edition state named
             // directly (the parser's Edition, a primed lexer field).
             var sites = new SortedDictionary<string, int>(StringComparer.Ordinal);
@@ -389,26 +464,27 @@ public sealed class EditionReadDriftTests
             // primed lexer fields are private (TheParsersEdition_IsWriteOnlyOutsideIt).
             // A use inside a read's OWN stage (nested types included) is the read arm's, not a site; every file is
             // parsed, so a second top-level type in a stage's file is a site source like any other.
+            IReadOnlySet<string> Callable(IReadOnlyDictionary<string, bool> reads, string stage) =>
+                OutsideCallable(reads).Union(derived.Where(d => d.Outside && stages[d.Type] == stage).Select(d => d.Member))
+                    .ToHashSet(StringComparer.Ordinal);
             var outside = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal)
             {
-                [ParserStage] = OutsideCallable(parserReads),
-                [LexerStage] = OutsideCallable(lexerReads),
-                [RetypeStageName] = OutsideCallable(retypeReads),
+                [ParserStage] = Callable(parserReads, ParserStage),
+                [LexerStage] = Callable(lexerReads, LexerStage),
+                [RetypeStageName] = Callable(retypeReads, RetypeStageName),
             };
             var trees = new List<(string Rel, SyntaxNode Root)>();
-            foreach (var path in SourceFiles())
+            foreach (var source in sources)
             {
-                string rel = Rel(path);
-                string text = File.ReadAllText(path);
-                bool frontEnd = rel.StartsWith("src/Cobol.Net.Frontend/", StringComparison.Ordinal);
-                if (!outside.Values.SelectMany(n => n).Any(n => text.Contains(n, StringComparison.Ordinal)) && !frontEnd) continue;
-                trees.Add((rel, CSharpSyntaxTree.ParseText(text).GetRoot()));
+                bool frontEnd = source.Rel.StartsWith("src/Cobol.Net.Frontend/", StringComparison.Ordinal);
+                if (!outside.Values.SelectMany(n => n).Any(n => source.Text.Contains(n, StringComparison.Ordinal)) && !frontEnd) continue;
+                trees.Add((source.Rel, RootOf(source)));
             }
 
             var drivers = new HashSet<string>(StringComparer.Ordinal);   // "Type.Member" of a non-private hand-off
             foreach (var (rel, root) in trees)
             {
-                foreach (var (node, name) in OutsideUses(root, outside))
+                foreach (var (node, name) in OutsideUses(root, outside, stages))
                     Bump(sites, $"{rel} | {SiteOf(node)} | {name}");
 
                 if (!rel.StartsWith("src/Cobol.Net.Frontend/", StringComparison.Ordinal)) continue;
@@ -420,7 +496,7 @@ public sealed class EditionReadDriftTests
                         MemberAccessExpressionSyntax ma => ma.Name.Identifier.Text,
                         _ => null,
                     };
-                    if (target is null || !ParserState.Contains(target) || StageOf(a) == ParserStage) continue;
+                    if (target is null || !ParserState.Contains(target) || StageOf(a, stages) == ParserStage) continue;
                     Bump(sites, $"{rel} | {SiteOf(a)} | {target}=");
                     if (a.Ancestors().OfType<MemberDeclarationSyntax>().FirstOrDefault(m => m is not BaseTypeDeclarationSyntax) is { } md
                         && !md.Modifiers.Any(m => m.IsKind(SyntaxKind.PrivateKeyword)))
@@ -443,7 +519,7 @@ public sealed class EditionReadDriftTests
             return new EditionReadModel
             {
                 ParserReads = parserReads, LexerReads = lexerReads, RetypeReads = retypeReads,
-                PrimedLexerFields = primed, Sites = sites,
+                PrimedLexerFields = primed, DerivedReads = derived, Sites = sites,
             };
         }
 
@@ -453,14 +529,18 @@ public sealed class EditionReadDriftTests
         /// themselves and named directly by a site.</summary>
         public static readonly IReadOnlySet<string> ParserState = new HashSet<string>(["Edition"], StringComparer.Ordinal);
 
+        /// <summary>The retype stage's edition state: the <c>EditionInfo</c> its reads take.</summary>
+        private static readonly IReadOnlySet<string> RetypeState = new HashSet<string>(["EditionInfo"], StringComparer.Ordinal);
+
         private const string ParserType = "CobolParserCore";
         private const string LexerType = "CobolLexer";
         private const string ParserStage = "parser";
         private const string LexerStage = "lexer";
         private const string RetypeStageName = "retype";
 
-        /// <summary>The types whose members — nested types' included — ARE a stage: code lexically inside one reads
-        /// that stage's state directly, so its uses of the stage's own reads are reads, never sites.</summary>
+        /// <summary>The NAMED stage types, whose members — nested types' included — ARE a stage: code lexically inside
+        /// one reads that stage's state directly, so its uses of the stage's own reads are reads, never sites. The
+        /// types derived from them join their stage (<see cref="StagesOf"/>).</summary>
         private static readonly IReadOnlyDictionary<string, string> StageTypes = new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["CobolParserCoreBase"] = ParserStage,
@@ -469,11 +549,64 @@ public sealed class EditionReadDriftTests
             ["TokenRetypes"] = RetypeStageName,
         };
 
-        /// <summary>The stage <paramref name="node"/> sits lexically inside (its outermost stage type), or
-        /// <see langword="null"/>.</summary>
-        private static string? StageOf(SyntaxNode node) =>
+        /// <summary>The stage of every type: the named <see cref="StageTypes"/>, plus each type declared in
+        /// <paramref name="roots"/> whose base list names a stage type, transitively.</summary>
+        public static IReadOnlyDictionary<string, string> StagesOf(IEnumerable<SyntaxNode> roots)
+        {
+            var stages = new Dictionary<string, string>(StageTypes, StringComparer.Ordinal);
+            var derivable = roots.SelectMany(r => r.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                .Where(t => t.BaseList is not null).ToList();
+            for (bool grew = true; grew;)
+            {
+                grew = false;
+                foreach (var t in derivable.Where(t => !stages.ContainsKey(t.Identifier.Text)))
+                    if (t.BaseList!.Types.Select(b => stages.GetValueOrDefault(SimpleName(b.Type))).FirstOrDefault(s => s is not null) is { } stage)
+                    {
+                        stages[t.Identifier.Text] = stage;
+                        grew = true;
+                    }
+            }
+
+            return stages;
+        }
+
+        private static string SimpleName(TypeSyntax type) => type switch
+        {
+            QualifiedNameSyntax q => SimpleName(q.Right),
+            AliasQualifiedNameSyntax a => SimpleName(a.Name),
+            SimpleNameSyntax s => s.Identifier.Text,
+            _ => type.ToString(),
+        };
+
+        /// <summary>The reads the types DERIVED from <paramref name="stage"/> declare: their members (nested types'
+        /// included) whose syntax reaches the stage's <paramref name="state"/> or one of its
+        /// <paramref name="stageReads"/>, or another derived read, to a fixpoint. Each is reported under the
+        /// outermost derived type of its file.</summary>
+        public static List<DerivedRead> DerivedReadsOf(IEnumerable<(string Rel, SyntaxNode Root)> trees,
+            IReadOnlyDictionary<string, string> stages, string stage, IReadOnlySet<string> state,
+            IReadOnlyDictionary<string, bool> stageReads)
+        {
+            var declared = new List<(string Rel, string Type, MemberDeclarationSyntax Member)>();
+            foreach (var (rel, root) in trees)
+                foreach (var t in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+                    if (!StageTypes.ContainsKey(t.Identifier.Text) && stages.GetValueOrDefault(t.Identifier.Text) == stage
+                        && !t.Ancestors().OfType<BaseTypeDeclarationSyntax>().Any(a => stages.ContainsKey(a.Identifier.Text)))
+                        declared.AddRange(t.DescendantNodes().OfType<MemberDeclarationSyntax>()
+                            .Where(m => m is MethodDeclarationSyntax or PropertyDeclarationSyntax)
+                            .Select(m => (rel, t.Identifier.Text, m)));
+
+            var reads = Fixpoint(Members(declared.Select(d => d.Member)),
+                ids => ids.Overlaps(state) || ids.Overlaps(stageReads.Keys), exclude: [.. state]);
+            return [.. declared.Select(d => (d.Rel, d.Type, Name: MemberName(d.Member)!))
+                .Where(d => reads.ContainsKey(d.Name))
+                .Select(d => new DerivedRead(d.Rel, d.Type, d.Name, reads[d.Name])).Distinct()];
+        }
+
+        /// <summary>The stage <paramref name="node"/> sits lexically inside (its outermost stage type, derived ones
+        /// included), or <see langword="null"/>.</summary>
+        private static string? StageOf(SyntaxNode node, IReadOnlyDictionary<string, string> stages) =>
             node.Ancestors().OfType<BaseTypeDeclarationSyntax>()
-                .Select(t => StageTypes.GetValueOrDefault(t.Identifier.Text)).LastOrDefault(s => s is not null);
+                .Select(t => stages.GetValueOrDefault(t.Identifier.Text)).LastOrDefault(s => s is not null);
 
         private static IReadOnlySet<string> OutsideCallable(IReadOnlyDictionary<string, bool> reads) =>
             reads.Where(kv => kv.Value).Select(kv => kv.Key).ToHashSet(StringComparer.Ordinal);
@@ -495,10 +628,11 @@ public sealed class EditionReadDriftTests
                 .Select(id => (a.Rule, id)));
 
         /// <summary>Every use of an outside-callable read in <paramref name="root"/> — called (<c>x.M()</c>,
-        /// <c>x?.M()</c>) or read as a property (<c>x.P</c>) — from code outside that read's own stage, but not an
-        /// assignment to it. <paramref name="outside"/> maps each stage to its outside-callable reads.</summary>
+        /// <c>x?.M()</c>) or read as a property (<c>x.P</c>) — from code outside that read's own stage (a type derived
+        /// from the stage is inside it), but not an assignment to it. <paramref name="outside"/> maps each stage to
+        /// its outside-callable reads; <paramref name="stages"/> maps each type to its stage (<see cref="StagesOf"/>).</summary>
         public static IEnumerable<(SyntaxNode Node, string Name)> OutsideUses(SyntaxNode root,
-            IReadOnlyDictionary<string, IReadOnlySet<string>> outside)
+            IReadOnlyDictionary<string, IReadOnlySet<string>> outside, IReadOnlyDictionary<string, string> stages)
         {
             foreach (var node in root.DescendantNodes())
             {
@@ -509,7 +643,7 @@ public sealed class EditionReadDriftTests
                     _ => null,
                 };
                 if (name is null) continue;
-                string? home = StageOf(node);
+                string? home = StageOf(node, stages);
                 if (!outside.Any(kv => kv.Key != home && kv.Value.Contains(name))) continue;
                 if (node.Parent is AssignmentExpressionSyntax a && a.Left == node) continue;
                 yield return (node, name);

@@ -72,3 +72,26 @@ and 23 site keys in `EditionReadDriftTests.cs`). No code or test changed: the te
 with the record itself, so a second copy of the count in a test would only be one more place to go stale. Merging main brought PB3022's
 `[Trait("Sweep", "tree")]` rule, and `drift_rules.py --sweeps` lists `EditionReadDriftTests` (it scans every C#
 member of `src/` and every grammar), so the class now carries the trait and the gate's tier 0c runs it on every change.
+
+**Branch review (round 4, findings R1-1 and R1-2 of the third review).** R1-1 (first raised as w1092e R3-1 and
+left unanswered by the round-3 finisher): the pin saw a stage's NESTED types but not its DERIVED ones.
+`CobolParserCoreBase` is public abstract and the generated `CobolParserCore` a non-sealed public partial, so a class in
+`src/` such as `sealed class StrictParser(ITokenStream s) : CobolParserCore(s) { public bool Strict() =>
+Edition.Has(2014) || reservedHere("LOCALE"); }` reads edition state through `this`, and neither arm saw it: the read arm
+took only the named stage types, and the site arm skips a bare `Edition` and never matches a protected read. Sealing
+was not available as the structural fix (a unit test derives `IsolatedLexer` from `CobolLexer`), so the rule now
+computes the derivation: `StagesOf` maps every type in `src/` whose base list names a stage type, transitively, to that
+stage; `DerivedReadsOf` takes such a type's members that reach the stage's state or one of its reads (to a fixpoint)
+as reads, recorded under the derived type's own file as `Type.Member`; a derived type's own use of a read is the read
+arm's, and an outside use of a derived read is a site. The comparison also reports a recorded file that no longer
+computes as STALE. `TheRule_SeesTheStagesDerivedTypes` pins it on synthetic text (the reviewer's spelling, a type
+deriving from that one, a lexer subclass named by a qualified base, and a listener), and a probe on the real tree
+(the reviewer's `StrictParser` plus a `CobolLexer` subclass in `src/Cobol.Net.Frontend/Parsing/`) failed
+`EditionReads_AreExactlyTheAdjudicatedSet` with `NEW edition read …#StrictParser.Strict`, `…#StrictLexer.S` and the
+listener's `NEW site`. The tree has no derived stage type today, so the record did not change. R1-2: the
+`CobolDeclined.g4` header still filed APPLY under word status and called CLASS's gate "right either way", eleven lines
+above the PB2291 verdict that says both are construct gates. The header now states the two reasons once, with the
+verdict: (a) word status for the arms led by a §8.9 user word below 2002 (DEFAULT, PRESENT, VALIDATE-STATUS,
+VAL-STATUS, VALID); (b) a recorded D7 construct gate for CLASS, DESTINATION, INVALID and VARYING (reserved at all four
+editions, re-measured in `reserved-words.json`) and for APPLY COMMIT (APPLY is §8.10 context-sensitive, a keyword only
+in the I-O-CONTROL paragraph). The hook-in comment further down now names all four (b) words.
