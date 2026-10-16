@@ -55,6 +55,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO / "scripts" / "spec"))
+import work  # noqa: E402 — the register's one frontmatter reader and DONE vocabulary (note_is_open, kb/Work PB3196)
+
 SCHEMA = 1
 RECORD_DIR = Path("docs/rearchitecture/evidence/arch-census")
 # The frozen evidence tree (owner decision kb/Work/PB785; its own README states the directory rule): a record there
@@ -98,7 +101,6 @@ HISTORY = ("DEVLOG/",)                         # the history narrative, one file
 # artifact it found dead (kb/Work PB2234's sweep).
 GENERATED_READERS = (RECORD_DIR.as_posix() + "/",)
 REGISTER = "kb/"                               # a kb/Work mention counts only while its note is open
-CLOSED_STATUSES = {"landed", "retired", "discharged", "closed", "superseded", "duplicate"}
 # Files read by a tool or a person BY CONVENTION, never by name (git, MSBuild, dotnet, GitHub, the harness):
 CONVENTIONAL = {"README.md", "LICENSE", "LICENSE.md", "LICENSE.txt", "__init__.py", ".gitignore", ".gitattributes",
                 ".gitmodules", "CLAUDE.md", "AGENTS.md", "CONTRIBUTING.md", "SECURITY.md", "CODE_OF_CONDUCT.md",
@@ -226,11 +228,14 @@ class Corpus:
 
 
 def note_is_open(text: str) -> bool:
-    if not text.startswith("---"):
-        return True
-    end = text.find("\n---", 3)
-    m = re.search(r"^status:\s*\"?([A-Za-z-]+)", text[: end if end > 0 else len(text)], re.MULTILINE)
-    return not (m and m.group(1).lower() in CLOSED_STATUSES)
+    """Whether a kb/ file's mention is an OPEN register mention: every file but a note whose status is DONE.
+
+    ONE reader and ONE vocabulary (kb/Work PB3196): the note is read by `work.parse_frontmatter` and DONE is
+    `work.TERMINAL_STATUSES`. This used its own regex and its own six closed statuses, four of which `work.py check`
+    rejects, so the next terminal status added to the register would have kept a note's mentions open here and hidden
+    every dead artifact only that note still named. A kb/ file that is not a note (no frontmatter) stays open."""
+    fm = work.parse_frontmatter(text)
+    return fm is None or fm.get("status") not in work.TERMINAL_STATUSES
 
 
 def build_corpus(root: Path, files: list[str], phrases: set[str] = frozenset()) -> Corpus:
@@ -771,6 +776,17 @@ def self_test() -> int:
             artifact_reach("README.md", corpus, ambiguous) == "conventional"
             and got["scripts/rr/rr-README.txt"] == "conventional"
             and got["scripts/rr/LICENSE/NOTES.txt"] == "conventional", str(got))
+
+    # DONE is the register's own vocabulary, read by its own reader (kb/Work PB3196): every status of
+    # work.TERMINAL_STATUSES closes a note, quoted or bare, and nothing else does (a status outside work.STATUSES
+    # included, the census's old private `superseded`); a kb/ file that is not a note stays an open mention.
+    def note(status: str) -> str:
+        return f"---\nid: PB9\nstatus: {status}\n---\nnames hist.py\n"
+    live = sorted(work.STATUSES - set(work.TERMINAL_STATUSES)) + ["superseded"]
+    arm("a note is closed exactly when work.TERMINAL_STATUSES calls its status DONE (quoted or bare)",
+        all(not note_is_open(note(s)) and not note_is_open(note(f'"{s}"')) for s in work.TERMINAL_STATUSES)
+        and all(note_is_open(note(s)) for s in live) and note_is_open("# kb/Search/README\nnames hist.py\n"),
+        f"terminal {work.TERMINAL_STATUSES}, live {live}")
 
     # The tracked-path prefixes are `/`-separated on every OS (a backslashed prefix matched nothing on Windows).
     record = RECORD_DIR.as_posix() + "/a02b.findings.json"

@@ -28,7 +28,8 @@ internal static class Program
         // default Windows console (cp437) the section sign left this process as the single byte 0x15 and the
         // en dash as '-', in every redirected capture and every CI log, because this entry point never set an
         // encoding while CobolNet.Runtime's did (kb/Work PB899 — the two-arm dispatch with one arm fixed). One
-        // rule, one place: CobolNet.Runtime.IO.StandardStreams, which the run-unit entry calls too.
+        // rule, one place: CobolNet.Runtime.IO.StandardStreams, which the other process entry, a compiled program's
+        // Main (ProgramTable.RunModule), calls too; a host entry never does (kb/Work PB3193).
         CobolNet.Runtime.IO.StandardStreams.EnsureUtf8();
         return BuildParser().Command.Parse(args).Invoke();
     }

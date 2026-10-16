@@ -325,8 +325,9 @@ public sealed class SharedExtendOpenDriftTests
     /// <remarks>
     /// <c>Console.OpenStandard…</c> is admitted by NAME and by argument shape: it takes no path at all — it
     /// hands back the process's already-open standard handle — so there is no share mode to state and §9.1.15
-    /// has nothing to say about it. <c>StandardStreams.EnsureUtf8</c> (kb/Work PB899) wraps those handles in
-    /// UTF-8 writers on a host where the <c>Console.OutputEncoding</c> setter is unavailable. The allowlist
+    /// has nothing to say about it. <c>StandardStreams.EnsureUtf8</c> (kb/Work PB899, PB3193) wraps those handles in
+    /// UTF-8 writers on a host where the <c>Console.OutputEncoding</c> setter is unavailable, and a redirected
+    /// standard input in a UTF-8 reader. The allowlist
     /// stays POSITIVE and this entry cannot widen to a path, so the next spelling of a real path open is still
     /// rejected.
     /// </remarks>

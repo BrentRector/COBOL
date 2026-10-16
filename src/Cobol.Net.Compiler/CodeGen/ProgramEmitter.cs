@@ -911,7 +911,7 @@ internal sealed class ProgramEmitter
             // PB2097 — kb/Work PB2846: it used to run before the boundary, so a version-skew refusal of the main module
             // escaped as an unhandled .NET exception), the delivery of the run unit's STOP status to the process exit code
             // (§14.9.42.4 GR5: RunModule alone writes Environment.ExitCode, once, when the run unit has ended; the
-            // RunUnit.ExitStatus setter is plain run-unit state and RunMain, the host entry, writes nothing, so a second
+            // RunUnit.ExitStatus setter is plain run-unit state and a host entry's activation writes nothing, so a second
             // process entry must call RunModule, kb/Work PB3163), the §14.6.12 abnormal-termination diagnostic + nonzero exit on a fatal EC, and
             // the §14.6.11 implicit CLOSE of ALL run-unit connectors. Runtime-side so each applies to the WHOLE run unit —
             // incl. a separately-compiled CALLed module whose EC/file descriptors this compilation group never

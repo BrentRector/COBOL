@@ -260,7 +260,8 @@ public sealed class ProgramTable
     /// EC or the open file originates in a SEPARATELY-COMPILED CALLed module whose descriptors the main group's
     /// entry wrapper never saw — the entry wrapper only catches <see cref="StopRun"/> (the normal-termination unwind
     /// boundary; the STOP status itself is the run unit's <see cref="RunUnit.ExitStatus"/>, written by the STOP statement
-    /// wherever in the run unit it executes). It never writes the host process's exit code (DOC-A.1-167; kb/Work PB3163).
+    /// wherever in the run unit it executes). It never writes the host process's exit code (DOC-A.1-167; kb/Work PB3163)
+    /// and never reconfigures the process's console (kb/Work PB3193): only <see cref="RunModule"/> does either.
     /// It is NOT a host route: a .NET host activates a program through the program's generated host entry
     /// (DESIGN-external-repository §4.4, the one host surface), and the standalone executable's entry, which IS the
     /// process, is <see cref="RunModule"/>; nothing in the runtime or the generated code calls it, and it stays only
@@ -284,23 +285,24 @@ public sealed class ProgramTable
     /// <para>This is the boundary that IS the process (DOC-A.1-167: "A standalone <c>cobol</c> executable IS its own
     /// host"), so it alone delivers the run unit's termination status to the process exit code, once, when the run unit
     /// has ended (normally, by STOP RUN's unwind, or abnormally): the one write of <c>Environment.ExitCode</c> in the
-    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163).</para></summary>
+    /// runtime, clamped to the host's 32-bit range by <see cref="CobolNum.Position32"/> (kb/Work PB1178, PB3163). It is
+    /// also the one runtime entry that configures the process's standard streams (<see cref="IO.StandardStreams.EnsureUtf8"/>,
+    /// kb/Work PB3193), before the run unit begins.</para></summary>
     /// <param name="ensureRegistered">The module's registration member.</param>
     /// <param name="mainPath">The main program's path. A module with no main program (a library, DESIGN-external-repository
     /// §7.2) has no <c>Main</c> and never enters here.</param>
     public void RunModule(Action ensureRegistered, string mainPath)
     {
+        // The process's console is this entry's too, for the same reason (kb/Work PB3193): the standard streams carry
+        // UTF-8 (DOC-A.1-59; kb/Work PB59, PB899), set here and in the CLI's Main, never by a host entry, so a run unit
+        // a host embeds writes through the console the host configured and leaves it as it found it.
+        IO.StandardStreams.EnsureUtf8();
         try { ActivationStack.RunOnRunUnitThread(() => RunOnThisThread(ensureRegistered, mainPath)); }
         finally { Environment.ExitCode = CobolNum.Position32(_owner.ExitStatus); }   // StopRun unwinds through here too
     }
 
     private void RunOnThisThread(Action? ensureRegistered, string path)
     {
-        // The standard display device writes UTF-8 (fix-queue PB59; CONFORMANCE.md item 59). ⛔ The rule lives in
-        // ONE place — CobolNet.Runtime.IO.StandardStreams — because this `if` used to BE that place and the
-        // `cobol` CLI's diagnostic path had no copy of it, so every ISO citation the compiler printed left the
-        // process mangled at the OS code page (kb/Work PB899, feedback_two_arm_dispatch).
-        IO.StandardStreams.EnsureUtf8();
         try
         {
             // The module's own registration is a statement of the run unit like any other (kb/Work PB2846): a refusal

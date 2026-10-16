@@ -308,8 +308,10 @@ convention is inherited from the first class specified in the INHERITS clause", 
 entry convention is COBOL". The CALL statement has no convention clause; `>>CALL-CONVENTION` (§7.3.9.3 GR1 "The default
 for the CALL-CONVENTION directive is" COBOL) governs name mapping; the `ENTRY` statement is a vendor extension this
 compiler refuses (`StatementBinder`: "ISO/IEC 1989 defines no ENTRY statement") and this design keeps refusing: a
-program has one entry. `OptionsBinder.EntryConventionOf` accepts only COBOL (A.1 item 64). The repository records
-`EntryConvention = "COBOL"` as a value; an imported base's value feeds GR4 inheritance. `CallConv*`/`UnmanagedCallersOnly`
+program has one entry. `OptionsBinder.ScreenEntryConvention` accepts only COBOL (A.1 item 64), so the bound OPTIONS
+model carries no entry-convention field (kb/Work PB298: the field it had was read by nobody). The repository records
+`EntryConvention = "COBOL"` as a value; an imported base's value feeds GR4 inheritance, and the slice that records it
+writes that constant, or adds a model field together with its consumer (`OptionsModelConsumerDriftTests`). `CallConv*`/`UnmanagedCallersOnly`
 (native stack conventions, static blittable-only) are rejected as its home.
 
 ### 3.5 OPTIONAL

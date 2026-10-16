@@ -99,6 +99,10 @@ internal static class ProcessObserver
         // mojibake (Ω arrived as '╬⌐' before this line existed).
         psi.StandardOutputEncoding = new System.Text.UTF8Encoding(false);
         psi.StandardErrorEncoding = new System.Text.UTF8Encoding(false);
+        // The ACCEPT device decodes a redirected standard input as UTF-8 (CONFORMANCE.md item 1; kb/Work PB3193), so
+        // the harness encodes what it pipes the same way; left unset, .NET on Windows encodes it in the console's input
+        // code page. BOM-less, or the first record of every run would begin with U+FEFF.
+        psi.StandardInputEncoding = new System.Text.UTF8Encoding(false);
 
         Process? proc;
         try

@@ -345,11 +345,13 @@ rule.
 
 **The wire encoding of a diagnostic is part of the diagnostic** (`kb/Work/PB899`). A message carries its ISO
 citation, so it carries non-ASCII — `(ISO §11.10.3 SR5–6)` holds U+00A7 and U+2013. `CobolNet.Runtime.IO.StandardStreams.EnsureUtf8()`
-is the ONE place that rule is written down, and BOTH entry points call it: `Program.Main` in the CLI before it
-parses an argument, and `ProgramTable.RunMain` for a run unit — which is where it used to live ALONE, so every
+is the ONE place that rule is written down, and BOTH process entries call it: `Program.Main` in the CLI before it
+parses an argument, and `ProgramTable.RunModule` for a compiled program's `Main` (never a host entry such as
+`RunMain`, whose host owns its console: kb/Work PB3193). The run-unit entry is where it used to live ALONE, so every
 citation the compiler printed left the process at the OS code page (on cp437 the section sign is the single byte
 `0x15`) in every redirected capture and every CI log. No golden could see it: the corpus runner matches `.err`
-files on a pure-ASCII diagnostic CODE substring, and the harness decodes every capture as UTF-8. The witness is
+files on a pure-ASCII diagnostic CODE substring, and the harness decodes every capture as UTF-8 (and encodes what it
+pipes to standard input as UTF-8, the ACCEPT device's decoding, kb/Work PB3193). The witness is
 therefore a BYTE assertion through a redirected stream, `CliDiagnosticEncodingTests`, which drives the CLI from a
 console forced to cp437 on Windows and FAILS if that code page was not actually in force — a child with no console
 inherits .NET's UTF-8 default and would pass on the broken build.
