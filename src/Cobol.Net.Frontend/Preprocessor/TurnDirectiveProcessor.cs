@@ -4,6 +4,7 @@ using CobolNet.Editions;
 using CobolNet.Frontend.Common;
 using CobolNet.Frontend.Diagnostics;
 using CobolNet.Runtime;
+using CobolNet.Runtime.Exceptions;
 
 namespace CobolNet.Frontend.Preprocessor;
 
@@ -23,8 +24,8 @@ public sealed record TurnEvent(int Line, IReadOnlyList<(string Ec, string? File)
 /// The WiseOwl COBOL <c>&gt;&gt;TURN</c> directive stage (ISO §7.3.25; greenfield-only — the legacy pipeline keeps
 /// consuming TURN in <see cref="ConditionalCompilationProcessor"/>): parses each surviving <c>&gt;&gt;TURN</c>
 /// line of the FINAL preprocessed text into a <see cref="TurnEvent"/>, enforces the directive's syntax rules
-/// (SR3 — no duplicate (exception-name, file-name) pair per directive; SR4 — a file-name only with an
-/// <c>EC-I-O…</c> name), and blanks the line (line-count preserving, so every later token line number is stable
+/// (SR2 — every exception-name is one of §14.6.13.1's, in this edition; SR3 — no duplicate (exception-name,
+/// file-name) pair per directive; SR4 — a file-name only with an <c>EC-I-O…</c> name), and blanks the line (line-count preserving, so every later token line number is stable
 /// — scout hazard H3: the stage asserts the line count is unchanged).
 /// </summary>
 public static class TurnDirectiveProcessor
@@ -53,7 +54,8 @@ public static class TurnDirectiveProcessor
             // from the turn-directive-2002 row) — this stage ran its own `if (dialectLevel < 2002)` with a
             // BESPOKE COBOLNET0875 until kb/Work PB725 reconciled the three mechanisms onto the registry's
             // COBOLNET0900. COBOLNET0875 is RETIRED; never reallocate it. dialectLevel survives here because
-            // ParseTurn passes it to the exception-name edition window (§14.6.13.1), a different rule.
+            // ParseTurn passes it to the §8.3.2.1 word-length rule and to the exception-name edition window
+            // (§14.6.13.1, ExceptionNameRule.Window), different rules.
             if (ParseTurn(operand, i + 1, dialectLevel, diagnostics, loc) is { } ev)
                 events.Add(Constructs.TurnDirective2002, i + 1, ev);
             lines[i] = "";   // blank, never delete — line-count preserving (H3)
@@ -63,7 +65,8 @@ public static class TurnDirectiveProcessor
 
     /// <summary>The SYNTAX-ONLY check of one <c>&gt;&gt;TURN</c> operand — what ISO §7.2.1 asks of a directive line in an
     /// OMITTED conditional-compilation branch ("syntactically correct in the initial source text and library text";
-    /// kb/Work PB2003): the same parse the compiled directive gets, reporting what it reports and applying nothing.</summary>
+    /// kb/Work PB2003): the same parse the compiled directive gets, reporting what it reports and applying nothing —
+    /// §7.3.25.3 SR2's unknown exception-name and edition-window diagnostics (COBOLNET0711/0878) included (kb/Work PB2740).</summary>
     internal static void CheckOperand(string operand, int dialectLevel, DiagnosticBag diagnostics, SourceLocation loc) =>
         ParseTurn(operand, 0, dialectLevel, diagnostics, loc);
 
@@ -91,12 +94,16 @@ public static class TurnDirectiveProcessor
 
         int k = 0;
         string? currentEc = null;
+        EcInfo currentInfo = default;
+        bool currentEcResolved = false;
         bool currentEcHasFiles = false;
+        bool anyUnresolved = false;   // a name SR2 refused: already reported, so an empty `names` is not also "malformed"
         void Flush()
         {
             // An EC name with no trailing file-names is one (ec, null) pair.
             if (currentEc is not null && !currentEcHasFiles) AddPair(currentEc, null);
             currentEc = null;
+            currentEcResolved = false;
             currentEcHasFiles = false;
         }
         void AddPair(string ec, string? file)
@@ -105,8 +112,30 @@ public static class TurnDirectiveProcessor
                 diagnostics.ReportError("COBOLNET0718",
                     $">>TURN: the exception-name/file-name combination '{ec}{(file is null ? "" : " " + file)}' is "
                     + "specified more than once in this directive (ISO §7.3.25.3 SR3)", loc, default);
-            else
-                names.Add((CobolNames.UpperFold(ec), file is null ? null : CobolNames.UpperFold(file)));
+            else if (currentEcResolved)   // the catalog's canonical spelling: the binder's fold matches on it
+                names.Add((currentInfo.Name, file is null ? null : CobolNames.UpperFold(file)));
+        }
+
+        // ⛔ §7.3.25.3 SR2 — "Exception-name-1 shall be one of the exception names listed in 14.6.13.1" — is a SYNTAX
+        // rule of the directive, so it is asked HERE, where a compiled line and an omitted-branch line (§7.2.1,
+        // CheckOperand) are parsed alike, through the one rule both this stage and the binder's written-name funnel
+        // share (ExceptionNameRule; kb/Work PB2740). The binder fold used to be its only home, and it reads compiled
+        // events alone. Below COBOL-2002 the directive itself is refused (COBOLNET0900), so the per-name edition
+        // window has nothing to add there.
+        bool ResolveName(string w)
+        {
+            if (!ExceptionNameRule.TryGet(w, ">>TURN", out currentInfo, out var unknown))
+            {
+                diagnostics.ReportError(unknown.Descriptor.Code, unknown.Message, loc, default);
+                return false;
+            }
+            if (ConstructRegistry.IsAvailable(new EditionInfo(dialectLevel, false), Constructs.TurnDirective2002)
+                && ExceptionNameRule.Window(currentInfo, dialectLevel, ">>TURN") is { } later)
+            {
+                diagnostics.ReportError(later.Descriptor.Code, later.Message, loc, default);
+                return false;
+            }
+            return true;
         }
 
         for (; k < words.Length; k++)
@@ -145,6 +174,8 @@ public static class TurnDirectiveProcessor
                 Flush();
                 CheckWord(w);
                 currentEc = w;
+                currentEcResolved = ResolveName(w);
+                anyUnresolved |= !currentEcResolved;
             }
             else if (currentEc is not null)
             {
@@ -193,6 +224,7 @@ public static class TurnDirectiveProcessor
             return null;
         }
 
+        if (on is not null && names.Count == 0 && anyUnresolved) return null;   // every name was refused by SR2 above
         if (on is null || names.Count == 0)
         {
             diagnostics.ReportError("COBOLNET0718",

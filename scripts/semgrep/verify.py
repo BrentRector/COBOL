@@ -51,8 +51,9 @@ def rule_ids(config: pathlib.Path) -> list[str]:
     return re.findall(r"^\s*-\s+id:\s*(\S+)", config.read_text(encoding="utf-8"), re.M)
 
 
-def strip_paths(config: pathlib.Path) -> pathlib.Path:
-    """Copy the config with every `paths:` block removed, so path-scoped rules can be fire-tested."""
+def strip_paths(config: pathlib.Path, into: pathlib.Path) -> pathlib.Path:
+    """Copy the config with every `paths:` block removed, so path-scoped rules can be fire-tested. The copy goes into
+    the caller's own directory `into`, never a fixed name in the machine-wide temp directory (kb/Work PB2922)."""
     out, skipping, skip_indent = [], False, 0
     for line in config.read_text(encoding="utf-8").splitlines():
         stripped = line.strip()
@@ -66,9 +67,9 @@ def strip_paths(config: pathlib.Path) -> pathlib.Path:
             skipping, skip_indent = True, indent
             continue
         out.append(line)
-    tmp = pathlib.Path(tempfile.gettempdir()) / "cobolnet-invariants-nopaths.yml"
-    tmp.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
-    return tmp
+    copy = into / "invariants-nopaths.yml"
+    copy.write_text("\n".join(out) + "\n", encoding="utf-8", newline="\n")
+    return copy
 
 
 def main() -> int:
@@ -80,7 +81,9 @@ def main() -> int:
     print(f"{len(declared)} rules declared.\n")
 
     # ---- Check 1: every rule fires on the deliberate violations -------------------------------------------
-    fired = {r["check_id"].split(".")[-1] for r in run(strip_paths(CONFIG), [str(TESTDATA)], no_git_ignore=True)}
+    with tempfile.TemporaryDirectory(prefix="cobolnet-semgrep-") as tmp:
+        fired = {r["check_id"].split(".")[-1]
+                 for r in run(strip_paths(CONFIG, pathlib.Path(tmp)), [str(TESTDATA)], no_git_ignore=True)}
     dead = [r for r in declared if r not in fired]
     print("CHECK 1 — every rule fires on testdata/")
     for r in declared:

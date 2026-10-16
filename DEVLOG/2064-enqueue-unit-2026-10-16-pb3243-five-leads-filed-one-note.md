@@ -1,0 +1,4 @@
+## Entry 2064 — 2026-10-16 05:17 PDT — Enqueue unit 2026-10-16 (PB3243): five leads filed, no note extended
+
+Filed PB3243 (the C# fixed-name `cobolnet-harness-observations.log` in the temp dir, from the w1089a PB2922 report), PB3244 (`import fitz` deprecated in PyMuPDF 1.28, 17 call sites, same report), PB3245 (no named diagnostic for an unterminated literal at a line end, from the w1084h PB1804 report), PB3246 (an unprobed analysis: a GOBACK RAISING propagation staged beside a GR17 termination is never consumed, from the w1084f PB1177 report) and PB3247 (with no impact map, leg 1 omits the drift test `drift_rules.py` names for a changed file, a CI-invariant gap clustered with PB1957, same report). PB2922 was NOT extended, because its fix (PR #96) moved the dry runs out of TEMP, so the legacy litter no longer affects any test and none remained.
+

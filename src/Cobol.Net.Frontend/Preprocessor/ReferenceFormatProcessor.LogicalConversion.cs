@@ -62,7 +62,7 @@ public static partial class ReferenceFormatProcessor
         {
             ' ' => LineKind.Source,
             '*' or '/' => LineKind.Comment,
-            '-' => LineKind.Continuation,
+            FixedFormLine.ContinuationIndicator => LineKind.Continuation,
             'D' or 'd' => LineKind.Debugging,                   // COBOL-85's debugging line
             _ when !ccvsIndicators => LineKind.NotAnIndicator,
             'S' or 's' or 'Y' or 'y' or 'P' or 'p' or 'J' or 'j' or 'H' or 'h' or 'E' or 'e' or 'U' or 'u' => LineKind.CcvsExcluded,
@@ -78,7 +78,7 @@ public static partial class ReferenceFormatProcessor
             // The program-text area is resultant text from its first character, which is position 8 (kb/Work PB1801).
             var site = new TextSite(lineNo, fixedLine.ProgramTextIndex, line.Columns);
             var kind = KindOf(indicator.Value);
-            switch (CommentEntryOf(kind, area))
+            switch (CommentEntryOf(kind, fixedLine, area))
             {
                 case CommentEntryText.Header:
                     // The paragraph HEADER stays program text — the parser and the one removal gate
@@ -164,14 +164,14 @@ public static partial class ReferenceFormatProcessor
         /// <summary>Classify a line against the comment-entry paragraph in progress. A comment, debugging or
         /// excluded-alternate line is processed by its own arm; a continuation line inside the paragraph continues
         /// its commentary.</summary>
-        private CommentEntryText CommentEntryOf(LineKind kind, string area)
+        private CommentEntryText CommentEntryOf(LineKind kind, FixedFormLine line, string area)
         {
             if (kind == LineKind.Continuation) return _inCommentEntry ? CommentEntryText.Body : CommentEntryText.None;
             if (kind is not (LineKind.Source or LineKind.NotAnIndicator)) return CommentEntryText.None;
             // COBOL-85's comment-entry paragraph begins at an Area-A word and ends at the next one — the only place the
             // Area A / Area B line matters here. WHERE the text is (the division) is read from the words of the line
             // wherever they begin (§6.3.1: the program-text area has no such line), by the one DivisionCursor rule.
-            string? firstAreaAWord = FirstAreaAWord(area);
+            string? firstAreaAWord = FirstAreaAWord(line, area);
             if (_division.InIdentificationDivision && firstAreaAWord is not null && CommentEntryParagraphs.Contains(firstAreaAWord))
             {
                 _inCommentEntry = true;                     // start (or continue, back-to-back) a comment-entry
@@ -219,20 +219,17 @@ public static partial class ReferenceFormatProcessor
     internal const int FreeFormMaxPositions = 255;
 
     /// <summary>
-    /// If the source area begins with a word in Area A (its first non-space character falls within
-    /// columns 8-11, i.e. the first <see cref="AreaAWidth"/> characters), return that word (the run of
-    /// non-space, non-period characters), else null. Used only for the COBOL-85 comment-entry paragraph, which
-    /// begins and ends at an Area-A word (<c>CommentEntryOf</c>); which DIVISION the text is in is never decided by
-    /// the area a word begins in (<see cref="DivisionCursor"/>, kb/Work PB2739).
+    /// If the line's program text begins in area A (<see cref="FixedFormLine.BeginsInAreaA"/>, the ONE definition of
+    /// the area), return the word it begins with (the run of non-space, non-period characters), else null. Used for the
+    /// COBOL-85 comment-entry paragraph, which begins and ends at an Area-A word (<c>CommentEntryOf</c>); which DIVISION
+    /// the text is in is never decided by the area a word begins in (<see cref="DivisionCursor"/>, kb/Work PB2739).
     /// </summary>
-    private static string? FirstAreaAWord(string sourceArea)
+    private static string? FirstAreaAWord(FixedFormLine line, string programText)
     {
-        int start = 0;
-        while (start < sourceArea.Length && sourceArea[start] == ' ') start++;
-        if (start >= sourceArea.Length || start >= AreaAWidth)
-            return null; // blank line, or text begins in Area B (not a header)
+        if (!line.BeginsInAreaA) return null;   // blank line, or text begins in area B (not a header)
+        int start = line.ProgramTextStart;
         int end = start;
-        while (end < sourceArea.Length && sourceArea[end] is not (' ' or '.')) end++;
-        return sourceArea[start..end];
+        while (end < programText.Length && programText[end] is not (' ' or '.')) end++;
+        return programText[start..end];
     }
 }

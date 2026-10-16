@@ -379,8 +379,7 @@ def render(group, nid, record_path, short_sha, design=None):
                 len(steps), steps[0]["target"]))
             body.append("")
             if steps[0].get("files"):
-                body.append("**The files this step edits** (the Sites above are the census finding's, the whole "
-                            "class): " + ", ".join("`%s`" % x for x in steps[0]["files"]) + ".")
+                body.append(step_files_line(steps[0]["files"]))
                 body.append("")
             body.extend(file_set_lines(steps[0].get("moves")))
             body.append("**It claims only that step** (one note = one wave; `plan_wave.py` groups notes). Steps 2–%d are "
@@ -435,6 +434,13 @@ def render_step(rid, k, nid, finding, design, record_path, short_sha):
              "**Blocked by:** " + blocked_sentence(bb) + ". The wave proves the §4 contract and adds the drift test "
              "that keeps its new boundary true.", ""]
     return "\n".join(body), title
+
+
+def step_files_line(files):
+    """The structured line naming the files ONE STEP edits (work.STEP_FILES_LABEL, which work.note_sites reads as a site
+    block, so a step file outside the census finding's Sites is in the note's declared set: kb/Work PB3242 R1-1)."""
+    return ("**%s** (the Sites above are the census finding's, the whole class): " % work.STEP_FILES_LABEL
+            + ", ".join("`%s`" % x for x in files) + ".")
 
 
 def file_set_lines(moves):
@@ -576,12 +582,12 @@ def file_notes(findings_path, id_pool, notes_dir, dry_run, targets=None, rerende
 
 # ── R2: the review fleet's upheld findings (kb/Work PB2560; DESIGN-architecture-review §3 R2; the R2 review's B5) ──
 R2_PREFIX = {"extract": "Extract:", "unify": "Unify:", "move-and-rename": "Move/rename:", "data-ize": "Data-ize:",
-             "delete": "Delete:", "modernize": "Modernize:", "defect-for-fix-lane": "Defect:"}
+             "delete": "Delete:", "modernize": "Modernize:", work.FIX_LANE_WAVE: "Defect:"}
 R2_MODEL = {"extract": EXTRACT_MODEL, "unify": EXTRACT_MODEL, "data-ize": EXTRACT_MODEL,
             "move-and-rename": "Sonnet (a rewriter-driven wave, R69 §4); a judgment it meets returns NEEDS-OPUS",
             "delete": "Sonnet (a measured deletion, R69 §4); a judgment it meets returns NEEDS-OPUS",
             "modernize": "Sonnet (one analyzer rule with its code fix, §5.5; R69 §4)",
-            "defect-for-fix-lane": "the fix lane's routing (`model_rules.json`)"}
+            work.FIX_LANE_WAVE: "the fix lane's routing (`model_rules.json`)"}
 # Critical stays MAJOR: the register reserves BLOCKER for an adjudicated severe wrong answer (4 notes of 2,137),
 # and the fix lane ranks a defect by its harm flags first; the landing adjudication re-ranks it.
 R2_SEVERITY = {"Critical": "MAJOR", "Warning": "MINOR"}
@@ -662,7 +668,7 @@ def r2_merge(group):
 
 def render_r2(rec, nid, pin, areas):
     wave = rec["wave_kind"]
-    defect = wave == "defect-for-fix-lane" or rec["kind"] == "defect"
+    defect = wave == work.FIX_LANE_WAVE or rec["kind"] == "defect"
     harm = {v: "true" if k in (rec.get("harm") or []) else "false" for k, v in R2_HARM.items()}
     title = "%s — %s %s (R2 %s at %s)" % (nid, R2_PREFIX[wave], rec["title"].rstrip("."), rec["pair"], pin[:9])
     clauses = sorted({str(r["clause"]) for r in rec.get("spec_refs") or []})
@@ -841,7 +847,7 @@ def self_test_r2():
         cp = os.path.join(tmp, "collected.json")
         dup = rec(1, id="s1--architecture--f2#1", files=["src/T.cs", "src/U.cs"], sites=["src/T.cs:80-120 (N.T.F)", "src/U.cs:1-9"],
                   title="the same split, seen from the far end", severity="Critical")
-        d = rec(2, wave_kind="defect-for-fix-lane", kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
+        d = rec(2, wave_kind=work.FIX_LANE_WAVE, kind="defect", harm=["wrong-answer"], files=["src/D.cs"],
                 sites=["src/D.cs:3"], severity="Critical", spec_refs=[clause], members=[])
         upheld = [rec(1), dup, d, rec(3, files=["src/Gone.cs"], sites=["src/Gone.cs:1"], members=["N.G.H"])]
         batch = {"pin": "abcdef0123456789", "complete": True, "relaunch": [], "upheld": upheld,

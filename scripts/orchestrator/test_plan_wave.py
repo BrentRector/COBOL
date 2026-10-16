@@ -8,6 +8,7 @@ selection whatever the harm flags, the blocked_by order, site clustering per dep
 waits (blockers in two chains, the owner, a frontier model), and work.py check's topology rules.
 Run: python scripts/orchestrator/test_plan_wave.py   (no build, no git; the campaign section needs the
 tools/claude-skills submodule, and its absence is a FAIL)."""
+import dataclasses
 import pathlib
 import re
 import subprocess
@@ -231,17 +232,134 @@ check("mid-prose `branch:` is not a field: with no field the branch word wins, n
       "worktree-wf_rv-6")
 check("mid-prose `branch:` above the Branch field does not pre-empt it", rv3["w1062k"].branch, "worktree-wf_rv-7")
 
+# 6b'''. THE DRAIN AND THE UNSEEN LEAD (kb/Work PB3150). Wave 1075's drain plan (`--max-groups 2`) put the SPLIT of
+#        w1074a first, whose finisher would have started PB3101 (never started) and cherry-picked `…-e99-1` again
+#        though `…-e99-4` merged it, and never planned license-product-name's review finisher: its lead PB3146 is
+#        process_only and existed only on its branch. --drain plans the finishers of STARTED work only; a FINDINGS
+#        report whose lead the fix lane cannot see gets its finisher in every mode, decided by the same rule as an
+#        open note (its newest report naming it, on any branch), and a DONE branch that merely contains it is named in
+#        its pred, never a reason to drop it (review R1-1, R1-2).
+DR = TMP / "reports-drain"
+DR.mkdir()
+for name, first, hdr in (
+        ("w1074a-PB5-report.md", "SPLIT", "# PB5 group (PB12 not started)\n**branch:** `worktree-wf_dr-1` · **HEAD:** `1010101aa`"),
+        ("w1074b-PB7-report.md", "Status: DONE", "**Review:** FINDINGS 1 w1074b-review-r1 2020202bb E:/s/review-w1074-b.jsonl\n"
+                                                 "Branch: worktree-wf_dr-2\nHEAD: 2020202bb"),
+        ("w1074c-PB6-report.md", "SPLIT", "# PB6 group\n**branch:** `worktree-wf_dr-3` · **HEAD:** `3030303cc`"),
+        ("w1074d-PB10-report.md", "SPLIT", "# PB10 group\n**branch:** `worktree-wf_dr-4` · **HEAD:** `4040404dd`"),
+        ("w1074z-PB77-report.md", "Status: DONE", "**Review:** FINDINGS 1 enqueue-review-owner-task-r1 5050505ee "
+                                                  "E:/s/review-owner-task.jsonl\nBranch: owner-task\nHEAD: 5050505ee"),
+        ("w1074y-PB79-report.md", "Status: DONE", "**Review:** FINDINGS 1 enqueue-review-r1 6060606ff E:/s/r79.jsonl\n"
+                                                  "Branch: worktree-wf_dr-5\nHEAD: 6060606ff")):
+    (DR / name).write_text(f"{first}\n{hdr}\n\n## Reproduced?\n", encoding="utf-8", newline="\n")
+DR_CLASS = {"worktree-wf_dr-1": "UNLANDED", "worktree-wf_dr-2": "UNLANDED", "worktree-wf_dr-3": "UNLANDED",
+            "worktree-wf_dr-4": "LANDED", "owner-task": "UNLANDED", "worktree-wf_dr-5": "UNLANDED",
+            "worktree-wf_dr-6": "UNLANDED", "worktree-wf_dr-7": "UNLANDED"}
+DR_CARRIER = {"worktree-wf_dr-1": "worktree-wf_dr-2", "worktree-wf_dr-5": "worktree-wf_dr-2",
+              "worktree-wf_dr-6": "worktree-wf_dr-2"}
+dr_reports = pw.load_reports(DR)
+
+
+class _Shown:
+    def __init__(self, rc, out=""):
+        self.returncode, self.stdout = rc, out
+
+
+def _show(*args, cwd=None):
+    if args[:2] == ("show", "owner-task:kb/Work/PB77.md"):
+        return _Shown(0, '---\ntitle: "PB77 — an owner task"\nid: PB77\nkind: defect\nstatus: landed\narea: process\n'
+                         "process_only: true\n---\n\n# PB77\n")
+    return _Shown(128)
+
+
+dr_notes = dict(notes)
+dr_notes.update(pw.branch_lead_notes(dr_reports, dr_notes, {"wrong_answer": 8}, _show))
+check("an unseen lead is read from its own branch, and only there", sorted(set(dr_notes) - set(notes)), ["PB77"])
+dr_notes["PB79"] = pw.Note("PB79", "open", "process", "PB79 — carried", [], "", 0)
+# unlanded_branch_notes is unfiltered (every id the subjects name); plan() keeps its leads (review R2-1)
+DR_UNLANDED = {"owner-task": ["PB77"], "worktree-wf_dr-6": ["PB11"], "worktree-wf_dr-7": ["PB9"]}
+
+
+def dr_plan(drain):
+    return pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                   budget_points=100, drain=drain, carrier=DR_CARRIER.get)
+
+
+pd = dr_plan(True)
+check("drain: only the finishers of started work", sorted(sorted(g.notes) for g in pd["groups"]),
+      [["PB6"], ["PB7"], ["PB77"], ["PB79"], ["PB9"]])
+check("drain: every group is a finisher whose pred says DRAIN",
+      all(g.kind == "finisher" and "DRAIN" in g.pred for g in pd["groups"]), True)
+check("drain: a SPLIT branch another DONE branch merged waits, with its carrier named",
+      {i: "worktree-wf_dr-2" in pd["waiting"].get(i, "") for i in ("PB5", "PB12", "PB11")},
+      {"PB5": True, "PB12": True, "PB11": True})
+check("drain: a SPLIT whose branch landed left only unstarted work", "never started" in pd["waiting"].get("PB10", ""), True)
+check("drain: the clusters' notes wait, counted", ("PB2" in pd["drain_not_started"], "PB4" in pd["drain_not_started"]),
+      (True, True))
+check("an unseen lead's branch with a finisher is no judgment row", pd["unlanded_without_note"], [])
+pn = dr_plan(False)
+check("every mode: an unseen lead's FINDINGS gets its finisher", any(g.notes == ["PB77"] for g in pn["groups"]), True)
+# R1-2: PB79's branch is contained in worktree-wf_dr-2, PB7's DONE branch, whose report never answers PB79's findings:
+# the carried FINDINGS branch still gets its finisher (the drop was silent: no group, no waiting entry, no judgment row),
+# which merges PB79's own branch only and is told the carrier may land its commits first.
+for mode, pm in (("every mode", pn), ("drain", pd)):
+    g79 = next((g for g in pm["groups"] if g.notes == ["PB79"]), None)
+    check(f"{mode}: a carried unseen-lead FINDINGS gets its finisher, its pred naming the carrier (R1-2)",
+          bool(g79) and ("git merge worktree-wf_dr-5" in g79.pred, "contained in worktree-wf_dr-2" in g79.pred,
+                         "never worktree-wf_dr-2" in g79.pred, "review_findings.py show E:/s/r79.jsonl" in g79.pred),
+          (True, True, True, True))
+g5n = next((g for g in pn["groups"] if "PB5" in g.notes), None)
+check("every mode: a carried SPLIT's finisher merges its carrier, never cherry-picks it",
+      bool(g5n) and "git merge worktree-wf_dr-2" in g5n.pred and "cherry-pick its unlanded" not in g5n.pred, True)
+check("without --drain nothing waits on the drain", (pn["drain_not_started"], any("DRAIN" in g.pred for g in pn["groups"])),
+      ([], False))
+# R1-1: the review finisher of owner-task's FINDINGS works on its OWN branch, and its later report about the same
+# unseen lead supersedes the FINDINGS report, as for an open note: a SPLIT is resumed from its own branch (never the
+# findings answered again from scratch, its branch never a judgment row); an unreviewed DONE awaits landing; a newer
+# FINDINGS stamp on the finisher's branch gets the next finisher from that report.
+SU = TMP / "reports-successor"
+SU.mkdir()
+(SU / "w1074z-PB77-report.md").write_text(
+    "Status: DONE\n**Review:** FINDINGS 1 enqueue-review-owner-task-r1 5050505ee E:/s/review-owner-task.jsonl\n"
+    "Branch: owner-task\nHEAD: 5050505ee\n\n## X\n", encoding="utf-8", newline="\n")
+SU_CLASS = {"owner-task": "UNLANDED", "worktree-wf_f-1": "UNLANDED"}
+for successor, carried, want in (
+        ("Status: SPLIT\nBranch: worktree-wf_f-1\nHEAD: 7070707aa", {}, "SPLIT"),
+        ("Status: DONE\nBranch: worktree-wf_f-1\nHEAD: 7070707aa", {"owner-task": "worktree-wf_f-1"}, "DONE"),
+        ("Status: DONE\n**Review:** FINDINGS 2 enqueue-review-wf_f-1-r1 7070707aa E:/s/review-wf_f-1.jsonl\n"
+         "Branch: worktree-wf_f-1\nHEAD: 7070707aa", {"owner-task": "worktree-wf_f-1"}, "FINDINGS")):
+    (SU / "w1075a-PB77-report.md").write_text(successor + "\n\n## X\n", encoding="utf-8", newline="\n")
+    for drain in (False, True):
+        ps = pw.plan(dr_notes, CLUSTERS, HALF, pw.load_reports(SU), lambda b: SU_CLASS.get(b, "ABSENT"),
+                     {"owner-task": ["PB77"], "worktree-wf_f-1": ["PB77"]}, RULES, budget_points=100, drain=drain,
+                     carrier=carried.get)
+        g77 = [g for g in ps["groups"] if "PB77" in g.notes]
+        mode = f"{want} successor{' (drain)' if drain else ''}"
+        if want == "SPLIT":
+            check(f"{mode}: the finisher resumes the successor's branch, never the stale FINDINGS report (R1-1)",
+                  [("w1075a" in g.pred, "worktree-wf_f-1" in g.pred, "review-owner-task.jsonl" in g.pred) for g in g77],
+                  [(True, True, False)])
+            # R2-1: the superseded FINDINGS branch names the unseen lead, which a newer report covers: skipped, as an
+            # open note's stale branch is, never a judgment row (unlanded_branch_notes once kept only open notes)
+            check(f"{mode}: neither the successor's nor the superseded FINDINGS branch is a judgment row (R2-1)",
+                  [b for b in ("worktree-wf_f-1", "owner-task") if b in ps["unlanded_without_note"]], [])
+        elif want == "DONE":
+            check(f"{mode}: an unreviewed successor awaits landing, no finisher (R1-1)",
+                  (g77, ps["awaiting_landing"].get("worktree-wf_f-1")), ([], ["PB77"]))
+        else:
+            check(f"{mode}: the successor's own FINDINGS gets the next finisher (R1-1)",
+                  [("review-wf_f-1.jsonl" in g.pred, "git merge worktree-wf_f-1" in g.pred) for g in g77], [(True, True)])
+
 # 6c. A NOTE AN UNREPORTED DISPATCH HOLDS IS NOT PLANNED AGAIN, IN EITHER LANE (kb/Work PB2806): the fix lane read no
 #     ledger, and wave 1044 re-planned seven of the eight groups another session's recorded, unlaunched wave 1045 held.
-#     A report written since the dispatch answers it (steps 1 and 2 govern), a terminal note is never held, and a hand
-#     entry expires after HAND_TTL_SECONDS.
+#     A report written since the dispatch answers it (steps 1 and 2 govern), a terminal note is never held, and a
+#     retired hand entry (kb/Work PB3186) is no dispatch, however fresh.
 HD = TMP / "held"
 HD_REPORTS = HD / "reports"
 HD_REPORTS.mkdir(parents=True)
-pw.record_dispatch(HD, "1045", [pw.Group(kind="cluster", notes=["PB5", "PB2"], file="", files=["src/X.cs"], letter="a"),
-                                pw.Group(kind="cluster", notes=["PB8"], file="", files=["src/Y.cs"], letter="b"),
-                                pw.Group(kind="cluster", notes=["PB9"], file="", files=["src/Z.cs"], letter="c")],
-                   lambda i: False)
+pw.record_dispatch(HD, "1045", [{"letter": "a", "notes": ["PB5", "PB2"], "files": ["src/X.cs"]},
+                                {"letter": "b", "notes": ["PB8"], "files": ["src/Y.cs"]},
+                                {"letter": "c", "notes": ["PB9"], "files": ["src/Z.cs"]}], lambda i: False)
 HD_AT = {g["letter"]: g["at"] for g in coord.read_json(HD / pw.DISPATCH_LEDGER, {})["groups"]}
 for name, nid, when in (("w1045b-PB8-report.md", "PB8", HD_AT["b"] + 60), ("w1031c-PB9-report.md", "PB9", HD_AT["c"] - 3600)):
     (HD_REPORTS / name).write_text(f"DONE\n# {nid} group\n**branch:** `worktree-wf_held-{nid}` · **HEAD:** `5555555ee`\n\n"
@@ -249,16 +367,54 @@ for name, nid, when in (("w1045b-PB8-report.md", "PB8", HD_AT["b"] + 60), ("w103
     __import__("os").utime(HD_REPORTS / name, (when, when))
 LEDGER_DOC = coord.read_json(HD / pw.DISPATCH_LEDGER, {})
 LEDGER_DOC["groups"].append({"wave": "hand", "letter": "", "notes": ["PB10"], "files": ["src/W.cs"], "hand": True,
-                             "at": HD_AT["a"] - pw.HAND_TTL_SECONDS - 60})
+                             "at": HD_AT["a"]})
 coord.write_json(HD / pw.DISPATCH_LEDGER, LEDGER_DOC)
-check("held: unanswered groups only, terminal notes and expired hand entries never",
-      pw.held_by_dispatch(HD, pw.load_reports(HD_REPORTS), lambda i: i == "PB2", now=HD_AT["a"] + 120),
+check("held: unanswered groups only, terminal notes and retired hand entries never",
+      pw.held_by_dispatch(HD, pw.load_reports(HD_REPORTS), lambda i: i == "PB2"),
       {"PB5": "dispatch w1045a", "PB9": "dispatch w1045c"})
 p6 = pw.plan(notes, CLUSTERS, HALF, reports, lambda b: CLASS.get(b, "ABSENT"), UNLANDED, RULES, budget_points=100,
              held={"PB5": "dispatch w1045a"})
 check("a held note is planned in no group and waits naming its dispatch",
       (any("PB5" in g.notes for g in p6["groups"]), "w1045a" in p6["waiting"].get("PB5", "")), (False, True))
 check("its cluster's other notes are still planned", any("PB2" in g.notes for g in p6["groups"]), True)
+# R2-1 (kb/Work PB3150): an UNSEEN lead (PB77, process_only, its FINDINGS on owner-task) is held exactly as an open note
+# is. Wave 1075 dispatched its review finisher, which has not reported: the next plan, normal or --drain, must not
+# plan a second finisher on the same findings (the hold once read `open_ids`, so PB77 was planned again).
+for drain in (False, True):
+    ph = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                 budget_points=100, drain=drain, carrier=DR_CARRIER.get, held={"PB77": "dispatch w1075a", "PB7": "dispatch w1075b"})
+    mode = "drain" if drain else "normal"
+    check(f"{mode}: a held unseen lead and a held open note both wait naming their dispatch, neither planned (R2-1)",
+          [(any(i in g.notes for g in ph["groups"]), f"held by dispatch {w}" in ph["waiting"].get(i, ""))
+           for i, w in (("PB77", "w1075a"), ("PB7", "w1075b"))], [(False, True), (False, True)])
+    check(f"{mode}: the held unseen lead's branch is no judgment row (R2-1)", "owner-task" in ph["unlanded_without_note"],
+          False)
+# The frontier-model hold reads the leads too: an unseen lead whose body needs Mythos under the owner's approval waits.
+fm_notes = dict(dr_notes)
+fm_notes["PB77"] = dataclasses.replace(dr_notes["PB77"], body="This needs Mythos, under the owner's per-dispatch approval.")
+pf = pw.plan(fm_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+             budget_points=100, carrier=DR_CARRIER.get)
+check("an unseen lead that needs the owner's frontier-model approval waits (R2-1)",
+      (any("PB77" in g.notes for g in pf["groups"]), "owner's approval" in pf["waiting"].get("PB77", "")), (False, True))
+# unlanded_branch_notes is unfiltered: an id that is no lead (a landed note, a typo) leaves its branch a judgment row
+pj = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"),
+             {**DR_UNLANDED, "worktree-wf_dr-8": ["PB4242"]}, RULES, budget_points=100, carrier=DR_CARRIER.get)
+check("a branch naming no lead is a judgment row, its non-lead ids never planned",
+      ("worktree-wf_dr-8" in pj["unlanded_without_note"], any("PB4242" in g.notes for g in pj["groups"])), (True, False))
+# ...and unlanded_branch_notes itself keeps every id the subjects name: it once kept only the open notes, so a
+# superseded FINDINGS branch naming only its unseen lead (owner-task: PB77) reached plan() empty, a judgment row.
+import prune_worktrees  # noqa: E402
+_saved = (prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git)
+_subjects = {"owner-task": "PB77: an owner task\nPB77: answer review R1-1", "worktree-wf_x": "PB2, PB11: fix"}
+prune_worktrees.main_names = lambda: set()
+prune_worktrees.classify = lambda b, _names: ("UNLANDED",)
+prune_worktrees.git = lambda *a, **_k: _Shown(0, "main\n" + "\n".join(_subjects) if a[0] == "branch"
+                                              else _subjects[a[-1].split("..")[1]])
+try:
+    check("unlanded_branch_notes names every id, an unseen lead's too (R2-1)", pw.unlanded_branch_notes(),
+          {"owner-task": ["PB77"], "worktree-wf_x": ["PB2", "PB11"]})
+finally:
+    prune_worktrees.main_names, prune_worktrees.classify, prune_worktrees.git = _saved
 
 # 7. the group JSON renders through the real template and passes check_practices' same-file rule
 gjson = [pw.as_group_json(g, "77", notes, "COBOLNET0001-COBOLNET0003") for g in p["groups"]]
@@ -352,16 +508,18 @@ def cnote(nid, cluster=("PB901",), blocked_by=(), body="", status="open", kind="
         f"blocked_by: [{bb}]\ncluster: [{', '.join(cluster)}]\n---\n\n# {nid}\n\n{body}\n", encoding="utf-8", newline="\n")
 
 
-cnote("PB901", body="Sever `src/Lib/Alpha.cs` from the old engine.")
-cnote("PB902", body="Rewrite scripts/gamma.py's legacy legs.")
-cnote("PB903", blocked_by=("PB901",), body="Then delete `src/Lib/Beta.cs`.")
-cnote("PB904", blocked_by=("PB901", "PB902"), body="Then rename tests/Delta.Tests/DeltaTests.cs.")
-cnote("PB905", blocked_by=("PB903",), body="Then sweep the docs; no code site named.")
+cnote("PB901", body="**Sites:**\n- `src/Lib/Alpha.cs`\n\nSever it from the old engine.")
+cnote("PB902", body="**Code site.** scripts/gamma.py (its legacy legs)\n\nRewrite them.")
+cnote("PB903", blocked_by=("PB901",), body="### Code site\n\n`src/Lib/Beta.cs:12-40`\n\n### Fix\n\nThen delete it.")
+cnote("PB904", blocked_by=("PB901", "PB902"), body="- **Code site:** tests/Delta.Tests/DeltaTests.cs#Rename\n\nThen rename.")
+# PB905 names no site in a site block: what its prose discusses, and its Gate: line, declare nothing (kb/Work PB3242)
+cnote("PB905", blocked_by=("PB903",), body="Then sweep the docs; it discusses `src/Lib/Alpha.cs` and scripts/gamma.py.\n\n"
+                                           "**Gate:** `python scripts/gamma.py --check`")
 cnote("PB906", body="Author = Mythos 5.1, only after the owner's explicit\napproval for this dispatch.", kind="analysis")
-cnote("PB907", cluster=("OTHER",), body="Another campaign: `src/Lib/Alpha.cs`.")
-cnote("PB908", status="landed", body="Landed already: `src/Lib/Alpha.cs`.")
+cnote("PB907", cluster=("OTHER",), body="**Sites:**\n- `src/Lib/Alpha.cs`")
+cnote("PB908", status="landed", body="**Sites:**\n- `src/Lib/Alpha.cs`")
 cnote("PB909", status="owner", body="Waits for the owner.")
-cnote("PB910", cluster=("PB901", "OTHER"), body="In two clusters: `scripts/gamma.py`.")
+cnote("PB910", cluster=("PB901", "OTHER"), body="**Sites:**\n- `scripts/gamma.py#main` (main)")
 citems = [dict(work.parse_frontmatter(p.read_text(encoding="utf-8")), _file=p.name) for p in sorted(CW.glob("*.md"))]
 view = work.cluster_order(citems, "PB901")
 check("cluster members: open, any kind, harm flags or not, in blocked_by order",
@@ -381,7 +539,10 @@ except SystemExit as e:  # the campaign clusters by fix_clusters.py's real index
 if fc:
     cnotes = pw.load_notes(CW, {"wrong_answer": 8})
     ctexts = {i: (CW / f"{i}.md").read_text(encoding="utf-8") for i in cnotes}
-    copen, chalf, cdeps, cwait = pw.campaign_clusters(view, cnotes, ctexts, RULES, fc, TMP / "campaign")
+    # THE declared set (declared_sets) on a policy that refuses to build an index: no note here names a member, so the
+    # index is never read (a fix-lane or sites-only note declares its sites without one)
+    CDECL = pw.declared_sets(TMP / "campaign", pw.IndexPolicy(TMP / "no-cache", regenerate=False))
+    copen, chalf, cdeps, cwait = pw.campaign_clusters(view, cnotes, ctexts, RULES, fc, TMP / "campaign", CDECL)
     # PB904 waits on PB901 (Alpha.cs) and PB902 (gamma.py): their two clusters merge, so PB904 can follow ONE chain
     check("campaign clusters by declared sites, one depth at a time; a dependent's blocker clusters merge",
           [(c["depth"], c["file"], [n["id"] for n in c["notes"]]) for c in copen],
@@ -441,11 +602,64 @@ free = pw.plan(notes, [cl(F_BIND, "PB5"), cl("src/X/Misc.cs", "PB9"), after5], [
                budget_points=100, deps={"PB13": ["PB5"]})
 check("with nothing in flight all three run", [g.notes for g in free["groups"]], [["PB5"], ["PB9"], ["PB13"]])
 bp = pw.plan(notes, [cl(F_BIND, "PB5"), cl("src/X/Misc.cs", "PB9"), after5], [], [], lambda b: "ABSENT", {}, RULES,
-             budget_points=100, deps={"PB13": ["PB5"]}, busy={"worktree-train-a": {F_BIND, "src/Other.cs"}})
-check("a colliding group waits, the collision named",
-      "file-set collision with worktree-train-a (" + F_BIND + ")" in bp["waiting"].get("PB5", ""), True)
+             budget_points=100, deps={"PB13": ["PB5"]},
+             busy={"worktree-train-a": pw.InFlight({F_BIND, "src/Other.cs"}, "worktree-train-a")})
+check("a group colliding with RUNNING work waits, the collision named",
+      "file-set collision with running work worktree-train-a [RUNNING] (" + F_BIND + ")" in bp["waiting"].get("PB5", ""),
+      True)
 check("its successor waits for it", "PB5 is not planned" in bp["waiting"].get("PB13", ""), True)
 check("a group that meets nothing runs", [g.notes for g in bp["groups"]], [["PB9"]])
+# PB2807: ONE rule for both lanes. The fix lane passes `busy` too (no deps): running work defers a group, a FINISHED
+# branch (a DONE report, no review findings) makes it that branch's CONTINUATION (merge it first, no `after:`), and the
+# group's own work never collides (the branch its pred continues; a dispatch of its own notes).
+FIN = pw.Report(TMP / "w1090c-PB66-report.md", 1090, "w1090c", "PB66", "DONE", ["PB66"], False, "worktree-done",
+                "E:/w/done", "abc1234")
+fl = pw.plan(notes, [cl(F_BIND, "PB5"), cl("src/X/Misc.cs", "PB9"), cl("src/X/Other.cs", "PB11")], [], [],
+             lambda b: "ABSENT", {}, RULES, budget_points=100,
+             busy={"worktree done (worktree-done)": pw.InFlight({F_BIND}, "worktree-done", finished=FIN),
+                   "dispatched w1091a (PB9)": pw.InFlight({"src/X/Misc.cs"}, notes={"PB9"}),
+                   "dispatched w1091b (PB40)": pw.InFlight({"src/X/Other.cs"}, notes={"PB40"})})
+FG = {tuple(g.notes): g for g in fl["groups"]}
+check("fix lane: a group meeting only a FINISHED branch is planned as its continuation, no after:",
+      (("PB5",) in FG, FG.get(("PB5",)) and FG[("PB5",)].after, FG.get(("PB5",)) and FG[("PB5",)].continues),
+      (True, "", ["worktree-done"]))
+check("... its pred says merge that branch first and names the shared file",
+      all(t in FG[("PB5",)].pred for t in ("CONTINUATION", "git merge", "worktree-done", "w1090c", F_BIND)), True)
+check("fix lane: a dispatch of the group's OWN notes never defers it (the hold already decided them)",
+      ("PB9",) in FG, True)
+check("fix lane: a group meeting another dispatch's RUNNING group waits, naming it",
+      ("PB11" in fl["waiting"], "running work dispatched w1091b" in fl["waiting"].get("PB11", "")), (True, True))
+fin_own = pw.plan(notes, [cl(F_EMIT, "PB3")], [], [r3], lambda b: "UNLANDED", {}, RULES, budget_points=100,
+                  busy={"worktree pred (" + str(r3.branch) + ")": pw.InFlight({F_EMIT}, r3.branch)})
+check("a finisher never collides with the branch its own pred continues (its predecessor's worktree)",
+      [(g.kind, g.notes) for g in fin_own["groups"]][:1], [("finisher", ["PB3"])])
+CI_META = {"worktree a (worktree-done)": {"branch": "worktree-done", "rev": "x"},
+           "worktree b (worktree-split)": {"branch": "worktree-split", "rev": "y"},
+           "worktree c (worktree-findings)": {"branch": "worktree-findings", "rev": "z"},
+           "worktree d (worktree-live)": {"branch": "worktree-live", "rev": "v"},
+           "branch worktree-landed": {"branch": "worktree-landed", "rev": "worktree-landed"},
+           "dispatched w1092a (PB67)": {"notes": ["PB67"], "at": 1.0, "slug": "w1092a"}}
+SPL = dataclasses.replace(FIN, path=TMP / "w1090d-PB68-report.md", slug="w1090d", lead="PB68", status="SPLIT",
+                          ids=["PB68"], branch="worktree-split")
+FND = dataclasses.replace(FIN, path=TMP / "w1090e-PB69-report.md", slug="w1090e", lead="PB69", ids=["PB69"],
+                          branch="worktree-findings", review=pw.Review("FINDINGS", 2, "r", "abc1234", "f.jsonl"))
+# the survey's lifecycle states (prune_worktrees.lifecycle) decide; a branch the survey does not name is running
+CI_STATES = {"worktree-done": "WAITING TO LAND", "worktree-split": "DECISION", "worktree-findings": "DECISION",
+             "worktree-live": "IN FLIGHT", "worktree-landed": "LANDED"}
+ci = pw.classify_inflight({o: {"src/A.cs"} for o in CI_META} | {"the open external-repository slices": {"src/S.cs"}},
+                          CI_META, [FIN, SPL, FND], CI_STATES, {"worktree-live": ["PB70"]})
+check("classify_inflight: WAITING TO LAND continues; DECISION, IN FLIGHT, a dispatch (answered ones never reach it: "
+      "inflight_file_sets drops them, PB2795) and an unnamed owner run; LANDED is gone",
+      {o: (x.finished.slug if x.finished else x.state) for o, x in ci.items()},
+      {"worktree a (worktree-done)": "w1090c", "worktree b (worktree-split)": "DECISION",
+       "worktree c (worktree-findings)": "DECISION", "worktree d (worktree-live)": "IN FLIGHT",
+       "dispatched w1092a (PB67)": "DISPATCHED, NO REPORT YET", "the open external-repository slices": "RUNNING"})
+check("classify_inflight: a branch's notes are its newest report's ids and its commit subjects' ids",
+      (ci["worktree b (worktree-split)"].notes, ci["worktree d (worktree-live)"].notes), ({"PB68"}, {"PB70"}))
+own = pw.plan(notes, [cl("src/X/Misc.cs", "PB9")], [], [], lambda b: "ABSENT", {}, RULES, budget_points=100,
+              busy={"worktree e (worktree-old)": pw.InFlight({"src/X/Misc.cs"}, "worktree-old", {"PB9"}, state="DECISION")})
+check("a branch working on the group's OWN note (an earlier attempt) never defers it",
+      [g.notes for g in own["groups"]], [["PB9"]])
 check("the one collision rule, path separators folded",
       pw.file_set_collisions(["src" + chr(92) + "A.cs"], {"t": {"src/A.cs"}, "u": {"src/B.cs"}}), ["t (src/A.cs)"])
 
@@ -506,11 +720,13 @@ check("the planner's own checkout is not in flight", any("main" in k for k in fl
 check("the collision names the dispatched owner", pw.file_set_collisions(["src/Dispatched.cs"], fly),
       ["dispatched w1040a (PB70) (src/Dispatched.cs)"])
 
-# 9e. the group's file set (PB2118 Draft 8, the seventh refuter's J2 and J3): every site a note names WHATEVER its
-#     score (Draft 7 kept fix_clusters' >= 2 and dropped a bare type name: "GammaState's" never added GammaState.cs),
-#     plus the callers the member index computes for the note (an injected function here; member_index.py's own
-#     self-test drives the computation); and a HAND dispatch is in flight from the moment the guard admits it, not
-#     from its first edit (record_hand_dispatch), until its notes land or its entry expires.
+# 9e. the group's file set (kb/Work PB3242; PB2118 Draft 8, the seventh refuter's J2): its notes' DECLARED sets, the
+#     structured sites (a bare type name in prose, "GammaState's", declares nothing) plus the callers the member index
+#     computes for the note (an injected function here; member_index.py's own self-test drives the computation), plus
+#     the primary file; and the dispatch ledger has STRUCTURED writers only (kb/Work PB3186):
+#     record_dispatch upserts on (wave, letter) and drops the retired hand entries, and make_dispatch_specs.py records
+#     every group it renders with its `file_set` list (or the set computed from its notes when a hand-built groups
+#     file carries none).
 if fc:
     C2 = TMP / "campaign2"
     for rel in ("src/Lib/Alpha.cs", "src/Lib/GammaState.cs", "src/Lib/Beta.cs", "src/Lib/Caller.cs"):
@@ -518,8 +734,8 @@ if fc:
         (C2 / rel).write_text("// fixture" + NL, encoding="utf-8", newline="\n")
     W2 = C2 / "kb" / "Work"
     W2.mkdir(parents=True)
-    for nid, body in (("PB950", "Fold GammaState's flags into `src/Lib/Alpha.cs`."),
-                      ("PB951", "Move `src/Lib/Beta.cs`'s members (callers computed).")):
+    for nid, body in (("PB950", f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}{NL}Fold GammaState's flags into it."),
+                      ("PB951", f"**Sites:**{NL}- `src/Lib/Beta.cs`{NL}{NL}Move its members (callers computed).")):
         (W2 / f"{nid}.md").write_text(
             f'---{NL}title: "{nid} — step"{NL}id: {nid}{NL}kind: analysis{NL}status: open{NL}area: architecture{NL}'
             f"wrong_answer: false{NL}process_only: true{NL}blocked: false{NL}blocked_by: []{NL}cluster: [PB950]{NL}---"
@@ -528,10 +744,11 @@ if fc:
     view2 = work.cluster_order(items2, "PB950")
     notes2 = pw.load_notes(W2, {"wrong_answer": 8})
     texts2 = {i: (W2 / f"{i}.md").read_text(encoding="utf-8") for i in notes2}
+    D2 = pw.declared_sets(C2, pw.IndexPolicy(TMP / "no-cache", regenerate=False))
     o2, _, _, _ = pw.campaign_clusters(view2, notes2, texts2, RULES, fc, C2,
-                                       callers=lambda text: {"src/Lib/Caller.cs"} if "PB951" in text else set())
+                                       lambda text: D2(text) | ({"src/Lib/Caller.cs"} if "PB951" in text else set()))
     files2 = {n["id"]: c["files"] for c in o2 for n in c["notes"]}
-    check("a bare type name (score 1) is in its group's file set", "src/Lib/GammaState.cs" in files2["PB950"], True)
+    check("a bare type name in prose declares nothing (PB3242)", "src/Lib/GammaState.cs" in files2["PB950"], False)
     check("a note's computed callers are in its group's file set", "src/Lib/Caller.cs" in files2["PB951"], True)
     check("callers never steer the clustering (the primary file is a named site)",
           sorted(c["file"] for c in o2), ["src/Lib/Alpha.cs", "src/Lib/Beta.cs"])
@@ -539,28 +756,57 @@ if fc:
           ["train t (src/Lib/Caller.cs)"])
 HL = TMP / "coord-hand"
 HL.mkdir()
-pw.record_hand_dispatch(HL, "general-purpose: R1 author", ["PB960"], {"src/Hand.cs"}, terminal=lambda i: False, now=1000.0)
-hand = pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False, now=1000.0 + 60)
-check("a hand dispatch is in flight before its agent edits a file", {f for fs in hand.values() for f in fs},
-      {"src/Hand.cs"})
-check("a hand entry expires after HAND_TTL_SECONDS",
-      pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False,
-                            now=1000.0 + pw.HAND_TTL_SECONDS + 1), {})
-check("a hand entry whose notes landed is not in flight",
-      pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: True, with_git=False, now=1000.0 + 60), {})
+coord.write_json(HL / pw.DISPATCH_LEDGER, {"groups": [
+    {"wave": "hand", "letter": "", "label": "cobol-clerk: x", "hand": True, "notes": ["PB961"], "files": ["src/Junk.cs"],
+     "at": 1.0},
+    {"wave": "1060", "letter": "A", "notes": ["PB962"], "files": ["src/Old.cs"], "at": 2.0}]})
+check("a retired hand entry is no dispatch: not in flight, not held, no wave number",
+      ({f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False).values() for f in fs},
+       pw.held_by_dispatch(HL, [], lambda i: False), pw.next_wave(TMP / "no-devlog", [], HL)),
+      ({"src/Old.cs"}, {"PB962": "dispatch w1060a"}, 1061))
+first = pw.record_dispatch(HL, "1061", [{"letter": "A", "notes": ["PB960"], "files": ["src" + chr(92) + "Hand.cs"]},
+                                        {"letter": "B", "notes": ["PB963"], "files": ["src/B.cs"]}], lambda i: False)
+again = pw.record_dispatch(HL, "1061", [{"letter": "a", "notes": ["PB960"], "files": ["src/Hand.cs", "src/More.cs"]}],
+                           lambda i: False)
+LG = coord.read_json(HL / pw.DISPATCH_LEDGER, {})["groups"]
+check("record_dispatch drops the retired hand entry and keeps the other waves", [(g["wave"], g["letter"]) for g in LG],
+      [("1060", "A"), ("1061", "B"), ("1061", "a")])
+check("record_dispatch UPSERTS on (wave, letter): the re-recorded group replaces its entry, its files exact, POSIX",
+      [g["files"] for g in LG if g["wave"] == "1061" and g["letter"].upper() == "A"], [["src/Hand.cs", "src/More.cs"]])
+check("each entry carries its report slug", [g["slug"] for g in first + again], ["w1061a", "w1061b", "w1061a"])
+check("a recorded group is in flight before its agent edits a file, until its notes land",
+      ({f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False).values() for f in fs}
+       >= {"src/Hand.cs", "src/More.cs"},
+       pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: True, with_git=False)), (True, {}))
+check("an ANSWERED group (its report exists, SPLIT residue included) holds no declared file, for every reader (PB2795)",
+      {f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False,
+                                         reports=[dataclasses.replace(FIN, slug="w1061B", status="SPLIT")]).values()
+       for f in fs} & {"src/B.cs", "src/Hand.cs"}, {"src/Hand.cs"})
+pw.record_dispatch(HL, "1062", [], lambda i: i == "PB962")
+check("an entry whose notes all landed is dropped at the next record",
+      [g["wave"] for g in coord.read_json(HL / pw.DISPATCH_LEDGER, {})["groups"]], ["1061", "1061"])
+MDS = TMP / "coord-mds"
+MDS.mkdir()
+MCFG = {"wave": "1070", "groups": [{"letter": "A", "slug": "w1070a", "notes": "PB970, PB971", "file_set": ["src/M.cs"]},
+                                   {"letter": "B", "slug": "w1070b", "notes": "PB972"}]}
+mds.record(MCFG, MDS, terminal=lambda i: False, file_set_of=lambda ids: {f"src/{i}.cs" for i in ids})
+check("make_dispatch_specs records every rendered group: its file_set list, else the set computed from its notes",
+      [(g["slug"], g["notes"], g["files"]) for g in coord.read_json(MDS / pw.DISPATCH_LEDGER, {})["groups"]],
+      [("w1070a", ["PB970", "PB971"], ["src/M.cs"]), ("w1070b", ["PB972"], ["src/PB972.cs"])])
+check("the planner's groups file carries the file set as a LIST", gjson[0]["file_set"], sorted(p["groups"][0].files))
 # 9f. (PB2118 Draft 9) the landing check orders two branches by dispatch time: the in-flight enumeration reports each
 #     dispatch entry's notes and time through `meta`; and the planner never plans on a stale member index
 META: dict = {}
-pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False, now=1000.0 + 60, meta=META)
-check("meta carries a dispatch entry's notes and time", [(m["notes"], m["at"]) for m in META.values()],
-      [(["PB960"], 1000.0)])
+pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: i != "PB960", with_git=False, meta=META)
+check("meta carries a dispatch entry's notes, time and slug",
+      [(m["notes"], m["at"], m["slug"]) for m in META.values()], [(["PB960"], again[0]["at"], "w1061a")])
 STALE = TMP / "stale-repo"
 (STALE / "src").mkdir(parents=True)
 (STALE / "src" / "A.cs").write_text("// a" + NL, encoding="utf-8", newline="\n")
 for args in (["init", "-q"], ["add", "-A"], ["-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "c"]):
     subprocess.run(["git", *args], cwd=STALE, check=True, capture_output=True)
 try:
-    pw.member_callers(STALE, TMP / "no-cache", regenerate=False)
+    pw.declared_sets(STALE, pw.IndexPolicy(TMP / "no-cache", regenerate=False))("**Moves or changes:** `N.T.M`")
     check("the planner refuses a tree no member index describes", "planned", "refused")
 except SystemExit:
     check("the planner refuses a tree no member index describes", "refused", "refused")
@@ -570,10 +816,9 @@ except SystemExit:
 #     letter order, so no two tie (N4); and an aborted dispatch is released by wave, group or note, never by a clock (N5)
 RL = TMP / "release"
 RL.mkdir()
-pw.record_dispatch(RL, "1050", [pw.Group(kind="cluster", notes=["PB80"], file="", files=["src/X.cs"], letter="a"),
-                                pw.Group(kind="cluster", notes=["PB81"], file="", files=["src/Y.cs"], letter="b"),
-                                pw.Group(kind="cluster", notes=["PB82"], file="", files=["src/Z.cs"], letter="c")],
-                   terminal=lambda i: False)
+pw.record_dispatch(RL, "1050", [{"letter": "a", "notes": ["PB80"], "files": ["src/X.cs"]},
+                                {"letter": "b", "notes": ["PB81"], "files": ["src/Y.cs"]},
+                                {"letter": "c", "notes": ["PB82"], "files": ["src/Z.cs"]}], terminal=lambda i: False)
 ATS = [g["at"] for g in coord.read_json(RL / pw.DISPATCH_LEDGER, {})["groups"]]
 check("one wave's groups never tie and keep letter order", ATS == sorted(ATS) and len(set(ATS)) == 3, True)
 check("release by group", [g["letter"] for g in pw.release_dispatch(RL, "1050b")], ["b"])
@@ -693,9 +938,153 @@ with tempfile.TemporaryDirectory() as td:
     (tdir / "DEVLOG" / "0001-wave-1034.md").write_text("## Entry 1 — wave 1034 dispatched" + NL, encoding="utf-8", newline="\n")
     check("next_wave counts a train label above every wave number", pw.next_wave(tdir, []), 1037)
     # PB2806: a wave recorded in the dispatch ledger with no report yet (another session's) is a taken number too
-    pw.record_dispatch(tdir, "1045", [pw.Group(kind="cluster", notes=["PB5"], file="", files=["src/X.cs"], letter="a")],
-                       lambda i: False)
+    pw.record_dispatch(tdir, "1045", [{"letter": "a", "notes": ["PB5"], "files": ["src/X.cs"]}], lambda i: False)
     check("next_wave counts a dispatched wave with no report", pw.next_wave(tdir, [], tdir), 1046)
+
+# PB3181: THE ONE "FINISHED REPORT" PREDICATE (Report.finished) and its `--finished` arm, which the rolling wave asks
+# before it reviews a return; the header's HEAD and BASE fields are read field-first.
+with tempfile.TemporaryDirectory() as td:
+    fdir = pathlib.Path(td)
+    full = "0123456789abcdef0123456789abcdef01234567"
+    for name, text in (("w9f1a-PB1-report.md", "Status: DONE\nBranch: b\nHEAD: 1111111\nBase: 2222222\n"),
+                       ("w9f1b-PB1-report.md", "**Status:** DISCHARGED · **branch:** `b` · **base:** `2222222` · "
+                                               "**HEAD:** `3333333`\n"),
+                       ("w9f1c-PB1-report.md", f"DISCHARGED\nBase {full}  Head {full[:9]}\n"),
+                       ("w9f1d-PB1-report.md", "Status: DISCHARGED\nBase: 2222222\n"),
+                       ("w9f1e-PB1-report.md", "Status: SPLIT\nHEAD: 1111111\n"),
+                       ("w9f1f-PB1-report.md", "\n**Review:** CLEAN r1 1111111\n# a report with no status line\n"
+                                               "Branch: b · head 1111111\n"),
+                       ("w9f1g-PB1-report.md", "Status: DONE\nBranch: b · base 2222222 (reviewed head 4444444 merged in)"
+                                               " · head 5555555\n")):
+        (fdir / name).write_text(text + "\n## Rule\nHEAD: 9999999 below the header binds nothing\n", encoding="utf-8",
+                                 newline="\n")
+    got = {n[4]: (r.status, r.head, r.base, r.finished) for n in sorted(p.name for p in fdir.iterdir())
+           if (r := pw.parse_report(fdir / n))}
+    check("Report.finished: DONE, or DISCHARGED with a HEAD past its base; never SPLIT, no status, head == base or none",
+          {k: v[3] for k, v in got.items()},
+          {"a": True, "b": True, "c": False, "d": False, "e": False, "f": False, "g": True})
+    check("the template's base and HEAD fields are read", got["b"][1:3], ("3333333", "2222222"))
+    check("a field-position head beats a head named in prose before it (w1080f's header)", got["g"][1], "5555555")
+    check("an abbreviated head names its full base: one commit (same_commit)", pw.same_commit(full[:9], full), True)
+    for letter, want in (("a", 0), ("b", 0), ("c", 1), ("d", 1), ("f", 1)):
+        check(f"--finished w9f1{letter}: exit {want}", pw.main(["--finished", str(fdir / f"w9f1{letter}-PB1-report.md")]),
+              want)
+    check("--finished on a missing report: exit 2", pw.main(["--finished", str(fdir / "w9f1z-PB1-report.md")]), 2)
+    (fdir / "notes.md").write_text("Status: DONE\n", encoding="utf-8", newline="\n")
+    check("--finished on a name that is not a fix-lane report: exit 2", pw.main(["--finished", str(fdir / "notes.md")]), 2)
+    check("status_line finds the bare word and its index; None without one",
+          (pw.status_line(["# title", "DONE"]), pw.status_line(["# title", "Branch: b"])), ((1, "DONE"), None))
+
+# 10. A NOTE'S DECLARED FILE SET IS ITS STRUCTURED SITES, READ BY ONE READER (kb/Work PB3242; DESIGN-architecture-review
+#     §8.7). The planner once declared every path a note's prose mentioned (fix_clusters' scored reading), so the R2
+#     and PB3160 campaigns planned zero groups: 57 of PB1754's 63 ready notes DISCUSS plan_wave.py and landing_check.py,
+#     and every PB3160 slice's Gate: line names cite.py.
+DR = TMP / "declared"
+for rel in ("src/Lib/Alpha.cs", "src/Lib/Beta.cs", "tests/Delta.Tests/DeltaTests.cs", "scripts/gamma.py",
+            "scripts/spec/cite.py", "src/Model/DataItem.cs"):
+    (DR / rel).parent.mkdir(parents=True, exist_ok=True)
+    (DR / rel).write_text("// fixture" + NL, encoding="utf-8", newline="\n")
+DDECL = pw.declared_sets(DR, pw.IndexPolicy(TMP / "no-cache", regenerate=False))
+sys.path.insert(0, str(coord.REPO / "scripts" / "arch"))
+import member_index  # noqa: E402
+GATE_ONLY = (f"**Sites:**{NL}- `scripts/gamma.py`{NL}{NL}Probe it with `python scripts/spec/cite.py --check 14.9 \"x\"`."
+             f"{NL}{NL}**Gate:** `python scripts/spec/cite.py --check 14.9 \"x\"` and `pwsh scripts/build-local.ps1`{NL}")
+check("(1) a note whose only mention of cite.py is a Gate: line and prose declares no cite.py",
+      ("scripts/spec/cite.py" in DDECL(GATE_ONLY), sorted(DDECL(GATE_ONLY))), (False, ["scripts/gamma.py"]))
+EVERY_SHAPE = (f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}- `src/Lib/Beta.cs#Run` (Run){NL}"
+               f"- `tests/Delta.Tests/DeltaTests.cs:12-40`{NL}- scripts/gamma.py (main){NL}"
+               f"- `M:N.OoBinder.Err(N.Model.DataItem)~System.String @ src/.../OoBinder.cs:1783`{NL}{NL}"
+               f"**Fix.** It also touches `src/Model/DataItem.cs` in prose.{NL}")
+SITES = ("scripts/gamma.py", "src/Lib/Alpha.cs", "src/Lib/Beta.cs", "tests/Delta.Tests/DeltaTests.cs")
+check("(2) a Sites path, a file#member, a file:line and a scripts/ path each declare their file; a census member id's "
+      "parameter type (PB2423) and a path in prose declare nothing", work.note_sites(EVERY_SHAPE).paths, SITES)
+check("(2) the census member id is a name, its return type dropped",
+      work.note_sites(EVERY_SHAPE).names, ("N.OoBinder.Err(N.Model.DataItem)",))
+for shape, text in (("a bold paragraph label", f"**Code site.** src/Lib/Alpha.cs#Run (the arm){NL}{NL}**Fix.** x"),
+                    ("a heading section", f"## Code sites{NL}{NL}`src/Lib/Alpha.cs:7`, and more:{NL}{NL}"
+                                          f"### Detail{NL}`src/Lib/Beta.cs`{NL}## Fix{NL}`scripts/gamma.py`"),
+                    ("a list-item label", f"- **Code site:** src/Lib/Alpha.cs#Run{NL}- **Fix:** scripts/gamma.py"),
+                    ("a label alone over a loose list", f"**Sites:**{NL}{NL}- `src/Lib/Alpha.cs`{NL}{NL}Prose: "
+                                                        f"scripts/gamma.py")):
+    want = ("src/Lib/Alpha.cs", "src/Lib/Beta.cs") if shape == "a heading section" else ("src/Lib/Alpha.cs",)
+    check(f"(2) the site block as {shape} ends where the block ends", work.note_sites(text).paths, want)
+check("(2) a placeholder, a glob and a bare root are no sites",
+      work.note_sites(f"**Sites:**{NL}- `src/<Project>/X.cs`{NL}- `tests/**/char_*.txt`{NL}- `src/`{NL}").paths, ())
+check("(2) the roots are model_rules.json's campaign roots, never a literal",
+      work.campaign_domain().roots, tuple(RULES["campaign"]["src"]))
+EMPTY_INDEX = {"commit": "c", "uses": {}, "types": {}, "declared": {}, "emitted": {}, "_simple": {}}
+fs_mi = member_index.note_file_set(EVERY_SHAPE, DR, index=lambda: EMPTY_INDEX, drifted=lambda: {})
+check("(3) the member index's declared set of a note with a name: its sites (the name unknown to this index)",
+      (tuple(fs_mi["sites"]), tuple(fs_mi["files"]), fs_mi["unknown"]), (SITES, SITES, ["N.OoBinder.Err(N.Model.DataItem)"]))
+SITES_ONLY = EVERY_SHAPE.replace(f"- `M:N.OoBinder.Err(N.Model.DataItem)~System.String @ src/.../OoBinder.cs:1783`{NL}", "")
+check("(3) the planner, the member index and the register read the same sites for the same note",
+      (tuple(sorted(DDECL(SITES_ONLY))), tuple(member_index.note_file_set(SITES_ONLY, DR)["sites"]),
+       work.note_sites(SITES_ONLY).paths), (SITES, SITES, SITES))
+if fc:
+    CD = TMP / "declared-campaign" / "kb" / "Work"
+    CD.mkdir(parents=True)
+    (CD / "PB990.md").write_text(f"---{NL}id: PB990{NL}status: open{NL}cluster: [PB990]{NL}---{NL}{NL}{SITES_ONLY}",
+                                 encoding="utf-8", newline="\n")
+    citems = [dict(work.parse_frontmatter((CD / "PB990.md").read_text(encoding="utf-8")), _file="PB990.md")]
+    cn = pw.load_notes(CD, {"wrong_answer": 8})
+    o3, _, _, _ = pw.campaign_clusters(work.cluster_order(citems, "PB990"), cn,
+                                       {"PB990": (CD / "PB990.md").read_text(encoding="utf-8")}, RULES, fc, DR, DDECL)
+    check("(3) the planner's campaign group: its primary file is a declared site, its files exactly the declared set",
+          (o3[0]["file"] in SITES, tuple(o3[0]["files"])), (True, SITES))
+FL = TMP / "declared-fix" / "kb" / "Work"
+FL.mkdir(parents=True)
+(FL / "PB991.md").write_text(f"---{NL}id: PB991{NL}---{NL}{NL}{GATE_ONLY}", encoding="utf-8", newline="\n")
+FLC = [{"file": "src/Lib/Alpha.cs", "files": ["src/Lib/Alpha.cs", "scripts/spec/cite.py"], "notes": [{"id": "PB991"}]}]
+pw.declare_fix_lane(FLC, DDECL, FL)
+check("a fix-lane cluster's collision set is its notes' declared sets plus its primary file, never fix_clusters' "
+      "prose sites", FLC[0]["files"], ["scripts/gamma.py", "src/Lib/Alpha.cs"])
+# Branch review R1-2: an R2 defect routed to the fix lane (its wave kind work.FIX_LANE_WAVE, with r2_members) is a
+# fix-lane note: the fix lane's plan declares its sites without reading the member index, so it never regenerates
+# one (DDECL's policy has no cache and refuses to regenerate: a read would raise StaleIndex).
+(FL / "PB992.md").write_text(f"---{NL}id: PB992{NL}---{NL}{NL}r2_members: N.Beta.Run, N.Alpha.Go{NL}{NL}"
+                             f"**Wave kind:** {work.FIX_LANE_WAVE}. **Model:** the fix lane's routing.{NL}{NL}"
+                             f"**Sites:**{NL}- `src/Lib/Beta.cs:10-20` (Beta.Run){NL}", encoding="utf-8", newline="\n")
+FLD = [{"file": "src/Lib/Beta.cs", "files": ["src/Lib/Beta.cs"], "notes": [{"id": "PB992"}]}]
+try:
+    pw.declare_fix_lane(FLD, DDECL, FL)
+    check("R1-2: an R2 fix-lane defect with r2_members declares its sites and reads no index", FLD[0]["files"],
+          ["src/Lib/Beta.cs"])
+except Exception as e:   # noqa: BLE001 — any read of the index (StaleIndex, a git call on a fixture) is the red
+    check("R1-2: an R2 fix-lane defect with r2_members declares its sites and reads no index",
+          f"read the index: {type(e).__name__}: {e}",
+          ["src/Lib/Beta.cs"])
+sys.path.insert(0, str(coord.REPO / "scripts" / "arch"))
+import r2_collect  # noqa: E402
+import file_census_notes  # noqa: E402
+check("R1-2: the fix lane's wave kind is one of the R2 collector's wave kinds (one constant, work.FIX_LANE_WAVE)",
+      work.FIX_LANE_WAVE in r2_collect.WAVES, True)
+# Branch review R1-1: the line file_census_notes writes naming the files ONE STEP edits is a site block, so a step file
+# outside the census finding's Sites (PB2300's IntrinsicCatalog.cs) is declared; the reader reads the writer's line.
+STEP = f"**Sites:**{NL}- `src/Lib/Alpha.cs`{NL}{NL}{file_census_notes.step_files_line(['src/Lib/Alpha.cs', 'src/Lib/Beta.cs'])}{NL}"
+check("R1-1: the step-files line file_census_notes writes declares its files (reader = planner)",
+      (work.note_sites(STEP).paths, tuple(sorted(DDECL(STEP)))), (("src/Lib/Alpha.cs", "src/Lib/Beta.cs"),) * 2)
+
+
+def note_path_scanners(sources: dict[str, str]) -> list[str]:
+    """(4) the modules that scan text for paths with a regex over the campaign roots (`(?:src|tests…)/`) or call
+    fix_clusters' prose scorer (`.sites(`): only the register's reader (scripts/spec/work.py) may read a note's paths.
+    The other regex shapes read documents that are not notes: drift_rules.py a C# drift test's string literals,
+    audit_evidence_supersession.py the evidence records. A test file's fixtures are no reader."""
+    alts = "|".join(sorted({re.escape(x) for r in RULES["campaign"]["src"] for x in (r, re.escape(r))}))
+    shape = re.compile(r"\((?:\?:)?(?:" + alts + r")\||\.sites\(")
+    exempt = {"scripts/spec/work.py", "scripts/spec/drift_rules.py", "scripts/spec/audit_evidence_supersession.py"}
+    return sorted(p for p, t in sources.items()
+                  if p not in exempt and not pathlib.PurePosixPath(p).name.startswith("test_") and shape.search(t))
+
+
+TREE = {p.relative_to(coord.REPO).as_posix(): p.read_text(encoding="utf-8", errors="replace")
+        for root in ("scripts", ".claude/skills") for p in (coord.REPO / root).rglob("*.py")}
+check("(4) no module outside the reader scans a note's text for paths", note_path_scanners(TREE), [])
+PLANT = "SITE_PATH = re.compile(r\"`((?" + ":src|tests)/[^`]+)\")"
+check("(4) the scan fails on a planted copy of the old whole-text SITE_PATH and on a prose-scorer call",
+      note_path_scanners({"scripts/arch/planted.py": PLANT, "scripts/orchestrator/p2.py": "fc" + ".sites(text, idx, exts)",
+                          "scripts/orchestrator/fine.py": "x = 1"}),
+      ["scripts/arch/planted.py", "scripts/orchestrator/p2.py"])
 
 for f in fails:
     print("FAIL:", f)

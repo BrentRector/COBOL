@@ -71,7 +71,7 @@ internal sealed class OoDriver(BindSession session)
 
     private DataBinder BindInterface(OoInterfaceSymbol iface)
     {
-        var data = new DataBinder(session.Edition) { OoClasses = session.OoClasses, OwnWords = session.OoClasses.CensusOf(iface.Ctx) ?? new(), OoIsClassUnit = true, RefModZeroLength = session.RefModZeroLength, CobolWords = session.CobolWords, Retypes = session.Retypes, LeapSecond = session.LeapSecond.IsOnAt(iface.Ctx.Start.Line), CompilationVariables = session.CompilationVariables };
+        var data = ElementBinder(iface.Ctx, iface.Ctx, ownerClassName: null);
         data.CallSeedUids(session.TakeUidBand());
         // §10.6.1 / §11.9.4 GR1: the INTERFACE skeleton carries its own OPTIONS paragraph, and nothing bound it
         // — so its clauses had no effect on the prototypes AND, because OptionsBinder is where the
@@ -79,10 +79,9 @@ internal sealed class OoDriver(BindSession session)
         // (kb/Work PB197: the second hollow arm, found by sweeping all six optionsParagraph-bearing productions
         // rather than only the METHOD one the finding named).
         data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(iface.Ctx.optionsParagraph(), session.Edition, null));
-        var synthetic = new Core.ProgramUnitContext(null!, -1);
         OoEnvironmentRules.Screen(OoDefinition.Interface, $"interface '{iface.Name}'",
             iface.Ctx.environmentDivision(), session.Edition);
-        if (iface.Ctx.environmentDivision() is { } env) synthetic.AddChild(env);
+        var synthetic = OoReparent(iface.Ctx.environmentDivision(), dataDivision: null);
         data.BindDeclarations(synthetic);
         using (session.Edition.At(iface.Ctx)) data.DeclareUserWord(iface.Name, UserWordKind.InterfaceName);
         foreach (var proto in iface.Prototypes)
@@ -115,23 +114,43 @@ internal sealed class OoDriver(BindSession session)
             classCtx.factoryParagraph()?.dataDivision(), edition);
         OoDefinitionRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
             classCtx.objectParagraph()?.dataDivision(), edition);
-        // OoOwnerClassName is what USAGE OBJECT REFERENCE [FACTORY OF] ACTIVE-CLASS binds to — §13.18.60.4
-        // GR22 e), the class of the object that invoked the containing method (kb/Work PB389).
-        var data = new DataBinder(edition) { OoClasses = session.OoClasses, OwnWords = session.OoClasses.CensusOf(classCtx) ?? new(), OoIsClassUnit = true, OoOwnerClassName = cls.Name, RefModZeroLength = session.RefModZeroLength, CobolWords = session.CobolWords, Retypes = session.Retypes, LeapSecond = session.LeapSecond.IsOnAt(cls.Symbol.Ctx.Start.Line), CompilationVariables = session.CompilationVariables };
-        data.CallSeedUids(session.TakeUidBand());
         // §10.6.1 / §11.9.4 GR1 (kb/Work PB135): the class skeleton's OPTIONS paragraph is the contained
-        // definitions' baseline; the OBJECT paragraph's own overrides it clause by clause.
-        var clsOptions = Binding.OptionsBinder.BindParagraph(cls.Symbol.Ctx.optionsParagraph(), edition, null);
-        data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(
-            cls.Symbol.Ctx.objectParagraph()?.optionsParagraph(), edition, clsOptions));
-        var synthetic = OoReparentClassData(cls.Symbol.Ctx);
-        data.ReserveMethodMemberNames(cls.Symbol.Methods);   // one C# class holds the object data AND the methods
+        // definitions' baseline; the OBJECT and FACTORY paragraphs' own override it clause by clause.
+        var clsOptions = Binding.OptionsBinder.BindParagraph(classCtx.optionsParagraph(), edition, null);
+
+        // ⛔ THE CLASS DEFINITION IS A SOURCE ELEMENT OF ITS OWN (kb/Work PB3154). §10.5: "A source element is a source
+        // unit excluding any contained source units", and the factory and instance definitions are source units the
+        // class definition contains (§3.165). So the words of the class definition's environment division (its
+        // REPOSITORY specifiers, its SPECIAL-NAMES names) and its CLASS-ID are declared ONCE, here, in the class's
+        // §8.3.2.2 census, and the factory and instance binders INHERIT the configuration they establish (§12.3.4
+        // GR1; DataBinder.InheritConfiguration, the contained-program model of kb/Work PB990) without declaring a word
+        // of it: §8.4.6.1 lets a contained source element "use identical user-defined words to name items independent
+        // of the use of these user-defined words by other source elements". Both halves used to bind the class's
+        // environment division as their own, so a factory or object data item spelled like a class the REPOSITORY
+        // names, an alphabet SPECIAL-NAMES declares or the CLASS-ID itself was refused COBOLNET2692 on legal source.
+        // Nothing here draws a uid (the division declares names, never data items), so it takes no uid band.
+        var classData = ElementBinder(classCtx, classCtx, cls.Name);
+        classData.CallInheritOptions(clsOptions);
+        var classSynthetic = OoReparent(classCtx.environmentDivision(), dataDivision: null);
+        classData.BindDeclarations(classSynthetic);
+        using (edition.At(classCtx)) classData.DeclareUserWord(cls.Name, UserWordKind.ObjectClassName);
+        classData.BindResolve(classSynthetic);
+
+        // The INSTANCE half: the OBJECT paragraph's own source element.
+        var obj = classCtx.objectParagraph();
+        var data = ElementBinder(obj, classCtx, cls.Name);
+        data.CallSeedUids(session.TakeUidBand());
+        data.InheritConfiguration(classData);   // before CallInheritOptions: it carries the class's OPTIONS baseline
+        data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(obj?.optionsParagraph(), edition, clsOptions));
+        var synthetic = OoReparent(obj?.environmentDivision(), obj?.dataDivision());
+        data.ReserveClassMemberNames(cls.Symbol.CsName, cls.Symbol.Methods);   // one C# class holds the object data AND the methods
         data.BindDeclarations(synthetic);
-        using (edition.At(cls.Symbol.Ctx)) data.DeclareUserWord(cls.Name, UserWordKind.ObjectClassName);
         foreach (var m in cls.Symbol.Methods.ToList())   // snapshot — property synthesis appends accessors
             data.OoBindMethodData(m);
         data.OoBindPropertyClauses(cls.Symbol, factory: false);
         data.BindResolve(synthetic);
+        // The class's symbolic-characters an OBJECT data-name of the spelling hides (§8.4.6.1; kb/Work PB3154 R1-1).
+        data.DropShadowedConstants();
         cls.Data = data;
         cls.Refs = new ReferenceResolver(data);
 
@@ -139,17 +158,20 @@ internal sealed class OoDriver(BindSession session)
         // invisible to instance methods and vice versa (separate source elements, §10.6), realized exactly
         // like method scoping: a second binder, never a merged namespace. SR 10 (INVOKE-argument ban on
         // factory WS) works free: the factory binder's WS roots are not method-scoped → OoIsObjectData.
-        var fdata = new DataBinder(edition) { OoClasses = session.OoClasses, OwnWords = session.OoClasses.CensusOf(classCtx.factoryParagraph()) ?? new(), OoIsClassUnit = true, OoOwnerClassName = cls.Name, RefModZeroLength = session.RefModZeroLength, CobolWords = session.CobolWords, Retypes = session.Retypes, LeapSecond = session.LeapSecond.IsOnAt(cls.Symbol.Ctx.Start.Line), CompilationVariables = session.CompilationVariables };
+        var fac = classCtx.factoryParagraph();
+        var fdata = ElementBinder(fac, classCtx, cls.Name);
         fdata.CallSeedUids(session.TakeUidBand());
+        fdata.InheritConfiguration(classData);
         fdata.CallInheritOptions(Binding.OptionsBinder.BindParagraph(
-            cls.Symbol.Ctx.factoryParagraph()?.optionsParagraph(), edition, clsOptions));   // §11.9.4 GR1 (kb/Work PB135)
-        var fsynthetic = OoReparentFactoryData(cls.Symbol.Ctx);
-        fdata.ReserveMethodMemberNames(cls.Symbol.FactoryMethods);   // the factory class holds both, likewise
+            fac?.optionsParagraph(), edition, clsOptions));   // §11.9.4 GR1 (kb/Work PB135)
+        var fsynthetic = OoReparent(fac?.environmentDivision(), fac?.dataDivision());
+        fdata.ReserveClassMemberNames(cls.Symbol.FactoryCsName, cls.Symbol.FactoryMethods);   // the factory class holds both, likewise
         fdata.BindDeclarations(fsynthetic);
         foreach (var m in cls.Symbol.FactoryMethods.ToList())
             fdata.OoBindMethodData(m);
         fdata.OoBindPropertyClauses(cls.Symbol, factory: true);
         fdata.BindResolve(fsynthetic);
+        fdata.DropShadowedConstants();   // …and a FACTORY data-name, likewise
         cls.FactoryData = fdata;
         cls.FactoryRefs = new ReferenceResolver(fdata);
     }
@@ -196,30 +218,38 @@ internal sealed class OoDriver(BindSession session)
         cls.FactoryBound = fbinder.BindMethodRoster(cls.Symbol, cls.Symbol.FactoryMethods);
     }
 
-    /// <summary>Re-shape a class definition's data surface into a synthetic <c>programUnit</c> context for the
-    /// per-unit DataBinder (the CallReparent pattern — accessors scan DIRECT children only): the OBJECT
-    /// paragraph's environment/data divisions, then the class-level environment division (the singular
-    /// <c>environmentDivision()</c> accessor returns the FIRST child, so the nearer OBJECT scope wins).</summary>
-    private static Core.ProgramUnitContext OoReparentClassData(Core.ClassDefinitionContext ctx)
+    /// <summary>Re-shape one OO source element's own divisions into a synthetic <c>programUnit</c> context for the
+    /// per-element DataBinder (the CallReparent pattern — the generated accessors scan DIRECT children only, so the
+    /// binder sees exactly this element's environment and data divisions): a class, factory, instance or interface
+    /// definition. A containing definition's environment division is never one of them: its configuration reaches
+    /// the element through <c>DataBinder.InheritConfiguration</c> (§12.3.4 GR1; kb/Work PB3154).</summary>
+    private static Core.ProgramUnitContext OoReparent(Core.EnvironmentDivisionContext? environmentDivision,
+        Core.DataDivisionContext? dataDivision)
     {
         var unit = new Core.ProgramUnitContext(null!, -1);
-        var obj = ctx.objectParagraph();
-        if (obj?.environmentDivision() is { } envObj) unit.AddChild(envObj);
-        if (ctx.environmentDivision() is { } envCls) unit.AddChild(envCls);
-        if (obj?.dataDivision() is { } dd) unit.AddChild(dd);
+        if (environmentDivision is not null) unit.AddChild(environmentDivision);
+        if (dataDivision is not null) unit.AddChild(dataDivision);
         return unit;
     }
 
-    /// <summary>Re-shape the FACTORY paragraph's data surface into a synthetic <c>programUnit</c> (the
-    /// CallReparent discipline): factory env → class env → factory data division.</summary>
-    private static Core.ProgramUnitContext OoReparentFactoryData(Core.ClassDefinitionContext ctx)
+    /// <summary>A DataBinder for one OO source element (§10.5): <paramref name="element"/> is the parse node whose
+    /// §8.3.2.2 census the binder declares into (<see cref="OoClassTable.CensusOf"/>, the census the element's
+    /// class-name references record into too; a null node, an absent FACTORY or OBJECT paragraph, gets a census of
+    /// its own), <paramref name="definition"/> the class or interface definition whose first line decides the
+    /// >>LEAP-SECOND state, and <paramref name="ownerClassName"/> what USAGE OBJECT REFERENCE [FACTORY OF]
+    /// ACTIVE-CLASS binds to — §13.18.60.4 GR22 e), the class of the object that invoked the containing method
+    /// (kb/Work PB389); null for an interface.</summary>
+    private DataBinder ElementBinder(Antlr4.Runtime.RuleContext? element, Antlr4.Runtime.ParserRuleContext definition,
+        string? ownerClassName) => new(session.Edition)
     {
-        var unit = new Core.ProgramUnitContext(null!, -1);
-        var fac = ctx.factoryParagraph();
-        if (fac?.environmentDivision() is { } envFac) unit.AddChild(envFac);
-        if (ctx.environmentDivision() is { } envCls) unit.AddChild(envCls);
-        if (fac?.dataDivision() is { } dd) unit.AddChild(dd);
-        return unit;
-    }
-
+        OoClasses = session.OoClasses,
+        OwnWords = session.OoClasses.CensusOf(element) ?? new(),
+        OoIsClassUnit = true,
+        OoOwnerClassName = ownerClassName,
+        RefModZeroLength = session.RefModZeroLength,
+        CobolWords = session.CobolWords,
+        Retypes = session.Retypes,
+        LeapSecond = session.LeapSecond.IsOnAt(definition.Start.Line),
+        CompilationVariables = session.CompilationVariables,
+    };
 }

@@ -73,8 +73,9 @@ OO mechanism (feedback_one_mechanism_per_job):
   fatal-EC protocol) — only when EC-OO-EXCEPTION checking is enabled in the ACTIVATING element, else nothing is
   raised and the statement completes (§14.9.18.4 GR1 b), §14.6.13.1.1). The object counts as "propagated" for the
   CALL's NOT ON EXCEPTION test (GR3i) only when a USE AFTER EXCEPTION OBJECT declarative took it or the named arm
-  raised it. The SAME pickup runs after every CALL and every Instance/Self/Super/Factory INVOKE
-  and every UNIVERSAL dispatch (`OoEmitter.EmitInvokePickup`); NEW needs none (the ctor runs no user statements).
+  raised it. The SAME pickup runs after every CALL and after every INVOKE of every form — Instance/Self/Super/Factory,
+  UNIVERSAL, and New, whose `NEW OVERRIDE` is a user method that INVOKE SELF "NEW" reaches (kb/Work PB1582) — in the
+  one INVOKE tail `OoEmitter.EmitInvocationReturned`, after the §14.9.40.4 GR17 termination question (kb/Work PB1177).
   GR1b's result-before-exception ordering falls out of stage-then-`throw MethodReturn` + the entry catch
   delivering RETURNING/copy-outs before the site's pickup.
 - **Headers**: the PD-header RAISING phrase (§14.2.1 — `exception-name-1 | [FACTORY OF] object-class-name-1 |
@@ -112,7 +113,14 @@ the engine's design specifics:
 **File map.** Frontend: `Preprocessor/TurnDirectiveProcessor.cs` (the `>>TURN` stage — runs LAST, after COPY/NIST,
 on the FINAL text so `TurnEvent.Line` is directly comparable to token `Start.Line`; line-count preserving, asserted
 by `Frontend.Parse`; an emitting-branch TURN survives `ConditionalCompilationProcessor` via `leaveTurnDirectives` —
-the legacy pipeline keeps consuming TURN there). Compiler: `Binding/TurnState.cs` (the compile-time §7.3.25.4 fold),
+the legacy pipeline keeps consuming TURN there). **§7.3.25.3 SR2 (every written exception-name is one of §14.6.13.1's,
+in this edition) is a SYNTAX rule of the directive, so the `>>TURN` stage reports it** — COBOLNET0711 / 0878 — for a
+compiled line and, through `CheckOperand`, for a line in an OMITTED `>>IF` branch alike (§7.2.1; kb/Work PB2740). The
+rule itself is `Editions/ExceptionNameRule.cs` (`TryGet` + `Window`), which the binder's written-name funnel
+(`EcNameResolution.TryResolve`) asks too; what stays in the binder is the policy half (the RAISE level test, the
+declined-module postures, the §15.33 width advisory — `EcNameResolution.Advise`), which `TurnState.Build` reaches through
+`AdviseResolved` for names the stage already resolved (a refused name never enters the `TurnEvent`).
+Compiler: `Binding/TurnState.cs` (the compile-time §7.3.25.4 fold),
 `Binding/Procedure/Verbs/EcBinder.cs` (RAISE/RESUME/SET LAST EXCEPTION/RAISING binds + the per-statement
 `EcWrap` fold → `BoundEcChecked`), `CodeGen/EcEmitter.cs` (guards + the generated `__EcDispatch` /
 `__IoCheckEc`), `CodeGen/Verbs/CallEmitter.cs` (RAISING staging, the CALL-site propagation pickup, the EC-PROGRAM
@@ -477,7 +485,14 @@ propagation slot + the EC-ARGUMENT-FUNCTION ambient gate), `EcFunctions` (§15.2
 - **Diagnostics band:** COBOLNET0710 (RAISE of a non-level-3), 0711 (unknown exception-name), 0712/0713/
   0714 (RESUME SR1/SR2/SR3), 0715/0716 (USE F3 SR13/SR14), 0717 (RAISING SR2 ¶27403), 0718/0719 (TURN SR3/SR1+SR4),
   0875–0879 (the 2002+ edition gates: TURN / RAISE+RESUME / USE F3 / per-name edition window / SET LAST EXCEPTION+
-  RAISING).
+  RAISING), 3803 (Warning, kb/Work PB2505: a `RAISE EXCEPTION` of a NONFATAL name whose checking is off at that
+  statement raises nothing — §14.6.13.1.1, §14.6.13.1.4 — so `EcBinder.BindRaise` advises it from the SAME
+  `BoundRaise.Enabled` fold `EcEmitter.EmitRaise` emits from; checking is lexical, §7.3.25.4 GR6 and the
+  §14.9.28.4 GR14 implicit TURN, so the fold is exact and the advisory has no false positive. A fatal name is not
+  advised: with checking off it terminates, the §14.6.13.1.3 8) implementor arm. The standard's own Annex D.2.5
+  sample program writes eleven `RAISE EXCEPTION EC-USER-FATAL-ERROR` and no TURN, so it runs past every one of
+  its fatal errors on a conforming implementation: a candidate defect report against the standard, the same class
+  as kb/Work PB312's two Annex D examples, never a reason to raise without checking (kb/Work PB867)).
 - **Verification:** `ExceptionConditionConformanceTests` (48 spec-pinned facts — TURN scoping/expansion, RAISE
   fatal/nonfatal × enabled/off, RESUME both forms, F3 tier selection, the SIZE/OVERFLOW/I-O/PROGRAM/
   ARGUMENT-FUNCTION bridges, RAISING propagation both verbs, the EXCEPTION-* functions, the edition gates, the
@@ -711,12 +726,45 @@ farther signal.
 
 *The SORT/MERGE arm.* A USE procedure invoked from a SORT/MERGE **implicit** transfer (§14.9.40.4 GR12/GR15,
 §14.9.24.4 GR7/GR12) is not attached to a statement the program wrote, so §14.9.33.4 GR2 a) 1.'s "applicable
-statement" is the SORT/MERGE itself and §14.9.40.4 GR17 states SORT's half outright: "If a USE procedure invoked
-while a format 1 SORT statement is active does not complete normally, the SORT statement is terminated."
-`SequentialIoEmitter.EmitUseHook` takes the enclosing statement's end label for exactly those call sites and jumps
-to it on the RESUME-AT-NEXT-STATEMENT action (§14.6.13.1.2 #1 is what makes a RESUME a completion that is not
-normal); the RESUME-AT-procedure-name action already leaves through `__pc`, and every other not-normal completion
-(GOBACK / EXIT PROGRAM / STOP / a fatal condition) unwinds by its own signal. The label sits inside the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. The same label is where a procedure that DID
+statement" is the SORT/MERGE itself: `SequentialIoEmitter.EmitUseHook` takes the enclosing statement's end label for
+exactly those call sites and jumps to it on the RESUME-AT-NEXT-STATEMENT action, and on the not-normal fall-off
+MERGE's "completes normally" rules turn on (§14.6.13.1.2 #1 is what makes a RESUME a completion that is not normal).
+For SORT, §14.9.40.4 GR17 states the rule for EVERY USE procedure invoked while the statement is active — "If a USE
+procedure invoked while a format 1 SORT statement is active does not complete normally, the SORT statement is
+terminated" — including one invoked by a statement of the INPUT or OUTPUT PROCEDURE (GR10/GR13 put "all statements
+in declarative procedures that are executed as a result of the execution of statements in the range" inside the
+procedure's range), whose raise site runs below the procedure's nested `__Dispatch` and cannot jump to the
+statement's end (kb/Work PB1177) — and equally one invoked by a statement of a program CALLed or a method INVOKEd in
+that range (GR10/GR13's "all statements that are executed as the result of a transfer of control in the range"),
+including a containing program's GLOBAL declarative (§14.9.49.4 GR4 b)). So §14.9.40.4 GR17 is ONE run-time mechanism: EVERY
+format 1 SORT registers itself as the run unit's active format 1 SORT first in its body (`CobolSort.RegisterFormat1Sort`,
+with its scope's `__useActive` — `EcEmitter.SortUseScope`, exactly when the scope has the EC-model `__RunUse` — or null),
+the generated `__RunUse` of every EC-model element hands every DECLARATIVE's action, with its own `__useActive`, to
+`CobolSort.AfterUseProcedure` once the declarative has finished, and that throws `SortTerminationSignal` for the
+innermost active format 1 SORT (`SortFileTable.ActiveFormat1Sort`) when the action is a completion that is not normal
+(`DispatchResult.CompletedNotNormally`: a RESUME of either form, or the `NotNormal` fall-off). The signal carries the
+action only for the SORT's OWN declaratives (the registered scope); another element's lands as `NotNormal`, because its
+RESUME AT procedure-name names a procedure of an activation the termination ends. The SORT statement's `catch`
+(`SortEmitter.TerminationLanding`; a bare end when the scope has no EC-model declarative) lands it after the
+`finally` has released the store: RESUME AT NEXT STATEMENT and the not-normal fall-off end at the end of the SORT —
+§14.9.33.4 GR2 a)'s "unless general rules associated with the applicable statement specify otherwise", GR17 being the
+rule that leaves a statement inside a terminated SORT's procedure no next statement to run — and RESUME AT
+procedure-name transfers as a GO TO (§14.9.33.4 GR3) from the SORT's own dispatcher, not from inside the procedure's.
+A USE procedure invoked by another USE procedure while the SORT is active is reached the same way, so the
+termination happens where the inner one ends. Every activation boundary the signal crosses ends with the range: the
+CALL boundary (`ProgramTable.CallProgram`, which also runs an INITIAL program's implicit CANCEL) and the method
+epilogue unwind as for any signal, and the callee's BY REFERENCE copy-out runs in its activation's `finally` when the
+activation returned OR ended this way (`SortTerminationSignal.EndsActivation`, a declining filter — a condition that
+terminates the run unit owes no copy-out). GOBACK / EXIT PROGRAM / STOP in the SORT's own declarative unwind by their
+own signals through the same `finally`. In ANOTHER element's declarative an EXIT PROGRAM or GOBACK is that element's
+return: `__RunUse` notes it with a declining filter on the return signal (`CobolSort.UseProcedureExited`), the return
+completes (copy-out, RETURNING), and the SORT is terminated in the activator (`SortFileTable.AfterActivationReturn`,
+asked by `ProgramTable.CallProgram` after every CALL and function activation and by every INVOKE site once
+§14.9.23.4 GR8 has placed the method's result, `OoEmitter.EmitInvocationReturned` — never in the method itself, whose
+result the termination would drop; the filter is in every EC-model `__RunUse` and in the EC-free one from the 2002 edition on, where GR17
+arrives). MERGE registers nothing — its rules (§14.9.24.4) carry no such sentence — so a statement of a MERGE output procedure is
+its own applicable statement and its RESUME AT NEXT STATEMENT continues the procedure (docs/CONFORMANCE.md §3). An
+exception-checking PERFORM handler is not a USE procedure, so its RESUME keeps the static landing above. Both labels and the `catch` sit around the statement body whose `finally` releases the sort store, so a terminated SORT statement is not a leaked sort. In an OO method the guard array is a LOCAL, so the method's selection machinery is emitted BEFORE its `__MDispatch` (as a program's is before its `__Dispatch`) — a SORT in the method body names it. Pinned by `conformance:2002/pb1177_sort_procedure_use_not_normal`, `conformance:2002/pb1177_method_sort_use_not_normal`, `conformance:2002/pb1177_sort_called_use_not_normal`, `conformance:2002/pb1177_invoke_sort_use_not_normal`, `conformance:2002/pb1177_sort_called_goback_ec_free`, `conformance:2002/pb1177_invoke_self_new_raising`, `conformance:2023/pb367b_sort_use_not_normal` and `unit:SortUseTerminationTests`. The implicit transfers' end label is also where a procedure that DID
 complete normally lands when the verb's own rule terminates the statement: §14.6.13.1.3 2) ("If the executed
 statement is a MERGE or SORT statement, then the rules for those statements apply") precedes 5)/7), so these
 sites call `__IoCheckEc(…, __verbRule: true)`, which skips the fatal throw, and dispose of the status from
@@ -992,7 +1040,7 @@ CobolNum.TryStore (the single settled name — see the C# mapping) computes the 
 
 ### RESUME control flow (NEXT STATEMENT vs procedure-name vs GLOBAL-declarative≡CONTINUE) requires a declarative to redirect the caller's control after it returns (ISO §14.9.33).
 
-As built there is no ResumeAction enum: declaratives are pc ranges, a RESUME statement throws `ResumeSignal`, and the generated `__RunUse` converts it into the `DispatchResult` every raise site reads (`ResumeNext` RESUME AT NEXT STATEMENT → fall through past the applicable statement, suppressing a fatal termination; `≥0` RESUME AT procedure-name's pc → as if GO TO; `Normal` fell off the end → continue for a nonfatal condition, terminate for a fatal one, §14.9.49.4 GR13) — the full protocol is "The declarative dispatch-result protocol" under EC engine specifics above. A RESUME written in a USE … GLOBAL declarative is refused at bind (COBOLNET0713, §14.9.33.3 SR2), whether written directly or nested in a WHEN phrase inside it (`EcBinder.BindResume` asks the GLOBAL question before the WHEN-phrase one, the order `PlacementRules.RefusedInGlobalDeclarative` gives GOBACK and EXIT). §14.9.33.4 GR1 — a RESUME *executed within the scope of* a global declarative (one the global declarative PERFORMs, §14.9.49.3 SR4) is a CONTINUE — is a RUN-TIME question, answered by the same per-program-instance `__useActive[global ids]` test (`DispatchState.InGlobalDeclarativeRangeTest`) that §14.9.18.4 GR6's EC-FLOW-GLOBAL-GOBACK uses: `EcEmitter.EmitResume` renders `if (!(<test>)) throw new ResumeSignal(…);` in a unit that declares a GLOBAL declarative, so the RESUME is a no-op while one is active and falls through (kb/Work PB1160); a unit with none emits the unconditional unwind. "Scope of execution" is read per program instance: a RESUME in a program CALLed from a global declarative resumes normally in its own activation (docs/CONFORMANCE.md §3). Consequently a declarative reached through `__RunGlobalUse` can never return a resume action. The §14.6.13.1.2 1) "fatal exception occurs within the scope of the declarative" half of normal completion is recorded by the DECLARATIVE ACTIVATION RECORD (kb/Work PB1122 Task B; the model is kb/Work PB1761): `__RunUse` of a DECLARATIVE id (`__id < DeclCount`; an exception-checking PERFORM's WHEN-handler ids share the invoker and are not declaratives) opens a record on the run-unit `ExceptionEngine` (`EnterDeclarative(__useActive)`), closes it in its `finally`, and on falling off its end answers `NotNormal` when the record was marked. Two marks: the fatal raise funnel (`ExceptionEngine.Set(…, fatal: true)` — "occurs" read as "is raised", i.e. checking enabled; it marks EVERY open record, the scope being dynamic across PERFORM and CALL) and the no-op RESUME of `EmitResume` (`MarkDeclarativesNotNormal(__useActive)` — only the records of the RESUME's own program instance, the rule saying "specified in this … program"). Only a rule keyed on normal completion tells `NotNormal` from `Normal`: the SORT (§14.9.40.4 GR17) and MERGE (§14.9.24.4 GR7, GR12) implicit transfers (`SequentialIoEmitter.EmitUseHook` jumps on `DispatchResult.TerminatesSortMerge`); every other consumer lets the statement finish (`FinishesStatement`, `ForHandledWarning`), because §14.9.49.4 GR13 and GR7 b)/c), GR12 b)/c) dispose of the condition by its FATALITY after the procedure returns. The Format 4 object selector's result is likewise treated as `Normal` (§14.6.13.1.5 names only the normal case; docs/CONFORMANCE.md §3). Pinned by `conformance:2002/pb1122_declarative_fatal_in_scope_merge` and `unit:DeclarativeActivationRecordTests`.
+As built there is no ResumeAction enum: declaratives are pc ranges, a RESUME statement throws `ResumeSignal`, and the generated `__RunUse` converts it into the `DispatchResult` every raise site reads (`ResumeNext` RESUME AT NEXT STATEMENT → fall through past the applicable statement, suppressing a fatal termination; `≥0` RESUME AT procedure-name's pc → as if GO TO; `Normal` fell off the end → continue for a nonfatal condition, terminate for a fatal one, §14.9.49.4 GR13) — the full protocol is "The declarative dispatch-result protocol" under EC engine specifics above. A RESUME written in a USE … GLOBAL declarative is refused at bind (COBOLNET0713, §14.9.33.3 SR2), whether written directly or nested in a WHEN phrase inside it (`EcBinder.BindResume` asks the GLOBAL question before the WHEN-phrase one, the order `PlacementRules.RefusedInGlobalDeclarative` gives GOBACK and EXIT). §14.9.33.4 GR1 — a RESUME *executed within the scope of* a global declarative (one the global declarative PERFORMs, §14.9.49.3 SR4) is a CONTINUE — is a RUN-TIME question, answered by the same per-program-instance `__useActive[global ids]` test (`DispatchState.InGlobalDeclarativeRangeTest`) that §14.9.18.4 GR6's EC-FLOW-GLOBAL-GOBACK uses: `EcEmitter.EmitResume` renders `if (!(<test>)) throw new ResumeSignal(…);` in a unit that declares a GLOBAL declarative, so the RESUME is a no-op while one is active and falls through (kb/Work PB1160); a unit with none emits the unconditional unwind. "Scope of execution" is read per program instance: a RESUME in a program CALLed from a global declarative resumes normally in its own activation (docs/CONFORMANCE.md §3). Consequently a declarative reached through `__RunGlobalUse` can never return a resume action. The §14.6.13.1.2 1) "fatal exception occurs within the scope of the declarative" half of normal completion is recorded by the DECLARATIVE ACTIVATION RECORD (kb/Work PB1122 Task B; the model is kb/Work PB1761): `__RunUse` of a DECLARATIVE id (`__id < DeclCount`; an exception-checking PERFORM's WHEN-handler ids share the invoker and are not declaratives) opens a record on the run-unit `ExceptionEngine` (`EnterDeclarative(__useActive)`), closes it in its `finally`, and on falling off its end answers `NotNormal` when the record was marked. Two marks: the fatal raise funnel (`ExceptionEngine.Set(…, fatal: true)` — "occurs" read as "is raised", i.e. checking enabled; it marks EVERY open record, the scope being dynamic across PERFORM and CALL) and the no-op RESUME of `EmitResume` (`MarkDeclarativesNotNormal(__useActive)` — only the records of the RESUME's own program instance, the rule saying "specified in this … program"). Only a rule keyed on normal completion tells `NotNormal` from `Normal`: §14.9.40.4 GR17 for every USE procedure invoked while a format 1 SORT is active (`__RunUse` asks `CobolSort.AfterUseProcedure`, which throws the SORT's termination signal on `DispatchResult.CompletedNotNormally`; kb/Work PB1177) and the MERGE (§14.9.24.4 GR7, GR12) implicit transfers (`SequentialIoEmitter.EmitUseHook` jumps on `DispatchResult.TerminatesSortMerge`); every other consumer lets the statement finish (`FinishesStatement`, `ForHandledWarning`), because §14.9.49.4 GR13 and GR7 b)/c), GR12 b)/c) dispose of the condition by its FATALITY after the procedure returns. The Format 4 object selector's result is likewise treated as `Normal` (§14.6.13.1.5 names only the normal case; docs/CONFORMANCE.md §3). Pinned by `conformance:2002/pb1122_declarative_fatal_in_scope_merge` and `unit:DeclarativeActivationRecordTests`.
 
 ### >>TURN must gate WHETHER a guard is emitted per statement, in source order, with EC-ALL/level-2 expansion — without a runtime cost when OFF.
 

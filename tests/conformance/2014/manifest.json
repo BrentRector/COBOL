@@ -1,6 +1,8 @@
 {
  "_comment": "The 2014 positive corpus (COBOL-2014 / M3 surface). PHASE-12 populates it: OCCURS DYNAMIC (dyn_*), the arithmetic-standard/OPTIONS/rounded-mode families, and the DYNAMIC LENGTH elementary items (dynamic_length_*).",
  "enabled": [
+  "pb3154_capacity_register_hides_alias",
+  "pb3154_half_capacity_register_hides_symbolic",
   "pb3128_refmod_dynamic_length_argument",
   "pb2991_function_address_data_item_edition_spelled",
   "pb2764_locale_text_normalized",
@@ -218,6 +220,7 @@
   "pb1929_set_function_pointer_function_sender",
   "pb1948_dynamic_length_limit_constant",
   "pb1674_global_capacity_register",
+  "pb3165_method_capacity_register_scope",
   "pb1265_occurs_printed_formats",
   "pb1374_flag02_defaults",
   "pb1073_dynamic_length_member_not_a_key_2014",
@@ -242,6 +245,8 @@
   "pb2690_fixed_table_formal_grows_dynamic_argument_invoke",
   "pb2690_initialized_created_occurrences_call",
   "pb2690_initialized_created_occurrences_invoke",
+  "pb2690_store_of_shown_image_grows_capacity_call",
+  "pb2690_store_of_shown_image_grows_capacity_invoke",
   "pb2967_numval_f_wide_binary_receiver_size_error",
   "pb2964_length_bit_variable_group",
   "pb3030_bit_odo_variable_group",
@@ -250,7 +255,8 @@
   "pb2937_unemitted_forest_edition_gates",
   "pb2988_capacity_register_type_copies",
   "pb546_group_into_national_dynamic",
-  "pb546_odo_national_tail"
+  "pb546_odo_national_tail",
+  "pb3153_inherited_names_yield_to_own_items"
  ],
  "pending": []
 }

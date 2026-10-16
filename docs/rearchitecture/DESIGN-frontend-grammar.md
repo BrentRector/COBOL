@@ -936,8 +936,8 @@ reference formats, and the only place source comments are recognized. Its model:
   converter line by line and by the COPY driver over logical text: a `DIVISION` word preceded by `IDENTIFICATION` / `ID`
   enters, any other `… DIVISION` leaves, and `PROGRAM-ID` / `CLASS-ID` / `FUNCTION-ID` / `INTERFACE-ID` / `METHOD-ID`
   enter (the header being optional, §11.2.1) — wherever the word begins in the program-text area (§6.3.1 draws no Area A
-  line), a word merely ending in `-ID` being a user's name; only the comment-entry paragraph's start and end are Area-A
-  facts. The cursor belongs to a TEXT, not to a block the merged driver flushes between directive lines; a spliced library
+  line), a word merely ending in `-ID` being a user's name; within the conversion only the comment-entry paragraph's
+  start and end are Area-A facts (the COBOL-85 placement rules are asked after the parse, below). The cursor belongs to a TEXT, not to a block the merged driver flushes between directive lines; a spliced library
   text hands its end division back to the text it was spliced into. And the `D` indicator is
   gated by the registry row `debugging-line-removed-2014` (accepted at 85, obsolete at 2002 — COBOLNET0903 — removed at
   2014 — COBOLNET0902; the NIST S / Y letters are the CCVS dialect, never gated, and excluded as comment lines). A `D`
@@ -968,6 +968,38 @@ reference formats, and the only place source comments are recognized. Its model:
   `HideAll` is exactly right for them.
 - **The program-text area is always positions 8–72**, a shorter record read as space-filled to margin R
   (DOC-A.1-157), so a continued literal carries every position to margin R (§6.3.5).
+- **COBOL-85's areas A and B are a fact the reference format RECORDS and a pass after the parse ASKS** (kb/Work PB3147;
+  VCR Table 7 row 7.35). ANSI X3.23-1985 split the program-text area into area A (positions 8–11) and area B (12 to
+  margin R) and placed every item by where it begins its line; ISO/IEC 1989:2002 removed the split (§6.3.1, §6.3.5), so
+  the two rules — an area-A item (a division, section or paragraph header, a level indicator, level-number 01 or 77,
+  DECLARATIVES, END DECLARATIVES, an end marker) begins its line in area A (`fixed-form-area-a-item-outside-area-a-2002`,
+  COBOLNET3734), and any other text that begins a line, a level-number other than 01 or 77 excepted, begins in area B
+  (`fixed-form-text-in-area-a-2002`, COBOLNET3735) — are asked at `--std 85` only. Neither half can be asked alone: which
+  token heads an item is the grammar's, where a token begins is the reference format's. So `FixedFormLine` is the ONE
+  definition of the area (`AreaAWidth`, `ProgramTextStart`, `BeginsInAreaA`; the comment-entry reader uses it too),
+  `ReferenceFormatMap` keeps, per fixed-form physical line, the physical column where its program text begins and its
+  area (`PlacementAt`: begins its line in area A, in area B, follows other text, or no area — free form), `FixedFormAreas`
+  composes the converged pass's `SourceLineMap` with every text's map so a TOKEN is placed where the user wrote it
+  (through COPY, REPLACE and tabs alike; `Frontend.Areas` → `EditionContext.Areas`), and `Validation/AreaPlacementPass`
+  (pre-bind, beside `LevelNumberPass`, so its diagnostics join the edition gates' instead of pre-empting them as a
+  front-end error would) collects the heads from the tree — rule-owned items by their context's first token, the
+  headers a rule writes INLINE (`X DIVISION`, `METHOD-ID.`, `END METHOD`, `END DECLARATIVES`) by their spelling among a
+  rule's children — and asks every token once. A token that heads nothing is screened by the area-B arm automatically,
+  so a new statement, clause or entry needs no change; a new kind of HEADER is one line in the pass. Rejected: a parse
+  predicate (PB2720 removed the last one; the rule is an edition's, not the grammar's) and a front-end check (a
+  FrontendError would hide every bind-time edition gate of the same program).
+  **The one half the pass cannot ask is the CONTINUATION line** (kb/Work PB3168): X3.23-1985 also requires "Area A of a
+  continuation line must be blank" (IBM Enterprise COBOL states it outright; VCR row 7.35), the same
+  `fixed-form-text-in-area-a-2002` row. A continued literal's tail is no token's start, and a resultant position has no
+  inverse to the physical line, so only the §6.5 logical conversion — which alone sees the hyphen — can name the line:
+  `LogicalLineBuilder.Add` asks `FixedFormLine.IsAreaAOffset` of the first character of every fixed continuation line and
+  reports through `ReferenceFormatDiagnostics.OnContinuationTextInAreaA` (every such line, the first text's column), the
+  way the other §6.3.5 continuation rules are reported. It is therefore a front-end error: the one place this family does
+  hide the bind-time gates, accepted because the line is the only fact the rule has and a continuation line in area A is
+  rare. The same fact makes a continuation line holding a period or a word in area A one diagnostic, not two: the row is
+  not yet introduced at every edition the pass screens, so the report is an error on both axes, the compilation returns
+  `FrontendError` before the bind, and the area pass never sees that token (it needs no exemption). A comment-entry
+  paragraph's continuation lines are commentary (discarded before the builder) and are not asked.
 - **A column is a CHARACTER POSITION — one code point — and never a string index** (DOC-A.1-157, kb/Work PB1966): a
   supplementary-plane character is two UTF-16 units and one position. `CharacterPositions` (count, index of a position,
   position of an index) is the one definition, `FixedFormLine` the one reader of a fixed-form line's columns (sequence

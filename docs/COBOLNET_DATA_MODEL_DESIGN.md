@@ -791,7 +791,8 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
 1. A **bit item immediately following an elementary bit item or bit group of the SAME LEVEL** → placed at the next
    bit position (**no padding** — this is the only case that shares a byte).
 2. **Any other bit item** → advance the cursor to the next byte boundary, then place. (Covers a bit item after a
-   character item, after a bit item of a *different* level, and the first item of a group.)
+   character item, after a bit item of a *different* level, and a group's first item when it is not a bit item or is
+   ALIGNED — a first bit item begins where its group begins, see 6.)
 3. A **non-bit item** → advance to the next byte boundary (its natural boundary), then place `ByteWidth × 8` bits.
    The implicit filler this generates is §8.5.1.6.3's "as needed to advance alignment to a required natural
    boundary for the next item within that group".
@@ -802,6 +803,15 @@ items inside one byte — which is exactly why `RecordLayout`'s `int` character 
    which is why an **elementary** bit item is not padded and keeps its exact bit count.
 5. **§15.50.4 r5** requires every implicit FILLER position generated above to be COUNTED. It is, by construction:
    the cursor advances through filler.
+6. **Byte boundaries are the RECORD's, not the group's** (kb/Work PB3158). A bit group that follows a same-level bit
+   item begins MID-byte (rule 1), and "the alignment of the start of a group item and the alignment of the first item
+   within that group, when the first item is a bit data item, are at the same bit position in storage": its first
+   child begins where it does, and every later round-up to a byte (rule 2, an ALIGNED subject — §13.18.1.4 GR1) is a
+   byte of the record. `BitLayout.PhaseOf(group)` is where in a byte the group begins (0 for everything but a
+   GROUP-USAGE BIT group that shares its predecessor's byte); the walk starts its cursor there and subtracts it from
+   the extents and starts it reports, which stay group-relative. The walk passes the phase DOWN (the `…At` readers) and
+   never asks `PhaseOf` per child (`BitGroupPhaseDriftTests`). A TABLE of bit groups lays every occurrence out as the
+   first one — the stride must be uniform — so only the first occurrence's byte boundaries are the record's.
 
 **Bits per character position is a pinned implementor choice** (§8.1.2 makes it implementor-specified): **8**,
 consistent with `ByteWidth`'s existing "DISPLAY = 1 byte per character position". Documented in
@@ -889,6 +899,8 @@ of a Tier-B canonical — the exact group the seed exists for. What the two comp
 field list, which is why the extraction is a run MAP and not a common walk.
 
 ⛔ A run CONTINUES only where `BitLayout.SharesByteWith` — the placement predicate the extent walk (`ExtentBits`), the offset walk (`StartBitWithin`) and the REDEFINES class walk (`AssignClassOffsets`) read — says the member shares its predecessor's byte. A run packs its members' carriers back to back, so a member those walks start on a fresh byte must LEAD a new run: an ALIGNED member (§13.18.1.4 GR1), and a group-typed TYPE subject, which §13.18.57.4 GR2 d) aligns "as though it were a level 1 item" and §8.5.1.6.3 therefore puts at the first bit of a byte (`DataItem.AlignedAsLevelOne`, set by `ExpandType`; carried by a SAME AS copy of such a subject, since §13.18.49.4 GR1 re-states data-name-1's description, TYPE clause included). A run scan that tested only "same level" packed `05 F PIC 1 USAGE BIT. 05 G PIC 1 USAGE BIT ALIGNED.` into ONE byte while `FUNCTION BYTE-LENGTH` counted two (kb/Work PB1569).
+
+⛔ A REDEFINING ENTRY IS TRANSPARENT TO A RUN, AND A TIER-B CANONICAL STAYS IN IT (kb/Work PB3166). §13.18.44.1 gives a redefining entry no storage of its own, so "immediately following" (§8.5.1.6.3) is asked of the next entry that OCCUPIES storage: `BitLayout.RunsOf` scans the non-redefining siblings only, exactly as the placement walk keeps its predecessor across a redefiner (a scan that broke the run AT the redefiner imaged `05 B PIC 1(6). 05 B2 REDEFINES B PIC 1(2). 05 C PIC 1(2) VALUE B"11".` with C as the leader of a run of its own, a byte past the byte the walk and `FUNCTION LENGTH` put it in). And a bit item that is the CANONICAL of a Tier-B class has no field of its own name — only the class's one string backing, which holds the canonical's own bits from its first bit (§13.18.44.4 GR1) — so it joins its run through that backing: `PhysicalModel.BuildPhysicals` yields the backing as the run member's field (the leader's slice, or width 0 for a continuation), and `GroupImageCodec.BitCarrierOf` / `EmitRunMemberFromBits` (one `BackingOf` test) read the member's bits out of it and write them back with `CobolBits.WriteWindow`. The same two sites serve a bit GROUP's `AsBits()` / `FromBits()` and the record `AsImage()` / `FromImage()` run packer.
 
 #### A boolean item's VALUE has ONE carrier answer, and the USAGE decision is separate (kb/Work PB584)
 
@@ -1435,7 +1447,11 @@ resolution) belongs with increments 2/3 where the register becomes a readable it
 (a VIEW over `{tablePath}.Capacity`, synthesized in a `DataBinder.DynamicResolve` post-build pass, indexed by
 `DataBinder.CapacityRegisters`, resolved via an early `ReferenceResolver.Resolve` hook + the new
 `ReferenceResolver.TablePath` whole-table-path helper); an unsigned-integer native-binary `PicInfo` so numeric reads
-hit the plain scale-0 branch, its `NumProfile` emitted (not a field) for the DISPLAY/`FormatDisplay` path. SET Format
+hit the plain scale-0 branch, its `NumProfile` emitted (not a field) for the DISPLAY/`FormatDisplay` path. **Scope (kb/Work
+PB3165):** the register is a name of its entry's source element (§13.18.38.3 SR30), so a METHOD's registers live in
+`OoMethodDataScope.CapacityRegisters`, not the unit map — method-private, shadowing an object-level register or data-name
+(§11.7.4 GR5), invisible to a sibling method, and the SR30 duplicate check is made against the method's own names.
+`SymbolTable.CapacityCandidates` is the one scope-aware lookup `ReferenceResolver.CapacityRegisterFor` reads. SET Format
 14 (TO/UP BY/DOWN BY) reroutes in `BindSetTo`/`BindSetUpDown` on a `CapacityRegisterPlace` first target →
 `BoundSetCapacity` → `SetCapacity`/`CapacityUpBy`/`CapacityDownBy`. Diagnostics: **1523** (register as an ordinary
 receiver — the `ResolveReceiving` chokepoint; and the SR30 implicit-definition name collision in `DynamicResolve`),

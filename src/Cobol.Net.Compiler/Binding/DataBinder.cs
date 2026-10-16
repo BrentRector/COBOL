@@ -174,7 +174,8 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// record (<see cref="InheritGlobalSubtree"/>). This element's own registers come first (one written definition
     /// per spelling: SR30's "shall not be defined elsewhere in the source element", reproduced once per TYPE / SAME AS
     /// copy of its entry, kb/Work PB2988), then each container's, so
-    /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The OWN registers alone are
+    /// <c>ReferenceResolver.CapacityRegisterFor</c> can apply §8.4.6.2.1 3)'s nearest-element rule. The one reader of a
+    /// name in this map is <see cref="Model.SymbolTable.CapacityCandidates"/>. The OWN registers alone are
     /// <see cref="DeclaredCapacityRegisterTables"/>.</para></summary>
     public IReadOnlyDictionary<string, List<DataItem>> CapacityRegisters
     {
@@ -184,9 +185,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     /// <summary>The dynamic tables whose named CAPACITY register THIS source element declares — the registers its
     /// own class emits a profile for. An inherited register's profile is its container's (the contained class is
-    /// nested in the container's and reads it there).</summary>
+    /// nested in the container's and reads it there). A METHOD's registers are declared by this element too — the
+    /// method's own scope holds the NAME (<see cref="OoMethodDataScope.CapacityRegisters"/>, kb/Work PB3165), the
+    /// class still emits the profile, as it does for the method's other numeric items.</summary>
     public IEnumerable<DataItem> DeclaredCapacityRegisterTables =>
-        CapacityRegisters.Values.SelectMany(static t => t).Where(t => DeclaringDepth(t) == 0);
+        CapacityRegisters.Values.SelectMany(static t => t).Where(t => DeclaringDepth(t) == 0)
+            .Concat(_ooBoundMethods.SelectMany(static m => m.DataScope.CapacityRegisters.Values).SelectMany(static t => t));
 
     /// <summary>REPORT SECTION <b>sum counter</b> names (case-insensitive) → every SUM ENTRY that carries the name —
     /// its <see cref="ReportSumFamily"/>, whose occurrences a subscript selects (kb/Work PB1271) — with its owning
@@ -489,7 +493,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // §12.3.3 SR1: "The configuration section shall not be specified in a program that is contained within
         // another program" — the container's applies (§12.3.4 GR1, InheritConfiguration). Diagnosed, then the
         // section is still walked below so a second diagnostic never masks this one.
-        if (UnitIsContained && EnvDivisions(program).Any(env => env.configurationSection() is not null))
+        if (UnitIsContained && program.environmentDivision()?.configurationSection() is not null)
             Edition.Error(DiagnosticCatalog.ConfigurationSectionInContainedProgram,
                 "a CONFIGURATION SECTION is specified in a program contained within another program; the "
                 + "containing program's configuration section applies to it (ISO §12.3.3 SR1 / §12.3.4 GR1)");
@@ -521,9 +525,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // and to any source unit contained within that source unit", and a contained program cannot restate the
         // clause (§12.3.3 SR1), so inheritance is its only route. An assignment here reset every contained unit to
         // false and compiled its USE FOR DEBUGGING section as comment lines (kb/Work PB1088).
-        DebuggingModeDeclared |= EnvDivisions(program).Any(env => env.configurationSection()?.configurationParagraph()
+        DebuggingModeDeclared |= program.environmentDivision()?.configurationSection()?.configurationParagraph()
             .Any(p => p.sourceComputerParagraph()?.debuggingModeClause() is not null)
-            ?? false);
+            ?? false;
 
         // REPOSITORY PROPERTY specifiers (§12.3.8 :14727-14729) — §8.4.3.9.3 SR1 makes a property-specifier
         // a PRECONDITION of every object-property reference in the unit; captured here, checked at the
@@ -535,9 +539,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // The REPOSITORY's own user-defined words, declared AFTER the loop: a specifier written before
         // `FUNCTION ALL INTRINSIC` is inside its scope all the same (§12.3.8.3 SR13; kb/Work PB1083).
         var specifierWords = new List<(Core.RepositoryEntryContext At, string Word, UserWordKind Kind)>();
-        foreach (var re in EnvDivisions(program).SelectMany(env => env.configurationSection()?.configurationParagraph()
+        foreach (var re in program.environmentDivision()?.configurationSection()?.configurationParagraph()
                      .Select(p => p.repositoryParagraph()).FirstOrDefault(r => r is not null)
-                     ?.repositoryEntry() ?? []))
+                     ?.repositoryEntry() ?? [])
         {
             // REPOSITORY PROPERTY/INTERFACE/CLASS (§12.3.8, OO): the COBOL-2002 introduction gates are now
             // VersionConformancePass ParseArm.VisitRepositoryEntry (14g.5). The PROPERTY name still registers here for
@@ -1175,28 +1179,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
 
     // ── FILE-CONTROL + FILE SECTION (ISO §12.4.5 / §13.18; COBOLNET_DESIGN §8) ─────────────────────────────────
 
-    /// <summary>Every ENVIRONMENT DIVISION of the unit, OUTERMOST (class-level) FIRST. A real program unit
-    /// carries at most ONE; an OO synthetic reparent unit (OoDriver's CallReparent pattern) carries
-    /// [half's-own-env, class-env] nearer-first, so iterating REVERSED binds the class scope first and the
-    /// nearer half's registrations override per-clause — the ISO §10.6 scoping (the class definition's
-    /// environment division applies to the factory and object definitions). This is the DEVLOG-738 latent-bug
-    /// fix: the former SINGULAR environmentDivision() read silently DROPPED the class-level env whenever the
-    /// half carried its own (the shadow-0× case).</summary>
-    internal static IReadOnlyList<Core.EnvironmentDivisionContext> EnvDivisions(Core.ProgramUnitContext program) =>
-        [.. program.GetRuleContexts<Core.EnvironmentDivisionContext>().Reverse()];
-
     /// <summary>Bind the FILE-CONTROL paragraph's SELECT clauses into <see cref="FileModel"/>s (assign target,
-    /// organization, access mode, OPTIONAL, FILE STATUS). The FD records attach in <see cref="BindFileSection"/>.</summary>
+    /// organization, access mode, OPTIONAL, FILE STATUS). The FD records attach in <see cref="BindFileSection"/>.
+    /// A unit carries at most ONE environment division: an OO definition's synthetic unit (<c>OoDriver.OoReparent</c>)
+    /// carries only its own, and a class definition's configuration reaches its factory and instance definitions by
+    /// inheritance (<see cref="InheritConfiguration"/>; kb/Work PB3154), never as a second division.</summary>
     private void BindFileControl(Core.ProgramUnitContext program)
     {
-        foreach (var env in EnvDivisions(program)) BindFileControl(env);
-    }
-
-    private void BindFileControl(Core.EnvironmentDivisionContext env)
-    {
-        var fc = env.inputOutputSection()?.fileControlParagraph();
-        if (fc is null) return;
-        // A class-level input-output section (the OO binder hands it to both the factory and the object half) is
+        if (program.environmentDivision() is not { } env
+            || env.inputOutputSection()?.fileControlParagraph() is not { } fc) return;
+        // A class-level input-output section (the class definition's own binder binds it, OoDriver.BindClassData) is
         // outside §12.4.5.2's "factory, function, object, or program" and is forbidden by §12.4.3 SR1 (kb/Work
         // PB1076), so SR2 and SR3 do not screen its entries.
         bool screened = env.Parent is not Core.ClassDefinitionContext;
@@ -1466,12 +1458,16 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 .Select(k => new CollatingKeyOperand { Name = k.Base, Qualifiers = k.Quals })
                 .ToList();
             file.KeyLevelCollating.Add(new KeyLevelCollatingClause(keys, ctx.cobolWord(0).GetText(), Edition.Cursor));
+            UseAlphabetName(ctx, ctx.cobolWord(0).GetText());   // the clause's §8.3.2.2 use (kb/Work PB3153)
             return;
         }
         if (file.FileLevelCollatingCount++ == 0) file.FileLevelCollatingAt = Edition.Cursor;   // §12.4.5.7.3 SR3 — at most one file-level clause
         file.FileLevelCollating = ChoiceIndicators.AlphabetPair(Edition, ctx.collatingForPhrase(),
             f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), ctx.cobolWord(),
             $"file '{file.CobolName}' COLLATING SEQUENCE", "12.4.5.7.2 Format 1");
+        // The written names are this clause's §8.3.2.2 uses (kb/Work PB3153); SR1/SR2 screen them post-build.
+        if (file.FileLevelCollating is var (alnum, nat))
+            foreach (var name in new[] { alnum, nat }.OfType<string>()) UseAlphabetName(ctx, name);
     }
 
     /// <summary>Resolve each INDEXED key's collating-weight table from the file's §12.4.5.7 COLLATING SEQUENCE
@@ -1544,7 +1540,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // or record-key-name-1 is national, alphabet-name-3 shall reference an alphabet that defines a national
             // collating sequence; otherwise, alphabet-name-3 shall reference an alphabet that defines an
             // alphanumeric collating sequence." An undeclared alphabet breaks both halves and is said once.
-            if (!Alphabets.ContainsKey(alphabet3) && !NationalAlphabets.ContainsKey(alphabet3))
+            if (!IsAlphabetName(alphabet3))
             {
                 Edition.Error(DiagnosticCatalog.FileCollatingAlphabet, $"file '{file.CobolName}': COLLATING SEQUENCE "
                     + $"OF … IS '{alphabet3}' — alphabet-name-3 names no alphabet declared in SPECIAL-NAMES "
@@ -1598,17 +1594,17 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// that cannot produce a program.</para></summary>
     internal string? CollatingAlphabetFault(string alphabet, bool national)
     {
-        if (!Alphabets.ContainsKey(alphabet) && !NationalAlphabets.ContainsKey(alphabet)
+        if (!IsAlphabetName(alphabet)
             && OwnWords.IsDeclaredAs(alphabet, UserWordKind.AlphabetName))   // SPECIAL-NAMES: never a method's (§12.3.3 SR2)
             return null;
         if (national)
-            return NationalAlphabets.TryGetValue(alphabet, out var nd)
+            return NationalAlphabets.TryPeek(alphabet, out var nd)
                 ? nd.HasCollatingSequence ? null
                     : $"'{alphabet}' ({nd.Phrase}) names a national coded character set only (ISO §12.3.7.4 Table 6)"
-                : Alphabets.ContainsKey(alphabet) ? $"'{alphabet}' is an alphanumeric alphabet"
+                : Alphabets.Declares(alphabet) ? $"'{alphabet}' is an alphanumeric alphabet"
                 : $"'{alphabet}' is not an alphabet declared in SPECIAL-NAMES";
-        return Alphabets.ContainsKey(alphabet) ? null
-            : NationalAlphabets.ContainsKey(alphabet) ? $"'{alphabet}' is defined FOR NATIONAL"
+        return Alphabets.Declares(alphabet) ? null
+            : NationalAlphabets.Declares(alphabet) ? $"'{alphabet}' is defined FOR NATIONAL"
             : $"'{alphabet}' is not an alphabet declared in SPECIAL-NAMES";
     }
 
@@ -1679,9 +1675,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         if (alphabet is null) return null;                                                       // GR5 / GR4
 
         if (!national)
-            return Alphabets.TryGetValue(alphabet, out var def) && !def.IsIdentity ? def : null;
+            return Alphabets.TryPeek(alphabet, out var def) && !def.IsIdentity ? def : null;   // used at capture
         using var _ = Edition.At(where);
-        if (NationalAlphabets.TryGetValue(alphabet, out var nd) && nd.HasCollatingSequence && !nd.IsIdentity)
+        if (NationalAlphabets.TryPeek(alphabet, out var nd) && nd.HasCollatingSequence && !nd.IsIdentity)
             Edition.Declined(DiagnosticCatalog.FileCollatingNationalUnsupported, $"file '{file.CobolName}': national "
                 + $"record key '{key.CobolName}' under COLLATING SEQUENCE '{alphabet}' ({nd.Phrase})");
         return null;
@@ -3402,10 +3398,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             using (Edition.At(f)) DeclareUserWord(f.GetText(), UserWordKind.ParameterName);
     }
 
-    /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, or a class's
-    /// object, factory or interface definition. A name a containing element's SPECIAL-NAMES passes down is inherited,
-    /// not declared here, and a contained source element may re-declare it as another type (§8.4.6.1: each element
-    /// "may use identical user-defined words"). The constructing driver passes the element's census from
+    /// <summary>The §8.3.2.2 census of THIS binder's own source element (kb/Work PB990): the program, a class
+    /// definition, its object or factory definition, or an interface definition. A name a containing element's
+    /// configuration section passes down (a container's SPECIAL-NAMES, a class definition's REPOSITORY; kb/Work
+    /// PB3154) is inherited, not declared here, and a contained source element may re-declare it as another type
+    /// (§8.4.6.1: each element "may use identical user-defined words") — until it also USES it, which
+    /// <see cref="RecordConfigurationNameUse"/> records here (kb/Work PB3153). The constructing driver passes the
+    /// element's census from
     /// <see cref="Compiler.Oo.OoClassTable.CensusOf"/>, the object the element's class-name references record into too
     /// (kb/Work PB3132); the default serves a binder no driver made (a TYPE expansion's, a unit test's).</summary>
     internal UserWordCensus OwnWords { private get; init; } = new();
@@ -3428,6 +3427,21 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (WordCensus.Record(word, kind) is not { } first) return;
         Edition.Error(DiagnosticCatalog.UserWordTypeConflict, UserWordCensus.ConflictMessage(word, first, kind));
+    }
+
+    /// <summary>⛔ THE ONE RECORDER of a reference to a name a configuration section declares (kb/Work PB3153): every
+    /// <see cref="ConfigurationNames{T}.TryUse"/> of this binder's tables, and every mnemonic-name resolution
+    /// (<c>Procedure.MnemonicRegistry</c>), lands here. §8.3.2.2 counts a USE ("<i>a given user-defined word may be
+    /// used as only one type of user-defined word</i>"), and a contained program or a method resolves names its
+    /// container declares (§8.4.6.1), so the use is recorded in the census of the element <paramref name="site"/> lies
+    /// in (<see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/>, the census PB3132's object-class-name references
+    /// record into); a paragraph or data item spelled like it in that element is then refused COBOLNET2692 at
+    /// whichever of the two comes second. A binder no driver made (a TYPE expansion's, a unit test's) has no element
+    /// table, and records into its own census.</summary>
+    internal void RecordConfigurationNameUse(Antlr4.Runtime.RuleContext? site, string word, UserWordKind kind)
+    {
+        if (OoClasses?.RecordReferenceUse(site, word, kind) == true) return;
+        using (Edition.At(site as Antlr4.Runtime.ParserRuleContext)) CheckOneTypePerWord(word, kind);
     }
 
     /// <summary>The letterless words already reported, so a repeated declaration of one (a TYPE expansion re-registers
@@ -4711,7 +4725,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                                 + "the clause, so there are no \"literals specified in the THROUGH phrase\" for "
                                 + "it to order (ISO §13.18.63.3 SR31)");
                         }
-                        else if (TryResolveRangeAlphabet(alphaName,
+                        else if (TryResolveRangeAlphabet(value, alphaName,
                                 CollatingSelection.ForComparison(parent.OperandPic?.Category, parent.OperandPic?.Category),
                                 $"condition-name '{name}'"))
                             cond.Alphabet = alphaName;
@@ -4776,7 +4790,12 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         }
         // The IN-omitted spelling: a bare last operand, after at least one literal-2.
         if (items[^1].valueClauseRange() is not null || (items.Length == 1 && ops.Length == 1)) return (null, null);
-        return dref.GetText() is var word && IsAlphabetName(word) ? (word, last) : (null, null);
+        // The §8.3.2.2 argument holds within ONE source element: a contained program or a method also sees its
+        // container's alphabet-names, and "a source element's reference to such a name, even when it is a
+        // different type of user-defined word, is to the item which that source element describes" (§8.4.6.1;
+        // kb/Work PB3153), so the element's own constant-name of the spelling keeps its literal-2 reading.
+        return dref.GetText() is var word && IsAlphabetName(word) && ConstantOf(dref) is null
+            ? (word, last) : (null, null);
     }
 
     /// <summary>Screen <c>[ WHEN SET TO FALSE IS literal-4 ]</c> — Format 3's SECOND literal position (ISO
@@ -5074,9 +5093,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     {
         if (alphabetName is not null)
         {
-            if (national && NationalAlphabets.TryGetValue(alphabetName, out var nd))
+            // TryResolveRangeAlphabet resolved (and recorded) the reference; this reads its definition again.
+            if (national && NationalAlphabets.TryPeek(alphabetName, out var nd))
                 return nd.Locale is not null ? (null, false) : (nd.Table?.Collation(true), true);
-            if (!national && Alphabets.TryGetValue(alphabetName, out var ad))
+            if (!national && Alphabets.TryPeek(alphabetName, out var ad))
                 return ad.Locale is not null ? (null, false) : (ad.Table?.Collation(false), true);
             return (null, true);       // unresolved: TryResolveRangeAlphabet already reported it; native order
         }
@@ -5149,6 +5169,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         Int128? dynLengthLimit = null; // integer-1 of the LIMIT phrase (§13.18.19.4 GR2); null = the phrase is absent
         string dynLengthLimitText = "";// integer-1 AS WRITTEN, for the COBOLNET2027 report
         string? dynLengthStructureName = null;   // the optional dynamic-length-structure-name-1 (§13.18.19.2)
+        Antlr4.Runtime.RuleContext? dynLengthStructureAt = null;   // where it is written: its §8.3.2.2 use (PB3153)
         DynamicLengthStructure? dynStructure = null;   // … and the SPECIAL-NAMES declaration it resolves to (SR2)
         bool hasExternal = false;      // observed for the BASED×EXTERNAL SR (the clause itself binds later)
         Core.ExternalizedNamePhraseContext? externalAs = null;   // the EXTERNAL clause's `AS literal-1` (§13.18.22.2; kb/Work PB511)
@@ -5187,7 +5208,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                         var locale = LocaleRef.Current;
                         if (localeName is not null)
                         {
-                            var sym = ResolveLocaleName(localeName.GetText(),
+                            var sym = ResolveLocaleName(localeName, localeName.GetText(),
                                 $"data item '{cobolName ?? "FILLER"}' PICTURE … LOCALE {localeName.GetText()}",
                                 "ISO §13.18.40.3 SR37 — locale-name-1 shall be specified in the LOCALE clause in the SPECIAL-NAMES paragraph");
                             if (sym is not null) locale = new LocaleRef(sym);
@@ -5220,6 +5241,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // IsDynamicLength is cleared on every SR violation, so a bound-arm gate would drop the 0900).
                     isDynamicLength = true;
                     dynLengthStructureName = dl.cobolWord()?.GetText();
+                    dynLengthStructureAt = dl.cobolWord();
                     // ⛔ integer-1 is read WIDE and bounded LATER, by CobolDynString.MaxSizeOf: §8.5.1.10.1 makes
                     // the item's maximum size the smallest of this phrase and the implementor maximum, so a
                     // literal past `int` is not "unparseable", it is simply larger than the maximum. Narrowing it
@@ -6052,7 +6074,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // used to be refused outright as "not yet supported" (COBOLNET1562, retired): the clause it names had no
             // grammar at all (kb/Work PB829).
             else if (dynLengthStructureName is not null
-                     && !DynamicLengthStructures.TryGetValue(dynLengthStructureName, out dynStructure))
+                     && !DynamicLengthStructures.TryUse(dynLengthStructureAt, dynLengthStructureName, out dynStructure))
             {
                 Edition.Error(DiagnosticCatalog.DynamicLengthStructureReference, $"{entryWhere}: the DYNAMIC LENGTH "
                     + $"clause names '{dynLengthStructureName}', which is not a dynamic-length-structure-name "
@@ -6294,9 +6316,9 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         var (alnumName, natName) = ChoiceIndicators.AlphabetPair(Edition, cs.codeSetForPhrase(),
             f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), cs.cobolWord(),
             $"file '{file.CobolName}' CODE-SET", "13.18.13.2");
-        var alnumSet = alnumName is null ? null : CodedCharacterSetOf(alnumName, $"CODE-SET … {alnumName}",
+        var alnumSet = alnumName is null ? null : CodedCharacterSetOf(cs, alnumName, $"CODE-SET … {alnumName}",
             "ISO §13.18.13.3 SR1 — alphabet-name-1 shall reference an alphabet that defines an alphanumeric coded character set");
-        var natSet = natName is null ? null : CodedCharacterSetOf(natName, $"CODE-SET … {natName}",
+        var natSet = natName is null ? null : CodedCharacterSetOf(cs, natName, $"CODE-SET … {natName}",
             "ISO §13.18.13.3 SR2 — alphabet-name-2 shall reference an alphabet that defines a national coded character set");
         if (alnumName is not null && alnumSet is null || natName is not null && natSet is null) return;
         if (alnumSet is { National: true })
@@ -6391,13 +6413,18 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             ? "ALL" + literal1.RawText
             // [ALL] symbolic-character-1 (§8.3.3.6.2 Format 7; §12.3.7.4 GR11 — kb/Work PB110): the figurative's ONE
             // character as an ALL literal of its class — GR2's fill in a VALUE association, exactly like ALL "c".
-            : op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symAll && SymbolicRaw(symAll.GetText()) is { } rawAll
+            : op.nonNumericLiteral()?.figurativeConstant()?.cobolWord() is { } symAll && SymbolicRaw(symAll, symAll.GetText()) is { } rawAll
             ? rawAll
-            : SymbolicValueRawText(op) is { } rawBare ? rawBare
             // A constant-name substitutes its literal AS WRITTEN and that literal then takes the path the written
             // literal takes (§13.10.4 GR1 "as if literal-1 … were written"; kb/Work PB1230): `VALUE K` where
-            // `K CONSTANT AS 1,5` under DECIMAL-POINT IS COMMA normalizes exactly as `VALUE 1,5` does.
-            : NormalizeIfNumericLiteral(ConstantValueRawText(op) ?? op.GetText());
+            // `K CONSTANT AS 1,5` under DECIMAL-POINT IS COMMA normalizes exactly as `VALUE 1,5` does. Asked BEFORE
+            // the symbolic-character, as every other literal-position reader asks it (ConcatFolder.FoldTerm,
+            // ExpressionBinder.LiteralAliasOf): a symbolic-character a CONTAINING element declares yields to the
+            // element's own constant-name of the spelling (§8.4.6.1; kb/Work PB3153), and its resolution records
+            // a §8.3.2.2 use. In one element the two cannot coexist (COBOLNET2692), so the order decides nothing there.
+            : ConstantValueRawText(op) is { } constantRaw ? NormalizeIfNumericLiteral(constantRaw)
+            : SymbolicValueRawText(op) is { } rawBare ? rawBare
+            : NormalizeIfNumericLiteral(op.GetText());
     }
 
     /// <summary>THE literal-position predicate for a VALUE operand (kb/Work PB732), PURE — no folding, no
@@ -6427,7 +6454,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             // counted a literal here, `PIC X VALUE NULL` stored LOW-VALUE).
             return nn.predefinedNull() is null
                 && (nn.figurativeConstant()?.cobolWord()?.GetText() is not { } symWord
-                || SymbolicOf(symWord) is not null || FindConstant(symWord) is not null);
+                || NamesSymbolic(symWord) || FindConstant(symWord) is not null);
         // §8.3.3.3.2 rule 2 makes a written sign part of the numeric literal — ONE sign, as its leftmost
         // character — so `VALUE -9999` is literal-1, while `--5`, `+-5` and `- 5` are no literal at all (kb/Work
         // PB1445: this arm used to strip ANY number of signs, and `VALUE --5` reached the C# backend as a
@@ -6444,7 +6471,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
         // sign-stripping lookup here would have called it a literal while ConstantValueRawText, which does not
         // strip, still fell through — re-opening the very sink PB732 closed, on `-K` instead of `K`.
         return BareValueOperandWord(op) is { } dref
-            && (ConstantOf(dref) is not null || SymbolicOf(dref) is not null);
+            && (ConstantOf(dref) is not null || NamesSymbolic(dref));
     }
 
     /// <summary>The BARE (unqualified, unsubscripted, UNSIGNED) word reference a VALUE operand reduces to, or
@@ -6562,12 +6589,13 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     /// <summary>The raw <c>ALL"c"</c> text a symbolic-character VALUE operand substitutes (bare-word form), or
     /// null when the operand names no symbolic character (kb/Work PB110; the ConstantValueRawText shape).</summary>
     private string? SymbolicValueRawText(Core.ValueClauseOperandContext op) =>
-        BareValueOperandWord(op) is { } dref && SymbolicOf(dref) is not null ? SymbolicRaw(dref.GetText()) : null;
+        BareValueOperandWord(op) is { } dref ? SymbolicRaw(dref, dref.GetText()) : null;
 
     /// <summary>The raw ALL-literal text of the symbolic character named <paramref name="word"/>, or null: the
-    /// class-prefixed re-quoted one-character literal (embedded delimiters doubled per §8.3.3.2.3 r3).</summary>
-    internal string? SymbolicRaw(string word) =>
-        SymbolicOf(word) is not { } sym ? null
+    /// class-prefixed re-quoted one-character literal (embedded delimiters doubled per §8.3.3.2.3 r3). A
+    /// resolution, recorded as a use at <paramref name="site"/> (§8.3.2.2; kb/Work PB3153).</summary>
+    internal string? SymbolicRaw(Antlr4.Runtime.RuleContext site, string word) =>
+        SymbolicOf(site, word) is not { } sym ? null
         : "ALL" + (sym.National ? "N" : "") + "\"" + sym.Value.Replace("\"", "\"\"") + "\"";
 
     /// <summary>Build the <see cref="EditingPhraseSpec"/> list for a PICTURE clause's EDITING phrases

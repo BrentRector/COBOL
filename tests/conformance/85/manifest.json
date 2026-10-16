@@ -417,12 +417,15 @@
   "pb845_national_bit_user_words",
   "pb2610_go_to_before_conditional",
   "pb2553_sum_counter_character_cell",
-  "pb2739_indented_division_header_remarks",
   "pb2739_data_name_ending_id_then_copy",
   "pb2502_renames_record_key",
   "pb2502_renames_sort_key",
   "pb2017_arithmetic_operator_spacing",
-  "pb2722_evaluate_object_not_ownership"
+  "pb2722_evaluate_object_not_ownership",
+  "pb3153_inherited_special_names_words",
+  "pb3154_contained_symbolic_character",
+  "pb3154_contained_symbolic_shadowed",
+  "pb359_unsuccessful_read_start_position"
  ],
  "pending": []
 }

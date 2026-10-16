@@ -1,0 +1,223 @@
+{
+ "$comment": [
+  "Written by scripts/spec/measure_sublist_levels.py --write; never edit by hand (kb/Work PB55).",
+  "Every catalog sub-list (an L<sublist>.<n> row family) MEASURED on the printed PDF at its rule",
+  "block's own margin: a peer list with its own lead-in, whose items are rules. extract_rule_catalog.py --check fails on a sub-list this file does not record."
+ ],
+ "sublists": [
+  {
+   "key": "8.3.2.2|program names of outermost programs object class names function prototype names interface names meth",
+   "row-at-measure": "GR-8.3.2.2-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 129,
+     "x0": 80.04,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "8.3.2.2|in the as phrase in a repository paragraph entry",
+   "row-at-measure": "SR-8.3.2.2-L3.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 129,
+     "x0": 80.05,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "8.3.2.2|when the cobol call convention is implied or cobol is specified in a call convention compiler direct",
+   "row-at-measure": "GR-8.3.2.2-L4.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 130,
+     "x0": 63.5,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "8.3.2.2|if the call statement cancel statement or program address identifier specifies a program prototype n",
+   "row-at-measure": "GR-8.3.2.2-L5.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 130,
+     "x0": 63.49,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "9.1.14|if the i o status indicates an unsuccessful completion that is not an invalid key condition control ",
+   "row-at-measure": "GR-9.1.14-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 260,
+     "x0": 63.48,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "9.3.6|if a method with the method name specified in the invocation is defined in the class of the object a",
+   "row-at-measure": "GR-9.3.6-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 272,
+     "x0": 63.49,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "9.3.6|the number of invocation parameters shall be equal to the number of parameters defined in the invoke",
+   "row-at-measure": "GR-9.3.6-L3.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 273,
+     "x0": 80.05,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "9.3.6|the parameter or returning item in the invocation and the corresponding parameter or returning item ",
+   "row-at-measure": "GR-9.3.6-L4.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 275,
+     "x0": 80.07,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.6.2.3.2|if the initialize clause is specified in the options paragraph the storage allocated for the implied",
+   "row-at-measure": "GR-14.6.2.3.2-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 568,
+     "x0": 63.48,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.6.13.1.5|if the exception object is neither of the following a an object whose class is specified or whose cl",
+   "row-at-measure": "GR-14.6.13.1.5-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 581,
+     "x0": 80.04,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.7.5|if the size error condition occurred during the arithmetic operations specified by the arithmetic st",
+   "row-at-measure": "GR-14.7.5-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 592,
+     "x0": 63.5,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.7.5|if the rules for evaluation of exponentiation are violated the ec size exponentiation exception cond",
+   "row-at-measure": "GR-14.7.5-L3.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 592,
+     "x0": 63.49,
+     "level": 0
+    },
+    {
+     "pdf_page": 593,
+     "x0": 80.02,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.8.2.3.2|if the activated element is a program for which there is no program specifier in the repository para",
+   "row-at-measure": "GR-14.8.2.3.2-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 600,
+     "x0": 63.49,
+     "level": 0
+    },
+    {
+     "pdf_page": 602,
+     "x0": 63.49,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.8.2.3.3|if the activated element is a program for which there is no program specifier in the repository para",
+   "row-at-measure": "GR-14.8.2.3.3-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 602,
+     "x0": 63.49,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.8.3.3|currency symbols match if and only if the corresponding currency strings are the same",
+   "row-at-measure": "GR-14.8.3.3-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 604,
+     "x0": 63.49,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "14.8.3.3|locale specifications in the picture clauses match if and only if both specify the same size phrase ",
+   "row-at-measure": "GR-14.8.3.3-L3.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 604,
+     "x0": 63.49,
+     "level": 0
+    }
+   ]
+  },
+  {
+   "key": "15.4.1|the returned value shall equal the value of the equivalent arithmetic expression note 2 as a result ",
+   "row-at-measure": "RV-15.4.1-L2.1",
+   "level": 0,
+   "printed": [
+    {
+     "pdf_page": 835,
+     "x0": 80.04,
+     "level": 0
+    }
+   ]
+  }
+ ]
+}

@@ -253,7 +253,7 @@ internal sealed class InspectBinder(BinderContext ctx, StatementBinder host)
             foreach (var ch in conv.sendingOperand())
                 if (ch.dataReference()?.cobolWord()?.GetText() is { } w
                     && !ctx.Symbols.TryResolve(w, ctx.ActiveScope, out _)
-                    && (ctx.Data.Alphabets.ContainsKey(w) || ctx.Data.NationalAlphabets.ContainsKey(w)))
+                    && ctx.Data.IsAlphabetName(w))
                     ctx.Edition.Error(DiagnosticCatalog.UndefinedReference,
                         $"INSPECT CONVERTING references the ALPHABET-name '{w}' — Format 4's operands are "
                         + "an identifier or a literal (ISO §14.9.22.2), and an alphabet-name is neither "

@@ -121,7 +121,7 @@ public sealed class EcCheckingProfileDriftTests
             .SelectMany(f => File.ReadAllLines(f).Select((l, i) => (File: f, Line: i + 1, Text: l)))
             .Where(x => !x.Text.TrimStart().StartsWith("//", StringComparison.Ordinal)
                      && (x.Text.Contains("EmitPropagationPickup()", StringComparison.Ordinal)
-                      || x.Text.Contains("EmitInvokePickup()", StringComparison.Ordinal)))
+                      || x.Text.Contains("EmitInvocationReturned()", StringComparison.Ordinal)))
             .Select(x => $"{Path.GetFileName(x.File)}:{x.Line}")
             .ToList();
         Assert.True(bare.Count == 0,

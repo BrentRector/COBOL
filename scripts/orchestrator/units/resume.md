@@ -6,9 +6,9 @@ from disk; do not re-do finished work.
    for each worktree it lists, `python tools/claude-skills/skills/agent-fleet/references/status_delta.py <worktree>`;
    the newest reports under {SCRATCH}\reports; the supervisor's last log under {COORD}\logs.
 2. Classify every branch by `python scripts/prune_worktrees.py`'s lifecycle (MANDATORY-PRACTICES O10, owner
-   2026-10-08, kb/Work PB2600): IN FLIGHT (leave it), WAITING TO LAND (the landing lane lands it, kb/Work PB3103), ENQUEUED (the merge queue holds it), BOUNCED (the enqueue unit's finisher), LANDED (`--apply`
+   2026-10-08, kb/Work PB2600): IN FLIGHT (leave it), WAITING FOR REVIEW (the enqueue unit's reviewer), WAITING TO LAND (the landing lane lands it, kb/Work PB3103), STOPPED (the lane's attempt at its tip stopped: the enqueue unit's finisher, kb/Work PB3125), ENQUEUED (the merge queue holds it), BOUNCED (the enqueue unit's finisher), LANDED (`--apply`
    removes it) or DECISION. DECIDE every DECISION row in this unit, never carry it forward to the next handoff: to
    finish (SPLIT or interrupted: plan_wave.py picks it up as a finisher), to land, or ABANDONED (a line in its kb/Work
-   note naming the branch, the word ABANDONED and why; then `--apply --abandon <branch>`). One the owner must decide
+   note with the word ABANDONED directly after the branch's name, and why; then `--apply --abandon <branch>`). One the owner must decide
    becomes `outcome: owner-question`. Commit or remove nothing you have not read.
 3. Write the handoff with `branches_pending` and `next_unit`: `enqueue` when anything is ready, otherwise `wave`.

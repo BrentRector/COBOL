@@ -85,10 +85,72 @@ public sealed partial class DataBinder
         string Name, PicCategory Category, string Text, string? IntegerText, bool IsGlobal, string RawText,
         string Specification);
 
-    /// <summary>The per-unit compile-time constant table (§13.10.4 GR1 substitution source). It also holds the
-    /// GLOBAL constants of every containing program (<see cref="InheritGlobalConstants"/>, kb/Work PB1009), named
-    /// in <see cref="_inheritedConstants"/> until a local declaration shadows them.</summary>
-    private readonly Dictionary<string, ConstantDef> _constants = new(CobolNames.Comparer);
+    /// <summary>⛔ THE CONSTANT ENTRIES OF ONE SOURCE ELEMENT (kb/Work PB3164): the binder's own element (a program, a
+    /// function, or a class's object, factory or interface definition — <see cref="_constants"/>), or one METHOD
+    /// (<see cref="OoMethodDataScope.Constants"/>). A method definition is a source unit of its own, and so a source
+    /// element (§3.164, "source unit excluding any contained source units"), which "may use identical user-defined
+    /// words to name items independent of the use of these user-defined words by other source elements" (§8.4.6.1).
+    /// A method's constant-name is a local name (§8.4.6.2.2; §13.18.27.3 SR4 bars GLOBAL in a method definition), which
+    /// "may be referenced only in the source element in which it is declared" (§8.4.6.2.1), so it is invisible to its
+    /// sibling methods and to its object, while the object's own constant-names are global names its methods see
+    /// (§8.4.6.2.2). §11.7.4 GR5 makes the method's constant-name, and every other word the method's data division
+    /// defines, hide a same-spelled word of the containing object or factory definition inside that method. One method's
+    /// entries used to join the class binder's one table, so a sibling method substituted them for its object's own data
+    /// item, a method's data item lost to its object's constant, and two methods' unequal entries of one name drew
+    /// §13.10.3 SR9.</summary>
+    internal sealed class ConstantScope
+    {
+        /// <summary>The bound constants by name (§13.10.4 GR1 substitution source). The binder's own table also holds
+        /// the GLOBAL constants of every containing program (<see cref="InheritGlobalConstants"/>, kb/Work PB1009),
+        /// named in <see cref="_inheritedConstants"/> until a local declaration shadows them.</summary>
+        internal Dictionary<string, ConstantDef> Bound { get; } = new(CobolNames.Comparer);
+
+        /// <summary>The element's constant entries by name, in source order (a duplicated name, §13.10.3 SR9, has
+        /// several), declared before any of them binds (kb/Work PB1231).</summary>
+        internal Dictionary<string, List<DeclaredConstant>> Declared { get; } = new(CobolNames.Comparer);
+
+        /// <summary>The words a METHOD's data division defines as anything but a constant-name — its data-names,
+        /// condition-names and index-names. §11.7.4 GR5 makes each hide a constant of the same spelling in the
+        /// containing object or factory definition. Empty for the binder's own element, whose data-names cannot repeat
+        /// one of its own constant-names (§8.3.2.2) and whose containers' constants it shadows through
+        /// <see cref="DropShadowedConstants"/>.</summary>
+        internal HashSet<string> OtherWords { get; } = new(CobolNames.Comparer);
+
+        /// <summary>Whether the element has any constant, bound or still to bind.</summary>
+        internal bool Any => Bound.Count > 0 || Declared.Count > 0;
+    }
+
+    /// <summary>This binder's own source element's constants (<see cref="ConstantScope"/>).</summary>
+    private readonly ConstantScope _constants = new();
+
+    /// <summary>The METHOD whose constants a reference made now reads first: the method whose data division is being
+    /// bound, else the method whose statements are (<see cref="ActiveMethodScope"/>); null at program, object,
+    /// factory and interface level.</summary>
+    private ConstantScope? MethodConstants => (_bindingMethodScope ?? ActiveMethodScope)?.Constants;
+
+    /// <summary>⛔ THE ONE ANSWER TO "WHICH ELEMENT'S CONSTANT DOES <paramref name="name"/> NAME HERE?" (kb/Work PB3164;
+    /// §11.7.4 GR5: "If a given user-defined word is defined in the data division of this method definition and in the
+    /// data division of the containing object definition, the use of that word in this method refers to the
+    /// declaration in this method"). Inside a method: the method's own table when it declares a constant entry of
+    /// that name; null when its data division defines the word as something else (that item is the one the word
+    /// names); else the containing definition's. Elsewhere, the binder's own table.
+    /// <para>The method's other words are its data division's data-names, condition-names and index-names
+    /// (<see cref="ConstantScope.OtherWords"/>, declared before its entries bind) and, while its statements bind, every
+    /// name <see cref="ActiveMethodDeclares"/> reaches — among them a method table's named CAPACITY register, which no
+    /// data description entry names (§13.18.38.3 SR30; ISO §8.4.6.2.1 3) a); kb/Work PB3154 review R1-1, R2-1).</para></summary>
+    private ConstantScope? ConstantScopeOf(string name)
+    {
+        if (MethodConstants is { } method)
+        {
+            if (method.Declared.ContainsKey(name)) return method;
+            if (method.OtherWords.Contains(name) || ActiveMethodDeclares(name)) return null;
+        }
+        return _constants;
+    }
+
+    /// <summary>Does <paramref name="name"/> name a constant entry of the element it is read in — bound, still to bind,
+    /// or refused?</summary>
+    private bool IsDeclaredConstant(string name) => ConstantScopeOf(name)?.Declared.ContainsKey(name) == true;
 
     /// <summary>The names in <see cref="_constants"/> that came from a container, not from this unit's own entries,
     /// each with the containment distance of the container that declared it (1 = the direct container) — the tier
@@ -107,8 +169,8 @@ public sealed partial class DataBinder
     /// <paramref name="depth"/> is the container's containment distance (1 = the direct container).</summary>
     internal void InheritGlobalConstants(DataBinder container, int depth)
     {
-        foreach (var (name, def) in container._constants)
-            if (def.IsGlobal && _constants.TryAdd(name, def))
+        foreach (var (name, def) in container._constants.Bound)
+            if (def.IsGlobal && _constants.Bound.TryAdd(name, def))
                 _inheritedConstants[name] = depth;
     }
 
@@ -118,15 +180,55 @@ public sealed partial class DataBinder
     /// §8.4.6.2.1 3) ("a) If the name is declared in source element B, the item in source element B is the referenced
     /// item. b) … 1. The item in source element A if the name is declared in source element A"), so it leaves the
     /// table before any procedure reference can substitute it (kb/Work PB1009; the nearer-container half kb/Work
-    /// PB1047 — an outer program's constant used to beat the middle program's global data-name).</summary>
+    /// PB1047 — an outer program's constant used to beat the middle program's global data-name).
+    /// <para>The INHERITED SYMBOLIC CHARACTERS figurative constants (§12.3.7.4 GR11 a; <see cref="InheritConfiguration"/>)
+    /// obey the same rule: §8.4.6.1 "a source element's reference to such a name, even when it is a different type of
+    /// user-defined word, is to the item which that source element describes", so a contained program's or an OO
+    /// half's data item spelled like its container's symbolic-character is the referenced item (kb/Work PB3154 review
+    /// R1-1: <c>MOVE S1 TO Y</c> moved the container's figurative instead of the local <c>01 S1</c>, with no
+    /// diagnostic). A shadowed symbolic is HIDDEN (<see cref="_shadowedSymbolics"/>), never removed: a contained unit
+    /// inherits the whole table from this one (<see cref="InheritConfiguration"/> copies one level), and this unit's
+    /// local data-name hides nothing from it.</para>
+    /// <para>Every tier a name can be declared at is asked by <see cref="DeclaredNearerThan"/>; a METHOD's own names
+    /// are the one tier nearer still, asked at reference time (<see cref="ActiveMethodDeclares"/>).</para></summary>
     internal void DropShadowedConstants()
     {
         foreach (var (name, depth) in _inheritedConstants.ToList())
-            if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth))
+            if (DeclaredNearerThan(name, depth))
             {
-                _constants.Remove(name);
+                _constants.Bound.Remove(name);
                 _inheritedConstants.Remove(name);
             }
+        foreach (var (name, depth) in _inheritedSymbolics)
+            if (DeclaredNearerThan(name, depth)) _shadowedSymbolics.Add(name);
+    }
+
+    /// <summary>⛔ ISO §8.4.6.2.1 3) ACROSS NAME CLASSES for a word that stands for a literal: whether this unit's set
+    /// of names (its own and every container's global ones) declares <paramref name="name"/> as a data-name, a
+    /// condition-name or an index-name in a source element NEARER than <paramref name="depth"/> (the containment
+    /// distance of the element that declared the constant or symbolic-character; 1 = the direct container). "b) 1.
+    /// The item in source element A if the name is declared in source element A. 2. The item in the containing
+    /// source element if the name is not declared in source element A and is declared in the source element
+    /// containing source element A." A condition-name is placed by its conditional variable.
+    /// <para>⛔ EVERY NAME INDEX A DATA DESCRIPTION ENTRY DECLARES INTO, not only <see cref="ByName"/> (kb/Work PB3154
+    /// review R2-1): a named OCCURS DYNAMIC CAPACITY register is a data-name (§13.18.38.3 SR30) kept off
+    /// <see cref="ByName"/> in <see cref="_capacityRegisters"/>, placed by its table (a METHOD's own register is never
+    /// in that index: it lives in <see cref="OoMethodDataScope.CapacityRegisters"/>, the method tier
+    /// <see cref="ActiveMethodDeclares"/> asks, kb/Work PB3165); a REPORT SECTION sum
+    /// counter is a data-name too (§13.18.54.4 GR5) kept off it in <see cref="_sumCounters"/>, placed by its report
+    /// (<see cref="ReportDepth"/>: 0 for this element's own, n for a container's GLOBAL report, §13.18.27.4 GR1), so
+    /// a FARTHER container's sum counter never hides a NEARER container's constant (kb/Work PB3154 review R3-1).
+    /// <c>GlobalNameClassDriftTests</c> holds this predicate to the inherited name-index list, so a name index
+    /// added there is asked here too.</para></summary>
+    internal bool DeclaredNearerThan(string name, int depth)
+    {
+        if (ByName.TryGetValue(name, out var items) && items.Any(i => DeclaringDepth(i) < depth)) return true;
+        if (Conditions.TryGetValue(name, out var conds) && conds.Any(c => DeclaringDepth(c.Parent) < depth)) return true;
+        if (_capacityRegisters.TryGetValue(name, out var tables) && tables.Any(t => DeclaringDepth(t) < depth)) return true;
+        if (_sumCounters.TryGetValue(name, out var counters) && counters.Any(c => ReportDepth(c.Report) < depth)) return true;
+        if (!IndexNames.Declares(name)) return false;
+        IndexNames.Candidates(name, static _ => true, out int indexDepth);   // int.MaxValue when none survives
+        return indexDepth < depth;
     }
 
     /// <summary>⛔ THE ONE CONSTANT LOOKUP (§13.10.4 GR1/GR3 substitution; kb/Work PB1231): the defined constant named
@@ -138,34 +240,38 @@ public sealed partial class DataBinder
     /// <see cref="IntegerOperandValue"/>, <see cref="ExpandPicConstants"/> and <c>LiteralEnvironment.Constant</c>.</summary>
     internal ConstantDef? FindConstant(string name)
     {
-        if (_declaredConstants.TryGetValue(name, out var declared))
+        // The element whose entry the word names here: a method's own, or its object's (§11.7.4 GR5; kb/Work PB3164).
+        if (ConstantScopeOf(name) is not { } scope) return null;
+        if (scope.Declared.TryGetValue(name, out var declared))
             foreach (var d in declared)
             {
-                if (_constants.ContainsKey(name)) break;
+                if (scope.Bound.ContainsKey(name)) break;
                 BindDeclaredConstant(d, demanded: true);
             }
-        return _constants.TryGetValue(name, out var def) ? def : null;
+        return scope.Bound.TryGetValue(name, out var def) ? def : null;
     }
 
-    /// <summary>Whether this unit has any constant, bound or still to bind — the guard the PICTURE expansion takes so a
-    /// constant-free program's PICTURE pipeline is untouched.</summary>
-    private bool UnitHasConstants => _constants.Count > 0 || _declaredConstants.Count > 0;
+    /// <summary>Whether a constant, bound or still to bind, is visible here — this unit's own, or the method's being
+    /// bound — the guard the PICTURE expansion takes so a constant-free program's PICTURE pipeline is untouched.</summary>
+    private bool UnitHasConstants => _constants.Any || MethodConstants?.Any == true;
 
     // ── Declaration before binding (kb/Work PB1231) ──────────────────────────────────────────────────────────────
 
     /// <summary>Where a constant entry stands in its bind: not yet reached, being evaluated (a re-entry is a
     /// circular dependence), waiting for the later data item its length phrase names, or finished (bound or
     /// rejected).</summary>
-    private enum ConstantBindState { Declared, Evaluating, Postponed, Finished }
+    internal enum ConstantBindState { Declared, Evaluating, Postponed, Finished }
 
-    /// <summary>One constant entry of this unit, collected before anything binds (<see cref="DeclareDataEntries"/>).
-    /// <paramref name="Entry"/> is the host entry (the diagnostic anchor); the level-number, the optional name and the
-    /// body are the three parts both hosts spell (§13.10.2; kb/Work PB1226).</summary>
-    private sealed class DeclaredConstant(
+    /// <summary>One constant entry of this unit or of one of its methods, collected before anything binds
+    /// (<see cref="DeclareDataEntries"/>). <paramref name="entry"/> is the host entry (the diagnostic anchor); the
+    /// level-number, the optional name and the body are the three parts both hosts spell (§13.10.2; kb/Work PB1226).
+    /// <paramref name="scope"/> is the source element that declares it, whose table its value joins (kb/Work PB3164).</summary>
+    internal sealed class DeclaredConstant(
         Antlr4.Runtime.ParserRuleContext entry, Core.LevelNumberContext level, Core.DataNameContext? nameCtx,
-        Core.ConstantEntryBodyContext body)
+        Core.ConstantEntryBodyContext body, ConstantScope scope)
     {
         public Antlr4.Runtime.ParserRuleContext Entry { get; } = entry;
+        public ConstantScope Scope { get; } = scope;
         public Core.LevelNumberContext Level { get; } = level;
         public Core.DataNameContext? NameCtx { get; } = nameCtx;
         public Core.ConstantEntryBodyContext Body { get; } = body;
@@ -179,10 +285,8 @@ public sealed partial class DataBinder
             && (cv.LENGTH() is not null || cv.constantByteLengthWord() is not null);
     }
 
-    /// <summary>The unit's constant entries by name, in source order (a duplicated name, §13.10.3 SR9, has several).</summary>
-    private readonly Dictionary<string, List<DeclaredConstant>> _declaredConstants = new(CobolNames.Comparer);
-
-    /// <summary>The same entries by their body — how an in-order walk finds the declaration it has reached.</summary>
+    /// <summary>Every constant entry declared in this binder, its methods' included, by its body — how an in-order walk
+    /// finds the declaration it has reached.</summary>
     private readonly Dictionary<Core.ConstantEntryBodyContext, DeclaredConstant> _constantByBody = [];
 
     /// <summary>The constant entries being evaluated, outermost first: the demand chain a circular reference closes.</summary>
@@ -190,30 +294,53 @@ public sealed partial class DataBinder
 
     /// <summary>Collect every constant entry under <paramref name="scope"/> (a DATA DIVISION, or a method's) BEFORE any
     /// of it binds, and every data description entry's place in its section (<see cref="DeclareDataEntryRuns"/>), so a
-    /// reference can name an entry that follows it. A local declaration SHADOWS a container's GLOBAL constant of the
-    /// same name from here on (§8.4.6; kb/Work PB1009) — whether or not its own bind succeeds.</summary>
+    /// reference can name an entry that follows it. A method's entries join the method's own table, beside every other
+    /// word its data division defines (<see cref="ConstantScope.OtherWords"/>; §11.7.4 GR5, kb/Work PB3164).</summary>
     private void DeclareDataEntries(Core.DataDivisionContext? scope)
     {
         if (scope is null) return;
+        var method = _bindingMethodScope?.Constants;
         foreach (var node in Descendants(scope))
         {
             if (node is Core.ReportDescriptionEntryContext rd) DeclareReportEntries(rd);
-            var (level, nameCtx, body) = node switch
+            switch (node)
             {
-                Core.DataDescriptionEntryContext e when e.dataDescriptionBody()?.constantEntryBody() is { } b
-                    => (e.levelNumber(), e.dataName(), b),
-                Core.ConstantEntryContext c => (c.levelNumber(), c.dataName(), c.constantEntryBody()),
-                _ => default,
-            };
-            if (body is null || _constantByBody.ContainsKey(body)) continue;
-            var d = new DeclaredConstant((Antlr4.Runtime.ParserRuleContext)node, level, nameCtx, body);
-            _constantByBody[body] = d;
-            if (nameCtx?.GetText() is not { } name || CobolNames.Same(name, "FILLER")) continue;
-            if (!_declaredConstants.TryGetValue(name, out var list)) _declaredConstants[name] = list = [];
-            list.Add(d);
-            if (_inheritedConstants.Remove(name)) _constants.Remove(name);
+                case Core.DataDescriptionEntryContext e when e.dataDescriptionBody()?.constantEntryBody() is { } b:
+                    DeclareConstant(e, e.levelNumber(), e.dataName(), b);
+                    break;
+                case Core.ConstantEntryContext c when c.constantEntryBody() is { } b:
+                    DeclareConstant(c, c.levelNumber(), c.dataName(), b);
+                    break;
+                // A method's data-names, condition-names and index-names hide its object's constants (§11.7.4 GR5).
+                case Core.DataDescriptionEntryContext e when method is not null && e.dataName()?.GetText() is { } n:
+                    method.OtherWords.Add(n);
+                    break;
+                case Core.IndexNameListContext ix when method is not null:
+                    foreach (var w in ix.cobolWord()) method.OtherWords.Add(w.GetText());
+                    break;
+            }
         }
         DeclareDataEntryRuns(scope);
+    }
+
+    /// <summary>Declare one constant entry in the source element being bound — the method whose data is being bound,
+    /// else this unit (kb/Work PB3164) — once, whichever walk reaches it first. A local declaration SHADOWS a
+    /// container's GLOBAL constant of the same name from here on (§8.4.6; kb/Work PB1009), whether or not its own bind
+    /// succeeds.</summary>
+    private DeclaredConstant DeclareConstant(Antlr4.Runtime.ParserRuleContext entry, Core.LevelNumberContext level,
+        Core.DataNameContext? nameCtx, Core.ConstantEntryBodyContext body)
+    {
+        if (_constantByBody.TryGetValue(body, out var known)) return known;
+        var scope = _bindingMethodScope?.Constants ?? _constants;
+        var d = new DeclaredConstant(entry, level, nameCtx, body, scope);
+        _constantByBody[body] = d;
+        if (nameCtx?.GetText() is { } name && !CobolNames.Same(name, "FILLER"))
+        {
+            if (!scope.Declared.TryGetValue(name, out var list)) scope.Declared[name] = list = [];
+            list.Add(d);
+            if (scope == _constants && _inheritedConstants.Remove(name)) _constants.Bound.Remove(name);
+        }
+        return d;
     }
 
     /// <summary>Every parse-tree descendant of <paramref name="node"/>, depth first in source order.</summary>
@@ -304,8 +431,10 @@ public sealed partial class DataBinder
         // entries are compared whichever binds first (an entry may now be bound on demand, out of source order).
         // ⚠ DETERMINATION (kb/Work PB1009): SR9's "duplicates another constant-name" is read within one source element
         // — a contained program's own declaration SHADOWS a container's GLOBAL constant of the same name
-        // (DeclareDataEntries drops the inherited one), never a cross-element obligation to repeat its specification.
-        if (_constants.TryGetValue(name, out var prior))
+        // (DeclareConstant drops the inherited one), never a cross-element obligation to repeat its specification.
+        // So the entries compared are those of the entry's own element (d.Scope): a METHOD is a source element of its
+        // own (§3.164; kb/Work PB3164), and two methods, or a method and its object, may each declare the name freely.
+        if (d.Scope.Bound.TryGetValue(name, out var prior))
         {
             if (!CobolNet.Frontend.Preprocessor.TextWordSequence.Matches(prior.Specification, def.Specification))
                 Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: duplicates constant-name "
@@ -314,24 +443,23 @@ public sealed partial class DataBinder
                     + "specification (ISO §13.10.3 SR9)");
             return;
         }
-        _constants[name] = def;
+        d.Scope.Bound[name] = def;
     }
 
     /// <summary>Does a reference to <paramref name="word"/> close a circular dependence — it names a constant entry being
     /// evaluated? Reported here (<see cref="ReportConstantCycle"/>), so the caller can recover silently.</summary>
     private bool ClosesConstantCycle(string word)
     {
-        if (!_declaredConstants.TryGetValue(word, out var declared)
-            || declared.FirstOrDefault(d => d.State == ConstantBindState.Evaluating) is not { } reentered)
+        if (ConstantScopeOf(word)?.Declared.TryGetValue(word, out var declared) != true
+            || declared!.FirstOrDefault(d => d.State == ConstantBindState.Evaluating) is not { } reentered)
             return false;
         ReportConstantCycle(reentered);
         return true;
     }
 
-    /// <summary>Does <paramref name="word"/> name a constant entry of this unit that yielded no value? Its own entry was
+    /// <summary>Does <paramref name="word"/> name a constant entry, here, that yielded no value? Its own entry was
     /// reported (a cycle, a bad operand), so a reader recovers without a second "not a constant-name" error.</summary>
-    private bool IsFailedConstant(string word) =>
-        _declaredConstants.ContainsKey(word) && FindConstant(word) is null;
+    private bool IsFailedConstant(string word) => IsDeclaredConstant(word) && FindConstant(word) is null;
 
     /// <summary>Report the circular dependence <paramref name="reentered"/> closes, once, at that entry: the chain of
     /// entries being evaluated from it back to itself. §13.10.3 SR4 when a length phrase is on the cycle (the length of
@@ -414,17 +542,7 @@ public sealed partial class DataBinder
     {
         // The entry was declared before anything bound (DeclareDataEntries); a host the declaration walk did not
         // reach is declared here, so the in-order walk never depends on that walk's coverage.
-        if (!_constantByBody.TryGetValue(body, out var d))
-        {
-            _constantByBody[body] = d = new DeclaredConstant(entry, level, nameCtx, body);
-            if (nameCtx?.GetText() is { } name && !CobolNames.Same(name, "FILLER"))
-            {
-                if (!_declaredConstants.TryGetValue(name, out var list)) _declaredConstants[name] = list = [];
-                list.Add(d);
-                if (_inheritedConstants.Remove(name)) _constants.Remove(name);
-            }
-        }
-        BindDeclaredConstant(d, demanded: false);
+        BindDeclaredConstant(DeclareConstant(entry, level, nameCtx, body), demanded: false);
     }
 
     /// <summary>The value of one constant entry's operand (§13.10.2's AS / FROM alternatives). <paramref name="waits"/>

@@ -11,6 +11,8 @@ UNIT: wave.
 2. `python scripts/orchestrator/plan_wave.py --from-budget --borrow-days {BORROW_DAYS} --scratch {SCRATCH} --stop-file {FLEET_STOP}{CLUSTER_ARG}` plans the wave deterministically,
    allocates codes and lead ids, renders the specs with make_dispatch_specs.py and runs check_practices.py. Read its
    table. Change the plan only for a reason you write into the handoff; re-run it rather than editing groups.json.
+   Under the owner's DRAIN (a steer or the last handoff names it) add `--drain`, never `--max-groups` alone: it plans
+   only the finishers of started work (kb/Work PB3150).
 3. Check {STOP_UNIT} IMMEDIATELY before the call; if it exists, do not launch: hand off naming the args file (the
    specs are reusable by the next unit). Otherwise start `.claude/skills/workstream/templates/wf_rolling_wave.js` with
    the args file it wrote ({SCRATCH}\wf-args-w<wave>.json), and run stall_watch.py beside it as the skill says.

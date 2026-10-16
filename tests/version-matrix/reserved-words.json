@@ -485,7 +485,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "CF",
@@ -548,7 +548,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "CLOSE",
@@ -566,7 +566,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "CODE",
@@ -665,7 +665,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "COMP",
@@ -917,7 +917,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUG-ITEM",
@@ -926,7 +926,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUG-LINE",
@@ -935,7 +935,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUG-NAME",
@@ -944,7 +944,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUG-SUB-1",
@@ -953,7 +953,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUG-SUB-2",
@@ -962,7 +962,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUG-SUB-3",
@@ -971,7 +971,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DEBUGGING",
@@ -980,7 +980,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DECIMAL-POINT",
@@ -1079,7 +1079,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "DISPLAY",
@@ -1160,7 +1160,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "ELSE",
@@ -1178,7 +1178,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "ENABLE",
@@ -1187,7 +1187,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "END",
@@ -1318,11 +1318,11 @@
     {
       "word": "END-RECEIVE",
       "r85": true,
-      "r2002": false,
+      "r2002": true,
       "r2014": false,
       "r2023": true,
       "confidence": "high",
-      "provenance": "1985-reserved, unreserved 2002/2014, re-reserved 2023 (ISO Annex E.2 item 25 — overrides the GnuCOBOL 2002/2014 lists, which keep the communication trio)"
+      "provenance": "1985/2002-reserved (GnuCOBOL 85/2002 lists: the communication facility, obsolete at 2002), unreserved 2014, re-reserved 2023 (ISO Annex E.2 item 25 = VCR row 32, which speaks of 2014 only)"
     },
     {
       "word": "END-RETURN",
@@ -1466,7 +1466,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "EVALUATE",
@@ -1484,7 +1484,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "EXCEPTION",
@@ -2357,7 +2357,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "MESSAGE-TAG",
@@ -2411,7 +2411,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "MOVE",
@@ -2744,7 +2744,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "PAGE",
@@ -2843,7 +2843,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "POSITIVE",
@@ -2897,7 +2897,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "PROCEED",
@@ -2906,7 +2906,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "PROGRAM",
@@ -2960,7 +2960,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "QUEUE",
@@ -2969,7 +2969,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "QUOTE",
@@ -3037,11 +3037,11 @@
     {
       "word": "RECEIVE",
       "r85": true,
-      "r2002": false,
+      "r2002": true,
       "r2014": false,
       "r2023": true,
       "confidence": "high",
-      "provenance": "1985-reserved, unreserved 2002/2014, re-reserved 2023 (ISO Annex E.2 item 25 — overrides the GnuCOBOL 2002/2014 lists, which keep the communication trio)"
+      "provenance": "1985/2002-reserved (GnuCOBOL 85/2002 lists: the communication facility, obsolete at 2002), unreserved 2014, re-reserved 2023 (ISO Annex E.2 item 25 = VCR row 32, which speaks of 2014 only)"
     },
     {
       "word": "RECORD",
@@ -3095,7 +3095,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "RELATIVE",
@@ -3401,7 +3401,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "SEGMENT-LIMIT",
@@ -3410,7 +3410,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "SELECT",
@@ -3433,11 +3433,11 @@
     {
       "word": "SEND",
       "r85": true,
-      "r2002": false,
+      "r2002": true,
       "r2014": false,
       "r2023": true,
       "confidence": "high",
-      "provenance": "1985-reserved, unreserved 2002/2014, re-reserved 2023 (ISO Annex E.2 item 25 — overrides the GnuCOBOL 2002/2014 lists, which keep the communication trio)"
+      "provenance": "1985/2002-reserved (GnuCOBOL 85/2002 lists: the communication facility, obsolete at 2002), unreserved 2014, re-reserved 2023 (ISO Annex E.2 item 25 = VCR row 32, which speaks of 2014 only)"
     },
     {
       "word": "SENTENCE",
@@ -3653,7 +3653,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "SUB-QUEUE-2",
@@ -3662,7 +3662,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "SUB-QUEUE-3",
@@ -3671,7 +3671,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "SUBTRACT",
@@ -3779,7 +3779,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "TERMINATE",
@@ -3806,7 +3806,7 @@
       "r2014": false,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved, kept by the GnuCOBOL 2002 list, removed by 2014 (absent from the 2014 list and ISO 2023 §8.9)"
     },
     {
       "word": "THAN",
@@ -4103,7 +4103,7 @@
       "r2014": true,
       "r2023": false,
       "confidence": "high",
-      "provenance": "1985-reserved, removed post-85 (GnuCOBOL per-standard lists; absent from ISO 2023 §8.9)"
+      "provenance": "1985-reserved through 2014 (GnuCOBOL 85/2002/2014 lists); dropped by 2023 §8.9"
     },
     {
       "word": "WORKING-STORAGE",

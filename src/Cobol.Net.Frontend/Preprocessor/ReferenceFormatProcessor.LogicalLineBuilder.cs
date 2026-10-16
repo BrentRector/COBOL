@@ -140,6 +140,10 @@ public static partial class ReferenceFormatProcessor
                 Discard(site);                           // a comment line (§6.2.3.1 1)): discarded, never a join
                 return;
             }
+            // X3.23-1985: "Area A of a continuation line must be blank" (kb/Work PB3168). A continuation line that continues
+            // a directive is dropped below and diagnosed there.
+            if (fixedContinuation && FixedFormLine.IsAreaAOffset(first) && !(_latest >= 0 && _latestIsDirective))
+                gates?.OnContinuationTextInAreaA(file, site.Line, site.Col(first));
             if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
                 DropDirectiveContinuation(site, site.Col(first));
             else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, site, fixedContinuation);
@@ -372,7 +376,7 @@ public static partial class ReferenceFormatProcessor
         /// <summary>The 0-based physical column of the character at index <paramref name="i"/> of the text — the column a
         /// diagnostic names: its character position in the line as the file holds it (a TAB counts one column, as in the
         /// user's editor, and a supplementary-plane character counts one, not two).</summary>
-        public int Col(int i) => Columns is null ? Index + i : Columns.ToPhysical(Index + i);
+        public int Col(int i) => PhysicalLine.ColumnOf(Columns, Index + i);
 
         /// <summary>A one-span origin of text at <paramref name="i"/>, written at resultant column
         /// <paramref name="resultColumn"/>.</summary>

@@ -27,9 +27,41 @@ public sealed class OoMethodDataScope
     /// object IX with its OWN cell — never one of the unit's <see cref="DataBinder.IndexNames"/>).</summary>
     public IndexNameRegistry IndexNames { get; } = new();
 
+    /// <summary>The method's own OCCURS DYNAMIC <c>CAPACITY IN data-name-3</c> register-names → the method's dynamic
+    /// tables that declare them (the method twin of <see cref="DataBinder.CapacityRegisters"/>; kb/Work PB3165). The
+    /// register is "treated as though implicitly defined at the same level as the entry containing the OCCURS
+    /// clause" (§13.18.38.3 SR30), so it is a name of the SAME source element and scope as that entry's data-names:
+    /// method-private, shadowing an object-level name of the spelling and invisible to a sibling method (§11.7.4
+    /// GR5). A list per name for the reason the unit's map has one (a TYPE / SAME AS copy of one written entry
+    /// reproduces its register, kb/Work PB2988).</summary>
+    public Dictionary<string, List<DataItem>> CapacityRegisters { get; } = new(CobolNames.Comparer);
+
     /// <summary>The method's own §8.3.2.2 census: a method is a source element of its own (§10.5), so its words may
     /// repeat, as another type, a word of its class or of a sibling method (§8.4.6.1; kb/Work PB2921).</summary>
     internal UserWordCensus Words { get; } = new();
+
+    /// <summary>Whether this method declares <paramref name="word"/> in ANY of its own name indexes — a data-name, a
+    /// condition-name, an index-name, a named CAPACITY register (§13.18.38.3 SR30 makes the register a data-name of
+    /// the method that declares its table) or a constant-name (kb/Work PB3164: the method's constant entries live in
+    /// <see cref="Constants"/>). ⛔ EVERY NAME INDEX OF THIS SCOPE, asked here beside the indexes themselves: when the
+    /// registers moved into the method's own scope (kb/Work PB3165), the hand-written list in the binder kept asking
+    /// the class's register index and a method's register stopped hiding a symbolic-character (kb/Work PB3154 review
+    /// R2-1, the PB3165 merge-queue bounce); and when the constants moved there (PB3164), this list did not ask them,
+    /// so a method's <c>01 X CONSTANT AS 7</c> let <c>IF X</c> test the object's level-88 <c>X</c> (§11.7.4 GR5: "the
+    /// use of that word in this method refers to the declaration in this method"; kb/Work PB3153 review round 3).
+    /// <c>GlobalNameClassDriftTests</c> finds this scope's name indexes by reflection and holds this predicate to
+    /// every one.</summary>
+    internal bool Declares(string word)
+    {
+        return ByName.ContainsKey(word) || Conditions.ContainsKey(word) || IndexNames.Declares(word)
+            || CapacityRegisters.ContainsKey(word) || Constants.Declared.ContainsKey(word);
+    }
+
+    /// <summary>The method's own CONSTANT entries, and the other words its data division defines, which hide a constant
+    /// of the containing object or factory definition (§11.7.4 GR5; kb/Work PB3164): read first by
+    /// <see cref="DataBinder.FindConstant"/> while the method's data or statements bind, and invisible to every other
+    /// element.</summary>
+    internal DataBinder.ConstantScope Constants { get; } = new();
 }
 
 /// <summary>
@@ -46,6 +78,16 @@ public sealed partial class DataBinder
     /// <summary>The name scope of the method whose statements are CURRENTLY being bound (set per-pc by
     /// <c>StatementBinder.BindClassBody</c>; null while binding program/object-level code).</summary>
     public OoMethodDataScope? ActiveMethodScope { get; set; }
+
+    /// <summary>Whether the method whose statements are being bound declares <paramref name="word"/> as a data-name,
+    /// a condition-name, an index-name, a CAPACITY register or a constant-name of its own (<see cref="OoMethodDataScope.Declares"/>) —
+    /// the NEAREST tier a reference made in that method can reach, so such a declaration hides every constant-name and
+    /// symbolic-character of the spelling the class's binder holds (ISO §8.4.6.2.1 3) a) "If the name is declared in
+    /// source element B, the item in source element B is the referenced item"; §8.4.6.1 "even when it is a different
+    /// type of user-defined word"; kb/Work PB3154 review R1-1). Asked by the two literal-alias lookups,
+    /// <see cref="FindConstant"/> and <see cref="SymbolicOf(string)"/>; always false outside a method's
+    /// statements.</summary>
+    internal bool ActiveMethodDeclares(string word) => ActiveMethodScope?.Declares(word) == true;
 
     /// <summary>True when this binder binds a CLASS unit (per-binder-instance configuration, set ONCE at
     /// construction by <c>Oo/OoDriver</c> — init-only since P9 Step 6, so a mid-bind mutation cannot compile): a root
@@ -289,14 +331,17 @@ public sealed partial class DataBinder
         public void Dispose() => binder._bindingMethodScope = null;
     }
 
-    /// <summary>Reserve the C# member names of the methods emitted into the same C# class as this binder's data (the
-    /// instance methods beside the object data, the factory methods beside the factory data), BEFORE the data
-    /// division binds, so a data root spelled like one of them takes a distinct field name (<c>PQ_2</c>) instead of a
-    /// second member <c>PQ</c> (CS0102). The COBOL is legal: the METHOD-ID's method-name belongs to the method's own
-    /// source element (§8.4.6.5, §10.5), and §8.3.2.2 bars one word as two types only within one source element
-    /// (kb/Work PB2921). The data root is private, so its C# name is free to move; the method's is its contract.</summary>
-    internal void ReserveMethodMemberNames(IEnumerable<OoMethodSymbol> methods) =>
-        _rootNames.Reserve(methods.Select(static m => m.CsName));
+    /// <summary>Reserve the names the C# class this binder's data is emitted into already holds, BEFORE the data
+    /// division binds: its own type name <paramref name="classCsName"/> (the instance class beside the object data,
+    /// the factory singleton class beside the factory data) and the C# member names of the methods emitted into it.
+    /// A data root spelled like one of them takes a distinct field name (<c>PQ_2</c>) instead of a member named like
+    /// its enclosing type (CS0542) or a second member <c>PQ</c> (CS0102). The COBOL is legal: the METHOD-ID's
+    /// method-name belongs to the method's own source element (§8.4.6.5, §10.5; kb/Work PB2921) and the CLASS-ID's
+    /// object-class-name to the class definition's (kb/Work PB3154), and §8.3.2.2 bars one word as two types only
+    /// within one source element. The data root is private, so its C# name is free to move; the type's and the
+    /// methods' are their contract.</summary>
+    internal void ReserveClassMemberNames(string classCsName, IEnumerable<OoMethodSymbol> methods) =>
+        _rootNames.Reserve([classCsName, .. methods.Select(static m => m.CsName)]);
 
     /// <summary>True when <paramref name="item"/> is OBJECT data of a class unit (§14.9.23.3 SR 10): its 01/77
     /// root is not method-scoped. Always false outside a class unit.</summary>

@@ -987,10 +987,11 @@ Draft 6 re-modelled them from the code after the fifth refuter, G2):
   governs contained PROGRAMS only. A class definition's OBJECT and FACTORY halves are the second producer the seed must
   cover (the sixth refuter, H2): a half MAY carry its own configuration section, limited to SPECIAL-NAMES (§12.3.3
   SR3: "The SOURCE-COMPUTER, OBJECT-COMPUTER, and REPOSITORY paragraphs shall not be specified in a factory definition
-  or an instance definition"), and its own OPTIONS paragraph. `OoDriver` builds a half's configuration by reparenting
-  the half's own ENVIRONMENT DIVISION before the class definition's into one synthetic unit (`OoReparentClassData` and
-  `OoReparentFactoryData`, `OoDriver.cs:176-196`), which `DataBinder.EnvDivisions` (`DataBinder.cs:1109-1117`) reads
-  outermost first, so the half's entries override the class's clause by clause; it builds the half's OPTIONS by
+  or an instance definition"), and its own OPTIONS paragraph. `OoDriver.BindClassData` binds the class definition's
+  own ENVIRONMENT DIVISION once, in a binder of the class's own source element (§10.5), and seeds each half from it
+  through the same `InheritConfiguration` before the half binds its own division (`OoDriver.OoReparent` hands a binder
+  only its own element's divisions; kb/Work PB3154, which made the class's names inherited by the halves rather than
+  declared in their §8.3.2.2 censuses); it builds the half's OPTIONS by
   overlaying the half's paragraph on the class's (`OoDriver.cs:99-101` for the OBJECT half, `:119-120` for the
   FACTORY half; an INTERFACE binds its own paragraph over none, `:41`), and `CallInheritOptions`
   (`DataBinder.cs:294`) writes the same `_inheritedOptions` field `InheritConfiguration` writes
@@ -1042,8 +1043,8 @@ none (§12.3.3 SR1) and takes the container's frozen `DataBindResult` (§12.3.4 
 FACTORY half takes its class definition's configuration (§12.3.4 GR1: the class contains the half) overlaid clause by
 clause by the half's own SPECIAL-NAMES, the one configuration paragraph §12.3.3 SR3 leaves it. The class definition
 binds no data, so it has no `DataBindResult`: its arm's source is a `ClassConfiguration` value, bound once per class by
-the same step from the class's own section and OPTIONS paragraph and handed to both halves, which replaces the synthetic
-reparent units' environment children and `EnvDivisions`' reverse order (the override becomes the arm's overlay, written
+the same step from the class's own section and OPTIONS paragraph and handed to both halves, which replaces the class
+binder `OoDriver.BindClassData` builds for the purpose today (kb/Work PB3154) (the seed becomes the arm's overlay, written
 once). A method is not a configuration unit (§12.3.3 SR2): it reads its half's slice. The OPTIONS slice is produced by
 the same step and the same three arms from the baseline the arm names (none for Own; the container's for Contained;
 the class definition's for ClassHalf) overlaid by the unit's own OPTIONS paragraph clause by clause (§11.9.4 GR1), so
@@ -1608,12 +1609,30 @@ slice in `blocked_by`), PB2151 and PB2129 where a note's sites need them, and v1
 is COMPUTED, never listed (PB2118 Draft 8; the seventh refuter, J2, found PB2296's hand list missing 16 callers and
 naming a file that does not exist, and Draft 7's "the brief computes callers with the rewriter's dry run and
 `where.py`" was no mechanism: `where.py` maps spec clauses to files, and the brief is rendered after the check). It is
-every site its notes name, whatever the score (a bare type name included; Draft 7 kept only `fix_clusters`' scores of
-2 and up, J3), plus every file under a folder its sites name, on the current tree, plus every file the MEMBER INDEX
-finds using or emitting what a note moves or changes: the note's `**Moves or changes:**` names, the documentation ids
-in its code spans, and every word of its target paragraph that is a member of a type the note names or its sites
-declare (Draft 9: PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use;
-the eighth refuter, K1), else every type its Sites declare (a folder, a class's files). The index is the census's own
+the union of its notes' DECLARED sets plus the group's primary file (`plan_wave.collision_set`, the fix lane's groups
+and a campaign's alike), and a note's declared set is its STRUCTURED sites only, read by ONE reader, the register's
+`work.note_sites` (kb/Work PB3242), which the planner, the member index, the spec renderer and the landing check all
+call: the paths of its Code site / Site / Sites blocks (a bold label's paragraph and the list under it, or a heading's
+section; `:line`, `#member` and `(member)` suffixes dropped) and of the `**The files this step edits**` line
+`file_census_notes` writes into a multi-step note (`work.STEP_FILES_LABEL`: a step's files can lie outside the census
+finding's Sites, as PB2300's `IntrinsicCatalog.cs` does) under the campaign roots of `model_rules.json` (never a
+literal list: `scripts/` was a root the register's own reader ignored), plus every tracked code file under a folder
+its sites name, on the current tree, plus every file the MEMBER INDEX finds using or emitting what the note moves or
+changes: the names on its `**Moves or changes:**` and `r2_members:` lines, the documentation ids in its site blocks,
+and every word of its target paragraph that is a member of a type the note names or its sites declare (Draft 9:
+PB2296's hand-listed line left out `DataBinder.Options`, which its target moves and 15 files use; the eighth refuter,
+K1), else, for a restructuring note (one with a `**Wave kind:**`), every type its sites declare (a folder, a class's
+files); a fix-lane note declares its sites only: one that names no member, and an R2 defect routed to the fix lane
+(`**Wave kind:** defect-for-fix-lane`, `work.FIX_LANE_WAVE`) whatever its `r2_members:` line names, since those say
+where the defect lives, not what a restructuring moves. A path its prose mentions, a `Gate:` line, a
+tool command and a bare type name declare NOTHING: Drafts 7-10 read every site the note's text named through
+`fix_clusters`' scored heuristic (whatever the score, so a bare type name counted, J3): 57 of PB1754's 63 ready R2
+notes DISCUSS `plan_wave.py` and `landing_check.py` and every PB3160 slice names `cite.py`, so on 2026-10-16 the
+PB1754 dry run planned one campaign group and the PB3160 run one, and with the structured reading six and the whole
+seven-slice chain, every remaining wait a file real in-flight work changes (kb/Work PB3242); the same reading made a
+census member id's parameter type a site (PB2423) and indexed an ignored benchmark report (PB2678).
+`fix_clusters`' scored prose sites still rank and group the fix lane's notes, which carry no site block, and never
+enter a declared set; a campaign clusters on the declared sites. The index is the census's own
 Roslyn walk (`tools/ArchCensus --member-index`, recorded by `scripts/arch/member_index.py --record` as frozen evidence
 `<sha>.members.json.gz`: per symbol, the authored product and test files that use it; per type and member, the files
 that declare it; and, for every type and member of the EMITTED SURFACE, the authored files whose string or
@@ -1623,26 +1642,44 @@ of `src/` and `tests/`, and the host's sources), and the planner plans only on T
 (`member_index.current`: a committed or cached record with that key, else one regenerated into
 `<coord>/member-index/`, else a refusal with `--no-index-regenerate`): a stale index cannot see a type or file a
 landing added (PB833's `OfdRegionLocks.cs` inside PB2251's site folder; K1), and Draft 8's "an older index only widens
-a set" was false. The readers bounded by time (the dispatch guard's record, `work.py check`) use the newest committed
-record plus a text re-scan of every file changed since it and the folder expansion. For PB2296 step 1 the planner's
-set is 73 files (Draft 8: 66), and holds every one of `DataBinder.Options`'s six users the refuter found outside it
-(`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`, `IntrinsicRenderer.cs`,
-`NumericRenderer.cs`); PB2249's holds the nine code-generation files that write the runtime signals as text. The dispatcher, `scripts/orchestrator/plan_wave.py --cluster` (`file_set_collisions`, the ONE
-implementation), checks it against (a) the in-flight work, read from sources a branch classification cannot drop
-(`inflight_file_sets`): every worktree's changed files, committed or not, and every unlanded branch's, each counted
-only while it still differs from `origin/main`, plus every group of the dispatch ledger
-(`<coord>/inflight-groups.json`, written when a wave is planned for dispatch, and by the dispatch guard for every
-write-capable HAND dispatch it admits, an attended Fable or Mythos author or a direct Agent call, with the open notes
-its prompt names and their computed file sets, so the planner sees it before its first edit; J3) whose notes are
-still open — Draft 6
+a set" was false. ONE function computes a declared set, `plan_wave.declared_sets`, on ONE explicit index policy
+(`plan_wave.IndexPolicy`: THE index of the tree, cached in `<coord>/member-index/`; kb/Work PB3203), and the planner,
+the spec renderer (`computed_file_set`, for a groups file that carries no file set) and the landing check (the same, for
+unrecorded R3 work) all pass it: the admission and the guarantee are one quantity, where the landing check's copy once
+read the newest committed record, which cannot see what a landing added. Regenerating costs a solution build plus the
+census host (110 s measured on a cold worktree, 2026-10-16), paid once per tree and, at a landing, only for R3 work no
+ledger entry records; the index is read at all only for a note that names what it moves or changes, or a restructuring
+note, never a fix-lane note (`member_index.needs_index`), so a fix-lane plan never builds one. Only `work.py check`'s unknown-name rule, bounded by time, reads the newest
+committed record plus a text re-scan of every file changed since it. For PB2296 step 1 the declared set is 69 files
+(Draft 8: 66; Draft 9's 73 counted prose sites), and holds every one of `DataBinder.Options`'s six users the refuter
+found outside it (`SetBinder.cs`, `InitialStateBackground.cs`, `PhysicalModel.cs`, `ConditionRenderer.cs`,
+`IntrinsicRenderer.cs`, `NumericRenderer.cs`); PB2249's holds the code-generation files that write the runtime signals
+as text. The dispatcher, `scripts/orchestrator/plan_wave.py` (`file_set_collisions`, the ONE
+implementation; for EVERY plan, the fix lane's too since kb/Work PB2807), checks it against (a) the in-flight work,
+read from sources a branch classification cannot drop (`inflight_file_sets`): every worktree's changed files, committed
+or not, and every unlanded branch's, each counted only while it still differs from `origin/main`, plus every group of
+the dispatch ledger (`<coord>/inflight-groups.json`, read through `plan_wave.ledger_groups`) whose notes are still
+open. The ledger has STRUCTURED writers only (kb/Work PB3186): `plan_wave.record_dispatch`, an upsert keyed on (wave,
+letter), called by `make_dispatch_specs.py` for every group it renders, the planner's waves and a hand-planned wave
+alike, with the group's exact file set, so a dispatched group is in flight before its first edit (J3); and `--release`.
+Draft 8's second writer, the dispatch guard's record of every HAND dispatch it admitted from a scrape of every note id
+its prompt and named files mentioned, recorded reference notes as dispatched work with the union of their sets (six
+entries of 303 to 910 files on 2026-10-15) and is deleted; an entry it left (`hand: true`, a wave that is not a
+number) is ignored by every reader and dropped by the next record, and an attended dispatch made without a rendered
+group is in flight from its worktree's first edit, the landing check behind it. The planner reads each in-flight
+owner through the branch survey's lifecycle state (`plan_wave.classify_inflight`): work WAITING FOR REVIEW, WAITING TO
+LAND or ENQUEUED is finished, and a group meeting it is planned as its CONTINUATION (its pred merges that branch
+first, no `after:`); a dispatched group with no report, and a branch IN FLIGHT, STOPPED, BOUNCED or undecided
+(DECISION) is running, and a group meeting it waits, the collision named; a group's own work (the branch its pred
+continues, a dispatch or branch on its own notes) never collides. Draft 6
 read only the branches `prune_worktrees.classify` called UNLANDED or CHECK, which drops a dispatched branch with no
 commit (MERGED) and one that edits only existing files (LANDED; the sixth refuter's lead); and (b) the open
 external-repository slices' in-flight set (`work.slice_file_set`): every file `DESIGN-external-repository.md` §12
 names for a row not yet landed, in ALL three columns (Draft 6 read only "Today", which missed the twelve caller
 files of "Callers updated in the same change"; H4), from every name in a code span, not only the first (`: GroupRepository`), a type
 mapped to each file declaring it, a member to the file declaring it (a one-word or widely declared name is reported,
-not guessed), and the `tests/` and `docs/` paths the table names; a collision defers the wave, with the collision
-named, never the train.
+not guessed), and the `tests/` and `docs/` paths the table names (set (b) gates the campaign only: the fix lane
+was never held for a slice); a collision defers the group, with the collision named.
 
 **The planner's set is the ADMISSION estimate; the landing check is the GUARANTEE** (PB2118 Drafts 9–10). Three refuter
 rounds each found a new hole in the computed set (hand lists, then the index's blind spots, then its staleness), so a
@@ -1656,31 +1693,44 @@ through one reader, `plan_wave.changed_files`) with
 admitted, read from the FULL ledger (the landing flips its own notes to terminal, and that declaration stays its
 authority), or the set computed now for a note never recorded; a file an R3 commit changed that existed on `main` and
 lies outside it stops the landing; and (2) every other in-flight branch's actual diff and every dispatched group's
-whole declared set until its notes are terminal, started or not (`inflight_file_sets`), when the shared file is R3
-work on either side. R3 work is attributed PER COMMIT (PB2703): a train is mixed, one commit per cluster, so the
+whole declared set, started or not, until its notes are terminal or its report answers it (`inflight_file_sets`;
+a returned group is read through its branch, kb/Work PB2795), when the shared file is R3
+work on either side. R3 work is attributed PER COMMIT (PB2703): a landing can be mixed (a branch that merged a
+predecessor; before kb/Work PB3023, a train of one commit per cluster), so the
 landing's R3 work is the commits that work on an R3 note and the files those commits change; its fix-lane commits
-neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. A shared file
+neither leave the R3 set nor make a shared file R3, and a squashed commit naming both kinds is R3 whole. Each commit
+is charged only with what it introduced (PB3180): a non-merge commit with its diff against its parent, a MERGE commit
+with the files and note statuses that differ from EVERY parent (its conflict resolutions and evil-merge edits, the
+combined-diff set) and the ids leading its own subject, never with its first-parent diff, which carries the other
+parent's whole history (a merged predecessor's commits, which the walk attributes one by one, or `main`'s own landings
+in a `Merge origin/main`); the first-parent reading charged one commit's R3 status flip to every file a merged
+predecessor changed and stopped PB3154's branch on a note whose only commit changed no code. A shared file
 stops the LATER of the two by dispatch time (the ledger's `at`, one millisecond apart per group so a wave never ties,
 else the branch's first commit), which re-plans and rebases onto the earlier once it lands, and the earlier one lands
 with a warning naming the branch that must rebase. An in-flight branch is R3 work because its DISPATCH says so, never
-by its commit wording (implementers commit `WIP checkpoint: …`): a train manifest that lists it, the dispatch-ledger
-groups whose declared files its actual diff meets, then the ids leading its subjects or whose status it flips. The
-landing's OWN members are excluded by its train manifest (`<coord>/scratch/train<label>-manifest.json`, which the
-rolling wave has its lander write first) and by content (a file whose version on the member IS the landing's: the
-lander re-commits its clusters); a branch whose commits the landing contains is the landing itself; anything else
-that shares a file and was dispatched earlier stops it, naming how it was identified and how to bind a member it did
-not recognise. An aborted dispatch's entry never expires on a clock; it is released by hand (`plan_wave.py --release
-<wave|group|note>`). Fix-lane work against fix-lane work is a train's ordinary merge and is not checked. The check
+by its commit wording alone (implementers commit `WIP checkpoint: …`), and it is bound to ONE dispatch (`identity`,
+kb/Work PB3186): its fix-lane REPORT (the newest whose branch field names it) and that report's ledger group (its
+slug), else the ids leading its subjects or whose status it flips, else the ONE ledger group that best covers its
+actual diff (`best_group`: most of its files, then the smallest declared set, then the latest). Draft 10 bound it to
+the union of every ledger group its diff met, so a fix-lane worktree on a file one R3 group (or a scraped hand entry)
+also declared read as R3 work: 23 fix-lane landings stopped so on 2026-10-14/15. A branch whose commits the landing
+contains (a predecessor it merged) is the landing itself, and a file whose version on another branch IS the landing's
+is the landing's content; anything else that shares a file and was dispatched earlier stops it, naming how it was
+identified and how to bind work it did not recognise. (The train manifests that once named a train's own members are
+gone with the train, kb/Work PB3023.) An aborted dispatch's entry never expires on a clock; it is released by hand
+(`plan_wave.py --release <wave|group|note>`). Fix-lane work against fix-lane work is never stopped: the merge queue
+merges it, at worst through a conflict finisher. The check
 costs 7.6 s on a real range with 33 worktrees (the ninth refuter measured 64 s for Draft 9: the per-worktree reads now
 run on a thread pool, and a branch's register changes are one patch, not two reads per note). A STOP is
 `enqueue.py land`'s exit 3. It is enforced where every landing passes, not by the server: CI has no worktrees and no
 dispatch ledger to compare with, so the server-side check is `ci-gate` on the merge group, and the ruleset refuses a
 direct push to `main`. The domain is
 the campaign's code roots and extensions (`model_rules.json` `campaign`) without `.md`: a document both sides edit is
-a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 25 cases) plants an out-of-set edit, a
-two-branch overlap, a rename each way, a `WIP checkpoint:`-only R3 worktree, a train against its own implementer
-(recorded, unrecorded, re-resolved with and without its manifest, and beside a stranger), a started wave's
-untouched declared file, and a mixed train (a fix-lane commit outside the R3 set and sharing a file with earlier
+a text merge the rebase resolves. Its self-test (`--self-test`, a CI step, 35 cases) plants an out-of-set edit, a
+two-branch overlap, a rename each way, a `WIP checkpoint:`-only R3 worktree, a landing against its own implementer
+(recorded, unrecorded, re-resolved unbound and merged, and beside a stranger), a fix-lane worktree on a file an R3
+group also declares (bound to the group covering its diff, by coverage and by its report), retired hand entries, a
+started wave's untouched declared file, and a mixed landing (a fix-lane commit outside the R3 set and sharing a file with earlier
 fix-lane work, an R3 commit sharing one with earlier work, an R3 commit that lands its own note, and a squashed commit
 of both kinds), in a scratch repository, and fails with the check disabled.
 

@@ -7150,6 +7150,58 @@ public static class DiagnosticCatalog
         "ISO §13.18.63.3 SR26");
 
 
+    /// <summary>COBOLNET3734 — at COBOL-85, an AREA-A ITEM of a fixed-form line that does not begin in area A (kb/Work
+    /// PB3147): a division, section or paragraph header, a level indicator (FD, SD, RD), level-number 01 or 77,
+    /// DECLARATIVES, END DECLARATIVES or an end marker that is not the first text of its line or begins in area B.
+    /// ANSI X3.23-1985's reference format places each of them in area A (positions 8–11); ISO/IEC 1989:2002 removed the
+    /// areas (ISO §6.3.1), so the rule is the <c>fixed-form-area-a-item-outside-area-a-2002</c> construct row's.</summary>
+    public static readonly DiagnosticDescriptor AreaAItemOutsideAreaA = new(
+        "COBOLNET3734", "area-a-item-outside-area-a", EditionSeverity.Error,
+        "COBOL-85 fixed-form reference format places a division, section or paragraph header, a level indicator, "
+        + "level-number 01 or 77, DECLARATIVES, END DECLARATIVES and an end marker in area A: each begins its line, in "
+        + "character positions 8-11. Begin the item on a line of its own in area A, or target COBOL-2002 or later, "
+        + "whose program-text area has no areas (ISO §6.3.1).",
+        "ANSI X3.23-1985 reference format (area A); ISO §6.3.1");
+
+    /// <summary>COBOLNET3735 — at COBOL-85, fixed-form program text that begins its line in AREA A but is not an
+    /// area-A item or a level-number (kb/Work PB3147): a statement, a sentence, a clause or entry continued on a new
+    /// line, a period. ANSI X3.23-1985 writes everything else in area B (positions 12 to margin R); ISO/IEC 1989:2002
+    /// removed the areas (ISO §6.3.5 continues an entry "in the program-text area of a subsequent line"), so the rule is
+    /// the <c>fixed-form-text-in-area-a-2002</c> construct row's. Also the text of a CONTINUATION line (a hyphen in the
+    /// indicator area) that begins in area A - X3.23-1985 "Area A of a continuation line must be blank" (kb/Work
+    /// PB3168), reported by the reference format's own gate, <c>ReferenceFormatDiagnostics.OnContinuationTextInAreaA</c>.</summary>
+    public static readonly DiagnosticDescriptor ProgramTextInAreaA = new(
+        "COBOLNET3735", "program-text-in-area-a", EditionSeverity.Error,
+        "COBOL-85 fixed-form reference format reserves area A (character positions 8-11) for division, section and "
+        + "paragraph headers, level indicators, level-numbers, DECLARATIVES, END DECLARATIVES and end markers: a "
+        + "sentence, a statement, and an entry or clause continued on a subsequent line begin in area B (position 12 or "
+        + "later), and area A of a continuation line (a hyphen in column 7) is blank. Indent the text into area B, or "
+        + "target COBOL-2002 or later (ISO §6.3.1, §6.3.5).",
+        "ANSI X3.23-1985 reference format (area B); ISO §6.3.1, §6.3.5");
+
+    /// <summary>COBOLNET3803 — a <c>RAISE EXCEPTION</c> of a NONFATAL exception-name whose checking is not enabled at
+    /// that statement (kb/Work PB2505), so the statement raises nothing. A quality-of-implementation advisory, never a
+    /// refusal: the source is conforming and does exactly what the standard says (kb/Work PB867), but the outcome is
+    /// one a reader of the source does not expect — the standard's own Annex D.2.5 sample program writes eleven such
+    /// RAISEs and no TURN directive. "Provably" is exact here: checking is lexical (§7.3.25.4 GR6; an exception-checking
+    /// PERFORM's WHEN phrase is an implicit TURN over imperative-statement-1, §14.9.28.4 GR14), so the enablement the
+    /// binder folds at the statement is the one the generated code obeys — the advisory and
+    /// <c>EcEmitter.EmitRaise</c>'s nothing-emitted arm read the SAME <c>BoundRaise.Enabled</c>. A FATAL name with
+    /// checking off is not advised: it terminates the run unit (the §14.6.13.1.3 8) implementor arm, kb/Work PB2504),
+    /// which no reader misses.</summary>
+    public static readonly DiagnosticDescriptor RaiseCheckingNotEnabled = new(
+        "COBOLNET3803", "raise-checking-not-enabled", EditionSeverity.Warning,
+        "A RAISE EXCEPTION statement names a nonfatal exception condition whose checking is not enabled at that "
+        + "statement, so it raises nothing: ISO §14.6.13.1.1, \"when the general rules for a statement indicate that a "
+        + "specific exception condition exists, it is raised only if checking for that exception condition is "
+        + "enabled\", and §14.6.13.1.4, \"If checking is not enabled, execution continues as if the exception did not "
+        + "occur\". No USE declarative or WHEN phrase runs, and the last exception status and EXCEPTION-OBJECT keep "
+        + "their values. Checking is enabled by a >>TURN directive that precedes the statement in the source text "
+        + "(§7.3.25.4 GR6: a directive at a PERFORM does not reach the paragraphs it performs) or by the WHEN phrase "
+        + "of an exception-checking PERFORM whose imperative-statement-1 contains the RAISE (§14.9.28.4 GR14). Write "
+        + ">>TURN <exception-name> CHECKING ON before the statement if the RAISE is meant to raise.",
+        "ISO §14.6.13.1.1; §14.6.13.1.4; §14.9.29.4 GR1");
+
     /// <summary>Every descriptor declared above (reflected, so a new field is picked up automatically by the
     /// <c>docs/DIAGNOSTICS.md</c> generator and the drift test — no hand-maintained list to forget).</summary>
     public static IReadOnlyList<DiagnosticDescriptor> All { get; } = typeof(DiagnosticCatalog)

@@ -1,6 +1,12 @@
 {
   "_comment": "The 2002 positive-corpus DISCOVERY MANIFEST (roadmap Phase-1 runner shells): CorpusRunnerTests compiles (and, given a sibling .out, runs+compares) every ENABLED program at --std 2002 strict. Programs exercising not-yet-implemented features stay PENDING (the ISO-validation critics' mass-red guard) and are enabled by the wave that lands their feature. The integrity fact asserts every .cob here is listed (enabled or pending) - nothing is silently undiscovered.",
   "enabled": [
+  "pb1177_sort_procedure_use_not_normal",
+  "pb1177_method_sort_use_not_normal",
+  "pb1177_sort_called_use_not_normal",
+  "pb1177_invoke_sort_use_not_normal",
+  "pb1177_sort_called_goback_ec_free",
+  "pb1177_invoke_self_new_raising",
   "pb3102_set_entry_not_found_declared",
   "pb2720_paragraph_header_mid_line",
   "pb3129_type_in_constant_record_ok",
@@ -663,6 +669,7 @@
   "l1c05_coded_character_values_national",
   "l1c05_oo_returning_only_same_class",
   "l1c05_oo_strong_type_same_type",
+  "pb1012_strong_type_override_factory",
   "l1c05_cce_arith_expression",
   "l1c05_cce_boolean_expression",
   "l1c05_constant_expr_truncated_integer",
@@ -831,6 +838,9 @@
   "pb2748_reopen_answers_41",
   "pb2751_keyed_write_rule_order",
   "pb2739_copy_after_directive_line",
+  "pb2739_indented_division_header_remarks",
+  "pb3147_area_free_placement",
+  "pb3168_continuation_area_a",
   "pb2618_no_get_part_store_every_execution",
   "pb2618_string_into_property_keeps_unreferenced",
   "pb2695_wide_item_subscript_and_odo_count",
@@ -857,7 +867,17 @@
   "pb546_national_leaf_one_width",
   "pb3132_contained_program_word_it_never_references",
   "pb3156_aligned_odo_bit_table_extent",
-  "pb2722_evaluate_partial_not_ownership"
+  "pb3166_redefines_bit_item_in_shared_byte",
+  "pb2722_evaluate_partial_not_ownership",
+  "pb2740_omitted_branch_turn_valid_names",
+  "pb3158_aligned_in_mid_byte_bit_group",
+  "pb3154_half_data_named_like_class_words",
+  "pb3154_half_data_hides_class_symbolic",
+  "pb3154_sum_counter_hides_symbolic",
+  "pb3154_global_sum_counter_tier",
+  "pb3164_method_constant_scope",
+  "pb3153_own_item_hides_switch_condition",
+  "pb656_padding_character_obsolete_2002"
   ],
   "pending": []
 }
