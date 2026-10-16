@@ -690,6 +690,8 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
         var (alnumName, natName) = ChoiceIndicators.AlphabetPair(ctx.Edition, c.collatingForPhrase(),
             f => f.NATIONAL() is not null, f => f.cobolWord().GetText(), c.cobolWord(),
             "SORT/MERGE COLLATING SEQUENCE", "14.9.40.2");
+        // The written names are the phrase's §8.3.2.2 uses (kb/Work PB3153); the screens below read the definitions.
+        foreach (var name in new[] { alnumName, natName }.OfType<string>()) ctx.Data.UseAlphabetName(c, name);
 
         // Alphabet-name-2 (national keys, GR5a): resolve + class-validate, and CARRY the sequence (PB678). A name
         // that fails either check leaves the national half on the program collating sequence — the diagnostic is
@@ -702,21 +704,21 @@ internal sealed class SortBinder(BinderContext ctx, StatementBinder host)
             if (ctx.Data.CollatingAlphabetFault(natName, national: true) is { } natFault)
                 ctx.Edition.Error("COBOLNET0898", DataBinder.CollatingAlphabetViolation("SORT/MERGE COLLATING SEQUENCE",
                     natName, national: true, natFault, "ISO §14.9.40.3 SR2; §14.9.24.3 SR6"));
-            else if (ctx.Data.NationalAlphabets.TryGetValue(natName, out var def))
+            else if (ctx.Data.NationalAlphabets.TryPeek(natName, out var def))
                 nat = def.IsIdentity ? null : def;   // GR5a — an identity national alphabet (NATIVE/UCS-4) ⇒ native
         }
 
         // Alphabet-name-1 (alphabetic/alphanumeric keys, GR5a); a FOR NATIONAL-only phrase leaves the
         // alphanumeric keys on the program collating sequence (GR5b per class).
         if (alnumName is null) return (pcs with { National = nat }, null);
-        if (!ctx.Data.Alphabets.TryGetValue(alnumName, out var alnumDef))
+        if (!ctx.Data.Alphabets.TryPeek(alnumName, out var alnumDef))
         {
             if (ctx.Data.CollatingAlphabetFault(alnumName, national: false) is { } fault)
                 ctx.Edition.Error("COBOLNET0898", DataBinder.CollatingAlphabetViolation("SORT/MERGE COLLATING SEQUENCE",
                     alnumName, national: false, fault, "ISO §14.9.40.3 SR1; §14.9.24.3 SR5"));
             // A FOR NATIONAL alphabet in the slot leaves the statement bindable (the alphanumeric keys fall to the
             // native order); any other word is no alphabet at all and the statement is rejected (PB236).
-            if (ctx.Data.NationalAlphabets.ContainsKey(alnumName)) return (new SortCollation(null, nat), null);
+            if (ctx.Data.NationalAlphabets.Declares(alnumName)) return (new SortCollation(null, nat), null);
             return (SortCollation.Native, BoundRejected.Reported(ctx.Edition));
         }
         // GR5a — the statement's own sequences (an identity alphabet ⇒ native, no carrier emitted).
