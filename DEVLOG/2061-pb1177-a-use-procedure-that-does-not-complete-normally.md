@@ -1,4 +1,4 @@
-## PB1177: a USE procedure that does not complete normally terminates the active SORT, whoever invoked it
+## Entry 2061 — 2026-10-16 04:59 PDT — PB1177: a USE procedure that does not complete normally terminates the active SORT, whoever invoked it
 
 kb/Work PB1177 was an ANALYSIS note: §14.9.40.4 GR17 ("If a USE procedure invoked while a format 1 SORT statement is
 active does not complete normally, the SORT statement is terminated") was verified only for a USE procedure invoked
@@ -141,3 +141,4 @@ shape, but `inventory_schema.witness_shape_error` checked only the scheme and a 
 bare class through three batches. It now refuses an xUnit-form (`test-dir`) body that is not `<Class>.<Method>`; the
 original batch dry-runs to that refusal. Batch `pb1177-finisher` retires the bare class and names the six test
 methods, and the row's notes say the same.
+
