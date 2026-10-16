@@ -156,33 +156,6 @@ public readonly record struct ObjectRefDescriptor(ObjectRefKind Kind, string? Na
     /// universal (kb/Work PB1499).</summary>
     public bool IsClrInterface => Kind is ObjectRefKind.Interface;
 
-    /// <summary>ISO §9.3.8.2.3 rule 2 / §14.8.2.3.2 IDENTICAL-DESCRIPTION equality: the same kind, the same
-    /// name (case-insensitively — COBOL words are, §8.3.2.2) and the same FACTORY and ONLY presence. Rule 2 c)
-    /// says it in one breath: "the corresponding parameter in interface-1 is described with the same
-    /// object-class-name, and the presence or absence of the FACTORY and ONLY phrases is the same in both
-    /// interfaces." Rule 2 d) is the ACTIVE-CLASS clause: "the corresponding parameter in interface-1 is described
-    /// with the ACTIVE-CLASS phrase, and the presence or absence of the FACTORY phrase is the same in both
-    /// interfaces" — the CONTAINING class is not part of the description (GR22 e) binds it at activation), so two
-    /// ACTIVE-CLASS descriptions agree whatever classes they were written in: an override in a subclass, a class
-    /// implementing an interface prototype's (owner-less) formal.
-    /// <para>A <see cref="Formal"/> description is the same as another only when both name the same parameter-name: a
-    /// parameter-name and a class of the group spelled alike are different words (inside its definition the word names
-    /// the formal, <c>OoNameResolution.Lookup</c>). Whether a formal and a DIFFERENT name describe the same thing is each
-    /// expansion's question, which <see cref="TurnsOnFormal"/> tells the caller before it asks this.</para></summary>
-    public bool SameDescriptionAs(ObjectRefDescriptor other)
-        => Kind == other.Kind && Factory == other.Factory && Only == other.Only && Formal == other.Formal
-           && (IsActiveClass || CobolNames.Same(Name, other.Name));
-
-    /// <summary>True when the identical-description question between this description and <paramref name="other"/>
-    /// has different answers in different expansions of the definition being bound as itself (ISO §9.3.8.2.4): one side
-    /// is a <see cref="Formal"/> description, the two do not name the same parameter-name, and they agree on every axis
-    /// but the name (the alternative, FACTORY, ONLY) — so an actual that IS the other side's class or interface makes
-    /// them identical and another does not. That question is the expansion's; the skeleton admits it. An axis that
-    /// differs differs in every expansion, and <see cref="SameDescriptionAs"/> answers it here.</summary>
-    public bool TurnsOnFormal(ObjectRefDescriptor other)
-        => (Formal || other.Formal) && !(Formal && other.Formal && CobolNames.Same(Name, other.Name))
-           && Kind == other.Kind && Factory == other.Factory && Only == other.Only;
-
     /// <summary>How the description reads back in a diagnostic — the phrases as written, so a message never
     /// has to say "universal" about a typed reference (the PB389 misdiagnosis). The ONE spelling is the run-time
     /// operand's (<see cref="ObjectReferenceOperand.Spelled"/>), which the §14.9.39.3 table's own refusals read.</summary>

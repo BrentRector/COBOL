@@ -35,8 +35,14 @@ public sealed class MethodConformanceRuleSetDriftTests
         string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
         string body = Body(text, signature);
         Assert.Contains("MethodConformanceMismatches(", body);
-        foreach (string own in new[] { "DescriptionMismatch(", "OptionalMismatch(", "ObjectRefAssignmentMismatch(",
-                                       ".Raising", "§9.3.8.2.3 rule", "§9.3.8.2)" })
+        // Every member the rule set calls for one of its rules is banned here: SignatureDifference is its
+        // per-item pair-mode comparison (rules 2/3, 6 and 7; ActivationRelations is the run-time relation it
+        // delegates to, kb/Work PB3101), OptionalMismatch rule 8, ObjectRefAssignmentMismatch rule 5,
+        // ReturningCircularity the closing sentence, .Raising rule 9. An asker that calls one beside
+        // MethodConformanceMismatches is a second copy.
+        foreach (string own in new[] { "SignatureDifference(", "ActivationRelations.", "OptionalMismatch(",
+                                       "ObjectRefAssignmentMismatch(", "ReturningCircularity(", ".Raising",
+                                       "§9.3.8.2.3 rule", "§9.3.8.2)" })
             Assert.False(body.Contains(own, StringComparison.Ordinal),
                 $"{signature.Trim()} spells '{own}' itself — a second copy of a §9.3.8.2.3 rule; ask "
                 + "MethodConformanceMismatches instead");
@@ -48,6 +54,9 @@ public sealed class MethodConformanceRuleSetDriftTests
         string text = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Oo", "OoConformance.cs"));
         string body = Body(text, "internal static IEnumerable<string> MethodConformanceMismatches(");
         Assert.Contains("RaisingMismatches(", body);
+        // The per-item comparison of rules 2/3, 6 and 7 lives in the rule set too, so the askers' ban above
+        // has a target.
+        Assert.Contains("SignatureDifference(", body);
         string rule9 = Body(text, "internal static IEnumerable<string> RaisingMismatches(");
         foreach (string arm in new[] { "RaisingTargetKind.ExceptionName", "RaisingTargetKind.ObjectClass", "rule 9 {arm}" })
             Assert.Contains(arm, rule9);

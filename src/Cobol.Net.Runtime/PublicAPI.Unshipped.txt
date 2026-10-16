@@ -121,5 +121,10 @@ static CobolNet.Runtime.IO.CobolSort.RegisterFormat1Sort(string! name, object? u
 static CobolNet.Runtime.IO.CobolSort.UseProcedureExited(object! useScope) -> bool
 static CobolNet.Runtime.IO.CobolSort.AfterActivationReturn() -> void
 static CobolNet.Runtime.Exceptions.SortTerminationSignal.EndsActivation(ref bool ended) -> bool
+const CobolNet.Runtime.ActivationCategory.FigurativeBoolean = "figurative-boolean" -> string!
+static CobolNet.Runtime.MoveValidity.FigurativeRefusal(bool zero, bool booleanCharacters, CobolNet.Runtime.Table16Category receiver) -> string?
+CobolNet.Runtime.ActivationDescription.ObjectNameIsParameter.get -> bool
+CobolNet.Runtime.ActivationDescription.ObjectNameIsParameter.init -> void
+static CobolNet.Runtime.ActivationRelations.SignatureDifference(CobolNet.Runtime.ActivationDescription! first, CobolNet.Runtime.ActivationDescription! second, string! firstRole = "item", string! secondRole = "corresponding item") -> string?
 CobolNet.Runtime.IO.FileConnector.StartPositioned() -> string!
 CobolNet.Runtime.IO.FileConnector.Unsuccessful(string! status) -> string!

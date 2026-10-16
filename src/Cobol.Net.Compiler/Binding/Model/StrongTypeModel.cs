@@ -93,16 +93,12 @@ public static class StrongTypeModel
     /// subordinate item in a type declaration" (alternative 2 — equivalent declarations PLUS the same relative
     /// position and length within them). A MIXED pair — one whole typed item against another's subordinate — is
     /// covered by NEITHER alternative and is therefore not of the same type.</para></summary>
-    /// <param name="prototypes">The prototype signature comparison this one runs inside, or null outside any
-    /// (<see cref="SameElementaryLayout"/>): the strongly-typed sentence of a signature comparison
-    /// (<c>OoConformance.DescriptionMismatch</c>) compares declarations whose pointer members are restricted to the
-    /// prototypes being compared (kb/Work PB3120).</param>
-    public static bool SameType(DataItem a, DataItem b, PrototypeBisimulation? prototypes)
+    public static bool SameType(DataItem a, DataItem b)
     {
         if (TypeAnchor(a) is not { } ra || TypeAnchor(b) is not { } rb) return false;
         bool aIsSubject = ReferenceEquals(ra, a), bIsSubject = ReferenceEquals(rb, b);
         if (aIsSubject != bIsSubject) return false;
-        if (!EquivalentTypeDeclarations(ra, rb, prototypes)) return false;
+        if (!EquivalentTypeDeclarations(ra, rb)) return false;
         return aIsSubject || SamePosition(ra, a, rb, b);                 // alternative 1 | alternative 2
     }
 
@@ -125,9 +121,8 @@ public static class StrongTypeModel
     /// <see cref="DeclaredStrong"/> / <see cref="DeclaredExternal"/> read the three level-1 identity facts from
     /// whichever form it is, so a restricted data-pointer's resolved declaration and a TYPE subject's anchor
     /// compare through the same walk.</summary>
-    /// <param name="prototypes">As <see cref="SameType"/>.</param>
-    public static bool EquivalentTypeDeclarations(DataItem a, DataItem b, PrototypeBisimulation? prototypes) =>
-        EquivalentDeclarations(a, b, new Comparison(prototypes));
+    public static bool EquivalentTypeDeclarations(DataItem a, DataItem b) =>
+        EquivalentDeclarations(a, b, new Comparison());
 
     private static bool EquivalentDeclarations(DataItem a, DataItem b, Comparison within)
     {
@@ -154,12 +149,11 @@ public static class StrongTypeModel
     /// positions and lengths of the ELEMENTARY items … and the ALIGNED, BLANK WHEN ZERO, DYNAMIC LENGTH,
     /// JUSTIFIED, PICTURE, SIGN, SYNCHRONIZED, and USAGE clauses specified for each of these elementary items",
     /// and an intermediate group level is none of those.</para>
-    /// <para><paramref name="prototypes"/> is the signature comparison this one runs INSIDE, or null outside any: a
-    /// group's elementary items may be restricted program- or function-pointers, whose type is a prototype's
-    /// SIGNATURE (<see cref="SameAnalyzedProfile"/>), and within a signature comparison that type is what the
-    /// comparison is still building (kb/Work PB3120, PB2495).</para></summary>
-    public static bool SameElementaryLayout(DataItem a, DataItem b, PrototypeBisimulation? prototypes) =>
-        SameLayout(a, b, new Comparison(prototypes));
+    /// <para>A group's elementary items may be restricted program- or function-pointers, whose type is a prototype's
+    /// SIGNATURE CLASS (<see cref="SameAnalyzedProfile"/>); asked while the classes are computed, each carries its
+    /// prototype's current block (<see cref="PrototypeSignatureClasses.Classify"/>; kb/Work PB3120, PB3101).</para></summary>
+    public static bool SameElementaryLayout(DataItem a, DataItem b) =>
+        SameLayout(a, b, new Comparison());
 
     private static bool SameLayout(DataItem a, DataItem b, Comparison within)
     {
@@ -318,15 +312,14 @@ public static class StrongTypeModel
     /// program- or function-pointer is typed by its prototype's SIGNATURE (§13.18.60.4 GR25 / GR26), so
     /// <see cref="PicInfo.RestrictedPrototypeName"/> leaves the record compare and the pair is asked
     /// <see cref="PrototypeSignatures.SameType"/> — two pointers restricted to differently named prototypes of one
-    /// signature are of the same type, exactly as the elementary §14.8.2.3.2 arm reads them
-    /// (<c>OoConformance.CategoryArmMismatch</c>). A restricted data-pointer is typed by the DECLARATION its type-name
+    /// signature are of the same type, exactly as an elementary pointer's description reads them
+    /// (<c>ActivationDescriptions</c>' <c>TO</c> class clause). A restricted data-pointer is typed by the DECLARATION its type-name
     /// resolves to (GR23), so <see cref="PicInfo.RestrictedTypeName"/> and its resolution
     /// <see cref="PicInfo.RestrictedTypeDecl"/> leave the record compare and the pair is asked
     /// <see cref="SameRestriction(TypeRestriction, TypeRestriction)"/>, the relation the elementary arm spends. Neither
     /// can stay in the record compare: the name decided what only the type may, and recursing into the declaration
     /// would not terminate for a type whose pointer member is restricted back to it — which
-    /// <paramref name="within"/> settles by assuming the declaration pairs under comparison equivalent and carrying the
-    /// enclosing signature comparison's <see cref="PrototypeBisimulation"/>.</para>
+    /// <paramref name="within"/> settles by assuming the declaration pairs under comparison equivalent.</para>
     /// </summary>
     private static bool SameAnalyzedProfile(DataItem a, DataItem b, Comparison within)
     {
@@ -338,23 +331,19 @@ public static class StrongTypeModel
         if ((x.RestrictedTypeName is not null || y.RestrictedTypeName is not null)
             && !SameRestriction(PointerRestriction(a), PointerRestriction(b), within)) return false;
         if ((x.RestrictedPrototypeName is not null || y.RestrictedPrototypeName is not null)
-            && !PrototypeSignatures.SameType(a, b, within.Prototypes)) return false;
+            && !PrototypeSignatures.SameType(a, b)) return false;
         return x.EditingRules is null ? y.EditingRules is null
             : y.EditingRules is { } yr && x.EditingRules.SequenceEqual(yr);
     }
 
     /// <summary>⛔ ONE §8.5.3.1 COMPARISON IN FLIGHT (kb/Work PB3120): what a pair of declarations being compared
-    /// carries down to the pointer members it meets. A restricted program- or function-pointer member is typed by its
-    /// prototype's signature (§13.18.60.4 GR25 / GR26), so inside a signature comparison it resolves under
-    /// <see cref="Prototypes"/>, the greatest fixed point of <see cref="PrototypeSignatures.Same"/>; a restricted
-    /// data-pointer member is typed by its type declaration (GR23), which may itself hold a pointer restricted back to
-    /// it, so the declaration pairs being compared are assumed equivalent (<see cref="Assume"/>) and the walk
-    /// terminates. Created at each public entry, so no state outlives one question.</summary>
-    private sealed class Comparison(PrototypeBisimulation? prototypes)
+    /// carries down to the pointer members it meets. A restricted data-pointer member is typed by its type declaration
+    /// (§13.18.60.4 GR23), which may itself hold a pointer restricted back to it, so the declaration pairs being compared
+    /// are assumed equivalent (<see cref="Assume"/>) and the walk terminates. (A restricted program- or function-pointer
+    /// member is typed by the signature class its item carries, <see cref="PrototypeSignatures.SameType"/>.) Created at
+    /// each public entry, so no state outlives one question.</summary>
+    private sealed class Comparison
     {
-        /// <summary>The prototype signature comparison this one runs inside, or null outside any.</summary>
-        public PrototypeBisimulation? Prototypes { get; } = prototypes;
-
         // Allocated on the first pair: most declarations hold no restricted data-pointer.
         private HashSet<(DataItem, DataItem)>? _assumed;
 
@@ -461,7 +450,7 @@ public static class StrongTypeModel
     /// restriction is to a TYPE, not to a member position, so this is declaration equivalence and NOT
     /// <see cref="SameType"/>, whose second alternative answers the different question of whether two OPERANDS
     /// occupy corresponding positions within their declarations.</summary>
-    public static bool SameRestriction(TypeRestriction a, TypeRestriction b) => SameRestriction(a, b, new Comparison(null));
+    public static bool SameRestriction(TypeRestriction a, TypeRestriction b) => SameRestriction(a, b, new Comparison());
 
     private static bool SameRestriction(TypeRestriction a, TypeRestriction b, Comparison within) =>
         a.IsRestricted && b.IsRestricted
