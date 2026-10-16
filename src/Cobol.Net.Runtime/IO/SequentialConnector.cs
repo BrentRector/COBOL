@@ -229,7 +229,7 @@ public sealed class SequentialConnector : FileConnector
         if (SharedPhysical is not { } shared) return;
         // …and a writer the host denied READ (OpenWriter's write-only OUTPUT fallback, kb/Work PB2848) cannot count
         // the medium: a count it could not make would refuse, AFTER the flush above, a record that is in the file.
-        _writeOrdinal = anotherWriter && _writerReads
+        _writeOrdinal = anotherWriter && FileLock!.CanRead
             ? PhysicalOrdinalOfRelease((SharedAppendStream)_writer!.BaseStream)   // §9.1.16 identity, off the medium
             : ++shared.ReleasedOrdinal;                                           // …or the only writer's mint
     }
@@ -349,7 +349,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        TakeRegions(stream.SafeFileHandle);
+        TakeRegions(stream);
         // A brand-new handle has read nothing, so it agrees with the medium by construction (kb/Work PB753).
         _coherentAt = Physical?.ReleaseGeneration ?? 0;
         return r;
@@ -382,7 +382,6 @@ public sealed class SequentialConnector : FileConnector
             access = FileLockPosture.AccessOf(Mode);
             stream = HostFile.OpenConnectorWriteStream(HostPath, mode, access, HostShare);
         }
-        _writerReads = (access & FileAccess.Read) != 0;
         StreamWriter w;
         try
         {
@@ -394,7 +393,7 @@ public sealed class SequentialConnector : FileConnector
             stream.Dispose();   // the areas could not be allocated: the handle must not outlive the failed OPEN
             throw;
         }
-        TakeRegions(HostFile.HandleOf(stream));
+        TakeRegions(HostFile.FileOf(stream));
         return w;
     }
 
@@ -404,12 +403,14 @@ public sealed class SequentialConnector : FileConnector
     /// given back) where the stream is.</summary>
     private RegionLocks? _regions;
 
-    /// <summary>Make the endpoint for the stream just opened on <paramref name="handle"/>; one a previous handle of this
-    /// connector had (a rebuilt reader) is given up with that handle.</summary>
-    private void TakeRegions(Microsoft.Win32.SafeHandles.SafeFileHandle handle)
+    /// <summary>Make the endpoint for the host stream just opened, <paramref name="host"/> (<see cref="FileLock"/>'s);
+    /// an endpoint still held is given up first, belt-and-braces like <c>KeyedConnector.TakeFileLock</c>'s handle (the
+    /// CLOSE and an abandoned OPEN already gave it up; no sibling's handle is ever rebuilt, kb/Work PB322). Its
+    /// writability is what the host GRANTED the handle, never re-derived from the open mode (kb/Work PB2758).</summary>
+    private void TakeRegions(FileStream host)
     {
         _regions?.Dispose();
-        _regions = HostRegionLocks.Open(handle, HostPath, writable: Mode is not FileOpenMode.Input);
+        _regions = HostRegionLocks.Open(host.SafeFileHandle, HostPath, writable: host.CanWrite);
     }
 
     /// <summary>Give the endpoint up with the handle it was made for.</summary>
@@ -419,10 +420,12 @@ public sealed class SequentialConnector : FileConnector
         _regions = null;
     }
 
-    /// <summary>Whether the writer's handle was granted READ access, so the connector can count records off the
-    /// medium (<see cref="PhysicalOrdinalOfRelease"/>). False only for the write-only OUTPUT handle
-    /// <see cref="OpenWriter"/> falls back to when the host refuses the read half; set by every OpenWriter.</summary>
-    private bool _writerReads;
+    /// <inheritdoc/>
+    /// <remarks>The host stream beneath the reader (INPUT, I-O) or the writer (OUTPUT, EXTEND) — the arms never hold
+    /// both — read through <see cref="HostFile.FileOf"/>, because the repositioning writer's own
+    /// <see cref="Stream.CanRead"/> is false over a read-write handle.</remarks>
+    internal override FileStream? FileLock =>
+        (_reader?.BaseStream ?? _writer?.BaseStream) is { } stream ? HostFile.FileOf(stream) : null;
 
     /// <inheritdoc/>
     /// <remarks>⛔ THE SEQUENTIAL ARM OF PB2660 (kb/Work PB2692). §9.1.16, <i>"While locked by a given file
@@ -1101,7 +1104,7 @@ public sealed class SequentialConnector : FileConnector
                     // create empty, then close — an auxiliary handle, not the connector's stream
                     if (!exists) using (HostFile.OpenAuxiliary(HostPath, FileMode.Create, FileAccess.Write)) { }
                     // ReadWrite access and NO FileOptions.SequentialScan for this mode — both decided once, in
-                    // OpenReader, which is also what the reposture rebuild uses.
+                    // OpenReader, the one spelling of the read handle.
                     _reader = OpenReader();
                     NoticeIfLayoutDisagrees();
                     if (!exists && IsOptional) return FileStatusCode.OptionalFileNotFound;

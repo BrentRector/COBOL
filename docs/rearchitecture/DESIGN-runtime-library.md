@@ -390,7 +390,8 @@ cannot admit this run unit's second connector while refusing a foreign process. 
   has a physical file and `ReleaseFileLock` in the CLOSE and on an unsuccessful OPEN. ⛔ **It is the SAME handle
   the store travels through** — `KeyedConnector.Load`/`Persist` read and write positionally through it, and `RecordFraming` only composes and decodes the image — because a
   second handle for the load or the persist would ask for access the connector's own `FileShare.None` forbids,
-  which is kb/Work PB713's defect re-opened by its own cure. The handle's ACCESS is `FileConnector.HostAccess`,
+  which is kb/Work PB713's defect re-opened by its own cure. The handle's ACCESS is `FileConnector.HostAccess`
+  (every organization opens its handle, `FileConnector.FileLock`, with it and spells none of its own; kb/Work PB2758),
   not the open mode's floor, because a whole-store organization reads the physical file in every writable mode
   (§14.9.51.4 GR29 a)'s release number is a fact of the records already there).
 
@@ -673,13 +674,14 @@ first changes the file or its store: the sequential record, line and print arms,
 `CommitGateDriftTests` measures every one with a gate that always refuses.
 
 **The SEQUENTIAL organization publishes its record locks the same way (kb/Work PB2692).** Its `RecordLocks` endpoint is made for
-the handle beneath its reader or writer (`HostFile.HandleOf`), and three facts make the published lock guard the
+the handle beneath its reader or writer (`FileConnector.FileLock`, read through `HostFile.FileOf`), writable exactly
+when the host granted that handle write access, and three facts make the published lock guard the
 right record across run units. (1) A writer that registered a record-locking posture opens its handle READ-WRITE
 (`SequentialConnector.HostAccess`): the presence byte is a SHARED hold, which Linux refuses through a write-only
 descriptor, and a lock with no presence byte is invisible to every other run unit's hot-path test. The read half is
 a PREFERENCE for OUTPUT and a NEED for EXTEND (kb/Work PB2848): OUTPUT creates the file and has no record to read,
 so a host that refuses the read (a write-only file) still grants the write, `OpenWriter` falls back to the mode's
-write-only handle, and that connector numbers its records by the in-run-unit mint (`_writerReads` is false) and
+write-only handle, and that connector numbers its records by the in-run-unit mint (its `FileLock` cannot read) and
 publishes no presence; EXTEND numbers the records already in the file and answers `37` without the read. (2) A sharing
 writer's released record is NUMBERED OFF THE MEDIUM (`ReleaseRecord` → `PhysicalOrdinalOfRelease`): the record lands
 where `SharedAppendStream.ReleaseStart` says, and its ordinal is one more than the records starting before that
