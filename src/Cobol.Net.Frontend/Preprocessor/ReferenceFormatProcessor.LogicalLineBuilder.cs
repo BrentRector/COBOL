@@ -140,6 +140,10 @@ public static partial class ReferenceFormatProcessor
                 Discard(site);                           // a comment line (§6.2.3.1 1)): discarded, never a join
                 return;
             }
+            // X3.23-1985: "Area A of a continuation line must be blank" (kb/Work PB3168). A continuation line that continues
+            // a directive is dropped below and diagnosed there.
+            if (fixedContinuation && FixedFormLine.IsAreaAOffset(first) && !(_latest >= 0 && _latestIsDirective))
+                gates?.OnContinuationTextInAreaA(file, site.Line, site.Col(first));
             if (_latest >= 0 && _latestIsDirective && (fixedContinuation || _literal.AwaitsFloating))
                 DropDirectiveContinuation(site, site.Col(first));
             else if (_latest >= 0 && _literal.AwaitsFloating) ContinueFloating(text, first, site, fixedContinuation);
