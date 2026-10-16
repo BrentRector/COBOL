@@ -88,6 +88,7 @@ import re
 import sys
 
 import citation_corpus  # noqa: E402  (same directory; the ONE definition of "frozen")
+import grammar_source  # noqa: E402  (same directory; THE reader of the grammar's rules, kb/Work PB3204)
 import work  # noqa: E402  (work.tracked_paths: a path exists when the COMMITTED tree has it; PB1957 2026-10-07)
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -99,8 +100,6 @@ REPO = pathlib.Path(__file__).resolve().parents[2]
 #: carry FOUR line-anchored citations into the tree between them, so the drift this audit measures is not the
 #: drift that directory can suffer.
 EVIDENCE = "docs/rearchitecture/evidence"
-
-GRAMMAR = REPO / "src" / "Cobol.Net.Frontend" / "Grammar"
 
 #: The banner key, the marker key, and the fields a marker must carry to be one.
 BANNER_KEY = "_frozen"
@@ -127,31 +126,16 @@ DECL = re.compile(r"`\s*(" + _IDENT + r")\s+:\s*([^`]+)`")
 CAMEL = re.compile(r"^[a-z][A-Za-z0-9_]*[A-Z]")
 
 
-def grammar_rules(grammar_dir: pathlib.Path) -> dict[str, list[tuple[str, int, int]]]:
-    """Every rule declared in the ANTLR grammar → the file and line SPAN it occupies.
+def rule_spans(rules: tuple[grammar_source.Rule, ...]) -> dict[str, list[tuple[str, int, int]]]:
+    """Every rule the grammar declares (parser, lexer and fragment alike) → the file and line SPAN it occupies.
 
-    ⛔ The declaration and its `:` are OFTEN SEPARATED BY A COMMENT — `performStatement` is followed by
-    ``// Out-of-line: explicit forms …`` before its first alternative, and `valueClause` the same. A reader of
-    the first draft of this function would have been told those two rules do not exist, which is the exact
-    false accusation this audit is supposed to make impossible.
+    The rules come from `grammar_source.read`, the one reader (kb/Work PB3204): a declaration whose `:` follows a
+    comment line (`performStatement`, `valueClause`) and a `;` carrying a trailing comment are its traps, handled
+    once there, so this audit can never again accuse a rule of not existing because its own regex missed it.
     """
     out: dict[str, list[tuple[str, int, int]]] = {}
-    for g in sorted(grammar_dir.rglob("*.g4")):
-        lines = g.read_text(encoding="utf-8").splitlines()
-        for i, line in enumerate(lines):
-            m = re.match(r"^(?:fragment\s+)?(" + _IDENT + r")\s*(:|$)", line)
-            if not m:
-                continue
-            if m.group(2) != ":":
-                j = i + 1
-                while j < len(lines) and (not lines[j].strip() or lines[j].lstrip().startswith("//")):
-                    j += 1
-                if j >= len(lines) or not lines[j].lstrip().startswith(":"):
-                    continue
-            end = i
-            while end < len(lines) and not re.sub(r"//.*$", "", lines[end]).rstrip().endswith(";"):
-                end += 1
-            out.setdefault(m.group(1), []).append((g.name, i + 1, min(end, len(lines) - 1) + 1))
+    for r in rules:
+        out.setdefault(r.name, []).append((r.file.name, r.first_line, r.last_line))
     return out
 
 
@@ -388,7 +372,7 @@ def main() -> int:
               f"the record this audit guards. One of the two is wrong; REFUSING to report either way.")
         return 2
     files = sorted((REPO / EVIDENCE).glob("*.json"))
-    findings, drift, stats = scan(files, grammar_rules(GRAMMAR), REPO)
+    findings, drift, stats = scan(files, rule_spans(grammar_source.read()), REPO)
     if stats["files"] == 0 or stats["citations"] == 0:
         print(f"⛔ NOT RUN — {stats['files']} file(s), {stats['citations']} citation(s) under {EVIDENCE}. "
               f"A gate that looked at nothing is not green, it is unmeasured.")
