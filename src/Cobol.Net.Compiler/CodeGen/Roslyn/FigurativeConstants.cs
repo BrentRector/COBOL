@@ -82,6 +82,10 @@ internal static class FigurativeConstants
     /// NATIONAL</c> literal phrase, §12.3.7 GR8/GR9) takes THAT sequence's extremes; otherwise the NATIVE
     /// sequence's extremes, U+FFFF / U+0000 for both classes (<see cref="CobolNet.Runtime.NativeCollatingSequence"/>,
     /// owner decision kb/Work R52).
+    /// <para>⛔ <paramref name="cat"/> IS A CHARACTER CONTEXT, NOT A PICTURE CATEGORY (kb/Work PB442): a caller
+    /// anchored on a data item passes <c>IntrinsicArgumentRules.CharacterContext</c> of the item's Table 2 class, so
+    /// a numeric-edited USAGE NATIONAL item (category numeric-edited, class national) is National here, as
+    /// §14.9.25.4 Table 17 and §8.3.3.6.4 GR1 require.</para>
     /// <para>⛔ <b>DETERMINATION D-B2 — the figurative SPACE against a BOOLEAN receiving operand is the boolean
     /// character '0'</b> (CONFORMANCE.md §3; kb/Work PB425). The standard leaves this undefined and the gap is
     /// reachable: §14.9.25.4 Table 17 gives SPACE against a Boolean receiving operand the category BOOLEAN, but

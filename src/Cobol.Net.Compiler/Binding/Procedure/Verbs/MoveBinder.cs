@@ -479,8 +479,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
             // receiver has to be able to hold one whichever way the test goes).
             if (move.Stores[i].Kind is not MoveKind.FigurativeToNumericImage
                 && MoveClassifier.ZeroLengthItemRoute(move.Stores[i].Sender, t) is null) continue;
-            if (t is not (RedefViewPlace or NumericImagePlace) && t.OwnsStorageCell && t.Item.Class is null
-                && t.Item.Pic is { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display })   // CARRIAGE, not image form (kb/Work PB646)
+            if (t is not (RedefViewPlace or NumericImagePlace) && t.OwnsStorageCell && IsCharacterImageNumeric(t.Item))
                 ctx.Data.MarkImageForced(t.Item);   // the collected image fact
         }
     }
@@ -573,7 +572,16 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     {
         foreach (var t in targets)
             if (t is RefModPlace { OwnsStorageCell: true } rm
-                && rm.Item is { Class: null, Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display } } item)   // CARRIAGE, not image form (kb/Work PB646)
-                ctx.Data.MarkImageForced(item);   // the collected image fact
+                && IsCharacterImageNumeric(rm.Item))
+                ctx.Data.MarkImageForced(rm.Item);   // the collected image fact
     }
+
+    /// <summary>⛔ THE ONE ELIGIBILITY of both image marks above — a figurative fill and a reference-modified store:
+    /// a numeric item whose USAGE is a CHARACTER form, DISPLAY or NATIONAL (§13.18.60.4 GR7 / GR8 — an
+    /// alphanumeric or a national coded character set represents it), outside a REDEFINES class, never a float. Usage NATIONAL
+    /// was left out of both copies (kb/Work PB442): a pre-2023 <c>MOVE LOW-VALUE TO</c> a <c>PIC 9 USAGE NATIONAL</c>
+    /// item reached the emitter's "without image-backed storage" guard and stopped the run unit with
+    /// NotImplementedCobolFeatureException. The mark is the CARRIAGE, not the image form (kb/Work PB646).</summary>
+    private static bool IsCharacterImageNumeric(DataItem item) =>
+        item is { Class: null, Pic: { Category: PicCategory.Numeric, IsFloat: false, Usage: Usage.Display or Usage.National } };
 }

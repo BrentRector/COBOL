@@ -1004,8 +1004,9 @@ of an unsupported facility.
   frame carries the activation that pushed it, and the frame walk stops at the first frame of another activation
   (`ExceptionEngine.RunTopFrame`), so every activation mechanism is bounded by the run unit's one activation record.
   Witnesses `conformance:2023/pb442_f3_when_activation_scope` (the PERFORMed paragraph, a CALLed program holding an
-  exception-checking PERFORM of its own, GOBACK … RAISING) and `conformance:2023/pb442_f3_when_method_scope` (an I-O
-  raise in an INVOKEd method of a class holding such a PERFORM).
+  exception-checking PERFORM of its own, GOBACK … RAISING), `conformance:2023/pb442_f3_when_method_scope` (an I-O
+  raise in an INVOKEd method of a class holding such a PERFORM) and `conformance:2023/pb442_f3_when_io_enablement`
+  (reading (c): a READ in a PERFORMed paragraph written before, and after, a `>>TURN`).
 - **Exception-checking PERFORM — the implicit POP ALL and the END-PERFORM line's reference format (§14.9.28.4 GR14, the
   spec states the order, not the line)**: "Immediately preceding the END PERFORM phrase, there is an implicit POP ALL",
   and ALL includes SOURCE FORMAT (§7.3.22.4 GR2). A reference format is a property of a physical LINE (§6.5), so the

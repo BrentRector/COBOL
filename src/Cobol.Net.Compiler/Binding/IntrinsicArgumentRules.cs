@@ -494,24 +494,52 @@ internal static class IntrinsicArgumentRules
                 _ => CobolClass.Alphanumeric,
             };
         }
+        return item.Pic is { } pic ? ClassOfPic(pic) : null;
+    }
+
+    /// <summary>The ISO §8.5.2.1 Table-2 class of an ELEMENTARY item's description — the half of
+    /// <see cref="ClassOfItem"/> a caller holding only the <see cref="PicInfo"/> (a VALUE clause's initializer) asks,
+    /// so it reads the SAME table rather than the raw category.</summary>
+    internal static CobolClass? ClassOfPic(PicInfo pic)
+    {
         // The USAGE-keyed arm rides BEFORE the category table (kb/Work R27): an index DATA item's PicInfo
         // carries category NUMERIC for the storage model (PicInfo.IndexItem), but §8.5.2.1 Table 2 puts it in
         // class INDEX — a distinct class no §15 argument rule admits. Keying the usage first is what stops the
         // storage category from answering the CLASS question.
-        if (item.Pic is { Usage: Usage.Index }) return CobolClass.Index;
+        if (pic.Usage is Usage.Index) return CobolClass.Index;
         // Class ALPHABETIC before the category table (kb/Work PB124 wave 5): the storage model folds PIC A
         // into PicCategory.Alphanumeric, so the category cannot answer — IsAlphabetic can, exactly as the
         // Usage.Index arm above un-folds the index item's storage category.
-        if (item.Pic is { IsAlphabetic: true }) return CobolClass.Alphabetic;
+        if (pic.IsAlphabetic) return CobolClass.Alphabetic;
         // Table 2 splits the numeric-edited row on USAGE — class alphanumeric "if usage is display", national "if
         // usage is national" — so the category table below cannot answer it alone (kb/Work PB1128).
-        if (item.Pic is { AnalyzedCategory: PicCategory.NumericEdited, Usage: Usage.National })
+        if (pic is { AnalyzedCategory: PicCategory.NumericEdited, Usage: Usage.National })
             return CobolClass.NumericEditedNational;
         // ⛔ THE ANALYZED category, never the storage one (kb/Work PB960): a recovery profile — the placeholder
         // for an entry whose PICTURE was already rejected — has NO class, so it reads "not statically decidable"
         // and every screen over this table fails OPEN instead of re-diagnosing the item as alphanumeric.
-        return item.Pic?.AnalyzedCategory is { } category ? ClassOfCategory(category) : null;
+        return pic.AnalyzedCategory is { } category ? ClassOfCategory(category) : null;
     }
+
+    /// <summary>⛔ THE CHARACTER CONTEXT OF A CLASS, written once (kb/Work PB442): the category whose characters,
+    /// coded character set and program collating sequence a figurative constant reads against an operand of
+    /// class <paramref name="cls"/>. §8.3.3.6.4 GR1 makes a figurative "a national character value" in "a context
+    /// requiring national characters" and an alphanumeric one otherwise; §14.9.25.4 Table 17 spells that out for
+    /// the MOVE statement by the receiving operand — national for categories national, national-edited and
+    /// numeric-edited "if usage is national", which is exactly Table 2's class national (§8.5.2.1) — and gives
+    /// SPACE and ZERO a boolean category against a boolean receiver (GR4's boolean zero, determination D-B2's
+    /// boolean space). So the answer is the CLASS projected through <see cref="TableTwoClass"/>: National,
+    /// Boolean, or Alphanumeric for every other class and for an operand with no decidable class. It is never
+    /// the raw PICTURE category, which is how a <c>PIC ZZ9 USAGE NATIONAL</c> receiver took the ALPHANUMERIC
+    /// program collating sequence's HIGH-VALUE and LOW-VALUE.</summary>
+    public static PicCategory CharacterContext(CobolClass? cls) => cls is { } c
+        ? TableTwoClass(c) switch
+        {
+            CobolClass.National => PicCategory.National,
+            CobolClass.Boolean => PicCategory.Boolean,
+            _ => PicCategory.Alphanumeric,
+        }
+        : PicCategory.Alphanumeric;
 
     /// <summary>ISO §8.5.2.1 Table 2, read as written.</summary>
     private static CobolClass? ClassOfCategory(PicCategory category) => category switch

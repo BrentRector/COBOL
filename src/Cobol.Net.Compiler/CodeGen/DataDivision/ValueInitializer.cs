@@ -448,7 +448,8 @@ internal sealed class ValueInitializer(EmitContext ctx)
     public string? FigurativeInitializer(string raw, PicInfo pic)
     {
         if (FigurativeKind(raw) is not { } k) return null;
-        string fillChar = FigurativeConstants.Fill(k, ctx.Data.Collating, pic.Category, ctx.Data.NationalCollating);
+        string fillChar = FigurativeConstants.Fill(k, ctx.Data.Collating,
+            IntrinsicArgumentRules.CharacterContext(IntrinsicArgumentRules.ClassOfPic(pic)), ctx.Data.NationalCollating);   // the CLASS (kb/Work PB442)
         return pic.Category is PicCategory.Numeric ? pic.DefaultInitializer : $"new string({fillChar}, {pic.Length})";
     }
 
