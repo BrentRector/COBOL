@@ -490,8 +490,10 @@ public sealed class DerivedVerdictDriftTests
         // dropped and shipped code is being documented as unsupported.
         foreach (string id in (string[])["SR-14.9.7.3-1", "SR-14.9.7.3-2", "GR-14.9.7.4-1", "GR-14.9.36.4-7"])
             Assert.DoesNotContain(id, ids);
-        // PB259 holds this one open as a genuine adjudication.
-        Assert.DoesNotContain("GR-14.9.7.4-2", ids);
+        // Each statement's GR2 SETS EC-FLOW-COMMIT / EC-FLOW-ROLLBACK, the declined module's own condition, so
+        // nothing survives it (kb/Work PB259 settled both). If either drops out, an EC-FLOW exclusion came back.
+        foreach (string id in (string[])["GR-14.9.7.4-2", "GR-14.9.36.4-2"])
+            Assert.Contains(id, ids);
         // FMT-14.9.36.2 would be wrong as non-support — ROLLBACK IS a recognized, accepted-inert statement in the
         // shipped grammar. Excluded by KIND on the statement arm, not by matching "^<pre": that rendering proxy
         // leaks on 56 of 322 FMT rows. (The REFUSED clause's own format, FMT-12.4.6.3.2, is in — asserted above.)

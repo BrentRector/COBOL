@@ -598,6 +598,8 @@
   "l1_test_formatted_datetime_national_format",
   "l1_trim_zero_length_result",
   "pb261_commit_facility_witness",
+  "pb259_commit_rollback_under_sort",
+  "pb259_commit_rollback_recursive",
   "pb292_record_delimiter_witness",
   "w59_mcs_facility_witness",
   "pb142_retry_conflict_class_ec",
