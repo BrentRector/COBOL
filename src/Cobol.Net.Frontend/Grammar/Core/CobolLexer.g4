@@ -219,8 +219,12 @@ channels { ABSENT_DEBUG_LINE }
     {
         // A directive-expression region never subscripts: every '(' groups (DESIGN §4.1). Checked first so a '('
         // after a boolean-operator data-name (e.g. `A B-AND (…)`, B-AND legal as a name below 2023) stays a group.
+        // ⛔ A WORD RIGHT AFTER THE INVOCATION OPERATOR `::` IS literal-1, NEVER A DATA-NAME (kb/Work PB780): §8.4.3.4.2
+        // prints `identifier-1 :: literal-1 [ ( … ) ]`, and a constant-name spelling literal-1 (§13.10.3 SR2) is the one
+        // word that stands there — so its '(' is the argument-list paren the written literal's '(' is, and `O :: K (X)`
+        // lexes exactly as `O :: "M" (X)` does.
         if (!_primeDirectiveExpr && PreviousTokenCouldBeDataName() && !PreviousIsFunctionName()
-            && !IsReportSumClauseKeyword())
+            && _prevNonWsTokenType != COLONCOLON && !IsReportSumClauseKeyword())
         {
             OpenRegion(ParenRegion.Reference);
             Type = REF_LPAREN;   // subscripts / reference modifier / keyword-omitted arguments; its ')' is REF_RPAREN

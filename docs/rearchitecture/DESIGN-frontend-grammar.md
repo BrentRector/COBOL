@@ -209,6 +209,11 @@ closed by the next section or division header) and a SUM there opens no referenc
 (`IsReportSumClauseKeyword`). SUM is the only §8.9 ∩ §8.11 word that begins a report or data description clause
 whose operand can open with '('; `CobolLexerModeDriftTests` pins both regions for all four words.
 
+The trigger has one POSITION exception besides (kb/Work PB780): a word right after the invocation operator `::` is an
+inline method invocation's literal-1 spelled by a constant-name (§8.4.3.4.2; §13.10.3 SR2), never a data-name, so
+`OnDefaultLParen` leaves its '(' the plain argument-list `LPAREN`, exactly as after a written literal (`O :: K (X)` lexes
+as `O :: "M" (X)` does).
+
 ---
 
 ## 2. Target architecture — overview

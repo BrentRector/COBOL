@@ -551,6 +551,18 @@ SR16). A numeric constant-name in a BY CONTENT / BY VALUE / intrinsic-argument p
 written numeric literal takes there. The chain had been written separately in six binders, and the positions missing a
 half refused conforming source; `LiteralAliasResolutionDriftTests` holds every procedure binder to the one resolution.
 
+The resolution has two spellings of its input and no third (kb/Work PB780): the bare data reference, for a position
+the grammar writes `literal | dataReference` (the word may be identifier-1 there, so the §8.4.6.1 own-item test is
+asked first), and the bare `cobolWord`, for a position the grammar writes `literal | cobolWord` because no identifier
+stands there (an inline method invocation's literal-1, §8.4.3.4.2). Each position that names a PROGRAM — CALL literal-1
+and its AS NESTED form, CANCEL, the program-address-identifier and the vendor `SET … TO ENTRY` — asks the alias FIRST and
+hands the written literal or the alias to the ONE program-name reader, `ProgramNameLiteral` (§14.9.4.3 SR2, §14.9.5.3
+SR2, §8.4.3.13.3 SR2: an alphanumeric or national literal, not zero-length, formed by `ExternalizedNames.FormInEdition`);
+INVOKE's literal-1 asks it before the identifier-2 arm. The DATA DIVISION positions read the constant table through
+`DataBinder`'s own readers: the CODE clause's literal-1 (`BindCodeClause`), the Format-2 VALUE subscripts
+(`TableValueSubscript`, grammar `valueTableSubscript : signedIntegerLiteral | cobolWord`) and the `integerOperand`
+positions (`IntegerOperandValue`).
+
 ### 3.7 Statement PRE-ops and the ONE sending-value materialization
 
 Several general rules say a value is computed **once, before the statement's effect**, and then used several

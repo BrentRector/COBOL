@@ -387,9 +387,11 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
     /// <summary>Whether the failure is at the empty parenthesis pair of an inline method invocation segment —
     /// <c>:: literal-1 ( )</c> (§8.4.3.4.2), with <paramref name="token"/> its '(' or its ')'. The §8.7.4 operator has
     /// no other role (§8.3.5 rule 7 makes '::' one lexical unit), so the four default-channel tokens are this format and
-    /// nothing else. GROUPING-PAREN-ONLY: a '(' after literal-1 is always the plain token — the lexer retypes a '(' to
+    /// nothing else. literal-1 is a literal token or the constant-name word that spells it (§13.10.3 SR2, kb/Work PB780).
+    /// GROUPING-PAREN-ONLY: a '(' after literal-1 is always the plain token — the lexer retypes a '(' to
     /// FNARG_LPAREN only after <c>FUNCTION</c> function-name (§8.4.3.2.3 SR6) and to REF_LPAREN only after a word that
-    /// could name a data item (<c>OnDefaultLParen</c>), and a literal is neither (the same reasoning as <c>InvocationSite.OfInlineSegment</c>).</summary>
+    /// could name a data item and does not follow '::' (<c>OnDefaultLParen</c>), and literal-1 is neither (the same
+    /// reasoning as <c>InvocationSite.OfInlineSegment</c>).</summary>
     private static bool IsEmptyInlineArgumentList(ITokenStream stream, IToken token)
     {
         var open = token.Type == CobolLexer.LPAREN ? token
@@ -397,7 +399,7 @@ public sealed class CobolErrorStrategy : DefaultErrorStrategy
         if (open?.Type != CobolLexer.LPAREN || NextDefault(stream, open.TokenIndex)?.Type != CobolLexer.RPAREN)
             return false;
         var name = PreviousDefault(stream, open.TokenIndex);
-        return name is not null && LiteralTokens.Types.Contains(name.Type)
+        return name is not null && name.Type is not (CobolLexer.LPAREN or CobolLexer.RPAREN)
             && PreviousDefault(stream, name.TokenIndex)?.Type == CobolLexer.COLONCOLON;
     }
 

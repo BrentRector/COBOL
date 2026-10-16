@@ -6714,8 +6714,10 @@ public sealed partial class DataBinder(EditionContext? edition = null)
             var fromWritten = new List<string>();
             List<int>? to = ph.TO() is not null ? [] : null;
             List<string>? toWritten = ph.TO() is not null ? [] : null;
-            foreach (var il in ph.signedIntegerLiteral())
+            bool subscriptsRead = true;
+            foreach (var sub in ph.valueTableSubscript())
             {
+                if (TableValueSubscript(sub, where) is not { } read) { subscriptsRead = false; continue; }
                 // SATURATE rather than fall to 0 on an out-of-int literal, through THE ONE integer-literal reader
                 // (kb/Work PB1579): the saturated value is out of range for any real table, so the §13.18.63.3
                 // SR20/SR21 screen still finds it, and the screen quotes the subscript AS WRITTEN (FromWritten /
@@ -6725,14 +6727,38 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                 // now a bindable value that §8.4.2.3.4 GR2 ("The value of a subscript shall be a positive
                 // integer") rejects downstream. A long.TryParse here saturated a 20-to-31-digit NEGATIVE subscript
                 // to int.MaxValue, and the screen then quoted a positive number back.
-                string written = SignedIntegerLiteral.Read(il);
-                int v = CobolNet.Validation.IntegerOperandRules.TryHostValue(written, out int n) ? n : int.MaxValue;
-                if (il.Start.TokenIndex < toIdx) { from.Add(v); fromWritten.Add(written); }
-                else { to!.Add(v); toWritten!.Add(written); }
+                int v = CobolNet.Validation.IntegerOperandRules.TryHostValue(read.Value, out int n) ? n : int.MaxValue;
+                if (sub.Start.TokenIndex < toIdx) { from.Add(v); fromWritten.Add(read.Written); }
+                else { to!.Add(v); toWritten!.Add(read.Written); }
             }
+            if (!subscriptsRead) { ok = false; continue; }
             list.Add(new TableValueSpec(literals, from, to, i, fromWritten, toWritten));
         }
         return ok ? list : null;
+    }
+
+    /// <summary>One Format-2 VALUE subscript-1 / subscript-2: its integer and its spelling as written. §13.18.63.3 SR19
+    /// makes it an integer numeric literal, so it is a literal position and an INTEGER constant-name stands there
+    /// (§13.10.3 SR2 — "constant-name-1 may be used anywhere that a format specifies a literal of the class and category
+    /// of constant-name-1"; §13.10.4 GR1 — "as if literal-1 … were written"), substituting its integer (kb/Work PB780).
+    /// The constant's value meets what the written literal meets: a negative or zero one is §8.4.2.3.4 GR2's to refuse
+    /// through the SR20/SR21 range screen, exactly as <c>FROM (-1)</c> is. Null (reported) for a word that is not an
+    /// integer constant-name.</summary>
+    private (string Value, string Written)? TableValueSubscript(Core.ValueTableSubscriptContext sub, string where)
+    {
+        if (sub.signedIntegerLiteral() is { } il)
+        {
+            string literal = SignedIntegerLiteral.Read(il);
+            return (literal, literal);
+        }
+        string word = sub.cobolWord().GetText();
+        if (FindConstant(word) is { Category: PicCategory.Numeric, IntegerText: { } integer }) return (integer, word);
+        if (IsFailedConstant(word)) return null;   // its own entry was reported
+        using var at = Edition.At(sub);
+        Edition.Error(DiagnosticCatalog.ConstantEntryRule, $"{where}: the subscript '{word}' is not an integer "
+            + "constant-name — subscript-1 and subscript-2 shall be integer numeric literals (ISO §13.18.63.3 SR19), and "
+            + "only an integer constant-name stands for one (§13.10.3 SR2)");
+        return null;
     }
 
     /// <summary>The ALL-FORMATS literal screen a Format 2 (table) VALUE's occurrence-literals ride (ISO
