@@ -13,9 +13,11 @@
 $PY = & {
     foreach ($candidate in @($env:PYTHON, 'python3', 'python')) {
         if (-not $candidate) { continue }
+        # A candidate that cannot be started (absent, or not executable) answers the probe "no", exactly as the bash
+        # twin's `if "$cand" … 2>&1` does: the next candidate is tried, and only none at all is the refusal below.
         try {
             & $candidate -c 'import sys; sys.exit(0 if sys.version_info >= (3, 12) else 1)' *> $null
-        } catch [System.Management.Automation.CommandNotFoundException] {
+        } catch {
             continue
         }
         if ($LASTEXITCODE -eq 0) { return $candidate }
