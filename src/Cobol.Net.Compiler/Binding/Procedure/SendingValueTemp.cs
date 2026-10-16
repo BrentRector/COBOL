@@ -116,7 +116,15 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// statement" (§14.9.13.4 GR3) are the same position in the generated code.</summary>
     /// <param name="op">The sending operand / selection subject to freeze.</param>
     /// <param name="tag">A short source tag for the temp's synthesized names (diagnostics and readability only).</param>
-    internal Place? Materialize(BoundOperand op, string tag)
+    /// <param name="at">Where on the pending list the freeze belongs: the count of pre-ops registered when the
+    /// operand finished binding, so the value is frozen AFTER its own pre-ops (the function-bearing subscripts and
+    /// activations it reads) and BEFORE those the statement's LATER operands registered — §14.6.4's left-to-right
+    /// order, which a receiving operand's function-bearing subscript would otherwise overtake (kb/Work PB370).
+    /// <see langword="null"/> appends, for a caller whose later operands register nothing.</param>
+    internal Place? Materialize(BoundOperand op, string tag, int? at = null) => Positioned(at, () => Freeze(op, tag));
+
+    /// <summary>The body of <see cref="Materialize"/>: the intermediate and its stores, appended.</summary>
+    private Place? Freeze(BoundOperand op, string tag)
     {
         if (Model(op) is not { } model) return null;
         var temp = ctx.Data.CreateCompilerTemp(model.Item, "__SENDVAL-", "__sendval", tag);
@@ -148,6 +156,27 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         // then compared a value that never arrived, so it took WHEN OTHER. The identity copy of an index data item into
         // its own class-index clone is the SET it names.
         ctx.Data.PendingPreOps.Add(IdentityStore(op, model.Item, place));
+        return place;
+    }
+
+    /// <summary>⛔ THE ONE PLACEMENT OF A FREEZE ON THE PENDING LIST: run <paramref name="register"/>, then move every
+    /// pre-op it registered (the identity copy, and the occurs-depending control-value copy before it when there is
+    /// one), in their own order, to <paramref name="at"/> — the position the frozen operand's evaluation owns, ahead
+    /// of the pre-ops a LATER operand of the statement registered (§14.6.4's left-to-right order). A later function
+    /// argument (<c>ArgumentOrder</c>, §8.4.3.2.4 GR2) and a MOVE's receiving operand (§14.9.25.4 GR1, kb/Work PB370)
+    /// are the two such later operands. <see langword="null"/>, or a position at the end, leaves the steps where they
+    /// were registered; a freeze that answers <see langword="null"/> moves nothing.</summary>
+    private Place? Positioned(int? at, Func<Place?> register)
+    {
+        var pending = ctx.Data.PendingPreOps;
+        int mark = pending.Count;
+        var place = register();
+        if (place is not null && at is { } position && position < mark)
+        {
+            var steps = pending.GetRange(mark, pending.Count - mark);
+            pending.RemoveRange(mark, steps.Count);
+            pending.InsertRange(position, steps);
+        }
         return place;
     }
 
@@ -222,7 +251,10 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// in the argument list (§8.4.3.2.4 GR2) and not after a later argument's activation changed an item it reads.
     /// The store is COMPUTE Format 2's own (<see cref="BoundComputeBoolean"/>), the channel a boolean expression has
     /// and <see cref="Materialize"/> deliberately does not reach. Null when the item cannot be resolved.</summary>
-    internal Place? MaterializeBoolean(BoundBoolExpr expr, int positions, string tag)
+    internal Place? MaterializeBoolean(BoundBoolExpr expr, int positions, string tag, int? at = null) =>
+        Positioned(at, () => FreezeBoolean(expr, positions, tag));
+
+    private Place? FreezeBoolean(BoundBoolExpr expr, int positions, string tag)
     {
         var model = new DataItem
         {
