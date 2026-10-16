@@ -13,7 +13,7 @@ setters write (`_reservedNonNames`, `_caseMappingEdition`) are edition state fro
 `SetCobolWords`, is fed from the >>COBOL-WORDS plan and primes nothing). Sites come from a brace-block scanner over
 every grammar (predicate and action bodies, attributed to their rule) and from Roslyn over `src/`: callers of a read,
 front-end hand-offs of the edition to a parser (`Edition = …`), and callers that pass one on. On today's tree that is
-17 parser reads, 4 lexer reads, 3 retype reads and 23 site keys, each recorded with a verdict, and a new read under any
+16 parser reads, 4 lexer reads, 3 retype reads and 23 site keys, each recorded with a verdict, and a new read under any
 name fails until it is adjudicated. A mutation check (`{reservedHere("CRT") && is2014()}?` in `CobolSpecialNames.g4`)
 turned it red with `NEW site … specialNameEntry | is2014`. The counts the note carried were older (67
 `keywordContinuesHere` alternatives, not 71; three `facilityWord` arms, not five), which is why the test computes them.
@@ -63,3 +63,10 @@ types), so a listener in a stage's file is a site. `TheRule_SeesTheStagesNestedT
 site arm on synthetic text. Mutation runs on `CompilationUnitTokenRetypes.cs`: the reviewer's two nested `Strict`
 members gave `NEW edition read …#Strict` and `…#Strict2`; a top-level `Leak` class calling `p.userWordHere` gave
 `NEW site …CompilationUnitTokenRetypes.cs | Leak.L | userWordHere ×1`; both reverted. The live inventory did not move.
+
+**Branch review (round 3, finding R1-1 of the second review): a stale count in the verdict of record.** The note and
+this entry said the rule finds 17 parser superclass reads; the first round's `RecordedMembers` listed 17 because it
+included the `DialectLevel` setter shim, which the round-1 fix deleted, so the pin has recorded 16 since. Both texts
+now say 16, and the note names `RecordedMembers` as the list of record (checked: 16 parser, 4 lexer and 3 retype names
+and 23 site keys in `EditionReadDriftTests.cs`). No code or test changed: the test computes the set and compares it
+with the record itself, so a second copy of the count in a test would only be one more place to go stale.
