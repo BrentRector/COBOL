@@ -1,4 +1,4 @@
-## PB243: DISPLAY's transfer-size and ALL-literal determinations get their evidence
+## Entry 2077 — 2026-10-16 08:19 PDT — PB243: DISPLAY's transfer-size and ALL-literal determinations get their evidence
 
 kb/Work PB243 said three DISPLAY rows were held open by missing evidence, not by code: GR2's unbounded transfer size,
 GR5 a)'s chunking leg (unreachable only because of GR2), and GR3's `ALL literal-1` arm. Re-probed on the worktree build
@@ -27,3 +27,4 @@ witness; GAP 97 -> 94. PB243 is landed with those three rows in `closes_rows`.
 **Self-review.** The change touches no compiler code. The test's expected value is computed from §8.3.3.6.4 GR2 (200
 copies of the ten-digit pattern) and not copied from a run. The pattern ends in a digit, so PB150's trailing-space trim
 cannot hide a fold.
+
