@@ -1,4 +1,4 @@
-## PB3233: a figurative INSPECT pattern is SR3's one character, and SR6 / SR9 measure it
+## Entry 2097 — 2026-10-16 11:30 PDT — PB3233: a figurative INSPECT pattern is SR3's one character, and SR6 / SR9 measure it
 
 **What was wrong.** ISO §14.9.22.3 SR6 and SR9 require literal-1 / literal-3 and literal-4 / literal-5 to be the
 same size unless the REPLACEMENT is a figurative constant, and SR3 makes a figurative literal-1, -2 or -4 "an
@@ -27,3 +27,4 @@ at all four editions with COBOLNET0846: `pb3233-inspect-figurative-literal1-size
 
 **Rows.** SR-14.9.22.3-6 and SR-14.9.22.3-9 were CONFORMS while under-rejecting. They are re-verdicted on the
 new site, the deleted methods are retired as witnesses, and SR-14.9.22.3-3 gains the new witnesses. GAP 78 → 78.
+
