@@ -14,7 +14,8 @@ namespace CobolNet.Tests.Unit;
 /// <c>[Trait("Host", "ReFS")]</c>, so <c>scripts/gate_plan.py</c> puts it in leg 1 (tier 0h) at every gate; every drift
 /// test that <c>scripts/spec/drift_rules.py --sweeps</c> classifies as a tree-wide sweep carries
 /// <c>[Trait("Sweep", "tree")]</c> and no other class does (tier 0c); and the planner's source scan of the traits
-/// agrees with the attributes the compiler sees.
+/// agrees with the attributes the compiler sees. This class is itself leg 1 at every gate, whatever its cost
+/// (<c>gate_plan.TRAIT_GUARD</c>, tier 0h).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -124,5 +125,9 @@ public sealed class HostWitnessTraitDriftTests
         string planner = File.ReadAllText(TestRepo.Scripts("gate_plan.py"));
         Assert.Matches(@"(?m)^TIER_ORDER = \(""0a"", ""0h"", ""0c"", ""0u"", ""1"", ""2"", ""3""\)\r?$", planner);
         Assert.Matches(@"(?m)^HOST_ONLY = \{\r?$", planner);
+        // ⛔ THIS CLASS RUNS AT EVERY GATE (tier 0h, kb/Work PB2730's finisher): its scans cost 5-11 s under a gate's
+        // load, over SWEEP_CHEAP_SECONDS, so as a plain sweep it sat in leg 2 and two branches gated GREEN on Windows
+        // over a trait drift the landing's whole Linux unit leg then found. The planner names it; a rename is red here.
+        Assert.Matches($@"(?m)^TRAIT_GUARD = ""{nameof(HostWitnessTraitDriftTests)}""\r?$", planner);
     }
 }
