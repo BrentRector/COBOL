@@ -480,7 +480,7 @@ internal static class IntrinsicArgumentRules
     /// A strongly-typed SUBORDINATE group (§8.5.3.1: "subordinate to a group item described with the TYPE clause")
     /// writes no TYPE clause of its own, so it names the type of the nearest TYPE clause it is typed by.</para></summary>
     internal static string ClassNameOf(Place p) =>
-        p is not RefModPlace && StrongTypeModel.IsStrongGroup(p.Item)
+        p.DenotedItem is not null && StrongTypeModel.IsStrongGroup(p.Item)
             && StrongTypeModel.TypeAnchor(p.Item)?.TypeName is { } typeName
             ? $"{typeName}, the type-name of a strongly-typed group item"
             : ClassOfPlace(p) is { } cls ? Name(cls) : "unknown";
