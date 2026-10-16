@@ -59,6 +59,13 @@ CASES = [
     (f"git rm -r src/X >{REPO.as_posix()}/src/a.cs", str(WT), False),                # a redirect truncates outside
     ("git rm -r src/X 2>/e/COBOL/kb/Work/PB1.md", str(WT), False),
     ("git rm -r <(ls) src/X", str(WT), False),                                       # process substitution
+    # argv is the shared parser's words (kb/Work PB3198: one model of the command line, no second splitter)
+    ('git rm -r "src/a b"', str(WT), True),                                          # a quoted path with a space
+    (f'git rm -r "{str(WT).replace("/", BS)}{BS}src{BS}X"', str(WT), True),          # a quoted backslash path inside
+    ("git rm -r src/X <<'EOF'\nx\nEOF", str(WT), False),                             # a heredoc feeds the call
+    ("cat > m.txt <<'EOF'\ngit rm -r src/X\nEOF", str(WT), False),                   # a body is text, not the command
+    ("git rm -r E:src/X", str(WT), False),                                           # drive-relative: its dir is unknown
+    ("git -C E:sub rm -r src/X", str(WT), False),
 ]
 
 

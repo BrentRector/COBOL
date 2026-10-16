@@ -24,6 +24,13 @@ following every location change the two shells accept:
                comments, `$( … )`, `{ … }`, heredoc bodies and PowerShell here-strings never split a command; `~` is the home dir; a variable set earlier in the SAME call to a literal
                (`WT=/e/x`, `$wt = 'E:\\x'`) is substituted.
 
+It is also the ONE model of a command line that every guard rule reads (kb/Work PB3198): a step's `text` and `words` are
+its command without the BODIES of the heredocs it introduces (a body is cut at its own delimiter line, never at the first
+`<<`, and a `<<` inside quotes or `$(( … ))` is no heredoc), the bodies ride beside it in `heredocs`, quoted text is one
+word, a `-c`/`-Command` payload is walked as the command line it is, and `git_calls` reads every `git` invocation of a
+step (its global options, the directory its `-C` options name, its subcommand). A rule that scans the raw text instead
+sees a heredoc body as commands, or a command after a heredoc as body: the hole PB3198 closed in four rules at once.
+
 A directory the line does not determine (a target spelled with an unknown variable or a command substitution, `popd`
 with nothing pushed in this call) is `None`, and so is every later step of that shell until an absolute location
 change: a caller treats it as UNKNOWN, never as the payload's cwd. Paths: an MSYS drive path (`/e/x`, `/cygdrive/e/x`) is `E:/x` on Windows (PB474);
@@ -61,8 +68,8 @@ _MSYS_DRIVE = re.compile(r"^/(?:cygdrive/)?([A-Za-z])(?=/|$)(.*)$")
 @dataclasses.dataclass(frozen=True)
 class Step:
     """One simple command of a tool call."""
-    text: str                    # as written, with any heredoc body it introduces
-    words: tuple[str, ...]       # its words, quotes removed, known variables substituted
+    text: str                    # as written, WITHOUT the bodies of the heredocs it introduces (those are `heredocs`)
+    words: tuple[str, ...]       # its words, quotes removed, known variables substituted (no heredoc body's words)
     cwd: str | None              # the directory it runs in; None when the line does not determine it
     sep: str                     # the separator that FOLLOWS it ("" at the end): && || ; | & or a newline; the last
                                  # step of a group or a `-c` payload carries the separator that follows the group
@@ -72,6 +79,18 @@ class Step:
     stranded: tuple[str, ...] = ()  # on the FIRST step after an and-or list a single `&` sent to the background: that
                                  # list's own location changes (as `location` spells them), which moved only the
                                  # background job and do NOT apply here (forbidden_commands.py rule 7, kb/Work PB3095)
+    heredocs: tuple[str, ...] = ()  # the bodies of the Bash heredocs (`<<DELIM`, `<<-DELIM`) the command introduces, in
+                                 # order, each without its delimiter line; a `-c` payload's last step carries the
+                                 # bodies that feed the payload (`bash -c '…' <<EOF`)
+
+
+@dataclasses.dataclass(frozen=True)
+class GitCall:
+    """One `git` invocation among a step's words (`git_calls`)."""
+    cwd: str | None              # the directory it acts on: the step's cwd with its `-C` options applied in order
+    options: tuple[str, ...]     # git's global options before the subcommand, as written (`-c`'s `name=value` too)
+    subcommand: str | None       # None when no subcommand follows
+    args: tuple[str, ...]        # every word after the subcommand
 
 
 def shell_of(tool_name: str | None) -> str:
@@ -110,14 +129,21 @@ def resolve(target: str, cwd: str | None) -> str | None:
 # ── the scanner: top-level commands and their separators ──────────────────────────────────────────────────────────
 
 
-def _split(command: str, shell: str) -> list[tuple[str, str]]:
-    """The tool call's top-level commands, each with the separator after it. Quotes, escapes, brackets, heredoc bodies
-    and here-strings are kept inside the command they belong to."""
+# A Bash heredoc operator: `<<` or `<<-`, then its delimiter word, quoted (`'EOF'`, `"EOF"`), backslash-quoted (`\EOF`) or
+# bare; a bare one starts with a letter or `_`, so `1<<2` outside `$(( … ))` is not read as a heredoc.
+_HEREDOC = re.compile(r"<<-?[ \t]*(?:(['\"])([^'\"\n]+)\1|\\?([A-Za-z_][A-Za-z0-9_.-]*))")
+
+
+def _split(command: str, shell: str) -> list[tuple[str, str, tuple[str, ...]]]:
+    """The tool call's top-level commands, each with the separator after it and the bodies of the heredocs it
+    introduces. Quotes, escapes, brackets and here-strings are kept inside the command they belong to; a heredoc body is
+    cut out of the text at its own delimiter line and carried beside its command (a body is data, never a command)."""
     out: list[tuple[str, str]] = []
     buf: list[str] = []
     i, n, depth = 0, len(command), 0
     esc = "\\" if shell == BASH else "`"
-    heredocs: list[str] = []          # delimiters whose bodies start at the next newline (Bash)
+    heredocs: list[tuple[str, int]] = []   # (delimiter, index in `out` of its command): bodies due at the next newline
+    bodies: dict[int, list[str]] = {}       # index in `out` -> the bodies of that command's heredocs, in order
 
     def flush(sep: str) -> None:
         text = "".join(buf).strip()
@@ -150,25 +176,34 @@ def _split(command: str, shell: str) -> list[tuple[str, str]]:
             i = n if j < 0 else j
             continue
         if shell == BASH and command.startswith("<<", i) and not command.startswith("<<<", i):
-            m = re.match(r"<<-?\s*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1", command[i:])
+            m = _HEREDOC.match(command, i)
             if m:
-                heredocs.append(m.group(2))
-                buf.append(m.group(0)); i += m.end(); continue
+                heredocs.append((m.group(2) or m.group(3), len(out)))
+                buf.append(m.group(0)); i = m.end(); continue
         if c in "({":
             depth += 1
         elif c in ")}" and depth:
             depth -= 1
+        if c in "\r\n" and heredocs:
+            # the bodies follow this newline, one after another, each ended by its delimiter on a line alone (to the end
+            # of the line when no such line comes, as Bash reads it). A top-level command's bodies are cut out of its
+            # text; inside brackets they stay in the text, whole, for the walk of the group to cut (an apostrophe in a
+            # body never opens a quote either way).
+            j = i + 2 if command.startswith("\r\n", i) else i + 1
+            for k, (delim, owner) in enumerate(heredocs):
+                if k:   # the next body starts on the line after the previous delimiter
+                    j += 2 if command.startswith("\r\n", j) else 1 if command.startswith("\n", j) else 0
+                m = re.compile(r"^[ \t]*" + re.escape(delim) + r"[ \t]*\r?$", re.M).search(command, j)
+                if depth == 0:
+                    bodies.setdefault(owner, []).append(command[j:m.start() if m else n])
+                j = n if not m else m.end()
+            if depth:
+                buf.append(command[i:j])
+            i = j
+            heredocs.clear()
+            continue
         if depth == 0:
             if c in "\r\n":
-                if heredocs:
-                    # the bodies follow this newline, one after another, each ended by its delimiter on a line alone
-                    j = i + 1
-                    for delim in heredocs:
-                        m = re.compile(r"^[ \t]*" + re.escape(delim) + r"[ \t]*$", re.M).search(command, j)
-                        j = n if not m else m.end()
-                    buf.append(command[i:j]); i = j
-                    heredocs.clear()
-                    continue
                 flush("\n"); i += 1; continue
             two = command[i:i + 2]
             if two in ("&&", "||"):
@@ -185,7 +220,7 @@ def _split(command: str, shell: str) -> list[tuple[str, str]]:
         buf.append(c)
         i += 1
     flush("")
-    return out
+    return [(text, sep, tuple(bodies.get(k, ()))) for k, (text, sep) in enumerate(out)]
 
 
 def _words(text: str, shell: str) -> list[str]:
@@ -272,11 +307,11 @@ class _State:
 def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) -> None:
     began: _State | None = None        # the shell's state when the current and-or list began
     stranded: tuple[str, ...] = ()     # a backgrounded list's location changes, for the next step
-    for text, sep in _split(command, shell):
+    for text, sep, heredocs in _split(command, shell):
         if began is None:
             began = state.copy()
         first = len(out)
-        _command(text, sep, state, shell, depth, out)
+        _command(text, sep, heredocs, state, shell, depth, out)
         if stranded and len(out) > first:
             out[first] = dataclasses.replace(out[first], stranded=stranded)
             stranded = ()
@@ -292,7 +327,8 @@ def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step]) 
         began = None
 
 
-def _command(text: str, sep: str, state: _State, shell: str, depth: int, out: list[Step]) -> None:
+def _command(text: str, sep: str, heredocs: tuple[str, ...], state: _State, shell: str, depth: int,
+             out: list[Step]) -> None:
     """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`."""
     grouped = _group(text, shell)
     if grouped is not None:
@@ -321,16 +357,17 @@ def _command(text: str, sep: str, state: _State, shell: str, depth: int, out: li
     # each side of a Bash pipeline runs in a subshell, so its changes do not persist (a background `&` is the whole
     # list's, undone by `_walk`)
     transient = shell == BASH and (sep == "|" or bool(out and out[-1].depth == depth and out[-1].sep == "|"))
-    if _shell_child(words, state, depth, sep, out):
+    if _shell_child(words, state, depth, sep, heredocs, out):
         return
     location = _location(words, shell)
     if location is not None:
         verb, target = location
-        out.append(Step(text, words, state.cwd, sep, depth, target if target is not None else ""))
+        out.append(Step(text, words, state.cwd, sep, depth, target if target is not None else "",
+                        heredocs=heredocs))
         if not transient:
             _move(state, verb, target)
         return
-    out.append(Step(text, words, _workdir(words, state.cwd), sep, depth))
+    out.append(Step(text, words, _workdir(words, state.cwd), sep, depth, heredocs=heredocs))
 
 
 def _location(words: tuple[str, ...], shell: str) -> tuple[str, str | None] | None:
@@ -384,9 +421,9 @@ def _move(state: _State, verb: str, target: str | None) -> None:
     state.previous, state.cwd = state.cwd, new
 
 
-def _shell_named(program: str) -> str | None:
-    """The shell `program` starts (`bash`, `/usr/bin/sh`, `pwsh.exe` …), or None when it is not a shell."""
-    return _SHELLS.get(re.sub(r"\.exe$", "", program.replace("\\", "/").rsplit("/", 1)[-1].lower()))
+def _shell_named(word: str) -> str | None:
+    """The shell a command word starts (`bash`, `/usr/bin/sh`, `pwsh.exe` …), or None when it is not a shell."""
+    return _SHELLS.get(program(word))
 
 
 def _workdir_arg(words: tuple[str, ...]) -> str | None:
@@ -405,7 +442,8 @@ def _workdir(words: tuple[str, ...], cwd: str | None) -> str | None:
     return cwd if arg is None else resolve(arg, cwd)
 
 
-def _shell_child(words: tuple[str, ...], state: _State, depth: int, sep: str, out: list[Step]) -> bool:
+def _shell_child(words: tuple[str, ...], state: _State, depth: int, sep: str, heredocs: tuple[str, ...],
+                 out: list[Step]) -> bool:
     """`bash -c '…'` / `pwsh [-WorkingDirectory dir] -Command "…"`: walk the payload in a child shell (its location
     changes never come back). True when `words` was such a call."""
     child_shell = _shell_named(words[0]) if words else None
@@ -420,7 +458,7 @@ def _shell_child(words: tuple[str, ...], state: _State, depth: int, sep: str, ou
     _walk(payload, child, child_shell, depth + 1, out)
     if len(out) > before:
         last = out[-1]
-        out[-1] = dataclasses.replace(last, sep=sep)
+        out[-1] = dataclasses.replace(last, sep=sep, heredocs=last.heredocs + heredocs)
     return True
 
 
@@ -443,14 +481,41 @@ def location_targets(command: str, shell: str = BASH) -> list[str]:
     return targets
 
 
-def git_dir(step: Step) -> str | None:
-    """The directory a git command acts on: its `-C <dir>` options applied in order to the step's cwd."""
+# git's global options that take their value as the NEXT word (`--git-dir=x` spells it in the same word)
+_GIT_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--super-prefix"}
+
+
+def program(word: str) -> str:
+    """The program a command word names, lower case, without its folder or `.exe` (`/usr/bin/git`, `git.exe` -> git)."""
+    return re.sub(r"\.exe$", "", word.replace("\\", "/").rsplit("/", 1)[-1].lower())
+
+
+def git_calls(step: Step) -> list[GitCall]:
+    """Every `git` invocation among the step's words, wherever it stands (`git …`, `FOO=1 git …`, PowerShell's `& git …`,
+    `xargs git …`): its global options (`-C dir`, `-c k=v`, `--no-pager`, `--git-dir=x` …), the directory its `-C`
+    options name (applied in order to the step's cwd, as git applies them), its subcommand and that subcommand's words.
+    Quoted text is one word, so a commit message that says "git push" is no call."""
+    calls: list[GitCall] = []
     words = step.words
-    if not words or words[0].lower() not in ("git", "git.exe"):
-        return step.cwd
-    cwd = step.cwd
-    i = 1
-    while i + 1 < len(words) and words[i] == "-C":
-        cwd = resolve(words[i + 1], cwd)
-        i += 2
-    return cwd
+    for k, word in enumerate(words):
+        if program(word) != "git":
+            continue
+        cwd, options, i = step.cwd, [], k + 1
+        while i < len(words) and words[i].startswith("-") and words[i] != "-":
+            if words[i] in _GIT_VALUE_OPTIONS and i + 1 < len(words):
+                if words[i] == "-C":
+                    cwd = resolve(words[i + 1], cwd)
+                options += words[i:i + 2]
+                i += 2
+                continue
+            options.append(words[i])
+            i += 1
+        calls.append(GitCall(cwd, tuple(options), words[i] if i < len(words) else None, tuple(words[i + 1:])))
+    return calls
+
+
+def git_dir(step: Step) -> str | None:
+    """The directory a git command acts on: its first git call's `-C <dir>` options applied in order to the step's cwd
+    (`git_calls`); the step's cwd when it calls no git."""
+    calls = git_calls(step)
+    return calls[0].cwd if calls else step.cwd

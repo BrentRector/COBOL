@@ -27,7 +27,6 @@ A deny from `forbidden_commands.py` still wins over this allow. Self-test: scrip
 import json
 import os
 import pathlib
-import shlex
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -40,6 +39,12 @@ ALLOWED_OPTIONS = {"-r", "-q", "--quiet", "--cached", "--"}
 
 def _norm(p: str) -> str:
     return p.strip("\"'").replace("\\", "/")
+
+
+def _drive_relative(p: str) -> bool:
+    """`E:x`: a drive with no root, relative to that drive's own current directory, which this hook cannot know (Bash
+    turns an unquoted `E:\\x` into `E:x`): never covered."""
+    return bool(pathlib.PureWindowsPath(p).drive) and not shell_location.is_absolute(p)
 
 
 def _under(path: pathlib.Path, root: pathlib.Path) -> bool:
@@ -60,27 +65,24 @@ def decide(command: str, cwd: str, shell: str = shell_location.BASH) -> str | No
     if any(s.depth for s in steps) or not steps or steps[-1].sep:
         return None
     if len(steps) == 2 and steps[0].location and steps[0].sep == "&&":
-        git_cmd, here = steps[1].text, steps[1].cwd
+        step = steps[1]
     elif len(steps) == 1:
-        git_cmd, here = steps[0].text, steps[0].cwd
+        step = steps[0]
     else:
         return None
-    if here is None:
+    # A substitution (`$(...)`, a backquote, `<(...)`, PowerShell's `$(...)`), a redirect or a heredoc runs, writes or
+    # reads before git sees its argv, and an allow covers the whole call: none is ever covered (train 1039b review).
+    if step.cwd is None or step.heredocs or any(ch in step.text for ch in ("$", "`", "<", ">")):
         return None
-    # A substitution (`$(...)`, a backquote, `<(...)`, PowerShell's `$(...)`) or a redirect runs, or writes, before git
-    # sees its argv, and an allow covers the whole call: none is ever covered (train 1039b review).
-    if any(ch in git_cmd for ch in ("$", "`", "<", ">")):
-        return None
-    base = pathlib.Path(_norm(here))
-    try:
-        argv = shlex.split(git_cmd.replace("\\", "/"), posix=True)
-    except ValueError:
-        return None
+    # git's argv is the shared parser's words of the step (kb/Work PB3198: one model of the command line, never a second
+    # splitter): quotes removed as the shell removes them, so the paths judged are the paths git receives.
+    argv = [_norm(w) for w in step.words]
     if not argv or argv[0] not in ("git", "git.exe"):
         return None
+    base = pathlib.Path(_norm(step.cwd))
     i = 1
     if i < len(argv) and argv[i] == "-C":
-        if i + 1 >= len(argv):
+        if i + 1 >= len(argv) or _drive_relative(argv[i + 1]):
             return None
         target = argv[i + 1]
         base = pathlib.Path(target) if shell_location.is_absolute(target) else base / target
@@ -97,6 +99,8 @@ def decide(command: str, cwd: str, shell: str = shell_location.BASH) -> str | No
         return None
     worktree = WORKTREES / base.relative_to(WORKTREES).parts[0]
     for p in paths:
+        if _drive_relative(p):
+            return None
         if shell_location.is_absolute(p):
             if not _under(pathlib.Path(p), worktree):
                 return None
