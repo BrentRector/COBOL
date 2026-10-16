@@ -2129,6 +2129,8 @@
   "l1c05-oo-strong-type-other-name",
   "l1c05-oo-strong-type-vs-plain-group",
   "l1c05-oo-strong-type-returning-other",
+  "pb1012-strong-type-override-layout-differs",
+  "pb1012-strong-type-factory-strong-one-side",
   "l1c05-cce-arith-exponentiation",
   "l1c05-cce-arith-division-by-zero",
   "l1c05-cce-arith-nonnumeric-operand",

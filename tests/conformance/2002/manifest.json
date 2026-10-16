@@ -669,6 +669,7 @@
   "l1c05_coded_character_values_national",
   "l1c05_oo_returning_only_same_class",
   "l1c05_oo_strong_type_same_type",
+  "pb1012_strong_type_override_factory",
   "l1c05_cce_arith_expression",
   "l1c05_cce_boolean_expression",
   "l1c05_constant_expr_truncated_integer",
