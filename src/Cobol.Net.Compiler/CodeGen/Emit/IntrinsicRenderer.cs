@@ -154,9 +154,11 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             && RenderDec(ic) is { } wideAligned)
             return wideAligned;
         if (sig.Float) return RenderFloat(ic, sig.RuntimeMethod);
-        // (The float lane's two preconditions are <see cref="FloatLaneExempt"/> — a numeric argument run whose
-        // RESULT binary64 cannot carry — and IntrinsicArgumentRules.ArgumentRunIsAllNumeric — an argument run
-        // binary64 cannot carry. Both ride the dispatch below; each states its own rule at its own declaration.)
+        // (The float lane's precondition is IntrinsicArgumentRules.ArgumentRunIsAllNumeric — an argument run binary64
+        // can carry — and its trigger is a binary64 operand at a §15.3 TYPE-10 position: AnyRealArgument reads the
+        // operands through RawArg, where a type-6 operand is already its integer (kb/Work PB651). That is also why no
+        // integer-only function needs a by-name exemption: FACTORIAL, whose result binary64 cannot carry (33! ≈ 8.7e36),
+        // never reaches the lane, because its one position is type 6.)
         // MAX / MIN / ORD-MAX / ORD-MIN — and MEDIAN over an odd count — are pure SELECTION: §15.59.4 r1 /
         // §15.63.4 r1 "the returned value is the CONTENT of the argument-1 having the greatest [least] value",
         // §15.61.4 r1 "the content of the argument-1 that is the middle value", each compared "according to the
@@ -188,8 +190,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // lane rests on — is not granted for it at all, and there is no binary64 carrier anywhere in the call.
         // IntrinsicArgumentRules.ArgumentRunIsAllNumeric derives the precondition from the SPEC-VERIFIED
         // argument table and fails open, so it can only ever take a call OUT of the lane on a cited rule.
-        if (AnyRealArgument(ic) && !FloatLaneExempt.Contains(sig.RuntimeMethod)
-            && IntrinsicArgumentRules.ArgumentRunIsAllNumeric(sig.Name, ic.Args.Count))
+        if (AnyRealArgument(ic) && IntrinsicArgumentRules.ArgumentRunIsAllNumeric(sig.Name, ic.Args.Count))
             return RenderFloat(ic, RealMethod(sig.RuntimeMethod));
 
         switch (sig.RuntimeMethod)
@@ -332,16 +333,18 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
 
             // The §15.90/§15.91 date validators — integer verdict chains (year → month → day), scale 0.
             // ⛔ THE WIDE INTAKE, because the two functions are TOTAL (kb/Work PB254 — see IntArgWide):
-            // §15.90.3 r1 / §15.91.3 r1 constrain nothing but integer-ness and r1a is a CATCH-ALL.
+            // §15.90.3 r1 / §15.91.3 r1 constrain nothing but integer-ness and r1a is a CATCH-ALL — which is also
+            // why a binary64 past the Int128 carrier may be clamped here: the verdict past the window never varies.
             case "TestDateYyyymmdd" or "TestDayYyyyddd":
-                return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, IntArgWide(ic, 0)), 0);
+                return new NumX(RuntimeApi.DateFn(sig.RuntimeMethod, IntArgWideSaturating(ic, 0)), 0);
 
             case "FindString":                                                  // §15.37 FIND-STRING (2023) — 1-based position of argument-2 in argument-1
                 // Argument-3 also takes the WIDE intake: §15.37.3 r3 places no value constraint and
-                // §15.37.4 r2/r3 answer for every integer — ignore that many matches, else 0 (PB254).
+                // §15.37.4 r2/r3 answer for every integer — ignore that many matches, else 0 (PB254). Past every
+                // match the answer is 0 however large the count, so a binary64 past the carrier is clamped.
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod,
                     $"{Str(ic.Args[0])}, {Str(ic.Args[1])}, {(ic.FindLast ? "true" : "false")}, "
-                    + $"{(ic.Args.Count > 2 ? IntArgWide(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}{AnycaseClassification(ic)}"), 0);
+                    + $"{(ic.Args.Count > 2 ? IntArgWideSaturating(ic, 2) : "0")}, {(ic.Anycase ? "true" : "false")}{AnycaseClassification(ic)}"), 0);
             case "Ord":                                                         // §15.70 — PCS-relative ordinal (H5: weights only when flagged)
                 return new NumX(RuntimeApi.Intrinsic(sig.RuntimeMethod, $"{Str(ic.Args[0])}{Collate(ic)}"), 0);
             case "Length" or "ByteLength" when ic.OverCurrentImage && ic.Args[0] is BoundFieldOperand { Place: { } vg }:
@@ -460,8 +463,6 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         }
     }
 
-    /// <summary>The §15.4.1 floating-math family: arguments as doubles (through the one scaled→double
-    /// conversion), result quantized by the ONE FromDouble at <c>ws = max(Receiver.Scale, 9)</c> (the ≥9 float floor).</summary>
     /// <summary>The FLOATING-POINT body's name for an exact-family runtime method (PB2).</summary>
     /// <remarks>
     /// A CONVENTION, not a table: <c>XxxScaled</c> → <c>XxxReal</c>, anything else gains a <c>Real</c> suffix.
@@ -470,34 +471,6 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// ambiguity and broke six corpus programs that never touched a float. <c>IntrinsicRealArgDriftTests</c>
     /// asserts the counterpart exists for every exact method reachable with a real argument.
     /// </remarks>
-    /// <summary>
-    /// The exact-family runtime methods that stay on their <b>exact</b> arm even with a floating-point argument,
-    /// because <see cref="RenderFloat"/>'s tail wraps every result in <c>FromDouble(double, ws)</c> and their
-    /// RESULT is not a value binary64 can carry. The argument run is numeric — so
-    /// <see cref="IntrinsicArgumentRules.ArgumentRunIsAllNumeric"/> admits it — and the exclusion is about the
-    /// CODOMAIN instead.
-    /// </summary>
-    /// <remarks>
-    /// <list type="bullet">
-    ///   <item><c>Factorial</c> (fix-queue PB21) — §15.36's result cannot ride a double: 33! is ~8.7e36, which is
-    ///         why the exact body returns <c>Int128</c>. Its arm consumes the argument through
-    ///         <see cref="IntArg"/>, whose <c>(long)(double)</c> conversion handles a float operand correctly, so
-    ///         the float case needs no separate body at all. Writing <c>FactorialReal</c> to satisfy the naming
-    ///         convention would have meant returning a double and silently losing exactness past 2⁵³ — a function
-    ///         answering differently because of how its ARGUMENT was stored, the shape-dependence defect PB13
-    ///         closed.</item>
-    /// </list>
-    /// <para>⛔ IT IS A DECLARED SET AND NOT AN INLINE <c>!= "Factorial"</c> (kb/Work PB635). The literal sat
-    /// inside the dispatch's boolean expression with its reason eight lines away and a drift test matching on
-    /// that exact spelling, so a second member could only be added by copying the shape. Here a second member is
-    /// one line with its own citation, and <c>IntrinsicRealArgDriftTests</c> reads the set rather than a
-    /// sentence.</para>
-    /// </remarks>
-    internal static readonly FrozenSet<string> FloatLaneExempt = new[]
-    {
-        "Factorial",
-    }.ToFrozenSet(StringComparer.Ordinal);
-
     internal static string RealMethod(string exact) =>
         exact.EndsWith("Scaled", StringComparison.Ordinal)
             ? string.Concat(exact.AsSpan(0, exact.Length - "Scaled".Length), "Real")
@@ -620,7 +593,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// other operand falls through to <see cref="DomainArg"/>, whose contract is APPROXIMATED.</remarks>
     private string LeadArg(BoundIntrinsicCall ic, string method)
     {
-        NumX x = num.AsNum(ic.Args[0], num.Receiver);
+        NumX x = RawArg(ic, 0);
         bool exact = WholeRangeBodies.TryGetValue(method, out var intake)
             && (x.Dec || intake is ExactIntake.EveryExact && !x.Real);
         return exact ? ExactArg(ic, x) : DomainArg(ic, x);
@@ -664,6 +637,8 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
             ? NumericRenderer.Real(x)
             : RuntimeApi.DomainArg(x, ic.Sig.Domain, ic.Sig.Name, ic.Sig.DomainRule!);
 
+    /// <summary>The §15.4.1 floating-math family: arguments as doubles (through the one scaled→double
+    /// conversion), result quantized by the ONE FromDouble at <c>ws = max(Receiver.Scale, 9)</c> (the ≥9 float floor).</summary>
     private NumX RenderFloat(BoundIntrinsicCall ic, string method)
     {
         string call = FloatBody(ic, method);
@@ -818,7 +793,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     // intake that CAN redefine it. Reading a class name off the member is now the whole check.
 
     /// <remarks>INTAKE(LANDED) — an SDIDI operand (and, under a standard mode, a float) is LANDED into the exact <c>Int128</c> lane at the receiver's working scale, truncating past it — the one intake that can change the argument's VALUE, which is why no function whose definition FIXES its value may consume its argument through it (kb/Work PB251).</remarks>
-    private NumX Arg(BoundIntrinsicCall ic, int i) => Landed(num.AsNum(ic.Args[i], num.Receiver));
+    private NumX Arg(BoundIntrinsicCall ic, int i) => Landed(RawArg(ic, i));
 
     /// <summary>
     /// ⛔ THE ONE SDIDI → EXACT-CARRIER LANDING FOR AN INTRINSIC ARGUMENT (fix-queue PB32/PB14).
@@ -897,9 +872,90 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
 
     // ── The STANDARD-DECIMAL body dispatch (fix-queue PB56) ──────────────────────────────────────────────────
 
-    /// <summary>An argument as rendered, WITHOUT the unscaled landing — the SDIDI lane's input.</summary>
-    /// <remarks>INTAKE(EXACT) — the operand on its OWN carrier at its OWN scale — nothing rescaled, converted or truncated.</remarks>
-    private NumX RawArg(BoundIntrinsicCall ic, int i) => num.AsNum(ic.Args[i], num.Receiver);
+    /// <summary>
+    /// ⛔ AN ARGUMENT AS ITS POSITION TAKES IT, WITHOUT THE UNSCALED LANDING — the one indexed entry every numeric-channel
+    /// intake and lane predicate reads (<see cref="Arg"/>, <see cref="Dbl"/>, <see cref="DecArg"/>, <see cref="IntArg"/>,
+    /// <see cref="Operands"/>). At a §15.3 type-6 position it is the operand's INTEGER (kb/Work PB651).
+    /// </summary>
+    /// <remarks>
+    /// <para>§15.3 type 6: "An arithmetic expression that will always result in an integer value or an integer data item
+    /// shall be specified." Strict conformance refuses a data item or literal that is not one (COBOLNET1627, kb/Work
+    /// PB248) and fails open on an arithmetic expression it cannot prove non-integral, so an expression (<c>A9 * 7</c>,
+    /// <c>A ** 3</c>) brings a fractional or SDIDI-carried value to such a position in every mode, and
+    /// <c>--permissive</c> also a floating-point item or a fixed-point item with fraction digits — and
+    /// docs/CONFORMANCE.md DOC-A.1-124 fixes what it then means: an integer when its value has no nonzero fraction
+    /// digit, otherwise EC-ARGUMENT-FUNCTION with checking on and the TRUNCATED integer with it off. That is a
+    /// property of the POSITION, so it is taken here, ONCE, before any arm or lane predicate sees the operand, on every
+    /// carrier, keeping the operand's VALUE or saying it cannot. An SDIDI operand STAYS on the SDIDI
+    /// (<c>CobolIntrinsics.IntegerArgUnboundedDec</c>): it holds 34 significant digits at ANY exponent, so its integer
+    /// reaches far past <c>Int128</c> — MOD(10 ** 40, 3) (kb/Work PB2630) and MOD(A ** 3, B) of a 15-digit A
+    /// (kb/Work PB69) are integers the SDIDI body evaluates, and landing them on <c>Int128</c> was EC-SIZE-OVERFLOW
+    /// (the PB651 finisher's Linux-gate red). A fixed-point operand's integer fits the <c>Int128</c> carrier its
+    /// unscaled value already rides, and a binary64 one takes the ONE type-6 intake at the total width
+    /// (<see cref="IntegerIntake"/>), past ±1.7e38 raising EC-ARGUMENT-FUNCTION as outside what the implementation
+    /// can represent (<c>CobolIntrinsics.IntegerArgWideReal</c>). A bounded body narrows the integer again through
+    /// <see cref="IntArg"/> and keeps its own range raise.</para>
+    /// <para>⛔ IT NEVER SATURATES (kb/Work PB651 review R1-2). Clamping a binary64 past the carrier to
+    /// <see cref="Int128.MaxValue"/> answers for a DIFFERENT integer, so every function whose value depends on its
+    /// argument's value answered silently wrong — MOD(1.0E39, 7) = 1 where the integer 10³⁹'s binary64 value answers
+    /// 5, ANNUITY(0, 1.0E39) = 1 / 1.7e38. The clamp is right only where the function's answer is CONSTANT past a
+    /// bound, and that is the arm's knowledge, not the position's: such an arm takes <see cref="IntArgWideSaturating"/>
+    /// instead.</para>
+    /// <para>⛔ BEFORE THIS, THE ARMS EACH DECIDED, AND THREE DECIDED WRONG — measured by
+    /// <c>IntrinsicIntegerPositionPermissiveDriftTests</c> over every verified type-6 position: MOD's scaled arm aligned
+    /// 7.5 and answered MOD(7.5, 3) = 1.5 where the integer 7 answers 1; a float at COMBINED-DATETIME's argument-1
+    /// moved the call to the binary64 lane, whose body added 143951.5 as it stood; ANNUITY's binary64 body took 3.5
+    /// periods. A float argument made a function's value depend on how its argument was stored — the invariant kb/Work
+    /// PB21 was opened for. And because an integer has no binary64-ness, a float at a type-6 position no longer moves a
+    /// call to the binary64 lane at all: <see cref="AnyRealArgument"/> reads this, so the lane is entered only through a
+    /// type-10 (numeric) position, where §15.4.1's licence is an approximation of the equivalent arithmetic expression's
+    /// own binary64 operand.</para>
+    /// <para>INTAKE(EXACT) — the operand on its OWN carrier at its OWN scale, nothing rescaled, converted or truncated —
+    /// EXCEPT at a §15.3 type-6 position, where it is INTEGRAL: an SDIDI operand becomes its integer on the SDIDI, a
+    /// float or a fractional fixed-point operand lands at scale 0 through the type-6 intake (a scale-0 fixed-point
+    /// integer passes as it stands), a float past the Int128 carrier raising rather than changing its value.</para>
+    /// </remarks>
+    private NumX RawArg(BoundIntrinsicCall ic, int i)
+    {
+        NumX x = num.AsNum(ic.Args[i], num.Receiver);
+        if (!(x.Real || x.Dec || x.Scale != 0) || !IntrinsicArgumentRules.IsIntegerPosition(ic.Sig.Name, i)) return x;
+        return x.Dec
+            ? x with { Expr = RuntimeApi.IntegerArgUnboundedDec(x.Expr) }
+            : new NumX(IntegerIntake(x, wide: true), 0);
+    }
+
+    /// <summary>
+    /// ⛔ THE WIDE INTEGER INTAKE FOR AN ARGUMENT WHOSE FUNCTION ANSWERS THE SAME PAST A BOUND — the one place a binary64
+    /// operand past the <c>Int128</c> carrier is CLAMPED to the carrier's extreme of its sign
+    /// (<c>CobolIntrinsics.IntegerArgSaturatingReal</c>) instead of raising (kb/Work PB254, PB651 review R1-2).
+    /// </summary>
+    /// <remarks>
+    /// <para>The clamp substitutes one integer for another, so it is correct exactly where the returned value cannot tell
+    /// them apart. Members, each with its runtime witness in
+    /// <c>IntrinsicCarrierAgreementDriftTests.TheTotalArguments_AnswerPastLong_AndRaiseNothingUnderChecking</c>:
+    /// TEST-DATE-YYYYMMDD / TEST-DAY-YYYYDDD argument-1 (§15.90.4 r1a / §15.91.4 r1a — a CATCH-ALL verdict for every
+    /// integer outside the window, however far) and FIND-STRING argument-3 (§15.37.4 r2/r3 — ignoring at least as many
+    /// matches as exist answers 0, and a negative count ignores none). Both functions are TOTAL, so a raise there would be
+    /// manufactured (§15.3 has no incorrect argument to key on). A function whose value DEPENDS on the integer — MOD,
+    /// RANDOM's seed, ANNUITY's periods, BOOLEAN-OF-INTEGER's bit configuration — never takes it:
+    /// <c>IntrinsicCarrierAgreementDriftTests.OnlyAnArgumentWhoseAnswerIsConstantPastABound_Saturates</c> holds the arm
+    /// set closed.</para>
+    /// <para>INTAKE(INTEGRAL) — the operand as an integer on the <c>Int128</c> carrier: a fixed-point carrier through
+    /// <see cref="AsIntWide"/>, a binary64 or an SDIDI one integrality-tested (DOC-A.1-124) and clamped past the
+    /// carrier. The SDIDI needs the clamp as much as binary64 does: its integer reaches far past <c>Int128</c>, and
+    /// <c>TEST-DATE-YYYYMMDD(10 ** 40)</c> under STANDARD-DECIMAL was a fatal EC-SIZE-OVERFLOW through the wide landing,
+    /// where §15.90.4 r1a answers 1.</para>
+    /// </remarks>
+    private string IntArgWideSaturating(BoundIntrinsicCall ic, int i)
+    {
+        NumX x = num.AsNum(ic.Args[i], num.Receiver);
+        return x.Real ? RuntimeApi.IntegerArgSaturatingReal(x.Expr)
+            : x.Dec ? RuntimeApi.IntegerArgSaturatingDec(x.Expr)
+            : AsIntWide(x);
+    }
+
+    /// <summary>Every argument as its position takes it (<see cref="RawArg"/>), in order — what a lane predicate asks.</summary>
+    private IEnumerable<NumX> Operands(BoundIntrinsicCall ic) => Enumerable.Range(0, ic.Args.Count).Select(i => RawArg(ic, i));
 
     /// <summary>An argument lifted to a <c>CobolDec</c> expression from its RAW carrier: a Dec operand passes
     /// through, a float converts per §8.8.1.5.1, a fixed-point operand lifts through <see cref="NumericRenderer.DecOperand"/>
@@ -1007,7 +1063,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// <summary>Does any argument arrive as a Dec (SDIDI) or float carrier, before any landing?</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded, so no value semantics apply.</remarks>
     private bool AnyDecOrRealRaw(BoundIntrinsicCall ic) =>
-        ic.Args.Any(a => { var x = num.AsNum(a, num.Receiver); return x.Dec || x.Real; });
+        Operands(ic).Any(x => x.Dec || x.Real);
 
     /// <summary>Can aligning this call's arguments to their common scale — and accumulating the aligned values —
     /// leave the <see cref="Int128"/> carrier? True only when EVERY argument is an exact scaled operand with a KNOWN
@@ -1029,7 +1085,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // family's value, in contrast, is as large as its arguments, so every digit a receiver can store (≤ 31) lies
         // inside the SDIDI's 34. (PB621 names SUM, RANGE, MEAN, MEDIAN and MIDRANGE only.)
         if (ic.Sig.RuntimeMethod is "ModScaled" or "RemScaled") return false;
-        var xs = ic.Args.Select(a => num.AsNum(a, num.Receiver)).ToList();
+        var xs = Operands(ic).ToList();
         if (xs.Count == 0 || xs.Any(x => x.Dec || x.Real || x.Digits == 0)) return false;
         int s = xs.Max(x => x.Scale);
         // ⛔ THE BOUND IS ON THE VALUE, NOT ON THE WIDEST ARGUMENT PLUS A DIGIT COUNT. Argument i, aligned to the common
@@ -1071,7 +1127,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
 
     /// <summary>Does any argument arrive on the SDIDI carrier (a native integer power — kb/Work PB69)?</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded.</remarks>
-    private bool AnyDecRaw(BoundIntrinsicCall ic) => ic.Args.Any(a => num.AsNum(a, num.Receiver).Dec);
+    private bool AnyDecRaw(BoundIntrinsicCall ic) => Operands(ic).Any(x => x.Dec);
 
     /// <summary>
     /// ⛔ THE FIRST HALF OF THE ALWAYS-SDIDI SET, AND THE ONLY HALF WITH A STRUCTURAL DEFINITION: the native-switch
@@ -1174,7 +1230,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded, so no value semantics apply.</remarks>
     private bool ArgumentRoundsAtLift(BoundIntrinsicCall ic) =>
         num.StandardDecimal && EquivalentExpressionUnaryArms.Contains(ic.Sig.RuntimeMethod)
-        && ic.Args.Any(a => num.LiftRounds(num.AsNum(a, num.Receiver)));
+        && Operands(ic).Any(num.LiftRounds);
 
     /// <summary>
     /// Under a standard arithmetic mode, evaluate a §15.4.1 r1 function's equivalent arithmetic expression ON
@@ -1288,13 +1344,13 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// the same question of the same value.</remarks>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question — of the LANDED operand, deliberately (see the remark above).</remarks>
     private bool AnyRealArgument(BoundIntrinsicCall ic) =>
-        ic.Args.Any(a => Landed(num.AsNum(a, num.Receiver)).Real);
+        Operands(ic).Any(x => Landed(x).Real);
 
     /// <summary>Does EVERY argument render as floating? (An all-float selection list stays in the float lane —
     /// each argument's content is its double; a mixed list rides the SDIDI, kb/Work PB65 RV-15.59.4-1 D2.)</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question — of the LANDED operand, as its sibling does.</remarks>
     private bool AllRealArguments(BoundIntrinsicCall ic) =>
-        ic.Args.All(a => Landed(num.AsNum(a, num.Receiver)).Real);
+        Operands(ic).All(x => Landed(x).Real);
 
     /// <summary>A numeric argument as a C# double (the float family's §15.4.1 carrier). ⛔ Converts the RAW
     /// operand (fix-queue PB56): routing through the <see cref="Landed"/> unscaled truncation first turned a
@@ -1381,7 +1437,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     {
         // A table(ALL) operand renders as its ELEMENT here (the index variable inside) — right for the scale and
         // the Real flag; the list itself enumerates through ArgArray (kb/Work PB62).
-        var xs = ic.Args.Select(a => num.AsNum(a, num.Receiver)).ToList();
+        var xs = Operands(ic).ToList();
         int s = xs.Count == 0 ? 0 : xs.Max(x => x.Scale);
         string list = ArgArray(ic, 0, "Int128", a => NumericRenderer.Align(num.AsNum(a, num.Receiver), s))
                       ?? string.Join(", ", xs.Select(x => NumericRenderer.Align(x, s)));
@@ -1395,7 +1451,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// <remarks>INTAKE(EXACT) — each argument at its OWN scale with that scale carried beside it — the selection family's intake, where no common alignment may be imposed (kb/Work PB65).</remarks>
     private (string Vals, string Scales, int Scale) RawArgPairs(BoundIntrinsicCall ic)
     {
-        var xs = ic.Args.Select(a => num.AsNum(a, num.Receiver)).ToList();
+        var xs = Operands(ic).ToList();
         int s = xs.Count == 0 ? 0 : xs.Max(x => x.Scale);
         // A table(ALL) argument enumerates (kb/Work PB62): its elements share one scale, so the scales array
         // enumerates the same ranges with a constant selector.

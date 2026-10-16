@@ -1101,6 +1101,16 @@ internal static class IntrinsicArgumentRules
                 + "operand list, so no class screen applies to it",
         };
 
+    /// <summary>Is operand position <paramref name="position"/> (0-based, the schema's operand convention) of
+    /// <paramref name="functionName"/> a §15.3 type-6 position — "An arithmetic expression that will always result in
+    /// an integer value or an integer data item shall be specified" — on a SPEC-VERIFIED schema? The renderer's
+    /// type-6 intake keys on it (<c>IntrinsicRenderer.RawArg</c>, kb/Work PB651), so it fails CLOSED — the opposite
+    /// direction from <see cref="ArgumentRunIsAllNumeric"/>, because a false here leaves the operand as it stands, which
+    /// is exactly what happened before the intake existed: a function absent from <see cref="Verified"/> or a position
+    /// its schema does not describe answers false.</summary>
+    public static bool IsIntegerPosition(string functionName, int position) =>
+        Verified.TryGetValue(functionName, out var schema) && schema.At(position) is { Kind: 'i' };
+
     /// <summary>
     /// Is EVERY operand position of <paramref name="functionName"/>'s argument run — <paramref name="argCount"/>
     /// operands — a §15.3 <b>numeric</b> position, i.e. one whose declared argument type is 6 (Integer) or 10
@@ -1126,9 +1136,11 @@ internal static class IntrinsicArgumentRules
     /// <para>
     /// ⛔ IT IS ALSO WHY THE ANSWER IS NOT "are the OPERANDS class numeric". Under <c>--permissive</c> the DA6
     /// leniency admits an ALPHANUMERIC operand at a NUMERIC position and digit-decodes it, so
-    /// <c>FUNCTION MOD(&lt;PIC X item&gt; &lt;COMP-2&gt;)</c> has a non-numeric OPERAND at a position that is
-    /// numeric and must keep riding the float lane. Reading the operand's class would have routed it to the
-    /// exact <c>Int128</c> arm and handed Roslyn a <c>double</c> — the CS1503 fix-queue PB2 closed, reopened.
+    /// <c>FUNCTION REM(&lt;PIC X item&gt; &lt;COMP-2&gt;)</c> has a non-numeric OPERAND at a position that is
+    /// numeric (§15.3 type 10, so the COMP-2 still moves the call to the float lane) and must keep riding it.
+    /// Reading the operand's class would have routed it to the exact <c>Int128</c> arm and handed Roslyn a
+    /// <c>double</c> — the CS1503 fix-queue PB2 closed, reopened. (MOD is not the example: both its positions
+    /// are §15.3 type 6, so its COMP-2 operand is taken as its integer before any lane is chosen.)
     /// </para>
     /// <para>
     /// <b>Fail OPEN, in the same direction and for the same reason as the screen above.</b> A function absent

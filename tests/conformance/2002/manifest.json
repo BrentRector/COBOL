@@ -3,6 +3,10 @@
   "enabled": [
   "pb442_numeric_edited_national_class",
   "pb442_forced_national_leaf_group_move",
+  "pb370_start_relative_reverse",
+  "pb370_start_indexed_reverse",
+  "pb370_exception_object_identity",
+  "pb370_use_file_beats_mode_method",
   "pb1177_sort_procedure_use_not_normal",
   "pb1177_method_sort_use_not_normal",
   "pb1177_sort_called_use_not_normal",

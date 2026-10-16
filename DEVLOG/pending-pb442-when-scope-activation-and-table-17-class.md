@@ -19,7 +19,7 @@ exception-checking PERFORM. A CALLed program holding such a PERFORM therefore ra
 `RunTopFrame` stops at the first frame of another activation. Every activation mechanism already pushes a ModuleStack
 frame, so none can forget the boundary. The floor, `TrimPerformTo`, `PerformDepth`, the CallProgram snapshot, the
 OoEmitter method-floor emission and the dead forwarders `RuntimeApi.ModulePushMethod`, `ModulePop` and
-`CobolModule.Push`/`Pop` are deleted. The shipped surface lost members, so the runtime major goes from 4 to 5. The
+`CobolModule.Push`/`Pop` are deleted. The shipped surface lost members, so the runtime major goes from 5 to 6 (PB651 took main from 4 to 5 first, and a module compiled at 5 still calls the deleted floor members). The
 registrar's §9.1.12 refutation (an I-O statement in a PERFORMed paragraph reaches the WHEN only under `>>TURN`) is
 the standard's enablement rule: §9.1.12 applies "When execution of an input-output statement raises an exception
 condition", and §9.1.13.1 makes raising depend on enablement, which a TURN directive gives the text after it.

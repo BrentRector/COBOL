@@ -586,10 +586,15 @@ whole licence the lane rests on — is not granted for it.
 function, an undeclared position and the `'p'` negative-list kind all answer *yes*, so it can only ever take a
 call OUT of the lane on the authority of a cited §15.x.3 rule. ⛔ It is a question about the POSITION and
 deliberately not about the operand's class: under `--permissive` the DA6 leniency admits an alphanumeric operand
-at a numeric position and digit-decodes it, so `MOD(<PIC X item> <COMP-2>)` must keep the lane, and reading the
-operand would have reopened PB2's CS1503. The `Factorial` exclusion is a separate, CODOMAIN question — 33! is
-~8.7e36, which no `FromDouble` tail can carry — and is now the declared set `IntrinsicRenderer.FloatLaneExempt`
-rather than an inline `!= "Factorial"`.
+at a numeric position and digit-decodes it, so `REM(<PIC X item> <COMP-2>)` (type 10 at both positions; MOD is not the example, its positions are type 6) must keep the lane, and reading the
+operand would have reopened PB2's CS1503. The lane's TRIGGER is a binary64 operand at a type-10 position only: a
+§15.3 type-6 operand is taken as its INTEGER before any lane is chosen (`IntrinsicRenderer.RawArg`, kb/Work PB651 —
+docs/CONFORMANCE.md DOC-A.1-124's truncation, on every lane), so an integer-only function such as FACTORIAL, whose
+33! ≈ 8.7e36 no `FromDouble` tail can carry, needs no by-name exemption: it never reaches the lane. Before PB651 the
+arms decided this each for themselves, and three decided wrong under `--permissive`: MOD's scaled arm aligned a
+fraction (MOD(7.5, 3) = 1.5 where the integer 7 gives 1), a float argument-1 moved COMBINED-DATETIME to binary64,
+and ANNUITY's binary64 body took 3.5 periods — measured by `IntrinsicIntegerPositionPermissiveDriftTests`, which
+probes every verified type-6 position against the integer-literal control.
 
 The defect was reachable only under `--permissive` (PB248's §15.3 type-6 screen rejects a floating-point item at
 an integer position under strict, COBOLNET1627), and the sweep measured **ten** functions crashing that way, not
