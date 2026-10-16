@@ -11,6 +11,11 @@
     <!-- Single source of the generated ANTLR parser namespace (rearch P1) — threaded into the generation Exec
          below and matched by the hand-written superClass base Parsing/CobolParserCoreBase.cs. -->
     <AntlrNamespace>CobolNet.Frontend.Generated</AntlrNamespace>
+    <!-- The ANTLR generation's other single-sourced inputs (kb/Work PB2719): the vendored tool jar, the one
+         generator script, and the stamp that carries the values above into the up-to-date check. -->
+    <AntlrJar>ANTLR4/antlr-4.13.2-complete.jar</AntlrJar>
+    <AntlrGenerator>Invoke-Antlr4CSharp.ps1</AntlrGenerator>
+    <AntlrGenerationStamp>$(BaseIntermediateOutputPath)antlr-generation.stamp</AntlrGenerationStamp>
     <!-- Suppress CS3021 warnings from ANTLR-generated files -->
     <NoWarn>$(NoWarn);CS3021</NoWarn>
   </PropertyGroup>
@@ -33,11 +38,12 @@
     <PackageReference Include="Antlr4.Runtime.Standard" />
   </ItemGroup>
 
-  <!-- Grammar files included for reference -->
+  <!-- Every grammar the generator reads: the parser and every grammar it imports, in whatever Grammar/ subfolder.
+       An item, because MSBuild expands a wildcard only in an item's Include, never in a target's Inputs (a literal
+       `Grammar/Core/*.g4` there names a file that never exists, so the target ran on every build). The grammars,
+       the jar and the script are also None items through the SDK's default globbing. -->
   <ItemGroup>
-    <None Include="Grammar\Core\CobolLexer.g4" />
-    <None Include="Grammar\CobolParserCore.g4" />
-    <None Include="ANTLR4\antlr-4.13.2-complete.jar" />
+    <AntlrGrammar Include="Grammar/**/*.g4" />
   </ItemGroup>
 
   <!-- Generated/ is a BUILD OUTPUT (.gitignored, never checked in): ANTLR generates DIRECTLY into it
@@ -46,26 +52,34 @@
        checkout regenerates, so java + pwsh are build prerequisites on every platform, and a failed generation
        FAILS the build (no stale-parser fallback — the DEVLOG-554 CI break). -->
 
-  <!-- Ensure Generated folder exists and regenerate parser if needed.
-       Uses BeforeTargets="CoreCompile" so generation completes before csc runs.
-       After generation, explicitly add generated .cs files to the Compile item group
-       in case they were missing during initial SDK globbing (e.g., after dotnet clean). -->
+  <!-- The stamp carries the generation's inputs that are VALUES rather than files: the -package namespace and the
+       jar path. It is rewritten only when its text changes, so its timestamp moves exactly when a value does and
+       the target below regenerates on a warm tree as a fresh checkout would (kb/Work PB2719). The tool flags live
+       in the generator script, which is itself an input. -->
+  <Target Name="WriteAntlrGenerationStamp">
+    <ItemGroup>
+      <_AntlrGenerationStampLine Include="package=$(AntlrNamespace)" />
+      <_AntlrGenerationStampLine Include="jar=$(AntlrJar)" />
+    </ItemGroup>
+    <WriteLinesToFile File="$(AntlrGenerationStamp)" Lines="@(_AntlrGenerationStampLine)" Overwrite="true"
+                      WriteOnlyWhenDifferent="true" />
+  </Target>
+
+  <!-- THE ONE up-to-date decision for the generated parser (kb/Work PB2719, PB2730): Generated/ is regenerated when
+       it is absent or any generation input is newer than it — a grammar, the generator script, the jar, or the stamp.
+       The generator keeps no staleness check of its own and takes every single-sourced value as a parameter.
+       BeforeTargets="CoreCompile" so generation completes before csc runs; the generated .cs files are added to
+       Compile in case they were missing during the SDK's initial globbing (a fresh checkout, after dotnet clean). -->
   <Target Name="EnsureGeneratedFiles"
           BeforeTargets="CoreCompile"
-          Inputs="Grammar/CobolParserCore.g4;Grammar/Core/*.g4"
-          Outputs="Generated/CobolLexer.cs;Generated/CobolParserCore.cs">
+          DependsOnTargets="WriteAntlrGenerationStamp"
+          Inputs="@(AntlrGrammar);$(AntlrGenerator);$(AntlrJar);$(AntlrGenerationStamp)"
+          Outputs="Generated/CobolLexer.cs;Generated/CobolParserCore.cs;Generated/CobolParserCoreVisitor.cs;Generated/CobolParserCoreBaseVisitor.cs">
 
-    <Message Text="Parser files not found. Generating..." Importance="high"
-             Condition="!Exists('Generated/CobolParserCore.cs')" />
-    <Message Text="Grammar file is newer than parser. Regenerating..." Importance="high"
-             Condition="Exists('Generated/CobolParserCore.cs')" />
+    <Message Text="Generating the ANTLR parser into Generated/ (absent, or a generation input is newer)." Importance="high" />
 
-    <!-- Create Generated folder if it doesn't exist -->
-    <MakeDir Directories="$(MSBuildProjectDirectory)/Generated" Condition="!Exists('$(MSBuildProjectDirectory)/Generated')" />
-
-    <!-- Run parser generation (outputs to temp, copies to Generated, skips CobolParserCoreBase.cs).
-         A nonzero exit FAILS the build - GenerateIfNewer.ps1 propagates the generator's exit code. -->
-    <Exec Command="pwsh -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/GenerateIfNewer.ps1&quot; -PackageName $(AntlrNamespace)"
+    <!-- A nonzero exit FAILS the build: the generator exits 1 on any failure and leaves Generated/ empty. -->
+    <Exec Command="pwsh -NoProfile -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)/$(AntlrGenerator)&quot; -PackageName $(AntlrNamespace) -JarPath &quot;$(MSBuildProjectDirectory)/$(AntlrJar)&quot; -OutputDir &quot;$(MSBuildProjectDirectory)/Generated&quot;"
           WorkingDirectory="$(MSBuildProjectDirectory)" />
 
     <!-- Add generated files to compilation in case they were missing during initial globbing -->

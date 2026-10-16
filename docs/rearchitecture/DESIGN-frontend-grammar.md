@@ -7,8 +7,8 @@ edition gate are all in the tree; the §8 questions are resolved as decided. Rem
 PHASE 15), and the residual preprocessor namespace / `using Core =` alias cleanup.
 Scope: `src/Cobol.Net.Frontend/**` — the ANTLR lexer/parser grammars (`Grammar/**/*.g4`), the hand-written
 preprocessor (`Preprocessor/`), the parse-stage machinery (`Parsing/`), the diagnostics model
-(`Diagnostics/`), the generated-parser build (`GenerateIfNewer.ps1` + `Invoke-Antlr4CSharp.ps1` + csproj
-targets), and the frontend's contract to its ONE consumer, the `Cobol.Net.Compiler` binder.
+(`Diagnostics/`), the generated-parser build (`Invoke-Antlr4CSharp.ps1` + the csproj's
+`EnsureGeneratedFiles` target), and the frontend's contract to its ONE consumer, the `Cobol.Net.Compiler` binder.
 
 This document is the decision-complete target for the frontend. It is a companion to
 `docs/rearchitecture/DESIGN-edition-framework.md` (the edition/version framework — this doc owns the
@@ -177,7 +177,7 @@ policy. Three independent renders of "removed = error strict / warning permissiv
 ### 1.6 The binder consumes the tree by string interpretation, not the generated visitor
 The `Cobol.Net.Compiler` binder hand-walks the raw ANTLR context types with **~336 `GetText()` calls** and
 string comparisons (dossier; e.g. `DataBinder.cs:155`), rather than the generated typed visitor. ANTLR's
-`-visitor` output is generated (`Invoke-Antlr4CSharp.ps1:71`) but only `EditionValidator` uses it. The raw
+`-visitor` output is generated (`Invoke-Antlr4CSharp.ps1`, its ANTLR step) but only `EditionValidator` uses it. The raw
 parse-tree shape is thus a wide, un-narrowed, stringly-typed cross-assembly contract with no façade: any
 grammar rule rename ripples into dozens of `GetText()` sites invisibly.
 
@@ -788,11 +788,20 @@ format (`computer-name-optional-2002`, `VisitObjectComputerParagraph`); `sourceC
 ### 3.5 Generated-parser build (D7 + D8)
 
 Behavior is already correct (portable flat-output regen, fail-hard, `.gitignored` `Generated/`,
-java+pwsh prerequisites — `Invoke-Antlr4CSharp.ps1`, `GenerateIfNewer.ps1`). Target changes are hygiene:
+java+pwsh prerequisites — `Invoke-Antlr4CSharp.ps1`, run by the csproj's `EnsureGeneratedFiles` target). Target
+changes are hygiene:
 
 1. **Package name → MSBuild property (DONE).** The generated namespace `CobolNet.Frontend.Generated` is a csproj property
-   (`AntlrNamespace`) passed to `GenerateIfNewer.ps1` as `-PackageName`; this performed the D8 namespace rename with one
-   property (the `using Core = CobolParserCore` aliases in consumers are a separate cleanup).
+   (`AntlrNamespace`) passed to `Invoke-Antlr4CSharp.ps1` as `-PackageName`; this performed the D8 namespace rename with
+   one property (the `using Core = CobolParserCore` aliases in consumers are a separate cleanup).
+1a. **One up-to-date decision over every input (DONE, kb/Work PB2719, PB2730).** `EnsureGeneratedFiles` is the only
+   staleness check: its `Inputs` are the `AntlrGrammar` item (`Grammar/**/*.g4`, an item because MSBuild never expands a
+   wildcard in a target's `Inputs`), the generator script (which carries the tool flags), the `AntlrJar`, and a stamp
+   (`obj/antlr-generation.stamp`, rewritten only when its text changes) carrying the namespace and the jar path. It
+   runs the generator directly with `-PackageName`, `-JarPath` and `-OutputDir`, all mandatory and without defaults;
+   the generator always generates, empties `Generated/` first and again on any failure (so a run ANTLR wrote before a
+   warning cannot pass for up to date), and has no self-invocation guard. A warm tree therefore regenerates on a
+   namespace, jar or flag change exactly as a fresh CI checkout does. `AntlrGenerationDriftTests` pins it.
 2. **Delete the committed `.antlr/` caches** (`Grammar/.antlr/`, `Grammar/Core/.antlr/`) and add
    `**/.antlr/` to `.gitignore`. They are IDE build output; one caches a dead grammar.
 3. **Narrow the SLL-bail catch** (`Frontend.cs:135`): `catch (Antlr4.Runtime.Misc.ParseCanceledException)`
@@ -1697,7 +1706,7 @@ assemblies produce, with the new wrapper rules flattened (DESIGN-architecture-re
 | create | — | `Cst/` façade namespace (`DataDescriptionCst`, `StatementCst`, …) | typed narrow contract; retire ~336 `GetText()` walks (§3.7) |
 | edit | `Frontend.cs:135` `catch (Exception)` | `catch (ParseCanceledException)` + `RecognitionException` | stop masking predicate/lexer-action bugs (§3.5) |
 | edit | `Frontend.cs:16` stale banner; `:103-105` throw | correct banner; record internal diagnostic | doc drift + exception-boundary consistency (§1.7, §3.6) |
-| edit | `Invoke-Antlr4CSharp.ps1:29`, csproj | `-PackageName $(AntlrPackage)` | package name in one MSBuild property (§3.5) |
+| edit | `Invoke-Antlr4CSharp.ps1`, csproj | `-PackageName $(AntlrNamespace)` | package name in one MSBuild property (§3.5) |
 | edit | `.gitignore` | add `**/.antlr/` | prevent re-committing IDE caches (§1.8) |
 
 ---
