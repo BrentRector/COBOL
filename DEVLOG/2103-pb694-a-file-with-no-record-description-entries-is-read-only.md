@@ -1,4 +1,4 @@
-## PB694: a file with no record description entries is read only with INTO (§13.4.5.3 SR3 c), COBOLNET3983), and SR3 b) holds because the record-name form cannot reach it
+## Entry 2103 — 2026-10-16 12:46 PDT — PB694: a file with no record description entries is read only with INTO (§13.4.5.3 SR3 c), COBOLNET3983), and SR3 b) holds because the record-name form cannot reach it
 
 Wave 1097 group F, kb/Work PB694. §13.4.5.3 SR3 (`cite.py --check 13.4.5.3` OK, rule 3) has three sub-rules for a
 file description entry with no record description entries: a) a RECORD clause is required, b) every WRITE and
@@ -41,3 +41,4 @@ one without INTO.
 **Self-review.** Architecture: one rule, one site, asked above the organization split. Code: the diagnostic quotes
 SR3 c) and GR6. Performance: one boolean test per READ, plus `WrittenRecords.Any()` only for an FD. Duplication: the
 antecedent is a single `FileModel` property.
+
