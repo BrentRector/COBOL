@@ -14,9 +14,12 @@ internal sealed class CorrespondingEmitter(EmitContext ctx, NumericRenderer num,
     /// statements, in D1 declaration order. MOVE pairs are ordinary MOVEs (MOVE GR11 §14.9.25.4 — "the same as if
     /// the user had referred to each pair … in separate MOVE statements"), reusing the one MOVE emission path.
     /// ADD/SUBTRACT pairs run inside ONE statement-level ON SIZE ERROR region (§14.7.6): the shared
-    /// <c>EmitArith</c> flag latches across the per-pair checked stores, an erring pair's receiver stays
-    /// UNCHANGED while the remaining pairs still execute (§14.7.5), the ON imperative dispatches ONCE after all
-    /// pairs complete, and the NOT branch is suppressed when any pair erred — never a per-pair phrase.
+    /// <c>EmitArith</c> flag latches across the per-pair guarded stores, an erring pair's receiver stays
+    /// UNCHANGED while the remaining pairs still execute (§14.7.5) — whether the pair erred while its sum was evaluated
+    /// or while it was stored, because each pair sits in its own guard — the ON imperative dispatches ONCE after all
+    /// pairs complete, and the NOT branch is suppressed when any pair erred — never a per-pair phrase. With no phrase
+    /// under EC-SIZE checking, the latched name is assigned per failing pair, so the condition raised after the loop is
+    /// the LAST erring pair's (§14.7.6).
     /// </summary>
     public void Emit(BoundCorresponding c)
     {
@@ -40,14 +43,12 @@ internal sealed class CorrespondingEmitter(EmitContext ctx, NumericRenderer num,
             EmitHoists(c.Hoists);
             Deferred(() =>
             {
+                // Each pair is ONE implied statement (§14.9.2.4 GR5 / §14.9.44.4 GR5: "separate ADD statements"),
+                // stored through the in-place store an explicit ADD uses, inside its own size-error guard, so a raise
+                // in one pair's evaluation leaves the later pairs to run (kb/Work PB229). ONE rounded-phrase mode for
+                // every pair (§14.7.4).
                 foreach (var p in c.Pairs)
-                {
-                    // ONE rounded-phrase mode for every pair (§14.7.4).
-                    var rcv = arith.RcvFor(new Receiver(p.Target, c.Rounding), ise);
-                    arith.StoreArith(p.Target,
-                        num.Combine(num.FieldNum(p.Target), op, num.FieldNum(p.Source), rcv),
-                        c.Rounding);
-                }
+                    arith.StoreInPlace(new Receiver(p.Target, c.Rounding), op, num.FieldNum(p.Source), ise);
             });
         });
     }
