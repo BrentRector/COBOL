@@ -563,8 +563,21 @@ public sealed partial class DataBinder
             : cv.constantByteLengthWord() is not null
                 ? BindConstantLength(name, isGlobal, spec, cv.dataReference(), where, bytes: true, demanded, out waits)
             : cv.nonNumericLiteral() is { } nn ? BindConstantStringLiteral(name, isGlobal, spec, nn, where)
+            : ConstantLiteralOperand(cv.arithmeticExpression()) is { } named ? named with { Name = name, IsGlobal = isGlobal, Specification = spec }
             : BindConstantArithmetic(name, isGlobal, spec, cv.arithmeticExpression(), where);
     }
+
+    /// <summary>The constant an AS operand written as ONE constant-name spells, or null for any other operand. The word
+    /// is literal-1 — "constant-name-1 may be used anywhere that a format specifies a literal of the class and category of
+    /// constant-name-1" (ISO §13.10.3 SR2), and §13.10.2 specifies literal-1 here — so the entry is "as if literal-1 …
+    /// were written" (§13.10.4 GR1) and takes that literal's class, category and text (GR2), whatever its class: an
+    /// alphanumeric, national or boolean constant-name is no operand of arithmetic-expression-1, which refused it
+    /// (kb/Work PB780), and a numeric one is a single numeric literal, "treated as a literal, not as an
+    /// arithmetic-expression" (§13.10.3 SR1), so <c>AS K</c> keeps K's 0.25 where the expression form truncates
+    /// (§13.10.4 GR4). A word that closes a circular dependence is left to the arithmetic path, which reports it
+    /// once (§13.10.3 SR5).</summary>
+    private ConstantDef? ConstantLiteralOperand(Core.ArithmeticExpressionContext operand) =>
+        SoleOperand.DataRef(operand) is { } word && !ClosesConstantCycle(word.GetText()) ? ConstantOf(word) : null;
 
     /// <summary>The AS operand's specification as written (§13.10.3 SR9's subject): its tokens' texts, one space
     /// apart. Built from the parse tree's TOKENS, not the source span, so a comment written inside a multi-line

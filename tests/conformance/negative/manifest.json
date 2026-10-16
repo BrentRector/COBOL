@@ -249,6 +249,7 @@
   "pb780-code-national-constant",
   "pb780-value-subscript-not-integer-constant",
   "pb780-options-fill-constant-not-hex",
+  "pb780-constant-as-constant-cycle",
   "pb1225-constant-without-as-at-85",
   "pb1271-sum-counter-occurrence-not-subscripted",
   "pb1402-extended-letter-85",
