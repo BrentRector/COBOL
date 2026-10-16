@@ -65,11 +65,13 @@ def record(cfg, coord_dir, terminal=None, file_set_of=None):
     """Record every group of the groups file `cfg` in the dispatch ledger (plan_wave.record_dispatch, an upsert on
     (wave, letter)) and return the entries written. A group's notes are its `notes` field's ids; its files are its
     `file_set` LIST, or, when a hand-built groups file carries none, `file_set_of(note ids)` (default
-    plan_wave.computed_file_set over this tree). `terminal(note id)` defaults to the register's landed or retired."""
+    plan_wave.computed_file_set over this tree, on the planner's index policy: THE index of the tree, cached in
+    `coord_dir`, kb/Work PB3203). `terminal(note id)` defaults to the register's landed or retired."""
     if terminal is None:
         status = {i.get('id'): i.get('status') for i in work.load()}
         terminal = lambda n: status.get(n) in work.TERMINAL_STATUSES  # noqa: E731
-    file_set_of = file_set_of or (lambda ids: plan_wave.computed_file_set(REPO, ids))
+    policy = plan_wave.IndexPolicy.of(coord_dir)
+    file_set_of = file_set_of or (lambda ids: plan_wave.computed_file_set(REPO, ids, policy))
     groups = []
     for g in cfg['groups']:
         notes = list(dict.fromkeys(PB.findall(g.get('notes', ''))))
