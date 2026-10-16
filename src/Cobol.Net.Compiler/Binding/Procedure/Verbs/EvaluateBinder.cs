@@ -308,7 +308,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             ok = false;
             ctx.Edition.Error(DiagnosticCatalog.EvaluateRangeOperandInvalid,
                 $"the {(end == 0 ? "first" : "second")} operand of the range-expression "
-                + $"'{DataBinder.WrittenText(range)}' is of class {c.ToString().ToLowerInvariant()}; ISO §14.9.13.3 SR4 "
+                + $"'{DataBinder.WrittenText(range)}' is of class {IntrinsicArgumentRules.Name(c)}; ISO §14.9.13.3 SR4 "
                 + "excludes class boolean, message-tag, object and pointer from a range-expression");
         }
         // SR4, first half — the same class. Reported only when neither end is already excluded, so one written
@@ -318,7 +318,7 @@ internal sealed class EvaluateBinder(BinderContext ctx, StatementBinder host)
             ok = false;
             ctx.Edition.Error(DiagnosticCatalog.EvaluateRangeOperandInvalid,
                 $"the two operands of the range-expression '{DataBinder.WrittenText(range)}' are of class "
-                + $"{lc.ToString().ToLowerInvariant()} and class {hc.ToString().ToLowerInvariant()}; ISO "
+                + $"{IntrinsicArgumentRules.Name(lc)} and class {IntrinsicArgumentRules.Name(hc)}; ISO "
                 + "§14.9.13.3 SR4 requires them to be of the same class (§8.5.2.1 Table 2 — CLASS, not "
                 + "category, so alphabetic and alphanumeric are two classes)");
         }

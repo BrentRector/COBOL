@@ -229,7 +229,7 @@ internal sealed class UdfBinder(BinderContext ctx, StatementBinder host)
             {
                 ctx.Edition.Error("COBOLNET1554",
                     $"FUNCTION {name.ToUpperInvariant()} argument {i + 1} is of class "
-                    + $"{cls.ToString().ToLowerInvariant()}; an argument passed to a BY VALUE formal parameter "
+                    + $"{IntrinsicArgumentRules.Name(cls)}; an argument passed to a BY VALUE formal parameter "
                     + "shall be of class numeric, object, or pointer (ISO §8.4.3.2.3 SR10)");
                 return BoundExprError.Refused(ctx.Edition, $"FUNCTION {name} argument {i + 1} BY VALUE class");
             }

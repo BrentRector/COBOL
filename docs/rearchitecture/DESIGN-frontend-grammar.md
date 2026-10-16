@@ -1019,7 +1019,14 @@ reference formats, and the only place source comments are recognized. Its model:
   3) removes an inline comment on a continuation line too, a quotation symbol ends a literal only when it is the one
   that opened it, and it stops at the floating literal continuation indicator and at a directive after program text.
   It replaced two scanners that disagreed (a comment strip that assumed "not in a literal" and a
-  state scan that treated either quotation symbol as closing).
+  state scan that treated either quotation symbol as closing). What a literal's delimiters are and what a comment
+  indicator is, it asks `CobolSourceText` (Cobol.Net.Editions, beside `CobolSpace`; kb/Work PB2621): the §8.3.5 5)
+  opening delimiters with their B/N/X/BX/NX prefixes, the closing delimiter with the §8.3.3.2.3 3) doubled quotation
+  symbol as content, and the §6.2.3.1 comment indicator `*>`. The text-word scanner and the directive-line parse ask the
+  same reader, so the scan keeps only what is its own: the literal state carried ACROSS a line end (a quotation symbol
+  that ends a line may be the first half of a doubled one), the floating continuation indicator and the directive after
+  program text. `LiteralScanDriftTests` refuses a text stage that spells the comment indicator, the quotation-symbol
+  pair or a doubled-quotation test again.
 - **Comments never leave this pass.** A comment line becomes an empty line and an inline comment is cut, in fixed
   AND free form, so no later stage (the lexer's picture mode, the COPY/REPLACE text-word scanner, the NIST
   substitutions) has a comment rule to get wrong. The lexer keeps `COMMENT_START` (and `PIC_COMMENT` /

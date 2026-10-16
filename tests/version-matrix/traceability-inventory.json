@@ -487,11 +487,11 @@
   "subject": "Text manipulation elements",
   "rule-digest": "43a1488e42b7",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#LiteralPrefixLength; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#LiteralEnd",
+  "code-location": "src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#TextWordScanner; src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#LiteralEnd; src/Cobol.Net.Editions/CobolSourceText.cs#TryOpeningDelimiterAt; src/Cobol.Net.Editions/CobolSourceText.cs#LiteralEnd",
   "test-ref": "unit:TextManipulationTextWordTests.Literals_WithPrefixOrDoubledQuote_AreSingleTextWords; conformance:2002/pb1354_copy_header_2002; conformance:85/pb1350_text_words_85",
   "derivation": "",
   "editions": "85, 2002, 2014, 2023",
-  "notes": "kb/Work PB1350 landed (w61a): A literal is ONE text-word from its 8.3.5 5) opening delimiter (X\" N\" NX\" B\" BX\", either quote, any case) through its closing delimiter, doubled quotes inside. Probe tw3: [A] [PQ] [P\"Q]. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location)",
+  "notes": "kb/Work PB1350 landed (w61a): A literal is ONE text-word from its 8.3.5 5) opening delimiter (X\" N\" NX\" B\" BX\", either quote, any case) through its closing delimiter, doubled quotes inside. Probe tw3: [A] [PQ] [P\"Q]. Spec re-derived and re-cited by the implementer; every probe of the note re-run on the fixed build. retired-witness: src/Cobol.Net.Frontend/Preprocessor/CopyProcessor.cs#TokenizeTextWords (the symbol was removed by kb/Work PB1350/PB1354 (one TextWordScanner + a parsed COPY/REPLACE statement); its successor is named in code-location) retired-witness: src/Cobol.Net.Frontend/Preprocessor/TextWord.cs#LiteralPrefixLength (kb/Work PB2621: the opening-delimiter reading moved to the one literal reader, CobolSourceText.TryOpeningDelimiterAt, which TextWordScanner.TryNext asks)",
   "state": "OK"
  },
  {
@@ -1237,11 +1237,11 @@
   "subject": "Compiler directives",
   "rule-digest": "71c715ed933c",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#StripInlineComment; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn; src/Cobol.Net.Frontend/Preprocessor/ReferenceFormatProcessor.LogicalConversion.cs#FixedFormConverter; src/Cobol.Net.Editions/CobolSourceText.cs#InlineCommentAt",
   "test-ref": "conformance:2002/pb1365_turn_directive_in_program_text_area; conformance:2023/pb1365_turn_directive_inline_comment_is_legal; conformance:negative/pb1365-turn-directive-trailing-word; conformance:negative/pb806-else-trailing-word; conformance:negative/pb806-end-if-trailing-word; conformance:negative/pb806-end-evaluate-trailing-word; conformance:negative/pb794-source-format-unknown; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord; unit:CompilerDirectiveCatalogDriftTests.InlineComment_IsNotPartOfTheOperand; unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_RejectsAWordAfterItsOperand_AndAcceptsItsOperandAndAComment; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (wave 1019 B). Both halves hold on a fresh build. (a) program-text area: a directive at column 8 with sequence-area content (cols 1-6) is read, a directive at column 7 is COBOLNET2616 (conformance:2002/pb1365_turn_directive_in_program_text_area; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; SR-7.3.3-2). (b) 'followed only by space characters and an optional inline comment': the one parse strips the inline comment quote-aware, the closed-word directives reject a trailing word through CheckOperand (COBOLNET1911: LISTING, PROPAGATE, REF-MOD-ZERO-LENGTH, LEAP-SECOND, CALL-CONVENTION, PUSH, POP, SOURCE FORMAT), ELSE / END-IF / END-EVALUATE reject any operand (PB806), and EVERY directive word of EVERY stage-owned row (TURN COBOLNET0718, FLAG-02/-14 COBOLNET1622, COBOL-WORDS COBOLNET1623, DEFINE/IF/EVALUATE/WHEN/DISPLAY COBOLNET1619) rejects a word after its conforming operand in fixed and free form and accepts its operand with an inline comment: StageOwnedDirectiveOperandDriftTests derives the word set from the Stage rows, so a new stage-owned directive without a witness line is a red test. The PB1365 hole was TURN's loop breaking at CHECKING.",
+  "notes": "kb/Work PB1365 (wave 1019 B). Both halves hold on a fresh build. (a) program-text area: a directive at column 8 with sequence-area content (cols 1-6) is read, a directive at column 7 is COBOLNET2616 (conformance:2002/pb1365_turn_directive_in_program_text_area; unit:ReferenceFormatLogicalConversionTests.FixedFormDirective_IsRecognizedInTheProgramTextArea; SR-7.3.3-2). (b) 'followed only by space characters and an optional inline comment': the one parse strips the inline comment quote-aware, the closed-word directives reject a trailing word through CheckOperand (COBOLNET1911: LISTING, PROPAGATE, REF-MOD-ZERO-LENGTH, LEAP-SECOND, CALL-CONVENTION, PUSH, POP, SOURCE FORMAT), ELSE / END-IF / END-EVALUATE reject any operand (PB806), and EVERY directive word of EVERY stage-owned row (TURN COBOLNET0718, FLAG-02/-14 COBOLNET1622, COBOL-WORDS COBOLNET1623, DEFINE/IF/EVALUATE/WHEN/DISPLAY COBOLNET1619) rejects a word after its conforming operand in fixed and free form and accepts its operand with an inline comment: StageOwnedDirectiveOperandDriftTests derives the word set from the Stage rows, so a new stage-owned directive without a witness line is a red test. The PB1365 hole was TURN's loop breaking at CHECKING. retired-witness: src/Cobol.Net.Editions/CompilerDirectiveLine.cs#StripInlineComment (kb/Work PB2621: the directive line's inline comment is found by the one literal reader, CobolSourceText.InlineCommentAt, which CompilerDirectiveLine.TryParse asks)",
   "state": "OK"
  },
  {
@@ -1252,11 +1252,11 @@
   "subject": "Compiler directives",
   "rule-digest": "873249b01de0",
   "verdict": "CONFORMS",
-  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveLine.cs#StripInlineComment; src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn",
+  "code-location": "src/Cobol.Net.Editions/CompilerDirectiveCatalog.cs#CheckOperand; src/Cobol.Net.Frontend/Preprocessor/TurnDirectiveProcessor.cs#ParseTurn; src/Cobol.Net.Editions/CobolSourceText.cs#InlineCommentAt",
   "test-ref": "unit:StageOwnedDirectiveOperandDriftTests.EveryStageDirectiveWord_RejectsAWordAfterItsOperand_AndAcceptsItsOperandAndAComment; unit:CompilerDirectiveCatalogDriftTests.InlineComment_IsNotPartOfTheOperand; unit:CompilerDirectiveCatalogDriftTests.EveryClosedOperandDirective_DiagnosesAMalformedOperand; unit:CompilerDirectiveCatalogDriftTests.EveryNoOperandWord_RejectsAnOperandAndAcceptsTheBareWord; conformance:2023/pb794_directive_operands; conformance:negative/pb1365-turn-directive-trailing-word",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1365 (wave 1019 B). Same one parse as SR-7.3.3-3: the free-form theory case of StageOwnedDirectiveOperandDriftTests drives every stage-owned directive word through the real front end with InitialFormat=Free; a free-form >>TURN ... CHECKING OFF JUNK, >>END-IF JUNK and >>LISTING ON JUNK are rejected and '*> c' is accepted (re-probed). PB806 (ELSE/END-IF/END-EVALUATE) and PB807 (DISPLAY) are landed, so no directive's stage parser skips the rule.",
+  "notes": "kb/Work PB1365 (wave 1019 B). Same one parse as SR-7.3.3-3: the free-form theory case of StageOwnedDirectiveOperandDriftTests drives every stage-owned directive word through the real front end with InitialFormat=Free; a free-form >>TURN ... CHECKING OFF JUNK, >>END-IF JUNK and >>LISTING ON JUNK are rejected and '*> c' is accepted (re-probed). PB806 (ELSE/END-IF/END-EVALUATE) and PB807 (DISPLAY) are landed, so no directive's stage parser skips the rule. retired-witness: src/Cobol.Net.Editions/CompilerDirectiveLine.cs#StripInlineComment (kb/Work PB2621: the directive line's inline comment is found by the one literal reader, CobolSourceText.InlineCommentAt, which CompilerDirectiveLine.TryParse asks)",
   "state": "OK"
  },
  {
@@ -8016,13 +8016,13 @@
   "ordinal": 3,
   "subject": "Class and category of data items and literals",
   "rule-digest": "16ca5033d3bf",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of",
-  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassNameOf; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NonNumericOperandKind",
+  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description; conformance:2002/pb1400_group_usage_operand_class; conformance:negative/pb1400-group-usage-arithmetic-operand; conformance-test:ArithmeticOperandClassTests.TheRefusal_NamesTheSection8521ClassOfTheOperand; unit:ClassSpellingDriftTests.TheArithmeticOperandScreen_AsksTheClassItNames",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1400 (registrar 15b). Rule: '3) A group item explicitly or implicitly described with a GROUP-USAGE clause with the BIT phrase.' (cite.py OK). Both halves verified: explicit (GB) and IMPLICIT (subordinate group GBS inside a GROUP-USAGE BIT group) -- probe p2.cob: LENGTH(GBS)=6 boolean positions (§15.50.4 r1), MOVE B\"110011\" TO GBS -> GB1=1100 GB2=11. pb522 golden derives the boolean-position LENGTH of explicit and nested bit groups from §8.5.2.5 item 3 + §15.50.4. || REFUTED: PARTIAL — The LENGTH, MOVE and COMPUTE-boolean paths treat a GROUP-USAGE BIT group as boolean. GBS B-OR B\"101010\" works, and MOVE GB TO a PIC 1(4) item gives 1011. But a second site restates group class without the GROUP-USAGE branch: ExpressionBinder.NonNumericOperandKind has the arm '_ when p.Item.IsGroup => class alphanumeric, ISO 8.5'. So COMPUTE N = GB + 1 on a bit group is rejected with a diagnostic that tells the user the bit group is 'class alphanumeric'. §8.5.2.1 and §8.5.2.5 item 3 make it class and category boolean. This is one rule in two places, and one of them is wrong for this rule's subject. The rejection itself is correct. Fix: derive that text from ItemCategory.GroupKindsOf / ClassOfItem.",
-  "state": "GAP"
+  "notes": "kb/Work PB1400 LANDED (w1095j). A group explicitly or implicitly described GROUP-USAGE BIT is category and class boolean everywhere it is asked: LENGTH/MOVE/boolean expressions (pb522, pb1400_group_usage_operand_class: GB B-XOR, subordinate GBS B-AND) and now the arithmetic-operand refusal too, whose text was the refuter's residual ('group item GB (class alphanumeric, ISO 8.5)'). ExpressionBinder.NonNumericOperandKind's group and ref-mod arms no longer spell a class; IntrinsicArgumentRules.ClassNameOf derives it from ClassOfPlace (the one 8.5.2.1 classifier): COMPUTE N = GB + 1 / GBS + 1 -> 'group item GB of class boolean (ISO 8.5.2.1)'. ClassSpellingDriftTests pins that no diagnostic spells a class from the enum name.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.5-4",
@@ -8106,13 +8106,13 @@
   "ordinal": 3,
   "subject": "Class and category of data items and literals",
   "rule-digest": "7d99adc20826",
-  "verdict": "PARTIAL",
-  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of",
-  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description",
+  "verdict": "CONFORMS",
+  "code-location": "src/Cobol.Net.Compiler/Binding/Model/ItemCategory.cs#GroupKindsOf; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassOfItem; src/Cobol.Net.Compiler/Binding/MoveTable16.cs#Table16Operand.Of; src/Cobol.Net.Compiler/Binding/IntrinsicArgumentRules.cs#ClassNameOf; src/Cobol.Net.Compiler/Binding/Procedure/ExpressionBinder.cs#NonNumericOperandKind",
+  "test-ref": "conformance:2002/pb522_group_usage_travels_with_the_description; conformance:2002/pb1400_group_usage_operand_class; conformance:negative/pb1400-group-usage-arithmetic-operand; conformance-test:ArithmeticOperandClassTests.TheRefusal_NamesTheSection8521ClassOfTheOperand; unit:ClassSpellingDriftTests.TheArithmeticOperandScreen_AsksTheClassItNames",
   "derivation": "",
   "editions": "2002, 2014, 2023",
-  "notes": "kb/Work PB1400 (registrar 15b). Rule: '3) A group item explicitly or implicitly described with a GROUP-USAGE clause with the NATIONAL phrase.' (cite.py OK). Both halves probed (p2.cob): subordinate group GS inside '01 GN GROUP-USAGE NATIONAL' -> LENGTH 3 national positions, BYTE-LENGTH 6, and MOVE \"XYZ\" TO GS converts to national as an elementary PIC N(3) (§13.18.29.4 GR2 b) -> GN1=XY GN2=Z. pb522 derives explicit + nested national group LENGTH; negative/pb59-display-of-group pins the complement (a plain group is not national). || REFUTED: PARTIAL — MOVE, LENGTH and the SR10 screen treat a GROUP-USAGE NATIONAL group as national. MOVE 'PQ' TO GN converts, and MOVE GS TO X2 is rejected as a national sender. The same second site as the bit group, ExpressionBinder.NonNumericOperandKind's IsGroup arm, gets it wrong: COMPUTE N = GB + 1 on a national group is diagnosed as 'group item GB (class alphanumeric, ISO 8.5)', but §8.5.2.10 item 3 / §8.5.2.1 make it class national. Two sites derive group class, and one lacks the GROUP-USAGE branch. There is also a group-MOVE lead, recorded under GR-8.5.2.3-3: a national group moved into an alphanumeric group is converted instead of being copied without conversion (§14.9.25.4 GR5).",
-  "state": "GAP"
+  "notes": "kb/Work PB1400 LANDED (w1095j). A group explicitly or implicitly described GROUP-USAGE NATIONAL is category and class national everywhere it is asked: LENGTH/MOVE (pb522; pb1400_group_usage_operand_class: MOVE N\"PQR\" TO GN as an elementary PIC N(3), GN = N\"PQR\", subordinate GNS moved as a national sender) and now the arithmetic-operand refusal, which said 'class alphanumeric' (the refuter's residual): COMPUTE N = GN + 1 / GNS + 1 -> 'group item GN of class national (ISO 8.5.2.1)', through IntrinsicArgumentRules.ClassNameOf over ClassOfPlace. The separate group-MOVE lead (a national group moved into an alphanumeric group) belongs to GR-8.5.2.3-3, not this row.",
+  "state": "OK"
  },
  {
   "rule-id": "GR-8.5.2.10-4",
