@@ -2441,12 +2441,28 @@ A process-wide registry keyed by external name (with an Area discriminator for r
 - **START's preconditions live in the same base, for the same reason** (kb/Work PB352). `FileConnector` owns
   `StartOpenModeGuard` — 14.9.41.4 GR1's "input or I-O" test, whose unsuccessful value is 9.1.13.7 item 7's
   '47' and whose blank cells are Table 20's — and the virtual `InvalidateFilePosition`, which is GR7 ("the file
-  position indicator is set to indicate that no valid record position has been established"). The guard applies
-  GR7 on the way out, because a refused START is an unsuccessful one: GR1's test had been written out FIVE
-  times (twice in each keyed connector, once in the sequential arm) and every copy returned '47' leaving the
-  indicator alone. A keyed connector overrides `InvalidateFilePosition` to clear its FPI VALIDITY BIT as well —
-  its indicator is a key value plus a bit, where the sequential connector's is the stream position — and each
-  connector's `StartFail` is that invalidation plus the invalid key condition's '23'.
+  position indicator is set to indicate that no valid record position has been established"). A refused START is
+  an unsuccessful one, so its '47' returns through the failure terminal `Unsuccessful` (below): GR1's test had
+  been written out FIVE times (twice in each keyed connector, once in the sequential arm) and every copy returned
+  '47' leaving the indicator alone. A keyed connector overrides `InvalidateFilePosition` to clear its FPI
+  VALIDITY BIT as well — its indicator is a key value plus a bit, where the sequential connector's is the stream
+  position — and each connector's `StartFail` is `Unsuccessful` with the invalid key condition's '23'.
+- **Every unsuccessful READ or START ends in ONE terminal, `FileConnector.Unsuccessful`** (kb/Work PB359).
+  §14.9.30.4 GR18 is GR7's READ twin ("Unless otherwise specified, at the completion of any unsuccessful execution
+  of a READ statement, … the file position indicator is set to indicate that no valid record position has been
+  established"), and both are unconditional on the kind of failure. `Unsuccessful(status)` is the twin of
+  `ReadSucceeded`: it calls `InvalidateFilePosition` and then assigns the status, as one step. The guards
+  (`ReadOpenModeGuard`, `SequentialReadGuard`, `RandomReadAbsentOptionalGuard`, `StartOpenModeGuard`) are PURE —
+  they answer a status and change nothing, which is also what lets the pre-read record identity
+  (`SequentialReadReachesRetrieval`, `PeekRandomReadRecordId`) ask the same guard a READ asks — and a READ or
+  START entry never assigns `Status` itself: every failing exit (the guards' '47'/'46'/'10'/'23', a random READ's
+  invalid key '23', an at-end '10', a relative '14', a sequential '30', START's '23') returns through
+  `Unsuccessful`, and every successful one through `ReadSucceeded` or the START epilogue `StartPositioned`. The
+  shapes this replaced — the base flag set by hand (which skipped a keyed connector's validity bit),
+  `return Status = notOpen;`, and `Status = X; return false;` with no invalidation — each kept GR18/GR7 only by an
+  argument about OPEN's current shape. The structural gate is `FilePositionInvalidationDriftTests` (no READ/START
+  entry of a connector assigns `Status`; the terminal invalidates first; the guards are pure); the witness is
+  `tests/conformance/85/pb359_unsuccessful_read_start_position`.
 - SAME AREA buffer-only and SAME SORT-MERGE AREA are no-ops in a managed runtime (pure memory-layout optimizations with no observable behavior).
 
 ## Per-edition gating (G1 — four compilers in one `cobol.exe`)

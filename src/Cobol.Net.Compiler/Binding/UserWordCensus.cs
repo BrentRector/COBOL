@@ -15,7 +15,9 @@ namespace CobolNet.Binding;
 /// by <see cref="DataBinder.DeclareUserWord"/> for every declaration, and by
 /// <see cref="Compiler.Oo.OoClassTable.RecordReferenceUse"/> for every reference to an object-class-name,
 /// interface-name or parameter-name, including one another element declares (a method's class, a contained
-/// program's container; kb/Work PB3132). Keyed case-insensitively, like every COBOL word.</summary>
+/// program's container; kb/Work PB3132), and for every reference to a name a configuration section declares
+/// (<see cref="DataBinder.RecordConfigurationNameUse"/>, kb/Work PB3153: a contained program's class condition over its
+/// container's class-name). Keyed case-insensitively, like every COBOL word.</summary>
 internal sealed class UserWordCensus
 {
     private readonly Dictionary<string, UserWordKind> _firstType = new(CobolNames.Comparer);

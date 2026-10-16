@@ -319,7 +319,7 @@ public sealed partial class DataBinder
         // Appended after this element's own register and each nearer container's (nearest first, as called), the
         // order ReferenceResolver.CapacityRegisterFor reads. A register the container refused (SR30's COBOLNET1523)
         // failed that compile and has no CapacityRegister view to inherit.
-        if (item.OccursSpec is { CapacityName: { } cap, CapacityRegister: not null }) AddCapacityRegister(cap, item);
+        if (item.OccursSpec is { CapacityName: { } cap, CapacityRegister: not null }) AddCapacityRegister(_capacityRegisters, cap, item);
         foreach (var child in item.Children) InheritGlobalSubtree(child, depth);
         foreach (var ren in item.Renames66) InheritGlobalSubtree(ren, depth);
     }
