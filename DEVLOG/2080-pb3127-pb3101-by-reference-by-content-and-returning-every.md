@@ -1,4 +1,4 @@
-## PB3127 + PB3101 (BY REFERENCE, BY CONTENT and RETURNING): every activation lane asks the run-time relation at bind time
+## Entry 2080 — 2026-10-16 08:44 PDT — PB3127 + PB3101 (BY REFERENCE, BY CONTENT and RETURNING): every activation lane asks the run-time relation at bind time
 
 **What was wrong.** A Format-2 CALL (a program prototype or the NESTED phrase) and a user-defined function checked
 their BY REFERENCE arguments and RETURNING items with `OoConformance.DescriptionMismatch`, a comparator over `DataItem`
@@ -168,3 +168,4 @@ deleted members as the current mechanism (`2002/pb1113_content_compute_move_regi
 `negative/pb133-arg-conformance`); each now names `ParameterConformance.ContentConformanceReason` or
 `ActivationRelations`, or marks the old comparator as deleted. These are comment-only edits; no `.out` or `.err`
 changed.
+
