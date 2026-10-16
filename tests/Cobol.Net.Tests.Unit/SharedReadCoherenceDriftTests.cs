@@ -459,7 +459,8 @@ public sealed class SharedReadCoherenceDriftTests
 
     /// <summary>⛔ THE ONE WALK, AND THE CHECK AT ITS HEAD. Every character this connector ever reads comes out
     /// of <c>FillChars</c> or <c>ReadPhysicalLine</c>, and both are reached only from <c>NextFrame</c>, whose
-    /// first statement is <c>EnsureReaderCoherent()</c>. That is what makes the invalidation a property of the
+    /// first statement is <c>EnsureReaderCoherent()</c> — directly, or through the <c>ChannelMedium</c> that
+    /// <c>NextFrame</c> alone constructs to hand its channel to the one frame decoder (kb/Work PB2754). That is what makes the invalidation a property of the
     /// connector rather than a courtesy at a call site — a fourth framing, or a second reader loop, cannot be
     /// added without either passing the check or failing here (kb/Work PB753, and
     /// <c>feedback_two_arm_dispatch</c>: the rule already existed in <c>SeekToRecord</c> for ONE arm).</summary>
@@ -470,6 +471,7 @@ public sealed class SharedReadCoherenceDriftTests
         var fill = Body(lines, "private int FillChars(");
         var line = Body(lines, "private string? ReadPhysicalLine(");
         var frame = Body(lines, "private string? NextFrame(");
+        var channel = Body(lines, "private struct ChannelMedium(");
 
         // 1. The check is the first statement of the walk.
         int firstStatement = -1;
@@ -513,11 +515,22 @@ public sealed class SharedReadCoherenceDriftTests
                 if (i == fill.Start || i == line.Start) continue;                     // the declarations
                 if (i >= frame.Start && i <= frame.End) continue;                     // the one walk
                 if (i >= fill.Start && i <= fill.End) continue;                       // FillChars' own loop
+                if (i >= channel.Start && i <= channel.End) continue;                 // the walk's frame medium
                 callers.Add($"SequentialConnector.cs:{i + 1}: {code.Trim()}");
             }
         Assert.True(callers.Count == 0,
             "A framing primitive called from outside NextFrame — the walk is where the coherence check lives, "
             + "so a second caller is a second, unchecked read path. Sites:\n  " + string.Join("\n  ", callers));
+
+        // 4. …and the frame medium that reads through FillChars is constructed only by the walk.
+        var media = Enumerable.Range(0, lines.Length)
+            .Where(i => Strip(lines[i]).Contains("new ChannelMedium(", StringComparison.Ordinal))
+            .ToList();
+        Assert.NotEmpty(media);
+        Assert.True(media.All(i => i >= frame.Start && i <= frame.End),
+            "A ChannelMedium constructed outside NextFrame — it reads the connector's reader, so a second "
+            + "constructor is a second, unchecked read path. Sites:\n  "
+            + string.Join("\n  ", media.Select(i => $"SequentialConnector.cs:{i + 1}: {lines[i].Trim()}")));
     }
 
     /// <summary>⛔ ONE BUFFER BETWEEN THE CONNECTOR AND THE MEDIUM, AND IT IS THE CONNECTOR'S INPUT-OUTPUT AREAS.
