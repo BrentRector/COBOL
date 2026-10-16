@@ -39,7 +39,7 @@ public sealed class SharingRefusalStatusTests
                 break;
             case Org.Indexed:
                 reg.RegisterIndexed(name, host, recordWidth: 4, optional: false, accessMode: 0,
-                    primeOffset: 0, primeLength: 4, varyMin: -1, varyMax: -1);
+                    primeKey: [new(0, 4)], varyMin: -1, varyMax: -1);
                 break;
             default:
                 reg.Register(name, host, recordWidth: 4, lineSequential: false, optional: false,

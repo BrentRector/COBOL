@@ -25,12 +25,12 @@ namespace CobolNet.Runtime.IO;
 /// </summary>
 public sealed class IndexedConnector : KeyedConnector
 {
-    private readonly int _primeOff, _primeLen;
+    /// <summary>The prime key's byte windows, in order (<see cref="KeySegment"/>; one for data-name-1, one per
+    /// data-name-2 of the SOURCE phrase), and their total width — the key's length.</summary>
+    private readonly KeySegment[] _prime;
+    private readonly int _primeLen;
     private readonly CobolCollation? _primeCollation;   // §12.4.5.7 prime-key collating sequence (the CobolCollation carrier); null = native ordinal
-    private readonly List<(int Off, int Len, bool Dups, CobolCollation? Collation, string? Suppress, CobolContiguousLayout? Layout)> _alts = [];
-    /// <summary>The prime key's record-type layout when a variable-length member precedes it (kb/Work PB1025) —
-    /// <see cref="_primeOff"/> is then its offset in the record's FIXED run; null otherwise.</summary>
-    private readonly CobolContiguousLayout? _primeLayout;
+    private readonly List<(KeySegment[] Segments, int Len, bool Dups, CobolCollation? Collation, string? Suppress)> _alts = [];
     /// <summary>True when ANY key's position varies with the record (<see cref="KeyOf"/>): such a key is located
     /// in the record AS WRITTEN — its length is what places it — so no key is ever sliced from a record image
     /// padded or truncated to the area width (<see cref="AreaKey"/>, and the WRITE / REWRITE key image).</summary>
@@ -85,26 +85,41 @@ public sealed class IndexedConnector : KeyedConnector
     // (KeyOf), so a varying record persists at its written length (§13.18.43 GR13) and reports it on READ
     // (GR15). Out-of-bounds WRITE/REWRITE is the GR14/§14.9.35 GR20 '44'.
 
-    public IndexedConnector(string hostPath, int recordWidth, KeyedAccess access, int primeOffset, int primeLength,
-        int varyMin = -1, int varyMax = -1, CobolCollation? primeCollation = null, CobolContiguousLayout? primeLayout = null)
+    /// <param name="primeKey">The prime record key's byte windows in order (§12.4.5.12): one for data-name-1, one per
+    /// data-name-2 of the SOURCE phrase (GR2), each with its record type's layout when a variable-length member
+    /// precedes it (kb/Work PB1025).</param>
+    public IndexedConnector(string hostPath, int recordWidth, KeyedAccess access, KeySegment[] primeKey,
+        int varyMin = -1, int varyMax = -1, CobolCollation? primeCollation = null)
         : base(hostPath, recordWidth, access, varyMin, varyMax)
     {
-        _primeOff = primeOffset;
-        _primeLen = primeLength;
+        _prime = CheckedKey(primeKey);
+        _primeLen = WidthOf(_prime);
         _primeCollation = primeCollation;
-        _primeLayout = primeLayout;
-        _layoutKeys = primeLayout is not null;
+        _layoutKeys = _prime.Any(s => s.Layout is not null);
     }
 
-    /// <summary>Register one ALTERNATE RECORD KEY's (offset, length, WITH DUPLICATES) geometry (§12.4.5.6), with
-    /// its optional §12.4.5.7 collating-weight table (null = native ordinal) and §12.4.5.6.4 GR6 SUPPRESS WHEN
-    /// value (null = no suppression), and — for a key a variable-length member precedes — its record type's
-    /// <paramref name="layout"/> (kb/Work PB1025).</summary>
-    public void AddAlternateKey(int offset, int length, bool duplicates, CobolCollation? collation = null, string? suppress = null,
-        CobolContiguousLayout? layout = null)
+    /// <summary>Register one ALTERNATE RECORD KEY's byte windows and WITH DUPLICATES phrase (§12.4.5.6), with its
+    /// optional §12.4.5.7 collating-weight table (null = native ordinal) and §12.4.5.6.4 GR6 SUPPRESS WHEN value
+    /// (null = no suppression). <paramref name="key"/> is shaped as the prime key's is (one segment per
+    /// data-name-2 of the SOURCE phrase, §12.4.5.6.4 GR2).</summary>
+    public void AddAlternateKey(KeySegment[] key, bool duplicates, CobolCollation? collation = null, string? suppress = null)
     {
-        _alts.Add((offset, length, duplicates, collation, suppress, layout));
-        _layoutKeys |= layout is not null;
+        var segments = CheckedKey(key);
+        _alts.Add((segments, WidthOf(segments), duplicates, collation, suppress));
+        _layoutKeys |= segments.Any(s => s.Layout is not null);
+    }
+
+    /// <summary>A key has at least one window (the general formats print data-name-1, or one or more data-name-2),
+    /// so an empty one is a generation defect and fails loudly here rather than as a zero-length key that every
+    /// record would duplicate.</summary>
+    private static KeySegment[] CheckedKey(KeySegment[] key) =>
+        key is { Length: > 0 } ? key : throw new ArgumentException("a record key has at least one segment", nameof(key));
+
+    private static int WidthOf(KeySegment[] key)
+    {
+        int width = 0;
+        foreach (var s in key) width += s.Length;
+        return width;
     }
 
     /// <inheritdoc/>
@@ -142,11 +157,14 @@ public sealed class IndexedConnector : KeyedConnector
         {
             var keys = new List<FixedFileAttributes.KeyDescriptor>(_alts.Count + 1)
             {
-                new(_primeOff, _primeLen, false, null, FixedFileAttributes.Fingerprint(_primeCollation)),
+                new(Windows(_prime), false, null, FixedFileAttributes.Fingerprint(_primeCollation)),
             };
-            foreach (var (off, len, dups, collation, suppress, _) in _alts)
-                keys.Add(new(off, len, dups, suppress, FixedFileAttributes.Fingerprint(collation)));
+            foreach (var (segments, _, dups, collation, suppress) in _alts)
+                keys.Add(new(Windows(segments), dups, suppress, FixedFileAttributes.Fingerprint(collation)));
             return keys;
+            // The recorded descriptor is each window's offset and length; a layout is how a record is READ, not
+            // an attribute of the physical file.
+            static KeySegment[] Windows(KeySegment[] key) => [.. key.Select(s => s with { Layout = null })];
         }
     }
 
@@ -867,8 +885,9 @@ public sealed class IndexedConnector : KeyedConnector
         return ordinals;
     }
 
-    /// <summary>The key value at <paramref name="keyIndex"/> (−1 = prime) — an (offset, length) slice of the
-    /// record's character image (§12.4.5.12 GR2 — the key IS its position range in the record). A key that
+    /// <summary>The key value at <paramref name="keyIndex"/> (−1 = prime) — the concatenation of the key's
+    /// <see cref="KeySegment"/> slices of the record's character image, in order (§12.4.5.12.4 GR2; a data-name-1
+    /// key is one slice — the key IS its position range in the record). A key that
     /// follows a variable-length member is found in THIS record through its record type's layout (kb/Work PB1025;
     /// docs/CONFORMANCE.md §3 D-KWV): the image is contiguous (§8.5.1.11.2), so its position moves with the
     /// preceding members' current lengths — read from the record's own EXTENT TABLE when it carries one that
@@ -876,9 +895,22 @@ public sealed class IndexedConnector : KeyedConnector
     /// a READ of the record decomposes it.</summary>
     private string KeyOf(string image, RecordExtents? extents, int keyIndex)
     {
-        var (off, len, layout) = keyIndex < 0 ? (_primeOff, _primeLen, _primeLayout)
-            : (_alts[keyIndex].Off, _alts[keyIndex].Len, _alts[keyIndex].Layout);
-        if (layout is not null) off = layout.Position(image, off, extents);
+        var (segments, len) = keyIndex < 0 ? (_prime, _primeLen) : (_alts[keyIndex].Segments, _alts[keyIndex].Len);
+        if (segments.Length == 1) return WindowOf(image, extents, segments[0]);
+        // §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2 — "the concatenation of all occurrences of data-name-2 in the order
+        // specified": each window is taken by the same slice a one-window key takes, so a segment a
+        // variable-length member precedes is located, and a short record padded, exactly as a whole key is.
+        var key = new System.Text.StringBuilder(len);
+        foreach (var segment in segments) key.Append(WindowOf(image, extents, segment));
+        return key.ToString();
+    }
+
+    /// <summary>One <see cref="KeySegment"/> of the key — an (offset, length) slice of the record's character
+    /// image.</summary>
+    private string WindowOf(string image, RecordExtents? extents, KeySegment segment)
+    {
+        var (off, len) = (segment.Offset, segment.Length);
+        if (segment.Layout is { } layout) off = layout.Position(image, off, extents);
         // A record shorter than the key's span (a RECORD VARYING record, or an area image taken as composed) is
         // extended with the RECORD AREA's own space — §14.9.30.4 GR15: a trailing space "is defined to be the
         // national space character" for a national record area — through the ONE pad, FitRecord. A byte-level

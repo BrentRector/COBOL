@@ -127,7 +127,7 @@ public sealed class CommitGateDriftTests
         string host = Tmp("idx");
         try
         {
-            var c = new IndexedConnector(host, 8, KeyedAccess.Dynamic, 0, 4, varyMin: 6, varyMax: 8);
+            var c = new IndexedConnector(host, 8, KeyedAccess.Dynamic, [new(0, 4)], varyMin: 6, varyMax: 8);
             Assert.Equal("00", c.Open(FileOpenMode.Output));
             Gate(c, refusing: true);
             Assert.Equal(Ceiling, c.Write("AAAA01"));

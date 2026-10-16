@@ -448,8 +448,8 @@ answers, each stated in the code where that organization's format lives:
   ⚖ Behaviourally GnuCOBOL's `variable-length SEQUENTIAL data integrity` case: an FD of
   `RECORD VARYING FROM 5 TO 500` over a plain XML text file answers `OPEN ERROR: 39`.
 - **RELATIVE and INDEXED — whatever the framed store's HEADER carries**: the **organization**, the **record
-  type**, the **minimum and maximum logical record size**, and the **key table** — each key's byte window,
-  DUPLICATES phrase, SUPPRESS WHEN value and collating-sequence fingerprint. Those two organizations live in an
+  type**, the **minimum and maximum logical record size**, and the **key table** — each key's byte windows (one,
+  or one per data-name-2 of a SOURCE phrase, kb/Work PB1099), DUPLICATES phrase, SUPPRESS WHEN value and collating-sequence fingerprint. Those two organizations live in an
   implementor-defined store whose STRUCTURE *is* those attributes, and the header is where that structure is now
   written down: **in the file**, exactly as GnuCOBOL's ISAM key definitions are in the file. A store whose header
   is absent or unreadable is not a store this build can interpret, and answering '39' for it is LOUD where
@@ -477,8 +477,9 @@ fixed-length record sequential file is still plain bytes and a line sequential f
 the interchange property those shapes exist for, and a varying record-sequential file still carries only the
 per-record prefix it always carried.
 
-**The store format is VERSION 4** (`RecordFraming.FormatVersion`): version 3 (kb/Work PB2660) added the store
-generation, and version 4 (kb/Work PB2693) the release mint and each indexed record's release ordinals; a store of
+**The store format is VERSION 5** (`RecordFraming.FormatVersion`): version 3 (kb/Work PB2660) added the store
+generation, version 4 (kb/Work PB2693) the release mint and each indexed record's release ordinals, and version 5
+(kb/Work PB1099) records each key as a segment count and its (offset, length) windows; a store of
 any earlier version is Foreign and refused with '39'. **Version 2 (kb/Work PB1602)** set the SUPPRESS WHEN
 encoding the header still uses. Each key's SUPPRESS WHEN value is stored as its exact UTF-16 code
 units behind an Int32 count biased by one (0 = no phrase). The header records what the program DECLARED, and the
@@ -502,7 +503,7 @@ and §12.4.5.6.4 GR3 says the same of every alternate key and of the number of a
 as that used when the physical file was created" — the two rules are worded differently and the difference is
 quoted here rather than smoothed over). Neither states a consequence where it is written; GR10's conflict
 condition is the mechanism that detects a violation, so carrying the key table in the store header is what gives
-those two rules an effect at all. The recorded descriptor is the key's byte window plus its collating sequence,
+those two rules an effect at all. The recorded descriptor is the key's byte windows plus its collating sequence,
 which is the whole of "the data description … as well as their relative location" this processor can act on:
 §12.4.5.12.3 SR2 confines a record key to category alphanumeric or category national, §12.4.5.12.4 GR1 makes key
 equality a relation condition under the file's collating sequence, and both native sequences are one code-unit
@@ -1289,8 +1290,9 @@ the formats column instead.
 
 **Boundaries.** The screen holds only what the standard states about the ENTRY. It carries every syntax rule of the
 three key clauses except the two DESCRIPTIVE ones, §12.4.5.12.3 SR5 and §12.4.5.6.3 SR6 (*"Record-key-name-1 has
-the class and category of data-name-2"*), which state a property of the SOURCE phrase's operand and have nothing
-to screen while that phrase is declined (just below). §12.4.5.12.3 SR3 and §12.4.5.6.3 SR3 (kb/Work PB1073) are
+the class and category of data-name-2"*), which state a property of the key rather than an obligation on the
+source: the resolved key takes its class and category from its first data-name-2 (`RecordKey.CategorySource`),
+and SR2's last sentence — a row of its own — makes every data-name-2 the same answer (just below). §12.4.5.12.3 SR3 and §12.4.5.6.3 SR3 (kb/Work PB1073) are
 one row each over the operand's own DYNAMIC LENGTH attribute, which is the ELEMENTARY half of §8.5.1.11.1's
 *"dynamic-capacity table or … dynamic-length elementary item"* — the table half is a key under OCCURS, which SR1
 already reports, and a GROUP that merely contains a dynamic-length item is a variable-length GROUP, which the
@@ -1298,7 +1300,8 @@ standard names separately where it means to forbid one (§12.4.5.8.3 SR3, §13.1
 key. §12.4.5.6.3 SR4 is one row that compares each alternate clause's `RecordLayout.KeyWindowInFile` offset (and
 whether a variable-length member precedes it) with the prime key's and with every OTHER alternate clause's; the
 operand carries its clause ordinal (`FileKeyOperand.Ordinal`), so two clauses naming one item each violate it. Its
-SOURCE-phrase exemption exempts the declined form, so no operand reaches the row through it. §12.4.5.2 SR8's third operand, the file-level COLLATING SEQUENCE clause, is refused where it
+SOURCE-phrase exemption — *"This restriction does not apply in the case where either key is specified using the
+SOURCE phrase"* — is `CoincidingKey`'s first test, and a SOURCE-form key is no other key to coincide with. §12.4.5.2 SR8's third operand, the file-level COLLATING SEQUENCE clause, is refused where it
 is RESOLVED (`DataBinder.ResolveFileCollating`, COBOLNET1582), because the same test is also the guard that stops
 the rest of that method and splitting a guard from its report would leave the resolution running on an entry it
 has already refused; its citation was §12.4.5.7.1, the clause's descriptive General paragraph, and is now SR8.
@@ -1312,32 +1315,50 @@ qualifier, an alternate key `WITH DUPLICATES`, a relative key in WORKING-STORAGE
 `FileControlKeyRuleSpecTests` carries the assertion no `.cob` corpus can make — that the SAME entry, with and
 without a keyed verb, draws the SAME diagnostics, exactly once.
 
-**THE SECOND KEY FORM IS DECLINED, AND IT IS DECLINED BY NAME** (kb/Work PB358, 2026-09-09). §12.4.5.12.2 and
-§12.4.5.6.2 each print a required choice of two key forms — `{ data-name-1 | record-key-name-1 SOURCE IS
-{ data-name-2 } … }` (rendered from printed pages 359 and 350; `RECORD`, `ALTERNATE` and `SOURCE` carry underline
-rules, `KEY` and both occurrences of `IS` do not) — and §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2 give the second one
-its meaning: *"Record-key-name-1 defines a record key consisting of the concatenation of all occurrences of
-data-name-2 in the order specified."* A WiseOwl COBOL record key is **one contiguous byte window** at every layer
-that carries it — `FileModel`, `RecordLayout.KeyIndexOfKeyItem`, `RuntimeApi.FileRegisterIndexed`,
-`IndexedConnector`'s `(Off, Len)` slice, and `FixedFileAttributes.KeyDescriptor` in D10's store header — so the
-concatenated form is **not provided**, which Annex A.3 item 40 expressly permits (*"The capability of specifying
-the SOURCE phrase … is dependent on the capabilities of the processor"*; `docs/CONFORMANCE.md` §2 row 40).
-⛔ **The decline is a REFUSAL, not the accept-inert warning its A.3 sibling the RECORD DELIMITER clause gets**
-(D-item: COBOLNET1778). The axis is not the annex — it is whether an inert reading exists. A declined RECORD
-DELIMITER changes no program-visible value (§12.4.5.11.4 GR1); a declined RECORD KEY names no data item at all
-(record-key-name-1 is its own name class, §8.3.2.2.24, scoped by §8.4.6.2.4), so an inert compile would leave the
-file **keyless** — a wrong answer. §4.2.6 ¶3 licenses refusing outright: *"The implementor is not required to
-produce executable code when unsupported processor-dependent language elements are used."*
-Both clauses PARSE the phrase (`CobolIO.g4#recordKeySourcePhrase`, one shared rule) so that
-`DataBinder.DeclineRecordKeySource` can name it — **ONE diagnostic, COBOLNET1954, for both clauses**, because
-A.3 item 40 names both in one sentence and the two general formats print the same brace group. Until this
-landed the phrase matched no alternative anywhere and a user saw `COBOL0312: unexpected 'SOURCE' … A period
-may be missing at the end of the previous sentence`, so §4.2.6 ¶3's mandatory compile-time indication was
-unbuilt here. ⚠ The §12.4.5.1 Format-1 requiredness rule reads `FileKeyOperand.Written`, not a null data-name,
-for a measured reason: the first build of the surface told the same program both that the form is not provided
-and that its indexed file *"has no RECORD KEY clause"*. **What providing it would cost** is recorded in
-kb/Work PB293 and is not proposed here: a key would become a LIST of windows end-to-end, including a second
-owner-visible break of D10's store-header format.
+**THE SECOND KEY FORM — `record-key-name-1 SOURCE IS { data-name-2 } …` — IS PROVIDED** (kb/Work PB1099 Q1, owner
+rule R65; it was refused by name as COBOLNET1954 from kb/Work PB358 until then, and the code is retired).
+§12.4.5.12.2 and §12.4.5.6.2 each print a required choice of two key forms — `{ data-name-1 | record-key-name-1
+SOURCE IS { data-name-2 } … }` (rendered from printed pages 359 and 350; `RECORD`, `ALTERNATE` and `SOURCE` carry
+underline rules, `KEY` and both occurrences of `IS` do not) — and §12.4.5.12.4 GR2 / §12.4.5.6.4 GR2 give the
+second one its meaning: *"Record-key-name-1 defines a record key consisting of the concatenation of all
+occurrences of data-name-2 in the order specified."* Annex A.3 item 40 makes the capability processor-dependent,
+and this processor has it.
+
+⛔ **ONE KEY SHAPE FOR BOTH FORMS: a record key is a LIST of byte windows, end to end.** The bound key is
+`FileModel.RecordKey` — its `Segments` are data-name-1's one item, or each data-name-2 in the order specified —
+and the runtime key is a `KeySegment[]` (offset, length, and the record type's layout when a variable-length
+member precedes the window, D-KWV). `IndexedConnector.KeyOf` concatenates the windows through the ONE slice a
+one-window key takes, so the SOURCE form is not a special case of anything: registration
+(`KeyedIoEmitter.KeySegments`, `RuntimeApi.KeySegments`), uniqueness, ordering, START's partial key (§14.9.41.4
+GR17 a)/b): the first n characters of the concatenation) and D10's store header (format version 5 records each
+key as its segment count and windows; §12.4.5.12.4 GR3 makes every window's location a fixed attribute) all read
+the same list.
+- **Capture and resolution.** `DataBinder.CaptureRecordKeySource` captures the phrase for BOTH clauses (one
+  shared grammar rule, `CobolIO.g4#recordKeySourcePhrase`) through the one data-name-n capture, and declares
+  record-key-name-1 (§8.3.2.2.24) through the one declaration funnel; `ResolveFiles` resolves each data-name-2 by
+  the same SR2 selection data-name-1 uses.
+- **The syntax rules.** `FileControlKeyRules` contributes ONE OPERAND PER data-name-2, so every rule stated of
+  "data-name-1 and data-name-2" (SR1 OCCURS, SR2 location and category, SR3 variable-length, the minimum-size
+  rule) reaches each one by the row that screens data-name-1; SR2's last sentence — *"All occurrences of
+  data-name-2 shall be of the same category"* — is a row of its own; the clause-level rows (§12.4.5.2 SR8,
+  §12.4.5.6.3 SR4, SR7's SUPPRESS WHEN) ask only the clause's first operand, so a clause is reported once.
+- **Naming the key.** A record-key-name is asked of the file its statement or clause names
+  (`FileModel.KeyIndexOfRecordKeyName`, which also reads §8.4.2.2.2 Format 6's one file-name qualifier):
+  READ … KEY (§14.9.30.3 SR11), START … KEY (§14.9.41.3 SR7; GR15's default is the prime key in either form, GR17
+  b)'s default length the concatenation's), COLLATING SEQUENCE OF (§12.4.5.7.3 SR5). A record-key-name that only
+  another visible file declares is refused naming the rule; a GLOBAL file's record-key-names have its scope
+  (§8.4.6.2.4) because the visible file set carries them. A SOURCE-form key is no data item, so the data-item
+  arms — READ SR11's identity, START SR6 a)/b) (b) 1. *"defined without the SOURCE phrase"*), §12.4.5.12.4 GR4's
+  positional promotion — pass over it (`RecordLayout.KeyIndexAtOffset`).
+- **SORT/MERGE GIVING an indexed file** (§14.9.40.3 SR9, §14.9.24.3 SR10) compares the first key with the prime
+  key's byte location and size, which a SOURCE-form prime key has only when its windows are one run.
+- **Edition.** ANSI X3.23-1985 prints data-name-1 only, so the phrase is a post-1985 form gated once, on the
+  shared rule (`record-key-source-2002`, VCR row 7.36, a DERIVED provisional 2002 edge; COBOLNET0900 at 85).
+Witnesses: `conformance:2002/pb1099_record_key_source` (a reversed-order prime key, a duplicate alternate key,
+the concatenated uniqueness '22', the sequential order, READ / START / START WITH LENGTH / DELETE on both keys, a
+Format-6 qualified record-key-name), `conformance:negative/pb1099-record-key-source-85`, and
+`FileControlKeyRuleSpecTests`' SOURCE section (each data-name-2 rule, SR11/SR7's other-file refusal, the
+complement).
 
 **Still homeless, and NOT closed by either half** (measured over the entry-rule family while here):
 §12.4.5.5.2 **SR1** (RANDOM banned on a file named in a SORT/MERGE USING or GIVING phrase — a statement-context

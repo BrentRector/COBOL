@@ -352,9 +352,9 @@ internal static class RecordLayout
     /// generic key, which START admits and READ does not (see <see cref="GenericKeyIndex"/>).</summary>
     public static int? KeyIndexOfKeyItem(FileModel file, DataItem operand)
     {
-        if (file.RecordKeyItem is { } prime && ReferenceEquals(prime, operand)) return -1;
+        if (file.PrimeKey?.Item is { } prime && ReferenceEquals(prime, operand)) return -1;
         for (int i = 0; i < file.AlternateKeys.Count; i++)
-            if (ReferenceEquals(file.AlternateKeys[i].Item, operand)) return i;
+            if (ReferenceEquals(file.AlternateKeys[i].Key.Item, operand)) return i;
         // §12.4.5.12.4 GR4's implicit keys — the same byte window in ANOTHER record description of the file
         // (a REDEFINES of the key, or a same-position item in a secondary 01). The operand shall live in a
         // record description entry OF THIS FILE: GR4 speaks of the file's own record description entries, and
@@ -372,9 +372,10 @@ internal static class RecordLayout
     /// <c>PIC 9(4) COMP-3</c> item stand in for an <c>X(6)</c> key and be compared on an incommensurable basis
     /// (kb/Work PB354 part 4; b) 2. and b) 3. are addressed by their printed path on <c>SR-14.9.41.3-6</c> since the
     /// PB698 transcription repair returned them to their printed level).
-    /// <para>b) 1. also requires the key to be <i>"defined without the SOURCE phrase"</i>; the RECORD KEY /
-    /// ALTERNATE RECORD KEY SOURCE phrase is not implemented (Annex A.3 item 40 — <c>FileModel</c> has no SOURCE
-    /// carrier), so every key reaching here satisfies that half by construction.</para></summary>
+    /// <para>b) 1. also requires the key to be <i>"defined without the SOURCE phrase"</i>: a SOURCE-form key
+    /// (kb/Work PB1099) has no data item of its own to coincide with, and <see cref="KeyIndexAtOffset"/> passes
+    /// over it — the same exclusion START's §14.9.41.3 SR6 a) and READ's §14.9.30.3 SR11 get, since a SOURCE-form
+    /// key is named only by its record-key-name (§14.9.41.3 SR7).</para></summary>
     public static int? GenericKeyIndex(FileModel file, DataItem operand)
     {
         if (!IsInRecordOfFile(file, operand) || OffsetOf(operand) is not { } off) return null;   // b) 1.
@@ -422,12 +423,11 @@ internal static class RecordLayout
     /// codec layout via <see cref="OffsetOf"/> — the basis §12.4.5.12.4 GR4 states the correspondence on.</summary>
     private static int? KeyIndexAtOffset(FileModel file, int off, Func<DataItem, bool> admits)
     {
-        if (file.RecordKeyItem is { } prime && OffsetOf(prime) == off && admits(prime)) return -1;
+        // Only data-name-1 keys: a SOURCE-form key (Item null) is no data item, so no operand's byte positions are
+        // it (§14.9.41.3 SR6 b) 1. "defined without the SOURCE phrase"; kb/Work PB1099).
+        if (file.PrimeKey?.Item is { } prime && OffsetOf(prime) == off && admits(prime)) return -1;
         for (int i = 0; i < file.AlternateKeys.Count; i++)
-        {
-            var alt = file.AlternateKeys[i].Item;
-            if (OffsetOf(alt) == off && admits(alt)) return i;
-        }
+            if (file.AlternateKeys[i].Key.Item is { } alt && OffsetOf(alt) == off && admits(alt)) return i;
         return null;
     }
 

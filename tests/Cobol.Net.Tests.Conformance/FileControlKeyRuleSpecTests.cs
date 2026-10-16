@@ -466,76 +466,190 @@ public sealed class FileControlKeyRuleSpecTests
         }
     }
 
-    // ── The DECLINED second key form: record-key-name-1 SOURCE IS { data-name-2 } … ────────────────────────
-    //    ISO §12.4.5.12.2 / §12.4.5.6.2 print a required choice of TWO key forms and this implementation
-    //    provides only the first. Annex A.3 item 40 makes the SOURCE phrase processor-dependent, §4.2.6 ¶3
-    //    obliges the compiler to say so at compile time, and its closing sentence — "The implementor is not
-    //    required to produce executable code when unsupported processor-dependent language elements are used" —
-    //    is what makes REFUSING (rather than accepting inert) conforming. kb/Work PB358.
-    //    The refusal itself is pinned by the negative corpus (tests/conformance/negative/pb358-*). What lives
-    //    HERE is what that corpus structurally cannot say: the two properties either side of the refusal.
-    private const string SourcePhraseDecline = "COBOLNET1954";
+    // ── The SECOND key form: record-key-name-1 SOURCE IS { data-name-2 } … (kb/Work PB1099 Q1) ─────────────────
+    //    ISO §12.4.5.12.2 / §12.4.5.6.2 print a required choice of TWO key forms; Annex A.3 item 40 makes the
+    //    SOURCE phrase processor-dependent and this implementation PROVIDES it (owner rule R65): the key is "the
+    //    concatenation of all occurrences of data-name-2 in the order specified" (§12.4.5.12.4 GR2 / §12.4.5.6.4
+    //    GR2). It is a post-1985 form (VCR row 7.36, provisional 2002 edge, COBOLNET0900 at 85). The run-time
+    //    behaviour is pinned by conformance 2002/pb1099_record_key_source; what lives HERE is the compile-time
+    //    rule set the phrase brings with it — each stated of data-name-2 as well as data-name-1 — and the
+    //    complement each of them must not reach.
+    private static readonly int[] SourceEditions = [2002, 2014, 2023];
 
-    /// <summary>⛔ THE CASCADE GUARD, and it is a MEASURED regression, not a hypothetical: the first build of
-    /// the grammar surface emitted COBOLNET1954 <i>and</i> §12.4.5.1 Format 1's "indexed file 'IXF' has no
-    /// RECORD KEY clause" — a false sentence (the program plainly wrote the clause) pointing at a different
-    /// repair. The Format-1 rule's subject is the clause's PRESENCE, so it now reads
-    /// <c>FileKeyOperand.Written</c> rather than inferring absence from a null data-name. Asserting the ABSENCE
-    /// of the second diagnostic is the only way to keep the two facts apart — a count of "at least one error"
-    /// passes either way (feedback_green_gates_arent_evidence).</summary>
-    [Fact]
-    public void PrimeKeySourcePhrase_IsRefusedByName_AndTheClauseIsNotAlsoReportedMissing()
-    {
-        string source = Indexed("        RECORD KEY IS F-COMPOSITE SOURCE IS F-K1 F-K2.",
-            "01 F-REC.\n   05 F-K1 PIC X(2).\n   05 F-K2 PIC X(2).\n   05 F-D PIC X(4).", "", EntryOnlyBody);
-        foreach (int edition in AllEditions)
-        {
-            var d = Diagnostics(source, edition);
-            Assert.Contains(d, e => e.Contains(SourcePhraseDecline, StringComparison.Ordinal));
-            Assert.DoesNotContain(d, e => e.Contains("has no RECORD KEY clause", StringComparison.Ordinal));
-            Assert.DoesNotContain(d, e => e.Contains("ISO §12.4.5.1 Format 1", StringComparison.Ordinal));
-        }
-    }
+    private const string SourceRecord =
+        "01 F-REC.\n   05 F-K1 PIC X(2).\n   05 F-K2 PIC X(2).\n   05 F-D PIC X(4).\n   05 F-N PIC 9(2).\n"
+        + "   05 F-W PIC N(2).\n   05 F-T.\n      10 F-TE PIC X OCCURS 2 TIMES.";
 
-    /// <summary>The ALTERNATE twin, refused from the same site under the same code — Annex A.3 item 40 names
-    /// both clauses in ONE sentence, so a fix reaching only the prime key would be this repository's most
-    /// reproducible defect shape (feedback_two_arm_dispatch). The prime key here is legal, so the only thing
-    /// the entry can be refused for is the alternate clause's SOURCE phrase.
-    /// <para>The <c>WITH DUPLICATES</c> row is not decoration: it proves the clause is recognized WHOLE rather
-    /// than up to the SOURCE token, which is what the generic parse error used to do — it reported a second
-    /// unexpected-token error at <c>WITH</c>.</para></summary>
+    /// <summary>The conforming spellings compile clean from 2002 — the printed form, the optional-word minimum
+    /// (§8.3.2.4.3: KEY and both IS are not underlined), a SOURCE alternate beside a data-name-1 prime and with
+    /// WITH DUPLICATES, a SOURCE prime beside a data-name-1 alternate at the SAME leftmost byte (§12.4.5.6.3 SR4's
+    /// last sentence exempts the pair), and a COLLATING SEQUENCE naming the key by its record-key-name
+    /// (§12.4.5.7.3 SR5) — and draw COBOLNET0900 at 85, the edition that prints only data-name-1. ⛔ The absence of
+    /// "has no RECORD KEY clause" is asserted at EVERY edition: a clause that names a record-key-name was once
+    /// reported missing (kb/Work PB358), and a count of "at least one error" at 85 would hide it.</summary>
     [Theory]
+    [InlineData("        RECORD KEY IS F-COMPOSITE SOURCE IS F-K1 F-K2.")]
+    [InlineData("        RECORD F-COMPOSITE SOURCE F-K1 F-K2.")]
     [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD KEY IS F-ALT SOURCE IS F-K2 F-D.")]
-    [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD KEY IS F-ALT SOURCE IS F-K2 WITH DUPLICATES.")]
-    public void AlternateKeySourcePhrase_IsRefusedByName_AtEveryEdition(string keyClauses)
+    [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD F-ALT SOURCE F-K2 WITH DUPLICATES.")]
+    [InlineData("        RECORD KEY IS F-PK SOURCE IS F-K1 F-K2\n        ALTERNATE RECORD KEY IS F-K1 WITH DUPLICATES.")]
+    [InlineData("        RECORD KEY IS F-PK SOURCE IS F-K2 F-K1\n        COLLATING SEQUENCE OF F-PK IS ALPHA-X.")]
+    public void SourcePhrase_CompilesFrom2002_AndIsAnIntroductionBelow(string keyClauses)
     {
-        string source = Indexed(keyClauses,
-            "01 F-REC.\n   05 F-K1 PIC X(2).\n   05 F-K2 PIC X(2).\n   05 F-D PIC X(4).", "", EntryOnlyBody);
+        string source = Indexed(keyClauses, SourceRecord, "", EntryOnlyBody)
+            .Replace("ENVIRONMENT DIVISION.", "ENVIRONMENT DIVISION.\nCONFIGURATION SECTION.\nSPECIAL-NAMES.\n    ALPHABET ALPHA-X IS NATIVE.", StringComparison.Ordinal);
         foreach (int edition in AllEditions)
         {
             var d = Diagnostics(source, edition);
-            Assert.Contains(d, e => e.Contains(SourcePhraseDecline, StringComparison.Ordinal));
             Assert.DoesNotContain(d, e => e.Contains("has no RECORD KEY clause", StringComparison.Ordinal));
+            if (edition == 85)
+                Assert.Contains(d, e => e.Contains("COBOLNET0900", StringComparison.Ordinal)
+                    && e.Contains("SOURCE phrase", StringComparison.Ordinal));
+            else
+                Assert.True(d.Count == 0, $"[{keyClauses.Replace('\n', ' ').Trim()}] @ {edition}: {string.Join(" | ", d)}");
         }
     }
 
-    /// <summary>⛔ THE COMPLEMENT — what the decline must NOT reach (feedback_measure_the_selectors_complement).
-    /// A widened grammar that swallowed the ordinary data-name-1 arm into the declined one would refuse every
-    /// indexed file in the corpus, and a test that only asserts the refusal fires would still be green.
-    /// The optional-word spellings are here for the same reason: §12.4.5.12.2's KEY and IS carry no underline
-    /// on the printed page, so <c>RECORD F-KEY</c> is a conforming RECORD KEY clause and must stay one.</summary>
+    /// <summary>Every operand rule the clauses state of "data-name-1 and data-name-2" reaches EACH data-name-2 — and
+    /// is reported once, at that operand, naming it as data-name-2 under its record-key-name. The last two rows are
+    /// SR2's third obligation, "All occurrences of data-name-2 shall be of the same category" (§12.4.5.12.3 SR2,
+    /// §12.4.5.6.3 SR2): an alphanumeric and a national operand under one record-key-name.</summary>
+    [Theory]
+    [InlineData("        RECORD KEY IS F-PK SOURCE IS F-K1 F-N.", "§12.4.5.12.3 SR2", "'F-PK' SOURCE operand 'F-N'")]
+    [InlineData("        RECORD KEY IS F-PK SOURCE IS F-K1 F-TE.", "§12.4.5.12.3 SR1", "'F-PK' SOURCE operand 'F-TE'")]
+    [InlineData("        RECORD KEY IS F-PK SOURCE IS F-K1 F-W.", "all occurrences of data-name-2 shall be of the same category (ISO §12.4.5.12.3 SR2)", "'F-W'")]
+    [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD KEY IS F-AK SOURCE IS F-D F-N.", "§12.4.5.6.3 SR2", "'F-AK' SOURCE operand 'F-N'")]
+    [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD KEY IS F-AK SOURCE IS F-D F-TE.", "§12.4.5.6.3 SR1", "'F-AK' SOURCE operand 'F-TE'")]
+    [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD KEY IS F-AK SOURCE IS F-D F-W.", "all occurrences of data-name-2 shall be of the same category (ISO §12.4.5.6.3 SR2)", "'F-W'")]
+    public void SourcePhraseOperandRules_ReachEachDataName2_Once(string keyClauses, string citation, string operand)
+    {
+        string source = Indexed(keyClauses, SourceRecord, "", EntryOnlyBody);
+        foreach (int edition in SourceEditions)
+        {
+            var hits = Diagnostics(source, edition).Where(e => e.Contains(citation, StringComparison.Ordinal)).ToList();
+            Assert.True(hits.Count == 1, $"[{keyClauses.Replace('\n', ' ').Trim()}] @ {edition}: {citation} reported "
+                + $"{hits.Count}×: {string.Join(" | ", hits)}");
+            Assert.Contains(operand, hits[0], StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>§14.9.30.3 SR11 and §14.9.41.3 SR7: a KEY phrase may name record-key-name-1 only when the SOURCE
+    /// phrase of a key clause of file-name-1 declares it. A record-key-name that only ANOTHER file declares is
+    /// refused naming the rule; the same name qualified by its own file (§8.4.2.2.2 Format 6) and used on that file
+    /// is the complement and compiles.</summary>
+    [Theory]
+    [InlineData("READ F KEY IS G-PK INVALID KEY CONTINUE END-READ", "ISO §14.9.30.3 SR11", true)]
+    [InlineData("START F KEY IS = G-PK INVALID KEY CONTINUE END-START", "ISO §14.9.41.3 SR7", true)]
+    [InlineData("READ G KEY IS G-PK OF G INVALID KEY CONTINUE END-READ", "", false)]
+    [InlineData("START G KEY IS >= G-PK IN G WITH LENGTH 1 INVALID KEY CONTINUE END-START", "", false)]
+    public void KeyPhraseRecordKeyName_MustBeDeclaredForTheStatementsFile(string statement, string citation, bool refused)
+    {
+        string source = $"""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. FCKRRK.
+            ENVIRONMENT DIVISION.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "fckr-f.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+                    RECORD KEY IS F-PK SOURCE IS F-K2 F-K1.
+                SELECT G ASSIGN TO "fckr-g.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+                    RECORD KEY IS G-PK SOURCE IS G-K2 G-K1.
+            DATA DIVISION.
+            FILE SECTION.
+            FD F.
+            01 F-REC.
+               05 F-K1 PIC X(2).
+               05 F-K2 PIC X(2).
+            FD G.
+            01 G-REC.
+               05 G-K1 PIC X(2).
+               05 G-K2 PIC X(2).
+            PROCEDURE DIVISION.
+            MAIN.
+                OPEN INPUT F G
+                {statement}
+                CLOSE F G
+                STOP RUN.
+            """;
+        foreach (int edition in SourceEditions)
+        {
+            var d = Diagnostics(source, edition);
+            if (refused)
+                Assert.Contains(d, e => e.Contains(citation, StringComparison.Ordinal)
+                    && e.Contains("record-key-name of another file", StringComparison.Ordinal));
+            else
+                Assert.True(d.Count == 0, $"[{statement}] @ {edition}: {string.Join(" | ", d)}");
+        }
+    }
+
+    /// <summary>§12.4.5.7.3 SR5 — <i>"Record-key-name-1 shall be a name specified as a record-key-name in an
+    /// ALTERNATE RECORD KEY clause or in a RECORD KEY clause in the file control entry."</i> A key-level COLLATING
+    /// SEQUENCE naming the record-key-name ANOTHER entry declares is refused under SR4/SR5's one message; the same
+    /// clause naming its own entry's record-key-name — bare, or qualified by its own file-name (§8.4.2.2.2
+    /// Format 6) — is the complement and compiles.</summary>
+    [Theory]
+    [InlineData("G-PK", true)]
+    [InlineData("F-PK", false)]
+    [InlineData("F-PK OF F", false)]
+    public void CollatingSequenceOf_ARecordKeyName_MustBeThisEntrys(string operand, bool refused)
+    {
+        string source = $"""
+            IDENTIFICATION DIVISION.
+            PROGRAM-ID. FCKRCS.
+            ENVIRONMENT DIVISION.
+            CONFIGURATION SECTION.
+            SPECIAL-NAMES.
+                ALPHABET ALPHA-X IS NATIVE.
+            INPUT-OUTPUT SECTION.
+            FILE-CONTROL.
+                SELECT F ASSIGN TO "fckr-cf.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+                    RECORD KEY IS F-PK SOURCE IS F-K2 F-K1
+                    COLLATING SEQUENCE OF {operand} IS ALPHA-X.
+                SELECT G ASSIGN TO "fckr-cg.dat" ORGANIZATION IS INDEXED ACCESS MODE IS DYNAMIC
+                    RECORD KEY IS G-PK SOURCE IS G-K2 G-K1.
+            DATA DIVISION.
+            FILE SECTION.
+            FD F.
+            01 F-REC.
+               05 F-K1 PIC X(2).
+               05 F-K2 PIC X(2).
+            FD G.
+            01 G-REC.
+               05 G-K1 PIC X(2).
+               05 G-K2 PIC X(2).
+            PROCEDURE DIVISION.
+            MAIN.
+                OPEN INPUT F G
+                CLOSE F G
+                STOP RUN.
+            """;
+        foreach (int edition in SourceEditions)
+        {
+            var d = Diagnostics(source, edition);
+            if (refused)
+                Assert.Contains(d, e => e.Contains("is not a RECORD KEY or ALTERNATE RECORD KEY of this file (ISO §12.4.5.7.3 SR4/SR5)",
+                    StringComparison.Ordinal));
+            else
+                Assert.True(d.Count == 0, $"[{operand}] @ {edition}: {string.Join(" | ", d)}");
+        }
+    }
+
+    /// <summary>⛔ THE COMPLEMENT — what the SOURCE form's gate and rules must NOT reach
+    /// (feedback_measure_the_selectors_complement). The ordinary data-name-1 clauses — the optional-word spellings
+    /// included, since §12.4.5.12.2's KEY and IS carry no underline — draw neither the introduction gate nor a key
+    /// rule at any edition, COBOL-85 included.</summary>
     [Theory]
     [InlineData("        RECORD KEY IS F-K1\n        ALTERNATE RECORD KEY IS F-K2 WITH DUPLICATES.")]
     [InlineData("        RECORD KEY F-K1\n        ALTERNATE RECORD KEY F-K2.")]
     [InlineData("        RECORD F-K1.")]
-    public void AnOrdinaryKeyClause_DrawsNoSourcePhraseDecline_AtEveryEdition(string keyClauses)
+    public void AnOrdinaryKeyClause_DrawsNoSourcePhraseGate_AtEveryEdition(string keyClauses)
     {
         string source = Indexed(keyClauses,
             "01 F-REC.\n   05 F-K1 PIC X(2).\n   05 F-K2 PIC X(2).\n   05 F-D PIC X(4).", "", EntryOnlyBody);
         foreach (int edition in AllEditions)
         {
             var d = Diagnostics(source, edition);
-            Assert.DoesNotContain(d, e => e.Contains(SourcePhraseDecline, StringComparison.Ordinal));
+            Assert.DoesNotContain(d, e => e.Contains("SOURCE phrase", StringComparison.Ordinal));
             Assert.DoesNotContain(d, e => e.Contains("COBOLNET0863", StringComparison.Ordinal));
         }
     }

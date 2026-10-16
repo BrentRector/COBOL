@@ -971,7 +971,9 @@ public sealed class SpecTraceabilityInventoryDriftTests
             // …the single-convention rows (>>CALL-CONVENTION and ENTRY-CONVENTION admit only COBOL):
             "GR-7.3.9.3-3", "GR-11.9.7.4-4", "GR-9.3.6-L3.2",
             // …and the rest, each stating its own closed set in its §8 Names cell:
-            "GR-13.18.10.4-3", "GR-13.18.10.4-4", "GR-7.3.4-4", "GR-8.1.3.2-5", "SR-12.4.5.7.3-5",
+            // (SR-12.4.5.7.3-5 left this list with kb/Work PB1099: the SOURCE phrase made its antecedent populated
+            // and the row is now tested, not derived.)
+            "GR-13.18.10.4-3", "GR-13.18.10.4-4", "GR-7.3.4-4", "GR-8.1.3.2-5",
             "GR-9.1.13.3-1", "GR-13.18.49.4-4", "DOC-A.1-169", "SR-8.4.2.3.3-7", "GR-8.5.1.11.3-1",
             "GR-14.9.51.4-16",
         ];

@@ -976,47 +976,6 @@
         "standard[-\\s]binary\\s+arithmetic"
       ]
     },
-    "record-key-source-only": {
-      "verdict": "DOCUMENTED-NON-SUPPORT",
-      "decision": "kb/Work R43 (owner, 2026-09-24) over docs/CONFORMANCE.md §2 Annex A.3 row 40 'SOURCE phrase of RECORD KEY / ALTERNATE RECORD KEY | Not claimed'. Licence: §4.2.6 ¶3's closing sentence ('The implementor is not required to produce executable code when unsupported processor-dependent language elements are used'); refused by name, COBOLNET1954 (DataBinder.DeclineRecordKeySource), on both clauses at every edition.",
-      "$selector": [
-        "A rule is SOLELY conditioned on the record-key SOURCE form when its subject is record-key-name-1 inside the",
-        "two clauses that define it (§12.4.5.6 ALTERNATE RECORD KEY, §12.4.5.12 RECORD KEY) — record-key-name-1 is",
-        "its own name class (§8.3.2.2.24) and exists only in that form — or when it requires the SOURCE phrase from",
-        "a consuming statement (START SR7).",
-        "",
-        "⛔ A RULE NAMING BOTH KEY FORMS STAYS OUT (each arm's own exclusion): 'data-name-1 or record-key-name-1'",
-        "constrains the plain key too, which is live — GR-12.4.5.6.4-6 (key suppression, DIVERGES on its own",
-        "finding), SR-14.9.41.3-6 (START's key operand, CONFORMS). The two general formats are excluded by KIND:",
-        "each prints both key forms, and R43 item 2 gives FMT-12.4.5.12.2 its data-name-1 arm's verdict.",
-        "",
-        "MEASURED 2026-09-24: 5 selected — the two class/category rules, the two concatenation rules and START SR7",
-        "(already DOCUMENTED-NON-SUPPORT)."
-      ],
-      "arms": [
-        {
-          "$arm": "operand — record-key-name-1 inside the two clauses that define it",
-          "sections": [
-            "12.4.5.6",
-            "12.4.5.12"
-          ],
-          "pattern": "\\brecord-key-name-1\\b",
-          "excludes-pattern": "\\bdata-name-1\\b",
-          "excludes-kinds": [
-            "FMT"
-          ]
-        },
-        {
-          "$arm": "text — a consuming statement that requires the SOURCE form",
-          "pattern": "\\bSOURCE phrase (?:in|of) the (?:ALTERNATE )?RECORD KEY\\b",
-          "excludes-pattern": "\\bdata-name-1\\b",
-          "excludes-kinds": [
-            "FMT"
-          ]
-        }
-      ],
-      "excludes-patterns": []
-    },
     "a1-optional-not-provided": {
       "verdict": "DOCUMENTED-NON-SUPPORT",
       "decision": "kb/Work PB280 Q1 — OWNER DECISION 2026-09-02. An Annex A.1 item the standard marks OPTIONAL, whose docs/CONFORMANCE.md §7 determination records the element as 'Not provided.', closes as DOCUMENTED-NON-SUPPORT. Licence: A.1's own preamble, which conditions the documentation duty on provision — 'Optional: The element may be provided at the implementor's option.' and 'Documentation required: If the element is provided by the implementor, the implementor's user documentation shall document the element or shall reference other documentation that fulfills this requirement.' (both cite.py --check A.1 → OK) — plus §4.2.7 ('An implementor shall identify in user documentation the optional language elements for which that implementor claims support', cite.py --check OK), which this verdict's own `meaning` already names as its second ground. ⛔ The §7 row STAYS and is the row's evidence: unlike an item an A.4 module WITHDREW, a not-provided optional element has a determination — the record of the non-provision — so the row carries its computed anchor and its witness is held to §7's `Pinned by` like any other.",
