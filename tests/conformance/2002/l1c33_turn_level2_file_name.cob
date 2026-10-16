@@ -6,12 +6,12 @@
       *> file-name-1 is specified, the effect is as if file-name-1 were
       *> specified for each of these exception-names."
       *>   cite.py: OK  §7.3.25.4 3)  (General rules)
-      *> Supporting: §9.1.13 - an I-O status '1x' is associated with
+      *> Supporting: §9.1.13.1 - an I-O status '1x' is associated with
       *> EC-I-O-AT-END; §7.3.25.4 GR6 "if file-name-1 is specified,
       *> checking is enabled only for exception conditions associated
-      *> with that file-name"; §14.6.13.1 - EXCEPTION-STATUS returns the
-      *> last raised level-3 exception-name, spaces while none has been
-      *> raised.
+      *> with that file-name"; §14.6.13.1.1 - a raised exception sets
+      *> the last exception status; §15.33.3 1) EXCEPTION-STATUS returns
+      *> spaces "If the last exception status indicates no exception".
       *> DERIVATION. '>>TURN EC-I-O F1 CHECKING ON' is, by GR3, the same
       *> as naming every level-3 EC-I-O-* (among them EC-I-O-AT-END)
       *> each with F1.
