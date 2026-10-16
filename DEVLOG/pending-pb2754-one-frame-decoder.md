@@ -55,4 +55,13 @@ point-in-time answers already. Witnesses: `FrameDecoderDriftTests.TheFrameWalk_A
 `ChannelMedium` was the sibling arm checked: its `TakePayload` never re-asked and its `Holds` asks the length only
 above 64 KiB.
 
+**Inventory re-site (finisher, after the landing's Linux gate went RED).** Deleting the char decoders left three
+traceability rows (GR-12.4.5.11.4-1, GR-12.4.5.11.4-5, DOC-A.1-151) naming `RecordFraming.cs#PrefixLength`, and
+`#WritePrefix`, which survived on main only in a stale `<see cref>` that this change also removed, so
+`SpecTraceabilityInventoryDriftTests.EveryCodeLocation_ResolvesInTheTree` failed in the WSL unit leg. A
+`record_verdicts.py` batch retired both witnesses and re-sited the rows to `RecordFraming.EncodeFrameHead` and
+`RecordFraming.ReadFrame` (the one encoder and decoder, which strips the head before the record area is filled,
+§12.4.5.11.4 GR1), plus `SequentialConnector.NextFrame` on the GR1 and A.1 item 151 rows. The Windows leg 1 never
+ran the case: the tier-0c cost cap planned it into leg 2, the gap kb/Work PB3131 records.
+
 **Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261016T155805Z-f7e334; Conformance 6,014 · Unit 33,193 · Characterization 6 ran in leg 1, the new FrameDecoderDriftTests cases among them); after the review fix, `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` again (run 20261016T161829Z-130770; Conformance 5,978 · Unit 33,156 · Characterization 6 ran in leg 1, both new walk witnesses Passed). The architecture oracle (`compare_oracle.py`) compares emitted C# and diagnostics, which no file of this change reaches (runtime only).
