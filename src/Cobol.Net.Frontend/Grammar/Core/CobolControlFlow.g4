@@ -168,14 +168,14 @@ performUntilTarget
 // bind narrow: the project's standing posture for a general-format shape violation.
 performVarying
     : (WITH? TEST (BEFORE | AFTER))?
-      VARYING dataReference FROM valueOperand
+      VARYING receivingIdentifier FROM valueOperand
       (BY valueOperand)?    // BY is optional per COBOL-85 spec (default = 1, §14.9.28.4 GR12)
       UNTIL performUntilTarget    // EXIT is the superset spelling §14.9.28.3 SR8 refuses at bind
       performVaryingAfter*
     ;
 
 performVaryingAfter
-    : AFTER dataReference FROM valueOperand
+    : AFTER receivingIdentifier FROM valueOperand
       (BY valueOperand)?    // BY is optional per COBOL-85 spec (default = 1, §14.9.28.4 GR12)
       UNTIL performUntilTarget    // EXIT is the superset spelling §14.9.28.3 SR8 refuses at bind
     ;
@@ -399,7 +399,7 @@ goToStatement
 // ==========================================
 
 searchStatement
-    : SEARCH dataReference (VARYING dataReference)?
+    : SEARCH dataReference (VARYING receivingIdentifier)?
       searchAtEndClause?
       searchWhenClause+
       END_SEARCH?
