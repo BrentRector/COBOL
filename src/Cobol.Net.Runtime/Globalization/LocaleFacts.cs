@@ -124,55 +124,73 @@ public sealed class LocaleFacts
     /// change (<c>RuntimeAbiPinDriftTests</c>), which is why it is documented here rather than deleted.</summary>
     public DateTimeFormatInfo DateTimeFormat { get; }
 
-    /// <summary>ISO 9945 <c>d_fmt</c> — the culture's short date pattern (L10), spacing-normalized.</summary>
-    public string DateFormat => NormalizeSpacing(DateTimeFormat.ShortDatePattern);
+    /// <summary>ISO 9945 <c>d_fmt</c> — the culture's short date pattern (L10), normalized by
+    /// <see cref="NormalizeLocaleText(string)"/>.</summary>
+    public string DateFormat => NormalizeLocaleText(DateTimeFormat.ShortDatePattern);
 
     /// <summary>ISO 9945 <c>t_fmt</c> — the culture's long time pattern, hours, minutes AND seconds (L10),
-    /// spacing-normalized (<see cref="NormalizeSpacing"/>).</summary>
-    public string TimeFormat => NormalizeSpacing(DateTimeFormat.LongTimePattern);
+    /// normalized by <see cref="NormalizeLocaleText(string)"/>.</summary>
+    public string TimeFormat => NormalizeLocaleText(DateTimeFormat.LongTimePattern);
 
-    /// <summary>⚖ DETERMINATION L10 addendum (kb/Work PB112; generalized to L12 at PB64 T6 — see
-    /// <see cref="NormalizeLocaleText"/> below): the U+202F NARROW NO-BREAK SPACE and U+2009 THIN
-    /// SPACE that newer CLDR/ICU releases put inside date/time patterns (ICU 72 moved en-US's day-period separator
-    /// from ' ' to U+202F) are normalized to the PLAIN SPACE in the patterns LOCALE-DATE / LOCALE-TIME /
-    /// LOCALE-TIME-FROM-SECONDS format with. Two grounds, documented in CONFORMANCE.md: (1) the host ICU version
-    /// varies BY HOST (Windows' bundled ICU lags the Linux runners'), so without this the SAME program prints
-    /// different bytes on different machines — the exact disease owner decision Q4 removed from collation; the
-    /// separator character inside a fixed COBOL text field must not depend on where the program runs. (2) ISO 9945's
-    /// own locale data (t_fmt <c>%r</c>) and GnuCOBOL's strftime rendition both use the plain space — the
-    /// survey-compilers-on-latitude rule. Found as CI's Linux-only red on the T4 golden (a U+202F between "09" and
-    /// "PM" that no eye could see in the assert message; the TRX artifact carried the bytes).</summary>
-    internal static string NormalizeSpacing(string pattern) => NormalizeLocaleText(pattern);
-
-    /// <summary>⚖ DETERMINATION L12, generalizing the L10 addendum (kb/Work PB64 T6): the ONE normalization of
-    /// locale-sourced text — every Unicode FORMAT character (category Cf: the ar-* currency symbols' trailing
-    /// U+200F, the U+061C/U+200E marks inside sign strings) is REMOVED, and U+00A0 NO-BREAK SPACE joins the
-    /// L10 pair (U+202F, U+2009) in mapping to the PLAIN SPACE. Applied to every LC_TIME string — the patterns above AND
-    /// the separators, designators, era, names and decimal point (<see cref="TimeFacts"/>, kb/Work PB2764) — AND to
-    /// every LC_MONETARY string (<see cref="MonetaryFacts"/>): ICU 72 moved fr-FR's mon_thousands_sep from
-    /// U+00A0 to U+202F, and monetary strings consume CHARACTER POSITIONS of a fixed-width PICTURE format-2
-    /// item, so a host-varying byte would change the §13.18.40.5 r14 b) truncation arithmetic and
-    /// EC-LOCALE-SIZE itself — PB112's disease in monetary data. Mapping only U+202F would be insufficient:
-    /// the fr-FR byte would still differ between an old-ICU host (U+00A0) and a new one. U+2212 MINUS SIGN is
-    /// NOT mapped — a genuinely different character (sv-SE's negative_sign), not a spacing artifact.
-    /// CONFORMANCE.md documents the determination with L10's own grounds: host-stable bytes in fixed fields
-    /// (owner decision Q4's principle), and the plain forms are what ISO 9945's locale data and GnuCOBOL's
-    /// C-library rendition use.</summary>
-    internal static string NormalizeLocaleText(string text)
+    /// <summary>⚖ DETERMINATION L12 (docs/CONFORMANCE.md, generalizing L10; kb/Work PB112, PB64 T6, PB2766): THE
+    /// ONE per-character equivalence of locale-sourced text. A Unicode FORMAT character (category Cf: the ar-* currency
+    /// symbols' trailing U+200F, the U+061C/U+200E marks inside sign strings) is REMOVED — the method returns false —
+    /// and U+00A0 NO-BREAK SPACE, U+202F NARROW NO-BREAK SPACE and U+2009 THIN SPACE fold to the PLAIN SPACE; every
+    /// other character is itself. U+2212 MINUS SIGN is NOT folded: it is a genuinely different character (sv-SE's
+    /// negative_sign), not a spacing artifact.
+    /// <para>Grounds (L10's own): the host ICU version varies BY HOST (Windows' bundled ICU lags the Linux runners';
+    /// ICU 72 moved en-US's day-period separator from ' ' to U+202F and fr-FR's mon_thousands_sep from U+00A0 to
+    /// U+202F), and locale text occupies CHARACTER POSITIONS of a fixed-width result — a LOCALE-TIME field, a PICTURE
+    /// format-2 item whose §13.18.40.5 r14 b) truncation arithmetic and EC-LOCALE-SIZE would otherwise move with the
+    /// host — so the bytes must not depend on where the program runs (owner decision Q4's principle); and the plain
+    /// forms are what ISO 9945's locale data and GnuCOBOL's C-library rendition use. Mapping only U+202F would be
+    /// insufficient: the fr-FR byte would still differ between an old-ICU host (U+00A0) and a new one.</para>
+    /// <para>Both sides of a locale comparison fold through THIS method: the snapshots
+    /// (<see cref="MonetaryFacts"/>, <see cref="TimeFacts"/>) through <see cref="NormalizeLocaleText(string)"/>, and
+    /// the text matched against them (NUMVAL-C / TEST-NUMVAL-C LOCALE's argument-1) through
+    /// <see cref="NormalizeLocaleText(string, out int[])"/>, so the next character a CLDR/ICU release introduces is
+    /// added here once and recognition and editing cannot drift apart.</para></summary>
+    internal static bool TryFoldLocaleChar(char c, out char canonical)
     {
-        bool clean = true;
-        foreach (char c in text)
-            if (c is '\u00A0' or '\u202F' or '\u2009' || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format)
-            {
-                clean = false;
-                break;
-            }
-        if (clean) return text;
-        var sb = new StringBuilder(text.Length);
-        foreach (char c in text)
+        if (char.GetUnicodeCategory(c) == UnicodeCategory.Format)
         {
-            if (char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format) continue;
-            sb.Append(c is '\u00A0' or '\u202F' or '\u2009' ? ' ' : c);
+            canonical = default;
+            return false;
+        }
+        canonical = c is '\u00A0' or '\u202F' or '\u2009' ? ' ' : c;
+        return true;
+    }
+
+    /// <summary>The L12 normalization of locale-sourced text (<see cref="TryFoldLocaleChar"/> over every character):
+    /// every LC_TIME string — the patterns above AND the separators, designators, era, names and decimal point
+    /// (<see cref="TimeFacts"/>, kb/Work PB2764) — and every LC_MONETARY string (<see cref="MonetaryFacts"/>). A text
+    /// the fold leaves unchanged is returned as is (no copy).</summary>
+    internal static string NormalizeLocaleText(string text) => Fold(text, trackOrigins: false, out _);
+
+    /// <summary>The same L12 normalization over a text that is MATCHED AGAINST locale data rather than taken from it
+    /// (NUMVAL-C / TEST-NUMVAL-C LOCALE's argument-1, ISO §15.68.3 r5 b): <paramref name="origins"/>[k] is the
+    /// 0-based ordinal in <paramref name="text"/> of the normalized text's character k, so a position the scan
+    /// reports is the argument's own (§15.94.4 r1); it is null when nothing was folded or removed (the identity).</summary>
+    internal static string NormalizeLocaleText(string text, out int[]? origins) => Fold(text, trackOrigins: true, out origins);
+
+    private static string Fold(string text, bool trackOrigins, out int[]? origins)
+    {
+        origins = null;
+        int first = 0;
+        while (first < text.Length && TryFoldLocaleChar(text[first], out char same) && same == text[first]) first++;
+        if (first == text.Length) return text;
+        var sb = new StringBuilder(text.Length);
+        sb.Append(text, 0, first);
+        if (trackOrigins)
+        {
+            origins = new int[text.Length];
+            for (int k = 0; k < first; k++) origins[k] = k;
+        }
+        for (int i = first; i < text.Length; i++)
+        {
+            if (!TryFoldLocaleChar(text[i], out char c)) continue;
+            if (origins is not null) origins[sb.Length] = i;
+            sb.Append(c);
         }
         return sb.ToString();
     }
