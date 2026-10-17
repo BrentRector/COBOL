@@ -27,7 +27,7 @@ public sealed class ReadmeDeclinedSummaryDriftTests
     private const string AnnexA4Heading = "## 5. Annex A.4";
 
     /// <summary>One row of §5: its A.4 clause (<c>A.4.11</c>) and its disposition.</summary>
-    private sealed record ModuleRow(string Clause, string Disposition);
+    internal sealed record ModuleRow(string Clause, string Disposition);
 
     /// <summary>An A.3 reference in the README: <c>A.3 item 8</c>, <c>A.3 items 6–7</c>, <c>A.3 items 19 and
     /// 20–21</c>. Each number or range is one row's item cell, written as §2 writes it.</summary>
@@ -44,7 +44,9 @@ public sealed class ReadmeDeclinedSummaryDriftTests
     private static bool IsClaimed(string disposition) =>
         disposition.TrimStart('*', ' ').StartsWith("Claimed", StringComparison.Ordinal);
 
-    private static List<ModuleRow> AnnexA4Register()
+    /// <summary>Parse §5's table, up to the next <c>## </c> heading. The one parser of the A.4 register:
+    /// <see cref="ConformanceSuiteProfileDriftTests"/> reads the rows through it.</summary>
+    internal static List<ModuleRow> AnnexA4Register()
     {
         var rows = new List<ModuleRow>();
         bool inSection = false;

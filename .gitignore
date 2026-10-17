@@ -169,3 +169,10 @@ DEVLOG.rendered.md
 
 # The harness's scheduled-tasks lock — a per-session artifact, committed by accident in 8abe9726 and untracked in train 23's record.
 .claude/scheduled_tasks.lock
+
+# The conformance suites are BUILD OUTPUT (DESIGN-conformance-suite.md §4; kb/Work PB3174): generate.py writes
+# suites/<edition>/manifest.json, suites/wiseowl/manifest.json and suites/completeness.json from the tests' headers.
+conformance-suite/suites/
+# A harness run's results are OUTPUT too (DESIGN-conformance-suite.md §5; kb/Work PB3175): run.py writes
+# results/<compiler>/results.json and junit.xml; a compiler's recorded verdicts are baselines/, which is tracked.
+conformance-suite/results/

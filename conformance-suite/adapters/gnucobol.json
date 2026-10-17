@@ -1,0 +1,22 @@
+{
+  "$comment": [
+    "GnuCOBOL 3.2 (`cobc`; DESIGN-conformance-suite.md §5). -std selects the dialect's warnings and features: it is",
+    "the flag-mode, not a conformance mode, and there is no 2023 dialect, so the 2023 suite is NOT APPLICABLE.",
+    "cobc refuses a source file base name longer than 31 characters ('invalid file base name ... length exceeds",
+    "maximum', measured on 3.2.0), so the harness names the source within that limit. A diagnostic reads",
+    "`<file>:<line>: error|warning: ...`; a line naming another file (`<command-line>`, a copybook) is not the",
+    "test's. An ASSIGN name is a file of the working directory (cobc also maps DD_<name>, dd_<name> and <name>",
+    "environment variables, none of which the harness sets). Run it where cobc is: on Windows, under WSL."
+  ],
+  "compiler": "gnucobol",
+  "profile": "gnucobol",
+  "editions": {"85": "cobol85", "2002": "cobol2002", "2014": "cobol2014"},
+  "source-formats": {"fixed": "fixed", "free": "free"},
+  "variables": {"cobc": "cobc"},
+  "source-extension": ".cob",
+  "name-limit": 31,
+  "compile": ["{cobc}", "-std={std}", "-fformat={source-format}", "-x", "-I", ".", "-o", "{program}", "{source}"],
+  "run": ["{work}/{program}"],
+  "flag": ["{cobc}", "-std={std}", "-fformat={source-format}", "-fsyntax-only", "-I", ".", "{source}"],
+  "diagnostic": "^(?P<file>[^:\\s][^:]*):(?P<line>[0-9]+): (?:error|warning):"
+}
