@@ -69,4 +69,6 @@ value (statement order, ISO §14.6.4 7)), so the emitted `string __strInto0 = WS
 `long __strPtr0 = 1;`, and the snapshot had not been re-baselined. It was not a Linux-only difference: the case fails
 the same way on Windows, where the gate's leg 1 ran 5 of the 36 characterization cases (no impact map) and left this
 one to leg 2. Re-baselined by the test's own mechanism (`COBOLNET_UPDATE_SNAPSHOTS=1`); the other 35 cases, every
-snapshot the store-path change reaches, pass unchanged.
+snapshot the store-path change reaches, pass unchanged. Re-gate at `83e70714f`: `=== BUILD-LOCAL GATE: LEG 1 ONLY
+(batched gating, PB2515): GREEN` (run `20261017T101030Z-b7e5e1`) and `=== LINUX GATE: GREEN (legs selftests unit
+characterization conformance guard selftests-built; HEAD 83e70714f) ===`.
