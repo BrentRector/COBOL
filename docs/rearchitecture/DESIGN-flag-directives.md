@@ -83,7 +83,7 @@ implementation increment. `[F]` = frontend-inline (no bound residue); `[B]` = bo
 | b COMPILE-TIME-ARITHMETIC-EXPRESSIONS | a compile-time arithmetic expr with a real operator, at EVERY site §7.3.6.1 lists: the DEFINE / EVALUATE / DISPLAY directive operands, a constant conditional expression, and a CONSTANT entry's arithmetic-expression-1 | `[F]` `ConditionalCompilationProcessor` (the directive operands) + `[B]` `FlagConformancePass.VisitConstantEntryBody` (the constant entry) — both ask the ONE predicate `FlagOptions.IsFlaggableCompileTimeArithmetic` | 2 | E.2 item 6. Guard on operator present (sole literal not flagged) |
 | c EVALUATE | a `>>EVALUATE` directive with both a WHEN and a WHEN OTHER | `[F]` `ConditionalCompilationProcessor` Evaluate/When frames | 2 | E.2 item 8. NOT the EVALUATE statement |
 | d I-O-DECLARATIVE | an INVALID-KEY-capable I-O stmt (WRITE/START/random-READ on a keyed file; REWRITE except on a sequential-organization file or a relative file in sequential access, §14.9.35.3 SR2; DELETE except on a file in sequential access mode, §14.9.10.3 SR2) without INVALID KEY, or a sequential READ without AT END, while a USE INPUT/OUTPUT/I-O/EXTEND declarative is present | `[B]` DONE — `VisitRead/Write/Rewrite/Delete/StartStatement` + `unit.Bound.Declaratives` modes + `_currentData.Files` org and access mode through `AdmitsInvalidKey` | 4 | E.2 item 19. ⚠ A FLAG, NOT A GATE: §7.3.15.4 GR4 d) is a normative FLAGGING obligation over Annex E.2's list, so the construct is flagged even though WiseOwl COBOL's own ANSWER for it does NOT vary by edition — the open-mode USE tier runs at 85/2002/2014/2023 alike (kb/Work PB344; VERSION_CHANGE_REFERENCE rows 25/26 are `ref-only`) |
-| e I-O-STATUS-04 | a reference testing a FILE STATUS item for `'04'` — a relation (including the abbreviated combined relation `FS = "00" OR "04"`), a level-88 whose VALUE is `'04'`, or an EVALUATE subject/object pair (value or partial-expression object) | `[B]` DONE — `FlagConformancePass.FileStatus.cs` (`VisitCondition` / `VisitEvaluateStatement`) + FILE-STATUS name/88 sets from `unit.Data.Files[]` | 4 | E.2 item 15 |
+| e I-O-STATUS-04 | a reference testing a FILE STATUS item for `'04'` — a relation (including the abbreviated combined relation `FS = "00" OR "04"`), a level-88 whose VALUE is `'04'`, or an EVALUATE subject/object pair (value or partial-expression object) | `[B]` DONE — `FlagConformancePass.FileStatus.cs` (`VisitCondition` / `VisitEvaluateStatement`); the operand is RESOLVED in the current unit's scope and is the reference when it IS (reference identity) a visible file's `FileStatusItem`, or the conditional variable of the level-88 it names | 4 | E.2 item 15 |
 | f I-O-STATUS-07 | a reference testing a FILE STATUS item for `'07'` — a relation, or a level-88 whose VALUE is `'07'` | `[B]` DONE — same detector as e (only the literal differs) | 4 | E.2 item 16 |
 | g NUM-ED-ZERO-FIGCONST | figurative ZERO in a VALUE clause of a numeric-edited item (a numeric picture with BLANK WHEN ZERO is numeric-edited, §13.18.8.4 GR2) | `[B]` `FlagConformancePass.VisitDataDescriptionEntry` + `PictureAnalyzer` (BLANK WHEN ZERO and the unit's CURRENCY SIGN set threaded to it) | 1 | E.2 item 28. **Same predicate as l** — one detector serves both |
 | h READ-PREVIOUS | a `READ … PREVIOUS` | `[B]` `BoundKeyedRead` Previous (already matched VCP:200) | 0 | E.2 item 22. The first end-to-end slice |
@@ -124,10 +124,14 @@ basis TurnState/RefModZeroLength use). Therefore `FlagConformancePass` is a `Cob
 over `group.Tree` — the SAME traversal mechanism VCP's `ParseArm` uses (the generated, drift-proof visitor; no
 bespoke switch — `feedback_path_a_leverage_tooling`). Options whose trigger is **syntactic** (READ PREVIOUS,
 CLOSE NO REWIND/UNIT, WRITE-without-EOP, SET-index, the VALUE-clause data options, MOVE shape) are decided from
-the parse node directly; options needing a **resolved fact** (TERMINATE's report has a VARYING clause; a MOVE's
-operands share a DDE; a condition tests a FILE STATUS item) look that fact up **by name** in the resolved models
-reachable from `GroupBindContext` (`Units[].Data` forest, `.Reports`, `FilesByName`) — a cheap dictionary hit,
-never a re-run of operand binding.
+the parse node directly; options needing a **resolved fact** (TERMINATE's report has a VARYING clause; a WRITE's file has a LINAGE
+clause; a MOVE's operands share a DDE; a condition tests a FILE STATUS item) **resolve the operand in the CURRENT
+unit's name scope** (`_currentUnit` / `_currentData` / `_currentRefs`, selected by `VisitUnit`; the same
+`ReferenceResolver` / `DataBinder` entries the binder uses, so qualification and §8.4.6.2.1 visibility are the
+binder's) and read the **role off the resolved object** (the `FileModel.Linage`, the `ReportModel.HasVarying`, a
+`DataItem` that is reference-equal to a visible file's `FileStatusItem`) — never a re-run of operand binding, and
+**never a name set**: the pass builds no group-wide set of names, because a spelling shared by an unrelated item of
+another program or another group would then carry the role (kb/Work PB3288).
 
 **D3 — ONE FlagState, ONE FlagOption catalog, ONE directive-line parser.** A single `FlagState`
 (`Cobol.Net.Compiler/Binding`, cloned from `RefModZeroLengthState` and extended per-option) folds the toggle
@@ -203,11 +207,14 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
   * **1a (DONE)** g NUM-ED-ZERO-FIGCONST + l VALUE-ZERO — `VisitDataDescriptionEntry`; numeric-edited via the ONE
     `PictureAnalyzer` (discard edition); figurative ZERO via `FirstDescendant<FigurativeConstantContext>`.
   * **1c (DONE)** m WRITE-END-OF-PAGE (WRITE + `FileModel.Linage` + no `writeAtEndOfPage`) + FLAG-02 f
-    TERMINATE-WITH-VARYING (TERMINATE + a report whose fields carry `Varyings`) — source-name lookups built in
-    `Run` from `GroupBindContext.Units[].Data`.
+    TERMINATE-WITH-VARYING (TERMINATE + a report whose fields carry `Varyings`) — scope-exact (kb/Work PB3288): the
+    WRITE's record-name (qualified or not, through `ResolveItem`) or `FILE file-name` resolves to a file among
+    `VisibleFiles()` (the unit's own, then its containers' GLOBAL ones, §13.18.27.4 GR1), and each TERMINATE report-name
+    to a report among `DataBinder.VisibleReports`; `Run` builds no lookup.
   * **1b (DONE for j)** j VALUE-EDITING — a numeric-edited VALUE that is a LITERAL (not figurative) with no
     editing symbols (§13.18.63 SR6/SR11 + E.2 item 29: numeric literals get editing auto-supplied, alphanumeric/
-    national literals now require it). "Editing symbols" scanned from the literal via the unambiguous insertion set
+    national literals now require it). The literal is read as its VALUE (`CobolLiteral.Decode`, the one literal
+    decoder: a doubled delimiter is one character, `X"2E"` is `.`; kb/Work PB3234). "Editing symbols" scanned via the unambiguous insertion set
     `{space / , . + - $ *}` + trailing CR/DB; `0`/`B` insertions are a documented rare false-negative.
   * **1b (DONE) k VALUE-FIG-CON-LENGTH** — a figurative-constant VALUE (any figurative, via
     `FirstDescendant<FigurativeConstantContext>`) on a data item with **no specified length** (§7.3.15.4 GR4 k;
@@ -242,9 +249,9 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
     (USAGE INDEX) receiver UNCHANGED (no EC-RANGE-INDEX), and Format-2 GR4a checks only index-name-3 — so a USAGE
     INDEX data-item receiver is **NOT** flagged (matching only `IndexFields` names realizes this exactly, and the
     shared SET grammar's pointer / capacity / dynamic-length / object receivers are intrinsically excluded).
-  * **Scope note (d/e):** an OO **METHOD body** MOVE/SET has no `BoundUnit` entry, so `_current*` stays null and the
-    operand is not resolved — a documented advisory **false-negative** (never a false-positive). A contained program
-    DOES have one: `_unitByIdentification` keys every program unit (outermost and contained) on its IDENTIFICATION
+  * **Scope note (d/e):** an OO **METHOD body** resolves through the method's own name scope over its class half's
+    forest (kb/Work PB1952, `VisitMethodDefinition`); `_currentUnit` stays null there (files and reports live in
+    program units). A contained program has its own entry: `_unitByIdentification` keys every program unit (outermost and contained) on its IDENTIFICATION
     DIVISION node, the one node a contained program shares with the synthetic `programUnit` its binder is built over
     (`BinderDriver.Reparent` adopts the children).
 * **Incr 4 — the new-analysis options.**
@@ -254,14 +261,17 @@ rows (98, 100–113) are directive-driven, not edition gates, so they carry `<!-
     and the nonnumeric literal '04'/'07' on the other); an **abbreviated combined relation** (`FS = "00" OR "04"`,
     `AND NOT = "04"` — §8.8.4.12.4 GR1 inserts the last preceding stated subject, so the scan of a `condition`'s tiers
     carries the leftmost operand of the last relation in source order, and a parenthesised condition restarts it); a
-    bare **level-88 condition-name** whose singleton `Condition88.Values` strips to '04'/'07' on the FILE-STATUS
+    bare **level-88 condition-name** (resolved through `DataBinder.QualifiedConditionCandidates`, the one
+    resolution the condition binder also reads) whose singleton `Condition88.Values` DECODE (`CobolLiteral.Decode`;
+    `X"3034"` is '04', `"0'4"` is three characters) to '04'/'07' and whose conditional variable is the FILE-STATUS
     item; and an **EVALUATE** selection subject/object pair (§14.9.13.3 SR2 pairs them by position, SR8 reads a
     partial expression as preceded by its subject). A range (`WHEN "00" THRU "09"`) is not a test FOR '04': its
-    membership depends on the collating sequence. The FILE-STATUS name set + the two 88-name sets are built in `Run` from
-    `unit.Data.Files[]` (`FileModel.FileStatusItem.CobolName` + its `Own88s`) — the m/f global-name-set idiom (a
-    role fact, collision-tolerant), NOT the scope-sensitive per-unit resolution d/e use. Operand navigation reuses
-    the canonical `ConditionBinder.SoleDataRef` (a lone reference, not an expression) + `valueOperand()
-    .nonNumericLiteral().STRINGLIT()` — no bespoke tree walk (`feedback_path_a_leverage_tooling`).
+    membership depends on the collating sequence. The role is read off the RESOLVED
+    operand, scope-exact like d/e (kb/Work PB3288; there is no group-wide name set): a data
+    reference resolves with `ResolveItem` (qualifiers honoured) and is flagged only when the item IS some file's
+    `FileStatusItem` in the current unit or a containing program. Operand navigation reuses the canonical
+    `ConditionBinder.SoleDataRef` (a lone reference, not an expression) + `valueOperand().nonNumericLiteral()`
+    (an alphanumeric, hexadecimal or national literal) — no bespoke tree walk (`feedback_path_a_leverage_tooling`).
   * **d I-O-DECLARATIVE (DONE)** — two rules: (1) a statement that CAN be specified with an INVALID KEY phrase
     (`AdmitsInvalidKey`: WRITE/START or a random READ on a KEYED file — Organization RELATIVE/INDEXED, the only ones
     that raise an invalid-key condition; REWRITE unless the file is relative in sequential access mode,
