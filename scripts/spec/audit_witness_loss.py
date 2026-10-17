@@ -15,10 +15,12 @@ evidence left every gate green and every derived artifact (the burn-down, the ow
 whose witnesses were removed still reads CONFORMS; it simply no longer has the evidence that justified it.
 
 WHAT COUNTS AS A LOSS is defined ONCE, in `inventory_schema.witness_losses`, and the writer asks the same function
-at record time — so this auditor and `record_verdicts.py` cannot come to disagree about it. Two losses are
-EXCUSED, and both are printed: a RETIREMENT (the writer records `retired-witness: <ref> (<reason>)` in the row's
-`notes` when a batch retires a witness by name), and a RE-SITE (a record that changes the verdict restates the
-row's `code-location` — see `inventory_schema.WITNESS_FIELDS` for why). Every other loss is RED.
+at record time — so this auditor and `record_verdicts.py` cannot come to disagree about it. Three losses are
+EXCUSED, and each is printed: a RETIREMENT (the writer records `retired-witness: <ref> (<reason>)` in the row's
+`notes` when a batch retires a witness by name), a RE-SITE (a record that changes the verdict restates the
+row's `code-location` — see `inventory_schema.WITNESS_FIELDS` for why), and a RE-SPELLING (the test's file was
+MOVED and the row cites it under its new name: git's rename record across the change says which file became
+which, `respellings`, so a move needs no map of its own; counted, not listed). Every other loss is RED.
 
 WHAT IS NOT A WITNESS LOSS: a ROW that disappears. Rows are regenerated from the rule catalog by
 `build_inventory.py`, which owns a row's existence; such rows are counted and printed, never gated.
@@ -37,10 +39,11 @@ import sys
 from collections import Counter
 from typing import Any
 
-from inventory_schema import (INVENTORY_PATH, REPO, WitnessLoss, load_inventory, load_schema, witness_losses,
-                              witness_shape_error)
+from inventory_schema import (INVENTORY_PATH, REPO, SCHEMA_PATH, Schema, WitnessLoss, load_inventory, load_schema,
+                              witness_losses, witness_shape_error)
 
 INVENTORY_REL = INVENTORY_PATH.relative_to(REPO).as_posix()
+SCHEMA_REL = SCHEMA_PATH.relative_to(REPO).as_posix()
 
 
 def _git(*args: str) -> str:
@@ -58,7 +61,43 @@ def rows_at(rev: str) -> list[dict[str, Any]] | None:
     return json.loads(r.stdout.decode("utf-8")) if r.returncode == 0 else None
 
 
-def compare(before: list[dict[str, Any]], after: list[dict[str, Any]], schema) -> tuple[list[WitnessLoss], list[str]]:
+def schema_at(rev: str) -> Schema | None:
+    """The inventory schema as committed at `rev` (its test-ref forms name the files of THAT tree), or None."""
+    r = subprocess.run(["git", "show", f"{rev}:{SCHEMA_REL}"], cwd=REPO, capture_output=True)
+    return Schema(json.loads(r.stdout.decode("utf-8"))) if r.returncode == 0 else None
+
+
+def respelled_from_name_status(out: str, before: Schema, after: Schema) -> dict[str, str]:
+    """`git diff -M --name-status -z` output → {before test-ref: after test-ref} for every RENAMED file that a
+    file-backed form names on both sides, each side spelled by its own tree's schema (`Schema.ref_for_path`)."""
+    fields = out.split("\0")
+    found: dict[str, str] = {}
+    i = 0
+    while i < len(fields) and fields[i]:
+        status = fields[i]
+        if status[:1] in ("R", "C"):
+            old, new = fields[i + 1], fields[i + 2]
+            i += 3
+            if status[0] == "R" and (was := before.ref_for_path(old)) and (now := after.ref_for_path(new)):
+                found[was] = now
+        else:
+            i += 2
+    return found
+
+
+def respellings(before_rev: str, after_rev: str | None, before: Schema, after: Schema) -> dict[str, str]:
+    """{before test-ref: after test-ref} for every witness file git records as RENAMED from `before_rev` to
+    `after_rev` (None: the working tree, whose renamed files must be tracked). Git's rename record IS the identity
+    of a moved file, so a move (the suite's S2 move, a test re-filed under another clause folder) needs no
+    hand-kept map, and the history walk reads the same record of every commit long after the move landed."""
+    roots = sorted(set(before.ref_roots) | set(after.ref_roots))
+    out = _git("-c", "diff.renameLimit=0", "diff", "-M", "--name-status", "-z", before_rev,
+               *([after_rev] if after_rev else []), "--", *roots)
+    return respelled_from_name_status(out, before, after)
+
+
+def compare(before: list[dict[str, Any]], after: list[dict[str, Any]], schema,
+            respelled: dict[str, str] | None = None) -> tuple[list[WitnessLoss], list[str]]:
     """(every witness lost by a row present on both sides, the rule-ids of witnessed rows that vanished)."""
     by_after = {r["rule-id"]: r for r in after}
     losses: list[WitnessLoss] = []
@@ -69,7 +108,21 @@ def compare(before: list[dict[str, Any]], after: list[dict[str, Any]], schema) -
             if row.get("code-location") or row.get("test-ref"):
                 vanished.append(row["rule-id"])
             continue
-        losses += witness_losses(row, now, schema)
+        losses += witness_losses(row, now, schema, respelled)
+    return losses, vanished
+
+
+def compare_revisions(before: list[dict[str, Any]], after: list[dict[str, Any]], before_rev: str,
+                      after_rev: str | None, schema) -> tuple[list[WitnessLoss], list[str]]:
+    """`compare`, with the re-spellings of the change from `before_rev` to `after_rev` (None: the working tree).
+    Git's rename record is read only when a file-backed test-ref was lost, so a change that moved nothing pays
+    nothing for it."""
+    losses, vanished = compare(before, after, schema)
+    before_schema = schema_at(before_rev) or schema
+    if any(not l.excused and l.field == "test-ref" and before_schema.ref_path(l.ref) for l in losses):
+        after_schema = (schema_at(after_rev) or schema) if after_rev else schema
+        losses, vanished = compare(before, after, schema,
+                                   respellings(before_rev, after_rev, before_schema, after_schema))
     return losses, vanished
 
 
@@ -87,21 +140,25 @@ def check(base: str, schema) -> int:
     if before is None:
         print(f"⛔ {INVENTORY_REL} does not exist at {base} — nothing to compare against")
         return 2
-    losses, vanished = compare(before, load_inventory(), schema)
+    losses, vanished = compare_revisions(before, load_inventory(), base, None, schema)
     unexcused = [l for l in losses if not l.excused]
     retired = [l for l in losses if l.retired]
     resited = [l for l in losses if l.resited and not l.retired]
+    respelled = [l for l in losses if l.respelled and not (l.retired or l.resited)]
     for l in retired:
         print(f"  ⓘ RETIRED  {l.rule_id} {l.field}: {l.ref}")
     for l in resited:
         print(f"  ⓘ RE-SITED {l.rule_id} {l.field}: {l.ref}  (the verdict changed — the record restates it)")
     for l in unexcused:
         print(f"  ⛔ LOST     {l.rule_id} {l.field}: {l.ref}")
+    if respelled:
+        print(f"  ⓘ RE-SPELLED {len(respelled)} test-ref(s) on {len({l.rule_id for l in respelled})} row(s): the "
+              "same files, moved (git's rename record), cited under their new names")
     if vanished:
         print(f"  ⓘ {len(vanished)} witnessed row(s) no longer in the inventory (catalog-owned, not gated): "
               + ", ".join(vanished[:10]) + (" …" if len(vanished) > 10 else ""))
     print(f"=== WITNESS LOSS vs {base[:12]}: {len(unexcused)} unexcused, {len(retired)} retired, "
-          f"{len(resited)} re-sited — {'RED' if unexcused else 'GREEN'} ===")
+          f"{len(resited)} re-sited, {len(respelled)} re-spelled — {'RED' if unexcused else 'GREEN'} ===")
     return 1 if unexcused else 0
 
 
@@ -122,7 +179,7 @@ def history(since: str | None, schema) -> tuple[list[tuple[str, str, WitnessLoss
         before = rows_at(f"{sha}^")
         if after is None or before is None:
             continue
-        losses, gone = compare(before, after, schema)
+        losses, gone = compare_revisions(before, after, f"{sha}^", sha, schema)
         verdict_after = {r["rule-id"]: r.get("verdict", "") for r in after}
         label = f"{sha[:9]} {date} {(subject[0] if subject else '')[:70]}"
         found += [(label, verdict_after[l.rule_id], l) for l in losses]
@@ -162,7 +219,8 @@ def run_history(args, schema) -> int:
     current = {r["rule-id"]: r for r in load_inventory()}
     per_commit: Counter[str] = Counter(label for label, _, _ in found)
     owed = owed_back(found, current, schema)
-    kinds = Counter(("retired" if l.retired else "re-sited" if l.resited else "lost", l.field) for *_, l in found)
+    kinds = Counter(("retired" if l.retired else "re-sited" if l.resited else "re-spelled" if l.respelled
+                     else "lost", l.field) for *_, l in found)
     print(f"commits that removed a witness : {len(per_commit)}")
     for label, n in per_commit.most_common():
         print(f"   {n:5d}  {label}")
@@ -221,13 +279,43 @@ def self_test(schema) -> int:
     resite = {**narrowed, "verdict": "PARTIAL" if row["verdict"] != "PARTIAL" else "CONFORMS"}
     expect("a re-adjudication re-sites code-location, never test-ref", witness_losses(row, resite, schema),
            len(refs) - 1, len(locs) - 1)
-    widened = {**row, "test-ref": row["test-ref"] + schema.test_ref_sep + "conformance:2023/self_test_extra"}
+    widened = {**row, "test-ref": row["test-ref"] + schema.test_ref_sep + "conformance:cases/0-SELF-TEST/self_test_extra"}
     expect("a widening is not a loss", witness_losses(row, widened, schema), 0, 0)
     reordered = {**row, "test-ref": schema.test_ref_sep.join(reversed(refs))}
     expect("a reordering is not a loss", witness_losses(row, reordered, schema), 0, 0)
     losses, vanished = compare([row], [], schema)
     verify("a vanished row is reported apart, never as a witness loss",
            not losses and vanished == [row["rule-id"]])
+
+    # A RE-SPELLING (kb/Work PB3177): the same test file, moved, cited under its new name.
+    moved_to = "conformance:cases/0-SELF-TEST/self_test_moved"
+    moved = {**row, "test-ref": schema.test_ref_sep.join([moved_to, *refs[1:]])}
+    expect("a re-spelled witness (its file moved, the row cites the new name) is excused",
+           witness_losses(row, moved, schema, {refs[0]: moved_to}), 0, 1)
+    expect("a re-spelling the row does not cite is still a loss",
+           witness_losses(row, {**row, "test-ref": schema.test_ref_sep.join(refs[1:])}, schema,
+                          {refs[0]: moved_to}), 1, 0)
+    expect("a re-spelling never excuses a code-location",
+           witness_losses(row, {**row, "code-location": schema.code_location_sep.join(locs[1:])}, schema,
+                          {locs[0]: locs[1]}), 1, 0)
+    owed = owed_back([("t", row["verdict"], l) for l in witness_losses(row, moved, schema, {refs[0]: moved_to})],
+                     {row["rule-id"]: moved}, schema).get(row["rule-id"], {})
+    verify("history replay owes back no re-spelled witness", not owed, f": owed {owed}")
+    raw = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+    raw["test-ref"]["forms"]["conformance"]["path-template"] = "tests/conformance/{0}.cob"   # the tree before S2
+    old = Schema(raw)
+    z = "\0".join(["R087", "tests/conformance/85/foo.cob", "conformance-suite/cases/7.2.3-COPY/foo_85.cob",
+                   "R100", "tests/conformance/85/lib.cpy", "conformance-suite/cases/7.2.3-COPY/lib.cpy",
+                   "M", "tests/nist/programs/NC101A.cob", "D", "tests/conformance/85/gone.cob",
+                   "C075", "tests/nist/programs/NC102A.cob", "tests/nist/programs/NC102B.cob", ""])
+    got = respelled_from_name_status(z, old, schema)
+    verify("git's rename record re-spells each renamed witness file, each side by its own tree's schema (a "
+           "modified, deleted or copied file, or one no form names, re-spells nothing)",
+           got == {"conformance:85/foo": "conformance:cases/7.2.3-COPY/foo_85"}, f": {got}")
+    verify("a file-backed form's ref and its path are inverses; an xUnit form names no file",
+           schema.ref_for_path(schema.ref_path(moved_to) or "") == moved_to
+           and schema.ref_path("unit:SomeTests.SomeMethod") is None
+           and "conformance-suite" in schema.ref_roots, f": {schema.ref_roots}")
 
     rid = row["rule-id"]
     owed = owed_back([("t", row["verdict"], l) for l in witness_losses(row, narrowed, schema)],
@@ -264,10 +352,10 @@ def self_test(schema) -> int:
            witness_losses(row, got, schema), 0, len(locs) - 1)
     got = written({**stmt, "verdict": new_verdict})
     expect("writer: a re-adjudication naming NO site keeps the row's", witness_losses(row, got, schema), 0, 0)
-    got = written({"rule-id": row["rule-id"], "test-ref": "conformance:2023/self_test_extra",
+    got = written({"rule-id": row["rule-id"], "test-ref": "conformance:cases/0-SELF-TEST/self_test_extra",
                    "code-location": locs[0]})
     verify("writer: a witness-only record adds its witness and restates nothing",
-           not witness_losses(row, got, schema) and "conformance:2023/self_test_extra" in got["test-ref"]
+           not witness_losses(row, got, schema) and "conformance:cases/0-SELF-TEST/self_test_extra" in got["test-ref"]
            and all(got.get(k) == row.get(k) for k in ("verdict", "editions", "notes", "derivation")))
     print(f"=== SELF-TEST: {'GREEN' if not fails else f'RED ({fails})'} ===")
     return 1 if fails else 0

@@ -33,7 +33,7 @@ import json
 import pathlib
 import re
 import sys
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from typing import Any, NamedTuple
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -90,10 +90,11 @@ class WitnessLoss(NamedTuple):
     ref: str
     retired: bool   # the AFTER row's notes record it as a deliberate retirement
     resited: bool   # a re-adjudication's code-location, which the write rule REPLACES (see `resites`)
+    respelled: bool = False   # the SAME test file under its new name, which the AFTER row cites (`witness_losses`)
 
     @property
     def excused(self) -> bool:
-        return self.retired or self.resited
+        return self.retired or self.resited or self.respelled
 
 
 def witness_shape_error(field: str, ref: str, schema: "Schema") -> str | None:
@@ -129,19 +130,28 @@ def witness_shape_error(field: str, ref: str, schema: "Schema") -> str | None:
     return None
 
 
-def witness_losses(before: dict[str, Any], after: dict[str, Any], schema: "Schema") -> list[WitnessLoss]:
+def witness_losses(before: dict[str, Any], after: dict[str, Any], schema: "Schema",
+                   respelled: Mapping[str, str] | None = None) -> list[WitnessLoss]:
     """Every witness `before` carried that `after` does not — THE one definition of a narrowing (kb/Work PB959).
 
     Read by the writer (`record_verdicts.py`, at record time) and by the auditor (`audit_witness_loss.py`, over a
     diff or the whole git history), so the two cannot come to disagree about what counts as losing evidence.
+
+    A witness is the TEST, not its spelling. `respelled` maps a `before` test-ref to the test-ref that names the
+    same file after the change moved it (the auditor reads it from git's rename record across the change,
+    `audit_witness_loss.respellings`); a lost reference whose new spelling `after` carries is the same witness,
+    excused as RE-SPELLED. The conformance suite's move (kb/Work PB3177) re-spelled 7,920 references at once, and
+    a clause pass that moves a test to another clause folder re-spells it again.
     """
     retired = retired_witnesses(after.get("notes", ""))
+    respelled = respelled or {}
     out: list[WitnessLoss] = []
     for field in WITNESS_FIELDS:
         sep = schema.code_location_sep if field == "code-location" else schema.test_ref_sep
         kept = set(schema.split(after.get(field, "") or "", sep))
         resited = resites(field, before.get("verdict", ""), after.get("verdict", ""))
-        out += [WitnessLoss(before.get("rule-id", ""), field, ref, ref in retired, resited)
+        out += [WitnessLoss(before.get("rule-id", ""), field, ref, ref in retired, resited,
+                            field == "test-ref" and respelled.get(ref) in kept)
                 for ref in schema.split(before.get(field, "") or "", sep) if ref not in kept]
     return out
 
@@ -890,6 +900,27 @@ class Schema:
 
     def split(self, value: str, sep: str) -> list[str]:
         return [p for p in (p.strip() for p in value.split(sep.strip())) if p]
+
+    def ref_path(self, ref: str) -> str | None:
+        """The repository file a test-ref names, from its form's `path-template`; None for a form that names no
+        file (an xUnit method) or an unknown form."""
+        scheme, colon, body = ref.partition(":")
+        template = self.test_ref_forms.get(scheme, {}).get("path-template")
+        return template.format(body.strip()) if colon and body.strip() and template else None
+
+    def ref_for_path(self, path: str) -> str | None:
+        """The test-ref that names the repository file `path`, `ref_path`'s inverse; None when no form names it."""
+        for scheme, form in self.test_ref_forms.items():
+            head, _, tail = (form.get("path-template") or "").partition("{0}")
+            if head and path.startswith(head) and path.endswith(tail) and len(path) > len(head) + len(tail):
+                return f"{scheme}:{path[len(head):len(path) - len(tail)]}"
+        return None
+
+    @property
+    def ref_roots(self) -> list[str]:
+        """The directories the file-backed test-ref forms name: a git pathspec for their files (`ref_path`)."""
+        return sorted({(form.get("path-template") or "").partition("{0}")[0].rpartition("/")[0]
+                       for form in self.test_ref_forms.values() if form.get("path-template")} - {""})
 
     def spell_editions(self, names: Iterable[str]) -> str:
         """The ONE spelling of an `editions` field that names `names` — THE writer of the spelling.
