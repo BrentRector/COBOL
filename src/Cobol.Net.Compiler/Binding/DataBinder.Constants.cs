@@ -169,6 +169,13 @@ public sealed partial class DataBinder
     /// or refused?</summary>
     private bool IsDeclaredConstant(string name) => ConstantScopeOf(name)?.Declared.ContainsKey(name) == true;
 
+    /// <summary>Is <paramref name="name"/> a constant-name here at all — a constant entry of the element it is read in
+    /// (<see cref="IsDeclaredConstant"/>) or a GLOBAL one inherited from a container (§13.18.27.4 GR1; bound at the
+    /// inheritance)? A PURE question: unlike <see cref="FindConstant"/> it binds nothing. The reporter of an
+    /// unidentified reference asks it so a constant-name is never told it "is not defined".</summary>
+    internal bool IsConstantName(string name) =>
+        ConstantScopeOf(name) is { } scope && (scope.Declared.ContainsKey(name) || scope.Bound.ContainsKey(name));
+
     /// <summary>The names in <see cref="_constants"/> that came from a container, not from this unit's own entries,
     /// each with the containment distance of the container that declared it (1 = the direct container) — the tier
     /// <see cref="DropShadowedConstants"/> weighs against a same-spelled data-name's (kb/Work PB1047).</summary>

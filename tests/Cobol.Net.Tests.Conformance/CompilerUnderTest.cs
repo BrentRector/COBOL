@@ -25,6 +25,11 @@ internal static class CutRunner
         return string.Join("\n", lines).TrimEnd('\n');
     }
 
+    /// <summary>The locale every program the harness runs gets as its USER and SYSTEM default (<see cref="RunExit"/>):
+    /// the root locale. The conformance suite's WiseOwl adapter sets the same pin for <c>run.py</c>
+    /// (<c>ConformanceSuiteRunnerDriftTests</c> holds the two equal).</summary>
+    internal const string LocalePin = "INVARIANT";
+
     /// <summary>Run <c>dotnet &lt;dll&gt;</c> in <paramref name="workDir"/> and capture normalized stdout.
     /// <paramref name="stdinFile"/> (when given) is piped to the program's stdin — ACCEPT device input (ISO
     /// §14.9.1 F1); stdin is always redirected and closed so an over-reading ACCEPT sees EOF, never the console.</summary>
@@ -57,8 +62,8 @@ internal static class CutRunner
         // and a test that wants another default passes it in `env` (which overrides the pin). A NULL value REMOVES
         // the variable, so a test can reach the run unit's fallback when it is unset (docs/CONFORMANCE.md
         // DOC-A.1-118; kb/Work PB2671).
-        psi.Environment[CobolNet.Runtime.LocaleState.UserDefaultVariable] = "INVARIANT";
-        psi.Environment[CobolNet.Runtime.LocaleState.SystemDefaultVariable] = "INVARIANT";
+        psi.Environment[CobolNet.Runtime.LocaleState.UserDefaultVariable] = LocalePin;
+        psi.Environment[CobolNet.Runtime.LocaleState.SystemDefaultVariable] = LocalePin;
         if (env is not null)
             foreach (var (k, v) in env)
                 if (v is null) psi.Environment.Remove(k);

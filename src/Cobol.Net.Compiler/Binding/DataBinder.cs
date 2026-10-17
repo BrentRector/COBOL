@@ -8635,6 +8635,26 @@ public sealed partial class DataBinder(EditionContext? edition = null)
     internal bool ConditionQualifierChainMatches(Condition88 cond, IReadOnlyList<string> qualifiers) =>
         QualifierChainMatchesFrom(cond.Parent, cond.Parent, qualifiers);
 
+    /// <summary>⭐ THE ONE §8.4.2.2 FORMAT 2 CANDIDATE SET of a written condition-name — every level-88 of
+    /// <paramref name="name"/> visible in <paramref name="scope"/> (the method overlay first, else the unit's:
+    /// <see cref="SymbolTable.TryResolveCondition"/>) whose conditional-variable chain carries each written
+    /// qualifier, narrowed to the nearest declaring source element (§8.4.6.2.1 3, kb/Work PB1047). The condition-name
+    /// twin of <see cref="QualifiedCandidates"/>: it RETURNS THE CANDIDATE SET, NOT A WINNER, because the number of
+    /// survivors is the §8.4.2.2.1 uniqueness verdict, which the caller reports (<c>ConditionBinder.ConditionOf</c>)
+    /// or ignores (a pass that only reads which condition a bare operand names: <c>FlagConformancePass</c>, kb/Work
+    /// PB3288). EMPTY when the spelling names no condition-name, when the qualifiers reach none, or when every
+    /// survivor is a lapsed type-declaration condition (§8.4.2.2.1 rule 4 — alone it names nothing to test). Pure:
+    /// it reports nothing.</summary>
+    internal List<Condition88> QualifiedConditionCandidates(string name, IReadOnlyList<string> qualifiers, Model.Scope scope)
+    {
+        if (!Symbols.TryResolveCondition(name, scope, out var list)) return [];
+        var matches = qualifiers.Count == 0
+            ? list
+            : list.Where(c => ConditionQualifierChainMatches(c, qualifiers)).ToList();
+        matches = Symbols.NearestDeclaring(matches, static c => c.Parent);
+        return matches.TrueForAll(IsTypeDeclarationCondition) ? [] : matches;
+    }
+
     /// <summary>The one qualifier walk: <paramref name="firstQualifiable"/> is the innermost entry a qualifier may
     /// name; <paramref name="member"/> locates the record for the file-name qualifier.</summary>
     private bool QualifierChainMatchesFrom(DataItem? firstQualifiable, DataItem member, IReadOnlyList<string> qualifiers)

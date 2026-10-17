@@ -34,7 +34,9 @@ public sealed class CldrIcuCrossCheckTests(ITestOutputHelper output)
         yield return ["ru-RU", "ru", new[] { "\U00000430", "\U00000431", "\U0000044F", "a", "b", "z", "1", "\U000003B1", "\U00000410", "\U00000451", "\U00000435" }];
         yield return ["hr-HR", "hr", new[] { "c", "č", "ć", "d", "dž", "đ", "e", "l", "lj", "m", "n", "nj", "o", "s", "š", "t", "z", "ž", "\U00000430", "\U000003B1", "a", "džep", "dzip", "ljubav", "lubav", "njiva", "niva" }];
         yield return ["th-TH", "th", new[] { "\U00000E01", "\U00000E40\U00000E01", "\U00000E02", "\U00000E40", "\U00000E01\U00000E32", "a", "b", "1", "\U00000E01\U00000E31\U00000E19" }];
-        yield return ["ar-SA", "ar", new[] { "\U00000627", "\U00000628", "\U0000062A", "a", "b", "1", "\U00000623", "\U00000622", "\U00000629" }];
+        yield return ["ar-SA", "ar", new[] { "\U00000627", "\U00000628", "\U0000062A", "a", "b", "1", "\U00000623", "\U00000622", "\U00000629",
+            // kb/Work PB3293: &ئا=ﯪ=ﯫ resets on a string holding the ئ tailored earlier.
+            "\U0000FBEA", "\U0000FBEB", "\U00000626\U00000627", "\U00000626" }];
         yield return ["he-IL", "he", new[] { "\U000005D0", "\U000005D1", "\U000005D2", "a", "b", "1", "\U000005EA" }];
         yield return ["tr-TR", "tr", new[] { "c", "ç", "d", "g", "ğ", "h", "ı", "i", "İ", "I", "j", "o", "ö", "p", "s", "ş", "t", "u", "ü", "v", "ırmak", "irmak", "İrmak", "Irmak" }];
         yield return ["pl-PL", "pl", new[] { "a", "ą", "b", "c", "ć", "d", "e", "ę", "f", "l", "ł", "m", "n", "ń", "o", "ó", "p", "s", "ś", "t", "z", "ź", "ż", "łódź", "lodz", "zab", "źab", "żab" }];
@@ -53,7 +55,9 @@ public sealed class CldrIcuCrossCheckTests(ITestOutputHelper output)
             // kb/Work PB2761: the =-chain after an extension (ja.xml: <<<う|ゝ=ぅ|ゝ=ゔ|ゝ=う|ゞ/゙=ぅ|ゞ/゙=ゔ|ゞ/゙).
             "\U00003045\U0000309E", "\U00003045\U00003094", "\U00003094\U0000309E", "\U00003094\U00003094", "\U00003046\U0000309E", "\U00003046\U00003094" }];
         yield return ["ko-KR", "ko", new[] { "\U0000AC00", "\U0000AC01", "\U0000AC02", "\U0000B098", "a", "\U00004E00", "\U00001100", "\U00003131" }];
-        yield return ["zh-CN", "zh", new[] { "\U00004E00", "\U00004E01", "\U00004E03", "\U00004E07", "\U00004E2D", "\U00006587", "\U00004E2D\U00006587", "\U00006587\U00004E2D", "a", "b", "1", "\U00005B57" }];
+        yield return ["zh-CN", "zh", new[] { "\U00004E00", "\U00004E01", "\U00004E03", "\U00004E07", "\U00004E2D", "\U00006587", "\U00004E2D\U00006587", "\U00006587\U00004E2D", "a", "b", "1", "\U00005B57",
+            // kb/Work PB3293: &'(一)'<<<㈠ (and 七, 三) resets on a string holding an ideograph tailored earlier.
+            "\U00003220", "\U00003222", "\U00003226", "(\U00004E00)", "(\U00004E03)" }];
         yield return ["de-DE", "de", new[] { "a", "ä", "ae", "af", "o", "ö", "oe", "u", "ü", "ue", "ß", "ss", "st", "Müller", "Mueller", "Muller", "z" }];
     }
 

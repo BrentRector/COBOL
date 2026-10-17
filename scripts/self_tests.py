@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""self_tests.py — THE ONE RUNNER OF EVERY SCRIPT SELF-TEST under scripts/ (kb/Work PB2563).
+"""self_tests.py — THE ONE RUNNER OF EVERY SCRIPT SELF-TEST among the live tools (kb/Work PB2563).
 
     python scripts/self_tests.py            # every self-test that needs no build, in parallel; exit 0 only when all pass
     python scripts/self_tests.py --built    # the ones that read the BUILT test assemblies (after a solution build)
@@ -14,7 +14,9 @@ This runner FINDS them, and the local gate (scripts/run_gate_legs.py AUDITS, bef
 (scripts/linux-gate.sh leg `selftests`) and CI (the `audits` job on Linux and a step of `windows-build-test`) all run
 THIS entry point, so no gate can run a self-test CI does not, or the reverse (the CI invariant, kb/Work PB1957).
 
-THE DISCOVERY RULE (one rule, `discover`): a tracked file under scripts/ is a self-test when
+THE DISCOVERY RULE (one rule, `discover`): a tracked file under one of the live tools' trees (`live_tools.ROOTS`:
+scripts/, .claude/ and the conformance suite's harness, whose generator is a gate audit and must self-test like one;
+kb/Work PB3174, PB3176) is a self-test when
   (a) it HANDLES `--self-test`: a .py file whose code (not a docstring or a comment) compares an argument with the
       string `--self-test` or declares it with `add_argument` — read from its syntax tree, so a script that only
       PASSES `--self-test` to another one is not one; a .sh file with a `--self-test)` case arm or a
@@ -101,11 +103,11 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 import sharedfile  # this directory's: the one Windows share-retry rule for files several processes read and replace
+import live_tools  # this directory's: the one list of the live tools' trees, which discovery reads
 import self_test_inputs as inputs  # this directory's: what a self-test read, and the tracer that records it
 from gate_slot import ExclusiveLock, git_common_dir  # this directory's: the OS file lock every gate place is
 
 REPO = Path(__file__).resolve().parents[1]
-ROOT = "scripts"
 FLAG = "--self-test"
 VERDICT = "=== SELF-TESTS: "
 #: The submodule `check_practices.py` lives in (test_dispatch_guard.py, test_plan_wave.py import it).
@@ -231,7 +233,7 @@ def classify(rel: str, text: str) -> SelfTest | None:
 
 
 def tracked_scripts(repo: Path) -> list[str]:
-    out = subprocess.run(["git", "ls-files", "-z", "--", ROOT], cwd=repo, check=True, capture_output=True,
+    out = subprocess.run(["git", "ls-files", "-z", "--", *live_tools.ROOTS], cwd=repo, check=True, capture_output=True,
                          env=_scrubbed_env(os.environ)).stdout
     return sorted(p for p in out.decode("utf-8").split("\0") if p.endswith((".py", ".sh", ".ps1")))
 

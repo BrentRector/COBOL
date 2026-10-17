@@ -1,6 +1,7 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
 using System.Globalization;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace CobolNet.Runtime.Collation.Cldr;
@@ -20,8 +21,9 @@ public sealed record CldrBuildResult(CollationTable Table, CollationOptions Opti
 /// <see cref="CollationOptions"/> the rules' settings ask for. This is the derivation the shipped
 /// <c>.tailor</c> files were made by hand for (Spanish ñ), done mechanically for every CLDR locale.
 /// <para><b>How a relation becomes weights.</b> Each weight level of the root table is an ordered line of DISTINCT
-/// weights. A reset (<c>&amp;X</c>) reads X's collation elements (tailored earlier in these rules, else the root's) as
-/// the current position; a relation of strength N (<c>&lt;</c>=1, <c>&lt;&lt;</c>=2, <c>&lt;&lt;&lt;</c>=3) takes the
+/// weights. A reset (<c>&amp;X</c>) reads X's collation elements as the current position: the NFD of X walked by
+/// UTS #10 S2.1 over the mappings these rules have built so far, else the root's (<see cref="BuiltSoFar"/> — the
+/// same read an extension and a prefix take, as ICU's CollationBuilder does); a relation of strength N (<c>&lt;</c>=1, <c>&lt;&lt;</c>=2, <c>&lt;&lt;&lt;</c>=3) takes the
 /// last element of the position and gives the tailored string a copy of it whose level-N weight is a NEW slot inserted
 /// immediately after the anchor's on that level's line and whose lower levels are the common weights; <c>=</c> and
 /// <c>&lt;&lt;&lt;&lt;</c> copy the position unchanged; <c>[before N]</c> resets to the slot just before X's;
@@ -178,6 +180,99 @@ public static class CldrTailoringBuilder
     }
 
     // =========================================================================================================
+    // The mappings built so far
+    // =========================================================================================================
+
+    /// <summary>
+    /// The mappings the rules have built SO FAR, over the base table, in the shape the UTS #10 S2.1 walk reads — what
+    /// a reset string (<c>&amp;X</c>), an extension (<c>x/y</c>) and a prefix (<c>p|x</c>) take their current elements
+    /// from. ICU's CollationBuilder reads each of the three as <c>getCEs</c> of the string's NFD over the data built so
+    /// far (<c>addReset</c>, <c>addRelation</c>), so this does the same: the string is normalized to NFD and walked by
+    /// the one <see cref="ContractionWalker"/> — the longest contraction, tailored or base, then the discontiguous
+    /// extension over unblocked non-starters — and each step takes the tailored mapping when these rules made one,
+    /// else the base table's. A tailored string is keyed by its NFD spelling (ICU's data builder maps the NFD string;
+    /// the precomposed spellings are canonical closure's, <see cref="CollationTable.Rebuild"/>). A first code point's
+    /// base contractions are copied in when it is first walked or first given a tailored contraction (ICU's
+    /// <c>copyFromBaseCE32</c>), so a tailored contraction is matched beside them, longest first; the base
+    /// contractions of a <c>[suppressContractions]</c> code point are never copied.
+    /// </summary>
+    private sealed class BuiltSoFar(CollationTable baseTable, Func<CollationElement, BuildElement> fromBase)
+    {
+        private readonly List<BuildElement> _pool = [];
+        private readonly Dictionary<int, (int Offset, int Count)> _singles = new();
+        private readonly Dictionary<int, CollationTable.Contraction[]?> _contractions = new();   // null: none
+        private HashSet<int>? _suppressed;
+
+        /// <summary>The code points whose base contractions <c>[suppressContractions]</c> removes. Set before the first
+        /// rule, as CLDR writes the setting before its rules.</summary>
+        public void Suppress(IReadOnlyList<int>? codePoints) =>
+            _suppressed = codePoints is { Count: > 0 } ? new HashSet<int>(codePoints) : null;
+
+        /// <summary>Record that these rules map <paramref name="key"/> (a relation's string, a prefix context's
+        /// prefix+string) to <paramref name="elements"/>, replacing any earlier mapping of its NFD spelling. A key whose
+        /// NFD spelling the built table does not map (<see cref="CollationTable.MapsItsNfdSpelling"/>: one led by a
+        /// Hangul syllable) is never met by a walk over NFD text, so it is not recorded.</summary>
+        public void Map(string key, List<BuildElement> elements)
+        {
+            if (!CollationTable.MapsItsNfdSpelling(CodePoints(key))) return;
+            var cps = CodePoints(Nfd(key));
+            int offset = _pool.Count;
+            _pool.AddRange(elements);
+            if (cps.Length == 1)
+            {
+                _singles[cps[0]] = (offset, elements.Count);
+                return;
+            }
+            var existing = ContractionsStartingWith(cps[0]) ?? [];
+            _contractions[cps[0]] = CollationTable.WithContraction(existing, cps[1..], offset, elements.Count, out _);
+        }
+
+        /// <summary>The current elements of <paramref name="text"/>: its NFD walked over the mappings built so far.
+        /// Never empty for a non-empty text (a completely ignorable code point yields one all-zero element).</summary>
+        public List<BuildElement> ElementsOf(string text)
+        {
+            string nfd = Nfd(text);
+            var result = new List<BuildElement>(nfd.Length + 1);
+            var walker = new ContractionWalker(nfd, baseTable);
+            while (walker.NextCodePoint(out int cp, out int after))
+            {
+                if (ContractionsStartingWith(cp) is { } candidates && walker.TryMatchContraction(after, candidates, out var c))
+                    result.AddRange(CollectionsMarshal.AsSpan(_pool).Slice(c.Offset, c.Count));
+                else if (_singles.TryGetValue(cp, out var single))
+                    result.AddRange(CollectionsMarshal.AsSpan(_pool).Slice(single.Offset, single.Count));
+                else
+                    foreach (var e in baseTable.GetElements(cp).Span) result.Add(fromBase(e));
+            }
+            return result;
+        }
+
+        /// <summary>The NFD of a string (the string itself when nothing in it decomposes or combines).</summary>
+        private string Nfd(string s) =>
+            Normalizer.NeedsNfd(s, baseTable, forIdentical: true) ? Normalizer.ToNfd(s, baseTable) : s;
+
+        /// <summary>The contractions beginning with <paramref name="codePoint"/>, longest first, or null: the
+        /// tailored ones and the base table's (copied in on first use).</summary>
+        private CollationTable.Contraction[]? ContractionsStartingWith(int codePoint)
+        {
+            if (_contractions.TryGetValue(codePoint, out var known)) return known;
+            CollationTable.Contraction[]? copied = null;
+            if (_suppressed?.Contains(codePoint) != true && baseTable.ContractionsStartingWith(codePoint) is { } fromTable)
+            {
+                copied = new CollationTable.Contraction[fromTable.Length];
+                for (int i = 0; i < fromTable.Length; i++)
+                {
+                    var b = fromTable[i];
+                    int offset = _pool.Count;
+                    foreach (var e in baseTable.Slice(b.Offset, b.Count)) _pool.Add(fromBase(e));
+                    copied[i] = new CollationTable.Contraction(b.Rest, offset, b.Count);
+                }
+            }
+            _contractions[codePoint] = copied;
+            return copied;
+        }
+    }
+
+    // =========================================================================================================
     // The builder
     // =========================================================================================================
 
@@ -193,11 +288,12 @@ public static class CldrTailoringBuilder
         private readonly Line _p, _s, _t;
         private readonly Dictionary<string, List<BuildElement>> _tailored = new(StringComparer.Ordinal);
         private readonly List<string> _tailoredOrder = [];
+        private readonly BuiltSoFar _built;
         private readonly List<string> _unsupported = [];
         private readonly List<string> _notes = [];
         private readonly HashSet<string> _importing = new(StringComparer.OrdinalIgnoreCase);
         private List<BuildElement> _position = [];
-        private int _rulesApplied, _quaternary, _prefixContexts, _skipped;
+        private int _rulesApplied, _quaternary, _prefixContexts;
         private (int First, int Last) _variableRootRange;      // root scale: space.first .. punct.last
 
         public Builder(CollationTable baseTable, string name)
@@ -225,7 +321,12 @@ public static class CldrTailoringBuilder
             if (baseTable.TryGetReorderGroup("space", out var sp)) spaceFirst = sp.FirstPrimary;
             if (baseTable.TryGetReorderGroup("punct", out var pu)) punctLast = pu.LastPrimary;
             _variableRootRange = (spaceFirst, punctLast);
+            _built = new BuiltSoFar(baseTable, FromBase);
         }
+
+        /// <summary>A base-table element as a build element: its weights as the lines' root slots.</summary>
+        private BuildElement FromBase(CollationElement e) =>
+            new(_p.RootSlot(e.Primary), _s.RootSlot(e.Secondary), _t.RootSlot(e.Tertiary), e.IsVariable, e.Case);
 
         /// <summary>A base-scale primary of the base table (the base is normally the root; a base that is itself
         /// renumbered maps its own AAAA values through its map, as GetImplicit does).</summary>
@@ -243,6 +344,7 @@ public static class CldrTailoringBuilder
             {
                 var (rules, effectiveSettings) = Expand(collation, selection.Found?.Tag ?? "root");
                 settings = effectiveSettings.Merge(selection.Tag.Settings);
+                _built.Suppress(settings.SuppressContractions);
                 foreach (string u in collation.Unsupported) _unsupported.Add(u);
                 foreach (var rule in rules)
                 {
@@ -256,7 +358,6 @@ public static class CldrTailoringBuilder
                     }
                     catch (NotSupportedException ex)
                     {
-                        _skipped++;
                         _unsupported.Add($"line {rule.Line}: {rule} — {ex.Message}");
                     }
                 }
@@ -459,7 +560,7 @@ public static class CldrTailoringBuilder
 
         private void Reset(CldrReset reset)
         {
-            List<BuildElement> pos = reset.Position is { } sp ? [SpecialPosition(sp)] : Lookup(reset.Text!);
+            List<BuildElement> pos = reset.Position is { } sp ? [SpecialPosition(sp)] : _built.ElementsOf(reset.Text!);
             if (reset.BeforeLevel > 0)
             {
                 int n = reset.BeforeLevel;
@@ -502,18 +603,19 @@ public static class CldrTailoringBuilder
             // before the extension once the relation is added). The extension is appended to a COPY, so the
             // position never carries it into the next relation.
             _position = ces;
-            if (rel.Extension is { } ext) ces = [.. ces, .. Lookup(ext)];
+            if (rel.Extension is { } ext) ces = [.. ces, .. _built.ElementsOf(ext)];
             string key = rel.Text;
             if (rel.Prefix is { } prefix)
             {
                 _prefixContexts++;
                 key = prefix + rel.Text;
-                var withPrefix = Lookup(prefix);
+                var withPrefix = _built.ElementsOf(prefix);
                 withPrefix.AddRange(ces);
                 ces = withPrefix;
             }
             if (!_tailored.ContainsKey(key)) _tailoredOrder.Add(key);
             _tailored[key] = ces;
+            _built.Map(key, ces);
         }
 
         /// <summary>The index of the element a level-N relation modifies: the LAST element, unless it is ignorable at
@@ -548,18 +650,6 @@ public static class CldrTailoringBuilder
                 }
             }
             return upper && lower ? ElementCase.Mixed : upper ? ElementCase.Upper : ElementCase.Lower;
-        }
-
-        /// <summary>The current elements of a string: tailored by these rules, else the base table's.</summary>
-        private List<BuildElement> Lookup(string text)
-        {
-            if (_tailored.TryGetValue(text, out var t)) return new List<BuildElement>(t);
-            var cps = CodePoints(text);
-            var elements = _base.GetElements(cps);
-            var list = new List<BuildElement>(elements.Length);
-            foreach (var e in elements)
-                list.Add(new BuildElement(_p.RootSlot(e.Primary), _s.RootSlot(e.Secondary), _t.RootSlot(e.Tertiary), e.IsVariable, e.Case));
-            return list;
         }
 
         /// <summary>The element of a logical reset position (UTS #35 Part 5 "Logical Reset Positions"), read from the base table.</summary>
@@ -674,18 +764,21 @@ public static class CldrTailoringBuilder
                 return 0;
             }
         }
+    }
 
-        // ---- text helpers ----------------------------------------------------------------------------------------
+    // =========================================================================================================
+    // Text helpers
+    // =========================================================================================================
 
-        private static int[] CodePoints(string s)
+    /// <summary>The code points of a string; an unpaired surrogate is its own code point (as the walk reads it).</summary>
+    private static int[] CodePoints(string s)
+    {
+        var list = new List<int>(s.Length);
+        for (int i = 0; i < s.Length; i++)
         {
-            var list = new List<int>(s.Length);
-            for (int i = 0; i < s.Length; i++)
-            {
-                if (char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1])) { list.Add(char.ConvertToUtf32(s[i], s[i + 1])); i++; }
-                else list.Add(s[i]);
-            }
-            return list.ToArray();
+            if (char.IsHighSurrogate(s[i]) && i + 1 < s.Length && char.IsLowSurrogate(s[i + 1])) { list.Add(char.ConvertToUtf32(s[i], s[i + 1])); i++; }
+            else list.Add(s[i]);
         }
+        return list.ToArray();
     }
 }

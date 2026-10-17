@@ -432,8 +432,10 @@ public static class ACCT_UPDATE
 - **Names.** The class, the record structs, their members and the `Call` parameters are named by the ONE allocator of
   §4.5 — `DataItem.Sanitize` of the word, then the smallest free `_2`, `_3`, … in source order — over a scope SEEDED
   with that scope's reserved names: the enclosing type's own name (CS0542), the fixed members (`Call` and `Cancel` in
-  the class; `AsImage` and `FromImage` in a record struct) and the record struct's synthesized members (`Equals`,
-  `GetHashCode`, `ToString`, `Deconstruct`, `PrintMembers`, `EqualityContract`). A group contributes a property and a
+  the class; `AsImage` and `FromImage` in a record struct), the record struct's synthesized members (`Equals`,
+  `GetHashCode`, `ToString`, `Deconstruct`, `PrintMembers`, `EqualityContract`) and the imported type names (§4.5:
+  a formal `HostLanding` publishes parameter `HostLanding_2`, a `PROGRAM-ID. HostLanding.` the class `HostLanding_2`;
+  kb/Work PB3270). A group contributes a property and a
   nested record-struct type, named `<word>` and `<word>_Record` in the same scope. The `Call` parameters are claimed
   in the CLASS's scope beside its record structs, in source order (a formal's word, then its record's), because the
   `Call` body names each record type by its simple name and a parameter of that spelling would shadow it: `USING REC
@@ -567,7 +569,7 @@ emitter (this slice) and the decoder (slice 4) hold the same input and nothing i
 | message-tag (§14.2.2 SR2 admits it BY VALUE) | none: the A.4 message-control facility is not provided and the DATA DIVISION refuses a message-tag item (`docs/CONFORMANCE.md` §4), so no formal has that class |
 | fixed group | the published record struct: one property per named subordinate (FILLER kept privately so `FromImage` → `AsImage` round-trips), nested record structs for subordinate groups, an array property for OCCURS (its length checked at `AsImage`); for OCCURS DEPENDING ON whose data-name-1 is in the record (where §13.18.38.3 20) places it before the table), the array's length is the DEPENDING ON value, which §13.18.38.4 7) makes "the current number of occurrences", and for one whose data-name-1 is outside the record the array is the table's whole area, every occurrence the storage holds (§8.5.1.8); a REDEFINES subordinate is not a member (the record is the first description; its other views are the image's) |
 | strongly-typed group with an object-reference or pointer leaf | the published record struct with those members; packed as the CALL lane's carrier for that shape (PB2087's cell area with managed slots) |
-| variable-length group — a dynamic-length elementary item or a dynamic-capacity table beneath it (§8.5.1.12), whose current extent composes (`DataItem.CurrentExtentImageCapable`, the CALL lane's own gate) | the published record struct: a dynamic-length member is `string`, a dynamic-capacity table an array of its current capacity (never below its minimum capacity, "Integer-4 is the minimum capacity of the table", §13.18.38.4 16)); crosses as the CALL lane's variable-length carrier (`CobolVarGroup`); no `AsImage`/`FromImage`, because its storage has no single image (a dynamic-length item "may be located elsewhere", §8.5.1.10.3). ⚠ GR13 RESTRICTION: a group holding both such a component and a pointer or object-reference member publishes no entry — the variable-length carrier has no managed slot, and the cell area that has them carries no components |
+| variable-length group — a dynamic-length elementary item or a dynamic-capacity table beneath it (§8.5.1.12), whose current extent composes (`DataItem.CurrentExtentImageCapable`, the CALL lane's own gate) | the published record struct: a dynamic-length member is `string`, a dynamic-capacity table an array of its current capacity (never below its minimum capacity, "Integer-4 is the minimum capacity of the table", §13.18.38.4 16)); crosses as the CALL lane's variable-length carrier (`CobolVarGroup`); no `AsImage`/`FromImage`, because its storage has no single image (a dynamic-length item "may be located elsewhere", §8.5.1.10.3). ⚠ GR13 RESTRICTION (ISO §14.2.3 13), the boundary's own: a group holding both such a component and a pointer or object-reference member publishes no entry, because NO crossing form of the boundary carries it — the variable-length carrier has no managed slot, the cell area that has them carries no components, and the activated program's own formal of that description stages the Tier-C loud at its copy-in (a COBOL CALL of it is COBOLNET1688). The restriction lifts together with a crossing form for the shape, never before it (kb/Work PB3273; `HostEntryShapeDriftTests` pins the lane's absence of a form) |
 
 The published record struct is rendered from the DESCRIPTION by `PublishedRecordEmitter` (corrected 2026-10-15, kb/Work
 PB2099: this paragraph used to name a "published mode" of `RecordStructEmitter` and `GroupImageCodec`, but a group
@@ -673,7 +675,21 @@ the members the emitter itself writes there and the ones C# synthesizes (a recor
 the other image and leaf-vector members, `Equals`, `GetHashCode`, `ToString`, `PrintMembers`, …, in
 `CsNames.RecordStructMembers`; a program class: the `ICobolProgram` surface `Call`, `CloseFiles`, `EndStorage`, …, in
 `CsNames.ProgramClassMembers`; the published host-entry scopes add `Call`, `Cancel` and the enclosing type's name) —
-so a legal word never collides with a generated member. **Landed for the internal scopes (kb/Work PB2093):**
+so a legal word never collides with a generated member. **Every scope is also seeded with the imported type names
+(kb/Work PB3270):** the generated file's using directives import `System` and the runtime's namespaces
+(`CsNames.ImportedNamespaces`, the ONE list) and the emitted C# names their types by SIMPLE name
+(`CobolString.Store(…)`, `HostLanding.LandText(…)`, `Int128`), so a field, member, parameter or host class spelled like
+one shadows it for every such reference in its scope (CS0236, CS0120, CS1061, CS0117 on legal COBOL).
+`CsNames.ImportedTypeNames` — every public top-level type of those namespaces in the runtime assembly, and of `System`
+in the core library — is DERIVED by reflection, never listed by hand, and each scope kind holds it shared beside its own
+members, so a word spelled the same (case-sensitively, as C# is) takes the next free `_n`: `ModuleTypes` included, so a
+`PROGRAM-ID. HostLanding.` gets host class `HostLanding_2` rather than capturing the runtime's `HostLanding` for the
+namespace. `ImportedTypeNameDriftTests` keeps the derivation total: the using directives the emitter writes ARE
+`ImportedNamespaces`; the runtime side equals what Roslyn sees; and no string the compiler holds names a framework
+`System` type by simple name that the core-library derivation misses (it found `Console.Error.WriteLine`, now
+`global::System.Console…`). OO class, interface, method and property names are `DataItem.WordIdentifier`'s UPPER-CASE
+fold and so spell no imported type (the one all-capitals type, `BASE`, is the OO base class itself).
+**Landed for the internal scopes (kb/Work PB2093):**
 `DataBinder`'s private `Unique`, which left both unseeded (a subordinate named `AsImage` or `Equals` drew CS0102 in
 `_T_0`, a record named `CloseFiles` in the program class), is deleted; a group's members are appended only through
 `DataItem.AddMember`, which allocates in the group's own record-struct scope, and the class-level roots through the
@@ -1152,7 +1168,7 @@ products: any .NET language, and only as the ACTIVATING element.** No non-COBOL 
 program-pointer or `ADDRESS OF PROGRAM` resolves only WiseOwl COBOL programs. **Mechanism:** every outermost program
 and every user-defined function — definition or prototype — has a generated public class `Cobol.<assembly>.<name>`
 in the assembly that compiled it (except a unit one of whose group formals or RETURNING item holds both a dynamic-length
-item or dynamic-capacity table and a pointer or object reference, which has none), whose static `Call` method activates
+item or dynamic-capacity table and a pointer or object reference, which has none: no crossing form of the boundary carries that group, the activated program's own formal of it stages the Tier-C loud at its copy-in, so an entry could only reach a loud - kb/Work PB3273), whose static `Call` method activates
 it through the same boundary a COBOL CALL crosses (§14.9.4.4 GR3), and, for a program, a static `Cancel` method
 (§14.9.5). This is the only host interface.
 **Parameter matching:** positional (§14.2.3 GR2), one `Call` parameter per USING formal in order; the C# compiler

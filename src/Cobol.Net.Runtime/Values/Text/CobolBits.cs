@@ -132,10 +132,11 @@ public static class CobolBits
     /// <summary>The carrier of a TABLE of bit occurrences whose occurrences sit <paramref name="stride"/> bits apart:
     /// each occurrence's own carrier, padded with zero filler bits to <paramref name="stride"/> except the last —
     /// §13.18.1.4 GR2 ("An ALIGNED clause specified for a multiple-occurrence data item applies to each occurrence of
-    /// that item") puts every occurrence at the first bit of a byte, and §8.5.1.6.3 generates filler only "as needed to
-    /// advance alignment to a required natural boundary for the next item", so the last occurrence has none after it
-    /// (<c>BitLayout.TableBits</c>). With every occurrence exactly <paramref name="stride"/> bits wide (no ALIGNED
-    /// clause) it is the plain concatenation.</summary>
+    /// that item") puts the subject, or an ALIGNED member, of every occurrence at the first bit of a byte, so the
+    /// occurrences are a whole number of bytes apart (<c>BitLayout.StrideBits</c>, kb/Work PB3167), and §8.5.1.6.3
+    /// generates filler only "as needed to advance alignment to a required natural boundary for the next item", so the
+    /// last occurrence has none after it (<c>BitLayout.TableBits</c>). With every occurrence exactly
+    /// <paramref name="stride"/> bits wide (a table packed bit by bit) it is the plain concatenation.</summary>
     public static string Strided(string[] occurrences, int stride)
     {
         var sb = new System.Text.StringBuilder();

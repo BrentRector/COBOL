@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using CobolNet.Binding;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -108,7 +110,13 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
     private sealed record Schema(
         IReadOnlyDictionary<string, Verdict> Verdicts,
+        //: The editions, ascending: their order IS the order of the `editions` field's one spelling.
         string[] Editions,
+        string EditionsSeparator,
+        //: The schema's `required` and `run-through-last` (kb/Work PB3173): a row names its band, and the band is
+        //: a run of `Editions` ending at the last one, every row being a rule of the newest standard's text.
+        bool EditionsRequired,
+        bool EditionsRunThroughLast,
         Regex CodeLocationPattern,
         string CodeLocationSeparator,
         string TestRefSeparator,
@@ -157,6 +165,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         }
 
         var loc = root.GetProperty("code-location");
+        var editions = root.GetProperty("editions");
 
         // `kinds` and `anchored-files` both carry $-prefixed DOCUMENTATION siblings inside the same object, so
         // both readers skip them by prefix rather than by name — a new comment key must never read as a kind.
@@ -189,7 +198,10 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
         return new Schema(
             verdicts,
-            [.. root.GetProperty("editions").EnumerateArray().Select(x => x.GetString()!)],
+            [.. editions.GetProperty("values").EnumerateArray().Select(x => x.GetString()!)],
+            editions.GetProperty("separator").GetString()!,
+            editions.GetProperty("required").GetBoolean(),
+            editions.GetProperty("run-through-last").GetBoolean(),
             new Regex(loc.GetProperty("pattern").GetString()!, RegexOptions.Compiled),
             loc.GetProperty("separator").GetString()!,
             testRef.GetProperty("separator").GetString()!,
@@ -630,10 +642,83 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
     private static List<string> BadEditions(IEnumerable<Row> rows, Schema s) =>
         [.. from r in rows
-            where r.Editions.Length > 0
-            from e in Split(r.Editions, ",")
-            where !s.Editions.Contains(e)
-            select $"{r.RuleId}: editions names '{e}', not one of {string.Join('/', s.Editions)}"];
+            let error = EditionsError(r.Editions, s)
+            where error is not null
+            select $"{r.RuleId}: {error}"];
+
+    /// <summary>
+    /// Why an <c>editions</c> field is not legal, or <see langword="null"/>: the C# twin of
+    /// <c>inventory_schema.Schema.editions_error</c>, read from the same schema entry (kb/Work PB3172;
+    /// DESIGN-conformance-suite.md §6 step 0). Legal is exactly the editions it names, each once, in the schema's
+    /// ascending order, joined by its separator with no spaces; non-empty when the schema's <c>required</c> says
+    /// so, and a run of the editions ending at the last one when <c>run-through-last</c> says so (kb/Work PB3173).
+    /// </summary>
+    private static string? EditionsError(string value, Schema s)
+    {
+        if (value.Length == 0)
+            return s.EditionsRequired
+                ? "editions is empty — every row names the editions its rule exists at, decided from the "
+                  + "standard (kb/Work PB3173; DESIGN-conformance-suite.md §6 step 0)"
+                : null;
+        string[] given = Split(value, s.EditionsSeparator);
+        string[] unknown = [.. given.Where(e => !s.Editions.Contains(e))];
+        if (unknown.Length > 0)
+            return $"editions names '{string.Join("', '", unknown)}', not one of {string.Join('/', s.Editions)}";
+        string[] repeated = [.. s.Editions.Where(e => given.Count(g => g == e) > 1)];
+        if (repeated.Length > 0)
+            return $"editions names '{string.Join("', '", repeated)}' more than once";
+        string spelled = string.Join(s.EditionsSeparator, s.Editions.Where(given.Contains));
+        if (value != spelled)
+            return $"editions '{value}' is not the one spelling — write '{spelled}' (ascending, "
+                   + $"'{s.EditionsSeparator}'-separated, no spaces: DESIGN-conformance-suite.md §6 step 0)";
+        if (!s.EditionsRunThroughLast) return null;
+        string first = given[0], last = s.Editions[^1];
+        string run = string.Join(s.EditionsSeparator, s.Editions[Array.IndexOf(s.Editions, first)..]);
+        return value == run
+            ? null
+            : $"editions '{value}' is not a run through {last} — a rule of the {last} text exists from its "
+              + $"introducing edition through {last} with no gap: write '{run}' if {first} introduced it "
+              + "(kb/Work PB3173)";
+    }
+
+    /// <summary>The function section a clause 15 rule's section lies in: <c>15.7.3</c> → <c>15.7</c>, never
+    /// <c>15.70</c>'s.</summary>
+    private static readonly Regex FunctionSectionOf = new(@"^(15\.\d+)(?:\.|$)", RegexOptions.Compiled);
+
+    /// <summary>
+    /// The rows of a clause 15 function whose band STARTS before the function exists: the edition the compiler
+    /// introduces it at, <see cref="IntrinsicSig.IntroducedIn"/> (the COBOLNET1502 window). No rule of a function
+    /// exists before the function does, so a per-edition suite built from such a band would include a rule that
+    /// edition's compiler refuses to compile (kb/Work PB3173, branch review round 1: nine rows, ABS's at 2002 and
+    /// TEST-NUMVAL's at 85 among them). A band that starts LATER than the window is a reading of the rule's 2023
+    /// wording (a rule that names national arguments, say) and is not refused here.
+    /// </summary>
+    /// <param name="rows">the inventory rows</param>
+    /// <param name="s">the schema, for the editions' order and separator</param>
+    /// <param name="functionOfSection">clause 15 function section → function name</param>
+    /// <param name="introducedIn">function name → its introducing edition</param>
+    private static List<string> EarlyFunctionBands(
+        IEnumerable<Row> rows, Schema s, IReadOnlyDictionary<string, string> functionOfSection,
+        Func<string, int> introducedIn)
+    {
+        var bad = new List<string>();
+        foreach (var r in rows)
+        {
+            if (r.Editions.Length == 0 || FunctionSectionOf.Match(r.Section) is not { Success: true } m
+                || !functionOfSection.TryGetValue(m.Groups[1].Value, out string? name))
+                continue;
+            string window = introducedIn(name).ToString(CultureInfo.InvariantCulture);
+            string first = Split(r.Editions, s.EditionsSeparator)[0];
+            int w = Array.IndexOf(s.Editions, window);
+            if (w < 0)
+                bad.Add($"{r.RuleId}: {name} is introduced at {window}, which is not an edition of the schema");
+            else if (Array.IndexOf(s.Editions, first) < w)
+                bad.Add($"{r.RuleId}: editions '{r.Editions}' starts at {first}, but the {name} function "
+                        + $"(§{m.Groups[1].Value}) exists from {window} — write the band from {window} "
+                        + "(IntrinsicCatalog.cs, the COBOLNET1502 window; kb/Work PB3173)");
+        }
+        return bad;
+    }
 
     private static List<string> UnresolvedCodeLocations(IEnumerable<Row> rows, Schema s, string root)
     {
@@ -824,13 +909,48 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.True(bad.Count == 0, Report("row(s) closed on differential evidence alone", bad, rows.Count));
     }
 
-    /// <summary>An <c>editions</c> field names only the four editions the compiler implements.</summary>
+    /// <summary>
+    /// Every <c>editions</c> field is its ONE spelling: the editions the compiler implements, each once, ascending,
+    /// comma-separated with no spaces (kb/Work PB3172; until then 645 rows used <c>", "</c> and 37 were out of
+    /// order, so every reader parsed the field its own way). It is never empty, and it is a run from the rule's
+    /// introducing edition through 2023 (kb/Work PB3173: 148 rows were empty, and 20 wrote a start edition alone,
+    /// endpoints or a band stopping at 2014, so no per-edition suite could tell whether a rule belonged to it).
+    /// </summary>
     [Fact]
-    public void EveryEditionsField_NamesOnlyKnownEditions()
+    public void EveryEditionsField_IsTheOneSpelling()
     {
         var rows = LoadInventory();
         var bad = BadEditions(rows, LoadSchema());
-        Assert.True(bad.Count == 0, Report("bad edition name(s)", bad, rows.Count));
+        Assert.True(bad.Count == 0, Report("editions field(s) not in the one spelling", bad, rows.Count));
+    }
+
+    /// <summary>
+    /// Every rule of a clause 15 function starts no earlier than the function: its band's first edition is at
+    /// or after the edition <c>IntrinsicCatalog</c> introduces the function at (kb/Work PB3173, branch review
+    /// round 1). The function of a section is read from the standard's own headings, so a new function or a
+    /// moved window needs no list here.
+    /// </summary>
+    [Fact]
+    public void EveryFunctionRule_StartsNoEarlierThanItsFunction()
+    {
+        var rows = LoadInventory();
+        var functionOfSection = SpecClauseText.FunctionSections(File.ReadAllText(TestRepo.Specs("ISO_COBOL.md")))
+            .ToDictionary(f => f.Section, f => f.Name, StringComparer.Ordinal);
+        Assert.True(functionOfSection.Count >= 79,
+            $"only {functionOfSection.Count} clause 15 function headings found in specs/ISO_COBOL.md — the heading "
+            + "shape changed; fix SpecClauseText.FunctionSections, do not lower the floor.");
+        int scanned = rows.Count(r => FunctionSectionOf.Match(r.Section) is { Success: true } m
+                                      && functionOfSection.ContainsKey(m.Groups[1].Value));
+        Assert.True(scanned >= functionOfSection.Count,
+            $"only {scanned} inventory rows lie in the {functionOfSection.Count} function sections — every "
+            + "function has at least its general-format row, so the section match is broken.");
+        var bad = EarlyFunctionBands(rows, LoadSchema(), functionOfSection, name =>
+        {
+            Assert.True(IntrinsicCatalog.TryGet(name, out var sig),
+                $"clause 15 defines the {name} function, but IntrinsicCatalog has no row for it");
+            return sig.IntroducedIn;
+        });
+        Assert.True(bad.Count == 0, Report("function rule(s) whose band starts before the function", bad, scanned));
     }
 
     /// <summary>
@@ -1164,8 +1284,37 @@ public sealed class SpecTraceabilityInventoryDriftTests
         // record a CONFORMS — only to CLOSE the row — which is what makes CONFORMS-but-untested expressible.)
         Assert.Single(MissingEvidence([Base("X-4") with { Verdict = "CONFORMS" }], s));
 
-        // An edition the compiler does not have.
+        // An edition the compiler does not have, and each other shape the one spelling refuses (kb/Work PB3172):
+        // a spaced list, an out-of-order one, a doubled separator, a repeated edition; and since kb/Work PB3173
+        // an empty field and a band that is not a run through 2023 (a gap, an early stop, a start edition
+        // written alone). The one spelling of a run through 2023 passes.
+        Assert.Contains("editions is empty", Assert.Single(BadEditions([Base("X-5a")], s)));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5b") with { Editions = "85,2023" }], s)));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5c") with { Editions = "85,2002,2014" }], s)));
+        Assert.Contains("write '2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5k") with { Editions = "2002" }], s)));
         Assert.Single(BadEditions([Base("X-5") with { Editions = "85,1974" }], s));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5d") with { Editions = "85, 2002, 2014, 2023" }], s)));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5e") with { Editions = "2002,2014,2023,85" }], s)));
+        Assert.Single(BadEditions([Base("X-5f") with { Editions = "85,,2002" }], s));
+        Assert.Single(BadEditions([Base("X-5g") with { Editions = "2023,2023" }], s));
+        Assert.Empty(BadEditions(
+            [Base("X-5h") with { Editions = "85,2002,2014,2023" }, Base("X-5i") with { Editions = "2014,2023" },
+             Base("X-5j") with { Editions = "2023" }], s));
+
+        // A rule of a function whose band starts before the function exists (kb/Work PB3173, branch review round
+        // 1): with ABS introduced at 2014, a 2002 start is refused and a 2014 start passes, and a row of §15.70
+        // is not read as a row of §15.7.
+        var absOnly = new Dictionary<string, string>(StringComparer.Ordinal) { ["15.7"] = "ABS" };
+        Assert.Contains("exists from 2014", Assert.Single(EarlyFunctionBands(
+            [Base("X-5l") with { Section = "15.7.3", Editions = "2002,2014,2023" }], s, absOnly, _ => 2014)));
+        Assert.Empty(EarlyFunctionBands(
+            [Base("X-5m") with { Section = "15.7.3", Editions = "2014,2023" },
+             Base("X-5n") with { Section = "15.70.3", Editions = "85,2002,2014,2023" }], s, absOnly, _ => 2014));
 
         // ⛔ DIFFERENTIAL-ONLY COVERAGE. A NIST golden alone, and a *_MatchesLegacy test alone, are both real
         // shapes — the first Phase-B batch produced seven of them before this rule existed. Neither may close a

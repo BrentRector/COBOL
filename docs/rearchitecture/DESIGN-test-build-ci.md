@@ -136,10 +136,19 @@ ancestor holding a `.git` entry (a directory in the main checkout, a file in a w
 the project a `dotnet` command names, else the directory the shell is in when it runs it. That directory comes from
 `scripts/hooks/shell_location.py`, the ONE parser of both shells' command lines and location changes (`cd`,
 `pushd`/`popd`, a subshell, an and-or list a single `&` backgrounds, `bash -c`; `Set-Location`/`sl`/`chdir`/
-`Push-Location` with `-Path`/`-LiteralPath`, `pwsh -WorkingDirectory`, `Start-Process -WorkingDirectory`), which
-`worktree_rm_allow.py`, `forbidden_commands.py` (its push, verdict-chaining, WSL and backgrounded-`cd` rules; kb/Work
-PB3095) and `status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
-<worktree>; dotnet build` was judged to build in the main checkout);
+`Push-Location` with `-Path`/`-LiteralPath`, `pwsh -WorkingDirectory`, `Start-Process -WorkingDirectory`, cmd.exe's
+`cd /d`), which `worktree_rm_allow.py`, `forbidden_commands.py` (every rule; kb/Work PB3095, PB3198) and
+`status_guard.py` share (kb/Work PB2599; each used to carry its own partial parser, and a PowerShell `Set-Location
+<worktree>; dotnet build` was judged to build in the main checkout). It is the ONE model of a command line those rules
+read (kb/Work PB3198): heredoc bodies cut out at their own delimiter lines, and every place a shell takes a command line
+from walked as one (a `$( … )`, backquote or PowerShell expression or script block; `bash -c`, `pwsh -Command` /
+`-EncodedCommand`, `cmd /c`, `eval`, `Invoke-Expression`, also behind `timeout`/`env`/`xargs`/`wsl -e`; a heredoc,
+here-string or literal pipe a shell reads as its script), each step marked with how many substitutions enclose it, so
+the steps of one level are that level's own command line (a pipe inside `$( … )` reads the stage beside it), and a
+walk carrying what its own stdin holds: the read side of a `|` reads the stage before it (a group's last step
+when the group writes the pipe), a group reading a pipe, a Bash substitution and a `-c` payload hand the stdin they
+inherit to their commands, and only a `|` of a walk's OWN makes a command a pipeline side (a `cd` inside a group
+that reads a pipe moves the group's later steps);
 the main checkout is that root, or the `gitdir:` target parsed out of the worktree's `.git` file (parsed, not
 shelled out — this runs before every `dotnet` call); and a foreign agent's tree is
 `<main>/.claude/worktrees/agent-<agentId>` **when that directory exists**, else the main checkout, because

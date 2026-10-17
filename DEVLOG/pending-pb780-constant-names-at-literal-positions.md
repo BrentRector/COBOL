@@ -72,7 +72,7 @@ with KG AS KF = 0.25, `M=14` from MULTIPLY 2 BY KN, `R=AAAAAA` from an inline in
 from CALL AS NESTED BY VALUE KN, `IN ENTRY` from SET PP TO ENTRY KE, then STOP RUN WITH NORMAL STATUS KZ, under
 PROGRAM-ID AS KP2, which is AS KP1). Negative `pb780-constant-as-constant-cycle` (§13.10.3 SR5).
 
-**Row.** `SR-13.10.3-2` PARTIAL → CONFORMS, editions 2002, 2014, 2023 (GAP 66 → 65). kb/Work PB780 landed.
+**Row.** `SR-13.10.3-2` PARTIAL → CONFORMS, editions 2002, 2014, 2023 (GAP 60 → 59 on the merged tree). kb/Work PB780 landed.
 
 **Self-review** found two leads outside the mechanism, filed through the report: the SELECT PADDING CHARACTER operand is
 never bound, so `PADDING CHARACTER IS NOSUCH` compiles clean at 2002; and two private sole-data-reference descents
@@ -96,3 +96,15 @@ to CI's whole-population run: Conformance 5,795 · Unit 497 · Characterization 
 **Gate after the review fixes** (run `20261016T231310Z-bc0b58`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
 PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,740 · Unit 442 · Characterization 31 …`; the
 extended golden and both new negatives Passed in leg 1. semgrep verify: PASS, counts unchanged.
+
+**Finisher (landing stop).** The landing's Linux gate went RED on the merge `26b822385`:
+`SpecTraceabilityInventoryDriftTests.EveryCodeLocation_ResolvesInTheTree` found three rows (GR-11.9.4-1,
+GR-11.9.5.2-4, FMT-11.9.11.1) still citing `OptionsBinder.cs#Bind`, the member V11 deleted. The cause was the branch,
+not the host: the Windows gate's leg 1 never ran the sweep, because it costs more than the cheap-sweep cut
+(`SWEEP_CHEAP_SECONDS` 2 s; it ran 6 s), and the Linux gate runs the whole unit population. The fix retires the
+witness through `record_verdicts.py` with its reason and names the code that replaced it:
+`OptionsBinder.BindParagraph` and `DataBinder.BindDeclarations` for GR-11.9.4-1 (the container's model as the
+baseline), and `OptionsBinder.Apply` for FMT-11.9.11.1 (the INTERMEDIATE ROUNDING clause). The merge of the newer
+origin/main conflicted on `SR-13.10.3-2`, which main's PB3173 had re-noted for its editions. The inventory was taken
+from main and the branch's adjudication applied over it as a batch, keeping main's editions sentence. Every
+code-location in the merged inventory now resolves (4,195 rows).

@@ -345,7 +345,7 @@ def measure_pacing() -> dict | None:
                 if r.get("account") == acct.name]
     if not readings:
         return None
-    q = acct.quota
+    q = acct.quota_at(datetime.datetime.now(datetime.timezone.utc))
     newest = max(readings, key=lambda r: datetime.datetime.fromisoformat(r["noted_at"]))
     return {"reading": newest, "account": acct.name, "weekly_cap": q["weekly_cap_pct"],
             "soft": q["session_soft_stop_pct"], "hard": q["session_hard_stop_pct"],
@@ -496,7 +496,7 @@ def self_test() -> int:
 
 def main() -> int:
     # Both streams in UTF-8 BEFORE argparse can print (its --help carries the docstring's non-ASCII): a redirected
-    # stream is the host's code page on Windows otherwise (kb/Work PB2615's class).
+    # stream is the host's code page on Windows otherwise (kb/Work PB1546's class).
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8")

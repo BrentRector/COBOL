@@ -105,6 +105,16 @@ check("borrowing a day turns hold-day into go/hold-session", r["allowance_pct"],
 
 r = budget.estimate(now, [reading], source([ev(at(2026, 10, 5, 10), "opus", out=32_000_000)]), FIXTURE, A1, borrow_days=6)
 check("stop-week at the cap", (r["decision"], r["allowance_pct"]), ("stop-week", 97.0))  # the cap is model_rules.json weekly_cap_pct (owner 2026-10-07 09:40, kb/Work R69 section 6)
+# 6b. the owner's dated cap override (kb/Work PB3305): it lifts the cap inside its window and is inert from `until` on
+over = source([ev(at(2026, 10, 5, 10), "opus", out=32_000_000)])
+lifted = accounts.Account(name=A1.name, config_dir=A1.config_dir, explicit=True, weekly_reset=RESET1, quota=A1.quota,
+                          quota_overrides=((None, now + dt.timedelta(hours=1), {"weekly_cap_pct": 99}),))
+r = budget.estimate(now, [reading], over, FIXTURE, lifted, borrow_days=6)
+check("a dated override lifts the cap inside its window", r["allowance_pct"], 99.0)
+lapsed = accounts.Account(name=A1.name, config_dir=A1.config_dir, explicit=True, weekly_reset=RESET1, quota=A1.quota,
+                          quota_overrides=((None, now, {"weekly_cap_pct": 99}),))
+r = budget.estimate(now, [reading], over, FIXTURE, lapsed, borrow_days=6)
+check("a dated override is inert at its `until`", (r["decision"], r["allowance_pct"]), ("stop-week", 97.0))
 
 hot = dict(reading, session_pct=95.0)  # the soft stop is 97 (owner 2026-10-07 09:40)
 r = budget.estimate(now, [hot], source([ev(at(2026, 10, 5, 10), "sonnet", out=1_000_000)]), FIXTURE, A1)

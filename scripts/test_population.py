@@ -274,7 +274,7 @@ _PROSE_SUFFIXES = frozenset({".md", ".txt", ".json", ".tsv", ".csv"})
 
 def _code_lines(text: str) -> list[tuple[int, str]]:
     """Every line that is not a WHOLE-line `#` comment (bash, PowerShell, YAML)."""
-    return [(i, line) for i, line in enumerate(text.splitlines(), 1) if not line.lstrip().startswith("#")]
+    return [(i, line) for i, line in enumerate(text.split("\n"), 1) if not line.lstrip().startswith("#")]
 
 
 def _python_findings(text: str, rel: str) -> tuple[bool, list[str]]:
