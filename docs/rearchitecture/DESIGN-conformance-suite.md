@@ -149,10 +149,22 @@ So:
   an alphanumeric item) and DISPLAYs an alphanumeric literal naming the outcome. A figurative constant is allowed:
   DISPLAY shows "the alphanumeric representation of that figurative constant" (§14.9.11.4 GR 3), except an ALL
   national literal. A reference-modified numeric or numeric-edited item of usage display is alphanumeric (§8.4.3.3.4
-  GR 6 c) and allowed; one of computational usage would show its storage and is not. The lint also refuses `UPON`
-  (an implementor-defined device, §14.9.11.3 SR 2, whose output no expected stdout holds) and, in fixed form,
-  program text past column 72 (margin R, above). It applies to the tests the suites carry; a name the generator
-  cannot classify (a RENAMES item, a special register) is refused rather than guessed.
+  GR 6 c) and allowed, unless it is signed and no SIGN SEPARATE clause applies to it: "Neither the representation
+  nor the position of that operational sign is specified" (§13.18.52.4 GR 4; GR 5 b for SIGN without SEPARATE),
+  while a separate sign is '+' or '-' (GR 6 b). One of computational usage would show its storage and is not
+  allowed. **The lint judges the storage an operand shows.** A group's USAGE, SIGN and SYNCHRONIZED clauses apply to
+  its items (§13.18.60.4 GR 1, §13.18.52.4 GR 1, §13.18.55.4 GR 1). A group is allowed only when every item it holds,
+  at any depth, is alphanumeric, numeric-edited, or an unsigned or separately signed numeric display item, and none
+  is SYNCHRONIZED ("The effect of this clause is defined by the implementor", §13.18.55.4 GR 9). An item whose storage
+  another entry also describes is judged by what that entry holds too: a REDEFINES (§13.18.44.4 GR 2), the records
+  of one FD or SD (§13.18.33.4 GR 3), the files of one SAME RECORD AREA clause (§12.4.6.4.4 GR 2). Each source unit's
+  DISPLAY statements are judged by that unit's own data descriptions; a name the unit does not declare (a GLOBAL or
+  EXTERNAL item of another unit) by every unit's. The lint reads declarations, not data flow: it does not follow the
+  bytes an alphanumeric MOVE carries from one item into another. The lint also refuses `UPON` (an
+  implementor-defined device, §14.9.11.3 SR 2, whose output no expected stdout holds) and, in fixed form, program
+  text past column 72 (margin R, above) in the test and in every library text it copies; a comment line is no
+  program text. It applies to the tests the suites carry; a name the generator cannot classify (a RENAMES item, a
+  special register) is refused rather than guessed. A refusal in a library text names that file and its line.
 - **`implementor-defined`** names Annex A.1 items whose values the standard enumerates. The example is item 148,
   "RECORD clause (whether fixed or variable records produced for fixed-or-variable-length format)": §13.18.43.4 GR 17
   "It is implementor defined whether format 3 of the RECORD clause produces fixed-length records or variable-length
@@ -207,8 +219,10 @@ conformance-suite/
   per edition (the cleared tests of `cases/`, not `_unassigned/`, that apply there, with their expectation: the
   expected-output file per A.1 value, or the flag kind, the marked line and the control), and
   `suites/wiseowl/manifest.json`: every test of both trees at each edition it names, portable or not, and the
-  `wiseowl/diagnostics.json` refusals, which is what WiseOwl's own runner executes (S1c). The suites are build
-  output, never committed.
+  `wiseowl/diagnostics.json` refusals, each with the refused test's source, reference format and declared files,
+  which is what WiseOwl's own runner executes (S1c). The suites are build output, never committed; `--out DIR`
+  writes them elsewhere (the in-process runner's own directory). A rerun replaces only what a previous run wrote (the
+  manifest directories and the completeness report) and refuses a directory holding anything else, deleting nothing.
 - **Completeness is reported per witness kind**, never as one count that can never reach zero: for each edition, the
   inventory rows witnessed by a suite test, by a documented determination (`docs/CONFORMANCE.md`), by a derivation,
   or only by a WiseOwl unit test, and the rows with no witness. The suite's own measure is "rows whose obligation a
@@ -269,10 +283,11 @@ conformance-suite/
   others' (each edition's record is a whole run of its suite), and `--test` is refused with it. `run.py` executes the per-edition suites; the `wiseowl` manifest and its
   refusals are the in-process xUnit runner's (S1c).
 - **In WiseOwl's own pipeline**: the xUnit runner in `Cobol.Net.Tests.Conformance` executes the same manifests
-  in-process (fast) and also checks `wiseowl/diagnostics.json`; CI also runs `harness/run.py` with the WiseOwl
-  adapter and a drift test requires the two runners' verdict sets to be equal. The output normalization exists in
-  both languages by nature (`CutRunner.Normalize` in C#; LF, per-line trailing-space trim) and both are pinned to
-  one shared fixture. The GnuCOBOL adapter ADDS a signal to the per-batch battery; it does not replace the GnuCOBOL
+  in-process (fast) and also checks `wiseowl/diagnostics.json`; the drift test that requires the two runners'
+  verdict sets to be equal runs `harness/run.py` with the WiseOwl adapter itself, on the same generated suites, so
+  every gate and both of CI's operating systems run it (no CI job of its own, which a local gate would not
+  reproduce). The output normalization exists in both languages by nature (`CutRunner.Normalize` in C#; LF,
+  per-line trailing-space trim) and both are pinned to one shared fixture, `harness/normalization-fixture.json`. The GnuCOBOL adapter ADDS a signal to the per-batch battery; it does not replace the GnuCOBOL
   differential (`scripts/gnucobol_differential.py`), which runs GnuCOBOL's own testsuite through WiseOwl, the other
   direction.
 
@@ -457,6 +472,22 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   the generator's manifests in-process (accept: compile, run, compare through `CutRunner.Normalize`; flag: the
   diagnostic at the marked line; `wiseowl/diagnostics.json`: the refusal and its code or message), and the drift
   tests of §9: equal verdicts with `run.py` on the WiseOwl adapter, and the two normalizations on one shared fixture.
+  **As landed:** `ConformanceSuiteTests` (one row per test and edition of the `wiseowl` manifest, red on FAIL or NO
+  VERDICT as `run.py` is with no baseline; one row per refusal and edition, which the front end or the binder must
+  refuse with its code) over `ConformanceSuiteRunner` (the verdicts of §5, compiling through the compiled-program
+  cache) and `ConformanceSuite` (the manifest, generated once per test process into a directory of its own by the new
+  `generate.py --out`; the adapter's diagnostic pattern and the profile, read rather than restated, since
+  `config.py` validates them at the audit). `ConformanceSuiteRunnerDriftTests` runs `run.py` through the WiseOwl
+  adapter on the same generated suites and names every test whose verdict differs, and holds `CutRunner.Normalize`
+  and `run.py`'s `normalize()` to `harness/normalization-fixture.json`. Two corrections to this design, written
+  above and in §4: the verdict drift test runs `run.py` itself (§5), and a refusal's manifest entry carries the
+  test's declared files, so the refused program compiles as the suite compiles it. The WiseOwl adapter pins a
+  program's default locales to the root locale, as the in-process runner does (`CutRunner.LocalePin`; the defaults
+  are the environment's, DOC-A.1-118), and a drift test holds the two pins equal. The Conformance project builds
+  the `cobol` command for `run.py` (a project reference that references no assembly), since CI's Conformance legs
+  build that project alone. The theories are one class each: the move (S2) partitions them when the corpus arrives,
+  as `CorpusRunnerTests` is (kb/Work PB2527), and decides the verdict drift test's shape at that size, since `run.py`
+  starts one `cobol` process per compile.
 - **S2 — the move (PB3177).** §6 step 1, in one landing: the converter (committed on the branch for review, deleted
   before it lands: the move is its output), the moved tree, `wiseowl/cases/` and `wiseowl/diagnostics.json`, the
   inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the

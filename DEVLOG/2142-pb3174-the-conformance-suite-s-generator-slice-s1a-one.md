@@ -1,4 +1,4 @@
-## PB3174 — the conformance suite's generator (slice S1a): one header reader, its refusals, the manifests and the completeness report
+## Entry 2142 — 2026-10-16 22:42 PDT — PB3174 — the conformance suite's generator (slice S1a): one header reader, its refusals, the manifests and the completeness report
 
 kb/Work PB3174, design `docs/rearchitecture/DESIGN-conformance-suite.md` §3, §4, §9 and §13 S1a (approved by the
 owner 2026-10-14). Wave 1104 C3, on PB3173's branch, so PB3172 (one spelling of `editions`) and PB3173 (every band
@@ -58,9 +58,36 @@ unreadable header, an unclassifiable DISPLAY operand and an unknown registry nam
 **Not done:** the completeness report on the ledger (§9's last bullet), whose content is the owner's (kb/Work
 PB2912); raised as a lead in the wave report.
 
+**Branch review, round 1 (four findings, all fixed).** The lint judged a DISPLAY operand by its declared class
+alone, so four ways of showing implementor-defined bytes passed it. R1-1: an item took no USAGE from its group, so
+`01 G USAGE COMP. 05 A PIC 9(4).` + `DISPLAY A(1:2)` passed as a reference-modified numeric display item (ISO
+§13.18.60.4 GR 1 "If the USAGE clause is specified or implied at a group level, it applies only to each elementary
+item in the group"). R1-2: a reference-modified signed item without SIGN SEPARATE passed (its sign is the
+implementor's, §13.18.52.4 GR 4; a separate sign is '+' or '-', GR 6 b), and so did a group holding a computational
+or signed item, whose DISPLAY shows that storage. R1-3: the margin-R check read the test's own text, never the library
+text it copies. R1-4: only the first program's DATA DIVISION was read, so a contained or sibling program's DISPLAY
+was judged by the first program's names (a silent pass, or a false refusal). The fix is one structure:
+`cobol_source.source_units` splits the compilation group into its source units (the IDENTIFICATION DIVISION header is
+optional, §11.2.1, so a unit opens at its paragraph), and `_Tree` builds each data division's level hierarchy, passes
+a group's USAGE, SIGN and SYNCHRONIZED clauses to its items (§13.18.60.4 GR 1, §13.18.52.4 GR 1-3, §13.18.55.4 GR 1),
+and computes what each group holds and what storage each item shares. The sibling sweep found three more ways the
+same bytes reach a portable-looking operand, all fixed in the same structure: a SYNCHRONIZED item in a group (its
+alignment is the implementor's, §13.18.55.4 GR 9), and storage described twice, by REDEFINES (§13.18.44.4 GR 2), by
+the records of one FD or SD (§13.18.33.4 GR 3) and by SAME RECORD AREA (§12.4.6.4.4 GR 2). A token now names the
+library text it came from, so a refusal found in a copybook (a COPY, a run-time expectation, a DISPLAY, the margin)
+names that file and its line, where it named the test with the copybook's line number. A comment line past column 72
+is no longer refused: it is comment wherever margin R lies. Seven self-test arms pin these (the reviewer's three
+probes among them), and a mutation check removed each mechanism in turn and saw its arm go RED. What the lint still
+cannot see is data flow: an alphanumeric MOVE of a group holding binary into an alphanumeric item (raised as a lead).
+
 **Gate:** run `20261017T032152Z-ddd86a` (HEAD 9da27563c): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515):
 GREEN — leg 2 left to CI's whole-population run: Conformance 5,880 · Unit 661 · Characterization 31 … — Conformance
 6,019/11,899 · Unit 33,225/33,886 · Characterization 5/36 cases ran (skipped 0) in 1 of 2 leg(s) …`. The first gate
 (run `20261017T024457Z-9cbe40`, GREEN) re-ran all 82 self-tests in 1,597 s, because `scripts/self_tests.py` is an
 input of every recorded PASS; the second reused 72. `SelfTestDiscoveryDriftTests` (5 of 5) passed in a direct run on
 the gate's build: its two edited methods are leg 2. Linux gate: the lander's (batched gating).
+After the review fixes, run `20261017T051108Z-487692` (HEAD e706d8df6): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
+gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,840 · Unit 473 · Characterization 31
+… — Conformance 6,078/11,918 · Unit 33,444/33,917 · Characterization 5/36 cases ran (skipped 0) in 1 of 2 leg(s) …`;
+`generate.py --self-test` re-ran GREEN in it, and `semgrep/verify.py` PASS.
+

@@ -1,0 +1,28 @@
+{
+  "$comment": [
+    "The ONE fixture of the output normalization (DESIGN-conformance-suite.md §5, §9): a compiled program's stdout and",
+    "its expected output are compared after line ends become LF (CR LF, CR, LF, NEL, LS, PS and FF: the line ends",
+    ".NET's String.ReplaceLineEndings reads), each line loses its trailing spaces (spaces only) and trailing line ends",
+    "are dropped. The rule exists in two languages by nature, run.py's normalize() and CutRunner.Normalize in",
+    "tests/Cobol.Net.Tests.Conformance/CompilerUnderTest.cs, and ConformanceSuiteRunnerDriftTests holds BOTH to every",
+    "case below, so the two runners of the suite compare outputs on one basis."
+  ],
+  "cases": [
+    {"name": "empty", "input": "", "normalized": ""},
+    {"name": "lf, with a final line end", "input": "A\nB\n", "normalized": "A\nB"},
+    {"name": "cr lf", "input": "A  \r\nB\r\n", "normalized": "A\nB"},
+    {"name": "a lone cr", "input": "A\rB", "normalized": "A\nB"},
+    {"name": "cr then cr lf is two line ends", "input": "A\r\r\nB", "normalized": "A\n\nB"},
+    {"name": "nel, ls, ps and ff end lines", "input": "A\u0085B C D\u000cE", "normalized": "A\nB\nC\nD\nE"},
+    {"name": "a vertical tab does not end a line", "input": "A\u000bB", "normalized": "A\u000bB"},
+    {"name": "trailing spaces of each line go", "input": "A   \n  B  \n", "normalized": "A\n  B"},
+    {"name": "a trailing tab stays", "input": "A\t\nB", "normalized": "A\t\nB"},
+    {"name": "a trailing no-break space stays", "input": "A \nB", "normalized": "A \nB"},
+    {"name": "trailing empty lines go", "input": "A\n\n\n", "normalized": "A"},
+    {"name": "a last line of spaces goes", "input": "A\n   ", "normalized": "A"},
+    {"name": "leading empty lines stay", "input": "\n\nA", "normalized": "\n\nA"},
+    {"name": "an inner line of spaces becomes empty and stays", "input": "A\n   \nB", "normalized": "A\n\nB"},
+    {"name": "only spaces", "input": "   ", "normalized": ""},
+    {"name": "inner spaces stay", "input": "A  B \n", "normalized": "A  B"}
+  ]
+}
