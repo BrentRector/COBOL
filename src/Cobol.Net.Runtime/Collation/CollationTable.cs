@@ -202,24 +202,6 @@ public sealed class CollationTable
         return new[] { first, second };
     }
 
-    /// <summary>The element sequence of a code point SEQUENCE — one contraction when the table has it, else the
-    /// concatenated per-code-point sequences (Hangul and implicit weights included). What a rule builder needs to
-    /// read the current position of a reset string.</summary>
-    public CollationElement[] GetElements(ReadOnlySpan<int> codePoints)
-    {
-        if (codePoints.Length == 1) return GetElements(codePoints[0]).ToArray();
-        if (codePoints.Length > 1 && _contractions.TryGetValue(codePoints[0], out var candidates))
-        {
-            var rest = codePoints[1..];
-            foreach (var c in candidates)
-                if (c.Rest.AsSpan().SequenceEqual(rest))
-                    return _elements.AsSpan(c.Offset, c.Count).ToArray();
-        }
-        var list = new List<CollationElement>(codePoints.Length * 2);
-        foreach (int cp in codePoints) list.AddRange(GetElements(cp).ToArray());
-        return list.ToArray();
-    }
-
     /// <summary>True when the table carries an explicit mapping for <paramref name="codePoint"/> (as opposed to a
     /// computed Hangul or implicit weight).</summary>
     public bool HasExplicitMapping(int codePoint) => _singles.ContainsKey(codePoint);
@@ -554,14 +536,26 @@ public sealed class CollationTable
             singles[codePoints[0]] = (offset << 8) | count;
             return;
         }
-        int[] rest = codePoints[1..];
         var existing = contractions.TryGetValue(codePoints[0], out var c) ? c : [];
+        contractions[codePoints[0]] = WithContraction(existing, codePoints[1..], offset, count, out bool added);
+        if (added) contractionCount++;
+    }
+
+    /// <summary>The contractions of one first code point with <paramref name="rest"/> mapped to the pool slice
+    /// (<paramref name="offset"/>, <paramref name="count"/>): the existing entry for that rest REPLACED, else a new
+    /// one inserted (<paramref name="added"/>), the array kept LONGEST FIRST — the order the S2.1 walk
+    /// (<see cref="ContractionWalker.TryMatchContraction"/>) relies on. A new array; <paramref name="existing"/> is not
+    /// modified. Every builder of a contraction list uses it: this table's derivation and the CLDR rule builder's
+    /// mappings-so-far.</summary>
+    internal static Contraction[] WithContraction(Contraction[] existing, int[] rest, int offset, int count, out bool added)
+    {
         int i = Array.FindIndex(existing, e => e.Rest.AsSpan().SequenceEqual(rest));
         Contraction[] updated;
         if (i >= 0)
         {
             updated = (Contraction[])existing.Clone();
             updated[i] = new Contraction(rest, offset, count);
+            added = false;
         }
         else
         {
@@ -569,9 +563,9 @@ public sealed class CollationTable
             existing.CopyTo(updated, 0);
             updated[^1] = new Contraction(rest, offset, count);
             Array.Sort(updated, (a, b) => b.Rest.Length.CompareTo(a.Rest.Length));   // longest first
-            contractionCount++;
+            added = true;
         }
-        contractions[codePoints[0]] = updated;
+        return updated;
     }
 
     // ---- loading -------------------------------------------------------------------------------------------------

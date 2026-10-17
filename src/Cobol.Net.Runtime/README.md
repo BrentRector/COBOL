@@ -28,7 +28,7 @@ verbatim): *"Implements collation behavior consistent with ISO/IEC 14651 through
         │  a combining mark present? → NFD with the table's own decompositions (never the host's)      [Unicode/, Collation/Normalizer]
         ▼
    collation elements: code point → element sequence; contractions (longest, then discontiguous over
-   unblocked marks); expansions; Hangul → jamo; implicit weights for Han/Tangut/Nushu/Khitan/unassigned    [CollationTable, CollationElementIterator]
+   unblocked marks); expansions; Hangul → jamo; implicit weights for Han/Tangut/Nushu/Khitan/unassigned    [CollationTable, ContractionWalker, CollationElementIterator]
         │
         ▼
    weights per level under CollationOptions — strength · alternate (maxVariable) · caseFirst · backwards   [Collator.WeightAt]
