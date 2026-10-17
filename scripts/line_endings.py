@@ -21,7 +21,7 @@ the attributes — so this check holds the rule, in three arms:
   WORKING TREE the same rule over the checkout's bytes, which are what a Windows gate compiles and compares. A checkout
                made before PB3029 is CRLF throughout: `--fix` rewrites it once, then re-states the index entries the
                rewrite made stale (`refresh_index`), so `git status` reads every rewritten file clean.
-  WRITERS      every text-mode write in a live Python tool (scripts/, .claude/, conformance-suite/harness/) states
+  WRITERS      every text-mode write in a live Python tool (under `live_tools.ROOTS`, the harness among them) states
                `newline=`: Python on Windows otherwise translates each "\\n" to CRLF, so a generator run on Windows
                leaves a CRLF working tree that the second arm then reports. `--fix-writers` adds `newline="\\n"`
                mechanically (re-run it after a rebase brings in a new writer). PowerShell and C# writers of tracked
@@ -45,15 +45,11 @@ import tokenize
 from dataclasses import dataclass
 from pathlib import Path
 
+import live_tools  # this directory's: the one list of the live tools' trees, where the WRITERS arm looks
+
 REPO = Path(__file__).resolve().parents[1]
 CR, LF, NUL = b"\r", b"\n", b"\0"
 CRLF = CR + LF
-
-#: Where the WRITERS arm looks: the live tools, including the conformance suite's harness (its generator is a gate
-#: audit and writes the manifests every runner reads; kb/Work PB3174, PB3176). `docs/**/evidence/**` and
-#: `adjudication/**` hold frozen records, never run against the tree, and `tools/claude-skills` is a submodule with
-#: its own repository.
-LIVE_ROOTS = ("scripts/", ".claude/", "conformance-suite/harness/")
 
 #: How many findings of one arm the report prints before it says "and N more".
 SHOWN = 40
@@ -188,7 +184,7 @@ def writer_calls(source: str) -> list[ast.Call]:
 
 def live_python(root: Path) -> list[str]:
     files = git(root, "ls-files", "-z", "--", "*.py").stdout.split("\0")
-    return sorted(f for f in files if f.startswith(LIVE_ROOTS))
+    return sorted(f for f in files if f.startswith(live_tools.ROOTS))
 
 
 def scan_writers(root: Path) -> list[str]:
@@ -535,6 +531,9 @@ def self_test() -> int:
     expect("--fix-writers keeps a single-line call on its line", fixed.splitlines()[3], "p.write_text('a', newline=\"\\n\")")
     expect("--fix-writers puts the keyword after a trailing comma",
            fixed.splitlines()[20], "    'w', newline=\"\\n\",")
+    reached = sorted(r for r in live_tools.ROOTS if any(p.startswith(r) for p in live_python(REPO)))
+    expect("arm WRITERS reaches every live tree (live_tools.ROOTS), the conformance suite's harness among them",
+           reached, sorted(live_tools.ROOTS))
 
     print(f"=== LINE ENDINGS SELF-TEST: {'FAIL — ' + str(len(failures)) if failures else 'PASS'} ===")
     return 1 if failures else 0

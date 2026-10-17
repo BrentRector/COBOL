@@ -45,7 +45,7 @@ def main():
                     continue
                 if not cpat.search(text):
                     continue
-                for i, line in enumerate(text.splitlines(), 1):
+                for i, line in enumerate(text.split('\n'), 1):  # LF only: splitlines also breaks at U+2028 in a literal
                     if cpat.search(line) and (rpat is None or rpat.search(line)):
                         hits[p.relative_to(ROOT).as_posix()].append((i, line.strip()))
     if not hits:

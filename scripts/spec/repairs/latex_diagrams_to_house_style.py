@@ -189,7 +189,7 @@ def main() -> int:
         n = sum(1 for l in text.splitlines() if "\\left" in l)
         sys.exit(f"FATAL: {n} LaTeX diagram line(s) still present — every general format should now be ASCII")
     fenced, fence = [], False
-    for i, l in enumerate(text.splitlines()):
+    for i, l in enumerate(text.split("\n")):  # LF only, so i + 1 is the file's line number
         if l.lstrip().startswith("```"):
             fence = not fence
             continue

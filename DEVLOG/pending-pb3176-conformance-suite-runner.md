@@ -78,3 +78,18 @@ and were not reported, because `scripts/line_endings.py`'s WRITERS arm looked on
 8e7851db9): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,132/11,947 · Unit 33,491/33,924 ·
 Characterization 5/36 cases ran; all 29 `ConformanceSuite*` cases passed in leg 1, and the SELF-TESTS audit ran
 `generated_output.py` and `generate.py --self-test` GREEN.
+
+**Branch review round 2.** R2-1: the round-1 fix added the harness to `line_endings.py`'s live roots but left
+`temp_names.py`'s copy at `scripts/` and `.claude/`, so a fixed temp name committed in `run.py` or `generate.py`
+passed the temp-name audit (re-probed: a line `p = Path(tempfile.gettempdir()) / "suite.json"` appended to `run.py`
+read GREEN). There were three copies of one list, so the fix is one list: `scripts/live_tools.py#ROOTS` (`scripts/`,
+`.claude/`, `conformance-suite/harness/`), read by `self_tests.py` discovery, the WRITERS arm and the temp-name audit.
+Discovery is unchanged (the same 86 lines from `self_tests.py --list` before and after; `.claude/` holds no
+self-test). The same probe now reads RED. New arms: each audit's self-test checks that its scan reaches every live
+tree, and `SelfTestDiscoveryDriftTests.EveryLiveTreeReader_ReadsTheOneList` checks that the three readers read
+`live_tools.ROOTS` and declare no copy of their own. The probe also turned up a second defect: the finding named
+line 862 but printed line 856's text. `temp_names.py` took a finding's text from `str.splitlines()`, which also
+breaks at the two U+2028/U+2029 characters in `run.py`'s normalization cases. Lines now split at LF only
+(`source_lines`). Two new self-test arms (`.py` and `.ps1`, a U+2028 in a literal before the finding) cover it, and the
+other live scripts that number lines with `splitlines` (`test_population.py#_code_lines`, `spec/where.py`,
+`spec/repairs/latex_diagrams_to_house_style.py`) are fixed the same way.
