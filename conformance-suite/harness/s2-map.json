@@ -52312,5 +52312,116 @@
   ],
   "refuse-at": [],
   "source-format": "fixed"
+ },
+ "2002/pb780_constant_names_literal_operands": {
+  "id": "pb780_constant_names_literal_operands",
+  "path": "cases/13.10-Constant/pb780_constant_names_literal_operands.cob",
+  "editions": [
+   "2002"
+  ],
+  "refuse-at": [],
+  "source-format": "free"
+ },
+ "2002/pb780_constant_names_name_programs": {
+  "id": "pb780_constant_names_name_programs",
+  "path": "cases/13.10-Constant/pb780_constant_names_name_programs.cob",
+  "editions": [
+   "2002"
+  ],
+  "refuse-at": [],
+  "source-format": "free"
+ },
+ "2002/pb780_constant_names_slot_witnesses": {
+  "id": "pb780_constant_names_slot_witnesses",
+  "path": "cases/13.10-Constant/pb780_constant_names_slot_witnesses.cob",
+  "editions": [
+   "2002"
+  ],
+  "refuse-at": [],
+  "source-format": "free"
+ },
+ "2023/pb780_constant_name_options_fill": {
+  "id": "pb780_constant_name_options_fill",
+  "path": "cases/13.10-Constant/pb780_constant_name_options_fill.cob",
+  "editions": [
+   "2023"
+  ],
+  "refuse-at": [],
+  "source-format": "fixed"
+ },
+ "negative/pb780-call-numeric-constant": {
+  "id": "pb780-call-numeric-constant",
+  "path": "cases/13.10-Constant/pb780-call-numeric-constant.cob",
+  "editions": [],
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "source-format": "free"
+ },
+ "negative/pb780-code-national-constant": {
+  "id": "pb780-code-national-constant",
+  "path": "cases/13.10-Constant/pb780-code-national-constant.cob",
+  "editions": [],
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "source-format": "free"
+ },
+ "negative/pb780-constant-as-constant-cycle": {
+  "id": "pb780-constant-as-constant-cycle",
+  "path": "cases/13.10-Constant/pb780-constant-as-constant-cycle.cob",
+  "editions": [],
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "source-format": "free"
+ },
+ "negative/pb780-currency-symbol-constant-chain-hex": {
+  "id": "pb780-currency-symbol-constant-chain-hex",
+  "path": "cases/_unassigned/pb780-currency-symbol-constant-chain-hex.cob",
+  "editions": [],
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "source-format": "free"
+ },
+ "negative/pb780-currency-symbol-constant-from-hex": {
+  "id": "pb780-currency-symbol-constant-from-hex",
+  "path": "cases/_unassigned/pb780-currency-symbol-constant-from-hex.cob",
+  "editions": [],
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "source-format": "free"
+ },
+ "negative/pb780-options-fill-constant-not-hex": {
+  "id": "pb780-options-fill-constant-not-hex",
+  "path": "cases/13.10-Constant/pb780-options-fill-constant-not-hex.cob",
+  "editions": [],
+  "refuse-at": [
+   "2023"
+  ],
+  "source-format": "free"
+ },
+ "negative/pb780-value-subscript-not-integer-constant": {
+  "id": "pb780-value-subscript-not-integer-constant",
+  "path": "cases/13.10-Constant/pb780-value-subscript-not-integer-constant.cob",
+  "editions": [],
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "source-format": "free"
  }
 }

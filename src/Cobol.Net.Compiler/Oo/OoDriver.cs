@@ -77,8 +77,8 @@ internal sealed class OoDriver(BindSession session)
         // — so its clauses had no effect on the prototypes AND, because OptionsBinder is where the
         // processor-dependence screens live, an interface could select a declined arithmetic mode in silence
         // (kb/Work PB197: the second hollow arm, found by sweeping all six optionsParagraph-bearing productions
-        // rather than only the METHOD one the finding named).
-        data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(iface.Ctx.optionsParagraph(), session.Edition, null));
+        // rather than only the METHOD one the finding named). BindDeclarations binds it (kb/Work PB780).
+        data.UseSkeletonOptions(iface.Ctx.optionsParagraph());
         OoEnvironmentRules.Screen(OoDefinition.Interface, $"interface '{iface.Name}'",
             iface.Ctx.environmentDivision(), session.Edition);
         var synthetic = OoReparent(iface.Ctx.environmentDivision(), dataDivision: null);
@@ -114,10 +114,6 @@ internal sealed class OoDriver(BindSession session)
             classCtx.factoryParagraph()?.dataDivision(), edition);
         OoDefinitionRules.Screen(OoDefinition.Instance, $"class '{cls.Name}' OBJECT paragraph",
             classCtx.objectParagraph()?.dataDivision(), edition);
-        // §10.6.1 / §11.9.4 GR1 (kb/Work PB135): the class skeleton's OPTIONS paragraph is the contained
-        // definitions' baseline; the OBJECT and FACTORY paragraphs' own override it clause by clause.
-        var clsOptions = Binding.OptionsBinder.BindParagraph(classCtx.optionsParagraph(), edition, null);
-
         // ⛔ THE CLASS DEFINITION IS A SOURCE ELEMENT OF ITS OWN (kb/Work PB3154). §10.5: "A source element is a source
         // unit excluding any contained source units", and the factory and instance definitions are source units the
         // class definition contains (§3.165). So the words of the class definition's environment division (its
@@ -130,7 +126,11 @@ internal sealed class OoDriver(BindSession session)
         // names, an alphabet SPECIAL-NAMES declares or the CLASS-ID itself was refused COBOLNET2692 on legal source.
         // Nothing here draws a uid (the division declares names, never data items), so it takes no uid band.
         var classData = ElementBinder(classCtx, classCtx, cls.Name);
-        classData.CallInheritOptions(clsOptions);
+        // §10.6.1 / §11.9.4 GR1 (kb/Work PB135): the class skeleton's OPTIONS paragraph is the contained
+        // definitions' baseline (InheritConfiguration carries classData.Options to them); the OBJECT and FACTORY
+        // paragraphs' own override it clause by clause. Each binds in its binder's BindDeclarations, after the
+        // definition's constant entries are declared (kb/Work PB780).
+        classData.UseSkeletonOptions(classCtx.optionsParagraph());
         var classSynthetic = OoReparent(classCtx.environmentDivision(), dataDivision: null);
         classData.BindDeclarations(classSynthetic);
         using (edition.At(classCtx)) classData.DeclareUserWord(cls.Name, UserWordKind.ObjectClassName);
@@ -140,8 +140,8 @@ internal sealed class OoDriver(BindSession session)
         var obj = classCtx.objectParagraph();
         var data = ElementBinder(obj, classCtx, cls.Name);
         data.CallSeedUids(session.TakeUidBand());
-        data.InheritConfiguration(classData);   // before CallInheritOptions: it carries the class's OPTIONS baseline
-        data.CallInheritOptions(Binding.OptionsBinder.BindParagraph(obj?.optionsParagraph(), edition, clsOptions));
+        data.InheritConfiguration(classData);   // carries the class's OPTIONS model, the §11.9.4 GR1 baseline
+        data.UseSkeletonOptions(obj?.optionsParagraph());
         var synthetic = OoReparent(obj?.environmentDivision(), obj?.dataDivision());
         data.ReserveClassMemberNames(cls.Symbol.CsName, cls.Symbol.Methods);   // one C# class holds the object data AND the methods
         data.BindDeclarations(synthetic);
@@ -162,8 +162,7 @@ internal sealed class OoDriver(BindSession session)
         var fdata = ElementBinder(fac, classCtx, cls.Name);
         fdata.CallSeedUids(session.TakeUidBand());
         fdata.InheritConfiguration(classData);
-        fdata.CallInheritOptions(Binding.OptionsBinder.BindParagraph(
-            fac?.optionsParagraph(), edition, clsOptions));   // §11.9.4 GR1 (kb/Work PB135)
+        fdata.UseSkeletonOptions(fac?.optionsParagraph());   // §11.9.4 GR1 (kb/Work PB135)
         var fsynthetic = OoReparent(fac?.environmentDivision(), fac?.dataDivision());
         fdata.ReserveClassMemberNames(cls.Symbol.FactoryCsName, cls.Symbol.FactoryMethods);   // the factory class holds both, likewise
         fdata.BindDeclarations(fsynthetic);

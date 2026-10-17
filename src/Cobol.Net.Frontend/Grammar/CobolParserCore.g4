@@ -362,6 +362,10 @@ optionsInitializeFill
     | LOW_VALUES
     | SPACES
     | literal              // literal-1 (one-byte hex-alphanumeric, §11.9.10.3 — checked in the binder)
+    // literal-1 spelled as a constant-name (ISO §13.10.3 SR2: a constant-name "may be used anywhere that a format
+    // specifies a literal"; kb/Work PB780). One word, so it cannot swallow the next clause's keyword; the binder
+    // substitutes the entry's literal (§13.10.4 GR1) and asks SR1 of it.
+    | cobolWord
     ;
 
 // §11.9.11 — INTERMEDIATE ROUNDING IS {NEAREST-AWAY-FROM-ZERO | NEAREST-EVEN | PROHIBITED | TRUNCATION}. A

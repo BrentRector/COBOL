@@ -981,7 +981,10 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // ⛔ The words `TO ENTRY` occur nowhere in ISO/IEC 1989 (the grammar's own note; kb/Work PB549) — a Micro Focus /
         // IBM spelling this compiler accepts for its program-pointer semantics, so the §4.2.10 warning names it.
         ctx.Edition.Extension(ExtensionIds.SetProgramPointerToEntry, "SET … TO ENTRY");
-        bool identForm = se.nonNumericLiteral() is null;
+        // The ENTRY operand's literal, as written or spelled by a constant-name (§13.10.3 SR2, kb/Work PB780).
+        ProgramNameOperand? entryLiteral = se.nonNumericLiteral() is { } nn ? ProgramNameLiteral.Of(host.Expr, nn, nn.GetText())
+            : se.dataReference() is { } entryRef ? ProgramNameLiteral.Of(host.Expr, entryRef)
+            : null;
         int targetCount = drefs.Length;
         if (targetCount < 1)
             return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.StatementFormatShape, "SET … TO ENTRY with no receiving operand (ISO §14.9.39.2)");
@@ -990,16 +993,17 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
         // The receiving operands AS WRITTEN — a statement ECHO names them (kb/Work PB388); only the FORM
         // reference passed to BindProgramAddressTargets above keeps the general format's own `…`.
         string written = SetFormatSelection.Written(drefs[..targetCount]);
-        if (!identForm)
+        if (entryLiteral is { } lit)
         {
-            var nn = se.nonNumericLiteral();
-            if (nn?.STRINGLIT() is not { } lit)
+            // The ONE program-name reader the ISO surface uses (§8.4.3.13.3 SR2): an alphanumeric or national literal
+            // whose length is not zero, its content FORMED as the run-time locate forms it.
+            if (lit.Form(ctx.Edition.Edition.Year).Name is not { } entryName)
             {
                 return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.PointerOperandShape,
-                    $"SET {written} TO ENTRY {nn?.GetText()}: the ENTRY literal shall be an alphanumeric literal "
-                    + "naming a program (ISO §8.4.3.13 / §8.3.2.2)");
+                    $"SET {written} TO ENTRY {lit.Spelling}: the ENTRY literal shall be an alphanumeric or national "
+                    + "literal, not zero-length, naming a program (ISO §8.4.3.13.3 SR2 / §8.3.2.2)");
             }
-            return new BoundSetEntry(targets, CobolLiteral.Decode(lit.GetText()), null);
+            return new BoundSetEntry(targets, entryName, null);
         }
         // The resolver reported (or defers) the reference; "the ENTRY identifier is unresolvable" on top named
         // no rule the program broke (kb/Work PB1030).
@@ -1120,9 +1124,14 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// context.</para></summary>
     internal BoundProgramAddress? BindProgramAddressOperand(Core.ProgramAddressIdentifierContext pai, string site)
     {
-        // ── ARM 2: literal-1 (§8.4.3.13.3 SR2 / §8.4.3.13.4 GR1b) ──────────────────────────────────────────
-        if (pai.nonNumericLiteral() is { } nn)
-            return ProgramAddressLiteral(nn, site) is { } value ? new BoundProgramAddress(value, null, null) : null;
+        // ── ARM 2: literal-1 (§8.4.3.13.3 SR2 / §8.4.3.13.4 GR1b) — as written, or spelled by a constant-name, which
+        //    "may be used anywhere that a format specifies a literal" (§13.10.3 SR2, kb/Work PB780). The alias is asked
+        //    before ARM 3, so a word the element declares as a constant is never an inherited prototype's name. ──
+        ProgramNameOperand? literal1 = pai.nonNumericLiteral() is { } nn ? ProgramNameLiteral.Of(host.Expr, nn, nn.GetText())
+            : pai.dataReference() is { } aliasRef ? ProgramNameLiteral.Of(host.Expr, aliasRef)
+            : null;
+        if (literal1 is { } lit)
+            return ProgramAddressLiteral(lit, site) is { } value ? new BoundProgramAddress(value, null, null) : null;
 
         // ── ARM 1b: identifier-1 written as a function-identifier or an inline method invocation (§8.4.3.1.3 SR1;
         //    kb/Work PB1452) — a reference to a data item like any other, so SR1's category screen is the same one. ──
@@ -1158,34 +1167,21 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// <summary>§8.4.3.13.3 SR2 over the literal arm of a program-address-identifier: "Literal-1 shall be an
     /// alphanumeric or national literal whose length is not zero." The figurative constants and the boolean
     /// literal are excluded by the same sentence — none of them is an alphanumeric or national literal — and a
-    /// §8.8.3 concatenation expression folds first, because §8.8.3.3 GR3 makes it "equivalent to a literal of
-    /// the same class and value". Returns null having reported.</summary>
-    private string? ProgramAddressLiteral(Core.NonNumericLiteralContext nn, string site)
+    /// §8.8.3 concatenation expression has folded, because §8.8.3.3 GR3 makes it "equivalent to a literal of
+    /// the same class and value". The name is FORMED by the ONE program-name reader CALL and CANCEL use
+    /// (<see cref="ProgramNameLiteral"/>): GR1 sends literal-1 through 8.3.2.2 exactly as §14.9.4.4 GR3 b) does.
+    /// Returns null having reported.</summary>
+    private string? ProgramAddressLiteral(ProgramNameOperand literal1, string site)
     {
-        string? value =
-            nn.figurativeConstant() is not null ? null
-            : nn.STRINGLIT() is { } s ? CobolLiteral.Decode(s.GetText())
-            : nn.HEXLIT() is { } x ? CobolLiteral.DecodeHex(x.GetText())
-            : nn.NATLIT() is { } nat ? CobolLiteral.Decode(nat.GetText())
-            : nn.concatenationExpression() is { } ce
-                && ConcatFolder.Fold(ce, ctx.Edition, ctx.Data.LiteralEnv) is { Category: PicCategory.Alphanumeric or PicCategory.National } f
-                    ? f.Value
-            : null;
-        if (value is null)
+        var (name, fault) = literal1.Form(ctx.Edition.Edition.Year);
+        if (fault != ProgramNameFault.None)
         {
             ctx.Edition.Error(DiagnosticCatalog.ProgramAddressOperand,
-                $"{site} ADDRESS OF PROGRAM {nn.GetText()}: literal-1 shall be an alphanumeric or national "
+                $"{site} ADDRESS OF PROGRAM {literal1.Spelling}: literal-1 shall be an alphanumeric or national "
                 + "literal whose length is not zero (ISO §8.4.3.13.3 SR2)");
             return null;
         }
-        if (value.Length == 0)
-        {
-            ctx.Edition.Error(DiagnosticCatalog.ProgramAddressOperand,
-                $"{site} ADDRESS OF PROGRAM \"\": literal-1 shall be an alphanumeric or national literal "
-                + "whose length is not zero (ISO §8.4.3.13.3 SR2)");
-            return null;
-        }
-        return value;
+        return name;
     }
 
     /// <summary>§14.9.39.3 SR22 against a program-address-identifier that is NOT the prototype arm. Only

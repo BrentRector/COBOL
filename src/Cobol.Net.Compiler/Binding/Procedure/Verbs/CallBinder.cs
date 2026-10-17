@@ -44,6 +44,10 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         // changes meaning: a word that names a data item stays identifier-1.
         bool asNested = false;
         ProgramPrototype? prototype = null;
+        // literal-1, as written or spelled by a constant-name (ISO §13.10.3 SR2), asked ONCE: §14.9.4.3 SR15's
+        // presence test, the NESTED scope lookup and the static target all read it (kb/Work PB780).
+        var target = call.callTarget();
+        ProgramNameOperand? literal1 = Literal1Of(target?.literal(), target?.dataReference());
         if (call.callAsPhrase() is { } asPhrase)
         {
             // The grammar decided the brace (kb/Work PB764): the NESTED keyword arm is a formatWord, recognized
@@ -80,7 +84,7 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
                 }
                 // §14.9.4.3 SR15: literal-1 shall be specified, and shall name a COMMON program or a program
                 // directly contained in the calling program.
-                if (call.callTarget()?.literal() is null)
+                if (literal1 is null)
                 {
                     return BoundRejected.Report(ctx.Edition, DiagnosticCatalog.CallAsNestedScope,
                         "CALL … AS NESTED: literal-1 shall be specified — the NESTED phrase names a contained or "
@@ -97,11 +101,11 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         // kb/Work PB131 — the AS NESTED callee's bound formals (§14.9.4.3 SR15 sentence 2 enforced here:
         // the name shall be a directly-contained or visible-COMMON program; the old binder bound the flag,
         // discarded it, and let ProgramTable resolve ANY outermost program at run time).
-        if (asNested && call.callTarget()?.literal() is { } asLit)
+        if (asNested && literal1 is { } asLit)
         {
             // The name is read and FORMED by the ONE program-name-literal reader, exactly as the target below is,
             // so the bind-time scope table and the run-time resolver match the same string (kb/Work PB1539).
-            if (ProgramNameLiteral(asLit, "CALL … AS NESTED", "§14.9.4.3 SR2") is not { } nestedName)
+            if (ProgramName(asLit, "CALL … AS NESTED", "§14.9.4.3 SR2") is not { } nestedName)
                 return BoundRejected.Reported(ctx.Edition);
             if (host.NestedCallables is { } nc && nc.TryGetValue(nestedName, out var sig))
                 callee = sig;
@@ -117,13 +121,13 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
         string? literalName = null;
         BoundOperand? dynamicName = null;
         bool isPointerTarget = false;   // identifier-1 is a PROGRAM-POINTER item (§14.9.4.3 SR1; P10 Step 7)
-        var target = call.callTarget();
-        if (target?.literal() is { } lit)
+        if (literal1 is { } lit)
         {
             // kb/Work PB130: through the ONE program-name-literal reader — SR2 admits alphanumeric AND
             // national literals (a hexadecimal literal IS §8.3.3.2 Format 2 of an alphanumeric one), and the
-            // old STRINGLIT-only read sent N"P" / X".." to a run-time loud on legal source.
-            if (ProgramNameLiteral(lit, "CALL", "§14.9.4.3 SR2") is not { } pn) return BoundRejected.Reported(ctx.Edition);
+            // old STRINGLIT-only read sent N"P" / X".." to a run-time loud on legal source. A constant-name is
+            // literal-1 too (kb/Work PB780), so `CALL K` is a static call of the program K's literal names.
+            if (ProgramName(lit, "CALL", "§14.9.4.3 SR2") is not { } pn) return BoundRejected.Reported(ctx.Edition);
             literalName = pn;
         }
         else if (target?.dataReference() is { } dref)
@@ -861,32 +865,31 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
             ? new BoundCallArg(mode, null, null) { DataAddress = ao.Data, ProgramAddress = ao.Program }
             : null;
 
-    /// <summary>Bind <c>CANCEL {literal|identifier}…</c> (ISO §14.9.5 — targets resolved like CALL's, §8.4.6.3).</summary>
-    /// <summary>The ONE program-name-literal reader (kb/Work PB130) — §14.9.4.3 SR2 / §14.9.5.3 SR2 admit
-    /// an alphanumeric OR national literal (a hexadecimal literal is §8.3.3.2 Format 2 of the alphanumeric
-    /// kind; a concatenation folds per §8.8.3.3 GR3; the D-N1 identity repertoire makes the national name
-    /// the same string). Reports the SR violation itself and returns null — a boolean literal, a numeric
-    /// literal, and a zero-length name each draw the cited diagnostic instead of a run-time loud.</summary>
-    private string? ProgramNameLiteral(Core.LiteralContext lit, string verb, string clause)
+    /// <summary>literal-1 of a CALL or CANCEL target written <c>literal | dataReference</c>: the written literal, or
+    /// the literal a constant-name or symbolic-character spells (ISO §13.10.3 SR2; §8.3.3.6.3 SR1; kb/Work PB780), or
+    /// <see langword="null"/> when the data reference is identifier-1 or program-prototype-name-1. The alias is asked
+    /// FIRST, as every procedure operand asks it (<see cref="ExpressionBinder.FieldOperand"/>), so a word the element
+    /// declares as a constant-name is never read as an inherited program-prototype-name of the same spelling.</summary>
+    private ProgramNameOperand? Literal1Of(Core.LiteralContext? lit, Core.DataReferenceContext? dref) =>
+        lit is not null ? ProgramNameLiteral.Of(host.Expr, lit.nonNumericLiteral(), ConcatFolder.Spelling(lit))
+        : dref is not null ? ProgramNameLiteral.Of(host.Expr, dref)
+        : null;
+
+    /// <summary>The program-name <paramref name="literal1"/> forms, through the ONE reader (<see cref="ProgramNameLiteral"/>,
+    /// kb/Work PB130) — §14.9.4.3 SR2 / §14.9.5.3 SR2 admit an alphanumeric OR national literal whose length is not
+    /// zero. Reports the SR violation itself and returns null — a boolean literal, a numeric literal, a figurative
+    /// constant and a zero-length name each draw the cited diagnostic instead of a run-time loud.</summary>
+    private string? ProgramName(ProgramNameOperand literal1, string verb, string clause)
     {
-        if (host.Expr.NonNumericLiteralOperand(lit.nonNumericLiteral()) is BoundStringLiteral
-            { Category: PicCategory.Alphanumeric or PicCategory.National } sl)
-        {
-            // The literal's content FORMS the program-name (§14.9.4.4 GR3 b) sends it "as described in 8.3.2.2";
-            // DOC-A.1-68): leading and trailing spaces removed by the ONE rule the run-time resolver applies too, so
-            // `CALL "trail  "` and a `PROGRAM-ID. S AS "trail  "` are the same name (kb/Work PB1539). A literal of
-            // spaces only is NOT zero-length (SR2 admits it) and stays legal: it forms the empty name, which the
-            // run-time locate reports as EC-PROGRAM-NOT-FOUND (§14.9.4.4 GR3 b). The name is also written in the
-            // edition's spelling (kb/Work PB2840), as the PROGRAM-ID word it names was lexed.
-            if (sl.Value.Length != 0) return CobolNet.Runtime.ExternalizedNames.FormInEdition(sl.Value, ctx.Edition.Edition.Year);
+        var (name, fault) = literal1.Form(ctx.Edition.Edition.Year);
+        if (fault == ProgramNameFault.ZeroLength)
             ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass,
                 $"{verb} with a zero-length literal program name (ISO {clause})");
-            return null;
-        }
-        ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass,
-            $"{verb} '{ConcatFolder.Spelling(lit)}': the literal program name shall be an alphanumeric or national literal "
-            + $"(ISO {clause})");
-        return null;
+        else if (fault == ProgramNameFault.NotAlphanumericOrNational)
+            ctx.Edition.Error(DiagnosticCatalog.IntrinsicArgumentClass,
+                $"{verb} '{literal1.Spelling}': the literal program name shall be an alphanumeric or national literal "
+                + $"(ISO {clause})");
+        return name;
     }
 
     /// <summary>THE program-prototype-name lookup (kb/Work PB237) — ONE place, because §14.9.4.3 syntax rule 16
@@ -915,17 +918,19 @@ internal sealed class CallBinder(BinderContext ctx, StatementBinder host)
     private static string? BarePrototypeWord(Core.DataReferenceContext dref) =>
         dref.cobolWord() is { } w && dref.dataReferenceSuffix().Length == 0 ? w.GetText() : null;
 
+    /// <summary>Bind <c>CANCEL {literal|identifier}…</c> (ISO §14.9.5 — targets resolved like CALL's, §8.4.6.3).</summary>
     public BoundStatement BindCancel(Core.CancelStatementContext cancel)
     {
         var targets = new List<(string?, BoundOperand?)>();
         foreach (var t in cancel.cancelTarget())
         {
-            if (t.literal() is { } lit)
+            if (Literal1Of(t.literal(), t.dataReference()) is { } lit)
             {
                 // kb/Work PB130: the ONE reader (national + hex admitted per §14.9.5.3 SR2 — the old
                 // rejection also miscited §14.9.5.2 SR1); a bad target reports and the LOOP CONTINUES, so a
-                // statement with one illegal target no longer discards its legal ones.
-                if (ProgramNameLiteral(lit, "CANCEL", "§14.9.5.3 SR2") is { } pn)
+                // statement with one illegal target no longer discards its legal ones. A constant-name is
+                // literal-1 too (§13.10.3 SR2, kb/Work PB780).
+                if (ProgramName(lit, "CANCEL", "§14.9.5.3 SR2") is { } pn)
                     targets.Add((pn, null));
             }
             else if (t.dataReference() is { } dref)

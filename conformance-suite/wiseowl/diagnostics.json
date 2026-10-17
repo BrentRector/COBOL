@@ -19124,6 +19124,60 @@
   ],
   "expect": "COBOLNET2104"
  },
+ "pb780-call-numeric-constant": {
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "expect": "\u00a714.9.4.3 SR2"
+ },
+ "pb780-code-national-constant": {
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "expect": "\u00a713.18.12.3 SR1"
+ },
+ "pb780-constant-as-constant-cycle": {
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "expect": "\u00a713.10.3 SR5"
+ },
+ "pb780-currency-symbol-constant-chain-hex": {
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "expect": "this is a hexadecimal literal"
+ },
+ "pb780-currency-symbol-constant-from-hex": {
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "expect": "this is a hexadecimal literal"
+ },
+ "pb780-options-fill-constant-not-hex": {
+  "refuse-at": [
+   "2023"
+  ],
+  "expect": "COBOLNET1727"
+ },
+ "pb780-value-subscript-not-integer-constant": {
+  "refuse-at": [
+   "2002",
+   "2014",
+   "2023"
+  ],
+  "expect": "\u00a713.18.63.3 SR19"
+ },
  "pb781-reserve-on-line-sequential": {
   "refuse-at": [
    "2023"
