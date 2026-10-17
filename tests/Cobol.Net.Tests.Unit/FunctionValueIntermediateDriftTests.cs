@@ -73,6 +73,29 @@ public sealed class FunctionValueIntermediateDriftTests : CobolNetTestBase
             + string.Join("\n  ", offenders));
     }
 
+    /// <summary>⛔ AN EXACT VALUE WHOSE EVERY RECEIVER IS FLOATING-POINT IS HELD IN THE RECEIVERS' OWN BINARY FORMAT, AND A
+    /// BINARY32 SET NEVER ON A BINARY64 (kb/Work PB3268, review R2-1). ISO §14.6.8.3 rule 2 converts the value to a
+    /// binary32 receiver "in a manner consistent with the specifications of ISO/IEC 60559" — one rounding; a binary64
+    /// intermediate narrowed into a binary32 receiver is two (kb/Work PB1110). A binary32 receiver beside a binary64 one
+    /// has no float format that converts once for both, so that set is held on a fixed-point (exact) item. A
+    /// float-family function's value IS a binary64 and is held on one whatever its receivers.</summary>
+    [Theory]
+    [InlineData("FVIB01", "FUNCTION NUMVAL(\"1.5\")", "FLOAT-BINARY-32", "FLOAT-SHORT", "float")]
+    [InlineData("FVIB02", "FUNCTION INTEGER(7.5)", "FLOAT-BINARY-32", "FLOAT-SHORT", "float")]
+    [InlineData("FVIB03", "FUNCTION NUMVAL(\"1.5\")", "FLOAT-LONG", "FLOAT-BINARY-64", "double")]
+    [InlineData("FVIB04", "FUNCTION NUMVAL(\"1.5\")", "FLOAT-BINARY-32", "FLOAT-LONG", "Int128")]
+    [InlineData("FVIB05", "FUNCTION INTEGER(7.5)", "FLOAT-SHORT", "FLOAT-LONG", "Int128")]
+    [InlineData("FVIB06", "FUNCTION SQRT(2)", "FLOAT-BINARY-32", "FLOAT-SHORT", "double")]
+    public void AnAllFloatReceiverSet_HoldsTheValueInTheReceiversOwnBinaryFormat(
+        string programId, string reference, string usage1, string usage2, string expected)
+    {
+        string types = IntermediateTypes(Compile(programId, reference, standardDecimal: false,
+            receivers: $"       01 Q1 USAGE {usage1}.\n       01 Q2 USAGE {usage2}.\n"));
+        Assert.True(types == expected,
+            $"ISO §14.6.8.3 rule 2 / §14.9.25.4 GR1 — MOVE {reference} TO Q1 ({usage1}) Q2 ({usage2}): the intermediate is "
+            + $"[{types}], expected [{expected}] (kb/Work PB3268 review R2-1: a binary32 receiver is owed one rounding)");
+    }
+
     [Fact]
     public void TheReturnedValueItemDescription_IsReadOnlyByTheQuestionsAskedOfTheItem()
     {
@@ -114,9 +137,12 @@ public sealed class FunctionValueIntermediateDriftTests : CobolNetTestBase
         return types.Count == 0 ? "(none)" : string.Join(",", types);
     }
 
-    /// <summary>Compile one program that moves <paramref name="reference"/> to two fixed-point receivers and return its
-    /// generated C#.</summary>
-    private string Compile(string programId, string reference, bool standardDecimal)
+    /// <summary>The two fixed-point receivers the float-family sweeps move a value to.</summary>
+    private const string FixedReceivers = "       01 Q1 PIC S9(9)V9(15).\n       01 Q2 PIC S9(9)V9(15).\n";
+
+    /// <summary>Compile one program that moves <paramref name="reference"/> to the receivers Q1 and Q2 that
+    /// <paramref name="receivers"/> declares (two fixed-point items by default) and return its generated C#.</summary>
+    private string Compile(string programId, string reference, bool standardDecimal, string receivers = FixedReceivers)
     {
         string options = standardDecimal
             ? "       OPTIONS.\n           ARITHMETIC IS STANDARD-DECIMAL.\n"
@@ -127,8 +153,7 @@ public sealed class FunctionValueIntermediateDriftTests : CobolNetTestBase
             + options
             + "       DATA DIVISION.\n"
             + "       WORKING-STORAGE SECTION.\n"
-            + "       01 Q1 PIC S9(9)V9(15).\n"
-            + "       01 Q2 PIC S9(9)V9(15).\n"
+            + receivers
             + "       PROCEDURE DIVISION.\n"
             + "       MAIN.\n"
             + $"           MOVE {reference} TO Q1 Q2\n"

@@ -875,7 +875,8 @@
   "pb3268_function_value_lane_matrix",
   "pb3268_function_value_nested_lane",
   "pb3268_function_value_integer_nested",
-  "pb3268_function_value_integer_float"
+  "pb3268_function_value_integer_float",
+  "pb3268_function_value_binary32_receivers"
   ],
  "pending": [
   "pb485_value_only_format1"

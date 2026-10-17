@@ -157,14 +157,17 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     ///     DOC-A.1-92's);</item>
     ///   <item>a function the renderer returns as a BINARY64 (<see cref="FunctionValueLane.ReturnsBinary64"/>, asked of
     ///     the call and its ARGUMENTS' carriers — a floating-point literal argument takes a function with an SDIDI body
-    ///     off the float lane, a binary64 argument puts any numeric-argument function onto it), or any function whose
-    ///     every receiver is a floating-point item (a binary64 receiver takes the value as a binary64) —
+    ///     off the float lane, a binary64 argument puts any numeric-argument function onto it) —
     ///     <see cref="Binary64ReturnedValuePic"/>, so the store into the intermediate quantizes NOTHING and each
-    ///     receiver's own transfer (the ONE float landing) quantizes once, at ITS scale. ⛔ AN INTEGER FUNCTION IS ASKED
-    ///     THIS TOO, BEFORE ITS SCALE-0 ITEM (kb/Work PB3268, review R1-1): §15.2 item 5 fixes the value's type, never
-    ///     its magnitude, so INTEGER of a COMP-2 holding 1.5E50 (<c>FloorReal</c>, a binary64) or INTEGER(1.5E40) into
-    ///     COMP-2 receivers is a 41- or 51-digit integer no 38-digit fixed item holds, and the integer item stored
-    ///     9.99906754673275E+37 (or 0) where `MOVE … TO C3` stores the value whole;</item>
+    ///     receiver's own transfer (the ONE float landing) quantizes once, at ITS scale;</item>
+    ///   <item>any function whose every receiver is a floating-point item of ONE binary format
+    ///     (<see cref="SharedFloatFormatPic"/>) — an item of that format, so the store into it is the one conversion each
+    ///     receiver's single-receiver MOVE makes; a binary32 set never takes a binary64, which would round an exact value
+    ///     twice (review R2-1). ⛔ AN INTEGER FUNCTION IS ASKED BOTH OF THESE, BEFORE ITS SCALE-0 ITEM (kb/Work PB3268,
+    ///     review R1-1): §15.2 item 5 fixes the value's type, never its magnitude, so INTEGER of a COMP-2 holding 1.5E50
+    ///     (<c>FloorReal</c>, a binary64) or INTEGER(1.5E40) into COMP-2 receivers is a 41- or 51-digit integer no
+    ///     38-digit fixed item holds, and the integer item stored 9.99906754673275E+37 (or 0) where `MOVE … TO C3`
+    ///     stores the value whole;</item>
     ///   <item>any other INTEGER function — <see cref="IntegerIntermediatePic"/>, the carrier's whole width at scale 0;</item>
     ///   <item>otherwise a fixed-point item described by the receivers (<see cref="ShapedPic"/>), or, when no
     ///     receiver is known (an EVALUATE subject, an argument frozen for §8.4.3.2.4 GR2's order),
@@ -175,11 +178,38 @@ internal sealed class SendingValueTemp(BinderContext ctx)
         bool integer = IntrinsicResultType.IsIntegerOperand(c);
         if (integer && use.AsText) return IntegerFunctionValuePic;
         var receivers = use.Receivers;
-        if (c is BoundComputedOperand { Expr: BoundIntrinsicCall call } && FunctionValueLane.ReturnsBinary64(call, ctx.Data.Options.Arithmetic)
-            || receivers is { Count: > 0 } && receivers.All(r => r.DenotedItem is not null && r.Item.OperandPic is { IsFloat: true }))
+        if (c is BoundComputedOperand { Expr: BoundIntrinsicCall call } && FunctionValueLane.ReturnsBinary64(call, ctx.Data.Options.Arithmetic))
             return Binary64ReturnedValuePic;
+        if (SharedFloatFormatPic(receivers) is { } floatPic) return floatPic;
         if (integer) return IntegerIntermediatePic;
         return receivers is { Count: > 0 } ? ShapedPic(receivers) : use.AsText ? FunctionValuePic : ValueOperandPic;
+    }
+
+    /// <summary>The intermediate result item of a NUMERIC function whose value lands only in BINARY32 receivers (COMP-1,
+    /// FLOAT-SHORT, FLOAT-BINARY-32 — <see cref="PicInfo.IsSingle"/>): a binary32 item, so the store into it is the ONE
+    /// correctly rounded conversion `MOVE … TO that receiver` makes and each receiver's store from it is an identity.</summary>
+    private static readonly PicInfo Binary32IntermediatePic = PicInfo.FloatItem(Usage.FloatShort);
+
+    /// <summary>The floating-point intermediate for a value whose EVERY receiver is a floating-point item of ONE binary
+    /// format: <see cref="Binary32IntermediatePic"/> when all are binary32, <see cref="Binary64ReturnedValuePic"/> when all
+    /// are binary64; otherwise null. ⛔ THE FORMAT IS THE RECEIVERS' OWN, NEVER "ANY FLOAT" (kb/Work PB3268, review R2-1):
+    /// an exact value held on a binary64 and then narrowed to a binary32 receiver is rounded TWICE — a value a hair off a
+    /// binary32 midpoint lands ON it in binary64 and the narrowing ties to even, the double rounding ISO §14.6.8.3 rule 2
+    /// ("in a manner consistent with the specifications of ISO/IEC 60559:2020") and kb/Work PB1110 forbid. A binary32
+    /// receiver BESIDE a binary64 one has no one float format that converts once for both, so that set takes the exact
+    /// fixed-point carrier (<see cref="IntegerIntermediatePic"/>, or <see cref="ValueOperandPic"/> through
+    /// <see cref="ShapedPic"/>) and its documented range.</summary>
+    private static PicInfo? SharedFloatFormatPic(IReadOnlyList<Place>? receivers)
+    {
+        if (receivers is not { Count: > 0 }) return null;
+        bool? single = null;
+        foreach (var receiver in receivers)
+        {
+            if (receiver.DenotedItem is null || receiver.Item.OperandPic is not { IsFloat: true } pic) return null;
+            if (single is { } s && s != pic.IsSingle) return null;
+            single = pic.IsSingle;
+        }
+        return single is true ? Binary32IntermediatePic : Binary64ReturnedValuePic;
     }
 
     /// <summary>The intermediate of an INTEGER function's value (§15.2 item 5 — "no digits to the right of the decimal
@@ -229,7 +259,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     private static PicInfo ShapedPic(IReadOnlyList<Place> receivers)
     {
         int scale = 0, integer = 0;
-        bool sized = false, anyFloat = false;
+        bool sized = false, anyFloat = false, anyFixed = false;
         foreach (var receiver in receivers)
         {
             // A reference-modified receiver is the elementary ALPHANUMERIC unique data item of §8.4.3.3.4 GR6, never
@@ -238,6 +268,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
             var pic = slice ? null : receiver.Item.OperandPic;
             if (!slice && pic is null) continue;
             sized = true;
+            anyFixed |= pic is not { IsFloat: true };
             if (pic is null) { scale = Math.Max(scale, ReturnedFractionDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
             else if (pic.IsFloat) anyFloat = true;
             else if (pic.Category is PicCategory.Numeric or PicCategory.NumericEdited)
@@ -249,8 +280,11 @@ internal sealed class SendingValueTemp(BinderContext ctx)
             else { scale = Math.Max(scale, ReturnedFractionDigits); integer = Math.Max(integer, ReturnedIntegerDigits); }
         }
         // No receiver had a description to size by (an index or object receiver is not a numeric MOVE receiver, so this
-        // is unreachable from a legal MOVE): the value operand's item, never a one-digit guess.
-        if (!sized) return ValueOperandPic;
+        // is unreachable from a legal MOVE): the value operand's item, never a one-digit guess. Nor does a set whose
+        // every receiver is floating-point, of BOTH binary formats (one format takes its own float item,
+        // SharedFloatFormatPic): no receiver bounds the digits, which is the value operand's case — 21 integer digits,
+        // so no magnitude the S9(21)V9(9) returned-value item holds is cut (kb/Work PB3268, review R2-1).
+        if (!sized || !anyFixed) return ValueOperandPic;
         integer = Math.Clamp(integer, 1, PicInfo.ScaledCarrierDigits);
         scale = Math.Min(scale, PicInfo.ScaledCarrierDigits - integer);
         if (anyFloat)

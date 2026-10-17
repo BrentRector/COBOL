@@ -593,9 +593,12 @@ and the equivalence is exact: a data item clones its description (§8.4.3.3.4 GR
 reference-modified, carried by a run-time-length item per §8.5.1.10.4), and a function-identifier takes §15.4's
 "temporary elementary data item" as the item `SendingValueTemp.IntermediatePic` describes FOR THE VALUE AND ITS USE
 (kb/Work PB3268): for an INTEGER function (§15.2 item 5) read as text in a character formal, the returned-value item's
-30-digit `IntegerFunctionValuePic`; for any numeric or integer function a `double` when the value is a binary64 or every
-receiver is floating-point (an INTEGER of a FLOAT-LONG holding 1.5E50 is a 51-digit integer no fixed item holds, review
-R1-1); otherwise, for an INTEGER function, the whole 38-digit carrier at scale 0 (`IntegerIntermediatePic`: a 31-digit
+30-digit `IntegerFunctionValuePic`; for any numeric or integer function a `double` when the value is a binary64, and
+an item of the receivers' own binary format when every receiver is floating-point of ONE format (`SharedFloatFormatPic`:
+a `float` for an all-binary32 set, since a binary64 narrowed into a binary32 rounds an exact value twice, ISO
+§14.6.8.3 rule 2 and kb/Work PB1110, review R2-1; a `double` for an all-binary64 set: an INTEGER of a FLOAT-LONG
+holding 1.5E50 is a 51-digit integer no fixed item holds, review R1-1); a binary32 receiver beside a binary64 one takes
+the exact fixed-point carrier below (`ValueOperandPic` for a non-integer value, no receiver bounding its digits); otherwise, for an INTEGER function, the whole 38-digit carrier at scale 0 (`IntegerIntermediatePic`: a 31-digit
 integer reaches every receiver whole). The `double` is chosen for a value the
 renderer returns as a binary64 (`FunctionValueLane.ReturnsBinary64`: the §15.4.1 float family and any numeric-argument
 function given a binary64 argument, under native arithmetic, unless a floating-point LITERAL argument takes a function
