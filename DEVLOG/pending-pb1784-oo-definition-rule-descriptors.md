@@ -64,7 +64,8 @@ class/interface collision was 0840 (it is 0820), `OoClassSymbol.cs` and `CobolOO
 code while their `.err` pinned the new one (l1c15 cyclic and pb1502 now 2791, l1c18 and l1m7 now 4212, pb814 and
 pb815 now 4211, pb660 now 0820 alone), and ten inventory notes still described the old mapping. All are corrected.
 The test `OverrideFinal_0838_0839` is renamed `OverrideFinal_0838_0839_FinalBase_2791` with its four inventory
-test-refs, and the GR-11.3.4-3 probe was re-run on this build (`CLASS-ID. FC INHERITS FB.` with FB FINAL gives
+test-refs. Each of those rows records the old name as a `retired-witness:`, the witness-loss audit's form for a
+rename; the first re-gate went RED on that audit before the mark was added. The GR-11.3.4-3 probe was re-run on this build (`CLASS-ID. FC INHERITS FB.` with FB FINAL gives
 COBOLNET2791 citing §11.3.3 SR5 / §11.3.4 GR3 at 2002, 2014 and 2023). The root was that nothing reads a golden's
 header, so a new unit sweep, `NegativeGoldenHeaderCodeDriftTests`, now checks it: a code a header states after
 `Expected`, `Diagnostic` or `->` must be one its `.err` pins. It checks 85 goldens. On the reviewed head it reports
