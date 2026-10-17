@@ -551,8 +551,11 @@ Pinned by `pb62_all_subscript_runtime_ranges` (every range and shape, values der
 ### A SELECTION function delivers the selected argument's CONTENT from its own carrier (PB65, RV-15.59.4-1 D2).
 
 MAX / MIN / ORD-MAX / ORD-MIN — and MEDIAN over an odd count (§15.61.4 r1's equivalent expression is
-`(argument-a)`, the middle argument itself) — return "the content of the argument" compared "according to the rules
-for simple conditions" (§15.59.4 r1 / §15.63.4 r1 / §15.61.4 r3); no equivalent ARITHMETIC expression is involved,
+`(argument-a)`, the middle argument itself) — select an argument: §15.59.4 r1 / §15.63.4 r1 make MAX / MIN return "the content of the argument-1";
+§15.71.4 r1 / §15.72.4 r1 make ORD-MAX / ORD-MIN return the "ordinal number that corresponds to the position of the argument-1";
+§15.61.1 makes MEDIAN return "the content of the argument whose value is the middle value"; each compares "according to
+the rules for simple conditions" (§15.59.4 r1, §15.63.4 r1, §15.71.4 r2, §15.72.4 r2, §15.61.4 r3); no equivalent
+ARITHMETIC expression is involved,
 so §15.4.1's native latitude over the representation of the returned value never reaches the VALUE. A MIXED
 argument list — a float beside a fixed-point item, conforming under §8.5.2.1 Table 2 (both class numeric) — used to
 route the WHOLE call through binary64 (`AnyRealArgument` → `RenderFloat` → `MaxReal(params double[])` →

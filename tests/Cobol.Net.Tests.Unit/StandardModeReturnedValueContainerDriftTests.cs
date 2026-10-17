@@ -58,7 +58,7 @@ public sealed class StandardModeReturnedValueContainerDriftTests : CobolNetTestB
     /// choices come from each function's own §15.x.3 argument rules (ACOS/ASIN need |argument-1| ≤ 1, LOG/LOG10
     /// need argument-1 &gt; 0, ANNUITY needs a non-negative rate and a positive integer period, RANDOM's seeded
     /// form is an integer). The KEY is the catalog's function name — that is what ties this table to the sweep.</summary>
-    private static readonly Dictionary<string, string> Fixtures = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly Dictionary<string, string> Fixtures = new(StringComparer.OrdinalIgnoreCase)
     {
         ["ACOS"] = "FUNCTION ACOS(1)",
         ["ASIN"] = "FUNCTION ASIN(0)",
@@ -80,7 +80,7 @@ public sealed class StandardModeReturnedValueContainerDriftTests : CobolNetTestB
         ["EXP10"] = "FUNCTION EXP10(2)",
     };
 
-    private static List<string> CatalogFloatRows()
+    internal static List<string> CatalogFloatRows()
     {
         string src = File.ReadAllText(TestRepo.Src("Cobol.Net.Compiler", "Binding", "IntrinsicCatalog.cs"));
         var all = FloatRow.Matches(src).ToList();

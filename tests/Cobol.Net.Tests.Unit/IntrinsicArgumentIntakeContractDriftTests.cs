@@ -142,7 +142,7 @@ public sealed class IntrinsicArgumentIntakeContractDriftTests
         string src = RendererSource();
         Assert.DoesNotContain("WorkingScale(ReceiverContext.SdidiLandingScaleFloor)", src, StringComparison.Ordinal);
 
-        int fixedArm = src.IndexOf("ValueFixedByDefinition(sig.RuntimeMethod) && RenderDec(ic)", StringComparison.Ordinal);
+        int fixedArm = src.IndexOf("FunctionValueLane.ValueFixedByDefinition(sig.RuntimeMethod) && RenderDec(ic)", StringComparison.Ordinal);
         int modeBranch = src.IndexOf("if (num.StandardDecimal)", StringComparison.Ordinal);
         Assert.True(fixedArm > 0, "the §15.4.1 value-fixed-by-definition arm is gone from IntrinsicRenderer");
         Assert.True(modeBranch > 0, "IntrinsicRenderer no longer branches on the arithmetic mode");

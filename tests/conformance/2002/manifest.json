@@ -909,7 +909,8 @@
   "pb3164_method_constant_scope",
   "pb3153_own_item_hides_switch_condition",
   "pb656_padding_character_obsolete_2002",
-  "pb243_display_all_literal_kinds"
+  "pb243_display_all_literal_kinds",
+  "pb3268_function_value_pi_and_wide_integers"
   ],
   "pending": []
 }

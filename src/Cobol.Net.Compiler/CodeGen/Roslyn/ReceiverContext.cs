@@ -105,7 +105,7 @@ internal readonly record struct ReceiverContext(
 
     /// <summary>Decimal digits the <c>Int128</c> intermediate carrier holds:<c>Int128.MaxValue</c> ≈ 1.7014×10³⁸,
     /// so any value below 10³⁸ is representable (numeric design D1 — the "Int128 escape boundary").</summary>
-    public const int IntermediateDigits = 38;
+    public const int IntermediateDigits = PicInfo.ScaledCarrierDigits;
 
     /// <summary>The float floor: a receiver-less or coarse-scaled context still quantizes a transcendental to at
     /// least 9 fraction digits, which is what makes <c>SQRT(2)</c> useful at scale 0 (deep-dive D1).</summary>

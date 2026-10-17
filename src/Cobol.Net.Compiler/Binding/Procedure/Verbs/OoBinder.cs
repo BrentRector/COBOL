@@ -1154,7 +1154,7 @@ internal sealed partial class OoBinder(BinderContext ctx, StatementBinder host)
             // to the expression arm and an object-reference formal drew COBOLNET0828).
             else if (fnOperand is BoundFieldOperand { Place: { } resultTemp }) inlinePlace = resultTemp;
             else if (fnOperand is not BoundComputedOperand { Expr: BoundIntrinsicCall }) { }
-            else if (host.SendingValue.Materialize(fnOperand, "invokearg") is { } fnTemp) inlinePlace = fnTemp;
+            else if (host.SendingValue.Materialize(fnOperand, "invokearg", SendingValueTemp.ValueUse.Text) is { } fnTemp) inlinePlace = fnTemp;
             else
             {
                 Err($"BY CONTENT function-identifier argument '{soleFn.GetText()}' for formal "

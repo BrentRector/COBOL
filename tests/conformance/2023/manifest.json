@@ -869,7 +869,11 @@
   "pb3102_report_not_terminated_with_location",
   "pb3102_intrinsic_names_ride_every_statement",
   "pb2740_omitted_branch_turn_2023_name",
-  "pb656_directive_words_as_user_words"
+  "pb656_directive_words_as_user_words",
+  "pb3268_function_value_float_receivers",
+  "pb3268_function_value_standard_decimal",
+  "pb3268_function_value_lane_matrix",
+  "pb3268_function_value_nested_lane"
   ],
  "pending": [
   "pb485_value_only_format1"

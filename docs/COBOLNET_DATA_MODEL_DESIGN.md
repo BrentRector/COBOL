@@ -1828,10 +1828,15 @@ a subscript is an occurrence number. **That is exactly wrong.** GR1b makes a sub
 result in an integer" set EC-BOUND-SUBSCRIPT, and §8.4.3.3.4 item 5)c says the same for a ref-mod position — so a
 scale-0 temp TRUNCATES the value on the way in and `W-E(FUNCTION SQRT(2))` silently indexes occurrence 1 instead
 of raising. The temp's own description would have turned legal source into a wrong answer, in the very code
-written to stop legal source from throwing. **The temp is `PIC S9(21)V9(9)` — 30 digits, scale 9** — so it takes
-the `Int128` wide tier (`PicInfo.IsWide`, >18 digits) and no subscript a program can express overflows it, which
-matters because high-order truncation could WRAP an out-of-range subscript into an in-range one and convert a
-detectable error into a silent one. It is synthetic, never enters `DataBinder.ConformanceForest`, so the edition
+written to stop legal source from throwing. **The first repair, a `PIC S9(21)V9(9)` temp, was wrong in its turn** —
+no fixed fraction width is exact for an arbitrary native intermediate, an SDIDI or a binary64, so a value whose
+fraction lay past the ninth digit was an integer by the time it was asked (kb/Work PB1890). **The temp is now the
+saturated integer POSITION** (`StatementBinder.SegmentTempPic`, a signed 38-digit scale-0 item on the `Int128` wide
+tier, kb/Work PB2695): `BoundPositionValue` asks the integrality question of the value on its own carrier BEFORE the
+store and stores only the answer, and the 38 digits keep an out-of-range position out of range, because high-order
+truncation could WRAP it into an in-range one and convert a detectable error into a silent one. The §15.4
+returned-value item `SendingValueTemp.FunctionValuePic` (S9(21)V9(9)) is NOT this temp; it is what `FUNCTION
+LENGTH` measures. It is synthetic, never enters `DataBinder.ConformanceForest`, so the edition
 digit-capacity gates (18 at COBOL-85) do not reach it — it is not a PICTURE the programmer wrote. (The temp prune
 lives in the SPINE both forests share, so it is absent from `CompositionForest` too — see
 `COBOLNET_DESIGN.md`'s group-VALUE bullets for why there are two: `ConformanceForest` is the WRITTEN-ENTRY set

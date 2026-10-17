@@ -3,6 +3,7 @@
 using System.Collections.Frozen;
 
 using CobolNet.Binding;
+using CobolNet.Binding.Procedure;
 using CobolNet.Binding.Model;
 using CobolNet.Binding.Bound;
 using CobolNet.Runtime;
@@ -86,7 +87,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // 1234567. NUMVAL-F is NOT here and must not be: §15.69.4 r2 grants native arithmetic "an approximation of
         // the numeric value represented by argument-1", so its native lane keeps the float family's determination
         // (CONFORMANCE.md item 92, PB60/RV-15.69.4-2) — the r2/r3 split is the standard drawing this exact line.
-        if (ValueFixedByDefinition(sig.RuntimeMethod) && RenderDec(ic) is { } fixedByDefinition)
+        if (FunctionValueLane.ValueFixedByDefinition(sig.RuntimeMethod) && RenderDec(ic) is { } fixedByDefinition)
             return fixedByDefinition;
 
         // ⛔ ROUTE ON THE ARGUMENT'S TYPE, NOT ONLY THE FUNCTION'S FAMILY (fix-queue PB2). The exact family
@@ -161,8 +162,10 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
         // never reaches the lane, because its one position is type 6.)
         // MAX / MIN / ORD-MAX / ORD-MIN — and MEDIAN over an odd count — are pure SELECTION: §15.59.4 r1 /
         // §15.63.4 r1 "the returned value is the CONTENT of the argument-1 having the greatest [least] value",
-        // §15.61.4 r1 "the content of the argument-1 that is the middle value", each compared "according to the
-        // rules for simple conditions"; no equivalent arithmetic expression, so §15.4.1's native latitude over the
+        // §15.71.4 r1 / §15.72.4 r1 "the ordinal number that corresponds to the position of the argument-1 having
+        // the greatest [least] value", and §15.61.1 MEDIAN "returns the content of the argument whose value is the
+        // middle value" (an even count is §15.61.4 r2's arithmetic mean, not a selection), each compared "according
+        // to the rules for simple conditions"; no equivalent arithmetic expression, so §15.4.1's native latitude over the
         // representation never reaches the VALUE. A MIXED list (a float beside a fixed-point item) must deliver
         // the selected argument from ITS OWN carrier, never re-rendered through binary64 (kb/Work PB65
         // RV-15.59.4-1 D2: MAX(F1 N1) with N1 = 999999999999999999 returned 13 — the 18-digit content went
@@ -847,29 +850,6 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     /// </remarks>
     private NumX Landed(NumX x) => num.Landed(x, num.Receiver);   // the ONE landing (NumericRenderer.Landed — kb/Work PB84)
 
-    /// <summary>
-    /// The functions whose DEFINITION fixes the returned value in EVERY arithmetic mode, so §15.4.1's
-    /// implementor latitude never reaches them and no working scale may be imposed (kb/Work PB251). Asked by
-    /// <see cref="RenderNum"/> BEFORE the arithmetic-mode dispatch.
-    /// </summary>
-    /// <remarks>
-    /// <para>⛔ THE SET IS TWO, AND IT WAS DERIVED BY SWEEPING CLAUSE 15 RATHER THAN BY RECALL — the refuted
-    /// adjudication's screen ("standard-decimal arithmetic is in effect" + "34 digits") could only find
-    /// MODE-CONDITIONED specifications and so missed the one function that states its value unconditionally.
-    /// The sound screen is: a §15.x "Returned value rule(s)" clause that mentions NEITHER an arithmetic mode,
-    /// NOR "implementor", NOR "approximation", NOR an equivalent arithmetic expression. Over clause 15 that
-    /// yields 38 functions, and every one but these two returns an INTEGER, a STRING, or a selected argument's
-    /// own content — shapes no fraction-digit working scale can damage. E (§15.27.3 r1), PI (§15.73.3 r1),
-    /// SQRT (§15.84.4 r4) and NUMVAL-F (§15.69.4 r2) each say "native … implementor-defined approximation" in
-    /// so many words, which is why they keep the float lane and are NOT here.</para>
-    /// <para>The members: NUMVAL §15.67.4 r1 and NUMVAL-C §15.68.4 r1, both "The returned value is the numeric
-    /// value represented by argument-1". <see cref="RenderDec"/> holds their SDIDI arms (its <c>alwaysDec</c>
-    /// list already named them), so this predicate only decides WHEN that lane is taken, never what it does.
-    /// If it ever returned <c>null</c> here the switch's <c>default</c> stages LOUD — never a quiet fallback to
-    /// a working-scale render.</para>
-    /// </remarks>
-    private static bool ValueFixedByDefinition(string runtimeMethod) => runtimeMethod is "Numval" or "NumvalC";
-
     // ── The STANDARD-DECIMAL body dispatch (fix-queue PB56) ──────────────────────────────────────────────────
 
     /// <summary>
@@ -1065,65 +1045,17 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     private bool AnyDecOrRealRaw(BoundIntrinsicCall ic) =>
         Operands(ic).Any(x => x.Dec || x.Real);
 
-    /// <summary>Can aligning this call's arguments to their common scale — and accumulating the aligned values —
-    /// leave the <see cref="Int128"/> carrier? True only when EVERY argument is an exact scaled operand with a KNOWN
-    /// digit bound (<see cref="NumX.Digits"/>) and the sum of the magnitudes the function adds, each bounded by its
-    /// aligned digits, exceeds <see cref="Int128.MaxValue"/>. An argument whose bound is unknown answers false: nothing
-    /// is provable, and the escape-checked native arm (PB252) keeps its documented behaviour for it.</summary>
-    /// <remarks>
-    /// <para>Which magnitudes are added is a property of the FUNCTION: SUM and MEAN add every argument (a table(ALL)
-    /// argument, whose run-time count is unknown, is charged 9 more digits); RANGE subtracts two; MEDIAN and
-    /// MIDRANGE add two and halve through ×10; MOD and REM align a pair and return one of them.</para>
-    /// <para>The aligned value's own digits are an UPPER bound by construction: an argument's unscaled digits plus
-    /// the scale gap it is shifted by.</para></remarks>
+    /// <summary>Can aligning this call's arguments to their common scale leave the <see cref="Int128"/> carrier? The rule is
+    /// <see cref="FunctionValueLane.AlignmentMayLeaveCarrier"/> (the ONE reader, which the bind-time lane prediction asks of
+    /// the same facts read from the bound tree); this reads them off the RAW operands: an SDIDI or binary64 operand, or
+    /// one of unknown digit bound (<see cref="NumX.Digits"/> 0), is not provable and answers <c>null</c>.</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question — of the RAW operand: its carrier flags and its digit bound.</remarks>
-    private bool AlignmentMayLeaveCarrier(BoundIntrinsicCall ic)
-    {
-        // ⛔ MOD / REM ARE NOT ROUTED. Their value is a DIFFERENCE of nearly equal magnitudes: MOD(9E30, 0.12345678) is
-        // 0.1194939, which needs 39 digits of the dividend, and the SDIDI body keeps 34 — it would answer an
-        // approximation SILENTLY where the native arm refuses LOUDLY (EC-SIZE-OVERFLOW at the carrier). The summing
-        // family's value, in contrast, is as large as its arguments, so every digit a receiver can store (≤ 31) lies
-        // inside the SDIDI's 34. (PB621 names SUM, RANGE, MEAN, MEDIAN and MIDRANGE only.)
-        if (ic.Sig.RuntimeMethod is "ModScaled" or "RemScaled") return false;
-        var xs = Operands(ic).ToList();
-        if (xs.Count == 0 || xs.Any(x => x.Dec || x.Real || x.Digits == 0)) return false;
-        int s = xs.Max(x => x.Scale);
-        // ⛔ THE BOUND IS ON THE VALUE, NOT ON THE WIDEST ARGUMENT PLUS A DIGIT COUNT. Argument i, aligned to the common
-        // scale, is below 10^D_i (D_i its unscaled digits plus the scale gap — a table(ALL) argument stands for an
-        // unknown number of elements, so it is charged nine more digits); the function's value is bounded by the sum of
-        // the magnitudes it adds: every argument for SUM and MEAN, the two largest for RANGE, and those two times ten
-        // for MEDIAN and MIDRANGE (added, then halved through ×10). `9(29)` beside `V9(9)` is 38 + 9 digits of two
-        // values whose sum is 1.0000000010e38 — the Int128 carrier holds it, and the old "widest + digits of n"
-        // allowance sent it to the SDIDI, which keeps 34 digits (kb/Work PB621's review follow-up).
-        var terms = xs.Select((x, i) => Pow10Bound(x.Digits + (s - x.Scale)
-            + (ic.Args[i] is BoundFieldOperand { Place: TableAllPlace } ? 9 : 0))).OrderByDescending(t => t).ToList();
-        UInt128? bound = ic.Sig.RuntimeMethod switch
-        {
-            "SumScaled" or "MeanScaled" => SumOf(terms),
-            "RangeScaled" => SumOf(terms.Take(2)),
-            _ => SumOf(terms.Take(2)) is { } two && two <= UInt128.MaxValue / 10 ? two * 10 : null,   // MEDIAN / MIDRANGE
-        };
-        return bound is not { } b || b > (UInt128)Int128.MaxValue;
-
-        // 10^digits − 1 — the largest magnitude of `digits` digits; null once it is past UInt128 (never fits).
-        static UInt128? Pow10Bound(int digits)
-        {
-            if (digits is < 0 or > 38) return null;
-            UInt128 p = 1;
-            for (int i = 0; i < digits; i++) p *= 10;
-            return p - 1;
-        }
-        static UInt128? SumOf(IEnumerable<UInt128?> terms)
-        {
-            UInt128 total = 0;
-            foreach (var t in terms)
-            {
-                if (t is not { } v || total > UInt128.MaxValue - v) return null;
-                total += v;
-            }
-            return total;
-        }
-    }
+    private bool AlignmentMayLeaveCarrier(BoundIntrinsicCall ic) =>
+        FunctionValueLane.AlignmentMayLeaveCarrier(ic.Sig.RuntimeMethod, Operands(ic)
+            .Select((x, i) => x.Dec || x.Real || x.Digits == 0
+                ? (FunctionValueLane.AlignedOperand?)null
+                : new FunctionValueLane.AlignedOperand(x.Digits, x.Scale, ic.Args[i] is BoundFieldOperand { Place: TableAllPlace }))
+            .ToList());
 
     /// <summary>Does any argument arrive on the SDIDI carrier (a native integer power — kb/Work PB69)?</summary>
     /// <remarks>INTAKE(PREDICATE) — renders only to ASK a question; the rendered text is discarded.</remarks>
@@ -1183,7 +1115,7 @@ internal sealed class IntrinsicRenderer(EmitContext ctx, NumericRenderer num)
     ///         SDIDI. Their argument is a string, so the carrier question never arises; before this arm the
     ///         standard-mode value rode the native Int128 projection at the item-92 working scale
     ///         (fix-queue PB60, RV-15.67.4-1a). ⛔ For NUMVAL and NUMVAL-C the MODE is not part of the
-    ///         question at all (kb/Work PB251): <see cref="ValueFixedByDefinition"/> routes them to
+    ///         question at all (kb/Work PB251): <see cref="FunctionValueLane.ValueFixedByDefinition"/> routes them to
     ///         <see cref="RenderDec"/> BEFORE the arithmetic-mode dispatch, so that arm precedes this
     ///         set; they are listed here because a string argument makes <c>AnyDecOrRealRaw</c> false
     ///         and the early-out would otherwise return null under native. NUMVAL-F is standard-mode
