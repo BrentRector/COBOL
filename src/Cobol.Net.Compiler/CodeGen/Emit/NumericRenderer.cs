@@ -269,7 +269,7 @@ internal sealed class NumericRenderer(EmitContext ctx, EcState ecState) : IBound
         string extent = n.PositionsPerCharacter == 1
             ? RuntimeApi.TableOdoExtentTrimmed(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs, n.FixedWidth, n.ElemWidth, n.TrailingWidth)
             : RuntimeApi.TableOdoExtentChars(PlaceRenderer.CountRead(n.Depending), n.MinOccurs, n.MaxOccurs,
-                n.FixedWidth, n.ElemWidth, n.PositionsPerCharacter);
+                n.FixedWidth, n.ElemWidth, n.TrailingWidth, n.PositionsPerCharacter);
         // A BASED entry not associated with actual data answers GR8b's maximum (§15.50.4 r4a / §15.14.4 r2a —
         // kb/Work PB80); the null test comes FIRST, before data-name-1 (possibly inside the entry) is read.
         long maximum = (n.FixedWidth + (long)n.MaxOccurs * n.ElemWidth - n.TrailingWidth + n.PositionsPerCharacter - 1) / n.PositionsPerCharacter;

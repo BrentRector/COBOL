@@ -1248,13 +1248,14 @@ internal static class RuntimeApi
         int trailingUnits) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtentTrimmed)}({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {trailingUnits})";
 
-    /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand — <see cref="TableOdoExtent"/>
-    /// rounded up to whole characters (<c>CobolTable.OdoExtentChars</c>). Identity when the positions ARE characters,
-    /// so the image channel has ONE arm rather than a units branch (kb/Work PB173).</summary>
+    /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand — <see cref="TableOdoExtentTrimmed"/>
+    /// rounded up to whole characters (<c>CobolTable.OdoExtentChars</c>; the trailing filler is given back before the
+    /// ceiling, kb/Work PB3167). Identity when the positions ARE characters, so the image channel has ONE arm rather
+    /// than a units branch (kb/Work PB173).</summary>
     public static string TableOdoExtentChars(
-        string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits, int positionsPerChar) =>
+        string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits, int trailingUnits, int positionsPerChar) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtentChars)}"
-        + $"({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {positionsPerChar})";
+        + $"({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {trailingUnits}, {positionsPerChar})";
 
     /// <summary>A table(ALL) intrinsic argument's enumeration (ISO §15.3; kb/Work PB62) — <c>CobolTable.AllArgs&lt;T&gt;</c>
     /// over one range lambda per ALL level (each <c>Func&lt;long[], long&gt;</c>, the index vector in) and the element

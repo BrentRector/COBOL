@@ -256,13 +256,19 @@ public static class CobolTable
 
     /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand whose positions are counted in
     /// <paramref name="positionsPerChar"/> units (1 for a character subtree, 8 for one holding USAGE BIT leaves —
-    /// ISO/IEC 1989:2023 §8.5.1.6.3, kb/Work PB173): <see cref="OdoExtent"/> rounded UP to whole characters. The
-    /// ceiling is where §8.5.1.6.3's trailing-filler rule puts the group's own partial byte, and it is the same
+    /// ISO/IEC 1989:2023 §8.5.1.6.3, kb/Work PB173): <see cref="OdoExtentTrimmed"/> rounded UP to whole characters.
+    /// The ceiling is where §8.5.1.6.3's trailing-filler rule puts the group's own partial byte, and it is the same
     /// rounding §15.50.4 r9 requires of every other bit width. With <paramref name="positionsPerChar"/> = 1 it is
-    /// the identity, so the character channel has ONE arm, never a units branch.</summary>
-    public static int OdoExtentChars(Occurrence count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar)
+    /// the identity, so the character channel has ONE arm, never a units branch.
+    /// <para>⛔ The LAST occurrence's <paramref name="trailingUnits"/> are given back BEFORE the ceiling, exactly as the
+    /// position channel gives them back (kb/Work PB3167): a bit table whose occurrences stride whole bytes can begin in
+    /// the middle of a byte, and then its stride-counted end lies in a later byte than its real end does —
+    /// <c>05 BA PIC 1(2). 05 SUB GROUP-USAGE BIT OCCURS 1 TO 3 DEPENDING ON N. 10 SA PIC 1. 10 TA PIC 1(5) ALIGNED.</c>
+    /// at N = 2 ends at bit 29 (4 characters), its stride count at bit 34 (5).</para></summary>
+    public static int OdoExtentChars(Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits,
+                                     int positionsPerChar)
     {
-        int units = OdoExtent(count, min, max, fixedUnits, elemUnits);
+        int units = OdoExtentTrimmed(count, min, max, fixedUnits, strideUnits, trailingUnits);
         return positionsPerChar <= 1 ? units : (units + positionsPerChar - 1) / positionsPerChar;
     }
 

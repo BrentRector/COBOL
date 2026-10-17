@@ -1004,7 +1004,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         if (m.Occurs is not { } occ || occ <= 0) return OneBitCarrierOf(m, useValues, subs);
         // ⛔ THE OCCURRENCES SIT ONE STRIDE APART (§13.18.1.4 GR2, kb/Work PB3156) — the compile-time twin of
         // BitCarrierOf: every occurrence is padded to its stride and the last one's padding cut off again, which is
-        // BitLayout.TableBits. A table without the ALIGNED clause has stride = width and needs neither.
+        // BitLayout.TableBits. A table whose layout does not depend on where in a byte it begins (no ALIGNED subject
+        // or member, nothing that starts a byte, kb/Work PB3167) has stride = width and needs neither.
         int filler = BitLayout.TrailingFillerBits(m);
         if (filler == 0)
             return OccurrenceRunEmit.Image(OccurrenceRunsOf(m, useValues, subs, occ), o => OneBitCarrierOf(m, useValues, subs.With(o)));
@@ -1050,7 +1051,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         }
         if (m.Occurs is { } o)
         {
-            // The occurrences are one STRIDE apart (§13.18.1.4 GR2 — an ALIGNED table's, kb/Work PB3156), each `per` wide.
+            // The occurrences are one STRIDE apart (§13.18.1.4 GR2 — an ALIGNED table's or member's, kb/Work PB3156,
+            // PB3167), each `per` wide.
             int stride = BitLayout.StrideBits(m);
             using (w.Block($"for (int __i = 0; __i < {o}; __i++)"))
                 w.Line(m.IsGroup
@@ -1084,8 +1086,8 @@ internal sealed class GroupImageCodec(EmitContext ctx, PhysicalModel phys, Value
         string occurrences = m.IsGroup ? $"global::System.Array.ConvertAll({m.CsName}, __e => __e.AsBits())" : m.CsName;
         // ⛔ THE OCCURRENCES SIT ONE STRIDE APART, NOT ONE WIDTH (§13.18.1.4 GR2, kb/Work PB3156): an ALIGNED table puts
         // every occurrence at the first bit of a byte, so the carrier carries the filler between them — the extent
-        // BitLayout.TableBits states, which BitAreaOf and the run packer both advance by. A table without the clause
-        // has stride = width, and keeps the plain concatenation.
+        // BitLayout.TableBits states, which BitAreaOf and the run packer both advance by. A table whose layout does not
+        // depend on where in a byte it begins (kb/Work PB3167) has stride = width, and keeps the plain concatenation.
         return BitLayout.StrideBits(m) == BitLayout.WidthBits(m)
             ? $"string.Concat({occurrences})"
             : RuntimeApi.BitsStrided(occurrences, $"{BitLayout.StrideBits(m)}");
