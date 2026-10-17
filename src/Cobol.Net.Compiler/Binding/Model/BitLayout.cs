@@ -446,7 +446,7 @@ internal static class BitLayout
             // Rule 1 vs 2 (and §13.18.1.4 GR1) — ONE predicate.
             if (!Continues(prev, c)) cursor = RoundUpToByte(cursor);   // rules 2 and 3 — same advance, different reasons
             if (starts is not null) starts[i] = cursor - phase;
-            cursor += RunBitsAt(c, cursor % BitsPerCharacter);   // width, or the ALIGNED per-occurrence stride × (n−1) + width (GR2)
+            cursor += RunBitsAt(c, cursor % BitsPerCharacter);   // width, or the whole-byte stride × (n−1) + width (GR2)
             prev = c;
         }
         if (starts is null) return cursor - phase;

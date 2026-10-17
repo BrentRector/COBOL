@@ -1241,8 +1241,8 @@ internal static class RuntimeApi
     public static string TableOdoExtent(string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtent)}({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits})";
 
-    /// <summary>The same extent where the LAST occurrence's <paramref name="trailingUnits"/> of filler (an ALIGNED bit
-    /// table's, §13.18.1.4 GR2) is not counted — <c>CobolTable.OdoExtentTrimmed</c>, the extent in POSITIONS the bit
+    /// <summary>The same extent where the LAST occurrence's <paramref name="trailingUnits"/> of filler (a bit table's
+    /// with an ALIGNED subject or member, §13.18.1.4 GR2) is not counted — <c>CobolTable.OdoExtentTrimmed</c>, the extent in POSITIONS the bit
     /// channel and FUNCTION LENGTH of a bit group read (kb/Work PB3156).</summary>
     public static string TableOdoExtentTrimmed(string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits,
         int trailingUnits) =>

@@ -2410,8 +2410,8 @@ internal sealed class IntrinsicBinder(BinderContext ctx, StatementBinder host)
     /// boundaries, so subtracting its counted extent leaves the fixed part exactly; the OCCURS DEPENDING table of
     /// bit elements, whose occurrences share bytes, is counted in bit positions
     /// (<see cref="BoundOdoExtent.PositionsPerCharacter"/>), and a bit GROUP's LENGTH is those positions
-    /// (§15.50.4 r1) rather than the bytes they occupy. An ALIGNED table's occurrences are padded to whole bytes
-    /// (§13.18.1.4 GR2): the positions are counted a stride apart with the LAST occurrence's padding given back
+    /// (§15.50.4 r1) rather than the bytes they occupy. The occurrences of a table with an ALIGNED subject or member
+    /// are padded to whole bytes (§13.18.1.4 GR2; kb/Work PB3167): the positions are counted a stride apart with the LAST occurrence's padding given back
     /// (<see cref="BitLayout.TableBits"/>, <see cref="BoundOdoExtent.TrailingWidth"/>), so the answer is the one the same
     /// table fixed at that many occurrences has (kb/Work PB3156).</para>
     /// </remarks>

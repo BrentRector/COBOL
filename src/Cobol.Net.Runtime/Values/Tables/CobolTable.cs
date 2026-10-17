@@ -224,9 +224,9 @@ public static class CobolTable
         fixedUnits + (int)CurrentCount(count, min, max) * elemUnits;
 
     /// <summary>The CURRENT extent, in positions, of an occurs-depending GROUP operand whose occurrences are
-    /// <paramref name="strideUnits"/> apart but whose LAST occurrence ends where its own width does — an ALIGNED bit
-    /// table's (§13.18.1.4 GR2: "applies to each occurrence of that item", so each occurrence starts a byte of its
-    /// own; §8.5.1.6.3 generates filler only "as needed to advance alignment to a required natural boundary for the
+    /// <paramref name="strideUnits"/> apart but whose LAST occurrence ends where its own width does — a bit table's
+    /// with an ALIGNED subject or member (§13.18.1.4 GR2: "applies to each occurrence of that item", so the
+    /// occurrences are a whole number of bytes apart, kb/Work PB3167; §8.5.1.6.3 generates filler only "as needed to advance alignment to a required natural boundary for the
     /// next item", and the last occurrence has no next one). <paramref name="trailingUnits"/> is the filler that pads
     /// that last occurrence to the stride (<c>stride − width</c>); it is given back once at least one occurrence
     /// exists: the extent at <c>c</c> occurrences is <c>fixed + c × stride − trailing</c> for <c>c &gt; 0</c> and
