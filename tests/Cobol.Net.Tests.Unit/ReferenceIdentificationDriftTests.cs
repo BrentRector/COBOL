@@ -77,8 +77,9 @@ public sealed class ReferenceIdentificationDriftTests
                    "ResolveQualified(", "ResolveUnqualified(", "ReportUnidentified(", "ScreenLinkageReference(", "ReadSubscripts(" })
             Assert.True(identify.Contains(screen, StringComparison.Ordinal),
                 $"ReferenceResolver.Identify no longer asks {screen} — the screen moved out of the one identification step.");
-        // §13.7.3 SR4 is written at ONE call site in the resolver (the definition and that call).
-        Assert.Equal(2, Regex.Matches(Code(ReferenceResolver), @"\bScreenLinkageReference\(").Count);
+        // §13.7.3 SR4 is asked at exactly two sites of the resolver — the identification step (every identifier) and the
+        // reported lookup of a TABLE name (FindReportedItem) — besides the definition.
+        Assert.Equal(3, Regex.Matches(Code(ReferenceResolver), @"\bScreenLinkageReference\(").Count);
     }
 
     [Fact]
@@ -101,5 +102,23 @@ public sealed class ReferenceIdentificationDriftTests
         string text = File.ReadAllText(Path.Combine(TestRepo.Src("Cobol.Net.Compiler"),
             "Binding", "Procedure", "Verbs", "IntrinsicBinder.cs"));
         Assert.Contains("ctx.Refs.SumCounterFamilyFor(dref, name, quals, report: true)", text, StringComparison.Ordinal);
+        // ... and its table lookup is the REPORTED one (the §8.4.2.2 report and the §13.7.3 SR4 screen), not a bare FindItem.
+        Assert.Contains("ctx.Refs.FindReportedItem(dref, name, quals)", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("Refs.FindItem(", text, StringComparison.Ordinal);
+    }
+
+    /// <summary>The two references that name a TABLE rather than a place — the SEARCH / SORT table operand and the
+    /// table(ALL) intrinsic argument — look their item up through <c>FindReportedItem</c>, which reports an unidentified
+    /// name and screens a LINKAGE item the procedure division may not reference (§13.7.3 SR4). A bare
+    /// <c>FindItem</c> there is the pre-PB3287 shape: <c>SEARCH L-TABLE</c> compiled clean over such a record.</summary>
+    [Fact]
+    public void TheTableOperand_LooksItsItemUpThroughTheReportedLookup()
+    {
+        string body = Code(BodyOf("public TableOperand? ResolveTableOperand("));
+        Assert.Contains("FindReportedItem(dref, name, written.Qualifiers)", body, StringComparison.Ordinal);
+        Assert.DoesNotContain("FindItem(", body, StringComparison.Ordinal);
+        string reported = Code(BodyOf("internal DataItem? FindReportedItem("));
+        Assert.Contains("ReportUnidentified(", reported, StringComparison.Ordinal);
+        Assert.Contains("ScreenLinkageReference(", reported, StringComparison.Ordinal);
     }
 }

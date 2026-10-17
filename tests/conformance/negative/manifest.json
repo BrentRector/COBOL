@@ -672,6 +672,8 @@
   "pb3287-address-of-ambiguous-name",
   "pb3287-address-of-index-name",
   "pb3287-address-of-constant-name",
+  "pb3287-search-linkage-table-not-referenceable",
+  "pb3287-all-subscript-linkage-table-not-referenceable",
   "pb531-picture-repetition-factor-negative",
   "pb531-picture-repetition-factor-signed",
   "pb531-picture-repetition-factor-zero",

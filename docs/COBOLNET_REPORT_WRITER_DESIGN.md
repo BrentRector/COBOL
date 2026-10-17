@@ -367,7 +367,12 @@ off-by-one through every later counter check.
   IMAGE-CARRIED, `StorageFormPass` gives it `StorageForm.CharImage`, kb/Work PB2553). Because it is a Place, every verb reaches it through the machinery it
   already has, receiving side included; the former read-only `BoundReportSumRef` is DELETED, and the compose of
   a SUM entry's printable face now goes through the same place (which is what GR4's "moved, according to the
-  general rules of the MOVE statement" asks for). An ambiguous or mis-qualified reference is **COBOLNET2145**;
+  general rules of the MOVE statement" asks for). An ambiguous or mis-qualified reference is **COBOLNET2145** —
+  and a counter is ONE CANDIDATE AMONG ALL THE DATA-NAMES OF ITS SPELLING (kb/Work PB3232): `SumCounterFamilyFor`
+  counts the counters together with the ordinary data items the written qualifiers reach in the same source element
+  (`DataBinder.QualifiedCandidates`), so an unqualified `TOT-N` that names a sum counter AND a WORKING-STORAGE item is
+  ambiguous (§8.4.2.2.3 SR1) instead of silently binding the counter, and `TOT-N OF group` / `TOT-N OF report-name`
+  tell them apart;
   the counter's own profile (§13.18.54.4 GR1 — signed, digits from the entry's PICTURE) is
   `PicInfo.SumCounterItem`, emitted beside the printable items' `NumProfile`s. **Its usage is DISPLAY** (kb/Work
   PB1943, PB2520; the implementor's choice, GR1 states none — CONFORMANCE.md A.4.11): a signed `S9(n)V9(m)` DISPLAY

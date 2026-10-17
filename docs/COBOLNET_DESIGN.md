@@ -182,7 +182,11 @@ a subscript position that is not a subscript — COBOLNET2363, a reference to a 
 the unbuilt ledger before any caller sees it, so a caller that drops the answer cannot make it silent, and a caller
 builds its node FROM the answer (`Refusal` / `OperandError` / `ExprError` / `BoolError`; `PlaceOrReported` where the
 caller cannot carry a deferral, which reports it as recognized-not-implemented, COBOLNET0899). The receiving
-chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported. Every
+chokepoint `ResolveReceiving` consumes the answer itself and still returns `Place?`, null meaning reported. A data
+reference is IDENTIFIED in one place, `ReferenceResolver.Identify` (kb/Work PB3287): the registers and implicit names,
+the §8.4.2.2 lookup with its one report, the §13.7.3 SR4 LINKAGE screen and the written subscripts; `Resolve` builds the
+item's place after it and `ResolveForAddressOf` the ADDRESS OF operand, so a screen added to the step reaches both
+(`ReferenceIdentificationDriftTests` holds the entries to it). Every
 receiving grammar slot is a `receivingIdentifier` (`setReceivingIdentifier` in SET, which lacks the data-address
 alternative so Format 7 keeps its own `ADDRESS OF data-name-1` receiver), and so is the BY REFERENCE argument of CALL and
 INVOKE (§14.9.4.3 SR5, §14.9.23.3 SR20; an address-identifier there is a sending operand and keeps its own arm; a

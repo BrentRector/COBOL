@@ -1525,6 +1525,24 @@ public sealed partial class ReferenceResolver(DataBinder data)
         qualifiers.Count == 0 ? ResolveUnqualified(name)
             : ResolveQualified(name, qualifiers as List<string> ?? [.. qualifiers]);
 
+    /// <summary>⛔ THE LOOKUP OF A WRITTEN NAME THAT NAMES A TABLE, REPORTED (kb/Work PB3287): <see cref="FindItem"/>, then
+    /// the one §8.4.2.2 report when no item is identified (<see cref="ReportUnidentified"/>) and the §13.7.3 SR4 screen
+    /// when one is (<see cref="ScreenLinkageReference"/>) — what <see cref="Identify"/> asks for every identifier, for the
+    /// two references that name a TABLE and not a place (the SEARCH / SORT table operand and the table(ALL) intrinsic
+    /// argument), which read their own subscripts. Both used to call <see cref="FindItem"/> and stop, so `SEARCH L-TABLE`
+    /// and `FUNCTION SUM (L-TABLE (ALL))` over a LINKAGE table the procedure division may not reference compiled clean
+    /// while `MOVE L-TABLE (1) TO X` drew COBOLNET2746. Null having reported.</summary>
+    internal DataItem? FindReportedItem(Core.DataReferenceContext dref, string name, List<string> qualifiers)
+    {
+        if (FindItem(name, qualifiers) is not { } item)
+        {
+            ReportUnidentified(dref, name, qualifiers);
+            return null;
+        }
+        ScreenLinkageReference(dref, item);
+        return item;
+    }
+
     /// <summary>A reference written where a general format prints a <b>table</b> operand, resolved and read: the
     /// <see cref="DataItem"/> the qualifiers single out, plus the two facts the statement's own syntax rules are
     /// about — how many subscripts were written, and whether a reference modification was.</summary>
@@ -1558,11 +1576,7 @@ public sealed partial class ReferenceResolver(DataBinder data)
         DataReferenceCst r = dref;
         if (r.Register != SpecialRegister.None || r.BaseName is not { } name) return null;
         var written = ReadWritten(dref);
-        if (FindItem(name, written.Qualifiers) is not { } item)
-        {
-            ReportUnidentified(dref, name, written.Qualifiers);
-            return null;
-        }
+        if (FindReportedItem(dref, name, written.Qualifiers) is not { } item) return null;
         // The subscripts AS WRITTEN, split by the ONE declaration-informed splitter (kb/Work PB136) — the same
         // reading SR8/SR9 already demand of a Format-2 key subscript, for the same reason: the RENDERED index
         // expression has erased how many operands the programmer wrote.
