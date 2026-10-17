@@ -41,14 +41,19 @@ internal sealed class RoslynBackend : ICodeGenBackend
             written.Add(Path.GetFullPath(csPath));
         }
 
-        var result = Compile(csharp, options.OutputPath, options.AssemblyName);
+        // A group with a main program is an executable; one without is a LIBRARY (DESIGN-external-repository §7.2): no
+        // Main, no runtimeconfig.json, reached through its host entries and the sibling probe. ProgramEmitter.MainUnit is
+        // the one answer, which EmitMain read too.
+        bool library = ProgramEmitter.MainUnit(program.Units) is null;
+        var result = Compile(csharp, options.OutputPath, options.AssemblyName,
+            library ? OutputKind.DynamicallyLinkedLibrary : OutputKind.ConsoleApplication);
         if (result.Success)
         {
             written.Add(Path.GetFullPath(options.OutputPath));
-            written.AddRange(AssemblyPackager.Package(options.OutputPath));   // P7 Step 2 — packaging off Compile
+            written.AddRange(AssemblyPackager.Package(options.OutputPath, library));   // P7 Step 2 — packaging off Compile
         }
         return new BackendArtifact(result.Success, result.Diagnostics, csPath,
-            result.Success ? options.OutputPath : null, written);
+            result.Success ? options.OutputPath : null, written, library);
     }
 
     /// <summary>The outcome of a backend compilation.</summary>
@@ -57,13 +62,15 @@ internal sealed class RoslynBackend : ICodeGenBackend
     public readonly record struct Result(bool Success, IReadOnlyList<Diagnostic> Diagnostics);
 
     /// <summary>
-    /// Compile <paramref name="csharpSource"/> to a console assembly at <paramref name="outputDllPath"/>.
+    /// Compile <paramref name="csharpSource"/> to an assembly of <paramref name="outputKind"/> (a console application
+    /// for a group with a main program, a library otherwise) at <paramref name="outputDllPath"/>.
     /// PURE C#→assembly since P7 Step 2: the packaging side effects (runtimeconfig + runtime deploy) live in
     /// <see cref="AssemblyPackager"/>, invoked by <see cref="Emit"/> on success — the only writes here are the
     /// assembly itself and the failed-emit cleanup.
     /// </summary>
     /// <param name="assemblyName">The emitted assembly's simple name (the COBOL PROGRAM-ID).</param>
-    public static Result Compile(string csharpSource, string outputDllPath, string assemblyName)
+    /// <param name="outputKind">The assembly's kind (DESIGN-external-repository §7.2).</param>
+    public static Result Compile(string csharpSource, string outputDllPath, string assemblyName, OutputKind outputKind)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(
             csharpSource, new CSharpParseOptions(LanguageVersion.Latest));
@@ -73,7 +80,7 @@ internal sealed class RoslynBackend : ICodeGenBackend
             [syntaxTree],
             ReferenceAssemblies(),
             new CSharpCompilationOptions(
-                OutputKind.ConsoleApplication,
+                outputKind,
                 optimizationLevel: OptimizationLevel.Release,
                 // The generated source is machine-emitted and self-consistent; nullable warnings on it are noise.
                 nullableContextOptions: NullableContextOptions.Disable,

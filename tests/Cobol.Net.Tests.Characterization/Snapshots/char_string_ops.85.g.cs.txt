@@ -121,6 +121,18 @@ internal sealed class _PRG_CHAR_STRING_OPS : ICobolProgram
         return __pc;
     }
 }
+
+/// <summary>PROGRAM-ID CHAR-STRING-OPS (ISO §14.2.3 13), DESIGN-external-repository §4.3): activates the program through the run unit's activation boundary (§14.9.4.4 3)) as a CALL statement naming it does, landing each argument exactly or refusing it.</summary>
+public static class CHAR_STRING_OPS
+{
+    public static void Call()
+    {
+        __CobolModule.EnsureRegistered();   // this assembly's programs, once per run unit (DESIGN-external-repository §11.2)
+        ProgramRegistry.CallProgram("CHAR-STRING-OPS", null, global::System.Array.Empty<CobolArg>(), null, siteArgMismatchChecking: true);
+    }
+    /// <summary>CANCEL CHAR-STRING-OPS (ISO §14.9.5) in the current run unit.</summary>
+    public static void Cancel() => ProgramRegistry.Cancel("CHAR-STRING-OPS", null);
+}
 public static class __CobolModule
 {
     public static void EnsureRegistered() => ProgramRegistry.RegisterModule("Cobol.p.__CobolModule", "6.0.0.0", 1, Register);

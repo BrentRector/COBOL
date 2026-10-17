@@ -10,7 +10,11 @@ CobolNet.Runtime.Collation.ResolvedLocaleCollation.Failure.get -> CobolNet.Runti
 CobolNet.Runtime.Collation.ResolvedLocaleCollation.Failure.init -> void
 CobolNet.Runtime.ConfigEntry.FamilyMember.get -> System.Func<string!, bool>?
 CobolNet.Runtime.ConfigEntry.FamilyMember.init -> void
-CobolNet.Runtime.ProgramTable.RunModule(System.Action! ensureRegistered, string? mainPath) -> void
+CobolNet.Runtime.ProgramTable.RunModule(System.Action! ensureRegistered, string! mainPath) -> void
+CobolNet.Runtime.RunUnitEndedException
+CobolNet.Runtime.RunUnitEndedException.Abnormal.get -> bool
+CobolNet.Runtime.RunUnitEndedException.ExitStatus.get -> long
+CobolNet.Runtime.RunUnitEndedException.RunUnitEndedException(long exitStatus, bool abnormal, string! message) -> void
 static CobolNet.Runtime.CobolIntrinsics.FractionPartU(System.UInt128 v, int scale) -> System.Int128
 static CobolNet.Runtime.CobolIntrinsics.IntegerPartU(System.UInt128 v, int scale) -> System.UInt128
 static CobolNet.Runtime.CobolIntrinsics.SignOfU(System.UInt128 v) -> long
@@ -20,7 +24,7 @@ static CobolNet.Runtime.CobolVarGroup.OverlaidImage(string! current, CobolNet.Ru
 static CobolNet.Runtime.CobolVarGroup.OverlayImage(CobolNet.Runtime.CobolVarGroup! current, CobolNet.Runtime.GroupAtom![]! currentShape, string! image, CobolNet.Runtime.GroupAtom![]! imageShape, CobolNet.Runtime.ReceivingReferences? received) -> CobolNet.Runtime.CobolVarGroup!
 static CobolNet.Runtime.CobolVarGroup.ToImage(CobolNet.Runtime.CobolVarGroup! v, CobolNet.Runtime.GroupAtom![]! from, CobolNet.Runtime.GroupAtom![]! imageShape, int width) -> string!
 static CobolNet.Runtime.ProgramRegistry.AddressNotLocated(string! name, bool function) -> string!
-static CobolNet.Runtime.ProgramRegistry.RunModule(System.Action! ensureRegistered, string? mainPath) -> void
+static CobolNet.Runtime.ProgramRegistry.RunModule(System.Action! ensureRegistered, string! mainPath) -> void
 static CobolNet.Runtime.ProgramTable.ClassHalfPath(string! externalizedName, bool factory) -> string!
 static CobolNet.Runtime.ProgramTable.ClassPath(string! externalizedName) -> string!
 static CobolNet.Runtime.ProgramTable.ContainedPath(string! containerPath, string! name) -> string!
@@ -128,3 +132,25 @@ CobolNet.Runtime.ActivationDescription.ObjectNameIsParameter.init -> void
 static CobolNet.Runtime.ActivationRelations.SignatureDifference(CobolNet.Runtime.ActivationDescription! first, CobolNet.Runtime.ActivationDescription! second, string! firstRole = "item", string! secondRole = "corresponding item") -> string?
 CobolNet.Runtime.IO.FileConnector.StartPositioned() -> string!
 CobolNet.Runtime.IO.FileConnector.Unsuccessful(string! status) -> string!
+CobolNet.Runtime.HostLanding
+static CobolNet.Runtime.CobolBits.WriteWindowInto(char[]! buffer, int startBit, string! bits) -> void
+static CobolNet.Runtime.HostLanding.RequireImage(string? image, int width, string! parameter) -> string!
+static CobolNet.Runtime.HostLanding.Dec(System.Int128 unscaled, int scale) -> CobolNet.Runtime.CobolDec
+static CobolNet.Runtime.HostLanding.Decimal(System.Int128 unscaled, int scale) -> decimal
+static CobolNet.Runtime.HostLanding.Integer(System.Int128 unscaled, int scale) -> System.Int128
+static CobolNet.Runtime.HostLanding.Land(CobolNet.Runtime.CobolDec value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
+static CobolNet.Runtime.HostLanding.Land(System.Int128 value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
+static CobolNet.Runtime.HostLanding.Land(System.UInt128 value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
+static CobolNet.Runtime.HostLanding.Land(decimal value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
+static CobolNet.Runtime.HostLanding.Land(long value, in CobolNet.Runtime.NumProfile formal, string! parameter, string? member) -> System.Int128
+static CobolNet.Runtime.HostLanding.LandedOccurrences(string! image, in CobolNet.Runtime.NumProfile depending, int minimum, int maximum, string! parameter, string! member, string! dependingName) -> int
+static CobolNet.Runtime.HostLanding.LandText(string? value, int positions, bool justified, bool boolean, string! parameter, string? member) -> string!
+static CobolNet.Runtime.HostLanding.LandVariable(string? value, int maximum, bool boolean, string! parameter, string? member) -> string!
+static CobolNet.Runtime.HostLanding.RequireOccurrences<T>(T[]? array, long occurrences, int minimum, int maximum, string! parameter, string! member) -> T[]!
+static CobolNet.Runtime.HostLanding.RequireDistinct(bool sameVariable, string! first, string! second) -> void
+static CobolNet.Runtime.HostLanding.TryOccurrences(string! image, in CobolNet.Runtime.NumProfile depending, int minimum, int maximum, string! member, string! dependingName, ref System.FormatException? failure, out int occurrences) -> bool
+static CobolNet.Runtime.HostLanding.TryDecode(string? image, in CobolNet.Runtime.NumProfile item, string! name, ref System.FormatException? failure, out System.Int128 unscaled) -> bool
+static CobolNet.Runtime.HostLanding.TryDec(System.UInt128 unscaled, int scale, string! name, ref System.FormatException? failure, out CobolNet.Runtime.CobolDec value) -> bool
+static CobolNet.Runtime.HostLanding.RequireCapacity<T>(T[]? array, int minimum, string! parameter, string! member) -> T[]!
+static CobolNet.Runtime.CobolVarGroup.RunOf(string! window, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable) -> string!
+static CobolNet.Runtime.CobolVarGroup.WindowOf(string! run, string! window, System.ReadOnlySpan<int> dynFixedAt, System.ReadOnlySpan<int> dynTable) -> string!

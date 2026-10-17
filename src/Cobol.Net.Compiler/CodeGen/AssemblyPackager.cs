@@ -55,10 +55,13 @@ public static class AssemblyPackager
     /// <summary>Package the emitted assembly at <paramref name="outputDllPath"/>: runtimeconfig + runtime deploy.
     /// (The design sketch passed the Roslyn <c>EmitResult</c> + options; the output path is the one input the
     /// packaging actually consumes — reduced accordingly.)</summary>
+    /// <param name="library">The assembly is a library (a group with no main program, DESIGN-external-repository §7.2):
+    /// it is loaded into a host's process, never launched, so it has no runtimeconfig.json.</param>
     /// <returns>Every file packaging wrote, as full paths (kb/Work PB985 — the backend's output set).</returns>
-    internal static IReadOnlyList<string> Package(string outputDllPath)
+    internal static IReadOnlyList<string> Package(string outputDllPath, bool library)
     {
-        var written = new List<string> { WriteRuntimeConfig(outputDllPath) };
+        var written = new List<string>();
+        if (!library) written.Add(WriteRuntimeConfig(outputDllPath));
         if (DeployRuntime(outputDllPath) is { } runtime) written.Add(runtime);
         return written;
     }
