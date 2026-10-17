@@ -7,7 +7,8 @@ evidence for that facility's introducing edition, each piece of which this scrip
   ("intrinsic", NAME, edition) -> IntrinsicCatalog.cs row NAME is gated at that edition (the COBOLNET1502 window)
   ("reserved", WORD, edition)  -> tests/version-matrix/reserved-words.json first reserves WORD at that edition
   ("row", rule-id, band)       -> the inventory row rule-id (a decided sibling) carries that band
-Ran once from the worktree root (adjudication/pb3173-editions/README.md):  python <this> <out-batch.json>
+Runs from the root of the tree BEFORE the batch (PB3172's merge, 8eca73497), extracted as README.md says:
+    python <this> <out-batch.json>
 """
 import json, pathlib, re, subprocess, sys
 
@@ -109,6 +110,12 @@ R = {
          "exists from 2014, the edition of both",
          [("cite", "8.5.1.12.1", "A variable-length group is a group item whose data description has at least one"),
           ("construct", "occurs-dynamic-2014", 2014), ("row", "DOC-A.1-62", A14)]),
+ "LEAPSEC": ("the LEAP-SECOND directive, whose General rule 4 states the implementor's choice this item documents, "
+             "is a COBOL-2002 introduction (the 7.3 directive facility); the item's other references (the "
+             "SECONDS-PAST-MIDNIGHT function, 15.80, and the 15.3.3 time formats) are 2014 users of the same choice, "
+             "and a documentation item exists from the first edition at which a rule it documents exists",
+             [("cite", "7.3.17.4", "The implementor defines whether a value greater than or equal to 86,400"),
+              ("construct", "leap-second-directive-2002", 2002), ("row", "GR-7.3.17.4-4", A02)]),
  "TIMEFORM": ("the standard numeric time form and the fractional-seconds time formats (15.3.3) serve the FORMATTED-* "
               "and SECONDS-PAST-MIDNIGHT functions, all 2014 introductions",
               [("intrinsic", "FORMATTED-TIME", 2014), ("intrinsic", "SECONDS-PAST-MIDNIGHT", 2014),
@@ -185,7 +192,7 @@ D = {
  "DOC-A.1-50": (A23, "DELFILE"), "DOC-A.1-57": (A14, "VLG"), "DOC-A.1-64": (A14, "ENTRYCONV"),
  "DOC-A.1-82": (A02, "FLOATLIT"), "DOC-A.1-87": (A14, fn("FORMATTED-CURRENT-DATE", 2014)),
  "DOC-A.1-88": (A02, "PROTO"), "DOC-A.1-96": (A02, "HEX"), "DOC-A.1-98": (A02, "HEX"),
- "DOC-A.1-112": (A14, "TIMEFORM"), "DOC-A.1-202": (A14, "TIMEFORM"),
+ "DOC-A.1-112": (A02, "LEAPSEC"), "DOC-A.1-202": (A14, "TIMEFORM"),
  **{f"DOC-A.1-{n}": (A23, "MODNAME") for n in range(133, 138)},
  "DOC-A.1-140": (A23, "POP"), "DOC-A.1-142": (A02, "PROGPTR"),
  "DOC-A.1-144": (A85, fn("RANDOM", 85)), "DOC-A.1-145": (A85, fn("RANDOM", 85)),
@@ -229,6 +236,16 @@ CORR = {
      + ["FMT-13.18.24.2", "FMT-13.18.51.2", "DOC-A.1-84", "DOC-A.1-85", "DOC-A.1-173"])},
  "AR-15.69.3-1": (A14, A02, fn("NUMVAL-F", 2002)), "RV-15.69.4-2": (A14, A02, fn("NUMVAL-F", 2002)),
  "AR-15.64.3-1": (A02, A85, fn("MOD", 85)),
+ # Branch review round 1 (kb/Work PB3027, wave 1104 C2): the two FORMAT-only rules the A.4.8 sweep missed (R1-1),
+ # and the nine clause-15 rules whose band started before their function exists (R1-3). A rule of a function
+ # exists from the function's introducing edition, never earlier; SpecTraceabilityInventoryDriftTests
+ # .EveryFunctionRule_StartsNoEarlierThanItsFunction now refuses that shape.
+ "SR-13.4.5.3-6": (A85, A02, "FMTSEL"), "SR-14.9.27.3-9": (A85, A02, "FMTSEL"),
+ "AR-15.7.3-1": (A02, A14, fn("ABS", 2014)), "RV-15.7.4-1": (A02, A14, fn("ABS", 2014)),
+ "AR-15.79.3-4": (A02, A14, fn("SECONDS-FROM-FORMATTED-TIME", 2014)),
+ **{rid: (A85, A02, fn("TEST-NUMVAL", 2002)) for rid in ("AR-15.93.3-1", "RV-15.93.4-1", "FMT-15.93.2")},
+ **{rid: (A85, A02, fn("TEST-NUMVAL-C", 2002)) for rid in ("AR-15.94.3-1", "RV-15.94.4-1")},
+ "AR-15.100.3-5": (A85, A02, fn("YEAR-TO-YYYY", 2002)),
 }
 
 def main() -> int:

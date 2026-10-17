@@ -1,7 +1,9 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Globalization;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using CobolNet.Binding;
 using CobolNet.Tests.Shared;
 using Xunit;
 
@@ -679,6 +681,45 @@ public sealed class SpecTraceabilityInventoryDriftTests
               + "(kb/Work PB3173)";
     }
 
+    /// <summary>The function section a clause 15 rule's section lies in: <c>15.7.3</c> → <c>15.7</c>, never
+    /// <c>15.70</c>'s.</summary>
+    private static readonly Regex FunctionSectionOf = new(@"^(15\.\d+)(?:\.|$)", RegexOptions.Compiled);
+
+    /// <summary>
+    /// The rows of a clause 15 function whose band STARTS before the function exists: the edition the compiler
+    /// introduces it at, <see cref="IntrinsicSig.IntroducedIn"/> (the COBOLNET1502 window). No rule of a function
+    /// exists before the function does, so a per-edition suite built from such a band would include a rule that
+    /// edition's compiler refuses to compile (kb/Work PB3173, branch review round 1: nine rows, ABS's at 2002 and
+    /// TEST-NUMVAL's at 85 among them). A band that starts LATER than the window is a reading of the rule's 2023
+    /// wording (a rule that names national arguments, say) and is not refused here.
+    /// </summary>
+    /// <param name="rows">the inventory rows</param>
+    /// <param name="s">the schema, for the editions' order and separator</param>
+    /// <param name="functionOfSection">clause 15 function section → function name</param>
+    /// <param name="introducedIn">function name → its introducing edition</param>
+    private static List<string> EarlyFunctionBands(
+        IEnumerable<Row> rows, Schema s, IReadOnlyDictionary<string, string> functionOfSection,
+        Func<string, int> introducedIn)
+    {
+        var bad = new List<string>();
+        foreach (var r in rows)
+        {
+            if (r.Editions.Length == 0 || FunctionSectionOf.Match(r.Section) is not { Success: true } m
+                || !functionOfSection.TryGetValue(m.Groups[1].Value, out string? name))
+                continue;
+            string window = introducedIn(name).ToString(CultureInfo.InvariantCulture);
+            string first = Split(r.Editions, s.EditionsSeparator)[0];
+            int w = Array.IndexOf(s.Editions, window);
+            if (w < 0)
+                bad.Add($"{r.RuleId}: {name} is introduced at {window}, which is not an edition of the schema");
+            else if (Array.IndexOf(s.Editions, first) < w)
+                bad.Add($"{r.RuleId}: editions '{r.Editions}' starts at {first}, but the {name} function "
+                        + $"(§{m.Groups[1].Value}) exists from {window} — write the band from {window} "
+                        + "(IntrinsicCatalog.cs, the COBOLNET1502 window; kb/Work PB3173)");
+        }
+        return bad;
+    }
+
     private static List<string> UnresolvedCodeLocations(IEnumerable<Row> rows, Schema s, string root)
     {
         var text = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -881,6 +922,35 @@ public sealed class SpecTraceabilityInventoryDriftTests
         var rows = LoadInventory();
         var bad = BadEditions(rows, LoadSchema());
         Assert.True(bad.Count == 0, Report("editions field(s) not in the one spelling", bad, rows.Count));
+    }
+
+    /// <summary>
+    /// Every rule of a clause 15 function starts no earlier than the function: its band's first edition is at
+    /// or after the edition <c>IntrinsicCatalog</c> introduces the function at (kb/Work PB3173, branch review
+    /// round 1). The function of a section is read from the standard's own headings, so a new function or a
+    /// moved window needs no list here.
+    /// </summary>
+    [Fact]
+    public void EveryFunctionRule_StartsNoEarlierThanItsFunction()
+    {
+        var rows = LoadInventory();
+        var functionOfSection = SpecClauseText.FunctionSections(File.ReadAllText(TestRepo.Specs("ISO_COBOL.md")))
+            .ToDictionary(f => f.Section, f => f.Name, StringComparer.Ordinal);
+        Assert.True(functionOfSection.Count >= 79,
+            $"only {functionOfSection.Count} clause 15 function headings found in specs/ISO_COBOL.md — the heading "
+            + "shape changed; fix SpecClauseText.FunctionSections, do not lower the floor.");
+        int scanned = rows.Count(r => FunctionSectionOf.Match(r.Section) is { Success: true } m
+                                      && functionOfSection.ContainsKey(m.Groups[1].Value));
+        Assert.True(scanned >= functionOfSection.Count,
+            $"only {scanned} inventory rows lie in the {functionOfSection.Count} function sections — every "
+            + "function has at least its general-format row, so the section match is broken.");
+        var bad = EarlyFunctionBands(rows, LoadSchema(), functionOfSection, name =>
+        {
+            Assert.True(IntrinsicCatalog.TryGet(name, out var sig),
+                $"clause 15 defines the {name} function, but IntrinsicCatalog has no row for it");
+            return sig.IntroducedIn;
+        });
+        Assert.True(bad.Count == 0, Report("function rule(s) whose band starts before the function", bad, scanned));
     }
 
     /// <summary>
@@ -1235,6 +1305,16 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.Empty(BadEditions(
             [Base("X-5h") with { Editions = "85,2002,2014,2023" }, Base("X-5i") with { Editions = "2014,2023" },
              Base("X-5j") with { Editions = "2023" }], s));
+
+        // A rule of a function whose band starts before the function exists (kb/Work PB3173, branch review round
+        // 1): with ABS introduced at 2014, a 2002 start is refused and a 2014 start passes, and a row of §15.70
+        // is not read as a row of §15.7.
+        var absOnly = new Dictionary<string, string>(StringComparer.Ordinal) { ["15.7"] = "ABS" };
+        Assert.Contains("exists from 2014", Assert.Single(EarlyFunctionBands(
+            [Base("X-5l") with { Section = "15.7.3", Editions = "2002,2014,2023" }], s, absOnly, _ => 2014)));
+        Assert.Empty(EarlyFunctionBands(
+            [Base("X-5m") with { Section = "15.7.3", Editions = "2014,2023" },
+             Base("X-5n") with { Section = "15.70.3", Editions = "85,2002,2014,2023" }], s, absOnly, _ => 2014));
 
         // ⛔ DIFFERENTIAL-ONLY COVERAGE. A NIST golden alone, and a *_MatchesLegacy test alone, are both real
         // shapes — the first Phase-B batch produced seven of them before this rule existed. Neither may close a

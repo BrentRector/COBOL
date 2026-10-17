@@ -52,7 +52,21 @@ All 56 were corrected in the same batch: 204 rows changed, and GAP stayed at 60.
 - the A.4.8 module's 2002 edge;
 - DOC-A.1-34 and -37 (2002);
 - DOC-A.1-188 (2002);
-- DOC-A.1-112 and -202 (2014).
+- DOC-A.1-202 (2014).
+
+**Branch review round 1** (kb/Work PB3027) returned three findings, all fixed in `decide.py`. The script re-ran
+against the pre-batch tree (8eca73497, extracted with `git archive`) and wrote 215 records; the 203 it already wrote
+are byte-identical, so the change moved exactly 12 rows:
+
+- R1-1: SR-13.4.5.3-6 and SR-14.9.27.3-9 are wholly FORMAT-clause rules but were left at 85. Both are now 2002, like
+  the other A.4.8 rows. A sweep of every row whose rule text names FORMAT or SELECT WHEN found no other such row.
+- R1-2: DOC-A.1-112 documents the LEAP-SECOND directive's General rule 4, a 2002 rule, but had been decided at 2014
+  under the time-forms reason. It is now 2002.
+- R1-3: nine clause 15 rules started before their function exists, such as ABS's at 2002 (ABS is 2014) and
+  TEST-NUMVAL's at 85 (TEST-NUMVAL is 2002). Each now starts at its `IntrinsicCatalog` window. The new
+  `EveryFunctionRule_StartsNoEarlierThanItsFunction` refuses this shape from now on. It reads each section's
+  function from the standard's headings through `SpecClauseText.FunctionSections`, which replaces two private
+  copies of the same regex. On the reviewed inventory it named exactly these nine rows.
 
 **Witnesses.** No goldens were written: this is a tooling and adjudication slice with no COBOL behaviour.
 

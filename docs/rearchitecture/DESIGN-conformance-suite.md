@@ -351,8 +351,11 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   the 2023 text, so its band always ends at 2023 and has no gap. The schema's `editions` entry now says so as data
   (`required`, `run-through-last`), the one validator and its C# twin refuse any other band, and the 20 rows that
   wrote one (a start edition alone, endpoints, or a band stopping at 2014) were corrected in the same batch, with the
-  wrong FORMAT / SELECT WHEN band (85, a clause whose keyword is first reserved at 2002) and four sibling bands
-  that contradicted the compiler's own edition windows.
+  wrong FORMAT / SELECT WHEN band (85, a clause whose keyword is first reserved at 2002) and the sibling bands
+  that contradicted the compiler's own edition windows. A second structural rule: a rule of a clause 15 function
+  exists from that function's introducing edition, never earlier, so `EveryFunctionRule_StartsNoEarlierThanItsFunction`
+  refuses a band that starts before the `IntrinsicCatalog` window (the function of a section is read from the
+  standard's headings). A band that starts later than the window reads the rule's 2023 wording and is allowed.
 - **S1a — the generator (PB3174).** `conformance-suite/harness/generate.py`: the one header parser (fixed and free
   form), every refusal of §4, the per-edition manifests and the `wiseowl` manifest, the completeness report by witness
   kind (§4), `--check` (the refusals only, writing nothing) as a gate audit (§9), `--self-test` (discovered by
