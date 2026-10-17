@@ -1038,10 +1038,18 @@ public sealed record ImplicitMovePhrase(string Statement, string Cite)
     /// frozen, classified and storage-marked — which is what building it in the emitter skipped (kb/Work PB880).</summary>
     public bool ValidityAskedByStatement { get; init; }
 
+    /// <summary>True when the owning statement identifies the RECEIVING operand before it evaluates the sending one,
+    /// so the move's store keeps that order instead of the MOVE statement's sender-first order (§14.9.25.4 GR1,
+    /// <c>PlaceIdentification.SenderFirst</c>; kb/Work PB3261). INITIALIZE is the one such statement: its rules give
+    /// no timing of their own, so §14.6.4 7) applies — "the identifiers within a statement are evaluated in left to
+    /// right order as the first operation of the execution of that statement" — and identifier-1, the receiver, is
+    /// written before the REPLACING phrase's sending identifier.</summary>
+    public bool ReceiverIdentifiedFirst { get; init; }
+
     /// <summary>INITIALIZE's implicit elementary MOVE — ISO §14.9.20.4 GR4, "Otherwise, the implicit statement is:
     /// MOVE sending-operand TO receiving-operand."</summary>
     public static readonly ImplicitMovePhrase Initialize =
-        new("INITIALIZE", "ISO §14.9.20.4 GR4") { ValidityAskedByStatement = true };
+        new("INITIALIZE", "ISO §14.9.20.4 GR4") { ValidityAskedByStatement = true, ReceiverIdentifiedFirst = true };
 
     /// <summary>MOVE CORRESPONDING's per-pair move — ISO §14.9.25.4 GR11, "The results are the same as if the user
     /// had referred to each pair of corresponding identifiers in separate MOVE statements." The pair was selected

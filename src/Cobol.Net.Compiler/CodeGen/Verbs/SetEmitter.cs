@@ -103,11 +103,23 @@ internal sealed class SetEmitter(EmitContext ctx, NumericRenderer num, Arithmeti
         string src = s.ToNull ? "ManagedPointer.Null"
             : ctx.SendOnce(s.Address is { } a ? ptr.AddressOfText(a)   // §8.4.3.11 data-address-identifier sender
                                               : PlaceRenderer.Read(s.Source!), s.Receivers.Count, "setPtr");
+        BoundOperand? sender = s.ToNull ? null : s.Address is { } ad ? new BoundAddressOperand(ad, null) : new BoundFieldOperand(s.Source!);
         foreach (var r in s.Receivers)
             if (r.Based is { } based) ptr.EmitSetAddressOfBased(based, src);       // GR13 — data-name-1
-            else ctx.Writer.Line(PlaceRenderer.Write(r.Pointer!, src)              // GR12 — identifier-5
+            else ctx.Writer.Line(StorePointer(sender, s.Receivers.Count, r.Pointer!, src)   // GR12 — identifier-5
                                  + "   // SET pointer (ISO §14.9.39.4 Format 7 GR12)");
     }
+
+    /// <summary>The store of a pointer-family SET's sending address <paramref name="src"/> into <paramref name="receiver"/>
+    /// — Formats 7, 8 and 9, whose general rules each say the receiver's "Item identification ... is done immediately before
+    /// the value of that data item is changed" (ISO §14.9.39.4 GR12, GR14, GR16), so the sender is evaluated first
+    /// (<see cref="PlaceIdentification.SenderFirst"/>, kb/Work PB3261). With more than one receiver
+    /// <c>EmitCore.SendOnce</c> has already evaluated the sender into a local ahead of every store, and a TO NULL sender
+    /// (<paramref name="sender"/> null) evaluates nothing, so both store in place.</summary>
+    private static string StorePointer(BoundOperand? sender, int receivers, Place receiver, string src) =>
+        sender is not null && receivers == 1
+            ? PlaceIdentification.SenderFirst(sender, receiver, src, v => PlaceRenderer.Write(receiver, v))
+            : PlaceRenderer.Write(receiver, src);
 
     /// <summary><c>SET LOCALE … TO …</c> (ISO §14.9.39 Format 11; kb/Work PB64 T1): one call on the run unit's ONE
     /// <c>LocaleState</c> per (first operand, source) pair — GR22 (the user default), GR23a/b/c (the categories from a
@@ -142,9 +154,10 @@ internal sealed class SetEmitter(EmitContext ctx, NumericRenderer num, Arithmeti
     public void EmitSetProgramPointer(BoundSetProgramPointer s)
     {
         string src = s.ToNull ? "ProgramPointer.Null"
-            : ctx.SendOnce(PlaceRenderer.Read(s.Source!), s.Targets.Count, "setPp");   // §14.9.39.4 GR18 (PB394)
+            : ctx.SendOnce(PlaceRenderer.Read(s.Source!), s.Targets.Count, "setPp");   // §14.9.39.4 GR16 (PB394)
+        BoundOperand? sender = s.ToNull ? null : new BoundFieldOperand(s.Source!);
         foreach (var t in s.Targets)
-            ctx.Writer.Line(PlaceRenderer.Write(t, src) + "   // SET program-pointer (ISO §14.9.39 Format 9)");
+            ctx.Writer.Line(StorePointer(sender, s.Targets.Count, t, src) + "   // SET program-pointer (ISO §14.9.39 Format 9)");
     }
 
     /// <summary><c>SET function-pointer… TO {NULL | function-pointer}</c> (ISO §14.9.39.2 Format 8; GR14 — the
@@ -156,8 +169,9 @@ internal sealed class SetEmitter(EmitContext ctx, NumericRenderer num, Arithmeti
     {
         string src = s.ToNull ? "FunctionPointer.Null"
             : ctx.SendOnce(PlaceRenderer.Read(s.Source!), s.Targets.Count, "setFp");   // §14.9.39.4 GR14 (PB394)
+        BoundOperand? sender = s.ToNull ? null : new BoundFieldOperand(s.Source!);
         foreach (var t in s.Targets)
-            ctx.Writer.Line(PlaceRenderer.Write(t, src) + "   // SET function-pointer (ISO §14.9.39.2 Format 8)");
+            ctx.Writer.Line(StorePointer(sender, s.Targets.Count, t, src) + "   // SET function-pointer (ISO §14.9.39.2 Format 8)");
     }
 
     /// <summary><c>SET index-name… {UP|DOWN} BY amount</c> (ISO §14.9.39 Format 2): the amount is evaluated ONCE

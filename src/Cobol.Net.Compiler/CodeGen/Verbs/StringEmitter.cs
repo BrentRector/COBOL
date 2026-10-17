@@ -38,11 +38,27 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
         brackets.Identify(s.Into, s.Pointer);
         int id = ctx.Names.NextStrUnstr();
         string ptr = $"__strPtr{id}", ptr0 = $"__strPtr0{id}", ovf = $"__strOvf{id}", acc = $"__strInto{id}";
-        w.Line(s.Pointer is { } p0
-            ? $"long {ptr} = {RuntimeApi.HostInt64(NumericRenderer.Align(num.AsNum(new BoundFieldOperand(p0), ReceiverContext.None), 0))};"   // GR4 — the user's initial value (by VALUE — kb/Work PB86; saturating — PB1033)
-            : $"long {ptr} = 1;");                                                    // GR5 — implicit pointer of 1
-        w.Line($"long {ptr0} = {ptr};");   // the starting pointer: GR6 changes the POINTER item only when a character moves
-        w.Line($"bool {ovf} = false;");
+        // ⛔ THE OPERANDS ARE READ IN THE ORDER THEY ARE WRITTEN (kb/Work PB3261). The freeze above hoists each operand's
+        // subscript and reference-modifier VALUES, but the range tests that raise EC-BOUND-SUBSCRIPT / EC-BOUND-REF-MOD run
+        // where the operand is READ — so the order of the reads is the order of identification §14.6.4 7) fixes: "the
+        // identifiers within a statement are evaluated in left to right order as the first operation of the execution of
+        // that statement", and §14.9.49.4 GR11 selects the declarative by the first condition in that order. Each sending
+        // operand and delimiter that identifies at run time is therefore read here, in statement order, BEFORE
+        // identifier-3 is read and before the POINTER item's value is taken. The transfers change only the working image,
+        // so a value read here is the value the transfer would have read (an operand overlapping identifier-3 or -4 is
+        // undefined, §14.9.43.4 GR10).
+        var sendings = new List<(string Source, string Delimiter)>(s.Sendings.Count);
+        foreach (var snd in s.Sendings)
+        {
+            // GR3a: the sender's CONTENT transfers per the alphanumeric-to-alphanumeric move mechanics — its raw
+            // character image (a numeric sender contributes its sign-carrying zoned image), not a converted value.
+            // GR2: a figurative literal-1 / literal-2 is a one-character item of identifier-3's usage, so its
+            // HIGH-/LOW-VALUE comes from THAT usage's program collating sequence (§8.3.3.6.4 GR6; kb/Work PB1185).
+            string src = ReadInOrder(snd.Value, OperandText.AsString(snd.Value, num, characterCategory: s.CharacterCategory), $"__strSrc{id}_{sendings.Count}");
+            string delim = snd.BySize || snd.Delimiter is null ? "null"
+                : ReadInOrder(snd.Delimiter, OperandText.AsString(snd.Delimiter, num, characterCategory: s.CharacterCategory), $"__strDlm{id}_{sendings.Count}");
+            sendings.Add((src, delim));
+        }
         // ⚖ A DYNAMIC-LENGTH identifier-3 (kb/Work PB871; DETERMINATION D-DL2, docs/CONFORMANCE.md §3): GR6 and
         // GR8 are written over "the number of character positions in the data item referenced by identifier-3",
         // which for a dynamic-length receiver is its MAXIMUM size (ReceivingStore.DynamicReceivingSize) — the
@@ -66,17 +82,16 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             }
             else
                 w.Line($"string {acc} = {ReadImage(s.Into)};");
-            foreach (var snd in s.Sendings)
-            {
-                // GR3a: the sender's CONTENT transfers per the alphanumeric-to-alphanumeric move mechanics — its raw
-                // character image (a numeric sender contributes its sign-carrying zoned image), not a converted value.
-                // GR2: a figurative literal-1 / literal-2 is a one-character item of identifier-3's usage, so its
-                // HIGH-/LOW-VALUE comes from THAT usage's program collating sequence (§8.3.3.6.4 GR6; kb/Work PB1185).
-                string src = OperandText.AsString(snd.Value, num, characterCategory: s.CharacterCategory);
-                string delim = snd.BySize || snd.Delimiter is null ? "null"
-                    : OperandText.AsString(snd.Delimiter, num, characterCategory: s.CharacterCategory);
+            // The POINTER item is identifier-4, written after identifier-3, so its value is taken after identifier-3 is
+            // read (the order above). ReceiverBracketEmitter.Receive emits this body inline, so the locals stay in scope
+            // for the store-back below.
+            w.Line(s.Pointer is { } p0
+                ? $"long {ptr} = {RuntimeApi.HostInt64(NumericRenderer.Align(num.AsNum(new BoundFieldOperand(p0), ReceiverContext.None), 0))};"   // GR4 — the user's initial value (by VALUE — kb/Work PB86; saturating — PB1033)
+                : $"long {ptr} = 1;");                                                    // GR5 — implicit pointer of 1
+            w.Line($"long {ptr0} = {ptr};");   // the starting pointer: GR6 changes the POINTER item only when a character moves
+            w.Line($"bool {ovf} = false;");
+            foreach (var (src, delim) in sendings)
                 w.Line($"{acc} = {RuntimeApi.StrTransfer(acc, src, delim, ptr, ovf)};");
-            }
             if (dynInto)
                 // GR6 advances the pointer once per character moved, so a moved character's position is below the
                 // final pointer: the content reaches position ptr-1 exactly when anything moved (ptr != its start).
@@ -93,6 +108,17 @@ internal sealed class StringEmitter(EmitContext ctx, NumericRenderer num, Arithm
             using (w.Block($"if ({ptr} != {ptr0})"))
                 brackets.Receive(p, null, () => arith.StoreArith(p, new NumX(ptr, 0), CobolRounding.Truncation));
         EmitOverflow(ovf, "EC-OVERFLOW-STRING", s.OnOverflow, s.NotOnOverflow);   // GR8b
+    }
+
+    /// <summary>STRING's in-order read of one sending operand or delimiter (kb/Work PB3261): the rendered
+    /// <paramref name="read"/> is evaluated into <paramref name="local"/> at this point of the statement when the
+    /// operand identifies at run time (<see cref="PlaceIdentification.IdentifiesAtRunTime(BoundOperand)"/>), so its range
+    /// tests run in statement order; a literal or figurative constant evaluates nothing and stays inline.</summary>
+    private string ReadInOrder(BoundOperand operand, string read, string local)
+    {
+        if (!PlaceIdentification.IdentifiesAtRunTime(operand)) return read;
+        ctx.Writer.Line($"string {local} = {read};");
+        return local;
     }
 
     /// <summary>UNSTRING (ISO §14.9.48): the sender's image and the delimiter values are read at initiation and
