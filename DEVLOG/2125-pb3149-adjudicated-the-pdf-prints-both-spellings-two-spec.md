@@ -1,4 +1,10 @@
-## PB3149 lands: EC-MCS-NO-REQUESTER is the name (Table 13); PB3306 retired into PB779
+## Entry 2125 — 2026-10-16 17:55 PDT — PB3149 adjudicated: the PDF prints both spellings; two spec-tooling leads filed; PB3149 lands: EC-MCS-NO-REQUESTER is the name (Table 13); PB3306 retired into PB779
+
+### PB3149 adjudicated: the PDF prints both spellings; two spec-tooling leads filed
+
+A read-only adjudicator (w1103z) found that the ISO PDF itself spells the MCS exception both EC-MCS-NO-REQUESTER (Table 13 §14.6.13.1.6 and the alphabetic Index) and EC-MCS-NO-REQUESTOR (§E.3.2 3)), that the transcription matches the PDF at every site, and that no general rule raises it (§14.9.31.4 raises INVALID-TAG and REQUESTOR-FAILED only); GnuCOBOL 3.2 registers only NO-REQUESTER. PB3149 records this and corrects its "§G.2 3)" site (really the Index). Two tooling leads from the same report were filed: PB3306 (cite.py attributes the Bibliography and Index to G.2) and PB3307 (some Index links are about 30 PDF pages early). The branch review (R1-1) found PB3306 a duplicate of the open PB779 Part A; the next entry retires it. Notes only; no code changed.
+
+### PB3149 lands: EC-MCS-NO-REQUESTER is the name (Table 13); PB3306 retired into PB779
 
 This branch merges the unlanded notes branch `notes-pb3149-adjudication-20261016` and answers its branch review.
 
@@ -32,3 +38,4 @@ other `scripts/spec` tools do.
 follows from §14.9.29.4 GR1 and Table 13's "NF". The doc wording was checked against the RAISE probe. `semgrep/verify.py`
 shows every count unchanged. Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run
 20261017T002332Z-db1ee1); both added corpus rows passed in leg 1.
+
