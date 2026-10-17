@@ -9,8 +9,8 @@
       *> GR4c's second bullet, "during the execution of an INITIALIZE statement". Before kb/Work PB393 this whole
       *> surface ABORTED - `INITIALIZE <group containing an occurs-depending table>` reached a runtime
       *> NotImplementedCobolFeatureException at all four editions - so no golden could exist; the sibling
-      *> conformance:85/pb577_odo_value_initial_state carries GR4c's FIRST bullet. The TO VALUE phrase is
-      *> COBOL-2002 (the edition floor is witnessed by conformance:negative/pb420-initialize-float-to-value-85).
+      *> conformance:cases/13.18.63-VALUE/pb577_odo_value_initial_state carries GR4c's FIRST bullet. The TO VALUE phrase is
+      *> COBOL-2002 (the edition floor is witnessed by conformance:cases/14.9.20-INITIALIZE/pb420-initialize-float-to-value-85).
       *> Every expected value below is derived from the rules, not measured:
       *>   L1 GR9, "causes EVERY occurrence of the associated data item to be assigned the specified value", at
       *>      this occasion: N1 is OUTSIDE S1 and holds 2, so 14.9.20.4 GR8 ("the number of occurrences
@@ -29,7 +29,7 @@
       *>      Reading N2 BEFORE it is re-raised is what makes this a witness of the order rather than a DERIVATION.
       *>   L4 GR6 case c, "a data item that is subordinate to an occurs-depending table", at this occasion.
       *>   L5 GR9's SECOND named arm, "an entry that is SUBORDINATE to an OCCURS clause", at this occasion -
-      *>      the arm conformance:2002/table_value_occurs cannot reach, because all three of its elements carry
+      *>      the arm conformance:cases/13.18.63-VALUE/table_value_occurs cannot reach, because all three of its elements carry
       *>      their own OCCURS clause. Every occurrence, not just the first.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB577OIN.

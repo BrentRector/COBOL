@@ -9,11 +9,11 @@
       *> the eight rounding modes 14.7.4.3 rules 3-10 define, and nothing else in this program asks for
       *> anything past COBOL-85 -- FUNCTION SQRT, COMPUTE and a PIC 9V9(9) receiver are all 85 constructs, and
       *> the whole substance of PB653 is stated at that edition in
-      *> tests/conformance/85/pb653_nested_float_operand. At --std 2002 the phrase alone is refused,
+      *> conformance-suite/cases/_unassigned/pb653_nested_float_operand. At --std 2002 the phrase alone is refused,
       *> COBOLNET0803.
-      *> The positives are tests/conformance/2014/pb653_nested_float_rounded_mode (the eight modes over an
+      *> The positives are conformance-suite/cases/_unassigned/pb653_nested_float_rounded_mode (the eight modes over an
       *> expression with a NESTED float operand, applied ONCE at the resultant identifier) and
-      *> tests/conformance/2014/pb654_prohibited_gate_one_evaluation (14.7.7 rule 4's single initial
+      *> conformance-suite/cases/_unassigned/pb654_prohibited_gate_one_evaluation (14.7.7 rule 4's single initial
       *> evaluation, and 14.7.4.3 rule 7's gate over every fixed-scale receiver category).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB653RMNEG.

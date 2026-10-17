@@ -7,7 +7,7 @@
 *> ISO 13.18.43.3 SR7: "Integer-2 shall be greater than or equal to zero."
 *> !! THE RULE HAS TWO HALVES AND THIS IS THE REJECTING ONE. The PERMITTING half -
 *> that FROM 0 is legal and shall compile - is witnessed by
-*> tests/conformance/2023/pb721_zero_length_record.cob and its COBOL-85 twin; a
+*> conformance-suite/cases/8.5.4-Zero-length-items/pb721_zero_length_record.cob and its COBOL-85 twin; a
 *> corpus that pinned only the permission would never notice a compiler that
 *> accepted a negative minimum too.
 *> A negative operand cannot be written at all, and that is the GENERAL FORMAT's

@@ -4,7 +4,7 @@
       *> source-format: fixed
       *> portable: unverified
       *>---
-      *> The REJECT half of conformance:2002/pb368_flow_use_reentrancy.
+      *> The REJECT half of conformance:cases/14.9.49-USE/pb368_flow_use_reentrancy.
       *> EC-FLOW-USE is the exception-name ISO §14.9.49.4 GR2 sets to
       *> exist, and §14.6.13.1.6 Table 13 carries it as Fatal; both
       *> belong to the exception-condition facility ISO/IEC 1989:2002

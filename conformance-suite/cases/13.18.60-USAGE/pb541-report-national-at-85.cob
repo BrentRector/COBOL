@@ -5,7 +5,7 @@
 *> portable: unverified
 *>---
 *> ⛔ THE NEGATIVE BELOW THE INTRODUCING EDITION (kb/Work PB541). §13.18.60.3 SR7 admits a NATIONAL report
-*> group item — conformance:2002/pb541_report_national_item is the positive — but national data itself is a
+*> group item — conformance:cases/13.18.14-COLUMN/pb541_report_national_item is the positive — but national data itself is a
 *> COBOL-2002 introduction (ISO §8.5.2, category national), so the same entry at --std 85 is not conforming
 *> COBOL-85 and the edition gate refuses it (COBOLNET0900).
 *>

@@ -22,7 +22,7 @@
       *> That is the point of the two PAIRS below: each PHYSICAL form must equal its plain form exactly.
       *>
       *> ⚠ AND A GENUINE ARITY ERROR MUST STILL FIRE - consuming a keyword must not become "accept anything".
-      *> The negative case is tests/conformance/negative/pb24-length-two-operands.
+      *> The negative case is conformance-suite/cases/15.50-LENGTH/pb24-length-two-operands.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB24PHYS.
        DATA DIVISION.

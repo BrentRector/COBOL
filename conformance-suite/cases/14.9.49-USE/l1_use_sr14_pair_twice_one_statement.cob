@@ -12,7 +12,7 @@
       *> shall compile. It is one of the two ACCEPTING complements of SR14 (the other -
       *> a repeated BARE exception-name-1 - is l1_use_sr14_bare_name_repeated in this same
       *> directory; the rejecting half is
-      *> tests/conformance/negative/l1-use-sr14-pair-in-two-statements).
+      *> conformance-suite/cases/14.9.49-USE/l1-use-sr14-pair-in-two-statements).
       *> The Format-3 figure (§14.9.49.2, rendered from the printed page) writes the scope as
       *> `exception-name-2 { FILE file-name-2 } ... ...`: the inner braces carry their own
       *> ellipsis, so one entry may name several files and nothing restricts them to being

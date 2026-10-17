@@ -6,7 +6,7 @@
 *>---
 *> ⛔ THE OTHER HALF OF §13.18.60.3 SR7, AND THE HALF THAT WAS SILENT (kb/Work PB541). The rule reads
 *> "Only the DISPLAY or NATIONAL phrase may be specified in any USAGE clause associated with a report group
-*> item." conformance:2002/pb541_report_national_item is the admitted side; this is the excluded side, and
+*> item." conformance:cases/13.18.14-COLUMN/pb541_report_national_item is the admitted side; this is the excluded side, and
 *> it is written on a GROUP entry on purpose.
 *>
 *> A USAGE clause on a report group entry is "associated with" the report group items under it — that is

@@ -12,8 +12,8 @@
       *> rule exists at 2002, 2014 and 2023 and not at 85.
       *> (The accepting complements - the same pair twice inside ONE statement, and a repeated
       *> BARE exception-name-1, which is exception-name-1 and outside this rule - are
-      *> tests/conformance/2002/l1_use_sr14_pair_twice_one_statement and
-      *> tests/conformance/2002/l1_use_sr14_bare_name_repeated.)
+      *> conformance-suite/cases/14.9.49-USE/l1_use_sr14_pair_twice_one_statement and
+      *> conformance-suite/cases/14.9.49-USE/l1_use_sr14_bare_name_repeated.)
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1S14N.
        ENVIRONMENT DIVISION.

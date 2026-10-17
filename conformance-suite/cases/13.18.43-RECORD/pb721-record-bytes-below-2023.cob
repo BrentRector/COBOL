@@ -13,8 +13,8 @@
 *> the one that applies: the spelling did not exist below 2023. SECONDS sits in the same item-13
 *> list and CONTINUE AFTER ... SECONDS is gated the same way.
 *> The CHARACTERS spelling of the very same clause is 1985-continuous and draws nothing, which is
-*> what tests/conformance/85/pb721_zero_length_record_85.cob compiles; and the WORD stays a
-*> user-defined word at every edition, which tests/conformance/85/pb721_bytes_user_word_85.cob
+*> what conformance-suite/cases/13.18.43-RECORD/pb721_zero_length_record_85.cob compiles; and the WORD stays a
+*> user-defined word at every edition, which conformance-suite/cases/_unassigned/pb721_bytes_user_word_85.cob
 *> compiles. Together those three programs say exactly what is gated and what is not.
 *> kb/Work PB721.
 IDENTIFICATION DIVISION.

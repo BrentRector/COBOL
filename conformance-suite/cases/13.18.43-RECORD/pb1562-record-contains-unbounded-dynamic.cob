@@ -12,7 +12,7 @@
 *> The screen used to skip every record holding a dynamic-length item, so this entry compiled clean and its records
 *> read back as one member holding the whole block. The DYNAMIC LENGTH clause is COBOL-2014 (§8.5.1.10), so the
 *> rule has nothing to say below it; the same entry with LIMIT phrases that fit is the positive golden
-*> tests/conformance/2014/pb1562_variable_group_under_fixed_record_clause.cob.
+*> conformance-suite/cases/13.18.43-RECORD/pb1562_variable_group_under_fixed_record_clause.cob.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB1562UN.
 ENVIRONMENT DIVISION.

@@ -6,7 +6,7 @@
 *> portable: unverified
 *>---
       *> !! THE SPECIAL-NAMES PARAGRAPH'S POST-85 OPTIONAL WORDS, OMITTED (kb/Work PB695).
-      *> Companion to tests/conformance/85/pb695_special_names_optional_words.cob, which covers the
+      *> Companion to conformance-suite/cases/_unassigned/pb695_special_names_optional_words.cob, which covers the
       *> clauses that exist at COBOL-85. This one covers the words the 85 program cannot write: the FOR
       *> that introduces the ALPHANUMERIC/NATIONAL class in the CLASS, SYMBOLIC CHARACTERS and ALPHABET
       *> clauses (a 2002 introduction, `special-names-for-national-2002`), the WITH of the CURRENCY

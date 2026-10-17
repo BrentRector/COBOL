@@ -10,7 +10,7 @@
       *> argument-2 is numeric, it shall be usage display or national and shall be an unsigned integer" -> OK), and
       *> FUNCTION INTEGER is an integer function (15.2 item 5) that is not ABS.
       *> The standard settles it on the function's TYPE, as SR11 does for an integer operand: INTEGER(3) yields the
-      *> integer 3 and is still barred. The legal ABS form is conformance:2023/pb1420_abs_integer_form_unsigned_position.
+      *> integer 3 and is still barred. The legal ABS form is conformance:cases/8.4.3.2-Function-identifier/pb1420_abs_integer_form_unsigned_position.
       *> IT COMPILED CLEAN AND ABORTED AT RUN TIME ('intrinsic string argument BoundComputedOperand'), kb/Work PB1420.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1420NEG1.

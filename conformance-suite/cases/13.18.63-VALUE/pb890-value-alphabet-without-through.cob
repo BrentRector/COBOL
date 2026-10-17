@@ -13,7 +13,7 @@
 *> erroneous" over a value LIST, because 8.8.4.5.3 GR2 compares singletons under the PROGRAM collating
 *> sequence and the IN phrase never reaches them - is a GENERAL-RULE answer to a SYNTAX-RULE question.
 *> MEASURED before the fix: this program compiled clean and ran (rc 0). The guard that skipped the screen
-*> existed to keep tests/conformance/2002/pb695_value_false_optional_words green, whose line 35 was
+*> existed to keep conformance-suite/cases/13.18.63-VALUE/pb695_value_false_optional_words green, whose line 35 was
 *> `88 CN-ORDER VALUE 1 IN AL1 WHEN SET TO FALSE 0.` - a NUMERIC singleton with IN, which SR31 excludes
 *> twice over. That golden's operand is now a conforming alphanumeric THROUGH range and the guard is gone.
 *> EDITION-INVARIANT: no edition of the clause has ever printed the IN phrase without the THROUGH phrase it

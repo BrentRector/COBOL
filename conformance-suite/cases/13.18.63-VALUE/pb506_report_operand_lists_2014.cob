@@ -6,8 +6,8 @@
 *> portable: unverified
 *>---
       *> THE MIDDLE EDITION'S ARM of the operand-list rules its 2002 and 2023 twins prove
-      *> (tests/conformance/2002/pb506_report_operand_lists_2002,
-      *>  tests/conformance/2023/pb506_report_value_operand_list; kb/Work PB506).
+      *> (conformance-suite/cases/13.18.63-VALUE/pb506_report_operand_lists_2002,
+      *>  conformance-suite/cases/13.18.53-SOURCE/pb506_report_value_operand_list; kb/Work PB506).
       *> ISO §13.18.63.3 SR35 (VALUE) and §13.18.53.3 SR6 (SOURCE) carry no version proviso, Annex E lists no
       *> 2014→2023 change to either, and the repetition vehicle they require — §13.15.4 GR3's "a LINE or COLUMN
       *> clause with more than one operand" — has existed since COBOL-2002 along with the COLUMNS/ARE and SOURCES

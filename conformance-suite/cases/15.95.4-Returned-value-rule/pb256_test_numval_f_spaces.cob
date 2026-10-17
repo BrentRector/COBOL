@@ -39,7 +39,7 @@
       *> Hand-derived, under NATIVE arithmetic at --std 2023 (§15.95.4 r1 b) 5's own precondition names the
       *> standard modes; under native the same positions fall out of leg b) generic, because r1's where-
       *> clause caps `n` at four digits with no arithmetic-mode qualification — the standard-decimal side is
-      *> conformance:2014/pb256_test_numval_standard_decimal):
+      *> conformance:cases/15.93.4-Returned-value-rule/pb256_test_numval_standard_decimal):
       *>   EIN4  "1E+1 234"    -> 6   the '2' at position 6 (⛔ 0 under the joined reading)
       *>   EIN5  "1E+1 2345"   -> 6   the '2' at position 6 (⛔ 9 under the joined reading)
       *>   ESIG  "1E + 1 2"    -> 8   the same, with the figure's other two space slots occupied

@@ -15,8 +15,8 @@
       *>   within an interface definition."
       *>   cite.py: OK  §13.8.3 1)  (Syntax rule)
       *> The two prohibitions are the negatives
-      *>   conformance:negative/l1m8-report-section-in-method and
-      *>   conformance:negative/l1m8-report-section-in-interface.
+      *>   conformance:cases/13.8-Report-section/l1m8-report-section-in-method and
+      *>   conformance:cases/13.8-Report-section/l1m8-report-section-in-interface.
       *> Each of the four legal owners declares its own FD + RD. The
       *>   program and the function run INITIATE / GENERATE / TERMINATE
       *>   on theirs, reporting LINE-COUNTER right after the GENERATE

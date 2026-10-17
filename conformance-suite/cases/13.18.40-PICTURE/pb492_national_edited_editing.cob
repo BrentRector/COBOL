@@ -18,7 +18,7 @@
       *> of the entry or if character-string-1 contains the symbol 'N', literal-1, literal-2, and
       *> literal-3 shall be national literals." Character-string-1 here contains 'N', so literal-1 is
       *> written N":" / N"-" and NOT ":" - the alphanumeric spelling is
-      *> conformance:negative/pb492-national-edited-literal-class (COBOLNET1955).
+      *> conformance:cases/13.18.40-PICTURE/pb492-national-edited-literal-class (COBOLNET1955).
       *>
       *> 13.18.40.3 SR12 makes the IS form "a fixed editing sign control symbol", and 13.18.40.5 rule 3
       *> lists it among the SIMPLE INSERTION editing symbols - "the symbols 'B', '0', '/', ',' and, if

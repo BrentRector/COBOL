@@ -13,8 +13,8 @@
       *> digit tier (and with it a sum counter wider than 18 digits
       *> over such an addend) is 2002 and later, so the 19-digit
       *> addend is refused at 85 (COBOLNET0802). The positive twins are
-      *> conformance:2002/pb1509_sum_counter_wide_native and
-      *> conformance:2014/pb1509_sum_counter_wide_standard_decimal.
+      *> conformance:cases/11.9.5-ARITHMETIC/pb1509_sum_counter_wide_native and
+      *> conformance:cases/11.9.5-ARITHMETIC/pb1509_sum_counter_wide_standard_decimal.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1509R.
        ENVIRONMENT DIVISION.

@@ -12,8 +12,8 @@
 *> sequential or dynamic."  KeyedIoBinder.BindStart screens it with COBOLNET0862.
 *> BOTH keyed organizations are exercised: the screen sits before the organization split, so a
 *> one-organization fixture would not show that the relative arm is covered too.
-*> The reachable cells of the same table are walked by conformance:2023/l1_table20_seq_relative and
-*> conformance:2023/l1_table20_indexed.
+*> The reachable cells of the same table are walked by conformance:cases/9.1.13.2-Successful-completion/l1_table20_seq_relative and
+*> conformance:cases/14.9.27-OPEN/l1_table20_indexed.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB325STRTRND.
 ENVIRONMENT DIVISION.

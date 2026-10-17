@@ -9,7 +9,7 @@
 *> refused - COBOLNET1594. (A 50-character literal passes this rule and then meets the separate P14
 *> multi-character render GAP, COBOLNET0899 - kb/Work PB491 - so the BOUNDARY is what this fixture
 *> pins: at 51 the SR9 diagnostic is present.) SR9's FIRST sentence, the literal CLASS, is
-*> conformance:negative/pb492-national-edited-literal-class (COBOLNET1955).
+*> conformance:cases/13.18.40-PICTURE/pb492-national-edited-literal-class (COBOLNET1955).
 *> reject-at names 2023 ONLY because the PICTURE EDITING phrase is itself a COBOL-2023 introduction:
 *> below 2023 the program is rejected by the phrase's own COBOLNET0900 introduction gate.
 IDENTIFICATION DIVISION.

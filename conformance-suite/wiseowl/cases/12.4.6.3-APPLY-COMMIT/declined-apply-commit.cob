@@ -14,7 +14,7 @@
 *> the word APPLY was swallowed by the I-O-CONTROL genericClause and the parse then died on COMMIT with an
 *> unnamed error. Refusing the clause is what keeps the rest of the decline coherent: with no clause ever
 *> accepted, no APPLY COMMIT clause is ever ACTIVE, which is the state 14.9.7.4 GR1 / 14.9.36.4 GR1 give
-*> COMMIT and ROLLBACK their CONTINUE behaviour in (pinned by conformance:2023/pb137_commit_inert).
+*> COMMIT and ROLLBACK their CONTINUE behaviour in (pinned by conformance:cases/14.9.7-COMMIT/pb137_commit_inert).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. DCLAPPLY.
        ENVIRONMENT DIVISION.

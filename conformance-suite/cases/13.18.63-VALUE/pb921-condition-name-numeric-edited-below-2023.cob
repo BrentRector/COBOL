@@ -13,7 +13,7 @@
       *> to be written as an alphanumeric or national literal (SR7).
       *>
       *> THIS IS THE FORMAT-3 (condition-name) SPELLING OF THAT SAME FACT, and it is the gating negative that
-      *> tests/conformance/2023/pb560_condition_value_numeric_edited_2023 never had: PB560's own gating negative
+      *> conformance-suite/cases/13.18.63-VALUE/pb560_condition_value_numeric_edited_2023 never had: PB560's own gating negative
       *> writes the FORMAT-1 spelling (`01 WS-A PIC ZZ9.99 VALUE 10.`), so it was green while the construct its
       *> positive actually rides was ungated. MEASURED BEFORE (kb/Work PB921): at --std 85 this program compiled
       *> clean, ran, and stored the COBOL-2023 edited image ` 10.00` - a COBOL-85 compiler has no such conversion,

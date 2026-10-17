@@ -24,7 +24,7 @@
       *>   (item 195), so the record written to and read from the file
       *>   is byte-for-byte the record's own image."
       *>
-      *> WHAT THIS ADDS to conformance:2023/l1_sync_file_record (one
+      *> WHAT THIS ADDS to conformance:cases/13.18.55-SYNCHRONIZED/l1_sync_file_record (one
       *>   4-byte record, which no per-record padding to a 2- or 4-byte
       *>   boundary could disturb): THREE records of an ODD length, 5
       *>   bytes, so any rule that aligns or pads a record as a whole

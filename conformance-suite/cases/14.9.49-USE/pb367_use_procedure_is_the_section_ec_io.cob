@@ -10,7 +10,7 @@
       *> plain EC dispatcher (the __IoCheckEc path, 14.9.49.4 GR12 rather than GR7 or GR13), and it took the
       *> same shape-derived handler end - so it gets its own witness. The general case, the format-1 and
       *> plain-format-3 arms and the full derivation are in
-      *> tests/conformance/2023/pb367_use_procedure_is_the_section.cob.
+      *> conformance-suite/cases/14.6.3-Explicit-and-implicit-transfers-of-control/pb367_use_procedure_is_the_section.cob.
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE SPEC AND NOT FROM A RUN:
       *>  . The second READ hits the end of the file with no AT END phrase; 9.1.13 sets I-O status 10 and, with

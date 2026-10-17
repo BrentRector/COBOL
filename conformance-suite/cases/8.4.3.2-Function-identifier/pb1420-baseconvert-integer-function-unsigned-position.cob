@@ -9,7 +9,7 @@
       *> half: "if the base specified in argument-2 is less than 11, [argument-1] shall also be an unsigned integer
       *> data item or literal" (cite.py --check 15.12.3 OK). Base 10 is below 11 and FUNCTION INTEGER is an integer
       *> function other than ABS, so argument-1 is barred; the same call at base 16 is legal
-      *> (conformance:2023/pb1420_abs_integer_form_unsigned_position) because the unsigned-integer half no longer applies.
+      *> (conformance:cases/8.4.3.2-Function-identifier/pb1420_abs_integer_form_unsigned_position) because the unsigned-integer half no longer applies.
       *> IT COMPILED CLEAN AND ABORTED AT RUN TIME, kb/Work PB1420.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1420NEG2.

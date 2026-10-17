@@ -21,7 +21,7 @@
       *> completed.  The cause was not a missing rule but a missing FACT: MoveBinder marks the numeric
       *> DISPLAY receiver image-forced, StorageFormPass consumes that mark, and the implicit move was
       *> being constructed in the EMITTER -- downstream of both.  Its 2023 twin, where the same
-      *> statement is REMOVED, is conformance:negative/pb348-release-from-quote-numeric-removed-2023.
+      *> statement is REMOVED, is conformance:cases/14.9.32-RELEASE/pb348-release-from-quote-numeric-removed-2023.
       *> The 2002 leg: SR5's sender is VALID here, with no diagnostic at all.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB348Q2.

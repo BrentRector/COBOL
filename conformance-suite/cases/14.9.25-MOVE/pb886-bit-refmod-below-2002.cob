@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The NEGATIVE below the introducing edition of tests/conformance/2002/pb886_refmod_intermediate_positions.
+      *> The NEGATIVE below the introducing edition of conformance-suite/cases/14.9.25-MOVE/pb886_refmod_intermediate_positions.
       *> ISO 8.4.3.3.4 GR5 a)'s BIT-position arm ("If the usage of identifier-1 is bit, positions used in
       *> evaluation are bit positions") has an antecedent only a boolean data item can satisfy, and boolean data
       *> - the PICTURE symbol 1 and USAGE BIT (ISO 8.5.2 category boolean / 13.18.60) - is a COBOL-2002

@@ -10,7 +10,7 @@
       *> [ END-RETURN ] and leaves the AT END line unbracketed; §5.2.6.2 makes brackets the only convention
       *> that makes a portion omissible, so nothing about the rule is edition-dependent and COBOLNET1850
       *> screens it at every edition (kb/Work PB350). This is the 85 ACCEPT side; the reject side is
-      *> tests/conformance/negative/pb350-return-without-at-end.cob, whose reject-at header names all four.
+      *> conformance-suite/cases/14.9.34-RETURN/pb350-return-without-at-end.cob, whose reject-at header names all four.
       *>
       *> ⚠ DELIBERATELY NORMAL ORDER ONLY. The 2023 twin (pb350_return_at_end_required.cob) carries the
       *> §14.9.34.3 SR4 reversed spelling; this one does not, so that an 85 red here can only mean the AT END

@@ -23,7 +23,7 @@
       *> category: alphanumeric → all seven; national → boolean/national/numeric; boolean →
       *> alphanumeric(-edited)/boolean/national.  The zero-length literal keeps its OWN category for that
       *> screen — GR2/GR3 substitute a VALUE, not a written figurative constant — which is why B"" into a
-      *> numeric receiver is a rejection (tests/conformance/negative/pb425-boolean-zero-length-to-numeric).
+      *> numeric receiver is a rejection (conformance-suite/cases/14.9.25-MOVE/pb425-boolean-zero-length-to-numeric).
       *> The boolean and national literal forms and PIC A/1/N receivers are COBOL-2002 additions and the
       *> zero-length literal a COBOL-2014 one (kb/Work PB895, VCR row 7.30), so 2014 is the first edition
       *> that can write this program; the behaviour does not differ by edition above it.

@@ -10,7 +10,7 @@
       *> ITSELF NONCONFORMING - it must be declared as a TYPE
       *> DECLARATION and reached through a TYPE clause. The legal
       *> shape is pinned by the positive golden
-      *> tests/conformance/2023/pb153_restricted_pointer.
+      *> conformance-suite/cases/13.18.60-USAGE/pb153_restricted_pointer.
       *> This exact illegal spelling had reached the corpus: the
       *> version-matrix row usage-pointer-to-type-2014 carried it as
       *> the construct's canonical witness, unexercised and therefore

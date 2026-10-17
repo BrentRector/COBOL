@@ -8,7 +8,7 @@
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB418TVS.
       *> kb/Work PB418 — the OCCURRENCE-KEY shapes of ISO 14.9.20.4 GR5c1c / GR6a3. The 2002 golden
-      *> (tests/conformance/2002/pb418_initialize_table_value_arms.cob) pins the GR5c/GR6 arm SELECTION; this one
+      *> (conformance-suite/cases/14.9.20-INITIALIZE/pb418_initialize_table_value_arms.cob) pins the GR5c/GR6 arm SELECTION; this one
       *> pins that the occurrence a Format-2 (table) VALUE is keyed by is identified on every lane the expansion
       *> can reach it through - a loop the walk introduced, a DYNAMIC-capacity loop, an OCCURS DEPENDING loop, and
       *> a subscript identifier-1 supplied itself, with a literal and with a run-time value.

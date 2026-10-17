@@ -9,7 +9,7 @@
 *> receiving operand shall be valid." At COBOL-2023 MOVE SPACE TO <a numeric item> is not: 14.9.25.3 SR5
 *> prohibits "the move of an alphanumeric figurative constant (SPACE, ...) to either a numeric item or a
 *> numeric-edited item" (a removal - Annex E.2 item 1 - so it was permitted through 2014; the positive twin
-*> is tests/conformance/85/pb880_initialize_replacing_figurative_numeric).
+*> is conformance-suite/cases/_unassigned/pb880_initialize_replacing_figurative_numeric).
 *> kb/Work PB879: SR5's edition rows lived in VersionConformancePass.GateMove, reachable only from a bound
 *> MOVE node INITIALIZE never builds, so this compiled clean at 2023 while the explicit MOVE was COBOLNET0902.
        IDENTIFICATION DIVISION.

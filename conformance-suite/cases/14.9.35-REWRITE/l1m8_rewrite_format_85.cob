@@ -9,7 +9,7 @@
       *> program can write: FROM identifier-1, INVALID KEY, NOT INVALID
       *> KEY, END-REWRITE (retry-phrase, the LOCK phrases, FROM literal-1
       *> and the FILE arm are later additions; they are pinned at 2023 by
-      *> conformance:2023/l1m8_rewrite_format_phrases)
+      *> conformance:cases/14.7.9-RETRY/l1m8_rewrite_format_phrases)
       *> Format (2023 text): REWRITE {record-name-1 | FILE file-name-1}
       *>   [RECORD] [FROM {identifier-1 | literal-1}] [retry-phrase]
       *>   [WITH LOCK | WITH NO LOCK]

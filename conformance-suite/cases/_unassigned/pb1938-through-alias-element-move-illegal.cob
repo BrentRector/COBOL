@@ -9,7 +9,7 @@
 *> group operand is a level-66 THROUGH alias (13.18.45.4 GR2 makes it a group item). ST (PIC 9(4)) and RT
 *> (PIC A(4)) match under 8.5.1.12.3 - four bytes each - but a numeric sending operand does not move to an
 *> alphabetic receiver (14.9.25.3 SR10, Table 16), so the element MOVE the group MOVE implies is invalid and
-*> COBOLNET0819 names it at the MOVE. (The positive half is tests/conformance/2014/pb1938_through_alias_vlg_element_moves.)
+*> COBOLNET0819 names it at the MOVE. (The positive half is conformance-suite/cases/_unassigned/pb1938_through_alias_vlg_element_moves.)
 IDENTIFICATION DIVISION.
 PROGRAM-ID. N1938EL.
 DATA DIVISION.

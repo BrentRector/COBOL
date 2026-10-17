@@ -13,10 +13,10 @@
       *>       numeric data item", and this is neither.
       *>
       *> ⚠ WHY THIS FIXTURE EXISTS. SIGN's reject side had never been executed on a bad argument: it was
-      *> pinned only through a SIBLING — conformance:negative/pb52-intrinsic-argument-stage exercises
+      *> pinned only through a SIBLING — conformance:cases/_unassigned/pb52-intrinsic-argument-stage exercises
       *> FUNCTION SQRT(SPACE) over the same argument-rule table and the same CheckArgumentClasses path — so
       *> the row's evidence was that a NEIGHBOUR is screened, never that SIGN is.
-      *> The ADMIT side is conformance:2023/pb2_float_argument_exact_family, where FUNCTION SIGN over a
+      *> The ADMIT side is conformance:cases/15.7.4-Returned-value-rule/pb2_float_argument_exact_family, where FUNCTION SIGN over a
       *> COMP-2 item (class numeric) returns -1.
       *>
       *> reject-at omits 85: SIGN is not one of the 1989 Intrinsic Function Module's functions and was

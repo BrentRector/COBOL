@@ -25,7 +25,7 @@
       *> all three pointer categories and class object reject through the same COBOLNET1694, and the
       *> sibling fixtures l1-display-program-pointer-operand and l1-display-object-reference-operand pin
       *> the two categories a USAGE-POINTER-only special case would have left printing CLR text.
-      *> The ADMIT side is conformance:2002/l1_display_admitted_classes.
+      *> The ADMIT side is conformance:cases/14.9.11-DISPLAY/l1_display_admitted_classes.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1DSPPTR.
        DATA DIVISION.

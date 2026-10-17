@@ -18,7 +18,7 @@
       *>      PERFORM DP2 references a DIFFERENT declarative section by
       *>      PERFORM, the one statement SR4 admits: N = 3.
       *> The refused half (a GO TO into a declarative section from outside
-      *> it) is conformance:negative/pb362-goto-into-declarative.
+      *> it) is conformance:cases/14.9.49-USE/pb362-goto-into-declarative.
       *> EDITION: SR4 is COBOL-85's USE syntax rule, unchanged in 2023.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB362DRB.

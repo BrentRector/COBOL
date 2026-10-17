@@ -13,7 +13,7 @@
       *> BOTTOM phrases and §14.9.51.4's ADVANCING rules are unchanged
       *> across the 1985, 2002, 2014 and 2023 editions, so the SAME
       *> physical layout is owed at every one; this fixture and its 2023
-      *> twin (tests/conformance/2023/pb523_linage_margins_on_the_medium
+      *> twin (conformance-suite/cases/13.18.34-LINAGE/pb523_linage_margins_on_the_medium
       *> .cob) bracket the supported range.
       *>
       *> ⛔ WHY THIS TWIN READS CHARACTERS WHERE THE 2023 ONE READS LINES. The

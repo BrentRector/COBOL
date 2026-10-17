@@ -21,7 +21,7 @@
       *> number of positions in the national program collating sequence" - measured against the sequence THIS
       *> alphabet actually builds, which is NOT 65 536 because the ALSO members share one position.
       *>
-      *> THE SIBLING IT MIRRORS. conformance:2002/pb59_char_representative already pins the ALPHANUMERIC twin of
+      *> THE SIBLING IT MIRRORS. conformance:cases/12.3.7-SPECIAL-NAMES/pb59_char_representative already pins the ALPHANUMERIC twin of
       *> this rule (§15.15.4 r2) with the same highest-coded-literal-1 discriminator and the same bound pattern
       *> (`ALPHABET AL IS "C" ALSO "A" ALSO "B"` -> CH1 =[C], ORMAX=065534, OVER =DEFAULT). What was untested is
       *> the NATIONAL branch: no golden carries an ALSO phrase on a FOR NATIONAL alphabet, and the two branches

@@ -8,7 +8,7 @@
       *> kb/Work PB488 - the COBOL-85 half of the ISO 13.16.3 SR24 over-rejection guard. The screen is
       *> UNGATED, so the shapes SR24 does NOT exclude have to keep compiling at the oldest edition too. Every
       *> leg here is one COBOL-85 can write; the 2023-only shapes (a STRONG type declaration's elementary
-      *> member, a national group) are pinned by tests/conformance/2023/pb488_condition_name_associations_ok.
+      *> member, a national group) are pinned by conformance-suite/cases/13.16-Data-description/pb488_condition_name_associations_ok.
       *>
       *> 1) CONSECUTIVE 88s all associate with P - SR24 a) excludes an 88 from BEING a conditional variable,
       *>    which is what lets a run of them share one. P = "AB": P-AB true, P-CD false, P-AB-OR-CD true.

@@ -20,7 +20,7 @@
       *> ORGANIZATION IS LINE SEQUENTIAL, which is itself a COBOL-2023 introduction (§12.4.5.10.3 GR2 — the
       *> Foreword lists it among the main changes over ISO/IEC 1989:2014), so it cannot appear in a COBOL-2002
       *> program at all (the kb/Work PB688 precedent, which removed exactly this read-back from an 85 fixture).
-      *> The CONTENT assertions therefore live in tests/conformance/2023/pb506_report_value_operand_list, and what
+      *> The CONTENT assertions therefore live in conformance-suite/cases/13.18.53-SOURCE/pb506_report_value_operand_list, and what
       *> this program asserts at 2002 is that the whole construct is ACCEPTED and the report presents: the
       *> emitter's operand-cycling and VALUE-recipe paths carry no version predicate, so a divergence between the
       *> editions could only come from a gate, and a gate would show up here as a COBOLNET0900 rejection.

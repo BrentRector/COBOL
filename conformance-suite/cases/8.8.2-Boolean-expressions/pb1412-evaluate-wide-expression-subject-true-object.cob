@@ -9,7 +9,7 @@
       *> (8.8.2 rule 10), so it stays boolean-expression-1, and SR10's Table 15 leaves the Boolean-expression subject x
       *> TRUE-or-FALSE object cell BLANK: a syntax-rule violation, so a compile-time COBOLNET1634 - and no second
       *> diagnostic about the word TRUE read as a condition. (The one-character spelling is legal and is pinned by
-      *> tests/conformance/2002/pb1412_evaluate_boolean_expression_operands.)
+      *> conformance-suite/cases/8.8.2-Boolean-expressions/pb1412_evaluate_boolean_expression_operands.)
       *>   cite.py --check 14.9.13.3 "If the selection object is TRUE or FALSE and the selection subject is a boolean
       *>     expression that results in one boolean character" -> OK 6) b)
        IDENTIFICATION DIVISION.

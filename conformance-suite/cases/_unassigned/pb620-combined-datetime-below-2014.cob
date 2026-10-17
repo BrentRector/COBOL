@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2014/pb620_combined_datetime_eae — the EDITION half of the same
+      *> The REJECT half of conformance:cases/15.4.1-Numeric-and-integer-functions/pb620_combined_datetime_eae — the EDITION half of the same
       *> reference that golden compiles and runs.
       *> ISO §15.17 COMBINED-DATETIME is one of the date/time functions ISO/IEC 1989:2014 added to clause 15;
       *> it is absent from ISO/IEC 1989:2002 and from ISO 1989:1985, whose intrinsic-function set contains no

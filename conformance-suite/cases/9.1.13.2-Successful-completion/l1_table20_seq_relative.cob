@@ -34,7 +34,7 @@
       *> bound node on this organization and the cells were unwalkable).
       *> The Random row's START is blank in every column: §14.9.41.3
       *> SR1 rejects it at compile time (see
-      *> conformance:negative/pb325-start-random-access).
+      *> conformance:cases/14.9.27-OPEN/pb325-start-random-access).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1TB20A.
        ENVIRONMENT DIVISION.

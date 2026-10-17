@@ -10,7 +10,7 @@
       *> subordinate item."  Both ends here hold a `PIC X DYNAMIC LENGTH` member.
       *>
       *> ⛔ AN OCCURS DEPENDING ON GROUP IS NOT ONE — its size is its maximum — and the legal ODO-ended
-      *> range is pinned by `conformance:85/pb399_evaluate_selection_set_shapes` leg ODO-RANGE.  kb/Work
+      *> range is pinned by `conformance:cases/14.9.13-EVALUATE/pb399_evaluate_selection_set_shapes` leg ODO-RANGE.  kb/Work
       *> PB399's own repro had that premise backwards; a screen written from it would have rejected legal
       *> source and left the shape the rule names untouched.
       *> Measured before the screen: this program compiled clean and aborted at RUN TIME on "whole-group

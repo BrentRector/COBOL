@@ -19,7 +19,7 @@
       *>     | BINARY-CHAR UNSIGNED | +255 (assuming an 8-bit representation)  |
       *>
       *> ⛔ ROWS 2, 6 AND 7 ARE THE POINT OF THIS FILE, AND THEY ARE THE THREE THE CORPUS DID NOT HOLD.
-      *> conformance:2002/highest_lowest_algebraic already pins the DISPLAY-usage shapes (S99, S9(4) display,
+      *> conformance:cases/15.43.4-Returned-value-rules/highest_lowest_algebraic already pins the DISPLAY-usage shapes (S99, S9(4) display,
       *> 99V9(3), $**,**9.99). What no fixture pinned is the DISCRIMINATION the table draws between two kinds
       *> of "may be represented in argument-1":
       *>   · S9(4) BINARY has a PICTURE, and the table's answer is +9999 — the PICTURE's all-nines, NOT the

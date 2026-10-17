@@ -46,7 +46,7 @@
       *> >>TURN directive (§7.3.25), the format-3 USE (§14.9.49.2), the
       *> RESUME statement (§14.9.33) and the EC-FLOW-USE name itself —
       *> is a COBOL-2002 introduction; the REJECT half below it is
-      *> conformance:negative/pb368-flow-use-name-below-2002.
+      *> conformance:cases/14.9.49-USE/pb368-flow-use-name-below-2002.
        >>TURN EC-FLOW-USE CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB368FU.

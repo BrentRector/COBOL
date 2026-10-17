@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb973_method_formal_named_like_emitter_member
+      *> The REJECT half of conformance:cases/_unassigned/pb973_method_formal_named_like_emitter_member
       *> (kb/Work PB973). The object-orientation facility is gated at
       *> COBOL-2002, so at 85 the class definition and its method with a
       *> LINKAGE formal named N draw the edition band COBOLNET0900 - never

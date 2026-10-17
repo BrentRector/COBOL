@@ -5,7 +5,7 @@
 *> portable: unverified
 *>---
       *> The NEGATIVE below the introducing edition of
-      *> tests/conformance/2002/pb3166_redefines_bit_item_in_shared_byte.
+      *> conformance-suite/cases/_unassigned/pb3166_redefines_bit_item_in_shared_byte.
       *> The storage association PB3166 fixes is 13.18.44.4 GR1's (the redefining entry starts at the first
       *> bit of data-name-2), and its antecedent is a data item of USAGE BIT - boolean data, which with the
       *> PICTURE symbol 1 is a COBOL-2002 introduction.  Below 2002 the bit item is refused at the DATA

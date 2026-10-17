@@ -23,7 +23,7 @@
       *> §14.9.20.3 SR3 is what makes identifier-2 the only sender here: "For each DATA-POINTER,
       *> FUNCTION-POINTER, MESSAGE-TAG, OBJECT-REFERENCE, or PROGRAM-POINTER phrase specified as the
       *> category-name in the REPLACING phrase, identifier-2 shall be specified" (the negative witness for
-      *> literal-1 is tests/conformance/negative/pb415-initialize-replacing-pointer-literal).
+      *> literal-1 is conformance-suite/cases/14.9.20-INITIALIZE/pb415-initialize-replacing-pointer-literal).
       *>
       *> EXPECTED, DERIVED FROM THE RULES ABOVE AND WRITTEN DOWN BEFORE THE RUN:
       *>   1[SET]   P1 is nulled, then REPLACING DATA-POINTER … BY SRC qualifies it through GR5c2 and GR6b

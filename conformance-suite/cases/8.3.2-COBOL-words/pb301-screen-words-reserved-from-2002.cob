@@ -9,7 +9,7 @@
       *> COBOL-2002, and 8.3.2.1 rule 1 - "Reserved words shall not be used as user-defined words or
       *> system-names" - therefore bars every one of them from the slot below at 2002/2014/2023. The SAME six
       *> declarations are CONFORMING at COBOL-85, where 8.9 does not reserve them; that acceptance lane is
-      *> tests/conformance/85/pb301_screen_words_as_user_words.
+      *> conformance-suite/cases/_unassigned/pb301_screen_words_as_user_words_85.
       *> WHAT THIS PINS THAT "is rejected" DOES NOT: the DIAGNOSTIC. The generated reservation gate withdraws
       *> each word from `cobolWord` at the editions 8.9 reserves it and `reservedGatedWord` re-admits it in the
       *> DEFINITION slot alone, so the entry still PARSES and the 8.9 funnel answers with COBOLNET0901 naming

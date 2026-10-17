@@ -18,7 +18,7 @@
       *>
       *> The eight post-85 words are refused here by the initialize-category-2002 / -2014 / -2023 gates
       *> (COBOLNET0900); the negative witness for that is
-      *> tests/conformance/negative/pb415-initialize-category-national-85.
+      *> conformance-suite/cases/14.9.20-INITIALIZE/pb415-initialize-category-national-85.
       *>
       *> EXPECTED, DERIVED BEFORE THE RUN:
       *>   T1  REPLACING ALPHABETIC ALPHANUMERIC DATA BY "Q" — ONE category-name naming TWO categories.

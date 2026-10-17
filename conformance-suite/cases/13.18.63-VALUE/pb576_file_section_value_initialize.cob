@@ -24,7 +24,7 @@
       *> "The initial value of the data items in the file section is undefined", so no conforming program can
       *> depend on it and no golden may pin it.
       *> FLOAT-LONG is COBOL-2002 (13.18.60.2); the edition floor for the TO VALUE vehicle is already witnessed by
-      *> conformance:negative/pb420-initialize-float-to-value-85.
+      *> conformance:cases/14.9.20-INITIALIZE/pb420-initialize-float-to-value-85.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB576FSV.
        ENVIRONMENT DIVISION.

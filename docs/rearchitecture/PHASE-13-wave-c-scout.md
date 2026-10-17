@@ -112,7 +112,7 @@ Byte-by-byte derivation (A = 1100, category boolean; R is PIC 1(4) so it renders
 8. Fire-on-RECOGNITION gate (DEVLOG 724): put the 2023 introduction gate in the VersionConformancePass ParseArm HasShiftOp scan, NOT a bound arm — a below-edition shift must name its edition even when binding also fails. Keep the existing HasBoolOp (B-AND family) gate separate: shift is a DIFFERENT construct/edition (2023 vs 2002), so a program using only shifts at --std 2002 must get the shift's COBOLNET0900, not the boolean-operators-2002 message.
 9. Exhaustive-visitor tripwire: adding BoundBoolShift without a Visit method breaks the BooleanRenderer build (intended — BooleanRenderer.cs:16-30 removed the loud `_ =>`); also update any other IBoundBoolExprVisitor impls (Gr3Width switch, BoolExprAllLengthOne at ConditionBinder.cs:183) or they throw/mis-handle.
 10. No EC is defined for boolean shift (no EC-BOUND/EC-SIZE) — do not invent one. The only compile constraints are rule 5 (integer 2nd operand, non-ALL first operand). A non-integer 2nd operand is a formation error (bind-time COBOLNET1511), not a runtime EC.
-11. Ship the conformance test in the SAME commit (memory feedback_conformance_tests_per_feature): tests/conformance/2023/boolean_shift.{cob,out} + the negative below-2023 gate; run the LEGACY guard because Core/*.g4 changed (memory feedback_autonomous_grammar_nist / shared-.g4 => full legacy guard).
+11. Ship the conformance test in the SAME commit (memory feedback_conformance_tests_per_feature): conformance-suite/cases/8.8.2-Boolean-expressions/boolean_shift.{cob,out} + the negative below-2023 gate; run the LEGACY guard because Core/*.g4 changed (memory feedback_autonomous_grammar_nist / shared-.g4 => full legacy guard).
 
 **Complexity:** M — 4 lexer tokens + 1 asymmetric grammar tier (integer RHS) + 1 new bound node + binder/emitter/runtime shift methods + a new 2023 construct/gate + golden & negative are mechanical and mirror the proven boolean-operators-2002 path; the one genuine risk that could push toward L is the rule-7b context-sensitive precedence for shifts MIXED with B-OR/B-XOR — if full spec-faithful mixed-precedence is in scope it needs a precedence-climbing bind rather than a fixed tier.
 
@@ -155,7 +155,7 @@ MISSING (to add):
 - PicInfo: add `bool PackedNoSign` field; branch StorageWidth `Usage.Packed => PackedNoSign ? (Digits + 1) / 2 : Digits / 2 + 1` (PicInfo.cs:330).
 - DataBinder: read `usage.noSignPhrase() is not null` near :1657; carry `noSign` into PicInfo build (:1790); reject NO SIGN on a non-Packed usage (new COBOLNET1565) and reject S-picture + NO SIGN per SR31 (new COBOLNET1566, after Analyze sets pic.Signed).
 - VersionConformancePass: new `VisitUsageClause` ParseArm override; new constructs.json row + regen Constructs.g.cs (UsagePackedNoSign2023).
-- New conformance golden tests/conformance/2023/usage_packed_no_sign.{cob,out}; edition-matrix continuity/introduction rows.
+- New conformance golden conformance-suite/cases/13.18.60-USAGE/usage_packed_no_sign.{cob,out}; edition-matrix continuity/introduction rows.
 
 **Golden program:**
 

@@ -14,7 +14,7 @@
       *> forwarded to the renamed item's place outright and became indistinguishable from writing WS-RK. Two
       *> spellings of one rule, one arm implemented (feedback_two_arm_dispatch).
       *> The positive control - where the same alias is a legal MOVE and ADD receiver - is
-      *> tests/conformance/85/pb602_start_key_identity.cob.
+      *> conformance-suite/cases/14.9.41-START/pb602_start_key_identity.cob.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB602NEGALIAS.
        ENVIRONMENT DIVISION.

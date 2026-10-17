@@ -11,12 +11,12 @@
       *> The FACTORY / INSTANCE axis is the load-bearing one and this fixture isolates it: the
       *> INSTANCE definition DOES implement the interface and the FACTORY definition does not,
       *> so a screen keyed on the wrong definition — or on the class as a whole — accepts the
-      *> program.  d)2., the instance twin, is pinned by conformance:2002/oo_set_self_interface
-      *> and conformance:negative/oo-set-self-interface-not-implemented; d)1. had no shipped
+      *> program.  d)2., the instance twin, is pinned by conformance:cases/14.9.39-SET/oo_set_self_interface
+      *> and conformance:cases/14.9.39-SET/oo-set-self-interface-not-implemented; d)1. had no shipped
       *> witness before this one.  The relation is §11.4.4 GR2's — direct IMPLEMENTS, an
       *> implemented interface that INHERITS int-1, or an inherited class whose factory object
       *> implements it — and all three legs are exercised positively by
-      *> conformance:2002/pb451_set_format5_self_sender; none of them holds here.
+      *> conformance:cases/11.4-FACTORY/pb451_set_format5_self_sender; none of them holds here.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB451N9.
        ENVIRONMENT DIVISION.

@@ -12,7 +12,7 @@
       *>
       *> Written at EVERY edition the row spans: §15.44's format is unchanged across 85 / 2002 / 2014 / 2023,
       *> so the rejection is too, and an arity model that lived behind an edition gate would show up here.
-      *> The ACCEPT side is conformance:2023/l1_integer_family_notes and conformance:85/l1_integer_floor_85.
+      *> The ACCEPT side is conformance:cases/15.42.3-Argument-rule/l1_integer_family_notes and conformance:cases/15.44.3-Argument-rule/l1_integer_floor_85.
       *> Expected: COBOLNET1504, the §15.3 argument-count diagnostic.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1INTARITY.

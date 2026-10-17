@@ -17,8 +17,8 @@
       *> fixture in the corpus would still pass.
       *>
       *> Written at EVERY edition the row spans; §15.49's format is unchanged across 85 / 2002 / 2014 / 2023.
-      *> The ACCEPT side is conformance:2023/l1_integer_family_notes (and, at --std 85, the P-* lines of
-      *> conformance:85/l1_integer_floor_85).
+      *> The ACCEPT side is conformance:cases/15.42.3-Argument-rule/l1_integer_family_notes (and, at --std 85, the P-* lines of
+      *> conformance:cases/15.44.3-Argument-rule/l1_integer_floor_85).
       *> Expected: COBOLNET1504, the §15.3 argument-count diagnostic.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1IPARITY.

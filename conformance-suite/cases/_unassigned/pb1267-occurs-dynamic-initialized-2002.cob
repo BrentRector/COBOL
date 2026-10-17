@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB1267 - the edition floor under conformance:2014/pb1267_dyn_initialized_seed (and the
+      *> kb/Work PB1267 - the edition floor under conformance:cases/13.18.38-OCCURS/pb1267_dyn_initialized_seed (and the
       *> other wave-67 group O goldens: pb1144_dyn_move_recreate, pb1269_dyn_overflow_resume_next,
       *> pb1411_dyn_vargroup_element_receiver). A dynamic-capacity table (8.5.1.9; OCCURS Format 4, 13.18.38)
       *> and its INITIALIZED phrase (8.5.1.9.5) are COBOL-2014 introductions, so at COBOL-85 and COBOL-2002

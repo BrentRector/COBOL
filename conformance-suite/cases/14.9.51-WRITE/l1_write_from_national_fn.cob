@@ -19,7 +19,7 @@
       *>     function" -> OK §14.9.51.3 4)
       *> A national function satisfies BOTH, so this arm is legal source
       *> under every reading. The refusal arm (an integer function) is
-      *> conformance:negative/pb348-write-from-integer-function and the
+      *> conformance:cases/14.9.32-RELEASE/pb348-write-from-integer-function and the
       *> alphanumeric arm is conformance:2023/pb10_function_identifier_
       *> sending; this golden is the NATIONAL arm neither of them pins.
       *> (The boolean arm is deliberately not pinned here: SR11 admits

@@ -40,7 +40,7 @@
       *>
       *> EDITIONS: STRING and UNSTRING are complete at COBOL-85 and SR1/SR2 are unchanged since, so this file
       *> lives at the introducing edition and the corpus keeps ONE copy.  The negatives are
-      *> tests/conformance/negative/pb664-string-sender-usage, -string-numeric-literal (both reject at every
+      *> conformance-suite/cases/14.9.43-STRING/pb664-string-sender-usage, -string-numeric-literal (both reject at every
       *> edition) and -string-sender-pointer, -unstring-sender-pointer (2002+, where USAGE POINTER exists).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB664POS85.

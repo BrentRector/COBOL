@@ -9,7 +9,7 @@
 *> (13.18.40.4 GR10), so the alphanumeric "AB CD" is refused - COBOLNET0898. The legal spelling,
 *> VALUE N"AB CD", is pinned by conformance:{2002,2014,2023}/pb492_national_edited.
 *> reject-at omits 85 because the DECLARATION is already a COBOL-2002 introduction there
-*> (conformance:negative/pb492-national-edited-at-85, COBOLNET0900) - a different rule and code.
+*> (conformance:cases/13.18.40-PICTURE/pb492-national-edited-at-85, COBOLNET0900) - a different rule and code.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB492VAL.
 DATA DIVISION.

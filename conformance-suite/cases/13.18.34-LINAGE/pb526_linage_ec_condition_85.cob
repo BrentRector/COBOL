@@ -6,7 +6,7 @@
       *> portable: unverified
       *>---
       *> The COBOL-85 EDITION TWIN of
-      *> tests/conformance/2023/pb526_linage_ec_condition, which carries
+      *> conformance-suite/cases/9.1.13.11-Implementor-defined-condition-with-unsuccessful-completion/pb526_linage_ec_condition, which carries
       *> the full derivation and every cite.py --check line.
       *>
       *> WHY THE TWIN EXISTS. §13.18.34.4 GR6 b)'s two value rules and the

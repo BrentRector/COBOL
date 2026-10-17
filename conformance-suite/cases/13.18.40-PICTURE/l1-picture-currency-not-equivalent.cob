@@ -17,7 +17,7 @@
       *> THE VIOLATED LEG. SR28 is a syntax rule, so source that breaks
       *> it is not a conforming source program and the compiler owes a
       *> diagnostic. The satisfied leg is
-      *> tests/conformance/2023/l1_picture_currency_equivalent.cob and
+      *> conformance-suite/cases/12.3.7-SPECIAL-NAMES/l1_picture_currency_equivalent.cob and
       *> its 2002 twin.
       *>
       *> HOW TWO NON-EQUIVALENT CURRENCY SYMBOLS ARE OBTAINED. The

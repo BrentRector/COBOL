@@ -27,7 +27,7 @@
       *>
       *> ⛔ WHY THIS EXISTS BESIDE THE TWO NATIVE-CAP FIXTURES. pb33 and l1_numval_family_cap_discriminators
       *> pin the FIRST sentence of the sibling rules (§15.67.3 r3 / §15.68.3 r6 / §15.69.3 r2 — 31 under
-      *> native), and conformance:2023/pb60_numval_standard_decimal pins the 34/35 boundary for NUMVAL
+      *> native), and conformance:cases/15.4.1-Numeric-and-integer-functions/pb60_numval_standard_decimal pins the 34/35 boundary for NUMVAL
       *> alone. Nothing measured the standard-decimal boundary on NUMVAL-C or on NUMVAL-F, and a cap is a
       *> BOUNDARY: only a matched pair astride it, on the function whose own rule is being measured, can
       *> tell 34 from 31 or from 35. The NUMVAL pair is carried here too so the three rules are measured in

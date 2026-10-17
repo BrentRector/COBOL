@@ -12,7 +12,7 @@
       *> phrase is what keeps the relaxation from being an over-acceptance.
       *> 2023 only, because the status phrase written twice here is a COBOL-2023 introduction
       *> (Annex E.3.3 item 32) and below that edition the program is refused for the edition instead.
-      *> POSITIVE CONTROL: tests/conformance/2023/pb407_goback_general_format.cob - both phrases, each once,
+      *> POSITIVE CONTROL: conformance-suite/cases/14.9.14-EXIT/pb407_goback_general_format.cob - both phrases, each once,
       *> in either order.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. NEGPB407.

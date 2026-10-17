@@ -13,7 +13,7 @@
 *> OUTERMOST programs" - so its uniqueness is scoped to its outermost program, never to the compilation group.
 *> kb/Work PB660 recorded this half as "appears enforced"; RE-MEASURED on 2026-09-22 it was not: the program
 *> below compiled, exited 0 and ran the FIRST containee. The positive control for the same scope is
-*> tests/conformance/2002/pb660_definition_name_scopes.cob, where two DIFFERENT outermost programs each
+*> conformance-suite/cases/_unassigned/pb660_definition_name_scopes.cob, where two DIFFERENT outermost programs each
 *> contain a program of one name and both run - which 8.4.6.3 rules 1 and 2 keep apart at every reference.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB660CTM.

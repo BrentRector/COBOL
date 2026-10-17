@@ -20,7 +20,7 @@
       *> REJECT, and this golden used to pin it as accepted (with a literal) while asserting a run-time rule.
       *> Written through a data item the statement is conforming and the run-time behaviour 8.5.1.9.1 describes is
       *> what is actually measured. The literal arm's refusal is pinned by
-      *> conformance:negative/pb458-set-capacity-literal-below-minimum.
+      *> conformance:cases/14.9.39-SET/pb458-set-capacity-literal-below-minimum.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. DYN-CAP-BOUNDS.
        DATA DIVISION.

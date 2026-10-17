@@ -7,7 +7,7 @@
 *>---
       *> kb/Work PB405 - EXIT PARAGRAPH and EXIT SECTION written INSIDE an inline PERFORM, at --std 2002
       *> (the edition that introduced the structured-exit statements; the 85 witness is the negative case
-      *> tests/conformance/negative/pb405-exit-paragraph-in-inline-perform-85.cob, COBOLNET0900).
+      *> conformance-suite/cases/14.9.14-EXIT/pb405-exit-paragraph-in-inline-perform-85.cob, COBOLNET0900).
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE SPEC AND NOT FROM A RUN:
       *> 14.9.14.4 GR6 - "The execution of an EXIT PARAGRAPH statement causes control to be passed to an

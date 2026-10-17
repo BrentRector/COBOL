@@ -13,7 +13,7 @@
       *> IS and LINE NUMBER ARE. 13.18.35.3 SR2 ("LINE and LINES are
       *> synonyms", cite.py: OK 13.18.35.3 2)) gives the two words one
       *> meaning, not each other's companions. The positive twin is
-      *> conformance:2002/pb1221_report_keyword_prefixes.
+      *> conformance:cases/13.18.14-COLUMN/pb1221_report_keyword_prefixes.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1221NL.
        ENVIRONMENT DIVISION.

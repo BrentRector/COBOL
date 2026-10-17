@@ -6,7 +6,7 @@
 *> portable: unverified
 *>---
       *> kb/Work PB367b - RESUME OUT OF A DECLARATIVE ENTERED FROM A RUNTIME RAISE SITE.
-      *> The companion of conformance:2023/pb367b_nonfatal_runtime_dispatch: there the declaratives
+      *> The companion of conformance:cases/14.9.49-USE/pb367b_nonfatal_runtime_dispatch: there the declaratives
       *> complete normally and the interrupted statement finishes; here they RESUME, which is an
       *> explicit transfer of control OUT of that statement.
       *>

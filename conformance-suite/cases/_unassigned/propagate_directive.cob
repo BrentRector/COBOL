@@ -10,7 +10,7 @@
       *> exception-condition propagation to the activating runtime element
       *> (GR1/GR2, default OFF per GR4). This program raises nothing, so
       *> ON changes nothing here: it compiles and runs. The propagation
-      *> itself is conformance:2002/w73d2_pb1119_propagate_on.
+      *> itself is conformance:cases/7.3.21-PROPAGATE/w73d2_pb1119_propagate_on.
       >>PROPAGATE ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PROPAGATE-DIRECTIVE.

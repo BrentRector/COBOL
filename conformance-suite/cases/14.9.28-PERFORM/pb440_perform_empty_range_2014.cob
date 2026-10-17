@@ -7,7 +7,7 @@
 *> portable: unverified
 *>---
       *> kb/Work PB440 - PERFORM of an EMPTY procedure range, at --std 2014. The full derivation and both
-      *> measured arms are in tests/conformance/2023/pb440_perform_empty_range.cob; this is the 2014
+      *> measured arms are in conformance-suite/cases/14.9.28-PERFORM/pb440_perform_empty_range_2023.cob; this is the 2014
       *> WITNESS, because the rule is edition-INDEPENDENT and the defect had no edition arm.
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE SPEC AND NOT FROM A RUN:

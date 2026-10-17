@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb891_checking_scope (and of
+      *> The REJECT half of conformance:cases/_unassigned/pb891_checking_scope (and of
       *> its group twins pb841_checking_across_call and
       *> pb893_close_report_completes). Per-statement checking scopes
       *> exist only through the exception-condition facility: the >>TURN

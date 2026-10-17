@@ -10,7 +10,7 @@
       *> phrase is specified twice and the source shall be rejected. SR7 is a FORMAT 1 rule and
       *> Format 1 exists at every edition, so all four reject.
       *> (The accepting complement — all four phrases, each written exactly once — is
-      *> tests/conformance/2023/l1_use_four_mode_phrases.)
+      *> conformance-suite/cases/14.9.49-USE/l1_use_four_mode_phrases.)
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1USE7N.
        ENVIRONMENT DIVISION.

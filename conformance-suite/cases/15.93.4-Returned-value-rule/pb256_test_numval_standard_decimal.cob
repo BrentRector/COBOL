@@ -28,7 +28,7 @@
       *>                returned value is the position of the fifth digit of the exponent."
       *> The standard-binary halves of r4/r3 (35) are UNREACHABLE: the mode is declined on §4.2.6
       *> processor-dependence (kb/Work PB198; docs/CONFORMANCE.md §1/§2), pinned by
-      *> conformance:negative/standard-binary-test-numval-2014. ArithmeticModes.NumvalDigitCap records the
+      *> conformance:cases/15.93.4-Returned-value-rule/standard-binary-test-numval-2014. ArithmeticModes.NumvalDigitCap records the
       *> 35 anyway so the table has no hole.
       *>
       *> Hand-derived, with STANDARD-DECIMAL arithmetic in effect by the OPTIONS paragraph (§11.9.5):

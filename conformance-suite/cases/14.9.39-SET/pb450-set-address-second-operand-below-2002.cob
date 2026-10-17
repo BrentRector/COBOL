@@ -18,7 +18,7 @@
 *> Format 7's COBOL-2002 date is constructs.json SetAddress2002 / usage-pointer-2002 - the data-pointer
 *> family's edition.
 *> 85 ONLY: at 2002 and above this is conforming source - the positive is
-*> tests/conformance/2002/pb450_set_format7_receiving_list.
+*> conformance-suite/cases/14.9.39-SET/pb450_set_format7_receiving_list.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. NEGPB450F7.
 DATA DIVISION.

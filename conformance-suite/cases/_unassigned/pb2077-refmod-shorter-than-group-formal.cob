@@ -10,7 +10,7 @@
       *> requires "the formal parameter shall be described with the same number or a smaller number of
       *> bytes as the corresponding argument" (cite.py --check 14.8.2.2 -> OK 14.8.2.2 1)); 14.9.23.3 SR5 c)
       *> applies 14.8.2 at compile time (OK 14.9.23.3 5) c)). X(1:3) is 3 bytes and LG 4: COBOLNET0828 (the
-      *> universal lane's twin is EC-OO-UNIVERSAL in conformance:2002/pb2077_refmod_argument_both_lanes).
+      *> universal lane's twin is EC-OO-UNIVERSAL in conformance:cases/_unassigned/pb2077_refmod_argument_both_lanes).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2077NS.
        ENVIRONMENT DIVISION.

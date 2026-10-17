@@ -16,7 +16,7 @@
       *> it carries; unenforced, A1's own PICTURE silently DISCARDED the type's declared description and
       *> 01 T IS TYPEDEF PIC X(3). 01 A TYPE T PIC 9(5). gave A a 5-digit numeric item that 13.18.57.4 GR1
       *> never described - defeating 8.5.3's whole purpose. Its SR12 twin for SAME AS is COBOLNET1555.
-      *> The permitted co-clauses are the positive golden conformance:2002/pb513_type_entry_composition.
+      *> The permitted co-clauses are the positive golden conformance:cases/13.16-Data-description/pb513_type_entry_composition.
       *> reject-at omits 85 because the TYPE clause is itself a COBOL-2002 introduction there (COBOLNET0900,
       *> a different rule and code).
        IDENTIFICATION DIVISION.

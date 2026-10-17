@@ -9,7 +9,7 @@
 *> pair: format 1 (report-writer) has the SAME spelling and IS supported (A.4.11 item 14; CONFORMANCE.md 5
 *> records report writer as Partial with it implemented). The two are told apart by WHERE the clause is
 *> written, and this entry is in WORKING-STORAGE. The other half is pinned by the POSITIVE control
-*> tests/conformance/2023/declined_rw_present_varying_control.cob, which must keep compiling and running.
+*> conformance-suite/cases/_unassigned/declined_rw_present_varying_control.cob, which must keep compiling and running.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. DCLPRES.
        DATA DIVISION.

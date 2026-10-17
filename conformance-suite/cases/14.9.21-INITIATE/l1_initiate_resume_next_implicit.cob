@@ -61,7 +61,7 @@
       *> EDITION: >>TURN, USE AFTER EXCEPTION CONDITION, RESUME and
       *> FUNCTION EXCEPTION-STATUS are COBOL-2002. At 1985 GR5 has
       *> no observable separable from GR1 (the order cannot be seen);
-      *> conformance:85/l1_initiate_multi_each_report_85 is a GR1 c)
+      *> conformance:cases/_unassigned/l1_initiate_multi_each_report_85 is a GR1 c)
       *> witness only, not a GR5 one.
        >>TURN EC-REPORT-ACTIVE CHECKING ON
        IDENTIFICATION DIVISION.

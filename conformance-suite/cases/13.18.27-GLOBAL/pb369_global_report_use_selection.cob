@@ -32,7 +32,7 @@
       *>    GLOBAL one (GR4 b) twice removed)     "A-GLOBAL TOT   T=09"
       *> The FD is GLOBAL too: §14.9.16.3 SR3 and §14.9.46.3 SR2 require it
       *> of a contained GENERATE / TERMINATE (the refused shape is
-      *> conformance:negative/pb369-contained-report-file-not-global).
+      *> conformance:cases/14.9.16-GENERATE/pb369-contained-report-file-not-global).
       *> The report file is not read back: the LINE SEQUENTIAL
       *> organization that would read it is a COBOL-2023 introduction.
       *> EDITION: Report Writer, nested programs, GLOBAL and USE BEFORE

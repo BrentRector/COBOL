@@ -18,7 +18,7 @@
 *> END is what is measured - an ambiguous range end would otherwise let an arbitrary SPAN of the program run),
 *> and GO TO format 1. Rejected at all four editions: 8.4.2.2.1 is unchanged across them.
 *> The legal counterparts - rule 6 resolution and an explicit IN qualifier - are the positive witness
-*> tests/conformance/85/pb466_procedure_name_uniqueness.cob.
+*> conformance-suite/cases/8.4.2.2-Qualification/pb466_procedure_name_uniqueness.cob.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB466AMBG.
        PROCEDURE DIVISION.

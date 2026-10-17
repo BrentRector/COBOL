@@ -13,7 +13,7 @@
 *> `RELEASE SRT-NUM FROM QUOTE` compiled with NO DIAGNOSTIC AT ALL: "according to the rules
 *> specified for the MOVE statement" was applied at no edition, because the implicit move was
 *> constructed after binding and no version-conformance pass could see it.  Its positive twin is
-*> conformance:2002/pb348_release_from_figurative_image, where the same statement is valid and runs.
+*> conformance:cases/14.9.32-RELEASE/pb348_release_from_figurative_image_2002, where the same statement is valid and runs.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB348N9.
 ENVIRONMENT DIVISION.

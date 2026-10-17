@@ -8,8 +8,8 @@
       *> COBOL-2002 introduction; COBOL-85 has no VARYING clause in a
       *> report group description entry, so the clause is refused at
       *> 85 by its introduction gate (COBOLNET0900). The positive twins
-      *> are conformance:2002/pb1305_report_varying_expression and
-      *> conformance:2014/pb1305_report_varying_standard_decimal.
+      *> are conformance:cases/13.18.64-VARYING/pb1305_report_varying_expression and
+      *> conformance:cases/13.18.64-VARYING/pb1305_report_varying_standard_decimal.
       *> "Each entry containing a VARYING clause establishes an
       *> independent temporary integer data item that shall be large
       *> enough to contain the maximum expected value."

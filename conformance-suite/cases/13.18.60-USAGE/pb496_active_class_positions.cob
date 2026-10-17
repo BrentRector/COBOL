@@ -9,7 +9,7 @@
       *> definition, an instance definition, or the linkage or local-storage section of a
       *> method definition."  FOUR permitted positions; conformance:2002/
       *> pb389_object_reference_descriptor writes the fourth (a method's LOCAL-STORAGE), and
-      *> conformance:negative/pb389-active-class-outside-class and
+      *> conformance:cases/13.18.60-USAGE/pb389-active-class-outside-class and
       *> …-active-class-method-working-storage pin two of the forbidden ones.  This program
       *> writes THE OTHER THREE and makes each one OBSERVABLE, so SR16's permission is proved
       *> by a running program rather than by the absence of a diagnostic.  kb/Work PB496.

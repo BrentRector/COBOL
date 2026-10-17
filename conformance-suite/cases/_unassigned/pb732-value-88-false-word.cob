@@ -12,7 +12,7 @@
 *> (COBOL0001 + COBOL0309 "A literal value is expected here, not a data-name") — which also refused
 *> the CONFORMING constant-name and symbolic-character spellings 13.10.3 SR2 and 8.3.3.6.2 format 7
 *> admit there. Widening the operand and screening it are ONE change; this negative pins the screen
-*> and tests/conformance/2023/pb732_value_word_substitutions.cob pins the widening.
+*> and conformance-suite/cases/_unassigned/pb732_value_word_substitutions.cob pins the widening.
 *> Rejected at 85 as well, and this case pins that the OPERAND SCREEN still fires there: since
 *> kb/Work PB555 the phrase also draws the COBOLNET0900 introduction diagnostic at 85 (it is a
 *> COBOL-2002 addition, row value-false-phrase-2002), and a gate that SHORT-CIRCUITED the screen

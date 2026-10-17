@@ -5,7 +5,7 @@
 *> portable: unverified
 *>---
       *> kb/Work PB1066 - the negative half of
-      *> conformance:2023/pb1066_gr14_implicit_pop_all_define. The implicit
+      *> conformance:cases/14.9.28-PERFORM/pb1066_gr14_implicit_pop_all_define. The implicit
       *> PUSH ALL / POP ALL of ISO 14.9.28.4 GR14 belongs to the exception-
       *> checking (Format 3) PERFORM, which is new in COBOL-2023, so below
       *> 2023 the PERFORM ... WHEN statement that brackets the >>DEFINE is

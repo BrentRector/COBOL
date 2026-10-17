@@ -12,7 +12,7 @@
       *> implicit redefinitions of the same area." The REDEFINES-clause syntax rules (13.18.44.3) are about a
       *> written clause and its data-name-2; they do not reach this source, which writes none. A WEAK type
       *> (TYPEDEF without STRONG) may be implicitly redefined - 13.18.57.3 SR4 bars only a STRONG one, and the
-      *> negative twin tests/conformance/negative/pb836-strong-record-implicitly-redefined pins that side.
+      *> negative twin conformance-suite/cases/13.18.57-TYPE/pb836-strong-record-implicitly-redefined pins that side.
       *>
       *> EXPECTED VALUES, DERIVED. The three records share ONE area, left-aligned (13.18.33.4 GR3):
       *>   MOVE "AB12CD" TO R-TEXT sets the six leading positions;

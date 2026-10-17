@@ -19,8 +19,8 @@
       *>
       *> This is the INTRODUCING edition: the object-orientation facility, and with it the predefined object
       *> reference and the 8.9 reservation of the word, arrived in COBOL-2002. The '85 counterpart is
-      *> tests/conformance/85/pb922_exception_object_user_word_85.cob, where the same spelling is an ORDINARY
-      *> user-defined word; the receiving refusal is tests/conformance/negative/pb922-exception-object-receiving.
+      *> conformance-suite/cases/_unassigned/pb922_exception_object_user_word_85.cob, where the same spelling is an ORDINARY
+      *> user-defined word; the receiving refusal is conformance-suite/cases/8.4.3.6-EXCEPTION-OBJECT/pb922-exception-object-receiving.
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE SPEC:
       *>

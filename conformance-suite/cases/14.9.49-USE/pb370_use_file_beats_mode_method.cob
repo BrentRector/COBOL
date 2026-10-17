@@ -13,7 +13,7 @@
       *> the DECLARATIVES format in "a method definition", and GR4 a)
       *> selects the declaratives of the element containing the failing
       *> statement. The twin of
-      *> conformance:85/pb370_use_file_beats_mode, run where the
+      *> conformance:cases/14.9.49-USE/pb370_use_file_beats_mode, run where the
       *> declaratives sit in a method over the object's files (OO is a
       *> COBOL-2002 introduction). The mode declarative is written
       *> FIRST.

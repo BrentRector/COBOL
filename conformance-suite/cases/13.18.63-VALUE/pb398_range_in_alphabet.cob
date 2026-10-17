@@ -29,7 +29,7 @@
       *>   D  the VALUE-clause twin, `88 ... VALUE "M" THRU "A" IN AL`      -> true   -> IN
       *>   E  the same set with no phrase, `VALUE "A" THRU "M"`, is inverted under the PCS AL - a sequence the
       *>      compiler KNOWS, so 13.18.63.3 SR26 b) refuses it at compile time (COBOLNET2961, kb/Work PB552);
-      *>      that leg lives in conformance:negative/pb552-value-through-not-ascending.
+      *>      that leg lives in conformance:cases/13.18.63-VALUE/pb552-value-through-not-ascending.
       *>   F  a SINGLETON value in a clause that also names an alphabet is NOT governed by it - 14.7.8 is the
       *>      THROUGH phrase's specification and rule 2 names the sequence "used for RANGE evaluation", while a
       *>      singleton is compared by 8.8.4.5.3 GR2's ordinary relation rules (under the PCS). WS-C = "C" is

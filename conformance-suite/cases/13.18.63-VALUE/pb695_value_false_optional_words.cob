@@ -24,7 +24,7 @@
       *> CN-BARE and CN-ORDER are true and CN-RANGE (2 THRU 3) is false; with C1 = 3 CN-RANGE is true and
       *> CN-BARE is false. Literal-4 is the value 13.18.63.4 GR20 places in the conditional variable for
       *> `SET condition-name TO FALSE`. Only its SPELLING is under test HERE - the GR20 store itself is
-      *> tests/conformance/2002/pb555_value_false_phrase's subject (kb/Work PB555, which bound literal-4;
+      *> conformance-suite/cases/13.18.63-VALUE/pb555_value_false_phrase's subject (kb/Work PB555, which bound literal-4;
       *> this file predates that and used to say the phrase was accepted-inert). The three literal-4 values
       *> written below are all OUTSIDE their condition's VALUE set, so 13.18.63.3 SR27 is satisfied and this
       *> program stays a POSITIVE case: 0 against VALUE 1, 0 against VALUES 2 THRU 3, "Z" against

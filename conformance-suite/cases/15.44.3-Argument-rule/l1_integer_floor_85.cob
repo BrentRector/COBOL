@@ -7,7 +7,7 @@
       *> portable: unverified
       *>---
       *> ISO §15.44.4 r1 — FUNCTION INTEGER returns "the greatest integer less than or equal to the value of
-      *> argument-1", exercised at --std 85 (the edition leg conformance:2023/l1_integer_family_notes cannot
+      *> argument-1", exercised at --std 85 (the edition leg conformance:cases/15.42.3-Argument-rule/l1_integer_family_notes cannot
       *> reach: the OPTIONS paragraph's ARITHMETIC clause and FUNCTION FRACTION-PART are both post-85).
       *>
       *> WHY THIS ONE IS STILL NORMATIVE UNDER NATIVE ARITHMETIC, WHICH IS ALL COBOL-85 HAS. §15.4.1 makes a
@@ -40,9 +40,9 @@
       *> the native approximation IS the exact §15.49.4 r1 value, which is what these seven lines measure at
       *> --std 85 (each is an integer over an exact terminating-decimal argument, so any deviation changes the
       *> integer, not its precision). The same determination is what makes the pre-existing native-arithmetic
-      *> golden conformance:2023/pb2_float_argument_exact_family — no OPTIONS paragraph, so native — evidence
+      *> golden conformance:cases/15.7.4-Returned-value-rule/pb2_float_argument_exact_family — no OPTIONS paragraph, so native — evidence
       *> for INTEGER-PART(-3.5) = -3; item 92 names that golden as its pin. The strictly NORMATIVE pin for
-      *> §15.49.4 r1 remains the STANDARD-DECIMAL golden conformance:2023/l1_integer_family_notes, where
+      *> §15.49.4 r1 remains the STANDARD-DECIMAL golden conformance:cases/15.42.3-Argument-rule/l1_integer_family_notes, where
       *> §15.4.1 rule 1 makes equality mandatory; this file adds the 85 edition leg the row otherwise leaves
       *> unmeasured.
       *>

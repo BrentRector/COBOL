@@ -8,7 +8,7 @@
 *> returning item (the sender, here described N1164BASE) into the activating one (the receiver, here described
 *> N1164DERV). SET SR12 a)2. admits a sender of the receiver's class or a SUBCLASS of it, so a SUPERCLASS-typed
 *> sender into a subclass-typed receiver is not admitted: COBOLNET1736 names 14.8.3.3. (The widening direction,
-*> subclass into superclass or universal, is the positive half tests/conformance/2002/pb1164_call_returning_set_rule.cob.)
+*> subclass into superclass or universal, is the positive half conformance-suite/cases/14.8.3.3-Elementary-items/pb1164_call_returning_set_rule.cob.)
 IDENTIFICATION DIVISION.
 CLASS-ID. N1164BASE INHERITS FROM BASE.
 ENVIRONMENT DIVISION.

@@ -40,7 +40,7 @@
       *> not create FN, so L3's OPEN of the same file is '35' again.
       *> (The destructive direction - a '61' sharing refusal leaves the
       *> file's content intact - is
-      *> conformance:2002/pb321_table19_open_arbitration.) The
+      *> conformance:cases/12.4.5.15-SHARING/pb321_table19_open_arbitration.) The
       *> exception-checking PERFORM is a COBOL-2023 introduction
       *> (perform-exception-checking-2023), so this golden runs at 2023.
        IDENTIFICATION DIVISION.

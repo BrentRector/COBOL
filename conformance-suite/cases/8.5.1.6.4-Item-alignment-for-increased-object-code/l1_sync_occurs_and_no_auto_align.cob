@@ -47,7 +47,7 @@
       *> and applied that per occurrence answers SUBORD=12, and one that
       *> applied it to the first occurrence only answers SUBORD=10. The
       *> vacuity itself is earned elsewhere, by the SYNC=3 leg of the shipped
-      *> conformance:2002/l1_byte_length_implicit_filler, which rules out a
+      *> conformance:cases/8.5.1.6.4-Item-alignment-for-increased-object-code/l1_byte_length_implicit_filler, which rules out a
       *> 2-byte alignment for exactly this carrier.
       *>
       *> THE NUMBERS.
@@ -89,7 +89,7 @@
       *>   a length CAN see: a policy that padded a record out to a natural
       *>   boundary would answer 4 or 8. Where a record-level rule would
       *>   really show is the file-record legs of
-      *>   conformance:2023/l1_sync_file_record, which answer 4/4 with no
+      *>   conformance:cases/13.18.55-SYNCHRONIZED/l1_sync_file_record, which answer 4/4 with no
       *>   padding.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1SYN04.

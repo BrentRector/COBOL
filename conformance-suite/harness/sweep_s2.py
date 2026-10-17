@@ -5,7 +5,8 @@
 
 ⛔ A ONE-TIME TOOL, deleted with convert_s2.py before the move lands. `<map.json>` is convert_s2.py's `--map` output
 (old `<edition|negative>/<name>` -> new suite path). In every tracked text file outside the history (DEVLOG/,
-adjudication/, a kb/Work note that is no longer open) and outside the suite itself and the converters, it rewrites
+adjudication/, a kb/Work note that is no longer open) and outside the converters and their map (a moved test's own
+comments that name a sibling by its former path included: a comment, so no verdict moves), it rewrites
   tests/conformance/<dir>/<name>[.cob|.out|.err]  ->  conformance-suite/<tree>/<folder>/<id>[.cob|.out]
   conformance:<dir>/<name>                         ->  conformance:<tree>/<folder>/<id>
 and prints every `tests/conformance` mention it could not map (a glob, a directory, a copybook), for a hand edit.
@@ -20,10 +21,13 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-PATH_REF = re.compile(r"tests/conformance/(85|2002|2014|2023|negative)/([A-Za-z0-9_-]+)(\.(?:cob|out|err))?(?![A-Za-z0-9_.-])")
+# A sentence may end right after the name or its extension ("... is tests/conformance/85/x.cob."), so a trailing
+# '.' never blocks the match (the first sweep's `(?![A-Za-z0-9_.-])` left 97 such mentions in the suite alone).
+PATH_REF = re.compile(r"tests/conformance/(85|2002|2014|2023|negative)/([A-Za-z0-9_-]+)(\.(?:cob|out|err))?(?![A-Za-z0-9_-])")
 INV_REF = re.compile(r"conformance:(85|2002|2014|2023|negative)/([A-Za-z0-9_-]+)(?![A-Za-z0-9_-])")
-SKIP_PREFIXES = ("DEVLOG/", "adjudication/", "conformance-suite/", "tests/version-matrix/traceability-inventory.json",
-                 "specs/", "evidence/")
+SKIP_PREFIXES = ("DEVLOG/", "adjudication/", "conformance-suite/harness/convert_s2.py",
+                 "conformance-suite/harness/sweep_s2.py", "conformance-suite/harness/s2-map.json",
+                 "tests/version-matrix/traceability-inventory.json", "specs/", "docs/rearchitecture/evidence/")
 OPEN = re.compile(r"(?m)^status:\s*(open|in-progress|blocked)\s*$")
 
 
@@ -40,7 +44,7 @@ def main() -> int:
         if not rel or rel.startswith(SKIP_PREFIXES):
             continue
         path = REPO / rel
-        if path.suffix.lower() not in (".md", ".cs", ".py", ".ps1", ".sh", ".yml", ".yaml", ".json", ".txt", ".g4",
+        if path.suffix.lower() not in (".md", ".cs", ".py", ".ps1", ".sh", ".yml", ".yaml", ".json", ".txt", ".g4", ".cbl", ".cpy",
                                        ".cob", ".base", ".js"):
             continue
         try:

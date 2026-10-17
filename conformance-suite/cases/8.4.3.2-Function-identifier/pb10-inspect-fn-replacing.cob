@@ -11,7 +11,7 @@
 *> sending. GR7 replaces matched characters IN identifier-1, so it is a RECEIVING operand.
 *> 8.4.3.2.3 SR1: "A function-identifier shall not be specified as a receiving operand."
 *> The SENDING format (Format 1, TALLYING only) IS legal and is pinned by the positive golden
-*> conformance:2023/pb10_function_identifier_sending.
+*> conformance:cases/8.4.3.1-Identifier/pb10_function_identifier_sending.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. NEGPB10INSP.
 DATA DIVISION.

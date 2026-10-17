@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB589's positive shape (tests/conformance/2002/pb589_bool_refmod_width) below its introducing
+      *> kb/Work PB589's positive shape (conformance-suite/cases/14.9.8-COMPUTE/pb589_bool_refmod_width) below its introducing
       *> edition: the boolean operators and category-boolean items are COBOL-2002 introductions (ISO 8.7.2 /
       *> 8.8.2), so a run-time-length boolean slice combined by B-OR is rejected at 85 with the edition-band code.
        IDENTIFICATION DIVISION.

@@ -14,7 +14,7 @@
       *> --check 8.4.3.3.4 -> OK 8.4.3.3.4 5) c)). 14.8.2.2 rule 1: "the formal parameter shall be described
       *> with the same number or a smaller number of bytes as the corresponding argument" (OK 14.8.2.2 1)),
       *> and a smaller formal sees the argument's leading positions (14.2.3 GR8, OK 14.2.3 8)). The match
-      *> of a slice with a group formal is the reading conformance:2002/pb480_universal_match_relations
+      *> of a slice with a group formal is the reading conformance:cases/9.3.6-Method-invocation/pb480_universal_match_relations
       *> pins for its TP leg (kb/Work for the PIC X(n) question: review D finding 5). Before the fix a
       *> non-literal length or an omitted one described the slice as 0 positions: EC-OO-UNIVERSAL.
       *> DERIVATION (X = "ABCDEFGHIJ" before each leg; TG's formal is a 4-character group):

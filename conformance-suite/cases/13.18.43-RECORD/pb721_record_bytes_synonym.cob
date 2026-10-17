@@ -22,7 +22,7 @@
       *> has been expanded", and 8.10 gives BYTES exactly ONE construct - the RECORD
       *> clause - so there is no earlier context for the second arm to name. Below 2023
       *> it is refused COBOLNET0900; that is
-      *> tests/conformance/negative/pb721-record-bytes-below-2023.cob.
+      *> conformance-suite/cases/13.18.43-RECORD/pb721-record-bytes-below-2023.cob.
       *>
       *> THE COMPLEMENT IS THE OTHER HALF OF THE RULE, and it is why WS-BYTES is here.
       *> 8.10 lists BYTES as a CONTEXT-SENSITIVE word whose construct is the "RECORD
@@ -32,7 +32,7 @@
       *> user-defined word." It is absent from 8.9's reserved-word list at every
       *> supported edition, so `01 WS-BYTES` and a table named BYTES are legal source
       *> that a hard keyword would have broken. That half is edition-INVARIANT, and its
-      *> COBOL-85 witness is tests/conformance/85/pb721_bytes_user_word_85.cob: the
+      *> COBOL-85 witness is conformance-suite/cases/_unassigned/pb721_bytes_user_word_85.cob: the
       *> clause is gated, the word is not.
       *>
       *> EXPECTED VALUES: the clauses are declarations, so the observable is that the

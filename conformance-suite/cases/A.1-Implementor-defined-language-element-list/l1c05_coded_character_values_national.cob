@@ -25,7 +25,7 @@
       *> The documented choice pinned (docs/CONFORMANCE.md DOC-A.1-32):
       *>   the national values are the SAME code units as the
       *>   alphanumeric ones
-      *>   (conformance:85/l1c05_coded_character_values), and the
+      *>   (conformance:cases/A.1-Implementor-defined-language-element-list/l1c05_coded_character_values), and the
       *>   floating-point editing E is U+0045. ORD = code unit + 1 in
       *>   both native sets (docs/CONFORMANCE.md DOC-A.1-8).
       *> Derivation (ORD, decimal):

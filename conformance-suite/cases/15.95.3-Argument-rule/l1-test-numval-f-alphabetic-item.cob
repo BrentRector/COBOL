@@ -22,7 +22,7 @@
       *> class its member and routed a PIC A item to it through PicInfo.IsAlphabetic — the datum MoveTable16
       *> and INITIALIZE's §14.9.20 GR5c category matching had been reading all along.
       *>
-      *> THE ADMIT SIDE IS conformance:2002/l1_test_numval_f_class_screen, which requires a value from a
+      *> THE ADMIT SIDE IS conformance:cases/15.95.3-Argument-rule/l1_test_numval_f_class_screen, which requires a value from a
       *> numeric-edited item and from a group item. Both are class alphanumeric by Table 2, so a screen that
       *> closed this hole by narrowing to CATEGORY alphanumeric would turn this fixture green and that one
       *> red — the pair is the measurement, neither half alone.

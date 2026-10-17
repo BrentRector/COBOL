@@ -27,7 +27,7 @@
       *>      implicit INITIALIZE statement." PRE-NE is the "only" half: on entry LA holds the 9.0 the caller left
       *>      in the argument, NOT the VALUE clause's 0.1. SAME is the operative half, after the INITIALIZE.
       *> FLOAT-LONG is COBOL-2002 (13.18.60.2); the edition floor for the TO VALUE vehicle is already witnessed by
-      *> conformance:negative/pb420-initialize-float-to-value-85.
+      *> conformance:cases/14.9.20-INITIALIZE/pb420-initialize-float-to-value-85.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB576FLV.
        DATA DIVISION.

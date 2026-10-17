@@ -11,7 +11,7 @@
       *> 8.5.2.1 makes the class of a strongly-typed group its type-name (cite.py --check 8.5.2.1 "Both the class and the
       *> category of a strongly-typed group item are the type-name specified in the TYPE clause" -> OK), so the group is
       *> not class numeric here however numeric its leaf is. This is the boundary kb/Work PB1901 pins: a strong group is
-      *> legal for the string-argument functions (conformance:2002/pb1901_strong_group_pointer_leaf_string_argument)
+      *> legal for the string-argument functions (conformance:cases/_unassigned/pb1901_strong_group_pointer_leaf_string_argument)
       *> and refused for the numeric ones.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1901NEG1.

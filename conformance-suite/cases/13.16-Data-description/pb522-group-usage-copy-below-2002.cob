@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB522 — the NEGATIVE twin of tests/conformance/2002/pb522_group_usage_travels_with_the_description.
+      *> kb/Work PB522 — the NEGATIVE twin of conformance-suite/cases/8.5.2.5-Boolean-category/pb522_group_usage_travels_with_the_description.
       *> The clause whose travel that golden pins is a COBOL-2002 introduction, so the whole construct is refused
       *> below it: GROUP-USAGE (ISO §13.18.29) with the TYPEDEF/TYPE family (§13.18.58 / §13.18.57) and SAME AS
       *> (§13.18.49) — none of which exists in COBOL-85 — each gated by COBOLNET0900 at --std 85.

@@ -14,7 +14,7 @@
 *> MOVE national -> national-edited is legal and pinned by
 *> conformance:{2002,2014,2023}/pb492_national_edited.
 *> reject-at omits 85 because the DECLARATION is already a COBOL-2002 introduction there
-*> (conformance:negative/pb492-national-edited-at-85, COBOLNET0900) - a different rule and code.
+*> (conformance:cases/13.18.40-PICTURE/pb492-national-edited-at-85, COBOLNET0900) - a different rule and code.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB492T16.
 DATA DIVISION.

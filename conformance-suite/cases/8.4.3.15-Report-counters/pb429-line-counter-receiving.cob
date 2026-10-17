@@ -10,7 +10,7 @@
 *> integer data item may appear." SR3 then removes exactly one of them from one position:
 *> "LINE-COUNTER shall not be referenced as a receiving operand."
 *>
-*> This is the COMPLEMENT of conformance:85/pb429_page_counter_receiving, and it is what makes that golden
+*> This is the COMPLEMENT of conformance:cases/8.4.3.1-Identifier/pb429_page_counter_receiving, and it is what makes that golden
 *> mean something: the two counters travel the same grammar, the same resolver and the same receiving
 *> chokepoint, so a compiler that admitted PAGE-COUNTER by weakening the receiving screen would admit this
 *> too. The rule is edition-invariant — the counters and SR3 are in the '85 standard unchanged — so every

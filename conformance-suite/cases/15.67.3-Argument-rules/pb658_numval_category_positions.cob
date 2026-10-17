@@ -12,7 +12,7 @@
       *> alphanumeric whatever the underlying item was. TEST-NUMVAL (15.93.3 r1) is CLASS-worded, "a data item of
       *> class alphanumeric or national", so Table 2's class alphanumeric admits the numeric-edited item itself.
       *> ED holds " 25"; GRP holds " 7   "; WX holds "  12  ". The expected NUMVAL values are those digits.
-      *> The reject side is conformance:negative/pb658-numval-numeric-edited-argument.
+      *> The reject side is conformance:cases/15.67.3-Argument-rules/pb658-numval-numeric-edited-argument.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB658POS.
        DATA DIVISION.

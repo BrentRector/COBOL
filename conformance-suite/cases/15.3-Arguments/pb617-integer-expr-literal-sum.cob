@@ -10,7 +10,7 @@
 *> 15.15.3 1)). 1.5 + 1 is an arithmetic expression (8.8.1.1) whose value is 2.5 for every execution, so
 *> it never results in an integer. Before the fix the always-integral screen's additive walk accumulated
 *> DATA ITEMS only; a literal's fraction never entered it, so this compiled clean while the bare
-*> CHAR(1.5) was refused (COBOLNET1627). The admitted twin is conformance:85/pb617_integer_arg_literal_constant.
+*> CHAR(1.5) was refused (COBOLNET1627). The admitted twin is conformance:wiseowl/cases/15.3-Arguments/pb617_integer_arg_literal_constant.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. NEGPB617LITSUM.
 DATA DIVISION.

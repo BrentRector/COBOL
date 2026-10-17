@@ -43,13 +43,13 @@
       *> !AnyDecOrRealRaw(ic)) return null;` — routes MOD/REM to their Dec bodies ONLY then. With two plain
       *> PIC S9(9) items, OPTIONS ARITHMETIC IS STANDARD-DECIMAL alone falls straight back to ModScaled and
       *> this unit would re-measure statements 1-5 while claiming a third carrier. The shape is the one
-      *> conformance:2023/pb32_dec_carrier_intrinsic_argument already proves compiles and computes
+      *> conformance:cases/15.81.4-Returned-value-rule/pb32_dec_carrier_intrinsic_argument already proves compiles and computes
       *> (`FUNCTION MOD(J + 10, 7)` under the same OPTIONS); here it carries the zero divisor.
       *>
       *> §11.9.5.2 GR3 puts the ARITHMETIC clause of §11.9.5.1 in effect for the source element that writes
       *> it, and GR4 makes the absence of the clause equivalent to NATIVE — which is why the two units are
       *> two source elements rather than one. The single >>TURN covers both (the same arrangement as
-      *> conformance:2023/pb133_arg_mismatch_checked).
+      *> conformance:cases/14.9.4-CALL/pb133_arg_mismatch_checked).
       *>
       *> FIVE ZERO SHAPES, because argument-2's zero-ness is a property of its VALUE, not of how it was
       *> written: a VALUE-0 item, a zero produced by run-time arithmetic, a floating-point zero, and the

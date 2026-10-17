@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB1781 - the NEGATIVE twin of tests/conformance/2002/pb1781_universal_group_crossing.
+      *> kb/Work PB1781 - the NEGATIVE twin of conformance-suite/cases/_unassigned/pb1781_universal_group_crossing.
       *> Object orientation - CLASS-ID, USAGE OBJECT REFERENCE and the INVOKE statement (ISO 13.18.60, 14.9.23) - is
       *> a COBOL-2002 introduction that does not exist in COBOL-85, so the program is rejected at --std 85, gated by
       *> COBOLNET0900.

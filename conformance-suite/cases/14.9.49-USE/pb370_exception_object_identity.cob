@@ -15,7 +15,7 @@
       *> instance of the same class: a register set to SELF, to a fresh
       *> instance, to the first object ever raised or to any other
       *> non-null object fails one of the two comparisons (a NOT = NULL
-      *> test, which conformance:2002/oo_ec_raise_object makes, passes
+      *> test, which conformance:cases/14.6.13.1.5-Exception-objects/oo_ec_raise_object makes, passes
       *> all of them).
       *>   P1  RAISE E1 in the program: EQ-E1 and NE-E2.
       *>   P2  RAISE E2 next: NE-E1 and EQ-E2 - the register follows the

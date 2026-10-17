@@ -22,7 +22,7 @@
       *> value with no exception condition, never mere over-acceptance.
       *>
       *> THE FORMAT IS AN OFFSET FORMAT, which is what §15.40.3 r6 requires before argument-4 may be written
-      *> at all (its violation is conformance:negative/l1-formatted-datetime-offset-local-format). §15.40.4
+      *> at all (its violation is conformance:cases/15.40.3-Argument-rules/l1-formatted-datetime-offset-local-format). §15.40.4
       *> r3 then fixes the expectation without any arithmetic: "the value in argument-3 is reflected DIRECTLY
       *> in the time portion of the returned value, and the offset in argument-4 is reflected DIRECTLY in the
       *> offset portion" — so the time never moves and only the offset field changes across the five probes.

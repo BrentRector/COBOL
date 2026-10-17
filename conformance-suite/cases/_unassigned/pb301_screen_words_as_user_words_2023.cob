@@ -9,7 +9,7 @@
       *> CONTEXT-SENSITIVE ("screen description entry", and for BELL, BLINK, HIGHLIGHT, LOWLIGHT, REVERSE-VIDEO
       *> and UNDERLINE also "SET attribute statement"), and 8.9 reserves NONE of them at ANY edition - so
       *> 8.3.2.1 rule 3 makes every one a legal user-defined word here, exactly as at COBOL-85
-      *> (tests/conformance/85/pb301_screen_words_as_user_words). This is the twin that would catch a
+      *> (conformance-suite/cases/_unassigned/pb301_screen_words_as_user_words_85). This is the twin that would catch a
       *> reservation gate applied to the wrong axis: a word this compiler tokenizes for a DECLINED module is
       *> still the user's to name, and the SCREEN-position complement - the same words still recognized in
       *> their own clause and refused BY NAME - is the a42-screen-* negative set.

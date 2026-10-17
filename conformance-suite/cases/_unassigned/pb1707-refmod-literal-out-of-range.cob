@@ -11,7 +11,7 @@
       *> cite.py OK) lets the compiler produce no code for a fatal condition it detects, and the positions
       *> being integer literals over an item of fixed size, it does (COBOLNET2670, as GnuCOBOL refuses
       *> "length of 'CX' out of bounds"). With checking enabled the same statement is COBOLNET2671, a
-      *> warning, and compiles: conformance:2023/l1_fatal_ec_runtime_detection.
+      *> warning, and compiles: conformance:cases/A.1-Implementor-defined-language-element-list/l1_fatal_ec_runtime_detection.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. NEGRMLIT.
        DATA DIVISION.

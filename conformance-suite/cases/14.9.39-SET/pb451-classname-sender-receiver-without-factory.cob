@@ -13,7 +13,7 @@
       *> Before kb/Work PB389 this program was refused because FACTORY OF could not be
       *> DECLARED at all; the rejection is now the rule's, and the conforming spelling
       *> (`01 F … FACTORY OF …C ONLY.` + `SET F TO …C.`) runs — see
-      *> conformance:2002/pb451_set_format5_class_name_sender.
+      *> conformance:cases/13.18.60-USAGE/pb451_set_format5_class_name_sender.
 
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB451N3.

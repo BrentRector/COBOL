@@ -15,8 +15,8 @@
       *> Written at EVERY edition the row spans (85 through 2023): the argument rule's text is unchanged
       *> across them, so an enforcement that reached only the post-85 compilers would be a defect this
       *> fixture catches. The complementary shape — class INDEX, which is also not class numeric — is pinned
-      *> by conformance:negative/intrinsic-index-argument, and the ACCEPT side by
-      *> conformance:85/l1_integer_floor_85 and conformance:2023/l1_integer_family_notes.
+      *> by conformance:cases/15.3-Arguments/intrinsic-index-argument, and the ACCEPT side by
+      *> conformance:cases/15.44.3-Argument-rule/l1_integer_floor_85 and conformance:cases/15.42.3-Argument-rule/l1_integer_family_notes.
       *> Expected: COBOLNET1627, the intrinsic-argument-class diagnostic.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1INTCLASS.

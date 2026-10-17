@@ -12,7 +12,7 @@
       *>
       *> THE CONDITION IS LOAD-BEARING, so this fixture is only half the evidence. The IDENTICAL item under
       *> the default NATIVE arithmetic (§11.9.5.2 GR4 — no ARITHMETIC clause, so NATIVE) is LEGAL and folds:
-      *> conformance:2023/l1_lowest_algebraic_value_rule, the line "FB64-NATIVE=OK". A compiler that simply
+      *> conformance:cases/15.58.3-Argument-rules/l1_lowest_algebraic_value_rule, the line "FB64-NATIVE=OK". A compiler that simply
       *> refused every floating-point argument would pass THIS case and fail that one.
       *>
       *> ⚠ reject-at omits 85 and 2002: ARITHMETIC IS STANDARD-DECIMAL and USAGE FLOAT-BINARY-64 are both

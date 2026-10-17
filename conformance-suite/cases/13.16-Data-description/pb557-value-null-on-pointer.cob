@@ -11,7 +11,7 @@
 *> predefined content of class message-tag", an identifier under 8.4.3, not a literal.
 *> Nothing is lost by the prohibition: 13.18.63.4 GR4 - "data items of class message-tag, class object, and
 *> class pointer are initialized to null" - already gives the item this value with no clause written, which
-*> tests/conformance/2002/pb557_pointer_class_initial_value_is_null pins. (COBOLNET2168)
+*> conformance-suite/cases/13.18.63-VALUE/pb557_pointer_class_initial_value_is_null pins. (COBOLNET2168)
 *> MEASURED BEFORE: rc=70 with no COBOL diagnostic at all - the raw literal text reached the record-struct
 *> initializer and Roslyn reported `CS0029: Cannot implicitly convert type 'string' to
 *> 'CobolNet.Runtime.ManagedPointer'`, naming a generated .g.cs file.

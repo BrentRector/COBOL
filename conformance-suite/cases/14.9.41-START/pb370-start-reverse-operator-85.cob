@@ -15,7 +15,7 @@
       *> visible in their first word: NOT GREATER (a NOT that turns a
       *> forward word into a reverse operator) and the symbol <=. The
       *> forward spellings (NOT LESS, NOT <) stay legal at 85:
-      *> conformance:85/pb370_start_forward_operators.
+      *> conformance:cases/14.9.41-START/pb370_start_forward_operators.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB370NR.
        ENVIRONMENT DIVISION.

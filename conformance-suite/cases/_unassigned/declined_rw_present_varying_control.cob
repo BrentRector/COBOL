@@ -11,7 +11,7 @@
       *> legs are told apart by WHERE the clause is written, not by how it is spelled, so a change that
       *> reached the report-group forms would silently decline a CLAIMED facility. This program writes both
       *> clauses in a REPORT GROUP at the default edition and asserts they still compile AND still produce
-      *> their values; conformance:negative/declined-validate-present-when and -varying are its complement.
+      *> their values; conformance:cases/13.18.41-PRESENT-WHEN/declined-validate-present-when and -varying are its complement.
       *> (tests/conformance/2002/rw_present_when.cob is the same shape at 2002 and stays the 2002 leg.)
       *> PLACEMENT (kb/Work PB484). The report's FIRST printed line is the first line of the file:
       *> a line number IS a page line number (ISO 13.18.35.4 GR6 - "the report's LINE-COUNTER is set

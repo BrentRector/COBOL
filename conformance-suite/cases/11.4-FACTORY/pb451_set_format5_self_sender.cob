@@ -65,7 +65,7 @@
       *>    proves the SET cleared it rather than reporting an initial value.
       *>
       *> The rejecting arms are fixtures, one clause each:
-      *> conformance:negative/pb451-self-sender-factory-method-instance-receiver (SR12 c)3.),
+      *> conformance:cases/14.9.39-SET/pb451-self-sender-factory-method-instance-receiver (SR12 c)3.),
       *> …-self-sender-instance-method-factory-receiver (SR12 c)4.),
       *> …-active-class-receiver-in-factory-method (SR14 b)1.),
       *> …-active-class-factory-receiver-in-instance-method (SR14 b)2.),

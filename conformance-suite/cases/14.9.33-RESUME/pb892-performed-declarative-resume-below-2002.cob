@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb892_performed_declarative_resume
+      *> The REJECT half of conformance:cases/14.9.33-RESUME/pb892_performed_declarative_resume
       *> (kb/Work PB892). RESUME (ISO 14.9.33), USE AFTER EXCEPTION
       *> CONDITION (14.9.49) and the >>TURN directive (7.3.25) are all
       *> ISO/IEC 1989:2002 introductions, so at COBOL-85 this source does

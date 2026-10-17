@@ -7,7 +7,7 @@
 *>---
       *> kb/Work PB301 - the COBOL-2002 leg of the screen-word rule. ISO 8.9 adds COL, COLS, COLUMNS,
       *> CRT, CURSOR and SCREEN at this edition (the reservation gate withdraws them here - the negative
-      *> lane tests/conformance/negative/pb301-screen-words-reserved-from-2002 is the same six declared
+      *> lane conformance-suite/cases/8.3.2-COBOL-words/pb301-screen-words-reserved-from-2002 is the same six declared
       *> and rejected at 2002/2014/2023), while 8.10's fifteen screen words are reserved NOWHERE at any
       *> edition, so 8.3.2.1 rule 3 keeps every one of them a legal user-defined word here. The three
       *> post-85 editions agree word for word; they get their own lane because the gate is GENERATED per

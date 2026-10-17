@@ -5,7 +5,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB461 - the SAME level-88 round trip as tests/conformance/85/pb461_all_literal_value_roundtrip_85,
+      *> kb/Work PB461 - the SAME level-88 round trip as conformance-suite/cases/14.9.39-SET/pb461_all_literal_value_roundtrip_85,
       *> over the categories COBOL-2002 introduced. ISO 8.3.3.6.3 SR2 admits an alphanumeric, boolean OR national
       *> literal-1 in Format 6, so the ALL-literal rule has to reach all three; 8.3.3.6.4 GR2 sizes each in the
       *> conditional variable's OWN positions (national positions for a PIC N item, boolean positions for a PIC 1

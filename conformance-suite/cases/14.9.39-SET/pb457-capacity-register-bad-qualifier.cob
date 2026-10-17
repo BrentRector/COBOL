@@ -8,7 +8,7 @@
       *> PERMITTED (8.4.2.2.3 SR2 - "A name may be qualified even though it does not need qualification") and
       *> SR30 says where the register sits, so OTHER-G - which is not in WS-CAP's hierarchy - is not a legal
       *> qualifier: SR4 requires qualifiers "in the order of successively more inclusive levels in the
-      *> hierarchy". Contrast tests/conformance/2014/pb457_capacity_register_qualified.cob, the positive half.
+      *> hierarchy". Contrast conformance-suite/cases/14.9.39-SET/pb457_capacity_register_qualified.cob, the positive half.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB457-CAP-QBAD.
        DATA DIVISION.

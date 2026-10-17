@@ -58,7 +58,7 @@
       *>    conformance-test:ExceptionConditionConformanceTests.UseF3_UseProcedureIsTheWholeSection_
       *>    ThenGr13bTerminates, which cannot live here because its run does not end normally.
       *>  . NOTHING here is edition-specific except the spelling: the 85 witness of the same rule is
-      *>    tests/conformance/85/pb367_use_procedure_is_the_section_85.cob, which reaches D1's return
+      *>    conformance-suite/cases/14.9.49-USE/pb367_use_procedure_is_the_section_85.cob, which reaches D1's return
       *>    through 14.9.14.4 GR2 (EXIT PROGRAM outside a calling runtime element is a CONTINUE)
       *>    because EXIT SECTION and the EXCEPTION CONDITION format are both 2002-and-later.
        >>TURN EC-BOUND-SUBSCRIPT CHECKING ON

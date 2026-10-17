@@ -11,7 +11,7 @@
       *>   cite.py: OK  §14.9.46.3 3)  (Syntax rules)
       *> The TERMINATE R-A R-B in imperative-statement-1 names two
       *> reports; everything else is legal (the single-name companion
-      *> conformance:2023/l1c33_terminate_single_in_exc_perform compiles
+      *> conformance:cases/14.9.46-TERMINATE/l1c33_terminate_single_in_exc_perform compiles
       *> and runs with the same PERFORM shape). Expected: COBOLNET1606.
       *> EDITION: the exception-checking PERFORM is COBOL-2023.
        IDENTIFICATION DIVISION.

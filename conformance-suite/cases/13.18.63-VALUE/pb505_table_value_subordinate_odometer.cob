@@ -12,7 +12,7 @@
       *> 13.18.63.3 SR18/SR20/SR21 and 13.18.63.4 GR12-GR15 carry no version proviso, so the subordinate
       *> arm and the multi-dimension odometer behave here exactly as they do at 2023.  The dynamic-capacity
       *> legs of the 2023 golden are deliberately absent: OCCURS DYNAMIC is a 2014 construct.
-      *> EXPECTED, derived from the spec (see tests/conformance/2023/pb505_table_value_geometry.cob for the
+      *> EXPECTED, derived from the spec (see conformance-suite/cases/13.18.63-VALUE/pb505_table_value_geometry.cob for the
       *> quoted rules):
       *>   1[AB|CD|AB]  SR18's subordinate arm + GR14's implied TO (3) + GR13's cyclic reuse
       *>   2[123|456]   GR12's odometer over a 2x3 table

@@ -37,9 +37,9 @@
       *>
       *> THE RULE'S THIRD MODE IS NOT SILENTLY SKIPPED. Both GR1 and GR7 name standard-decimal AND
       *> standard-binary arithmetic. The standard-decimal clause is pinned by the twin
-      *> conformance:2014/l1_divide_quotient_remainder_standard_decimal (the same six statements, the same
+      *> conformance:cases/14.9.12-DIVIDE/l1_divide_quotient_remainder_standard_decimal (the same six statements, the same
       *> derived values, under ARITHMETIC IS STANDARD-DECIMAL); the standard-binary clause is refused by
-      *> name — conformance:negative/l1-divide-arithmetic-standard-binary — under the §4.2.6
+      *> name — conformance:cases/14.9.12-DIVIDE/l1-divide-arithmetic-standard-binary — under the §4.2.6
       *> processor-dependence decline recorded in docs/CONFORMANCE.md §2 row 2, so that clause is
       *> UNREACHABLE rather than unverified.
        IDENTIFICATION DIVISION.

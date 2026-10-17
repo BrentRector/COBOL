@@ -43,7 +43,7 @@
       *>    reference to hold — "the factory object of the specified class", that class and no
       *>    subclass.  INVOKE FO "TAG" is therefore:                                  FTAG-B
       *>    DISCRIMINATOR: the same receiver with PB451D as the sender is refused — fixture
-      *>    conformance:negative/pb451-classname-sender-only-receiver-subclass.
+      *>    conformance:cases/13.18.60-USAGE/pb451-classname-sender-only-receiver-subclass.
       *>
       *> 4. SET F1 F2 TO PB451D — GR10's multi-receiver form, "placed into EACH data item
       *>    referenced by identifier-3 in the order specified", over receivers described

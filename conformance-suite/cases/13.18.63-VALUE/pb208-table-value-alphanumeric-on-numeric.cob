@@ -11,7 +11,7 @@
       *> ("Syntax rules 10, 11,12,13,14,and 15 above apply"), so a table VALUE literal is governed exactly as
       *> a format 1 one.  It was not: DataBinder.BuildTableValueSpecs' per-occurrence literals never reached
       *> ValidateValueCategory, so THIS program compiled CLEAN at strict 2023 (and seeded zeros) while its
-      *> format 1 twin - tests/conformance/negative/pb94-value-alphanumeric-on-numeric.cob - was COBOLNET1657.
+      *> format 1 twin - conformance-suite/cases/13.18.63-VALUE/pb94-value-alphanumeric-on-numeric.cob - was COBOLNET1657.
       *> One funnel now serves both formats (DataBinder.ScreenValueLiteral).
       *>
       *> ALL FOUR EDITIONS reject, and COBOLNET1657 is present at every one of them: SR2 is edition-

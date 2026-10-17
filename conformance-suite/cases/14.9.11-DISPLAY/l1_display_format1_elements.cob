@@ -21,15 +21,15 @@
       *>     any neighbouring item.
       *>   · WITH is NOT underlined, so `NO ADVANCING` without it is the same statement (§5.2.3).
       *>   · END-DISPLAY is optional, so the same list is legal with and without it.
-      *> The UPON phrase's own element is pinned by conformance:2023/l1_display_standard_device, which
+      *> The UPON phrase's own element is pinned by conformance:cases/14.9.11-DISPLAY/l1_display_standard_device, which
       *> discriminates SYSERR from the standard display device; it is not repeated here.
       *>
       *> FORMAT 2 (screen) IS NOT EXERCISED, AND ITS ABSENCE IS DOCUMENTED, NOT MISSING. Annex A.4.2
       *> (ACCEPT and DISPLAY screen handling) is recorded "Not claimed" in docs/CONFORMANCE.md, and Annex
       *> A.4.1 admits an optional element's syntax "only when support for that language element is claimed
       *> by the implementor" — so screen-name-1, the AT LINE/COLUMN phrase and the [NOT] ON EXCEPTION pair
-      *> are refused BY NAME (COBOLNET1707), witnessed by conformance:negative/a42-display-screen-minimal
-      *> and conformance:negative/a42-display-screen-positioned.
+      *> are refused BY NAME (COBOLNET1707), witnessed by conformance:wiseowl/cases/14.9.11-DISPLAY/a42-display-screen-minimal
+      *> and conformance:wiseowl/cases/14.9.11-DISPLAY/a42-display-screen-positioned.
       *>
       *> DERIVED OUTPUT:
       *>   A=0042|abc   four operands: literal, PIC 9(4) item (stored digits), literal, PIC X(3) item.

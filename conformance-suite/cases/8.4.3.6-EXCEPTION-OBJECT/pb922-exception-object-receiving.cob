@@ -12,8 +12,8 @@
       *> COBOL-2023 and cannot be used as a user-defined word"): two diagnostics that contradict each other, and
       *> neither of them the rule the program broke.
       *> NOT rejected below 2002: there the word is an ordinary user-defined word and the same statement is
-      *> conforming source - tests/conformance/85/pb922_exception_object_user_word_85.cob is the witness.
-      *> Positive at the introducing edition: tests/conformance/2002/pb922_exception_object_reference.cob.
+      *> conforming source - conformance-suite/cases/_unassigned/pb922_exception_object_user_word_85.cob is the witness.
+      *> Positive at the introducing edition: conformance-suite/cases/8.4.3.1-Identifier/pb922_exception_object_reference.cob.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB922NEGRECV.
        DATA DIVISION.

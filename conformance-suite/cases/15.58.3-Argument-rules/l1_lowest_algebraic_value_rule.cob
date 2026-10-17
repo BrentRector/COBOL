@@ -36,7 +36,7 @@
       *> -(2 - 2**-52) x 2**1023 = -1.7976931348623157E+308. The bound is one-sided on purpose: any literal
       *> farther from zero than the carrier's own maximum (1.798E+308, say) is not a representable binary64
       *> literal, so a two-sided test cannot be written under this mode. The REJECT side of rule 2 is
-      *> conformance:negative/l1-lowest-algebraic-std-decimal-binary-float — the pair is what proves the bar
+      *> conformance:cases/15.58.3-Argument-rules/l1-lowest-algebraic-std-decimal-binary-float — the pair is what proves the bar
       *> is mode-conditional rather than a blanket refusal of floating-point arguments.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1LOWRV2.

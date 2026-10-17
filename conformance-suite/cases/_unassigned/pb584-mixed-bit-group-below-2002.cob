@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The NEGATIVE below the introducing edition of tests/conformance/2002/pb584_mixed_bit_group_image.
+      *> The NEGATIVE below the introducing edition of conformance-suite/cases/_unassigned/pb584_mixed_bit_group_image.
       *> The composition PB584 fixes is 8.5.1.6.3's ("an elementary bit data item immediately following an
       *> elementary bit data item or bit group item of the same level" shares a byte), and its antecedent is a
       *> data item of USAGE BIT - boolean data, which with the PICTURE symbol 1 is a COBOL-2002 introduction.

@@ -38,7 +38,7 @@
       *> filler), so the ceiling absorbs it in both functions. Here: TRAIL is 3 with the trailing run and 3
       *> without it (19 bits), ADJ3 is 2 either way (9 bits), NEST is 3 and 4 either way (17 and 25 bits).
       *> ⛔ AND THE SAME HOLDS FOR THE FUNCTION LENGTH GOLDEN OFTEN CREDITED WITH IT. The MIX=4 leg of
-      *> conformance:2023/pb43_usage_bit_occupies_bits does NOT discriminate source (b) either - W-MIX is 3 bytes
+      *> conformance:cases/13.18.60-USAGE/pb43_usage_bit_occupies_bits does NOT discriminate source (b) either - W-MIX is 3 bytes
       *> plus 5 bits, which is 4 character positions with the trailing filler and 4 without it, because r9 rounds.
       *> §15.50.4 r5 ("The returned length shall include the number of implicit FILLER positions, if any, in
       *> argument-1") is SATISFIED by that leg, not WITNESSED by it - a distinction worth writing down, because

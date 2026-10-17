@@ -7,9 +7,9 @@
 *>---
       *> kb/Work PB653 at COBOL-2014 -- THE EIGHT-MODE ROUNDED PHRASE REACHES AN EXPRESSION WITH A NESTED
       *> FLOAT OPERAND, AND IS APPLIED ONCE, AT THE RESULTANT IDENTIFIER. The whole substance of PB653 is the
-      *> 85 golden (tests/conformance/85/pb653_nested_float_operand); THIS edition adds the one thing 85 and
+      *> 85 golden (conformance-suite/cases/_unassigned/pb653_nested_float_operand); THIS edition adds the one thing 85 and
       *> 2002 cannot express -- the ROUNDED MODE IS phrase, a COBOL-2014 introduction (COBOLNET0803 below it;
-      *> the negative is tests/conformance/negative/pb653-nested-float-rounded-mode-below-2014).
+      *> the negative is conformance-suite/cases/_unassigned/pb653-nested-float-rounded-mode-below-2014).
       *>
       *> It is a real behaviour difference and not a syntax copy. While a NESTED float operand was quantized
       *> at the >=9 working scale with truncation, the operand reached the store ALREADY truncated at 9, the

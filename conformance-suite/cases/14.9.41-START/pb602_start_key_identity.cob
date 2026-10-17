@@ -8,7 +8,7 @@
       *> kb/Work PB602 - "SHALL BE THE DATA ITEM" IS AN IDENTITY OVER DATA ITEMS. This is the POSITIVE control
       *> for it: every form below IS the item its rule names, or is a reference whose identity the standard makes
       *> its own, and all of them must keep working. The refusals are
-      *> tests/conformance/negative/pb602-start-key-refmod-slice.cob and pb602-start-key-renames-alias.cob.
+      *> conformance-suite/cases/14.9.41-START/pb602-start-key-refmod-slice.cob and pb602-start-key-renames-alias.cob.
       *>
       *> ISO 14.9.41.3 SR5 - "For relative files, data-name-1, if specified, shall be the data item specified in
       *>   the RELATIVE KEY clause in the associated file control entry."

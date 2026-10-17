@@ -5,7 +5,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB2722 - the 2002 legs of tests/conformance/85/pb2722_evaluate_object_not_ownership: a NOT that
+      *> kb/Work PB2722 - the 2002 legs of conformance-suite/cases/14.9.13-EVALUATE/pb2722_evaluate_object_not_ownership: a NOT that
       *> begins partial-expression-1 is THAT expression's own, and NOT boolean-expression-2 is the bracketed NOT
       *> ISO 1989:2023 14.9.13.2 prints ("The bracketed `NOT` applies only to the first five alternatives, exactly as
       *> stacked"). 14.9.13.3 SR5: "A selection object is a partial-expression if the leftmost portion of the

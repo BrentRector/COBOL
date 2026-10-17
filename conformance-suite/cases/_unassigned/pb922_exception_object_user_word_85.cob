@@ -14,7 +14,7 @@
       *> for SR1 - "EXCEPTION-OBJECT shall not be specified as a receiving operand" - compared the spelling on
       *> its own, so `MOVE "ABCD" TO EXCEPTION-OBJECT` here drew COBOLNET2196: SR1 quoted at a program that
       *> references no register at all. The positive at the introducing edition is
-      *> tests/conformance/2002/pb922_exception_object_reference.cob.
+      *> conformance-suite/cases/8.4.3.1-Identifier/pb922_exception_object_reference.cob.
       *>
       *> EXPECTED OUTPUT, DERIVED FROM THE SPEC:
       *>

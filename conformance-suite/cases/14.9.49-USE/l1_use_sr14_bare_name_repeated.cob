@@ -20,7 +20,7 @@
       *> EC-I-O-AT-END - is LEGAL, and its OUTPUT is what GR3 prescribes: the FIRST section runs
       *> and the second never does. (The pair-scoped accepting complement is
       *> l1_use_sr14_pair_twice_one_statement; the rejecting half is
-      *> tests/conformance/negative/l1-use-sr14-pair-in-two-statements.)
+      *> conformance-suite/cases/14.9.49-USE/l1-use-sr14-pair-in-two-statements.)
       *> Placed in the 2002 corpus - the earliest edition with Format 3.
       *>
       *> DERIVATION - every expected line follows from the rule text, nothing from the compiler.

@@ -14,7 +14,7 @@
       *>     a boolean value according to the rules for evaluating boolean expressions." -> OK 3) d)
       *> A = 1100, C = 1010. A B-AND C = 1000, equal to B"1000": EV1-Y. A B-SHIFT-L 1 = 1000: EV2-Y (the shift
       *> operators are a 2023 introduction, so this is the 2023 leg; the 2002 leg is
-      *> tests/conformance/2002/pb1412_evaluate_boolean_expression_operands). A B-OR C = 1110, not B"1000": EV3-N.
+      *> conformance-suite/cases/8.8.2-Boolean-expressions/pb1412_evaluate_boolean_expression_operands). A B-OR C = 1110, not B"1000": EV3-N.
       *> Before the fix each drew COBOLNET1511 + COBOLNET1634: the subject was parsed as a condition and held to the
       *> simple-boolean-condition length-1 rule.
        IDENTIFICATION DIVISION.

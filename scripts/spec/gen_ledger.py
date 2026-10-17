@@ -50,7 +50,7 @@ account in the coordination directory, and this script prints it after a render 
                                                        tree, and every leg's measured result
     docs/VERSION_CHANGE_REFERENCE.md                   the anchor dispositions (todo · gated · ref-only · pinned)
     tests/version-matrix/constructs.json               the matrix registry size
-    tests/conformance/**                               the golden corpus, by edition
+    conformance-suite/ (its generator's reader)        the conformance suite: tests accepted by edition, refusals
     kb/Work, through ledger_plan.py                    what remains: the buckets, each note's lane (`.agent-fleet.json`'s
                                                        fix-lane population, the campaign and held clusters of the
                                                        owner's decision PB2911), the external repository's slices
@@ -110,7 +110,7 @@ CONSTRUCTS = REPO / "tests" / "version-matrix" / "constructs.json"
 CONFORMANCE = REPO / "docs" / "CONFORMANCE.md"
 PLAN = REPO / "docs" / "COBOLNET_REARCHITECTURE_PLAN.md"
 VCR = REPO / "docs" / "VERSION_CHANGE_REFERENCE.md"
-CORPUS = REPO / "tests" / "conformance"
+SUITE_HARNESS = REPO / "conformance-suite" / "harness"
 TREND = REPO / "docs" / "rearchitecture" / "evidence" / "ledger-trend.json"
 # The page is the orchestrator's: rendered into the coordination directory beside ledger-published.json, where the
 # units render it and the attended session publishes it (design section 14). Named without creating the directory.
@@ -363,24 +363,23 @@ def measure_battery(stamp_sha: str) -> dict:
             "since_code": int(since_code or 0), "owed": int(since_code or 0) > 0}
 
 
-def edition_order(name: str) -> int:
-    """`85` is COBOL-1985 and sorts FIRST — a plain string sort puts it after 2023, and a plain int sort puts it
-    in 85 AD. The corpus directories are named the way `--std` spells the editions, so the mapping lives here."""
-    v = int(name)
-    return v if v > 1900 else 1900 + v
-
-
-def measure_corpus() -> dict:
-    editions = {d.name: len(list(d.glob("*.out")))
-                for d in sorted(CORPUS.iterdir(), key=lambda p: edition_order(p.name) if p.name.isdigit() else 0)
-                if d.is_dir() and d.name != "negative"}
+def measure_suite() -> dict:
+    """The conformance suite as its generator reads it (`conformance-suite/harness/generate.py`, the one reader of a
+    test's header): the tests, the tests accepted at each edition (the schema's editions, ascending) and the
+    refusals `wiseowl/diagnostics.json` records; then the version matrix's registry and anchor counts."""
+    sys.path.insert(0, str(SUITE_HARNESS))
+    import generate  # noqa: PLC0415  (the suite's own reader; imported here, so only this measurement pays for it)
+    inputs, _ = generate.repository_inputs()
+    reader = generate.Reader(generate.SUITE, inputs)
+    reader.read_tree()
+    editions = {e: sum(1 for c in reader.cases if e in c.accept) for e in inputs.editions}
     vcr = VCR.read_text(encoding="utf-8")
     gate = [g for g in re.findall(r"<!--\s*gate:([A-Za-z0-9_\-]+)\s*-->", vcr)
             if g not in ("CONSTRUCT-ID", "id")]  # the two are the doc's own worked example, not anchors
     todo, ref, pin = vcr.count("<!-- todo -->"), vcr.count("<!-- ref-only -->"), vcr.count("<!-- pin-to-spec -->")
     return {
-        "positive": sum(editions.values()), "negative": len(list((CORPUS / "negative").glob("*.err"))),
-        "editions": editions,
+        "tests": len(reader.cases), "accepted": sum(1 for c in reader.cases if c.accept),
+        "refusals": len(inputs.diagnostics), "editions": editions,
         "constructs": len(json.loads(CONSTRUCTS.read_text(encoding="utf-8"))["constructs"]),
         "vcr_todo": todo, "vcr_gated": len(gate), "vcr_ref": ref, "vcr_pin": pin,
         "vcr_done": len(gate) + ref + pin, "vcr_total": len(gate) + ref + pin + todo,
@@ -925,7 +924,7 @@ def render_pacing(pacing: dict | None, burn: dict | None) -> str:
 
 
 def render(ctx: dict) -> str:
-    inv, wk, a1, cf, bat, cp = (ctx["inv"], ctx["work"], ctx["a1"], ctx["conf"], ctx["battery"], ctx["corpus"])
+    inv, wk, a1, cf, bat, cp = (ctx["inv"], ctx["work"], ctx["a1"], ctx["conf"], ctx["battery"], ctx["suite"])
     head, pts, plan, pacing, rem = ctx["head"], ctx["trend"], ctx["plan"], ctx["pacing"], ctx["remaining"]
     pct = 100.0 * inv["closed"] / inv["rows"]
     kinds = " · ".join(f'{n(v)} {k}' for k, v in inv["kind"].most_common())
@@ -994,8 +993,8 @@ def render(ctx: dict) -> str:
                         f'</span><span class="pill crit">{n(len(a1["findings"]))} FINDING(S)</span><span class="dim">')
                      + '</span>')),
         facilities=e(" · ".join(cf["facilities"])), facilities_n=n(len(cf["facilities"])),
-        corpus_pos=n(cp["positive"]), corpus_neg=n(cp["negative"]),
-        corpus_editions=e(" · ".join(f"{n(v)} ({k})" for k, v in cp["editions"].items())),
+        suite_tests=n(cp["tests"]), suite_accepted=n(cp["accepted"]), suite_refusals=n(cp["refusals"]),
+        suite_editions=e(" · ".join(f"{n(v)} ({k})" for k, v in cp["editions"].items())),
         constructs=n(cp["constructs"]), matrix_cells=n(cp["constructs"] * 4),
         vcr_todo=n(cp["vcr_todo"]), vcr_done=n(cp["vcr_done"]), vcr_total=n(cp["vcr_total"]),
         vcr_pct=f'{100.0 * cp["vcr_done"] / cp["vcr_total"]:.1f}',
@@ -1137,7 +1136,7 @@ TEMPLATE = """<title>{title}</title>
         {bat_legs}
         <tr><td>Version matrix</td><td class="r num">{constructs} × 4 = {matrix_cells} cells</td><td><span class="pill good">GREEN</span></td></tr>
       </tbody>
-      <tfoot><tr><td>Corpus, measured tree</td><td class="r num">{corpus_pos} + {corpus_neg}</td><td>positive goldens · negative fixtures — {corpus_editions}</td></tr></tfoot>
+      <tfoot><tr><td>Conformance suite, measured tree</td><td class="r num">{suite_tests} tests</td><td>{suite_accepted} accepted — {suite_editions} · {suite_refusals} WiseOwl refusals</td></tr></tfoot>
     </table>
   </div>
 </section>
@@ -1199,7 +1198,7 @@ TEMPLATE = """<title>{title}</title>
 
 
 <footer>
-  <p><strong>Every number on this page is computed — none is remembered, none is hand-written.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicates, what remains and its lanes through <span class="mono">ledger_plan.py</span> (the fix lane's population from <span class="mono">.agent-fleet.json</span>, the campaign and held clusters from the owner's decision PB2911), the estimate from <span class="mono">fix_clusters.py</span>, <span class="mono">model_rules.json</span>, <span class="mono">landing_measure.py</span> and the orchestrator's meter readings, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the corpus and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
+  <p><strong>Every number on this page is computed — none is remembered, none is hand-written.</strong> Inventory from <span class="mono">tests/version-matrix/traceability-inventory.json</span>, work standing from <span class="mono">kb/Work</span> through <span class="mono">work.py</span>'s own predicates, what remains and its lanes through <span class="mono">ledger_plan.py</span> (the fix lane's population from <span class="mono">.agent-fleet.json</span>, the campaign and held clusters from the owner's decision PB2911), the estimate from <span class="mono">fix_clusters.py</span>, <span class="mono">model_rules.json</span>, <span class="mono">landing_measure.py</span> and the orchestrator's meter readings, gates from plan §0's battery reference, documentation posture from <span class="mono">docs/CONFORMANCE.md</span> §2/§4/§5 and <span class="mono">audit_annex_a1.py --json</span>, the suite and anchor counts from the trees themselves, the trend series from <span class="mono">docs/rearchitecture/evidence/ledger-trend.json</span>. Rendered by <span class="mono">scripts/spec/gen_ledger.py</span>. The work register remains <span class="mono">kb/Work/</span> — this ledger is a derived view, never a tracker.</p>
   <p class="mono">Snapshot: {head_date} · measured tree {head_sha} — the last commit that touched an input this page reports, so an unrelated commit cannot make a correct page look stale · {rows} rows · {closed} closed · {gap} GAP · {adjudicated} adjudicated · battery #{bat_n} on {bat_sha} · A.1 {a1_discharged}/{a1_scope} · register {work_items} notes, {work_open} open, {work_actionable} actionable · {comp_n} known compiler notes.</p>
 </footer>
 
@@ -1221,7 +1220,7 @@ def build() -> tuple[str, dict]:
     plan = ledger_plan.measure(items, inv["gap"])
     inputs = ledger_plan.estimate_inputs()
     ctx = {"inv": inv, "work": measure_work(), "a1": measure_annex_a1(), "conf": measure_conformance(),
-           "battery": bat, "corpus": measure_corpus(), "head": head, "trend": pts, "plan": plan,
+           "battery": bat, "suite": measure_suite(), "head": head, "trend": pts, "plan": plan,
            "remaining": rem, "estimate": ledger_plan.bucket_estimates(rem, inputs), "inputs": inputs,
            "pacing": ledger_plan.measure_pacing()}
     return render(ctx), {"points": pts, "is_new": is_new}

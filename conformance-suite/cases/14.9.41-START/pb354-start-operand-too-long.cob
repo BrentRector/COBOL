@@ -8,7 +8,7 @@
 *> IX-LONG begins at the prime key's leftmost character position within a record of the file and has the
 *> same class, category and usage, so b) 1. and b) 2. are both satisfied and b) 3. is the ONLY condition
 *> left to reject it: nine character positions against a six-character key. Its accept side is
-*> conformance:2002/pb354_start_generic_key_ok K3 (a 3-character generic key over the same X(6) key), so
+*> conformance:cases/12.4.5.12-RECORD-KEY/pb354_start_generic_key_ok K3 (a 3-character generic key over the same X(6) key), so
 *> the threshold is pinned from both directions.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. P354LONG.

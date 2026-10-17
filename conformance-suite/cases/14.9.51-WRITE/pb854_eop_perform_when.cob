@@ -9,7 +9,7 @@
       *> kb/Work PB854 -- §14.9.51.4 GR27 c): the exception-checking
       *> PERFORM's WHEN leg of the end-of-page routing. Its declarative
       *> and phrase legs are pinned at their introducing edition by
-      *> conformance:2002/pb854_write_eop_exception_conditions; the
+      *> conformance:cases/14.9.51-WRITE/pb854_write_eop_exception_conditions; the
       *> exception-checking PERFORM is COBOL-2023, so this leg lives here.
       *>   python scripts/spec/cite.py --check 14.9.51.4 "and the WRITE
       *>   statement is specified in a statement that is in

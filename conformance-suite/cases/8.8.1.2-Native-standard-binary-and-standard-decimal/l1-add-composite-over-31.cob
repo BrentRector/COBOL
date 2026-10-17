@@ -15,7 +15,7 @@
 *> L1DA is 18 integer digits; L1DB is 1 integer + 17 fraction digits; aligned on
 *> the decimal point that is 18 + 17 = 35 digits, over the 31-digit cap.  Native arithmetic is in effect (no
 *> OPTIONS paragraph, 8.8.1.3), which is the condition rule 2 states.
-*> THIS IS THE ARMED COMPLEMENT of conformance:2023/l1_compute_composite_exempt: the SAME two items are legal
+*> THIS IS THE ARMED COMPLEMENT of conformance:cases/8.8.1.2-Native-standard-binary-and-standard-decimal/l1_compute_composite_exempt: the SAME two items are legal
 *> in a COMPUTE, because 8.8.1.2 rule 7 exempts arithmetic expressions from exactly this restriction.  Without
 *> this fixture the positive golden would only show that some COMPUTE compiles, not that the restriction it is
 *> exempt from is real and enforced.

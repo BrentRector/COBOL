@@ -6,7 +6,7 @@
 *>---
 *> ISO 1989:2023 8.4.3.2.4 GR1 gives a user-defined function's temporary the description, class and category of its
 *> RETURNING item with no category excluded (so a FLOAT-LONG result is a legal function-identifier, positive half
-*> tests/conformance/2002/udf_returning_every_category.cob), but the user-defined function itself is a COBOL-2002
+*> conformance-suite/cases/8.4.3.2-Function-identifier/udf_returning_every_category.cob), but the user-defined function itself is a COBOL-2002
 *> introduction: at --std 85 the reference is rejected (COBOLNET0900, registry row user-function-invocation-2002).
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB1419N85.

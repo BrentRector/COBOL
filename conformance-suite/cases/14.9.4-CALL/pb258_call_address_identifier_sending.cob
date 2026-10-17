@@ -47,7 +47,7 @@
       *>     address-identifier activates PB258TG (TARGET CALLED) and
       *>     QP=NULL.
       *> Below 2002 every address-identifier operand is refused by the
-      *> edition gate: conformance:negative/pb239-call-address-identifier-at-85.
+      *> edition gate: conformance:cases/14.9.4-CALL/pb239-call-address-identifier-at-85.
       *> 12.3.8.4 GR10 a)/b): each Format-2 callee is given a program
       *> prototype definition ahead of every other unit (10.6.2 SR1).
        IDENTIFICATION DIVISION.

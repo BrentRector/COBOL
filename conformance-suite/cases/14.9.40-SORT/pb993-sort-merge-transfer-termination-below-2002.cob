@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb993_sort_merge_transfer_termination
+      *> The REJECT half of conformance:cases/14.6.13.1.3-Fatal-exception-conditions/pb993_sort_merge_transfer_termination
       *> (kb/Work PB993). The golden's nonfatal-OPEN legs (14.9.24.4 GR7 a),
       *> GR12 a)/b)) are reachable only through a '61' sharing refusal, and the
       *> SHARING clause that produces it (12.4.5.15; Table 19) is an ISO/IEC

@@ -10,7 +10,7 @@
 *> range of values allowed by the implementor for a data-pointer data item"). COBOL-85 has no data-pointer
 *> category at all, so the whole statement is refused at --std 85 by the pointer-arithmetic-2002 edition gate.
 *>
-*> kb/Work PB465 - the COMPLEMENT of tests/conformance/2002/pb465_set_pointer_range_ec.cob. That golden pins
+*> kb/Work PB465 - the COMPLEMENT of conformance-suite/cases/14.9.39-SET/pb465_set_pointer_range_ec.cob. That golden pins
 *> what the two rules DO at the edition that introduces them; this one pins that they are not available below
 *> it, so a repair to GR19/GR20 cannot quietly make the construct compile at 85. The program also trips the
 *> USAGE POINTER and SET ADDRESS OF gates - every data-pointer construct is post-85 - so the expected .err

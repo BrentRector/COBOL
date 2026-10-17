@@ -18,8 +18,8 @@
       *> GROUP-USAGE clause, not strongly typed, §13.18.29.4 GR3) has class alphanumeric, a bit group
       *> boolean, a national group national. Class ALPHABETIC is a
       *> DISTINCT class with its own Table 2 row ("Alphabetic | Alphabetic") and r1 does not name it, which
-      *> is the reject side: conformance:negative/l1-test-numval-f-alphabetic-item. Class NUMERIC is the
-      *> other exclusion: conformance:negative/l1-test-numval-f-numeric-item.
+      *> is the reject side: conformance:cases/15.95.3-Argument-rule/l1-test-numval-f-alphabetic-item. Class NUMERIC is the
+      *> other exclusion: conformance:cases/15.95.3-Argument-rule/l1-test-numval-f-numeric-item.
       *>
       *> ⛔ WHY THE ADMIT SIDE IS A FIXTURE OF ITS OWN. The compiler could not express class ALPHABETIC at
       *> all until kb/Work PB124 wave 5 — PicCategory folds PIC A into Alphanumeric for storage — so this

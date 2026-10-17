@@ -10,7 +10,7 @@
       *> paragraph's data division is a syntax-rule violation at EVERY edition with the OO facility.
       *> Before PB1251 it compiled clean and bound as persistent factory data. One table now judges it
       *> (OoDefinitionRules); the positive halves are the factory FILE / WORKING-STORAGE goldens
-      *> (conformance:2002/oo_factory_file, oo_object_file).
+      *> (conformance:cases/_unassigned/oo_factory_file, oo_object_file).
        IDENTIFICATION DIVISION.
        CLASS-ID. PB1251FS INHERITS FROM BASE.
        ENVIRONMENT DIVISION.

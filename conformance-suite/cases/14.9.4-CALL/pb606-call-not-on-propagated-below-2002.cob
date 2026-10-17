@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb606_call_not_on_propagated
+      *> The REJECT half of conformance:cases/14.9.4-CALL/pb606_call_not_on_propagated
       *> (kb/Work PB606). ISO 14.9.4.4 GR3 i)'s "if an exception condition
       *> is propagated from the called program" needs the GOBACK RAISING
       *> phrase (14.9.18) and USE AFTER EXCEPTION CONDITION - ISO/IEC

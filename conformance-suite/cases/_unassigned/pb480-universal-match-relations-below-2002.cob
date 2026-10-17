@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB480 - the NEGATIVE twin of tests/conformance/2002/pb480_universal_match_relations (and of
+      *> kb/Work PB480 - the NEGATIVE twin of conformance-suite/cases/9.3.6-Method-invocation/pb480_universal_match_relations (and of
       *> pb1112_active_class_universal). Object orientation - CLASS-ID, USAGE OBJECT REFERENCE and the INVOKE
       *> statement (ISO 13.18.60, 14.9.23) - and the national category (PIC N) are COBOL-2002 introductions that do
       *> not exist in COBOL-85, so the program is rejected at --std 85, gated by COBOLNET0900.

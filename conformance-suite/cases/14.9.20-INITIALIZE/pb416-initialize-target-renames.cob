@@ -11,7 +11,7 @@
 *> perfectly well. It fell through to the unsupported-place-kind arm and shipped as an unhandled run-time
 *> NotImplementedCobolFeatureException naming a missing COMPILER feature — pointing the reader at this
 *> compiler instead of at their own illegal program. The check now asks the RESOLVED item.
-*> The positive control is tests/conformance/85/pb416_initialize_operand_screens_85 T5: a 66 entry BESIDE
+*> The positive control is conformance-suite/cases/14.9.20-INITIALIZE/pb416_initialize_operand_screens_85 T5: a 66 entry BESIDE
 *> identifier-1 is not a RENAMES clause in identifier-1's own entry, and INITIALIZE of that group is legal.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB416NRN.

@@ -12,7 +12,7 @@
       *> PIC 9(d) USAGE DISPLAY (docs/CONFORMANCE.md, the counter registers'
       *> declared capacity), d bytes: 2 for LINAGE IS 20 LINES, 18 for the
       *> report counters. The COBOL-85 witness of the same description is
-      *> conformance:85/pb1153_counter_register_character_image.
+      *> conformance:cases/8.4.3.14-LINAGE-COUNTER/pb1153_counter_register_character_image.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1153CBL.
        ENVIRONMENT DIVISION.

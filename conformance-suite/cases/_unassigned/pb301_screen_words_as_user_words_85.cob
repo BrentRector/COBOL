@@ -17,7 +17,7 @@
       *> `reservedGatedWord` still admits it in the DEFINITION slot, so a program that only declared would not
       *> notice a half-applied gate.
       *> COLUMN is deliberately absent: 8.9 reserves it at every edition (the report-writer COLUMN clause), so
-      *> it is barred by 8.3.2.1 rule 1 - tests/conformance/negative/pb301-column-reserved-at-every-edition.
+      *> it is barred by 8.3.2.1 rule 1 - conformance-suite/cases/8.3.2-COBOL-words/pb301-column-reserved-at-every-edition.
       *> UNDERLINE is declared as a TABLE so the subscript-trigger half of the cobol-words.json row is exercised:
       *> `UNDERLINE (2)` must enter the lexer's SUBSCRIPT mode, which only happens for a word in _dataNameTokens.
        IDENTIFICATION DIVISION.

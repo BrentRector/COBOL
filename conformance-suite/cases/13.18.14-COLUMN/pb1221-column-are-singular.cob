@@ -11,7 +11,7 @@
       *> the parser refuses it (COBOL0001), as it refuses COLUMNS IS
       *> (SR5) and COLS NUMBER (the printed spelling brace). The
       *> positive twin is
-      *> conformance:2002/pb1221_report_keyword_prefixes.
+      *> conformance:cases/13.18.14-COLUMN/pb1221_report_keyword_prefixes.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1221NC.
        ENVIRONMENT DIVISION.

@@ -26,9 +26,9 @@
       *> are "barred by rule 2 under STANDARD-DECIMAL" — false twice over, since neither is a §3.166 usage
       *> and the mode was never consulted. A screen that rejected here would be indistinguishable, from the
       *> reject fixture alone, from one that reads the mode correctly. The pair is the measurement:
-      *> conformance:negative/l1-highest-algebraic-standard-binary-usage writes the SAME USAGE under
+      *> conformance:cases/15.43.3-Argument-rules/l1-highest-algebraic-standard-binary-usage writes the SAME USAGE under
       *> ARITHMETIC IS STANDARD-DECIMAL and requires COBOLNET1516; this program writes it under native and
-      *> requires a value. conformance:2023/pb122_smallest_algebraic_float holds the third cell of the same
+      *> requires a value. conformance:cases/15.43.3-Argument-rules/pb122_smallest_algebraic_float holds the third cell of the same
       *> table — a NON-§3.166 float (COMP-1 / COMP-2) under STANDARD-DECIMAL, which r2 also admits.
       *>
       *> The bounds are derived from §15.43.4 r2 ("The value returned is equal to the positive algebraic

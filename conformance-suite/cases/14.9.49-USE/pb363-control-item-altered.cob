@@ -6,7 +6,7 @@
 *>---
 *> ISO §14.9.49.3 SR11: "A USE BEFORE REPORTING procedure shall not alter the value of any control
 *> data item." WS-GRP is the CONTROL clause operand (kb/Work PB363). The legal store into a
-*> non-control item is conformance:85/pb363_before_reporting_legal_store.
+*> non-control item is conformance:cases/14.9.49-USE/pb363_before_reporting_legal_store.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB363CIA.
        ENVIRONMENT DIVISION.

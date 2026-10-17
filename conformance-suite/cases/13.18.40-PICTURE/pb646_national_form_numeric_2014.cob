@@ -117,9 +117,9 @@
       *>       the content, except for the operational sign, consists entirely of the characters 0, 1,
       *>       2, 3, ..., 9" - true for both NNUM and NSGN.
       *>
-      *> The BYTE image is pinned by conformance:2023/pb646_national_form_numeric_bytes (a REDEFINES
+      *> The BYTE image is pinned by conformance:cases/13.18.40-PICTURE/pb646_national_form_numeric_bytes (a REDEFINES
       *> over the same items) and the 85 rejection by
-      *> conformance:negative/pb646-national-form-numeric-at-85 (COBOLNET0900).
+      *> conformance:cases/13.18.40-PICTURE/pb646-national-form-numeric-at-85 (COBOLNET0900).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB646NF4.
        DATA DIVISION.

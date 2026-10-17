@@ -21,7 +21,7 @@
       *>   GR1 c) ZERO "true if the value is zero"         cite.py: OK  §8.8.4.7.4 1)
       *> The earlier CA8 golden expected the Format-2 sign-BIT answer (+0.0 POSITIVE, -0.0
       *> NEGATIVE) on FLOAT-LONG; that pinned the defect. Format 2 itself (FLOAT-BINARY-64) is
-      *> pinned at 2014 by conformance:2014/pb1471_sign_condition_float_partition.
+      *> pinned at 2014 by conformance:cases/8.8.4.7-Simple-sign-condition/pb1471_sign_condition_float_partition.
       *>
       *> DERIVATION (every value is +0.0, then -0.0, then 3.5 — all exact):
       *>   FL/FS/FX = +0.0 : IS POSITIVE -> NOTPOS (zero), IS ZERO -> ZERO

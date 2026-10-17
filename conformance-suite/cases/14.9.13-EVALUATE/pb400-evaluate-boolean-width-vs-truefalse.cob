@@ -14,7 +14,7 @@
       *> It used to compile and die at run time with "boolean-literal condition"; the
       *> length test SR6 turns on was implemented nowhere (kb/Work PB400).  The
       *> ONE-character spelling of the same program is legal and is pinned by
-      *> tests/conformance/2002/pb400_evaluate_boolean_sr6_pair.
+      *> conformance-suite/cases/14.9.13-EVALUATE/pb400_evaluate_boolean_sr6_pair.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB400NBOOL.
        DATA DIVISION.

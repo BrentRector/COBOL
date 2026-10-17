@@ -14,8 +14,8 @@
       *> GR4's "the implementor shall specify the position and representation" and GR5 b)'s "the
       *> implementor defines what constitutes valid signs" — so the determination is edition-
       *> independent and the CLAIM to be edition-independent is what this file makes falsifiable.
-      *> It brackets the supported range against conformance:2023/pb803_sign_default_representation
-      *> and conformance:2023/pb803_sign_valid_set, which pin the same answers at the newest edition.
+      *> It brackets the supported range against conformance:cases/13.18.52-SIGN/pb803_sign_default_representation
+      *> and conformance:cases/13.18.52-SIGN/pb803_sign_valid_set, which pin the same answers at the newest edition.
       *> No intrinsic function appears here: FUNCTION BYTE-LENGTH is a COBOL-2002 introduction, so
       *> the width claim rides entirely on the `|` sentinel, which needs no intrinsic to be
       *> refutable (a 4-character signed item would push it out of the window).

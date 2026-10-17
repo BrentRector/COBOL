@@ -26,7 +26,7 @@
       *> NOTHING HERE PINS WHAT AN "OCCURRENCE" IS WHEN MATCHES OVERLAP: both needles above were chosen so
       *> that adjacent matches are exactly len(argument-2) apart, so every value below is the same under an
       *> overlapping-inclusive and a non-overlapping reading. That axis is pinned by its own golden,
-      *> conformance:2023/pb314_find_string_overlapping_matches, under the determination recorded in
+      *> conformance:cases/15.37.4-Returned-value-rules/pb314_find_string_overlapping_matches, under the determination recorded in
       *> docs/CONFORMANCE.md (overlapping matches count; §15.37.4 states no consumption rule, unlike
       *> §15.87.4 r3).
        IDENTIFICATION DIVISION.

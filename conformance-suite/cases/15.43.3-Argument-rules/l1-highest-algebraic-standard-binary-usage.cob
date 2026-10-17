@@ -23,10 +23,10 @@
       *> usages (§13.18.60.4 GR14-GR16) are both COBOL-2014 additions, so the rule as worded cannot be
       *> evaluated at COBOL-2002 at all and the header names 2014 and 2023 only.
       *>
-      *> THE ADMIT ARM IS conformance:2014/l1_algebraic_standard_binary_usage_mode_bar — the same USAGE
+      *> THE ADMIT ARM IS conformance:cases/15.43.3-Argument-rules/l1_algebraic_standard_binary_usage_mode_bar — the same USAGE
       *> FLOAT-BINARY-32/-64 items under NATIVE arithmetic, where r2's antecedent is false and the reference
       *> must return a value. A screen that ignored the mode would fail that fixture; one that ignored the
-      *> usage family would fail conformance:2023/pb122_smallest_algebraic_float, whose COMP-1/COMP-2
+      *> usage family would fail conformance:cases/15.43.3-Argument-rules/pb122_smallest_algebraic_float, whose COMP-1/COMP-2
       *> arguments run under STANDARD-DECIMAL.
       *> Expected: COBOLNET1516, the algebraic-family argument diagnostic.
        IDENTIFICATION DIVISION.

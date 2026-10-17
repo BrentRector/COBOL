@@ -7,8 +7,8 @@
 *>---
       *> ISO §8.8.1.3 Native arithmetic — the two halves of Annex A.1 item 123's determination that the
       *> intermediate's SIZE cannot reach (docs/CONFORMANCE.md#DOC-A.1-123). Its sibling
-      *> conformance:2023/l1_native_arithmetic_intermediate measures the scaled-Int128 carrier at the §14.7.7
-      *> rule 2a boundary, and conformance:2002/pb125_factorial_native_size measures its magnitude ceiling from
+      *> conformance:cases/11.9.5-ARITHMETIC/l1_native_arithmetic_intermediate measures the scaled-Int128 carrier at the §14.7.7
+      *> rule 2a boundary, and conformance:cases/15.4.1-Numeric-and-integer-functions/pb125_factorial_native_size measures its magnitude ceiling from
       *> both sides. NEITHER touches the two sentences below, and this file exists for them.
       *>   python scripts/spec/cite.py --check 8.8.1.3 "The implementor shall specify techniques used for native
       *>   arithmetic."  ->  OK  §8.8.1.3

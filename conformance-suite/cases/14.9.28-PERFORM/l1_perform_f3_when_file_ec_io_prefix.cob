@@ -29,7 +29,7 @@
       *> file-name-2, so the file-name-1 arm (WHEN EXCEPTION
       *> {file-name-1}…) carries no exception-name and is not subject
       *> to it — that arm is exercised by
-      *> conformance:2023/l1_perform_f3_when_file_repeat_licensed's
+      *> conformance:cases/14.9.28-PERFORM/l1_perform_f3_when_file_repeat_licensed's
       *> negative siblings.
       *>
       *> SR14 is separately satisfied — F1 and F2 each appear once.

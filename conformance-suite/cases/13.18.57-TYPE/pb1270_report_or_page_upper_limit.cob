@@ -9,7 +9,7 @@
       *> upper limit is "the line following the last line of the lowest-level control heading that has an OR PAGE phrase."
       *> cite.py: OK  13.18.57.4 7)  (General rules)   and   13.18.35.3 6) c)  (Syntax rules)
       *> OR PAGE is a COBOL 2002 phrase of TYPE CONTROL HEADING (13.18.57.2), so this is the introducing-edition witness;
-      *> conformance:negative/pb1270-detail-inside-or-page-heading is the refused side.
+      *> conformance:cases/13.18.57-TYPE/pb1270-detail-inside-or-page-heading is the refused side.
       *> DERIVATION. PAGE LIMIT IS 10 LINES FIRST DETAIL 3 (HEADING 1; LAST DETAIL and FOOTING default to 10, GR3). The control
       *> heading CH1 has two relative lines. The first GENERATE is the first body group of page 1, so the control heading prints
       *> first (13.18.57.4 GR6 c 1.) with its first line on FIRST DETAIL, 3 (13.18.35.4 GR5 b 3.), the second on 4. The detail's

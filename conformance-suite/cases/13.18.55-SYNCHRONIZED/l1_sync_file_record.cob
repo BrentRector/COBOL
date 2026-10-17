@@ -37,7 +37,7 @@
       *>   DOC-A.1-209 (USAGE DISPLAY is one byte per character position) and
       *>   DOC-A.1-205 (a 3-4 digit COMP item is 2 bytes). This is the same
       *>   number the equivalent WORKING-STORAGE group gives — the AUTO leg of
-      *>   conformance:2023/l1_sync_occurs_and_no_auto_align measures exactly
+      *>   conformance:cases/8.5.1.6.4-Item-alignment-for-increased-object-code/l1_sync_occurs_and_no_auto_align measures exactly
       *>   that shape outside a file — so a file-level rule that padded RS-N
       *>   to a natural boundary would answer 5 or 6 here and split the two
       *>   sections apart.

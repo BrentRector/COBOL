@@ -26,7 +26,7 @@
       *> TRIM (TRIM (arg-1 arg-2-1) arg-2-2)") make r1 and r2 rules about ONE argument-2 applied at each
       *> level of a nesting, which is a different function whenever the argument-2 characters INTERLEAVE at
       *> an edge. The NOTE's own example, TRIM("aabbcc" "c" "b") = "aa", agrees under both readings and so
-      *> cannot separate them; conformance:2023/pb117_trim_sequential pins the unkeyworded (BOTH) shape and
+      *> cannot separate them; conformance:cases/15.96.4-Returned-value-rules/pb117_trim_sequential pins the unkeyworded (BOTH) shape and
       *> one LEADING case. This fixture measures r1 and r2 in their own right, each against its union twin.
       *>
       *> Hand-derived, one line at a time, from r1/r2 + r5 — the union answer is written beside every

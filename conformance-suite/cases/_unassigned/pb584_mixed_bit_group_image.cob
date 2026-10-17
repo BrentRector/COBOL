@@ -52,7 +52,7 @@
       *> EDITIONS: boolean data (the PICTURE symbol 1, USAGE BIT) and GROUP-USAGE are COBOL-2002 introductions,
       *> so 2002 is the introducing edition and this file lives here; the composition rule does not vary by
       *> edition, so the corpus keeps ONE copy (the negative below 2002 is
-      *> tests/conformance/negative/pb584-mixed-bit-group-below-2002).
+      *> conformance-suite/cases/_unassigned/pb584-mixed-bit-group-below-2002).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB584MIX02.
        DATA DIVISION.

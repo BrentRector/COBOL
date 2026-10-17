@@ -14,7 +14,7 @@
       *> ONE call site and so reached only formats 1 and 2; it is now asked once, from the funnel every format's
       *> literal passes through. This program is what proves the wider reach did not become a wider REJECTION:
       *> every arm below is legal at COBOL-2023 and shall compile and produce its computed value. The gating
-      *> negatives are tests/conformance/negative/pb921-condition-name-numeric-edited-below-2023 (format 3) and
+      *> negatives are conformance-suite/cases/13.18.63-VALUE/pb921-condition-name-numeric-edited-below-2023 (format 3) and
       *> pb921-report-numeric-edited-below-2023 (format 4).
       *>
       *> EXPECTED VALUES, COMPUTED FROM THE RULES - never measured:

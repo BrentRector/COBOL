@@ -24,7 +24,7 @@
       *>   according to rule 1 is then stored", proves it is rule 1's sub-item b); reported with this batch).
       *> THE OPERANDS: L1CA is 18 integer digits and no fraction digits; L1CB is 1 integer digit and 17 fraction
       *> digits.  Superimposed aligned on their decimal points that is max(18,1) + max(0,17) = 35 digits, which
-      *> exceeds 31.  So `ADD L1CA TO L1CB` is ILLEGAL — conformance:negative/l1-add-composite-over-31 is the
+      *> exceeds 31.  So `ADD L1CA TO L1CB` is ILLEGAL — conformance:cases/8.8.1.2-Native-standard-binary-and-standard-decimal/l1-add-composite-over-31 is the
       *> ARMED COMPLEMENT that pins the rejection over these very pictures — while every COMPUTE below combines
       *> the same operands legally.  Without that complement a green run here would be no evidence at all.
       *> NATIVE arithmetic is in effect (no OPTIONS paragraph, §8.8.1.3), which is the only mode in which

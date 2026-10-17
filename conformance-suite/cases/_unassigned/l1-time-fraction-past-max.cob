@@ -13,7 +13,7 @@
       *> time format". The violation is a syntax rule on a literal argument, so it is diagnosed
       *> at COMPILE time (COBOLNET1631) rather than fabricating a value at run time.
       *> This is the upper half of the pair whose lower half is
-      *> conformance:2023/l1_time_fraction_max_digits (18 accepted); together they pin the
+      *> conformance:cases/A.1-Implementor-defined-language-element-list/l1_time_fraction_max_digits (18 accepted); together they pin the
       *> documented maximum at exactly 18.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1TFR02.

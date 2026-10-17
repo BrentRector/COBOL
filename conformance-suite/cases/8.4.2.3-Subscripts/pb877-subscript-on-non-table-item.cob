@@ -5,7 +5,7 @@
 *> portable: unverified
 *>---
 *> kb/Work PB877 - ISO 8.4.2.3.3 SR2, the NEGATIVE half of the rule whose POSITIVE half
-*> tests/conformance/85/pb877_subscripted_subscript.cob witnesses.
+*> conformance-suite/cases/8.4.2.3-Subscripts/pb877_subscripted_subscript.cob witnesses.
 *>
 *> SR2: "If a subscript is specified, the data description entry describing qualified-data-name-1 or the
 *> conditional variable associated with qualified-condition-name-1 shall contain an OCCURS clause or shall

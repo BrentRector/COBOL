@@ -22,7 +22,7 @@
       *>
       *> 2002 is the introducing edition of the OBSERVABLE: the §7.3 compiler-directive facility (>>TURN) and the
       *> exception-condition declaratives are COBOL-2002 introductions, so the EC half cannot be written at 85 —
-      *> see conformance:negative/pb395-turn-data-incompatible-below-2002. The transfer and fall-through halves
+      *> see conformance:cases/14.9.17-GO-TO/pb395-turn-data-incompatible-below-2002. The transfer and fall-through halves
       *> are edition-independent.
       *>
       *> kb/Work PB395 / PB230: EC-DATA-INCOMPATIBLE used to be armed by a STATEMENT-KIND test (`node is

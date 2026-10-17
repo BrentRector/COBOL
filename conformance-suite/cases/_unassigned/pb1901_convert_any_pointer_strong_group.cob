@@ -16,7 +16,7 @@
       *> digits - 'a' is 61, 'b' is 62, a zero position is 00 in the alphanumeric coded character set:
       *>   61 62 00 00 00 00 00 00 00 00   =   "61620000000000000000"
       *> It used to compile clean and abort at run time (the whole-group image refusal), exactly as UPPER-CASE did.
-      *> CONVERT is a COBOL 2023 function; strongly-typed groups are 2002 (conformance:2002/pb1901_strong_group_pointer_leaf_string_argument).
+      *> CONVERT is a COBOL 2023 function; strongly-typed groups are 2002 (conformance:cases/_unassigned/pb1901_strong_group_pointer_leaf_string_argument).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1901CNV.
        DATA DIVISION.

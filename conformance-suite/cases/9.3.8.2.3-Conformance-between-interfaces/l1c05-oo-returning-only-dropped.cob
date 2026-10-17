@@ -25,7 +25,7 @@
       *>   class, but not "described with the ONLY phrase", so it does
       *>   not conform and §11.8.3 SR2 is violated: COBOLNET0841.
       *>   Everything else is identical to the admitted
-      *>   conformance:2002/l1c05_oo_returning_only_same_class.
+      *>   conformance:cases/9.3.8.2.3-Conformance-between-interfaces/l1c05_oo_returning_only_same_class.
        IDENTIFICATION DIVISION.
        CLASS-ID. L1C05SX INHERITS FROM BASE.
        ENVIRONMENT DIVISION.

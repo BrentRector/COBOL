@@ -9,7 +9,7 @@
 *> unqualified, so the reference identifies no single resource (8.4.2.1). Before PB443 the binder read
 *> only the base word and took candidates.FirstOrDefault(IsTable), so this compiled clean and searched
 *> whichever E was declared FIRST - a silent wrong answer decided by declaration order. The qualified
-*> spellings, which are the ones the standard admits, are in tests/conformance/85/pb443_search_identifier_1.
+*> spellings, which are the ones the standard admits, are in conformance-suite/cases/14.9.37-SEARCH/pb443_search_identifier_1.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB443AMB.
        DATA DIVISION.

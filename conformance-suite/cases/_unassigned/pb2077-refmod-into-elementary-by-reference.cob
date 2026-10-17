@@ -12,7 +12,7 @@
       *> SIGN, and USAGE clauses" (OK 9.3.6 3)), so X(1:5) never matches LP PIC X(5). 14.9.23.4 GR7 b)
       *> locates the method by 9.3.6 for every INVOKE (OK 14.9.23.4 7)); a typed receiver's descriptions
       *> are static, so the refusal is at compile time (COBOLNET0828; the universal lane's twin is
-      *> EC-OO-METHOD in conformance:2002/pb2077_refmod_argument_both_lanes). Before the fix the typed lane
+      *> EC-OO-METHOD in conformance:cases/_unassigned/pb2077_refmod_argument_both_lanes). Before the fix the typed lane
       *> accepted the equal-length slice and ran it.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB2077NE.

@@ -35,7 +35,7 @@
       *>
       *> The other direction - a signed numeric record item under a CODE-SET FD that is described with NO
       *> SIGN SEPARATE clause at all, neither its own nor an inherited one - is
-      *> conformance:negative/pb536-code-set-signed-without-separate (COBOLNET1672).
+      *> conformance:cases/13.18.52-SIGN/pb536-code-set-signed-without-separate (COBOLNET1672).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB536GS.
        ENVIRONMENT DIVISION.

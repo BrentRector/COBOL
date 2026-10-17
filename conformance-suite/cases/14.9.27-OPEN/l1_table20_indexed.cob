@@ -26,7 +26,7 @@
       *> by unit:Table20WriteOpenModeTests (kb/Work PB325).
       *> The Random row's START cells are blank in every column:
       *> §14.9.41.3 SR1 rejects that at compile time (see
-      *> conformance:negative/pb325-start-random-access).
+      *> conformance:cases/14.9.27-OPEN/pb325-start-random-access).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1TB20B.
        ENVIRONMENT DIVISION.

@@ -32,9 +32,9 @@
       *>   D=333 001   quotient 3.33, remainder 10 − 3.33 × 3 = 0.01.
       *>   E=67 020    stored quotient ROUNDED to 6.7; subsidiary quotient TRUNCATED to 6.6 (GR6c);
       *>               remainder 20 − 6.6 × 3 = 0.20.
-      *> The native twin is conformance:85/l1_divide_quotient_remainder_native, which also carries GR1's
+      *> The native twin is conformance:cases/14.9.12-DIVIDE/l1_divide_quotient_remainder_native, which also carries GR1's
       *> §14.7.5 division-by-zero leg; the composite-expression consumers of the standard-decimal
-      *> intermediate are pinned separately by conformance:2023/pb84_standard_decimal_intermediate_consumers.
+      *> intermediate are pinned separately by conformance:cases/14.9.12-DIVIDE/pb84_standard_decimal_intermediate_consumers.
       *>
       *> EDITION. ARITHMETIC IS STANDARD-DECIMAL is the 2014 clause of the OPTIONS paragraph
       *> (arithmetic-standard-decimal-2014); the version matrix owns the gate below it.

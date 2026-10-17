@@ -11,7 +11,7 @@
       *> clause applies to it - neither its own nor one inherited from a containing group (13.18.52.4 GR1) -
       *> so the record description violates the rule: COBOLNET1672.
       *> The LEGAL inherited spelling, 05 G SIGN IS LEADING SEPARATE. 10 N PIC S9(4)., is the positive
-      *> golden conformance:85/pb536_code_set_group_sign - the shape the screen used to refuse by running
+      *> golden conformance:cases/13.18.52-SIGN/pb536_code_set_group_sign - the shape the screen used to refuse by running
       *> one phase too early (kb/Work PB536). No edition gate: the clause, the rule and the diagnostic are
       *> the same at every edition CODE-SET exists in.
        IDENTIFICATION DIVISION.

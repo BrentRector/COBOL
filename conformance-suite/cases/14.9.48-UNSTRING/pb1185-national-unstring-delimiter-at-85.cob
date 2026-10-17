@@ -7,7 +7,7 @@
 *> THE NEGATIVE BELOW THE INTRODUCING EDITION (kb/Work PB1185). ISO 14.9.48.4 GR7 makes a figurative
 *> delimiter a NATIONAL literal when identifier-1 is national, and 8.3.3.6.4 GR6 then takes its
 *> HIGH-VALUE / LOW-VALUE from the national program collating sequence -
-*> conformance:2002/pb1185_figurative_delimiter_national_pcs is the positive. National data and the
+*> conformance:cases/14.9.48-UNSTRING/pb1185_figurative_delimiter_national_pcs is the positive. National data and the
 *> PROGRAM COLLATING SEQUENCE ... FOR NATIONAL phrase are COBOL-2002 introductions, so the same statement
 *> over a national sender is not conforming COBOL-85 and the edition gate refuses it.
        IDENTIFICATION DIVISION.

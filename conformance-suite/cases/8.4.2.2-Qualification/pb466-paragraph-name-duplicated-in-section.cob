@@ -14,7 +14,7 @@
 *> the rule-1 ambiguity of pb466-ambiguous-procedure-name.
 *> SR7 is conditioned on "if explicitly referenced", so the check belongs at the REFERENCE: a duplicated
 *> paragraph-name that nothing mentions is conforming and compiles, which the positive witness
-*> tests/conformance/85/pb466_procedure_name_uniqueness.cob measures. Rejected at all four editions.
+*> conformance-suite/cases/8.4.2.2-Qualification/pb466_procedure_name_uniqueness.cob measures. Rejected at all four editions.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB466SR7.
        PROCEDURE DIVISION.

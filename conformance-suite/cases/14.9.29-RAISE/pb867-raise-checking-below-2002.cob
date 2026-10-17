@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb867_raise_checking_not_enabled
+      *> The REJECT half of conformance:cases/14.9.29-RAISE/pb867_raise_checking_not_enabled
       *> (kb/Work PB867). RAISE (ISO 14.9.29), USE AFTER EXCEPTION
       *> CONDITION (14.9.49) and the >>TURN directive (7.3.25) are all
       *> ISO/IEC 1989:2002 introductions, so at COBOL-85 this source does

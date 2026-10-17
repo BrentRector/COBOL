@@ -8,7 +8,7 @@
 *> COBOL-2002 introduction of ISO 14.9.14.2 Format 4 (14.9.14.4 GR6); COBOL-85's EXIT statement has only the
 *> bare Format-1 "assign a procedure-name to a given point in a procedure division" form, so at --std 85 the
 *> construct row refuses it COBOLNET0900. It compiles at 2002 and above, where the positive witness
-*> tests/conformance/2002/pb405_exit_paragraph_section_in_inline_perform.cob measures GR6 and GR7 inside an
+*> conformance-suite/cases/14.9.14-EXIT/pb405_exit_paragraph_section_in_inline_perform.cob measures GR6 and GR7 inside an
 *> inline PERFORM — the placement that used to emit a bare C# `break` and leave the PERFORM's loop instead of
 *> the paragraph.
        IDENTIFICATION DIVISION.

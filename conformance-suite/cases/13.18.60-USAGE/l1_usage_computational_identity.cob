@@ -55,7 +55,7 @@
       *> IDENT — the identity claim itself, and the leg no earlier golden
       *>     carries: the same picture and the same value at COMPUTATIONAL, at
       *>     COMP and at BINARY produce the SAME four bytes, neighbours
-      *>     included. conformance:2023/l1_usage_binary_storage pins the
+      *>     included. conformance:cases/13.18.60-USAGE/l1_usage_binary_storage pins the
       *>     BINARY side alone; this is the side that says COMPUTATIONAL did
       *>     not drift away from it.
       *> HOLD / SIZE / KEEP — the RANGE determination, which is the one that

@@ -16,7 +16,7 @@
       *> one, two and three — every one of which is exercised below, in one program
       *> so the optionality STRUCTURE is pinned in a single place rather than
       *> inferred from three files that each happen to use a different count.
-      *> The reject side is tests/conformance/negative/l1-day-to-yyyyddd-arity4
+      *> The reject side is conformance-suite/cases/15.25-DAY-TO-YYYYDDD/l1-day-to-yyyyddd-arity4
       *> (a fourth argument) and l1-day-to-yyyyddd-no-function-word (the required
       *> word omitted without the §8.4.3.2.3 SR2 REPOSITORY permission).
       *>

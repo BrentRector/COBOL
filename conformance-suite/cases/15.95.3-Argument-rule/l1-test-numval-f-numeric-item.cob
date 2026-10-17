@@ -17,7 +17,7 @@
       *>
       *> ⚠ IT IS NOT THE NUMERIC-EDITED CASE. §8.5.2.1 Table 2 puts category numeric-edited with usage
       *> display in class ALPHANUMERIC, so a PIC ZZ9.99 argument IS admitted and
-      *> conformance:2002/l1_test_numval_f_class_screen requires it to return a value. A screen that read
+      *> conformance:cases/15.95.3-Argument-rule/l1_test_numval_f_class_screen requires it to return a value. A screen that read
       *> "looks numeric" instead of the Table 2 class column would reject both, and the two fixtures
       *> together are what separates them.
       *> Expected: COBOLNET1627, the intrinsic-argument-class diagnostic.

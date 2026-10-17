@@ -11,7 +11,7 @@
       *> compilation unit, so the bare word is a program-name, but it is not a program prototype
       *> specified in the REPOSITORY paragraph (SR3), and it is not a data item either (so the
       *> identifier-1 arm cannot take it).  The same word WITH the REPOSITORY entry is the positive
-      *> arm 4 of conformance:2002/pb549_program_address_identifier.
+      *> arm 4 of conformance:cases/8.4.3.13-Program-address-identifier/pb549_program_address_identifier.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C23G.
        DATA DIVISION.

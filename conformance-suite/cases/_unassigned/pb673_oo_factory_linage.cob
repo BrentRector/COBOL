@@ -8,7 +8,7 @@
       *> ISO 1989:2002/2023 §13.18.34.4 GR6 - THE LINAGE OPERAND VALUES REACH A CLASS'S FILE TOO. The rule is
       *> written over "the indicated statement" and its file, with no exemption for the runtime element that
       *> executes it, and §9.3.14.2's factory object owns file connectors exactly as a program does
-      *> (conformance:2002/oo_factory_file pins the connector itself).
+      *> (conformance:cases/_unassigned/oo_factory_file pins the connector itself).
       *>
       *> This is the third face of kb/Work PB673, and it is a TWO-ARM DISPATCH with one arm fixed: the LINAGE
       *> operand values used to be INSTALLED as a closure beside the connector's registration, and only the

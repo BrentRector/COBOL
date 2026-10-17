@@ -11,7 +11,7 @@
 *> specified). So COBOL-85, COBOL-2002 and COBOL-2014 must REFUSE it by edition, with COBOLNET0900 naming
 *> the construct — not with a bare parse error, which is what the pre-PB712 grammar produced for this exact
 *> source because it could not spell the printed format at all. The 2023 arm is the positive golden
-*> tests/conformance/2023/write_before_and_after.cob. kb/Work PB712.
+*> conformance-suite/cases/14.9.51-WRITE/write_before_and_after.cob. kb/Work PB712.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB712NEG3.
        ENVIRONMENT DIVISION.

@@ -6,7 +6,7 @@
 *>---
 *> ISO 13.18.64 VARYING, the VALIDATION leg - Annex A.4.14 item 8. The second SHARED clause: the
 *> report-writer leg (A.4.11 item 20) is implemented and stays so - see the positive control
-*> tests/conformance/2023/declined_rw_present_varying_control.cob. 13.18.64.3 SR1 requires an OCCURS clause
+*> conformance-suite/cases/_unassigned/declined_rw_present_varying_control.cob. 13.18.64.3 SR1 requires an OCCURS clause
 *> outside a report group, which is why this entry carries one.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. DCLVARY.

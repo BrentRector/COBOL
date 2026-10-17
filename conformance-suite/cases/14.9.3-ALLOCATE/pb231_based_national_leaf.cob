@@ -11,7 +11,7 @@
       *> ORDINARY, CELL-BACKED STORAGE. IT RETIRES THE SECOND OF THE
       *> THREE BOUNDARIES conformance:negative/pb164-based-national-leaf
       *> PINNED (THE FIRST WAS THE USAGE BIT ONE,
-      *> conformance:2002/pb231_based_bit_leaf; ONLY THE POINTER-CLASS
+      *> conformance:cases/14.9.3-ALLOCATE/pb231_based_bit_leaf; ONLY THE POINTER-CLASS
       *> LEAF IS LEFT), THE SAME WAY 2023/stepd_based_comp_leaf RETIRED
       *> pb151-based-comp-leaf: THE BIND-TIME COBOLNET1695 WAS
       *> REJECTING LEGAL COBOL.

@@ -18,7 +18,7 @@
       *> expression operand, L2) and the character channel (DISPLAY, L1).
       *> (The zero-length leg, L4 - a reference that does not touch the incompatible content raises nothing - needs
       *> a zero-length reference modification, which is legal only under the COBOL-2023 directive
-      *> REF-MOD-ZERO-LENGTH, so it lives in conformance:2023/pb230_zero_length_boolean_operand.)
+      *> REF-MOD-ZERO-LENGTH, so it lives in conformance:cases/_unassigned/pb230_zero_length_boolean_operand.)
       *> EC-DATA-INCOMPATIBLE is fatal (Table 13), so RESUME AT NEXT STATEMENT abandons the raising statement:
       *> L1 prints nothing after its marker and L2 leaves RB holding what L0 stored.
        >>TURN EC-DATA-INCOMPATIBLE CHECKING ON

@@ -13,7 +13,7 @@
       *> contain … an instance object of the specified class", never a subclass instance —
       *> so the SUBCLASS assignment a)2. permits without ONLY is exactly what a)1. forbids
       *> with it.  The permitted twin (the same SET without ONLY) runs in
-      *> tests/conformance/2002/l1_set_sr12a2_class_conformance.cob.
+      *> conformance-suite/cases/14.9.39-SET/l1_set_sr12a2_class_conformance.cob.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB389N4.
        ENVIRONMENT DIVISION.

@@ -31,7 +31,7 @@
       *> on the other kind of carrier: the format minimum, never the ULP of a particular value.
       *>
       *> ⛔ THE BOUNDS ARE TWENTY SIGNIFICANT DIGITS WIDE, AND THAT IS THE POINT. The pre-existing witness
-      *> conformance:2023/pb122_smallest_algebraic_float brackets the binary64 answer as "> 0 and
+      *> conformance:cases/15.43.3-Argument-rules/pb122_smallest_algebraic_float brackets the binary64 answer as "> 0 and
       *> < 5.0E-324", which any positive number below the subnormal satisfies, and the binary32 answer to
       *> three digits. Those bounds prove the ADMISSION of a float argument-1 (§15.83.3 r2's arm) and are
       *> the right test for it; they do not pin the VALUE r2 names, which is this row's rule. A window one

@@ -5,7 +5,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> PB230 L4 (split from conformance:2002/pb230_incompatible_boolean_sending by kb/Work PB1707) - ISO 14.6.13.2
+      *> PB230 L4 (split from conformance:cases/14.6.13.2-Incompatible-data/pb230_incompatible_boolean_sending by kb/Work PB1707) - ISO 14.6.13.2
       *> rule 1, the BOOLEAN sibling of rule 2: a boolean sending item whose content would evaluate to false in a
       *> boolean class condition makes the result of the reference undefined and sets EC-DATA-INCOMPATIBLE, "except
       *> in the following circumstances: - a sending item is referenced in a class condition, or - a sending item is

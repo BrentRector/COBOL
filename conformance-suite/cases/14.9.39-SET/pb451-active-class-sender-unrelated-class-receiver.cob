@@ -15,7 +15,7 @@
       *> b)1. and b)3., its siblings, are pinned by conformance:negative/
       *> pb389-only-receiver-active-class-sender and …/pb389-active-class-factory-presence;
       *> the CONFORMING direction of b)2. is the `SET B3 TO A` line of
-      *> conformance:2002/pb389_object_reference_descriptor.
+      *> conformance:cases/9.3.6-Method-invocation/pb389_object_reference_descriptor.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB451NA.
        ENVIRONMENT DIVISION.

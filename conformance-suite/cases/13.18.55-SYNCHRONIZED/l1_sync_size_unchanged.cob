@@ -23,7 +23,7 @@
       *> SYNCHRONIZED ITEM may not.
       *>
       *> WHAT THIS MEASURES, AND WHY IT IS NOT THE EXISTING WITNESS. The
-      *> shipped golden conformance:2002/l1_byte_length_implicit_filler
+      *> shipped golden conformance:cases/8.5.1.6.4-Item-alignment-for-increased-object-code/l1_byte_length_implicit_filler
       *> measures the GROUP's byte length around a synchronized item (its
       *> SYNC=3 leg, §13.18.55.4 GR9 b). GR6 is about the synchronized ITEM's
       *> own length, so every leg below applies FUNCTION BYTE-LENGTH

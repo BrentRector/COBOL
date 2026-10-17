@@ -19,7 +19,7 @@
       *> next page (unless procedurally altered)", is the standard naming the very use. §8.4.3.15.4 GR1 makes
       *> the counters "temporary unsigned integer data items of class and category numeric", which is the
       *> receiving profile every store below goes through. The complement is
-      *> conformance:negative/pb429-line-counter-receiving, which pins SR3 at every edition.
+      *> conformance:cases/8.4.3.15-Report-counters/pb429-line-counter-receiving, which pins SR3 at every edition.
       *>
       *> SR1 NAMES NO STATEMENT, so this golden runs the COUNTER THROUGH THE CONTEXTS, not through MOVE:
       *> each line below is one context that admits an integer data item, and each expected value is the

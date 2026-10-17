@@ -17,7 +17,7 @@
       *> entropy (no fixed seed), which is by construction not reproducible across runs and so
       *> is not, and must not be, spelled as a literal in any golden.
       *>
-      *> ⛔ THIS IS THE BRANCH NO OTHER GOLDEN REACHES. conformance:2023/pb1_intrinsic_formats
+      *> ⛔ THIS IS THE BRANCH NO OTHER GOLDEN REACHES. conformance:cases/15.75.3-Argument-rules/pb1_intrinsic_formats
       *> exercises r5 and returned-value r2, but its FIRST reference is FUNCTION RANDOM(7), so
       *> r4's precondition ("the first reference ... does not specify argument-1") is false
       *> there. Here the first reference in the run unit is the bare FUNCTION RANDOM below —

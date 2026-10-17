@@ -27,7 +27,7 @@
       *> two-receiver MOVE put " X   " where the one-receiver MOVE put "XYZ   ".
       *>
       *> COBOL-2002: user-defined functions and GROUP-USAGE are 2002 introductions - the negative twin
-      *> tests/conformance/negative/pb888-national-group-result-below-2002.cob pins the gate below it.
+      *> conformance-suite/cases/_unassigned/pb888-national-group-result-below-2002.cob pins the gate below it.
        IDENTIFICATION DIVISION.
        FUNCTION-ID. PB888NGFN.
        DATA DIVISION.

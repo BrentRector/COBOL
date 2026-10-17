@@ -30,7 +30,7 @@
       *> format 2 exactly as in format 1, and it was accepted only because the format-2 screen did not exist.
       *> It exists now (DataBinder.ScreenValueLiteral, one funnel for every format), so the quoted spelling is
       *> COBOLNET1657 at strict and the numeric store under --permissive - the negative twin is
-      *> tests/conformance/negative/pb208-table-value-alphanumeric-on-numeric.cob.  THE WIDTH PIN IS
+      *> conformance-suite/cases/13.18.63-VALUE/pb208-table-value-alphanumeric-on-numeric.cob.  THE WIDTH PIN IS
       *> UNCHANGED BY THAT: PB188's whole point was that the CCVS-leniency arm and the numeric arm are ONE
       *> encode (an alphanumeric literal on a numeric item is read AS the numeric literal SR2 asked for), so a
       *> numeric literal reaches the SAME RuntimeApi.NumFormatImage with the SAME item profile, and every

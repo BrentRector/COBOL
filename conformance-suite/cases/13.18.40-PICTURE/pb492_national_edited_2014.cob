@@ -64,14 +64,14 @@
       *> item in edited form." So VALUE N"AB CD" is stored EXACTLY as written - the 'B' does NOT re-insert
       *> and the data positions are not re-packed - and the image is "AB CD". An ALPHANUMERIC literal
       *> there is SR5's other half and is refused:
-      *> conformance:negative/pb492-national-edited-value-literal-class (COBOLNET0898).
+      *> conformance:cases/13.18.63-VALUE/pb492-national-edited-value-literal-class (COBOLNET0898).
       *>
       *> COMPARISON: 8.5.2.1 Table 2 puts category national-edited in class NATIONAL
       *> ("| National | National<br>National-edited<br>Numeric-edited (if usage is national) |"), so
       *> the edited image compares against a national literal with no conversion.
       *>
       *> National-edited data is a COBOL-2002 introduction; the 85 rejection is
-      *> conformance:negative/pb492-national-edited-at-85 (COBOLNET0900).
+      *> conformance:cases/13.18.40-PICTURE/pb492-national-edited-at-85 (COBOLNET0900).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB492NE4.
        DATA DIVISION.

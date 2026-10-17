@@ -34,7 +34,7 @@
       *>       a nine-digit fraction a format that EVERY conforming implementor must accept, so
       *>       this leg is not about our determination at all: it is the conformance obligation.
       *> F18 - OUR determination, which is 18. Accepting 18 is what the documented maximum
-      *>       claims; the paired negative golden conformance:negative/l1-time-fraction-past-max
+      *>       claims; the paired negative golden conformance:cases/_unassigned/l1-time-fraction-past-max
       *>       shows 19 REJECTED, and the two together pin the maximum at exactly 18 — which
       *>       satisfies §15.3.3.2 because 18 >= 9.
       *> B9  - the BASIC shape at the same nine digits, where the separator is in the FORMAT and

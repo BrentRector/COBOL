@@ -8,7 +8,7 @@
       *> holds variable-length components, below the edition that introduced them: the
       *> DYNAMIC LENGTH clause (ISO 13.18.19) and the dynamic-capacity table (13.18.38 Format 4)
       *> are COBOL-2014, so a COBOL-2002 program cannot describe the element (COBOLNET0900); the
-      *> 2014 positive is conformance:2014/pb1951_table_sort_external_variable_element.
+      *> 2014 positive is conformance:cases/_unassigned/pb1951_table_sort_external_variable_element.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1951N02.
        DATA DIVISION.

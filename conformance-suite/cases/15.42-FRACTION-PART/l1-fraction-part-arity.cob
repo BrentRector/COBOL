@@ -11,7 +11,7 @@
       *> function at all, and there is no other §15.42 format for it to be.
       *>
       *> The ACCEPT side of the same format (the one-argument form, in a MOVE and in a COMPUTE) is pinned by
-      *> conformance:2023/l1_integer_family_notes. This is the half that says the format is a CONSTRAINT and
+      *> conformance:cases/15.42.3-Argument-rule/l1_integer_family_notes. This is the half that says the format is a CONSTRAINT and
       *> not merely a suggestion; without it, an arity model that silently ignored trailing arguments — or
       *> that treated FRACTION-PART as variadic like MAX — would pass every positive fixture in the corpus.
       *> Expected: COBOLNET1504, the §15.3 argument-count diagnostic.

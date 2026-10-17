@@ -13,7 +13,7 @@
       *> and for each elementary item in one type declaration there is a corresponding elementary item in
       *> the other type declaration, starting at the same relative byte or bit position and having the
       *> same length" (OK 8.5.3.1). 9.3.6 match rule 3 e) compares the USAGE clauses, a pointer's
-      *> restriction among them (the reading conformance:2002/pb1408_universal_address_of_subordinate_group
+      *> restriction among them (the reading conformance:cases/_unassigned/pb1408_universal_address_of_subordinate_group
       *> already pins), and "6) otherwise, the EC-OO-METHOD exception condition is set to exist" (OK 9.3.6 6)).
       *> The caller's T-REC (X(2) + X(4)) and the class's T-REC (one 9(6)) are not equivalent; C480RQ's
       *> T-REC is. Before the fix the restriction was keyed by its type-NAME only, so TR was reached.

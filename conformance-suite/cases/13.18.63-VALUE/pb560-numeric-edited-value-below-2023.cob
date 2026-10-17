@@ -10,7 +10,7 @@
 *> that permission: "VALUE clause, numeric-edited items and numeric literals. It is now permitted to allow
 *> numeric-edited data items to be assigned values specified as numeric literals" - a COBOL-2023 addition,
 *> so below 2023 the version-conformance pass rejects it (COBOLNET0900).
-*> This is the gating negative of tests/conformance/2023/pb560_condition_value_numeric_edited_2023, whose
+*> This is the gating negative of conformance-suite/cases/13.18.63-VALUE/pb560_condition_value_numeric_edited_2023, whose
 *> legs all rest on that conversion; it pins the edition band the positive runs in.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB560NEVAL.

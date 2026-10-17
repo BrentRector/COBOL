@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb987_property_per_evaluation
+      *> The REJECT half of conformance:cases/8.4.3.1-Identifier/pb987_property_per_evaluation
       *> (kb/Work PB987). An object property reference in a repeated
       *> condition (ISO 8.8.4.13 2)) needs the REPOSITORY paragraph's
       *> PROPERTY specifier, a class definition and object references -

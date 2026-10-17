@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> kb/Work PB1071 - the edition floor under conformance:2002/pb1071_pointer_member_image. The strongly-
+      *> kb/Work PB1071 - the edition floor under conformance:cases/_unassigned/pb1071_pointer_member_image. The strongly-
       *> typed group (TYPEDEF STRONG, 13.18.58), USAGE POINTER (13.18.60) and the restricted pointer type are
       *> COBOL-2002 introductions, so at COBOL-85 the shared pointer-bearing records the positive case images
       *> cannot be declared at all; COBOLNET0900 is the version gate.

@@ -23,7 +23,7 @@
       *> "{ABCDEFGHI" and negative 0-9 to "}JKLMNOPQR".  So -123 is `12L` (negative table position
       *> 3) and +123 is `12C` (positive table position 3), and the fused sign occupies an EXISTING
       *> digit position: the item is 3 character positions, never 4.  The ALTERNATIVE convention is
-      *> pinned by conformance:2023/pb803_sign_encoding_ascii, which compiles under
+      *> pinned by conformance:wiseowl/cases/13.18.52-SIGN/pb803_sign_encoding_ascii, which compiles under
       *> `*> options: sign-encoding=ascii`.
       *>
       *> WHY EACH LEG CAN FAIL — expected values derived from the determination above, not observed.

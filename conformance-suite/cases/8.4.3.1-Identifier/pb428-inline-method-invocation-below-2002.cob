@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb428_inline_method_invocation.
+      *> The REJECT half of conformance:cases/8.4.3.1-Identifier/pb428_inline_method_invocation.
       *> An inline method invocation (ISO §8.4.3.4 — the §8.4.3.1.2 Format 4
       *> identifier) belongs to the object-orientation facility, which this
       *> compiler gates at COBOL-2002 throughout. THE EDGE IS DERIVED, NOT

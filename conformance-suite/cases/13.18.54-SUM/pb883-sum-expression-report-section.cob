@@ -12,7 +12,7 @@
       *> entry and therefore outside what SR6 admits.  Note how narrowly the
       *> standard draws this: the SOURCE clause's twin rule, 13.18.53.3 SR4, DOES
       *> admit "a report counter identifier or a sum counter defined in the
-      *> current report", and tests/conformance/85/pb852_report_source_expression
+      *> current report", and conformance-suite/cases/13.18.53-SOURCE/pb852_report_source_expression
       *> exercises that side.  Two clauses, two lines, and each is screened
       *> against its own rule (COBOLNET2144).
        IDENTIFICATION DIVISION.

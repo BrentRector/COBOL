@@ -15,7 +15,7 @@
 *> TRUE arm only" - on the same derived authority as its VALUE-clause half (value-false-phrase-2002); the
 *> 2023 Annex E carries no 85->2002 SET row (the A1 authority-sufficiency gap D18).
 *> 85 ONLY: at 2002 and above this is conforming source and is the positive
-*> tests/conformance/2002/pb450_set_condition_mixed_groups.
+*> conformance-suite/cases/14.9.39-SET/pb450_set_condition_mixed_groups.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. NEGPB450G2.
 DATA DIVISION.

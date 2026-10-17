@@ -12,7 +12,7 @@
 *> The SIBLING half of kb/Work PB348: WRITE, REWRITE and RELEASE shared ONE operand binder that
 *> applied none of the three rules, so fixing RELEASE alone would have left this arm silent
 *> (feedback_two_arm_dispatch).  The paired positive is the alphanumeric-function admission pinned
-*> by conformance:2023/pb10_function_identifier_sending.
+*> by conformance:cases/8.4.3.1-Identifier/pb10_function_identifier_sending.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB348N2.
 ENVIRONMENT DIVISION.

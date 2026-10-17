@@ -12,7 +12,7 @@
 *> Before PB416 this compiled clean, stored nothing and printed nothing: 14.9.20.4 GR5a1's exclusion of an
 *> index item CONTAINED IN identifier-1 was being applied to identifier-1 ITSELF, turning a syntax error into
 *> a silent no-op. That exclusion's own silence is still correct and is pinned by the POSITIVE control,
-*> tests/conformance/85/pb416_initialize_operand_screens_85, whose G contains a subordinate USAGE INDEX item
+*> conformance-suite/cases/14.9.20-INITIALIZE/pb416_initialize_operand_screens_85, whose G contains a subordinate USAGE INDEX item
 *> that INITIALIZE G skips without a word.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB416NIX.

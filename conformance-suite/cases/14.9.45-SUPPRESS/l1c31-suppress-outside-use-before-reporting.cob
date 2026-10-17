@@ -12,7 +12,7 @@
       *>   only in a USE BEFORE REPORTING procedure."
       *>   -> OK  §14.9.45.3 1)  (Syntax rule)
       *> The program is otherwise a valid Report Writer program (the
-      *> same shape as conformance:2023/rw_suppress with the SUPPRESS
+      *> same shape as conformance:cases/13.18.16-CONTROL/rw_suppress with the SUPPRESS
       *> moved out of its declarative into MAIN-PARA and no
       *> DECLARATIVES at all), so the only reason to reject it is SR1:
       *> expect COBOLNET1581 (report-suppress-context).

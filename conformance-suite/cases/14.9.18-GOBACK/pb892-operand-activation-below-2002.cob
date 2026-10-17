@@ -4,7 +4,7 @@
 *> source-format: free
 *> portable: unverified
 *>---
-      *> The REJECT half of conformance:2002/pb892_operand_activation_resume
+      *> The REJECT half of conformance:cases/14.9.18-GOBACK/pb892_operand_activation_resume
       *> (kb/Work PB892). A condition propagated from an activation written
       *> as an OPERAND needs a user-defined function (ISO 9.4 / 11.5), the
       *> GOBACK RAISING phrase (14.9.18) and USE AFTER EXCEPTION CONDITION

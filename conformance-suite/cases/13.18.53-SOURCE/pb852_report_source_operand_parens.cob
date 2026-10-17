@@ -11,13 +11,13 @@
       *> repeats the brace pair), so once an operand may itself contain operators the list has two readings and
       *> the standard removes the choice by requiring the parentheses — on EVERY operand, the bare identifiers
       *> included.  The rule is ENFORCED (COBOLNET2142), never inferred from the grammar's shape; its negative
-      *> twin is tests/conformance/negative/pb852-source-operand-parens.cob.
+      *> twin is conformance-suite/cases/13.18.53-SOURCE/pb852-source-operand-parens.cob.
       *>
       *> WHY THIS COPY IS AT 2002 AND THE REST OF PB852 AT 85.  SR7 only bites on a multi-operand clause, which
       *> SR6 confines to a repeating entry ("the entry shall be a repeating entry or shall be subordinate to a
       *> repeating entry"), and 13.15.4 GR3's repetition vehicles — a multiple COLUMN or LINE clause, or a
       *> report-group OCCURS — are COBOL-2002 introductions.  The ROUNDED phrase and the expression operand
-      *> themselves are witnessed at 85 by tests/conformance/85/pb852_report_source_expression.cob.
+      *> themselves are witnessed at 85 by conformance-suite/cases/13.18.53-SOURCE/pb852_report_source_expression.cob.
       *>
       *> DERIVATION OF THE EXPECTED OUTPUT.  WS-A = 100, WS-B = 23, WS-N = 2.  One TYPE DE group, one GENERATE.
       *> The entry writes COLUMNS ARE 1 5 — two repetitions (13.15.4 GR3) — and two SOURCE operands, so

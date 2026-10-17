@@ -9,7 +9,7 @@
       *> phrase, 14.7.5 SIZE ERROR phrase and size error condition, 14.7.6 CORRESPONDING phrase, 14.7.7 Arithmetic
       *> statements, 14.6.13.2 Incompatible data" — so it is verified by verifying that each referenced
       *> specification applies ON SUBTRACT. §14.7.4 / §14.7.5 / §14.7.6 / §14.7.7 are pinned elsewhere
-      *> (conformance:85/optional_on_size_error for the SIZE ERROR leg); THIS golden is the §14.6.13.2 leg, which
+      *> (conformance:cases/14.9.2-ADD/optional_on_size_error for the SIZE ERROR leg); THIS golden is the §14.6.13.2 leg, which
       *> had no covering case for any verb.
       *>
       *> §14.6.13.2 rule 2: "When the content of a numeric sending item that is not described with a standard
@@ -24,7 +24,7 @@
       *> stores 100 - 7 = 93, so a compiler that simply raised on every SUBTRACT would fail here.
       *>
       *> 2002 is the introducing edition of the observable (>>TURN is a COBOL-2002 introduction, §7.3.25); see
-      *> conformance:negative/pb395-turn-data-incompatible-below-2002 for that gate.
+      *> conformance:cases/14.9.17-GO-TO/pb395-turn-data-incompatible-below-2002 for that gate.
        >>TURN EC-DATA-INCOMPATIBLE CHECKING ON
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB395SUBINC.

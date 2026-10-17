@@ -86,7 +86,7 @@
       *> ALPHABET REV IS "B" "A" puts "B" in position 1 and "A" in
       *> position 2, so `IF X > "B"` is TRUE for X = "A" under REV
       *> and FALSE under the native sequence — the same observable
-      *> tests/conformance/2023/pb78_object_computer_optional_name
+      *> conformance-suite/cases/12.3.5-SOURCE-COMPUTER/pb78_object_computer_optional_name
       *> already pins.  Both legs must answer REV; the ELSE branch
       *> prints NATIVE, and a CALL that never ran leaves the flag 0
       *> and also prints NATIVE, so the leg fails LOUDLY.

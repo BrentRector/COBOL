@@ -8,7 +8,7 @@
       *> kb/Work PB560 - the NUMERIC-EDITED legs of the ONE level-88 VALUE recipe. IN THE 2023 CORPUS because a
       *> numeric-literal VALUE for a numeric-edited item is itself a COBOL-2023 introduction (Annex E.3.3 item
       *> 43, "It is now permitted to allow numeric-edited data items to be assigned values specified as numeric
-      *> literals"; the gating negative is tests/conformance/negative/pb560-numeric-edited-value-below-2023).
+      *> literals"; the gating negative is conformance-suite/cases/13.18.63-VALUE/pb560-numeric-edited-value-below-2023).
       *>
       *> ISO 14.9.39.4 GR6: the literal "is placed in the conditional variable according to the rules for the
       *> VALUE clause"; 13.18.63.4 GR19: "The characteristics of a condition-name are implicitly those of its

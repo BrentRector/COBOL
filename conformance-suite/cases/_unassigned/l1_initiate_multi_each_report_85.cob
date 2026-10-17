@@ -34,7 +34,7 @@
       *> An implementation that initiated only the first (or only the
       *> last) name would leave A=5 (or B=5) - a GR1 violation.
       *> GR5 (both sentences) is pinned at 2002+ by
-      *> conformance:2002/l1_initiate_resume_next_implicit.
+      *> conformance:cases/14.9.21-INITIATE/l1_initiate_resume_next_implicit.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1INIM.
        ENVIRONMENT DIVISION.

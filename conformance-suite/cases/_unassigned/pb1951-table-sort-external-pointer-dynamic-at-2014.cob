@@ -9,7 +9,7 @@
       *> POINTER below level 1 needs a STRONG type declaration (ISO 13.18.60.3 SR14), and an
       *> EXTERNAL record's strongly-typed declaration must itself be EXTERNAL (13.18.22.3 SR5),
       *> a COBOL-2023 description (COBOLNET0900); the 2023 positive is
-      *> conformance:2023/pb1951_table_sort_external_pointer_dynamic_table.
+      *> conformance:cases/_unassigned/pb1951_table_sort_external_pointer_dynamic_table.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1951N14.
        DATA DIVISION.

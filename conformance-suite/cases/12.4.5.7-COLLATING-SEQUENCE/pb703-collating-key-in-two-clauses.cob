@@ -11,7 +11,7 @@
       *>
       *> This case is the DISCRIMINATOR for kb/Work PB703: the fix relaxed the CLAUSE
       *> boundary, not the rule. Its sibling positive golden
-      *> tests/conformance/2002/pb703_collating_key_named_twice.cob names IX-KEY TWICE
+      *> conformance-suite/cases/12.4.5.7-COLLATING-SEQUENCE/pb703_collating_key_named_twice.cob names IX-KEY TWICE
       *> INSIDE ONE clause and must COMPILE, because §12.4.5.7.2's Format-2 figure prints
       *> the ellipsis immediately right of the closing brace of
       *> { data-name-1 | record-key-name-1 } and §5.2.7 makes the brace group the repeated

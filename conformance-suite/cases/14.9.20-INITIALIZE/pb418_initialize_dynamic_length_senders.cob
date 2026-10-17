@@ -29,7 +29,7 @@
       *>   L7 DN carries no VALUE clause, so GR5c1b and GR5c1c are both false; it qualifies through GR5c3
       *>      (DEFAULT) and GR6c + GR7 give 00.
       *> DYNAMIC LENGTH is COBOL-2014 (8.5.1.10 / 13.18.19); the negative below it is
-      *> tests/conformance/negative/pb418-initialize-dynamic-length-2002.
+      *> conformance-suite/cases/14.9.20-INITIALIZE/pb418-initialize-dynamic-length-2002.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB418DYN.
        DATA DIVISION.

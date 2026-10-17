@@ -8,7 +8,7 @@
       *> introduced with COBOL-2002 (constructs.json object-view-2002: A.4.10 does not list it among the
       *> optional OO elements, Annex E's 2014->2023 delta does not list it). The program uses no other
       *> OO construct, so the COBOLNET0900 below names the object-view itself; the positive twin is
-      *> tests/conformance/2002/pb1425_object_view.cob.
+      *> conformance-suite/cases/8.4.3.1-Identifier/pb1425_object_view.cob.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1425W0.
        DATA DIVISION.

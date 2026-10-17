@@ -12,7 +12,7 @@
       *> interface.  Here the INSTANCE definition does and the FACTORY definition does not —
       *> the discriminator, because a screen that asked the instance-side closure (or asked
       *> merely "is the receiver typed at all") would accept this program.
-      *> The conforming twin is conformance:2002/pb451_set_format5_class_name_sender.
+      *> The conforming twin is conformance:cases/13.18.60-USAGE/pb451_set_format5_class_name_sender.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB451N1.
        ENVIRONMENT DIVISION.

@@ -12,7 +12,7 @@
 *> instead of a raw COBOL0001 that never says why. 8.3.2.1 rule 1: "Reserved words
 *> shall not be used as user-defined words or system-names". At 85, where 8.9 does
 *> not reserve UNLOCK, the same source is a conforming program - the 85 acceptance
-*> lane is tests/conformance/85/pb693_reserved_words_as_data_names.cob.
+*> lane is conformance-suite/cases/_unassigned/pb693_reserved_words_as_data_names.cob.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. UNLOCK.
 PROCEDURE DIVISION.

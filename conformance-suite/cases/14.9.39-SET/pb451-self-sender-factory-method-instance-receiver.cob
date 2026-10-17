@@ -15,7 +15,7 @@
       *> Roslyn CS0030 naming a synthesized type that appears nowhere in the program
       *> (kb/Work PB451); its interface twin, SR10 d), had been repaired one arm over.
       *> The conforming pair is the FMK / MK methods of
-      *> conformance:2002/pb451_set_format5_self_sender.
+      *> conformance:cases/11.4-FACTORY/pb451_set_format5_self_sender.
 
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB451N5.

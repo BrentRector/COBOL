@@ -12,7 +12,7 @@
       *> level-number, OCCURS, PRESENT WHEN, PROPERTY, TYPEDEF, VALIDATE-STATUS, VALUE, and VARYING."
       *> Every entry below writes one of them, so every entry below is LEGAL and the whole program compiles.
       *> The complement - PICTURE, USAGE, JUSTIFIED, SYNCHRONIZED, SIGN, BLANK WHEN ZERO, REDEFINES and
-      *> GROUP-USAGE - is conformance:negative/pb513-type-entry-composition (COBOLNET2150).
+      *> GROUP-USAGE - is conformance:cases/13.16-Data-description/pb513-type-entry-composition (COBOLNET2150).
       *>
       *> WHAT THE SUBJECT'S DESCRIPTION IS, computed from the rules and not read off a run:
       *>   13.18.57.4 GR1 - "the data description entry ... is treated as though it were described with the

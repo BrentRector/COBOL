@@ -7,7 +7,7 @@
 *>---
       *> kb/Work PB420 — the SAME ISO 14.9.20.4 GR4 implicit MOVE into a floating-point receiver, over the
       *> phrases and usages COBOL-2002 introduced, which the '85 witness
-      *> (tests/conformance/85/pb420_initialize_float_receiver_85) cannot express: the VALUE phrase
+      *> (conformance-suite/cases/14.9.20-INITIALIZE/pb420_initialize_float_receiver_85) cannot express: the VALUE phrase
       *> (`ALL TO VALUE`), the DEFAULT phrase (`THEN TO DEFAULT`), and the FLOAT-SHORT / FLOAT-LONG /
       *> FLOAT-EXTENDED usage words of 13.18.60. The rule is edition-invariant — GR4 splits on the RECEIVER's
       *> category and a float item is category NUMERIC (8.5.2.4), so the implicit statement is

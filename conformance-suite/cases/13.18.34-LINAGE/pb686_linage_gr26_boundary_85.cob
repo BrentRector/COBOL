@@ -6,7 +6,7 @@
       *> portable: unverified
       *>---
       *> ISO §14.9.51.4 GR26 a)/b) AT THE BOUNDARY — THE COBOL-85 TWIN
-      *> of tests/conformance/2023/pb686_linage_gr26_boundary.cob.
+      *> of conformance-suite/cases/13.18.34-LINAGE/pb686_linage_gr26_boundary.cob.
       *>
       *> ⚖ THE DETERMINATION IS EDITION-INDEPENDENT, AND THIS FIXTURE
       *> IS WHAT MAKES THAT A MEASUREMENT RATHER THAN AN ASSERTION.

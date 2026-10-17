@@ -12,7 +12,7 @@
       *> Method RUNM of the instance definition declares an (empty)
       *> REPORT SECTION; nothing else in the program is wrong (the
       *> general format lets a REPORT SECTION hold no entries). The
-      *> positive half is conformance:2023/l1m8_report_section_placements.
+      *> positive half is conformance:cases/13.8-Report-section/l1m8_report_section_placements.
       *> Expected: COBOLNET1519, the method-section arm; the .err pins
       *> its REPORT SECTION message (the FILE / SCREEN arms share the
       *> code).

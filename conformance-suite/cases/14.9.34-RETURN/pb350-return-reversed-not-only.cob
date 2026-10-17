@@ -16,7 +16,7 @@
       *> screen asks instead whether the AT END BLOCK is null after PhraseBlocks.Split has normalized position
       *> away, which is one test covering both arms.
       *> The legal complement — the SAME reversal with BOTH halves — is exercised by DRAIN-2 of
-      *> tests/conformance/2023/pb350_return_at_end_required.cob and must keep compiling.
+      *> conformance-suite/cases/14.9.34-RETURN/pb350_return_at_end_required.cob and must keep compiling.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB350N2.
        ENVIRONMENT DIVISION.

@@ -17,7 +17,7 @@
       *> §15.4.1 rule 1 is "the returned value shall equal the value of the equivalent arithmetic expression",
       *> so every P-* and F-* line below is NORMATIVE rather than merely expected. §15.44.4 r1 states
       *> INTEGER's value DIRECTLY (that function has no equivalent arithmetic expression), so its I-* lines
-      *> are normative in every mode — pinned again under native arithmetic by conformance:85/l1_integer_floor_85.
+      *> are normative in every mode — pinned again under native arithmetic by conformance:cases/15.44.3-Argument-rule/l1_integer_floor_85.
       *>
       *> THE DERIVATION, per argument a (every argument is an exact terminating decimal, so no rounding of the
       *> ARGUMENT is in play and only the three rules decide):

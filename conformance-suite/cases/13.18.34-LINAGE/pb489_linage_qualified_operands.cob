@@ -68,7 +68,7 @@
       *> TOP and BOTTOM operands visible (a margin has no effect on the
       *> counter). The derivation of the three line numbers for exactly
       *> this geometry is the one already recorded in
-      *> tests/conformance/85/pb523_linage_margins_on_the_medium_85.cob —
+      *> conformance-suite/cases/13.18.34-LINAGE/pb523_linage_margins_on_the_medium_85.cob —
       *> LINAGE 2 / TOP 3 / BOTTOM 2, three WRITEs AFTER ADVANCING 1 LINE:
       *> lines 1-4 blank, AAAA on line 5, lines 6-10 blank, BBBB on line
       *> 11, CCCC on line 12. The reader counts line feeds, because the

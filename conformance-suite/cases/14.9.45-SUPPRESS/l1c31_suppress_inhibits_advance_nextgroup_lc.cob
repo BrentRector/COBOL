@@ -18,7 +18,7 @@
       *> group is a detail, the SUPPRESS statement does not affect the
       *> sensing for control breaks or the subsequent control break
       *> processing."  ((a), no printing, is
-      *>    conformance:2023/rw_suppress)
+      *>    conformance:cases/13.18.16-CONTROL/rw_suppress)
       *> cite.py --check 14.9.45.4 "Any page advance associated with the
       *>   report group."           -> OK  §14.9.45.4 3) b)
       *> cite.py --check 14.9.45.4 "The processing of any NEXT GROUP

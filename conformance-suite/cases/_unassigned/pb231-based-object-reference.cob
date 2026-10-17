@@ -10,9 +10,9 @@
       *> pins is the standard's own. The BASED rule bars ONLY class
       *> object, so `01 P USAGE POINTER BASED.` - class pointer - is
       *> legal source and is exactly what the pointer third implements
-      *> (conformance:2002/pb231_based_pointer_leaf), while
+      *> (conformance:cases/14.9.3-ALLOCATE/pb231_based_pointer_leaf), while
       *> 13.18.22.3 SR4 bars BOTH classes from the EXTERNAL clause
-      *> (conformance:negative/pb231-external-pointer-item). Until the
+      *> (conformance:cases/13.18.22-EXTERNAL/pb231-external-pointer-item). Until the
       *> pointer third, one residue diagnostic (COBOLNET1695) rejected
       *> all three shapes for one wrong reason; each now draws the rule
       *> that is actually about it, and this fixture is what stops the

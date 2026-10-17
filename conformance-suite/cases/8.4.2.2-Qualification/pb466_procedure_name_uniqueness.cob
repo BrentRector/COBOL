@@ -27,7 +27,7 @@
       *>                  UNREF-DUP is declared twice inside S-ONE and once more in S-TWO and is referenced
       *>                  NOWHERE, so the condition SR7 states is not met and the program is conforming. This
       *>                  is why the uniqueness checks live at the reference and not at the declaration; the
-      *>                  negative twin is conformance:negative/pb466-paragraph-name-duplicated-in-section.
+      *>                  negative twin is conformance:cases/8.4.2.2-Qualification/pb466-paragraph-name-duplicated-in-section.
       *> 14.9.28.4 GR5 - each out-of-line PERFORM returns after its range, so PERFORM RULE6-ONE runs that one
       *>                  paragraph and the nested PERFORM COMMON-P inside it is a disjoint range (GR2's
       *>                  undefined case is OVERLAPPING ranges, which these are not).

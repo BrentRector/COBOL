@@ -29,7 +29,7 @@
       *> ⚠ IT IS A CONFORMANCE REJECTION, NOT A CAPABILITY GAP: --permissive accepts the same reference as a
       *> documented coercion extension and the Real-lane body then answers correctly. The rules' own
       *> windowing content is measured on the lane conforming source DOES reach, by
-      *> conformance:2002/l1_year_to_yyyy_defaults_and_sum_window.
+      *> conformance:cases/15.100.3-Arguments-rule/l1_year_to_yyyy_defaults_and_sum_window.
       *> Expected: COBOLNET1627, the intrinsic-argument-class diagnostic.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. NEGL1Y2YF.

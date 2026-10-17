@@ -9,7 +9,7 @@
 *> statement is specified." Two rules, two if blocks, ONE shape - the two-arm defect this project keeps
 *> finding, so the THRU arm gets its own case. Note what must NOT be rejected with it: an INVERTED range
 *> (procedure-name-2 physically preceding procedure-name-1) is legal, 14.9.28.4 GR6, and the positive
-*> golden tests/conformance/85/pb390_procedure_and_condition_operands.cob keeps the THRU composition green.
+*> golden conformance-suite/cases/8.4.4-Condition-name/pb390_procedure_and_condition_operands.cob keeps the THRU composition green.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB390PERFSR13.
 PROCEDURE DIVISION.

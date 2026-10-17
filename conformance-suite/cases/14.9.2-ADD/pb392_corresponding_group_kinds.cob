@@ -7,7 +7,7 @@
 *>---
       *> kb/Work PB392. The CORRESPONDING operand rule is a SET of group KINDS, and the three verbs name
       *> DIFFERENT sets - which is why this program is legal at every line and the bit-group SUBTRACT in
-      *> tests/conformance/negative/pb392-subtract-corresponding-bit-group.cob is not.
+      *> conformance-suite/cases/14.9.2-ADD/pb392-subtract-corresponding-bit-group.cob is not.
       *>
       *> ISO 1989:2023 14.9.44.3 SR6 (and 14.9.2.3 SR6, word for word): "Identifier-4 and identifier-5 shall be
       *> alphanumeric group items, national group items, variable-length groups, or strongly-typed group items

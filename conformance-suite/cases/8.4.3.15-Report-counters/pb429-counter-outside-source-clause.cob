@@ -7,7 +7,7 @@
 *> ⛔ THE REPORT-SECTION HALF OF §8.4.3.15.3 SR1 (kb/Work PB429). The rule has two halves and this golden is
 *> the second one: "In the report section, PAGE-COUNTER and LINE-COUNTER may be referenced only in a SOURCE
 *> clause. In the procedure division, PAGE-COUNTER and LINE-COUNTER may be referenced in any context where an
-*> integer data item may appear." conformance:85/pb429_page_counter_receiving is the procedure-division half —
+*> integer data item may appear." conformance:cases/8.4.3.1-Identifier/pb429_page_counter_receiving is the procedure-division half —
 *> ten contexts that admit an integer data item, all accepted; this one is the report section, where the
 *> permission is narrow and a counter outside a SOURCE clause is not source at all.
 *>

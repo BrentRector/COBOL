@@ -13,9 +13,9 @@
       *> and a literal has none. Folding 999 to 999 would look plausible and be meaningless, which is the
       *> failure mode this fixture exists to make loud.
       *>
-      *> The sibling conjuncts: category, by conformance:negative/l1-highest-algebraic-category; the function
-      *> exclusion, by conformance:negative/l1-highest-algebraic-intrinsic-arg and
-      *> conformance:negative/algebraic-udf-argument.
+      *> The sibling conjuncts: category, by conformance:cases/15.43.3-Argument-rules/l1-highest-algebraic-category; the function
+      *> exclusion, by conformance:cases/15.43.3-Argument-rules/l1-highest-algebraic-intrinsic-arg and
+      *> conformance:cases/15.43.3-Argument-rules/algebraic-udf-argument.
       *> Expected: COBOLNET1516, the algebraic-family argument diagnostic.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1HALIT.

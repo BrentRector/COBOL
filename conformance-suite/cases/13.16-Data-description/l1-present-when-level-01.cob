@@ -49,7 +49,7 @@
       *> 2002, 2014 and 2023 only.
       *>
       *> POSITIVE CONTROL, WHICH MUST KEEP COMPILING:
-      *> tests/conformance/2023/declined_rw_present_varying_control.cob
+      *> conformance-suite/cases/_unassigned/declined_rw_present_varying_control.cob
       *> — report-writer PRESENT WHEN (§13.18.41 format 1, Annex A.4.11
       *> item 14) is a DIFFERENT clause with the same spelling, it IS
       *> supported, and SR20 does not govern it.

@@ -8,7 +8,7 @@
 *> global name may reference that name without describing it again". R-1 has NO GLOBAL clause, so its
 *> detail group DET-1 is not a name the contained program PB369NGB can reference, and its GENERATE names
 *> neither a detail report group nor a report-name it can see (ISO §14.9.16.3 SR1/SR2). kb/Work PB369;
-*> the legal shape - RD ... IS GLOBAL - is conformance:85/pb369_global_report_use_selection.
+*> the legal shape - RD ... IS GLOBAL - is conformance:cases/13.18.27-GLOBAL/pb369_global_report_use_selection.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB369NGA.
        ENVIRONMENT DIVISION.

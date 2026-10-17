@@ -8,7 +8,7 @@
 *> GR9) "are moved according to the rules of the MOVE statement specified in 14.9.25". ST (PIC 9(4)) and RT
 *> (PIC A(4)) match under 8.5.1.12.3 - four bytes each - but a numeric sending operand does not move to an
 *> alphabetic receiver (14.9.25.3 SR10, Table 16), so the element MOVE the group MOVE implies is invalid and
-*> COBOLNET0819 names it at the MOVE. (The positive half is tests/conformance/2014/pb1144_dyn_move_elements.)
+*> COBOLNET0819 names it at the MOVE. (The positive half is conformance-suite/cases/14.6.9.2-Moving-a-table/pb1144_dyn_move_elements.)
 IDENTIFICATION DIVISION.
 PROGRAM-ID. N1144EL.
 DATA DIVISION.

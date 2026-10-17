@@ -13,7 +13,7 @@
       *> paired with an exception-name, so the licensing clause does
       *> not apply and the statement is illegal.
       *> The licence half is pinned by
-      *> conformance:2023/l1_perform_f3_when_file_repeat_licensed.
+      *> conformance:cases/14.9.28-PERFORM/l1_perform_f3_when_file_repeat_licensed.
       *> ONLY 2023 is named: the exception-checking PERFORM is new in
       *> COBOL-2023 (Annex E.3.3 item 36), so below 2023 the whole
       *> format is rejected by the construct gate with a different

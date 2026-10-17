@@ -12,7 +12,7 @@
       *>
       *> It also pins the LEGAL side of 13.18.57.3 SR5 / 13.18.49.3 SR9: a group with NO GROUP-USAGE, SIGN
       *> or USAGE clause may hold TYPE and SAME AS subordinates. The negatives
-      *> tests/conformance/negative/pb889-group-usage-over-type / -over-same-as pin the illegal side.
+      *> conformance-suite/cases/13.18.57-TYPE/pb889-group-usage-over-type / -over-same-as pin the illegal side.
       *>
       *> EXPECTED VALUES, DERIVED. 13.18.57.4 GR1: the effect is "as though the data description identified
       *> by type-name-1 had been coded in place of the TYPE clause", so both spellings give a group over

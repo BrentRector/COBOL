@@ -19,7 +19,7 @@
       *> Base 16 is not below 11, so r1's unsigned-integer half does not apply and an INTEGER function is an ordinary
       *> numeric-string argument there: BASECONVERT(INTEGER(10) 16 2) reads the digits "10" in base 16 (sixteen) and
       *> writes them in base 2 = 10000. (The nested INTEGER function itself is the SR12 REJECT at CONCAT and at a base
-      *> below 11: conformance:negative/pb1420-concat-integer-function-unsigned-position.)
+      *> below 11: conformance:cases/8.4.3.2-Function-identifier/pb1420-concat-integer-function-unsigned-position.)
       *> CONCAT and BASECONVERT are COBOL 2023 functions.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1420POS.

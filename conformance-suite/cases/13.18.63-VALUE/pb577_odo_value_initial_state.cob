@@ -7,8 +7,8 @@
       *>---
       *> kb/Work PB577 — ISO 13.18.63.4 GR6 and GR9 at the INITIAL-STATE occasion (GR4c first bullet), which is
       *> the only occasion COBOL-85 has for them: the TO VALUE phrase of INITIALIZE is COBOL-2002 (the sibling
-      *> golden conformance:2002/pb577_odo_value_initialize carries GR4c's second bullet). No spec-derived test
-      *> covered either rule's ODO population, and conformance:2002/table_value_occurs covers only the FIRST of
+      *> golden conformance:cases/13.18.63-VALUE/pb577_odo_value_initialize carries GR4c's second bullet). No spec-derived test
+      *> covered either rule's ODO population, and conformance:cases/13.18.63-VALUE/table_value_occurs covers only the FIRST of
       *> GR9's two named arms. Every expected value below is derived from the rules, not measured:
       *>   GR6 "the initialization of the associated data item behaves as if the value of the data item referenced
       *>   by the DEPENDING phrase ... is set to the maximum number of occurrences as specified by that OCCURS

@@ -10,7 +10,7 @@
       *> exception-name that does NOT begin with those characters, so
       *> pairing it with FILE violates the rule.
       *> The accept half is pinned by
-      *> conformance:2023/l1_perform_f3_when_file_ec_io_prefix.
+      *> conformance:cases/14.9.28-PERFORM/l1_perform_f3_when_file_ec_io_prefix.
       *> ONLY 2023 is named: the exception-checking PERFORM is new in
       *> COBOL-2023 (Annex E.3.3 item 36).
        IDENTIFICATION DIVISION.

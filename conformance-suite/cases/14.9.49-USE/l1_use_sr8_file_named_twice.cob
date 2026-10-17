@@ -9,7 +9,7 @@
       *> EXCEPTION statement within the same procedure division." ONE statement is not more than
       *> one statement, so this program - whose single Format-1 USE writes F1 twice and then F2 -
       *> is LEGAL and shall compile. It is the ACCEPTING complement of that rule (its rejecting
-      *> half is tests/conformance/negative/l1-use-sr8-file-in-two-statements).
+      *> half is conformance-suite/cases/14.9.49-USE/l1-use-sr8-file-in-two-statements).
       *> The Format-1 figure (§14.9.49.2, rendered from the printed page) writes the operand list
       *> as `{ file-name-1 } ...`: an ellipsis over a single brace group, with nothing restricting
       *> the repetition. §14.9.49.4 GR6 a) then associates the one procedure with the file - "If

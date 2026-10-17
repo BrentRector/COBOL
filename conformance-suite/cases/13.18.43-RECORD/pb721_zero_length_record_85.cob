@@ -6,7 +6,7 @@
       *> portable: unverified
       *>---
       *> The COBOL-85 half of the Annex A.3 item 43 claim (the 2023 witness is
-      *> tests/conformance/2023/pb721_zero_length_record.cob, which carries the full
+      *> conformance-suite/cases/8.5.4-Zero-length-items/pb721_zero_length_record.cob, which carries the full
       *> derivation). It exists because the capability and 13.18.43.3 SR7's permission
       *> to write a ZERO minimum are NOT edition-dependent, and the way that fact fails
       *> is a gate leaking downward: a >=2023 gate written on RECORD IS VARYING IN SIZE

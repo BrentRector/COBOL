@@ -24,7 +24,7 @@
       *>   carries USAGE NATIONAL and prints nothing itself; its subordinate 05 has no USAGE clause and is a
       *>   national item because of GR1. Before this, a USAGE clause on a report GROUP entry was captured and
       *>   then silently DISCARDED — `03 USAGE COMP.` over a printable item compiled and ran, which is the
-      *>   complement pinned by conformance:negative/pb541-report-usage-comp.
+      *>   complement pinned by conformance:cases/13.15-Report-group-description/pb541-report-usage-comp.
       *>
       *> LINE 3 — IMPLIED by the picture character-string. §13.18.60.4 GR8 speaks of "the implicit or explicit
       *>   USAGE NATIONAL clause", and §13.18.40.3 makes a picture of all N symbols a national item, so this
@@ -32,7 +32,7 @@
       *>   CLAUSE alone would miss, which is why the rule is asked once more of the usage the entry settles on.
       *>
       *> EDITION. National data is a COBOL-2002 introduction (§8.5.2 category national), so 2002 is the
-      *> introducing edition for a NATIONAL report item and conformance:negative/pb541-report-national-at-85
+      *> introducing edition for a NATIONAL report item and conformance:cases/13.18.60-USAGE/pb541-report-national-at-85
       *> is the negative below it. The behaviour does not differ across 2002/2014/2023, so there is one copy.
       *>
       *> THE READ-BACK IS BYTE-WISE because ORGANIZATION LINE SEQUENTIAL is gated at 2023 in this compiler; a

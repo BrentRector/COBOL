@@ -34,7 +34,7 @@
       *>                                                (14.6.8.2 rule 4)                               => 001
       *> SR7's multi-operand form needs a REPEATING entry (SR6), whose only vehicles — a multiple COLUMN or LINE
       *> clause, or a report-group OCCURS — are COBOL-2002 introductions, so it is witnessed by the 2002 sibling
-      *> tests/conformance/2002/pb852_report_source_operand_parens.cob and its negative twin.
+      *> conformance-suite/cases/13.18.53-SOURCE/pb852_report_source_operand_parens.cob and its negative twin.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB852RSX.
        ENVIRONMENT DIVISION.

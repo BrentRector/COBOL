@@ -10,7 +10,7 @@
       *> statement and the source shall be rejected. SR8 is a FORMAT 1 rule and Format 1 exists
       *> at every edition, so all four reject.
       *> (The accepting complement - ONE statement naming the same file twice - is
-      *> tests/conformance/85/l1_use_sr8_file_named_twice.)
+      *> conformance-suite/cases/14.9.49-USE/l1_use_sr8_file_named_twice.)
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1USE8N.
        ENVIRONMENT DIVISION.

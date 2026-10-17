@@ -14,7 +14,7 @@
       *> returns rule 12, never 14 — which is precisely why the compiler runs ONE placement
       *> predicate over the receiver's FACTORY axis and lets the receiver's KIND choose the
       *> clause it names.  The conforming twin is the MK method of
-      *> conformance:2002/pb389_object_reference_descriptor (SET A TO SELF, prints DERIVED).
+      *> conformance:cases/9.3.6-Method-invocation/pb389_object_reference_descriptor (SET A TO SELF, prints DERIVED).
 
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB451N7.

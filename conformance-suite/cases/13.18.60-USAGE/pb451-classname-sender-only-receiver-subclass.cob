@@ -11,7 +11,7 @@
       *> shall be the factory object of the specified class" — that class exactly, where
       *> d)1.a. (no ONLY) admits "or of a subclass".  The receiver here is FACTORY OF …C ONLY
       *> and the sender names …D, a subclass.  The twin WITHOUT the ONLY phrase is the
-      *> `SET F1 F2 TO PB451D` line of conformance:2002/pb451_set_format5_class_name_sender,
+      *> `SET F1 F2 TO PB451D` line of conformance:cases/13.18.60-USAGE/pb451_set_format5_class_name_sender,
       *> which is legal and prints FTAG-D — so the ONLY axis is what decides, not the names.
 
        IDENTIFICATION DIVISION.

@@ -6,7 +6,7 @@
 *> portable: unverified
 *>---
       *> kb/Work PB620 — ISO §15.17 COMBINED-DATETIME under NATIVE arithmetic: the twin of
-      *> conformance:2014/pb620_combined_datetime_eae, and the only place the THIRD carrier is reachable.
+      *> conformance:cases/15.4.1-Numeric-and-integer-functions/pb620_combined_datetime_eae, and the only place the THIRD carrier is reachable.
       *>
       *> WHY A SECOND PROGRAM. §15.17.3 r2 is a rule about argument-2's VALUE — "Argument-2 shall be in standard
       *> numeric time form", which §15.5.5 defines by magnitude alone — so the USAGE of the item holding that

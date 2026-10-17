@@ -32,7 +32,7 @@
       *> cite.py --check 10.6.2 "The data division may contain only a
       *>   linkage section" -> OK  §10.6.2 4) e)  (Syntax rules)
       *> The IMPLEMENTS-on-OBJECT asker is
-      *>   conformance:2002/l1c05_oo_strong_type_same_type. Here:
+      *>   conformance:cases/9.3.8.2.3-Conformance-between-interfaces/l1c05_oo_strong_type_same_type. Here:
       *>   1) the FACTORY of PB1012A IMPLEMENTS PB1012I, whose FSWAP
       *>      prototype takes and returns the strong type TT (declared
       *>      in the prototype's linkage section, the only data section

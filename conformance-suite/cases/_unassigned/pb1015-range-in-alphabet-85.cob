@@ -14,7 +14,7 @@
       *>   LOW  - the VALUE clause with IN omitted (IN is an optional word; AL names an alphabet)
       *>   WHEN - the EVALUATE range-expression (14.9.13.2), explicit IN
       *> Before PB1015 this compiled at --std 85 and printed IN / MID. The same source is legal at 2002+
-      *> (tests/conformance/2002/pb398_range_in_alphabet and pb502_value_range_in_alphabet pin the behaviour).
+      *> (conformance-suite/cases/13.18.63-VALUE/pb398_range_in_alphabet and pb502_value_range_in_alphabet pin the behaviour).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1015NEG.
        ENVIRONMENT DIVISION.

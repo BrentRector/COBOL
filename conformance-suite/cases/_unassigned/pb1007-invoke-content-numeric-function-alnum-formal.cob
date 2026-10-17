@@ -8,7 +8,7 @@
       *> non-numeric formal conform "as for a MOVE statement"; NUMVAL is a NUMERIC function (15.2 item 4),
       *> Table 16's Noninteger row, which 14.9.25.3 SR10 refuses into an alphanumeric receiver - exactly as
       *> `MOVE FUNCTION NUMVAL("3.7") TO P1` is refused. The integer twin is admitted
-      *> (conformance:2002/pb1007_invoke_content_integer_function).
+      *> (conformance:cases/_unassigned/pb1007_invoke_content_integer_function).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1007NI.
        ENVIRONMENT DIVISION.

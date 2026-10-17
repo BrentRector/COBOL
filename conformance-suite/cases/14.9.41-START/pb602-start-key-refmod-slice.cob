@@ -13,7 +13,7 @@
       *> which for a slice is still WS-RK - and positioned the file on the relative record number the key's first
       *> two characters spell, where ISO 12.4.5.13.4 GR1 makes 1 the first legal relative record number. A silent
       *> wrong answer at every edition.
-      *> The positive control is tests/conformance/85/pb602_start_key_identity.cob.
+      *> The positive control is conformance-suite/cases/14.9.41-START/pb602_start_key_identity.cob.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB602NEGSLICE.
        ENVIRONMENT DIVISION.

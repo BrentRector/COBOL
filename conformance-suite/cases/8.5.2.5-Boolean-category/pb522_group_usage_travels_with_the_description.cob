@@ -41,7 +41,7 @@
       *> / D=6 CTL=3 — every copy disagreeing with its own byte-identical control, with no diagnostic.
       *>
       *> COBOL-2002: GROUP-USAGE, TYPEDEF/TYPE and SAME AS are all 2002 introductions — the negative twin
-      *> tests/conformance/negative/pb522-group-usage-copy-below-2002.cob pins the gate below it.
+      *> conformance-suite/cases/13.16-Data-description/pb522-group-usage-copy-below-2002.cob pins the gate below it.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB522GUCOPY.
        DATA DIVISION.

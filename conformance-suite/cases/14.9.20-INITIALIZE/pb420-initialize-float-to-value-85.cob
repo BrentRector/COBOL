@@ -11,10 +11,10 @@
 *> and with it general rule 5c1 and general rule 6a, the operand-selection and sender rules that phrase
 *> carries. At --std 85 the initialize-to-value construct row refuses it, COBOLNET0831.
 *> It compiles and runs at 2002 and above — the positive witness for the same statement over the same
-*> receiver kind is tests/conformance/2002/pb420_initialize_float_value_default_2002, whose V1 arm reads the
+*> receiver kind is conformance-suite/cases/14.9.20-INITIALIZE/pb420_initialize_float_value_default_2002, whose V1 arm reads the
 *> VALUE clause's literal back out of the float leaves; and the COBOL-85-reachable half of GR4's implicit
 *> MOVE into a float receiver (the REPLACING phrase and the bare form) is
-*> tests/conformance/85/pb420_initialize_float_receiver_85.
+*> conformance-suite/cases/14.9.20-INITIALIZE/pb420_initialize_float_receiver_85.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB420NV85.
        DATA DIVISION.

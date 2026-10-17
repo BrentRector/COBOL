@@ -8,7 +8,7 @@
       *> ISO §14.9.49.3 SR7 — "The INPUT, OUTPUT, I-O, and EXTEND phrases may each be specified
       *> only once in the declaratives portion of a given procedure division." This is the
       *> ACCEPTING complement of that rule (its rejecting half is
-      *> tests/conformance/negative/l1-use-input-phrase-twice): all FOUR phrases appear, each
+      *> conformance-suite/cases/14.9.49-USE/l1-use-input-phrase-twice): all FOUR phrases appear, each
       *> exactly once, so the source conforms and each phrase names a DISTINCT open-mode scope.
       *> The four fired handlers are what makes the once-each reading falsifiable: were any two
       *> of the four phrases treated as one scope, this program would have to be rejected as a

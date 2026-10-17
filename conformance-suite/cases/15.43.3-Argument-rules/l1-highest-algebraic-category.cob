@@ -13,12 +13,12 @@
       *> decorative: r1 admits numeric-EDITED precisely because §8.5.2.1 Table 2 also puts a display
       *> numeric-edited item in CLASS alphanumeric, so a screen written on CLASS instead of CATEGORY would
       *> have to accept this item to keep accepting `$**,**9.99` (which
-      *> conformance:2023/l1_highest_algebraic_note_table requires it to accept).
+      *> conformance:cases/15.43.4-Returned-value-rules/l1_highest_algebraic_note_table requires it to accept).
       *>
       *> The rule's other two conjuncts are pinned separately, since they fail for different reasons: a
-      *> non-data-item argument by conformance:negative/l1-highest-algebraic-literal, and the function
-      *> exclusion by conformance:negative/l1-highest-algebraic-intrinsic-arg (intrinsic) and
-      *> conformance:negative/algebraic-udf-argument (user-defined).
+      *> non-data-item argument by conformance:cases/15.43.3-Argument-rules/l1-highest-algebraic-literal, and the function
+      *> exclusion by conformance:cases/15.43.3-Argument-rules/l1-highest-algebraic-intrinsic-arg (intrinsic) and
+      *> conformance:cases/15.43.3-Argument-rules/algebraic-udf-argument (user-defined).
       *> Expected: COBOLNET1516, the algebraic-family argument diagnostic.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1HACAT.

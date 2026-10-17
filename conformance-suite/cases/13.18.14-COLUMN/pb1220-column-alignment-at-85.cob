@@ -7,7 +7,7 @@
       *> kb/Work PB1220. The COLUMN clause's LEFT / CENTER / RIGHT alignment phrase (ISO/IEC 1989:2023
       *> 13.18.14.2 Format 1, 13.18.14.4 GR6) is a COBOL-2002 form (construct report-multi-column-2002): the
       *> COBOL-85 COLUMN clause is COLUMN NUMBER IS integer-1 alone, so COLUMN CENTER 5 is COBOLNET0900 at
-      *> --std 85. The positive twin is conformance:2002/pb1220_column_alignment.
+      *> --std 85. The positive twin is conformance:cases/13.18.14-COLUMN/pb1220_column_alignment.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1220N8.
        ENVIRONMENT DIVISION.

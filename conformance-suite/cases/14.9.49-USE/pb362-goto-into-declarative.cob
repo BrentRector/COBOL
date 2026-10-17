@@ -7,7 +7,7 @@
 *> ISO §14.9.49.3 SR4: "Procedure-names within a declarative section may be referenced in a different
 *> declarative section or in a nondeclarative procedure only with a PERFORM statement." The GO TO DP1
 *> in the nondeclarative portion names a paragraph of declarative section D1 (kb/Work PB362). The legal
-*> PERFORM of the same paragraph is conformance:85/pb362_declaratives_reference_boundary.
+*> PERFORM of the same paragraph is conformance:cases/14.9.49-USE/pb362_declaratives_reference_boundary.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB362GID.
        ENVIRONMENT DIVISION.

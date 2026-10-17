@@ -21,7 +21,7 @@
       *> A POSITIVE digit is left alone and a NEGATIVE digit becomes digit + 0x40, so 0-9 fuse to
       *> "0123456789" positive and "pqrstuvwxy" negative.  This is GnuCOBOL's `-fsign=ascii`, its
       *> default on a PC host; the default `ibm` row of the same tables is pinned by
-      *> conformance:2023/pb803_sign_default_representation.
+      *> conformance:cases/13.18.52-SIGN/pb803_sign_default_representation.
       *>
       *> WHY EACH LEG CAN FAIL — expected values derived from the determination, not observed.
       *> NEG / LEAD / POS are the three images the two conventions DISAGREE on: under `ibm` they

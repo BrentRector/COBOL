@@ -51,7 +51,7 @@
       *>      makes that order part of the format. Same range as A, and literal-4 does not disturb it
       *>                                                                                -> TRUE   -> E=T
       *>   B  `VALUE "D" THRU "P" IN ALPHA-REV` - 23 > 11: literal-1 collates AFTER literal-2 under
-      *>      ALPHA-REV. That leg moved to conformance:negative/pb552-value-through-not-ascending: ALPHA-REV
+      *>      ALPHA-REV. That leg moved to conformance:cases/13.18.63-VALUE/pb552-value-through-not-ascending: ALPHA-REV
       *>      is a sequence the compiler KNOWS, so 13.18.63.3 SR26 b) refuses the inverted range at compile
       *>      time (COBOLNET2961, kb/Work PB552) - in the NAMED sequence, which is what B pinned here (NATIVE
       *>      would give x44 <= x4D <= x50, a perfectly ordered range). A and E are its mirror: inverted

@@ -5,7 +5,7 @@
 *> portable: unverified
 *>---
       *> kb/Work PB1196 -- THE EDITION EDGE of the 2014 positive
-      *> tests/conformance/2014/pb1196_float_resultant_rounded_mode.
+      *> conformance-suite/cases/14.7.4-ROUNDED/pb1196_float_resultant_rounded_mode.
       *> FLOAT-SHORT is a COBOL-2002 usage, and at 2002 a floating-point
       *> resultant already takes 14.7.4.3 rule 2's implied TRUNCATION and
       *> a bare ROUNDED; the ROUNDED MODE IS phrase that selects any other
