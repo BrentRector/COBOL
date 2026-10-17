@@ -80,5 +80,8 @@ are byte-identical, so the change moved exactly 12 rows:
 without `newline=`, so the file checked out with CRLF. The writer now passes `newline` as LF. The re-gate
 (20261017T011528Z-adddfa) reads `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to
 CI's whole-population run: Conformance 6,046 · Unit 1,010 · Characterization 31`. In `leg-1-Unit.trx`, both
-`EveryEditionsField_IsTheOneSpelling` and `TheseChecks_ActuallyFail_OnAFabricatedInventory` read Passed.
+`EveryEditionsField_IsTheOneSpelling` and `TheseChecks_ActuallyFail_OnAFabricatedInventory` read Passed. After the
+review fixes, the re-gate (20261017T034637Z-d9e64e) reads `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
+PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,850 · Unit 599 · Characterization 31`, and
+`EveryFunctionRule_StartsNoEarlierThanItsFunction` reads Passed in its `leg-1-Unit.trx`.
 `semgrep/verify.py` passes with no count raised.
