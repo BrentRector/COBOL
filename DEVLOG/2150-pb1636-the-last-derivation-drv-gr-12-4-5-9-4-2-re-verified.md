@@ -1,4 +1,4 @@
-## PB1636: the last derivation, DRV-GR-12.4.5.9.4-2, re-verified and parked for the owner's signature
+## Entry 2150 — 2026-10-17 11:26 PDT — PB1636: the last derivation, DRV-GR-12.4.5.9.4-2, re-verified and parked for the owner's signature
 
 Wave 1108 group C took kb/Work PB1636 (`status: half`) to finish its open half: inventory row GR-12.4.5.9.4-2,
 §12.4.5.9.4 GR2, *"If the processor does not support record locking, record locks have no effect for the associated
@@ -20,3 +20,4 @@ planner (`work.py cluster_order` now reports `waiting on status: owner`) and ont
 note carries the refreshed draft row, ready to paste into §8 once signed, and the bare question for the owner. The
 draft names the current code sites and witnesses. The note's stale macOS caveat (written before PB2936 landed) is
 corrected. No inventory row changed: GR-12.4.5.9.4-2 stays GAP, still claimed by PB1636, until the signature.
+
