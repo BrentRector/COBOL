@@ -2093,7 +2093,8 @@ public sealed partial class ReferenceResolver(DataBinder data)
     /// the table(ALL) intrinsic argument so both ask it in the same order relative to ordinary lookup (a counter
     /// first, unless the qualifiers reach no counter and an ordinary item answers them). Null when the name is no
     /// counter's, when an ordinary item answers the qualifiers, or when the reference was diagnosed (no counter
-    /// is subordinate to the qualifiers; two counters are).</summary>
+    /// is subordinate to the qualifiers; two counters are; a counter and an ordinary data item of the same source
+    /// element are — kb/Work PB3232, the counters and the ordinary items being ONE §8.4.2.2.3 SR1 candidate set).</summary>
     internal (ReportModel Report, ReportSumFamily Family)? SumCounterFamilyFor(
         Core.DataReferenceContext dref, string name, List<string> qualifiers, bool report)
     {
@@ -2134,13 +2135,31 @@ public sealed partial class ReferenceResolver(DataBinder data)
                 ? data.DeclaredNearerThan(name, counterDepth)
                 : ResolveQualified(name, qualifiers) is { } nearer && data.DeclaringDepth(nearer) < counterDepth))
             return null;
-        if (matches.Count > 1)
+        // ⛔ THE COUNTER IS ONE CANDIDATE AMONG ALL THE DATA-NAMES OF ITS SPELLING (kb/Work PB3232). §13.18.54.4 GR5 makes a
+        // SUM entry's data-name the name of its sum counter, so the counter is a data-name like the ordinary data items
+        // of the same source element, and §8.4.2.2.3 SR1 — "For each non unique user-defined name that is explicitly
+        // referenced, uniqueness shall be established through a sequence of qualifiers that precludes any ambiguity of
+        // reference" — counts them TOGETHER. The ordinary items asked about are the ones the SAME written qualifiers
+        // reach in the SAME source element as the counters (§8.4.6.2.1 3): the one candidate set
+        // DataBinder.QualifiedCandidates, which the ordinary lookup (ResolveUnqualified / ResolveQualified) reads too.
+        // Asking only the counters, as this method did, let the counter win every collision with a WORKING-STORAGE item
+        // that had no qualifier to tell them apart: a MOVE to the name altered the report total, silently.
+        int sameSpelling = matches.Count + data.QualifiedCandidates(name, qualifiers, data.ActiveScope)
+            .Where(item => data.DeclaringDepth(item) == counterDepth).Count;
+        if (sameSpelling > 1)
         {
             if (report && _diagnosed.Add(dref))
+            {
+                int ordinary = sameSpelling - matches.Count;
                 data.Edition.Error(DiagnosticCatalog.ReportSumCounterReference, $"'{DataBinder.WrittenText(dref)}': the reference is ambiguous — "
-                    + $"{matches.Count} entries establish a sum counter named '{name}' (ISO §13.18.54.4 GR1 gives "
-                    + "each entry its own counter). A reference shall uniquely identify one resource (ISO "
-                    + "§8.4.2.2.1); qualify it by report group entry or report-name, or give the entries distinct data-names.");
+                    + (ordinary == 0
+                        ? $"{matches.Count} entries establish a sum counter named '{name}' (ISO §13.18.54.4 GR1 gives each entry its own counter)."
+                        : $"'{name}' is the name of {(matches.Count == 1 ? "a sum counter" : $"{matches.Count} sum counters")} "
+                          + $"(ISO §13.18.54.4 GR5) and of {(ordinary == 1 ? "a data item" : $"{ordinary} data items")} "
+                          + "the written qualifiers also reach.")
+                    + " A reference shall uniquely identify one resource (ISO §8.4.2.2.1, §8.4.2.2.3 SR1); qualify it by "
+                    + "report group entry, group or report-name, or give the entries distinct data-names.");
+            }
             return null;
         }
         return matches[0];
