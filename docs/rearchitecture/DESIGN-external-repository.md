@@ -432,8 +432,10 @@ public static class ACCT_UPDATE
 - **Names.** The class, the record structs, their members and the `Call` parameters are named by the ONE allocator of
   §4.5 — `DataItem.Sanitize` of the word, then the smallest free `_2`, `_3`, … in source order — over a scope SEEDED
   with that scope's reserved names: the enclosing type's own name (CS0542), the fixed members (`Call` and `Cancel` in
-  the class; `AsImage` and `FromImage` in a record struct) and the record struct's synthesized members (`Equals`,
-  `GetHashCode`, `ToString`, `Deconstruct`, `PrintMembers`, `EqualityContract`). A group contributes a property and a
+  the class; `AsImage` and `FromImage` in a record struct), the record struct's synthesized members (`Equals`,
+  `GetHashCode`, `ToString`, `Deconstruct`, `PrintMembers`, `EqualityContract`) and the imported type names (§4.5:
+  a formal `HostLanding` publishes parameter `HostLanding_2`, a `PROGRAM-ID. HostLanding.` the class `HostLanding_2`;
+  kb/Work PB3270). A group contributes a property and a
   nested record-struct type, named `<word>` and `<word>_Record` in the same scope. The `Call` parameters are claimed
   in the CLASS's scope beside its record structs, in source order (a formal's word, then its record's), because the
   `Call` body names each record type by its simple name and a parameter of that spelling would shadow it: `USING REC
@@ -673,7 +675,21 @@ the members the emitter itself writes there and the ones C# synthesizes (a recor
 the other image and leaf-vector members, `Equals`, `GetHashCode`, `ToString`, `PrintMembers`, …, in
 `CsNames.RecordStructMembers`; a program class: the `ICobolProgram` surface `Call`, `CloseFiles`, `EndStorage`, …, in
 `CsNames.ProgramClassMembers`; the published host-entry scopes add `Call`, `Cancel` and the enclosing type's name) —
-so a legal word never collides with a generated member. **Landed for the internal scopes (kb/Work PB2093):**
+so a legal word never collides with a generated member. **Every scope is also seeded with the imported type names
+(kb/Work PB3270):** the generated file's using directives import `System` and the runtime's namespaces
+(`CsNames.ImportedNamespaces`, the ONE list) and the emitted C# names their types by SIMPLE name
+(`CobolString.Store(…)`, `HostLanding.LandText(…)`, `Int128`), so a field, member, parameter or host class spelled like
+one shadows it for every such reference in its scope (CS0236, CS0120, CS1061, CS0117 on legal COBOL).
+`CsNames.ImportedTypeNames` — every public top-level type of those namespaces in the runtime assembly, and of `System`
+in the core library — is DERIVED by reflection, never listed by hand, and each scope kind holds it shared beside its own
+members, so a word spelled the same (case-sensitively, as C# is) takes the next free `_n`: `ModuleTypes` included, so a
+`PROGRAM-ID. HostLanding.` gets host class `HostLanding_2` rather than capturing the runtime's `HostLanding` for the
+namespace. `ImportedTypeNameDriftTests` keeps the derivation total: the using directives the emitter writes ARE
+`ImportedNamespaces`; the runtime side equals what Roslyn sees; and no string the compiler holds names a framework
+`System` type by simple name that the core-library derivation misses (it found `Console.Error.WriteLine`, now
+`global::System.Console…`). OO class, interface, method and property names are `DataItem.WordIdentifier`'s UPPER-CASE
+fold and so spell no imported type (the one all-capitals type, `BASE`, is the OO base class itself).
+**Landed for the internal scopes (kb/Work PB2093):**
 `DataBinder`'s private `Unique`, which left both unseeded (a subordinate named `AsImage` or `Equals` drew CS0102 in
 `_T_0`, a record named `CloseFiles` in the program class), is deleted; a group's members are appended only through
 `DataItem.AddMember`, which allocates in the group's own record-struct scope, and the class-level roots through the

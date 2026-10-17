@@ -434,6 +434,7 @@
   "pb359_unsuccessful_read_start_position",
   "pb243_display_all_literal",
   "pb3233_inspect_figurative_pattern_size",
+  "pb3270_runtime_type_names_as_user_words",
   "pb3254_sort_inverted_section_thru"
  ],
  "pending": []
