@@ -300,7 +300,7 @@ def main() -> int:
     if bad:
         return 1
     out.write_text(json.dumps({"batch": "pb3173-s0b-editions", "records": records}, indent=1, ensure_ascii=False)
-                   + "\n", encoding="utf-8")
+                   + "\n", encoding="utf-8", newline="\n")
     print(f"{len(records)} records, {len(checked)} evidence items checked, all OK -> {out}")
     return 0
 
