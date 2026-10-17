@@ -620,13 +620,23 @@ BASED entry's pointer, §13.18.5.4 GR3). A NUMERIC function-identifier's tempora
 (`SendingValueTemp.ReturnedValuePicFor` over `ReceivingReach.Of`): the fixed 30-digit, scale-9 description
 stored `MOVE FUNCTION PI TO S1 S2` into `PIC 9V9(12)` as 3.141592653000 where the single-receiver MOVE stores
 3.141592653589, so the equivalence was exact only for receivers of scale 9 or less and 21 integer digits or fewer.
-`ReceivingReach` decides the intermediate's SHAPE from the receivers: when every receiver is floating-point the
-intermediate is floating-point too (the receivers' one usage, binary32 for several binary32 usages, otherwise
-binary64), because no scaled integer carries a binary64's magnitude or digits — a scale-9 intermediate stored
-`MOVE FUNCTION PI TO F (I)` into a FLOAT-LONG as 3.141592653 under a >>TURN that made the N = 1 freeze owed, where
-the un-frozen MOVE stores 3.141592653589793. Otherwise it is fixed-point at the widest
-fixed-point receiver's scale and integer digits (`PicInfo.WidestReceiving`), and a floating-point or
-floating-point-edited receiver beside them asks for every fraction digit the 38-digit carrier keeps.
+`ReceivingReach` decides the intermediate's SHAPE from the receivers, and the binder does not know the function's
+carrier family (binary64, SDIDI or scaled integer, decided by `IntrinsicRenderer`), so each shape is exact for
+every family. When every receiver is a floating-point item the intermediate is a floating-point item too (the
+receivers' one usage, binary32 for several binary32 usages, otherwise binary64), because no scaled integer carries a
+binary64's magnitude or digits — a scale-9 intermediate stored `MOVE FUNCTION PI TO F (I)` into a FLOAT-LONG as
+3.141592653 under a >>TURN that made the N = 1 freeze owed, where the un-frozen MOVE stores 3.141592653589793.
+When every receiver is floating-point and one is a floating-point numeric-edited item, the intermediate is the
+widest such item the PICTURE admits, `+9.9(35)E+9999` (§13.18.40.3 SR15, §13.18.40.4 GR13 b): an edited receiver
+truncates the sender's decimal value to its own significand (§14.6.8.4 2), and truncating to 36 digits first changes
+nothing, where a binary64 intermediate cut `MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO D (I)` into
+`PIC +9.9(20)E+99` to 17 digits. When every receiver is a fixed-point item, the intermediate is fixed-point at
+exactly the receivers' widest scale and integer digits (`PicInfo.WidestReceiving`): each receiver truncates a
+sub-range of them (§14.6.8.2 4), and the returned value's own 21 integer digits added cut a `PIC S9(3)V9(28)`
+receiver's fraction to 17 digits. Any other set (fixed-point receivers beside floating-point ones, or a character
+receiver, which takes the returned value's own text image) takes the larger of the returned value's description and
+the fixed-point receivers' digits, and a floating-point or floating-point-edited receiver beside them asks for every
+fraction digit the 38-digit carrier keeps — the one documented limit, a MIXED set (DOC-A.1-92).
 
 **The intermediate's CAPACITY is counted in §8.4.3.3.4 GR5 positions, not in characters.** GR5 a) fixes the unit —
 "If the usage of identifier-1 is bit, positions used in evaluation are bit positions; otherwise, positions used

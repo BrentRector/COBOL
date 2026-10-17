@@ -106,29 +106,36 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     internal static PicInfo NumericReturnedValuePic(BoundOperand c) =>
         IntrinsicResultType.IsIntegerOperand(c) ? IntegerFunctionValuePic : FunctionValuePic;
 
-    /// <summary>⛔ THE TEMPORARY A MOVE FREEZES A NUMERIC FUNCTION'S VALUE INTO KEEPS EVERY FRACTION DIGIT ITS RECEIVERS
-    /// TAKE (kb/Work PB370). §14.9.25.4 GR1's equivalence — <c>MOVE a TO temp</c> / <c>MOVE temp TO b</c> — is exact
+    /// <summary>⛔ THE TEMPORARY A MOVE FREEZES A NUMERIC FUNCTION'S VALUE INTO KEEPS EVERY DIGIT ITS RECEIVERS TAKE
+    /// (kb/Work PB370). §14.9.25.4 GR1's equivalence — <c>MOVE a TO temp</c> / <c>MOVE temp TO b</c> — is exact
     /// only if <c>MOVE temp TO b</c> stores what <c>MOVE a TO b</c> stores, and the un-frozen MOVE renders the
     /// function at the RECEIVER's scale when that is wider than the working scale 9 (<c>ReceiverContext</c>). A
     /// scale-9 temporary therefore truncated <c>MOVE FUNCTION PI TO S (I)</c> into a <c>PIC 9V9(12)</c> receiver to
     /// 3.141592653000 where the un-frozen statement stores 3.141592653589 — and the same for every receiver of a
     /// multi-receiver MOVE; and a 21-integer-digit temporary dropped the high-order digits a receiver with more
-    /// integer positions holds. So the temporary takes the larger of <see cref="NumericReturnedValuePic"/>'s and
-    /// <paramref name="reach"/>'s integer digits and scale (an INTEGER function keeps scale 0, §15.2 item 5), with the
-    /// scale capped so the whole value still fits the 38-digit <c>Int128</c> carrier — the cap
-    /// <c>ReceiverContext.WorkingScale</c> applies to the un-frozen landing, for the same reason. When every receiver
-    /// is floating-point the temporary is floating-point instead (<see cref="ReceivingReach.Float"/>).
-    /// <see cref="NumericReturnedValuePic"/> stays the description of the returned value itself, which the LENGTH fold
-    /// measures.</summary>
+    /// integer positions holds. <paramref name="reach"/> decides (<see cref="ReceivingReach"/>'s summary has the
+    /// rule): a floating-point set takes its floating-point description (<see cref="ReceivingReach.Floating"/>); an
+    /// all-fixed-point set takes exactly its receivers' widest integer digits and scale
+    /// (<see cref="ReceivingReach.FixedPointOnly"/>), since each receiver truncates a sub-range of them; any other
+    /// set takes the larger of <see cref="NumericReturnedValuePic"/>'s and <paramref name="reach"/>'s. An INTEGER
+    /// function keeps scale 0 (§15.2 item 5), and the scale is capped so the whole value still fits the 38-digit
+    /// <c>Int128</c> carrier — the cap <c>ReceiverContext.WorkingScale</c> applies to the un-frozen landing, for the
+    /// same reason. <see cref="NumericReturnedValuePic"/> stays the description of the returned value itself, which
+    /// the LENGTH fold measures.</summary>
     private static PicInfo ReturnedValuePicFor(BoundOperand c, ReceivingReach reach)
     {
-        // ⛔ AN ALL-FLOATING-POINT SET TAKES A FLOATING-POINT INTERMEDIATE (kb/Work PB370): no
-        // scaled integer carries a binary64 receiver's value, so a FLOAT-LONG F (I) stored 3.141592653 for
-        // FUNCTION PI where the un-frozen MOVE stores 3.141592653589793 (ReceivingReach's summary has the rule).
-        if (reach.Float is { } floating) return floating;
+        // ⛔ A FLOATING-POINT SET TAKES A FLOATING-POINT INTERMEDIATE (kb/Work PB370): no scaled integer carries a
+        // binary64 receiver's value, so a FLOAT-LONG F (I) stored 3.141592653 for FUNCTION PI where the un-frozen
+        // MOVE stores 3.141592653589793 — and no binary64 carries a 21-digit floating-point edited receiver's.
+        if (reach.Floating is { } floating) return floating;
         var pic = NumericReturnedValuePic(c);
-        int integerDigits = Math.Min(MaxWideDigits, Math.Max(pic.Digits - pic.Scale, reach.IntegerDigits));
-        int scale = pic.Scale == 0 ? 0 : Math.Min(Math.Max(pic.Scale, reach.Scale), MaxWideDigits - integerDigits);
+        int ownIntegerDigits = reach.FixedPointOnly ? 0 : pic.Digits - pic.Scale;
+        int ownScale = reach.FixedPointOnly ? 0 : pic.Scale;
+        int integerDigits = Math.Min(MaxWideDigits, Math.Max(ownIntegerDigits, reach.IntegerDigits));
+        int scale = pic.Scale == 0 ? 0 : Math.Min(Math.Max(ownScale, reach.Scale), MaxWideDigits - integerDigits);
+        // An INTEGER function moved only to all-fraction receivers (PIC V99) keeps one integer digit: a numeric item
+        // has at least one digit position, and those receivers store zero whatever the integer digits hold.
+        if (integerDigits + scale == 0) integerDigits = 1;
         int digits = integerDigits + scale;
         return digits == pic.Digits && scale == pic.Scale ? pic : pic with { Length = digits, Digits = digits, Scale = scale };
     }
@@ -153,7 +160,7 @@ internal sealed class SendingValueTemp(BinderContext ctx)
     /// <see langword="null"/> appends, for a caller whose later operands register nothing.</param>
     /// <param name="reach">What the operands the frozen value is moved to can hold (a MOVE's receivers,
     /// <see cref="ReceivingReach.Of"/>): a numeric function's temporary keeps at least that many fraction and integer
-    /// digits, or is floating-point for an all-floating-point set (<see cref="ReturnedValuePicFor"/>). Default (no
+    /// digits, or is floating-point (or floating-point edited) for a floating-point set (<see cref="ReturnedValuePicFor"/>). Default (no
     /// digits, fixed-point) for a caller with no such receiver.</param>
     internal Place? Materialize(BoundOperand op, string tag, int? at = null, ReceivingReach reach = default) =>
         Positioned(at, () => Freeze(op, tag, reach));

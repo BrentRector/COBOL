@@ -203,7 +203,7 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets)
                 || SenderIdentificationIsOverrun(source, targets, senderPreOpsEnd))
             && host.SendingValue.Materialize(source, "move", senderPreOpsEnd,
-                ReceivingReach.Of([.. targets.Select(t => t.DenotedItem?.Pic)])) is { } frozen)
+                ReceivingReach.Of([.. targets.Select(t => t.DenotedItem?.Pic)], ctx.Edition)) is { } frozen)
             source = new BoundFieldOperand(frozen);
         // ⛔ §14.6.9.2's element moves are bound HERE, beside the group move they follow (kb/Work PB1144), so every
         // GR9 move — the written MOVE and each implicit phrase move alike — carries them, and each is a MOVE this

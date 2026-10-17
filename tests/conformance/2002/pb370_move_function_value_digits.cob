@@ -32,6 +32,23 @@
       *>   Y  MOVE FUNCTION EXP (100) TO D (I), a floating-point
       *>      numeric-edited receiver PIC +9.9(9)E+99 (no fixed scale):
       *>      the same edited image its twin DQ takes, +2.688117141E+43.
+      *>   Z  MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO W (I),
+      *>      PIC +9.9(20)E+99: an exact-valued function into a 21-digit
+      *>      edited significand, truncated there (§14.6.8.4 2) to
+      *>      +1.23456789012345678901E+00 as its twin WQ is - more digits
+      *>      than a binary64 intermediate carries.
+      *>   K  The same value TO WQ WS, a 21-digit and a 6-digit edited
+      *>      receiver: each equals its single-receiver twin.
+      *>   V  MOVE FUNCTION PI TO W (I): a binary64 value into the
+      *>      21-digit edited receiver equals its twin.
+      *>   P  MOVE FUNCTION NUMVAL ("-1.2345678901234567890123") TO F1 WQ:
+      *>      a FLOAT-LONG beside an edited receiver - each equals its twin.
+      *>   J  The 22-digit NUMVAL value TO SL (I) and TO SL1 SL2, all
+      *>      PIC S9(3)V9(28): every one of the 28 fraction digits the
+      *>      receivers take (the returned value's 21 integer digits would
+      *>      leave seventeen within a 38-digit intermediate).
+      *>   W  MOVE FUNCTION INTEGER (I) TO V1 V2, PIC V99: an integer
+      *>      value into all-fraction receivers stores zero in each.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB370FD.
        DATA DIVISION.
@@ -58,6 +75,19 @@
        01 DT.
           05 D PIC +9.9(9)E+99 OCCURS 3 TIMES.
        01 DQ PIC +9.9(9)E+99.
+       01 WT.
+          05 W PIC +9.9(20)E+99 OCCURS 3 TIMES.
+       01 WQ PIC +9.9(20)E+99.
+       01 WQ2 PIC +9.9(20)E+99.
+       01 WS PIC -9.9(5)E+99.
+       01 WS2 PIC -9.9(5)E+99.
+       01 SLT.
+          05 SL PIC S9(3)V9(28) OCCURS 3 TIMES.
+       01 SL1 PIC S9(3)V9(28).
+       01 SL2 PIC S9(3)V9(28).
+       01 SLQ PIC S9(3)V9(28).
+       01 V1 PIC V99.
+       01 V2 PIC V99.
        01 I  PIC 99 VALUE 2.
        PROCEDURE DIVISION.
        MAIN-P.
@@ -115,5 +145,38 @@
            MOVE FUNCTION EXP (100) TO DQ
            IF D (I) = DQ DISPLAY "Y D (I) EQUAL " D (I)
                       ELSE DISPLAY "Y D (I) DIFFER " D (I) " " DQ
+           END-IF
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO W (I)
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO WQ
+           IF W (I) = WQ DISPLAY "Z W (I) EQUAL " W (I)
+                      ELSE DISPLAY "Z W (I) DIFFER " W (I) " " WQ
+           END-IF
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO WS
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO WQ2 WS2
+           IF WQ2 = WQ AND WS2 = WS DISPLAY "K WQ2 WS2 EQUAL " WS2
+                       ELSE DISPLAY "K WQ2 WS2 DIFFER " WQ2 " " WS2
+           END-IF
+           MOVE FUNCTION PI TO W (I)
+           MOVE FUNCTION PI TO WQ
+           IF W (I) = WQ DISPLAY "V W (I) EQUAL"
+                      ELSE DISPLAY "V W (I) DIFFER " W (I) " " WQ
+           END-IF
+           MOVE FUNCTION NUMVAL ("-1.2345678901234567890123") TO G
+           MOVE FUNCTION NUMVAL ("-1.2345678901234567890123") TO WQ
+           MOVE FUNCTION NUMVAL ("-1.2345678901234567890123") TO F1 WQ2
+           IF F1 = G AND WQ2 = WQ DISPLAY "P F1 WQ2 EQUAL " WQ2
+                              ELSE DISPLAY "P F1 WQ2 DIFFER " F1 " " WQ2
+           END-IF
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO SLQ
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO SL (I)
+           MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO SL1 SL2
+           IF SL (I) = SLQ AND SL1 = SLQ AND SL2 = SLQ
+                DISPLAY "J SL (I) SL1 SL2 EQUAL"
+           ELSE DISPLAY "J SL (I) SL1 SL2 DIFFER " SL (I) " " SL1
+           END-IF
+           MOVE 0.5 TO V1 V2
+           MOVE FUNCTION INTEGER (I) TO V1 V2
+           IF V1 = 0 AND V2 = 0 DISPLAY "W V1 V2 ZERO"
+                            ELSE DISPLAY "W V1 V2 DIFFER " V1 " " V2
            END-IF
            STOP RUN.

@@ -59,3 +59,22 @@ floating-point edited receiver), six of which fail on the reviewed head. The swe
 callers found the same fixed scale-9 temporary under an EVALUATE subject (`EVALUATE FUNCTION PI WHEN 1 ... WHEN G`
 takes WHEN OTHER where `IF FUNCTION PI = G` is true), which has no receivers to decide the shape from; it is reported as
 a lead.
+
+**Branch review round 2 (R2-1): a floating-point edited receiver and an all-fixed-point set.** The round-1 shape sent
+every floating-point EDITED receiver through a binary64 intermediate, but such a receiver takes the sender's DECIMAL
+value and truncates it to its own significand (§14.6.8.4 2), so an exact-valued function lost every digit past the
+seventeenth: `MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO D (I)` into `PIC +9.9(20)E+99` stored
+`+1.23456789012345670000E+00` under `>>TURN EC-BOUND CHECKING ON` where the un-frozen MOVE stores
+`+1.23456789012345678901E+00`, and `MOVE ... TO DQ D (I)` cut both. The binder does not know the function's carrier
+family (binary64, SDIDI or scaled integer, `IntrinsicRenderer` decides it), so `ReceivingReach.Of` now picks only shapes
+that are exact for every family: a floating-point set holding an edited receiver takes the widest floating-point edited
+item the PICTURE admits, `+9.9(35)E+9999` (§13.18.40.3 SR15's 36 digits, §13.18.40.4 GR13 b's four exponent digits),
+analyzed by `PictureAnalyzer.Analyze`, because truncating to 36 digits first and then to the receiver's changes nothing.
+The sibling sweep of the same rule found the fixed-point arm failing the same way: the returned value's own 21 integer
+digits were added to the receivers', so `MOVE FUNCTION NUMVAL ("1.2345678901234567890123") TO SL (I)` (and `TO SL1 SL2`)
+into `PIC S9(3)V9(28)` kept 17 fraction digits in the 38-digit carrier. An all-fixed-point set now takes exactly its
+receivers' widest digits (`ReceivingReach.FixedPointOnly`), since each receiver truncates a sub-range of them
+(§14.6.8.2 4); any set with a character receiver keeps the returned value's description, which its text image needs.
+`ReceivingReach.Float` is renamed `Floating`. The golden gains legs Z, K, V, P, J and W, of which Z, K, P and J print
+DIFFER on the round-2 head. DOC-A.1-92 and DESIGN-binder-bound-tree now state the mixed-set limit as the only one, and
+name its three cases.
