@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: national_intrinsics
-*> rules: [GR-15.2-3, AR-15.3-9, RV-15.26.4-1, RV-15.26.4-4, RV-15.66.4-1, RV-15.66.4-4, FMT-15.26.2, DOC-A.1-33]
+*> rules: [GR-15.2-3, AR-15.3-9, RV-15.26.4-1, RV-15.26.4-4,
+*>    RV-15.66.4-1, RV-15.66.4-4, FMT-15.26.2, DOC-A.1-33]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

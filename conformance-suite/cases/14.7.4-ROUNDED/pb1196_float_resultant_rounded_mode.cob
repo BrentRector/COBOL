@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb1196_float_resultant_rounded_mode
-      *> rules: [GR-14.7.4.3-2, GR-14.7.4.3-3, GR-14.7.4.3-4, GR-14.7.4.3-6, GR-14.7.4.3-7, GR-14.7.4.3-8, GR-14.7.4.3-9, GR-14.7.4.3-10, GR-14.7.5-8, GR-14.7.5-L3.5]
+      *> rules: [GR-14.7.4.3-2, GR-14.7.4.3-3, GR-14.7.4.3-4,
+      *>    GR-14.7.4.3-6, GR-14.7.4.3-7, GR-14.7.4.3-8, GR-14.7.4.3-9,
+      *>    GR-14.7.4.3-10, GR-14.7.5-8, GR-14.7.5-L3.5]
       *> accept: [2014]
       *> source-format: fixed
       *> portable: unverified

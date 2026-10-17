@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1294_report_rolled_totals
-*> rules: [GR-13.18.53.4-3, SR-13.18.54.3-4, GR-13.18.54.4-6, GR-13.18.54.4-7, GR-13.18.54.4-9, GR-13.18.54.4-11]
+*> rules: [GR-13.18.53.4-3, SR-13.18.54.3-4, GR-13.18.54.4-6,
+*>    GR-13.18.54.4-7, GR-13.18.54.4-9, GR-13.18.54.4-11]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1292_source_operand_forms
-*> rules: [SR-8.4.2.2.1-3, GR-13.18.53.4-1, GR-13.18.64.4-4, FMT-13.18.53.2]
+*> rules: [SR-8.4.2.2.1-3, GR-13.18.53.4-1, GR-13.18.64.4-4,
+*>    FMT-13.18.53.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

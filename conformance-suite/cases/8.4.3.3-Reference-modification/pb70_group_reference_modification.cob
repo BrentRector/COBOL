@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb70_group_reference_modification
-*> rules: [SR-8.4.3.3.3-1, GR-8.4.3.3.4-2, GR-8.4.3.3.4-6, GR-13.18.38.4-8]
+*> rules: [SR-8.4.3.3.3-1, GR-8.4.3.3.4-2, GR-8.4.3.3.4-6,
+*>    GR-13.18.38.4-8]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

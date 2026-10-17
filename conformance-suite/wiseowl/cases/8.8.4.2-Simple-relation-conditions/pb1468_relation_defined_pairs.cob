@@ -1,10 +1,11 @@
-      *>--- conformance-case
-      *> id: pb1468_relation_defined_pairs
-      *> rules: [GR-8.8.4.2.1-6, GR-8.8.4.2.1-8, GR-8.8.4.2.13-2, GR-8.8.4.2.13-3]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb1468_relation_defined_pairs
+*> rules: [GR-8.8.4.2.1-6, GR-8.8.4.2.1-8, GR-8.8.4.2.13-2,
+*>    GR-8.8.4.2.13-3]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> kb/Work PB1468 - the pairs ISO 8.8.4.2.1 "Comparisons are defined for the following:" DOES define, each
       *> evaluated by the rule it names. Item 6 with 8.8.4.2.5: "The numeric integer operand shall be an integer
       *> literal or an integer numeric data item of usage display or national" - the integer is moved to an item of

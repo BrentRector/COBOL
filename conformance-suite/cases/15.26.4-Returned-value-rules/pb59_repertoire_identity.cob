@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb59_repertoire_identity
-*> rules: [RV-15.26.4-1, RV-15.26.4-2, RV-15.26.4-3, RV-15.66.4-1, RV-15.66.4-2, RV-15.66.4-3, DOC-A.1-33, DOC-A.1-36]
+*> rules: [RV-15.26.4-1, RV-15.26.4-2, RV-15.26.4-3, RV-15.66.4-1,
+*>    RV-15.66.4-2, RV-15.66.4-3, DOC-A.1-33, DOC-A.1-36]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

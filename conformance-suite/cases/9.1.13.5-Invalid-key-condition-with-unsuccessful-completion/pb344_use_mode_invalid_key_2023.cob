@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb344_use_mode_invalid_key_2023
-*> rules: [GR-9.1.13.5-2, GR-9.1.13.5-3, GR-14.9.30.4-28, GR-14.9.49.4-6]
+*> rules: [GR-9.1.13.5-2, GR-9.1.13.5-3, GR-14.9.30.4-28,
+*>    GR-14.9.49.4-6]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

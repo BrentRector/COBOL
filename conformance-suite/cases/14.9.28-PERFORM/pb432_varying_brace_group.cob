@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb432_varying_brace_group
-      *> rules: [SR-14.9.28.3-3, SR-14.9.28.3-4, SR-14.9.28.3-5, FMT-14.9.28.2]
+      *> rules: [SR-14.9.28.3-3, SR-14.9.28.3-4, SR-14.9.28.3-5,
+      *>    FMT-14.9.28.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

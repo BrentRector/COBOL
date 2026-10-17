@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1059_page_columns_width
-*> rules: [SR-13.18.14.3-8, GR-13.18.14.4-5, GR-13.18.39.4-2, GR-13.18.39.4-5, FMT-13.18.39.2]
+*> rules: [SR-13.18.14.3-8, GR-13.18.14.4-5, GR-13.18.39.4-2,
+*>    GR-13.18.39.4-5, FMT-13.18.39.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1_open_extend_position
-      *> rules: [GR-9.1.13.5-1, GR-14.9.27.4-15, GR-14.9.51.4-17, GR-14.9.51.4-18, GR-14.9.51.4-30, GR-14.9.51.4-38]
+      *> rules: [GR-9.1.13.5-1, GR-14.9.27.4-15, GR-14.9.51.4-17,
+      *>    GR-14.9.51.4-18, GR-14.9.51.4-30, GR-14.9.51.4-38]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

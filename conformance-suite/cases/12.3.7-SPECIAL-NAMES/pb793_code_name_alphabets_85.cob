@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb793_code_name_alphabets_85
-      *> rules: [SR-12.3.7.3-15, GR-12.3.7.4-7, DOC-A.1-183, DOC-A.1-184]
+      *> rules: [SR-12.3.7.3-15, GR-12.3.7.4-7, DOC-A.1-183,
+      *>    DOC-A.1-184]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

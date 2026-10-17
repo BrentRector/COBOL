@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb732_value_symbolic_character
-      *> rules: [GR-8.3.3.6.4-10]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb732_value_symbolic_character
+*> rules: [GR-8.3.3.6.4-10]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
 *> kb/Work PB732 POSITIVE TWIN at COBOL-85 — the constant entry (ISO 13.10) is a COBOL-2002 element, so
 *> at 85 the ONLY word a VALUE literal position admits is a symbolic-character: 8.3.3.6.2 Format 7 with
 *> 8.3.3.6.3 SR4 ("Symbolic-character-1 shall be specified in the SYMBOLIC CHARACTERS clause of the

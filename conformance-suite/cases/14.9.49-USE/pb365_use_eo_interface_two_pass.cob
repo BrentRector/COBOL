@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb365_use_eo_interface_two_pass
-*> rules: [SR-14.9.49.3-16, SR-14.9.49.3-17, GR-14.9.49.4-1, GR-14.9.49.4-14, FMT-14.9.49.2]
+*> rules: [SR-14.9.49.3-16, SR-14.9.49.3-17, GR-14.9.49.4-1,
+*>    GR-14.9.49.4-14, FMT-14.9.49.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

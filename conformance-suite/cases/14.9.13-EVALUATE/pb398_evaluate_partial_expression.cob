@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb398_evaluate_partial_expression
-*> rules: [SR-14.9.13.3-5, SR-14.9.13.3-6, SR-14.9.13.3-8, SR-14.9.13.3-10, GR-14.9.13.4-4]
+*> rules: [SR-14.9.13.3-5, SR-14.9.13.3-6, SR-14.9.13.3-8,
+*>    SR-14.9.13.3-10, GR-14.9.13.4-4]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

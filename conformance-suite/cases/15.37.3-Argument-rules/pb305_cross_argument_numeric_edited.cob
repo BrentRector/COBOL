@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb305_cross_argument_numeric_edited
-      *> rules: [AR-15.37.3-2, AR-15.48.3-3, AR-15.59.3-2, AR-15.63.3-2, AR-15.68.3-2, AR-15.71.3-3, AR-15.72.3-3, AR-15.79.3-3, AR-15.87.3-2, AR-15.92.3-2]
+      *> rules: [AR-15.37.3-2, AR-15.48.3-3, AR-15.59.3-2, AR-15.63.3-2,
+      *>    AR-15.68.3-2, AR-15.71.3-3, AR-15.72.3-3, AR-15.79.3-3,
+      *>    AR-15.87.3-2, AR-15.92.3-2]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

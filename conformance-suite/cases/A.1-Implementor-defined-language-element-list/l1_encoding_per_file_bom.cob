@@ -2,7 +2,8 @@
 *> id: l1_encoding_per_file_bom
 *> rules: [DOC-A.1-26]
 *> accept: [2023]
-*> files: [L1ENC16L.cpy, L1ENC16B.cpy, L1ENC32L.cpy, L1ENC32B.cpy, L1ENC8B.cpy]
+*> files: [L1ENC16L.cpy, L1ENC16B.cpy, L1ENC32L.cpy, L1ENC32B.cpy,
+*>    L1ENC8B.cpy]
 *> source-format: free
 *> portable: unverified
 *>---

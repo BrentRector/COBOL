@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb46_call_format2_as_nested
-*> rules: [SR-14.9.4.3-15, SR-14.9.4.3-17, GR-14.9.4.4-2, GR-14.9.4.4-6, GR-14.9.4.4-8, FMT-14.9.4.2]
+*> rules: [SR-14.9.4.3-15, SR-14.9.4.3-17, GR-14.9.4.4-2, GR-14.9.4.4-6,
+*>    GR-14.9.4.4-8, FMT-14.9.4.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

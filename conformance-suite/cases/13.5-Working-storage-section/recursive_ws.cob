@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: recursive_ws
-*> rules: [GR-13.5.4-1, GR-14.9.5.4-1, GR-14.9.5.4-3, GR-14.9.5.4-6, FMT-11.10.2, FMT-14.9.5.2]
+*> rules: [GR-13.5.4-1, GR-14.9.5.4-1, GR-14.9.5.4-3, GR-14.9.5.4-6,
+*>    FMT-11.10.2, FMT-14.9.5.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

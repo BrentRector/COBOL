@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb248-integer-arg-float-item
-*> rules: [AR-15.90.3-1, AR-15.91.3-1, AR-15.100.3-1, AR-15.100.3-2, AR-15.100.3-4]
+*> rules: [AR-15.90.3-1, AR-15.91.3-1, AR-15.100.3-1, AR-15.100.3-2,
+*>    AR-15.100.3-4]
 *> source-format: free
 *> portable: unverified
 *>---

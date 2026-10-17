@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb721_record_bytes_synonym
-*> rules: [SR-13.18.43.3-2, SR-13.18.43.3-3, SR-13.18.43.3-9, FMT-13.18.43.2]
+*> rules: [SR-13.18.43.3-2, SR-13.18.43.3-3, SR-13.18.43.3-9,
+*>    FMT-13.18.43.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

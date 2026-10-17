@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1471_sign_condition_float_partition
-*> rules: [SR-8.8.4.7.3-1, SR-8.8.4.7.3-2, GR-8.8.4.7.4-1, GR-8.8.4.7.4-2]
+*> rules: [SR-8.8.4.7.3-1, SR-8.8.4.7.3-2, GR-8.8.4.7.4-1,
+*>    GR-8.8.4.7.4-2]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

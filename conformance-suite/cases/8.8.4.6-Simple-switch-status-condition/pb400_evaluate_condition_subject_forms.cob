@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb400_evaluate_condition_subject_forms
-      *> rules: [GR-8.8.4.6.3-1, GR-14.9.13.4-4, GR-14.9.39.4-5, FMT-8.8.4.6.2]
+      *> rules: [GR-8.8.4.6.3-1, GR-14.9.13.4-4, GR-14.9.39.4-5,
+      *>    FMT-8.8.4.6.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

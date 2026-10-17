@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1_renames_through_thru
-      *> rules: [SR-13.16.3-22, SR-13.18.45.3-1, SR-13.18.45.3-9, FMT-13.18.45.2]
+      *> rules: [SR-13.16.3-22, SR-13.18.45.3-1, SR-13.18.45.3-9,
+      *>    FMT-13.18.45.2]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

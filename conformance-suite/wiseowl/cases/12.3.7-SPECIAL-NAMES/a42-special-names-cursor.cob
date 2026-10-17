@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: a42-special-names-cursor
-*> rules: [SR-12.3.7.3-1, SR-12.3.7.3-4, SR-12.3.7.3-29, SR-12.3.7.3-30, GR-12.3.7.4-15, GR-12.3.7.4-16, DOC-A.1-45]
+*> rules: [SR-12.3.7.3-1, SR-12.3.7.3-4, SR-12.3.7.3-29, SR-12.3.7.3-30,
+*>    GR-12.3.7.4-15, GR-12.3.7.4-16, DOC-A.1-45]
 *> source-format: free
 *> portable: unverified
 *>---

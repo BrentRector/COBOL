@@ -1,6 +1,9 @@
 *>--- conformance-case
 *> id: pb974_repository_as_phrase
-*> rules: [SR-8.3.2.2-L3.1, GR-8.4.3.2.4-3, GR-11.6.4-1, SR-12.3.8.3-1, GR-12.3.8.4-2, GR-12.3.8.4-6, GR-12.3.8.4-9, GR-12.3.8.4-11, GR-12.3.8.4-15, FMT-12.3.8.2, DOC-A.1-161, DOC-A.1-162, DOC-A.1-163]
+*> rules: [SR-8.3.2.2-L3.1, GR-8.4.3.2.4-3, GR-11.6.4-1, SR-12.3.8.3-1,
+*>    GR-12.3.8.4-2, GR-12.3.8.4-6, GR-12.3.8.4-9, GR-12.3.8.4-11,
+*>    GR-12.3.8.4-15, FMT-12.3.8.2, DOC-A.1-161, DOC-A.1-162,
+*>    DOC-A.1-163]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

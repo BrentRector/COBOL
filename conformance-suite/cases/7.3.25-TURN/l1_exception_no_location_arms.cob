@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1_exception_no_location_arms
-      *> rules: [GR-7.3.25.4-7, RV-15.30.3-1, RV-15.31.3-1, RV-15.32.3-1, DOC-A.1-139, DOC-A.1-204]
+      *> rules: [GR-7.3.25.4-7, RV-15.30.3-1, RV-15.31.3-1,
+      *>    RV-15.32.3-1, DOC-A.1-139, DOC-A.1-204]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

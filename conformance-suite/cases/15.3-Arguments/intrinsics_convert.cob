@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: intrinsics_convert
-*> rules: [AR-15.3-7, AR-15.19.3-5, AR-15.19.3-7, RV-15.19.4-2, RV-15.19.4-4, RV-15.19.4-5, FMT-15.19.2]
+*> rules: [AR-15.3-7, AR-15.19.3-5, AR-15.19.3-7, RV-15.19.4-2,
+*>    RV-15.19.4-4, RV-15.19.4-5, FMT-15.19.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

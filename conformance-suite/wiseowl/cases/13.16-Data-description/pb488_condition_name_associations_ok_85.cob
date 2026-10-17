@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb488_condition_name_associations_ok_85
-      *> rules: [SR-13.16.3-24]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb488_condition_name_associations_ok_85
+*> rules: [SR-13.16.3-24]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> kb/Work PB488 - the COBOL-85 half of the ISO 13.16.3 SR24 over-rejection guard. The screen is
       *> UNGATED, so the shapes SR24 does NOT exclude have to keep compiling at the oldest edition too. Every
       *> leg here is one COBOL-85 can write; the 2023-only shapes (a STRONG type declaration's elementary

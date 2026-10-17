@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb141_close_forms
-      *> rules: [GR-9.1.13.2-6, SR-14.9.6.3-2, GR-14.9.6.4-2, GR-14.9.6.4-3, GR-14.9.6.4-4, FMT-14.9.6.2, DOC-A.1-24]
+      *> rules: [GR-9.1.13.2-6, SR-14.9.6.3-2, GR-14.9.6.4-2,
+      *>    GR-14.9.6.4-3, GR-14.9.6.4-4, FMT-14.9.6.2, DOC-A.1-24]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

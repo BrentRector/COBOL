@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb922_exception_object_reference
-*> rules: [SR-8.4.3.1.3-7, SR-8.4.3.6.3-1, SR-8.4.3.6.3-2, FMT-8.4.3.6.2]
+*> rules: [SR-8.4.3.1.3-7, SR-8.4.3.6.3-1, SR-8.4.3.6.3-2,
+*>    FMT-8.4.3.6.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

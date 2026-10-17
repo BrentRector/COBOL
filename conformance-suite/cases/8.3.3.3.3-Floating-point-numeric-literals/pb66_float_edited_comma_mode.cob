@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb66_float_edited_comma_mode
-*> rules: [SR-8.3.3.3.3-1, SR-13.18.40.3-13, GR-14.6.8.4-1, GR-14.6.8.4-2]
+*> rules: [SR-8.3.3.3.3-1, SR-13.18.40.3-13, GR-14.6.8.4-1,
+*>    GR-14.6.8.4-2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

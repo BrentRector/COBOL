@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1275_property_set_formats
-*> rules: [SR-8.4.3.9.3-3, SR-8.4.3.9.3-5, SR-8.4.3.9.3-6, GR-13.18.42.4-1, GR-13.18.42.4-2]
+*> rules: [SR-8.4.3.9.3-3, SR-8.4.3.9.3-5, SR-8.4.3.9.3-6,
+*>    GR-13.18.42.4-1, GR-13.18.42.4-2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

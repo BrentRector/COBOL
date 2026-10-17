@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb518_clause_placement_legal
-      *> rules: [SR-13.16.3-5, SR-13.18.8.3-1, SR-13.18.22.3-1, SR-13.18.32.3-3]
+      *> rules: [SR-13.16.3-5, SR-13.18.8.3-1, SR-13.18.22.3-1,
+      *>    SR-13.18.32.3-3]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

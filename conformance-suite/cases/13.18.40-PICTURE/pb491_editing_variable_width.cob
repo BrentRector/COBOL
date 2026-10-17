@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb491_editing_variable_width
-*> rules: [SR-13.18.40.3-10, SR-13.18.40.3-11, GR-13.18.40.4-12, GR-13.18.40.4-14, GR-13.18.40.5-5, GR-13.18.40.5-6]
+*> rules: [SR-13.18.40.3-10, SR-13.18.40.3-11, GR-13.18.40.4-12,
+*>    GR-13.18.40.4-14, GR-13.18.40.5-5, GR-13.18.40.5-6]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

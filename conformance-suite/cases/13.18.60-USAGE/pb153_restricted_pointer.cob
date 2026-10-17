@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb153_restricted_pointer
-*> rules: [SR-13.18.60.3-18, GR-13.18.60.4-23, SR-14.9.3.3-4, SR-14.9.3.3-5]
+*> rules: [SR-13.18.60.3-18, GR-13.18.60.4-23, SR-14.9.3.3-4,
+*>    SR-14.9.3.3-5]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb305-cross-class-national-mixed
-*> rules: [AR-15.37.3-2, AR-15.48.3-3, AR-15.59.3-2, AR-15.63.3-2, AR-15.68.3-2, AR-15.71.3-3, AR-15.72.3-3, AR-15.79.3-3, AR-15.87.3-2, AR-15.92.3-2]
+*> rules: [AR-15.37.3-2, AR-15.48.3-3, AR-15.59.3-2, AR-15.63.3-2,
+*>    AR-15.68.3-2, AR-15.71.3-3, AR-15.72.3-3, AR-15.79.3-3,
+*>    AR-15.87.3-2, AR-15.92.3-2]
 *> source-format: free
 *> portable: unverified
 *>---

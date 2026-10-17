@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: w59_float_decimal_clause_witness
-      *> rules: [GR-4.2.10-2, SR-11.9.9.3-1, SR-11.9.9.3-2, SR-11.9.9.3-3, SR-11.9.9.3-4, SR-11.9.9.3-5, SR-11.9.9.3-6, FMT-11.9.9.2, DOC-A.1-47]
+      *> rules: [GR-4.2.10-2, SR-11.9.9.3-1, SR-11.9.9.3-2,
+      *>    SR-11.9.9.3-3, SR-11.9.9.3-4, SR-11.9.9.3-5, SR-11.9.9.3-6,
+      *>    FMT-11.9.9.2, DOC-A.1-47]
       *> accept: [2014]
       *> source-format: fixed
       *> portable: unverified

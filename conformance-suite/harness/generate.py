@@ -83,6 +83,8 @@ UNASSIGNED = "_unassigned"
 CLAUSE_FOLDER = re.compile(r"^(?P<clause>(?:[0-9]+|[A-Z])(?:\.[0-9]+)*)-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 TEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 OPEN_MARK, CLOSE_MARK = "*>--- conformance-case", "*>---"
+#: A metadata line whose text after `*>` opens with this many spaces continues the field before it (§3).
+CONTINUATION = "    "
 #: The fields of §3.1 (and `constructs`), each with its value's shape.
 FIELDS = {
     "id": "scalar", "rules": "list", "accept": "list", "flag": "map", "control": "scalar", "requires": "list",
@@ -297,6 +299,7 @@ def read_header(text: str) -> tuple[Header | None, list[tuple[int, str]]]:
                           f"column 7 (fixed form) or column 1 (free form) (§3)")]
     fields: dict[str, Any] = {}
     where: dict[str, int] = {}
+    entries: list[list[Any]] = []  # [key, value text, line] per field, a continuation line appended to its value
     for number, raw in enumerate(lines[1:], start=2):
         form, line = _block_line(raw)
         if form is None:
@@ -306,7 +309,21 @@ def read_header(text: str) -> tuple[Header | None, list[tuple[int, str]]]:
             problems.append((number, f"a metadata line in {form} form inside a block that opened in {seen} form"))
         body = line[2:]
         if line == CLOSE_MARK:
+            for key, value, at in entries:
+                try:
+                    fields[key] = parse_value(value)
+                    where[key] = at
+                except HeaderValueError as e:
+                    problems.append((at, f"{key}: {e}"))
             return Header(fields, where, seen, number), problems
+        if body.startswith(CONTINUATION) and body.strip():
+            # A long value continues on the lines after its field's, each indented past the field names (so a
+            # fixed-form block stays inside margin R and a free-form line inside its 255 positions, ISO 6.1).
+            if not entries:
+                problems.append((number, f"a continuation line with no field before it: {line!r}"))
+            else:
+                entries[-1][1] += " " + body.strip()
+            continue
         if not body.startswith(" ") or ":" not in body:
             problems.append((number, f"a metadata line is `*> <field>: <value>`, not {line!r}"))
             continue
@@ -315,14 +332,10 @@ def read_header(text: str) -> tuple[Header | None, list[tuple[int, str]]]:
         if key not in FIELDS:
             problems.append((number, f"unknown field {key!r} (the fields are §3.1's: {', '.join(FIELDS)})"))
             continue
-        if key in fields:
+        if key in fields or any(e[0] == key for e in entries):
             problems.append((number, f"the field {key!r} twice"))
             continue
-        try:
-            fields[key] = parse_value(value)
-            where[key] = number
-        except HeaderValueError as e:
-            problems.append((number, f"{key}: {e}"))
+        entries.append([key, value, number])
     problems.append((len(lines), f"the metadata block has no closing line `{CLOSE_MARK}`"))
     return None, problems
 
@@ -372,7 +385,9 @@ class Reader:
 
     def read_case(self, tree: str, folder: str, cob: Path) -> Case | None:
         rel = cob.relative_to(self.root)
-        text = cob.read_text(encoding="utf-8")
+        # Bytes, never read_text: universal newlines would read a lone CR, a character of the line (docs/CONFORMANCE.md
+        # DOC-A.1-156), as a line end, and every line number after it would be wrong.
+        text = cob.read_bytes().decode("utf-8")
         header, problems = read_header(text)
         for line, message in problems:
             self.refuse(rel, line, message)
@@ -494,8 +509,9 @@ class Reader:
                 self.refuse(observed.source or rel, observed.line,
                             f"a run-time expectation (it observes an exception condition) accepted at "
                             f"{', '.join(early)}: run-time violations are judged only from {FIRST_RUN_TIME} on (§3.2)")
-        # Free form before it existed.
-        if case.source_format == "free":
+        # Free form before it existed. A WiseOwl test may use it at 85: `--source-format free` at every edition is
+        # WiseOwl's extension (docs/CONFORMANCE.md §7, DOC-A.1-158), and its own regression tests exercise it.
+        if case.source_format == "free" and case.tree != "wiseowl":
             first = self.inputs.editions.index(FIRST_FREE_FORM)
             early = sorted({e for e in case.accept + (case.flag.at if case.flag else ())
                             if self.inputs.editions.index(e) < first}, key=self.inputs.editions.index)

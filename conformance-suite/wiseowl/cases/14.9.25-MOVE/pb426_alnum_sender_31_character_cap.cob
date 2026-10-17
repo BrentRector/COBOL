@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb426_alnum_sender_31_character_cap
-      *> rules: [GR-14.9.25.4-6]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb426_alnum_sender_31_character_cap
+*> rules: [GR-14.9.25.4-6]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> ISO §14.9.25.4 GR6 d) 3 — THE SIZE OF AN ALPHANUMERIC SENDING OPERAND MOVING TO A NUMERIC
       *> RECEIVER, at the earliest edition COBOL.NET compiles. The rule is not edition-gated: it reads
       *> identically at 85, 2002, 2014 and 2023, and the 2002 golden pb426_alnum_sender_data_incompatible

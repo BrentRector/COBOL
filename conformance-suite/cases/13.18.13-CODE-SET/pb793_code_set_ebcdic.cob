@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb793_code_set_ebcdic
-*> rules: [GR-13.18.13.4-1, GR-13.18.13.4-2, GR-13.18.13.4-3, GR-13.18.13.4-6, DOC-A.1-183]
+*> rules: [GR-13.18.13.4-1, GR-13.18.13.4-2, GR-13.18.13.4-3,
+*>    GR-13.18.13.4-6, DOC-A.1-183]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

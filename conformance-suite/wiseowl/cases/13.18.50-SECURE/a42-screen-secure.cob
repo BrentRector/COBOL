@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: a42-screen-secure
-*> rules: [GR-13.18.50.3-1, GR-13.18.50.3-2, GR-13.18.50.3-3, GR-13.18.50.3-4, FMT-13.18.50.2, DOC-A.1-172]
+*> rules: [GR-13.18.50.3-1, GR-13.18.50.3-2, GR-13.18.50.3-3,
+*>    GR-13.18.50.3-4, FMT-13.18.50.2, DOC-A.1-172]
 *> source-format: free
 *> portable: unverified
 *>---

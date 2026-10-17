@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1226_report_filler_entry_name
-      *> rules: [SR-13.15.3-2, SR-13.18.20.3-2, SR-13.18.20.3-3, GR-13.18.20.4-1, FMT-13.15.2, FMT-13.18.20.2]
+      *> rules: [SR-13.15.3-2, SR-13.18.20.3-2, SR-13.18.20.3-3,
+      *>    GR-13.18.20.4-1, FMT-13.15.2, FMT-13.18.20.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

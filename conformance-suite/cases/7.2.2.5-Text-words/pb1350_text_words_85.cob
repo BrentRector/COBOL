@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1350_text_words_85
-      *> rules: [GR-7.2.2.5-1, GR-7.2.2.5-2, GR-7.2.2.5-3, GR-7.2.3.4-6, GR-7.2.3.4-9, GR-7.2.4.4-2, GR-7.2.4.4-8]
+      *> rules: [GR-7.2.2.5-1, GR-7.2.2.5-2, GR-7.2.2.5-3, GR-7.2.3.4-6,
+      *>    GR-7.2.3.4-9, GR-7.2.4.4-2, GR-7.2.4.4-8]
       *> accept: [85]
       *> files: [pb1350cb.cpy]
       *> source-format: fixed

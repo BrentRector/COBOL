@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1188_report_nonfatal_raise
-*> rules: [SR-13.18.14.3-8, GR-13.18.14.4-4, GR-13.18.14.4-5, GR-13.18.35.4-2, GR-13.18.41.4-3, GR-14.9.46.4-5]
+*> rules: [SR-13.18.14.3-8, GR-13.18.14.4-4, GR-13.18.14.4-5,
+*>    GR-13.18.35.4-2, GR-13.18.41.4-3, GR-14.9.46.4-5]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

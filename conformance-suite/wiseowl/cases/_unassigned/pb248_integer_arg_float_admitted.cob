@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb248_integer_arg_float_admitted
-      *> rules: []
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb248_integer_arg_float_admitted
+*> rules: []
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
 *> kb/Work PB248 - THE ADMITTED HALF of the ISO 15.3 type-6 floating-point arms, pinned so the screen cannot
 *> be widened into a rejecter of legal source (the PB1 failure mode arrived at from the opposite direction).
 *> 15.15.3 r1 is "Argument-1 shall be an integer", and 15.3 type 6 says what an integer ARGUMENT may be

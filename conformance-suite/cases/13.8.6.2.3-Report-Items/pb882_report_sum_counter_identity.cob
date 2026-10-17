@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb882_report_sum_counter_identity
-      *> rules: [SR-13.8.6.2.3-1, GR-13.18.54.4-1, GR-13.18.54.4-5, GR-13.18.54.4-12]
+      *> rules: [SR-13.8.6.2.3-1, GR-13.18.54.4-1, GR-13.18.54.4-5,
+      *>    GR-13.18.54.4-12]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

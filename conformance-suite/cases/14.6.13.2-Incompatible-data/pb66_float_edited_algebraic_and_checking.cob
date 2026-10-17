@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb66_float_edited_algebraic_and_checking
-*> rules: [GR-14.6.13.2-4, GR-14.9.25.4-5, GR-14.9.25.4-6, RV-15.43.4-1, RV-15.58.4-1]
+*> rules: [GR-14.6.13.2-4, GR-14.9.25.4-5, GR-14.9.25.4-6, RV-15.43.4-1,
+*>    RV-15.58.4-1]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

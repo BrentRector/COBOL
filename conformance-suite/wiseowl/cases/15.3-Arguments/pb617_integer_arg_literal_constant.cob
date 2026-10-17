@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb617_integer_arg_literal_constant
-      *> rules: [AR-15.3-6]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb617_integer_arg_literal_constant
+*> rules: [AR-15.3-6]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
 *> kb/Work PB617 - THE ADMITTED HALF of the literal-constant witness: an integer argument written as an
 *> arithmetic expression whose literal terms carry fractions is judged on the VALUE of the expression,
 *> never on the presence of a fraction in some literal.

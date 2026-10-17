@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb957_next_group_control
-      *> rules: [GR-13.18.37.4-1, GR-13.18.37.4-2, GR-13.18.37.4-3, GR-13.18.37.4-4, GR-13.18.37.4-6, GR-14.9.16.4-4, FMT-13.18.37.2]
+      *> rules: [GR-13.18.37.4-1, GR-13.18.37.4-2, GR-13.18.37.4-3,
+      *>    GR-13.18.37.4-4, GR-13.18.37.4-6, GR-14.9.16.4-4,
+      *>    FMT-13.18.37.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

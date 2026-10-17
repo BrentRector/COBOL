@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb64t1_set_locale_categories
-*> rules: [GR-14.6.6-1, GR-14.6.6-3, GR-14.9.39.4-22, GR-14.9.39.4-23, GR-14.9.39.4-25]
+*> rules: [GR-14.6.6-1, GR-14.6.6-3, GR-14.9.39.4-22, GR-14.9.39.4-23,
+*>    GR-14.9.39.4-25]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

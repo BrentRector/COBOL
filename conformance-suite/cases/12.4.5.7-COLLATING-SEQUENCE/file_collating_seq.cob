@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: file_collating_seq
-*> rules: [GR-12.4.5.7.4-2, GR-12.4.5.12.4-1, GR-14.9.30.4-13, GR-14.9.41.4-16, GR-14.9.41.4-17]
+*> rules: [GR-12.4.5.7.4-2, GR-12.4.5.12.4-1, GR-14.9.30.4-13,
+*>    GR-14.9.41.4-16, GR-14.9.41.4-17]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

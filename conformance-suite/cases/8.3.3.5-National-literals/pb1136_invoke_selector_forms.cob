@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1136_invoke_selector_forms
-*> rules: [GR-8.3.3.5.4-4, SR-14.9.23.3-2, SR-14.9.23.3-7, SR-14.9.23.3-8]
+*> rules: [GR-8.3.3.5.4-4, SR-14.9.23.3-2, SR-14.9.23.3-7,
+*>    SR-14.9.23.3-8]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

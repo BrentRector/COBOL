@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb321_table19_open_arbitration
-*> rules: [GR-12.4.5.15.3-1, GR-14.9.27.4-4, GR-14.9.27.4-22, GR-14.9.27.4-25, FMT-12.4.5.15.2]
+*> rules: [GR-12.4.5.15.3-1, GR-14.9.27.4-4, GR-14.9.27.4-22,
+*>    GR-14.9.27.4-25, FMT-12.4.5.15.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

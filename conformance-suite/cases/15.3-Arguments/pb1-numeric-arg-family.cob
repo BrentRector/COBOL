@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1-numeric-arg-family
-*> rules: [AR-15.3-10, AR-15.9.3-1, AR-15.74.3-1, AR-15.75.3-1, AR-15.76.3-1]
+*> rules: [AR-15.3-10, AR-15.9.3-1, AR-15.74.3-1, AR-15.75.3-1,
+*>    AR-15.76.3-1]
 *> source-format: free
 *> portable: unverified
 *>---

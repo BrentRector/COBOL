@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb528_picture_composition_legal_85
-      *> rules: [SR-13.18.40.3-2, SR-13.18.40.3-16, SR-13.18.40.3-18, SR-13.18.40.3-19, SR-13.18.40.3-21, SR-13.18.40.3-24, SR-13.18.40.3-26]
+      *> rules: [SR-13.18.40.3-2, SR-13.18.40.3-16, SR-13.18.40.3-18,
+      *>    SR-13.18.40.3-19, SR-13.18.40.3-21, SR-13.18.40.3-24,
+      *>    SR-13.18.40.3-26]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

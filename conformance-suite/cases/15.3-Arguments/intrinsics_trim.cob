@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: intrinsics_trim
-*> rules: [AR-15.3-7, AR-15.96.3-3, RV-15.96.4-1, RV-15.96.4-2, RV-15.96.4-3, FMT-15.96.2]
+*> rules: [AR-15.3-7, AR-15.96.3-3, RV-15.96.4-1, RV-15.96.4-2,
+*>    RV-15.96.4-3, FMT-15.96.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

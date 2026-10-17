@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb451_set_format5_class_name_sender
-*> rules: [GR-13.18.60.4-22, SR-14.9.39.3-11, SR-14.9.39.3-13, GR-14.9.39.4-10]
+*> rules: [GR-13.18.60.4-22, SR-14.9.39.3-11, SR-14.9.39.3-13,
+*>    GR-14.9.39.4-10]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

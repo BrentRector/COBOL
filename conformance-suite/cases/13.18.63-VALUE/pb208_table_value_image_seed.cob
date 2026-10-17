@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb208_table_value_image_seed
-*> rules: [GR-13.18.63.4-12, GR-13.18.63.4-13, GR-13.18.63.4-14, GR-13.18.63.4-15]
+*> rules: [GR-13.18.63.4-12, GR-13.18.63.4-13, GR-13.18.63.4-14,
+*>    GR-13.18.63.4-15]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

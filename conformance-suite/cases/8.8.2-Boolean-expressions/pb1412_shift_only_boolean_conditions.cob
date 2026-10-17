@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1412_shift_only_boolean_conditions
-*> rules: [GR-8.8.2-8, GR-8.8.2-9, GR-8.8.4.3.4-1, GR-8.8.4.3.4-2, FMT-8.8.4.3.2]
+*> rules: [GR-8.8.2-8, GR-8.8.2-9, GR-8.8.4.3.4-1, GR-8.8.4.3.4-2,
+*>    FMT-8.8.4.3.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

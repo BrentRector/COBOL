@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1280_redefines_entry_rules_legal
-*> rules: [SR-8.4.2.2.1-2, SR-13.18.44.3-1, SR-13.18.44.3-2, SR-13.18.44.3-3, SR-13.18.44.3-8, SR-13.18.44.3-15]
+*> rules: [SR-8.4.2.2.1-2, SR-13.18.44.3-1, SR-13.18.44.3-2,
+*>    SR-13.18.44.3-3, SR-13.18.44.3-8, SR-13.18.44.3-15]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

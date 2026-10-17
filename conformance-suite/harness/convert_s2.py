@@ -35,8 +35,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
+import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -58,6 +61,12 @@ GENERIC_HEADINGS = {"general", "general format", "general formats", "syntax rule
                     "general rules"}
 TRAILING_NOUNS = {"statement", "directive", "clause", "entry", "paragraph", "function", "phrase"}
 LIBRARY_SUFFIXES = (".CPY", ".CBL", ".COB", ".cpy", ".cbl", ".cob")
+#: A header line stays inside margin R (column 72) in fixed form and well inside free form's 255 positions.
+HEADER_WIDTH = 72
+#: The run-time output that names a source line (EXCEPTION-LOCATION, the debugging special register): the programs
+#: whose expected output moves with the header the move adds above their code.
+LINE_REPORTING = re.compile(r"EXCEPTION-LOCATION|DEBUG-LINE|DEBUG-ITEM", re.IGNORECASE)
+COBOL = REPO / "src" / "Cobol.Net.Cli" / "bin" / "Debug" / "net10.0" / ("cobol.exe" if os.name == "nt" else "cobol")
 OPTIONS = "*> options:"
 REJECT_AT = "reject-at:"
 WISEOWL_OPTIONS = ("sign-encoding", "flag-extensions")
@@ -202,7 +211,7 @@ def load_programs() -> list[Program]:
             if names is not None and cob.stem not in names:
                 print(f"  NOTE {d}/{cob.name}: on disk, in no manifest list: converted as enabled")
         for cob in sorted(base.glob("*.cob")):
-            text = cob.read_text(encoding="utf-8")
+            text = cob.read_bytes().decode("utf-8")  # no newline translation: a lone CR is a character (DOC-A.1-156)
             out = base / (cob.stem + ".out")
             err = base / (cob.stem + ".err")
             first = text.split("\n")[0]
@@ -211,8 +220,8 @@ def load_programs() -> list[Program]:
                 raise SystemExit(f"{d}/{cob.name}: a negative without its '*> reject-at:' first line")
             programs.append(Program(
                 directory=d, name=cob.stem, text=text,
-                out=out.read_text(encoding="utf-8") if out.is_file() else None,
-                err=err.read_text(encoding="utf-8").strip() if err.is_file() else None,
+                out=out.read_bytes().decode("utf-8") if out.is_file() else None,
+                err=err.read_bytes().decode("utf-8").strip() if err.is_file() else None,
                 reject_at=reject, options=leading_comment_options(text)))
     return programs
 
@@ -285,18 +294,83 @@ def _library_name(tokens: list[cobol.Token], stmt: cobol.CopyStatement) -> str |
 # ── the conversion ──────────────────────────────────────────────────────────────────────────────────────────────────
 
 def header(program: Program) -> str:
-    def lst(values: list[str]) -> str:
-        return "[" + ", ".join(v if re.fullmatch(r"[^\s\[\]{},:\"]+", v) else '"' + v.replace('"', '""') + '"'
-                               for v in values) + "]"
-    fields = [f"id: {program.test_id}", f"rules: {lst(program.rows)}"]
-    if program.editions:
-        fields.append(f"accept: {lst(program.editions)}")
-    if program.files:
-        fields.append(f"files: {lst(program.files)}")
-    fields += [f"source-format: {program.fmt}", "portable: unverified"]
+    """The metadata block (§3): one line per field, a long list continued on indented lines within HEADER_WIDTH."""
     prefix = "      " if program.fmt == "fixed" else ""
-    lines = ["*>--- conformance-case", *(f"*> {f}" for f in fields), "*>---"]
+
+    def item(v: str) -> str:
+        return v if re.fullmatch(r"[^\s\[\]{},:\"]+", v) else '"' + v.replace('"', '""') + '"'
+
+    def field(name: str, values: list[str] | None = None, scalar: str | None = None) -> list[str]:
+        if scalar is not None:
+            return [f"*> {name}: {scalar}"]
+        lines = [f"*> {name}: ["]
+        for i, v in enumerate(values):
+            text = item(v) + (", " if i < len(values) - 1 else "]")
+            if len(prefix + lines[-1] + text.rstrip()) > HEADER_WIDTH and not lines[-1].endswith("["):
+                lines[-1] = lines[-1].rstrip()
+                lines.append("*>    ")
+            lines[-1] += text
+        if not values:
+            lines[-1] += "]"
+        return lines
+
+    lines = ["*>--- conformance-case", *field("id", scalar=program.test_id), *field("rules", program.rows)]
+    if program.editions:
+        lines += field("accept", program.editions)
+    if program.files:
+        lines += field("files", program.files)
+    lines += [*field("source-format", scalar=program.fmt), *field("portable", scalar="unverified"), "*>---"]
     return "\n".join(prefix + line for line in lines) + "\n"
+
+
+def fixed_compatible(text: str) -> bool:
+    """Does `text` read as the same program in fixed form: every line blank, a comment in column 7, or program text
+    from column 8 that ends by margin R (column 72), with nothing in the sequence number area but digits and spaces?"""
+    for raw in text.split("\n"):
+        line = raw.rstrip("\r").expandtabs(8)
+        if not line.strip():
+            continue
+        if not all(c.isdigit() or c == " " for c in line[:6]) or len(line) < 7 or line[6] not in " */-Dd":
+            return False
+        if line[6] == " " and line[72:].strip():
+            return False
+    return True
+
+
+def shifted(text: str, delta: int, pattern: re.Pattern) -> str:
+    """`text` with every line number `pattern` captures (its group 1) moved by `delta`."""
+    return pattern.sub(lambda m: m.group(0)[:m.start(1) - m.start(0)] + str(int(m.group(1)) + delta)
+                       + m.group(0)[m.end(1) - m.start(0):], text)
+
+
+#: A diagnostic's position as a WiseOwl `.err` expectation quotes it: `(<line>,<column>):`.
+DIAGNOSTIC_POSITION = re.compile(r"\((\d+),\d+\)")
+
+
+def run(program_text: str, files: dict[str, bytes], edition: str, fmt: str, options: dict[str, str]) -> str | None:
+    """The program's standard output from the `cobol` command (compile, then run with dotnet, as the WiseOwl adapter
+    does), its declared files beside it; None when it does not compile."""
+    with tempfile.TemporaryDirectory() as work:
+        for name, data in files.items():
+            Path(work, name).parent.mkdir(parents=True, exist_ok=True)
+            Path(work, name).write_bytes(data)
+        Path(work, "prog.cob").write_text(program_text, encoding="utf-8", newline="")
+        cmd = [str(COBOL), "prog.cob", "--std", edition, "--source-format", fmt, "-o", "prog.dll"]
+        if options.get("sign-encoding"):
+            cmd += ["--sign-encoding", options["sign-encoding"]]
+        if options.get("flag-extensions") == "on":
+            cmd += ["--flag-extensions"]
+        env = {**os.environ, "COBOL_USER_LOCALE": "INVARIANT", "COBOL_SYSTEM_LOCALE": "INVARIANT"}
+        if subprocess.run(cmd, cwd=work, capture_output=True, env=env).returncode != 0:
+            return None
+        r = subprocess.run(["dotnet", "prog.dll"], cwd=work, capture_output=True, env=env, stdin=subprocess.DEVNULL,
+                           timeout=120)
+        return r.stdout.decode("utf-8", errors="replace")
+
+
+def normalize(text: str) -> str:
+    """CutRunner.Normalize / run.py's normalize(): LF line endings, each line's trailing spaces trimmed."""
+    return "\n".join(line.rstrip() for line in text.replace("\r\n", "\n").split("\n")).rstrip("\n")
 
 
 def main() -> int:
@@ -321,10 +395,10 @@ def main() -> int:
     for p in programs:
         stated = p.options.get("source-format")
         p.fmt = stated if stated in ("fixed", "free") else ("fixed" if is_fixed_form(p.text) else "free")
-        if p.fmt == "free" and not stated and p.directory == "85":
+        if p.fmt == "free" and not stated and p.directory == "85" and fixed_compatible(p.text):
             # COBOL-85 has no free form (ISO 6.4 is a 2002 introduction): the detector read a fixed-form program
             # whose comment lines run past column 72 as free form. It is the fixed-form program it was written as.
-            problems.append(f"NOTE {p.ref}: detected free at 85: written as fixed")
+            problems.append(f"NOTE {p.ref}: detected free at 85, fixed-form text: written as fixed")
             p.fmt = "fixed"
         rows = cited.get(p.ref, [])
         if not p.negative:
@@ -343,7 +417,9 @@ def main() -> int:
         p.files = copied_files(p, problems)
         # A library-name's text in a library folder: where it is found is the implementor's (ISO 7.2.3.4 GR 2-3).
         library = any("/" in f for f in p.files)
-        p.tree = "wiseowl" if dns or declined or wiseowl_option or library else "cases"
+        # A free-form program at 85 runs under WiseOwl's extension (free form at every edition): WiseOwl's own test.
+        free85 = p.fmt == "free" and p.directory == "85"
+        p.tree = "wiseowl" if dns or declined or wiseowl_option or library or free85 else "cases"
 
     # Ids: a base name two programs share.
     by_name: dict[str, list[Program]] = {}
@@ -407,14 +483,42 @@ def main() -> int:
             files.append(rel)
         p.files = files
         body = strip_wiseowl_lines(p.text, p.negative)
+        block = header(p)
+        # Every code line moves by the same delta: the header above it, less the lines the move removed (the
+        # negative's reject-at line and the leading options lines, all above the code).
+        delta = block.count("\n") - (p.text.count("\n") - body.count("\n"))
+        if p.negative and p.err:
+            moved = shifted(p.err, delta, DIAGNOSTIC_POSITION)
+            if moved != p.err:
+                problems.append(f"NOTE {p.ref}: its diagnostic's position moved {delta} lines with the header")
+                p.err = moved
+        if not p.negative and (p.out is None or LINE_REPORTING.search(p.text)) and not args.dry_run:
+            staged = {rel: (OLD / p.directory / rel).read_bytes() for rel in files}
+            got = run(block + body, staged, p.directory, p.fmt, p.options)
+            if p.out is None:
+                if got is not None:
+                    p.out = got
+                    problems.append(f"NOTE {p.ref}: compile-only: its output recorded ({len(got.splitlines())} line(s))")
+            elif got is not None and normalize(got) != normalize(p.out):
+                want, have = normalize(p.out).split("\n"), normalize(got).split("\n")
+                numbers = re.compile(r"\d+")
+                same_shape = len(want) == len(have) and all(
+                    numbers.sub("#", w) == numbers.sub("#", h)
+                    and all(int(b) - int(a) in (0, delta) for a, b in zip(numbers.findall(w), numbers.findall(h)))
+                    for w, h in zip(want, have))
+                if same_shape:
+                    problems.append(f"NOTE {p.ref}: its reported source lines moved {delta} with the header")
+                    p.out = got
+                else:
+                    problems.append(f"WARN {p.ref}: its output differs beyond the line shift: left as it was")
         if not args.dry_run:
             folder.mkdir(parents=True, exist_ok=True)
-            (folder / (p.test_id + ".cob")).write_text(header(p) + body, encoding="utf-8", newline="")
+            (folder / (p.test_id + ".cob")).write_text(block + body, encoding="utf-8", newline="")
             if not p.negative:
                 (folder / (p.test_id + ".out")).write_text(p.out if p.out is not None else "", encoding="utf-8",
                                                          newline="")
         if p.out is None and not p.negative:
-            problems.append(f"NOTE {p.ref}: compile-only: an empty expected output (§3.1)")
+            problems.append(f"WARN {p.ref}: compile-only and it does not compile: an empty expected output")
         if p.negative:
             diagnostics[p.test_id] = {"refuse-at": p.reject_at, "expect": p.err}
         wise = {k: v for k, v in p.options.items() if k in WISEOWL_OPTIONS}

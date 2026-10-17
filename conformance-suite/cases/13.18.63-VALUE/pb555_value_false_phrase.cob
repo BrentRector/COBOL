@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb555_value_false_phrase
-*> rules: [SR-13.18.63.3-27, SR-13.18.63.3-32, GR-13.18.63.4-20, SR-14.9.39.3-7, GR-14.9.39.4-7]
+*> rules: [SR-13.18.63.3-27, SR-13.18.63.3-32, GR-13.18.63.4-20,
+*>    SR-14.9.39.3-7, GR-14.9.39.4-7]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

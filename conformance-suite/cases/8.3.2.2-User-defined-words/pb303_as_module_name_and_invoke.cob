@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb303_as_module_name_and_invoke
-*> rules: [SR-8.3.2.2-L3.6, GR-8.3.2.2-L4.2, GR-11.7.4-1, GR-11.10.4-1, FMT-11.7.2]
+*> rules: [SR-8.3.2.2-L3.6, GR-8.3.2.2-L4.2, GR-11.7.4-1, GR-11.10.4-1,
+*>    FMT-11.7.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

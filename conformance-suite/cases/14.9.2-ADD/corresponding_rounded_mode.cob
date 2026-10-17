@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: corresponding_rounded_mode
-*> rules: [SR-14.9.2.3-5, SR-14.9.2.3-6, GR-14.9.2.4-3, GR-14.9.2.4-5, FMT-14.9.2.2]
+*> rules: [SR-14.9.2.3-5, SR-14.9.2.3-6, GR-14.9.2.4-3, GR-14.9.2.4-5,
+*>    FMT-14.9.2.2]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

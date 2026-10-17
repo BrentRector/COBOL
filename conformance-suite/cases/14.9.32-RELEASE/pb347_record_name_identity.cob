@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb347_record_name_identity
-*> rules: [SR-14.9.32.3-1, SR-14.9.35.3-1, SR-14.9.51.3-1, SR-14.9.51.3-5, FMT-14.9.32.2]
+*> rules: [SR-14.9.32.3-1, SR-14.9.35.3-1, SR-14.9.51.3-1,
+*>    SR-14.9.51.3-5, FMT-14.9.32.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

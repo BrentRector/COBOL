@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb64t6_picture_locale_smoke
-*> rules: [GR-13.18.40.4-16, GR-13.18.40.5-11, GR-14.6.6-6, FMT-13.18.40.2]
+*> rules: [GR-13.18.40.4-16, GR-13.18.40.5-11, GR-14.6.6-6,
+*>    FMT-13.18.40.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

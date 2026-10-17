@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1041_exp_and_wide_exact_argument
-*> rules: [RV-15.20.4-1, RV-15.34.4-1, RV-15.35.4-1, RV-15.82.4-1, RV-15.89.4-1]
+*> rules: [RV-15.20.4-1, RV-15.34.4-1, RV-15.35.4-1, RV-15.82.4-1,
+*>    RV-15.89.4-1]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

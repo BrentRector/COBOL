@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb15_result_type_follows_argument
-*> rules: [AR-15.39.3-1, RV-15.39.4-1, AR-15.96.3-3, RV-15.96.4-3, FMT-15.87.2]
+*> rules: [AR-15.39.3-1, RV-15.39.4-1, AR-15.96.3-3, RV-15.96.4-3,
+*>    FMT-15.87.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

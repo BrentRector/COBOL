@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1383-call-convention-undefined-name
-*> rules: [GR-7.3.9.3-2, GR-8.3.2.2-L4.2, GR-8.3.2.2-L5.2, GR-9.3.5.3-2, DOC-A.1-68]
+*> rules: [GR-7.3.9.3-2, GR-8.3.2.2-L4.2, GR-8.3.2.2-L5.2, GR-9.3.5.3-2,
+*>    DOC-A.1-68]
 *> source-format: free
 *> portable: unverified
 *>---

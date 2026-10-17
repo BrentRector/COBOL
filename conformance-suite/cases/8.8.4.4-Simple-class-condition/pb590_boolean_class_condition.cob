@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb590_boolean_class_condition
-*> rules: [SR-8.8.4.4.3-3, SR-8.8.4.4.3-5, GR-8.8.4.4.4-2, FMT-8.8.4.4.2]
+*> rules: [SR-8.8.4.4.3-3, SR-8.8.4.4.3-5, GR-8.8.4.4.4-2,
+*>    FMT-8.8.4.4.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

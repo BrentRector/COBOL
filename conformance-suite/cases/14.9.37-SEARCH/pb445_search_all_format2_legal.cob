@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb445_search_all_format2_legal
-*> rules: [SR-14.9.37.3-7, SR-14.9.37.3-8, SR-14.9.37.3-9, SR-14.9.37.3-10, SR-14.9.37.3-11, SR-14.9.37.3-13]
+*> rules: [SR-14.9.37.3-7, SR-14.9.37.3-8, SR-14.9.37.3-9,
+*>    SR-14.9.37.3-10, SR-14.9.37.3-11, SR-14.9.37.3-13]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

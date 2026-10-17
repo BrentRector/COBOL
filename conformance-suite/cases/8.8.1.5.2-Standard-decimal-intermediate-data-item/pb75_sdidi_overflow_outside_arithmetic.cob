@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb75_sdidi_overflow_outside_arithmetic
-*> rules: [GR-8.8.1.5.2-2, GR-14.6.13.1.3-4, GR-14.6.13.1.3-5, GR-14.7.5-2, GR-14.7.5-7, GR-14.7.5-L3.3, DOC-A.1-70]
+*> rules: [GR-8.8.1.5.2-2, GR-14.6.13.1.3-4, GR-14.6.13.1.3-5,
+*>    GR-14.7.5-2, GR-14.7.5-7, GR-14.7.5-L3.3, DOC-A.1-70]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

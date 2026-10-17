@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb110_code_set_identity
-*> rules: [GR-12.3.7.4-7, SR-13.18.13.3-1, SR-13.18.13.3-3, GR-13.18.13.4-1, GR-13.18.13.4-2, GR-13.18.13.4-7, FMT-13.18.13.2, DOC-A.1-187]
+*> rules: [GR-12.3.7.4-7, SR-13.18.13.3-1, SR-13.18.13.3-3,
+*>    GR-13.18.13.4-1, GR-13.18.13.4-2, GR-13.18.13.4-7, FMT-13.18.13.2,
+*>    DOC-A.1-187]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

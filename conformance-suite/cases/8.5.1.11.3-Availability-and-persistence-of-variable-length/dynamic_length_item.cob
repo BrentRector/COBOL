@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: dynamic_length_item
-*> rules: [GR-8.5.1.11.3-7, SR-13.18.19.3-3, GR-13.18.19.4-1, GR-14.9.25.4-8, RV-15.50.4-6]
+*> rules: [GR-8.5.1.11.3-7, SR-13.18.19.3-3, GR-13.18.19.4-1,
+*>    GR-14.9.25.4-8, RV-15.50.4-6]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

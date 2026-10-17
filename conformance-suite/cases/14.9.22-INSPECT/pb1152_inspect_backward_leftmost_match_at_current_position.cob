@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1152_inspect_backward_leftmost_match_at_current_position
-*> rules: [GR-14.9.22.4-3, GR-14.9.22.4-8, GR-14.9.22.4-9, GR-14.9.22.4-17]
+*> rules: [GR-14.9.22.4-3, GR-14.9.22.4-8, GR-14.9.22.4-9,
+*>    GR-14.9.22.4-17]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

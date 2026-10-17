@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb806-else-trailing-word
-*> rules: [SR-7.3.3-3, SR-7.3.3-6, SR-7.3.16.3-3, SR-7.3.16.3-4, FMT-7.3.16.2]
+*> rules: [SR-7.3.3-3, SR-7.3.3-6, SR-7.3.16.3-3, SR-7.3.16.3-4,
+*>    FMT-7.3.16.2]
 *> source-format: free
 *> portable: unverified
 *>---

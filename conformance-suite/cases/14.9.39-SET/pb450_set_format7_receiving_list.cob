@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb450_set_format7_receiving_list
-*> rules: [SR-14.9.39.3-17, SR-14.9.39.3-18, SR-14.9.39.3-19, GR-14.9.39.4-12, GR-14.9.39.4-13, FMT-14.9.39.2]
+*> rules: [SR-14.9.39.3-17, SR-14.9.39.3-18, SR-14.9.39.3-19,
+*>    GR-14.9.39.4-12, GR-14.9.39.4-13, FMT-14.9.39.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

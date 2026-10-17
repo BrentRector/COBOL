@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: open_fixed_attribute_conflict_ix
-      *> rules: [GR-9.1.13.6-7, GR-12.4.5.6.4-3, GR-12.4.5.12.4-3, GR-14.9.27.4-10, DOC-A.1-129]
+      *> rules: [GR-9.1.13.6-7, GR-12.4.5.6.4-3, GR-12.4.5.12.4-3,
+      *>    GR-14.9.27.4-10, DOC-A.1-129]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

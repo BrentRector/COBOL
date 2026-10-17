@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1128_inspect_identifier1_class_store
-*> rules: [GR-14.9.22.4-4, GR-14.9.22.4-14, GR-14.9.22.4-20, GR-14.9.22.4-22]
+*> rules: [GR-14.9.22.4-4, GR-14.9.22.4-14, GR-14.9.22.4-20,
+*>    GR-14.9.22.4-22]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

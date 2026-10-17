@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1050_reports_share_file
-      *> rules: [SR-13.18.12.3-3, GR-13.18.12.4-1, GR-13.18.46.4-1, FMT-13.18.46.2]
+      *> rules: [SR-13.18.12.3-3, GR-13.18.12.4-1, GR-13.18.46.4-1,
+      *>    FMT-13.18.46.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

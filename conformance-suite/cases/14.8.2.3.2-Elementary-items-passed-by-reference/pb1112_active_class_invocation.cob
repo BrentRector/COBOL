@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1112_active_class_invocation
-*> rules: [GR-14.8.2.3.2-4, GR-14.8.2.3.3-1, GR-14.8.2.3.3-2, GR-14.8.3.3-2]
+*> rules: [GR-14.8.2.3.2-4, GR-14.8.2.3.3-1, GR-14.8.2.3.3-2,
+*>    GR-14.8.3.3-2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

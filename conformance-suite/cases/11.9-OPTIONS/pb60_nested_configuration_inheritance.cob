@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb60_nested_configuration_inheritance
-*> rules: [GR-11.9.4-1, GR-12.3.4-1, GR-12.3.6.4-1, GR-12.3.6.4-11, AR-15.67.3-5]
+*> rules: [GR-11.9.4-1, GR-12.3.4-1, GR-12.3.6.4-1, GR-12.3.6.4-11,
+*>    AR-15.67.3-5]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

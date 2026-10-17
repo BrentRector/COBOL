@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1_integer_floor_85
-      *> rules: [AR-15.44.3-1, RV-15.44.4-1, RV-15.49.4-1, FMT-15.44.2, FMT-15.49.2]
+      *> rules: [AR-15.44.3-1, RV-15.44.4-1, RV-15.49.4-1, FMT-15.44.2,
+      *>    FMT-15.49.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

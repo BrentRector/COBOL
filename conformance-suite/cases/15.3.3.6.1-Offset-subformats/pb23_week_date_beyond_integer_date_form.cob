@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb23_week_date_beyond_integer_date_form
-*> rules: [GR-15.3.3.6.1-3, AR-15.48.3-4, AR-15.48.3-5, RV-15.48.4-1, AR-15.79.3-5, RV-15.92.4-1, FMT-15.92.2]
+*> rules: [GR-15.3.3.6.1-3, AR-15.48.3-4, AR-15.48.3-5, RV-15.48.4-1,
+*>    AR-15.79.3-5, RV-15.92.4-1, FMT-15.92.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

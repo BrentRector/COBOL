@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb110_symbolic_and_class_in
-*> rules: [SR-8.3.3.6.3-4, GR-8.3.3.6.4-2, GR-8.3.3.6.4-3, SR-12.3.7.3-16, SR-12.3.7.3-17, GR-12.3.7.4-7, GR-12.3.7.4-11, GR-12.3.7.4-12]
+*> rules: [SR-8.3.3.6.3-4, GR-8.3.3.6.4-2, GR-8.3.3.6.4-3,
+*>    SR-12.3.7.3-16, SR-12.3.7.3-17, GR-12.3.7.4-7, GR-12.3.7.4-11,
+*>    GR-12.3.7.4-12]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

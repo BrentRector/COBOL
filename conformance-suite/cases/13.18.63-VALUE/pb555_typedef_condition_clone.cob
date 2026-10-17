@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb555_typedef_condition_clone
-*> rules: [SR-13.18.63.3-27, SR-13.18.63.3-31, SR-13.18.63.3-32, GR-13.18.63.4-20]
+*> rules: [SR-13.18.63.3-27, SR-13.18.63.3-31, SR-13.18.63.3-32,
+*>    GR-13.18.63.4-20]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

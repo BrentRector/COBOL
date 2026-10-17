@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb455_set_false_group_length
-*> rules: [GR-13.18.63.4-20, SR-14.9.39.3-7, GR-14.9.39.4-7, FMT-13.18.63.2]
+*> rules: [GR-13.18.63.4-20, SR-14.9.39.3-7, GR-14.9.39.4-7,
+*>    FMT-13.18.63.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

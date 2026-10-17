@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: rw_suppress
-*> rules: [SR-13.18.16.3-1, GR-13.18.16.4-3, GR-13.18.16.4-5, SR-13.18.57.3-11, FMT-14.9.45.2]
+*> rules: [SR-13.18.16.3-1, GR-13.18.16.4-3, GR-13.18.16.4-5,
+*>    SR-13.18.57.3-11, FMT-14.9.45.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

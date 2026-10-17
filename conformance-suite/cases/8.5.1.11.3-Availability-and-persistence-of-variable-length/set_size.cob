@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: set_size
-*> rules: [GR-8.5.1.11.3-6, SR-14.9.39.3-33, SR-14.9.39.3-34, GR-14.9.39.4-38, GR-14.9.39.4-39]
+*> rules: [GR-8.5.1.11.3-6, SR-14.9.39.3-33, SR-14.9.39.3-34,
+*>    GR-14.9.39.4-38, GR-14.9.39.4-39]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

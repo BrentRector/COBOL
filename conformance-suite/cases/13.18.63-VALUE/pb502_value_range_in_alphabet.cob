@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb502_value_range_in_alphabet
-*> rules: [SR-13.18.63.3-26, SR-13.18.63.3-31, GR-13.18.63.4-18, FMT-13.18.63.2]
+*> rules: [SR-13.18.63.3-26, SR-13.18.63.3-31, GR-13.18.63.4-18,
+*>    FMT-13.18.63.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

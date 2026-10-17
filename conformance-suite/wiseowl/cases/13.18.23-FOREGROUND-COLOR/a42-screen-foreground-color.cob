@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: a42-screen-foreground-color
-*> rules: [SR-13.18.23.3-1, SR-13.18.23.3-2, GR-13.18.23.4-1, GR-13.18.23.4-2, GR-13.18.23.4-3, GR-13.18.23.4-4, FMT-13.18.23.2, DOC-A.1-27, DOC-A.1-83]
+*> rules: [SR-13.18.23.3-1, SR-13.18.23.3-2, GR-13.18.23.4-1,
+*>    GR-13.18.23.4-2, GR-13.18.23.4-3, GR-13.18.23.4-4, FMT-13.18.23.2,
+*>    DOC-A.1-27, DOC-A.1-83]
 *> source-format: free
 *> portable: unverified
 *>---

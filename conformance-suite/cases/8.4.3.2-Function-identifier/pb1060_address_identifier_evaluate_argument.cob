@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1060_address_identifier_evaluate_argument
-*> rules: [SR-8.4.3.2.3-8, SR-8.4.3.2.3-10, SR-14.9.13.3-7, GR-14.9.13.4-3, AR-15.14.3-1, AR-15.50.3-1]
+*> rules: [SR-8.4.3.2.3-8, SR-8.4.3.2.3-10, SR-14.9.13.3-7,
+*>    GR-14.9.13.4-3, AR-15.14.3-1, AR-15.50.3-1]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

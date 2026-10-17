@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: a413-write-file-format-2
-*> rules: [SR-14.9.51.3-7, SR-14.9.51.3-8, SR-14.9.51.3-9, SR-14.9.51.3-10, GR-14.9.51.4-7, GR-14.9.51.4-8]
+*> rules: [SR-14.9.51.3-7, SR-14.9.51.3-8, SR-14.9.51.3-9,
+*>    SR-14.9.51.3-10, GR-14.9.51.4-7, GR-14.9.51.4-8]
 *> source-format: free
 *> portable: unverified
 *>---

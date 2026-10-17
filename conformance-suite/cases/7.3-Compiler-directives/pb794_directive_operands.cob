@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb794_directive_operands
-*> rules: [SR-7.3.3-4, SR-7.3.3-5, SR-7.3.19.3-2, GR-7.3.19.4-1, FMT-7.3.9.2, FMT-7.3.18.2, FMT-7.3.19.2, FMT-7.3.20.2, FMT-7.3.22.2, FMT-7.3.24.2]
+*> rules: [SR-7.3.3-4, SR-7.3.3-5, SR-7.3.19.3-2, GR-7.3.19.4-1,
+*>    FMT-7.3.9.2, FMT-7.3.18.2, FMT-7.3.19.2, FMT-7.3.20.2,
+*>    FMT-7.3.22.2, FMT-7.3.24.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

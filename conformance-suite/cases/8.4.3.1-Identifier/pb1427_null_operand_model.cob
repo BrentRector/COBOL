@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1427_null_operand_model
-      *> rules: [SR-8.4.3.1.3-9, SR-8.4.3.10.3-1, GR-8.4.3.10.4-1, GR-8.4.3.10.4-3, FMT-8.4.3.10.2]
+      *> rules: [SR-8.4.3.1.3-9, SR-8.4.3.10.3-1, GR-8.4.3.10.4-1,
+      *>    GR-8.4.3.10.4-3, FMT-8.4.3.10.2]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

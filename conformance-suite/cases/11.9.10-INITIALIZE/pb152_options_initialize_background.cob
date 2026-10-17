@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb152_options_initialize_background
-*> rules: [GR-11.9.10.4-1, GR-11.9.10.4-4, GR-11.9.10.4-5, GR-14.6.2.3.2-1, GR-14.6.2.3.2-L2.1]
+*> rules: [GR-11.9.10.4-1, GR-11.9.10.4-4, GR-11.9.10.4-5,
+*>    GR-14.6.2.3.2-1, GR-14.6.2.3.2-L2.1]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1425_object_property_identifier
-*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-7, SR-8.4.3.1.3-8, GR-8.4.3.1.4-1, SR-8.4.3.8.3-3, FMT-8.4.3.1.2, FMT-8.4.3.9.2]
+*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-7, SR-8.4.3.1.3-8,
+*>    GR-8.4.3.1.4-1, SR-8.4.3.8.3-3, FMT-8.4.3.1.2, FMT-8.4.3.9.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

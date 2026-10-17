@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb428_inline_method_invocation
-*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-5, GR-8.4.3.1.4-1, SR-8.4.3.4.3-2, GR-8.4.3.4.4-1, SR-14.9.25.3-3, FMT-8.4.3.4.2]
+*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-5, GR-8.4.3.1.4-1,
+*>    SR-8.4.3.4.3-2, GR-8.4.3.4.4-1, SR-14.9.25.3-3, FMT-8.4.3.4.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

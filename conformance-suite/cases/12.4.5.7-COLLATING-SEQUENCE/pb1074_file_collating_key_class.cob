@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1074_file_collating_key_class
-*> rules: [GR-12.4.5.7.4-2, GR-12.4.5.7.4-3, GR-12.4.5.7.4-5, GR-12.4.5.12.4-1]
+*> rules: [GR-12.4.5.7.4-2, GR-12.4.5.7.4-3, GR-12.4.5.7.4-5,
+*>    GR-12.4.5.12.4-1]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

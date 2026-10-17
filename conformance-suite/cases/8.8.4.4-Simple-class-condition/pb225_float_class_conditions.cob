@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb225_float_class_conditions
-*> rules: [SR-8.8.4.4.3-6, SR-8.8.4.4.3-7, GR-8.8.4.4.4-3, FMT-8.8.4.4.2]
+*> rules: [SR-8.8.4.4.3-6, SR-8.8.4.4.3-7, GR-8.8.4.4.4-3,
+*>    FMT-8.8.4.4.2]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

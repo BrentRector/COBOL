@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1072_suppress_when_forms
-*> rules: [SR-12.4.5.6.3-7, GR-12.4.5.6.4-6, GR-14.9.35.4-24, GR-14.9.35.4-25, GR-14.9.51.4-35, GR-14.9.51.4-41]
+*> rules: [SR-12.4.5.6.3-7, GR-12.4.5.6.4-6, GR-14.9.35.4-24,
+*>    GR-14.9.35.4-25, GR-14.9.51.4-35, GR-14.9.51.4-41]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

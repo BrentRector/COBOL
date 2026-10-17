@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb943_group_sender_conversions
-*> rules: [GR-13.18.38.4-8, GR-14.9.25.4-2, GR-14.9.25.4-3, GR-14.9.25.4-4]
+*> rules: [GR-13.18.38.4-8, GR-14.9.25.4-2, GR-14.9.25.4-3,
+*>    GR-14.9.25.4-4]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

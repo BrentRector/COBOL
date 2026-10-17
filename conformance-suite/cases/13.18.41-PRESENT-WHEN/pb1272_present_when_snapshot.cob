@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1272_present_when_snapshot
-*> rules: [GR-13.18.41.1-1, GR-13.18.41.4-2, GR-13.18.41.4-3, GR-13.18.54.4-2]
+*> rules: [GR-13.18.41.1-1, GR-13.18.41.4-2, GR-13.18.41.4-3,
+*>    GR-13.18.54.4-2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb528-picture-precedence
-*> rules: [SR-13.18.40.3-2, SR-13.18.40.3-25, SR-13.18.40.3-26, SR-13.18.40.3-27]
+*> rules: [SR-13.18.40.3-2, SR-13.18.40.3-25, SR-13.18.40.3-26,
+*>    SR-13.18.40.3-27]
 *> source-format: free
 *> portable: unverified
 *>---

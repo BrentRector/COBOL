@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb1098_organization_permanence_85
-      *> rules: [GR-12.4.5.10.3-1, GR-12.4.5.10.3-4, GR-12.4.5.10.3-5]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb1098_organization_permanence_85
+*> rules: [GR-12.4.5.10.3-1, GR-12.4.5.10.3-4, GR-12.4.5.10.3-5]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB1098OP.
       *> ISO/IEC 1989:2023 §12.4.5.10.3 GR1, GR4, GR5 — the file

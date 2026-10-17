@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb79_group_usage_national
-*> rules: [GR-13.16.4-2, SR-13.18.29.3-3, GR-13.18.29.4-2, AR-15.3-9, RV-15.50.4-2, FMT-13.18.29.2]
+*> rules: [GR-13.16.4-2, SR-13.18.29.3-3, GR-13.18.29.4-2, AR-15.3-9,
+*>    RV-15.50.4-2, FMT-13.18.29.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

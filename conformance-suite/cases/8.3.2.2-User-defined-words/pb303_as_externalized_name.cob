@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb303_as_externalized_name
-*> rules: [GR-8.3.2.2-L2.1, GR-8.3.2.2-L2.2, SR-8.3.2.2-L3.3, SR-8.3.2.2-L3.4, SR-8.3.2.2-L3.5, GR-8.3.2.2-L5.2, GR-11.5.4-1, GR-11.10.4-1, DOC-A.1-68]
+*> rules: [GR-8.3.2.2-L2.1, GR-8.3.2.2-L2.2, SR-8.3.2.2-L3.3,
+*>    SR-8.3.2.2-L3.4, SR-8.3.2.2-L3.5, GR-8.3.2.2-L5.2, GR-11.5.4-1,
+*>    GR-11.10.4-1, DOC-A.1-68]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

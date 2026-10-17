@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb963_turn_file_name_arms
-      *> rules: [GR-7.3.25.4-3, GR-7.3.25.4-5, GR-7.3.25.4-6, GR-7.3.25.4-8]
+      *> rules: [GR-7.3.25.4-3, GR-7.3.25.4-5, GR-7.3.25.4-6,
+      *>    GR-7.3.25.4-8]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

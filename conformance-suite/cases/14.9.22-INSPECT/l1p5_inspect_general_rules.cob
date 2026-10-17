@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: l1p5_inspect_general_rules
-      *> rules: [GR-14.9.22.4-1, GR-14.9.22.4-5, GR-14.9.22.4-7, GR-14.9.22.4-8, GR-14.9.22.4-9, GR-14.9.22.4-11, GR-14.9.22.4-16]
+      *> rules: [GR-14.9.22.4-1, GR-14.9.22.4-5, GR-14.9.22.4-7,
+      *>    GR-14.9.22.4-8, GR-14.9.22.4-9, GR-14.9.22.4-11,
+      *>    GR-14.9.22.4-16]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

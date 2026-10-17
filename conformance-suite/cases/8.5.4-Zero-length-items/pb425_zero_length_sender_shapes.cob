@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb425_zero_length_sender_shapes
-*> rules: [GR-8.5.4-6, GR-8.5.4-9, GR-14.9.25.4-1, GR-14.9.25.4-2, GR-14.9.25.4-3]
+*> rules: [GR-8.5.4-6, GR-8.5.4-9, GR-14.9.25.4-1, GR-14.9.25.4-2,
+*>    GR-14.9.25.4-3]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

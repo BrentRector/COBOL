@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb757_invoke_omitted
-*> rules: [SR-8.4.3.2.3-9, GR-8.4.3.2.4-7, SR-8.8.4.8.3-1, GR-8.8.4.8.4-1, GR-8.8.4.8.4-2, SR-14.9.23.3-18, GR-14.9.23.4-9]
+*> rules: [SR-8.4.3.2.3-9, GR-8.4.3.2.4-7, SR-8.8.4.8.3-1,
+*>    GR-8.8.4.8.4-1, GR-8.8.4.8.4-2, SR-14.9.23.3-18, GR-14.9.23.4-9]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

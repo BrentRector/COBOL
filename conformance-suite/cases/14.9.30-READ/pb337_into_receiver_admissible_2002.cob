@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb337_into_receiver_admissible_2002
-*> rules: [SR-14.9.30.3-1, SR-14.9.30.3-2, SR-14.9.34.3-2, SR-14.9.34.3-3]
+*> rules: [SR-14.9.30.3-1, SR-14.9.30.3-2, SR-14.9.34.3-2,
+*>    SR-14.9.34.3-3]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

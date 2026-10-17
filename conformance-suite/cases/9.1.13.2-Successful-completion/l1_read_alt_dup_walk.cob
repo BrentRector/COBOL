@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1_read_alt_dup_walk
-      *> rules: [GR-9.1.13.2-2, GR-9.1.13.4-1, GR-14.9.30.4-21, GR-14.9.30.4-26, GR-14.9.30.4-27]
+      *> rules: [GR-9.1.13.2-2, GR-9.1.13.4-1, GR-14.9.30.4-21,
+      *>    GR-14.9.30.4-26, GR-14.9.30.4-27]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

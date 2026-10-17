@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb440_perform_empty_range_85
-      *> rules: [GR-14.9.28.4-4, GR-14.9.28.4-5, GR-14.9.28.4-8, GR-14.9.28.4-9, GR-14.9.28.4-13]
+      *> rules: [GR-14.9.28.4-4, GR-14.9.28.4-5, GR-14.9.28.4-8,
+      *>    GR-14.9.28.4-9, GR-14.9.28.4-13]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

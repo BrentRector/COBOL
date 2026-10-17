@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb60_currency_sign_set
-*> rules: [SR-12.3.7.3-23, SR-12.3.7.3-25, SR-12.3.7.3-26, SR-12.3.7.3-27, GR-12.3.7.4-13, GR-13.18.40.4-14, AR-15.68.3-3]
+*> rules: [SR-12.3.7.3-23, SR-12.3.7.3-25, SR-12.3.7.3-26,
+*>    SR-12.3.7.3-27, GR-12.3.7.4-13, GR-13.18.40.4-14, AR-15.68.3-3]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb526_linage_ec_condition
-*> rules: [GR-9.1.13.11-1, GR-13.18.34.4-3, GR-13.18.34.4-6, DOC-A.1-110]
+*> rules: [GR-9.1.13.11-1, GR-13.18.34.4-3, GR-13.18.34.4-6,
+*>    DOC-A.1-110]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

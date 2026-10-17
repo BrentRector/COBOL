@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb979_unstring_any_length_national
-*> rules: [SR-14.9.48.3-3, GR-14.9.48.4-4, GR-14.9.48.4-8, GR-14.9.48.4-11]
+*> rules: [SR-14.9.48.3-3, GR-14.9.48.4-4, GR-14.9.48.4-8,
+*>    GR-14.9.48.4-11]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

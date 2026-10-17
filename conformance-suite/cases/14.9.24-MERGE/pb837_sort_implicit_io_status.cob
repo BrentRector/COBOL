@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb837_sort_implicit_io_status
-*> rules: [GR-14.9.24.4-7, GR-14.9.40.4-9, GR-14.9.40.4-12, GR-14.9.40.4-15]
+*> rules: [GR-14.9.24.4-7, GR-14.9.40.4-9, GR-14.9.40.4-12,
+*>    GR-14.9.40.4-15]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

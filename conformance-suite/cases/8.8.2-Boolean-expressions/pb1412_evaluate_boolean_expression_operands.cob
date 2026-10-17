@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1412_evaluate_boolean_expression_operands
-*> rules: [GR-8.8.2-8, SR-14.9.13.3-6, SR-14.9.13.3-8, SR-14.9.13.3-10, GR-14.9.13.4-3, FMT-14.9.13.2]
+*> rules: [GR-8.8.2-8, SR-14.9.13.3-6, SR-14.9.13.3-8, SR-14.9.13.3-10,
+*>    GR-14.9.13.4-3, FMT-14.9.13.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

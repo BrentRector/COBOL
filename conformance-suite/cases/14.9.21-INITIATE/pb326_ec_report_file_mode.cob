@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb326_ec_report_file_mode
-*> rules: [GR-14.9.21.4-3, SR-14.9.27.3-1, GR-14.9.27.4-7, GR-14.9.46.4-1]
+*> rules: [GR-14.9.21.4-3, SR-14.9.27.3-1, GR-14.9.27.4-7,
+*>    GR-14.9.46.4-1]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

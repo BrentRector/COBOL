@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb993_sort_merge_transfer_termination
-*> rules: [GR-14.6.13.1.3-2, GR-14.9.24.4-1, GR-14.9.24.4-7, GR-14.9.24.4-12, GR-14.9.40.4-12, GR-14.9.40.4-15]
+*> rules: [GR-14.6.13.1.3-2, GR-14.9.24.4-1, GR-14.9.24.4-7,
+*>    GR-14.9.24.4-12, GR-14.9.40.4-12, GR-14.9.40.4-15]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

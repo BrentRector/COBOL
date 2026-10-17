@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb994_sort_merge_keyed_using_giving
-      *> rules: [SR-14.9.24.3-13, GR-14.9.24.4-12, SR-14.9.40.3-9, SR-14.9.40.3-12, GR-14.9.40.4-15, FMT-14.9.40.2]
+      *> rules: [SR-14.9.24.3-13, GR-14.9.24.4-12, SR-14.9.40.3-9,
+      *>    SR-14.9.40.3-12, GR-14.9.40.4-15, FMT-14.9.40.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

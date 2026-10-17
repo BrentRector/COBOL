@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb116_sqrt_standard_decimal
-*> rules: [GR-11.9.5.2-3, RV-15.4.1-L2.1, RV-15.84.4-1, RV-15.84.4-2, RV-15.86.4-1]
+*> rules: [GR-11.9.5.2-3, RV-15.4.1-L2.1, RV-15.84.4-1, RV-15.84.4-2,
+*>    RV-15.86.4-1]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

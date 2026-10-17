@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1067_library_text_source_format
-      *> rules: [GR-6.5-7, GR-6.5-9, GR-7.3.4-5, GR-7.3.24.3-1, GR-7.3.24.3-3, GR-7.3.24.3-5]
+      *> rules: [GR-6.5-7, GR-6.5-9, GR-7.3.4-5, GR-7.3.24.3-1,
+      *>    GR-7.3.24.3-3, GR-7.3.24.3-5]
       *> accept: [2002]
       *> files: [pb1067a.cpy, pb1067b.cpy]
       *> source-format: fixed

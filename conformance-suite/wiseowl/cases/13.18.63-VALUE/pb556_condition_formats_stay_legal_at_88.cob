@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb556_condition_formats_stay_legal_at_88
-      *> rules: [SR-13.18.63.3-33]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb556_condition_formats_stay_legal_at_88
+*> rules: [SR-13.18.63.3-33]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> kb/Work PB556 - the POSITIVE half of ISO 13.18.63.3 SR33, "Formats 3 and 5 may be specified only when
       *> the level-number of the subject of the entry is 88." A screen that rejects a phrase at the wrong level
       *> is only correct if it still ACCEPTS it at the right one, and the three negatives that pin the rejection

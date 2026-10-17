@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb140_delete_file_gate
-*> rules: [GR-9.1.13.7-1, GR-14.9.10.4-2, GR-14.9.10.4-13, GR-14.9.10.4-16, GR-14.9.10.4-20]
+*> rules: [GR-9.1.13.7-1, GR-14.9.10.4-2, GR-14.9.10.4-13,
+*>    GR-14.9.10.4-16, GR-14.9.10.4-20]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

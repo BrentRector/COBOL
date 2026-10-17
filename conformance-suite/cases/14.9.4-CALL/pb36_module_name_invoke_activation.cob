@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb36_module_name_invoke_activation
-*> rules: [GR-14.9.4.4-1, GR-14.9.23.4-1, RV-15.65.4-4, RV-15.65.4-7, RV-15.65.4-9]
+*> rules: [GR-14.9.4.4-1, GR-14.9.23.4-1, RV-15.65.4-4, RV-15.65.4-7,
+*>    RV-15.65.4-9]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

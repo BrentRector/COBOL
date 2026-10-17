@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1288_report_entry_placement
-      *> rules: [SR-13.15.3-5, SR-13.15.3-9, SR-13.15.3-12, GR-13.15.4-2, SR-13.18.14.3-3]
+      *> rules: [SR-13.15.3-5, SR-13.15.3-9, SR-13.15.3-12,
+      *>    GR-13.15.4-2, SR-13.18.14.3-3]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

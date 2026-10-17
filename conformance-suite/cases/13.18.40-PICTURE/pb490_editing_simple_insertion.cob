@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb490_editing_simple_insertion
-*> rules: [GR-13.18.40.4-7, GR-13.18.40.5-1, GR-13.18.40.5-2, GR-13.18.40.5-3, GR-13.18.40.5-6]
+*> rules: [GR-13.18.40.4-7, GR-13.18.40.5-1, GR-13.18.40.5-2,
+*>    GR-13.18.40.5-3, GR-13.18.40.5-6]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

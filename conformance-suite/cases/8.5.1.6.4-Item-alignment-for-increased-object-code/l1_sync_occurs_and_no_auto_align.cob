@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: l1_sync_occurs_and_no_auto_align
-*> rules: [GR-8.5.1.6.4-1, GR-8.5.1.6.4-2, GR-13.18.55.4-8, GR-13.18.55.4-10]
+*> rules: [GR-8.5.1.6.4-1, GR-8.5.1.6.4-2, GR-13.18.55.4-8,
+*>    GR-13.18.55.4-10]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb495_group_usage_standard_float
-*> rules: [GR-13.18.60.4-12, GR-13.18.60.4-13, GR-13.18.60.4-14, GR-13.18.60.4-15, GR-13.18.60.4-21]
+*> rules: [GR-13.18.60.4-12, GR-13.18.60.4-13, GR-13.18.60.4-14,
+*>    GR-13.18.60.4-15, GR-13.18.60.4-21]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

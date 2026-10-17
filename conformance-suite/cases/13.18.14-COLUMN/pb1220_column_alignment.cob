@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1220_column_alignment
-*> rules: [SR-13.18.14.3-9, GR-13.18.14.4-6, GR-13.18.14.4-9, FMT-13.18.14.2]
+*> rules: [SR-13.18.14.3-9, GR-13.18.14.4-6, GR-13.18.14.4-9,
+*>    FMT-13.18.14.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

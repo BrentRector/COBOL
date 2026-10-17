@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: ec_range_invalid
-*> rules: [SR-13.18.63.3-26, GR-14.7.8-1, GR-14.7.8-2, GR-14.9.13.4-2, GR-14.9.13.4-4, RV-15.33.3-1]
+*> rules: [SR-13.18.63.3-26, GR-14.7.8-1, GR-14.7.8-2, GR-14.9.13.4-2,
+*>    GR-14.9.13.4-4, RV-15.33.3-1]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

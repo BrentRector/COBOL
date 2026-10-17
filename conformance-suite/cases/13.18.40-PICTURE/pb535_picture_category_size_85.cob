@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb535_picture_category_size_85
-      *> rules: [GR-13.18.40.4-3, GR-13.18.40.4-4, GR-13.18.40.4-6, GR-13.18.40.4-11]
+      *> rules: [GR-13.18.40.4-3, GR-13.18.40.4-4, GR-13.18.40.4-6,
+      *>    GR-13.18.40.4-11]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb174-float-decimal-encoding-nonsupport
-      *> rules: [GR-13.18.60.4-16, GR-13.18.60.4-17, GR-13.18.60.4-18, GR-13.18.60.4-20, DOC-A.1-47, DOC-A.1-48]
+      *> rules: [GR-13.18.60.4-16, GR-13.18.60.4-17, GR-13.18.60.4-18,
+      *>    GR-13.18.60.4-20, DOC-A.1-47, DOC-A.1-48]
       *> source-format: fixed
       *> portable: unverified
       *>---

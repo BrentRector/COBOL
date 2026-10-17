@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb232_entry_convention_cobol
-*> rules: [SR-11.9.7.3-1, GR-11.9.7.4-1, GR-11.9.7.4-2, GR-14.9.4.4-10, FMT-11.9.7.2, DOC-A.1-64]
+*> rules: [SR-11.9.7.3-1, GR-11.9.7.4-1, GR-11.9.7.4-2, GR-14.9.4.4-10,
+*>    FMT-11.9.7.2, DOC-A.1-64]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

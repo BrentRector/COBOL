@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb646_national_form_numeric_2002
-*> rules: [GR-8.4.3.3.4-3, GR-13.18.40.4-1, GR-13.18.40.4-8, GR-13.18.49.4-3, GR-13.18.49.4-5, SR-13.18.60.3-12, SR-13.18.63.3-8]
+*> rules: [GR-8.4.3.3.4-3, GR-13.18.40.4-1, GR-13.18.40.4-8,
+*>    GR-13.18.49.4-3, GR-13.18.49.4-5, SR-13.18.60.3-12,
+*>    SR-13.18.63.3-8]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb459_set_index_amount_guards
-*> rules: [GR-14.9.39.4-1, GR-14.9.39.4-2, GR-14.9.39.4-3, GR-14.9.39.4-4, DOC-A.1-128]
+*> rules: [GR-14.9.39.4-1, GR-14.9.39.4-2, GR-14.9.39.4-3,
+*>    GR-14.9.39.4-4, DOC-A.1-128]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

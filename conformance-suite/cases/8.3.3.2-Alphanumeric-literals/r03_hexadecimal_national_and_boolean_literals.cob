@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: r03_hexadecimal_national_and_boolean_literals
-*> rules: [GR-8.3.3.2.4-1, GR-8.3.3.2.4-4, GR-8.3.3.4.4-5, GR-8.3.3.4.4-6, GR-8.3.3.4.4-7, GR-8.3.3.5.4-4, AR-15.66.3-3, FMT-8.3.3.2.2, FMT-8.3.3.5.2, DOC-A.1-122]
+*> rules: [GR-8.3.3.2.4-1, GR-8.3.3.2.4-4, GR-8.3.3.4.4-5,
+*>    GR-8.3.3.4.4-6, GR-8.3.3.4.4-7, GR-8.3.3.5.4-4, AR-15.66.3-3,
+*>    FMT-8.3.3.2.2, FMT-8.3.3.5.2, DOC-A.1-122]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

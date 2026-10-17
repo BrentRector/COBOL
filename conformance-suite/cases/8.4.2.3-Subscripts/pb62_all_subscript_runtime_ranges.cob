@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb62_all_subscript_runtime_ranges
-*> rules: [GR-8.4.2.3.4-1, AR-15.3-14, RV-15.61.4-1, RV-15.61.4-2, RV-15.61.4-3, RV-15.88.4-1, FMT-8.4.2.3.2, FMT-15.21.2, FMT-15.60.2, FMT-15.61.2, FMT-15.62.2, FMT-15.76.2]
+*> rules: [GR-8.4.2.3.4-1, AR-15.3-14, RV-15.61.4-1, RV-15.61.4-2,
+*>    RV-15.61.4-3, RV-15.88.4-1, FMT-8.4.2.3.2, FMT-15.21.2,
+*>    FMT-15.60.2, FMT-15.61.2, FMT-15.62.2, FMT-15.76.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

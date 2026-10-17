@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: a42-ec-screen-turn
-*> rules: [GR-13.18.14.4-18, GR-13.18.14.4-19, GR-13.18.35.4-14, GR-14.9.11.4-13, GR-14.9.11.4-19]
+*> rules: [GR-13.18.14.4-18, GR-13.18.14.4-19, GR-13.18.35.4-14,
+*>    GR-14.9.11.4-13, GR-14.9.11.4-19]
 *> source-format: free
 *> portable: unverified
 *>---

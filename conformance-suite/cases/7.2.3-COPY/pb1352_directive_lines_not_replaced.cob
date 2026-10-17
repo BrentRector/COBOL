@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1352_directive_lines_not_replaced
-      *> rules: [GR-7.2.3.4-8, GR-7.2.3.4-9, GR-7.2.4.4-8, GR-7.3.4-1, GR-7.3.4-2, GR-7.3.16.4-1, GR-7.3.19.4-1]
+      *> rules: [GR-7.2.3.4-8, GR-7.2.3.4-9, GR-7.2.4.4-8, GR-7.3.4-1,
+      *>    GR-7.3.4-2, GR-7.3.16.4-1, GR-7.3.19.4-1]
       *> accept: [2002]
       *> files: [pb1352c.cpy, pb1352d.cpy, pb1352a.cpy, pb1352b.cpy]
       *> source-format: fixed

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb398_range_in_alphabet
-*> rules: [GR-13.18.63.4-18, GR-14.7.8-2, SR-14.9.13.3-3, GR-14.9.13.4-2, GR-14.9.13.4-4, DOC-A.1-203]
+*> rules: [GR-13.18.63.4-18, GR-14.7.8-2, SR-14.9.13.3-3,
+*>    GR-14.9.13.4-2, GR-14.9.13.4-4, DOC-A.1-203]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

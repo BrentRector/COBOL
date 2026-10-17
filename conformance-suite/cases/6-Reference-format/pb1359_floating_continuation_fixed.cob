@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1359_floating_continuation_fixed
-      *> rules: [GR-6.1-1, SR-6.2.3.2-4, SR-6.3.4-2, SR-6.3.5-2, GR-6.5-4, GR-6.5-8, SR-7.2.3.3-8, SR-7.2.4.3-8]
+      *> rules: [GR-6.1-1, SR-6.2.3.2-4, SR-6.3.4-2, SR-6.3.5-2,
+      *>    GR-6.5-4, GR-6.5-8, SR-7.2.3.3-8, SR-7.2.4.3-8]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1140_sort_merge_short_record_fill
-*> rules: [GR-14.9.24.4-2, GR-14.9.24.4-13, GR-14.9.40.4-7, GR-14.9.40.4-16]
+*> rules: [GR-14.9.24.4-2, GR-14.9.24.4-13, GR-14.9.40.4-7,
+*>    GR-14.9.40.4-16]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

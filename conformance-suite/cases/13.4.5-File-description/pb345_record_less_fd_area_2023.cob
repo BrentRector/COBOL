@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb345_record_less_fd_area_2023
-*> rules: [SR-13.4.5.3-3, SR-13.4.5.3-7, GR-13.4.5.4-1, SR-13.18.43.3-1, GR-14.9.30.4-6, GR-14.9.47.4-2, GR-14.9.47.4-3]
+*> rules: [SR-13.4.5.3-3, SR-13.4.5.3-7, GR-13.4.5.4-1, SR-13.18.43.3-1,
+*>    GR-14.9.30.4-6, GR-14.9.47.4-2, GR-14.9.47.4-3]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

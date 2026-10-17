@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb1137_invoke_argument_forms
-*> rules: [SR-8.4.3.7.3-2, SR-14.9.23.3-6, SR-14.9.23.3-11, SR-14.9.23.3-17, SR-14.9.23.3-19, SR-14.9.23.3-21, GR-14.9.23.4-6, FMT-8.4.3.7.2]
+*> rules: [SR-8.4.3.7.3-2, SR-14.9.23.3-6, SR-14.9.23.3-11,
+*>    SR-14.9.23.3-17, SR-14.9.23.3-19, SR-14.9.23.3-21, GR-14.9.23.4-6,
+*>    FMT-8.4.3.7.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

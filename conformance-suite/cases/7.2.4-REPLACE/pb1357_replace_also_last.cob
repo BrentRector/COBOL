@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1357_replace_also_last
-      *> rules: [GR-7.2.4.4-4, GR-7.2.4.4-5, GR-7.2.4.4-6, GR-7.2.4.4-7, FMT-7.2.4.2]
+      *> rules: [GR-7.2.4.4-4, GR-7.2.4.4-5, GR-7.2.4.4-6, GR-7.2.4.4-7,
+      *>    FMT-7.2.4.2]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

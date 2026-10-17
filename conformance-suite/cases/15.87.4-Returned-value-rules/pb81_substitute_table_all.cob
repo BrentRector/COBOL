@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb81_substitute_table_all
-*> rules: [RV-15.87.4-1, RV-15.87.4-2, RV-15.87.4-3, RV-15.87.4-4, RV-15.87.4-5, FMT-15.87.2]
+*> rules: [RV-15.87.4-1, RV-15.87.4-2, RV-15.87.4-3, RV-15.87.4-4,
+*>    RV-15.87.4-5, FMT-15.87.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

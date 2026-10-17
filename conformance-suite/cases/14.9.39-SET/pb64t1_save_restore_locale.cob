@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb64t1_save_restore_locale
-*> rules: [GR-14.9.39.4-21, GR-14.9.39.4-22, GR-14.9.39.4-23, GR-14.9.39.4-26, GR-14.9.39.4-27]
+*> rules: [GR-14.9.39.4-21, GR-14.9.39.4-22, GR-14.9.39.4-23,
+*>    GR-14.9.39.4-26, GR-14.9.39.4-27]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

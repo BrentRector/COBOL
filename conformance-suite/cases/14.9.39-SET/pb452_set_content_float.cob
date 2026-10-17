@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb452_set_content_float
-*> rules: [SR-14.9.39.3-32, GR-14.9.39.4-33, GR-14.9.39.4-34, GR-14.9.39.4-35, DOC-A.1-176]
+*> rules: [SR-14.9.39.3-32, GR-14.9.39.4-33, GR-14.9.39.4-34,
+*>    GR-14.9.39.4-35, DOC-A.1-176]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

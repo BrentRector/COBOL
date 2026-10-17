@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb329_line_sequential_charset_2023
-      *> rules: [GR-9.1.13.2-7, GR-9.1.13.10-1, GR-12.4.5.10.3-2, GR-14.9.30.4-1, GR-14.9.30.4-16, GR-14.9.51.4-23, FMT-12.4.5.10.2, DOC-A.1-115]
+      *> rules: [GR-9.1.13.2-7, GR-9.1.13.10-1, GR-12.4.5.10.3-2,
+      *>    GR-14.9.30.4-1, GR-14.9.30.4-16, GR-14.9.51.4-23,
+      *>    FMT-12.4.5.10.2, DOC-A.1-115]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: boolean_ops
-*> rules: [GR-8.8.4.2.1-4, GR-8.8.4.3.4-1, SR-14.9.8.3-2, GR-14.9.8.4-3, FMT-8.8.4.3.2]
+*> rules: [GR-8.8.4.2.1-4, GR-8.8.4.3.4-1, SR-14.9.8.3-2, GR-14.9.8.4-3,
+*>    FMT-8.8.4.3.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

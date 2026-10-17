@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1221_report_keyword_prefixes
-      *> rules: [SR-13.18.14.3-1, SR-13.18.14.3-4, SR-13.18.14.3-5, SR-13.18.53.3-1, FMT-13.18.35.2, FMT-13.18.53.2]
+      *> rules: [SR-13.18.14.3-1, SR-13.18.14.3-4, SR-13.18.14.3-5,
+      *>    SR-13.18.53.3-1, FMT-13.18.35.2, FMT-13.18.53.2]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

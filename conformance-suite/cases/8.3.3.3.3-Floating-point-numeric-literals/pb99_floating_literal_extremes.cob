@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb99_floating_literal_extremes
-*> rules: [SR-8.3.3.3.3-1, SR-8.3.3.3.3-2, SR-8.3.3.3.3-3, GR-8.3.3.3.3-5, DOC-A.1-82]
+*> rules: [SR-8.3.3.3.3-1, SR-8.3.3.3.3-2, SR-8.3.3.3.3-3,
+*>    GR-8.3.3.3.3-5, DOC-A.1-82]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

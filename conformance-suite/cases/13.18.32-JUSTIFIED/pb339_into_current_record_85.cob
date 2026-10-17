@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb339_into_current_record_85
-      *> rules: [GR-13.18.32.4-1, GR-13.18.32.4-2, GR-13.18.43.4-16, GR-14.9.30.4-4]
+      *> rules: [GR-13.18.32.4-1, GR-13.18.32.4-2, GR-13.18.43.4-16,
+      *>    GR-14.9.30.4-4]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb133_omitted_args
-*> rules: [GR-14.2.3-3, SR-14.9.4.3-24, GR-14.9.4.4-11, GR-14.9.4.4-12, FMT-8.8.4.8.2]
+*> rules: [GR-14.2.3-3, SR-14.9.4.3-24, GR-14.9.4.4-11, GR-14.9.4.4-12,
+*>    FMT-8.8.4.8.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

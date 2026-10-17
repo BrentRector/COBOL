@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: exp_standard_decimal_eae
-*> rules: [GR-8.8.1.5.4-2, RV-15.4.1-3, RV-15.4.1-L2.1, RV-15.4.1-L2.2, FMT-15.27.2, FMT-15.35.2]
+*> rules: [GR-8.8.1.5.4-2, RV-15.4.1-3, RV-15.4.1-L2.1, RV-15.4.1-L2.2,
+*>    FMT-15.27.2, FMT-15.35.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

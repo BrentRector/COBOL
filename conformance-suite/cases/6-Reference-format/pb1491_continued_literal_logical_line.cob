@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1491_continued_literal_logical_line
-      *> rules: [GR-6.1-2, SR-6.3.4-1, SR-6.3.5-1, SR-6.3.5-2, GR-6.5-2, GR-6.5-6]
+      *> rules: [GR-6.1-2, SR-6.3.4-1, SR-6.3.5-1, SR-6.3.5-2, GR-6.5-2,
+      *>    GR-6.5-6]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

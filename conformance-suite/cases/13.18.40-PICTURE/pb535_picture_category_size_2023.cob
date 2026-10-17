@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb535_picture_category_size_2023
-*> rules: [GR-13.18.40.4-3, GR-13.18.40.4-4, GR-13.18.40.4-6, GR-13.18.40.4-11]
+*> rules: [GR-13.18.40.4-3, GR-13.18.40.4-4, GR-13.18.40.4-6,
+*>    GR-13.18.40.4-11]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

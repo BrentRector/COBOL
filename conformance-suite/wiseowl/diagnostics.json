@@ -8745,7 +8745,7 @@
    "2014",
    "2023"
   ],
-  "expect": "(23,29): error COBOLNET2776"
+  "expect": "(28,29): error COBOLNET2776"
  },
  "pb1456-counter-qualified-by-report-group": {
   "refuse-at": [
@@ -9681,7 +9681,7 @@
   "refuse-at": [
    "85"
   ],
-  "expect": "(13,39): error COBOLNET0900: a STRING statement with the DELIMITED phrase omitted"
+  "expect": "(18,39): error COBOLNET0900: a STRING statement with the DELIMITED phrase omitted"
  },
  "pb1569-type-bit-group-below-2002": {
   "refuse-at": [
@@ -9974,7 +9974,7 @@
   "refuse-at": [
    "85"
   ],
-  "expect": "(15,16): error COBOLNET0900"
+  "expect": "(20,16): error COBOLNET0900"
  },
  "pb169-goback-status-zero-length-literal": {
   "refuse-at": [
@@ -11952,7 +11952,7 @@
    "2014",
    "2023"
   ],
-  "expect": "(18,7): error COBOLNET3473"
+  "expect": "(23,7): error COBOLNET3473"
  },
  "pb2495-recursive-prototype-signature-mismatch": {
   "refuse-at": [
@@ -12691,7 +12691,7 @@
    "2014",
    "2023"
   ],
-  "expect": "(11,24): error COBOLNET2495"
+  "expect": "(16,24): error COBOLNET2495"
  },
  "pb2983-supplementary-letters-parser-error-column": {
   "refuse-at": [
@@ -12699,7 +12699,7 @@
    "2014",
    "2023"
   ],
-  "expect": "(12,24): error COBOLNET1941"
+  "expect": "(17,24): error COBOLNET1941"
  },
  "pb2988-capacity-register-copies-unqualified": {
   "refuse-at": [
@@ -19338,7 +19338,7 @@
   "refuse-at": [
    "2023"
   ],
-  "expect": "(31,12): error COBOLNET1690"
+  "expect": "(36,12): error COBOLNET1690"
  },
  "pb814-raising-interface-not-conforming": {
   "refuse-at": [

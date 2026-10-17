@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb64t6_numvalc_locale
-*> rules: [AR-15.68.3-5, RV-15.68.4-3, AR-15.94.3-1, RV-15.94.4-1, FMT-15.94.2]
+*> rules: [AR-15.68.3-5, RV-15.68.4-3, AR-15.94.3-1, RV-15.94.4-1,
+*>    FMT-15.94.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

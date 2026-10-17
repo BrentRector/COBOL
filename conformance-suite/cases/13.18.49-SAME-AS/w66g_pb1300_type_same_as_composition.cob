@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: w66g_pb1300_type_same_as_composition
-*> rules: [GR-13.18.49.4-3, GR-13.18.49.4-5, GR-13.18.57.4-1, GR-13.18.57.4-3]
+*> rules: [GR-13.18.49.4-3, GR-13.18.49.4-5, GR-13.18.57.4-1,
+*>    GR-13.18.57.4-3]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

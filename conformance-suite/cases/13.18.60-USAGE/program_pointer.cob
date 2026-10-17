@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: program_pointer
-      *> rules: [SR-13.18.60.3-8, GR-13.18.60.4-24, SR-14.9.4.3-1, SR-14.9.39.3-21, GR-14.9.39.4-16, GR-14.9.39.4-17, DOC-A.1-175, DOC-A.1-217]
+      *> rules: [SR-13.18.60.3-8, GR-13.18.60.4-24, SR-14.9.4.3-1,
+      *>    SR-14.9.39.3-21, GR-14.9.39.4-16, GR-14.9.39.4-17,
+      *>    DOC-A.1-175, DOC-A.1-217]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

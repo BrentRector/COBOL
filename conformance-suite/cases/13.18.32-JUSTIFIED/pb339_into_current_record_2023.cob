@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb339_into_current_record_2023
-*> rules: [GR-13.18.32.4-1, GR-13.18.32.4-2, GR-13.18.43.4-13, GR-13.18.43.4-15, GR-13.18.43.4-16, GR-14.9.30.4-4, GR-14.9.34.4-5]
+*> rules: [GR-13.18.32.4-1, GR-13.18.32.4-2, GR-13.18.43.4-13,
+*>    GR-13.18.43.4-15, GR-13.18.43.4-16, GR-14.9.30.4-4,
+*>    GR-14.9.34.4-5]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

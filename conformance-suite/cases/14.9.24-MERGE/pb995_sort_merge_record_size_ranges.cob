@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb995_sort_merge_record_size_ranges
-      *> rules: [SR-14.9.24.3-3, SR-14.9.24.3-12, SR-14.9.40.3-5, SR-14.9.40.3-11]
+      *> rules: [SR-14.9.24.3-3, SR-14.9.24.3-12, SR-14.9.40.3-5,
+      *>    SR-14.9.40.3-11]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

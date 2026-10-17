@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb367b_sort_use_not_normal
-*> rules: [GR-14.6.13.1.2-1, GR-14.9.40.4-12, GR-14.9.40.4-17, GR-14.9.49.4-7, GR-14.9.49.4-12]
+*> rules: [GR-14.6.13.1.2-1, GR-14.9.40.4-12, GR-14.9.40.4-17,
+*>    GR-14.9.49.4-7, GR-14.9.49.4-12]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

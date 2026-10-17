@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb425_zero_length_literal_move
-*> rules: [GR-8.3.3.2.4-3, GR-8.3.3.4.4-4, GR-14.9.25.4-2, GR-14.9.25.4-3]
+*> rules: [GR-8.3.3.2.4-3, GR-8.3.3.4.4-4, GR-14.9.25.4-2,
+*>    GR-14.9.25.4-3]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

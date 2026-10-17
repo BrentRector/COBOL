@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb65_selection_alignment
-*> rules: [RV-15.59.4-1, RV-15.63.4-1, RV-15.63.4-2, RV-15.71.4-2, RV-15.72.4-2, RV-15.72.4-3]
+*> rules: [RV-15.59.4-1, RV-15.63.4-1, RV-15.63.4-2, RV-15.71.4-2,
+*>    RV-15.72.4-2, RV-15.72.4-3]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

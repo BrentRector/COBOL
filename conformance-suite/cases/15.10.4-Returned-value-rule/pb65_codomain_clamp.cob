@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb65_codomain_clamp
-*> rules: [RV-15.10.4-1, RV-15.11.4-1, RV-15.75.4-1, FMT-15.10.2, FMT-15.11.2]
+*> rules: [RV-15.10.4-1, RV-15.11.4-1, RV-15.75.4-1, FMT-15.10.2,
+*>    FMT-15.11.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

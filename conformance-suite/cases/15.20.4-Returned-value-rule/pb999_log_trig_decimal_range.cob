@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb999_log_trig_decimal_range
-*> rules: [RV-15.20.4-1, RV-15.55.4-1, RV-15.56.4-1, RV-15.82.4-1, RV-15.84.4-4, RV-15.89.4-1]
+*> rules: [RV-15.20.4-1, RV-15.55.4-1, RV-15.56.4-1, RV-15.82.4-1,
+*>    RV-15.84.4-4, RV-15.89.4-1]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

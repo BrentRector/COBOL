@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: w73d2_pb1119_propagate_on
-      *> rules: [GR-7.3.21.4-1, GR-7.3.21.4-2, GR-7.3.21.4-3, GR-14.6.13.1.3-6]
+      *> rules: [GR-7.3.21.4-1, GR-7.3.21.4-2, GR-7.3.21.4-3,
+      *>    GR-14.6.13.1.3-6]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

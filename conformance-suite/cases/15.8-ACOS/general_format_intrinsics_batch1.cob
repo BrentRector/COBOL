@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: general_format_intrinsics_batch1
-*> rules: [FMT-15.8.2, FMT-15.15.2, FMT-15.18.2, FMT-15.20.2, FMT-15.24.2]
+*> rules: [FMT-15.8.2, FMT-15.15.2, FMT-15.18.2, FMT-15.20.2,
+*>    FMT-15.24.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

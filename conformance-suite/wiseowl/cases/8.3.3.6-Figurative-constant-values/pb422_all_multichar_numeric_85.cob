@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb422_all_multichar_numeric_85
-      *> rules: [SR-8.3.3.6.3-3]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb422_all_multichar_numeric_85
+*> rules: [SR-8.3.3.6.3-3]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
 *> kb/Work PB422 - a multi-character ALL literal ASSOCIATED with a numeric item at COBOL-85, where the
 *> association is admitted (an obsolete element of ANSI X3.23-1985, deleted by ISO 2002 - VCR Table 7 row
 *> 7.13, a DERIVED edge; from 2002 ISO 8.3.3.6.3 SR3 prohibits it: "If the length of literal-1 is greater than

@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: phrase_order_arithmetic
-      *> rules: [GR-14.9.2.4-6, GR-14.9.8.4-2, GR-14.9.26.4-4, FMT-14.9.2.2, FMT-14.9.8.2, FMT-14.9.12.2, FMT-14.9.26.2, FMT-14.9.44.2]
+      *> rules: [GR-14.9.2.4-6, GR-14.9.8.4-2, GR-14.9.26.4-4,
+      *>    FMT-14.9.2.2, FMT-14.9.8.2, FMT-14.9.12.2, FMT-14.9.26.2,
+      *>    FMT-14.9.44.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

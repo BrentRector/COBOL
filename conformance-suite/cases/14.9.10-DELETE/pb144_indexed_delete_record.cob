@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb144_indexed_delete_record
-*> rules: [SR-14.9.10.3-2, GR-14.9.10.4-1, GR-14.9.10.4-3, GR-14.9.10.4-8, GR-14.9.10.4-9, GR-14.9.10.4-11]
+*> rules: [SR-14.9.10.3-2, GR-14.9.10.4-1, GR-14.9.10.4-3,
+*>    GR-14.9.10.4-8, GR-14.9.10.4-9, GR-14.9.10.4-11]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb131_gr9_formal_mode
-*> rules: [SR-14.9.4.3-15, SR-14.9.4.3-19, SR-14.9.4.3-20, GR-14.9.4.4-6, GR-14.9.4.4-9]
+*> rules: [SR-14.9.4.3-15, SR-14.9.4.3-19, SR-14.9.4.3-20,
+*>    GR-14.9.4.4-6, GR-14.9.4.4-9]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

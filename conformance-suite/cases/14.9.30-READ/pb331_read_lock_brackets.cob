@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb331_read_lock_brackets
-*> rules: [SR-14.9.30.3-3, SR-14.9.30.3-10, SR-14.9.30.3-11, SR-14.9.30.3-12, FMT-14.9.30.2]
+*> rules: [SR-14.9.30.3-3, SR-14.9.30.3-10, SR-14.9.30.3-11,
+*>    SR-14.9.30.3-12, FMT-14.9.30.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

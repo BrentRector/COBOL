@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb156_float_literal_exact_native
-*> rules: [SR-8.3.3.3.3-3, GR-8.3.3.3.3-5, GR-14.9.2.4-4, GR-14.9.44.4-4, DOC-A.1-82]
+*> rules: [SR-8.3.3.3.3-3, GR-8.3.3.3.3-5, GR-14.9.2.4-4,
+*>    GR-14.9.44.4-4, DOC-A.1-82]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb164_vlg_display
-      *> rules: [GR-14.9.11.4-4, GR-14.9.11.4-6, GR-14.9.11.4-7, DOC-A.1-57]
+      *> rules: [GR-14.9.11.4-4, GR-14.9.11.4-6, GR-14.9.11.4-7,
+      *>    DOC-A.1-57]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

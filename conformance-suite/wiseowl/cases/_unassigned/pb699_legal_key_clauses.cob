@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb699_legal_key_clauses
-      *> rules: []
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb699_legal_key_clauses
+*> rules: []
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> ISO 1989:2023 12.4.5 - the LEGAL twin of the pb699-* negatives, and the over-rejection
       *> guard on the entry-time key screen (kb/Work PB699). Every shape the screen could get wrong
       *> is here and must BIND AND RUN:

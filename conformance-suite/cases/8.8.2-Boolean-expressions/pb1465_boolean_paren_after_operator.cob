@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1465_boolean_paren_after_operator
-*> rules: [SR-8.8.2-1, SR-8.8.2-3, SR-8.8.2-6, GR-8.8.2-7, GR-8.8.4.3.4-1, GR-8.8.4.3.4-2]
+*> rules: [SR-8.8.2-1, SR-8.8.2-3, SR-8.8.2-6, GR-8.8.2-7,
+*>    GR-8.8.4.3.4-1, GR-8.8.4.3.4-2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1_perform_until_condition_forms
-      *> rules: [SR-8.7.5.2-2, SR-8.7.5.2-4, SR-14.9.28.3-7, FMT-8.8.4.5.2, FMT-8.8.4.10.2]
+      *> rules: [SR-8.7.5.2-2, SR-8.7.5.2-4, SR-14.9.28.3-7,
+      *>    FMT-8.8.4.5.2, FMT-8.8.4.10.2]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb862_implementor_names
-      *> rules: [SR-12.3.7.3-5, SR-12.3.7.3-8, GR-12.3.7.4-2, GR-12.3.7.4-3, DOC-A.1-189, DOC-A.1-191]
+      *> rules: [SR-12.3.7.3-5, SR-12.3.7.3-8, GR-12.3.7.4-2,
+      *>    GR-12.3.7.4-3, DOC-A.1-189, DOC-A.1-191]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

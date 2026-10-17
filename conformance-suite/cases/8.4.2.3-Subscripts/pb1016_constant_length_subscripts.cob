@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1016_constant_length_subscripts
-*> rules: [SR-8.4.2.3.3-2, SR-8.4.2.3.3-5, SR-13.10.3-3, GR-13.10.4-3, GR-13.10.4-6]
+*> rules: [SR-8.4.2.3.3-2, SR-8.4.2.3.3-5, SR-13.10.3-3, GR-13.10.4-3,
+*>    GR-13.10.4-6]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

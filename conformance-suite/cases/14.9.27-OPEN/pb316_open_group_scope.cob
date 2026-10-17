@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb316_open_group_scope
-*> rules: [GR-14.9.27.4-20, GR-14.9.27.4-22, GR-14.9.27.4-23, GR-14.9.27.4-24, FMT-14.9.27.2]
+*> rules: [GR-14.9.27.4-20, GR-14.9.27.4-22, GR-14.9.27.4-23,
+*>    GR-14.9.27.4-24, FMT-14.9.27.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

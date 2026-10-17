@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1001_line_next_page
-*> rules: [GR-8.4.3.15.4-3, GR-13.18.35.4-4, GR-13.18.37.4-4, FMT-13.18.35.2, FMT-14.9.21.2]
+*> rules: [GR-8.4.3.15.4-3, GR-13.18.35.4-4, GR-13.18.37.4-4,
+*>    FMT-13.18.35.2, FMT-14.9.21.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

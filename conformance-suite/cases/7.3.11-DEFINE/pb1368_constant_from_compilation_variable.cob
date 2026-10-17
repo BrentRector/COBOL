@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1368_constant_from_compilation_variable
-*> rules: [GR-7.3.11.4-1, SR-8.3.2.2-1, GR-13.10.4-1, GR-13.10.4-2, FMT-13.10.2]
+*> rules: [GR-7.3.11.4-1, SR-8.3.2.2-1, GR-13.10.4-1, GR-13.10.4-2,
+*>    FMT-13.10.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

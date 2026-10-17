@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb65_leap_second_off
-*> rules: [GR-7.3.17.4-5, GR-7.3.17.4-7, AR-15.79.3-4, RV-15.92.4-1, DOC-A.1-112]
+*> rules: [GR-7.3.17.4-5, GR-7.3.17.4-7, AR-15.79.3-4, RV-15.92.4-1,
+*>    DOC-A.1-112]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

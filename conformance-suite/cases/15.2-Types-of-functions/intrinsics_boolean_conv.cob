@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: intrinsics_boolean_conv
-*> rules: [GR-15.2-2, AR-15.3-3, RV-15.13.4-1, AR-15.45.3-1, RV-15.45.4-1, FMT-15.13.2, FMT-15.45.2]
+*> rules: [GR-15.2-2, AR-15.3-3, RV-15.13.4-1, AR-15.45.3-1,
+*>    RV-15.45.4-1, FMT-15.13.2, FMT-15.45.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

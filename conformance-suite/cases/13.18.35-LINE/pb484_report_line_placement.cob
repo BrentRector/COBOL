@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb484_report_line_placement
-      *> rules: [GR-13.18.35.4-5, GR-13.18.35.4-6, GR-13.18.35.4-7, GR-13.18.35.4-8, GR-13.18.39.4-1, GR-13.18.39.4-2]
+      *> rules: [GR-13.18.35.4-5, GR-13.18.35.4-6, GR-13.18.35.4-7,
+      *>    GR-13.18.35.4-8, GR-13.18.39.4-1, GR-13.18.39.4-2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

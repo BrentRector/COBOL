@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb443_search_identifier_1
-      *> rules: [SR-14.9.37.3-1, SR-14.9.37.3-2, SR-14.9.37.3-3, SR-14.9.37.3-9, SR-14.9.37.3-11]
+      *> rules: [SR-14.9.37.3-1, SR-14.9.37.3-2, SR-14.9.37.3-3,
+      *>    SR-14.9.37.3-9, SR-14.9.37.3-11]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

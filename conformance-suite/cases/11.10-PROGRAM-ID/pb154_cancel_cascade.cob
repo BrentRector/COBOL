@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb154_cancel_cascade
-*> rules: [SR-11.10.3-6, GR-13.5.4-2, GR-14.6.2.3.2-3, GR-14.9.5.4-4, GR-14.9.5.4-7]
+*> rules: [SR-11.10.3-6, GR-13.5.4-2, GR-14.6.2.3.2-3, GR-14.9.5.4-4,
+*>    GR-14.9.5.4-7]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

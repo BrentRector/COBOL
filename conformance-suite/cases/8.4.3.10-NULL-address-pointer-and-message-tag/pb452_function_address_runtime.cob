@@ -1,6 +1,9 @@
 *>--- conformance-case
 *> id: pb452_function_address_runtime
-*> rules: [GR-8.4.3.10.4-2, SR-8.4.3.12.3-1, SR-8.4.3.12.3-3, GR-8.4.3.12.4-1, GR-8.4.3.12.4-2, GR-8.4.3.12.4-4, GR-14.9.39.4-14, GR-14.9.39.4-15, DOC-A.1-125, DOC-A.1-174, DOC-A.1-210]
+*> rules: [GR-8.4.3.10.4-2, SR-8.4.3.12.3-1, SR-8.4.3.12.3-3,
+*>    GR-8.4.3.12.4-1, GR-8.4.3.12.4-2, GR-8.4.3.12.4-4,
+*>    GR-14.9.39.4-14, GR-14.9.39.4-15, DOC-A.1-125, DOC-A.1-174,
+*>    DOC-A.1-210]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

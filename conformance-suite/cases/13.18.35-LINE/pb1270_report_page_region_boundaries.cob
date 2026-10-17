@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb1270_report_page_region_boundaries
-      *> rules: [SR-13.18.35.3-6, SR-13.18.39.3-5, SR-13.18.39.3-6, GR-13.18.39.4-1, GR-13.18.39.4-4, GR-13.18.57.4-7, GR-13.18.57.4-8]
+      *> rules: [SR-13.18.35.3-6, SR-13.18.39.3-5, SR-13.18.39.3-6,
+      *>    GR-13.18.39.4-1, GR-13.18.39.4-4, GR-13.18.57.4-7,
+      *>    GR-13.18.57.4-8]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb324_assign_using_dynamic
-*> rules: [GR-9.1.13.6-2, SR-12.4.5.2-6, SR-12.4.5.2-7, GR-12.4.5.3-3, GR-12.4.5.3-4, GR-14.9.27.4-26, DOC-A.1-10, DOC-A.1-73]
+*> rules: [GR-9.1.13.6-2, SR-12.4.5.2-6, SR-12.4.5.2-7, GR-12.4.5.3-3,
+*>    GR-12.4.5.3-4, GR-14.9.27.4-26, DOC-A.1-10, DOC-A.1-73]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

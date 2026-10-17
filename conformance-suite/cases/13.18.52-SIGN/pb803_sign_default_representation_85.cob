@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb803_sign_default_representation_85
-      *> rules: [GR-13.18.52.4-4, GR-13.18.52.4-5, DOC-A.1-177, DOC-A.1-178]
+      *> rules: [GR-13.18.52.4-4, GR-13.18.52.4-5, DOC-A.1-177,
+      *>    DOC-A.1-178]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

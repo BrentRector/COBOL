@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb140_close_status
-      *> rules: [GR-9.1.13.7-2, GR-14.9.6.4-1, GR-14.9.6.4-4, GR-14.9.6.4-6, GR-14.9.6.4-8]
+      *> rules: [GR-9.1.13.7-2, GR-14.9.6.4-1, GR-14.9.6.4-4,
+      *>    GR-14.9.6.4-6, GR-14.9.6.4-8]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

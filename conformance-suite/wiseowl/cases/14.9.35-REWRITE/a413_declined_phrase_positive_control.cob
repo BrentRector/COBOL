@@ -1,10 +1,13 @@
-      *>--- conformance-case
-      *> id: a413_declined_phrase_positive_control
-      *> rules: [SR-14.9.35.3-7, SR-14.9.35.3-8, SR-14.9.35.3-10, SR-14.9.35.3-11, SR-14.9.35.3-12, GR-14.9.35.4-9, SR-14.9.51.3-7, SR-14.9.51.3-8, SR-14.9.51.3-9, SR-14.9.51.3-10, GR-14.9.51.4-7, GR-14.9.51.4-8]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: a413_declined_phrase_positive_control
+*> rules: [SR-14.9.35.3-7, SR-14.9.35.3-8, SR-14.9.35.3-10,
+*>    SR-14.9.35.3-11, SR-14.9.35.3-12, GR-14.9.35.4-9, SR-14.9.51.3-7,
+*>    SR-14.9.51.3-8, SR-14.9.51.3-9, SR-14.9.51.3-10, GR-14.9.51.4-7,
+*>    GR-14.9.51.4-8]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
 *> THE POSITIVE CONTROL for the Annex A.4.8 / A.4.13 declines (COBOLNET1705 / COBOLNET1706).
 *>
 *> A refusal gate is only evidence if it also proves what it did NOT take down. A.4.1 NOTE 1 is the reason

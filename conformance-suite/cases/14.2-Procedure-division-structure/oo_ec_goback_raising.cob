@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: oo_ec_goback_raising
-*> rules: [GR-14.2.3-12, GR-14.6.13.1.5-L2.2, SR-14.9.18.3-3, GR-14.9.18.4-4]
+*> rules: [GR-14.2.3-12, GR-14.6.13.1.5-L2.2, SR-14.9.18.3-3,
+*>    GR-14.9.18.4-4]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

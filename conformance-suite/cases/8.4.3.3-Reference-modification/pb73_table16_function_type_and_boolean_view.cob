@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb73_table16_function_type_and_boolean_view
-*> rules: [GR-8.4.3.3.4-1, GR-8.4.3.3.4-2, GR-8.4.3.3.4-6, SR-14.9.25.3-10, GR-15.2-1, GR-15.2-4, GR-15.2-5, DOC-A.1-92]
+*> rules: [GR-8.4.3.3.4-1, GR-8.4.3.3.4-2, GR-8.4.3.3.4-6,
+*>    SR-14.9.25.3-10, GR-15.2-1, GR-15.2-4, GR-15.2-5, DOC-A.1-92]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: exception_statement_ambient
-*> rules: [GR-7.3.25.4-7, GR-14.6.13.1.3-4, GR-14.9.9.4-1, RV-15.30.3-1, RV-15.32.3-1, RV-15.32.3-2, DOC-A.1-139, DOC-A.1-204]
+*> rules: [GR-7.3.25.4-7, GR-14.6.13.1.3-4, GR-14.9.9.4-1, RV-15.30.3-1,
+*>    RV-15.32.3-1, RV-15.32.3-2, DOC-A.1-139, DOC-A.1-204]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

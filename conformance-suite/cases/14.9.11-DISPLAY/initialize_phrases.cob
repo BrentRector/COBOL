@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: initialize_phrases
-*> rules: [GR-14.9.11.4-4, GR-14.9.11.4-6, SR-14.9.20.3-8, GR-14.9.20.4-5, GR-14.9.20.4-6, GR-14.9.20.4-8, FMT-14.9.20.2]
+*> rules: [GR-14.9.11.4-4, GR-14.9.11.4-6, SR-14.9.20.3-8,
+*>    GR-14.9.20.4-5, GR-14.9.20.4-6, GR-14.9.20.4-8, FMT-14.9.20.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb506_report_operand_lists_2002
-*> rules: [SR-13.18.63.3-34, SR-13.18.63.3-35, GR-13.18.63.4-21, GR-13.18.63.4-23]
+*> rules: [SR-13.18.63.3-34, SR-13.18.63.3-35, GR-13.18.63.4-21,
+*>    GR-13.18.63.4-23]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

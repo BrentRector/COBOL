@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb511_external_as_name
-*> rules: [SR-8.3.2.2-L3.2, GR-13.18.22.4-4, GR-13.18.22.4-5, FMT-13.4.5.2, FMT-13.16.2, FMT-13.18.22.2]
+*> rules: [SR-8.3.2.2-L3.2, GR-13.18.22.4-4, GR-13.18.22.4-5,
+*>    FMT-13.4.5.2, FMT-13.16.2, FMT-13.18.22.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1276_record_contains_sizes_file
-      *> rules: [GR-13.18.43.4-1, GR-13.18.43.4-2, GR-13.18.43.4-6, DOC-A.1-146]
+      *> rules: [GR-13.18.43.4-1, GR-13.18.43.4-2, GR-13.18.43.4-6,
+      *>    DOC-A.1-146]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

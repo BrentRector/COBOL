@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1425_qualified_super
-*> rules: [SR-8.4.3.1.3-7, SR-8.4.3.8.3-3, SR-8.4.3.8.3-4, SR-8.4.3.8.3-6, GR-8.4.3.8.4-4, FMT-8.4.3.8.2]
+*> rules: [SR-8.4.3.1.3-7, SR-8.4.3.8.3-3, SR-8.4.3.8.3-4,
+*>    SR-8.4.3.8.3-6, GR-8.4.3.8.4-4, FMT-8.4.3.8.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

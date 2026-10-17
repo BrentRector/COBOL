@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1179_string_receiver_arms
-*> rules: [GR-14.9.43.4-1, GR-14.9.43.4-6, GR-14.9.43.4-7, GR-14.9.43.4-8, GR-14.9.43.4-9]
+*> rules: [GR-14.9.43.4-1, GR-14.9.43.4-6, GR-14.9.43.4-7,
+*>    GR-14.9.43.4-8, GR-14.9.43.4-9]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1222_report_arrangement_present_when
-*> rules: [SR-13.15.3-16, SR-13.18.14.3-7, SR-13.18.14.3-10, SR-13.18.35.3-6]
+*> rules: [SR-13.15.3-16, SR-13.18.14.3-7, SR-13.18.14.3-10,
+*>    SR-13.18.35.3-6]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

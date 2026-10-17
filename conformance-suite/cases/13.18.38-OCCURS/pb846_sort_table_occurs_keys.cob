@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb846_sort_table_occurs_keys
-*> rules: [GR-13.18.38.4-3, SR-14.9.40.3-15, GR-14.9.40.4-18, GR-14.9.40.4-19, GR-14.9.40.4-21, GR-14.9.40.4-22]
+*> rules: [GR-13.18.38.4-3, SR-14.9.40.3-15, GR-14.9.40.4-18,
+*>    GR-14.9.40.4-19, GR-14.9.40.4-21, GR-14.9.40.4-22]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

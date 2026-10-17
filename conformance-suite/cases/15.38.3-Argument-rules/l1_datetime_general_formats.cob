@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: l1_datetime_general_formats
-*> rules: [AR-15.38.3-1, RV-15.38.4-1, AR-15.39.3-3, FMT-15.17.2, FMT-15.38.2, FMT-15.39.2]
+*> rules: [AR-15.38.3-1, RV-15.38.4-1, AR-15.39.3-3, FMT-15.17.2,
+*>    FMT-15.38.2, FMT-15.39.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: a42-screen-to
-*> rules: [SR-13.18.56.3-1, SR-13.18.56.3-2, SR-13.18.56.3-3, GR-13.18.56.4-1, GR-13.18.56.4-2, FMT-13.18.56.2]
+*> rules: [SR-13.18.56.3-1, SR-13.18.56.3-2, SR-13.18.56.3-3,
+*>    GR-13.18.56.4-1, GR-13.18.56.4-2, FMT-13.18.56.2]
 *> source-format: free
 *> portable: unverified
 *>---

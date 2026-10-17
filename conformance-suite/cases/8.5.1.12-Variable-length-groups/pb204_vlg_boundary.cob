@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb204_vlg_boundary
-*> rules: [GR-8.5.1.12.1-1, GR-8.5.1.12.1-2, GR-8.5.1.12.1-3, SR-14.9.4.3-25]
+*> rules: [GR-8.5.1.12.1-1, GR-8.5.1.12.1-2, GR-8.5.1.12.1-3,
+*>    SR-14.9.4.3-25]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

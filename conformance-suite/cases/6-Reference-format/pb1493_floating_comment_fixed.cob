@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1493_floating_comment_fixed
-      *> rules: [GR-6.1-2, SR-6.2.3.2-1, SR-6.3.4-1, GR-6.5-2, GR-6.5-3, SR-8.3.2.4.2-2]
+      *> rules: [GR-6.1-2, SR-6.2.3.2-1, SR-6.3.4-1, GR-6.5-2, GR-6.5-3,
+      *>    SR-8.3.2.4.2-2]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

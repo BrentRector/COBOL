@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb122_smallest_algebraic_float
-*> rules: [AR-15.43.3-2, AR-15.83.3-4, RV-15.83.4-1, RV-15.83.4-2, DOC-A.1-180]
+*> rules: [AR-15.43.3-2, AR-15.83.3-4, RV-15.83.4-1, RV-15.83.4-2,
+*>    DOC-A.1-180]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

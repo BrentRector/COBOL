@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb586_level88_range_boundaries
-      *> rules: [SR-13.18.63.3-2]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb586_level88_range_boundaries
+*> rules: [SR-13.18.63.3-2]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> ISO/IEC 1989:2023 13.18.63.3 SR2/SR3 (ALL FORMATS; kb/Work PB586): a level-88 literal shall be a
       *> permissible value in its conditional variable's PICTURE range (13.18.63.4 GR19). The BOUNDARY values are
       *> exactly representable and must stay legal: -99.9 and 99.9 for S9(2)V9 (SR3: a signed subject takes a

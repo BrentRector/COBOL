@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: declined-validate-default
-*> rules: [SR-13.18.17.3-1, SR-13.18.17.3-2, GR-13.18.17.4-1, GR-13.18.17.4-2, GR-13.18.17.4-3, GR-13.18.17.4-4, FMT-13.18.17.2]
+*> rules: [SR-13.18.17.3-1, SR-13.18.17.3-2, GR-13.18.17.4-1,
+*>    GR-13.18.17.4-2, GR-13.18.17.4-3, GR-13.18.17.4-4, FMT-13.18.17.2]
 *> source-format: free
 *> portable: unverified
 *>---

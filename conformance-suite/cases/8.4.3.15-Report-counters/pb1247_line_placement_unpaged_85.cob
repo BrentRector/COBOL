@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1247_line_placement_unpaged_85
-      *> rules: [GR-8.4.3.15.4-4, GR-13.18.35.4-1, GR-13.18.35.4-3, GR-13.18.35.4-5, GR-13.18.35.4-7]
+      *> rules: [GR-8.4.3.15.4-4, GR-13.18.35.4-1, GR-13.18.35.4-3,
+      *>    GR-13.18.35.4-5, GR-13.18.35.4-7]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

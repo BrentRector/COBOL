@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb11_datetime_format_grammar
-*> rules: [GR-15.3.3.6.1-1, GR-15.3.3.6.1-2, GR-15.3.3.6.1-3, AR-15.39.3-2, RV-15.39.4-1, AR-15.40.3-2, AR-15.41.3-2, AR-15.41.3-6, AR-15.48.3-2, AR-15.79.3-2, FMT-15.41.2]
+*> rules: [GR-15.3.3.6.1-1, GR-15.3.3.6.1-2, GR-15.3.3.6.1-3,
+*>    AR-15.39.3-2, RV-15.39.4-1, AR-15.40.3-2, AR-15.41.3-2,
+*>    AR-15.41.3-6, AR-15.48.3-2, AR-15.79.3-2, FMT-15.41.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

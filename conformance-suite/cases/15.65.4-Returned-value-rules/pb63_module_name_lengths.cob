@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb63_module_name_lengths
-*> rules: [RV-15.65.4-1, RV-15.65.4-4, RV-15.65.4-5, RV-15.65.4-6, RV-15.65.4-9, DOC-A.1-135, DOC-A.1-136, DOC-A.1-137]
+*> rules: [RV-15.65.4-1, RV-15.65.4-4, RV-15.65.4-5, RV-15.65.4-6,
+*>    RV-15.65.4-9, DOC-A.1-135, DOC-A.1-136, DOC-A.1-137]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1306_varying_scope
-*> rules: [SR-8.4.2.2.1-3, SR-13.18.64.3-2, SR-13.18.64.3-3, GR-13.18.64.4-1, GR-13.18.64.4-3, GR-13.18.64.4-4]
+*> rules: [SR-8.4.2.2.1-3, SR-13.18.64.3-2, SR-13.18.64.3-3,
+*>    GR-13.18.64.4-1, GR-13.18.64.4-3, GR-13.18.64.4-4]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

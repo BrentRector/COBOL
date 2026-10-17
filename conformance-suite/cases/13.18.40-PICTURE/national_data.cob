@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: national_data
-*> rules: [GR-13.18.40.4-1, GR-13.18.40.4-9, SR-13.18.60.3-13, GR-14.9.11.4-4, GR-14.9.11.4-6]
+*> rules: [GR-13.18.40.4-1, GR-13.18.40.4-9, SR-13.18.60.3-13,
+*>    GR-14.9.11.4-4, GR-14.9.11.4-6]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

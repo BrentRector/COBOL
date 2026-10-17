@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb157_compute_bit_group
-      *> rules: [SR-14.9.8.3-2, SR-14.9.8.3-3, GR-14.9.8.4-3, FMT-14.9.8.2]
+      *> rules: [SR-14.9.8.3-2, SR-14.9.8.3-3, GR-14.9.8.4-3,
+      *>    FMT-14.9.8.2]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

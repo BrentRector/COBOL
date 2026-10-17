@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb165_dynamic_call_description_check
-      *> rules: [GR-14.8.2.3.2-L2.1, GR-14.8.2.3.3-L2.1, SR-14.9.4.3-25, GR-14.9.4.4-3]
+      *> rules: [GR-14.8.2.3.2-L2.1, GR-14.8.2.3.3-L2.1, SR-14.9.4.3-25,
+      *>    GR-14.9.4.4-3]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

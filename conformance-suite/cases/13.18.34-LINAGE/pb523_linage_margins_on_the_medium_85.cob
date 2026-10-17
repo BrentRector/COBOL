@@ -1,6 +1,8 @@
       *>--- conformance-case
       *> id: pb523_linage_margins_on_the_medium_85
-      *> rules: [GR-13.18.34.4-1, GR-13.18.34.4-4, GR-13.18.34.4-5, GR-13.18.34.4-8, GR-14.9.27.4-18, GR-14.9.51.4-26, DOC-A.1-130]
+      *> rules: [GR-13.18.34.4-1, GR-13.18.34.4-4, GR-13.18.34.4-5,
+      *>    GR-13.18.34.4-8, GR-14.9.27.4-18, GR-14.9.51.4-26,
+      *>    DOC-A.1-130]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

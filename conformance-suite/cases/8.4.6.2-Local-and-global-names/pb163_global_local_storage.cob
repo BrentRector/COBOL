@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb163_global_local_storage
-*> rules: [GR-8.4.6.2.1-2, SR-13.18.27.3-1, GR-13.18.27.4-2, FMT-13.18.27.2]
+*> rules: [GR-8.4.6.2.1-2, SR-13.18.27.3-1, GR-13.18.27.4-2,
+*>    FMT-13.18.27.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

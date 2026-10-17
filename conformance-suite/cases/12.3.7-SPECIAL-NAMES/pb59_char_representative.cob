@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb59_char_representative
-*> rules: [GR-12.3.7.4-7, AR-15.15.3-2, RV-15.15.4-1, RV-15.15.4-2, DOC-A.1-90]
+*> rules: [GR-12.3.7.4-7, AR-15.15.3-2, RV-15.15.4-1, RV-15.15.4-2,
+*>    DOC-A.1-90]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

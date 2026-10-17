@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1192_relative_write_boundary_85
-      *> rules: [GR-9.1.13.5-4, GR-14.9.51.4-29, GR-14.9.51.4-33, DOC-A.1-107]
+      *> rules: [GR-9.1.13.5-4, GR-14.9.51.4-29, GR-14.9.51.4-33,
+      *>    DOC-A.1-107]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

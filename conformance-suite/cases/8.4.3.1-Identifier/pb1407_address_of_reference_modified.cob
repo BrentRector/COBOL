@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1407_address_of_reference_modified
-*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-4, SR-8.4.3.1.3-10, GR-8.4.3.1.4-1, SR-8.4.3.11.3-4, FMT-8.4.3.11.2]
+*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-4, SR-8.4.3.1.3-10,
+*>    GR-8.4.3.1.4-1, SR-8.4.3.11.3-4, FMT-8.4.3.11.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

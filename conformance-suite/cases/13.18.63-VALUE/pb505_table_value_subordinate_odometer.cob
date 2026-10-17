@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb505_table_value_subordinate_odometer
-*> rules: [SR-13.18.63.3-18, GR-13.18.63.4-12, GR-13.18.63.4-13, GR-13.18.63.4-14]
+*> rules: [SR-13.18.63.3-18, GR-13.18.63.4-12, GR-13.18.63.4-13,
+*>    GR-13.18.63.4-14]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

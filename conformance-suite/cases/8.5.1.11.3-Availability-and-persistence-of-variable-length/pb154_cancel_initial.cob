@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb154_cancel_initial
-*> rules: [GR-8.5.1.11.3-4, GR-14.6.2.3.2-L2.3, GR-14.9.5.4-3, GR-14.9.5.4-9]
+*> rules: [GR-8.5.1.11.3-4, GR-14.6.2.3.2-L2.3, GR-14.9.5.4-3,
+*>    GR-14.9.5.4-9]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

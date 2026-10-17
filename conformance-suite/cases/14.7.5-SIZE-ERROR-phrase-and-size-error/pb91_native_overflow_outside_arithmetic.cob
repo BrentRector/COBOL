@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb91_native_overflow_outside_arithmetic
-*> rules: [GR-14.7.5-2, GR-14.7.5-3, GR-14.7.5-5, GR-14.7.5-L3.2, DOC-A.1-179]
+*> rules: [GR-14.7.5-2, GR-14.7.5-3, GR-14.7.5-5, GR-14.7.5-L3.2,
+*>    DOC-A.1-179]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

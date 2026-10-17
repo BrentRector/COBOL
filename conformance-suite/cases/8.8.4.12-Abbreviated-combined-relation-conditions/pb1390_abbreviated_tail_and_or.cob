@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1390_abbreviated_tail_and_or
-      *> rules: [SR-8.8.4.12.1-1, SR-8.8.4.12.1-2, GR-8.8.4.12.4-1, FMT-8.8.4.12.2]
+      *> rules: [SR-8.8.4.12.1-1, SR-8.8.4.12.1-2, GR-8.8.4.12.4-1,
+      *>    FMT-8.8.4.12.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

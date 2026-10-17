@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb829_closed_formats_legal
-*> rules: [FMT-11.2.1, FMT-12.3.2, FMT-12.3.7.2, FMT-12.4.5.1, FMT-12.4.6.2, FMT-13.4.5.2, FMT-13.4.6.2]
+*> rules: [FMT-11.2.1, FMT-12.3.2, FMT-12.3.7.2, FMT-12.4.5.1,
+*>    FMT-12.4.6.2, FMT-13.4.5.2, FMT-13.4.6.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

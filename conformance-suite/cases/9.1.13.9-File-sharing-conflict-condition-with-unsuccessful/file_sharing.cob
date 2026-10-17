@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: file_sharing
-*> rules: [GR-9.1.13.9-1, GR-14.9.27.4-22, GR-14.9.47.4-1, FMT-14.9.47.2]
+*> rules: [GR-9.1.13.9-1, GR-14.9.27.4-22, GR-14.9.47.4-1,
+*>    FMT-14.9.47.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

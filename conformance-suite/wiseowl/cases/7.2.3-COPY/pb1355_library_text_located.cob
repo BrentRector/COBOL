@@ -1,8 +1,11 @@
       *>--- conformance-case
       *> id: pb1355_library_text_located
-      *> rules: [SR-7.2.3.3-3, GR-7.2.3.4-1, GR-7.2.3.4-2, GR-7.2.3.4-3, DOC-A.1-40]
+      *> rules: [SR-7.2.3.3-3, GR-7.2.3.4-1, GR-7.2.3.4-2, GR-7.2.3.4-3,
+      *>    DOC-A.1-40]
       *> accept: [85]
-      *> files: [pb1355a.cpy, pb1355a.cbl, pb1355lib/pb1355b.cpy, pb1355b.cpy, pb1355c.txt, pb1355lib/pb1355d.cbl, pb1355lib/pb1355d.cob]
+      *> files: [pb1355a.cpy, pb1355a.cbl, pb1355lib/pb1355b.cpy,
+      *>    pb1355b.cpy, pb1355c.txt, pb1355lib/pb1355d.cbl,
+      *>    pb1355lib/pb1355d.cob]
       *> source-format: fixed
       *> portable: unverified
       *>---

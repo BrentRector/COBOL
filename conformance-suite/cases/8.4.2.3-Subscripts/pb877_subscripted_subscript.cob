@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb877_subscripted_subscript
-      *> rules: [SR-8.4.2.3.3-2, SR-8.4.2.3.3-3, GR-8.4.2.3.4-1, FMT-8.4.2.3.2]
+      *> rules: [SR-8.4.2.3.3-2, SR-8.4.2.3.3-3, GR-8.4.2.3.4-1,
+      *>    FMT-8.4.2.3.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

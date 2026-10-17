@@ -1,10 +1,11 @@
-      *>--- conformance-case
-      *> id: pb742_legal_entry_formats_85
-      *> rules: [SR-12.4.5.2-8, SR-12.4.5.2-9, GR-12.4.5.3-5, GR-12.4.5.3-7, GR-12.4.5.3-8, GR-12.4.5.3-9, SR-12.4.5.6.3-2, SR-12.4.5.12.3-2]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb742_legal_entry_formats_85
+*> rules: [SR-12.4.5.2-8, SR-12.4.5.2-9, GR-12.4.5.3-5, GR-12.4.5.3-7,
+*>    GR-12.4.5.3-8, GR-12.4.5.3-9, SR-12.4.5.6.3-2, SR-12.4.5.12.3-2]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> ISO 1989:2023 12.4.5 - the LEGAL twin of the pb742-* / pb743-* negatives, and the
       *> over-rejection guard on the two rules they add (kb/Work PB742, PB743). Every shape the new
       *> rows could get wrong is here and must BIND AND RUN:

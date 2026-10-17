@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: optional_on_size_error
-      *> rules: [GR-14.9.2.4-6, GR-14.9.8.4-2, GR-14.9.44.4-6, FMT-14.9.2.2, FMT-14.9.8.2, FMT-14.9.12.2]
+      *> rules: [GR-14.9.2.4-6, GR-14.9.8.4-2, GR-14.9.44.4-6,
+      *>    FMT-14.9.2.2, FMT-14.9.8.2, FMT-14.9.12.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

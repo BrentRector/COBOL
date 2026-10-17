@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1456_other_report_counters_85
-      *> rules: [SR-8.4.2.2.3-9, SR-8.4.2.2.3-10, SR-8.4.3.1.3-12, SR-8.4.3.15.3-2, FMT-8.4.3.15.2]
+      *> rules: [SR-8.4.2.2.3-9, SR-8.4.2.2.3-10, SR-8.4.3.1.3-12,
+      *>    SR-8.4.3.15.3-2, FMT-8.4.3.15.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

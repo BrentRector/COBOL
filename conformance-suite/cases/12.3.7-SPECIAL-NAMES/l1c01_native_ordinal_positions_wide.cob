@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1c01_native_ordinal_positions_wide
-      *> rules: [GR-12.3.7.4-6, DOC-A.1-8, DOC-A.1-34, DOC-A.1-36, DOC-A.1-37, DOC-A.1-38]
+      *> rules: [GR-12.3.7.4-6, DOC-A.1-8, DOC-A.1-34, DOC-A.1-36,
+      *>    DOC-A.1-37, DOC-A.1-38]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

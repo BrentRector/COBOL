@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb415_initialize_replacing_set_form
-*> rules: [SR-14.9.20.3-3, SR-14.9.20.3-8, GR-14.9.20.4-2, GR-14.9.20.4-5, GR-14.9.20.4-6, FMT-14.9.20.2]
+*> rules: [SR-14.9.20.3-3, SR-14.9.20.3-8, GR-14.9.20.4-2,
+*>    GR-14.9.20.4-5, GR-14.9.20.4-6, FMT-14.9.20.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

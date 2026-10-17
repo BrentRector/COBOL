@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb10_function_identifier_sending
-*> rules: [SR-8.4.3.1.3-2, SR-14.9.20.3-8, SR-14.9.32.3-2, SR-14.9.51.3-11]
+*> rules: [SR-8.4.3.1.3-2, SR-14.9.20.3-8, SR-14.9.32.3-2,
+*>    SR-14.9.51.3-11]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

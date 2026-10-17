@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb63_exception_file_select_names
-*> rules: [AR-15.3-4, AR-15.28.3-1, RV-15.28.4-1, RV-15.28.4-2, AR-15.29.3-1, RV-15.29.4-1, RV-15.29.4-2]
+*> rules: [AR-15.3-4, AR-15.28.3-1, RV-15.28.4-1, RV-15.28.4-2,
+*>    AR-15.29.3-1, RV-15.29.4-1, RV-15.29.4-2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

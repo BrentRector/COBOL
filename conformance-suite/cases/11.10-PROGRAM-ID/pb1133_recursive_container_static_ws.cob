@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1133_recursive_container_static_ws
-*> rules: [GR-11.10.4-5, GR-13.5.4-1, GR-14.6.2.3.2-3, GR-14.6.2.3.2-L2.2]
+*> rules: [GR-11.10.4-5, GR-13.5.4-1, GR-14.6.2.3.2-3,
+*>    GR-14.6.2.3.2-L2.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

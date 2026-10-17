@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: oo_ec_raise_object
-*> rules: [GR-14.6.13.1.5-2, SR-14.9.49.3-15, GR-14.9.49.4-14, RV-15.33.3-1]
+*> rules: [GR-14.6.13.1.5-2, SR-14.9.49.3-15, GR-14.9.49.4-14,
+*>    RV-15.33.3-1]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

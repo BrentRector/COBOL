@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1630_null_argument_crossing
-*> rules: [SR-8.4.3.1.3-9, SR-8.4.3.10.3-1, GR-8.4.3.10.4-1, GR-8.4.3.10.4-3]
+*> rules: [SR-8.4.3.1.3-9, SR-8.4.3.10.3-1, GR-8.4.3.10.4-1,
+*>    GR-8.4.3.10.4-3]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

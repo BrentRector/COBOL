@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb492_national_edited_editing
-*> rules: [SR-13.18.40.3-9, GR-13.18.40.4-2, GR-13.18.40.4-10, GR-13.18.40.5-2]
+*> rules: [SR-13.18.40.3-9, GR-13.18.40.4-2, GR-13.18.40.4-10,
+*>    GR-13.18.40.5-2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

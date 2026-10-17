@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb1277_record_size_in_bytes
-*> rules: [GR-13.4.6.4-1, GR-13.18.43.4-1, GR-13.18.43.4-3, GR-13.18.43.4-4, GR-13.18.43.4-5, GR-13.18.43.4-8, GR-13.18.43.4-9]
+*> rules: [GR-13.4.6.4-1, GR-13.18.43.4-1, GR-13.18.43.4-3,
+*>    GR-13.18.43.4-4, GR-13.18.43.4-5, GR-13.18.43.4-8,
+*>    GR-13.18.43.4-9]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

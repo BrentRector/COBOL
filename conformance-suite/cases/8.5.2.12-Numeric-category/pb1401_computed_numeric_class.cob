@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1401_computed_numeric_class
-*> rules: [GR-8.5.2.12-3, GR-8.5.2.12-4, GR-8.5.2.12-5, GR-8.5.2.12-6, GR-8.5.2.12-7, GR-8.8.4.4.4-3]
+*> rules: [GR-8.5.2.12-3, GR-8.5.2.12-4, GR-8.5.2.12-5, GR-8.5.2.12-6,
+*>    GR-8.5.2.12-7, GR-8.8.4.4.4-3]
 *> accept: [2014]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb919_index_name_qualified
-      *> rules: [SR-8.4.2.2.1-1, SR-8.4.2.2.3-1, SR-8.4.2.2.3-3, SR-8.4.2.2.3-6, FMT-8.4.2.2.2]
+      *> rules: [SR-8.4.2.2.1-1, SR-8.4.2.2.3-1, SR-8.4.2.2.3-3,
+      *>    SR-8.4.2.2.3-6, FMT-8.4.2.2.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

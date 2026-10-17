@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb65_date_windowing
-*> rules: [AR-15.23.3-4, AR-15.23.3-6, AR-15.25.3-4, AR-15.25.3-6, RV-15.25.4-1, AR-15.100.3-4, AR-15.100.3-6]
+*> rules: [AR-15.23.3-4, AR-15.23.3-6, AR-15.25.3-4, AR-15.25.3-6,
+*>    RV-15.25.4-1, AR-15.100.3-4, AR-15.100.3-6]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb495_group_usage_applies_to_each_leaf
-*> rules: [SR-13.18.60.3-13, GR-13.18.60.4-1, GR-13.18.60.4-12, GR-13.18.60.4-13, GR-13.18.60.4-21]
+*> rules: [SR-13.18.60.3-13, GR-13.18.60.4-1, GR-13.18.60.4-12,
+*>    GR-13.18.60.4-13, GR-13.18.60.4-21]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

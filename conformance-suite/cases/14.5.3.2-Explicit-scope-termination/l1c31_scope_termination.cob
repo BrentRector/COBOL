@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: l1c31_scope_termination
-      *> rules: [GR-14.5.3.2-2, GR-14.5.3.3-1, GR-14.5.3.3-3, GR-14.5.3.3-4]
+      *> rules: [GR-14.5.3.2-2, GR-14.5.3.3-1, GR-14.5.3.3-3,
+      *>    GR-14.5.3.3-4]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

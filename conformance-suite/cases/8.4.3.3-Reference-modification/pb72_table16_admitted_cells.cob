@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb72_table16_admitted_cells
-*> rules: [GR-8.4.3.3.4-2, GR-8.4.3.3.4-6, SR-14.9.25.3-10, AR-15.3-1, RV-15.18.4-3]
+*> rules: [GR-8.4.3.3.4-2, GR-8.4.3.3.4-6, SR-14.9.25.3-10, AR-15.3-1,
+*>    RV-15.18.4-3]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

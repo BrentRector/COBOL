@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1167_any_length_returning
-*> rules: [SR-13.18.2.3-3, GR-13.18.2.4-1, GR-14.8.3.3-L3.4, GR-14.8.3.3-L3.5]
+*> rules: [SR-13.18.2.3-3, GR-13.18.2.4-1, GR-14.8.3.3-L3.4,
+*>    GR-14.8.3.3-L3.5]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

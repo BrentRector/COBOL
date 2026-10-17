@@ -1,10 +1,10 @@
-      *>--- conformance-case
-      *> id: pb531_picture_repetition_factor
-      *> rules: [SR-13.18.40.3-4, SR-13.18.40.3-6]
-      *> accept: [85]
-      *> source-format: fixed
-      *> portable: unverified
-      *>---
+*>--- conformance-case
+*> id: pb531_picture_repetition_factor
+*> rules: [SR-13.18.40.3-4, SR-13.18.40.3-6]
+*> accept: [85]
+*> source-format: free
+*> portable: unverified
+*>---
       *> kb/Work PB531 / PB532 - THE PICTURE CHARACTER-STRING'S OWN SHAPE, at the earliest edition COBOL.NET
       *> compiles.  Both rules are ALL FORMATS and read identically at 85, 2002, 2014 and 2023, so this is the
       *> single positive witness; the negatives below it pin each refusal.

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb646_national_form_numeric_bytes
-*> rules: [GR-13.18.40.4-1, GR-13.18.40.4-2, SR-13.18.60.3-12, DOC-A.1-213]
+*> rules: [GR-13.18.40.4-1, GR-13.18.40.4-2, SR-13.18.60.3-12,
+*>    DOC-A.1-213]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

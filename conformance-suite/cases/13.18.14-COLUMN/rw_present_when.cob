@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: rw_present_when
-*> rules: [GR-13.18.14.4-12, GR-13.18.41.1-1, GR-13.18.41.4-1, GR-13.18.41.4-2, FMT-13.18.41.2]
+*> rules: [GR-13.18.14.4-12, GR-13.18.41.1-1, GR-13.18.41.4-1,
+*>    GR-13.18.41.4-2, FMT-13.18.41.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

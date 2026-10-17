@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1130_report_sum_size_line_overlap
-*> rules: [GR-13.18.35.4-3, GR-13.18.54.4-2, GR-13.18.54.4-4, GR-14.9.16.4-8, GR-14.9.21.4-1, GR-14.9.46.4-5]
+*> rules: [GR-13.18.35.4-3, GR-13.18.54.4-2, GR-13.18.54.4-4,
+*>    GR-14.9.16.4-8, GR-14.9.21.4-1, GR-14.9.46.4-5]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

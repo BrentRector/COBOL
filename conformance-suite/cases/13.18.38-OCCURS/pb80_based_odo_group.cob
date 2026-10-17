@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb80_based_odo_group
-*> rules: [SR-13.18.38.3-17, GR-13.18.38.4-8, GR-14.9.3.4-3, SR-14.9.39.3-19, RV-15.14.4-2, RV-15.50.4-4]
+*> rules: [SR-13.18.38.3-17, GR-13.18.38.4-8, GR-14.9.3.4-3,
+*>    SR-14.9.39.3-19, RV-15.14.4-2, RV-15.50.4-4]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

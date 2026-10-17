@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb506_report_value_operand_list
-*> rules: [SR-13.18.53.3-1, GR-13.18.53.4-4, SR-13.18.63.3-34, SR-13.18.63.3-35, GR-13.18.63.4-21, GR-13.18.63.4-23, FMT-13.18.53.2]
+*> rules: [SR-13.18.53.3-1, GR-13.18.53.4-4, SR-13.18.63.3-34,
+*>    SR-13.18.63.3-35, GR-13.18.63.4-21, GR-13.18.63.4-23,
+*>    FMT-13.18.53.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

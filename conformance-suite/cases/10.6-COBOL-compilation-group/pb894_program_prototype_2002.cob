@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb894_program_prototype_2002
-*> rules: [SR-10.6.2-1, SR-10.6.2-2, GR-11.10.4-6, SR-12.3.8.3-14, GR-12.3.8.4-10, FMT-11.10.2]
+*> rules: [SR-10.6.2-1, SR-10.6.2-2, GR-11.10.4-6, SR-12.3.8.3-14,
+*>    GR-12.3.8.4-10, FMT-11.10.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

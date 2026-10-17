@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb440_perform_empty_range_2023
-*> rules: [GR-14.9.28.4-4, GR-14.9.28.4-5, GR-14.9.28.4-6, GR-14.9.28.4-8, GR-14.9.28.4-9, GR-14.9.28.4-13]
+*> rules: [GR-14.9.28.4-4, GR-14.9.28.4-5, GR-14.9.28.4-6,
+*>    GR-14.9.28.4-8, GR-14.9.28.4-9, GR-14.9.28.4-13]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb883_report_sum_expression
-      *> rules: [SR-13.18.54.3-1, SR-13.18.54.3-6, GR-13.18.54.4-1, GR-13.18.54.4-3, GR-13.18.54.4-7, GR-13.18.54.4-9]
+      *> rules: [SR-13.18.54.3-1, SR-13.18.54.3-6, GR-13.18.54.4-1,
+      *>    GR-13.18.54.4-3, GR-13.18.54.4-7, GR-13.18.54.4-9]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

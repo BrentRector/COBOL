@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb490_simple_insertion_comma_mode
-*> rules: [GR-12.3.7.4-14, GR-13.18.40.5-3, GR-13.18.40.5-6, GR-13.18.40.5-7]
+*> rules: [GR-12.3.7.4-14, GR-13.18.40.5-3, GR-13.18.40.5-6,
+*>    GR-13.18.40.5-7]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

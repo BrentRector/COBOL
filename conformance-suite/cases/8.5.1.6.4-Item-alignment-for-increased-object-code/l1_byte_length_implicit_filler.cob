@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: l1_byte_length_implicit_filler
-*> rules: [GR-8.5.1.6.4-1, GR-13.18.55.4-2, GR-13.18.55.4-3, GR-13.18.55.4-9, RV-15.14.4-3, FMT-13.18.55.2, DOC-A.1-12, DOC-A.1-195, DOC-A.1-197]
+*> rules: [GR-8.5.1.6.4-1, GR-13.18.55.4-2, GR-13.18.55.4-3,
+*>    GR-13.18.55.4-9, RV-15.14.4-3, FMT-13.18.55.2, DOC-A.1-12,
+*>    DOC-A.1-195, DOC-A.1-197]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

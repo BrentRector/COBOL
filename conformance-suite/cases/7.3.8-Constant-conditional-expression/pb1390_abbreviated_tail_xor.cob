@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1390_abbreviated_tail_xor
-*> rules: [SR-7.3.8.2-1, GR-7.3.8.3-1, SR-8.8.4.12.1-1, SR-8.8.4.12.1-2, GR-8.8.4.12.4-1, FMT-8.8.4.11.2, FMT-8.8.4.12.2]
+*> rules: [SR-7.3.8.2-1, GR-7.3.8.3-1, SR-8.8.4.12.1-1, SR-8.8.4.12.1-2,
+*>    GR-8.8.4.12.4-1, FMT-8.8.4.11.2, FMT-8.8.4.12.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

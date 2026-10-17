@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: w61b-pb1166-group-kind-pairing
-*> rules: [SR-14.8.2.2-1, GR-14.8.2.3.2-L2.2, GR-14.8.3.3-L3.2, GR-14.8.3.3-L3.3]
+*> rules: [SR-14.8.2.2-1, GR-14.8.2.3.2-L2.2, GR-14.8.3.3-L3.2,
+*>    GR-14.8.3.3-L3.3]
 *> source-format: free
 *> portable: unverified
 *>---

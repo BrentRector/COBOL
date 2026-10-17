@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb988_end_markers
-*> rules: [SR-10.7.3-1, SR-10.7.3-2, SR-10.7.3-3, SR-10.7.3-4, SR-10.7.3-5, SR-10.7.3-6, SR-10.7.3-7, SR-10.7.3-8, SR-10.7.3-9, FMT-10.7.2]
+*> rules: [SR-10.7.3-1, SR-10.7.3-2, SR-10.7.3-3, SR-10.7.3-4,
+*>    SR-10.7.3-5, SR-10.7.3-6, SR-10.7.3-7, SR-10.7.3-8, SR-10.7.3-9,
+*>    FMT-10.7.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

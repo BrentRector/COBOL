@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb322_default_sharing_by_open_mode
-*> rules: [GR-14.9.27.4-4, GR-14.9.27.4-18, GR-14.9.27.4-23, DOC-A.1-77, DOC-A.1-131]
+*> rules: [GR-14.9.27.4-4, GR-14.9.27.4-18, GR-14.9.27.4-23, DOC-A.1-77,
+*>    DOC-A.1-131]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

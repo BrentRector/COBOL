@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1051_method_by_value_match
-*> rules: [GR-9.3.6-L2.1, GR-9.3.6-L2.2, GR-9.3.6-L2.3, GR-9.3.6-L2.4, GR-9.3.6-L2.5, GR-9.3.6-L3.5, GR-13.7.4-4, SR-14.9.23.3-16]
+*> rules: [GR-9.3.6-L2.1, GR-9.3.6-L2.2, GR-9.3.6-L2.3, GR-9.3.6-L2.4,
+*>    GR-9.3.6-L2.5, GR-9.3.6-L3.5, GR-13.7.4-4, SR-14.9.23.3-16]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: w61b_pb1166_picture_identity
-*> rules: [GR-9.3.6-L3.3, SR-14.8.2.2-1, GR-14.8.2.3.2-L2.2, GR-14.8.3.3-L2.1, GR-14.8.3.3-L2.2, GR-14.8.3.3-L2.3, GR-14.8.3.3-L3.2, GR-14.8.3.3-L3.3]
+*> rules: [GR-9.3.6-L3.3, SR-14.8.2.2-1, GR-14.8.2.3.2-L2.2,
+*>    GR-14.8.3.3-L2.1, GR-14.8.3.3-L2.2, GR-14.8.3.3-L2.3,
+*>    GR-14.8.3.3-L3.2, GR-14.8.3.3-L3.3]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb1425_predefined_object_operands
-*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-7, SR-8.4.3.8.3-7, AR-15.3-11, FMT-8.4.3.1.2, FMT-8.4.3.8.2]
+*> rules: [SR-8.4.3.1.3-1, SR-8.4.3.1.3-7, SR-8.4.3.8.3-7, AR-15.3-11,
+*>    FMT-8.4.3.1.2, FMT-8.4.3.8.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

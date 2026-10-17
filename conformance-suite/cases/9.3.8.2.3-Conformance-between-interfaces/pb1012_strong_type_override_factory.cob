@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb1012_strong_type_override_factory
-      *> rules: [GR-9.3.8.2.3-3, GR-9.3.8.2.3-4, GR-9.3.8.2.3-6, GR-9.3.8.2.3-7]
+      *> rules: [GR-9.3.8.2.3-3, GR-9.3.8.2.3-4, GR-9.3.8.2.3-6,
+      *>    GR-9.3.8.2.3-7]
       *> accept: [2002]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: delete_file_attribute_set_empty
-      *> rules: [GR-9.1.13.6-7, GR-14.9.10.4-18, GR-14.9.10.4-19, DOC-A.1-50]
+      *> rules: [GR-9.1.13.6-7, GR-14.9.10.4-18, GR-14.9.10.4-19,
+      *>    DOC-A.1-50]
       *> accept: [2023]
       *> source-format: fixed
       *> portable: unverified

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb140_read_gate
-*> rules: [GR-9.1.13.7-3, GR-14.9.10.4-2, GR-14.9.10.4-10, SR-14.9.30.3-8, GR-14.9.47.4-3, FMT-14.9.47.2]
+*> rules: [GR-9.1.13.7-3, GR-14.9.10.4-2, GR-14.9.10.4-10,
+*>    SR-14.9.30.3-8, GR-14.9.47.4-3, FMT-14.9.47.2]
 *> accept: [2002]
 *> source-format: free
 *> portable: unverified

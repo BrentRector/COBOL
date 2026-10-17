@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: a42-screen-erase
-*> rules: [SR-13.18.21.3-1, SR-13.18.21.3-2, GR-13.18.21.4-1, GR-13.18.21.4-2, FMT-13.18.21.2]
+*> rules: [SR-13.18.21.3-1, SR-13.18.21.3-2, GR-13.18.21.4-1,
+*>    GR-13.18.21.4-2, FMT-13.18.21.2]
 *> source-format: free
 *> portable: unverified
 *>---

@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: l1_integer_family_notes
-*> rules: [AR-15.42.3-1, RV-15.42.4-1, RV-15.44.4-1, RV-15.49.4-1, FMT-15.42.2, FMT-15.44.2, FMT-15.49.2]
+*> rules: [AR-15.42.3-1, RV-15.42.4-1, RV-15.44.4-1, RV-15.49.4-1,
+*>    FMT-15.42.2, FMT-15.44.2, FMT-15.49.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

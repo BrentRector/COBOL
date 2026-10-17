@@ -1,6 +1,8 @@
 *>--- conformance-case
 *> id: pb941_push_pop_directive_state
-*> rules: [GR-7.3.4-3, SR-7.3.20.3-3, GR-7.3.20.4-1, GR-7.3.20.4-2, GR-7.3.20.4-3, SR-7.3.22.3-3, GR-7.3.22.4-1, GR-7.3.22.4-2, GR-7.3.22.4-3]
+*> rules: [GR-7.3.4-3, SR-7.3.20.3-3, GR-7.3.20.4-1, GR-7.3.20.4-2,
+*>    GR-7.3.20.4-3, SR-7.3.22.3-3, GR-7.3.22.4-1, GR-7.3.22.4-2,
+*>    GR-7.3.22.4-3]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

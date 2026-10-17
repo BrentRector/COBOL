@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb63_exception_location_procedure_field
-*> rules: [RV-15.30.3-2, RV-15.31.3-2, FMT-15.30.2, FMT-15.31.2, FMT-15.32.2, FMT-15.33.2]
+*> rules: [RV-15.30.3-2, RV-15.31.3-2, FMT-15.30.2, FMT-15.31.2,
+*>    FMT-15.32.2, FMT-15.33.2]
 *> accept: [2023]
 *> source-format: free
 *> portable: unverified

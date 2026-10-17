@@ -1,6 +1,7 @@
 *>--- conformance-case
 *> id: pb64t5-case-phrase-name-undeclared
-*> rules: [AR-15.3-8, RV-15.57.4-2, RV-15.97.4-2, FMT-15.57.2, FMT-15.97.2]
+*> rules: [AR-15.3-8, RV-15.57.4-2, RV-15.97.4-2, FMT-15.57.2,
+*>    FMT-15.97.2]
 *> source-format: free
 *> portable: unverified
 *>---

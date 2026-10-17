@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb567_condition_name_qualification
-      *> rules: [SR-8.4.2.2.3-2, SR-8.4.2.2.3-3, SR-8.4.2.2.3-4, SR-8.4.2.2.3-5, SR-8.4.4.3-2, SR-13.16.3-23, FMT-8.4.2.2.2]
+      *> rules: [SR-8.4.2.2.3-2, SR-8.4.2.2.3-3, SR-8.4.2.2.3-4,
+      *>    SR-8.4.2.2.3-5, SR-8.4.4.3-2, SR-13.16.3-23, FMT-8.4.2.2.2]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified

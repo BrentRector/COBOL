@@ -1,6 +1,7 @@
       *>--- conformance-case
       *> id: pb212_operand_class_screens
-      *> rules: [SR-14.9.17.3-1, SR-14.9.37.3-5, SR-14.9.39.3-1, SR-14.9.39.3-2, SR-14.9.39.3-3, SR-14.9.39.3-4]
+      *> rules: [SR-14.9.17.3-1, SR-14.9.37.3-5, SR-14.9.39.3-1,
+      *>    SR-14.9.39.3-2, SR-14.9.39.3-3, SR-14.9.39.3-4]
       *> accept: [85]
       *> source-format: fixed
       *> portable: unverified
