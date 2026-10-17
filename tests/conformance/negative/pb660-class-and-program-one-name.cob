@@ -6,11 +6,11 @@
 *> function-prototype-names, interface-names, method-names, program-prototype-names, property-names, and
 *> user-function-names").
 *> THE SIBLING SWEEP FIXTURE (kb/Work PB660): before that landing every definition namespace policed only
-*> ITSELF - class-vs-class by COBOLNET0820 and interface-vs-class by COBOLNET0840 under 8.4.6.4's own
+*> ITSELF - class-vs-class and interface-vs-class (one code, COBOLNET0820, since kb/Work PB1784) under 8.4.6.4's own
 *> uniqueness sentences, function-vs-function by COBOLNET1508, program-vs-program by nothing at all - so no
 *> check ever compared a definition of one kind against a definition of another and this compiled clean.
 *> COBOLNET2213 is now the ONE check over 8.3.2.2's whole list. It does NOT restate 8.4.6.4: a class/class or
-*> class/interface pair sharing the declared WORD is left to COBOLNET0820/0840, which own that sentence.
+*> class/interface pair sharing the declared WORD is left to COBOLNET0820, which owns that sentence.
 *> reject-at begins at 2002 because a CLASS-ID definition is a COBOL-2002 introduction.
 IDENTIFICATION DIVISION.
 PROGRAM-ID. PB660XM.

@@ -56,3 +56,16 @@ descriptor instead of two codes.
 Leg 1 ran Conformance 6,161/11,951, Unit 33,489/33,925 and Characterization 5/36 with no failure. The three new
 negatives, the new OoSpineTests fact, the renamed `_4211` tests and the seven re-pinned negatives all passed in leg 1.
 The Linux gate is run at landing (batched gating).
+
+**Branch review round 1 (R1-1, doc accuracy).** The reviewer found the old code meanings still written where the
+current state is described: the OO deep-dive said a FINAL base class (§11.3.3 SR5) was 0839, `OoClassTable.cs` said a
+class/interface collision was 0840 (it is 0820), `OoClassSymbol.cs` and `CobolOO.g4` said a FINAL superclass was 0839,
+`CobolOO.g4` named 0840 as the prototype-body screen (it is 2272), seven negative-golden headers named the superseded
+code while their `.err` pinned the new one (l1c15 cyclic and pb1502 now 2791, l1c18 and l1m7 now 4212, pb814 and
+pb815 now 4211, pb660 now 0820 alone), and ten inventory notes still described the old mapping. All are corrected.
+The test `OverrideFinal_0838_0839` is renamed `OverrideFinal_0838_0839_FinalBase_2791` with its four inventory
+test-refs, and the GR-11.3.4-3 probe was re-run on this build (`CLASS-ID. FC INHERITS FB.` with FB FINAL gives
+COBOLNET2791 citing §11.3.3 SR5 / §11.3.4 GR3 at 2002, 2014 and 2023). The root was that nothing reads a golden's
+header, so a new unit sweep, `NegativeGoldenHeaderCodeDriftTests`, now checks it: a code a header states after
+`Expected`, `Diagnostic` or `->` must be one its `.err` pins. It checks 85 goldens. On the reviewed head it reports
+five of the seven stale headers; the other two named the code in prose. A built-in fixture proves the detector trips.

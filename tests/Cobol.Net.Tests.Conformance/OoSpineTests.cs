@@ -1972,10 +1972,12 @@ public sealed class OoSpineTests
         EditionHarness.AssertHasDiagnostic(warnsPerm, "COBOLNET0837");
     }
 
-    /// <summary>§11.7 SR3 — OVERRIDE with no matching superclass method (incl. no INHERITS at all) is 0838;
-    /// §11.7 GR3 / §11.3 GR3 — overriding a FINAL method and inheriting a FINAL class are the 0839 family.</summary>
+    /// <summary>§11.7.3 SR3 first sentence — OVERRIDE with no matching superclass method (incl. no INHERITS at all)
+    /// is 0838; its second sentence and §11.7.4 GR3 — overriding a FINAL method — is 0839; §11.3.3 SR5 / §11.3.4
+    /// GR3 — inheriting a FINAL class — is the INHERITS clause's rule, 2791. One descriptor per rule (kb/Work
+    /// PB1784).</summary>
     [Fact]
-    public void OverrideFinal_0838_0839()
+    public void OverrideFinal_0838_0839_FinalBase_2791()
     {
         EditionHarness.AssertHasDiagnostic(ErrorsOf(DriverAndClass("OOSP44", "OSPC44", """
                 INVOKE OSPC44 "NEW" RETURNING T.

@@ -12,7 +12,7 @@
       *> well-formed, and IS FINAL is NOT written, so SR8 (the sibling
       *> fixture l1c18-method-prototype-final) is not violated.  The
       *> prototype body is the same empty shape as that fixture's.
-      *> Expected: COBOLNET0840 with the prototype message head.
+      *> Expected: COBOLNET4212 with the prototype message head.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1M7OVM.
        PROCEDURE DIVISION.

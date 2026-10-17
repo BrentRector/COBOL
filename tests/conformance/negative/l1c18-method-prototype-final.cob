@@ -9,7 +9,7 @@
       *> cite.py: OK  §9.3.7   (Method prototypes)
       *> The interface inherits nothing and PING is its only prototype;
       *> no OVERRIDE is written, so only SR8 is violated.  Diagnostic
-      *> COBOLNET0840 with the prototype message head.
+      *> COBOLNET4212 with the prototype message head.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C18G.
        PROCEDURE DIVISION.

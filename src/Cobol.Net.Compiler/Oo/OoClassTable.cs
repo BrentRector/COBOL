@@ -31,7 +31,7 @@ public sealed class OoClassTable
 
     /// <summary>All interfaces in source order (§11.6 — emitted as C# interfaces BEFORE the classes, purely
     /// for readability; Roslyn needs no ordering). Interfaces and classes share ONE name namespace
-    /// (<see cref="_ifaceByName"/> is checked against <see cref="_byName"/> at Build — a collision is 0840).</summary>
+    /// (<see cref="_ifaceByName"/> is checked against <see cref="_byName"/> at Build — a collision is COBOLNET0820, §8.3.2.2).</summary>
     public IReadOnlyList<OoInterfaceSymbol> Interfaces => _interfaces;
     private readonly List<OoInterfaceSymbol> _interfaces = [];
 

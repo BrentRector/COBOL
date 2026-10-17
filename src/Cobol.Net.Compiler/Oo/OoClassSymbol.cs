@@ -49,7 +49,8 @@ public sealed class OoClassSymbol(string name, string csName, CobolParserCore.Cl
     /// SUPER search that would start there (§8.4.3.8.4 GR3) is the expansion's: <see cref="Base"/> stays null.</summary>
     public string? FormalBaseName { get; set; }
 
-    /// <summary>CLASS-ID … IS FINAL (§11.3 — GR3: a FINAL class shall not be a superclass; 0839). Emits
+    /// <summary>CLASS-ID … IS FINAL (§11.3.4 GR3: a FINAL class shall not be a superclass; an INHERITS naming one
+    /// is §11.3.3 SR5, COBOLNET2791). Emits
     /// C# <c>sealed</c>; every fresh method slot in it emits NON-virtual (the CS0549 trap — a virtual
     /// member inside a sealed class is a Roslyn error on emitted code).</summary>
     public bool IsFinal { get; init; }

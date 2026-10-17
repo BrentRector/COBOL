@@ -6611,7 +6611,7 @@
   "test-ref": "conformance:negative/oo-multi-base-super",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "docs/CONFORMANCE.md §5 row A.4.10 (Object orientation optional items — Not claimed), for items 1 and 3 ONLY. Licence: §4.2.7 + Annex A.4.1. The OO CORE is mandatory surface and is implemented; only the CLASS-side INHERITS repetition (item 1) and parametric polymorphism (item 3) are declined. Item 2, the INTERFACE-ID INHERITS repetition, IS IMPLEMENTED (CobolOO.g4 `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2/SR3/SR6 with COBOLNET0840) — its rows are NOT in this batch. SR5's OWN subject — a bare SUPER inside a class with more than one base. ⚠ NOT to be read as covering SR-8.4.3.8.3-4/-6 or GR-8.4.3.8.4-4: the `[object-class-name-1 OF] SUPER` prefix of FMT-8.4.3.8.2 has NO grammar surface at all (objectReference admits a bare SUPER only), which leaves those three as genuine open NOT-IMPLEMENTED rows, not module-licensed ones.",
+  "notes": "docs/CONFORMANCE.md §5 row A.4.10 (Object orientation optional items — Not claimed), for items 1 and 3 ONLY. Licence: §4.2.7 + Annex A.4.1. The OO CORE is mandatory surface and is implemented; only the CLASS-side INHERITS repetition (item 1) and parametric polymorphism (item 3) are declined. Item 2, the INTERFACE-ID INHERITS repetition, IS IMPLEMENTED (CobolOO.g4 `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2 with COBOLNET0840 and SR3/SR6 with COBOLNET2791 (kb/Work PB1784)) — its rows are NOT in this batch. SR5's OWN subject — a bare SUPER inside a class with more than one base. ⚠ NOT to be read as covering SR-8.4.3.8.3-4/-6 or GR-8.4.3.8.4-4: the `[object-class-name-1 OF] SUPER` prefix of FMT-8.4.3.8.2 has NO grammar surface at all (objectReference admits a bare SUPER only), which leaves those three as genuine open NOT-IMPLEMENTED rows, not module-licensed ones.",
   "state": "OK"
  },
  {
@@ -11756,7 +11756,7 @@
   "test-ref": "conformance:negative/pb1505-class-inherits-itself; conformance:negative/pb1505-parameterized-class-inherits-itself",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'Object-class-name-2 shall not be the name of the class declared by this class definition.' OK 3). Its own descriptor COBOLNET2791 (class-inherits-rule) citing §11.3.3 SR3 — it was COBOLNET0820 shared with duplicate-class-definition and cited §11.3.2 (the general format). Asked over the RESOLVED link for a table class (an AS-literal alias of the class's own name is still itself) and over the WRITTEN name for a parameterized (USING) class definition, which OoExpansion keeps out of the table and which compiled silently before (pb1505-parameterized-class-inherits-itself).",
+  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'Object-class-name-2 shall not be the name of the class declared by this class definition.' OK 3). Its own descriptor COBOLNET2791 (inherits-clause-rule) citing §11.3.3 SR3 — it was COBOLNET0820 shared with duplicate-class-definition and cited §11.3.2 (the general format). Asked over the RESOLVED link for a table class (an AS-literal alias of the class's own name is still itself) and over the WRITTEN name for a parameterized (USING) class definition, which OoExpansion keeps out of the table and which compiled silently before (pb1505-parameterized-class-inherits-itself).",
   "state": "OK"
  },
  {
@@ -11783,10 +11783,10 @@
   "rule-digest": "dc025e12c3dc",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839; conformance:negative/pb1505-parameterized-class-inherits-final",
+  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791; conformance:negative/pb1505-parameterized-class-inherits-final",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'Object-class-name-2 shall not be the name of a class defined with the FINAL clause.' OK 5). The refuter's PARTIAL was the parameterized half: a USING class definition never entered the class table, so its INHERITS was never resolved. OoClassTable.Build now resolves a parameterized definition's INHERITS name through the §8.4.6.4 funnel (§11.3.3 SR2 included) unless it is one of the definition's own parameter-names (§11.3.4 GR6 — that names each expansion's actual, judged on the expansion), and a FINAL base is COBOLNET0839 (pb1505-parameterized-class-inherits-final compiled clean before). Non-parameterized definitions keep OoSpineTests.OverrideFinal_0838_0839.",
+  "notes": "kb/Work PB1505 LANDED (wave 1015 Z). cite.py --check 11.3.3 'Object-class-name-2 shall not be the name of a class defined with the FINAL clause.' OK 5). The refuter's PARTIAL was the parameterized half: a USING class definition never entered the class table, so its INHERITS was never resolved. OoClassTable.Build now resolves a parameterized definition's INHERITS name through the §8.4.6.4 funnel (§11.3.3 SR2 included) unless it is one of the definition's own parameter-names (§11.3.4 GR6 — that names each expansion's actual, judged on the expansion), and a FINAL base is COBOLNET2791, the INHERITS-clause descriptor (kb/Work PB1784; pb1505-parameterized-class-inherits-final compiled clean before). Non-parameterized definitions keep OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791.",
   "state": "OK"
  },
  {
@@ -11816,7 +11816,7 @@
   "test-ref": "conformance:negative/oo-inherits-same-base-twice",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "docs/CONFORMANCE.md §5 row A.4.10 (Object orientation optional items — Not claimed), for items 1 and 3 ONLY. Licence: §4.2.7 + Annex A.4.1. The OO CORE is mandatory surface and is implemented; only the CLASS-side INHERITS repetition (item 1) and parametric polymorphism (item 3) are declined. Item 2, the INTERFACE-ID INHERITS repetition, IS IMPLEMENTED (CobolOO.g4 `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2/SR3/SR6 with COBOLNET0840) — its rows are NOT in this batch. SR7's OWN subject — the SAME class name twice in one INHERITS clause. The pre-existing fixture oo-multi-base-inherits uses two DISTINCT base names, so this rule had never been witnessed on its own subject.",
+  "notes": "docs/CONFORMANCE.md §5 row A.4.10 (Object orientation optional items — Not claimed), for items 1 and 3 ONLY. Licence: §4.2.7 + Annex A.4.1. The OO CORE is mandatory surface and is implemented; only the CLASS-side INHERITS repetition (item 1) and parametric polymorphism (item 3) are declined. Item 2, the INTERFACE-ID INHERITS repetition, IS IMPLEMENTED (CobolOO.g4 `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2 with COBOLNET0840 and SR3/SR6 with COBOLNET2791 (kb/Work PB1784)) — its rows are NOT in this batch. SR7's OWN subject — the SAME class name twice in one INHERITS clause. The pre-existing fixture oo-multi-base-inherits uses two DISTINCT base names, so this rule had never been witnessed on its own subject.",
   "state": "OK"
  },
  {
@@ -11888,10 +11888,10 @@
   "rule-digest": "923274f058fe",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Frontend/Grammar/Core/CobolOO.g4#classIdParagraph",
-  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839",
+  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Rule: 'If the FINAL clause is specified, the class shall not be the superclass for any other class.' (cite.py --check 11.3.4 -> OK §11.3.4 3)). Grammar `(IS? FINAL)?` accepts both spellings; IsFinal = id.FINAL() is not null; the base-link loop emits COBOLNET0839 when the resolved base IsFinal. Probe out/probe/class-id-paragraph/final.cob (`CLASS-ID. FB FINAL.` then `CLASS-ID. FC INHERITS FB.` with REPOSITORY CLASS FB) -> COBOLNET0839 at (8,30) citing §11.3.3 SR5 / §11.3.4 GR3, at --std 2002, 2014, 2023. A FINAL class that is NOT used as a superclass compiles and runs (chain.cob: `CLASS-ID. CHD IS FINAL INHERITS FROM CHC.`, instantiated and invoked). OoSpineTests.OverrideFinal_0838_0839 asserts 0839 for `CLASS-ID. BAS46 IS FINAL.` inherited by SUB46 (spec-derived negative). Only in-group superclasses exist (external-repository classes cannot be inherited at all, see GR-11.3.4-2), so no FINAL class escapes the check.",
+  "notes": "Rule: 'If the FINAL clause is specified, the class shall not be the superclass for any other class.' (cite.py --check 11.3.4 -> OK §11.3.4 3)). Grammar `(IS? FINAL)?` accepts both spellings; IsFinal = id.FINAL() is not null; the base-link loop emits COBOLNET2791 (the INHERITS-clause rule, kb/Work PB1784) when the resolved base IsFinal. Probe out/probe/class-id-paragraph/final.cob (`CLASS-ID. FB FINAL.` then `CLASS-ID. FC INHERITS FB.` with REPOSITORY CLASS FB) -> COBOLNET2791 at (8,30) citing §11.3.3 SR5 / §11.3.4 GR3, at --std 2002, 2014, 2023. A FINAL class that is NOT used as a superclass compiles and runs (chain.cob: `CLASS-ID. CHD IS FINAL INHERITS FROM CHC.`, instantiated and invoked). OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791 asserts 2791 for `CLASS-ID. BAS46 IS FINAL.` inherited by SUB46 (spec-derived negative). Only in-group superclasses exist (external-repository classes cannot be inherited at all, see GR-11.3.4-2), so no FINAL class escapes the check.",
   "state": "OK"
  },
  {
@@ -11906,7 +11906,7 @@
   "test-ref": "conformance:negative/oo-inherits-diamond",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "docs/CONFORMANCE.md §5 row A.4.10 (Object orientation optional items — Not claimed), for items 1 and 3 ONLY. Licence: §4.2.7 + Annex A.4.1. The OO CORE is mandatory surface and is implemented; only the CLASS-side INHERITS repetition (item 1) and parametric polymorphism (item 3) are declined. Item 2, the INTERFACE-ID INHERITS repetition, IS IMPLEMENTED (CobolOO.g4 `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2/SR3/SR6 with COBOLNET0840) — its rows are NOT in this batch. GR4's OWN subject — the DIAMOND. The rule's own NOTE fixes the reading: \"While the same class cannot be directly inherited more than once, a class can be indirectly inherited multiple times\", and the indirect route needs some class to carry two DIRECT bases, which item 1 declines.",
+  "notes": "docs/CONFORMANCE.md §5 row A.4.10 (Object orientation optional items — Not claimed), for items 1 and 3 ONLY. Licence: §4.2.7 + Annex A.4.1. The OO CORE is mandatory surface and is implemented; only the CLASS-side INHERITS repetition (item 1) and parametric polymorphism (item 3) are declined. Item 2, the INTERFACE-ID INHERITS repetition, IS IMPLEMENTED (CobolOO.g4 `INHERITS FROM interfaceName+`; OoClassTable enforces §11.6.3 SR2 with COBOLNET0840 and SR3/SR6 with COBOLNET2791 (kb/Work PB1784)) — its rows are NOT in this batch. GR4's OWN subject — the DIAMOND. The rule's own NOTE fixes the reading: \"While the same class cannot be directly inherited more than once, a class can be indirectly inherited multiple times\", and the indirect route needs some class to carry two DIRECT bases, which item 1 declines.",
   "state": "OK"
  },
  {
@@ -12086,7 +12086,7 @@
   "test-ref": "conformance:negative/l1c15-interface-inherits-cyclic",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "Rule (cite.py --check 11.6.3 OK, SR 3): 'Interface-name-2 shall not inherit directly or indirectly from interface-name-1.' Code: after resolution, a DFS from each interface over Inherits reports COBOLNET0840 'the INHERITS graph is cyclic (ISO §11.6.3 SR3)' when it reaches itself. Probes (--std 2002): probe/interface-id-paragraph/sr3_self.cob (A INHERITS A) -> 0840; sr3_cycle.cob (A->B->A) -> 0840 on both; sr3_indirect.cob (A->C->B->A, three-deep) -> 0840 on all three. Acyclic diamond-free multi-base pos.cob compiles. No existing spec-derived test -> test-needed. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (the OO facility, introduced by ISO/IEC 1989:2002; interface definitions are rejected COBOLNET0900 at 85)",
+  "notes": "Rule (cite.py --check 11.6.3 OK, SR 3): 'Interface-name-2 shall not inherit directly or indirectly from interface-name-1.' Code: after resolution, a DFS from each interface over Inherits reports COBOLNET2791 (the INHERITS-clause rule, kb/Work PB1784) 'the INHERITS graph is cyclic (ISO §11.6.3 SR3)' when it reaches itself. Probes (--std 2002): probe/interface-id-paragraph/sr3_self.cob (A INHERITS A) -> 0840; sr3_cycle.cob (A->B->A) -> 0840 on both; sr3_indirect.cob (A->C->B->A, three-deep) -> 0840 on all three. Acyclic diamond-free multi-base pos.cob compiles. No existing spec-derived test -> test-needed. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (the OO facility, introduced by ISO/IEC 1989:2002; interface definitions are rejected COBOLNET0900 at 85)",
   "state": "OK"
  },
  {
@@ -12131,7 +12131,7 @@
   "test-ref": "conformance:negative/pb1502-interface-inherits-same-name-twice; conformance:2002/pb1502_interface_inherits_legal",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "kb/Work PB1502 (w1013 L). cite.py --check 11.6.3 SR6 'A given interface-name shall not appear more than once in an INHERITS clause': keyed on the WRITTEN interface-name (a case variant is the same word, 8.1.3.2 GR3 - refused COBOLNET0840 as before); two different REPOSITORY names for one externalized interface are two interface-names, legal, and name one base (docs/CONFORMANCE.md D-INH1, following PB946).",
+  "notes": "kb/Work PB1502 (w1013 L). cite.py --check 11.6.3 SR6 'A given interface-name shall not appear more than once in an INHERITS clause': keyed on the WRITTEN interface-name (a case variant is the same word, 8.1.3.2 GR3 - refused COBOLNET2791, the INHERITS-clause rule (kb/Work PB1784)); two different REPOSITORY names for one externalized interface are two interface-names, legal, and name one base (docs/CONFORMANCE.md D-INH1, following PB946).",
   "state": "OK"
  },
  {
@@ -12236,7 +12236,7 @@
   "test-ref": "conformance:negative/l1m7-method-prototype-override",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "§11.7.3 SR2 + §9.3.7: OVERRIDE on an INTERFACE-ID method (a prototype) is rejected with COBOLNET0840",
+  "notes": "§11.7.3 SR2 + §9.3.7: OVERRIDE on an INTERFACE-ID method (a prototype) is rejected with COBOLNET4212 (kb/Work PB1784)",
   "state": "OK"
  },
  {
@@ -12248,10 +12248,10 @@
   "rule-digest": "4ace4416e900",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build; src/Cobol.Net.Compiler/Oo/OoConformance.cs",
-  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839",
+  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py --check 11.7.3 \"The method in the superclass shall not be defined with the FINAL clause.\" -> OK §11.7.3 3). First sentence: OVERRIDE with no superclass method of that name -> COBOLNET0838 (incl. no INHERITS). The resolution signature is the name alone (parametric polymorphism not claimed, CONFORMANCE.md A.4.10 item 3); a same-name base with a different parameter list is then rejected by the §11.7.3 SR9 / §9.3.8.2.3 override conformance (OoConformance) — rejected either way. Second sentence: base FINAL -> COBOLNET0839, including an indirect FINAL ancestor (probe p6, 2002/2023). An OVERRIDE whose only same-named method is an IMPLEMENTED interface prototype (not a superclass method) is correctly 0838 because the lookup is superclass-only. Both sentences asserted by OoSpineTests.OverrideFinal_0838_0839. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (MarkRoster 0838/0839); src/Cobol.Net.Compiler/Oo/OoConformance.cs",
+  "notes": "cite.py --check 11.7.3 \"The method in the superclass shall not be defined with the FINAL clause.\" -> OK §11.7.3 3). First sentence: OVERRIDE with no superclass method of that name -> COBOLNET0838 (incl. no INHERITS). The resolution signature is the name alone (parametric polymorphism not claimed, CONFORMANCE.md A.4.10 item 3); a same-name base with a different parameter list is then rejected by the §11.7.3 SR9 / §9.3.8.2.3 override conformance (OoConformance) — rejected either way. Second sentence: base FINAL -> COBOLNET0839, including an indirect FINAL ancestor (probe p6, 2002/2023). An OVERRIDE whose only same-named method is an IMPLEMENTED interface prototype (not a superclass method) is correctly 0838 because the lookup is superclass-only. Both sentences asserted by OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (MarkRoster 0838/0839); src/Cobol.Net.Compiler/Oo/OoConformance.cs",
   "state": "OK"
  },
  {
@@ -12326,7 +12326,7 @@
   "test-ref": "conformance:negative/l1c18-method-prototype-final",
   "derivation": "",
   "editions": "2002,2014,2023",
-  "notes": "cite.py --check 11.7.3 \"The FINAL clause shall not be specified in a method prototype.\" -> OK. Same check as SR2 (m.FINAL()). Probe p7b_final_in_prototype (`METHOD-ID. PING IS FINAL.` in an INTERFACE-ID) -> COBOLNET0840 at 2023. Untested — test-needed. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (interface prototype loop, COBOLNET0840)",
+  "notes": "cite.py --check 11.7.3 \"The FINAL clause shall not be specified in a method prototype.\" -> OK. Same check as SR2 (m.FINAL()). Probe p7b_final_in_prototype (`METHOD-ID. PING IS FINAL.` in an INTERFACE-ID) -> COBOLNET4212 (kb/Work PB1784) at 2023. Untested — test-needed. || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (interface prototype loop, COBOLNET4212)",
   "state": "OK"
  },
  {
@@ -12383,7 +12383,7 @@
   "rule-digest": "196cee7dd02b",
   "verdict": "CONFORMS",
   "code-location": "src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build",
-  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839",
+  "test-ref": "conformance-test:OoSpineTests.OverrideFinal_0838_0839_FinalBase_2791",
   "derivation": "",
   "editions": "2002,2014,2023",
   "notes": "cite.py --check 11.7.4 \"The FINAL clause indicates that this method shall not be overridden in any subclasses.\" -> OK. MarkRoster reports COBOLNET0839 when the base method found by the chain walk IsFinal. 'any subclasses' edge probed: p6_indirect_final_override (A.M IS FINAL; B INHERITS A without M; C INHERITS B with M OVERRIDE) -> COBOLNET0839 at 2002 and 2023. Emission makes a FINAL root method non-virtual / sealed override (oo_override_final). || Editions (adjudicator, verbatim): 2002, 2014, 2023 (METHOD-ID is part of the OO facility introduced by COBOL 2002; absent at 1985) || Code sites (adjudicator, verbatim): src/Cobol.Net.Compiler/Oo/OoClassTable.cs#Build (MarkRoster 0839)",
