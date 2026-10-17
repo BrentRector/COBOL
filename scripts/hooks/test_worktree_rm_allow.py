@@ -49,6 +49,7 @@ CASES = [
     (f"cd {WT.as_posix()}; git rm -r src/X", MAIN, False),                            # `;`: a failed cd removes in main
     (f"ls && cd {WT.as_posix()} && git rm -r src/X", MAIN, False),                    # more than the one prefix
     (f"(cd {WT.as_posix()} && git rm -r src/X)", MAIN, False),                        # a subshell is never covered
+    (f"echo y | ( cd {WT.as_posix()} && git rm -r src/X )", MAIN, False),             # nor one reading a pipe (R3-1)
     (f"bash -c 'git rm -r src/X'", str(WT), False),                                  # nor a -c payload
     ("cd $WT && git rm -r src/X", MAIN, False),                                      # a target the line does not determine
     ("git rm -r", str(WT), False),                                                   # no path

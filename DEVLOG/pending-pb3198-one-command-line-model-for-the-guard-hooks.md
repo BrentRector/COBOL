@@ -82,3 +82,17 @@ calling shell. `_walk` now passes the previous stage forward explicitly: a group
 stage reads a group's last step, and a Bash `{ … }` pipeline side is a subshell. Rule 5 still treats a substitution
 like a group, as one opaque part of its command. Tests: `test_forbidden_commands.py` 210 → 222 (7 of the new cases fail
 on the reviewed head e24a57545), `test_shell_location.py` 120 → 125.
+
+Branch review round 3 (R3-1): round 2's stage fix handed a group's upstream stage to the group's inner walk, and
+`_command` read any upstream stage as "this command is a pipeline side", so the FIRST command inside a group on the
+read side of a `|` never applied its `cd`. `cd /e/claude-skills; echo y | ( cd /e/COBOL && git push origin HEAD:main )`
+and the `true | { cd /e/COBOL; git push origin main; }` form passed rule 2 (a push to this repository's main), and
+`echo y | ( cd /e/claude-skills && git push -q origin main )` was blocked. The model had folded two facts into one
+argument: what a command's stdin carries, and whether it is a side of a pipe of its own walk. `_walk` now takes the
+walk's stdin (the texts `_output` spells) and gives each command that stdin unless a `|` of the walk itself precedes
+it. Only that local `|` makes a command transient. The sweep found the same gap in the stdin itself: a group passed its
+stage only to its first command, so `echo 'git stash' | ( cd X; bash )` passed, and neither a Bash substitution nor a
+`-c` payload inherited the stdin of the command holding it (`echo 'git stash' | bash -c 'cd X; bash'`,
+`echo 'git stash' | x=$(bash)`). Each now does; a script read from stdin consumes it. Tests: `test_forbidden_commands.py`
+222 → 232 (6 of the new cases fail on the reviewed head ff8f1c01b), `test_shell_location.py` 125 → 135 (7 fail there),
+`test_worktree_rm_allow.py` 56 → 57 (a pin: a group never grants).

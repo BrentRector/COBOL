@@ -145,7 +145,10 @@ from walked as one (a `$( … )`, backquote or PowerShell expression or script b
 `-EncodedCommand`, `cmd /c`, `eval`, `Invoke-Expression`, also behind `timeout`/`env`/`xargs`/`wsl -e`; a heredoc,
 here-string or literal pipe a shell reads as its script), each step marked with how many substitutions enclose it, so
 the steps of one level are that level's own command line (a pipe inside `$( … )` reads the stage beside it), and a
-pipeline stage handed forward explicitly, a group on either side of a `|` included;
+walk carrying what its own stdin holds: the read side of a `|` reads the stage before it (a group's last step
+when the group writes the pipe), a group reading a pipe, a Bash substitution and a `-c` payload hand the stdin they
+inherit to their commands, and only a `|` of a walk's OWN makes a command a pipeline side (a `cd` inside a group
+that reads a pipe moves the group's later steps);
 the main checkout is that root, or the `gitdir:` target parsed out of the worktree's `.git` file (parsed, not
 shelled out — this runs before every `dotnet` call); and a foreign agent's tree is
 `<main>/.claude/worktrees/agent-<agentId>` **when that directory exists**, else the main checkout, because

@@ -40,7 +40,8 @@ its subcommand). EVERY place either shell takes a command line from is walked as
     (`timeout 5 bash -c …`, `env X=1 sh -c …`, `xargs sh -c …`, `wsl -e bash -c …`, PowerShell's `&`);
   - a shell reading its script from stdin (no script operand, `-s`, `-Command -`, `-File -`) and `iex`: stdin is the
     heredocs fed to it, its here-string (`bash <<< "…"`), or what the pipeline stage before it writes when the line
-    spells that (`echo|printf|Write-Output` of words, `cat` of a heredoc or here-string, a PowerShell literal string).
+    spells that (`echo|printf|Write-Output` of words, `cat` of a heredoc or here-string, a PowerShell literal string),
+    or the stdin a group reading a pipe, a Bash substitution or a `-c` payload inherits from the command holding it.
 A rule that scans the raw text instead sees a heredoc body as commands, or a command after a heredoc as body: the hole
 PB3198 closed in four rules at once; a model that skips any of those places hides the commands inside it from every rule
 (the branch review of PB3198, R1-1 and R1-2: a stash or a push inside `$( … )`, `eval "…"`, `cmd /c "…"` or `| bash`).
@@ -438,20 +439,24 @@ class _State:
             other.cwd, other.previous, other.stack, other.variables, other.moved)
 
 
-def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step], upstream: Step | None = None) -> None:
-    """The steps of `command` appended to `out`. `upstream` is the pipeline stage the FIRST command reads from: a group
-    that follows a `|` (`echo x | ( bash )`) hands its first command the stage before the group."""
+def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step], stdin: tuple[str, ...] = ()) -> None:
+    """The steps of `command` appended to `out`. `stdin` is what the walk's OWN stdin carries, when the line spells it
+    (`_output`): a group that is the read side of a `|` (`echo x | ( cd X; bash )`), a Bash substitution and a `-c`
+    payload inherit the stdin of the command that holds them. Every command of the walk reads it except the read side
+    of a `|` of the walk itself, which reads the stage before it. Inheriting a stdin never makes a command a pipeline
+    side: that is the enclosing group's, so a `cd` inside the group still moves the group's later steps (the branch
+    review of PB3198, R3-1)."""
     began: _State | None = None        # the shell's state when the current and-or list began
     stranded: tuple[str, ...] = ()     # a backgrounded list's location changes, for the next step
-    prev = upstream                    # the stage the next command reads from, when a `|` joins them
+    piped: tuple[str, ...] | None = None  # when a `|` of THIS walk precedes the next command: what that stage writes
     for text, sep, heredocs, subs in _split(command, shell)[0]:
         if began is None:
             began = state.copy()
         first = len(out)
-        _command(text, sep, heredocs, subs, state, shell, depth, out, prev)
+        _command(text, sep, heredocs, subs, state, shell, depth, out, stdin if piped is None else piped, piped is not None)
         # the next stage reads this command's last step: a group's last step (`( echo x ) | bash`), never a step of its
         # substitutions (those come before it)
-        prev = out[-1] if sep == "|" and len(out) > first else None
+        piped = (_output(out[-1], shell) if len(out) > first else ()) if sep == "|" else None
         if stranded and len(out) > first:
             out[first] = dataclasses.replace(out[first], stranded=stranded)
             stranded = ()
@@ -468,11 +473,12 @@ def _walk(command: str, state: _State, shell: str, depth: int, out: list[Step], 
 
 
 def _command(text: str, sep: str, heredocs: tuple[str, ...], subs: tuple[str, ...], state: _State, shell: str,
-             depth: int, out: list[Step], prev: Step | None) -> None:
-    """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`. `prev`
-    is the pipeline stage it reads from when a `|` precedes it (each side of a Bash pipeline runs in a subshell, so its
-    changes do not persist; a background `&` is the whole list's, undone by `_walk`)."""
-    transient = shell == BASH and (sep == "|" or prev is not None)
+             depth: int, out: list[Step], fed: tuple[str, ...], reads_pipe: bool) -> None:
+    """One top-level command of a `_walk`: its steps appended to `out`, its location change applied to `state`. `fed` is
+    what its stdin carries: the stage before it when `reads_pipe` (a `|` of its OWN walk precedes it), else the walk's
+    stdin. Each side of a Bash pipeline runs in a subshell, so a command that writes to or reads from a `|` of its walk
+    moves nothing; a background `&` is the whole list's, undone by `_walk`."""
+    transient = shell == BASH and (sep == "|" or reads_pipe)
     grouped = _group(text, shell)
     if grouped is not None:
         bracket, inner = grouped
@@ -482,18 +488,20 @@ def _command(text: str, sep: str, heredocs: tuple[str, ...], subs: tuple[str, ..
         # Its substitutions are its own commands', found again by this walk.
         child = state.copy()
         before = len(out)
-        _walk(inner, child, shell, depth + 1, out, prev)
+        _walk(inner, child, shell, depth + 1, out, fed)
         if len(out) > before:
             out[-1] = dataclasses.replace(out[-1], sep=sep)
         if not (shell == BASH and (bracket == "(" or transient)):
             state.adopt(child)
         return
-    # its substitutions run first: Bash's in a subshell; a PowerShell expression or script block in this runspace, so
-    # one that moves the location leaves the directory undetermined (a script block may or may not have run)
+    # its substitutions run first: Bash's in a subshell that inherits the command's stdin (a word is expanded before the
+    # command's redirections apply, so a heredoc of the command is not the substitution's); a PowerShell expression or
+    # script block in this runspace, so one that moves the location leaves the directory undetermined (a script block
+    # may or may not have run), and its pipeline input (`$input`, `$_`) is no stdin this model spells
     for inner in subs:
         child = state.copy()
         before = len(out)
-        _walk(inner, child, shell, depth + 1, out)
+        _walk(inner, child, shell, depth + 1, out, fed if shell == BASH else ())
         out[before:] = [dataclasses.replace(s, substitution=s.substitution + 1) for s in out[before:]]
         if shell == POWERSHELL and len(child.moved) > len(state.moved):
             state.cwd = None
@@ -508,7 +516,7 @@ def _command(text: str, sep: str, heredocs: tuple[str, ...], subs: tuple[str, ..
         for w in assigned:
             name, value = _ASSIGN_BASH.match(w).groups()
             state.variables[name] = value
-    stdin = heredocs + _here_strings(words, shell) + (_output(prev, shell) if prev is not None else ())
+    stdin = heredocs + _here_strings(words, shell) + fed
     if _interpreter(words, state, shell, depth, sep, heredocs, stdin, out):
         return
     location = _location(words, shell, state.cwd)
@@ -734,6 +742,7 @@ def _interpreter(words: tuple[str, ...], state: _State, shell: str, depth: int, 
     if _EVAL.get(name) == shell:
         args = [w for w in call[1:] if not (shell == POWERSHELL and w.lower() == "-command")]
         payloads = [" ".join(args)] if args else list(stdin) if shell == POWERSHELL else []
+        inherited = stdin if args else ()
         child_shell, run_in = shell, (lambda: state)
     else:
         child_shell = _SHELLS.get(name)
@@ -745,9 +754,11 @@ def _interpreter(words: tuple[str, ...], state: _State, shell: str, depth: int, 
                 payloads = [p for p in (_decoded(call[at + 1]),) if p]
             else:
                 payloads = [call[at + 1] if child_shell == BASH else " ".join(call[at + 1:])]
+            inherited = stdin          # `echo 'git stash' | bash -c 'cd X; bash'`: the payload reads the same stdin
             workdir = _workdir(call[:at], state.cwd)
         elif stdin and (at is not None or _reads_stdin_script(call, child_shell)):
             payloads = list(stdin)     # stdin IS the script (`-Command -` names stdin): each text is a command line
+            inherited = ()             # ... so the script consumed it
             workdir = _workdir(call, state.cwd)
         else:
             return False
@@ -756,7 +767,7 @@ def _interpreter(words: tuple[str, ...], state: _State, shell: str, depth: int, 
         return False
     before = len(out)
     for payload in payloads:
-        _walk(payload, run_in(), child_shell, depth + 1, out)
+        _walk(payload, run_in(), child_shell, depth + 1, out, inherited)
     if len(out) > before:
         last = out[-1]
         out[-1] = dataclasses.replace(last, sep=sep, heredocs=last.heredocs + heredocs)

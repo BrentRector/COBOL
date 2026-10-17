@@ -187,6 +187,16 @@ CASES = [
     ("( echo 'git stash' ) | bash", True),
     ("echo 'git stash' | ( bash )", True),
     ("echo 'git stash list' | ( bash )", False),
+    # R3-1: reading a pipe never makes a group's FIRST command a pipeline side, so its cd moves the group's later steps
+    # (at ff8f1c01b the first two passed, a push to this repository's main, and the third was a false block)
+    ("cd /e/claude-skills; echo y | ( cd /e/COBOL && git push origin HEAD:main )", True),
+    ("cd /e/claude-skills; true | { cd /e/COBOL; git push origin main; }", True),
+    ("echo y | ( cd /e/claude-skills && git push -q origin main )", False),
+    # and the group's stdin reaches each of its commands, a -c payload's and a substitution's
+    ("echo 'git stash' | ( cd /e/W; bash )", True),
+    ("echo 'git stash list' | ( cd /e/W; bash )", False),
+    ("echo 'git stash' | bash -c 'cd /e/W; bash'", True),
+    ("echo 'git stash' | x=$(bash)", True),
     # R1-2: every other way a shell is handed a command line as a string or through stdin
     ('eval "git stash"', True),
     ('eval "git stash list"', False),
@@ -228,6 +238,10 @@ PS_CASES = [
     ("Write-Output (git stash)", True),
     ("Get-ChildItem | ForEach-Object { git stash }", True),
     ("if ($x) { git stash }", True),
+    # R3-1's PowerShell forms: a script block reading the pipeline runs in this runspace, so its Set-Location moves it
+    ("Set-Location E:/claude-skills; 'y' | & { Set-Location E:/COBOL; git push origin main }", True),
+    ("Set-Location E:/claude-skills; 'y' | ForEach-Object { Set-Location E:/COBOL; git push origin main }", True),
+    ("'y' | & { Set-Location E:/claude-skills; git push origin main }", False),
     ("$m = (git log -1 --format=%s)", False),
     ("Write-Output 'git stash'", False),
     # R2-1: a filtered run inside an expression or subexpression pipes to the reader beside it

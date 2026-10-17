@@ -231,6 +231,25 @@ with tempfile.TemporaryDirectory() as tmp:
           [("echo 'git a'", 1, 0), ("git a", 1, 0)])
     check("a Bash `{ … }` pipeline side is a subshell: its cd ends at the pipe",
           dirs_of(f"{{ cd {W}; dotnet build; }} | cat; dotnet test", main, B), [wt, main])
+    # the branch review of PB3198, R3-1: a group on the READ side of a pipe hands its stdin to its commands, never its
+    # pipeline-side-ness: the cd inside it moves the group's later steps (at ff8f1c01b each of these ran in main)
+    check("a `( … )` reading a pipe: its cd moves its later steps",
+          dirs_of(f"echo y | ( cd {W} && git stash )", main, B, "git"), [wt])
+    check("a `( … )` reading a file's pipe, `;`", dirs_of(f"cat f | ( cd {W}; git status )", main, B, "git"), [wt])
+    check("a `{ … }` reading a pipe: its cd moves its later steps, and ends at the group (a pipeline side)",
+          dirs_of(f"echo y | {{ cd {W}; dotnet build; }}; dotnet test", main, B), [wt, main])
+    check("a group inside a group reading a pipe", dirs_of(f"echo y | ( ( cd {W}; dotnet build ) )", main, B), [wt])
+    check("a pipe of the group's OWN is a pipeline side inside it",
+          dirs_of(f"echo y | ( cd {W} | cat; dotnet build )", main, B), [main])
+    check("powershell: a script block reading the pipeline",
+          dirs_of(f"'y' | ForEach-Object {{ Set-Location {Wn}; dotnet build }}", main, P), [wt])
+    # and the group's stdin reaches every command of it that reads no pipe of its own, a Bash substitution's and a -c
+    # payload's (they inherit the stdin of the command holding them; a script read from stdin consumed it)
+    feeds = lambda cmd, shell=B: [s.text for s in sl.steps(cmd, str(main), shell) if s.text == "git a"]
+    exact("a group's stdin reaches its later shell", feeds("echo 'git a' | ( cd /y; bash )"), ["git a"])
+    exact("a -c payload's shell reads the command's stdin", feeds("echo 'git a' | bash -c 'cd /y; bash'"), ["git a"])
+    exact("a substitution's shell reads the command's stdin", feeds("echo 'git a' | x=$(bash)"), ["git a"])
+    exact("a script read from stdin consumed it: a shell inside it reads nothing", feeds("echo 'bash' | bash"), [])
     exact("a backquote and a process substitution", [t for t, _, sub in marked("echo `git a` <(git b)") if sub],
           ["git a", "git b"])
     exact("a substitution inside double quotes, never inside single quotes",
