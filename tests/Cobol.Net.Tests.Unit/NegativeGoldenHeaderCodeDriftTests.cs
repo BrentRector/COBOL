@@ -25,7 +25,6 @@ namespace CobolNet.Tests.Unit;
 /// sibling rule's code, the code a fix replaced) is prose and is not read. A <c>.err</c> that pins only message text
 /// carries no code to compare, so its golden is not asked.</para>
 /// </summary>
-[Trait("Sweep", "tree")]
 public sealed class NegativeGoldenHeaderCodeDriftTests
 {
     /// <summary>A code the header states as the expected diagnostic: <c>Expected: COBOLNETnnnn</c>,

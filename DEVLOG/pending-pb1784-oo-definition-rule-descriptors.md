@@ -67,6 +67,8 @@ The test `OverrideFinal_0838_0839` is renamed `OverrideFinal_0838_0839_FinalBase
 test-refs. Each of those rows records the old name as a `retired-witness:`, the witness-loss audit's form for a
 rename; the first re-gate went RED on that audit before the mark was added. The GR-11.3.4-3 probe was re-run on this build (`CLASS-ID. FC INHERITS FB.` with FB FINAL gives
 COBOLNET2791 citing §11.3.3 SR5 / §11.3.4 GR3 at 2002, 2014 and 2023). The root was that nothing reads a golden's
-header, so a new unit sweep, `NegativeGoldenHeaderCodeDriftTests`, now checks it: a code a header states after
+header, so a new drift test over `tests/conformance/negative`, `NegativeGoldenHeaderCodeDriftTests`, now checks it
+(a directory below the sweep depth, so it carries no `Sweep` trait; the second re-gate went RED on
+`HostWitnessTraitDriftTests` while it did): a code a header states after
 `Expected`, `Diagnostic` or `->` must be one its `.err` pins. It checks 85 goldens. On the reviewed head it reports
 five of the seven stale headers; the other two named the code in prose. A built-in fixture proves the detector trips.
