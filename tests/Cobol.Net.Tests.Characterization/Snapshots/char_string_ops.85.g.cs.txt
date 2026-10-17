@@ -60,10 +60,10 @@ internal sealed class _PRG_CHAR_STRING_OPS : ICobolProgram
                         __ins1 = CobolInspect.Replace(__ins1, new int[] { CobolInspect.ReplaceAll }, new string?[] { "L" }, new string?[] { "*" }, new string?[] { null }, new string?[] { null }, false);
                         WS_TXT = __ins1;
                     }
+                    string __strInto0 = WS_OUT;
                     long __strPtr0 = 1;
                     long __strPtr00 = __strPtr0;
                     bool __strOvf0 = false;
-                    string __strInto0 = WS_OUT;
                     __strInto0 = CobolStringOps.StringTransfer(__strInto0, "A", null, ref __strPtr0, ref __strOvf0);
                     __strInto0 = CobolStringOps.StringTransfer(__strInto0, "-", null, ref __strPtr0, ref __strOvf0);
                     WS_OUT = __strInto0;

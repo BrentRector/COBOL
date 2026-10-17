@@ -40,6 +40,83 @@ internal static class PlaceIdentification
         return name;
     };
 
+    /// <summary>⛔ THE SENDING OPERAND IS EVALUATED BEFORE THE RECEIVING OPERAND IS IDENTIFIED (kb/Work PB3261) — the
+    /// store <paramref name="store"/> of <paramref name="value"/> (the rendered sending value) into
+    /// <paramref name="receiver"/>, ordered so that every run-time step of evaluating the sender happens before any
+    /// run-time step of identifying the receiver.
+    /// <para><b>The rule.</b> ISO §14.9.25.4 GR1: "If identifier-1 is reference-modified, subscripted, or is a
+    /// function-identifier, the reference modifier, subscript, or function-identifier is evaluated only once,
+    /// immediately before data is moved to the first of the receiving operands", and "Item identification for
+    /// identifier-2 is performed immediately before the data is moved to the respective data item" — the sender
+    /// first, then each receiver. Which exception condition a statement raises when both sides fail is observable:
+    /// §14.9.49.4 GR11 selects the declarative by "the first one that occurs in the order of evaluation of the
+    /// statement that causes the exception to exist".</para>
+    /// <para><b>Why a store needs this at all.</b> A store renders as <c>&lt;receiver&gt; = &lt;value&gt;</c>, and C#
+    /// evaluates the left operand's address first: <c>CobolTable.At(TB.T, CobolTable.Occ(I, …)) =
+    /// CobolString.Store(CobolString.RefMod(X, …), 4)</c> range-tests the receiving subscript (EC-BOUND-SUBSCRIPT)
+    /// before the sending reference modifier (EC-BOUND-REF-MOD), so <c>MOVE X(1:L) TO T(I)</c> ran the wrong USE
+    /// declarative. A reference-modified receiver splices (<c>X = SpliceInto(X, start, length, value)</c>), whose
+    /// start and length are converted before the value argument, so the same inversion reached it by argument order.
+    /// When both sides identify at run time the value is evaluated into a block-scoped local first; otherwise the
+    /// order is unobservable and the store is rendered as it always was.</para>
+    /// <para>A caller whose verb identifies the receiver FIRST (§14.6.4 7)'s left-to-right default with the receiver
+    /// written first, as INITIALIZE's identifier-1) does not call this.</para></summary>
+    public static string SenderFirst(BoundOperand sender, Place receiver, string value, Func<string, string> store) =>
+        IdentifiesAtRunTime(sender) && IdentifiesAtRunTime(receiver)
+            ? $"{{ var {SendingValueLocal} = {value}; {store(SendingValueLocal)} }}"
+            : store(value);
+
+    /// <summary>The block-scoped local <see cref="SenderFirst"/> evaluates the sending value into. Each use is its own
+    /// block, and no store nests another, so one name serves every statement.</summary>
+    private const string SendingValueLocal = "__sending";
+
+    /// <summary>⛔ DOES IDENTIFYING THIS OPERAND EVALUATE ANYTHING AT RUN TIME? — the question <see cref="SenderFirst"/>
+    /// asks of each side. A field operand answers by its <see cref="Place"/>; a literal, a figurative constant, the
+    /// predefined NULL and an operand already refused evaluate nothing; every other operand (a function-identifier's
+    /// value, an arithmetic expression, a record area) is evaluated when it is read, and answers true.</summary>
+    public static bool IdentifiesAtRunTime(BoundOperand operand) => operand switch
+    {
+        BoundFieldOperand f => IdentifiesAtRunTime(f.Place),
+        BoundStringLiteral or BoundNumericLiteral or BoundFigurative or BoundAllLiteral or BoundPredefinedNull
+            or BoundOperandError => false,
+        _ => true,
+    };
+
+    /// <summary>True when identifying <paramref name="place"/> evaluates something at run time: an address fragment
+    /// <see cref="Freeze(Place, Func{string, string})"/> would hoist (a subscript, a reference modifier, a window
+    /// offset — asked of Freeze itself, so the two cannot drift), an occurs-depending length (§14.6.4 step 6, which
+    /// reads the DEPENDING ON item and may raise EC-BOUND-ODO), a reference modification's range test, or the guard
+    /// of a formal that may be omitted (EC-PROGRAM-ARG-OMITTED).
+    /// <para>⛔ A REFERENCE MODIFICATION IS RANGE-TESTED AT RUN TIME WHATEVER ITS POSITIONS (kb/Work PB3261 review
+    /// R1-1). ISO §8.4.3.3.4 5) c): "The sum of leftmost-position and length minus the value one shall be less than or
+    /// equal to the number of positions in the data item referenced by identifier-1", and every read and splice of a
+    /// <see cref="RefModPlace"/> tests it when it executes (<c>StrRefMod</c> / <c>StrSpliceInto</c>), raising
+    /// EC-BOUND-REF-MOD. Integer-literal positions are no exception: over a DYNAMIC LENGTH or ANY LENGTH identifier-1
+    /// the number of positions is the item's current one, so <c>MOVE DL(1:5) TO T(I)</c> with DL holding two
+    /// characters failed the sender's test only after the receiver's subscript, and over a fixed-size item a literal
+    /// out of range binds (with its warning) where EC-BOUND-REF-MOD checking is on
+    /// (<c>ReferenceResolver.LiteralRefModRangeViolation</c>). Answering "can this test fail?" would restate that
+    /// screen here; a test that cannot fail costs the hoist one block-scoped local, so the answer is the rule's,
+    /// true.</para></summary>
+    public static bool IdentifiesAtRunTime(Place place)
+    {
+        bool runTime = false;
+        Freeze(place, fragment => { runTime = true; return fragment; });
+        return runTime || EvaluatesBesidesItsAddress(place);
+    }
+
+    private static bool EvaluatesBesidesItsAddress(Place place) => place switch
+    {
+        OdoGroupPlace or RefModPlace => true,
+        PlaceDecorator d => EvaluatesBesidesItsAddress(d.Inner),
+        MemberPlace m => Guarded(m.Path),
+        DynTablePlace d => Guarded(d.Path),
+        RedefViewPlace v => Guarded(v.Backing),
+        _ => false,
+    };
+
+    private static bool Guarded(AccessPath path) => path.Segments is [RootFieldSegment { Guard: not null }, ..];
+
     /// <summary>The operand with its data reference frozen — a field operand's <see cref="Place"/>; a literal, a
     /// figurative or a function result has no run-time address of its own (a function-identifier's argument
     /// subscripts were hoisted at bind time, <c>DataBinder.PendingPreOps</c>) and is returned unchanged.</summary>

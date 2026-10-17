@@ -29,10 +29,12 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         {
             // The operand sum is the ONE initial evaluation (ISO §14.7.7 GR4 + NOTE 3): with several receivers it
             // must be materialized, or a receiver that aliases an operand (ADD A TO B A C) would poison the
-            // receivers stored after it when the inlined expression re-reads the field. The fold itself is
+            // receivers stored after it when the inlined expression re-reads the field — and with one receiver that
+            // identifies at run time it is materialized too, so the operands are evaluated before the receiver is
+            // read or identified (MaterializesInitialEvaluation, kb/Work PB3261). The fold itself is
             // receiver-INDEPENDENT (GR4 -- the initial evaluation precedes any receiver's involvement): None.
             NumX value = num.Fold(operands, ReceiverContext.None with { InSizeError = ise });
-            if (targets.Count > 1) value = Snapshot(value);
+            if (MaterializesInitialEvaluation(targets)) value = Snapshot(value);
             // Each receiver's FieldNum read is ALSO a sending reference (A = A + value; §14.6.13.2 NOTE 2), so a
             // non-finite float receiver is caught by its CobolFloat.Sending wrap. Precise follow-on (parallel to the
             // "precise ContainsRefMod filter" note): with MULTIPLE float receivers under EC-DATA-NOT-FINITE checking, a
@@ -75,7 +77,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             NumX v = value(rcv);
             // ONE initial evaluation (§14.7.7 GR4 + NOTE 3): materialized with several receivers so a receiver
             // aliasing a sender cannot change the value the remaining receivers store.
-            if (targets.Count > 1) v = Snapshot(v);
+            if (MaterializesInitialEvaluation(targets)) v = Snapshot(v);
             foreach (var r in targets) GuardedStore(ise, r.Place, () => StoreArith(r.Place, v, r.Rounding));
         });
 
@@ -93,7 +95,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             var opRcv = targets.Count == 1 ? RcvFor(targets[0], ise)
                 : SetRcv(targets, ise);
             NumX ax = num.Render(a, opRcv), bx = num.Render(b, opRcv);
-            if (targets.Count > 1) { ax = Snapshot(ax); bx = Snapshot(bx); }
+            if (MaterializesInitialEvaluation(targets)) { ax = Snapshot(ax); bx = Snapshot(bx); }
             foreach (var r in targets)
                 GuardedStore(ise, r.Place, () =>
                     StoreArith(r.Place, num.Combine(ax, "*", bx, RcvFor(r, ise), outermost: true), r.Rounding));
@@ -111,7 +113,7 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
             var opRcv = SetRcv(targets, ise);
             NumX divisorX = num.Render(divisor, opRcv);
             NumX? dividendX = dividend is not null ? num.Render(dividend, opRcv) : null;
-            if (targets.Count > 1)
+            if (MaterializesInitialEvaluation(targets))
             {
                 divisorX = Snapshot(divisorX);
                 if (dividendX is { } dx) dividendX = Snapshot(dx);
@@ -221,8 +223,6 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         return (dividend, divisor, new NumX(sq, 0, Dec: true), _ => quotient);
     }
 
-    /// <summary>COMPUTE: the RHS is rendered per receiver (so a quotient is computed at that receiver's scale + mode)
-    /// then stored, rounded by the receiver's ROUNDED mode, under the ON SIZE ERROR phrase if any.</summary>
     /// <summary>COMPUTE Format 2 — boolean-compute (ISO §14.9.8): render the boolean RHS ONCE at the §14.9.8.4
     /// GR3 width (the largest boolean ITEM referenced, carried at run time — <see cref="BooleanRenderer.RenderAtItemWidth"/>;
     /// an all-literal expression keeps its own length and the per-receiver store fits it), then store into each
@@ -257,6 +257,8 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
         }
     }
 
+    /// <summary>COMPUTE: the RHS is rendered per receiver (so a quotient is computed at that receiver's scale + mode)
+    /// then stored, rounded by the receiver's ROUNDED mode, under the ON SIZE ERROR phrase if any.</summary>
     public void EmitCompute(BoundCompute c)
         => EmitArith(c.SizeError, ise =>
         {
@@ -294,11 +296,20 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
                 return;
             }
             foreach (var r in c.Targets)
+            {
                 // Single receiver: the RHS's top-level division (if any) IS the final transfer to r — render it
                 // outermost so an outermost quotient rounds at r's scale + mode and a nested quotient does not
-                // inherit r's mode (CA5; §14.7.7 rule 3 NOTE 1).
-                GuardedStore(ise, r.Place, () =>
-                    StoreArith(r.Place, num.Render(c.Rhs, RcvFor(r, ise), outermost: true), r.Rounding));
+                // inherit r's mode (CA5; §14.7.7 rule 3 NOTE 1). A receiver that identifies at run time takes the
+                // value materialized first (§14.7.7 rule 4; MaterializesInitialEvaluation).
+                if (MaterializesInitialEvaluation(c.Targets))
+                {
+                    NumX v = Snapshot(num.Render(c.Rhs, RcvFor(r, ise), outermost: true));
+                    GuardedStore(ise, r.Place, () => StoreArith(r.Place, v, r.Rounding));
+                }
+                else
+                    GuardedStore(ise, r.Place, () =>
+                        StoreArith(r.Place, num.Render(c.Rhs, RcvFor(r, ise), outermost: true), r.Rounding));
+            }
         });
 
     /// <summary>A subscript / reference-modifier bound's pre-operation (kb/Work PB1890): the expression renders
@@ -370,6 +381,20 @@ internal sealed class ArithmeticEmitter(EmitContext ctx, NumericRenderer num, Ec
     /// <summary>The receiver's editing-config arguments (<see cref="EmitContext.EditCfg"/> — the mask's currency
     /// string + the unit's DECIMAL-POINT IS COMMA).</summary>
     private string EditCfg(PicInfo? pic) => ctx.EditCfg(pic);
+
+    /// <summary>⛔ IS THE INITIAL EVALUATION MATERIALIZED BEFORE THE FIRST RECEIVER IS STORED? ISO §14.7.7 rule 4 orders an
+    /// arithmetic statement: a) "The initial evaluation of the statement is done and the result of this operation is placed
+    /// in an intermediate data item", then b) "Item identification for the receiving data items is done as each data item is
+    /// accessed unless it was already done in step a". Two things make the order observable, and either one materializes:
+    /// more than one receiver (NOTE 3 — a receiver that shares storage with a sender must not change the value the receivers
+    /// after it store), and a receiver that identifies at run time
+    /// (<see cref="PlaceIdentification.IdentifiesAtRunTime(Place)"/>; kb/Work PB3261): a store renders as
+    /// <c>&lt;receiver&gt; = &lt;value&gt;</c> and C# evaluates the receiver's address first, so
+    /// <c>COMPUTE N(I) = FUNCTION NUMVAL(X(1:L))</c> range-tested I before the reference modifier, and the in-place
+    /// <c>ADD FUNCTION NUMVAL(X(1:L)) TO N(I)</c> read N(I) before the operand written to its left, selecting
+    /// EC-BOUND-SUBSCRIPT where §14.9.49.4 GR11 selects the first condition in the order of evaluation.</summary>
+    private static bool MaterializesInitialEvaluation(IReadOnlyList<Receiver> targets) =>
+        targets.Count > 1 || PlaceIdentification.IdentifiesAtRunTime(targets[0].Place);
 
     /// <summary>Materialize a rendered sender/initial-evaluation into a local temp (ISO §14.7.7 GR4 + NOTE 3 —
     /// ONE initial evaluation; results independent of sender/receiver storage overlap). Inlining the expression

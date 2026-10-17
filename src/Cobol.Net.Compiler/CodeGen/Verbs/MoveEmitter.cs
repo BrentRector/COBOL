@@ -43,6 +43,13 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     {
         var target = m.Targets[i];
         var (source, kind, origin) = m.Stores[i];
+        // ⛔ kb/Work PB3261: the sending operand is evaluated BEFORE this receiver is identified (ISO §14.9.25.4 GR1 —
+        // identifier-1's reference modifier, subscript or function-identifier is evaluated "immediately before data is
+        // moved to the first of the receiving operands", and "Item identification for identifier-2 is performed
+        // immediately before the data is moved to the respective data item"), so every store below renders through
+        // PlaceIdentification.SenderFirst. A move whose carrying statement identifies the receiver first keeps C#'s
+        // order (INITIALIZE — ImplicitMovePhrase.ReceiverIdentifiedFirst), and so does an overlap prefill (EmitStore).
+        bool senderFirst = m.ImplicitOf is not { ReceiverIdentifiedFirst: true };
         // ⛔ ISO §14.9.25.4 GR1's ZERO-LENGTH-ITEM clause — "If identifier-1 is a zero-length item, it is as
         // if literal-1 were specified as a zero-length literal" — which lands in the GR2/GR3 substitution the
         // store above already carries for a written literal. Whether the sending ITEM is zero-length is a
@@ -71,13 +78,13 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             // store, which is why the route could only ever serve the numeric receivers it was filtered to).
             var fig = MoveClassifier.ZeroLengthItemFigurative(zlSend);
             ctx.Writer.Line($"if ({len} == 0) {{");
-            EmitStore(target, fig, MoveClassifier.Kind(fig, target), MoveSenderOrigin.ZeroLengthItem);
+            EmitStore(target, fig, MoveClassifier.Kind(fig, target), MoveSenderOrigin.ZeroLengthItem, senderFirst);
             ctx.Writer.Line("} else {");
-            EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
+            EmitStore(target, source, kind, origin, senderFirst, m.Stores[i].Prefill);
             ctx.Writer.Line("}");
             return;
         }
-        EmitStore(target, source, kind, origin, m.Stores[i].Prefill);
+        EmitStore(target, source, kind, origin, senderFirst, m.Stores[i].Prefill);
         EmitElementMoves(m, i);
     }
 
@@ -111,10 +118,13 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// <see cref="Emit"/> so §14.9.25.4 GR1's zero-length-item test can place the statement's REAL store in its
     /// else arm (kb/Work PB896). Every arm is the one it always was; the only change is that the dispatch has a
     /// name and two callers.</summary>
-    private void EmitStore(Place target, BoundOperand source, MoveKind kind, MoveSenderOrigin origin,
+    private void EmitStore(Place target, BoundOperand source, MoveKind kind, MoveSenderOrigin origin, bool senderFirst,
         OverlapPrefill prefill = default)
     {
         EmitOverlapPrefill(target, prefill);
+        // An overlapping receiver prepared BEFORE the sender is read (D-OVL1/D-OVL2) keeps that order: the prefill has
+        // already identified it, so the store below renders as it always did (kb/Work PB3261).
+        senderFirst &= prefill.Kind == OverlapPrefillKind.None;
         switch (kind)
         {
             case MoveKind.RefModSlice:
@@ -139,14 +149,14 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                         FigurativeConstants.FillText(fig.Kind, ctx.Data.Collating,
                             IntrinsicArgumentRules.CharacterContext(IntrinsicArgumentRules.ClassOfPlace(rmp)), ctx.Data.NationalCollating)),
                     BoundAllLiteral all => PlaceRenderer.WriteFill(rmp, CsLiteral(all.Literal)),
-                    _ => PlaceRenderer.Write(rmp, OperandText.AsString(source, num)),
+                    _ => Ordered(senderFirst, source, rmp, OperandText.AsString(source, num), v => PlaceRenderer.Write(rmp, v)),
                 });
                 break;
             case MoveKind.Group:
-                EmitGroupMove(target, source);
+                EmitGroupMove(target, source, senderFirst);
                 break;
             case MoveKind.GroupToElementary:
-                EmitGroupToElementaryMove(target, source);
+                EmitGroupToElementaryMove(target, source, senderFirst);
                 break;
             case MoveKind.FigurativeToNumericImage:
             case MoveKind.Convert:
@@ -156,7 +166,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // wrong rule in a loud is the misattribution kb/Work PB393 measured, one verb over — and the
                 // provenance rides the STORE, because it is a bind-time fact and reading m.Source to recover
                 // it is the scalar read this shape exists to remove.
-                ctx.Writer.Line(ElementaryStore(target, source, origin));
+                ctx.Writer.Line(ElementaryStore(target, source, origin, senderFirst));
                 break;
         }
     }
@@ -184,17 +194,11 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 // image as it is; a native numeric field has no character image, and its zero is MOVE ZERO.
                 ctx.Writer.Line(target is RedefViewPlace || target.Item.StoreAsImage
                     ? PlaceRenderer.Write(target, CsLiteral(new string('0', target.Item.ImageWidth)))
-                    : ElementaryStore(target, new BoundFigurative('Z'), MoveSenderOrigin.Written));
+                    : ElementaryStore(target, new BoundFigurative('Z'), MoveSenderOrigin.Written, senderFirst: false));
                 break;
         }
     }
 
-    /// <summary>The ONE-STATEMENT store of an ELEMENTARY move — the <see cref="MoveKind.Convert"/> and
-    /// <see cref="MoveKind.FigurativeToNumericImage"/> renderings, RETURNED rather than written so GR1's
-    /// zero-length-item test can place BOTH of its arms inside one emitted <c>if/else</c> (kb/Work PB425)
-    /// instead of the emitter growing a second copy of either rendering. The kind is re-asked of THIS sender
-    /// because GR1's two arms differ in it: the substituted figurative into a numeric receiver is the image
-    /// fill, the written sender is the conversion.</summary>
     /// <summary>Why a FILL is being stored into a numeric receiver — the rule to blame when the receiver has no
     /// character image to hold it (<see cref="FigurativeToNumericImageStore"/>'s narrow loud). Three provenances,
     /// three different rules, and only one of them is the removed construct.</summary>
@@ -210,13 +214,26 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
              + "§14.9.25.3 SR5 / Annex E.2 item 1",
     };
 
-    private string ElementaryStore(Place target, BoundOperand source, MoveSenderOrigin origin) =>
+    /// <summary>The ONE-STATEMENT store of an ELEMENTARY move — the <see cref="MoveKind.Convert"/> and
+    /// <see cref="MoveKind.FigurativeToNumericImage"/> renderings, RETURNED rather than written so GR1's
+    /// zero-length-item test can place BOTH of its arms inside one emitted <c>if/else</c> (kb/Work PB425)
+    /// instead of the emitter growing a second copy of either rendering. The kind is re-asked of THIS sender
+    /// because GR1's two arms differ in it: the substituted figurative into a numeric receiver is the image
+    /// fill, the written sender is the conversion.</summary>
+    private string ElementaryStore(Place target, BoundOperand source, MoveSenderOrigin origin, bool senderFirst) =>
         MoveClassifier.Kind(source, target) is MoveKind.FigurativeToNumericImage
             ? FigurativeToNumericImageStore(target, source, FillCite(origin))
             // An ANY LENGTH receiver stores at the CARRIER's current length (ISO §13.18.2 GR1 — the item is n
             // repetitions of its picture symbol, n = the activating argument's length).
-            : PlaceRenderer.Write(target, ConvertSource(source, target.Item,
-                target.Item.IsAnyLength ? ReceivingStore.AnyLengthWidth(target) : null));
+            : Ordered(senderFirst, source, target, ConvertSource(source, target.Item,
+                target.Item.IsAnyLength ? ReceivingStore.AnyLengthWidth(target) : null), v => PlaceRenderer.Write(target, v));
+
+    /// <summary>The store of <paramref name="value"/>, the rendered sending value, into <paramref name="target"/> —
+    /// through <see cref="PlaceIdentification.SenderFirst"/> when the move keeps the MOVE statement's own order
+    /// (<paramref name="senderFirst"/>, decided once per receiver by <see cref="EmitReceiver"/>; kb/Work PB3261), and
+    /// in C#'s receiver-first order otherwise.</summary>
+    private static string Ordered(bool senderFirst, BoundOperand source, Place target, string value, Func<string, string> store) =>
+        senderFirst ? PlaceIdentification.SenderFirst(source, target, value, store) : store(value);
 
     /// <summary>MOVE of an alphanumeric figurative constant (SPACE / QUOTE / HIGH-VALUE / LOW-VALUE) or an ALL
     /// "literal" containing a non-digit into an ELEMENTARY NUMERIC receiver — the PRE-REMOVAL semantics of a
@@ -268,7 +285,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// same decode a READ into an elementary record area rides, kb/Work PB1556): string-backed receivers take
     /// the bytes as they are; a native numeric receiver decodes them in its OWN byte form (zoned, radix-2, BCD or
     /// IEEE), deterministically for possibly-incompatible content as §14.6.13.2 permits.</summary>
-    private void EmitGroupToElementaryMove(Place target, BoundOperand source)
+    private void EmitGroupToElementaryMove(Place target, BoundOperand source, bool senderFirst)
     {
         var item = target.Item;
         // ⛔ ISO §14.9.25.4 GR8 FIRST — "If the sending or receiving item is a dynamic-length elementary item,
@@ -286,8 +303,8 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // characters from the bytes exactly as the fixed national receiver below does (design D-N8, kb/Work PB546).
         if (item.IsDynamicLength)
         {
-            ctx.Writer.Line(PlaceRenderer.Write(target, ReceivingStore.Characters(item,
-                ReceivingStore.ContentCharacters(item, OperandText.NonElementaryMoveSender(source, num, "group MOVE into")), "")));
+            ctx.Writer.Line(Ordered(senderFirst, source, target, OperandText.NonElementaryMoveSender(source, num, "group MOVE into"),
+                v => PlaceRenderer.Write(target, ReceivingStore.Characters(item, ReceivingStore.ContentCharacters(item, v), ""))));
             return;
         }
         // ⛔ THE OPERAND'S capability, not the declaring entry's (Place.ImageCapable, kb/Work PB189): one occurrence
@@ -317,10 +334,11 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
             : item.Pic is { Usage: Usage.National } ? $"({len} * {RuntimeApi.BytesPerNational})"
             : item.Pic is { Usage: Usage.Bit } ? $"(({len} + {BitLayout.BitsPerCharacter - 1}) / {BitLayout.BitsPerCharacter})"
             : len;
-        string area = ReceivingStore.Characters(item, OperandText.NonElementaryMoveSender(source, num, "group MOVE into"), gw);
         // The receiver's representation is decoded FROM the area's bytes by THE ONE elementary storage-area
-        // store — the same decode a READ into an elementary record area rides (kb/Work PB1556).
-        ctx.Writer.Line(ReceivingStore.StorageArea(target, area, ReceivingStore.StoragePositions(target)));
+        // store — the same decode a READ into an elementary record area rides (kb/Work PB1556). The width-fitted
+        // area reads the receiver's width, so only the sending image is the value evaluated first (kb/Work PB3261).
+        ctx.Writer.Line(Ordered(senderFirst, source, target, OperandText.NonElementaryMoveSender(source, num, "group MOVE into"),
+            v => ReceivingStore.StorageArea(target, ReceivingStore.Characters(item, v, gw), ReceivingStore.StoragePositions(target))));
     }
 
     /// <summary>MOVE into a whole group (alphanumeric semantics, ISO §14.9.25.4 MOVE GR4 — no conversion, filled without
@@ -330,7 +348,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// leaves (their image slices are the pinned byte representations — radix-2/BCD/IEEE, COBOLNET_DESIGN
     /// §14.4; kb/Work PB164 + R40 — INDEX leaves included). Only a variable-length group or a group with a
     /// pointer/object-class leaf stays the genuine Tier-C byte-island (deferred, loud).</summary>
-    private void EmitGroupMove(Place target, BoundOperand source)
+    private void EmitGroupMove(Place target, BoundOperand source, bool senderFirst)
     {
         // ⛔ ISO §14.9.25.4 GR9 GOVERNS FIRST (kb/Work PB393) — "If both the sending operand and the receiving
         // data item are group items and one or both is a variable-length group, the following rules apply".
@@ -339,7 +357,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // alphanumeric elementary move"), so this test precedes every GR4 path below — including
         // AlignedLeafPairs, which for two identically-laid-out variable-length groups produced the RIGHT answer
         // by accident and thereby hid the hole (the shape a first test covers).
-        if (VariableLengthGroupMove(target, source)) return;
+        if (VariableLengthGroupMove(target, source, senderFirst)) return;
         // ⛔ TWO STRONGLY-TYPED GROUPS OF ONE TYPE WITH AN OBJECT-REFERENCE OR POINTER LEAF (kb/Work PB1940): they have no
         // character image, and §14.9.25.3 SR2 makes the sender "a group item of the same type", so their subordinates
         // correspond one to one and the
@@ -349,7 +367,8 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         if (CobolNet.Compiler.Oo.OoClassTable.LeafCarried(target.Item)
             && source is BoundFieldOperand { Place: var sendPlace } && CobolNet.Compiler.Oo.OoClassTable.LeafCarried(sendPlace.Item))
         {
-            ctx.Writer.Line(PlaceRenderer.WriteGroupLeaves(target, PlaceRenderer.GroupLeaves(sendPlace)));
+            ctx.Writer.Line(Ordered(senderFirst, source, target, PlaceRenderer.GroupLeaves(sendPlace),
+                v => PlaceRenderer.WriteGroupLeaves(target, v)));
             return;
         }
         if (!target.Item.IsCharacterImage)
@@ -366,6 +385,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
                 && pairs.Select(p => (S: refs.ResolveItem(p.Src), T: refs.ResolveItem(p.Tgt))).ToList()
                     is { } resolved && resolved.All(r => r.S is not null && r.T is not null))
             {
+                // C#'s receiver-first order is unobservable here (kb/Work PB3261): AlignedLeafPairs admits no OCCURS on
+                // either ancestor chain, so no leaf carries a subscript or an occurs-depending length, and the one run-time
+                // step left to either side, an omitted formal's guard, raises the same condition on both.
                 foreach (var (s, t) in resolved)
                     ctx.Writer.Line(PlaceRenderer.Write(t!, PlaceRenderer.Read(s!)));
                 return;
@@ -399,7 +421,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         // The ONE group-image store (PlaceRenderer.WriteGroupImage — kb/Work PB70): the §13.18.38 GR8a current-extent
         // splice for an occurs-depending receiver with data-name-1 outside, the Tier-B view's window, the OCCURS
         // DYNAMIC receiving accessor, and the plain FromImage — written once for every verb that deposits an image.
-        ctx.Writer.Line(PlaceRenderer.WriteGroupImage(target, image, "MOVE to group"));
+        ctx.Writer.Line(Ordered(senderFirst, source, target, image, v => PlaceRenderer.WriteGroupImage(target, v, "MOVE to group")));
     }
 
     /// <summary>⛔ THE ISO §14.9.25.4 GR9 MOVE — "If both the sending operand and the receiving data item are
@@ -450,7 +472,7 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
     /// (<c>MoveTable16.Validity</c>, framed by <c>MoveBinder.MoveCategoryLegality</c>), so the two component sequences correspond one for
     /// one by construction — which is why an ordinal carrier is faithful here for the same reason it is at the
     /// activation boundary.</para></summary>
-    private bool VariableLengthGroupMove(Place target, BoundOperand source)
+    private bool VariableLengthGroupMove(Place target, BoundOperand source, bool senderFirst)
     {
         // §14.9.25.4 GR9's antecedent: BOTH operands are group items AND one or both is a VARIABLE-LENGTH group. A
         // reference-modified operand is an ELEMENTARY alphanumeric item by rule (§8.4.3.3.4 GR6), never a group.
@@ -465,8 +487,9 @@ internal sealed class MoveEmitter(EmitContext ctx, NumericRenderer num, Referenc
         ctx.Writer.Line(PlaceRenderer.VarGroupOperand(send, "the sending variable-length group",
                 "the sending group of a variable-length group MOVE") is not var (carrier, sendShape)
             ? LoudStmt(VarShapeReason(send.Item, "the sending operand of a variable-length group MOVE"))
-            : VarCarrierWrite(target, carrier, sendShape) ?? LoudStmt(
-                VarShapeReason(target.Item, "the receiving operand of a variable-length group MOVE")));
+            : VarCarrierWrite(target, carrier, sendShape) is null ? LoudStmt(
+                VarShapeReason(target.Item, "the receiving operand of a variable-length group MOVE"))
+            : Ordered(senderFirst, source, target, carrier, c => VarCarrierWrite(target, c, sendShape)!));
         return true;
     }
 
