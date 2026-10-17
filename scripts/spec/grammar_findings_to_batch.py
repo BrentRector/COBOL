@@ -39,8 +39,7 @@ import json
 import pathlib
 import sys
 
-REPO = pathlib.Path(__file__).resolve().parents[2]
-CATALOG = REPO / "docs" / "rearchitecture" / "spec-rule-catalog.json"
+from inventory_schema import Schema, load_catalog as load_rules, load_schema
 
 VERDICT_MAP = {
     "MATCHES": "CONFORMS",
@@ -53,11 +52,16 @@ GRAMMAR_KINDS = {"FMT", "SR"}
 
 
 def load_catalog() -> dict[str, dict]:
-    return {r["id"]: r for r in json.loads(CATALOG.read_text(encoding="utf-8"))["rules"]}
+    """The rule catalog by id, read through `inventory_schema` — the one loader of the catalog file."""
+    return {r["id"]: r for r in load_rules()}
 
 
-def convert(findings: list[dict], catalog: dict[str, dict]) -> tuple[list[dict], list[str]]:
-    """(records, problems). A finding that cannot be converted is a PROBLEM, never a silently dropped row."""
+def convert(findings: list[dict], catalog: dict[str, dict], schema: Schema) -> tuple[list[dict], list[str]]:
+    """(records, problems). A finding that cannot be converted is a PROBLEM, never a silently dropped row.
+
+    A finding's `editions` (a string in any spacing or order, or a list) is written in the field's one spelling
+    by `Schema.spell_editions` (kb/Work PB3172); an edition the schema lacks or names twice is a problem.
+    """
     records: list[dict] = []
     problems: list[str] = []
     seen: dict[str, str] = {}
@@ -74,6 +78,13 @@ def convert(findings: list[dict], catalog: dict[str, dict]) -> tuple[list[dict],
             problems.append(f"{where}: verdict {verdict} carries NO rule_ids — nothing can be recorded from it, "
                             f"and expanding it across the section's rules is not allowed")
             continue
+        given = f.get("editions") or ""
+        names = [str(e) for e in given] if isinstance(given, list) else schema.split(str(given), schema.editions_sep)
+        try:
+            editions = schema.spell_editions(names)
+        except ValueError as e:
+            problems.append(f"{where}: {e}")
+            continue
         for rid in ids:
             if rid not in catalog:
                 problems.append(f"{where}: rule-id {rid!r} is not in the catalog")
@@ -89,7 +100,7 @@ def convert(findings: list[dict], catalog: dict[str, dict]) -> tuple[list[dict],
             seen[rid] = verdict
             rec = {"rule-id": rid, "verdict": VERDICT_MAP[verdict],
                    "code-location": f.get("grammar_site", ""), "test-ref": "",
-                   "editions": f.get("editions", ""), "notes": ""}
+                   "editions": editions, "notes": ""}
             if verdict == "DIVERGES":
                 rec["notes"] = (f"grammar {f.get('divergence_kind', 'other')}: "
                                 f"ISO requires {f.get('iso_syntax', '(unstated)')}; "
@@ -147,17 +158,29 @@ def self_test() -> int:
         ("two findings disagreeing about one rule is caught",
          [{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"]},
           {**base, "verdict": "DIVERGES", "rule_ids": ["SR-14.9.1.3-1"]}], 1, "disagree"),
+        ("an edition the schema lacks is a problem, not a record",
+         [{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"], "editions": "85,1974"}], 0, "not in"),
     ]
+    schema = load_schema()
     rc = 0
     print("=== grammar_findings_to_batch --self-test ===")
     for name, findings, want_n, want_problem in cases:
-        recs, probs = convert(findings, cat)
+        recs, probs = convert(findings, cat, schema)
         ok = len(recs) == want_n and (want_problem is None or any(want_problem in p for p in probs))
         if want_problem is None and probs:
             ok = False
         print(("  ok: " if ok else "  SELF-TEST FAILED: ") + name)
         if not ok:
             print(f"      records={len(recs)} (want {want_n})  problems={probs}")
+            rc = 1
+    # a finding's editions, in any spacing, order or as a list, are written in the one spelling (kb/Work PB3172)
+    for given in ("2023, 2002, 2014", ["2023", "2002", "2014"]):
+        recs, _ = convert([{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"], "editions": given}],
+                          cat, schema)
+        ok = [r["editions"] for r in recs] == ["2002,2014,2023"]
+        print(("  ok: " if ok else "  SELF-TEST FAILED: ") + f"editions {given!r} are written in the one spelling")
+        if not ok:
+            print(f"      got {[r['editions'] for r in recs]}")
             rc = 1
     # coverage must NAME what was left unadjudicated
     left = coverage([{**base, "verdict": "MATCHES", "rule_ids": ["SR-14.9.1.3-1"]}], cat)
@@ -203,7 +226,7 @@ def main(argv: list[str]) -> int:
         doc = json.loads(p.read_text(encoding="utf-8"))
         findings.extend(doc.get("findings", doc if isinstance(doc, list) else []))
     catalog = load_catalog()
-    records, problems = convert(findings, catalog)
+    records, problems = convert(findings, catalog, load_schema())
 
     print(f"{len(paths)} file(s), {len(findings)} finding(s) -> {len(records)} inventory record(s)")
     if a.coverage:
