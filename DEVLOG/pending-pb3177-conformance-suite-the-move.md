@@ -71,3 +71,11 @@ the citation corpus and the ledger each pointed at nothing without a red, which 
 
 **Left for the owner.** The `golden_registered.py` hook stays wired in `.claude/settings.json` (a configuration change
 an agent does not make); it now only echoes the refusal.
+
+**Gate.** Two reds on the way, each fixed at its root: the LINE ENDINGS writers audit (main's PB3176 widened it to
+the suite harness, and the move's own generator self-test arm wrote without `newline=`), and
+`HostWitnessTraitDriftTests` (`drift_rules.py` knew neither `TestRepo.Suite` nor a `conformance-suite/` literal, so
+`IntrinsicModeFlagCoverageDriftTests`, which reads every suite test, stopped being a tree-wide sweep; drift_rules now
+sees the suite). Then run 20261017T112021Z-9beab1: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`
+— Conformance 13,878/17,265 (10,568 suite rows among them, every one passed: the neutrality proof again, on the merged
+tree), Unit 33,501/33,923, Characterization 5/36; leg 2 is CI's. LINUX GATE: the lander's (batched gating).
