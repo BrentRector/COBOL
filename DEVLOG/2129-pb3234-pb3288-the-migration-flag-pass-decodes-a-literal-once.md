@@ -1,4 +1,4 @@
-## PB3234 + PB3288: the migration-flag pass decodes a literal once and resolves every name in its own unit
+## Entry 2129 — 2026-10-16 18:35 PDT — PB3234 + PB3288: the migration-flag pass decodes a literal once and resolves every name in its own unit
 
 `FlagConformancePass` (FLAG-02 / FLAG-14, ISO §7.3.14.4 / §7.3.15.4 GR4) carried two private mechanisms beside the
 canonical ones, and both were wrong answers a source change could not silence.
@@ -47,3 +47,4 @@ condition-name candidate walk existed once (ConditionOf) and now still exists on
 
 Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261017T002742Z-c3d3cd; Unit 33,331 /
 Conformance 6,055 / Characterization 5 cases ran in leg 1).
+
