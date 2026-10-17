@@ -100,6 +100,8 @@ internal sealed class ProgramEmitter
         w.Line(RuntimeApi.ModuleRecordAttribute(ns.RegistrarClrName));
         w.Line($"namespace {ns.CsName};");
         w.Line();
+        // ⛔ Every namespace imported here is listed in CsNames.ImportedNamespaces, whose types' simple names no C# name
+        // generated from a COBOL word may spell (kb/Work PB3270); ImportedTypeNameDriftTests is red on a directive not listed.
         w.Line("using global::System;                    // Int128 — the wide arithmetic carrier (numeric design D1)");
         w.Line("using global::CobolNet.Runtime;          // CobolNum / CobolString substrates + the inter-program ABI (ManagedPointer / ICobolProgram / ProgramRegistry)");
         if (anyFiles)
