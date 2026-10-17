@@ -1200,7 +1200,21 @@
     }
   },
 
-  "editions": ["85", "2002", "2014", "2023"],
+  "editions": {
+    "$comment": [
+      "The editions a rule can exist at, and the ONE spelling of a row's `editions` field (kb/Work PB3172;",
+      "docs/rearchitecture/DESIGN-conformance-suite.md §6 step 0, §13 S0a): the editions it names, each at most",
+      "once, in the order of `values` (ascending), joined by `separator` with no spaces: `85,2002,2014,2023`,",
+      "`2002,2014,2023`, `2023`. Until 2026-10-16 the field was written two ways (645 rows used ', ', 37 of them",
+      "out of order as well), so every reader parsed it its own way. `inventory_schema.Schema.editions_error` is",
+      "the one validator (record_verdicts.py asks it of every record, and SpecTraceabilityInventoryDriftTests",
+      "mirrors it over the whole inventory); `Schema.spell_editions` is the one writer of the spelling",
+      "(build_inventory.py, normalize_batch.py, grammar_findings_to_batch.py). An EMPTY field claims nothing and",
+      "stays legal until kb/Work PB3173 (S0b) decides every empty row from the standard."
+    ],
+    "values": ["85", "2002", "2014", "2023"],
+    "separator": ","
+  },
 
   "code-location": {
     "$comment": [

@@ -4,7 +4,7 @@
     python scripts/spec/normalize_batch.py scratchpad/phase-b/b5/out-*.json --in-place
 
 ⛔ WHY THIS EXISTS, AND WHY IT REPORTS. `record_verdicts.py` validates ALL-OR-NOTHING and accepts only
-`verdict · code-location · test-ref · editions · notes`. A batch that carries anything else is rejected whole —
+the adjudicated fields (`inventory_schema.ADJUDICATED`). A batch that carries anything else is rejected whole —
 correctly, because a partially-applied batch is the worst outcome available (the rows that DID land look exactly
 like reviewed work). But the fix must not be "delete the offending fields": an agent's `evidence` is the reason
 its verdict is believable, and dropping it silently would convert a reviewed verdict into an unsourced one.
@@ -15,6 +15,8 @@ So:
     close a row anyway (the C# gate `SpecTraceabilityInventoryDriftTests` enforces that), so keeping a malformed
     one only makes the batch un-mergeable. The obvious `path/To/Class.cs#Method` shape is REWRITTEN to the
     canonical `unit:` / `conformance-test:` form where the directory says which it is; anything else is dropped.
+  · `editions` is RESPELLED in its one form (`Schema.spell_editions`: ascending, comma-separated, no spaces;
+    kb/Work PB3172); an edition the schema lacks or names twice is left as written for the validator to refuse.
   · Every change is printed. A silent normalizer would be a second place verdicts can change without a reader.
 """
 from __future__ import annotations
@@ -29,7 +31,7 @@ import sys
 #: ⛔ IMPORTED, NOT RETYPED. This set is the SAME rule `record_verdicts` enforces, and it had a second copy here
 #: until 2026-09-03 — at which point adding the `derivation` field (kb/Work PB386) would have made this
 #: normalizer reject, whole, every batch the writer accepts. One rule, one place.
-from inventory_schema import ADJUDICATED
+from inventory_schema import ADJUDICATED, Schema, load_schema
 
 ALLOWED = set(ADJUDICATED)
 KNOWN_FORMS = ("conformance:", "nist:", "characterization:", "unit:", "conformance-test:")
@@ -75,7 +77,7 @@ def normalize_ref(ref: str) -> tuple[str | None, str | None]:
     return None, f"test-ref {ref!r} did not parse and was removed by normalize_batch"
 
 
-def normalize(doc: dict, name: str, log: list[str]) -> dict:
+def normalize(doc: dict, name: str, log: list[str], schema: Schema) -> dict:
     out = []
     for i, rec in enumerate(doc.get("records", [])):
         rec = dict(rec)
@@ -144,6 +146,20 @@ def normalize(doc: dict, name: str, log: list[str]) -> dict:
         if loc_notes:
             notes = f"{notes} [{'; '.join(loc_notes)}]".strip()
 
+        # `editions` in its ONE spelling (kb/Work PB3172), which record_verdicts now refuses any other: agents
+        # write "85, 2002, 2014, 2023", an out-of-order list, or a JSON list. Spelled by the schema's own writer;
+        # an edition the schema lacks or names twice is left as written, for the validator to name.
+        if ed := rec.get("editions"):
+            names = [str(e) for e in ed] if isinstance(ed, list) else schema.split(str(ed), schema.editions_sep)
+            try:
+                spelled = schema.spell_editions(names)
+            except ValueError as e:
+                log.append(f"  {name}[{i}] {rec.get('rule-id','?')}: editions {ed!r} left as written ({e})")
+            else:
+                if spelled != ed:
+                    log.append(f"  {name}[{i}] {rec.get('rule-id','?')}: editions {ed!r} -> {spelled!r}")
+                    rec["editions"] = spelled
+
         rec["notes"] = notes
         for k in list(rec):
             if k != "rule-id" and k not in ALLOWED:
@@ -170,9 +186,10 @@ def main(argv: list[str]) -> int:
         return 2
     log: list[str] = []
     total = 0
+    schema = load_schema()
     for p in sorted(paths):
         doc = json.loads(p.read_text(encoding="utf-8"))
-        fixed = normalize(doc, p.name, log)
+        fixed = normalize(doc, p.name, log, schema)
         total += len(fixed["records"])
         if a.in_place:
             p.write_text(json.dumps(fixed, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")

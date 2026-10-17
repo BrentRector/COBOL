@@ -108,7 +108,9 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
     private sealed record Schema(
         IReadOnlyDictionary<string, Verdict> Verdicts,
+        //: The editions, ascending: their order IS the order of the `editions` field's one spelling.
         string[] Editions,
+        string EditionsSeparator,
         Regex CodeLocationPattern,
         string CodeLocationSeparator,
         string TestRefSeparator,
@@ -157,6 +159,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         }
 
         var loc = root.GetProperty("code-location");
+        var editions = root.GetProperty("editions");
 
         // `kinds` and `anchored-files` both carry $-prefixed DOCUMENTATION siblings inside the same object, so
         // both readers skip them by prefix rather than by name — a new comment key must never read as a kind.
@@ -189,7 +192,8 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
         return new Schema(
             verdicts,
-            [.. root.GetProperty("editions").EnumerateArray().Select(x => x.GetString()!)],
+            [.. editions.GetProperty("values").EnumerateArray().Select(x => x.GetString()!)],
+            editions.GetProperty("separator").GetString()!,
             new Regex(loc.GetProperty("pattern").GetString()!, RegexOptions.Compiled),
             loc.GetProperty("separator").GetString()!,
             testRef.GetProperty("separator").GetString()!,
@@ -630,10 +634,33 @@ public sealed class SpecTraceabilityInventoryDriftTests
 
     private static List<string> BadEditions(IEnumerable<Row> rows, Schema s) =>
         [.. from r in rows
-            where r.Editions.Length > 0
-            from e in Split(r.Editions, ",")
-            where !s.Editions.Contains(e)
-            select $"{r.RuleId}: editions names '{e}', not one of {string.Join('/', s.Editions)}"];
+            let error = EditionsError(r.Editions, s)
+            where error is not null
+            select $"{r.RuleId}: {error}"];
+
+    /// <summary>
+    /// Why an <c>editions</c> field is not legal, or <see langword="null"/>: the C# twin of
+    /// <c>inventory_schema.Schema.editions_error</c>, read from the same schema entry (kb/Work PB3172;
+    /// DESIGN-conformance-suite.md §6 step 0). Legal is empty (until kb/Work PB3173 decides the empty rows) or
+    /// exactly the editions it names, each once, in the schema's ascending order, joined by its separator with
+    /// no spaces.
+    /// </summary>
+    private static string? EditionsError(string value, Schema s)
+    {
+        if (value.Length == 0) return null;
+        string[] given = Split(value, s.EditionsSeparator);
+        string[] unknown = [.. given.Where(e => !s.Editions.Contains(e))];
+        if (unknown.Length > 0)
+            return $"editions names '{string.Join("', '", unknown)}', not one of {string.Join('/', s.Editions)}";
+        string[] repeated = [.. s.Editions.Where(e => given.Count(g => g == e) > 1)];
+        if (repeated.Length > 0)
+            return $"editions names '{string.Join("', '", repeated)}' more than once";
+        string spelled = string.Join(s.EditionsSeparator, s.Editions.Where(given.Contains));
+        return value == spelled
+            ? null
+            : $"editions '{value}' is not the one spelling — write '{spelled}' (ascending, "
+              + $"'{s.EditionsSeparator}'-separated, no spaces: DESIGN-conformance-suite.md §6 step 0)";
+    }
 
     private static List<string> UnresolvedCodeLocations(IEnumerable<Row> rows, Schema s, string root)
     {
@@ -824,13 +851,17 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.True(bad.Count == 0, Report("row(s) closed on differential evidence alone", bad, rows.Count));
     }
 
-    /// <summary>An <c>editions</c> field names only the four editions the compiler implements.</summary>
+    /// <summary>
+    /// Every <c>editions</c> field is empty or its ONE spelling: the editions the compiler implements, each once,
+    /// ascending, comma-separated with no spaces (kb/Work PB3172). Until then 645 rows used <c>", "</c> and 37
+    /// were out of order, so every reader parsed the field its own way.
+    /// </summary>
     [Fact]
-    public void EveryEditionsField_NamesOnlyKnownEditions()
+    public void EveryEditionsField_IsTheOneSpelling()
     {
         var rows = LoadInventory();
         var bad = BadEditions(rows, LoadSchema());
-        Assert.True(bad.Count == 0, Report("bad edition name(s)", bad, rows.Count));
+        Assert.True(bad.Count == 0, Report("editions field(s) not in the one spelling", bad, rows.Count));
     }
 
     /// <summary>
@@ -1164,8 +1195,19 @@ public sealed class SpecTraceabilityInventoryDriftTests
         // record a CONFORMS — only to CLOSE the row — which is what makes CONFORMS-but-untested expressible.)
         Assert.Single(MissingEvidence([Base("X-4") with { Verdict = "CONFORMS" }], s));
 
-        // An edition the compiler does not have.
+        // An edition the compiler does not have, and each other shape the one spelling refuses (kb/Work PB3172):
+        // a spaced list, an out-of-order one, a doubled separator, a repeated edition. The one spelling and an
+        // empty field pass.
         Assert.Single(BadEditions([Base("X-5") with { Editions = "85,1974" }], s));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5d") with { Editions = "85, 2002, 2014, 2023" }], s)));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5e") with { Editions = "2002,2014,2023,85" }], s)));
+        Assert.Single(BadEditions([Base("X-5f") with { Editions = "85,,2002" }], s));
+        Assert.Single(BadEditions([Base("X-5g") with { Editions = "2023,2023" }], s));
+        Assert.Empty(BadEditions(
+            [Base("X-5h") with { Editions = "85,2002,2014,2023" }, Base("X-5i") with { Editions = "2014,2023" },
+             Base("X-5j")], s));
 
         // ⛔ DIFFERENTIAL-ONLY COVERAGE. A NIST golden alone, and a *_MatchesLegacy test alone, are both real
         // shapes — the first Phase-B batch produced seven of them before this rule existed. Neither may close a
