@@ -50,9 +50,9 @@ internal sealed record SuiteProfile(
 /// <para><b>It never reads a test header.</b> <c>harness/generate.py</c> is the ONE reader of the headers (§10: two
 /// parsers of the headers would be two implementations of the suite's semantics), so the manifest is generated once
 /// per test process, into a directory of this process's own (<c>generate.py --out</c>), and read from there; the
-/// repository's <c>suites/</c> is never written under a concurrent <c>run.py</c>. A refused tree makes every row of
-/// <see cref="ConformanceSuiteTests"/> red with the generator's refusals; a missing interpreter is a loud failure,
-/// never a skip (<see cref="PythonInstrument"/>).</para>
+/// repository's <c>suites/</c> is never written under a concurrent <c>run.py</c>. A refused tree makes both theories
+/// of <see cref="ConformanceSuiteTests"/> red at discovery, with the generator's refusals; a missing interpreter is a
+/// loud failure, never a skip (<see cref="PythonInstrument"/>).</para>
 /// <para><b>The adapter and the profile are read, never restated.</b> <c>harness/config.py</c> is their one loader
 /// and validator, and the generator's audit (<c>generate.py --check</c>, a gate audit) validates every one of them, so
 /// this class reads only the fields the in-process runner needs, from files already proved well formed: how a

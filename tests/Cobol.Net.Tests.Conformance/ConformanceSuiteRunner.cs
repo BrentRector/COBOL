@@ -165,7 +165,8 @@ internal static class ConformanceSuiteRunner
 
     /// <summary>Compile <paramref name="source"/> as the adapter's <c>compile</c> (or, with <paramref name="flag"/>,
     /// its <c>flag</c>: the §4.2.10 warning mechanism invoked) does: the edition, the test's reference format, the
-    /// source's own directory as the copy library. A thrown exception is the compiler's crash, returned as text.</summary>
+    /// source's own directory as the copy library. A thrown exception is the compiler's crash, returned as text with
+    /// its stack, so the NO VERDICT it becomes names where the compiler failed.</summary>
     private static (CompilerDriver.Result? Result, string? Crash) Compile(string source, string dll, string edition,
         string sourceFormat, bool flag)
     {
@@ -176,7 +177,7 @@ internal static class ConformanceSuiteRunner
         try { return (CompiledProgramCache.Compile(options), null); }
         catch (Exception e) when (e is not (HarnessNonObservationException or OutOfMemoryException))
         {
-            return (null, $"{e.GetType().Name}: {e.Message}");
+            return (null, e.ToString());
         }
     }
 

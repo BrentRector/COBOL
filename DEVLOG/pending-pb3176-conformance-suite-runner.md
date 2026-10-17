@@ -33,7 +33,9 @@ because CI's Conformance legs build that project alone.
 **Probes.** The 29 new rows pass locally (22 test rows, 4 refusal rows, 3 drift facts; the verdict drift test about
 8 s). A mutation probe, one wrong line appended to `compute-numeric-receiver.out`, turned that test's four rows red
 ("the output differs ... at line 2: expected 'WRONG', got '<end of output>'") while both runners still agreed on
-FAIL; reverted.
+FAIL; a second, the flagged test's `<<` mark moved one line down, turned its four rows red ("no diagnostic at the
+marked line 21 (diagnostics at line(s) 20)"), both runners again agreeing; both reverted. Self-review then made a
+compiler crash's NO VERDICT carry the exception's stack, not only its message.
 
 **Design corrections** (§4, §5, §13): the verdict drift test runs `run.py` itself, so every gate and both CI
 operating systems run it, instead of a CI job of its own that no local gate would reproduce; a refusal's manifest
