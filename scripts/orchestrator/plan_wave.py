@@ -12,13 +12,18 @@ cost the orchestrator a hand-written groups.json; this computes it.
 1. AWAITING LANDING: an open note whose newest report is DONE and whose branch is not on main yet is excluded (the
    landing lane, land_lane.py, lands it first; re-planning it would dispatch the same work twice).
    HELD BY A DISPATCH: an open note that a dispatch-ledger group names (a wave this loop or another session planned
-   or rendered, launched or not) and that no report written since that dispatch names is excluded too, and waits with
-   the group named: its work is another agent's, or a planned wave's that has not launched yet (held_by_dispatch,
+   or rendered, launched or not) and that the group's OWN report has not answered (`answers`: the report whose slug is
+   the group's, `w<wave><letter>`, written at or after the dispatch; a report that merely names the note, or a
+   reviewer's stamp on another dispatch's report, answers nothing, kb/Work PB3311) is excluded too, and waits with the
+   group named: its work is another agent's, or a planned wave's that has not launched yet (held_by_dispatch,
    kb/Work PB2806). An aborted dispatch is released with --release.
 2. FINISHERS FIRST: an open note whose newest report says SPLIT or NOT STARTED (its branch landed, gone, or still
    unlanded: the finisher then cherry-picks the branch's commits, because the landing lane lands only DONE branches;
    kb/Work PB2575), a DONE report whose branch review stamped FINDINGS (kb/Work PB3027: the finisher answers each
-   finding), a `status: half` note, and an UNLANDED branch (prune_worktrees.classify) whose commit subjects
+   finding; none while the report's branch is IN FLIGHT by its own lifecycle, prune_worktrees.owned, kb/Work PB3311:
+   a live agent's worktree, a dispatch still out, or a touch inside --min-age means someone is already finishing it;
+   IN FLIGHT only as a carrier's content is not that), a `status: half` note, and an UNLANDED branch
+   (prune_worktrees.classify) whose commit subjects
    name an open note with no report. One finisher group per predecessor; its `pred` names the predecessor report and
    branch. The lead of a FINDINGS report that the fix lane cannot see (a `process_only` note, or an owner task's
    note that exists only on its own branch, read from there) is decided by the same rule as an open note: its newest
@@ -380,6 +385,22 @@ def ledger_slug(g: dict[str, Any]) -> str:
     return str(g.get("slug") or f"w{g['wave']}{g['letter'].lower()}").lower()
 
 
+def answers(r: Report, g: dict[str, Any]) -> bool:
+    """THE ONE "A DISPATCH RETURNED" PREDICATE (kb/Work PB3311, PB3152): the report is the group's OWN (its slug, the
+    ledger group's `w<wave><letter>`) and was written at or after the group's `at`. Never a report that merely NAMES
+    one of the group's notes: a branch reviewer stamps its `Review:` line into the reviewed report, which moves that
+    report's mtime past every later dispatch of the same notes (PB3198: a review finisher's dispatch looked answered
+    by the stamp on the very report it was dispatched to answer), and a report header mentions notes it does not own
+    (PB3152). The time bound keeps an EARLIER dispatch's report of a reused slug (two sessions planning one wave
+    number) from answering this one. Both readers of "answered" call it: held_by_dispatch (the notes' hold) and
+    inflight_file_sets (the group's file set). A report whose file cannot be read answers nothing: the hold is the
+    safe side of a double dispatch."""
+    try:
+        return r.slug.lower() == ledger_slug(g) and r.path.stat().st_mtime >= g.get("at", 0.0)
+    except OSError:
+        return False
+
+
 def _names(out: str) -> set[str]:
     return {s.strip() for s in out.splitlines() if s.strip() and not s.strip().startswith(_NOT_PRODUCT)}
 
@@ -409,8 +430,8 @@ def inflight_file_sets(*, git: Callable[..., Any] | None = None, repo: pathlib.P
          first edits precede its first commit);
       2. every local branch with no worktree whose tip is not on origin/main: `_still_differs(branch)`;
       3. every group in the dispatch ledger (<coord>/inflight-groups.json, read through ledger_groups) with a note that
-         is not terminal and that no report in `reports` ANSWERS (a report whose slug is the group's, `w<wave><letter>`:
-         its agent returned, so its work is its branch's, which sources 1-2 read by their actual diff, and a SPLIT
+         is not terminal and that no report in `reports` ANSWERS (`answers`: a report whose slug is the group's,
+         `w<wave><letter>`, written at or after the dispatch: its agent returned, so its work is its branch's, which sources 1-2 read by their actual diff, and a SPLIT
          group's unstarted residue holds no file; kb/Work PB2795): the files the group was planned on, which exist
          before the agent has a worktree or a commit. The planner, the landing check and the survey's in-flight slugs
          all pass their reports, so the three read one rule. Its writers are structured (kb/Work PB3186): the planner's record of a planned wave and the spec
@@ -465,9 +486,8 @@ def inflight_file_sets(*, git: Callable[..., Any] | None = None, repo: pathlib.P
                 out[f"branch {b}"] = files
                 if meta is not None:
                     meta[f"branch {b}"] = {"rev": b, "uncommitted": set(), "path": None, "branch": b}
-    answered = {r.slug.lower() for r in reports}
     for g in ledger_groups(coord_dir or coord.coord_dir()):
-        if (terminal is not None and all(terminal(i) for i in g.get("notes", []))) or ledger_slug(g) in answered:
+        if (terminal is not None and all(terminal(i) for i in g.get("notes", []))) or any(answers(r, g) for r in reports):
             continue
         if files := {f.replace(chr(92), "/") for f in g.get("files", [])}:
             owner = f"dispatched {ledger_slug(g)} ({', '.join(g.get('notes', [])[:3])})"
@@ -502,17 +522,17 @@ def record_dispatch(coord_dir: pathlib.Path, wave: str, groups: list[dict[str, A
 
 def held_by_dispatch(coord_dir: pathlib.Path, reports: list[Report], terminal: Callable[[str], bool]) -> dict[str, str]:
     """{open note: the dispatch holding it}: every note a dispatch-ledger group names (ledger_groups, the entries
-    inflight_file_sets reads as source 3) unless the note is terminal or a report written at or after the group's
-    `at` names one of the group's notes. Such a report answers the dispatch, and step 1 (awaiting landing) and step 2
+    inflight_file_sets reads as source 3) unless the note is terminal or the group is answered (`answers`: its own
+    report, by slug, written at or after the group's `at`; the predicate inflight_file_sets reads too, kb/Work
+    PB3311). Such a report answers the dispatch, and step 1 (awaiting landing) and step 2
     (finishers) govern its notes from then on; an unanswered group is still running, or was planned and not launched
     (another session's wave waiting for the operator's GO), so its notes are not planned again (kb/Work PB2806: the
     fix lane read no ledger, and wave 1044 re-planned seven of wave 1045's eight groups)."""
     held: dict[str, str] = {}
     for g in ledger_groups(coord_dir):
-        mine, at = set(g.get("notes", [])), g.get("at", 0.0)
-        if any(mine & set(r.ids) and r.path.stat().st_mtime >= at for r in reports):
+        if any(answers(r, g) for r in reports):
             continue
-        for nid in sorted(i for i in mine if not terminal(i)):
+        for nid in sorted(i for i in set(g.get("notes", [])) if not terminal(i)):
             held.setdefault(nid, f"dispatch {ledger_slug(g)}")
     return held
 
@@ -869,7 +889,8 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
          rules: dict[str, Any], budget_points: float, max_groups: int | None = None,
          deps: dict[str, list[str]] | None = None, busy: dict[str, InFlight] | None = None,
          held: dict[str, str] | None = None, drain: bool = False,
-         carrier: Callable[[str], str | None] | None = None) -> dict[str, Any]:
+         carrier: Callable[[str], str | None] | None = None,
+         owned: set[str] | None = None) -> dict[str, Any]:
     """`clusters` and `half_clusters` are fix_clusters.py --json views of the open and the half notes; they also
     define which notes are plannable at all (fix_clusters applies .agent-fleet.json's kind and skip flags).
     `held`, {note: the dispatch holding it} from held_by_dispatch, applies in BOTH lanes: a held note waits.
@@ -888,8 +909,13 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
     to a golden).
 
     `carrier` (branch_carrier) names the DONE branch that contains a branch; `drain` plans the finishers of started
-    work only (the module docstring's item 9, kb/Work PB3150)."""
+    work only (the module docstring's item 9, kb/Work PB3150). `owned` (prune_worktrees.owned over the branch
+    survey: the branches IN FLIGHT by their OWN lifecycle, never one IN FLIGHT only because a carrier contains it)
+    lets a FINDINGS report's branch with a live owner wait: someone is already answering the findings (kb/Work
+    PB3311). A FINDINGS branch that a carrier merely contains is not owned, and gets its finisher with the carrier
+    named in its pred (`carrier`, kb/Work PB3150 review R1-2; PB3311 review R1-1)."""
     carrier = carrier or (lambda _b: None)
+    owned = owned or set()
     wave_rules = rules["wave"]
     cap = wave_rules["max_notes_per_group"]
     open_ids = {n["id"] for c in clusters + half_clusters for n in c["notes"] if n["id"] in notes}
@@ -938,7 +964,17 @@ def plan(notes: dict[str, Note], clusters: list[dict[str, Any]], half_clusters: 
         # note NOT started still lands first: the landing lane lands its finished work.
         # A DONE branch whose review stamp says FINDINGS is unfinished too (kb/Work PB3027): the enqueue unit never fixes
         # a review finding, so its finisher answers them (finisher_pred's review arm).
-        if r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or findings(r, cls):
+        if findings(r, cls) and r.branch in owned:
+            # THE BRANCH IS BEING FINISHED (kb/Work PB3311): the survey reads it IN FLIGHT by its own lifecycle (a live
+            # agent's worktree, its dispatch out, or a touch inside --min-age, which is how a resumed branch whose tip
+            # moved past the reviewed head reads). A finisher's own branch is exempt from the file-set collision (it
+            # CONTINUES the branch), so only this arm can see that the continued branch has a live owner; a second
+            # finisher would redo the first one's fix and leave two branches for one note. A branch IN FLIGHT only as
+            # a carrier's content is NOT owned (prune_worktrees.owned): its findings go unanswered unless planned.
+            waiting[nid] = (f"its review findings are being answered: branch {r.branch} is IN FLIGHT (a live agent, a "
+                            f"dispatch still out, or touched within --min-age): a finisher now would redo that work; "
+                            f"it is planned again once the branch settles")
+        elif r.status in FINISH_STATUSES or (cls in LANDED_CLASSES and r.not_started) or findings(r, cls):
             if drain and not findings(r, cls) and (why := drained(r.branch, cls)):
                 waiting[nid] = why
             else:
@@ -1307,15 +1343,17 @@ def main(argv: list[str] | None = None) -> int:
                          and i.get("status") not in work.TERMINAL_STATUSES for i in items):
         raw["the open external-repository slices"] = work.slice_file_set()
     states: dict[str, str] = {}
+    owned: set[str] = set()
     if not a.no_branches:   # the branch survey's lifecycle state of every branch: THE lifecycle rule (O10), pull
         # requests included (ENQUEUED and BOUNCED are read from them), exactly as the landing lane reads it
         import prune_worktrees  # noqa: PLC0415
-        states = {r.name: r.state for r in prune_worktrees.live_survey(coord_dir=cdir, reports_dir=reports_dir,
-                                                                       terminal=terminal)}
+        rows = prune_worktrees.live_survey(coord_dir=cdir, reports_dir=reports_dir, terminal=terminal)
+        states, owned = {r.name: r.state for r in rows}, prune_worktrees.owned(rows)
     busy = classify_inflight(raw, meta, reports, states, unlanded)
     p = plan(notes, clusters, half_clusters, reports, classify, unlanded, rules, budget_points,
              a.max_groups or rules["wave"]["max_groups"], deps=deps, busy=busy,
-             held=held_by_dispatch(cdir, reports, terminal), drain=a.drain, carrier=carrier)
+             held=held_by_dispatch(cdir, reports, terminal), drain=a.drain, carrier=carrier,
+             owned=owned)
     waiting.update(p["waiting"])
     if a.drain:
         campaign += " — DRAIN (finishers of started work only)"
