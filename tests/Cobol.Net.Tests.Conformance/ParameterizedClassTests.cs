@@ -249,7 +249,7 @@ public sealed class ParameterizedClassTests
 
     /// <summary>A definition some expansion re-binds is asked through that expansion only, never also as itself
     /// (kb/Work PB2051, train 1053 review): a report that names the class or interface — a duplicate METHOD-ID
-    /// (COBOLNET0822), a duplicate prototype (COBOLNET0840), an OBJECT LINKAGE SECTION (COBOLNET1519) — would
+    /// or a duplicate prototype (both COBOLNET0822, the declined Annex A.4.10 item 3), an OBJECT LINKAGE SECTION (COBOLNET1519) — would
     /// otherwise sit twice at one position, once naming the expansion and once the definition that emits nothing.
     /// An UNEXPANDED definition is still asked as itself (the pb2051 negatives).</summary>
     [Fact]
@@ -294,8 +294,10 @@ public sealed class ParameterizedClassTests
             END CLASS PCECSK.
             """ + Driver("CLASS PCEB1 CLASS PCECSK INTERFACE PCEISK "
                 + "CLASS PCEX EXPANDS PCECSK USING PCEB1 INTERFACE PCEY EXPANDS PCEISK USING PCEB1"));
-        Assert.Single(errors, e => e.Contains("COBOLNET0822", StringComparison.Ordinal));
-        Assert.Single(errors, e => e.Contains("COBOLNET0840", StringComparison.Ordinal));
+        Assert.Single(errors, e => e.Contains("COBOLNET0822", StringComparison.Ordinal)
+            && e.Contains("a second method named", StringComparison.Ordinal));
+        Assert.Single(errors, e => e.Contains("COBOLNET0822", StringComparison.Ordinal)
+            && e.Contains("a second method prototype named", StringComparison.Ordinal));
         Assert.Single(errors, e => e.Contains("COBOLNET1519", StringComparison.Ordinal));
         Assert.DoesNotContain(errors, e => e.Contains("'PCECSK'", StringComparison.Ordinal)
             || e.Contains("'PCEISK'", StringComparison.Ordinal));

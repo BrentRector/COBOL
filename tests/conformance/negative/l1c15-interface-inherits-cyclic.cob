@@ -6,7 +6,7 @@
       *> cite.py: OK  §11.6.3 3)  (Syntax rules)
       *> Each INHERITS name is in the inheriting interface's own
       *> REPOSITORY (SR2 satisfied), and neither interface names itself,
-      *> so only the indirect cycle is wrong. Diagnostic COBOLNET0840
+      *> so only the indirect cycle is wrong. Diagnostic COBOLNET2791
       *> with the cycle message head.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. L1C15Q.

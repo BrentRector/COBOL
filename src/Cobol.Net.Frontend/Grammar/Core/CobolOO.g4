@@ -51,7 +51,7 @@ classIdParagraph
     : CLASS_ID DOT className externalizedNamePhrase? (IS? FINAL)? (INHERITS FROM? className+)?
       (USING ooParameterName+)?   // §11.3.2 — a PARAMETERIZED class (kb/Work PB759; see ooParameterName)
       DOT
-    ;   // [AS literal-1] sits between object-class-name-1 and [IS FINAL] per the §11.3.2 format (kb/Work PB303); [IS FINAL] precedes INHERITS per the §10.6 format (:12742-12744); a FINAL class shall not be a superclass (§11.3 GR3 — bind-gated 0839).
+    ;   // [AS literal-1] sits between object-class-name-1 and [IS FINAL] per the §11.3.2 format (kb/Work PB303); [IS FINAL] precedes INHERITS per the §10.6 format (:12742-12744); a FINAL class shall not be a superclass (§11.3.4 GR3; an INHERITS naming one is §11.3.3 SR5 — bind-gated COBOLNET2791).
         // INHERITS repetition PARSES per the §11.3.2 format (superset parse — P3 doctrine); v1 REJECTS 2+ bases
         // LOUDLY at pass-1 (COBOLNET0849; SSOT §18 #18 / A.4.10) — never a bare syntax error, never a silent drop.
 
@@ -91,8 +91,8 @@ interfaceName
     ;
 
 // INTERFACE definition (§11.6 :13157; §10.6 :12783-12796 — NO data division at the interface level; methods
-// are PROTOTYPES: header + optional LINKAGE-only data division, no procedure body — enforced at pass-1,
-// COBOLNET0840). INHERITS repetition is SUPPORTED (C# interface lists are native — the deliberate asymmetry
+// are PROTOTYPES: header + optional LINKAGE-only data division, no procedure body — enforced at bind,
+// COBOLNET2272, the one §10.6.2 SR4 prototype-body screen). INHERITS repetition is SUPPORTED (C# interface lists are native — the deliberate asymmetry
 // with the class-side single-inheritance restriction, SSOT §18.18).
 interfaceDefinition
     : (IDENTIFICATION DIVISION DOT)? INTERFACE_ID DOT interfaceName

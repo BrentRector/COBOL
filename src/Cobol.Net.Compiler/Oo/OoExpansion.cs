@@ -119,9 +119,9 @@ internal static class OoExpansion
             if (classNames.Contains(sk.Name) || ifaceNames.Contains(sk.Name))
             {
                 using var _ = edition.At(sk.Ctx);
-                edition.Error(sk.IsInterface ? "COBOLNET0840" : "COBOLNET0820",
-                    $"duplicate {Kind(sk)} definition '{sk.Name}' — class and interface names share one namespace "
-                    + "and shall be unique in the compilation group (ISO §8.3.2.2/§11.3/§11.6)");
+                edition.Error(DiagnosticCatalog.OoDefinitionNameNotUnique,
+                    $"duplicate {Kind(sk)} definition '{sk.Name}' — class and interface definitions within a compilation "
+                    + "group shall have unique names, and a class and an interface cannot share one (ISO §8.4.6.4 / §8.3.2.2)");
             }
         foreach (var e in entries)
         {
@@ -241,9 +241,10 @@ internal static class OoExpansion
             // The skeleton's own END CLASS / END INTERFACE name (§10.7.3 SR4 / SR6) is asked with every other end
             // marker by Validation.EndMarkerPass, over the written tree, before any expansion renames it.
             if (!skeletons.TryAdd(name, new Skeleton(ctx, name, isInterface, formals, kinds)))
-                edition.Error(isInterface ? "COBOLNET0840" : "COBOLNET0820",
+                edition.Error(DiagnosticCatalog.OoDefinitionNameNotUnique,
                     $"duplicate {(isInterface ? "interface" : "class")} definition '{name}' — class and interface "
-                    + "names share one namespace and shall be unique in the compilation group (ISO §8.3.2.2/§11.3/§11.6)");
+                    + "definitions within a compilation group shall have unique names, and a class and an interface cannot "
+                    + "share one (ISO §8.4.6.4 / §8.3.2.2)");
         }
 
         Expansion? Validate(Core.RepositoryEntryContext e)

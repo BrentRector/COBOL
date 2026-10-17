@@ -2,7 +2,7 @@
       *> kb/Work PB815 -- ISO 14.9.18.3 SR4 a): "the presence or absence of the FACTORY phrase is the same in
       *> the data description entry of identifier-1 as in the RAISING phrase of the procedure division header
       *> of the containing source element".  The header lists CN815A WITHOUT the FACTORY phrase; identifier-1
-      *> is described FACTORY OF CN815A.  The class matches, the FACTORY axis does not -> COBOLNET0849 (SR4a).
+      *> is described FACTORY OF CN815A.  The class matches, the FACTORY axis does not -> COBOLNET4211 (SR4a).
       *> Before PB815 this axis could not be written on the header end at all (RAISING cobolWord+).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PN815A.

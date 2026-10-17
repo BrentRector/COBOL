@@ -3,7 +3,7 @@
       *> to an interface specified in the RAISING phrase".  9.3.8.2.3: interface-1 conforms to interface-2 iff
       *> "for every method in interface-2 there is a method in interface-1 with the same name" satisfying the
       *> numbered conditions.  IN814B (identifier-1's interface) has no method PING, which IN814A (the listed
-      *> interface) requires, so IN814B does not conform -> COBOLNET0849 (SR4b).  The header itself is legal
+      *> interface) requires, so IN814B does not conform -> COBOLNET4211 (SR4b).  The header itself is legal
       *> (14.2.2 SR9) -- before PB814 it was the header that was refused (COBOLNET0858).
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PN814A.

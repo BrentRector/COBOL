@@ -1,1 +1,1 @@
-COBOLNET0840: interface 'L1M7OVI', method 'PING': OVERRIDE/FINAL may not appear in a method PROTOTYPE
+COBOLNET4212: interface 'L1M7OVI', method 'PING': the OVERRIDE phrase shall not be specified in a method prototype (ISO §11.7.3 SR2)
