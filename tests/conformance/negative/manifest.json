@@ -2734,7 +2734,10 @@
   "pb656-cobol-reserved-through-2014",
   "pb3233-inspect-figurative-literal1-size",
   "pb3233-inspect-figurative-literal4-size",
-  "pb3233-inspect-symbolic-literal1-size"
+  "pb3233-inspect-symbolic-literal1-size",
+  "pb3191-numeric-constant-name-as-condition",
+  "pb3191-numeric-constant-name-boolean-operand",
+  "pb3191-boolean-constant-name-length-two-condition"
  ],
  "pending": []
 }
