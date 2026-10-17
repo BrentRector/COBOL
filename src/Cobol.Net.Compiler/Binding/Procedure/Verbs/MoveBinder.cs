@@ -115,8 +115,11 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         if (send.dataReference() is { } sdref
             && host.Expr.ScreenIndexNameOperand(source, sdref.GetText(), "a MOVE sending operand"))
             source = BoundOperandError.Refused(ctx.Edition, $"MOVE of the index-name '{DataBinder.WrittenText(sdref)}' (ISO §13.18.38.3 r7)");
+        // Identifier-1 is bound; what the receivers register from here on (a function-bearing subscript's temporary,
+        // a user-defined function's activation) is THEIR evaluation, which §14.6.4 puts after the sender's.
+        int senderPreOpsEnd = ctx.Data.PendingPreOps.Count;
         var resolved = host.Expr.ResolveTargets(targets.receivingIdentifier());
-        return BindMoveOf(source, resolved);
+        return BindMoveOf(source, resolved, senderPreOpsEnd: senderPreOpsEnd);
     }
 
     /// <summary>
@@ -139,8 +142,11 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
     /// by construction rather than by an edit. <paramref name="implicitOf"/> is null for the explicit statement
     /// and names the phrase otherwise, so each screen's diagnostic reports the statement that was written.</para>
     /// </summary>
+    /// <param name="senderPreOpsEnd">The pending pre-op count when the WRITTEN sending operand finished binding,
+    /// before any receiving operand was resolved (<see cref="Bind"/>); <see langword="null"/> for an implicit move,
+    /// whose receivers the carrying statement resolved before its sender existed.</param>
     public BoundMove BindMoveOf(BoundOperand source, IReadOnlyList<Place> targets,
-                                ImplicitMovePhrase? implicitOf = null)
+                                ImplicitMovePhrase? implicitOf = null, int? senderPreOpsEnd = null)
     {
         // ⛔ THE SYNTAX SCREENS RUN UNLESS THE STATEMENT HAS ALREADY ASKED THE SAME QUESTION ITS OWN WAY
         // (kb/Work PB880). INITIALIZE is the one such statement: §14.9.20.3 SR4 asks the MOVE validity question
@@ -177,19 +183,27 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         // frozen into that item HERE (kb/Work PB394) — the receiver side already conforms, since item
         // identification for identifier-2 happens immediately before each store (the per-target loop in
         // MoveEmitter is the receiver half of the same rule).
-        // ⭐ ONLY when there is more than one receiving operand, and that is a PROOF, not a shortcut: with a
-        // single identifier-2 the source expression is rendered exactly once already, and the equivalence's own
-        // first two steps collapse — temp's description IS identifier-1's, so `MOVE a (b) TO temp / MOVE temp TO
-        // b` applies the identity copy and then the same conversion `MOVE a (b) TO b` applies. The intermediate
-        // is unobservable at N = 1, and MOVE is the most executed verb in a COBOL program.
-        // ⭐ AND the SECOND reason to freeze it, the same rule's other sentence: GR1's "If identifier-1 is a
-        // zero-length item, it is as if literal-1 were specified as a zero-length literal" makes the sender's
-        // LENGTH decide which value is stored, and "the length … is evaluated only once" then forbids reading a
-        // reference modifier or a function-identifier twice to learn it. Materializing lands the value in
-        // SendingValueTemp's dynamic-length carrier, whose length the emitted test reads off a field
-        // (kb/Work PB425; MoveClassifier.NeedsLengthFreeze names the shapes).
-        if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets))
-            && host.SendingValue.Materialize(source, "move") is { } frozen)
+        // ⭐ With more than one receiving operand the freeze is always owed. With a SINGLE identifier-2 the source
+        // expression is rendered exactly once already, and the equivalence's own first two steps collapse — temp's
+        // description IS identifier-1's, so `MOVE a (b) TO temp / MOVE temp TO b` applies the identity copy and
+        // then the same conversion `MOVE a (b) TO b` applies — so the intermediate is owed at N = 1 only where it
+        // is OBSERVABLE, and MOVE is the most executed verb in a COBOL program. Two shapes make it observable:
+        // ⭐ the SECOND sentence of the rule: GR1's "If identifier-1 is a zero-length item, it is as if literal-1
+        // were specified as a zero-length literal" makes the sender's LENGTH decide which value is stored, and
+        // "the length … is evaluated only once" then forbids reading a reference modifier or a function-identifier
+        // twice to learn it. Materializing lands the value in SendingValueTemp's dynamic-length carrier, whose
+        // length the emitted test reads off a field (kb/Work PB425; MoveClassifier.NeedsLengthFreeze names the
+        // shapes);
+        // ⭐ and the ORDER of the two identifications (kb/Work PB370): the sender's "immediately before data is
+        // moved to the first of the receiving operands" precedes identifier-2's, as §14.6.4's left-to-right order
+        // does, but the store C# renders identifies the RECEIVER first (`CobolTable.At(T, Occ(I)) = <sender>`
+        // evaluates its ref-returning left operand before its right), so `MOVE X (1:L) TO T (I)` with both out of
+        // range selected EC-BOUND-SUBSCRIPT where §14.9.49.4 GR11 selects the first condition in the order of
+        // evaluation, EC-BOUND-REF-MOD (SenderIdentificationIsOverrun).
+        if ((targets.Count > 1 || MoveClassifier.NeedsLengthFreeze(source, targets)
+                || SenderIdentificationIsOverrun(source, targets, senderPreOpsEnd))
+            && host.SendingValue.Materialize(source, "move", senderPreOpsEnd,
+                ReceivingReach.Of([.. targets.Select(t => t.DenotedItem?.Pic)])) is { } frozen)
             source = new BoundFieldOperand(frozen);
         // ⛔ §14.6.9.2's element moves are bound HERE, beside the group move they follow (kb/Work PB1144), so every
         // GR9 move — the written MOVE and each implicit phrase move alike — carries them, and each is a MOVE this
@@ -199,6 +213,33 @@ internal sealed class MoveBinder(BinderContext ctx, StatementBinder host, Corres
         // store the emitter renders — including the sender §14.9.25.4 GR2 substitutes (kb/Work PB425).
         MarkFillImageStorage(move);
         return move;
+    }
+
+    /// <summary>⛔ WOULD THE ONE RECEIVER'S IDENTIFICATION OVERRUN THE SENDER'S? (kb/Work PB370) — ISO §14.9.25.4 GR1
+    /// evaluates identifier-1's "reference modifier, subscript, or function-identifier … immediately before data is
+    /// moved to the first of the receiving operands", and "Item identification for identifier-2 is performed
+    /// immediately before the data is moved to the respective data item": the sender's evaluation comes first, as
+    /// §14.6.4's left-to-right order has it. An un-frozen single-receiver store renders the opposite order: the
+    /// receiver's pre-ops (a function-bearing subscript's temporary, a user-defined function's activation) run before
+    /// the statement, and the store's C# identifies its receiving place before it evaluates the value assigned to it.
+    /// The difference is observable exactly when the sender's own evaluation can be overtaken — it identifies at run
+    /// time, or is a function-identifier — AND the receiver's evaluation can do something first: run a pre-op (which
+    /// may change what the sender reads), or raise an exception condition, which needs an enabling >>TURN anywhere in
+    /// the compilation group (the zero-scaffolding invariant every raising identification step keeps) and makes
+    /// §14.9.49.4 GR11's "first one that occurs in the order of evaluation" select the receiver's condition. A wider
+    /// answer would cost the statement an intermediate it cannot observe.</summary>
+    private bool SenderIdentificationIsOverrun(BoundOperand source, IReadOnlyList<Place> targets, int? senderPreOpsEnd)
+    {
+        if (targets is not [var receiver]) return false;
+        bool senderEvaluates = source switch
+        {
+            BoundComputedOperand => true,
+            BoundFieldOperand f => f.Place.IdentifiesAtRunTime,
+            _ => false,
+        };
+        if (!senderEvaluates) return false;
+        bool receiverRanPreOps = senderPreOpsEnd is { } end && ctx.Data.PendingPreOps.Count > end;
+        return receiverRanPreOps || (ctx.EcState.Turn.AnyEnabled && receiver.IdentifiesAtRunTime);
     }
 
     // ── ISO §14.6.9.2's element moves of a §14.9.25.4 GR9 group move (kb/Work PB1144) ─────────────────────────

@@ -113,6 +113,27 @@ public abstract record Place
     /// (kb/Work PB1943: <c>MOVE "00" TO CF-T (1:2)</c> followed by <c>CF-T (3:)</c> sliced the counter's number as
     /// though it were a string). Decorators forward.</summary>
     public virtual bool OwnsStorageCell => true;
+
+    /// <summary>⛔ <b>DOES IDENTIFYING THIS REFERENCE EVALUATE ANYTHING AT RUN TIME?</b> (ISO §14.6.4; kb/Work PB370)
+    /// — a subscript, an occurs-depending length, a reference modifier, a formal's omitted-argument guard: the
+    /// item-identification steps that can raise an exception condition or read a value when the statement reaches
+    /// them. A statement whose rules ORDER the identification of two operands asks it, because the C# a store renders
+    /// identifies its RECEIVING place before it evaluates the value assigned (a ref-returning <c>CobolTable.At(…) =
+    /// value</c>), so the order the standard states holds only where it is made explicit (<c>MoveBinder.BindMoveOf</c>,
+    /// §14.9.25.4 GR1). ABSTRACT, so a new place kind cannot compile without answering; a decorator forwards to its
+    /// inner place unless its own decoration is evaluated. The answer may be a conservative "yes", never a wrong "no".</summary>
+    public abstract bool IdentifiesAtRunTime { get; }
+
+    /// <summary>The BASED half every storage leaf shares: a reference to a BASED entry or to any item subordinate to
+    /// it dereferences the entry's data-address pointer, and §13.18.5.4 GR3 — "If the subject of the entry or any item
+    /// subordinate to it is referenced directly or indirectly while its address is NULL, the EC-DATA-PTR-NULL
+    /// exception condition is set to exist" — makes that dereference an evaluation that can raise.</summary>
+    protected static bool UnderBasedEntry(DataItem item)
+    {
+        for (DataItem? at = item; at is not null; at = at.Parent)
+            if (at.IsBased) return true;
+        return false;
+    }
 }
 
 /// <summary>
@@ -140,6 +161,10 @@ public abstract record PlaceDecorator(Place Inner) : Place
 
     /// <inheritdoc/>
     public override bool OwnsStorageCell => Inner.OwnsStorageCell;
+
+    /// <summary>A coding view identifies exactly what its inner place identifies; a decoration that is itself
+    /// evaluated (a reference modifier, an occurs-depending extent, a table(ALL) enumeration) overrides.</summary>
+    public override bool IdentifiesAtRunTime => Inner.IdentifiesAtRunTime;
 }
 
 /// <summary>
@@ -157,6 +182,9 @@ public sealed record MemberPlace(AccessPath Path, DataItem MemberItem) : Place
 
     /// <inheritdoc/>
     public override DataItem Item => MemberItem;
+
+    /// <inheritdoc/>
+    public override bool IdentifiesAtRunTime => Path.IdentifiesAtRunTime || UnderBasedEntry(MemberItem);
 }
 
 /// <summary>
@@ -186,6 +214,10 @@ public sealed record DynTablePlace(AccessPath Path, DataItem ElementItem) : Plac
     /// <summary>The <see cref="ImageCapable"/> law applied to the one-way transfer image (kb/Work PB244).</summary>
     public override bool TransferImageCapable =>
         ElementItem.IsDynamicTable ? ElementItem.ElementTransferImageCapable : ElementItem.TransferImageCapable;
+
+    /// <summary>Always: the element's subscript is checked against the table's CURRENT capacity, and a receiving
+    /// reference may grow it (§8.5.1.9.3).</summary>
+    public override bool IdentifiesAtRunTime => true;
 }
 
 /// <summary>
@@ -348,6 +380,13 @@ public sealed record RedefViewPlace(AccessPath Backing, Position Offset, int Wid
 
     /// <inheritdoc/>
     public override DataItem Item => ViewItem;
+
+    /// <summary>The window's backing path, its byte offset (which carries a subscript term per enclosing table), its
+    /// storage cell's path and its dynamic ordinal — every address fragment <c>CodeGen.PlaceIdentification</c>
+    /// freezes — and a BASED entry's pointer, which the backing dereferences.</summary>
+    public override bool IdentifiesAtRunTime =>
+        Backing.IdentifiesAtRunTime || !Offset.IsSelfEvaluating
+        || Cell is { IdentifiesAtRunTime: true } || DynOrdinal is { IsSelfEvaluating: false } || UnderBasedEntry(ViewItem);
 }
 
 /// <summary>The CODING of a <see cref="RedefViewPlace"/> window over the class's one byte backing — the relation
@@ -687,6 +726,9 @@ public sealed record RenamesPlace(IReadOnlyList<Place> Leaves, DataItem AliasIte
 
     /// <inheritdoc/>
     public override DataItem Item => AliasItem;
+
+    /// <summary>A level-66 span identifies each leaf it composes (§13.18.45.4 GR2).</summary>
+    public override bool IdentifiesAtRunTime => Leaves.Any(l => l.IdentifiesAtRunTime);
 }
 
 /// <summary>
@@ -723,7 +765,12 @@ public sealed record RenamesPlace(IReadOnlyList<Place> Leaves, DataItem AliasIte
 public sealed record OdoGroupPlace(
     Place Inner, Place Depending, int FixedUnits, int ElemUnits, int MinOccurs, int MaxOccurs,
     bool DependingInside, int PositionsPerCharacter, int TrailingUnits)
-    : PlaceDecorator(Inner);
+    : PlaceDecorator(Inner)
+{
+    /// <summary>Always: §14.6.4 step 6 — the length of an occurs-depending group is evaluated from data-name-1's
+    /// current value, which §13.18.38.4 GR7 bounds (EC-BOUND-ODO).</summary>
+    public override bool IdentifiesAtRunTime => true;
+}
 
 /// <summary>
 /// A <c>table(… ALL …)</c> intrinsic-function argument (ISO §15.3 — "When the definition of a function permits an
@@ -746,6 +793,9 @@ public sealed record OdoGroupPlace(
 /// </summary>
 public sealed record TableAllPlace(Place Element, LocalVector Indices, IReadOnlyList<AllCount> Counts) : PlaceDecorator(Element)
 {
+    /// <summary>Always: each ALL level enumerates the occurrences current when the argument is evaluated (§15.3).</summary>
+    public override bool IdentifiesAtRunTime => true;
+
     /// <summary>The number of elements when EVERY ALL level has a fixed range — the product of the OCCURS counts;
     /// null when any level's range is a runtime value (an OCCURS DEPENDING or dynamic-capacity table).</summary>
     public long? StaticCount
@@ -900,6 +950,9 @@ public sealed record CapacityRegisterPlace(AccessPath Table, DataItem RegisterIt
 
     /// <inheritdoc/>
     public override DataItem Item => RegisterItem;
+
+    /// <summary>The CAPACITY register of the table the path reaches — a nested table's carries the outer subscripts.</summary>
+    public override bool IdentifiesAtRunTime => Table.IdentifiesAtRunTime;
 }
 
 /// <summary>
@@ -930,6 +983,9 @@ public sealed record ReportSumCounterPlace(
 
     /// <inheritdoc/>
     public override DataItem Item => RegisterItem;
+
+    /// <summary>A sum counter of a repeated entry is subscripted (§13.18.54.4); an unsubscripted one is a plain register.</summary>
+    public override bool IdentifiesAtRunTime => Subscripts is { Count: > 0 };
 }
 
 /// <summary>
@@ -960,6 +1016,9 @@ public sealed record ReportPageCounterPlace(int ReportIndex, DataItem RegisterIt
 
     /// <inheritdoc/>
     public override DataItem Item => RegisterItem;
+
+    /// <summary>An implicitly-defined register the engine owns: identifying it evaluates nothing.</summary>
+    public override bool IdentifiesAtRunTime => false;
 }
 
 /// <summary>The member of the X3.23-1985 <c>DEBUG-ITEM</c> register a <see cref="DebugRegisterPlace"/> refers to
@@ -990,6 +1049,9 @@ public sealed record DebugRegisterPlace(DataItem RegisterItem, DebugRegisterMemb
 
     /// <inheritdoc/>
     public override DataItem Item => RegisterItem;
+
+    /// <summary>An implicitly-defined register the engine owns: identifying it evaluates nothing.</summary>
+    public override bool IdentifiesAtRunTime => false;
 }
 
 /// <summary>
@@ -1024,6 +1086,9 @@ public sealed record ExceptionObjectPlace(DataItem RegisterItem) : Place
 
     /// <inheritdoc/>
     public override DataItem Item => RegisterItem;
+
+    /// <summary>An implicitly-defined register the engine owns: identifying it evaluates nothing.</summary>
+    public override bool IdentifiesAtRunTime => false;
 }
 
 /// <summary>
@@ -1081,6 +1146,10 @@ public sealed record RefModPlace(Place Inner, Position Start, Position? Length) 
     /// data item …" — §14.9.41.3 SR5's RELATIVE KEY identity, SR6's record key, the arithmetic resultant screen —
     /// must answer NO here, and every "is this a whole item" test is one reading of this (kb/Work PB602).</summary>
     public override DataItem? DenotedItem => null;
+
+    /// <summary>Always: reference modification is §14.6.4 step 7, and its start and length are bounds-checked when
+    /// the statement reaches them (EC-BOUND-REF-MOD) — even literal ones, against a dynamic-length or ANY LENGTH item.</summary>
+    public override bool IdentifiesAtRunTime => true;
 
     /// <summary>
     /// The CATEGORY of the unique data item reference modification creates — <b>ISO §8.4.3.3.4 GR6, verbatim</b>:
