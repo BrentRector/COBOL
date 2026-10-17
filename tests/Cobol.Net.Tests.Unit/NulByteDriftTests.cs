@@ -36,7 +36,7 @@ namespace CobolNet.Tests.Unit;
 public sealed class NulByteDriftTests
 {
     /// <summary>The repo-root-relative trees swept.</summary>
-    private static readonly string[] Trees = ["src/", "tests/"];
+    private static readonly string[] Trees = ["src/", "tests/", "conformance-suite/"];   // the suite holds the moved corpus (PB3177, S2): its .cob/.out/.err text is what the sweeps read
 
     /// <summary>The text kinds the repo's greps and drift sweeps read, compared case-insensitively. COBOL sources and
     /// copybooks, the C# the compiler is made of, the grammar, the registers and project files, and the golden
