@@ -300,10 +300,10 @@ def main() -> int:
                 #    hand ("the DISPLAY Format-2 omitted-COLUMN default …"). The selector's `decision` string is
                 #    strictly weaker than that, so an existing note WINS and the decision only fills a blank.
                 #    Overwriting them would have traded eleven adjudications for one boilerplate sentence.
-                #  · `editions` — left EMPTY where the row has none, and NOT defaulted to all four. FORMAT and
-                #    SELECT WHEN are 2002-and-later, so "85,2002,2014,2023" on an A.4.8 row would assert that a
-                #    rule which does not exist at COBOL-85 is DECLINED there. An empty field claims nothing;
-                #    the edition band is the introduction record's answer and belongs to whoever writes it.
+                #  · `editions` — the row's own band, NEVER defaulted to all four. FORMAT and SELECT WHEN are
+                #    2002-and-later, so "85,2002,2014,2023" on an A.4.8 row would assert that a rule which does not
+                #    exist at COBOL-85 is DECLINED there. The band is decided from the standard on every row
+                #    (kb/Work PB3173), so a derived verdict restates it and never re-decides it.
                 "code-location": schema.code_location_sep.join(locations),
                 "test-ref": row.get("test-ref", ""),
                 #  · `derivation` — carried for the same reason as `test-ref`: it is what CLOSES a row that no

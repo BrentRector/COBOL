@@ -120,7 +120,8 @@ def main() -> int:
     if prior:
         print(f"  carried forward: {carried} row(s) with adjudicated work preserved")
         if added:
-            print(f"  NEW            : {len(added)} (spec moved — these need verdicts)")
+            print(f"  NEW            : {len(added)} (spec moved — these need verdicts, and editions, which a new row "
+                  f"lacks and SpecTraceabilityInventoryDriftTests refuses empty: kb/Work PB3173)")
         if removed:
             print(f"  ⚠ REMOVED      : {len(removed)} rows no longer in the spec — verdicts dropped:")
             for rid in removed[:10]:

@@ -133,6 +133,10 @@ AUDITS = (
     # PR 9 went RED in CI on a `blocked: true` the work register refuses, behind a GREEN gate.
     ("WORK REGISTER", ["scripts/spec/work.py", "check"]),
     ("FLEET PRACTICES", [".claude/skills/workstream/check_practices.py"]),
+    # DESIGN-conformance-suite.md §9 (kb/Work PB3174): the conformance suite's generator refuses a malformed test
+    # (its header, its rules, its control, its expected outputs, the portability lint) reading only the tree, so a
+    # refused test is red here in a fraction of a second, before the slot and the build.
+    ("CONFORMANCE SUITE", ["conformance-suite/harness/generate.py", "--check"]),
 )
 #: ⛔ WHAT AN AUDIT NEEDS IN THE TREE, made ready before any audit runs, exactly as CI's `audits` job makes it ready:
 #: FLEET PRACTICES reads the pinned public skills submodule, which a fresh worktree does not have. A prerequisite that

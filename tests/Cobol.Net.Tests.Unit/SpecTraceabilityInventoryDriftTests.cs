@@ -111,6 +111,10 @@ public sealed class SpecTraceabilityInventoryDriftTests
         //: The editions, ascending: their order IS the order of the `editions` field's one spelling.
         string[] Editions,
         string EditionsSeparator,
+        //: The schema's `required` and `run-through-last` (kb/Work PB3173): a row names its band, and the band is
+        //: a run of `Editions` ending at the last one, every row being a rule of the newest standard's text.
+        bool EditionsRequired,
+        bool EditionsRunThroughLast,
         Regex CodeLocationPattern,
         string CodeLocationSeparator,
         string TestRefSeparator,
@@ -194,6 +198,8 @@ public sealed class SpecTraceabilityInventoryDriftTests
             verdicts,
             [.. editions.GetProperty("values").EnumerateArray().Select(x => x.GetString()!)],
             editions.GetProperty("separator").GetString()!,
+            editions.GetProperty("required").GetBoolean(),
+            editions.GetProperty("run-through-last").GetBoolean(),
             new Regex(loc.GetProperty("pattern").GetString()!, RegexOptions.Compiled),
             loc.GetProperty("separator").GetString()!,
             testRef.GetProperty("separator").GetString()!,
@@ -641,13 +647,17 @@ public sealed class SpecTraceabilityInventoryDriftTests
     /// <summary>
     /// Why an <c>editions</c> field is not legal, or <see langword="null"/>: the C# twin of
     /// <c>inventory_schema.Schema.editions_error</c>, read from the same schema entry (kb/Work PB3172;
-    /// DESIGN-conformance-suite.md §6 step 0). Legal is empty (until kb/Work PB3173 decides the empty rows) or
-    /// exactly the editions it names, each once, in the schema's ascending order, joined by its separator with
-    /// no spaces.
+    /// DESIGN-conformance-suite.md §6 step 0). Legal is exactly the editions it names, each once, in the schema's
+    /// ascending order, joined by its separator with no spaces; non-empty when the schema's <c>required</c> says
+    /// so, and a run of the editions ending at the last one when <c>run-through-last</c> says so (kb/Work PB3173).
     /// </summary>
     private static string? EditionsError(string value, Schema s)
     {
-        if (value.Length == 0) return null;
+        if (value.Length == 0)
+            return s.EditionsRequired
+                ? "editions is empty — every row names the editions its rule exists at, decided from the "
+                  + "standard (kb/Work PB3173; DESIGN-conformance-suite.md §6 step 0)"
+                : null;
         string[] given = Split(value, s.EditionsSeparator);
         string[] unknown = [.. given.Where(e => !s.Editions.Contains(e))];
         if (unknown.Length > 0)
@@ -656,10 +666,17 @@ public sealed class SpecTraceabilityInventoryDriftTests
         if (repeated.Length > 0)
             return $"editions names '{string.Join("', '", repeated)}' more than once";
         string spelled = string.Join(s.EditionsSeparator, s.Editions.Where(given.Contains));
-        return value == spelled
+        if (value != spelled)
+            return $"editions '{value}' is not the one spelling — write '{spelled}' (ascending, "
+                   + $"'{s.EditionsSeparator}'-separated, no spaces: DESIGN-conformance-suite.md §6 step 0)";
+        if (!s.EditionsRunThroughLast) return null;
+        string first = given[0], last = s.Editions[^1];
+        string run = string.Join(s.EditionsSeparator, s.Editions[Array.IndexOf(s.Editions, first)..]);
+        return value == run
             ? null
-            : $"editions '{value}' is not the one spelling — write '{spelled}' (ascending, "
-              + $"'{s.EditionsSeparator}'-separated, no spaces: DESIGN-conformance-suite.md §6 step 0)";
+            : $"editions '{value}' is not a run through {last} — a rule of the {last} text exists from its "
+              + $"introducing edition through {last} with no gap: write '{run}' if {first} introduced it "
+              + "(kb/Work PB3173)";
     }
 
     private static List<string> UnresolvedCodeLocations(IEnumerable<Row> rows, Schema s, string root)
@@ -852,9 +869,11 @@ public sealed class SpecTraceabilityInventoryDriftTests
     }
 
     /// <summary>
-    /// Every <c>editions</c> field is empty or its ONE spelling: the editions the compiler implements, each once,
-    /// ascending, comma-separated with no spaces (kb/Work PB3172). Until then 645 rows used <c>", "</c> and 37
-    /// were out of order, so every reader parsed the field its own way.
+    /// Every <c>editions</c> field is its ONE spelling: the editions the compiler implements, each once, ascending,
+    /// comma-separated with no spaces (kb/Work PB3172; until then 645 rows used <c>", "</c> and 37 were out of
+    /// order, so every reader parsed the field its own way). It is never empty, and it is a run from the rule's
+    /// introducing edition through 2023 (kb/Work PB3173: 148 rows were empty, and 20 wrote a start edition alone,
+    /// endpoints or a band stopping at 2014, so no per-edition suite could tell whether a rule belonged to it).
     /// </summary>
     [Fact]
     public void EveryEditionsField_IsTheOneSpelling()
@@ -1196,8 +1215,16 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.Single(MissingEvidence([Base("X-4") with { Verdict = "CONFORMS" }], s));
 
         // An edition the compiler does not have, and each other shape the one spelling refuses (kb/Work PB3172):
-        // a spaced list, an out-of-order one, a doubled separator, a repeated edition. The one spelling and an
-        // empty field pass.
+        // a spaced list, an out-of-order one, a doubled separator, a repeated edition; and since kb/Work PB3173
+        // an empty field and a band that is not a run through 2023 (a gap, an early stop, a start edition
+        // written alone). The one spelling of a run through 2023 passes.
+        Assert.Contains("editions is empty", Assert.Single(BadEditions([Base("X-5a")], s)));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5b") with { Editions = "85,2023" }], s)));
+        Assert.Contains("write '85,2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5c") with { Editions = "85,2002,2014" }], s)));
+        Assert.Contains("write '2002,2014,2023'",
+            Assert.Single(BadEditions([Base("X-5k") with { Editions = "2002" }], s)));
         Assert.Single(BadEditions([Base("X-5") with { Editions = "85,1974" }], s));
         Assert.Contains("write '85,2002,2014,2023'",
             Assert.Single(BadEditions([Base("X-5d") with { Editions = "85, 2002, 2014, 2023" }], s)));
@@ -1207,7 +1234,7 @@ public sealed class SpecTraceabilityInventoryDriftTests
         Assert.Single(BadEditions([Base("X-5g") with { Editions = "2023,2023" }], s));
         Assert.Empty(BadEditions(
             [Base("X-5h") with { Editions = "85,2002,2014,2023" }, Base("X-5i") with { Editions = "2014,2023" },
-             Base("X-5j")], s));
+             Base("X-5j") with { Editions = "2023" }], s));
 
         // ⛔ DIFFERENTIAL-ONLY COVERAGE. A NIST golden alone, and a *_MatchesLegacy test alone, are both real
         // shapes — the first Phase-B batch produced seven of them before this rule existed. Neither may close a
