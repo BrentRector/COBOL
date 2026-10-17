@@ -54,3 +54,5 @@ lock, ledger or touch. Mutating `owned()` back to the bare state turns both red 
 waits, no finisher). Sibling arm, left as it is: `classify_inflight` still reads a contained branch as RUNNING, so a
 new group on its files waits until the carrier lands rather than continuing it; that is the safe side (a later plan,
 never double work), and continuing a branch whose findings are unanswered would be the wrong default.
+Gate: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run 20261017T185309Z-55e581;
+`test_plan_wave.py`, `prune_worktrees.py --self-test` and `enqueue.py --self-test` re-run GREEN in it).
