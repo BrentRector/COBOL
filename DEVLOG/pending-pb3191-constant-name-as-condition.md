@@ -36,3 +36,8 @@ forms, expected values derived from §8.8.2/§8.8.4.3. Negatives `pb3191-numeric
 (§8.8.4.3.3 SR1 on `B"10"`).
 
 **Register.** PB3191 closes no inventory row (`closes_rows: []` with its reason); severity stays MINOR.
+
+**Gate red, and a golden that encoded the false message.** The first gate read RED on one case:
+`negative/pb3153-method-constant-hides-object-condition-name` expected COBOLNET1639 for `IF X` over a method-local
+`01 X CONSTANT AS 7`, the very message this note reports as false (X is declared). Its expectation is now
+COBOLNET2318 and its header says why; a sweep of every negative that expects 1639 beside a CONSTANT entry found no other.

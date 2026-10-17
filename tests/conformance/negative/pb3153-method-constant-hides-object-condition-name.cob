@@ -5,10 +5,12 @@
       *>   method definition and in the data division of the containing
       *>   object definition, the use of that word in this method refers
       *>   to the declaration in this method" -> OK 11.7.4 5). SHOWA's X
-      *>   is its own constant-name, which identifies no condition, so
-      *>   IF X references nothing a condition can test (8.4.2.1):
-      *>   COBOLNET1639, as in a program whose only X is a constant.
-      *>   Before the fix IF X tested the object's level-88 X.
+      *>   is its own constant-name, the numeric literal 7 (13.10.4
+      *>   GR1), which is none of the simple conditions of 8.8.4.2.1:
+      *>   COBOLNET2318, as in a program whose only X is a constant
+      *>   (kb/Work PB3191 - it said COBOLNET1639 "not defined", a false
+      *>   message: X is declared). Before the PB3153 fix IF X tested
+      *>   the object's level-88 X.
        IDENTIFICATION DIVISION.
        PROGRAM-ID. PB3153CP.
        ENVIRONMENT DIVISION.
