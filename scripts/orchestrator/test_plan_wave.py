@@ -9,6 +9,7 @@ waits (blockers in two chains, the owner, a frontier model), and work.py check's
 Run: python scripts/orchestrator/test_plan_wave.py   (no build, no git; the campaign section needs the
 tools/claude-skills submodule, and its absence is a FAIL)."""
 import dataclasses
+import os
 import pathlib
 import re
 import subprocess
@@ -297,6 +298,27 @@ check("drain: a SPLIT whose branch landed left only unstarted work", "never star
 check("drain: the clusters' notes wait, counted", ("PB2" in pd["drain_not_started"], "PB4" in pd["drain_not_started"]),
       (True, True))
 check("an unseen lead's branch with a finisher is no judgment row", pd["unlanded_without_note"], [])
+# kb/Work PB3311 hole 1: a FINDINGS report's branch that the branch survey reads IN FLIGHT (a resumed branch whose tip
+# moved past the reviewed head, a live agent's worktree, a dispatch out) is being finished: no second finisher, in
+# either mode, for an open note (PB7, branch wf_dr-2) and an unseen lead (PB79, wf_dr-5) alike, with the reason named.
+# The same plan with the branch DECISION (nobody working on it: the stamp covers the tip) plans both.
+for drain in (False, True):
+    for state, planned in (("IN FLIGHT", False), ("DECISION", True)):
+        pf1 = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                      budget_points=100, drain=drain, carrier=DR_CARRIER.get,
+                      states={"worktree-wf_dr-2": state, "worktree-wf_dr-5": state})
+        check(f"{'drain' if drain else 'normal'}: a FINDINGS branch that is {state} "
+              f"{'plans' if planned else 'waits, no'} finisher (PB3311)",
+              [(any(i in g.notes for g in pf1["groups"]), "IN FLIGHT" in pf1["waiting"].get(i, ""))
+               for i in ("PB7", "PB79")], [(planned, not planned)] * 2)
+        if not planned:
+            check(f"{'drain' if drain else 'normal'}: the waiting reason names the branch and the answers in progress",
+                  all(w in pf1["waiting"].get("PB7", "") for w in ("worktree-wf_dr-2", "being answered")), True)
+    # a SPLIT report's branch IN FLIGHT is a different arm (kb/Work PB2974): untouched by this rule
+    pf2 = pw.plan(dr_notes, CLUSTERS, HALF, dr_reports, lambda b: DR_CLASS.get(b, "ABSENT"), DR_UNLANDED, RULES,
+                  budget_points=100, drain=False, carrier=DR_CARRIER.get, states={"worktree-wf_dr-3": "IN FLIGHT"})
+    check("a SPLIT report's branch IN FLIGHT is the SPLIT arm's (PB2974), not this rule's",
+          any("PB6" in g.notes for g in pf2["groups"]), True)
 pn = dr_plan(False)
 check("every mode: an unseen lead's FINDINGS gets its finisher", any(g.notes == ["PB77"] for g in pn["groups"]), True)
 # R1-2: PB79's branch is contained in worktree-wf_dr-2, PB7's DONE branch, whose report never answers PB79's findings:
@@ -778,10 +800,56 @@ check("a recorded group is in flight before its agent edits a file, until its no
       ({f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False).values() for f in fs}
        >= {"src/Hand.cs", "src/More.cs"},
        pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: True, with_git=False)), (True, {}))
+HL_REPORTS = TMP / "reports-hl"
+HL_REPORTS.mkdir()
+
+
+def hl_report(name, status, when=None, sub=""):
+    """A real report file (the answered rule reads its mtime), `when` seconds since the epoch or now."""
+    path = HL_REPORTS / sub / name
+    path.parent.mkdir(exist_ok=True)
+    path.write_text(f"Status: {status}\n# {name}\n**branch:** `worktree-wf_hl`\n\n## X\n", encoding="utf-8", newline="\n")
+    if when is not None:
+        os.utime(path, (when, when))
+    return pw.parse_report(path)
+
+
+HL_AT = {g["letter"]: g["at"] for g in LG}
 check("an ANSWERED group (its report exists, SPLIT residue included) holds no declared file, for every reader (PB2795)",
       {f for fs in pw.inflight_file_sets(coord_dir=HL, terminal=lambda i: False, with_git=False,
-                                         reports=[dataclasses.replace(FIN, slug="w1061B", status="SPLIT")]).values()
+                                         reports=[hl_report("w1061b-PB963-report.md", "SPLIT", HL_AT["B"] + 60)]).values()
        for f in fs} & {"src/B.cs", "src/Hand.cs"}, {"src/Hand.cs"})
+# kb/Work PB3311 hole 2 (with PB3152's second-predicate witness): ONE predicate (`answers`) says "a dispatch returned"
+# for the notes' hold AND the group's file set: the group's OWN report (its slug), written at or after the dispatch.
+# A reviewer's stamp on ANOTHER dispatch's report names the same note and bumps its mtime past the dispatch, and a
+# header that merely mentions the note says nothing about it: neither answers (the dispatch is the review finisher
+# `w1101ar1` of PB3198, whose original report `w1101a` the branch reviewer re-stamped after the dispatch).
+RV = TMP / "coord-review"
+RV.mkdir()
+pw.record_dispatch(RV, "1101", [{"letter": "AR1", "notes": ["PB3198"], "files": ["src/Review.cs"]}], lambda i: False)
+RV_AT = coord.read_json(RV / pw.DISPATCH_LEDGER, {})["groups"][0]["at"]
+
+
+def rv_state(*reports):
+    held = pw.held_by_dispatch(RV, list(reports), lambda i: False)
+    files = {f for fs in pw.inflight_file_sets(coord_dir=RV, terminal=lambda i: False, with_git=False,
+                                               reports=list(reports)).values() for f in fs}
+    return held, files
+
+
+STAMPED = hl_report("w1101a-PB3198-report.md", "DONE", RV_AT + 600)           # the reviewed report, stamped after
+MENTION = hl_report("w1102z-PB3203-report.md", "DONE", RV_AT + 600)           # its header names PB3198 below
+MENTION.ids.append("PB3198")
+EARLIER = hl_report("w1101ar1-PB3198-report.md", "DONE", RV_AT - 3600, "earlier")      # an earlier dispatch's, reused slug
+RETURNED = hl_report("w1101ar1-PB3198-report.md", "DONE", RV_AT + 900)        # the review finisher's own report
+HELD = ({"PB3198": "dispatch w1101ar1"}, {"src/Review.cs"})
+check("a reviewer's stamp on another dispatch's report, a header that mentions the note, and an earlier dispatch's "
+      "report of the slug answer nothing: held and in flight by both readers (PB3311)",
+      (rv_state(STAMPED), rv_state(MENTION), rv_state(EARLIER)), (HELD, HELD, HELD))
+check("the group's own report written since the dispatch answers it for both readers (PB3311)",
+      rv_state(STAMPED, RETURNED), ({}, set()))
+check("a report whose file is gone answers nothing (the safe side of a double dispatch)",
+      rv_state(dataclasses.replace(RETURNED, path=HL_REPORTS / "gone-PB3198-report.md")), HELD)
 pw.record_dispatch(HL, "1062", [], lambda i: i == "PB962")
 check("an entry whose notes all landed is dropped at the next record",
       [g["wave"] for g in coord.read_json(HL / pw.DISPATCH_LEDGER, {})["groups"]], ["1061", "1061"])
