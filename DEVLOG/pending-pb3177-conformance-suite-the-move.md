@@ -98,3 +98,8 @@ tree), Unit 33,501/33,923, Characterization 5/36; leg 2 is CI's. LINUX GATE: the
   whose record is never edited; they are restored (the supersession marker the audit asks for stays).
 - *R1-3: a comment named a test class that does not exist.* `ConformanceSuiteTests.cs` names
   `ConformancePartitioningDriftTests` and what it pins.
+- *Re-gate.* One red on the way: LINE ENDINGS (this entry's appended paragraph was written CRLF by the shell; the index
+  held LF; `line_endings.py --fix`). Then run 20261017T115951Z-adfc77: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating,
+  PB2515): GREEN` (Conformance 13,924/17,290 with the 25 moved PB3261/PB780 rows passed, Unit 33,523/33,928,
+  Characterization 5/36). The planner left `ConstantNameLiteralPositionDriftTests.EveryWordAdmittingLiteralSlot…` to leg
+  2; it passed when run alone on the same build (3/3). LINUX GATE: the lander's (batched gating).
