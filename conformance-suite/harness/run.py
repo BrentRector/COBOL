@@ -38,8 +38,9 @@ THE CHANGES (§5) compare the run with `baselines/<compiler>.json`: a regression
 one), a new FAIL or NO VERDICT, any other change of verdict, an improvement, and a recorded test that did not run.
 The run is RED when a verdict differs from its recorded one (or has none) and is FAIL or NO VERDICT, or was a
 recorded PASS; so a second compiler's known failures are a regression net, never a permanently red leg, and a
-compiler with no baseline is RED on every FAIL. `--record-baseline` writes the run's verdicts as the baseline (only
-for a whole run: never with `--test`).
+compiler with no baseline is RED on every FAIL. `--record-baseline` writes the run's verdicts as the baseline: a
+whole run (never one narrowed by `--test`) replaces it, and an `--editions` run replaces the record of each edition it
+ran and keeps every other edition's.
 
 Exit status: 0 GREEN (or a baseline recorded), 1 RED, 2 a usage or configuration error.
 Standard library only (§5): Windows, Linux and z/OS.
@@ -513,8 +514,11 @@ def _run(args: argparse.Namespace, root: Path) -> int:
     counts = " · ".join(f"{v} {by[v]}" for v in VERDICTS)
     where = f"{len(results)} test(s) at {len(tests)} edition(s): {counts}; results in {out}"
     if args.record_baseline:
-        config.write_baseline(baseline_path, adapter.compiler,
-                              {e: {r.test_id: r.verdict for r in results if r.edition == e} for e in tests})
+        # Each edition's record is a whole run of that edition's suite; an --editions run re-records only the
+        # editions it ran, so every other edition's recorded verdicts stay a regression net (§5).
+        recorded = dict(baseline or {}) if editions else {}
+        recorded.update({e: {r.test_id: r.verdict for r in results if r.edition == e} for e in tests})
+        config.write_baseline(baseline_path, adapter.compiler, recorded)
         print(f"{VERDICT}BASELINE RECORDED — {adapter.compiler}: {where}; written to {baseline_path} ===")
         return 0
     red = found["red"]
@@ -653,8 +657,6 @@ def self_test() -> int:
         "refused": (["refuse"], "x\n", _entry("refused", c)),
         "no-program": (["no-program"], "x\n", _entry("no-program", c)),
         "crashes": (["crash"], "x\n", _entry("crashes", c)),
-        "hangs": (["hang"], "x\n", _entry("hangs", c)),
-        "run-hangs": (["run run-hang"], "x\n", _entry("run-hangs", c)),
         "stdin": (["run stdin"], "STDIN=''\n", _entry("stdin", c)),
         "staged": (["need DATA1.dat", "env DD_DATA1=DATA1.dat", "run out OK"], "OK\n",
                    _entry("staged", c, files=("DATA1.dat",))),
@@ -676,9 +678,16 @@ def self_test() -> int:
         "weak-control": (["refuse"], "x\n", _entry("weak-control", c)),
         "flag-na": (["diag 4"], None, _entry("flag-na", c, "flag", line=4, control="weak-control")),
     }
+    # The hang arms run as a suite of their own, under a short hang guard: a stub that sleeps far beyond the guard is
+    # NO VERDICT however loaded the host is. Every other arm runs under the default guard (HANG_GUARD), so no verdict
+    # the self-test expects depends on how fast a process finishes (kb/Work PB1590).
+    hang_tests: dict[str, tuple[list[str], str | None, dict[str, Any]]] = {
+        "hangs": (["hang"], "x\n", _entry("hangs", c)),
+        "run-hangs": (["run run-hang"], "x\n", _entry("run-hangs", c)),
+    }
     expected = {
         "passes": PASS, "differs": FAIL, "lower": FAIL, "refused": FAIL, "no-program": FAIL, "crashes": NO_VERDICT,
-        "hangs": NO_VERDICT, "run-hangs": NO_VERDICT, "stdin": PASS, "staged": PASS, "leaves": PASS, "fresh": PASS,
+        "stdin": PASS, "staged": PASS, "leaves": PASS, "fresh": PASS,
         "exit-status": PASS, "valued": PASS, "needs-module": NOT_APPLICABLE, "needs-claimed": PASS,
         "reserved-word": NOT_APPLICABLE, "a-very-long-test-identifier": PASS, "control": PASS, "flag-pass": PASS,
         "flag-elsewhere": FAIL, "flag-copybook": FAIL, "flag-silent": FAIL, "flag-crash": NO_VERDICT,
@@ -688,7 +697,7 @@ def self_test() -> int:
         root = Path(d)
         stub = root / "stubcc.py"
         stub.write_text(_STUB, encoding="utf-8", newline="\n")
-        for test_id, (directives, out, _) in stub_tests.items():
+        for test_id, (directives, out, _) in {**stub_tests, **hang_tests}.items():
             folder = root / "cases" / c
             folder.mkdir(parents=True, exist_ok=True)
             (folder / f"{test_id}.cob").write_text("".join(f"      * STUB {x}\n" for x in directives), encoding="utf-8",
@@ -703,6 +712,9 @@ def self_test() -> int:
             (root / "suites" / e).mkdir(parents=True)
             (root / "suites" / e / "manifest.json").write_text(json.dumps({"edition": e, "tests": manifest}),
                                                                encoding="utf-8", newline="\n")
+        (root / "hang-suites" / "85").mkdir(parents=True)
+        (root / "hang-suites" / "85" / "manifest.json").write_text(json.dumps(
+            {"edition": "85", "tests": [entry for _, _, entry in hang_tests.values()]}), encoding="utf-8", newline="\n")
         (root / "adapters").mkdir()
         (root / "profiles").mkdir()
         (root / "adapters" / "stub.json").write_text(json.dumps(_stub_adapter(
@@ -722,9 +734,10 @@ def self_test() -> int:
             doc = json.loads((out / "results.json").read_text(encoding="utf-8")) if (out / "results.json").is_file() else {}
             return code, doc
 
-        code, doc = results_of(quiet(["--compiler", "stub", "--out", str(out), "--hang-guard", "3", "--jobs", "4"]))
+        code, doc = results_of(quiet(["--compiler", "stub", "--out", str(out), "--jobs", "4"]))
         got = {(t["edition"], t["id"]): t["verdict"] for t in doc.get("tests", [])}
         verdicts85 = {i: v for (e, i), v in got.items() if e == "85"}
+        verdicts2023 = {i: v for (e, i), v in got.items() if e == "2023"}
         for test_id, want in expected.items():
             check(f"arm: {test_id} is {want}", verdicts85.get(test_id) == want,
                   (verdicts85.get(test_id), next((t["reason"] for t in doc.get("tests", [])
@@ -753,6 +766,13 @@ def self_test() -> int:
                   dict(suite85.attrib))
         except (ET.ParseError, StopIteration, OSError) as e:
             check("arm: JUnit XML is well-formed", False, e)
+        # A process that exceeds the hang guard is NO VERDICT, at compile and at run.
+        code, doc = results_of(quiet(["--compiler", "stub", "--suites", str(root / "hang-suites"), "--out", str(out),
+                                      "--hang-guard", "3"]))
+        hung = {t["id"]: (t["verdict"], t["reason"]) for t in doc.get("tests", [])}
+        for test_id in hang_tests:
+            check(f"arm: {test_id} is {NO_VERDICT} (the hang guard)", hung.get(test_id, ("", ""))[0] == NO_VERDICT
+                  and "exceeded the hang guard (3 s)" in hung[test_id][1], hung.get(test_id))
         # --keep: the working directory holds the staged source under the adapter's name limit (12 here).
         before = set(Path(tempfile.gettempdir()).glob("conformance-kept-*"))
         quiet(["--compiler", "stub", "--out", str(out), "--editions", "85", "--test", "a-very-long-test-identifier",
@@ -778,11 +798,21 @@ def self_test() -> int:
               hv == {"passes": PASS, "lower": PASS}, (hv, doc.get("tests")))
 
         # The baseline and the CHANGES (§5).
-        small = ["--compiler", "stub", "--out", str(out), "--editions", "85", "--hang-guard", "3"]
-        code = quiet(small + ["--record-baseline"])
+        whole = ["--compiler", "stub", "--out", str(out)]
+        small = whole + ["--editions", "85"]
+        code = quiet(whole + ["--record-baseline"])
         recorded, problems = config.load_baseline(root / "baselines" / "stub.json")
         check("arm: --record-baseline writes every verdict of the run", code == 0 and not problems
-              and recorded == {"85": verdicts85}, (code, problems))
+              and recorded == {"85": verdicts85, "2023": verdicts2023}, (code, problems, recorded))
+        config.write_baseline(root / "baselines" / "stub.json", "stub",
+                              {"85": {"passes": FAIL}, "2023": {**verdicts2023, "passes": FAIL}})
+        code = quiet(small + ["--record-baseline"])
+        recorded, problems = config.load_baseline(root / "baselines" / "stub.json")
+        check("arm: --record-baseline with --editions re-records only the editions it ran and keeps the others",
+              code == 0 and not problems and recorded == {"85": verdicts85, "2023": {**verdicts2023, "passes": FAIL}},
+              (code, problems, recorded))
+        config.write_baseline(root / "baselines" / "stub.json", "stub", {"85": verdicts85, "2023": verdicts2023})
+        recorded = {"85": dict(verdicts85), "2023": dict(verdicts2023)}
         code, doc = results_of(quiet(small))
         check("arm: a run equal to its baseline is GREEN with no CHANGES despite its FAILs",
               code == 0 and not any(doc["changes"][k] for k in doc["changes"]), (code, doc.get("changes")))
@@ -817,14 +847,14 @@ def self_test() -> int:
         check("arm: a profile with no value of an A.1 item a test needs is a configuration error (2)",
               quiet(small) == 2)
         (root / "profiles" / "stub.json").write_text(json.dumps(profile), encoding="utf-8", newline="\n")
-        check("arm: a missing suite manifest is a usage error (2)", quiet(small[:-4] + ["--editions", "2014"]) == 2)
+        check("arm: a missing suite manifest is a usage error (2)", quiet(whole + ["--editions", "2014"]) == 2)
         (root / "suites" / "2014").mkdir()
         (root / "suites" / "2014" / "manifest.json").write_text(json.dumps({"edition": "2014", "tests": []}),
                                                                  encoding="utf-8", newline="\n")
         check("arm: a run over suites holding no test is a usage error (2), never GREEN",
-              quiet(small[:-4] + ["--editions", "2014"]) == 2)
+              quiet(whole + ["--editions", "2014"]) == 2)
         (root / "suites" / "2014" / "manifest.json").write_text("{not json", encoding="utf-8", newline="\n")
-        check("arm: an unreadable manifest is a usage error (2)", quiet(small[:-4] + ["--editions", "2014"]) == 2)
+        check("arm: an unreadable manifest is a usage error (2)", quiet(whole + ["--editions", "2014"]) == 2)
         shutil.rmtree(root / "suites" / "2014")
 
         # The configuration formats (config.py), as the generator's audit checks them.
@@ -837,7 +867,7 @@ def self_test() -> int:
             {"compiler": "orphan", "verdicts": {"85": {"ghost": "MAYBE"}}}), encoding="utf-8", newline="\n")
         found = [f"{p}: {m}" for p, m in config.check_tree(root, ["85", "2002", "2014", "2023"],
                                                             frozenset({"A.4.4", "A.4.11", "A.3-15"}), {9: ("one", "two")},
-                                                            {"85": set(expected) - {"gone"}})]
+                                                            {"85": set(expected) - {"gone"}, "2023": set(expected)})]
         for needle in ("adapters/bad.json: compile uses {nope}", "adapters/bad.json: diagnostic is a regular expression",
                        "profiles/lax.json: editions are listed in ascending order",
                        "profiles/lax.json: A.4.99 is not an Annex A.4 module", "profiles/lax.json: modules names A.4.",

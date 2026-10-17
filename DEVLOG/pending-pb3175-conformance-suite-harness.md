@@ -56,8 +56,22 @@ refuses (COBOLNET1675 on the flagged seed, an edition diagnostic): `RunCompile`'
 arm and its `_` default was 70, so a wrong program read as a compiler failure. `Program.ExitCode` names every outcome
 (BindError 65, like a parse error; an unnamed one throws) and `CliParserTests` pins each.
 
-**Tests.** `run.py --self-test` 58 arms (Windows and WSL), `generate.py --self-test` 75 arms (the words, the defined
-names, the standard's keywords, the configuration refusals), `ConformanceSuiteProfileDriftTests`, two `CliParserTests`.
+**Branch review, round 1 (four findings, all fixed).** (R1-1) `--record-baseline --editions 2014` rewrote the whole
+baseline with that one edition, erasing every other edition's recorded verdicts: an `--editions` run now replaces only
+the record of each edition it ran (each edition's record is a whole run of its suite), with a self-test arm that was
+red on the old code. (R1-2) The WiseOwl adapter's diagnostic pattern required `COBOLNET<n>`, so a parse error
+(`COBOL0001`) or a COPY error (`CBL<n>`) at a flagged test's marked line read as "no diagnostic reported": the pattern
+now takes any code at its position, and the new `ConformanceSuiteAdapterDriftTests` renders every code of both
+registries through the compiler's own formatters (`Diagnostic.ToString`, `EditionContext.Error`/`Warning`) and
+requires the pattern to read each one's file and line (51 misses on the old pattern). Sibling:
+`gnucobol_differential.py`'s `ourCodes` dropped the CBL family, now included. (R1-3) The self-test ran its PASS arms
+under a 3 s hang guard, a wall-clock limit on a stub process: the two hang arms now run as a suite of their own under
+the short guard (NO VERDICT however loaded the host), every other arm under the default guard, and the self-test
+takes 7 s instead of 29. (R1-4) `kb/Work/PB782` records that its target (3), the exit-code mapping, landed here
+(re-measured: COBOLNET0900 and COBOLNET1639 exit 65) and stays open for the end-to-end CLI test.
+
+**Tests.** `run.py --self-test` 59 arms (Windows and WSL), `generate.py --self-test` 75 arms (the words, the defined
+names, the standard's keywords, the configuration refusals), `ConformanceSuiteProfileDriftTests`, `ConformanceSuiteAdapterDriftTests`, two `CliParserTests`.
 No inventory row: test infrastructure (`closes_rows: []`, its reason filed). PB3176 (S1c) unblocked.
 
 **Gate:** run `20261017T043946Z-7f15b2` (HEAD 8fe3944d2): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,072/11,913 · Unit 33,411/33,918 · Characterization 5/36 cases ran; the new Unit tests passed in leg 1 and `run.py --self-test` ran GREEN in the audits (29 s). semgrep verify PASS. LINUX GATE: the lander's (batched gating).
