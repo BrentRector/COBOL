@@ -1,4 +1,4 @@
-## PB3254: an inverted THRU over sections keeps both operands' lexical extent, so SR3 sees the whole sort procedure
+## Entry 2126 — 2026-10-16 18:06 PDT — PB3254: an inverted THRU over sections keeps both operands' lexical extent, so SR3 sees the whole sort procedure
 
 **The defect.** `PcRange` carried only the return-address pair (Start = first pc of procedure-name-1, End = last pc of procedure-name-2), and the lexical membership test `Spans`/`SpannedPcs` derived its interval from `min(Start, End)..max(Start, End)`. For `INPUT PROCEDURE IS S-B THRU S-A` over SECTIONS with S-A (A1, A2) physically before S-B (B1, B2, B3), the pair is `(B1, A2)` and the derived interval `A2..B1` drops A1, B2 and B3. A file SORT written in B2 (inside procedure-name-1) and one in A1 compiled with no diagnostic, while the same program with `S-A THRU S-B` drew COBOLNET2700 at both (ISO 14.9.40.3 SR3; 14.9.28.4 GR4/GR6 make the inverted range legal). PB812 and PB1139 fixed the paragraph-to-paragraph inversion, where each endpoint is one pc; sections were the arm they left.
 
@@ -9,3 +9,4 @@
 **Goldens.** `conformance/85/pb3254_sort_inverted_section_thru` (a legal inverted section THRU that runs: records released from B1, B2 and A1, A2 sort to `A B C D`), negatives `pb3254-sort-in-inverted-section-sort-procedure-first` (SORT in the middle paragraph of procedure-name-1) and `-last` (SORT in the first paragraph of procedure-name-2), both at every edition, and `pb3254-merge-in-inverted-section-sort-procedure` (COBOLNET1572 at 2023). A unit test, `ThroughSpansEveryParagraphOfBothOperandsInWhicheverOrder`, pins ten compositions including inverted sections and empty operands.
 
 **Rows.** PB3254 claimed no inventory row, so `closes_rows` is empty with its reason.
+
