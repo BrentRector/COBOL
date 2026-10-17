@@ -58,4 +58,9 @@ unreadable header, an unclassifiable DISPLAY operand and an unknown registry nam
 **Not done:** the completeness report on the ledger (§9's last bullet), whose content is the owner's (kb/Work
 PB2912); raised as a lead in the wave report.
 
-**Gate:** GATE-VERDICT-PENDING
+**Gate:** run `20261017T032152Z-ddd86a` (HEAD 9da27563c): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515):
+GREEN — leg 2 left to CI's whole-population run: Conformance 5,880 · Unit 661 · Characterization 31 … — Conformance
+6,019/11,899 · Unit 33,225/33,886 · Characterization 5/36 cases ran (skipped 0) in 1 of 2 leg(s) …`. The first gate
+(run `20261017T024457Z-9cbe40`, GREEN) re-ran all 82 self-tests in 1,597 s, because `scripts/self_tests.py` is an
+input of every recorded PASS; the second reused 72. `SelfTestDiscoveryDriftTests` (5 of 5) passed in a direct run on
+the gate's build: its two edited methods are leg 2. Linux gate: the lander's (batched gating).
