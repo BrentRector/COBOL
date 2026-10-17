@@ -8,8 +8,8 @@ prefixes. Re-probe on the pin: with `88 FS-HEX04 VALUE X"3034"` on a FILE STATUS
 `IF WS-FS = "0'4"` drew COBOLNET1621 (the value is the three characters `0'4`, which StripLiteral turned into `04`)
 while `IF WS-FS = X"3034"` and `IF FS-HEX04` (value `04`, which it turned into `X3034`) drew nothing. The same
 function fed the VALUE-EDITING scan. It is deleted: the relation operand, the level-88 VALUE reading and the
-VALUE-EDITING scan call `CobolLiteral.Decode`, the one decoder (§8.3.3.2.4 GR1 delimiters are no part of the value,
-a doubled one is one character; GR4 `X"3034"` is `04`). Finding on the way: the hexadecimal literal is a token of its
+VALUE-EDITING scan call `CobolLiteral.Decode`, the one decoder (§8.3.3.2.4 GR1 delimiters are no part of the value;
+§8.3.3.2.3 SR3 / §8.3.3.5.3 SR3 a doubled one is one character; §8.3.3.2.4 GR4 `X"3034"` is `04`). Finding on the way: the hexadecimal literal is a token of its
 own (`HEXLIT`), which a relation reader written for `STRINGLIT` never saw; `CharacterLiteralText` now names
 STRINGLIT, NATLIT and HEXLIT once for both readers, so `IF FS = N"04"` and a hexadecimal `VALUE` on a numeric-edited
 item are judged by their value too.

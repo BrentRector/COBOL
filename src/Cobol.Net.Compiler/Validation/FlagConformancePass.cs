@@ -770,7 +770,8 @@ internal sealed partial class FlagConformancePass : CursorFollowingVisitor   // 
     /// with a digit / a letter) escapes the scan — a rare false-negative for this advisory flag. A concatenation or
     /// boolean literal is not analyzed (not a numeric-editing value) and is not flagged. The characters scanned are
     /// the literal's VALUE — <see cref="CobolLiteral.Decode"/>, the one literal decoder: a doubled delimiter is one
-    /// character (§8.3.3.2.4 GR1: the delimiters are no part of the value), and an <c>X"2E"</c> hexadecimal literal is the
+    /// character (§8.3.3.2.3 SR3, §8.3.3.5.3 SR3 for a national literal; §8.3.3.2.4 GR1: the delimiters are no part of
+    /// the value), and an <c>X"2E"</c> hexadecimal literal is the
     /// <c>.</c> it denotes (§8.3.3.2.4 GR4).</summary>
     private static bool LiteralHasNoEditingSymbols(CobolParserCore.ValueClauseContext value)
     {

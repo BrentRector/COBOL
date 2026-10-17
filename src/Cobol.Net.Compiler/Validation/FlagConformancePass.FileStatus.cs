@@ -225,7 +225,8 @@ internal sealed partial class FlagConformancePass
 
     /// <summary>The character value of a raw alphanumeric or national literal operand (a relation's or a level-88's), else
     /// null: <see cref="CobolLiteral.Decode"/> keeps only what §8.3.3.2.4 GR1 keeps (the delimiters are not part of the
-    /// value, a doubled one is one character) and decodes the hexadecimal form.</summary>
+    /// value) and what §8.3.3.2.3 SR3 / §8.3.3.5.3 SR3 say (a doubled delimiter is one character), and decodes
+    /// the hexadecimal form (§8.3.3.2.4 GR4).</summary>
     private static string? StatusLiteral(string raw)
         => CobolLiteral.ClassOf(raw) is LiteralClass.Alphanumeric or LiteralClass.National ? CobolLiteral.Decode(raw) : null;
 }

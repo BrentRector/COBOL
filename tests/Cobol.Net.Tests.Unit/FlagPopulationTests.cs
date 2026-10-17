@@ -360,7 +360,7 @@ public sealed class FlagPopulationTests
     [InlineData("    IF FS = X\"3034\"|        CONTINUE|    END-IF.", "I-O-STATUS-07", 0)]
     [InlineData("    IF FS = N\"04\"|        CONTINUE|    END-IF.", "I-O-STATUS-04", 1)]         // a national '04'
     [InlineData("    IF FS = \"0'4\"|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]         // §8.3.3.2.4 GR1: three characters 0'4
-    [InlineData("    IF FS = '0''4'|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]           // a doubled delimiter is ONE character
+    [InlineData("    IF FS = '0''4'|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]           // §8.3.3.2.3 SR3: a doubled delimiter is ONE character
     [InlineData("    IF FS-HEX04|        CONTINUE|    END-IF.", "I-O-STATUS-04", 1)]              // an 88 VALUE X"3034"
     [InlineData("    IF FS-HEX07|        CONTINUE|    END-IF.", "I-O-STATUS-07", 1)]
     [InlineData("    IF FS-HEX07|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]
