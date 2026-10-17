@@ -72,3 +72,6 @@ header, so a new drift test over `tests/conformance/negative`, `NegativeGoldenHe
 `HostWitnessTraitDriftTests` while it did): a code a header states after
 `Expected`, `Diagnostic` or `->` must be one its `.err` pins. It checks 85 goldens. On the reviewed head it reports
 five of the seven stale headers; the other two named the code in prose. A built-in fixture proves the detector trips.
+The review finisher's gate, run `20261017T113417Z-7025a0` on `f84c138f0`: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched
+gating, PB2515): GREEN`, with Conformance 6,246/11,953, Unit 33,517/33,927 and Characterization 5/36 run and no
+failure; both new facts, the renamed OoSpineTests fact and the seven re-headed negatives passed in leg 1.
