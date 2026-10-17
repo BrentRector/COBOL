@@ -1,3 +1,10 @@
+      *>--- conformance-case
+      *> id: pb3261_sender_first_order
+      *> rules: [GR-14.9.49.4-11]
+      *> accept: [2002]
+      *> source-format: fixed
+      *> portable: unverified
+      *>---
       *> kb/Work PB3261. ISO §14.9.49.4 GR11: "The exception condition
       *> that is used to determine which USE statement to select is the
       *> first one that occurs in the order of evaluation of the

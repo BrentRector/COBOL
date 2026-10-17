@@ -1,3 +1,10 @@
+      *>--- conformance-case
+      *> id: pb3261_sender_first_runtime_length
+      *> rules: []
+      *> accept: [2023]
+      *> source-format: fixed
+      *> portable: unverified
+      *>---
       *> kb/Work PB3261 review R1-1. ISO §14.9.49.4 GR11: "The
       *> exception condition that is used to determine which USE
       *> statement to select is the first one that occurs in the order
