@@ -61,3 +61,10 @@ All 56 were corrected in the same batch: 204 rows changed, and GAP stayed at 60.
 - `grammar_findings_to_batch.py --self-test` gains a finding with no band and a finding with a gap.
 - `SpecTraceabilityInventoryDriftTests.TheseChecks_ActuallyFail_OnAFabricatedInventory` gains the same four C#
   cases, and `EveryEditionsField_IsTheOneSpelling` now holds the whole inventory to the stricter rule.
+
+**Gate.** The first run (20261017T011355Z-6839cd) was RED on its LINE ENDINGS audit: `decide.py` wrote its batch
+without `newline=`, so the file checked out with CRLF. The writer now passes `newline` as LF. The re-gate
+(20261017T011528Z-adddfa) reads `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN — leg 2 left to
+CI's whole-population run: Conformance 6,046 · Unit 1,010 · Characterization 31`. In `leg-1-Unit.trx`, both
+`EveryEditionsField_IsTheOneSpelling` and `TheseChecks_ActuallyFail_OnAFabricatedInventory` read Passed.
+`semgrep/verify.py` passes with no count raised.
