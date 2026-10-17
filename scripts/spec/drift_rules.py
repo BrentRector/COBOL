@@ -25,9 +25,9 @@ import sys
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 HELPERS = {"Src": "src", "Tests": "tests", "Docs": "docs", "Scripts": "scripts", "Specs": "specs",
-           "VersionMatrix": "tests/version-matrix", "Nist": "tests/nist", "At": ""}
+           "VersionMatrix": "tests/version-matrix", "Nist": "tests/nist", "Suite": "conformance-suite", "At": ""}
 CALL = re.compile(r"TestRepo\.(" + "|".join(HELPERS) + r")\(([^()]*)\)")
-LITERAL = re.compile(r'"((?:src|tests|docs|scripts|specs|kb|grammars|\.github|adjudication)/[^"\s{}*]+)"')
+LITERAL = re.compile(r'"((?:src|tests|docs|scripts|specs|kb|grammars|\.github|adjudication|conformance-suite)/[^"\s{}*]+)"')
 SUMMARY = re.compile(r"///\s*<summary>(.*?)</summary>", re.S)
 CLASS = re.compile(r"\bclass\s+(\w*DriftTests)\b")
 CREF = re.compile(r'<(?:see|seealso)\s+(?:cref|langword|href)="(?:[A-Z]:)?([^"]+)"\s*/>')

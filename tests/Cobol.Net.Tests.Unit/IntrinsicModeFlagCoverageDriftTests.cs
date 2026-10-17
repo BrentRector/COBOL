@@ -156,7 +156,7 @@ public sealed class IntrinsicModeFlagCoverageDriftTests
         {
             foreach (SuiteTest test in tests.Values.Where(t => t.Expect == "accept").OrderBy(t => t.Id, StringComparer.Ordinal))
             {
-                yield return ($"{ed}/{test.Id}", File.ReadAllText(Path.Combine(SuiteManifest.Root, test.Source)));
+                yield return ($"{ed}/{test.Id}", File.ReadAllText(Path.Combine(TestRepo.Suite(), test.Source)));
             }
         }
     }
