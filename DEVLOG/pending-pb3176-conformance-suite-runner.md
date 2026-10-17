@@ -71,4 +71,7 @@ wholesale wipe and now uses the same helper (its notes: `_Dashboard.md`, `clause
 directories, never a caller's path. Arms: `generated_output.py --self-test` (6) and four new `generate.py
 --self-test` arms (a foreign entry refused and kept, a file path refused, a previous run's output replaced whole, an
 empty directory written). The finisher's merge of main (PB3174's review round 1) resolved one conflict in the
-generator's self-test, keeping both sides' arms.
+generator's self-test, keeping both sides' arms. Its first re-gate (run `20261017T072617Z-08ab4b`) was RED at LINE
+ENDINGS: the helper's self-test wrote text without `newline=`. The four new `generate.py` writes had the same shape
+and were not reported, because `scripts/line_endings.py`'s WRITERS arm looked only in `scripts/` and `.claude/` while
+`self_tests.py` runs the suite harness as a live tool; `conformance-suite/harness/` is now one of its live roots.
