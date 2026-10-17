@@ -40,3 +40,8 @@ the verb emitters only decide whether their rule is sender-first. Full code: eac
 INITIALIZE's receiver-first order is the one deliberate exception. Performance: a hoist is emitted only when both
 sides evaluate at run time, a JIT-elided local. Duplication: no second copy of the order rule; the arithmetic snapshot
 reuses the existing `Snapshot`.
+
+**Gate.** The first gate was red on `MoveOverlapDriftTests` (it pins exactly two reads of `m.Stores[i].Prefill`; the
+order decision read a third), so the overlap-prefill exception moved into `EmitStore` beside the prefill it reads. The
+re-gate (run `20261017T031527Z-6d6fa0`): `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` —
+Conformance 5,888 · Unit 33,173 · Characterization 5 cases ran in leg 1, the golden among them.
