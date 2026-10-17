@@ -92,4 +92,6 @@ line 862 but printed line 856's text. `temp_names.py` took a finding's text from
 breaks at the two U+2028/U+2029 characters in `run.py`'s normalization cases. Lines now split at LF only
 (`source_lines`). Two new self-test arms (`.py` and `.ps1`, a U+2028 in a literal before the finding) cover it, and the
 other live scripts that number lines with `splitlines` (`test_population.py#_code_lines`, `spec/where.py`,
-`spec/repairs/latex_diagrams_to_house_style.py`) are fixed the same way.
+`spec/repairs/latex_diagrams_to_house_style.py`) are fixed the same way. The round-2 finisher's gate: run `20261017T074916Z-1fbbbd` (HEAD 9164c6097):
+`LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,126/11,947 · Unit 33,497/33,925 · Characterization
+5/36 cases ran; `EveryLiveTreeReader_ReadsTheOneList` passed in leg 1, and the SELF-TESTS audit ran 84 GREEN.
