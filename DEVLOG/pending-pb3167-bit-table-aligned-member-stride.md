@@ -54,3 +54,5 @@ shape. No inventory row is re-verdicted (`closes_rows: []` with its reason).
 **Self-review.** One mechanism, at its one place: the stride question lives beside the walk and uses its predicate.
 Performance: `HoldsByteStart` returns at the first byte-starting member, and it is reached only by bit tables.
 Duplication: one fewer copy of the placement dispatch.
+
+**Gate.** `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN` (run `20261017T014548Z-ba6d09` at b2ac0ff92; Conformance 5,950 · Unit 33,015 · Characterization 5 cases ran). The 14 characterization snapshots that carry the runtime version are not in leg 1 (the kb/Work PB3144 trap), so they were run directly: 14/14 Passed. LINUX GATE: the landing's (batched gating).
