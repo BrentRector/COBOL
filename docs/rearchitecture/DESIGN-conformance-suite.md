@@ -149,10 +149,22 @@ So:
   an alphanumeric item) and DISPLAYs an alphanumeric literal naming the outcome. A figurative constant is allowed:
   DISPLAY shows "the alphanumeric representation of that figurative constant" (§14.9.11.4 GR 3), except an ALL
   national literal. A reference-modified numeric or numeric-edited item of usage display is alphanumeric (§8.4.3.3.4
-  GR 6 c) and allowed; one of computational usage would show its storage and is not. The lint also refuses `UPON`
-  (an implementor-defined device, §14.9.11.3 SR 2, whose output no expected stdout holds) and, in fixed form,
-  program text past column 72 (margin R, above). It applies to the tests the suites carry; a name the generator
-  cannot classify (a RENAMES item, a special register) is refused rather than guessed.
+  GR 6 c) and allowed, unless it is signed and no SIGN SEPARATE clause applies to it: "Neither the representation
+  nor the position of that operational sign is specified" (§13.18.52.4 GR 4; GR 5 b for SIGN without SEPARATE),
+  while a separate sign is '+' or '-' (GR 6 b). One of computational usage would show its storage and is not
+  allowed. **The lint judges the storage an operand shows.** A group's USAGE, SIGN and SYNCHRONIZED clauses apply to
+  its items (§13.18.60.4 GR 1, §13.18.52.4 GR 1, §13.18.55.4 GR 1). A group is allowed only when every item it holds,
+  at any depth, is alphanumeric, numeric-edited, or an unsigned or separately signed numeric display item, and none
+  is SYNCHRONIZED ("The effect of this clause is defined by the implementor", §13.18.55.4 GR 9). An item whose storage
+  another entry also describes is judged by what that entry holds too: a REDEFINES (§13.18.44.4 GR 2), the records
+  of one FD or SD (§13.18.33.4 GR 3), the files of one SAME RECORD AREA clause (§12.4.6.4.4 GR 2). Each source unit's
+  DISPLAY statements are judged by that unit's own data descriptions; a name the unit does not declare (a GLOBAL or
+  EXTERNAL item of another unit) by every unit's. The lint reads declarations, not data flow: it does not follow the
+  bytes an alphanumeric MOVE carries from one item into another. The lint also refuses `UPON` (an
+  implementor-defined device, §14.9.11.3 SR 2, whose output no expected stdout holds) and, in fixed form, program
+  text past column 72 (margin R, above) in the test and in every library text it copies; a comment line is no
+  program text. It applies to the tests the suites carry; a name the generator cannot classify (a RENAMES item, a
+  special register) is refused rather than guessed. A refusal in a library text names that file and its line.
 - **`implementor-defined`** names Annex A.1 items whose values the standard enumerates. The example is item 148,
   "RECORD clause (whether fixed or variable records produced for fixed-or-variable-length format)": §13.18.43.4 GR 17
   "It is implementor defined whether format 3 of the RECORD clause produces fixed-length records or variable-length

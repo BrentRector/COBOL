@@ -451,10 +451,11 @@ class Reader:
             self.refuse(rel, marks[0], "a marked line `<<` in a test that is not flagged")
         # COPY of an undeclared copybook (§4).
         declared = set(case.files)
-        for stmt in self._all_copies(case, tokens):
+        copies = self._all_copies(case, tokens)
+        for stmt in copies:
             if not any(f == stmt.name or Path(f).stem == stmt.name for f in declared):
-                self.refuse(rel, stmt.line, f"COPY {stmt.name}: the library text is not a declared file of this "
-                                            f"test (`files`, §3.1)")
+                self.refuse(stmt.source or rel, stmt.line, f"COPY {stmt.name}: the library text is not a declared "
+                                                           f"file of this test (`files`, §3.1)")
         # A run-time expectation at 85 (§3.2), in the program or in the library text it copies.
         expanded = cobol.expand_copies(tokens, lambda name: self._library(case, name))
         observed = cobol.observes_exception(expanded)
@@ -462,9 +463,9 @@ class Reader:
             early = [e for e in case.accept if self.inputs.editions.index(e) < self.inputs.editions.index(
                 FIRST_RUN_TIME)]
             if early:
-                self.refuse(rel, observed, f"a run-time expectation (it observes an exception condition) accepted at "
-                                           f"{', '.join(early)}: run-time violations are judged only from "
-                                           f"{FIRST_RUN_TIME} on (§3.2)")
+                self.refuse(observed.source or rel, observed.line,
+                            f"a run-time expectation (it observes an exception condition) accepted at "
+                            f"{', '.join(early)}: run-time violations are judged only from {FIRST_RUN_TIME} on (§3.2)")
         # Free form before it existed.
         if case.source_format == "free":
             first = self.inputs.editions.index(FIRST_FREE_FORM)
@@ -473,27 +474,37 @@ class Reader:
             if early:
                 self.refuse(rel, h.lines.get("source-format", 1), f"free form at {', '.join(early)}: the free-form "
                                                                   f"reference format is a {FIRST_FREE_FORM} feature")
-        # The portability lint (§3.3), for a test the suites carry.
+        # The portability lint (§3.3), for a test the suites carry: on the program text the compiler reads, the
+        # test's own and every library text it copies.
         if case.in_suite:
             if case.source_format == "fixed":
-                for number in cobol.program_text_past_margin(text):
-                    self.refuse(rel, number, f"program text past column {cobol.FIXED_TEXT_END}: margin R is "
-                                             f"implementor-defined (ISO 6.3.1)")
-            for issue in cobol.display_issues(expanded, cobol.data_classes(expanded)):
-                self.refuse(rel, issue.line, f"portability lint: DISPLAY {issue.operand}: {issue.why} (§3.3; ISO "
-                                             f"14.9.11.4 GR 1 makes its device form the implementor's)")
+                texts = [(rel, text)] + [t for t in (self._library_text(case, n) for n in
+                                                     dict.fromkeys(s.name for s in copies)) if t is not None]
+                for path, program_text in texts:
+                    for number in cobol.program_text_past_margin(program_text):
+                        self.refuse(path, number, f"program text past column {cobol.FIXED_TEXT_END}: margin R is "
+                                                  f"implementor-defined (ISO 6.3.1)")
+            for issue in cobol.display_issues(expanded):
+                self.refuse(issue.source or rel, issue.line, f"portability lint: DISPLAY {issue.operand}: "
+                                                             f"{issue.why} (§3.3; ISO 14.9.11.4 GR 1 makes its device "
+                                                             f"form the implementor's)")
 
-    def _library_path(self, case: Case, name: str) -> Path | None:
+    def _library_text(self, case: Case, name: str) -> tuple[Path, str] | None:
+        """The declared library text `name` names (a file of `files`, by its name or its stem): its path relative to
+        the tree and its text, or None when no declared file is there."""
         for f in case.files:
             if f == name or Path(f).stem == name:
-                return self.root / case.path.parent / f
+                rel = case.path.parent / f
+                path = self.root / rel
+                return (rel, path.read_text(encoding="utf-8")) if path.is_file() else None
         return None
 
     def _library(self, case: Case, name: str) -> list[cobol.Token] | None:
-        path = self._library_path(case, name)
-        if path is None or not path.is_file():
+        found = self._library_text(case, name)
+        if found is None:
             return None
-        return cobol.tokenize(cobol.read_lines(path.read_text(encoding="utf-8"), case.source_format))
+        rel, text = found
+        return cobol.tokenize(cobol.read_lines(text, case.source_format), _posix(rel))
 
     def _all_copies(self, case: Case, tokens: list[cobol.Token]) -> list[cobol.CopyStatement]:
         """The COPY statements of the program and, recursively, of the declared library texts it copies."""
@@ -1023,7 +1034,8 @@ def self_test() -> int:
         "cases/1.1.1-Rule/copying.cob": _fixed(["id: copying", "rules: [GR-1.1.1-1]", "accept: [85]",
                                                 "files: [CPY1.cpy]", "source-format: fixed"],
                                                _PROGRAM[:4] + ["       COPY CPY1."] + _PROGRAM[4:]),
-        "cases/1.1.1-Rule/CPY1.cpy": "       01 W-C PIC X.\n",
+        "cases/1.1.1-Rule/CPY1.cpy": "      * a comment line of a library text runs on past column 72 to 80 COMMENT1\n"
+                                     "       01 W-C PIC X.\n",
         "cases/1.1.1-Rule/copying.out": "OK ABC  0\n",
         "cases/1.1.1-Rule/unverified.cob": _fixed(["id: unverified", "rules: [GR-1.1.1-1]", "accept: [85]",
                                                    "portable: unverified", "source-format: fixed"],
@@ -1237,11 +1249,14 @@ def self_test() -> int:
         "missing declared file": ("cases/1.1.1-Rule/gone.cob",
                                   _fixed(["id: gone", "rules: [GR-1.1.1-1]", "accept: [85]", "files: [GONE.cpy]",
                                           "source-format: fixed"], _PROGRAM), "which is not beside the test"),
-        "exception observed in a copybook at 85": ("cases/1.1.1-Rule/ec-copy.cob",
-                                                   _fixed(["id: ec-copy", "rules: [GR-1.1.1-1]", "accept: [85]",
-                                                           "files: [ECCPY.cpy]", "source-format: fixed"],
-                                                          _PROGRAM[:9] + ["           COPY ECCPY."] + _PROGRAM[9:]),
-                                                   "run-time expectation"),
+        "exception observed in a copybook at 85": ("cases/1.1.1-Rule/ECCPY.cpy",
+                                                   "           IF FUNCTION EXCEPTION-STATUS = SPACE CONTINUE "
+                                                   "END-IF.\n", "run-time expectation"),
+        "lint margin in a copybook": ("cases/1.1.1-Rule/MRGCPY.cpy",
+                                      "       01 W-C PIC X." + " " * 52 + "PIC 9(3)\n",
+                                      "program text past column 72"),
+        "lint display in a copybook": ("cases/1.1.1-Rule/DSPCPY.cpy", "           DISPLAY W-N\n",
+                                       "DISPLAY W-N: a data item of class numeric"),
         "duplicate id": ("wiseowl/cases/1.1.1-Rule/ok.cob",
                          _fixed(["id: ok", "rules: [GR-1.1.1-1]", "accept: [85]", "source-format: fixed"], _PROGRAM),
                          "is also"),
@@ -1271,9 +1286,17 @@ def self_test() -> int:
     base["cases/2.2.2-Free/free85.out"] = "x\n"
     base["cases/COMPUTE/folder.out"] = "x\n"
     base["wiseowl/cases/1.1.1-Rule/ok.out"] = "x\n"
-    for name in ("ctl-unflagged", "gone", "ec-copy"):
+    for name in ("ctl-unflagged", "gone", "ec-copy", "copy-margin", "copy-display"):
         base[f"cases/1.1.1-Rule/{name}.out"] = "x\n"
-    base["cases/1.1.1-Rule/ECCPY.cpy"] = "           IF FUNCTION EXCEPTION-STATUS = SPACE CONTINUE END-IF.\n"
+    base["cases/1.1.1-Rule/ec-copy.cob"] = _fixed(["id: ec-copy", "rules: [GR-1.1.1-1]", "accept: [85]",
+                                                   "files: [ECCPY.cpy]", "source-format: fixed"],
+                                                  _PROGRAM[:9] + ["           COPY ECCPY."] + _PROGRAM[9:])
+    base["cases/1.1.1-Rule/copy-margin.cob"] = _fixed(["id: copy-margin", "rules: [GR-1.1.1-1]", "accept: [85]",
+                                                       "files: [MRGCPY.cpy]", "source-format: fixed"],
+                                                      _PROGRAM[:5] + ["       COPY MRGCPY."] + _PROGRAM[5:])
+    base["cases/1.1.1-Rule/copy-display.cob"] = _fixed(["id: copy-display", "rules: [GR-1.1.1-1]", "accept: [85]",
+                                                        "files: [DSPCPY.cpy]", "source-format: fixed"],
+                                                       _PROGRAM[:9] + ["           COPY DSPCPY."] + _PROGRAM[9:])
     base["cases/1.1.1-Rule/rough.cob"] = _fixed(["id: rough", "rules: [GR-1.1.1-1]", "accept: [85]",
                                                  "portable: unverified", "source-format: fixed"], _PROGRAM)
     base["cases/1.1.1-Rule/rough.out"] = "x\n"
@@ -1304,7 +1327,10 @@ def self_test() -> int:
               rc_empty == 1 and any("there is no cases/ tree" in r.message for r in reader.refusals))
 
     # The program-text reader's own arms.
-    src = cobol.tokenize(cobol.read_lines("\n".join([
+    def fixed_tokens(*lines: str) -> list[cobol.Token]:
+        return cobol.tokenize(cobol.read_lines("\n".join(lines), "fixed"))
+
+    data = [
         "      * a comment line",
         "       01 A PIC S9(4)V99 USAGE COMP.",
         "       01 B PIC X(4)  VALUE 'IT''S'.",
@@ -1314,27 +1340,85 @@ def self_test() -> int:
         "       01 K CONSTANT AS 12.",
         "       01 T OCCURS 3 INDEXED BY TX PIC X.",
         "      -    ",
-    ]), "fixed"))
-    classes = cobol.data_classes([cobol.Token(cobol.WORD, "DATA", 0), cobol.Token(cobol.WORD, "DIVISION", 0)] + src)
+    ]
+    classes = cobol.data_classes(fixed_tokens(*data))
     check("arm: the reader classifies items by PICTURE, USAGE, group and constant",
           {k: classes.get(k) for k in ("A", "B", "C", "G", "G1", "G2", "N1", "K", "TX", "T")} == {
               "A": {cobol.NUMERIC_COMPUTATIONAL_CLASS}, "B": {cobol.ALPHANUMERIC_CLASS},
               "C": {cobol.NUMERIC_EDITED_CLASS}, "G": {cobol.ALPHANUMERIC_CLASS}, "G1": {cobol.ALPHANUMERIC_CLASS},
               "G2": {cobol.NUMERIC_DISPLAY_CLASS}, "N1": {cobol.NATIONAL_CLASS}, "K": {cobol.NUMERIC_DISPLAY_CLASS},
               "TX": {cobol.INDEX_CLASS}, "T": {cobol.ALPHANUMERIC_CLASS}}, classes)
-    proc = cobol.tokenize(cobol.read_lines("\n".join([
-        "       PROCEDURE DIVISION.",
-        "           DISPLAY \"X\" G G2 (1:1) A (1:2) SPACE B *> a floating comment DISPLAY C",
-        "           IF B = SPACE DISPLAY C END-IF.",
-    ]), "fixed"))
-    issues = [(i.operand, i.why) for i in cobol.display_issues(proc, classes)]
+    proc = fixed_tokens("       DATA DIVISION.", *data, "       PROCEDURE DIVISION.",
+                        "           DISPLAY \"X\" G G2 (1:1) A (1:2) SPACE B *> a floating comment DISPLAY C",
+                        "           IF B = SPACE DISPLAY C END-IF.")
+    issues = [(i.operand, i.why) for i in cobol.display_issues(proc)]
     check("arm: a reference-modified numeric display item is alphanumeric; a computational one is not; a floating "
           "comment is no operand", issues == [("A", "a data item of class " + cobol.NUMERIC_COMPUTATIONAL_CLASS)],
           issues)
-    cont = cobol.tokenize(cobol.read_lines("\n".join([
-        "           DISPLAY \"ABC",
-        "      -    \"DEF\" W-X.",
-    ]), "fixed"))
+
+    def refused(data: list[str], displays: list[str], environment: tuple[str, ...] = ()) -> list[str]:
+        """The operands the lint refuses in a one-unit program with `data` and one DISPLAY per `displays` item."""
+        lines = (["       ENVIRONMENT DIVISION.", *environment] if environment else []) + [
+            "       DATA DIVISION.", *data, "       PROCEDURE DIVISION.",
+            *("           DISPLAY " + d for d in displays), "           STOP RUN."]
+        return [i.operand + (" (" + i.why + ")" if "holding" in i.why or "sharing" in i.why else "")
+                for i in cobol.display_issues(fixed_tokens(*lines))]
+
+    # ISO 13.18.60.4 GR 1: a group's USAGE applies to each elementary item in it (branch review R1-1).
+    got = refused(["       WORKING-STORAGE SECTION.", "       01 GC USAGE COMP.", "           05 A1 PIC 9(4) VALUE 1.",
+                   "       01 GN USAGE NATIONAL.", "           05 N2 PIC 9(3).",
+                   "       01 GG GROUP-USAGE NATIONAL.", "           05 M PIC N(2)."],
+                  ["A1 (1:2)", "N2 (1:3)", "GG", "M (1:1)"])
+    check("arm: an item takes its group's USAGE (computational, national) and GROUP-USAGE",
+          got == ["A1", "N2", "GG", "M"], got)
+    # ISO 13.18.52.4 GR 4-6: only a separate sign is the standard's '+' / '-' (branch review R1-2 a).
+    got = refused(["       WORKING-STORAGE SECTION.", "       01 S PIC S9(3) VALUE -12.",
+                   "       01 SL PIC S9(3) SIGN LEADING.", "       01 SS PIC S9(3) SIGN LEADING SEPARATE.",
+                   "       01 GS SIGN TRAILING SEPARATE.", "           05 S2 PIC S9(2).",
+                   "           05 S3 PIC S9(2) SIGN LEADING."],
+                  ["S (1:3)", "SL (1:3)", "SS (1:4)", "S2 (1:3)", "S3 (1:2)"])
+    check("arm: a reference-modified signed item is refused unless a SIGN SEPARATE clause applies (its own, or its "
+          "group's when it has none)", got == ["S", "SL", "S3"], got)
+    # A group shows its items' storage (branch review R1-2 b), with SYNCHRONIZED slack bytes (13.18.55.4 GR 9).
+    got = refused(["       WORKING-STORAGE SECTION.", "       01 H.", "           05 HB PIC 9(4) COMP VALUE 1.",
+                   "           05 FILLER PIC X.", "       01 H2.", "           05 FILLER PIC S9.",
+                   "       01 H3.", "           05 H3A PIC X(2).", "           05 H3B PIC 9(2).",
+                   "           05 H3C PIC -9.", "           05 H3D PIC S9 SIGN SEPARATE.",
+                   "       01 H4.", "           05 H4A PIC X(2) SYNC.",
+                   "       01 H5.", "           05 H5S.", "               10 H5B PIC 9 COMP."],
+                  ["H", "H (1:2)", "H2", "H3", "H4", "H4A", "H5S", "H5"])
+    check("arm: a group is refused when it holds a computational, signed or synchronized item, at any depth",
+          [g.split(" (")[0] for g in got] == ["H", "H", "H2", "H4", "H5S", "H5"]
+          and all("holding a" in g for g in got), got)
+    # ISO 13.18.44.4 GR 2, 13.18.33.4 GR 3, 12.4.6.4.4 GR 2: storage described twice shows what either holds.
+    got = refused(["       FILE SECTION.", "       FD F1.", "       01 F1-A PIC X(4).",
+                   "       01 F1-B PIC S9(4) COMP.", "       FD F2.", "       01 F2-A PIC X(4).", "       FD F3.",
+                   "       01 F3-A PIC X(4).", "       WORKING-STORAGE SECTION.", "       01 R1 PIC X(4).",
+                   "       01 R2 REDEFINES R1 PIC 9(4) COMP.", "       01 R3 PIC X(4).", "       01 R4 REDEFINES R3 PIC 9(4).", "       01 R5.",
+                   "           05 R5A PIC X(2).", "           05 R5B REDEFINES R5A PIC S99.",
+                   "           05 R5C PIC X(2)."],
+                  ["F1-A", "F2-A", "F3-A", "R1", "R3", "R5A", "R5C", "R5"],
+                  environment=("       INPUT-OUTPUT SECTION.", "       I-O-CONTROL.",
+                               "           SAME RECORD AREA FOR F2 F1."))
+    check("arm: an item sharing storage (REDEFINES, a file's records, SAME RECORD AREA) is judged by what the other "
+          "descriptions hold", [g.split(" (")[0] for g in got] == ["F1-A", "F2-A", "R1", "R5A", "R5"]
+          and all("sharing storage with a" in g for g in got[:4]) and "holding a" in got[4], got)
+    # Each source unit is judged by its own data descriptions (branch review R1-4).
+    units = fixed_tokens(
+        "       IDENTIFICATION DIVISION.", "       PROGRAM-ID. P1.", "       DATA DIVISION.",
+        "       WORKING-STORAGE SECTION.", "       01 X PIC X(4).", "       01 GX PIC X(2) GLOBAL.",
+        "       PROCEDURE DIVISION.", "           DISPLAY X", "           CALL \"P2\"", "           STOP RUN.",
+        "       IDENTIFICATION DIVISION.", "       PROGRAM-ID. P2.", "       DATA DIVISION.",
+        "       WORKING-STORAGE SECTION.", "       01 X PIC S9(4) COMP VALUE -1.", "       01 Y PIC X(2).",
+        "       01 U USAGE DISPLAY PIC X.", "       PROCEDURE DIVISION.", "           DISPLAY X Y GX U",
+        "           GOBACK.", "       END PROGRAM P2.", "       END PROGRAM P1.")
+    got = [(i.line, i.operand, i.why) for i in cobol.display_issues(units)]
+    check("arm: a contained program's DISPLAY is judged by its own entries, a GLOBAL name by its container's",
+          got == [(19, "X", "a data item of class " + cobol.NUMERIC_COMPUTATIONAL_CLASS)], got)
+    check("arm: a comment line past column 72 is no program text; a code line is",
+          cobol.program_text_past_margin("      * comment" + " " * 60 + "SEQ\n" + "       MOVE A TO B." + " " * 53
+                                         + "SEQ\n") == [2])
+    cont = fixed_tokens("           DISPLAY \"ABC", "      -    \"DEF\" W-X.")
     check("arm: a continued literal is one token", [t.text for t in cont][:2] == ["DISPLAY", "\"ABCDEF\""],
           [t.text for t in cont])
     check("arm: free form strips a floating comment and reads a line-initial one as a comment",
