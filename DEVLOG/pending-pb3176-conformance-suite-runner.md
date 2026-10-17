@@ -74,4 +74,7 @@ empty directory written). The finisher's merge of main (PB3174's review round 1)
 generator's self-test, keeping both sides' arms. Its first re-gate (run `20261017T072617Z-08ab4b`) was RED at LINE
 ENDINGS: the helper's self-test wrote text without `newline=`. The four new `generate.py` writes had the same shape
 and were not reported, because `scripts/line_endings.py`'s WRITERS arm looked only in `scripts/` and `.claude/` while
-`self_tests.py` runs the suite harness as a live tool; `conformance-suite/harness/` is now one of its live roots.
+`self_tests.py` runs the suite harness as a live tool; `conformance-suite/harness/` is now one of its live roots. The finisher's gate: run `20261017T072859Z-2174fa` (HEAD
+8e7851db9): `LEG 1 ONLY (batched gating, PB2515): GREEN` — Conformance 6,132/11,947 · Unit 33,491/33,924 ·
+Characterization 5/36 cases ran; all 29 `ConformanceSuite*` cases passed in leg 1, and the SELF-TESTS audit ran
+`generated_output.py` and `generate.py --self-test` GREEN.
