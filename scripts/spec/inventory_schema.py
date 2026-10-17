@@ -32,6 +32,8 @@ from __future__ import annotations
 import json
 import pathlib
 import re
+import sys
+from collections.abc import Iterable
 from typing import Any, NamedTuple
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
@@ -683,7 +685,13 @@ class Schema:
     def __init__(self, raw: dict[str, Any]) -> None:
         self._raw = raw
         self.verdicts: dict[str, dict[str, Any]] = raw["verdicts"]
-        self.editions: list[str] = raw["editions"]
+        #: The editions, ascending — the order IS the spelling's order (`spell_editions`).
+        self.editions: list[str] = raw["editions"]["values"]
+        self.editions_sep: str = raw["editions"]["separator"]
+        #: A row must name its band (kb/Work PB3173, S0b), and the band runs from the rule's introducing edition
+        #: THROUGH the last of `values`: every catalog rule is a rule of the newest text, so it exists there.
+        self.editions_required: bool = raw["editions"]["required"]
+        self.editions_run_through_last: bool = raw["editions"]["run-through-last"]
         self.code_location_re = re.compile(raw["code-location"]["pattern"])
         self.code_location_sep: str = raw["code-location"]["separator"]
         self.test_ref_sep: str = raw["test-ref"]["separator"]
@@ -883,6 +891,56 @@ class Schema:
     def split(self, value: str, sep: str) -> list[str]:
         return [p for p in (p.strip() for p in value.split(sep.strip())) if p]
 
+    def spell_editions(self, names: Iterable[str]) -> str:
+        """The ONE spelling of an `editions` field that names `names` — THE writer of the spelling.
+
+        The schema's `values` order (ascending), each edition once, joined by its `separator` with no spaces:
+        `85,2002,2014,2023` (kb/Work PB3172; DESIGN-conformance-suite.md §6 step 0). Every writer that takes
+        editions from somewhere else — an agent's batch, a grammar finding, a row carried across a rebuild —
+        spells them through here, so no writer has its own idea of the form. ⛔ Raises ValueError on an edition
+        the schema does not have or one named twice: those are not spellings to tidy but claims to correct, and a
+        writer that dropped them would be deciding a rule's edition band by deletion.
+        """
+        given = [n.strip() for n in names]
+        if unknown := [n for n in given if n not in self.editions]:
+            raise ValueError(f"editions {unknown} not in {self.editions}")
+        if repeated := [e for e in self.editions if given.count(e) > 1]:
+            raise ValueError(f"editions {repeated} named more than once")
+        return self.editions_sep.join(e for e in self.editions if e in given)
+
+    def editions_error(self, value: str) -> str | None:
+        """Why `value` is not a legal `editions` field — or None. THE validator of the field.
+
+        Legal is exactly `spell_editions` of the editions it names (kb/Work PB3172), NON-EMPTY when the schema's
+        `required` says so, and a RUN of `values` ending at the last one when `run-through-last` says so (kb/Work
+        PB3173, S0b: every row is a rule of the newest standard's text, so its band runs from the edition that
+        introduced the rule through that one, with no gap). A space, an out-of-order list, a doubled separator, an
+        unknown or a repeated edition, an empty field, and a band that stops early or skips an edition are each
+        refused, naming the value to write where one follows from the value given. The C# battery gate's
+        `BadEditions` (SpecTraceabilityInventoryDriftTests) evaluates the same rule over the whole inventory, from
+        the same schema entry.
+        """
+        if not value:
+            return ("editions is empty — every row names the editions its rule exists at, decided from the "
+                    "standard (kb/Work PB3173; DESIGN-conformance-suite.md §6 step 0)"
+                    if self.editions_required else None)
+        try:
+            spelled = self.spell_editions(self.split(value, self.editions_sep))
+        except ValueError as e:
+            return str(e)
+        if value != spelled:
+            return (f"editions '{value}' is not the one spelling — write '{spelled}' (ascending, "
+                    f"'{self.editions_sep}'-separated, no spaces: DESIGN-conformance-suite.md §6 step 0)")
+        if self.editions_run_through_last:
+            first = value.split(self.editions_sep)[0]
+            run = self.editions_sep.join(self.editions[self.editions.index(first):])
+            if value != run:
+                last = self.editions[-1]
+                return (f"editions '{value}' is not a run through {last} — a rule of the {last} text exists from "
+                        f"its introducing edition through {last} with no gap: write '{run}' if {first} introduced "
+                        f"it (kb/Work PB3173)")
+        return None
+
 
 def load_schema() -> Schema:
     if not SCHEMA_PATH.exists():
@@ -916,3 +974,62 @@ def write_inventory(rows: list[dict[str, Any]]) -> None:
     tmp = INVENTORY_PATH.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(rows, indent=1, ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     tmp.replace(INVENTORY_PATH)
+
+
+def self_test() -> int:
+    """The `editions` validator and writer against values built to break them, under the REAL schema entry.
+
+    Discovered by `scripts/self_tests.py` (this file handles `--self-test`), so every gate and CI's `audits` job
+    runs it. ⚠ It proves the RULE; holding the whole inventory to it is SpecTraceabilityInventoryDriftTests'
+    job (`EveryEditionsField_IsTheOneSpelling`), which runs the same cases against its C# twin.
+    """
+    s = load_schema()
+    rc = 0
+
+    def check(name: str, ok: bool, got: object) -> None:
+        nonlocal rc
+        print(("  ok: " if ok else "  SELF-TEST FAILED: ") + name + ("" if ok else f" — got {got!r}"))
+        rc |= 0 if ok else 1
+
+    print("=== inventory_schema --self-test ===")
+    for legal in ("85,2002,2014,2023", "2002,2014,2023", "2014,2023", "2023"):
+        check(f"{legal!r} is legal", (got := s.editions_error(legal)) is None, got)
+    refused = {
+        "an empty field (kb/Work PB3173)": ("", "editions is empty"),
+        "a band with a gap": ("85,2023", "write '85,2002,2014,2023'"),
+        "a band with an inner gap": ("85,2002,2023", "write '85,2002,2014,2023'"),
+        "a band that stops before the last edition": ("85,2002,2014", "write '85,2002,2014,2023'"),
+        "a start edition written alone": ("2002", "write '2002,2014,2023'"),
+        "a spaced list": ("85, 2002, 2014, 2023", "write '85,2002,2014,2023'"),
+        "an out-of-order list": ("2002,2014,2023,85", "write '85,2002,2014,2023'"),
+        "a spaced, out-of-order list": ("2014, 2023, 2002", "write '2002,2014,2023'"),
+        "a doubled separator": ("85,,2002", "write '85,2002'"),
+        "a leading space": (" 2023", "write '2023'"),
+        "an unknown edition": ("85,1974", "['1974'] not in"),
+        "a repeated edition": ("2023,2023", "['2023'] named more than once"),
+    }
+    for name, (value, want) in refused.items():
+        got = s.editions_error(value)
+        check(f"{name} is refused ({value!r})", got is not None and want in got, got)
+    check("the writer spells an agent's list", (got := s.spell_editions(["2023", " 85", "2014"])) == "85,2014,2023",
+          got)
+    for name, names in (("an unknown edition", ["85", "1974"]), ("a repeated edition", ["85", "85"])):
+        try:
+            got = s.spell_editions(names)
+            check(f"the writer refuses {name}", False, got)
+        except ValueError:
+            check(f"the writer refuses {name}", True, None)
+    print("=== inventory_schema --self-test: " + ("ALL GREEN" if not rc else "FAILED") + " ===")
+    return rc
+
+
+if __name__ == "__main__":
+    for _stream in (sys.stdout, sys.stderr):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
+    if sys.argv[1:] != ["--self-test"]:
+        raise SystemExit("usage: python scripts/spec/inventory_schema.py --self-test  (a module, imported by every "
+                         "inventory consumer; run directly it only self-tests)")
+    sys.exit(self_test())
