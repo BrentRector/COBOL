@@ -1,4 +1,4 @@
-## PB3261: a store evaluates its sending operand before it identifies the receiver
+## Entry 2145 — 2026-10-17 03:46 PDT — PB3261: a store evaluates its sending operand before it identifies the receiver
 
 kb/Work PB3261 (wave 1102 G). `MOVE X(1:L) TO T(I)` with L and I both out of range ran the EC-BOUND-SUBSCRIPT
 declarative, although ISO §14.9.25.4 GR1 evaluates identifier-1's reference modifier "immediately before data is moved
@@ -72,3 +72,4 @@ one to leg 2. Re-baselined by the test's own mechanism (`COBOLNET_UPDATE_SNAPSHO
 snapshot the store-path change reaches, pass unchanged. Re-gate at `83e70714f`: `=== BUILD-LOCAL GATE: LEG 1 ONLY
 (batched gating, PB2515): GREEN` (run `20261017T101030Z-b7e5e1`) and `=== LINUX GATE: GREEN (legs selftests unit
 characterization conformance guard selftests-built; HEAD 83e70714f) ===`.
+
