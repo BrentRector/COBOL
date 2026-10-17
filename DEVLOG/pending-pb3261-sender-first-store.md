@@ -62,3 +62,11 @@ summary; each now carries its own. Sweeping the same shape found four more doubl
 touched (`EmitCompute`, `MoveEmitter.ElementaryStore`, `BoundIntrinsicCall.Anycase`, `BoundBoolAll`), fixed here; 47
 remain across the tree, left for a drift test of their own. Re-gate (run `20261017T034046Z-13719e`): `=== BUILD-LOCAL
 GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`, both goldens passed in leg 1.
+
+**Landing stop, Linux gate.** The landing's Linux gate (attempt `20261017T044733643296Z`) was red on one case,
+`EmittedCSharp_MatchesSnapshot(char_string_ops, 85)`: STRING now reads identifier-3 before it takes the POINTER item's
+value (statement order, ISO §14.6.4 7)), so the emitted `string __strInto0 = WS_OUT;` moved above
+`long __strPtr0 = 1;`, and the snapshot had not been re-baselined. It was not a Linux-only difference: the case fails
+the same way on Windows, where the gate's leg 1 ran 5 of the 36 characterization cases (no impact map) and left this
+one to leg 2. Re-baselined by the test's own mechanism (`COBOLNET_UPDATE_SNAPSHOTS=1`); the other 35 cases, every
+snapshot the store-path change reaches, pass unchanged.
