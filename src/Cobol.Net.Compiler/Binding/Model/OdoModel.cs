@@ -108,7 +108,7 @@ public sealed class OccursSpec
 /// occurrence, the §13.18.38.4 GR7 bounds, in units of which <paramref name="PositionsPerCharacter"/> make one
 /// character of the group's image — 1 (the unit IS a character, bytes on the physical basis) or 8 (bits, §8.5.1.6.3).
 /// <paramref name="TrailingUnits"/> is the padding of the LAST occurrence that its <paramref name="ElemUnits"/> stride
-/// counts and its extent does not (<see cref="BitLayout.TrailingFillerBits"/>: an ALIGNED bit table's, §13.18.1.4 GR2),
+/// counts and its extent does not (<see cref="BitLayout.TrailingFillerBits"/>: a bit table's with an ALIGNED subject or member, §13.18.1.4 GR2),
 /// so the extent at <c>c</c> occurrences is <c>FixedUnits + c × ElemUnits − (c &gt; 0 ? TrailingUnits : 0)</c>.</summary>
 public readonly record struct OdoGeometry(int FixedUnits, int ElemUnits, int MinOccurs, int MaxOccurs, int PositionsPerCharacter,
     int TrailingUnits)

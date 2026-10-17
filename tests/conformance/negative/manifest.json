@@ -997,6 +997,7 @@
   "pb132-call-vlg-argument",
   "pb132-call-bit-unaligned",
   "pb3158-call-bit-unaligned-after-aligned",
+  "pb3167-redefines-group-first-item-aligned",
   "pb132-call-bit-variable-subscript",
   "pb132-call-byvalue-index-name",
   "pb132-call-byvalue-implied-class",

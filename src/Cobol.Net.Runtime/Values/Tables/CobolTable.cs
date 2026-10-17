@@ -224,9 +224,9 @@ public static class CobolTable
         fixedUnits + (int)CurrentCount(count, min, max) * elemUnits;
 
     /// <summary>The CURRENT extent, in positions, of an occurs-depending GROUP operand whose occurrences are
-    /// <paramref name="strideUnits"/> apart but whose LAST occurrence ends where its own width does — an ALIGNED bit
-    /// table's (§13.18.1.4 GR2: "applies to each occurrence of that item", so each occurrence starts a byte of its
-    /// own; §8.5.1.6.3 generates filler only "as needed to advance alignment to a required natural boundary for the
+    /// <paramref name="strideUnits"/> apart but whose LAST occurrence ends where its own width does — a bit table's
+    /// with an ALIGNED subject or member (§13.18.1.4 GR2: "applies to each occurrence of that item", so the
+    /// occurrences are a whole number of bytes apart, kb/Work PB3167; §8.5.1.6.3 generates filler only "as needed to advance alignment to a required natural boundary for the
     /// next item", and the last occurrence has no next one). <paramref name="trailingUnits"/> is the filler that pads
     /// that last occurrence to the stride (<c>stride − width</c>); it is given back once at least one occurrence
     /// exists: the extent at <c>c</c> occurrences is <c>fixed + c × stride − trailing</c> for <c>c &gt; 0</c> and
@@ -256,13 +256,19 @@ public static class CobolTable
 
     /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand whose positions are counted in
     /// <paramref name="positionsPerChar"/> units (1 for a character subtree, 8 for one holding USAGE BIT leaves —
-    /// ISO/IEC 1989:2023 §8.5.1.6.3, kb/Work PB173): <see cref="OdoExtent"/> rounded UP to whole characters. The
-    /// ceiling is where §8.5.1.6.3's trailing-filler rule puts the group's own partial byte, and it is the same
+    /// ISO/IEC 1989:2023 §8.5.1.6.3, kb/Work PB173): <see cref="OdoExtentTrimmed"/> rounded UP to whole characters.
+    /// The ceiling is where §8.5.1.6.3's trailing-filler rule puts the group's own partial byte, and it is the same
     /// rounding §15.50.4 r9 requires of every other bit width. With <paramref name="positionsPerChar"/> = 1 it is
-    /// the identity, so the character channel has ONE arm, never a units branch.</summary>
-    public static int OdoExtentChars(Occurrence count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar)
+    /// the identity, so the character channel has ONE arm, never a units branch.
+    /// <para>⛔ The LAST occurrence's <paramref name="trailingUnits"/> are given back BEFORE the ceiling, exactly as the
+    /// position channel gives them back (kb/Work PB3167): a bit table whose occurrences stride whole bytes can begin in
+    /// the middle of a byte, and then its stride-counted end lies in a later byte than its real end does —
+    /// <c>05 BA PIC 1(2). 05 SUB GROUP-USAGE BIT OCCURS 1 TO 3 DEPENDING ON N. 10 SA PIC 1. 10 TA PIC 1(5) ALIGNED.</c>
+    /// at N = 2 ends at bit 29 (4 characters), its stride count at bit 34 (5).</para></summary>
+    public static int OdoExtentChars(Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits,
+                                     int positionsPerChar)
     {
-        int units = OdoExtent(count, min, max, fixedUnits, elemUnits);
+        int units = OdoExtentTrimmed(count, min, max, fixedUnits, strideUnits, trailingUnits);
         return positionsPerChar <= 1 ? units : (units + positionsPerChar - 1) / positionsPerChar;
     }
 

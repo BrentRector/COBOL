@@ -2963,7 +2963,7 @@ static CobolNet.Runtime.CobolTable.OccValue(System.Int128 unscaled, int scale) -
 static CobolNet.Runtime.CobolTable.OccValueDec(CobolNet.Runtime.CobolDec value) -> System.Int128
 static CobolNet.Runtime.CobolTable.OccValueReal(double value) -> System.Int128
 static CobolNet.Runtime.CobolTable.OdoExtent(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int elemUnits) -> int
-static CobolNet.Runtime.CobolTable.OdoExtentChars(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int elemUnits, int positionsPerChar) -> int
+static CobolNet.Runtime.CobolTable.OdoExtentChars(CobolNet.Runtime.Occurrence count, int min, int max, int fixedUnits, int strideUnits, int trailingUnits, int positionsPerChar) -> int
 static CobolNet.Runtime.CobolTable.SortInPlace<T>(System.Span<T> occurrences, System.Comparison<T>! compare) -> void
 static CobolNet.Runtime.CobolTable.With<T, R>(T value, System.Func<T, R>! body) -> R
 static CobolNet.Runtime.CobolTiming.ContinueAfter(CobolNet.Runtime.CobolDec seconds, bool checkLessThanZero) -> bool

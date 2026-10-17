@@ -78,8 +78,10 @@ public sealed partial class DataBinder
         // follows a same-level bit item at the NEXT BIT position and every other data item on a byte boundary (an
         // ALIGNED clause, §13.18.1.4 GR1, makes a bit item the latter too). A subject needing a byte boundary over a
         // data-name-2 that begins mid-byte has no storage association §13.18.44.4 GR1 can make: the area "starts at
-        // the first bit of the data item referenced by data-name-2". A bit-aligned subject fits any starting bit.
-        if (!BitLayout.IsBitItem(item) || item.IsAligned || item.AlignedAsLevelOne)
+        // the first bit of the data item referenced by data-name-2". A bit-aligned subject fits any starting bit. The
+        // "requires a byte boundary" is the layout's own placement predicate, so a bit group whose first item is
+        // ALIGNED requires one too: it begins where that item does (§8.5.1.6.3; kb/Work PB3167).
+        if (!BitLayout.KeepsPosition(item))
         {
             int start = TargetStartBit(target);
             if (start > 0 && start % BitLayout.BitsPerCharacter != 0)

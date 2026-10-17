@@ -18,10 +18,13 @@ namespace CobolNet.Tests.Unit;
 /// does not know where the group sits still gets the record's answer;</item>
 /// <item>the walk never calls <c>PhaseOf</c> itself: it passes down the phase it already holds (the explicit <c>…At</c>
 /// readers). A walk that asked <c>PhaseOf</c> for each child would re-walk the parent for every sibling, which is
-/// exponential in a run of same-level bit groups.</item>
+/// exponential in a run of same-level bit groups;</item>
+/// <item>a table whose element lays out differently at different phases strides whole bytes (<c>HoldsByteStart</c>),
+/// so laying every occurrence out at the first one's phase is exact, and a group begins where its first item does
+/// (kb/Work PB3167); the placement dispatch is written once (<c>Continues</c>).</item>
 /// </list>
-/// The behaviour is pinned by the golden <c>tests/conformance/2002/pb3158_aligned_in_mid_byte_bit_group.cob</c> and
-/// <c>BitRunImageDriftTests</c> (BRD09, BRD10).
+/// The behaviour is pinned by the goldens <c>tests/conformance/2002/pb3158_aligned_in_mid_byte_bit_group.cob</c> and
+/// <c>pb3167_aligned_member_in_bit_group_table.cob</c> and <c>BitRunImageDriftTests</c> (BRD09, BRD10, BRD13, BRD14).
 /// </summary>
 public sealed class BitGroupPhaseDriftTests
 {
@@ -60,5 +63,21 @@ public sealed class BitGroupPhaseDriftTests
         // The body's REDEFINES chase and the per-child placement read starts and the explicit forms, never PhaseOf.
         Assert.DoesNotMatch(@"\bPhaseOf\(", body);
         Assert.Matches(@"RunBitsAt\(c,\s*cursor", body);
+    }
+
+    /// <summary>kb/Work PB3167: laying every occurrence of a table out as the first is exact only because a table
+    /// whose layout depends on its phase strides whole bytes. The stride asks THAT question (<c>HoldsByteStart</c>,
+    /// read through the walk's own placement predicate), never the ALIGNED clause alone, which left an ALIGNED
+    /// MEMBER of a table element inside a byte in every occurrence after the first; and a group keeps its position
+    /// only when its first item does (§8.5.1.6.3, both directions of "the same bit position").</summary>
+    [Fact]
+    public void TheStride_AsksWhetherTheLayoutDependsOnThePhase_AndAGroupBeginsWithItsFirstItem()
+    {
+        string text = BitLayoutText();
+        Assert.Matches(@"private static int StrideBitsAt\(DataItem item, int phase\) =>\s*HoldsByteStart\(item\)", text);
+        Assert.Matches(@"KeepsPosition\(c\.Children\[0\]\)", text);
+        // One placement dispatch: the walk, PhaseOf and HoldsByteStart ask Continues, never spell its two arms again.
+        Assert.Single(Regex.Matches(text, @"prev is null \? !?KeepsPosition"));
+        Assert.True(Regex.Matches(text, @"!Continues\(prev, ").Count >= 3, "a placement site no longer asks BitLayout.Continues");
     }
 }

@@ -108,6 +108,19 @@ public sealed class BitRunImageDriftTests
         "05 M1 PIC 1(6) USAGE BIT VALUE B\"101010\". 05 M1R REDEFINES M1 PIC 1(2) USAGE BIT."
         + " 05 M2 PIC 1(2) USAGE BIT VALUE B\"11\".",
         "M1|M1R|M2")]
+    // ⛔ PB3167 - a TABLE of bit groups that begins mid-byte (bit 2) and holds an ALIGNED member strides whole bytes
+    // (16 bits, §13.18.1.4 GR2 "applies to each occurrence"), so Q2(2) is at bit 24 like Q2(1) is at bit 8: the struct
+    // lane's per-occurrence AsBits and the seed lane's strided carrier must agree on the filler between occurrences.
+    [InlineData("BRD13", 4,
+        "05 M1 PIC 1(2) USAGE BIT VALUE B\"11\". 05 S1 GROUP-USAGE BIT OCCURS 2. 10 Q1 PIC 1 USAGE BIT VALUE B\"1\"."
+        + " 10 Q2 PIC 1(5) USAGE BIT ALIGNED VALUE B\"10101\".",
+        "M1|Q1 (1)|Q2 (1)|Q1 (2)|Q2 (2)|S1 (2)")]
+    // A bit group whose FIRST item is ALIGNED begins where that item does (§8.5.1.6.3), so the filler before it is the
+    // enclosing group's and the group is only its member's 5 bits.
+    [InlineData("BRD14", 2,
+        "05 M1 PIC 1(2) USAGE BIT VALUE B\"11\". 05 S2 GROUP-USAGE BIT. 10 Q1 PIC 1(5) USAGE BIT ALIGNED VALUE B\"10101\"."
+        + " 05 M2 PIC 1(2) USAGE BIT VALUE B\"01\".",
+        "M1|Q1|S2|M2")]
     public void AliasedGroup_ReadsBackExactlyAsItsUnaliasedTwin(string pid, int width, string members, string reads)
     {
         string aliased = Program(pid + "A", members, reads, $"01 V REDEFINES G PIC X({width}).");
