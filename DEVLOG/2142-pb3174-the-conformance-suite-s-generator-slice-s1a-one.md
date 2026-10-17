@@ -1,4 +1,4 @@
-## PB3174 — the conformance suite's generator (slice S1a): one header reader, its refusals, the manifests and the completeness report
+## Entry 2142 — 2026-10-16 22:42 PDT — PB3174 — the conformance suite's generator (slice S1a): one header reader, its refusals, the manifests and the completeness report
 
 kb/Work PB3174, design `docs/rearchitecture/DESIGN-conformance-suite.md` §3, §4, §9 and §13 S1a (approved by the
 owner 2026-10-14). Wave 1104 C3, on PB3173's branch, so PB3172 (one spelling of `editions`) and PB3173 (every band
@@ -90,3 +90,4 @@ After the review fixes, run `20261017T051108Z-487692` (HEAD e706d8df6): `=== BUI
 gating, PB2515): GREEN — leg 2 left to CI's whole-population run: Conformance 5,840 · Unit 473 · Characterization 31
 … — Conformance 6,078/11,918 · Unit 33,444/33,917 · Characterization 5/36 cases ran (skipped 0) in 1 of 2 leg(s) …`;
 `generate.py --self-test` re-ran GREEN in it, and `semgrep/verify.py` PASS.
+
