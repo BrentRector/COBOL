@@ -1,0 +1,9 @@
+DET
+DET
+DET
+
+PT=04DET
+DET
+
+
+PT=01
