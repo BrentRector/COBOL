@@ -715,7 +715,7 @@ public sealed record RenamesPlace(IReadOnlyList<Place> Leaves, DataItem AliasIte
 /// one ended, which §8.5.1.6.3's shared-byte runs break in characters. The BIT channel (<c>AsBits</c>/
 /// <c>FromBits</c>, §13.18.29.4 GR1b) uses the positions directly; the CHARACTER channel (<c>AsImage</c>/
 /// <c>FromImage</c>) takes the ceiling, which is also where §8.5.1.6.3 rule 4's trailing filler lives.
-/// <see cref="TrailingUnits"/> is the padding of an ALIGNED table's LAST occurrence (§13.18.1.4 GR2) that the
+/// <see cref="TrailingUnits"/> is the padding of the LAST occurrence of a table with an ALIGNED subject or member (§13.18.1.4 GR2) that the
 /// <see cref="ElemUnits"/> stride counts and the bit channel's extent must not (<see cref="BitLayout.TableBits"/>;
 /// kb/Work PB3156): the same table fixed at <c>n</c> occurrences is <c>stride × (n − 1) + width</c> positions, so
 /// the ODO extent at <c>c</c> occurrences is too.</para>
