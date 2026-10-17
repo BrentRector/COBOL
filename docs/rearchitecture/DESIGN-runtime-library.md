@@ -618,8 +618,9 @@ organizations. Three pieces close it, and each lives in one place:
   persists only when the store holds records the file does not (`KeyedStore.Version` against
   `PersistedVersion`). ⚠ The price of keeping the whole-store FORMAT is paid by the coherent connector alone: each
 statement that changes the records persists the whole store, O(store) per mutating statement, so a bulk load
-through an `ALL OTHER` connector is quadratic in the records — a record-level in-place format would remove it, and
-is the next step if that cost is ever measured to matter. Every load and every persist, coherent or not, runs under
+through an `ALL OTHER` connector is quadratic in the records. ⛔ The owner ruled this whole-store model unacceptable
+(2026-10-17). kb/Work PB3330 replaces it with a record-level on-disk format for both keyed organizations; until that
+lands, this section describes the current compiler. Every load and every persist, coherent or not, runs under
 the mutex, so no run unit reads a
   store another is half-way through rewriting. The store's bytes are read and written POSITIONALLY through the
   connector's own handle (`KeyedConnector.Load`/`Persist`, `RandomAccess`), never through the `FileStream`'s
