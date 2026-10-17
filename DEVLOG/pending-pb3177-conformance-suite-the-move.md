@@ -115,3 +115,5 @@ tree), Unit 33,501/33,923, Characterization 5/36; leg 2 is CI's. LINUX GATE: the
   before this round's re-review. If main moves before the landing and brings a file under `tests/conformance/`, the
   generator audit `removed_corpus_files` refuses it at the lander's gate in seconds, and a finisher restores the
   tools from c9a1ffdb2. The design's As built and the note now say this.
+- *Re-gate.* Run 20261017T122308Z-801c3a: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`
+  (Conformance 13,910/17,290, Unit 33,539/33,928, Characterization 5/36). LINUX GATE: the lander's (batched gating).
