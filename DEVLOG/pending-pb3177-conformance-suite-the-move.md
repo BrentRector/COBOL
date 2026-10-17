@@ -33,8 +33,7 @@ former edition and every former negative refused with its former diagnostic. The
 expectations that quote a line moved with them (13 diagnostics' `(line,column)`, 6 EXCEPTION-LOCATION outputs, each
 verified by running the program); the 14 compile-only programs carry their recorded output.
 
-**The consumers (wave 1107 B, the split's continuation).** Main added nothing under `tests/conformance/` after the
-move's base, so the quiet-point re-run had nothing to convert. Five mechanisms were still on the old layout:
+**The consumers (wave 1107 B, the split's continuation).** Five mechanisms were still on the old layout:
 
 - *The witness-loss audit read 7,920 re-spelled references as lost.* A witness is the test, not its spelling:
   `inventory_schema.witness_losses` now excuses a lost test-ref whose new spelling the row cites, and
@@ -79,3 +78,23 @@ the suite harness, and the move's own generator self-test arm wrote without `new
 sees the suite). Then run 20261017T112021Z-9beab1: `=== BUILD-LOCAL GATE: LEG 1 ONLY (batched gating, PB2515): GREEN`
 — Conformance 13,878/17,265 (10,568 suite rows among them, every one passed: the neutrality proof again, on the merged
 tree), Unit 33,501/33,923, Characterization 5/36; leg 2 is CI's. LINUX GATE: the lander's (batched gating).
+
+**Review round 1 (wave 1107 B finisher).** Three findings, each answered at its root.
+- *R1-1: the converter was deleted before main was quiet.* It was, and main was not: PB3261 (PR 179) and then PB780
+  (PR 181) each landed tests under `tests/conformance/` after the move's base, and git's directory-rename detection
+  put them in `cases/_unassigned/` without the metadata header every suite test carries, and the inventory still cited
+  them by their old spelling. The
+  converter, its sweep and its map are restored unchanged and re-run over each merge: PB3261's 2 tests (one under
+  `cases/14.9.49-USE/`, one uncited under `_unassigned/`) and PB780's 11 (nine under `cases/13.10-Constant/`, two
+  uncited negatives under `_unassigned/`; 7 refusals). The inventory's conflicted rows take main's verdicts and are
+  re-spelled through the map. Each delta is proved neutral by the suite runner over its ids (2/2 and 23/23 rows), and
+  PB780's new `ConstantNameLiteralPositionDriftTests`, which read the removed tree's manifests, now reads the suite's
+  accepted tests through `SuiteManifest` (3/3). The tools stay on the branch until the lander's final merge of main
+  and are deleted by the branch's last commit; the design's As built and the note say so.
+- *R1-2: the sweep moved paths but not line numbers.* The header the move added above every program shifted each
+  `file.cob:N` pointer by 5-9 lines. Every pointer outside the history was re-pointed by its file's line delta (24, each
+  verified by comparing the old line's text with the new one), and the one that named the removed `reject-at` line now
+  names its `wiseowl/diagnostics.json` entry. Sibling: the first sweep had also rewritten six FROZEN evidence files,
+  whose record is never edited; they are restored (the supersession marker the audit asks for stays).
+- *R1-3: a comment named a test class that does not exist.* `ConformanceSuiteTests.cs` names
+  `ConformancePartitioningDriftTests` and what it pins.

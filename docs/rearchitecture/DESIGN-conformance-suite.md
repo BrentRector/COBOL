@@ -506,8 +506,8 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   adds one refusal to the generator, a file under the removed `tests/conformance/` path, for a branch the drain does
   not hold (an attended or Mythos branch): it is a gate audit (§9), so such a branch is red in seconds, before the
   build, and the fix is moving the file into `cases/`.
-  **As built:** a one-time converter (on the branch for review, deleted before the landing with its map, as this
-  slice says) moved 5,219 programs into 5,110 tests of `cases/` and 109 of `wiseowl/cases/`, 2,752 refusals into
+  **As built:** a one-time converter (on the branch for review, deleted with its sweep and map by the branch's last
+  commit, after the quiet point's final merge of main and the review of what that merge converted) moved 5,219 programs into 5,110 tests of `cases/` and 109 of `wiseowl/cases/`, 2,752 refusals into
   `wiseowl/diagnostics.json`, two compile options into `wiseowl/options.json`, and rewrote the inventory's 7,920
   citations; a sweep rewrote the other files' citations, the moved tests' own comments included. No map
   survives the move, because none is needed: the witness-loss audit reads a moved test's identity from git's

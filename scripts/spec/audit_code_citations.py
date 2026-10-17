@@ -603,7 +603,7 @@ def _owning_cite(cites: list[tuple[int, int]], pos: int) -> int:
     Returns the index of the nearest citation span (ties to the earlier one).
 
     Measured on landing train 36: `§8.4.2.2.2 Format 1 … §8.4.3.1 Format 10, qualified-linage-counter`
-    (conformance-suite/cases/8.4.3.14-LINAGE-COUNTER/pb489-linage-operand-is-linage-counter.cob:6) is CORRECT on both halves — the
+    (conformance-suite/cases/8.4.3.14-LINAGE-COUNTER/pb489-linage-operand-is-linage-counter.cob:11) is CORRECT on both halves — the
     two clauses genuinely print the SAME format name under DIFFERENT numbers — and the whole-line test
     attributed the second citation's name to the first and accused it. No name-uniqueness assumption can
     stand in for this; the POSITION is the only thing that separates the two claims."""
@@ -941,7 +941,7 @@ ORDINAL_SELF_TEST = [
      "/// <summary>SET data-pointer assignment (§14.9.39 Format 4; Phase-4b increment 1)",
      "/// <summary>SET data-pointer assignment (§14.9.39 Format 7; Phase-4b increment 1)"),
     # ⛔ THE SILENT TWIN IS A LINE WITH TWO CITATIONS, and it is the one this check accused (landing
-    # train 36, conformance-suite/cases/8.4.3.14-LINAGE-COUNTER/pb489-linage-operand-is-linage-counter.cob:6). §8.4.2.2.2 Format 7
+    # train 36, conformance-suite/cases/8.4.3.14-LINAGE-COUNTER/pb489-linage-operand-is-linage-counter.cob:11). §8.4.2.2.2 Format 7
     # and §8.4.3.1 Format 10 are BOTH named `qualified-linage-counter`, so a whole-line name test cannot tell
     # which citation the name belongs to; `_owning_cite` gives it to the one it stands next to. The DEFECT
     # half is the same name beside the WRONG number with no second citation to own it.

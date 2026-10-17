@@ -69,7 +69,8 @@ public abstract class ConformanceSuiteTestsBase<TSlot>
 }
 
 // ⛔ THE 24 PARTITIONS — each its own xUnit collection. TestPartitionAudit proves they cover both row sources exactly
-// once; ConformanceSuitePartitioningDriftTests pins the count (kb/Work PB2527).
+// once; ConformancePartitioningDriftTests keeps the count at its floor and bounds the rows per partition
+// (MaxSuiteRowsPerPartition, kb/Work PB2527).
 
 /// <summary>Conformance-suite partition 0 of <see cref="ConformanceSuiteTestsBase{TSlot}.Partitions"/>.</summary>
 public sealed class ConformanceSuiteTests_P0 : ConformanceSuiteTestsBase<Slot0>;

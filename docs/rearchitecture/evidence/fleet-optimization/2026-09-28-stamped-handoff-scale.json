@@ -664,7 +664,7 @@
     "uncovered_commits": [
      {
       "sha": "0c3e71c05",
-      "what_it_contains": "WIP checkpoint after STATUS was written: re-derives conformance-suite/cases/9.1.13.2-Successful-completion/pb329_line_sequential_charset_2023 (.cob + .out) with full-width 7-char records (JKLMNOP/UVWXYZA/PQRSTUV) so the section-D REWRITE is equal-size ('00') and the X2 '71' leg is still reached; appends to kb/Work/PB1168.md explaining that pb329 had pinned the trimmed reading. Note the handoff's NEXT line misnames the issue as the 'trimmed GR17 d) reading'; the conflict is actually GR17 b) (the record-size comparison) against the trimmed-line WRITE (GR21). This commit is the fix the STATUS NEXT asked for, so that NEXT is done in code but has not been verified."
+      "what_it_contains": "WIP checkpoint after STATUS was written: re-derives tests/conformance/2023/pb329_line_sequential_charset_2023 (.cob + .out) with full-width 7-char records (JKLMNOP/UVWXYZA/PQRSTUV) so the section-D REWRITE is equal-size ('00') and the X2 '71' leg is still reached; appends to kb/Work/PB1168.md explaining that pb329 had pinned the trimmed reading. Note the handoff's NEXT line misnames the issue as the 'trimmed GR17 d) reading'; the conflict is actually GR17 b) (the record-size comparison) against the trimmed-line WRITE (GR21). This commit is the fix the STATUS NEXT asked for, so that NEXT is done in code but has not been verified."
      }
     ],
     "gate_state": "UNVERIFIED after the fix. The last recorded gate, gate 1 (the wave-local gate in gate1.log), was RED on only one test, pb329_line_sequential_charset_2023, at 1087c7163. Commit 0c3e71c05 commits the golden re-derivation that should clear it, but nothing on the branch or in STATUS shows gate 1 was re-run after that commit. Gate 2 (the comprehensive battery plus the GnuCOBOL differential) has not been run on this state. I checked the new pb329 .out against the .cob by hand and it is consistent: W1 00, W2 71, W3 00, R3 [JKLMNOP], X1 00 (7 vs 7 bytes, equal size), R4 [UVWXYZA], X2 71, F1 [PQRSTUV], F2 [UVWXYZA]. The branch is 6 commits over origin/main at 9706bf48d. It touches 32 files. No commit touches DEVLOG.md or plan section 0 yet.",
@@ -1612,7 +1612,7 @@
    "result": {
     "done_items": [
      {
-      "item": "PB1269 landed: RESUME NEXT STATEMENT after EC-BOUND-OVERFLOW continues the growth; one implicit raise (CobolDynTable.RaiseImplicitOverflow). Note status: landed, closes GR-13.18.38.4-17 and GR-8.5.1.9.6-1; golden conformance:cases/8.5.1.9.6-Exceeding-capacity/pb1269_dyn_overflow_resume_next",
+      "item": "PB1269 landed: RESUME NEXT STATEMENT after EC-BOUND-OVERFLOW continues the growth; one implicit raise (CobolDynTable.RaiseImplicitOverflow). Note status: landed, closes GR-13.18.38.4-17 and GR-8.5.1.9.6-1; golden conformance:2014/pb1269_dyn_overflow_resume_next",
       "commit": "9a93da0aa"
      },
      {
@@ -2951,7 +2951,7 @@
     "uncovered_commits": [
      {
       "sha": "0c3e71c057ce09caf5e9e8dd08954e8586a55f20",
-      "what_it_contains": "Fix for the gate-1 RED. It rewrites conformance-suite/cases/9.1.13.2-Successful-completion/pb329_line_sequential_charset_2023.cob so the lines are written full-width (JKLMNOP, UVWXYZA, PQRSTUV instead of the 5-char values) and re-derives its .out (R3/R4/F1/F2 now show 7 non-space characters, X1 stays 00). It also adds a paragraph to kb/Work/PB1168.md explaining that pb329 had pinned the trimmed reading. STATUS.md was never updated after this commit: it still says NEXT is fixing this RED, and it mislabels the reading as GR17 d) where it should say GR17 b)."
+      "what_it_contains": "Fix for the gate-1 RED. It rewrites tests/conformance/2023/pb329_line_sequential_charset_2023.cob so the lines are written full-width (JKLMNOP, UVWXYZA, PQRSTUV instead of the 5-char values) and re-derives its .out (R3/R4/F1/F2 now show 7 non-space characters, X1 stays 00). It also adds a paragraph to kb/Work/PB1168.md explaining that pb329 had pinned the trimmed reading. STATUS.md was never updated after this commit: it still says NEXT is fixing this RED, and it mislabels the reading as GR17 d) where it should say GR17 b)."
      }
     ],
     "gate_state": "GREEN. The wave-local gate (filter ~SequentialFileIoSpecTests|~LinageConformanceTests|~FileIoDifferentialTests|~CorpusRunner|~Nist|~Drift|~EditionGate) passed per E:\\Temp\\claude\\E--COBOL\\eb162d4b-e0bb-4027-b8a0-86fd190d20be\\scratchpad\\w67p\\gate2.log (14:08:59, after branch HEAD 0c3e71c05 was committed at 14:03:11). Conformance passed 4178/4178, including pb329. Two caveats. First, gate2.log does not record a SHA, so its match to HEAD rests on timestamps. Second, the worktree was not opened (per the brief), so I did not check for uncommitted changes. The earlier gate1.log (13:52) is the superseded RED: 1 failure, pb329. The branch is not pushed to origin. Its base is 9706bf48d; origin/main is now at ee68c406b (behind local main c26b5a3ba). The branch has no DEVLOG entry.",
@@ -4285,7 +4285,7 @@
       "commit": "901130445"
      },
      {
-      "item": "Goldens conformance-suite/cases/A.1-Implementor-defined-language-element-list/pb1542_code_set_unrepresentable_85 and conformance-suite/cases/A.1-Implementor-defined-language-element-list/pb1542_code_set_line_sequential, both registered in their manifest.json. Unit tests: CodeSetConversionTests (7 new), CodedCharacterSetTests.Medium_*, and a FileBoundaryTests update.",
+      "item": "Goldens tests/conformance/85/pb1542_code_set_unrepresentable_85 and tests/conformance/2023/pb1542_code_set_line_sequential, both registered in their manifest.json. Unit tests: CodeSetConversionTests (7 new), CodedCharacterSetTests.Medium_*, and a FileBoundaryTests update.",
       "commit": "e222b2c4e"
      },
      {
