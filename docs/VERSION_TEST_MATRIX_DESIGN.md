@@ -20,7 +20,7 @@
 > bugs live (the right ~80%): "feature introduced in E is rejected below E", "feature removed by E is rejected at E",
 > "85 program still compiles later unless removed or word-collided", per-edition behavior where it differs. It is NOT
 > comprehensive per-edition *construct* coverage — exhaustively re-validating every 2002/2014/2023 construct stays
-> gated on building those **positive corpora** (`tests/conformance/<ver>/`), which the survey confirms are young
+> gated on building those **positive corpora** (now the conformance suite, `conformance-suite/`), which the survey confirms are young
 > (≈34 × 2002, ~0 × 2014, 1 × 2023). Delta-correctness first; corpus breadth is a parallel, longer effort.
 
 ---
@@ -122,20 +122,21 @@ they cover ~70% of real dialect collisions and exercise all five gating patterns
   each NIST program at 2002/2014/2023 too and
   assert it still compiles (output need not re-match the golden at a later edition unless behavior is edition-invariant,
   which for the nucleus it is — so re-matching the golden is the strong form; start with "still compiles").
-- **Positive — per-edition:** `tests/conformance/<ver>/*.cob` + `.out`, discovered from each directory's
-  `manifest.json` by `CorpusRunnerTests` (`tests/Cobol.Net.Tests.Conformance/CorpusRunnerTests.cs`). ⚠ A program
-  compiles and runs ONLY at its directory's edition (`ConformanceCorpus.PositiveOptions`): nothing runs an 85
-  program at a later edition and compares its output, so no directory is a complete per-edition suite (kb/Work
-  PB3160).
-- **Negative:** `tests/conformance/negative/<name>.cob` + `<name>.err` (the expected COBOLNET code), each naming the
-  editions that must reject it on its first line (`*> reject-at: 2002 2014 2023`); `CorpusRunnerTests` compiles it at
-  each named edition and asserts the diagnostic. `tests/conformance/README.md` is the authoring guide.
-- **Behavior-variant:** the same snippet with a per-edition `.out` (only where INV-3 actually applies).
-- **Replacement (approved by the owner 2026-10-14):** `docs/rearchitecture/DESIGN-conformance-suite.md` (kb/Work
-  PB3160): one tree of compiler-neutral tests filed by ISO clause, generated into four complete per-edition suites
-  that any COBOL compiler can run. This section describes the corpus until slice S2 (kb/Work PB3177) moves
-  `tests/conformance/` into it and deletes the tree; PB3177 rewrites this section in the same landing (it names
-  the consumers of the old paths).
+- **The conformance suite** (`conformance-suite/`, `docs/rearchitecture/DESIGN-conformance-suite.md`, approved by
+  the owner 2026-10-14, kb/Work PB3160): one tree of tests filed by ISO clause (`cases/<clause>-<Name>/<id>.cob`
+  + `<id>.out`; WiseOwl's own behaviour under `wiseowl/cases/`), each opening with a metadata header that names its
+  `rules` and the editions it is accepted at (`accept`). `conformance-suite/harness/generate.py` reads the headers
+  and generates the per-edition suites and WiseOwl's manifest; `ConformanceSuiteTests` (24 partitions,
+  `tests/Cobol.Net.Tests.Conformance/ConformanceSuiteTests.cs`) compiles and runs every test at each accepted
+  edition and compares its output. `conformance-suite/README.md` is the authoring guide.
+- **Refused programs:** a program WiseOwl must refuse names no `accept` edition; its entry in
+  `conformance-suite/wiseowl/diagnostics.json` gives the editions it is refused at (`refuse-at`) and the code or
+  message it reports (`expect`), and `ConformanceSuiteTests` requires the front end or the binder to refuse it so.
+- **Behavior-variant:** a per-edition `<id>.<edition>.out` (only where INV-3 actually applies).
+- ⚠ **The migrated tests** of the former per-edition corpus (`tests/conformance/`, moved by kb/Work PB3177) are
+  `portable: unverified` and accepted only at the edition their old directory named, so no edition's suite is
+  complete yet: each clause pass (design §6 step 2) runs its tests at every later edition and decides each
+  difference from the standard.
 
 ## 6. Harness design
 
@@ -456,7 +457,7 @@ decision.
 |---|---|
 | Edition config object | legacy `DialectConfig` (two-axis) |
 | Accept/warn/reject-by-edition validator | legacy `DialectStrictnessChecks` (validator pattern) + `ControlFlowBinder` gating |
-| Per-edition positive corpus discovery | legacy `ConformanceTests` (`tests/conformance/<ver>/`) |
+| Per-edition positive suite discovery | the suite generator's manifests (`conformance-suite/harness/generate.py`) |
 | Obsolete-element flagging conformance | legacy `FlaggingConformanceTests` + `CompileNistDiagnostics(name, dialect)` |
 | Diagnostic-assertion harness | legacy `DiagnosticTestBase.GetDiagnostics/AssertHasDiagnostic` |
 | 85 positive + differential | `NistDifferentialTests` + the `ICompilerUnderTest` differential harness (add a dialect param) |

@@ -2922,7 +2922,7 @@ Part II §PHASE-16 of this document.
 ## §3 EXECUTION MODEL — tiered testing + batching + parallelism (owner-directed; use it every session)
 
 - **Tiered testing.** *Wave-local gate* (~2–3 min): fresh `Cobol.Net.sln` build → characterization +
-  `CorpusRunnerTests` filtered to the wave + targeted unit tests + a CLI probe. *Comprehensive gate*
+  `ConformanceSuiteTests` filtered to the wave + targeted unit tests + a CLI probe. *Comprehensive gate*
   (~12–17 min; the Conformance leg itself is ~10 min since the [[A13]] collection split — §0 Gates):
   FULL greenfield Conformance + (when forced) the FULL NIST guard — once per BATCH of waves and
   MANDATORY before any merge to `main`. Forcing guardrails: any shared-`.g4`/preprocessor/lexer change → full
@@ -3231,9 +3231,10 @@ already-derivable coverage; none change the pipeline.
   characterization: `tests/Cobol.Net.Tests.Characterization` ·
   FULL CLI-level NIST guard: `bash scripts/guard.sh` (fast: `guard-fast.sh`; gate on the VERDICT line). It drives
   `cobol` and its lines name the compiler — `=== NIST (cobol): … ===` (PB750); it has no other arm (PB2109).
-- Positive corpus: `tests/conformance/{2002,2014,2023}/<name>.cob|.out` + per-dir `manifest.json`
-  (enabled ⊕ pending, integrity-asserted). Negative corpus: `tests/conformance/negative/<name>.cob|.err`
-  (first line `*> reject-at: <editions>`). Matrix rows: `tests/version-matrix/constructs.json` (+
+- The conformance suite: `conformance-suite/cases/<clause>-<Name>/<id>.cob|.out` (WiseOwl's own behaviour in
+  `wiseowl/cases/`), each with a metadata header (`rules`, `accept`, `source-format`); refused programs are
+  `wiseowl/diagnostics.json` entries (`refuse-at`, `expect`); `python conformance-suite/harness/generate.py --check`
+  is the audit, `ConformanceSuiteTests` the runner (conformance-suite/README.md; kb/Work PB3177). Matrix rows: `tests/version-matrix/constructs.json` (+
   `reserved-words.json`); regen `.g.cs` via `scripts/gen-constructs.ps1` / docs via `gen-vcr.ps1`,
   `gen-diagnostics-doc.ps1`.
 - Work register: `python scripts/spec/work.py check` (frontmatter well-formed, including the `closes_rows`

@@ -17,7 +17,7 @@ was rearchitected first, to compare against committed goldens, and the engine is
 ### 1.1 Test projects (four, two stacks)
 | Project | Files | Role |
 |---|---|---|
-| `tests/Cobol.Net.Tests.Conformance` | ~80 `.cs` | ACTIVE greenfield net: differential feature tests (`*DifferentialTests.cs`), `NistDifferentialTests` (the corpus goldens, `[MemberData]` over `corpus.tsv` — see §3.2), `VersionMatrixTests`, `CorpusRunnerTests`, `EditionHarness`, `CompilerUnderTest`/`CutRunner`. Those three theory-heavy families are **PARTITIONED across xUnit collections** — §3.11. |
+| `tests/Cobol.Net.Tests.Conformance` | ~80 `.cs` | ACTIVE greenfield net: differential feature tests (`*DifferentialTests.cs`), `NistDifferentialTests` (the corpus goldens, `[MemberData]` over `corpus.tsv` — see §3.2), `VersionMatrixTests`, `ConformanceSuiteTests`, `EditionHarness`, `CompilerUnderTest`/`CutRunner`. Those three theory-heavy families are **PARTITIONED across xUnit collections** — §3.11. |
 | `tests/Cobol.Net.Tests.Unit` | ~17 `.cs` | Greenfield unit: runtime kernels, `ConstructRegistryDriftTests`, `ReservedWordsDriftTests`, `CheckOnlyCompileTests`, CLI parser, `EditionContextTests`. |
 
 ### 1.2 The differential oracle (the load-bearing risk)
@@ -116,7 +116,8 @@ landing lease are deleted (kb/Work PB3024's closing change).
 
 ### 1.5 Drift discipline (a genuine strength — preserve it)
 `ConstructRegistryDriftTests` binds `constructs.json` ↔ in-code `ConstructRegistry` both directions;
-`CorpusRunnerTests.Manifest_CoversEveryProgram_NoOverlap` proves every on-disk `.cob` is manifest-listed;
+`conformance-suite/harness/generate.py --check` refuses every on-disk file no test declares (it replaced the corpus's
+`Manifest_CoversEveryProgram_NoOverlap`, kb/Work PB3177);
 `ReservedWordsDriftTests` binds `reserved-words.json`. Nothing silently undiscovered.
 
 ### 1.6 Diagnostics
@@ -213,7 +214,7 @@ Collapse to a coherent, layered set under one namespace root `CobolNet.Tests.*`:
 | `tests/Cobol.Net.Tests.Conformance` | (kept, refocused) | End-to-end program behavior: NIST goldens, per-edition corpus, version matrix, negative corpus. Compares to COMMITTED goldens only — no live second compiler. |
 | `tests/Cobol.Net.Tests.Characterization` | NEW | The behavior-neutrality harness: diagnostic snapshots + emitted-C# snapshots (gates 2 & 3) over a fixed "characterization corpus". Runs on every phase. |
 
-Rationale: `CorpusRunnerTests` is the one corpus runner; the legacy `ConformanceTests` runner and its `GreenfieldOnly`/`LegacyDivergent` skip sets were deleted with the legacy test projects (PB2110).
+Rationale: `ConformanceSuiteTests` is the one suite runner (it replaced `CorpusRunnerTests`, kb/Work PB3177); the legacy `ConformanceTests` runner and its `GreenfieldOnly`/`LegacyDivergent` skip sets were deleted with the legacy test projects (PB2110).
 
 ### 3.2 The green-corpus single source of truth: `tests/nist/corpus.tsv`
 Replace the three copies with ONE declarative manifest, consumed everywhere.
@@ -591,12 +592,12 @@ why that direction cannot reach the audit at all).
 |---|---|---|---|
 | `VersionMatrixTests_P0 … _P11` | 12 | 2127 rows, **720.5 s SERIAL** — the whole 721 s leg | 12 × (175…179 rows), 552–601 s each, all spanning the run together |
 | `NistDifferentialTests_P0 … _P5` | 6 | 349 rows, 237.9 s SERIAL | 6 × (58–59 rows), 329–354 s each |
-| `CorpusRunnerTests_P0 … _P23` | 24 | at 3 partitions (2026-10-07, about 4,635 rows): 3 × about 1,546 cases, 246–282 s each, the Conformance leg's 95–220 s tail at 1–4 threads | 24 × about 193 rows (kb/Work PB2527); `CorpusPartitioningDriftTests` bounds a partition at 250 rows |
+| `ConformanceSuiteTests_P0 … _P23` (formerly `CorpusRunnerTests`) | 24 | at 3 partitions (2026-10-07, about 4,635 rows): 3 × about 1,546 cases, 246–282 s each, the Conformance leg's 95–220 s tail at 1–4 threads | 24 × about 193 rows (kb/Work PB2527); `CorpusPartitioningDriftTests` bounds a partition at 250 rows |
 | `OptionalWordSubsetDriftTests_P0 … _P7` | 8 | one 23-row class, 131–152 s span (one row 59 s) | 8 × about 3 formats (kb/Work PB2527), bounded at 3 |
 | `StorageFormNistEquivalenceTests_P0 … _P7` | 8 | one `[Fact]` looping the corpus, **171.5 s** — *was* the Unit leg's wall clock | 8 slice-`[Fact]`s, 81–138 s each |
 
 Whole-corpus assertions stay OFF the partitioned base and run ONCE (`VersionMatrixTests`' two catalogue facts,
-`CorpusRunnerTests.Manifest_CoversEveryProgram_NoOverlap`) — an inherited `[Fact]` would run N times and inflate
+`ConformanceSuiteTests.TheAlternativeSignConventionTest_CarriesItsWiseOwlOption`) — an inherited `[Fact]` would run N times and inflate
 the count N-fold. The StorageForm sweep is the one deliberate count change (6 → 13) and it keeps its POPULATION
 assertion: the whole-corpus bar was `parsed >= 50`, and each partition now asserts its proportional share rounded
 UP, so a partition that silently stopped binding goes RED instead of green-and-empty (§3.10 corollary 1).
