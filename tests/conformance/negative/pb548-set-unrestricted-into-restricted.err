@@ -1,1 +1,0 @@
-the receiving data-pointer is restricted to type 'TT', so the sender shall be NULL or a data-pointer restricted to the same type (ISO §14.9.39.3 SR19)

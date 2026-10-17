@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Unit;
 /// The GLOBAL clause on a report description entry (ISO §13.18.27.3 SR1 e), §13.18.27.4 GR1/GR2) and the Format-2
 /// half of §14.9.49.4 GR4 — the USE BEFORE REPORTING declarative is selected per STATEMENT, from the source element
 /// containing the GENERATE / TERMINATE and then from the GLOBAL declaratives of its containers (kb/Work PB369). The
-/// run-time selection is witnessed by conformance:85/pb369_global_report_use_selection; this class pins the bind
+/// run-time selection is witnessed by conformance:cases/13.18.27-GLOBAL/pb369_global_report_use_selection; this class pins the bind
 /// rules and the shape the emitter gives the selection.
 /// </summary>
 public sealed class GlobalReportScopeTests

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using CobolNet.Tests.Shared;
 using Xunit;
 
 namespace CobolNet.Tests.Conformance;
@@ -18,7 +19,7 @@ public sealed class IntrinsicPointerArgumentPermissiveTests
 {
     /// <summary>A negative fixture's program text without its <c>*&gt;</c> header comment lines.</summary>
     private static string Fixture(string name) =>
-        string.Join('\n', ConformanceCorpus.NegativeCase(name).Source.Split('\n')
+        string.Join('\n', File.ReadAllText(TestRepo.SuiteCase(name)).Split('\n')
             .Where(line => !line.TrimStart().StartsWith("*>", StringComparison.Ordinal)));
 
     /// <summary>A pointer argument is refused under <c>--permissive</c>, and no diagnostic about it claims the mode

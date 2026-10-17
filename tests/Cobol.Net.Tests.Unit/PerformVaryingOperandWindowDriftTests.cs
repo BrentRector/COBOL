@@ -23,7 +23,7 @@ namespace CobolNet.Tests.Unit;
 /// hoist is EXACT for.
 ///
 /// <para><b>Why a drift test and not only the goldens.</b> The two per-evaluation slots are covered by runtime
-/// cardinality in <c>tests/conformance/2023/pb437_varying_operand_windows.cob</c>, but the FIRST-level FROM's
+/// cardinality in <c>conformance-suite/cases/14.9.28-PERFORM/pb437_varying_operand_windows.cob</c>, but the FIRST-level FROM's
 /// window is not observable from a program's output at all: GR13 uses that operand once whichever window it
 /// carries, so only the activation COUNT differs, and only a side-effecting function could see it. The window
 /// table is therefore pinned HERE, over the generated C#, where "before the loop" and "inside the loop" are

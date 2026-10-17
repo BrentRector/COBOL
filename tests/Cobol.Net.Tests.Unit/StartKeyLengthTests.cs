@@ -12,7 +12,7 @@ namespace CobolNet.Tests.Unit;
 /// referenced by file-name-1 is set to '23'". The predicate is asked of the value the expression PRODUCED, so the
 /// emitter must hand the connector that value (a scaled Int128 + scale, or a double) and never an
 /// <c>(int)(Align(…, 0))</c> narrowing of it. The behaviour is also pinned end to end by the corpus golden
-/// <c>tests/conformance/2002/pb357_start_length_not_integer.cob</c>.
+/// <c>conformance-suite/cases/9.1.13.5-Invalid-key-condition-with-unsuccessful-completion/pb357_start_length_not_integer.cob</c>.
 /// </summary>
 public sealed class StartKeyLengthTests
 {

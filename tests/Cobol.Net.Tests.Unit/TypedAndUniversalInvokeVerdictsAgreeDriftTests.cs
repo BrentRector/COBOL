@@ -40,7 +40,7 @@ namespace CobolNet.Tests.Unit;
 /// <item>BEHAVIORAL: over every elementary pair the comparator's own drift test enumerates, plus reference-modified and
 /// ANY LENGTH sides, the binder's verdict is the relation's; and PB3098's rows compile to the verdicts the table
 /// derives from the standard (the universal lane's twin is the golden
-/// <c>conformance:2002/pb2077_refmod_argument_both_lanes</c>).</item>
+/// <c>conformance:cases/_unassigned/pb2077_refmod_argument_both_lanes</c>).</item>
 /// </list>
 /// </summary>
 public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
@@ -252,7 +252,7 @@ public sealed class TypedAndUniversalInvokeVerdictsAgreeDriftTests
         "the argument is described with PICTURE 9(6) where the formal parameter is described with PICTURE 9(4)")]
     public void ARefusal_SpellsItsClauses_NeverAnIdentityKey(string negative, string argument, string difference)
     {
-        var r = CompilerDriver.Compile(new CompilerDriver.Options(TestRepo.Tests("conformance", "negative", negative),
+        var r = CompilerDriver.Compile(new CompilerDriver.Options(TestRepo.SuiteCase(Path.GetFileNameWithoutExtension(negative)),
             Path.Combine(Path.GetTempPath(), "CobolNet_PB2077_" + Guid.NewGuid().ToString("N")[..8] + ".dll"),
             DialectLevel: 2023, CheckOnly: true, SourceFormat: InitialReferenceFormat.Auto));
         var refusals = r.Errors.Where(e => e.Contains("COBOLNET0828", StringComparison.Ordinal)

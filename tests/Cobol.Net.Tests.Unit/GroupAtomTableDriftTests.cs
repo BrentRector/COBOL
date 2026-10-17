@@ -43,7 +43,7 @@ public sealed class GroupAtomTableDriftTests : CobolNetTestBase
     [Fact]
     public void AGeneratedModule_StatesEachDistinctArrayOnce_AndNamesItEverywhereElse()
     {
-        string source = File.ReadAllText(TestRepo.Tests("conformance", "2014", "pb2690_fixed_group_vlg_element_tables_call.cob"));
+        string source = File.ReadAllText(TestRepo.SuiteCase("pb2690_fixed_group_vlg_element_tables_call"));
         string src = Path.Combine(TempDir, "pb2690_atoms.cob");
         File.WriteAllText(src, source);
         var result = CompilerDriver.Compile(new CompilerDriver.Options(src, DialectLevel: 2014, SourceFormat: InitialReferenceFormat.Auto));

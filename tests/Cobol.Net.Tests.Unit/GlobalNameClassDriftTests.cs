@@ -24,7 +24,7 @@ namespace CobolNet.Tests.Unit;
 /// by REFLECTION, so a name index added tomorrow is discovered without anyone remembering this list, and it must
 /// either be reached from <c>InheritGlobalSubtree</c> or be excluded below with the reason it is not a per-entry name
 /// a GLOBAL record hands down. The behavioural half is
-/// <c>tests/conformance/2014/pb1674_global_capacity_register.cob</c>.</para>
+/// <c>conformance-suite/cases/_unassigned/pb1674_global_capacity_register.cob</c>.</para>
 /// </summary>
 public sealed class GlobalNameClassDriftTests
 {
@@ -154,7 +154,7 @@ public sealed class GlobalNameClassDriftTests
     /// declaration of a spelling in ANY name class hides the class's constant-name or symbolic-character of it
     /// (§8.4.6.1, §8.4.6.2.1 3) a)). When PB3165 moved a method's CAPACITY registers out of the binder's index into
     /// <see cref="OoMethodDataScope.CapacityRegisters"/>, the binder's hand-written method predicate kept asking the
-    /// old index, and <c>tests/conformance/2014/pb3154_half_capacity_register_hides_symbolic.cob</c> displayed the
+    /// old index, and <c>conformance-suite/cases/_unassigned/pb3154_half_capacity_register_hides_symbolic.cob</c> displayed the
     /// figurative <c>CCC</c> for the method's own register. The scope's name indexes are found by REFLECTION, so an
     /// index added to the scope must be asked by <c>OoMethodDataScope.Declares</c> too.</summary>
     [Fact]
@@ -179,7 +179,7 @@ public sealed class GlobalNameClassDriftTests
     /// index-name was refused as an index in COMPUTE, and a method condition-name let <c>MOVE X</c> read the object's
     /// data-name <c>X</c>. Every <see cref="SymbolTable"/> member whose body opens a method tier
     /// (<c>scope.Method is { } m</c>) must ask <c>m.Declares(name)</c> before it reaches the unit's maps. The
-    /// behavioural half is <c>tests/conformance/2014/pb3165_method_capacity_register_scope.cob</c> (SHOWF) and the
+    /// behavioural half is <c>conformance-suite/cases/_unassigned/pb3165_method_capacity_register_scope.cob</c> (SHOWF) and the
     /// three <c>negative/pb3165-method-*-hides-object-*</c> cases.</summary>
     [Fact]
     public void EverySymbolTableMethodTier_AsksTheMethodsWholeDeclaration()

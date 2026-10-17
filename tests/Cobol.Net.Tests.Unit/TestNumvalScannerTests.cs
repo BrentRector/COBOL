@@ -15,8 +15,8 @@ namespace CobolNet.Tests.Unit;
 /// ⛔ EVERY TEST HERE PASSES THE DECISION AS A LITERAL, so none of them measures the COMPILER arm that computes
 /// it (<c>IntrinsicRenderer.CommaFlag</c> from <c>ctx.Data.DecimalPointIsComma</c>; <c>DigitCapFlag</c> from
 /// <c>ArithmeticModes.NumvalDigitCap</c>). That half is measured END TO END by
-/// <c>conformance:2002/pb256_test_numval_mode_flags</c> (both flags, both directions, three compilation units)
-/// and <c>conformance:2014/pb256_test_numval_standard_decimal</c>, and
+/// <c>conformance:cases/15.93.4-Returned-value-rule/pb256_test_numval_mode_flags</c> (both flags, both directions, three compilation units)
+/// and <c>conformance:cases/15.93.4-Returned-value-rule/pb256_test_numval_standard_decimal</c>, and
 /// <c>IntrinsicModeFlagCoverageDriftTests</c> keeps that true for any function that gains such an argument
 /// later. Until kb/Work PB256 neither existed and the second fact below was named
 /// <c>DigitCap_FollowsArithmeticMode</c> — a green check over a name no arithmetic mode was in scope for.

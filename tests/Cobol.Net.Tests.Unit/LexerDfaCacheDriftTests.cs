@@ -77,7 +77,7 @@ public sealed class LexerDfaCacheDriftTests(ITestOutputHelper output)
 
     /// <summary>Every NIST program and copybook and every conformance golden and negative, read as text.</summary>
     private static List<(string Path, string Text)> SuiteSources() =>
-        [.. new[] { TestRepo.Nist(), TestRepo.Tests("conformance") }
+        [.. new[] { TestRepo.Nist(), TestRepo.Suite("cases"), TestRepo.Suite("wiseowl", "cases") }
             .SelectMany(root => Directory.EnumerateFiles(root, "*", SearchOption.AllDirectories))
             .Where(f => Path.GetExtension(f).ToLowerInvariant() is ".cob" or ".cbl" or ".cpy")
             .Order(StringComparer.Ordinal)

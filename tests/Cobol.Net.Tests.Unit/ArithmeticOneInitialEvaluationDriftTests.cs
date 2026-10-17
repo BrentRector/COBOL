@@ -20,7 +20,7 @@ namespace CobolNet.Tests.Unit;
 /// argument-1 return the next number in the current sequence") the test examined one returned value and the
 /// store landed the NEXT one, and the statement consumed two elements of the pseudo-random sequence.</para>
 /// <para>This class reads the EMITTED C# because that is where the defect lives: the corpus golden
-/// <c>tests/conformance/2014/pb654_prohibited_gate_one_evaluation</c> pins the BEHAVIOUR through RANDOM's
+/// <c>conformance-suite/cases/_unassigned/pb654_prohibited_gate_one_evaluation</c> pins the BEHAVIOUR through RANDOM's
 /// sequence position, and these pin the SHAPE over every receiver category and phrase combination, so a new
 /// arm that re-spells the value fails here even if no golden happens to cross it.</para>
 /// </summary>

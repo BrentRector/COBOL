@@ -71,7 +71,14 @@ RESERVED_WORDS_PATH = REPO / "tests" / "version-matrix" / "reserved-words.json"
 SPEC_PATH = REPO / "specs" / "ISO_COBOL.md"
 IMPLEMENTOR_DEFINED_PATH = SUITE / "implementor-defined.json"
 DIAGNOSTICS_PATH = SUITE / "wiseowl" / "diagnostics.json"
+OPTIONS_PATH = SUITE / "wiseowl" / "options.json"
+#: wiseowl/options.json (§4): the WiseOwl compile options a WiseOwl test may need, and each one's values (the `cobol`
+#: command's --sign-encoding and --flag-extensions). Only a test of the wiseowl tree may name one.
+WISEOWL_OPTIONS = {"sign-encoding": ("ibm", "ascii"), "flag-extensions": ("on", "off")}
 OUT = SUITE / "suites"
+#: The corpus slice S2 moved into the suite (kb/Work PB3177). A file there is a test a branch cut before the move
+#: added, which no runner would ever run: refused, so the branch is red in seconds (§13 S2).
+REMOVED_CORPUS = Path("tests") / "conformance"
 VERDICT = "=== CONFORMANCE SUITE: "
 #: The completeness report's file name, beside the manifest directories in the output directory.
 COMPLETENESS_NAME = "completeness.json"
@@ -79,10 +86,13 @@ COMPLETENESS_NAME = "completeness.json"
 #: The two trees of tests: the suites' (`cases/`) and WiseOwl's own regression tests (`wiseowl/cases/`, §4).
 TREES = {"cases": Path("cases"), "wiseowl": Path("wiseowl") / "cases"}
 UNASSIGNED = "_unassigned"
-#: A clause folder: the ISO clause number, then a hyphen and a name (`14.9.8-COMPUTE`), or `_unassigned`.
-CLAUSE_FOLDER = re.compile(r"^(?P<clause>[0-9]+(?:\.[0-9]+)*)-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
+#: A clause folder: the ISO clause number (an annex's letter first, `A.1`), then a hyphen and a name
+#: (`14.9.8-COMPUTE`), or `_unassigned`.
+CLAUSE_FOLDER = re.compile(r"^(?P<clause>(?:[0-9]+|[A-Z])(?:\.[0-9]+)*)-[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*$")
 TEST_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]*$")
 OPEN_MARK, CLOSE_MARK = "*>--- conformance-case", "*>---"
+#: A metadata line whose text after `*>` opens with this many spaces continues the field before it (§3).
+CONTINUATION = "    "
 #: The fields of §3.1 (and `constructs`), each with its value's shape.
 FIELDS = {
     "id": "scalar", "rules": "list", "accept": "list", "flag": "map", "control": "scalar", "requires": "list",
@@ -182,6 +192,8 @@ class Inputs:
     #: edition does not reserve: the uses of a user-defined word a compiler's added reserved word can stop (ISO 4.2.10).
     reserved: dict[str, frozenset[str]] = field(default_factory=dict)
     keywords: frozenset[str] = frozenset()
+    #: wiseowl/options.json: test id -> {option: value}, the WiseOwl compile options of a WiseOwl test.
+    options: dict[str, dict[str, str]] = field(default_factory=dict)
 
     @property
     def editions(self) -> list[str]:
@@ -295,6 +307,7 @@ def read_header(text: str) -> tuple[Header | None, list[tuple[int, str]]]:
                           f"column 7 (fixed form) or column 1 (free form) (§3)")]
     fields: dict[str, Any] = {}
     where: dict[str, int] = {}
+    entries: list[list[Any]] = []  # [key, value text, line] per field, a continuation line appended to its value
     for number, raw in enumerate(lines[1:], start=2):
         form, line = _block_line(raw)
         if form is None:
@@ -304,7 +317,21 @@ def read_header(text: str) -> tuple[Header | None, list[tuple[int, str]]]:
             problems.append((number, f"a metadata line in {form} form inside a block that opened in {seen} form"))
         body = line[2:]
         if line == CLOSE_MARK:
+            for key, value, at in entries:
+                try:
+                    fields[key] = parse_value(value)
+                    where[key] = at
+                except HeaderValueError as e:
+                    problems.append((at, f"{key}: {e}"))
             return Header(fields, where, seen, number), problems
+        if body.startswith(CONTINUATION) and body.strip():
+            # A long value continues on the lines after its field's, each indented past the field names (so a
+            # fixed-form block stays inside margin R and a free-form line inside its 255 positions, ISO 6.1).
+            if not entries:
+                problems.append((number, f"a continuation line with no field before it: {line!r}"))
+            else:
+                entries[-1][1] += " " + body.strip()
+            continue
         if not body.startswith(" ") or ":" not in body:
             problems.append((number, f"a metadata line is `*> <field>: <value>`, not {line!r}"))
             continue
@@ -313,14 +340,10 @@ def read_header(text: str) -> tuple[Header | None, list[tuple[int, str]]]:
         if key not in FIELDS:
             problems.append((number, f"unknown field {key!r} (the fields are §3.1's: {', '.join(FIELDS)})"))
             continue
-        if key in fields:
+        if key in fields or any(e[0] == key for e in entries):
             problems.append((number, f"the field {key!r} twice"))
             continue
-        try:
-            fields[key] = parse_value(value)
-            where[key] = number
-        except HeaderValueError as e:
-            problems.append((number, f"{key}: {e}"))
+        entries.append([key, value, number])
     problems.append((len(lines), f"the metadata block has no closing line `{CLOSE_MARK}`"))
     return None, problems
 
@@ -370,7 +393,9 @@ class Reader:
 
     def read_case(self, tree: str, folder: str, cob: Path) -> Case | None:
         rel = cob.relative_to(self.root)
-        text = cob.read_text(encoding="utf-8")
+        # Bytes, never read_text: universal newlines would read a lone CR, a character of the line (docs/CONFORMANCE.md
+        # DOC-A.1-156), as a line end, and every line number after it would be wrong.
+        text = cob.read_bytes().decode("utf-8")
         header, problems = read_header(text)
         for line, message in problems:
             self.refuse(rel, line, message)
@@ -470,10 +495,12 @@ class Reader:
                 case.marked_line = marks[0]
         elif marks:
             self.refuse(rel, marks[0], "a marked line `<<` in a test that is not flagged")
-        # COPY of an undeclared copybook (§4).
+        # COPY of an undeclared copybook (§4). A test that is neither accepted nor flagged is one WiseOwl only refuses
+        # (wiseowl/diagnostics.json): it never runs, and a library text that is not available can be what it
+        # witnesses (ISO 7.2.3.4 GR 2: library-name-1 "names a resource that shall be available to the compiler").
         declared = set(case.files)
         copies = self._all_copies(case, tokens)
-        for stmt in copies:
+        for stmt in copies if case.accept or case.flag is not None else ():
             if not any(f == stmt.name or Path(f).stem == stmt.name for f in declared):
                 self.refuse(stmt.source or rel, stmt.line, f"COPY {stmt.name}: the library text is not a declared "
                                                            f"file of this test (`files`, §3.1)")
@@ -490,8 +517,9 @@ class Reader:
                 self.refuse(observed.source or rel, observed.line,
                             f"a run-time expectation (it observes an exception condition) accepted at "
                             f"{', '.join(early)}: run-time violations are judged only from {FIRST_RUN_TIME} on (§3.2)")
-        # Free form before it existed.
-        if case.source_format == "free":
+        # Free form before it existed. A WiseOwl test may use it at 85: `--source-format free` at every edition is
+        # WiseOwl's extension (docs/CONFORMANCE.md §7, DOC-A.1-158), and its own regression tests exercise it.
+        if case.source_format == "free" and case.tree != "wiseowl":
             first = self.inputs.editions.index(FIRST_FREE_FORM)
             early = sorted({e for e in case.accept + (case.flag.at if case.flag else ())
                             if self.inputs.editions.index(e) < first}, key=self.inputs.editions.index)
@@ -520,7 +548,7 @@ class Reader:
             if f == name or Path(f).stem == name:
                 rel = case.path.parent / f
                 path = self.root / rel
-                return (rel, path.read_text(encoding="utf-8")) if path.is_file() else None
+                return (rel, cobol.decode(path.read_bytes())) if path.is_file() else None
         return None
 
     def _library(self, case: Case, name: str) -> list[cobol.Token] | None:
@@ -580,18 +608,28 @@ class Reader:
             claimed.update(case.files)
             self._outputs(case, folder)
             claimed.update(p.name for p in case.outputs.values())
+        # A WiseOwl test may declare library text in a LIBRARY folder beside it (`<library>/<file>`): where a
+        # library-name's text is found is the implementor's (ISO 7.2.3.4 GR 2-3), so no suite test can depend on it.
+        libraries = {name.split("/")[0] for name in claimed if tree == "wiseowl" and name.count("/") == 1}
         for f in sorted(folder.iterdir()):
             rel = f.relative_to(self.root)
-            if f.is_dir():
-                self.refuse(rel, 1, "a folder inside a clause folder: a test's files lie beside it")
+            if f.is_dir() and f.name in libraries:
+                for inner in sorted(f.iterdir()):
+                    if f"{f.name}/{inner.name}" not in claimed:
+                        self.refuse(inner.relative_to(self.root), 1, "a file of a library folder no test of this folder "
+                                                                     "declares (`files`)")
+            elif f.is_dir():
+                self.refuse(rel, 1, "a folder inside a clause folder: a test's files lie beside it (a WiseOwl test's "
+                                    "library text may lie in a library folder it declares, `<library>/<file>`)")
             elif f.name not in claimed and not f.name.endswith(".cob"):
                 self.refuse(rel, 1, "a file no test of this folder declares (`files`) or expects as its output")
         for case in cases:
             for name in case.files:
                 if not (folder / name).is_file():
                     self.refuse(case.path, 1, f"files names {name!r}, which is not beside the test")
-                if "/" in name or "\\" in name:
-                    self.refuse(case.path, 1, f"files names {name!r}: a declared file lies beside the test")
+                if "\\" in name or name.count("/") > (1 if tree == "wiseowl" else 0):
+                    self.refuse(case.path, 1, f"files names {name!r}: a declared file lies beside the test (a WiseOwl "
+                                              f"test's library text may lie in a library folder, `<library>/<file>`)")
         self.cases.extend(cases)
 
     def _outputs(self, case: Case, folder: Path) -> None:
@@ -701,6 +739,23 @@ def check_cases(reader: Reader) -> None:
             reader.refuse(DIAGNOSTICS_PATH.relative_to(SUITE), 1, f"{test_id}: WiseOwl refuses it at "
                                                                   f"{', '.join(overlap)}, where the test must be "
                                                                   f"accepted")
+    # wiseowl/options.json (§4): WiseOwl's compile options, for WiseOwl's own tests only.
+    where = OPTIONS_PATH.relative_to(SUITE)
+    for test_id, entry in inputs.options.items():
+        case = by_id.get(test_id)
+        if case is None:
+            reader.refuse(where, 1, f"an entry for {test_id!r}, which is no test")
+        elif case.tree != "wiseowl":
+            reader.refuse(where, 1, f"{test_id}: a WiseOwl compile option for a test of cases/, which compiles under "
+                                    f"each compiler's adapter alone")
+        elif not isinstance(entry, dict) or not entry:
+            reader.refuse(where, 1, f"{test_id}: an entry maps each option to its value")
+        else:
+            for key, value in entry.items():
+                if value not in WISEOWL_OPTIONS.get(key, ()):
+                    reader.refuse(where, 1, f"{test_id}: {key}={value!r} is not a WiseOwl compile option ("
+                                            + "; ".join(f"{k}: {', '.join(v)}" for k, v in WISEOWL_OPTIONS.items())
+                                            + ")")
     for case in reader.cases:
         if case.flag is not None and case.test_id not in inputs.diagnostics:
             reader.refuse(case.path, 1, "a flagged test needs an entry in wiseowl/diagnostics.json: the editions at "
@@ -820,7 +875,8 @@ def manifests(cases: list[Case], inputs: Inputs) -> dict[str, dict[str, Any]]:
     wiseowl: dict[str, Any] = {"generator": "conformance-suite/harness/generate.py", "editions": {}, "diagnostics": {}}
     for e in inputs.editions:
         wiseowl["editions"][e] = [
-            {**entry_for(c, e, inputs), "tree": c.tree, "portable": c.portable, "in-suite": c.in_suite}
+            {**entry_for(c, e, inputs), "tree": c.tree, "portable": c.portable, "in-suite": c.in_suite,
+             "options": dict(inputs.options.get(c.test_id, {}))}
             for c in ordered if e in c.accept or (c.flag is not None and e in c.flag.at)]
     by_id = {c.test_id: c for c in cases}
     for test_id in sorted(inputs.diagnostics):
@@ -830,6 +886,7 @@ def manifests(cases: list[Case], inputs: Inputs) -> dict[str, dict[str, Any]]:
         # format and its declared files (a copybook it COPYs), never a re-read of its header.
         wiseowl["diagnostics"][test_id] = {"source": _posix(case.path), "source-format": case.source_format,
                                            "files": [_posix(case.path.parent / f) for f in case.files],
+                                           "options": dict(inputs.options.get(test_id, {})),
                                            "refuse-at": list(entry["refuse-at"]), "expect": entry["expect"]}
     out["wiseowl"] = wiseowl
     return out
@@ -968,17 +1025,25 @@ def repository_inputs() -> tuple[Inputs, list[str]]:
                   for c in json.loads(CONSTRUCTS_PATH.read_text(encoding="utf-8"))["constructs"]}
     a1, problems = load_implementor_defined(IMPLEMENTOR_DEFINED_PATH, rows)
     diagnostics = json.loads(DIAGNOSTICS_PATH.read_text(encoding="utf-8")) if DIAGNOSTICS_PATH.is_file() else {}
+    options = json.loads(OPTIONS_PATH.read_text(encoding="utf-8")) if OPTIONS_PATH.is_file() else {}
     register = schema.register_items()
     spec = SPEC_PATH.read_text(encoding="utf-8")
     inputs = Inputs(
         schema=schema, rows=rows, constructs=constructs, requirable=annex_names(spec),
         implementor_defined=a1, diagnostics={k: v for k, v in diagnostics.items() if not k.startswith("$")},
         determined=lambda row: schema.anchor_for(row) is not None and row.get("rule-id") in register,
-        derived=schema.derivation_stands, reserved=reserved_words(), keywords=standard_keywords(spec))
+        derived=schema.derivation_stands, reserved=reserved_words(), keywords=standard_keywords(spec),
+        options={k: v for k, v in options.items() if not k.startswith("$")})
     return inputs, problems
 
 
 # ── running ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+def removed_corpus_files(repo: Path) -> list[str]:
+    """The files under the removed `tests/conformance/` of `repo`, as repository-relative POSIX paths."""
+    old = repo / REMOVED_CORPUS
+    return sorted(f.relative_to(repo).as_posix() for f in old.rglob("*") if f.is_file()) if old.is_dir() else []
+
 
 def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
              echo: bool = True) -> tuple[int, Reader]:
@@ -986,6 +1051,9 @@ def generate(root: Path, inputs: Inputs, problems: list[str], out: Path | None,
     reader = Reader(root, inputs)
     reader.read_tree()
     check_cases(reader)
+    for rel in removed_corpus_files(root.parent):
+        reader.refuse(f"../{rel}", 1, "a file under tests/conformance/, which the suite replaced (kb/Work PB3177): "
+                                      "move the test into conformance-suite/cases/ (README, 'Adding a test')")
     for p in problems:
         reader.refuse(IMPLEMENTOR_DEFINED_PATH.name, 1, p)
     # The harness's configuration (§5): every adapter, profile and baseline, against what only the repository knows.
@@ -1570,6 +1638,25 @@ def self_test() -> int:
     check("arm: free form strips a floating comment and reads a line-initial one as a comment",
           [t.text for t in cobol.tokenize(cobol.read_lines("*> all comment\nMOVE A TO B *> rest\n", "free"))]
           == ["MOVE", "A", "TO", "B"])
+    with tempfile.TemporaryDirectory() as tmp:
+        stray = Path(tmp) / REMOVED_CORPUS / "2023" / "late.cob"
+        stray.parent.mkdir(parents=True)
+        stray.write_text("       IDENTIFICATION DIVISION.\n", encoding="utf-8")
+        check("arm: a file under the removed tests/conformance/ is refused (a branch cut before the move)",
+              removed_corpus_files(Path(tmp)) == ["tests/conformance/2023/late.cob"]
+              and removed_corpus_files(Path(tmp) / "nowhere") == [])
+    copies = cobol.copy_statements(fixed_tokens("       >>PAGE COPY FOO IS DOCUMENTATION", "           COPY BAR."))
+    check("arm: a COPY in a directive's text (a PAGE directive's comment-text, 7.3.19.4 GR 1) is no COPY statement",
+          [c.name for c in copies] == ["BAR"], copies)
+    switched = cobol.tokenize(cobol.read_lines("       >>SOURCE FORMAT FREE\nCOPY A.\n>>SOURCE FIXED\n"
+                                              "       COPY B.\n", "fixed"))
+    check("arm: a SOURCE FORMAT directive switches the form of the lines after it (7.3.24.3 GR 1)",
+          [c.name for c in cobol.copy_statements(switched)] == ["A", "B"], [t.text for t in switched])
+    text = "       01 X PIC X.\n"
+    check("arm: a library text is read in the encoding its byte-order mark names, else UTF-8",
+          all(cobol.decode(mark + text.encode(enc)) == text for mark, enc in (
+              (b"\xfe\xff", "utf-16-be"), (b"\xff\xfe", "utf-16-le"), (b"\x00\x00\xfe\xff", "utf-32-be"),
+              (b"\xff\xfe\x00\x00", "utf-32-le"), (b"\xef\xbb\xbf", "utf-8"), (b"", "utf-8"))))
     print("=== generate.py --self-test: " + ("ALL GREEN" if not rc else "FAILED") + " ===")
     return rc
 

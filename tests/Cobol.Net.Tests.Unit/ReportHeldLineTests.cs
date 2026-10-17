@@ -13,7 +13,7 @@ namespace CobolNet.Tests.Unit;
 /// write claims the device first (<see cref="FileRegistry.HoldLine"/>), which writes out a DIFFERENT holder's line —
 /// produced earlier, so it must reach the medium first — and every CLOSE writes the holder's line before the file
 /// closes. These facts reach the arms a golden barely can: a second producer on one file (several reports on one
-/// file, §13.18.46 REPORTS ARE — conformance:85/pb1050_reports_share_file drives it end to end, kb/Work PB1050) and
+/// file, §13.18.46 REPORTS ARE — conformance:cases/13.18.12-CODE/pb1050_reports_share_file drives it end to end, kb/Work PB1050) and
 /// the re-claim by the same holder.
 /// </summary>
 public sealed class ReportHeldLineTests

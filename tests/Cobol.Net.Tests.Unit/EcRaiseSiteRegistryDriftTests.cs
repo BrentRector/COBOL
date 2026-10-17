@@ -46,8 +46,8 @@ namespace CobolNet.Tests.Unit;
 /// statement kind loses its row. It was seen to fail by removing EC-OO-RESOURCE from the INVOKE row (the failure names
 /// the name). Deleting the <c>BoundSetEntry</c> row's EC-PROGRAM-NOT-FOUND leaves it GREEN — <c>ProgramNames</c> (the
 /// CALL and CANCEL rows), <c>ActivationSiteNames</c> and the address-operand row still declare the name — and that loss is
-/// caught by the goldens that run the row: <c>conformance:2002/pb1549_set_program_address_fatal_resume</c> (the ISO
-/// ADDRESS OF PROGRAM sender) and <c>conformance:2002/pb3102_set_entry_not_found_declared</c> (the ENTRY senders), both
+/// caught by the goldens that run the row: <c>conformance:cases/8.4.3.13-Program-address-identifier/pb1549_set_program_address_fatal_resume</c> (the ISO
+/// ADDRESS OF PROGRAM sender) and <c>conformance:cases/_unassigned/pb3102_set_entry_not_found_declared</c> (the ENTRY senders), both
 /// seen red with the row deleted (kb/Work PB3102, review finding R1-1).</para>
 /// </summary>
 [Trait("Sweep", "tree")]

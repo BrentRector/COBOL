@@ -293,7 +293,7 @@ reference-modification over a pointer stays excluded, because §13.18.44.3 SR12/
 on conforming source. `PlaceRenderer.Read`/`Write` already render a slot window
 (`CobolPtr.SlotRead`/`SlotWrite`), so the Managed arm's snapshot and accessor carriers need no second rendering.
 Excluding every view sent `SET WP TO ADDRESS OF WP` followed by `CALL … BY CONTENT WP` to the character arm,
-where the compiler threw. Golden: `tests/conformance/2002/pb1632_pointer_arg_cell_backed` (a self-addressed
+where the compiler threw. Golden: `conformance-suite/cases/_unassigned/pb1632_pointer_arg_cell_backed` (a self-addressed
 pointer, a BASED pointer and a cell-backed program-pointer, BY CONTENT and BY REFERENCE).
 
 **⛔ THE PREDEFINED NULL AS AN ARGUMENT IS AN IDENTIFIER OF THE FORMAL'S CLASS, NOT A FILL (kb/Work PB1630).**
@@ -472,13 +472,13 @@ formal takes the same landing through `FloatResultant` in `OoEmitter`'s float ar
 or other-usage float identifier, a literal-2 or an arithmetic expression; a same-usage float identifier keeps its
 verbatim §14.9.25.4 GR6 c) read), raising under EC-SIZE checking through `RuntimeApi.FloatResultantStoreOrRaise`;
 the binder's "fixed-point⇄float CONTENT conversion is not carried across INVOKE" refusal is retired
-(kb/Work PB1114; `conformance:2002/pb1114_invoke_content_float_formal`, CALL lane
-`conformance:2023/pb1114_call_content_float_formal`, `CallAbiFloatLandingTests`). **The third sender class** (the train review's
+(kb/Work PB1114; `conformance:cases/9.3.6-Method-invocation/pb1114_invoke_content_float_formal`, CALL lane
+`conformance:cases/14.8.2.3.3-Elementary-items-passed-by-content-or/pb1114_call_content_float_formal`, `CallAbiFloatLandingTests`). **The third sender class** (the train review's
 finding): a FLOATING-POINT sender BY CONTENT into a FIXED-POINT image-carried method formal takes the SAME §14.2.3 GR9 COMPUTE as a
 fixed-point sender — `OoEmitter.OoStringReadOf`'s landing asks `IsClassNumericFixedPoint` of the formal and `IsClassNumeric` of the
 sender (a COMPUTE's sending operand may be floating-point), through `NumericRenderer.StoreExpr`, which tells the lanes apart; it fell
 to a MOVE store rendering the formal's profile bare (a Roslyn CS0103), and a MOVE where §14.7.5 r4 owes the EC-SIZE raise
-(`conformance:2023/pb1114_invoke_content_float_to_fixed_formal`).
+(`conformance:cases/_unassigned/pb1114_invoke_content_float_to_fixed_formal`).
 
 **THE ONE NUMERIC LANDING — `CobolArgAdapt.Land` (kb/Work PB288).** Every numeric arm of the callee-side adapter
 reaches its receiving side through a single private helper, because §14.2.3 GR9 and GR10 describe the *same*

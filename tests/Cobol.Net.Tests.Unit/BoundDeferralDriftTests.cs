@@ -238,10 +238,10 @@ SKIPPER.
     [Fact]
     public void NoNegativeGolden_ExpectsTheDeferralCode()
     {
-        var errs = Directory.GetFiles(TestRepo.At("tests", "conformance", "negative"), "*.err");
-        Assert.True(errs.Length >= 1000, $"only {errs.Length} negative expectations found — has the corpus moved?");
-        var pins = errs.Where(f => File.ReadAllText(f).Contains("COBOLNET1756", StringComparison.Ordinal))
-            .Select(Path.GetFileName).ToList();
+        var refusals = SuiteManifest.Manifest.Refusals.Values.ToList();
+        Assert.True(refusals.Count >= 1000, $"only {refusals.Count} refusal expectations found — has the suite moved?");
+        var pins = refusals.Where(r => r.Expect.Contains("COBOLNET1756", StringComparison.Ordinal))
+            .Select(r => r.Id).ToList();
         Assert.True(pins.Count == 0, "a negative golden expects the DEFERRAL code — a capability limit pinned as "
             + "the standard's refusal (kb/Work PB938):\n" + string.Join("\n", pins));
     }

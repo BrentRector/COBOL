@@ -1199,7 +1199,7 @@ internal sealed class SetBinder(BinderContext ctx, StatementBinder host)
     /// (<see cref="BindSetEntry"/>) is deliberately NOT subject to this, and the asymmetry is the standard's
     /// rather than an oversight: SR22 constrains <i>identifier-8</i>, the sender of §14.9.39.2 <b>Format 9</b>,
     /// and the ENTRY spelling is not that format — its words are in no ISO general format at all, so the rule
-    /// has no operand there to name. <c>tests/conformance/2002/pb817_restricted_program_pointer</c> is the
+    /// has no operand there to name. <c>conformance-suite/cases/13.18.60-USAGE/pb817_restricted_program_pointer</c> is the
     /// witness that loads a restricted program-pointer through it. §13.18.60.4 GR25's content obligation on a
     /// restricted program-pointer is a separate question about the EXTENSION's own discipline, registered as
     /// its own mechanism.</para></summary>

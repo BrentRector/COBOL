@@ -11,15 +11,16 @@ namespace CobolNet.Tests.Conformance;
 /// ⛔ THE ARCHITECTURE REVIEW'S BEHAVIOR-NEUTRALITY ORACLE (kb/Work PB2116; docs/rearchitecture/
 /// DESIGN-architecture-review.md §4 items 1 and 2). A refactor can change what the compiler emits through
 /// registration order, static initialization or a shared cache while every test stays green; this records, for
-/// every compile this assembly's partitioned theory families perform (the conformance corpus, NIST, the version
+/// every compile this assembly's partitioned theory families perform (the conformance suite, NIST, the version
 /// matrix and the optional-word subset sweep), the emitted C# and the diagnostic stream, so a restructuring wave can prove case by case that it changed
 /// neither.
 /// <para><b>The population is the suites' own.</b> Every case is enumerated from a <see cref="RowSource"/> — the
 /// <c>[PartitionedRowSource]</c> member a partitioned theory family consumes — and compiled through the SAME option
-/// builders and harness paths the theories call (<see cref="ConformanceCorpus.PositiveOptions"/>,
-/// <see cref="ConformanceCorpus.NegativeCase"/>, <see cref="CorpusManifest.CompileOptions(string, string)"/>,
-/// <see cref="EditionHarness.CompileStaged{T}"/>, <see cref="EditionHarness.CompileNistObserved{T}"/>). A golden
-/// added to a manifest is therefore captured with no edit here, and <c>ArchOracleDriftTests</c> holds every row
+/// builders and harness paths the theories call (<see cref="ConformanceSuiteRunner.AcceptOptions"/>,
+/// <see cref="ConformanceSuiteRunner.FlagOptions"/>, <see cref="ConformanceSuiteRunner.RefusalOptions"/>,
+/// <see cref="CorpusManifest.CompileOptions(string, string)"/>,
+/// <see cref="EditionHarness.CompileStaged{T}"/>, <see cref="EditionHarness.CompileNistObserved{T}"/>). A test
+/// added to the suite is therefore captured with no edit here, and <c>ArchOracleDriftTests</c> holds every row
 /// source of this assembly enrolled, so a new population cannot escape either.</para>
 /// <para><b>An observation is portable.</b> The repository root and the per-compile scratch directory are written
 /// as <c>&lt;repo&gt;</c> and <c>&lt;scratch&gt;</c> with forward slashes, line endings are LF, and the
@@ -37,9 +38,9 @@ public static class ArchOracle
     internal sealed record Observation(string? CSharp, string Diagnostics);
 
     /// <summary>One compile configuration the suites perform, by its stable identity.</summary>
-    /// <param name="Id">The case identity, e.g. <c>corpus/2023/pb803_sign_encoding_ascii</c>,
+    /// <param name="Id">The case identity, e.g. <c>suite/2023/pb803_sign_encoding_ascii</c>,
     /// <c>matrix/goback-raising@2014+permissive</c>, <c>negative/pb1234_x</c>.</param>
-    /// <param name="Population">The suite and edition it is counted under, e.g. <c>corpus/2023</c>.</param>
+    /// <param name="Population">The suite and edition it is counted under, e.g. <c>suite/2023</c>.</param>
     /// <param name="Observe">Compile the case and observe it.</param>
     internal sealed record OracleCase(string Id, string Population, Func<Observation> Observe);
 
@@ -56,10 +57,10 @@ public static class ArchOracle
     /// (<c>ArchOracleDriftTests</c>) — each with the compile its theory performs for a row.</summary>
     internal static IReadOnlyList<RowSource> Sources { get; } =
     [
-        new(typeof(CorpusRunnerTestsBase<>), nameof(CorpusRunnerTestsBase<Slot0>.AllEnabledPositive),
-            CorpusRunnerTestsBase<Slot0>.AllEnabledPositive, CorpusPositive),
-        new(typeof(CorpusRunnerTestsBase<>), nameof(CorpusRunnerTestsBase<Slot0>.AllEnabledNegative),
-            CorpusRunnerTestsBase<Slot0>.AllEnabledNegative, CorpusNegative),
+        new(typeof(ConformanceSuiteTestsBase<>), nameof(ConformanceSuiteTestsBase<Slot0>.AllTests),
+            ConformanceSuiteTestsBase<Slot0>.AllTests, SuiteTestCase),
+        new(typeof(ConformanceSuiteTestsBase<>), nameof(ConformanceSuiteTestsBase<Slot0>.AllRefusals),
+            ConformanceSuiteTestsBase<Slot0>.AllRefusals, SuiteRefusalCase),
         new(typeof(NistDifferentialTestsBase<>), nameof(NistDifferentialTestsBase<Slot0>.AllGreenPrograms),
             NistDifferentialTestsBase<Slot0>.AllGreenPrograms, NistGolden),
         new(typeof(VersionMatrixTestsBase<>), nameof(VersionMatrixTestsBase<Slot0>.AllMatrix),
@@ -103,24 +104,24 @@ public static class ArchOracle
 
     // ── the row → case mappings: each compiles exactly what its theory compiles ─────────────────────────────────
 
-    private static IEnumerable<OracleCase> CorpusPositive(object[] row)
+    /// <summary>A conformance-suite test at one edition: its accept compile, or a flagged test's flag compile (its
+    /// control is a test of its own).</summary>
+    private static IEnumerable<OracleCase> SuiteTestCase(object[] row)
     {
-        var (edition, name) = ((string)row[0], (string)row[1]);
-        if (edition == "shell") yield break;   // ConformanceCorpus.EnabledPositive's empty-manifest sentinel
-        yield return new($"corpus/{edition}/{name}", $"corpus/{edition}", () => InScratch(dir =>
-            CompiledProgramCache.Compile(ConformanceCorpus.PositiveOptions(edition, name, Path.Combine(dir, name + ".dll")))));
+        var (edition, id) = ((string)row[0], (string)row[1]);
+        SuiteTest test = SuiteManifest.Manifest.Editions[edition][id];
+        yield return new($"suite/{edition}/{id}", $"suite/{edition}", () => InScratch(dir => CompiledProgramCache.Compile(
+            test.Expect == "accept" ? ConformanceSuiteRunner.AcceptOptions(test, edition, dir)
+                : ConformanceSuiteRunner.FlagOptions(test, edition, dir))));
     }
 
-    private static IEnumerable<OracleCase> CorpusNegative(object[] row)
+    /// <summary>One of WiseOwl's refusals (<c>wiseowl/diagnostics.json</c>) at one edition.</summary>
+    private static IEnumerable<OracleCase> SuiteRefusalCase(object[] row)
     {
-        string name = (string)row[0];
-        if (name == "sentinel") yield break;   // ConformanceCorpus.EnabledNegative's empty-manifest sentinel
-        yield return new($"negative/{name}", "negative", () =>
-        {
-            var (source, editions) = ConformanceCorpus.NegativeCase(name);
-            return Fold(editions.Select(ed => ($"@{ed}", EditionHarness.CompileStaged(
-                source, ed, permissive: false, copybooks: null, flagExtensions: false, Observe))));
-        });
+        var (id, edition) = ((string)row[0], (string)row[1]);
+        SuiteRefusal refusal = SuiteManifest.Manifest.Refusals[id];
+        yield return new($"refusal/{id}@{edition}", "refusal", () => InScratch(dir =>
+            CompiledProgramCache.Compile(ConformanceSuiteRunner.RefusalOptions(refusal, edition, dir))));
     }
 
     /// <summary>A green∪divergent NIST program at the golden run's edition, and the chain predecessors its golden run

@@ -150,7 +150,7 @@ public sealed class DisplayUsageUnionDriftTests
             //      in a national coded character set (§13.18.60.4 GR8), so it HAS the character cells both marks
             //      write, and leaving it out was MEASURED: below 2023 `MOVE LOW-VALUE TO` a `PIC 9 USAGE NATIONAL`
             //      item stopped the run unit with NotImplementedCobolFeatureException and `MOVE SPACE TO NN9(1:1)`
-            //      was silently lost (conformance:2002/pb442_numeric_edited_national_class). This is a SINGLE-LEAF
+            //      was silently lost (conformance:cases/14.9.25-MOVE/pb442_numeric_edited_national_class). This is a SINGLE-LEAF
             //      mark, not the whole-group promotion DataBinder's MarkImageLeaves keeps DISPLAY-only: a forced
             //      national leaf was probed through group-to-group MOVEs between two such groups (both leaves
             //      forced, one forced, GROUP-USAGE NATIONAL and alphanumeric groups, an ALL "7" group deposit) and

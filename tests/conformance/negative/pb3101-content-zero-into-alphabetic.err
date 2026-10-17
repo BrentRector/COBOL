@@ -1,1 +1,0 @@
-the argument (the figurative constant ZERO) is not a valid sending operand of a MOVE to the formal parameter (an elementary alphabetic item described with PICTURE A(4) USAGE DISPLAY): the figurative constant ZERO shall not be moved to an alphabetic data item (ISO §14.9.25.3 SR6)

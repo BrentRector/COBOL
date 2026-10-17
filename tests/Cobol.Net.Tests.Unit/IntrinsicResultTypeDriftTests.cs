@@ -261,7 +261,7 @@ public sealed class IntrinsicResultTypeDriftTests
     [Fact]
     public void ThePb15Fixtures_ExistAndAreRegistered()
     {
-        string negative = File.ReadAllText(TestRepo.Tests("conformance", "negative", "manifest.json"));
+        var refusals = SuiteManifest.Manifest.Refusals;
         foreach (string name in new[]
                  {
                      "pb15-trim-national-result-to-an",
@@ -270,14 +270,12 @@ public sealed class IntrinsicResultTypeDriftTests
                      "pb15-formatted-date-national-result-to-an",
                  })
         {
-            Assert.True(File.Exists(TestRepo.Tests("conformance", "negative", name + ".cob")), $"{name}.cob missing");
-            Assert.True(File.Exists(TestRepo.Tests("conformance", "negative", name + ".err")), $"{name}.err missing");
-            Assert.True(negative.Contains(name, StringComparison.Ordinal),
-                $"{name} is not in tests/conformance/negative/manifest.json — it would never run");
+            Assert.True(File.Exists(TestRepo.SuiteCase(name)), $"{name}.cob missing");
+            Assert.True(refusals.ContainsKey(name),
+                $"{name} has no entry in conformance-suite/wiseowl/diagnostics.json — it would never be refused");
         }
 
-        string positive = File.ReadAllText(TestRepo.Tests("conformance", "2023", "manifest.json"));
-        Assert.True(positive.Contains("pb15_result_type_follows_argument", StringComparison.Ordinal),
-            "pb15_result_type_follows_argument is not enabled in tests/conformance/2023/manifest.json");
+        Assert.True(SuiteManifest.Manifest.Editions["2023"].ContainsKey("pb15_result_type_follows_argument"),
+            "pb15_result_type_follows_argument is not a conformance-suite test accepted at 2023");
     }
 }

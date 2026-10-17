@@ -15,7 +15,7 @@ namespace CobolNet.Tests.Conformance;
 /// — the documented diagnostic and exit code 1 — and its §14.6.11 2) implicit CLOSE: "An implicit CLOSE statement
 /// without any phrases is executed for each file that is in the open mode". Before the fix each program died of a CLR
 /// stack overflow at a depth of about 250: no diagnostic a COBOL programmer can act on, and no CLOSE. The CALL arm
-/// with ON EXCEPTION is the golden <c>conformance:2002/pb2659_call_resources_recursion</c>.
+/// with ON EXCEPTION is the golden <c>conformance:cases/14.9.4-CALL/pb2659_call_resources_recursion</c>.
 /// </summary>
 public sealed class ActivationResourcesTests
 {

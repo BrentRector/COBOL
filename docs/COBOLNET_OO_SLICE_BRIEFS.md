@@ -422,8 +422,8 @@ These files are greenfield-only (2002 manifest); the legacy NIST guard never com
 | 5 | `src/Cobol.Net.Compiler/Binding/OoClassTable.cs` :135–141, :158–178, :181–192, :210–224, :280–282 | D-C capture + SR checks; delete the leniency comment |
 | 6 | `src/Cobol.Net.Compiler/Binding/EditionContext.cs` :58–61 | widen `Removed` XML doc (leniency seam) |
 | 7 | `src/Cobol.Net.Compiler/CodeGen/CSharpEmitter.Oo.cs` :117, :142–150 | D-D `sealed`/modifier table + comment refresh (drop "documented grammar gap") |
-| 8 | `tests/conformance/2002/oo_inherit.cob`, `oo_super.cob`, `oo_self_polymorphic.cob` | add OVERRIDE (goldens unchanged) |
-| 9 | `tests/conformance/2002/oo_override_final.cob` + `.out` + `manifest.json` | new golden (below) |
+| 8 | `conformance-suite/cases/9.3.6-Method-invocation/oo_inherit.cob`, `oo_super.cob`, `oo_self_polymorphic.cob` | add OVERRIDE (goldens unchanged) |
+| 9 | `conformance-suite/cases/11.7-METHOD-ID/oo_override_final.cob` + `.out` + `manifest.json` | new golden (below) |
 | 10 | `tests/Cobol.Net.Tests.Conformance/OoAttributeTests.cs` (new) | negative/positive suite (below) |
 | 11 | `docs/COBOLNET_OO_DESIGN.md` | same change set: D7 AS-BUILT note (attributes landed; SR4a strict + permissive inference); update the "Missing:" grammar-seam list (:301) and the Open-questions grammar bullet (:375) — OVERRIDE/IS FINAL no longer missing; edge-case list :237 now cites 0837/0838; record the SR2/SR8 forward obligation on the INTERFACE-ID question |
 | 12 | `DEVLOG/` | a new entry file, `pending-<slug>.md`, stamped at the landing (`devlog.py stamp`) |
@@ -440,7 +440,7 @@ These files are greenfield-only (2002 manifest); the legacy NIST guard never com
 
 ## 4. Tests (same commit — `feedback_goldens_ship_with_the_feature`, `feedback_goldens_ship_with_the_feature`)
 
-**Golden** `tests/conformance/2002/oo_override_final.cob` (+ `.out`, + `manifest.json` entry): driver +
+**Golden** `conformance-suite/cases/11.7-METHOD-ID/oo_override_final.cob` (+ `.out`, + `manifest.json` entry): driver +
 `CLASS-ID. ANIMAL.` with `METHOD-ID. SPEAK.` (virtual) — `CLASS-ID. DOG INHERITS FROM ANIMAL.` with
 `METHOD-ID. SPEAK OVERRIDE IS FINAL.` — `CLASS-ID. KEEPER IS FINAL.` with a fresh `METHOD-ID. GREET.`;
 driver invokes SPEAK through an ANIMAL-typed reference holding a DOG (proves `sealed override` dispatch) and

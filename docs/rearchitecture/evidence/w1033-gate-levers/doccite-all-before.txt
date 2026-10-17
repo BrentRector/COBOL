@@ -7,8 +7,8 @@
 — 63 quote(s) not found anywhere in the spec. MOSTLY NOT DEFECTS: a doc quotes labels
   and paraphrases as well as spec text, and nothing distinguishes them mechanically. Eyeball only.
 
-  tests/conformance/negative/l1-formatted-datetime-offset-local-format.cob:10: §15.3.3.5 "a common time format followed by 'Z'"
-  tests/conformance/negative/pb400-evaluate-signed-sole-literal-pair.cob:11: §8.8.4.7.3 "single data item not enclosed in parentheses"
+  conformance-suite/cases/15.40.3-Argument-rules/l1-formatted-datetime-offset-local-format.cob:10: §15.3.3.5 "a common time format followed by 'Z'"
+  conformance-suite/cases/14.9.13-EVALUATE/pb400-evaluate-signed-sole-literal-pair.cob:11: §8.8.4.7.3 "single data item not enclosed in parentheses"
   docs/COBOLNET_INTERPROGRAM_DESIGN.md:178: §14.2.3 "a value copy allocated at call initiation and conformed to the formal"
   docs/COBOLNET_INTERPROGRAM_DESIGN.md:232: §14.8.3.2 "subject to compatibility as described in 8.5.1.12"
   docs/COBOLNET_REARCHITECTURE_PLAN.md:1785: §8.8.1.3 "exact Int128 fixed-point engine"

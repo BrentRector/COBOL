@@ -1,0 +1,8 @@
+{
+ "pb1525_flag_extensions_changes_nothing": {
+  "flag-extensions": "on"
+ },
+ "pb803_sign_encoding_ascii": {
+  "sign-encoding": "ascii"
+ }
+}

@@ -42,7 +42,7 @@ public sealed class ClassConditionDifferentialTests
     // item referenced by identifier-1 is boolean, numeric, or numeric-edited" — three categories, of which only
     // BOOLEAN was screened until kb/Work PB571. The former legacy engine is a regression NET, never authority
     // (CLAUDE.md rule 1), and the case now lives where a rejection belongs:
-    // tests/conformance/negative/pb571-class-alphabetic-on-numeric (COBOLNET0844, every edition).
+    // conformance-suite/cases/8.8.4.4-Simple-class-condition/pb571-class-alphabetic-on-numeric (COBOLNET0844, every edition).
     // The admission side — the same operand with an ALPHABET-NAME, which SR4 does NOT name — is
     // 85/pb571_class_condition_one_table's F line.
     [InlineData("01 X PIC X(3) VALUE \"ABC\".", "    IF X IS ALPHABETIC-UPPER DISPLAY \"UP\" ELSE DISPLAY \"NO\" END-IF.")]

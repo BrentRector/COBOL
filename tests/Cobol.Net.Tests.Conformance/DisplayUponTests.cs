@@ -69,7 +69,7 @@ public sealed class DisplayUponTests
     /// observable of "unbounded" is one line per DISPLAY however long the operand. 2,000 positions exceed every line
     /// width a terminal or printer has had; the repeated ten-digit pattern makes a fold at ANY column visible, and it
     /// ends in a digit, so the harness's trailing-space trim (kb/Work PB150) cannot hide one. The standard device
-    /// alone is the corpus golden <c>conformance:2023/l1_display_transfer_size</c>; this adds SYSOUT, CONSOLE and the
+    /// alone is the corpus golden <c>conformance:cases/14.9.11-DISPLAY/l1_display_transfer_size</c>; this adds SYSOUT, CONSOLE and the
     /// standard-error device SYSERR, which the corpus cannot observe (it compares standard output only). kb/Work PB243.
     /// </summary>
     [Fact]

@@ -31,8 +31,8 @@ namespace CobolNet.Tests.Unit;
 /// The fix is the shape, not the assignment: <c>StartSucceeded(int keyOfReference, KeyedRec found)</c> takes the
 /// key of reference as a REQUIRED ARGUMENT, so a fourth START format cannot be written without answering the
 /// question. This file is what keeps that true. The BEHAVIOUR is pinned by the corpus goldens
-/// <c>tests/conformance/2002/pb356_start_first_last_indexed.cob</c> (the inverted orderings and the four
-/// following prime-order READs) and <c>tests/conformance/2023/pb356_start_first_last_suppressed.cob</c> (the
+/// <c>conformance-suite/cases/14.9.41-START/pb356_start_first_last_indexed.cob</c> (the inverted orderings and the four
+/// following prime-order READs) and <c>conformance-suite/cases/14.9.41-START/pb356_start_first_last_suppressed.cob</c> (the
 /// SUPPRESS WHEN records FIRST/LAST must still see); this file pins the STRUCTURE, because an epilogue reading
 /// shared mutable state is how the defect could exist at all.
 /// </para>

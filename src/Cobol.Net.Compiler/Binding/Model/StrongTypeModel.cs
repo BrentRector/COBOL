@@ -175,7 +175,7 @@ public static class StrongTypeModel
     /// elementary item's relative bit position, length in bits and §8.5.3.1 essential characteristics (the
     /// <see cref="SameEssentialCharacteristics"/> list: ALIGNED, BLANK WHEN ZERO, DYNAMIC LENGTH, JUSTIFIED,
     /// SYNCHRONIZED and the analyzed PICTURE / SIGN / USAGE profile), so equal keys ⇔ <see cref="SameType"/> — pinned
-    /// end to end by <c>conformance:2002/pb480_universal_match_relations</c> (two equivalent declarations of one
+    /// end to end by <c>conformance:cases/9.3.6-Method-invocation/pb480_universal_match_relations</c> (two equivalent declarations of one
     /// type-name in two source elements cross). The one fact a key cannot carry exactly is the LOCALE phrase's
     /// external identification, which §8.5.3.1 compares character for character between two literals but without
     /// regard to case when a word is involved: it is keyed as written, word or literal, so a literal and a word that

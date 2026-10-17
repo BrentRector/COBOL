@@ -822,7 +822,7 @@ public abstract class OptionalWordSubsetDriftTestsBase<TSlot>
     // factory-of-ACTIVE-CLASS item in a factory method) and prints what each one invokes — so the template can
     // never drift from a program whose output is already pinned.
     private static readonly string ObjectReferenceFactoryOf =
-        File.ReadAllText(Path.Combine(ConformanceCorpus.Root, "2002", "pb389_object_reference_descriptor.cob"))
+        File.ReadAllText(TestRepo.SuiteCase("pb389_object_reference_descriptor"))
             .Replace("FACTORY OF PB389B", "FACTORY {0} PB389B", StringComparison.Ordinal)
             .Replace("FACTORY OF ACTIVE-CLASS", "FACTORY {1} ACTIVE-CLASS", StringComparison.Ordinal)
             .Replace("PROGRAM-ID. PB389M.", "PROGRAM-ID. OPWX.", StringComparison.Ordinal)

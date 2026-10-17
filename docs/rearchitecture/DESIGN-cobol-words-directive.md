@@ -306,8 +306,8 @@ gate) → commit + push + a DEVLOG entry.
   equals its JSON AND the spec section, and no word is in both §8.9-at-2023 and §8.10.
 - **Conformance, the name-level half** `tests/conformance/2023/pb250_cobol_words_phrase_word_{equate,undefine}.cob`
   (a §15 phrase word the lexer does not tokenize, both directions),
-  `tests/conformance/2023/pb250_cobol_words_multi_spelling.cob` (UNDEFINE "ZERO" leaves ZEROS/ZEROES reserved),
-  and `tests/conformance/negative/pb250-cobol-words-undefined-keyword-syntax-withdrawn.cob` (GR3: the withdrawn
+  `conformance-suite/cases/_unassigned/pb250_cobol_words_multi_spelling.cob` (UNDEFINE "ZERO" leaves ZEROS/ZEROES reserved),
+  and `conformance-suite/cases/15.94-TEST-NUMVAL-C/pb250-cobol-words-undefined-keyword-syntax-withdrawn.cob` (GR3: the withdrawn
   syntax is not available).
 
 > **Not conflated:** `tests/version-matrix/cobol-words.json` + `scripts/gen-cobol-words.ps1` are the STATIC

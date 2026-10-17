@@ -438,7 +438,7 @@ public static class MoveTable16
     /// "message-tag/object/pointer classes cannot reach a bound MOVE yet (their usages are compile-gated
     /// skeletons)". <c>PicInfo</c> contradicted that premise in its own XML docs — <c>Usage.Pointer</c> "LIVE
     /// (Phase-4b increment 1)", <c>Usage.ProgramPointer</c> "LIVE (P10 Step 7)", <c>Usage.ObjectReference</c>
-    /// "LIVE (the Phase-3 OO spine)" — and <c>conformance:2002/based_pointer</c> exercises a live USAGE POINTER
+    /// "LIVE (the Phase-3 OO spine)" — and <c>conformance:cases/13.18.5-BASED/based_pointer</c> exercises a live USAGE POINTER
     /// end to end. MEASURED at <c>--std 2023</c> and <c>--std 2002</c>: <c>MOVE P TO Y</c> (pointer into
     /// <c>PIC X(8)</c>) printed <c>Y=[CobolNet]</c> — the CLR type name of the pointer carrier, deposited in a
     /// user's alphanumeric item with no diagnostic anywhere. A premise about what "cannot reach" a screen is

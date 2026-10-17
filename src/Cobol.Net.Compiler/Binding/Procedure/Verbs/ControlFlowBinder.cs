@@ -215,7 +215,7 @@ internal sealed partial class ControlFlowBinder(BinderContext ctx, StatementBind
     /// arithmetic-expression-1 specified as zero") resolved at bind: by §14.9.9.4 GR1 a zero interval suspends
     /// nothing and is not less than zero, so it can never set EC-CONTINUE-LESS-THAN-ZERO, and the AFTER-0 reading
     /// leaves no observable trace for the node to carry. The equivalence is MEASURED, not assumed:
-    /// <c>conformance:2023/pb241_continue_bare_equals_after_zero</c> runs both spellings under checking ON WITH
+    /// <c>conformance:cases/14.9.9-CONTINUE/pb241_continue_bare_equals_after_zero</c> runs both spellings under checking ON WITH
     /// LOCATION and compares their EXCEPTION-STATUS / -STATEMENT / -LOCATION triples (kb/Work PB241), so giving
     /// <see cref="BoundNop"/> anything observable fails it. The AFTER … SECONDS timed-pause phrase (COBOL-2023, introduction-gated on the
     /// phrase by the VersionConformancePass) binds to a <see cref="BoundContinueAfter"/>. Whether

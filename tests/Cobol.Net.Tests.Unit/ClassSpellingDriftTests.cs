@@ -99,7 +99,7 @@ public sealed class ClassSpellingDriftTests
             || f.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}");
         var files = Directory.EnumerateFiles(TestRepo.Src(), "*.cs", SearchOption.AllDirectories)
             .Concat(Directory.EnumerateFiles(TestRepo.Tests(), "*.cs", SearchOption.AllDirectories))
-            .Concat(Directory.EnumerateFiles(TestRepo.Tests(["conformance"]), "*.cob", SearchOption.AllDirectories))
+            .Concat(Directory.EnumerateFiles(TestRepo.Suite(), "*.cob", SearchOption.AllDirectories))
             .Where(f => !Built(f) && Path.GetFullPath(f) != self);
         var offenders = files
             .SelectMany(f =>

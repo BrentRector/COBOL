@@ -20,7 +20,7 @@ namespace CobolNet.Tests.Unit;
 /// standing in for a per-group value: <c>BoundOpen</c> carried <c>SharingOverride</c> and <c>Retry</c> as
 /// statement properties, so one group's phrase governed every file — and the next phrase added to the format
 /// (the NO REWIND phrase, kb/Work PB317; the per-file-name syntax rules, kb/Work PB318) would have been added
-/// the same way, because that was the shape on offer. <c>conformance:2002/pb316_open_group_scope</c> proves the
+/// the same way, because that was the shape on offer. <c>conformance:cases/14.9.27-OPEN/pb316_open_group_scope</c> proves the
 /// two phrases that exist TODAY are scoped correctly; only a check on the SHAPE makes the next one automatic.
 /// The rule enforced here is exact: the statement node carries nothing but its file list, and every per-group
 /// value lives on <see cref="BoundOpenFile"/>.</para>

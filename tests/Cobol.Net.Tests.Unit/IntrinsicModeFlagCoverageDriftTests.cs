@@ -148,21 +148,15 @@ public sealed class IntrinsicModeFlagCoverageDriftTests
         construct.IsMatch(scope)
         && Regex.IsMatch(scope, @"FUNCTION\s+" + Regex.Escape(cobolFn) + @"\s*\(", RegexOptions.IgnoreCase);
 
-    /// <summary>Enabled positive goldens that also have a sibling <c>.out</c>, so the runner RUNS and COMPARES
-    /// them rather than only compiling them.</summary>
+    /// <summary>The conformance-suite tests accepted at an edition, which the runner RUNS and COMPARES rather than
+    /// only compiling them.</summary>
     private static IEnumerable<(string Name, string Source)> RunnableGoldens()
     {
-        foreach (string ed in new[] { "85", "2002", "2014", "2023" })
+        foreach (var (ed, tests) in SuiteManifest.Manifest.Editions)
         {
-            string dir = TestRepo.Tests("conformance", ed);
-            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "manifest.json")));
-            if (!doc.RootElement.TryGetProperty("enabled", out var enabled)) continue;
-            foreach (var e in enabled.EnumerateArray())
+            foreach (SuiteTest test in tests.Values.Where(t => t.Expect == "accept").OrderBy(t => t.Id, StringComparer.Ordinal))
             {
-                string name = e.GetString()!;
-                string cob = Path.Combine(dir, name + ".cob");
-                if (File.Exists(cob) && File.Exists(Path.Combine(dir, name + ".out")))
-                    yield return ($"{ed}/{name}", File.ReadAllText(cob));
+                yield return ($"{ed}/{test.Id}", File.ReadAllText(Path.Combine(SuiteManifest.Root, test.Source)));
             }
         }
     }

@@ -1,1 +1,0 @@
-a file-control COLLATING SEQUENCE clause is a Format-1 clause and shall be specified only for an indexed file — this file is sequential (ISO §12.4.5.2 SR8)

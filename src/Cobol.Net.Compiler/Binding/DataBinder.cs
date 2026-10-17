@@ -4713,7 +4713,7 @@ public sealed partial class DataBinder(EditionContext? edition = null)
                     // ordinary relation rules under the PROGRAM collating sequence — so it is inert, not
                     // erroneous. Keying the screen on the conditional VARIABLE alone instead refused
                     // `88 CN-ORDER VALUE 1 IN AL1 WHEN SET TO FALSE 0`, conforming source this corpus already
-                    // pins (tests/conformance/2002/pb695_value_false_optional_words), on a rule that says nothing
+                    // pins (conformance-suite/cases/13.18.63-VALUE/pb695_value_false_optional_words), on a rule that says nothing
                     // about it. The class read is still the variable's, which §13.18.63.3 SR4/SR5 make the
                     // literals' own class.
                     if (alphaName is not null)

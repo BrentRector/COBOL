@@ -16,7 +16,7 @@ namespace CobolNet.Tests.Conformance;
 /// augment the one to its left — is invisible unless an AFTER level's FROM READS the level to its left. The
 /// claim stood over a body of <c>AssertMatchesGolden</c> differentials for as long as the emitter implemented the
 /// opposite order (kb/Work PB436). The ordering is measured by the spec-derived golden
-/// <c>conformance:85/pb436_varying_after_from_outer</c>, which writes <c>AFTER B FROM A</c> in both the inline
+/// <c>conformance:cases/14.9.28-PERFORM/pb436_varying_after_from_outer</c>, which writes <c>AFTER B FROM A</c> in both the inline
 /// and out-of-line spellings, at two and three levels, with index-name levels, and pins the TEST AFTER arm
 /// (GR13 c) 4, the opposite order) beside it.</para>
 /// </summary>

@@ -1,1 +1,0 @@
-COBOLNET0841: class 'L1C09W', method 'SPEAK': formal #1: the formal parameter (an elementary numeric item described with PICTURE 9(8) USAGE DISPLAY) and the corresponding parameter of the 'L1C09O' prototype (an elementary numeric item described with PICTURE 9(4) USAGE DISPLAY)

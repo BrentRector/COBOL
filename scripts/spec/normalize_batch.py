@@ -44,7 +44,7 @@ PROJECT_FORM = {
 }
 #: `tests/conformance/<edition>/<case>.cob` -> `conformance:<edition>/<case>` — the SPEC-DERIVED corpus form,
 #: i.e. the one that can actually CLOSE a row. Missing it in the first draft would have silently dropped a
-#: legitimate closing reference (out-mean.json's `tests/conformance/2002/arith_standard.cob`) and left the row
+#: legitimate closing reference (out-mean.json's `conformance-suite/cases/15.60.4-Returned-value-rule/arith_standard.cob`) and left the row
 #: open for a reason that had nothing to do with the compiler.
 COB_REF = re.compile(r"^tests/conformance/(?P<ed>85|2002|2014|2023|negative)/(?P<case>[A-Za-z0-9_.-]+?)(?:\.cob)?$")
 
