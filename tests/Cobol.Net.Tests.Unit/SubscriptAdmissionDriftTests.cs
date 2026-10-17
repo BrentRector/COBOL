@@ -128,7 +128,8 @@ public sealed class SubscriptAdmissionDriftTests
 
     /// <summary>kb/Work PB681 — the THIRD arm of the written-subscript family, §8.4.2.3.3 SR5's omitted list, on
     /// EVERY entry that resolves an identifier: <c>Resolve</c>, <c>ResolveForItem</c> (the condition-name
-    /// conditional variable) and <c>ResolveForAddressOf</c>. Each used to return an unreported null — or, for
+    /// conditional variable) and <c>ResolveForAddressOf</c> (the first and last through <c>Identify</c>, kb/Work
+    /// PB3287). Each used to return an unreported null — or, for
     /// ADDRESS OF, the first occurrence's address — so <c>MOVE E TO B</c> over a table element compiled clean and
     /// aborted at run time. An entry that forgets the omitted arm is the two-arm-dispatch shape
     /// (feedback_two_arm_dispatch); this pins all three.</summary>
@@ -138,8 +139,11 @@ public sealed class SubscriptAdmissionDriftTests
         string text = File.ReadAllText(ReferenceResolver);
         // kb/Work PB1030: the three entries share ONE reading of the written list (ReadSubscripts), so the omitted
         // arm is written once and each entry is pinned to calling it — an entry that stops calling it is red here.
+        // kb/Work PB3287: Resolve and ResolveForAddressOf reach it together, through the ONE identification step
+        // (ReferenceResolver.Identify — ReferenceIdentificationDriftTests pins that both ask it), so the call sites
+        // are that step's and ResolveForItem's.
         Assert.Single(Regex.Matches(text, @"ScreenSubscriptArity\(dref, item, 0\)"));
-        Assert.Equal(3, Regex.Matches(text, @"ReadSubscripts\(dref, item, [^,]+, out var \w+\)").Count);
+        Assert.Equal(2, Regex.Matches(text, @"ReadSubscripts\(dref, item, [^,]+, out var \w+\)").Count);
         Assert.Contains("DiagnosticCatalog.TableElementNotSubscripted", text, StringComparison.Ordinal);
     }
 }

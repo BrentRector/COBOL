@@ -66,19 +66,31 @@ except Exception:  # noqa: BLE001
 
 cmd = (data.get("tool_input") or {}).get("command", "") or ""
 
-# Split on the heredoc marker so a rule about COMMANDS never fires on text inside a heredoc body (and vice versa).
-head, _, body = cmd.partition("<<")
-commands = head if body else cmd
+# EVERY rule reads the command line through the ONE model of it, the shared parser `shell_location.steps` (kb/Work
+# PB2599, PB3198): its simple commands in order, each with its words (quoted text is one word), the heredoc bodies it
+# introduces cut out beside it at their own delimiter lines, every place a shell takes a command line from walked as the
+# command line it is (a `$( … )` / backquote / PowerShell expression or script block, a `bash -c` / `pwsh -Command` /
+# `cmd /c` payload, `eval` / `iex`, a heredoc, here-string or pipe a shell reads as its script; the branch review's R1-1
+# and R1-2), and every `git` invocation read by `shell_location.git_calls`. No rule scans the raw text: a private view of
+# it reads a heredoc body as commands, a command written after a heredoc as body, or a `<<` inside quotes as the start of
+# one (kb/Work PB3198: five such views let a stash, a push to main and a bare test filter through after a heredoc).
+# The cwd is "." so a relative location stays relative: a relative `cd` never leaves this
+# repository unless it names a registered submodule (rule 2). A parse failure leaves the rules nothing to judge.
+try:
+    STEPS = shell_location.steps(cmd, ".", shell_location.shell_of(data.get("tool_name")))
+except Exception:  # noqa: BLE001 — a hook must never wedge a session
+    STEPS = []
+GIT_CALLS = [call for st in STEPS for call in shell_location.git_calls(st)]
 
-# 1. git stash (listing/showing is harmless) and --autostash
-for m in re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?stash\b(\s+\w+)?", commands):
-    sub = (m.group(1) or "").strip()
-    if sub not in ("list", "show"):
+# 1. git stash (listing/showing is harmless) and --autostash (as a flag, or switched on through `-c <x>.autostash=…`)
+for call in GIT_CALLS:
+    if call.subcommand == "stash" and (call.args[:1] or ("",))[0] not in ("list", "show"):
         block("`git stash` is forbidden in this repo — the stash stack is shared by every worktree and another "
               "agent's pop takes your entry. Commit WIP on your own branch (`git commit -m \"WIP checkpoint: ...\"`); "
               "to compare against a clean tree use `git worktree add --detach <path> <sha>`.")
-if re.search(r"--autostash\b", commands):
-    block("`--autostash` uses the shared stash stack (see `git stash`). Commit WIP first, then rebase.")
+    if (any(a.startswith("--autostash") for a in call.args)
+            or any(re.fullmatch(r"[\w.-]*\.autostash(?:=(?!(?:false|no|off|0)$).*)?", o, re.I) for o in call.options)):
+        block("`--autostash` uses the shared stash stack (see `git stash`). Commit WIP first, then rebase.")
 
 # 2. a push that targets main directly — THIS repo only (another repo reached by `cd`/`-C` has its own rules).
 # "This repo" is recognized by its FOLDER NAME, derived from where this hook lives — never a hard-coded literal: the
@@ -95,9 +107,13 @@ _SUBMODULES = [tuple(p.lower().split("/")) for p in re.findall(r"^\s*path\s*=\s*
                _GITMODULES.read_text(encoding="utf-8"), re.M)] if _GITMODULES.exists() else []
 
 
-def _is_this_repo(target: str) -> bool:
+def _is_this_repo(target: str | None) -> bool:
+    """Whether a git call's directory is THIS repository. Undetermined (None: an unknown variable, `cd -`) is this
+    repository, so the rule fails closed; a relative path is too, unless it ends in a registered submodule."""
+    if target is None:
+        return True
     t = target.lower().replace("\\", "/")
-    segs = [s for s in t.split("/") if s]
+    segs = [s for s in t.split("/") if s and s != "."]
     if any(len(segs) >= len(sub) and tuple(segs[-len(sub):]) == sub for sub in _SUBMODULES):
         return False  # a registered submodule, absolute or relative: another repository
     if not (t.startswith(("/", "~")) or re.match(r"[a-z]:", t)):
@@ -105,17 +121,16 @@ def _is_this_repo(target: str) -> bool:
     return any(s in _THIS_REPO or any(s.startswith(n + "-") for n in _THIS_REPO) for s in segs)
 
 
-# Every location change either shell accepts (`cd`, `pushd`, `Set-Location`/`sl`/`chdir`/`Push-Location`, `-Path`,
-# quoted paths with spaces, `-WorkingDirectory`), read by the one shared parser (kb/Work PB2599), plus git's own `-C`.
-try:
-    cds = shell_location.location_targets(commands, shell_location.shell_of(data.get("tool_name")))
-except Exception:  # noqa: BLE001 — no target read means no other repo: the push rule still applies (fails closed)
-    cds = []
-cds += re.findall(r"\bgit\s+-C\s+[\"']?([^\s;&|\"']+)", commands)
-other_repo = any(not _is_this_repo(c) for c in cds)
-for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;&|\n]*)", commands)):
-    args = m.group(1)
-    if re.search(r"(?:^|\s|:)(?:refs/heads/)?main(?:\s|$)", args):
+def _names_main(refspec: str) -> bool:
+    """A push argument whose destination is main: `main`, `HEAD:main`, `+x:refs/heads/main`."""
+    return refspec.lstrip("+").rsplit(":", 1)[-1] in ("main", "refs/heads/main")
+
+
+# Each push is judged in the directory IT runs in (`GitCall.cwd`: every location change either shell accepts, a `-C`,
+# a `-WorkingDirectory`, read by the one shared parser, kb/Work PB2599): a `cd` to another repository elsewhere in the
+# line no longer exempts a push to this one.
+for call in GIT_CALLS:
+    if call.subcommand == "push" and _is_this_repo(call.cwd) and any(_names_main(a) for a in call.args):
         block("a direct push to main is refused by the server (required `ci-gate` check). Land with "
               "`python scripts/orchestrator/enqueue.py land <branch>` (kb/Work PB3023): it merges origin/main in, "
               "runs the gate, stamps the DEVLOG entry and queues one pull request into GitHub's merge queue (it "
@@ -128,55 +143,49 @@ for m in ([] if other_repo else re.finditer(r"\bgit\s+(?:-C\s+\S+\s+)?push\b([^;
 # project's deny rule (a TEXT pattern, `git push origin HEAD:main`) missed it because of the extra `-q`. A unit lands
 # through `python scripts/orchestrator/enqueue.py land`, whose command text contains no `git push`; the supervisor exports
 # COBOL_COORD_DIR into every unit's environment and hooks (also in its subagents) inherit it. Attended sessions and
-# cloud sessions never have it set, so their pushes are untouched. The pattern is the git SUBCOMMAND after any global
-# options (`-C dir`, `-c k=v`, `--no-pager`), so flags before or after cannot dodge it and `git log --grep=push` is not hit.
-_PUSH = re.compile(r"\bgit(?:\s+(?:-C\s+\S+|-c\s+\S+|--[\w-]+(?:=\S+)?))*\s+push\b")
-_QUOTED = re.compile(r"\"[^\"]*\"|'[^']*'")
-# the payload of `bash -c '…'` / `pwsh -Command "…"` IS a command line, so it is scanned; every other quoted span is text
-# (a commit message that says "git push" is not a push)
-_SHELL_PAYLOAD = re.compile(r"\b(?:bash|sh|zsh|pwsh|powershell)(?:\.exe)?\s+(?:-\w+\s+)*-(?:c|lc|Command)\s+([\"'])(.*?)\1", re.S)
-
-
-def _without_heredoc_bodies(text: str) -> str:
-    """Everything except the BODIES of heredocs. `commands` above stops at the first `<<`, so a push written AFTER a heredoc
-    (`cat > msg <<'EOF' … EOF` then `git commit -F msg; git push …`, the shape the unit used) would never be scanned."""
-    out, pos = [], 0
-    for m in re.finditer(r"<<-?\s*[\"']?(\w+)[\"']?[^\n]*\n", text):
-        if m.start() < pos:
-            continue
-        out.append(text[pos:m.end()])
-        end = re.search(r"^\s*" + re.escape(m.group(1)) + r"\s*$", text[m.end():], re.M)
-        pos = m.end() + (end.end() if end else len(text) - m.end())
-    out.append(text[pos:])
-    return "".join(out)
-
-
-if os.environ.get("COBOL_COORD_DIR"):
-    scan = _without_heredoc_bodies(cmd)
-    payloads = [m.group(2) for m in _SHELL_PAYLOAD.finditer(scan)]
-    if any(_PUSH.search(t) for t in [_QUOTED.sub(" ", scan)] + payloads):
-        block("a direct `git push` is refused inside an orchestrator unit (any repository, any flags). Land this "
-              "repository's work with `python scripts/orchestrator/enqueue.py land <branch>` (it queues a pull "
-              "request into GitHub's merge queue). A change to ANOTHER repository (the public skills "
-              "repo, a site) is never published by a unit: hand it off as an owed push in the handoff and the "
-              "attended session or the owner publishes it (kb/Work/PB2044).")
-# 3. backslash escapes inside a heredoc body
-if body and re.search(r"\\[nrtuUx0abfvdswDSW\\'\"]", body):
+# cloud sessions never have it set, so their pushes are untouched. A call is the git SUBCOMMAND after any global options
+# (`-C dir`, `-c k=v`, `--no-pager`; `shell_location.git_calls`), so flags before or after cannot dodge it, `git log
+# --grep=push` is not hit, a commit message that says "git push" is one quoted word, and a `bash -c` payload is a command
+# line like any other.
+if os.environ.get("COBOL_COORD_DIR") and any(call.subcommand == "push" for call in GIT_CALLS):
+    block("a direct `git push` is refused inside an orchestrator unit (any repository, any flags). Land this "
+          "repository's work with `python scripts/orchestrator/enqueue.py land <branch>` (it queues a pull "
+          "request into GitHub's merge queue). A change to ANOTHER repository (the public skills "
+          "repo, a site) is never published by a unit: hand it off as an owed push in the handoff and the "
+          "attended session or the owner publishes it (kb/Work/PB2044).")
+# 3. backslash escapes inside a heredoc body — the bodies the model cut out at their delimiter lines, never the text after
+# the first `<<` (a `<<` inside quotes is no heredoc, and a command after the body is no body)
+if any(re.search(r"\\[nrtuUx0abfvdswDSW\\'\"]", body) for st in STEPS for body in st.heredocs):
     block("this heredoc body contains backslash escape sequences, which have been mangled here repeatedly. Write the "
           "script or file with the Write tool (into the scratchpad) and run it, or express the character without an "
           "escape (chr(10), a character class).")
 
-# 4. dotnet test filters
-if re.search(r"\bdotnet\s+test\b", commands) and "--filter" in commands:
-    fm = re.search(r"--filter\s+(\"[^\"]*\"|'[^']*'|\S+)", commands)
-    if fm:
-        terms = re.split(r"[|&]", fm.group(1).strip("\"'"))
-        bare = [t for t in terms if t.strip().startswith(("~", "!~", "="))]
-        if bare:
-            block(f"filter term(s) {bare} have no property, so they match NOTHING and the run exits 0 — a silent "
-                  "green. Write `FullyQualifiedName~X` for every term. (A GATE never filters: it is "
-                  "`scripts/build-local.ps1`, the ordered gate.)")
-    if not re.search(r"(>|\|\s*(tail|grep|Select-String|Tee-Object|tee|findstr|Out-File))", commands):
+# 4. dotnet test filters, per `dotnet test` command: its own `--filter` value, and its own redirection or the reader the
+# pipe after it feeds (a `>` elsewhere in the line logs some other command)
+_PIPE_READERS = {"tail", "grep", "select-string", "tee-object", "tee", "findstr", "out-file"}
+for n, st in enumerate(STEPS):
+    w = st.words
+    at = next((k for k in range(len(w) - 1) if shell_location.program(w[k]) == "dotnet" and w[k + 1] == "test"), None)
+    if at is None:
+        continue
+    args = w[at + 2:]
+    value = next((a[9:] for a in args if a[:9] in ("--filter=", "--filter:")), None)
+    if value is None and "--filter" in args[:-1]:
+        value = args[args.index("--filter") + 1]
+    if value is None:
+        continue
+    bare = [t for t in re.split(r"[|&]", value) if t.strip().startswith(("~", "!~", "="))]
+    if bare:
+        block(f"filter term(s) {bare} have no property, so they match NOTHING and the run exits 0 — a silent "
+              "green. Write `FullyQualifiedName~X` for every term. (A GATE never filters: it is "
+              "`scripts/build-local.ps1`, the ordered gate.)")
+    # the reader is the next stage's command: the next step at this step's own substitution level (a `dotnet test`
+    # inside `$( … )` pipes to a step of that same substitution); the steps of the READER's substitutions run before
+    # it, one level deeper, and are not the reader (the branch review of PB3198, R2-1)
+    nxt = next((s for s in STEPS[n + 1:] if s.substitution <= st.substitution), None) if st.sep == "|" else None
+    reader = nxt.words[:1] if nxt is not None else ()
+    piped = bool(reader) and shell_location.program(reader[0]) in _PIPE_READERS
+    if not (piped or any(">" in a for a in args)):
         block("a filtered `dotnet test` must redirect its output to a log (or pipe it through tail/grep) and read the "
               "verdict line — unredirected output floods the context and hides the verdict. A GATE is "
               "`scripts/build-local.ps1`, never a filtered run.")
@@ -194,23 +203,21 @@ VERDICT = re.compile(r"^(?:\w+=\S*\s+)*(?:dotnet\s+(?:test|build)\b|"
 READ_ONLY = re.compile(r"^\s*(?:grep|rg|tail|head|cat|sed\s+-n|wc|ls|Select-String|Get-Content|findstr|type)\b")
 
 
-# Rules 5-7 read the command line through the ONE shared parser (`shell_location.steps`, kb/Work PB2599): quotes,
-# escapes, comments, heredoc bodies, here-strings, `( … )`/`{ … }` groups and `bash -c` payloads are its to know, never
-# a private scanner's (the branch review of PB3024, R1-1: a private splitter opened a quote on a comment's apostrophe and
-# failed open). The whole command goes to it, heredoc included; a parse failure leaves these rules nothing to judge.
-try:
-    _steps = shell_location.steps(cmd, None, shell_location.shell_of(data.get("tool_name")))
-except Exception:  # noqa: BLE001
-    _steps = []
+# Rules 5-7 read the same STEPS as every rule above: quotes, escapes, comments, heredoc bodies, here-strings,
+# `( … )`/`{ … }` groups and `bash -c` payloads are the shared parser's to know, never a private scanner's (the branch
+# review of PB3024, R1-1: a private splitter opened a quote on a comment's apostrophe and failed open).
 
 
 def _segments(steps) -> list[str]:
     """The command line's segments: each a command or pipeline ended by `&&`, `||`, `;` or a newline (a pipe or a
     background `&` keeps what follows in the same segment). A group or a `-c` payload is one opaque part, `( … )`: a
-    verdict command inside one is not this command line's chain."""
+    verdict command inside one is not this command line's chain. A substitution's steps are part of the command whose
+    text holds them (`echo "EXIT=$? $(date)"` is one echo), so they are no segment of their own."""
     out: list[str] = []
     cur: list[str] = []
     for st in steps:
+        if st.substitution:
+            continue
         part = st.text if st.depth == 0 else "( … )"
         if not (part == "( … )" and cur and cur[-1] == part):
             cur.append(part)
@@ -222,7 +229,7 @@ def _segments(steps) -> list[str]:
     return out
 
 
-segs = _segments(_steps)
+segs = _segments(STEPS)
 
 # 6. WSL lifecycle commands (owner 2026-10-04): `wsl --terminate/--shutdown/--update/--export/--import/--unregister/--install`
 # can end the owner's open session, race a procedure they run by hand, or burn tens of GB of disk, so NO agent or unattended
@@ -230,7 +237,7 @@ segs = _segments(_steps)
 # whose command IS wsl is checked, so a commit message or a grep pattern that mentions the flags passes.
 WSL_LIFECYCLE = re.compile(r"^(?:\w+=\S*\s+)*(?:&\s+)?(?:\S*[\\/])?wsl(?:\.exe)?\s+(?:[^|;&]*\s)?"
                            r"(?:--terminate|-t|--shutdown|--update|--export|--import|--unregister|--install)\b")
-for _st in _steps:   # every simple command, a `-c` payload's and a pipeline's later sides too
+for _st in STEPS:   # every simple command, a `-c` payload's and a pipeline's later sides too
     if WSL_LIFECYCLE.match(_st.text):
         block("WSL lifecycle commands (`--terminate`, `--shutdown`, `--update`, `--export`, `--import`, `--unregister`, "
               "`--install`) are the OWNER's to run (owner 2026-10-04: they can end an open session or burn disk). Give the "
@@ -261,7 +268,7 @@ for i, seg in enumerate(segs[:-1]):
 # with nothing after the `&`. The list structure is the shared parser's (`shell_location.steps`, kb/Work PB2599): it
 # knows quotes, escapes, comments, heredocs, redirections and PowerShell's call operator, and it marks the first step
 # after such a list with the list's location changes (`Step.stranded`).
-for _n, _after in enumerate(_steps):
+for _after in STEPS:
     if _after.stranded:
         _moves = " ".join(t or "(home)" for t in _after.stranded)
         block(f"a location change to `{_moves[:60]}` sits in an and-or list that a single `&` sends to the background, "
