@@ -904,6 +904,21 @@ BY REFERENCE bit argument's subscripts are numeric literals or all-literal expre
 SR12), and INSPECT, STRING and UNSTRING take only usage display or national operands (§14.9.22.3 SR1, §14.9.43.3 SR1,
 §14.9.48.3 SR4).
 
+Freeze hoists a position's VALUE; the range test that raises EC-BOUND-SUBSCRIPT or EC-BOUND-REF-MOD runs where the
+operand is read or stored, so the ORDER of reads and stores is the order of evaluation §14.9.49.4 GR11 selects a
+declarative by (kb/Work PB3261). Two `PlaceIdentification` members carry that order.
+`IdentifiesAtRunTime(Place | BoundOperand)` asks whether identifying an operand evaluates anything at run time — an
+address fragment Freeze would hoist (asked of Freeze itself), an occurs-depending length, an omitted formal's guard,
+or, for an operand, any value that is not a literal or figurative constant. `SenderFirst(sender, receiver, value,
+store)` renders a store whose verb identifies the receiver after evaluating the sender: when both sides answer true it
+evaluates the value into a block-scoped `__sending` local before the store, because C# evaluates the left operand of
+`<receiver> = <value>` (and a splice's start and length arguments) first. Its callers are every MoveEmitter store arm
+(§14.9.25.4 GR1; INITIALIZE keeps the receiver first, `ImplicitMovePhrase.ReceiverIdentifiedFirst`, §14.6.4 7)) and
+the pointer-family SET stores (§14.9.39.4 GR12, GR14, GR16). The arithmetic statements materialize their initial
+evaluation (`ArithmeticEmitter.MaterializesInitialEvaluation`, §14.7.7 rule 4) for a receiver that identifies at run
+time, as they always did for several receivers, and STRING reads each sending operand and delimiter that identifies at
+run time, in statement order, before identifier-3 and the POINTER item (§14.6.4 7)).
+
 #### 3.9.4 How it landed — one carrier per commit, the oracle after each
 
 Each step kept the emitted C# and the diagnostic stream identical (`scripts/arch/compare_oracle.py`) or explained every
