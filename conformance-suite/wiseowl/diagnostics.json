@@ -1,0 +1,12 @@
+{
+  "$comment": [
+    "WiseOwl COBOL's own refusals, outside the compiler-neutral cases (DESIGN-conformance-suite.md §3.2, §4): per test",
+    "id, the editions at which WiseOwl refuses the program (`refuse-at`) and the code or message substring it reports",
+    "(`expect`). Every flagged test has an entry (§9); the generator (harness/generate.py) refuses an entry naming no",
+    "test, and one refusing a test at an edition the test must be accepted at."
+  ],
+  "compute-alphanumeric-receiver": {
+    "refuse-at": ["85", "2002", "2014", "2023"],
+    "expect": "COBOLNET1675"
+  }
+}
