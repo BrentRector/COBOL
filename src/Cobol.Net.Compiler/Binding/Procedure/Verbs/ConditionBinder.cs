@@ -1572,23 +1572,17 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         string name = dref.cobolWord()?.GetText() ?? dref.GetText();
         // §11.7 GR5 — a method-local 88 shadows object data; the overlay-first precedence lives in the ONE
         // scope-aware SymbolTable (P7 Step 10a, the DEVLOG-773 pickup), no longer duplicated inline here.
-        if (!ctx.Symbols.TryResolveCondition(name, ctx.ActiveScope, out var list)) return null;
-        var qualifiers = QualifiersOf(dref);
         // §8.4.2.2 Format 2 (kb/Work R33's sweep — the condition-name sibling of the data-name fix): the
-        // reference must identify EXACTLY ONE level-88. TryResolveCondition returns one namespace tier, so a
-        // plural SURVIVOR set — unqualified with duplicate 88 names, or qualifiers matching more than one —
-        // is genuine ambiguity, previously resolved silently to the first declaration. Strict: report and
-        // bind the first anyway (the compile already fails; no caller fallback runs a different reading).
+        // reference must identify EXACTLY ONE level-88. The candidate set is DataBinder.QualifiedConditionCandidates,
+        // the ONE resolution this and FlagConformancePass read (kb/Work PB3288): one namespace tier, narrowed by the
+        // written qualifiers, then by §8.4.6.2.1 3) after qualification (a condition-name of this source element hides
+        // a container's global one, a nearer container's a farther one, kb/Work PB1047), and EMPTY for a lapsed
+        // type-declaration condition-name alone (§8.4.2.2.1 rule 4 — it only COUNTS against a condition-name the
+        // reference also reaches). A plural SURVIVOR set — unqualified with duplicate 88 names, or qualifiers matching
+        // more than one — is genuine ambiguity, previously resolved silently to the first declaration. Strict: report
+        // and bind the first anyway (the compile already fails; no caller fallback runs a different reading).
         // --permissive: the traditional first match, warned.
-        var matches = qualifiers.Count == 0
-            ? list
-            : list.Where(c => ctx.Data.ConditionQualifierChainMatches(c, qualifiers)).ToList();
-        // §8.4.6.2.1 3) after qualification — a condition-name of this source element hides a container's global
-        // one, a nearer container's a farther one (kb/Work PB1047); placed by its conditional variable.
-        matches = ctx.Symbols.NearestDeclaring(matches, static c => c.Parent);
-        // A lapsed type-declaration condition-name (§8.4.2.2.1 rule 4; DataBinder.WithLapsedTypeConditions) only
-        // COUNTS against a condition-name the reference also reaches; alone it names nothing to test.
-        if (matches.TrueForAll(DataBinder.IsTypeDeclarationCondition)) return null;
+        var matches = ctx.Data.QualifiedConditionCandidates(name, QualifiersOf(dref), ctx.ActiveScope);
         // The NEGATIVE side of §13.16.3 SR23 (kb/Work PB567): no condition-name of this spelling is subordinate to
         // the written qualifiers, so this reference names no condition-name. It is not reported HERE because the
         // same word may still be a DATA-name those qualifiers do reach; the caller falls through to the data

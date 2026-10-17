@@ -38,7 +38,7 @@ Everything the pinned release uses (a drift test parses every file with **0 unsu
 
 | Construct | Meaning | Applied |
 |---|---|---|
-| `&X` | reset: the position of string X (tailored earlier in these rules, else the root's) | yes |
+| `&X` | reset: the position of string X — its NFD walked by UTS #10 S2.1 over the mappings these rules have built so far (tailored contractions beside the root's), as ICU reads it | yes |
 | `&[before 1|2|3]X` | reset to the position just before X at that level | yes |
 | `&[first/last tertiary ignorable]`, `…secondary ignorable`, `…primary ignorable`, `[first/last variable]`, `[first/last regular]`, `[first/last implicit]`, `[first/last trailing]` | logical reset positions, read from the table | yes |
 | `<`, `<<`, `<<<`, `=` | primary / secondary / tertiary difference / identity, relative to the current position | yes |
@@ -102,7 +102,11 @@ backwards, `kf` caseFirst, `ks` strength, `kv` maxVariable, `kr` reorder codes, 
 `CldrTailoringBuilder.Build(selection, name)` (see the class summary for the algorithm):
 
 1. Each weight level of the root table is an ordered **line** of its distinct weights. A reset reads X's elements as
-   the current position; a relation of strength N gives the string a copy of the last element with a **new slot
+   the current position — the NFD of X walked by the one UTS #10 S2.1 walk (`ContractionWalker`: longest
+   contraction, then discontiguous over unblocked marks) over the mappings the rules have built SO FAR, each tailored
+   string keyed by its NFD and matched beside the root's contractions; an extension's and a prefix's elements are
+   read the same way (ICU's `getCEs` over the NFD string in `addReset` / `addRelation`; `&'(一)'<<<㈠` in Chinese
+   pinyin reads the pinyin-tailored 一, `&ئا=ﯪ` in Arabic the tailored ئ); a relation of strength N gives the string a copy of the last element with a **new slot
    inserted immediately after** the anchor's on line N and the common weights below it; `=` copies; `[before N]` steps
    back one slot; an extension (`x/y`) appends y's elements to x only — the next relation of the chain is placed
    after x's own elements, never after y (`&T<<þ/h<<<Þ/h`: Þ is t h, not t h h); prefixes become contractions;

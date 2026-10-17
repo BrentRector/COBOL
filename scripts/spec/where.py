@@ -23,6 +23,12 @@ def main():
     ap.add_argument('rule', nargs='?', help='optional rule token, e.g. SR2, GR4, r6')
     ap.add_argument('--top', type=int, default=12)
     ap.add_argument('--lines', type=int, default=3)
+    # The cited lines it prints carry characters a cp1252 console cannot encode (a source comment's ⛔, a §), and
+    # printing one raised UnicodeEncodeError mid-listing; cite.py does the same before its parse_args.
+    try:
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    except Exception:  # noqa: BLE001
+        pass
     a = ap.parse_args()
     clause = re.escape(a.clause.lstrip('§'))
     cpat = re.compile(r'§\s?' + clause + r'(?![0-9])')

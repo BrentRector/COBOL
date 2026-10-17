@@ -175,6 +175,22 @@ of an unsupported facility.
   time. The name is catalogued and accepted wherever an exception-name may be written, and the implementation never
   raises it: inventing a raise site for a condition the standard never sets would be behaviour with no rule behind it.
   Held by `unit:EcRaiseSiteRegistryDriftTests.EveryCataloguedLevel3Name_IsDeclaredAndRaised_OrDeclinedWithAReason`.
+- **D-MCS-NR — the exception-name is EC-MCS-NO-REQUESTER; the standard's other spelling EC-MCS-NO-REQUESTOR is
+  not a name** (kb/Work PB3149; a defect in the printed standard, recorded here and not coded around). The ISO PDF prints
+  both spellings, and the transcription matches it at every site. §14.6.13.1.6 Table 13, which "is a list of the
+  exception-names and their attributes", has the row `| EC-MCS-NO-REQUESTER | NF | RECEIVE statement |`, and the
+  alphabetic Index spells it the same way. §E.3.2 3) spells it EC-MCS-NO-REQUESTOR in its list of the Asynchronous
+  messaging facility's new exception conditions. Annex E is informative and only summarizes changes; it defines no
+  exception-name. §7.3.25.3 SR2 binds the TURN directive's operand to Table 13: "Exception-name-1 shall be one of
+  the exception names listed in 14.6.13.1". So the normative name is the Table 13 spelling, and no general rule raises
+  either spelling (§14.9.31.4, RECEIVE, raises EC-MCS-INVALID-TAG and EC-MCS-REQUESTOR-FAILED only). The -OR
+  spelling of the sibling EC-MCS-REQUESTOR-FAILED is consistent between Table 13 and E.3.2, so only NO-REQUESTER
+  differs. GnuCOBOL 3.2 agrees: `libcob/exception.def` registers EC-MCS-NO-REQUESTER (1A05) and no -OR alias.
+  Accepting EC-MCS-NO-REQUESTOR as well would be a nonstandard extension (section 3.2 below) that nothing asks for. So
+  `ExceptionCatalog` catalogues EC-MCS-NO-REQUESTER only (a COBOL-2023 name, accepted inert like every EC-MCS name,
+  section 4 item 1), and EC-MCS-NO-REQUESTOR is an unknown exception-name: COBOLNET0711 at every edition that has the TURN
+  directive. Witnessed by `conformance:2023/pb3149_ec_mcs_no_requester_table13` and
+  `conformance:negative/pb3149-ec-mcs-no-requestor-unknown`.
 
 - **D-TW1 — a period, comma or semicolon written immediately before a closing pseudo-text delimiter is a
   SEPARATOR, so `==STOP RUN.==` holds the text-words `STOP` `RUN` `.`** (kb/Work PB1350). §8.3.5 2)/3) make those
