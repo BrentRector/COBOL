@@ -103,3 +103,15 @@ tree), Unit 33,501/33,923, Characterization 5/36; leg 2 is CI's. LINUX GATE: the
   PB2515): GREEN` (Conformance 13,924/17,290 with the 25 moved PB3261/PB780 rows passed, Unit 33,523/33,928,
   Characterization 5/36). The planner left `ConstantNameLiteralPositionDriftTests.EveryWordAdmittingLiteralSlot…` to leg
   2; it passed when run alone on the same build (3/3). LINUX GATE: the lander's (batched gating).
+
+**Review round 2 (wave 1107 B finisher).** One finding.
+- *R2-1: the deletion was left to the lander, and no landing path takes it.* Round 1 kept the converter, its sweep and
+  its map on the branch and told the lander to delete them after its final merge of main. But `enqueue.py land` runs
+  a review gate (`prune_worktrees.unreviewed_since`). It accepts only a clean merge or a DEVLOG-only commit after the
+  CLEAN head. So the deletion commit would be refused, or the three one-time tools (a 52,427-line map) would land on
+  main against design §13 S2. The design's own order fixes it: the branch's last merge of main at the quiet point,
+  then the deletion, then the review. The loop is drained and main is still 20161db10, the merge base (`git merge
+  origin/main`: already up to date). So the branch merged main (nothing to convert) and deleted the three tools
+  before this round's re-review. If main moves before the landing and brings a file under `tests/conformance/`, the
+  generator audit `removed_corpus_files` refuses it at the lander's gate in seconds, and a finisher restores the
+  tools from c9a1ffdb2. The design's As built and the note now say this.
