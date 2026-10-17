@@ -135,16 +135,28 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         // predicate IsBooleanValueOperand reads it (§8.8.2; kb/Work PB1464).
         if (ConditionOperandExpression(vo) is { } expr && SoleDataRef(expr) is { } dref)
         {
-            // The resolver's own answer when it built no place (kb/Work PB1030) — never the 1511 default below,
-            // which told a user whose name was undefined (already COBOLNET1639) that it was "not a boolean operand".
-            if (host.Expr.ResolveSending(dref) is var r && r.Place is not { } p) return r.BoolError(ctx.Edition);
-            // THE ONE category reader (D20/PB79): a ref-mod view's category (GR6), else the item's own picture or a
-            // bit group's as-if PICTURE 1(m) — a bit group IS a boolean operand (§13.18.29.4 GR1a).
-            var cat = p is RefModPlace rm ? rm.Category : p.Item.OperandPic?.Category;
-            if (cat is PicCategory.Boolean) return new BoundBoolRef(p);
-            ctx.Edition.Error("COBOLNET1511", $"operand '{DataBinder.WrittenText(dref)}' in a boolean expression is not a "
-                + "boolean data item (ISO §8.8.2 — boolean operands only)");
-            return BoundBoolError.Refused(ctx.Edition, $"non-boolean operand '{DataBinder.WrittenText(dref)}'");
+            // A constant-name is NOT a data item: "the effect of specifying constant-name-1 … is as if literal-1 … were
+            // written where constant-name-1 is written" (§13.10.4 GR1), and it "may be used anywhere that a format
+            // specifies a literal of the class and category of constant-name-1" (§13.10.3 SR2). A boolean constant IS
+            // the boolean literal of §8.8.2's operand list; any other alias (a numeric or string constant, a
+            // symbolic-character) is a literal §8.8.2 does not list, named for what it is below (kb/Work PB3191).
+            var alias = host.Expr.LiteralAliasOf(dref);
+            if (alias?.Constant is { Category: PicCategory.Boolean } boolConstant) return new BoundBoolLiteral(boolConstant.Text);
+            if (alias is null)
+            {
+                // The resolver's own answer when it built no place (kb/Work PB1030) — never the 1511 default below,
+                // which told a user whose name was undefined (already COBOLNET1639) that it was "not a boolean operand".
+                if (host.Expr.ResolveSending(dref) is var r && r.Place is not { } p) return r.BoolError(ctx.Edition);
+                // THE ONE category reader (D20/PB79): a ref-mod view's category (GR6), else the item's own picture or a
+                // bit group's as-if PICTURE 1(m) — a bit group IS a boolean operand (§13.18.29.4 GR1a).
+                var cat = p is RefModPlace rm ? rm.Category : p.Item.OperandPic?.Category;
+                if (cat is PicCategory.Boolean) return new BoundBoolRef(p);
+            }
+            ctx.Edition.Error("COBOLNET1511", $"operand '{DataBinder.WrittenText(dref)}' in a boolean expression is "
+                + (alias is null ? "not a boolean data item" : $"{alias.Described}, not a boolean literal")
+                + " (ISO §8.8.2 — boolean operands only)");
+            return BoundBoolError.Refused(ctx.Edition, alias is null ? $"non-boolean operand '{DataBinder.WrittenText(dref)}'"
+                : $"non-boolean literal alias '{DataBinder.WrittenText(dref)}'");
         }
         // A sole FUNCTION reference whose result is class boolean — §8.8.2's "an identifier referencing a boolean
         // data item": a function-identifier IS an identifier (§8.4.3.1.2) referencing a temporary data item
@@ -189,6 +201,13 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         if (nn?.concatenationExpression() is { } ce) return ConcatFolder.ClassOf(ce, ctx.Data.LiteralEnv) is PicCategory.Boolean;
         // Through the enclosing parentheses: "a boolean expression enclosed in parentheses" is a boolean expression
         // (§8.8.2) — `(BW)` is the boolean item BW (kb/Work PB1464; ConditionOperandExpression).
+        // A BOOLEAN constant-name is the boolean literal it substitutes (§13.10.4 GR1; kb/Work PB3191): asked BEFORE
+        // the probe, as the operand binder (ExpressionBinder.FieldOperand) asks its alias before the resolution.
+        // The alias question is the ONE literal-alias resolution (LiteralAliasResolutionDriftTests): it records at most
+        // the §8.3.2.2 use the bind of the same word records again, so asking it here stays diagnostic-free.
+        if (ConditionOperandExpression(vo) is { } kx && SoleDataRef(kx) is { } kref
+            && host.Expr.LiteralAliasOf(kref) is { } kalias)
+            return kalias.Constant is { Category: PicCategory.Boolean };
         if (ConditionOperandExpression(vo) is { } expr && SoleDataRef(expr) is { } dref
             && ctx.Refs.Probe(dref) is { } p)   // Probe — a predicate is diagnostic-free (R30)
             // ProbeResult.OperandCategory IS the one category reader for a probed reference (kb/Work PB157 +
@@ -1063,7 +1082,12 @@ internal sealed class ConditionBinder(BinderContext ctx, StatementBinder host)
         string text = vo is null ? "operand" : DataBinder.WrittenText(vo);
         var dref = ConditionOperandExpression(vo) is { } expr ? SoleDataRef(expr) : null;   // `(X)` names X (kb/Work PB1464)
         string? what = null;
-        if (BareClassWord(vo) is { } classWord)
+        // A constant-name is the literal it substitutes (§13.10.4 GR1), and a symbolic-character a figurative constant
+        // (§12.3.7.4 GR11 a)): neither is a data item, and neither is a condition — a boolean constant never gets
+        // here, it is the §8.8.4.3 simple boolean condition AnalyzeBareOperand routed it as (kb/Work PB3191).
+        if (dref is { } ad && ad.dataReferenceSuffix().Length == 0 && host.Expr.LiteralAliasOf(ad) is { } alias)
+            what = $"{alias.Described}, which is none of the conditions";
+        else if (BareClassWord(vo) is { } classWord)
             what = ctx.Data.IsAlphabetName(classWord)
                 ? $"alphabet-name '{classWord}', which forms a class condition only after the identifier it tests — "
                   + "\"identifier-1 IS [NOT] alphabet-name-1\" (ISO §8.8.4.4.2)"
