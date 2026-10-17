@@ -1,5 +1,6 @@
       *> reject-at: 2023
       *> kb/Work PB3254 - THE MERGE ARM READS THE SAME LEXICAL SPAN (PcRange.Spans) AS THE SORT ARM.
+      *> The inverted THRU range is the PERFORM statement's (§14.9.28.4 GR6), which a sort procedure shares:
       *>   cite.py --check 14.9.28.4 "There is no necessary relationship between procedure-name-1 and
       *>     procedure-name-2" -> OK §14.9.28.4 6
       *> OUTPUT PROCEDURE IS S-B THRU S-A names SECTIONS with S-A (A1, A2) BEFORE S-B (B1, B2, B3). The MERGE in B2
