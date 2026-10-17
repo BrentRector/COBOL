@@ -46,7 +46,8 @@ than half-adjudicated — a partially applied batch is the worst outcome availab
 land look exactly like reviewed work and nothing afterwards can tell them from it.
 
 WHAT IS CHECKED HERE, AND WHAT IS NOT. This validates SHAPE only: the rule-id is real, the verdict is in the
-vocabulary, the fields that verdict requires are present, the editions are legal, the syntax of each reference
+vocabulary, the fields that verdict requires are present, the editions are in their one spelling (or empty:
+`Schema.editions_error`, kb/Work PB3172), the syntax of each reference
 parses, the register anchor the row's KIND computes is present, and no fragment on an `anchored-files` path is
 outside that file's anchor space. A record may also carry a `derivation` — §1.1's owner-signed alternative to a
 spec-derived test, for a rule with no observable obligation (kb/Work PB386) — and every one of the six bounds the
@@ -98,6 +99,25 @@ def read_batch(path: pathlib.Path) -> list[dict]:
 
 def _sep(field: str, schema) -> str:
     return schema.code_location_sep if field == "code-location" else schema.test_ref_sep
+
+
+def _list_hint(field: str, value: object, schema) -> str:
+    """The string a record should have written where it wrote a JSON list — the field's own spelling, or nothing.
+
+    `editions` is spelled by `Schema.spell_editions` (ascending, no spaces: kb/Work PB3172), so the hint is the
+    value the validator will accept rather than the list's own order; a witness field joins on its separator.
+    """
+    if not isinstance(value, list):
+        return ""
+    items = [str(v) for v in value]
+    if field == "editions":
+        try:
+            return f" — write it as \"{schema.spell_editions(items)}\""
+        except ValueError as e:
+            return f" — and {e}"
+    if field in WITNESS_FIELDS:
+        return f" — write it as \"{_sep(field, schema).join(items)}\""
+    return ""
 
 
 def is_witness_only(rec: dict) -> bool:
@@ -179,8 +199,7 @@ def validate(records: list[tuple[pathlib.Path, int, dict]], schema, catalog: dic
         # run. Checked here so every field access below is safe.
         if mistyped := sorted(f for f in (*ADJUDICATED, *CONTROL) if f in rec and not isinstance(rec[f], str)):
             for f in mistyped:
-                bad.append(f"{where}: '{f}' is {type(rec[f]).__name__}, not a string"
-                           + (f" — write it as \"{','.join(map(str, rec[f]))}\"" if isinstance(rec[f], list) else ""))
+                bad.append(f"{where}: '{f}' is {type(rec[f]).__name__}, not a string{_list_hint(f, rec[f], schema)}")
             continue
 
         row = by_id.get(rid, {})
@@ -224,9 +243,9 @@ def validate(records: list[tuple[pathlib.Path, int, dict]], schema, catalog: dic
             if not after.get(field):
                 bad.append(f"{where}: verdict {verdict} requires a non-empty '{field}'")
 
-        if ed := rec.get("editions", ""):
-            if illegal := [e for e in schema.split(ed, ",") if e not in schema.editions]:
-                bad.append(f"{where}: editions {illegal} not in {schema.editions}")
+        # The one validator of the field (`Schema.editions_error`, kb/Work PB3172): the one spelling or empty.
+        if err := schema.editions_error(rec.get("editions", "")):
+            bad.append(f"{where}: {err}")
 
         # Each reference the record NAMES is shape-checked by the one predicate the history replay also asks
         # (`witness_shape_error`); the row's already-carried references are the battery gate's to re-check.

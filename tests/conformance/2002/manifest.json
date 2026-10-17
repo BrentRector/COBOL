@@ -670,6 +670,7 @@
   "pb970_image_carried_packed_returning_invoke",
   "pb1009_global_linkage_formal",
   "pb1019_address_of_linkage_formal",
+  "pb3287_address_of_linkage_sr4_admitted",
   "pb1018_table_sort_qualified_keys",
   "pb970_pointer_by_content_storage_image",
   "pb1019_address_of_method_formal",
