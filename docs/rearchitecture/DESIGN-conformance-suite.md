@@ -207,8 +207,9 @@ conformance-suite/
   per edition (the cleared tests of `cases/`, not `_unassigned/`, that apply there, with their expectation: the
   expected-output file per A.1 value, or the flag kind, the marked line and the control), and
   `suites/wiseowl/manifest.json`: every test of both trees at each edition it names, portable or not, and the
-  `wiseowl/diagnostics.json` refusals, which is what WiseOwl's own runner executes (S1c). The suites are build
-  output, never committed.
+  `wiseowl/diagnostics.json` refusals, each with the refused test's source, reference format and declared files,
+  which is what WiseOwl's own runner executes (S1c). The suites are build output, never committed; `--out DIR`
+  writes them elsewhere (the in-process runner's own directory).
 - **Completeness is reported per witness kind**, never as one count that can never reach zero: for each edition, the
   inventory rows witnessed by a suite test, by a documented determination (`docs/CONFORMANCE.md`), by a derivation,
   or only by a WiseOwl unit test, and the rows with no witness. The suite's own measure is "rows whose obligation a
@@ -268,10 +269,11 @@ conformance-suite/
   verdicts (never a `--test`-narrowed one). `run.py` executes the per-edition suites; the `wiseowl` manifest and its
   refusals are the in-process xUnit runner's (S1c).
 - **In WiseOwl's own pipeline**: the xUnit runner in `Cobol.Net.Tests.Conformance` executes the same manifests
-  in-process (fast) and also checks `wiseowl/diagnostics.json`; CI also runs `harness/run.py` with the WiseOwl
-  adapter and a drift test requires the two runners' verdict sets to be equal. The output normalization exists in
-  both languages by nature (`CutRunner.Normalize` in C#; LF, per-line trailing-space trim) and both are pinned to
-  one shared fixture. The GnuCOBOL adapter ADDS a signal to the per-batch battery; it does not replace the GnuCOBOL
+  in-process (fast) and also checks `wiseowl/diagnostics.json`; the drift test that requires the two runners'
+  verdict sets to be equal runs `harness/run.py` with the WiseOwl adapter itself, on the same generated suites, so
+  every gate and both of CI's operating systems run it (no CI job of its own, which a local gate would not
+  reproduce). The output normalization exists in both languages by nature (`CutRunner.Normalize` in C#; LF,
+  per-line trailing-space trim) and both are pinned to one shared fixture, `harness/normalization-fixture.json`. The GnuCOBOL adapter ADDS a signal to the per-batch battery; it does not replace the GnuCOBOL
   differential (`scripts/gnucobol_differential.py`), which runs GnuCOBOL's own testsuite through WiseOwl, the other
   direction.
 
@@ -456,6 +458,22 @@ hold the status, this section the scope. Every slice ships its own tests and dri
   the generator's manifests in-process (accept: compile, run, compare through `CutRunner.Normalize`; flag: the
   diagnostic at the marked line; `wiseowl/diagnostics.json`: the refusal and its code or message), and the drift
   tests of §9: equal verdicts with `run.py` on the WiseOwl adapter, and the two normalizations on one shared fixture.
+  **As landed:** `ConformanceSuiteTests` (one row per test and edition of the `wiseowl` manifest, red on FAIL or NO
+  VERDICT as `run.py` is with no baseline; one row per refusal and edition, which the front end or the binder must
+  refuse with its code) over `ConformanceSuiteRunner` (the verdicts of §5, compiling through the compiled-program
+  cache) and `ConformanceSuite` (the manifest, generated once per test process into a directory of its own by the new
+  `generate.py --out`; the adapter's diagnostic pattern and the profile, read rather than restated, since
+  `config.py` validates them at the audit). `ConformanceSuiteRunnerDriftTests` runs `run.py` through the WiseOwl
+  adapter on the same generated suites and names every test whose verdict differs, and holds `CutRunner.Normalize`
+  and `run.py`'s `normalize()` to `harness/normalization-fixture.json`. Two corrections to this design, written
+  above and in §4: the verdict drift test runs `run.py` itself (§5), and a refusal's manifest entry carries the
+  test's declared files, so the refused program compiles as the suite compiles it. The WiseOwl adapter pins a
+  program's default locales to the root locale, as the in-process runner does (`CutRunner.LocalePin`; the defaults
+  are the environment's, DOC-A.1-118), and a drift test holds the two pins equal. The Conformance project builds
+  the `cobol` command for `run.py` (a project reference that references no assembly), since CI's Conformance legs
+  build that project alone. The theories are one class each: the move (S2) partitions them when the corpus arrives,
+  as `CorpusRunnerTests` is (kb/Work PB2527), and decides the verdict drift test's shape at that size, since `run.py`
+  starts one `cobol` process per compile.
 - **S2 — the move (PB3177).** §6 step 1, in one landing: the converter (committed on the branch for review, deleted
   before it lands: the move is its output), the moved tree, `wiseowl/cases/` and `wiseowl/diagnostics.json`, the
   inventory's citations and ref grammar, every consumer of §2's command, the arch-oracle baseline, the hook, CI, the

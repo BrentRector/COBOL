@@ -12,7 +12,8 @@ namespace CobolNet.Tests.Conformance;
 /// <c>cobol</c> command through the WiseOwl adapter give EVERY test of the per-edition suites the same verdict, and
 /// run exactly the same tests; and the two output normalizations, <see cref="CutRunner.Normalize"/> and
 /// <c>run.py</c>'s <c>normalize()</c>, both map every case of the one shared fixture
-/// (<c>conformance-suite/harness/normalization-fixture.json</c>) to its stated result.
+/// (<c>conformance-suite/harness/normalization-fixture.json</c>) to its stated result; and the WiseOwl adapter runs a
+/// program under the same default locales as <see cref="CutRunner"/>.
 /// </summary>
 /// <remarks>
 /// <para><b>Why both runners exist and why they must agree.</b> <c>run.py</c> is what any compiler runs (Python standard
@@ -70,6 +71,24 @@ public sealed class ConformanceSuiteRunnerDriftTests
                 $"{differing.Count} test(s) of the suite have different verdicts in the two runners:\n{string.Join("\n", differing)}");
         }
         finally { CutRunner.TryDelete(scratch); }
+    }
+
+    /// <summary>The two runners run a program under the same default locales: <see cref="CutRunner.RunExit"/> pins
+    /// both to <see cref="CutRunner.LocalePin"/>, and the WiseOwl adapter's <c>environment</c> must set the same pin
+    /// for <c>run.py</c>, or a host's regional setting would reach one runner's verdict and not the other's
+    /// (docs/CONFORMANCE.md DOC-A.1-118: the defaults are the environment's).</summary>
+    [Fact]
+    public void BothRunners_RunAProgramUnderTheSameDefaultLocales()
+    {
+        string adapter = Path.Combine(ConformanceSuite.Root, "adapters", ConformanceSuite.Compiler + ".json");
+        using var doc = JsonDocument.Parse(File.ReadAllText(adapter));
+        Assert.True(doc.RootElement.TryGetProperty("environment", out JsonElement environment),
+            $"{adapter} sets no environment, so run.py runs a program under the host's default locales");
+        foreach (string variable in new[] { CobolNet.Runtime.LocaleState.UserDefaultVariable, CobolNet.Runtime.LocaleState.SystemDefaultVariable })
+        {
+            Assert.True(environment.TryGetProperty(variable, out JsonElement value) && value.GetString() == CutRunner.LocalePin,
+                $"{adapter} must set {variable} to {CutRunner.LocalePin}, the pin of CutRunner.RunExit");
+        }
     }
 
     [Fact]

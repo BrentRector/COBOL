@@ -33,7 +33,8 @@ internal readonly record struct SuiteResult(string Verdict, string Reason);
 ///     harness budget is a non-observation, never a value), or the harness could not run the test.</item>
 /// </list>
 /// <para><b>Each test runs in a fresh working directory</b> holding a byte copy of each declared file, with stdin
-/// closed (<see cref="CutRunner.RunExit"/>); the program is compiled from a directory of its own holding its source
+/// closed and the default locales pinned (<see cref="CutRunner.RunExit"/>; the WiseOwl adapter pins the same for
+/// <c>run.py</c>); the program is compiled from a directory of its own holding its source
 /// and declared files, named as its copy library (<c>run.py</c> compiles in the working directory, which the
 /// <c>cobol</c> command searches first, DOC-A.1-40), and a flagged test's control compiles in a directory inside the
 /// test's. The working directory is removed afterwards.</para>

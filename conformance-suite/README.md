@@ -16,6 +16,7 @@ PB3160); this folder is built slice by slice from its §13.
 | `harness/generate.py` | The one reader of the test headers: refuses a malformed test (and a malformed adapter, profile or baseline), writes the suites, reports completeness |
 | `harness/run.py` | The harness: runs the suites against a compiler through its adapter and reports a verdict per test |
 | `harness/config.py` | The formats of the adapters, profiles and baselines, and their one loader |
+| `harness/normalization-fixture.json` | The output normalization's one fixture, which both runners' normalizations are held to |
 | `adapters/<compiler>.json` | How the harness drives a compiler: its compile, run and flag-mode commands, its edition map, how a diagnostic's line is read, file-name limits, crash codes |
 | `profiles/<compiler>.json` | What a compiler claims: its editions, the Annex A.4 modules and A.3 elements it supports (with the evidence), its Annex A.1 values, the words it reserves beyond the standard |
 | `baselines/<compiler>.json` | A compiler's recorded verdicts, against which a run reports its changes |
@@ -45,6 +46,7 @@ form. Every field, every expectation and the portability lint (what a portable t
 
 ```
 python conformance-suite/harness/generate.py            # refuse, or write suites/ and print the completeness report
+python conformance-suite/harness/generate.py --out DIR  # the same, written to DIR instead of suites/
 python conformance-suite/harness/generate.py --check    # the refusals only, writing nothing
 python conformance-suite/harness/generate.py --self-test
 ```
@@ -73,6 +75,17 @@ crashed, a process exceeded the hang guard, or the harness could not run the tes
 `results/<compiler>/` as JSON and JUnit XML, with totals per edition and per clause and the changes against
 `baselines/<compiler>.json`: a run is RED only when a verdict became worse than the recorded one (or, with no
 baseline, on any FAIL or NO VERDICT).
+
+### In WiseOwl COBOL's own gate
+
+WiseOwl COBOL's test assembly `tests/Cobol.Net.Tests.Conformance` runs the suite in-process (design §5, §13 S1c):
+`ConformanceSuiteTests` generates the manifests into a directory of its own (`generate.py --out`) and runs every test
+of `suites/wiseowl/manifest.json` (both trees, at every edition each names) through `ConformanceSuiteRunner`, which
+judges exactly as `run.py` does with the WiseOwl adapter, red on FAIL or NO VERDICT; and it compiles every refusal of
+`wiseowl/diagnostics.json` at its editions, which must be refused with its code or text. `ConformanceSuiteRunnerDriftTests`
+runs `run.py` through the WiseOwl adapter on the same generated suites and requires both runners to give every suite
+test the same verdict, holds both output normalizations to the one fixture `harness/normalization-fixture.json`, and
+holds the WiseOwl adapter's locale pin (a program's default locales are its environment's) to the in-process one.
 
 ### Writing an adapter for another compiler
 
