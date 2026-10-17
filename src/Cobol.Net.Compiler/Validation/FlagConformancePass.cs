@@ -4,7 +4,7 @@ using Antlr4.Runtime;                // ParserRuleContext — the source-element
 using CobolNet.Binding;              // FlagState / PictureAnalyzer / EditionContext
 using CobolNet.Binding.Model;        // Usage / PicCategory / PicInfo
 using CobolNet.Binding.Passes;       // GroupBindContext
-using CobolNet.Binding.Procedure;    // ConditionBinder.SoleDataRef (the canonical bare-operand unwrap)
+using CobolNet.Binding.Procedure;    // PhraseBlocks (the AT END-OF-PAGE branch test)
 using CobolNet.Common;               // CobolLiteral (the one literal decoder)
 using CobolNet.Editions;             // IDiagnosticSink / EditionDiagnostic / EditionSeverity
 using CobolNet.Editions.Diagnostics; // DiagnosticCatalog

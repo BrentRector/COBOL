@@ -6,7 +6,6 @@ using CobolNet.Binding;              // DiagnosticCursorAt.At(sink, ctx)
 using CobolNet.Binding.Model;        // DataItem / Condition88
 using CobolNet.Binding.Procedure;    // ConditionBinder.SoleDataRef (the canonical bare-operand unwrap)
 using CobolNet.Common;               // CobolLiteral / LiteralClass
-using CobolNet.Frontend.Cst;         // DataReferenceCst / SpecialRegister
 using CobolNet.Frontend.Generated;   // CobolParserCore
 using CobolNet.Frontend.Preprocessor;// FlagOption
 
