@@ -635,7 +635,6 @@ CobolNet.Runtime.Collation.CollationTable.CombiningClass(int codePoint) -> int
 CobolNet.Runtime.Collation.CollationTable.ContractionCount.get -> int
 CobolNet.Runtime.Collation.CollationTable.Description.get -> string!
 CobolNet.Runtime.Collation.CollationTable.ElementCount.get -> int
-CobolNet.Runtime.Collation.CollationTable.GetElements(System.ReadOnlySpan<int> codePoints) -> CobolNet.Runtime.Collation.CollationElement[]!
 CobolNet.Runtime.Collation.CollationTable.GetElements(int codePoint) -> System.ReadOnlyMemory<CobolNet.Runtime.Collation.CollationElement>
 CobolNet.Runtime.Collation.CollationTable.HasContraction(System.ReadOnlySpan<int> codePoints) -> bool
 CobolNet.Runtime.Collation.CollationTable.HasExplicitMapping(int codePoint) -> bool
