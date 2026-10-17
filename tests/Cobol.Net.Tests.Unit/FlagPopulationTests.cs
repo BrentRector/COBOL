@@ -1,5 +1,6 @@
 // Copyright (c) 2026 Brent Rector. All rights reserved.
 // Licensed under the Business Source License 1.1. See LICENSE file in the project root.
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace CobolNet.Tests.Unit;
@@ -26,6 +27,10 @@ public sealed class FlagPopulationTests
 
     private static bool AtLine(string warning, int line) =>
         warning.Contains($"flag.cob({line},", StringComparison.Ordinal);
+
+    /// <summary>The 1-based source line a warning is positioned at.</summary>
+    private static int WarningLine(string warning) =>
+        int.Parse(Regex.Match(warning, @"flag\.cob\((\d+),").Groups[1].Value);
 
     // ── FLAG-02 b EC-PROGRAM-EXCEPTIONS (§7.3.14.4 GR4 b): "A TURN directive for EC-ALL, EC-PROGRAM,
     //    EC-PROGRAM-ARG-OMITTED, or EC-PROGRAM-NOT-FOUND shall be flagged if 1. the source element calls any
@@ -330,6 +335,7 @@ public sealed class FlagPopulationTests
         "        FILE STATUS IS FS.",
         "DATA DIVISION.", "FILE SECTION.", "FD F.", "01 F-REC.", "   05 F-KEY PIC X(4).",
         "WORKING-STORAGE SECTION.", "01 FS PIC XX.", "   88 FS-DUP VALUE \"07\".", "   88 FS-EOF VALUE \"10\".",
+        "   88 FS-HEX04 VALUE X\"3034\".", "   88 FS-QUOTE04 VALUE \"0'4\".", "   88 FS-HEX07 VALUE X\"3037\".",
         "01 WS PIC XX.", "PROCEDURE DIVISION.", "MAIN.",
         ">>FLAG-14 I-O-STATUS-04 ON", ">>FLAG-14 I-O-STATUS-07 ON",
         .. statements, "    STOP RUN."]);
@@ -349,6 +355,16 @@ public sealed class FlagPopulationTests
     [InlineData("    EVALUATE FS|        WHEN \"05\" CONTINUE|    END-EVALUATE.", "I-O-STATUS-04", 0)]  // another status
     [InlineData("    EVALUATE FS|        WHEN \"04\" CONTINUE|    END-EVALUATE.", "I-O-STATUS-07", 0)]  // per-option gating
     [InlineData("    IF FS-EOF|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]                       // an 88 for '10'
+    // kb/Work PB3234: the literal's VALUE is decoded once (CobolLiteral.Decode), not its text with every quote deleted.
+    [InlineData("    IF FS = X\"3034\"|        CONTINUE|    END-IF.", "I-O-STATUS-04", 1)]       // §8.3.3.2.4 GR4: X"3034" is '04'
+    [InlineData("    IF FS = X\"3034\"|        CONTINUE|    END-IF.", "I-O-STATUS-07", 0)]
+    [InlineData("    IF FS = N\"04\"|        CONTINUE|    END-IF.", "I-O-STATUS-04", 1)]         // a national '04'
+    [InlineData("    IF FS = \"0'4\"|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]         // §8.3.3.2.4 GR1: three characters 0'4
+    [InlineData("    IF FS = '0''4'|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]           // §8.3.3.2.3 SR3: a doubled delimiter is ONE character
+    [InlineData("    IF FS-HEX04|        CONTINUE|    END-IF.", "I-O-STATUS-04", 1)]              // an 88 VALUE X"3034"
+    [InlineData("    IF FS-HEX07|        CONTINUE|    END-IF.", "I-O-STATUS-07", 1)]
+    [InlineData("    IF FS-HEX07|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]
+    [InlineData("    IF FS-QUOTE04|        CONTINUE|    END-IF.", "I-O-STATUS-04", 0)]             // an 88 VALUE "0'4"
     public void IoStatus_FlagsEveryConditionThatTestsTheFileStatusItem(string statements, string option, int expected)
     {
         var warnings = Warnings(StatusProgram(statements.Split('|')), "COBOLNET1621")
@@ -450,5 +466,160 @@ public sealed class FlagPopulationTests
         var warnings = Warnings(source, "COBOLNET1620");
         Assert.Single(warnings);
         Assert.True(AtLine(warnings[0], LineOf(source, "TERMINATE R")), warnings[0]);
+    }
+
+    // ── kb/Work PB3288: a name is RESOLVED in the current unit's scope; the role (FILE STATUS item, LINAGE file, VARYING
+    //    report) is read off the resolved object. A same-named item of another program or another group is not it. ──
+
+    private static string[] StatusUnit(string id, bool withFileStatus, bool directive) => [
+        "IDENTIFICATION DIVISION.", $"PROGRAM-ID. {id}.", "ENVIRONMENT DIVISION.", "INPUT-OUTPUT SECTION.",
+        "FILE-CONTROL.",
+        withFileStatus ? "    SELECT F ASSIGN TO \"f.dat\" FILE STATUS IS WS-STAT." : "    SELECT F ASSIGN TO \"f.dat\".",
+        "DATA DIVISION.", "FILE SECTION.", "FD F.", "01 F-REC PIC X(4).",
+        "WORKING-STORAGE SECTION.", "01 WS-STAT PIC XX.", "   88 STAT-04 VALUE \"04\".",
+        "PROCEDURE DIVISION.", "MAIN.",
+        .. (directive ? (string[])[">>FLAG-14 I-O-STATUS-04 ON"] : []),
+        "    IF WS-STAT = \"04\"", "        CONTINUE", "    END-IF.",
+        "    IF STAT-04", "        CONTINUE", "    END-IF.",
+        "    STOP RUN.", $"END PROGRAM {id}."];
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void IoStatus_ANameSharedWithAnotherProgramsFileStatusItem_IsNotAReference(bool statusProgramFirst)
+    {
+        // Program PS names WS-STAT in a FILE STATUS clause; program PN declares its own WS-STAT and STAT-04 and no
+        // FILE STATUS clause. The FLAG-14 e directive (in the first program) stays on for the text that follows it,
+        // across the group, so only the program whose WS-STAT IS the FILE STATUS item draws its two warnings.
+        string[] first = StatusUnit(statusProgramFirst ? "PS" : "PN", withFileStatus: statusProgramFirst, directive: true);
+        string[] second = StatusUnit(statusProgramFirst ? "PN" : "PS", withFileStatus: !statusProgramFirst, directive: false);
+        string source = Src(first.Concat(second).ToArray());
+        var warnings = Warnings(source, "COBOLNET1621");
+        int boundary = LineOf(source, statusProgramFirst ? "PROGRAM-ID. PN." : "PROGRAM-ID. PS.");
+        Assert.Equal(2, warnings.Count);
+        Assert.All(warnings, w => Assert.True(statusProgramFirst ? WarningLine(w) < boundary : WarningLine(w) > boundary, w));
+    }
+
+    [Fact]
+    public void IoStatus_ANameSharedByAnotherGroupOfTheSameProgram_IsNotAReference()
+    {
+        // FS OF G1 is the FILE STATUS item; FS OF G2 and the level-88 IS-04 OF FS OF G2 are other items that merely
+        // share the spelling (§8.4.2.2: qualification selects the item), so only G1's two references are flagged.
+        string source = Src(
+            "IDENTIFICATION DIVISION.", "PROGRAM-ID. FLGGRP.", "ENVIRONMENT DIVISION.", "INPUT-OUTPUT SECTION.",
+            "FILE-CONTROL.", "    SELECT F ASSIGN TO \"f.dat\" FILE STATUS IS FS OF G1.",
+            "DATA DIVISION.", "FILE SECTION.", "FD F.", "01 F-REC PIC X(4).",
+            "WORKING-STORAGE SECTION.",
+            "01 G1.", "   05 FS PIC XX.", "      88 IS-04 VALUE \"04\".",
+            "01 G2.", "   05 FS PIC XX.", "      88 IS-04 VALUE \"04\".",
+            "PROCEDURE DIVISION.", "MAIN.", ">>FLAG-14 I-O-STATUS-04 ON",
+            "    IF FS OF G1 = \"04\"", "        CONTINUE", "    END-IF.",
+            "    IF FS OF G2 = \"04\"", "        CONTINUE", "    END-IF.",
+            "    IF IS-04 OF FS OF G1", "        CONTINUE", "    END-IF.",
+            "    IF IS-04 OF FS OF G2", "        CONTINUE", "    END-IF.",
+            "    STOP RUN.");
+        var warnings = Warnings(source, "COBOLNET1621");
+        Assert.Equal(2, warnings.Count);
+        Assert.Contains(warnings, w => AtLine(w, LineOf(source, "IF FS OF G1")));
+        Assert.Contains(warnings, w => AtLine(w, LineOf(source, "IF IS-04 OF FS OF G1")));
+    }
+
+    [Fact]
+    public void IoStatus_AContainedProgramReferencingAContainersGlobalFileStatusItem_IsFlagged()
+    {
+        // The FILE STATUS item and the LINAGE file are the container's, GLOBAL (§13.18.27.4 GR1), and the contained
+        // program's references to them resolve there: both the data item and its level-88, and both WRITE spellings.
+        string source = Src(
+            "IDENTIFICATION DIVISION.", "PROGRAM-ID. FLGOUT.", "ENVIRONMENT DIVISION.", "INPUT-OUTPUT SECTION.",
+            "FILE-CONTROL.", "    SELECT LF ASSIGN TO \"lf.txt\" FILE STATUS IS WS-STAT.",
+            "DATA DIVISION.", "FILE SECTION.", "FD LF GLOBAL LINAGE IS 10 LINES.", "01 LREC PIC X(4).",
+            "WORKING-STORAGE SECTION.", "01 WS-STAT PIC XX GLOBAL.", "   88 STAT-04 VALUE \"04\".",
+            "PROCEDURE DIVISION.", "MAIN.", ">>FLAG-14 I-O-STATUS-04 ON", ">>FLAG-14 WRITE-END-OF-PAGE ON",
+            "    CALL \"FLGINN\".", "    STOP RUN.",
+            "IDENTIFICATION DIVISION.", "PROGRAM-ID. FLGINN.", "DATA DIVISION.", "PROCEDURE DIVISION.", "MAIN.",
+            "    IF WS-STAT = \"04\"", "        CONTINUE", "    END-IF.",
+            "    IF STAT-04", "        CONTINUE", "    END-IF.",
+            "    WRITE LREC.", "    WRITE LREC IN LF.", "    GOBACK.",
+            "END PROGRAM FLGINN.", "END PROGRAM FLGOUT.");
+        var warnings = Warnings(source, "COBOLNET1621");
+        Assert.Equal(4, warnings.Count);
+        Assert.Contains(warnings, w => AtLine(w, LineOf(source, "IF WS-STAT")));
+        Assert.Contains(warnings, w => AtLine(w, LineOf(source, "IF STAT-04")));
+        Assert.Contains(warnings, w => AtLine(w, LineOf(source, "WRITE LREC.")));
+        Assert.Contains(warnings, w => AtLine(w, LineOf(source, "WRITE LREC IN LF.")));
+    }
+
+    private static string[] LinageUnit(string id, string fdClause) => [
+        "IDENTIFICATION DIVISION.", $"PROGRAM-ID. {id}.", "ENVIRONMENT DIVISION.", "INPUT-OUTPUT SECTION.",
+        "FILE-CONTROL.", "    SELECT OUTF ASSIGN \"of.txt\".", "DATA DIVISION.", "FILE SECTION.",
+        $"FD OUTF{fdClause}.", "01 OUT-REC PIC X(80).", "PROCEDURE DIVISION.", "MAIN.",
+        "    OPEN OUTPUT OUTF.", "    WRITE OUT-REC.", "    CLOSE OUTF.", "    STOP RUN.", $"END PROGRAM {id}."];
+
+    [Fact]
+    public void WriteEndOfPage_ARecordNameSharedWithAnotherProgramsLinageFile_IsNotFlagged()
+    {
+        // OUT-REC belongs to a LINAGE file in PL and to a file with no LINAGE in PN: only PL's WRITE allows END-OF-PAGE.
+        string source = "       >>FLAG-14 WRITE-END-OF-PAGE ON\n"
+            + Src(LinageUnit("PL", " LINAGE IS 60 LINES").Concat(LinageUnit("PN", "")).ToArray());
+        var warnings = Warnings(source, "COBOLNET1621");
+        Assert.Single(warnings);
+        Assert.True(WarningLine(warnings[0]) < LineOf(source, "PROGRAM-ID. PN."), warnings[0]);
+    }
+
+    [Fact]
+    public void WriteEndOfPage_AQualifiedRecordNameResolvesToItsOwnFile()
+    {
+        // Two files, one record spelling: `WRITE REC IN LF` writes the LINAGE file's record (flagged), `WRITE REC IN PLAINF`
+        // the other's (§8.4.2.2.2 Format 1: the FD is the outermost qualifier). Matching the written text `RECINLF`
+        // never found either.
+        string source = Src(
+            "IDENTIFICATION DIVISION.", "PROGRAM-ID. FLGQREC.", "ENVIRONMENT DIVISION.", "INPUT-OUTPUT SECTION.",
+            "FILE-CONTROL.", "    SELECT LF ASSIGN \"lf.txt\".", "    SELECT PLAINF ASSIGN \"pf.txt\".",
+            "DATA DIVISION.", "FILE SECTION.", "FD LF LINAGE IS 60 LINES.", "01 REC PIC X(80).",
+            "FD PLAINF.", "01 REC PIC X(80).", "PROCEDURE DIVISION.", "MAIN.", ">>FLAG-14 WRITE-END-OF-PAGE ON",
+            "    WRITE REC IN LF.", "    WRITE REC IN PLAINF.", "    STOP RUN.");
+        var warnings = Warnings(source, "COBOLNET1621");
+        Assert.Single(warnings);
+        Assert.True(AtLine(warnings[0], LineOf(source, "WRITE REC IN LF")), warnings[0]);
+    }
+
+    private static string[] ReportUnit(string id, bool varying) => [
+        "IDENTIFICATION DIVISION.", $"PROGRAM-ID. {id}.", "ENVIRONMENT DIVISION.", "INPUT-OUTPUT SECTION.",
+        "FILE-CONTROL.", "    SELECT RPT ASSIGN \"r.rpt\".", "DATA DIVISION.", "FILE SECTION.",
+        "FD RPT REPORT IS R.", "REPORT SECTION.", "RD R.", "01 DL TYPE DETAIL LINE PLUS 1.",
+        .. (varying
+            ? (string[])["   05 G1 OCCURS 3 VARYING K FROM 1 BY 1.", "      10 COLUMN + 2 PIC X(3) VALUE \"AB\"."]
+            : ["   05 COLUMN + 2 PIC X(3) VALUE \"AB\"."]),
+        "PROCEDURE DIVISION.", "MAIN.", "    OPEN OUTPUT RPT.", "    INITIATE R.", "    GENERATE DL.",
+        "    TERMINATE R.", "    CLOSE RPT.", "    STOP RUN.", $"END PROGRAM {id}."];
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TerminateWithVarying_AReportNameSharedWithAnotherProgramsVaryingReport_IsNotFlagged(bool varyingFirst)
+    {
+        // Report R has a VARYING clause in PV and none in PN: only the TERMINATE of PV's R is flagged, whichever
+        // program comes first (§7.3.14.4 GR4 f: "the report being terminated contains a VARYING clause").
+        string[] first = ReportUnit(varyingFirst ? "PV" : "PN", varying: varyingFirst);
+        string[] second = ReportUnit(varyingFirst ? "PN" : "PV", varying: !varyingFirst);
+        string source = "       >>FLAG-02 TERMINATE-WITH-VARYING ON\n" + Src(first.Concat(second).ToArray());
+        var warnings = Warnings(source, "COBOLNET1620");
+        Assert.Single(warnings);
+        int boundary = LineOf(source, varyingFirst ? "PROGRAM-ID. PN." : "PROGRAM-ID. PV.");
+        Assert.True(varyingFirst ? WarningLine(warnings[0]) < boundary : WarningLine(warnings[0]) > boundary, warnings[0]);
+    }
+
+    [Fact]
+    public void ValueEditing_AHexadecimalLiteralIsScannedByItsValue()
+    {
+        // §7.3.15.4 GR4 j: a VALUE literal "that does not contain any editing symbols" is flagged. X"3132" is the
+        // value "12" (flagged); X"312E" is "1." and carries an editing symbol (kb/Work PB3234: a hexadecimal literal
+        // was scanned as the text X312E, never as its value).
+        string source = ValueProgram("",
+            "01 A PIC 99 BLANK WHEN ZERO VALUE X\"3132\".",
+            "01 B PIC 99 BLANK WHEN ZERO VALUE X\"312E\".");
+        var warnings = Warnings(source, "COBOLNET1621").Where(w => w.Contains("VALUE-EDITING", StringComparison.Ordinal)).ToList();
+        Assert.Single(warnings);
+        Assert.True(AtLine(warnings[0], LineOf(source, "01 A PIC")), warnings[0]);
     }
 }

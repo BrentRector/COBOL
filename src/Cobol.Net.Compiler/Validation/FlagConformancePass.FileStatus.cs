@@ -3,8 +3,9 @@
 using Antlr4.Runtime;
 using Antlr4.Runtime.Tree;
 using CobolNet.Binding;              // DiagnosticCursorAt.At(sink, ctx)
+using CobolNet.Binding.Model;        // DataItem / Condition88
 using CobolNet.Binding.Procedure;    // ConditionBinder.SoleDataRef (the canonical bare-operand unwrap)
-using CobolNet.Frontend.Cst;         // DataReferenceCst / SpecialRegister
+using CobolNet.Common;               // CobolLiteral / LiteralClass
 using CobolNet.Frontend.Generated;   // CobolParserCore
 using CobolNet.Frontend.Preprocessor;// FlagOption
 
@@ -28,11 +29,39 @@ namespace CobolNet.Validation;
 /// </list>
 /// A range (<c>WHEN "00" THRU "09"</c>, an 88 with a THRU) is deliberately NOT a test FOR '04': whether it contains the
 /// value depends on the collating sequence it is ordered in, and it names no status.
+/// <para>⛔ A REFERENCE IS RESOLVED, NEVER MATCHED BY SPELLING (kb/Work PB3288). "A data item specified in a FILE STATUS
+/// clause" is a data item, not a word: the operand is resolved in the current unit's name scope (qualifiers honoured,
+/// <c>ResolveItem</c> for a data-name, <c>DataBinder.QualifiedConditionCandidates</c> for a condition-name) and is the
+/// reference exactly when the item it resolves to IS (reference identity) some visible file's FILE STATUS item, or the
+/// condition-name's conditional variable is. A same-named item of another program, or of another group, is not.</para>
+/// <para>The value tested for is the operand literal's VALUE, decoded once by <see cref="CobolLiteral.Decode"/>
+/// (kb/Work PB3234): <c>"0'4"</c> is three characters, <c>X"3034"</c> is <c>04</c>.</para>
 /// </summary>
 internal sealed partial class FlagConformancePass
 {
-    private bool FileStatusReferencesPossible =>
-        _fileStatusNames.Count > 0 || _fileStatus88Is04.Count > 0 || _fileStatus88Is07.Count > 0;
+    /// <summary>Whether any file visible from the current unit — its own, or a container's — names a FILE STATUS item
+    /// (the cheap guard before a condition is scanned; a level-88 can only hang on such an item).</summary>
+    private bool FileStatusReferencesPossible
+    {
+        get
+        {
+            for (var unit = _currentUnit; unit is not null; unit = unit.Parent)
+                if (unit.Data.Files.Any(f => f.FileStatusItem is not null)) return true;
+            return false;
+        }
+    }
+
+    /// <summary>Whether <paramref name="item"/> IS the data item some file in the current unit or a containing program
+    /// specified in its FILE STATUS clause (the data item itself: reference identity, never its name). A container's
+    /// FD need not be GLOBAL for its status item to be referenced from a contained program (the item's own GLOBAL
+    /// clause makes it visible), so every file of the chain counts here, unlike <see cref="VisibleFiles"/>.</summary>
+    private bool IsFileStatusItem(DataItem item)
+    {
+        for (var unit = _currentUnit; unit is not null; unit = unit.Parent)
+            foreach (var file in unit.Data.Files)
+                if (ReferenceEquals(file.FileStatusItem, item)) return true;
+        return false;
+    }
 
     /// <summary>The subject of an abbreviated combined relation in flight (§8.8.4.12.4 GR1): the leftmost operand of the
     /// last preceding stated relation of the SAME condition, which every succeeding elided relation takes as its own.</summary>
@@ -77,7 +106,7 @@ internal sealed partial class FlagConformancePass
         if (selectionObject.valueOperand() is { } value)
         {
             FileStatusRelation(subject, value, selectionObject);                       // EVALUATE FS WHEN "04"
-            FileStatusConditionName(BareRefName(value), selectionObject);              // EVALUATE TRUE WHEN FS-AVAIL
+            FileStatusConditionName(value, selectionObject);                           // EVALUATE TRUE WHEN FS-AVAIL
         }
         else if (selectionObject.partialExpression() is { } partial)
             ScanConditionTree(partial, new RelationSubject { Operand = subject });     // WHEN = "04"
@@ -124,7 +153,7 @@ internal sealed partial class FlagConformancePass
             // or a level-88 condition-name on a FILE-STATUS item whose VALUE is '04' / '07'.
             var operand = operands[0].valueOperand();
             FileStatusRelation(subject.Operand, operand, comparison);
-            FileStatusConditionName(BareRefName(operand), comparison);
+            FileStatusConditionName(operand, comparison);
         }
     }
 
@@ -133,7 +162,7 @@ internal sealed partial class FlagConformancePass
     private void FileStatusRelation(CobolParserCore.ValueOperandContext? subject,
         CobolParserCore.ValueOperandContext? value, ParserRuleContext site)
     {
-        if (BareRefName(subject) is not { } name || !_fileStatusNames.Contains(name)) return;
+        if (BareItem(subject) is not { } item || !IsFileStatusItem(item)) return;
         switch (OperandLiteral(value))
         {
             case "04": FlagAt(site, FlagOption.Flag14IoStatus04, "a relation testing a FILE STATUS item for '04'"); break;
@@ -141,12 +170,22 @@ internal sealed partial class FlagConformancePass
         }
     }
 
-    private void FileStatusConditionName(string? name, ParserRuleContext site)
+    /// <summary>Flag a reference to a level-88 condition-name whose conditional variable IS a FILE-STATUS item and one
+    /// of whose single VALUEs is '04' / '07' — "a reference … that tests for" the status (a THRU range names none).</summary>
+    private void FileStatusConditionName(CobolParserCore.ValueOperandContext? operand, ParserRuleContext site)
     {
-        if (name is null) return;
-        if (_fileStatus88Is04.Contains(name))
+        if (BareCondition(operand) is not { } condition || !IsFileStatusItem(condition.Parent)) return;
+        bool tests04 = false, tests07 = false;
+        foreach (var (low, high) in condition.Values)
+            if (high is null)   // a singleton VALUE tests for exactly that status
+                switch (StatusLiteral(low))
+                {
+                    case "04": tests04 = true; break;
+                    case "07": tests07 = true; break;
+                }
+        if (tests04)
             FlagAt(site, FlagOption.Flag14IoStatus04, "a reference to a FILE STATUS condition-name that tests for '04'");
-        if (_fileStatus88Is07.Contains(name))
+        if (tests07)
             FlagAt(site, FlagOption.Flag14IoStatus07, "a reference to a FILE STATUS condition-name that tests for '07'");
     }
 
@@ -158,18 +197,36 @@ internal sealed partial class FlagConformancePass
         Flag(option, site.Start.Line, where);
     }
 
-    /// <summary>The base data-name when the operand is a SOLE data reference (the canonical
+    /// <summary>The data item a SOLE data reference operand resolves to in the current unit's scope (the canonical
     /// <see cref="ConditionBinder.SoleDataRef"/> unwrap — non-null only when the arithmetic operand is a lone
-    /// reference, not an expression), else null.</summary>
-    private static string? BareRefName(CobolParserCore.ValueOperandContext? operand)
+    /// reference, not an expression), else null. Qualifiers are honoured (<c>FS OF G1</c>); subscripts and a
+    /// reference modifier select within the described item and are ignored, as in <see cref="ResolveItem"/>.</summary>
+    private DataItem? BareItem(CobolParserCore.ValueOperandContext? operand)
+        => SoleReference(operand) is { } dref ? ResolveItem(dref) : null;
+
+    /// <summary>The level-88 condition-name a SOLE data reference operand names in the current unit's scope, else
+    /// null — one candidate of <see cref="DataBinder.QualifiedConditionCandidates"/> (the resolution the condition
+    /// binder reads); several is an ambiguity the binder has already refused, so no condition is named.</summary>
+    private Condition88? BareCondition(CobolParserCore.ValueOperandContext? operand)
     {
-        if (operand?.arithmeticExpression() is not { } arithmetic
-            || ConditionBinder.SoleDataRef(arithmetic) is not { } dref) return null;
-        DataReferenceCst r = dref;
-        return r.Register == SpecialRegister.None ? r.BaseName : null;
+        if (_currentData is null || SoleReference(operand) is not { } dref
+            || dref.cobolWord()?.GetText() is not { } name) return null;
+        return _currentData.QualifiedConditionCandidates(name, ConditionBinder.QualifiersOf(dref), _currentData.ActiveScope)
+            is [var only] ? only : null;
     }
 
-    /// <summary>The stripped text of a SOLE nonnumeric string-literal operand (§8.3.3.2), else null.</summary>
+    private static CobolParserCore.DataReferenceContext? SoleReference(CobolParserCore.ValueOperandContext? operand)
+        => operand?.arithmeticExpression() is { } arithmetic ? ConditionBinder.SoleDataRef(arithmetic) : null;
+
+    /// <summary>The VALUE of a SOLE alphanumeric (plain or hexadecimal) or national literal operand (§8.3.3.2, §8.3.3.5) —
+    /// decoded once, by the one literal decoder — else null.</summary>
     private static string? OperandLiteral(CobolParserCore.ValueOperandContext? operand)
-        => operand?.nonNumericLiteral()?.STRINGLIT() is { } literal ? StripLiteral(literal.GetText()) : null;
+        => operand?.nonNumericLiteral() is { } literal && CharacterLiteralText(literal) is { } text ? StatusLiteral(text) : null;
+
+    /// <summary>The character value of a raw alphanumeric or national literal operand (a relation's or a level-88's), else
+    /// null: <see cref="CobolLiteral.Decode"/> keeps only what §8.3.3.2.4 GR1 keeps (the delimiters are not part of the
+    /// value) and what §8.3.3.2.3 SR3 / §8.3.3.5.3 SR3 say (a doubled delimiter is one character), and decodes
+    /// the hexadecimal form (§8.3.3.2.4 GR4).</summary>
+    private static string? StatusLiteral(string raw)
+        => CobolLiteral.ClassOf(raw) is LiteralClass.Alphanumeric or LiteralClass.National ? CobolLiteral.Decode(raw) : null;
 }
