@@ -100,8 +100,17 @@ THRU composition come out right with no special case: an empty procedure-name-1'
 continues past it, and an empty procedure-name-2's `End` is the last pc before it. `Through` marks the composition
 empty only when BOTH endpoints are empty and nothing lies between them.
 
+**The lexical span is STORED too (kb/Work PB3254).** The `(Start, End)` pair is the RETURN-ADDRESS pair, so a
+composed THRU forgets the far end of each operand: `INPUT PROCEDURE IS S-B THRU S-A` over SECTIONS with S-A (A1, A2)
+physically before S-B (B1, B2, B3) is `(B1, A2)`, and the interval `min..max` of that pair, `A2..B1`, is not the
+procedure (GR4: every statement from the first of procedure-name-1 to the last of procedure-name-2; GR6: any physical
+order). `PcRange` therefore carries `SpanLow`/`SpanHigh` as fields — each constructor sets them from the operand's
+own extent (an empty range is the gap `(s, s-1)`), `Through` takes the hull of both operands' — and `Spans` /
+`SpannedPcs` read them, so SR3's ban, the MERGE/COMMIT/ROLLBACK arms and `ProcedureReach.Closure`'s seeds all see the
+whole text of the procedure in whichever order the two names stand.
+
 **Drift test.** `ProcedureRangeEmptinessDriftTests` pins all of it: the `(s, s-1)` collision, the eight `Through`
-compositions, `DispatchCall`'s refusal, and two SOURCE scans — no second dispatch-call construction site, and no
+compositions, the ten lexical spans of `Through` (inverted sections, empty operands), `DispatchCall`'s refusal, and two SOURCE scans — no second dispatch-call construction site, and no
 `.Start`-vs-`.End` comparison anywhere in the compiler. Both scans carry positive controls and were proved to fail.
 
 **Rejected alternatives.** A guard bolted onto the THRU branch (`if (start > end) return Nop`) — rejected: it is the
