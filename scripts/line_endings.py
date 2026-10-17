@@ -22,11 +22,11 @@ the attributes — so this check holds the rule, in three arms:
                made before PB3029 is CRLF throughout: `--fix` rewrites it once, then re-states the index entries the
                rewrite made stale (`refresh_index`), so `git status` reads every rewritten file clean.
   WRITERS      every text-mode write in a live Python tool (scripts/, .claude/, conformance-suite/harness/) states
-               `newline=`: Python on Windows otherwise translates each "\\n" to CRLF, so a generator run on Windows leaves a CRLF working tree that
-               the second arm then reports. `--fix-writers` adds `newline="\\n"` mechanically (re-run it after a rebase
-               brings in a new writer). PowerShell and C# writers of tracked files write LF by construction at their
-               few sites (the generators, the test-side regeneration modes); the WORKING TREE arm catches a new one at
-               the next Windows gate.
+               `newline=`: Python on Windows otherwise translates each "\\n" to CRLF, so a generator run on Windows
+               leaves a CRLF working tree that the second arm then reports. `--fix-writers` adds `newline="\\n"`
+               mechanically (re-run it after a rebase brings in a new writer). PowerShell and C# writers of tracked
+               files write LF by construction at their few sites (the generators, the test-side regeneration modes);
+               the WORKING TREE arm catches a new one at the next Windows gate.
 
 Explicitly byte-exact files are exempt from every arm: the pinned Unicode/CLDR inputs (content-addressed by SHA-256)
 and a conformance fixture whose lone CRs are its subject.
