@@ -99,6 +99,8 @@ CobolNet.Runtime.OdoTail.PositionsPerCharacter.get -> int
 CobolNet.Runtime.OdoTail.PositionsPerCharacter.init -> void
 CobolNet.Runtime.OdoTail.RecordMaxUnits.get -> int
 CobolNet.Runtime.OdoTail.RecordUnit.get -> int
+CobolNet.Runtime.OdoTail.Trailing.get -> int
+CobolNet.Runtime.OdoTail.Trailing.init -> void
 static CobolNet.Runtime.CobolVarGroup.Overlay(CobolNet.Runtime.CobolVarGroup! current, CobolNet.Runtime.CobolVarGroup! view, CobolNet.Runtime.GroupAtom![]! currentShape, CobolNet.Runtime.GroupAtom![]! viewShape, CobolNet.Runtime.ReceivingReferences? received) -> CobolNet.Runtime.CobolVarGroup!
 static CobolNet.Runtime.UniversalGroupCarrier.WriteBackFixed(object? box, CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal, string! image, CobolNet.Runtime.ReceivingReferences? received) -> object!
 static CobolNet.Runtime.UniversalGroupCarrier.WriteBackVariable(object? box, CobolNet.Runtime.ActivationDescription! argument, CobolNet.Runtime.ActivationDescription! formal, CobolNet.Runtime.CobolVarGroup! carrier, CobolNet.Runtime.ReceivingReferences? received) -> object!

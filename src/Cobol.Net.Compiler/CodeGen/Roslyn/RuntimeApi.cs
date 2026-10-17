@@ -1241,20 +1241,21 @@ internal static class RuntimeApi
     public static string TableOdoExtent(string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtent)}({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits})";
 
-    /// <summary>The same extent where the LAST occurrence's <paramref name="trailingUnits"/> of filler (an ALIGNED bit
-    /// table's, §13.18.1.4 GR2) is not counted — <c>CobolTable.OdoExtentTrimmed</c>, the extent in POSITIONS the bit
+    /// <summary>The same extent where the LAST occurrence's <paramref name="trailingUnits"/> of filler (a bit table's
+    /// with an ALIGNED subject or member, §13.18.1.4 GR2) is not counted — <c>CobolTable.OdoExtentTrimmed</c>, the extent in POSITIONS the bit
     /// channel and FUNCTION LENGTH of a bit group read (kb/Work PB3156).</summary>
     public static string TableOdoExtentTrimmed(string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits,
         int trailingUnits) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtentTrimmed)}({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {trailingUnits})";
 
-    /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand — <see cref="TableOdoExtent"/>
-    /// rounded up to whole characters (<c>CobolTable.OdoExtentChars</c>). Identity when the positions ARE characters,
-    /// so the image channel has ONE arm rather than a units branch (kb/Work PB173).</summary>
+    /// <summary>The current CHARACTER extent of an occurs-depending GROUP operand — <see cref="TableOdoExtentTrimmed"/>
+    /// rounded up to whole characters (<c>CobolTable.OdoExtentChars</c>; the trailing filler is given back before the
+    /// ceiling, kb/Work PB3167). Identity when the positions ARE characters, so the image channel has ONE arm rather
+    /// than a units branch (kb/Work PB173).</summary>
     public static string TableOdoExtentChars(
-        string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits, int positionsPerChar) =>
+        string occ, int minOccurs, int maxOccurs, int fixedUnits, int elemUnits, int trailingUnits, int positionsPerChar) =>
         $"{nameof(CobolTable)}.{nameof(CobolTable.OdoExtentChars)}"
-        + $"({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {positionsPerChar})";
+        + $"({occ}, {minOccurs}, {maxOccurs}, {fixedUnits}, {elemUnits}, {trailingUnits}, {positionsPerChar})";
 
     /// <summary>A table(ALL) intrinsic argument's enumeration (ISO §15.3; kb/Work PB62) — <c>CobolTable.AllArgs&lt;T&gt;</c>
     /// over one range lambda per ALL level (each <c>Func&lt;long[], long&gt;</c>, the index vector in) and the element
@@ -2397,11 +2398,13 @@ internal static class RuntimeApi
     /// <summary>The OCCURS DEPENDING table a variable-length group holds as its trailing storage (<c>OdoTail</c>,
     /// kb/Work PB244, PB2497), as the argument of the cell's group helpers and of a record layout; <c>default</c> for
     /// a group that holds none. <paramref name="odo"/> is the table's element width, maximum count and components per
-    /// occurrence (zero when absent), and for a table counted in bits its lead bits and unit (kb/Work PB3030).</summary>
+    /// occurrence (zero when absent), and for a table counted in bits its lead bits, unit and the last occurrence's
+    /// trailing filler (kb/Work PB3030, PB3167 review R1-1).</summary>
     private static string OdoTailOf(OdoTail odo) =>
         odo.Max <= 0 ? "default"
-        : odo.PositionsPerCharacter <= 1 ?$"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})"
-        : $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps}, {odo.Lead}, {odo.PositionsPerCharacter})";
+        : odo.PositionsPerCharacter <= 1 ? $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps})"
+        : $"new {nameof(OdoTail)}({odo.Elem}, {odo.Max}, {odo.Comps}, {odo.Lead}, {odo.PositionsPerCharacter}"
+          + (odo.Trailing == 0 ? ")" : $", {odo.Trailing})");
 
     /// <summary>How many trailing characters of a member's maximum image lie beyond <paramref name="countExpr"/>
     /// occurrences of its OCCURS DEPENDING table — <c>OdoTail.CutAt</c> (kb/Work PB3030).</summary>
