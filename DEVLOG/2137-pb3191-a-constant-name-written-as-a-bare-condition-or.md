@@ -1,4 +1,4 @@
-## PB3191: a constant-name written as a bare condition or boolean operand is its literal, not an undefined name
+## Entry 2137 — 2026-10-16 20:58 PDT — PB3191: a constant-name written as a bare condition or boolean operand is its literal, not an undefined name
 
 kb/Work PB3191 reported that `01 K CONSTANT AS 0.` then `IF K` was refused COBOLNET1639 "'K' is not defined",
 a false message, and left open whether §8.8.4.3.3 SR1 admits a boolean constant-name as a condition.
@@ -41,3 +41,4 @@ forms, expected values derived from §8.8.2/§8.8.4.3. Negatives `pb3191-numeric
 `negative/pb3153-method-constant-hides-object-condition-name` expected COBOLNET1639 for `IF X` over a method-local
 `01 X CONSTANT AS 7`, the very message this note reports as false (X is declared). Its expectation is now
 COBOLNET2318 and its header says why; a sweep of every negative that expects 1639 beside a CONSTANT entry found no other.
+
