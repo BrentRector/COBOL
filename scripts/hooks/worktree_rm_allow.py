@@ -27,7 +27,6 @@ A deny from `forbidden_commands.py` still wins over this allow. Self-test: scrip
 import json
 import os
 import pathlib
-import shlex
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
@@ -40,6 +39,12 @@ ALLOWED_OPTIONS = {"-r", "-q", "--quiet", "--cached", "--"}
 
 def _norm(p: str) -> str:
     return p.strip("\"'").replace("\\", "/")
+
+
+def _drive_relative(p: str) -> bool:
+    """`E:x`: a drive with no root, relative to that drive's own current directory, which this hook cannot know (Bash
+    turns an unquoted `E:\\x` into `E:x`): never covered."""
+    return bool(pathlib.PureWindowsPath(p).drive) and not shell_location.is_absolute(p)
 
 
 def _under(path: pathlib.Path, root: pathlib.Path) -> bool:
@@ -60,35 +65,30 @@ def decide(command: str, cwd: str, shell: str = shell_location.BASH) -> str | No
     if any(s.depth for s in steps) or not steps or steps[-1].sep:
         return None
     if len(steps) == 2 and steps[0].location and steps[0].sep == "&&":
-        git_cmd, here = steps[1].text, steps[1].cwd
+        step = steps[1]
     elif len(steps) == 1:
-        git_cmd, here = steps[0].text, steps[0].cwd
+        step = steps[0]
     else:
         return None
-    if here is None:
+    # A substitution (`$(...)`, a backquote, `<(...)`, PowerShell's `$(...)`), a redirect or a heredoc runs, writes or
+    # reads before git sees its argv, and an allow covers the whole call: none is ever covered (train 1039b review).
+    if step.cwd is None or step.heredocs or any(ch in step.text for ch in ("$", "`", "<", ">")):
         return None
-    # A substitution (`$(...)`, a backquote, `<(...)`, PowerShell's `$(...)`) or a redirect runs, or writes, before git
-    # sees its argv, and an allow covers the whole call: none is ever covered (train 1039b review).
-    if any(ch in git_cmd for ch in ("$", "`", "<", ">")):
+    # git's argv is the shared parser's words of the step (kb/Work PB3198: one model of the command line, never a second
+    # splitter): quotes removed as the shell removes them, so the paths judged are the paths git receives.
+    # Its git invocation is `git_calls`' reading (the same one every guard rule reads): the step must BE that call, and
+    # its only global options `-C <dir>` (any other, `-c`, `--git-dir`, `--work-tree`, changes what `rm` acts on).
+    calls = shell_location.git_calls(step)
+    if (not step.words or step.words[0] not in ("git", "git.exe") or len(calls) != 1 or calls[0].subcommand != "rm"
+            or calls[0].cwd is None):
         return None
-    base = pathlib.Path(_norm(here))
-    try:
-        argv = shlex.split(git_cmd.replace("\\", "/"), posix=True)
-    except ValueError:
+    call = calls[0]
+    flags, dirs = call.options[0::2], call.options[1::2]
+    if len(flags) != len(dirs) or any(f != "-C" for f in flags) or any(_drive_relative(_norm(d)) for d in dirs):
         return None
-    if not argv or argv[0] not in ("git", "git.exe"):
-        return None
-    i = 1
-    if i < len(argv) and argv[i] == "-C":
-        if i + 1 >= len(argv):
-            return None
-        target = argv[i + 1]
-        base = pathlib.Path(target) if shell_location.is_absolute(target) else base / target
-        i += 2
-    if i >= len(argv) or argv[i] != "rm":
-        return None
+    base = pathlib.Path(_norm(call.cwd))
     opts, paths = [], []
-    for a in argv[i + 1:]:
+    for a in (_norm(w) for w in call.args):
         (opts if a.startswith("-") and a != "--" or a == "--" else paths).append(a)
     if not paths or any(o not in ALLOWED_OPTIONS for o in opts) or "-r" not in opts:
         return None
@@ -97,6 +97,8 @@ def decide(command: str, cwd: str, shell: str = shell_location.BASH) -> str | No
         return None
     worktree = WORKTREES / base.relative_to(WORKTREES).parts[0]
     for p in paths:
+        if _drive_relative(p):
+            return None
         if shell_location.is_absolute(p):
             if not _under(pathlib.Path(p), worktree):
                 return None
